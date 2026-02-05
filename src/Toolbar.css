@@ -1,0 +1,15 @@
+.toolbar-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+  align-items: center;
+  justify-content: center;
+}

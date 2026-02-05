@@ -1,0 +1,379 @@
+.tiptap {
+  white-space: pre-wrap;
+  tab-size: 4;
+}
+
+.editor-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar {
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 100px;
+  max-width: 500px;
+
+  border-left: 1px solid #444;
+  border-right: 1px solid #444;
+  border-radius: 16px;
+  padding: 8px;
+  margin-bottom: 10px;
+
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.sidebar-content {
+  padding: 10px;
+  overflow-y: auto;
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.right-sidebar {
+  padding: 10px;
+}
+
+.resizer {
+  position: absolute;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+.resizer:hover {
+  background: rgba(31, 119, 180, 0.5);
+}
+
+.resizer-right {
+  right: -2px;
+}
+
+.resizer-left {
+  left: -2px;
+}
+
+.sidebar-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #333;
+  background: #1a1a1a;
+  padding: 4px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+
+.sidebar-tabs button {
+  flex: 1;
+  padding: 6px;
+  font-size: 11px;
+  cursor: pointer;
+
+  background: transparent;
+  color: #888;
+  border: none;
+  border-radius: 6px;
+
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.sidebar-tabs button:hover {
+  background: #2a2a2a;
+  color: #ddd;
+}
+
+.sidebar-tabs button.active {
+  background: #333;
+  color: #fff;
+}
+
+.workbench {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.analysis-tile,
+.tile {
+  background: var(--tile-color);
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  position: relative;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.analysis-tile span {
+  display: inline-block;
+  transition: all 0.2s;
+}
+
+.analysis-tile:hover {
+  background: #333 !important;
+}
+
+.tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 6px;
+
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tile-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.tile button,
+.clear-btn {
+  background: #1f1f1f;
+  border: 1px solid #444;
+  color: #ddd;
+
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tile button:hover,
+.clear-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+.middle-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editor-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+
+}
+
+.editor-wrapper {
+  width: 100%;
+  max-width: 800px;
+  padding: 40px;
+}
+
+.editor {
+  outline: none;
+  font-size: 18px;
+  line-height: 1.6;
+  max-width: 800px;
+  padding-left: 40px;
+  padding-right: 40px;
+
+  min-height: 100px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.editor p {
+  min-height: 1.6em;
+  margin: 0;
+}
+
+/* Optional: make sure caret is visible at top-left in empty document */
+.editor:empty::before {
+  content: "\200B"; /* zero-width space forces a place to type */
+  display: block;
+  height: 1.6em;
+  color: transparent;
+}
+
+
+.editor *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: #007aff;
+  border-radius: 50%;
+  margin-left: 2px;
+  cursor: pointer;
+  vertical-align: super;
+
+  border: 0.1px solid #444;
+  box-shadow: none;
+  transition: transform 0.2s;
+}
+
+.note-dot:hover {
+  transform: scale(1.5);
+  background-color: #fff;
+}
+
+.note-anchor {
+  border-bottom: 1px dashed #555;
+}
+
+.note-tile {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  position: relative;
+  cursor: pointer;
+}
+
+.note-tile:hover {
+  background: #333;
+}
+
+.note-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.note-delete:hover {
+  color: #fff;
+}
+
+.note-anchor-label {
+  font-size: 11px;
+  color: #007aff;
+  font-weight: bold;
+  margin-bottom: 6px;
+  border-left: 2px solid #007aff;
+  padding-left: 8px;
+}
+
+.note-textarea {
+  width: 100%;
+  background: none;
+  border: none;
+  color: #eee;
+  padding: 0;
+  font-size: 13px;
+  outline: none;
+
+  resize: none;
+  overflow: hidden;
+
+  line-height: 1.4;
+  max-height: calc(1.4em * 10);
+}
+
+.note-textarea.expanded {
+  max-height: none;
+}
+
+
+.note-timestamp {
+  font-size: 9px;
+  color: #555;
+  margin-top: 6px;
+  text-align: right;
+}
+
+.panel-header {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.editor ul,
+.editor ol {
+  padding-left: 1.5em;
+}
+
+.editor li {
+  margin: 4px 0;
+}
+
+.editor li > p {
+  margin: 0;
+}
+
+.editor-container.split-active {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Two equal columns */
+  gap: 10px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pane {
+  height: 100%;
+  overflow-y: auto;
+  background: white;
+}
+
+.secondary-pane {
+  border-left: 2px solid #eaeaea;
+  position: relative;
+}
+
+.split-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #999;
+  padding: 5px;
+  background: #f9f9f9;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+}
+
+/* Ensure the Tiptap editor doesn't break layout */
+.editor {
+  min-height: 100%;
+}
+
+:root {
+  --tile-color: #2b2b2b;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --tile-color: rgb(246, 246, 246);
+  }
+}
