@@ -13,3 +13,8 @@
   align-items: center;
   justify-content: center;
 }
+
+.toolbar button.active {
+  background-color: #007aff;
+  color: white;
+}

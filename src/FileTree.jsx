@@ -18,7 +18,7 @@ export default function FileTree({ projectName, currentDoc, onSelectDoc }) {
       await saveDocument(projectName, newName, { type: 'doc', content: [] });
       setNewName('');
       setIsAdding(false);
-      await refreshFiles();
+      await refreshFiles?.();
       onSelectDoc(newName);
     }
   };

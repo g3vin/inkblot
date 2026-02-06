@@ -26,8 +26,7 @@
   min-width: 100px;
   max-width: 500px;
 
-  border-left: 1px solid #444;
-  border-right: 1px solid #444;
+  border: 1px solid #444;
   border-radius: 16px;
   padding: 8px;
   margin-bottom: 10px;
@@ -51,14 +50,14 @@
 .resizer {
   position: absolute;
   top: 0;
-  width: 5px;
+  width: 3px;
   height: 100%;
   cursor: col-resize;
   z-index: 10;
 }
 
 .resizer:hover {
-  background: rgba(31, 119, 180, 0.5);
+  background: rgba(31, 118, 180, 0.377);
 }
 
 .resizer-right {
@@ -72,8 +71,8 @@
 .sidebar-tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid #333;
-  background: #1a1a1a;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--tile-color);
   padding: 4px;
   margin-bottom: 8px;
   border-radius: 8px;
@@ -258,6 +257,7 @@
   margin-bottom: 12px;
   position: relative;
   cursor: pointer;
+  background: var(--tile-color);
 }
 
 .note-tile:hover {
@@ -336,7 +336,7 @@
 
 .editor-container.split-active {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* Two equal columns */
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
   height: 100%;
   overflow: hidden;
@@ -345,7 +345,6 @@
 .pane {
   height: 100%;
   overflow-y: auto;
-  background: white;
 }
 
 .secondary-pane {
@@ -363,13 +362,12 @@
   border-bottom: 1px solid #eee;
 }
 
-/* Ensure the Tiptap editor doesn't break layout */
 .editor {
   min-height: 100%;
 }
 
 :root {
-  --tile-color: #2b2b2b;
+  --tile-color: #0d0d0d;
 }
 
 @media (prefers-color-scheme: light) {
