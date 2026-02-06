@@ -7,6 +7,8 @@ export default function LeftSidebar({
   currentDoc,
   setCurrentDoc,
   debouncedSave,
+  refreshFiles,   // ✅ new
+  onSelectDoc,
 }) {
   return (
     <aside className="sidebar" style={{ width }}>
@@ -18,6 +20,7 @@ export default function LeftSidebar({
             debouncedSave?.flush?.()
             setCurrentDoc(doc)
           }}
+          refreshFiles={refreshFiles}
         />
       </div>
       <div className="resizer resizer-right" onMouseDown={onResize} />

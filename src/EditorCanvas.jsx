@@ -8,6 +8,9 @@ import { CustomTextStyle } from './extensions/CustomTextStyle'
 import { NoteAnnotation } from './extensions/NoteAnnotation'
 import TabIndent from './extensions/TabIndent'
 import { debounce } from 'lodash'
+import { TextAlign } from '@tiptap/extension-text-align'
+import {Highlight} from '@tiptap/extension-highlight'
+
 // dynamic import of Tauri window API (avoids bundler/export issues)
 
 export default function EditorCanvas({
@@ -22,6 +25,8 @@ export default function EditorCanvas({
   splitView,       // 'editor' | null
   setSplitView,
   secondaryDoc,
+  refreshFiles,   // ✅ add this
+  onSelectDoc,
 }) {
   /* ---------- Editors ---------- */
 
@@ -36,6 +41,12 @@ export default function EditorCanvas({
       FontFamily,
       NoteAnnotation,
       TabIndent,
+      TextAlign.configure({
+      types: ['heading', 'paragraph'],
+    }),
+    Highlight.configure({
+      multicolor: true,
+    }),
     ],
     content: '',
   })
@@ -51,6 +62,12 @@ export default function EditorCanvas({
       FontFamily,
       NoteAnnotation,
       TabIndent,
+      TextAlign.configure({
+      types: ['heading', 'paragraph'],
+    }),
+        Highlight.configure({
+      multicolor: true,
+    }),
     ],
     content: '',
   })

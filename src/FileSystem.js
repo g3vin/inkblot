@@ -1,11 +1,53 @@
-import { 
-  writeTextFile, 
-  readTextFile, 
-  BaseDirectory, 
-  mkdir, 
-  exists, 
-  readDir
-} from '@tauri-apps/plugin-fs';
+import {
+  writeTextFile,
+  readTextFile,
+  BaseDirectory,
+  mkdir,
+  exists,
+  readDir,
+  rename,
+  remove,
+} from '@tauri-apps/plugin-fs'
+
+// --- existing saveDocument, loadDocument, listFiles stay the same ---
+
+/**
+ * Deletes a document file from the project folder.
+ */
+export async function deleteFile(projectName, docName) {
+  try {
+    const filePath = `${projectName}/${docName}.json`
+    const fileExists = await exists(filePath, { baseDir: BaseDirectory.AppData })
+    if (!fileExists) return
+
+    await remove(filePath, { baseDir: BaseDirectory.AppData })
+    console.log(`Deleted file: ${filePath}`)
+  } catch (error) {
+    console.error('Failed to delete file:', error)
+  }
+}
+
+/**
+ * Renames a document file within the project folder.
+ */
+export async function renameFile(projectName, oldName, newName) {
+  try {
+    const oldPath = `${projectName}/${oldName}.json`
+    const newPath = `${projectName}/${newName}.json`
+
+    const fileExists = await exists(oldPath, { baseDir: BaseDirectory.AppData })
+    if (!fileExists) {
+      console.warn(`File not found: ${oldPath}`)
+      return
+    }
+
+    await rename(oldPath, newPath, { baseDir: BaseDirectory.AppData })
+    console.log(`Renamed file: ${oldName} → ${newName}`)
+  } catch (error) {
+    console.error('Failed to rename file:', error)
+  }
+}
+
 
 export async function saveDocument(projectName, docName, content) {
   try {
