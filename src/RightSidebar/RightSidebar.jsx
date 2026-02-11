@@ -18,7 +18,7 @@ export default function RightSidebar({
 }) {
   
   return (
-    <aside className="sidebar" style={{ width }}>
+    <aside className="sidebar right-sidebar" style={{ width }}>
       <div className="resizer resizer-left" onMouseDown={onResize} />
 
       <SidebarTabs
@@ -30,19 +30,19 @@ export default function RightSidebar({
         {sidebarTab === 'workbench' ? (
           <Workbench tiles={tiles} setTiles={setTiles} editor={editor} />
         ) : sidebarTab === 'notes' ? (
-          <NotesPanel notes={notes} setNotes={setNotes} jumpToText={(text) => {
-            if (!editor) return
-            let foundPos = -1
-            editor.state.doc.descendants((node, pos) => {
-              if (node.isText && node.text.includes(text)) {
-                foundPos = pos + node.text.indexOf(text)
-                return false
-              }
-            })
-            if (foundPos !== -1) {
-              editor.chain().focus().setTextSelection({ from: foundPos, to: foundPos + text.length }).scrollIntoView().run()
-            }
-          }} />
+          <NotesPanel notes={notes} setNotes={setNotes} jumpToText={(note) => {
+              if (!editor || note.type !== 'quote') return
+
+              editor
+                .chain()
+                .focus()
+                .setTextSelection({ from: note.from, to: note.to })
+                .scrollIntoView()
+                .run()
+            }}
+
+        
+         />
         ) : (
           <HistoryPanel versions={versions} setVersions={setVersions} editor={editor} />
         )}

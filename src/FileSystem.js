@@ -49,20 +49,23 @@ export async function renameFile(projectName, oldName, newName) {
 }
 
 
-export async function saveDocument(projectName, docName, content) {
+export async function saveDocument(projectName, docName, docData) {
   try {
-    const dir = projectName;
-    const filePath = `${projectName}/${docName}.json`;
+    const dir = projectName
+    const filePath = `${projectName}/${docName}.json`
 
-    // Ensure directory exists
-    await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
+    await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true })
 
-    await writeTextFile(filePath, JSON.stringify(content), {
-      baseDir: BaseDirectory.AppData,
-    });
-    console.log('Document saved successfully');
+    await writeTextFile(
+      filePath,
+      JSON.stringify({
+        content: docData.content || [],
+        notes: docData.notes || [],
+      }),
+      { baseDir: BaseDirectory.AppData }
+    )
   } catch (error) {
-    console.error('Failed to save document:', error);
+    console.error('Failed to save document:', error)
   }
 }
 
@@ -71,18 +74,21 @@ export async function saveDocument(projectName, docName, content) {
  */
 export async function loadDocument(projectName, docName) {
   try {
-    const filePath = `${projectName}/${docName}.json`;
+    const filePath = `${projectName}/${docName}.json`
 
-    const fileExists = await exists(filePath, { baseDir: BaseDirectory.AppData });
-    if (!fileExists) return null;
+    const fileExists = await exists(filePath, {
+      baseDir: BaseDirectory.AppData,
+    })
+    if (!fileExists) return null
 
     const contents = await readTextFile(filePath, {
       baseDir: BaseDirectory.AppData,
-    });
-    return JSON.parse(contents);
+    })
+
+    return JSON.parse(contents)
   } catch (error) {
-    console.error('Failed to load document:', error);
-    return null;
+    console.error('Failed to load document:', error)
+    return null
   }
 }
 
@@ -92,7 +98,10 @@ export async function listFiles(projectName) {
     // Filter for files and remove the .json extension for the UI
     return entries
       .filter(e => e.isFile)
-      .map(e => e.name.replace('.json', ''));
+      .map(e => e.name)
+      .filter(name => name && !name.startsWith('.'))
+      .filter(name => name.endsWith('.json'))
+      .map(name => name.replace('.json', ''));
   } catch (e) {
     console.error("List files failed:", e);
     return [];

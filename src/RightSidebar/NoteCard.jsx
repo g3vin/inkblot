@@ -22,7 +22,7 @@ export default function NoteCard({
     <div
       id={`note-${note.id}`}
       className="note-tile"
-      onClick={onJump}
+      onClick={note.type === 'quote' ? onJump : undefined}
     >
       <button
         className="note-delete"
@@ -34,9 +34,12 @@ export default function NoteCard({
         ×
       </button>
 
-      <div className="note-anchor-label">
-        "{note.anchor}"
-      </div>
+      {note.type === 'quote' && (
+        <div className="note-anchor-label">
+          "{note.anchor}"
+        </div>
+      )}
+
 
       <textarea
         ref={textareaRef}
