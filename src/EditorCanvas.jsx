@@ -1,34 +1,32 @@
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 import { Color } from '@tiptap/extension-color'
 import { FontFamily } from '@tiptap/extension-font-family'
+import { TextAlign } from '@tiptap/extension-text-align'
+import { Highlight } from '@tiptap/extension-highlight'
+import { debounce } from 'lodash'
+
 import Toolbar from './Toolbar'
 import { CustomTextStyle } from './extensions/CustomTextStyle'
 import { NoteAnnotation } from './extensions/NoteAnnotation'
 import TabIndent from './extensions/TabIndent'
-import { debounce } from 'lodash'
-import { TextAlign } from '@tiptap/extension-text-align'
-import {Highlight} from '@tiptap/extension-highlight'
-
-// dynamic import of Tauri window API (avoids bundler/export issues)
+import { saveDocument, loadDocument } from './FileSystem'
 
 export default function EditorCanvas({
   setEditor,
-  notes,
-  debouncedSave,
-  loadDocument,
   projectName,
   currentDoc,
-  versions,
-  setVersions,
-  splitView,       // 'editor' | null
+  splitView,
   setSplitView,
   secondaryDoc,
-  refreshFiles,   // ✅ add this
-  onSelectDoc,
+  notes,
+  setNotes,
 }) {
-  /* ---------- Editors ---------- */
+
+  const [, forceNoteRender] = useState(0)
+
+  /* ---------------- Primary Editor ---------------- */
 
   const editor = useEditor({
     extensions: [
@@ -42,129 +40,162 @@ export default function EditorCanvas({
       NoteAnnotation,
       TabIndent,
       TextAlign.configure({
-      types: ['heading', 'paragraph'],
-    }),
-    Highlight.configure({
-      multicolor: true,
-    }),
+        types: ['heading', 'paragraph'],
+      }),
+      Highlight.configure({
+        multicolor: true,
+      }),
     ],
     content: '',
   })
+
+  /* ---------------- Secondary Editor ---------------- */
 
   const secondaryEditor = useEditor({
     extensions: [
-      StarterKit.configure({
-        bulletList: { keepMarks: true },
-        orderedList: { keepMarks: true },
-      }),
+      StarterKit,
       CustomTextStyle,
       Color,
       FontFamily,
-      NoteAnnotation,
       TabIndent,
       TextAlign.configure({
-      types: ['heading', 'paragraph'],
-    }),
-        Highlight.configure({
-      multicolor: true,
-    }),
+        types: ['heading', 'paragraph'],
+      }),
+      Highlight.configure({ multicolor: true }),
     ],
     content: '',
   })
 
-  const lastSavedText = useRef('')
-
-  /* ---------- Close Pinterest when app closes ---------- */
-
-  useEffect(() => {
-    let cleanup = null
-    ;(async () => {
-      try {
-          const mod = await import('@tauri-apps/api/window')
-          const getWindow = mod.getWindow
-          const getCurrent = mod.getCurrent
-
-          if (typeof getCurrent === 'function') {
-            const unlisten = getCurrent().onCloseRequested(async () => {
-              const pinterest = typeof getWindow === 'function' ? getWindow('pinterest') : null
-              await pinterest?.close()
-            })
-            cleanup = () => Promise.resolve(unlisten).then(f => f && f())
-          } else if (typeof getWindow === 'function') {
-            // Fallback: use browser unload to attempt closing pinterest webview
-            const handler = async () => {
-              const pinterest = getWindow('pinterest')
-              await pinterest?.close()
-            }
-            window.addEventListener('beforeunload', handler)
-            cleanup = () => window.removeEventListener('beforeunload', handler)
-          }
-        } catch (err) {
-          // ignore if Tauri window API is not available in this environment
-          console.warn('Tauri window API not available:', err)
-        }
-    })()
-
-    return () => {
-      if (cleanup) cleanup()
-    }
-  }, [])
-
-  /* ---------- Editor Wiring ---------- */
+  /* ---------------- Expose Editor ---------------- */
 
   useEffect(() => {
     if (editor) setEditor(editor)
   }, [editor, setEditor])
 
-  useEffect(() => {
-    if (!editor) return
-    loadDocument(projectName, currentDoc).then(doc =>
-      editor.commands.setContent(doc || '<p></p>')
-    )
-  }, [editor, currentDoc, projectName, loadDocument])
+  /* ---------------- Load Primary Doc ---------------- */
 
   useEffect(() => {
-    if (!secondaryEditor || splitView !== 'editor') return
-    loadDocument(projectName, secondaryDoc).then(doc =>
-      secondaryEditor.commands.setContent(doc || '<p></p>')
-    )
-  }, [secondaryEditor, secondaryDoc, splitView, loadDocument])
+    if (!editor || !currentDoc) return
 
-  useEffect(() => {
-    if (!editor) return
-    editor.storage.noteAnnotation.notes = notes
-    editor.view.dispatch(editor.state.tr)
-  }, [notes, editor])
+    const load = async () => {
+      const doc = await loadDocument(projectName, currentDoc)
 
-  /* ---------- Autosave ---------- */
+      if (!doc) {
+        editor.commands.setContent('<p></p>')
+        setNotes([])
+        return
+      }
 
-  const saveVersionDebounced = useCallback(
-    debounce(() => {
-      if (!editor) return
-      const text = editor.getText()
-      if (text === lastSavedText.current) return
-
-      setVersions(prev => [
-        { timestamp: new Date().toLocaleTimeString(), content: editor.getHTML() },
-        ...prev.slice(0, 49),
-      ])
-
-      lastSavedText.current = text
-    }, 10000),
-    [editor, setVersions]
-  )
-
-  useEffect(() => {
-    if (!editor) return
-    const handler = () => {
-      debouncedSave(editor.getJSON())
-      saveVersionDebounced()
+      editor.commands.setContent(doc.content || '<p></p>')
+      setNotes(doc.notes || [])
     }
-    editor.on('update', handler)
-    return () => editor.off('update', handler)
-  }, [editor, debouncedSave, saveVersionDebounced])
 
-  /* ---------- Render ---------- */
+    load()
+  }, [editor, currentDoc, projectName, setNotes])
+
+  /* ---------------- Load Secondary Doc ---------------- */
+
+  useEffect(() => {
+    if (!secondaryEditor || splitView !== 'editor' || !secondaryDoc) return
+
+    const load = async () => {
+      const doc = await loadDocument(projectName, secondaryDoc)
+
+      if (!doc) {
+        secondaryEditor.commands.setContent('<p></p>')
+        return
+      }
+
+      secondaryEditor.commands.setContent(doc.content || '<p></p>')
+    }
+
+    load()
+  }, [secondaryEditor, secondaryDoc, splitView, projectName])
+
+  /* ---------------- Sync Notes → Editor Storage ---------------- */
+
+  useEffect(() => {
+    if (!editor) return
+    editor.storage.noteAnnotation.notes = notes || []
+    forceNoteRender(v => v + 1)
+  }, [editor, notes])
+
+  /* ---------------- Autosave ---------------- */
+
+  useEffect(() => {
+    if (!editor || !currentDoc) return
+
+    const handler = debounce(async () => {
+      await saveDocument(projectName, currentDoc, {
+        content: editor.getJSON(),
+        notes: notes || [],
+      })
+    }, 800)
+
+    editor.on('update', handler)
+
+    return () => {
+      editor.off('update', handler)
+      handler.cancel()
+    }
+  }, [editor, currentDoc, projectName, notes])
+
+  /* ---------------- Autosave Notes ---------------- */
+
+  useEffect(() => {
+    if (!editor || !currentDoc) return
+
+    const handler = debounce(async () => {
+      await saveDocument(projectName, currentDoc, {
+        content: editor.getJSON(),
+        notes: notes || [],
+      })
+    }, 800)
+
+    handler()
+
+    return () => {
+      handler.cancel()
+    }
+  }, [editor, currentDoc, projectName, notes])
+
+  /* ---------------- Anchor Remapping ---------------- */
+
+  useEffect(() => {
+    if (!editor) return
+
+    const handler = ({ transaction }) => {
+      if (!transaction.docChanged) return
+
+      const mapping = transaction.mapping
+
+      const updated = (notes || [])
+        .map(note => {
+          if (note.type !== 'quote') return note
+
+          const newFrom = mapping.map(note.from)
+          const newTo = mapping.map(note.to)
+
+          if (newFrom >= newTo) return null
+
+          return {
+            ...note,
+            from: newFrom,
+            to: newTo,
+            anchor: editor.state.doc.textBetween(newFrom, newTo),
+          }
+        })
+        .filter(Boolean)
+
+      setNotes(updated)
+    }
+
+    editor.on('transaction', handler)
+    return () => editor.off('transaction', handler)
+
+  }, [editor, notes, setNotes])
+
+  /* ---------------- Render ---------------- */
 
   return (
     <div className="middle-section">
@@ -178,13 +209,13 @@ export default function EditorCanvas({
 
       <div className={`editor-container ${splitView ? 'split-active' : ''}`}>
 
-        {/* LEFT: Primary Editor */}
         <div className="pane primary-pane">
-          <div className="pane-header">Editing: {currentDoc}</div>
+          <div className="pane-header">
+            Editing: {currentDoc}
+          </div>
           <EditorContent editor={editor} className="editor" />
         </div>
 
-        {/* RIGHT: Secondary Editor (only split mode now) */}
         {splitView === 'editor' && (
           <div className="pane secondary-pane">
             <div className="pane-header split-header">
@@ -194,7 +225,6 @@ export default function EditorCanvas({
             <EditorContent editor={secondaryEditor} className="editor" />
           </div>
         )}
-
       </div>
     </div>
   )

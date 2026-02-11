@@ -14,6 +14,20 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root[data-theme='light'] {
+  color-scheme: light;
+  color: #213547;
+  background-color: #ffffff;
+  --tile-color: rgb(246, 246, 246);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #000000;
+  --tile-color: #0d0d0d;
+}
+
 a {
   font-weight: 500;
   color: #646cff;

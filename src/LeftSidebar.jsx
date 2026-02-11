@@ -11,7 +11,7 @@ export default function LeftSidebar({
   onSelectDoc,
 }) {
   return (
-    <aside className="sidebar" style={{ width }}>
+    <aside className="sidebar left-sidebar" style={{ width }}>
       <div className="sidebar-content">
         <FileTree
           projectName={projectName}
