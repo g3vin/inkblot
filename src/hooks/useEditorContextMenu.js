@@ -204,19 +204,26 @@ export function useEditorContextMenu({
             await MenuItem.new({
               text: 'Add to Notes',
               action: () => {
-                setNotes((p) => [
+                const { from, to } = editor.state.selection
+
+                setNotes(p => [
                   {
-                    id: Date.now(),
-                    anchor: text,
+                    id: crypto.randomUUID(),
+                    type: 'quote',
+                    from,
+                    to,
+                    anchor: editor.state.doc.textBetween(from, to),
                     content: '',
                     timestamp: new Date().toLocaleTimeString(),
                   },
                   ...p,
                 ])
+
                 setSidebarTab('notes')
               },
             })
           )
+
 
           items.push(
             await MenuItem.new({
