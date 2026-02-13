@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { appWindow } from '@tauri-apps/api/window'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPinterest } from './openPinterest'
 import Editor from './Editor.jsx'
 
@@ -137,6 +137,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const appWindow = getCurrentWindow()
     const onKeyDown = async (e) => {
       if (e.key !== 'Escape') return
 

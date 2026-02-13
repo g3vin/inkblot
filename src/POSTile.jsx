@@ -9,6 +9,7 @@ export default function POSTile({ sentence, onRemove }) {
     Verb: '#2ca02c',
     Adjective: '#ff7f0e',
     Adverb: '#d62728',
+    Number: '#17becf',
     Pronoun: '#9467bd',
     Determiner: '#8c564b',
     Conjunction: '#e377c2',
@@ -23,6 +24,7 @@ export default function POSTile({ sentence, onRemove }) {
     if (tags.some(t => ['Verb', 'Infinitive', 'PastTense', 'PresentTense', 'Gerund', 'Copula', 'Modal'].includes(t))) return 'Verb'
     if (tags.some(t => ['Adjective', 'Comparative', 'Superlative'].includes(t))) return 'Adjective'
     if (tags.includes('Adverb')) return 'Adverb'
+    if (tags.some(t => ['Value', 'NumericValue', 'Ordinal', 'Cardinal', 'Number'].includes(t))) return 'Number'
     if (tags.includes('Pronoun')) return 'Pronoun'
     if (tags.includes('Determiner')) return 'Determiner'
     if (tags.includes('Conjunction')) return 'Conjunction'
@@ -32,11 +34,14 @@ export default function POSTile({ sentence, onRemove }) {
   }
 
   useEffect(() => {
-    if (!sentence) return
+    if (!sentence) {
+      setAnalysis([])
+      return
+    }
+
     const doc = nlp(sentence)
     const termsJson = doc.terms().json()
 
-    // Map through sentences and terms (handling nesting)
     const result = termsJson.flatMap(s => s.terms).map(item => ({
       text: item.text,
       tag: normalizeTag(item.tags, item.text)
@@ -66,18 +71,18 @@ export default function POSTile({ sentence, onRemove }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
         {analysis.map((word, i) => (
           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ 
-              fontSize: '9px', 
-              color: 'white', 
-              backgroundColor: tagColors[word.tag], 
-              padding: '1px 4px', 
+            <span style={{
+              fontSize: '9px',
+              color: 'white',
+              backgroundColor: tagColors[word.tag],
+              padding: '1px 4px',
               borderRadius: '3px',
               marginBottom: '2px',
               textTransform: 'uppercase'
             }}>
               {word.tag}
             </span>
-            <span style={{ 
+            <span style={{
               fontSize: '14px',
               borderBottom: `2px solid ${tagColors[word.tag]}`
             }}>

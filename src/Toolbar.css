@@ -2,16 +2,71 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  height: calc(var(--toolbar-height, 48px) + 34px);
+  margin-bottom: calc((var(--toolbar-height, 48px) + 24px) * -1);
+  background: linear-gradient(
+    to bottom,
+    #000000 0%,
+    rgba(0, 0, 0, 0.9) 60%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+
+
+:root[data-theme='light'] .toolbar-wrapper {
+  background: linear-gradient(
+    to bottom,
+    #ffffff 0%,
+    rgba(255, 255, 255, 0.9) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .toolbar-wrapper {
+    background: linear-gradient(
+      to bottom,
+      #ffffff 0%,
+      rgba(255, 255, 255, 0.9) 60%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
 }
 
 .toolbar {
   display: flex;
   gap: 10px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  backdrop-filter: blur(6px);
+  height: var(--toolbar-height, 48px);
+  padding: 0 20px;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
+  width: 100%;
+}
+
+.toolbar button,
+.toolbar select {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 24px;
+}
+
+.toolbar input[type='color'] {
+  width: 22px;
+  height: 22px;
+  padding: 0;
 }
 
 .toolbar button.active {

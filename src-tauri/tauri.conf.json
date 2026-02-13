@@ -2,15 +2,16 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Inkblot",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.inkblot.app",
   "build": {
-    "frontendDist": "../build",
+    "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "npm run download:model && npm run download:rhyme && npm run dev",
+    "beforeBuildCommand": "npm run download:model && npm run download:rhyme && npm run build"
   },
   
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Inkblot",
@@ -27,6 +28,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": [
+      "assets/pos_context_tagger.onnx",
+      "assets/pos_context_meta.json"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

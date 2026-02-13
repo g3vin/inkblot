@@ -4,9 +4,22 @@ import { invoke } from '@tauri-apps/api/core'
 let pinterestWindow = null
 
 export async function openPinterest(query = '') {
-  const url = query
-    ? `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`
-    : 'https://www.pinterest.com'
+  const raw = String(query || '').trim()
+  let url = 'https://www.pinterest.com'
+  let title = 'Pinterest'
+
+  // If the caller passes a full URL, navigate directly.
+  // This allows using the logged-in Pinterest window for private boards.
+  if (raw) {
+    try {
+      const parsed = new URL(raw)
+      url = parsed.toString()
+      title = 'Pinterest'
+    } catch {
+      url = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(raw)}`
+      title = `Pinterest — ${raw}`
+    }
+  }
 
   // If the window already exists, just navigate it (no destroy)
   if (pinterestWindow) {
@@ -29,7 +42,6 @@ export async function openPinterest(query = '') {
       await invoke('navigate_webview', { label: 'pinterest', url })
 
       // Update title to reflect query
-      const title = query ? `Pinterest — ${query}` : 'Pinterest'
       try { await pinterestWindow.setTitle(title) } catch (e) { /* ignore */ }
 
       return
@@ -50,7 +62,7 @@ export async function openPinterest(query = '') {
 
   pinterestWindow = new WebviewWindow('pinterest', {
     url,
-    title: 'Pinterest',
+    title,
     width: Math.round(w * 0.45),
     height: h,
     resizable: true,
