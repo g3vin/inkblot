@@ -5,26 +5,95 @@ import { Color } from '@tiptap/extension-color'
 import { FontFamily } from '@tiptap/extension-font-family'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { Highlight } from '@tiptap/extension-highlight'
+import { Underline } from '@tiptap/extension-underline'
+import { Fragment } from '@tiptap/pm/model'
+import ResizableImage from './extensions/ResizableImage'
 import { debounce } from 'lodash'
 
 import Toolbar from './Toolbar'
 import { CustomTextStyle } from './extensions/CustomTextStyle'
 import { NoteAnnotation } from './extensions/NoteAnnotation'
+import PinterestBoard, { normalizePinterestBoardUrl } from './extensions/PinterestBoard'
 import TabIndent from './extensions/TabIndent'
 import { saveDocument, loadDocument } from './FileSystem'
+import SFIcon from './SFIcon'
 
 export default function EditorCanvas({
   setEditor,
+  setSecondaryEditor,
+  setActiveEditor,
   projectName,
   currentDoc,
+  setCurrentDoc,
   splitView,
   setSplitView,
   secondaryDoc,
-  notes,
-  setNotes,
+  setSecondaryDoc,
+  notesByDoc,
+  setNotesForDoc,
+  activeDoc,
+  setActiveDoc,
 }) {
+  const hasActiveDoc = Boolean(projectName && currentDoc)
 
   const [, forceNoteRender] = useState(0)
+
+  const createPasteHandler = () => {
+    return (view, event) => {
+      const items = event.clipboardData?.items
+
+      const imageItem = items
+        ? Array.from(items).find(item => item.type.startsWith('image/'))
+        : null
+
+      if (imageItem) {
+        const file = imageItem.getAsFile()
+        if (!file) return false
+
+        const reader = new FileReader()
+        reader.onload = () => {
+          const src = reader.result
+          if (typeof src !== 'string') return
+
+          const { schema, tr } = view.state
+          const imageNode = schema.nodes.image?.create({ src })
+          if (!imageNode) return
+          view.dispatch(tr.replaceSelectionWith(imageNode))
+        }
+        reader.readAsDataURL(file)
+        return true
+      }
+
+      // Pinterest board auto-embed when pasting a board URL.
+      const pastedText = event.clipboardData?.getData('text/plain')
+      const boardUrl = normalizePinterestBoardUrl(pastedText)
+      if (!boardUrl) return false
+
+      const { schema, tr, selection } = view.state
+      const boardNode = schema.nodes.pinterestBoard?.create({ url: boardUrl })
+      if (!boardNode) return false
+
+      const paragraph = schema.nodes.paragraph?.create()
+      const fragment = paragraph
+        ? Fragment.fromArray([boardNode, paragraph])
+        : Fragment.fromArray([boardNode])
+
+      view.dispatch(
+        tr
+          .replaceRange(selection.from, selection.to, fragment)
+          .scrollIntoView()
+      )
+      return true
+    }
+  }
+  const [primaryWordCount, setPrimaryWordCount] = useState(0)
+  const [secondaryWordCount, setSecondaryWordCount] = useState(0)
+
+  const countWords = (text = '') => {
+    const trimmed = text.trim()
+    if (!trimmed) return 0
+    return trimmed.split(/\s+/).length
+  }
 
   /* ---------------- Primary Editor ---------------- */
 
@@ -38,15 +107,24 @@ export default function EditorCanvas({
       Color,
       FontFamily,
       NoteAnnotation,
+      PinterestBoard,
       TabIndent,
+      Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
       Highlight.configure({
         multicolor: true,
       }),
+      ResizableImage.configure({
+        inline: true,
+        allowBase64: true,
+      }),
     ],
     content: '',
+    editorProps: {
+      handlePaste: createPasteHandler(),
+    },
   })
 
   /* ---------------- Secondary Editor ---------------- */
@@ -57,13 +135,22 @@ export default function EditorCanvas({
       CustomTextStyle,
       Color,
       FontFamily,
+      PinterestBoard,
       TabIndent,
+      Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
       Highlight.configure({ multicolor: true }),
+      ResizableImage.configure({
+        inline: true,
+        allowBase64: true,
+      }),
     ],
     content: '',
+    editorProps: {
+      handlePaste: createPasteHandler(),
+    },
   })
 
   /* ---------------- Expose Editor ---------------- */
@@ -71,6 +158,10 @@ export default function EditorCanvas({
   useEffect(() => {
     if (editor) setEditor(editor)
   }, [editor, setEditor])
+
+  useEffect(() => {
+    if (secondaryEditor) setSecondaryEditor?.(secondaryEditor)
+  }, [secondaryEditor, setSecondaryEditor])
 
   /* ---------------- Load Primary Doc ---------------- */
 
@@ -82,16 +173,20 @@ export default function EditorCanvas({
 
       if (!doc) {
         editor.commands.setContent('<p></p>')
-        setNotes([])
+        setNotesForDoc(currentDoc, [])
+        editor.commands.focus('start')
         return
       }
 
       editor.commands.setContent(doc.content || '<p></p>')
-      setNotes(doc.notes || [])
+      setNotesForDoc(currentDoc, doc.notes || [])
+      if (!doc.content || doc.content?.content?.length === 0) {
+        editor.commands.focus('start')
+      }
     }
 
     load()
-  }, [editor, currentDoc, projectName, setNotes])
+  }, [editor, currentDoc, projectName, setNotesForDoc])
 
   /* ---------------- Load Secondary Doc ---------------- */
 
@@ -107,18 +202,19 @@ export default function EditorCanvas({
       }
 
       secondaryEditor.commands.setContent(doc.content || '<p></p>')
+      setNotesForDoc(secondaryDoc, doc.notes || [])
     }
 
     load()
-  }, [secondaryEditor, secondaryDoc, splitView, projectName])
+  }, [secondaryEditor, secondaryDoc, splitView, projectName, setNotesForDoc])
 
   /* ---------------- Sync Notes → Editor Storage ---------------- */
 
   useEffect(() => {
     if (!editor) return
-    editor.storage.noteAnnotation.notes = notes || []
+    editor.storage.noteAnnotation.notes = (notesByDoc?.[currentDoc] || [])
     forceNoteRender(v => v + 1)
-  }, [editor, notes])
+  }, [editor, notesByDoc, currentDoc])
 
   /* ---------------- Autosave ---------------- */
 
@@ -128,7 +224,7 @@ export default function EditorCanvas({
     const handler = debounce(async () => {
       await saveDocument(projectName, currentDoc, {
         content: editor.getJSON(),
-        notes: notes || [],
+        notes: notesByDoc?.[currentDoc] || [],
       })
     }, 800)
 
@@ -138,17 +234,72 @@ export default function EditorCanvas({
       editor.off('update', handler)
       handler.cancel()
     }
-  }, [editor, currentDoc, projectName, notes])
+  }, [editor, currentDoc, projectName, notesByDoc])
+
+  /* ---------------- Word Count ---------------- */
+
+  useEffect(() => {
+    if (!editor) return
+
+    const update = () => {
+      setPrimaryWordCount(countWords(editor.getText()))
+    }
+
+    editor.on('update', update)
+    update()
+
+    return () => editor.off('update', update)
+  }, [editor])
+
+  useEffect(() => {
+    if (!secondaryEditor || splitView !== 'editor' || !secondaryDoc) return
+
+    const handler = debounce(async () => {
+      await saveDocument(projectName, secondaryDoc, {
+        content: secondaryEditor.getJSON(),
+        notes: notesByDoc?.[secondaryDoc] || [],
+      })
+    }, 800)
+
+    secondaryEditor.on('update', handler)
+
+    return () => {
+      secondaryEditor.off('update', handler)
+      handler.cancel()
+    }
+  }, [secondaryEditor, secondaryDoc, splitView, projectName, notesByDoc])
+
+  useEffect(() => {
+    if (!secondaryEditor || splitView !== 'editor') return
+
+    const update = () => {
+      setSecondaryWordCount(countWords(secondaryEditor.getText()))
+    }
+
+    secondaryEditor.on('update', update)
+    update()
+
+    return () => secondaryEditor.off('update', update)
+  }, [secondaryEditor, splitView])
 
   /* ---------------- Autosave Notes ---------------- */
 
   useEffect(() => {
-    if (!editor || !currentDoc) return
+    if (!activeDoc) return
+
+    const getEditorForDoc = (docName) => {
+      if (docName === currentDoc) return editor
+      if (docName === secondaryDoc) return secondaryEditor
+      return null
+    }
+
+    const targetEditor = getEditorForDoc(activeDoc)
+    if (!targetEditor) return
 
     const handler = debounce(async () => {
-      await saveDocument(projectName, currentDoc, {
-        content: editor.getJSON(),
-        notes: notes || [],
+      await saveDocument(projectName, activeDoc, {
+        content: targetEditor.getJSON(),
+        notes: notesByDoc?.[activeDoc] || [],
       })
     }, 800)
 
@@ -157,7 +308,7 @@ export default function EditorCanvas({
     return () => {
       handler.cancel()
     }
-  }, [editor, currentDoc, projectName, notes])
+  }, [editor, secondaryEditor, activeDoc, currentDoc, secondaryDoc, projectName, notesByDoc])
 
   /* ---------------- Anchor Remapping ---------------- */
 
@@ -169,7 +320,7 @@ export default function EditorCanvas({
 
       const mapping = transaction.mapping
 
-      const updated = (notes || [])
+      const updated = (notesByDoc?.[currentDoc] || [])
         .map(note => {
           if (note.type !== 'quote') return note
 
@@ -187,15 +338,64 @@ export default function EditorCanvas({
         })
         .filter(Boolean)
 
-      setNotes(updated)
+      setNotesForDoc(currentDoc, updated)
     }
 
     editor.on('transaction', handler)
     return () => editor.off('transaction', handler)
 
-  }, [editor, notes, setNotes])
+  }, [editor, notesByDoc, currentDoc, setNotesForDoc])
 
   /* ---------------- Render ---------------- */
+
+  const closeSecondary = () => {
+    setSecondaryDoc?.(null)
+    setSplitView?.(null)
+  }
+
+  const closePrimary = () => {
+    if (secondaryDoc) {
+      setCurrentDoc?.(secondaryDoc)
+    }
+    closeSecondary()
+  }
+
+  const focusEditor = (target) => {
+    if (!target) return
+    if (target.isEmpty) {
+      target.commands.focus('start')
+      return
+    }
+    target.chain().focus().run()
+  }
+
+  if (!hasActiveDoc) {
+    return (
+      <div className="middle-section">
+        <div className="empty-state">
+          <div className="empty-state-content">
+            {projectName ? 'Create a new document to begin.' : 'Select a project to begin.'}
+            {projectName && (
+              <button
+                className="empty-state-action"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent('filetree:new-entry', {
+                      detail: { type: 'file', parent: '' },
+                    })
+                  )
+                }}
+                aria-label="Create new document"
+                title="Create new document"
+              >
+                <SFIcon name="plus" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="middle-section">
@@ -209,20 +409,45 @@ export default function EditorCanvas({
 
       <div className={`editor-container ${splitView ? 'split-active' : ''}`}>
 
-        <div className="pane primary-pane">
-          <div className="pane-header">
-            Editing: {currentDoc}
+        <div
+          className="pane primary-pane"
+          onFocus={() => setActiveDoc(currentDoc)}
+          onMouseEnter={() => setActiveDoc(currentDoc)}
+          onWheel={() => setActiveDoc(currentDoc)}
+          onMouseDown={() => focusEditor(editor)}
+          onClick={() => focusEditor(editor)}
+          onMouseMove={() => setActiveEditor?.(editor)}
+        >
+          <div className="pane-scroll">
+            {splitView === 'editor' && (
+              <div className="pane-header pane-header-centered">
+                <span>{currentDoc}</span>
+                <button onClick={closePrimary}>×</button>
+              </div>
+            )}
+            <EditorContent editor={editor} className="editor" />
           </div>
-          <EditorContent editor={editor} className="editor" />
+          <div className="word-count">{primaryWordCount} words</div>
         </div>
 
         {splitView === 'editor' && (
-          <div className="pane secondary-pane">
-            <div className="pane-header split-header">
-              <span>Reference: {secondaryDoc}</span>
-              <button onClick={() => setSplitView(null)}>×</button>
+          <div
+            className="pane secondary-pane"
+            onFocus={() => setActiveDoc(secondaryDoc)}
+            onMouseEnter={() => setActiveDoc(secondaryDoc)}
+            onWheel={() => setActiveDoc(secondaryDoc)}
+            onMouseDown={() => focusEditor(secondaryEditor)}
+            onClick={() => focusEditor(secondaryEditor)}
+            onMouseMove={() => setActiveEditor?.(secondaryEditor)}
+          >
+            <div className="pane-scroll">
+              <div className="pane-header split-header pane-header-centered">
+                <span>{secondaryDoc}</span>
+                <button onClick={closeSecondary}>×</button>
+              </div>
+              <EditorContent editor={secondaryEditor} className="editor" />
             </div>
-            <EditorContent editor={secondaryEditor} className="editor" />
+            <div className="word-count">{secondaryWordCount} words</div>
           </div>
         )}
       </div>
