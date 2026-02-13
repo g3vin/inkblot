@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import NoteCard from './RightSidebar/NoteCard'
+import SFIcon from './SFIcon'
 
 export default function NotesPanel({
   notes = [],
@@ -75,23 +76,15 @@ export default function NotesPanel({
       <div className="panel-header">
         <span>NOTES</span>
 
-        {notes.length > 0 && (
-          <button
-            className="clear-btn"
-            onClick={handleClearAll}
-          >
-            Clear All
-          </button>
-        )}
-      </div>
-
-      {/* Add Button */}
       <button
-        className="add-note-btn"
+        className="clear-btn"
         onClick={handleAddNote}
+        aria-label="Add note"
+        title="Add note"
       >
-        + Free Note
+        <SFIcon name="plus" />
       </button>
+      </div>
 
       {/* Search */}
       <input

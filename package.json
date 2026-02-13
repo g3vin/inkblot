@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "download:model": "node scripts/download-model.js",
+    "download:rhyme": "node scripts/download-rhyme-model.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -15,12 +17,15 @@
     "@tiptap/extension-color": "^3.19.0",
     "@tiptap/extension-font-family": "^3.19.0",
     "@tiptap/extension-highlight": "^3.19.0",
+    "@tiptap/extension-image": "^3.19.0",
     "@tiptap/extension-text-align": "^3.19.0",
     "@tiptap/extension-text-style": "^3.19.0",
+    "@tiptap/extension-underline": "^3.19.0",
     "@tiptap/react": "^3.19.0",
     "@tiptap/starter-kit": "^3.19.0",
     "compromise": "^14.14.5",
     "lodash": "^4.17.23",
+    "onnxruntime-web": "^1.24.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

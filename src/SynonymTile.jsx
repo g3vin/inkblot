@@ -1,6 +1,61 @@
 import React, { useEffect, useState } from 'react'
 
-export default function SynonymTile({ word, onReplace, onRemove }) {
+let synonymsIndexPromise
+
+const normalizeTerm = (term) => term.trim().toLowerCase()
+
+const parseCsvToIndex = (csvText) => {
+  const lines = csvText.split(/\r?\n/).filter(Boolean)
+  if (lines.length === 0) return new Map()
+
+  const header = lines[0].split(',')
+  const lemmaIndex = header.indexOf('lemma')
+  const synonymsIndex = header.indexOf('synonyms')
+
+  const index = new Map()
+
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i]
+    const parts = line.split(',')
+    const lemma = parts[lemmaIndex]
+    const synonyms = parts[synonymsIndex]
+
+    if (!lemma || !synonyms) continue
+
+    const lemmaKey = normalizeTerm(lemma)
+    const synList = synonyms
+      .split('|')
+      .flatMap((group) => group.split(';'))
+      .map(normalizeTerm)
+      .filter(Boolean)
+
+    if (!index.has(lemmaKey)) {
+      index.set(lemmaKey, new Set())
+    }
+
+    const existing = index.get(lemmaKey)
+    synList.forEach((syn) => existing.add(syn))
+  }
+
+  return index
+}
+
+const loadSynonymsIndex = async () => {
+  if (!synonymsIndexPromise) {
+    synonymsIndexPromise = fetch('/synonyms.csv')
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load synonyms.csv (${response.status})`)
+        }
+        return response.text()
+      })
+      .then(parseCsvToIndex)
+  }
+
+  return synonymsIndexPromise
+}
+
+export default function SynonymTile({ word, onReplace, onRemove, onSelect }) {
   const [synonyms, setSynonyms] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -10,23 +65,19 @@ export default function SynonymTile({ word, onReplace, onRemove }) {
     const fetchSynonyms = async () => {
       setLoading(true)
       try {
-        // We use 'ml' (means like) but we add a 'topics' hint and limit to high-score results
-        const response = await fetch(
-          `https://api.datamuse.com/words?ml=${encodeURIComponent(word)}&max=15`
-        )
-        const data = await response.json()
-        const filtered = data
-          .filter(item => 
-            item.word.toLowerCase() !== word.toLowerCase() && 
-            item.word.length > 2 &&
-            item.score > 1000000
-          )
-          .map(item => item.word)
-          .slice(0, 10)
+        const index = await loadSynonymsIndex()
+        const key = normalizeTerm(word)
+        const list = index.get(key)
+        const filtered = list
+          ? Array.from(list)
+              .filter((syn) => syn && syn !== key)
+              .slice(0, 10)
+          : []
 
         setSynonyms(filtered)
       } catch (error) {
-        console.error("Error fetching synonyms:", error)
+        console.error('Error fetching synonyms:', error)
+        setSynonyms([])
       } finally {
         setLoading(false)
       }
@@ -36,10 +87,17 @@ export default function SynonymTile({ word, onReplace, onRemove }) {
   }, [word])
 
   return (
-    <div className="tile" style={{
-    }}>
+    <div
+      className="tile"
+      style={{
+      }}
+      onClick={onSelect}
+    >
       <button 
-        onClick={onRemove} 
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove()
+        }} 
         style={{ 
           position: 'absolute', top: '5px', right: '8px', 
           background: 'none', border: 'none', color: '#888', 
@@ -61,17 +119,11 @@ export default function SynonymTile({ word, onReplace, onRemove }) {
           synonyms.map((syn, i) => (
             <button
               key={i}
-              onClick={() => onReplace(syn)}
-              className="synonym-btn"
-              style={{
-                background: '#1a1a1a',
-                border: '1px solid #444',
-                color: '#ddd',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                fontSize: '13px',
-                cursor: 'pointer',
+              onClick={(e) => {
+                e.stopPropagation()
+                onReplace(syn)
               }}
+              className="synonym-btn"
             >
               {syn}
             </button>

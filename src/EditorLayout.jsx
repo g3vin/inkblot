@@ -12,13 +12,20 @@ export default function EditorLayout(props) {
   // Use splitView/secondaryDoc from props (managed at top-level `Editor`) to avoid
   // shadowing state and keep all parts of the UI in sync.
   const handleContextMenu = useEditorContextMenu({
-    editor: props.editor,
+    editor: props.activeEditor,
     setTiles: props.setTiles,
     setNotes: props.setNotes,
     setSidebarTab: props.setSidebarTab,
     setSplitView: props.setSplitView,
     setSecondaryDoc: props.setSecondaryDoc,
+    setCurrentDoc: props.setCurrentDoc,
     splitView: props.splitView,
+    currentDoc: props.currentDoc,
+    secondaryDoc: props.secondaryDoc,
+    activeDoc: props.activeDoc,
+    projectName: props.projectName,
+    refreshFiles: props.refreshFiles,
+    onSelectDoc: props.setCurrentDoc,
   })
 
   const jumpToText = anchor => {
@@ -69,10 +76,22 @@ export default function EditorLayout(props) {
         <LeftSidebar
           width={left.width}
           onResize={left.start}
+          collapsed={left.collapsed}
+          peeked={left.peeked}
+          pinned={left.pinned}
+          togglePin={left.togglePin}
+          onAutoCollapse={left.collapse}
           splitView={props.splitView}
           setSplitView={props.setSplitView}
-          secondaryDoc={props.secondaryDoc}
           setSecondaryDoc={props.setSecondaryDoc}
+          currentDoc={props.currentDoc}
+          secondaryDoc={props.secondaryDoc}
+          activeDoc={props.activeDoc}
+          setActiveDoc={props.setActiveDoc}
+          registerRefreshFiles={props.registerRefreshFiles}
+          projectName={props.projectName}
+          setProjectName={props.setProjectName}
+          secondaryEditor={props.secondaryEditor}
           {...props}
         />
 
@@ -83,6 +102,11 @@ export default function EditorLayout(props) {
         <RightSidebar
           width={right.width}
           onResize={right.start}
+          collapsed={right.collapsed}
+          peeked={right.peeked}
+          pinned={right.pinned}
+          togglePin={right.togglePin}
+          onAutoCollapse={right.collapse}
 
           sidebarTab={props.sidebarTab}
           setSidebarTab={props.setSidebarTab}

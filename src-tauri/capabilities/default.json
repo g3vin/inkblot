@@ -10,10 +10,41 @@
     "core:webview:allow-create-webview-window",
     "fs:allow-mkdir",
     "fs:allow-exists",
-    "fs:allow-read-text-file",
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [
+        { "path": "$APPDATA" },
+        { "path": "$APPDATA/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        { "path": "$APPDATA" },
+        { "path": "$APPDATA/**" },
+        { "path": "$RESOURCE" },
+        { "path": "$RESOURCE/**" }
+      ]
+    },
     "fs:allow-write-text-file",
+    {
+      "identifier": "fs:allow-rename",
+      "allow": [
+        { "path": "$APPDATA" },
+        { "path": "$APPDATA/**" },
+        { "path": "**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        { "path": "$APPDATA" },
+        { "path": "$APPDATA/**" }
+      ]
+    },
     "core:window:allow-destroy",
     "core:window:allow-set-focus",
+    "dialog:allow-confirm",
     {
       "identifier": "fs:default",
       "allow": [{ "path": "$APPDATA/**" }]

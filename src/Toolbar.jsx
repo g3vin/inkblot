@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import './Toolbar.css'
 import { openPinterest } from './openPinterest'
+import SFIcon from './SFIcon'
 
 export default function Toolbar({ editor }) {
   const [color, setColor] = useState('#000000')
@@ -10,6 +11,12 @@ export default function Toolbar({ editor }) {
   const [font, setFont] = useState('Georgia')
   const [fontSize, setFontSize] = useState('18px')
   const [alignment, setAlignment] = useState('left')
+  const [activeMarks, setActiveMarks] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strike: false,
+  })
 
   if (!editor) return null
 
@@ -27,6 +34,31 @@ export default function Toolbar({ editor }) {
       setFont(fontAttr)
       setFontSize(fontSizeAttr)
       setAlignment(alignAttr)
+
+      const { state } = editor
+      const { from, to, empty, $from } = state.selection
+      const getMarkActive = (markName) => {
+        const markType = state.schema.marks[markName]
+        if (!markType) return false
+        if (!empty) {
+          return state.doc.rangeHasMark(from, to, markType)
+        }
+
+        const parent = $from.parent
+        const offset = $from.parentOffset
+        const afterNode = parent.childAfter(offset).node
+        const beforeNode = parent.childBefore(offset).node
+        const pickNode = (afterNode?.isText && afterNode) || (beforeNode?.isText && beforeNode)
+        const marks = pickNode?.marks || []
+        return marks.some(mark => mark.type === markType)
+      }
+
+      setActiveMarks({
+        bold: getMarkActive('bold'),
+        italic: getMarkActive('italic'),
+        underline: getMarkActive('underline'),
+        strike: getMarkActive('strike'),
+      })
 
       // ✅ only update highlight color if the user isn’t currently picking one
       if (!userSelectingHighlight) {
@@ -82,22 +114,36 @@ export default function Toolbar({ editor }) {
       <div className="toolbar">
         {/* Text Style Buttons */}
         <button
-          className={editor.isActive('bold') ? 'active' : ''}
+          className={activeMarks.bold ? 'active' : ''}
           onClick={() => editor.chain().focus().toggleBold().run()}
+          aria-label="Bold"
+          title="Bold"
         >
-          B
+          <SFIcon name="bold" filled={activeMarks.bold} />
         </button>
         <button
-          className={editor.isActive('italic') ? 'active' : ''}
+          className={activeMarks.italic ? 'active' : ''}
           onClick={() => editor.chain().focus().toggleItalic().run()}
+          aria-label="Italic"
+          title="Italic"
         >
-          I
+          <SFIcon name="italic" filled={activeMarks.italic} />
         </button>
         <button
-          className={editor.isActive('strike') ? 'active' : ''}
-          onClick={() => editor.chain().focus().toggleStrike().run()}
+          className={activeMarks.underline ? 'active' : ''}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          aria-label="Underline"
+          title="Underline"
         >
-          S
+          <SFIcon name="underline" filled={activeMarks.underline} />
+        </button>
+        <button
+          className={activeMarks.strike ? 'active' : ''}
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+          aria-label="Strikethrough"
+          title="Strikethrough"
+        >
+          <SFIcon name="strikethrough" filled={activeMarks.strike} />
         </button>
 
         {/* Text Color */}
@@ -143,29 +189,26 @@ export default function Toolbar({ editor }) {
         <button
           className={alignment === 'left' ? 'active' : ''}
           onClick={() => applyAlignment('left')}
+          aria-label="Align left"
+          title="Align left"
         >
-          ⬅
+          <SFIcon name="text.alignleft" />
         </button>
         <button
           className={alignment === 'center' ? 'active' : ''}
           onClick={() => applyAlignment('center')}
+          aria-label="Align center"
+          title="Align center"
         >
-          ⬍
+          <SFIcon name="text.aligncenter" />
         </button>
         <button
           className={alignment === 'right' ? 'active' : ''}
           onClick={() => applyAlignment('right')}
+          aria-label="Align right"
+          title="Align right"
         >
-          ➡
-        </button>
-
-        <div className="separator" />
-
-        <button
-          onClick={() => openPinterest('landscapes')}
-          title="Open Pinterest"
-        >
-          P
+          <SFIcon name="text.alignright" />
         </button>
       </div>
     </div>

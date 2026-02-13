@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { confirm } from '@tauri-apps/plugin-dialog'
 
 export default function NoteCard({
   note,
@@ -9,13 +10,30 @@ export default function NoteCard({
   const textareaRef = useRef(null)
   const [editing, setEditing] = useState(false)
 
-  // Auto-resize while editing
-  useEffect(() => {
-    if (!editing || !textareaRef.current) return
-
+  const resizeTextarea = () => {
     const el = textareaRef.current
+    if (!el) return
+
     el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
+
+    if (editing) {
+      el.style.height = `${el.scrollHeight}px`
+      return
+    }
+
+    const styles = window.getComputedStyle(el)
+    const maxHeightValue = styles.maxHeight
+    const maxHeight = maxHeightValue && maxHeightValue !== 'none'
+      ? parseFloat(maxHeightValue)
+      : Infinity
+
+    const nextHeight = Math.min(el.scrollHeight, maxHeight)
+    el.style.height = `${nextHeight}px`
+  }
+
+  // Auto-resize on load and whenever content/expand state changes
+  useEffect(() => {
+    resizeTextarea()
   }, [note.content, editing])
 
   return (
@@ -26,9 +44,10 @@ export default function NoteCard({
     >
       <button
         className="note-delete"
-        onClick={e => {
+        onClick={async e => {
           e.stopPropagation()
-          onRemove()
+          const ok = await confirm('Delete note?')
+          if (ok) onRemove()
         }}
       >
         ×
