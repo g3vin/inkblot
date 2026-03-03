@@ -1,3 +1,25 @@
+# Ignore downloaded NLP model files and related metadata
+# Prevent large ONNX files from being accidentally committed or pushed
+
+# Specific model files downloaded by scripts
+/public/synonym.onnx
+/public/synonym.onnx.data
+/public/.synonym_meta.json
+/public/vocab_kaggle.json
+/src-tauri/assets/pos_context_tagger.onnx
+
+# General patterns to catch any other model artifacts
+*.onnx
+*.onnx.data
+
+# Ignore any local build artifacts for the model downloader
+/public/*.onnx.tmp
+
+# Node / Vite / editor files (keep common defaults)
+node_modules/
+dist/
+/.cache
+.DS_Store
 # Logs
 logs
 *.log
