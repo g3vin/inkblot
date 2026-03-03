@@ -1,76 +1,68 @@
-
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use ndarray::Array2;
-use ort::session::Session;
-use ort::value::TensorRef;
+
 use serde::Serialize;
 use std::collections::HashSet;
-use tauri::{path::BaseDirectory, AppHandle, Manager};
+use std::sync::Mutex;
+
+use tauri::{AppHandle, Manager};
 use url::Url;
 
+use once_cell::sync::Lazy;
+
+use ndarray::Array;
+use ort::value::Tensor;
+use ort::session::Session;
+use ort::session::builder::SessionBuilder;
+
+use reqwest;
+
+/* ============================================================
+   WEBVIEW COMMANDS
+============================================================ */
+
 #[tauri::command]
-async fn navigate_webview(app_handle: AppHandle, label: String, url: String) -> Result<(), String> {
+async fn navigate_webview(
+    app_handle: AppHandle,
+    label: String,
+    url: String,
+) -> Result<(), String> {
     if let Some(webview) = app_handle.get_webview_window(&label) {
-        let parsed_url = Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
-        let webview_clone = webview.clone(); // ✅ clone handle before moving into closure
+        let parsed_url =
+            Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
+
+        let webview_clone = webview.clone();
 
         webview
             .run_on_main_thread(move || {
-                if let Err(e) = webview_clone.navigate(parsed_url) {
-                    eprintln!("Failed to navigate webview: {}", e);
-                }
+                let _ = webview_clone.navigate(parsed_url);
             })
             .map_err(|e| format!("run_on_main_thread failed: {}", e))?;
 
         Ok(())
     } else {
-        Err(format!("Webview with label '{}' not found", label))
+        Err(format!("Webview '{}' not found", label))
     }
 }
 
 #[tauri::command]
-async fn eval_webview(app_handle: AppHandle, label: String, script: String) -> Result<(), String> {
-    if let Some(webview) = app_handle.get_webview_window(&label) {
-        let webview_clone = webview.clone();
-        let eval_error: std::sync::Arc<std::sync::Mutex<Option<String>>> =
-            std::sync::Arc::new(std::sync::Mutex::new(None));
-        let eval_error_clone = eval_error.clone();
-
-        webview
-            .run_on_main_thread(move || {
-                if let Err(e) = webview_clone.eval(&script) {
-                    eprintln!("Failed to eval webview: {e}");
-                    if let Ok(mut slot) = eval_error_clone.lock() {
-                        *slot = Some(e.to_string());
-                    }
-                }
-            })
-            .map_err(|e| format!("run_on_main_thread failed: {e}"))?;
-
-        if let Ok(slot) = eval_error.lock() {
-            if let Some(err) = slot.clone() {
-                return Err(format!("webview eval failed: {err}"));
-            }
-        }
-
-        Ok(())
-    } else {
-        Err(format!("Webview with label '{}' not found", label))
-    }
-}
-
-#[tauri::command]
-async fn get_webview_url(app_handle: AppHandle, label: String) -> Result<String, String> {
+async fn get_webview_url(
+    app_handle: AppHandle,
+    label: String,
+) -> Result<String, String> {
     if let Some(webview) = app_handle.get_webview_window(&label) {
         webview
             .url()
             .map(|u| u.to_string())
-            .map_err(|e| format!("Failed to get webview URL: {e}"))
+            .map_err(|e| format!("Failed to get URL: {e}"))
     } else {
-        Err(format!("Webview with label '{}' not found", label))
+        Err(format!("Webview '{}' not found", label))
     }
 }
+
+/* ============================================================
+   PINTEREST SCRAPER (unchanged logic)
+============================================================ */
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -523,66 +515,203 @@ async fn scrape_pinterest_html(url: String, max_pins: Option<usize>) -> Result<S
     Ok(ScrapeResult { pins: out, html })
 }
 
+use tokenizers::Tokenizer;
+
+static TOKENIZER: Lazy<Tokenizer> = Lazy::new(|| {
+    println!("[INFO] Loading HuggingFace tokenizer...");
+    Tokenizer::from_pretrained(
+        "sentence-transformers/all-MiniLM-L6-v2",
+        None,
+    )
+    .expect("Failed to load tokenizer")
+});
+
+struct SynonymModel {
+    session: Session,
+    vocab: Vec<String>,
+}
+
+fn find_target_position(
+    encoding: &tokenizers::Encoding,
+    text: &str,
+    target: &str,
+) -> i64 {
+    let offsets = encoding.get_offsets(); // Vec<(u32,u32)> typically
+    let start_char = text.find(target).unwrap_or(0);
+
+    for (i, (s, e)) in offsets.iter().enumerate() {
+        // cast offset endpoints to usize before comparing to start_char
+        let s_usize = *s as usize;
+        let e_usize = *e as usize;
+        if s_usize <= start_char && start_char < e_usize {
+            return i as i64;
+        }
+    }
+
+    0
+}
+
+static MODEL: Lazy<Mutex<Option<SynonymModel>>> =
+    Lazy::new(|| Mutex::new(None));
+
+fn init_synonym_model() {
+    let mut guard = MODEL.lock().unwrap();
+
+    if guard.is_some() {
+        return;
+    }
+
+    println!("[INFO] Loading ONNX synonym model...");
+
+    let session = SessionBuilder::new()
+        .unwrap()
+        .commit_from_file("../public/synonym.onnx")
+        .unwrap();
+
+    let vocab: Vec<String> =
+        serde_json::from_str(
+            &std::fs::read_to_string("../public/vocab_kaggle.json")
+                .expect("Failed to read vocab"),
+        )
+        .expect("Invalid vocab JSON");
+
+    *guard = Some(SynonymModel { session, vocab });
+
+    println!("[INFO] Synonym model loaded.");
+}
+
 #[derive(Serialize)]
-struct PosInferenceResult {
-    logits: Vec<f32>,
-    shape: Vec<usize>,
+struct SynonymResponse {
+    synonyms: Vec<String>,
+    antonyms: Vec<String>,
 }
 
 #[tauri::command]
-fn run_pos_inference(app_handle: AppHandle, tokens: Vec<i64>) -> Result<PosInferenceResult, String> {
-    if tokens.is_empty() {
-        return Ok(PosInferenceResult {
-            logits: Vec::new(),
-            shape: vec![0, 0, 0],
-        });
+async fn get_synonyms(
+    _text: String,
+    target_word: String,
+) -> Result<SynonymResponse, String> {
+    // ----- pull model from the global -----
+    let mut guard = MODEL.lock().unwrap();
+    let model = guard.as_mut().ok_or("Model not initialized")?;
+
+    // ----- tokenizer / inputs -----
+    let max_len: usize = 32;
+
+    // TOKENIZER is the Lazy<Tokenizer> you already declared
+    let encoding = TOKENIZER
+        .encode(_text.as_str(), true)
+        .map_err(|e| format!("tokenizer.encode error: {}", e))?;
+
+    // convert ids / mask to i64 Vec
+    let mut input_ids_i64: Vec<i64> = encoding
+        .get_ids()
+        .iter()
+        .map(|&id| id as i64)
+        .collect();
+
+    let mut attention_mask_i64: Vec<i64> = encoding
+        .get_attention_mask()
+        .iter()
+        .map(|&m| m as i64)
+        .collect();
+
+    // pad/truncate to max_len
+    input_ids_i64.resize(max_len, 0);
+    attention_mask_i64.resize(max_len, 0);
+    input_ids_i64.truncate(max_len);
+    attention_mask_i64.truncate(max_len);
+
+    // find target token position (as i64)
+    let target_pos_val: i64 = find_target_position(&encoding, &_text, &target_word) as i64;
+
+    // build ndarrays with proper shapes and types
+    let input_array = Array::from_shape_vec((1, max_len), input_ids_i64)
+        .map_err(|e| format!("input ndarray build failed: {}", e))?;
+
+    let mask_array = Array::from_shape_vec((1, max_len), attention_mask_i64)
+        .map_err(|e| format!("mask ndarray build failed: {}", e))?;
+
+    let target_array = Array::from_vec(vec![target_pos_val]);
+
+    // convert to onnx runtime tensors
+    let input_tensor = Tensor::from_array(input_array).map_err(|e| e.to_string())?;
+    let mask_tensor = Tensor::from_array(mask_array).map_err(|e| e.to_string())?;
+    let target_tensor = Tensor::from_array(target_array).map_err(|e| e.to_string())?;
+
+    // ----- run model -----
+    let outputs = model
+        .session
+        .run(vec![
+            ("input_ids", &input_tensor),
+            ("attention_mask", &mask_tensor),
+            ("target_pos", &target_tensor),
+        ])
+        .map_err(|e| format!("onnx run failed: {}", e))?;
+
+    let (_shape, data) = outputs[0]
+        .try_extract_tensor::<f32>()
+        .map_err(|e| format!("extract tensor failed: {}", e))?;
+
+    let sims: Vec<f32> = data.to_vec();
+
+    if sims.is_empty() {
+        return Err("Empty model output".into());
     }
 
-    let resolved_path = app_handle
-        .path()
-        .resolve("assets/pos_context_tagger.onnx", BaseDirectory::Resource)
-        .map_err(|e| e.to_string())?;
-    let model_path = if resolved_path.exists() {
-        resolved_path
-    } else {
-        std::path::PathBuf::from("src-tauri/assets/pos_context_tagger.onnx")
-    };
+    // ----- sorting + pick top/bottom -----
+    let indices: Vec<usize> = (0..sims.len()).collect();
 
-    let mut session = Session::builder()
-        .map_err(|e| e.to_string())?
-        .commit_from_file(model_path)
-        .map_err(|e| e.to_string())?;
+    let mut high = indices.clone();
+    high.sort_by(|&a, &b| sims[b].partial_cmp(&sims[a]).unwrap());
 
-    let token_len = tokens.len();
-    let input = Array2::from_shape_vec((1, token_len), tokens).map_err(|e| e.to_string())?;
-    let flat = input.as_slice().ok_or("Input tensor is not contiguous")?;
-    let input_tensor = TensorRef::from_array_view(([1usize, token_len], flat))
-        .map_err(|e| e.to_string())?;
-    let outputs = session
-        .run(ort::inputs![input_tensor])
-        .map_err(|e| e.to_string())?;
+    let mut low = indices;
+    low.sort_by(|&a, &b| sims[a].partial_cmp(&sims[b]).unwrap());
 
-    let array = outputs[0]
-        .try_extract_array::<f32>()
-        .map_err(|e| e.to_string())?;
-    let shape = array.shape().to_vec();
-    let logits = array.iter().cloned().collect();
+    let mut synonyms = Vec::new();
+    let mut antonyms = Vec::new();
 
-    Ok(PosInferenceResult { logits, shape })
+    for idx in high.iter().take(200) { // iterate more, then filter like Python
+        if let Some(word) = model.vocab.get(*idx) {
+            if word != &target_word {
+                synonyms.push(word.clone());
+            }
+        }
+        if synonyms.len() >= 10 {
+            break;
+        }
+    }
+
+    for idx in low.iter().take(200) {
+        if let Some(word) = model.vocab.get(*idx) {
+            if word != &target_word {
+                antonyms.push(word.clone());
+            }
+        }
+        if antonyms.len() >= 5 { // you said you wanted 5 antonyms
+            break;
+        }
+    }
+
+    Ok(SynonymResponse { synonyms, antonyms })
 }
+
+/* ============================================================
+   MAIN
+============================================================ */
 
 fn main() {
+    init_synonym_model();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_dialog::init()) // Add this!
-    .invoke_handler(tauri::generate_handler![
-        navigate_webview,
-        eval_webview,
-        get_webview_url,
-        scrape_pinterest_html,
-        run_pos_inference,
-    ])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            navigate_webview,
+            get_webview_url,
+            scrape_pinterest_html,
+            get_synonyms,
+        ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("error running tauri application");
 }
-
