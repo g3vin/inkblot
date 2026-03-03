@@ -15,7 +15,7 @@ import { CustomTextStyle } from './extensions/CustomTextStyle'
 import { NoteAnnotation } from './extensions/NoteAnnotation'
 import PinterestBoard, { normalizePinterestBoardUrl } from './extensions/PinterestBoard'
 import TabIndent from './extensions/TabIndent'
-import { saveDocument, loadDocument } from './FileSystem'
+import { saveDocument, loadDocument, appendVersion, getVersions } from './FileSystem'
 import SFIcon from './SFIcon'
 
 export default function EditorCanvas({
@@ -33,6 +33,7 @@ export default function EditorCanvas({
   setNotesForDoc,
   activeDoc,
   setActiveDoc,
+  setVersions,
 }) {
   const hasActiveDoc = Boolean(projectName && currentDoc)
 
@@ -67,23 +68,41 @@ export default function EditorCanvas({
       // Pinterest board auto-embed when pasting a board URL.
       const pastedText = event.clipboardData?.getData('text/plain')
       const boardUrl = normalizePinterestBoardUrl(pastedText)
-      if (!boardUrl) return false
+      if (boardUrl) {
+        const { schema, tr, selection } = view.state
+        const boardNode = schema.nodes.pinterestBoard?.create({ url: boardUrl })
+        if (!boardNode) return false
 
-      const { schema, tr, selection } = view.state
-      const boardNode = schema.nodes.pinterestBoard?.create({ url: boardUrl })
-      if (!boardNode) return false
+        const paragraph = schema.nodes.paragraph?.create()
+        const fragment = paragraph
+          ? Fragment.fromArray([boardNode, paragraph])
+          : Fragment.fromArray([boardNode])
 
-      const paragraph = schema.nodes.paragraph?.create()
-      const fragment = paragraph
-        ? Fragment.fromArray([boardNode, paragraph])
-        : Fragment.fromArray([boardNode])
+        view.dispatch(
+          tr
+            .replaceRange(selection.from, selection.to, fragment)
+            .scrollIntoView()
+        )
+        return true
+      }
 
-      view.dispatch(
-        tr
-          .replaceRange(selection.from, selection.to, fragment)
-          .scrollIntoView()
-      )
-      return true
+      // If a plain-paste was explicitly requested elsewhere (e.g. Cmd+Shift+V handler),
+      // handle it here by inserting plain text only. Otherwise, let default paste proceed
+      // so normal Cmd+V preserves formatting.
+      if (window.__inkblot_forcePlainPaste) {
+        try { event.preventDefault(); } catch (e) {}
+
+        const plainTextFromClipboard = event.clipboardData?.getData('text/plain') || ''
+        const { tr, selection } = view.state
+        tr.insertText(plainTextFromClipboard, selection.from, selection.to)
+        view.dispatch(tr.scrollIntoView())
+        // reset the flag so subsequent pastes behave normally
+        try { window.__inkblot_forcePlainPaste = false } catch (e) {}
+        return true
+      }
+
+      // Not a forced plain paste — return false to allow TipTap's default paste handling
+      return false
     }
   }
   const [primaryWordCount, setPrimaryWordCount] = useState(0)
@@ -183,6 +202,15 @@ export default function EditorCanvas({
       if (!doc.content || doc.content?.content?.length === 0) {
         editor.commands.focus('start')
       }
+
+      // load versions for the right sidebar
+      try {
+        const vs = await getVersions(projectName, currentDoc)
+        setVersions?.(currentDoc, vs)
+      } catch (e) {
+        console.error('Failed to load versions:', e)
+        setVersions?.(currentDoc, [])
+      }
     }
 
     load()
@@ -220,18 +248,49 @@ export default function EditorCanvas({
 
   useEffect(() => {
     if (!editor || !currentDoc) return
-
+    console.debug('[autosave] effect init', { projectName, currentDoc })
     const handler = debounce(async () => {
+      try { console.debug('[autosave] handler fired', { projectName, currentDoc }) } catch (e) {}
+      const contentJson = editor.getJSON()
+      const contentHtml = editor.getHTML()
+
+      console.debug('[autosave] saving', { projectName, currentDoc, contentLength: contentHtml?.length })
+
       await saveDocument(projectName, currentDoc, {
-        content: editor.getJSON(),
+        content: contentJson,
         notes: notesByDoc?.[currentDoc] || [],
+        _appendVersion: true,
+        _version: {
+          contentHtml,
+          contentJson,
+        },
       })
+
+      try {
+        console.debug('[autosave] calling appendVersion', { projectName, currentDoc })
+        await appendVersion(projectName, currentDoc, { contentHtml, contentJson })
+        console.debug('[autosave] appendVersion done', { projectName, currentDoc })
+      } catch (e) {
+        console.error('[autosave] appendVersion failed', e)
+      }
+
+      try {
+        console.debug('[autosave] about to getVersions', { projectName, currentDoc })
+        const vs = await getVersions(projectName, currentDoc)
+        console.debug('[autosave] getVersions returned', { projectName, currentDoc, count: Array.isArray(vs) ? vs.length : 0 })
+        setVersions?.(currentDoc, vs)
+        console.debug('[autosave] setVersions called', { projectName, currentDoc })
+      } catch (e) {
+        console.error('Failed to refresh versions:', e)
+      }
     }, 800)
 
     editor.on('update', handler)
+    console.debug('[autosave] handler attached', { projectName, currentDoc })
 
     return () => {
       editor.off('update', handler)
+      console.debug('[autosave] handler detached', { projectName, currentDoc })
       handler.cancel()
     }
   }, [editor, currentDoc, projectName, notesByDoc])
@@ -297,13 +356,18 @@ export default function EditorCanvas({
     if (!targetEditor) return
 
     const handler = debounce(async () => {
+      const contentJson = targetEditor.getJSON()
+      const contentHtml = targetEditor.getHTML && targetEditor.getHTML()
       await saveDocument(projectName, activeDoc, {
-        content: targetEditor.getJSON(),
+        content: contentJson,
         notes: notesByDoc?.[activeDoc] || [],
+        _appendVersion: true,
+        _version: { contentHtml, contentJson },
       })
     }, 800)
 
-    handler()
+    // run once to persist notes immediately, include version snapshot to avoid overwriting versions
+    try { handler() } catch (e) {}
 
     return () => {
       handler.cancel()

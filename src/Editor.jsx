@@ -29,7 +29,14 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
   const [tiles, setTiles] = useState([])
   const [notesByDoc, setNotesByDoc] = useState({})
   const [activeDoc, setActiveDoc] = useState(session.activeDoc || session.currentDoc || 'doc1')
-  const [versions, setVersions] = useState([])
+  const [versions, setVersionsState] = useState({})
+  const setVersions = useCallback((docName, vs) => {
+    if (!docName) return
+    try {
+      console.debug('[setVersions] set', { docName, count: Array.isArray(vs) ? vs.length : 0 })
+    } catch (e) {}
+    setVersionsState(prev => ({ ...prev, [docName]: vs || [] }))
+  }, [])
 
   const [splitView, setSplitView] = useState(session.splitView || null) // null, 'editor', or 'pinterest'
   const [secondaryDoc, setSecondaryDoc] = useState(session.secondaryDoc || null) // The name of the second file
@@ -134,6 +141,78 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
     }, 2000),
     [projectName]
   )
+
+  useEffect(() => {
+    const handlePasteWithFormat = async (event) => {
+      // Cmd+Shift+V (metaKey + shiftKey + 'v') — normalize key to lower
+      if (event.metaKey && event.shiftKey && event.key && event.key.toLowerCase() === 'v') {
+        // Prevent other handlers and default browser UI
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') {
+          event.stopImmediatePropagation();
+        }
+
+        try {
+          const clipboardText = await navigator.clipboard.readText();
+
+          // Sanitize: strip HTML and styles, keep plain text
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(clipboardText, 'text/html');
+          const plainText = doc.body.textContent || '';
+
+          // Prefer the explicit activeTipTap editor, fall back to primary/secondary editor
+          const targetEditor = activeEditor || editor || secondaryEditor;
+
+          if (targetEditor && typeof targetEditor.chain === 'function') {
+            // TipTap editor API
+            targetEditor.chain().focus().insertContent(plainText).run();
+            return;
+          }
+
+          // Fallback: if we have a ProseMirror view (TipTap exposes `view`), use tr.insertText
+          if (targetEditor && targetEditor.view && targetEditor.view.state && targetEditor.view.dispatch) {
+            const { view } = targetEditor;
+            const tr = view.state.tr.insertText(plainText);
+            view.dispatch(tr.scrollIntoView());
+            if (view.dom && typeof view.dom.focus === 'function') view.dom.focus();
+            return;
+          }
+
+          // Last resort: try to paste into the active element (textarea or contenteditable)
+          const activeEl = document.activeElement;
+          if (activeEl && (activeEl.isContentEditable || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) {
+            // For inputs/textareas, use setRangeText or value insertion
+            if (typeof activeEl.setRangeText === 'function') {
+              try {
+                activeEl.setRangeText(plainText);
+              } catch (e) {
+                activeEl.value = (activeEl.value || '') + plainText;
+              }
+            } else if (typeof document.execCommand === 'function') {
+              document.execCommand('insertText', false, plainText);
+            } else {
+              activeEl.textContent = (activeEl.textContent || '') + plainText;
+            }
+            // restore focus
+            try { activeEl.focus(); } catch (e) {}
+            return;
+          }
+
+          console.error('No suitable editor target to paste into.');
+        } catch (error) {
+          console.error('Failed to read clipboard content:', error);
+        }
+      }
+    };
+
+    // Use capture so we get the event before other listeners
+    window.addEventListener('keydown', handlePasteWithFormat, { capture: true });
+
+    return () => {
+      window.removeEventListener('keydown', handlePasteWithFormat, { capture: true });
+    };
+  }, [activeEditor])
 
   return (
     <EditorLayout

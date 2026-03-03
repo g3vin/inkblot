@@ -1,16 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import EditorCanvas from './EditorCanvas'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from './hooks/useResizableSidebar'
 import { useEditorContextMenu } from './hooks/useEditorContextMenu'
-import { useState } from 'react'
+import Bubble from './Bubble'
 
 export default function EditorLayout(props) {
   const left = useResizableSidebar(200, 180, 300, 'left')
   const right = useResizableSidebar(300, 280, 500, 'right')
   // Use splitView/secondaryDoc from props (managed at top-level `Editor`) to avoid
   // shadowing state and keep all parts of the UI in sync.
+  const [bubbleSentence, setBubbleSentence] = useState(null)
+
   const handleContextMenu = useEditorContextMenu({
     editor: props.activeEditor,
     setTiles: props.setTiles,
@@ -26,6 +28,7 @@ export default function EditorLayout(props) {
     projectName: props.projectName,
     refreshFiles: props.refreshFiles,
     onSelectDoc: props.setCurrentDoc,
+    setBubbleSentence,
   })
 
   const jumpToText = anchor => {
@@ -120,9 +123,18 @@ export default function EditorLayout(props) {
 
           versions={props.versions}
           setVersions={props.setVersions}
+          activeDoc={props.activeDoc}
+          projectName={props.projectName}
 
           jumpToText={jumpToText}
         />
+
+        {bubbleSentence ? (
+          <Bubble
+            sentence={bubbleSentence}
+            onClose={() => setBubbleSentence(null)}
+          />
+        ) : null}
 
 
       </div>

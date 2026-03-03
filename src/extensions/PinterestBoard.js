@@ -35,15 +35,15 @@ const parsePinterestBoardParts = (pinterestUrl) => {
 }
 
 /**
- * Returns a canonical Pinterest board URL if `text` looks like a board URL.
- * Otherwise returns null.
+ * returns a Pinterest board URL if `text` looks like a board URL
+ * otherwise returns null
  */
 export function normalizePinterestBoardUrl(text) {
   if (!text) return null
   const trimmed = String(text).trim()
   if (!trimmed) return null
 
-  // Fast path: only consider pinterest.com URLs.
+  // only consider pinterest.com URLs
   if (!/^https?:\/\//i.test(trimmed)) return null
 
   let url
@@ -56,7 +56,7 @@ export function normalizePinterestBoardUrl(text) {
   const host = url.hostname.toLowerCase()
   if (!(host === 'pinterest.com' || host === 'www.pinterest.com')) return null
 
-  // Board URLs are typically: /{username}/{board}/
+  // board URLs are typically: /{username}/{board}/
   const segments = url.pathname
     .split('/')
     .map(s => s.trim())
@@ -66,7 +66,7 @@ export function normalizePinterestBoardUrl(text) {
 
   const [first, second] = segments
 
-  // Ignore non-board routes.
+  // ignore non-board routes.
   const blocked = new Set([
     'pin',
     'search',
