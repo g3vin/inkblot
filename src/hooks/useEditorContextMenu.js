@@ -76,6 +76,7 @@ export function useEditorContextMenu({
   projectName,
   refreshFiles,
   onSelectDoc,
+  setBubbleSentence,
 }) {
   return useCallback(
     async (e) => {
@@ -282,6 +283,20 @@ export function useEditorContextMenu({
 
           items.push(await PredefinedMenuItem.new({ item: 'Separator' }))
 
+          // Open Analytic Bubble (modal)
+          items.push(
+            await MenuItem.new({
+              text: 'Open Analytic Bubble',
+              action: () => {
+                try {
+                  setBubbleSentence?.(text)
+                } catch (err) {
+                  console.warn('Failed to open analytic bubble:', err)
+                }
+              },
+            })
+          )
+
           // ---- Existing text actions ----
           items.push(
             await MenuItem.new({
@@ -472,6 +487,7 @@ export function useEditorContextMenu({
       projectName,
       refreshFiles,
       onSelectDoc,
+      setBubbleSentence,
     ]
   )
 }

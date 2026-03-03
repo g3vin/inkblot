@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import SidebarTabs from './SidebarTabs'
 import Workbench from './Workbench'
 import NotesPanel from '../NotesPanel'
@@ -26,7 +27,14 @@ export default function RightSidebar({
   versions = [],
   editor, 
   setVersions,
+  projectName,
 }) {
+
+  useEffect(() => {
+    try {
+      console.debug('[RightSidebar] activeDoc', activeDoc, 'versionsForActiveDocCount', versions?.[activeDoc]?.length)
+    } catch (e) {}
+  }, [activeDoc, versions])
   
   return (
     <aside
@@ -82,7 +90,7 @@ export default function RightSidebar({
         
          />
         ) : (
-          <HistoryPanel versions={versions} setVersions={setVersions} editor={editor} />
+          <HistoryPanel versions={versions?.[activeDoc] || []} setVersions={setVersions} editor={editor} projectName={projectName} docName={activeDoc} />
         )}
       </div>
     </aside>
