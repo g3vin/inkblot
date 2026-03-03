@@ -4,10 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "download:model": "node scripts/download-model.js",
-    "download:rhyme": "node scripts/download-rhyme-model.js",
-    "build": "vite build",
+    "dev": "npm run download:model && vite",
+    "download:model": "node scripts/download-synonym-model.js",
+    "build": "npm run download:model && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
