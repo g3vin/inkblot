@@ -54,11 +54,73 @@ export async function renameFile(projectName, oldName, newName) {
 
 export async function saveDocument(projectName, docName, docData) {
   try {
+    console.debug('[saveDocument] called', { projectName, docName, append: !!docData?._appendVersion })
     const nestedPath = docName?.split('/')?.slice(0, -1).join('/')
     const dir = nestedPath ? `${projectName}/${nestedPath}` : projectName
     const filePath = `${projectName}/${docName}.json`
 
     await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true })
+
+    // If caller requests versioning, merge versions into the same document file
+    if (docData._appendVersion) {
+      try {
+        // read existing file if present
+        let existing = null
+        try {
+          const raw = await readTextFile(filePath, { baseDir: BaseDirectory.AppData })
+          existing = JSON.parse(raw || '{}')
+        } catch (e) {
+          existing = null
+        }
+
+        const versions = Array.isArray(existing?.versions) ? existing.versions.slice() : []
+
+        const newEntry = {
+          id: Date.now(),
+          timestamp: new Date().toISOString(),
+          contentHtml: docData._version?.contentHtml || null,
+          contentJson: docData._version?.contentJson || null,
+        }
+
+        console.debug('[saveDocument] appendVersion', { projectName, docName, newEntryId: newEntry.id })
+
+        // avoid duplicate consecutive
+        if (!(versions[0] && versions[0].contentHtml && newEntry.contentHtml && versions[0].contentHtml === newEntry.contentHtml)) {
+          versions.unshift(newEntry)
+          // cap versions list
+          if (versions.length > 200) versions.length = 200
+          console.debug('[saveDocument] merged version; versionsCount=', versions.length)
+        } else {
+          console.debug('[saveDocument] skipped duplicate consecutive version')
+        }
+
+        await writeTextFile(
+          filePath,
+          JSON.stringify({
+            content: docData.content || [],
+            notes: docData.notes || [],
+            versions,
+          }),
+          { baseDir: BaseDirectory.AppData }
+        )
+        try {
+          const verifyRaw = await readTextFile(filePath, { baseDir: BaseDirectory.AppData })
+          const verify = JSON.parse(verifyRaw || '{}')
+          console.debug('[saveDocument] write verified', { filePath, writtenVersions: Array.isArray(verify.versions) ? verify.versions.length : 0 })
+        } catch (ve) {
+          console.debug('[saveDocument] write verify failed', { filePath, err: String(ve) })
+        }
+        try {
+          if (typeof window !== 'undefined' && window?.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('versions:changed', { detail: { projectName, docName } }))
+            console.debug('[saveDocument] dispatched versions:changed', { projectName, docName })
+          }
+        } catch (e) {}
+        return
+      } catch (e) {
+        console.error('[saveDocument] version merge failed:', e)
+      }
+    }
 
     await writeTextFile(
       filePath,
@@ -68,8 +130,110 @@ export async function saveDocument(projectName, docName, docData) {
       }),
       { baseDir: BaseDirectory.AppData }
     )
+    try {
+      const verifyRaw2 = await readTextFile(filePath, { baseDir: BaseDirectory.AppData })
+      const verify2 = JSON.parse(verifyRaw2 || '{}')
+      console.debug('[saveDocument] write verified (no-versions)', { filePath, hasVersions: Array.isArray(verify2.versions) ? verify2.versions.length : 0 })
+    } catch (ve2) {
+      console.debug('[saveDocument] write verify failed (no-versions)', { filePath, err: String(ve2) })
+    }
   } catch (error) {
     console.error('Failed to save document:', error)
+  }
+}
+
+/**
+ * Append a version entry for a document. Stores a small changelog file
+ * under a `.versions` folder next to the project.
+ */
+export async function appendVersion(projectName, docName, { contentHtml, contentJson } = {}) {
+  try {
+    const rel = normalizePath(docName)
+    const versionsDir = rel ? `${projectName}/.versions/${rel.split('/').slice(0, -1).join('/')}` : `${projectName}/.versions`
+    const versionsFile = rel ? `${projectName}/.versions/${rel}.versions.json` : `${projectName}/.versions/${docName}.versions.json`
+
+    // Ensure directory exists
+    const parentDir = versionsDir || `${projectName}/.versions`
+    await mkdir(parentDir, { baseDir: BaseDirectory.AppData, recursive: true })
+
+    // Load existing versions (avoid `exists()` which may be forbidden in some capability scopes)
+    let existing = []
+    try {
+      const raw = await readTextFile(versionsFile, { baseDir: BaseDirectory.AppData })
+      existing = JSON.parse(raw || '[]')
+    } catch (e) {
+      existing = []
+    }
+
+    console.debug('[appendVersion] writing to', { versionsFile, projectName, docName })
+
+    // Avoid duplicate consecutive entries
+    const latest = existing[0]
+    if (latest && latest.contentHtml && contentHtml && latest.contentHtml === contentHtml) {
+      console.debug('[appendVersion] skipped duplicate consecutive entry')
+      return
+    }
+
+    const entry = {
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      contentHtml: contentHtml || null,
+      // store a light representation (json) if provided for potential restores
+      contentJson: contentJson || null,
+    }
+
+    existing.unshift(entry)
+
+    await writeTextFile(versionsFile, JSON.stringify(existing), { baseDir: BaseDirectory.AppData })
+    console.debug('[appendVersion] wrote version', { id: entry.id, versionsFile, total: existing.length })
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('versions:changed', { detail: { projectName, docName } }))
+        console.debug('[appendVersion] dispatched versions:changed', { projectName, docName })
+      }
+    } catch (e) {
+      // ignore
+    }
+  } catch (e) {
+    console.error('[appendVersion] failed:', e)
+  }
+}
+
+export async function getVersions(projectName, docName) {
+  try {
+    // Prefer embedded versions in the main document file
+    const docPath = `${projectName}/${docName}.json`
+    try {
+      const raw = await readTextFile(docPath, { baseDir: BaseDirectory.AppData })
+      const parsed = JSON.parse(raw || '{}')
+      const found = Array.isArray(parsed.versions) ? parsed.versions.length : 0
+      console.debug('[getVersions] read from doc file', { docPath, projectName, docName, found })
+      if (Array.isArray(parsed.versions) && parsed.versions.length) return parsed.versions
+      // fallthrough to .versions file fallback
+    } catch (e) {
+      console.debug('[getVersions] failed reading doc file, will try .versions fallback', { docPath, projectName, docName, err: String(e) })
+    }
+
+    // Fallback: check for a .versions file stored alongside the project (used by appendVersion)
+    try {
+      const rel = normalizePath(docName)
+      const versionsFile = rel ? `${projectName}/.versions/${rel}.versions.json` : `${projectName}/.versions/${docName}.versions.json`
+      try {
+        const raw2 = await readTextFile(versionsFile, { baseDir: BaseDirectory.AppData })
+        const parsed2 = JSON.parse(raw2 || '[]')
+        console.debug('[getVersions] read from .versions file', { versionsFile, projectName, docName, found: Array.isArray(parsed2) ? parsed2.length : 0 })
+        return Array.isArray(parsed2) ? parsed2 : []
+      } catch (e2) {
+        console.debug('[getVersions] no .versions file found or failed to read', { versionsFile, err: String(e2) })
+        return []
+      }
+    } catch (e3) {
+      console.error('[getVersions] fallback read failed:', e3)
+      return []
+    }
+  } catch (e) {
+    console.error('[getVersions] failed:', e)
+    return []
   }
 }
 

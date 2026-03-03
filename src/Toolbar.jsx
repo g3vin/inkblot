@@ -20,7 +20,6 @@ export default function Toolbar({ editor }) {
 
   if (!editor) return null
 
-  /* ---------------- Update Toolbar When Cursor Moves ---------------- */
   useEffect(() => {
     const updateToolbar = () => {
       const attrs = editor.getAttributes('textStyle') || {}
@@ -60,7 +59,6 @@ export default function Toolbar({ editor }) {
         strike: getMarkActive('strike'),
       })
 
-      // ✅ only update highlight color if the user isn’t currently picking one
       if (!userSelectingHighlight) {
         setHighlight(highlightAttr)
       }
@@ -76,7 +74,6 @@ export default function Toolbar({ editor }) {
     }
   }, [editor, userSelectingHighlight, highlight])
 
-  /* ---------------- Apply Formatting Actions ---------------- */
   const applyColor = (c) => {
     setColor(c)
     editor.chain().focus().setColor(c).run()
@@ -84,7 +81,6 @@ export default function Toolbar({ editor }) {
 
   const applyHighlight = (c) => {
     setHighlight(c)
-    // ✅ persist this color globally for context-menu use
     if (editor.storage) editor.storage.lastHighlightColor = c
     editor.chain().focus().setHighlight({ color: c }).run()
   }
@@ -108,11 +104,9 @@ export default function Toolbar({ editor }) {
     }
   }
 
-  /* ---------------- Render Toolbar ---------------- */
   return (
     <div className="toolbar-wrapper">
       <div className="toolbar">
-        {/* Text Style Buttons */}
         <button
           className={activeMarks.bold ? 'active' : ''}
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -154,17 +148,15 @@ export default function Toolbar({ editor }) {
           title="Text Color"
         />
 
-        {/* ✅ Highlight Color */}
         <input
           type="color"
           value={highlight}
           onFocus={() => setUserSelectingHighlight(true)}
           onBlur={() => setUserSelectingHighlight(false)}
-          onChange={(e) => applyHighlight(e.target.value)} // ✅ only call applyHighlight
+          onChange={(e) => applyHighlight(e.target.value)}
           title="Highlight Color"
         />
 
-        {/* Font Family */}
         <select value={font} onChange={(e) => applyFont(e.target.value)}>
           <option value="Georgia">Georgia</option>
           <option value="Arial">Arial</option>
@@ -173,7 +165,6 @@ export default function Toolbar({ editor }) {
           <option value="Verdana">Verdana</option>
         </select>
 
-        {/* Font Size */}
         <select value={fontSize} onChange={(e) => applyFontSize(e.target.value)}>
           <option value="14px">14px</option>
           <option value="16px">16px</option>
@@ -181,11 +172,12 @@ export default function Toolbar({ editor }) {
           <option value="20px">20px</option>
           <option value="24px">24px</option>
           <option value="28px">28px</option>
+          <option value="32px">32px</option>
+          <option value="36px">36px</option>
         </select>
 
         <div className="separator" />
 
-        {/* Alignment */}
         <button
           className={alignment === 'left' ? 'active' : ''}
           onClick={() => applyAlignment('left')}

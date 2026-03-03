@@ -449,7 +449,7 @@
 
 .analysis-tile,
 .tile {
-  background: var(--tile-color);
+  background-color: var(--tile-color);
   border: 1px solid #444;
   border-radius: 8px;
   padding: 12px;
@@ -511,7 +511,7 @@
 }
 
 .synonym-btn {
-  background: transparent;
+  background-color: var(--tile-color);
   border: 1px solid #444;
   color: #ddd;
   padding: 4px 10px;
@@ -655,15 +655,12 @@
   margin: 0 auto;
 }
 
-/* Double gap between paragraphs and increase indent */
-/* Moderate gap between paragraphs */
 .editor p {
   min-height: 1.6em;
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
 
-/* Only indent paragraphs with .indented class */
 .editor p.indented {
   text-indent: 2em;
 }

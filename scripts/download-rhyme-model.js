@@ -33,38 +33,47 @@ const downloadFile = async (url, outPath) => {
   await pipeline(res.body, fileStream)
 }
 
-const downloadFromRepo = async (repo) => {
-  for (const asset of ASSETS) {
-    const rawUrl = `https://raw.githubusercontent.com/${repo}/${REPO_REF}/${asset}`
-    const outPath = path.join(TARGET_DIR, asset)
-    console.log(`Downloading ${asset} -> ${outPath}`)
-    await downloadFile(rawUrl, outPath)
-  }
+const downloadFromRepo = async (repo, asset, outPath) => {
+  const rawUrl = `https://raw.githubusercontent.com/${repo}/${REPO_REF}/${asset}`
+  console.log(`Trying ${repo} for ${asset}`)
+  await downloadFile(rawUrl, outPath)
 }
 
 const main = async () => {
-  let lastError = null
+  for (const asset of ASSETS) {
+    const outPath = path.join(TARGET_DIR, asset)
 
-  for (const repo of DEFAULT_REPOS) {
-    try {
-      console.log(`Fetching rhyme assets from ${repo}...`)
-      await downloadFromRepo(repo)
-      console.log('Rhyme model downloads complete')
-      return
-    } catch (err) {
-      lastError = err
-      console.warn(`Failed to download from ${repo}: ${err.message || err}`)
+    if (fs.existsSync(outPath)) {
+      console.log(`${asset} already exists at ${outPath}, skipping`)
+      continue
+    }
+
+    let downloaded = false
+    let lastErr = null
+
+    for (const repo of DEFAULT_REPOS) {
+      try {
+        console.log(`Fetching ${asset} from ${repo}...`)
+        await downloadFromRepo(repo, asset, outPath)
+        console.log(`Downloaded ${asset} from ${repo}`)
+        downloaded = true
+        break
+      } catch (err) {
+        lastErr = err
+        console.warn(`Failed to download ${asset} from ${repo}: ${err.message || err}`)
+      }
+    }
+
+    if (!downloaded) {
+      if (lastErr) throw lastErr
+      throw new Error(`No rhyme repo configured to provide ${asset}`)
     }
   }
 
-  if (lastError) {
-    throw lastError
-  }
-
-  throw new Error('No rhyme repo configured')
+  console.log('Rhyme model downloads complete')
 }
 
 main().catch(err => {
-  console.error(err)
-  process.exit(1)
+  console.warn('Rhyme model download failed; continuing without rhyme model:', err?.message || err)
+  // Do not exit with non-zero status during dev; missing rhyme model is optional for development.
 })
