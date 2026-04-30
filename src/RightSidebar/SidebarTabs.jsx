@@ -13,6 +13,15 @@ export default function SidebarTabs({ tab, setTab }) {
       </button>
 
       <button
+        className={tab === 'clipboard' ? 'active' : ''}
+        onClick={() => setTab('clipboard')}
+        aria-label="Clipboard"
+        title="Clipboard"
+      >
+        <SFIcon name="doc.on.clipboard" filled={tab === 'clipboard'} />
+      </button>
+
+      <button
         className={tab === 'workbench' ? 'active' : ''}
         onClick={() => setTab('workbench')}
         aria-label="Workbench"

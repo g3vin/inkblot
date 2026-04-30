@@ -1,0 +1,5 @@
+[target.aarch64-apple-darwin]
+# On CLT-only macOS setups, rustc can still pass an Xcode-style search path for
+# `clang_rt.osx` during the final link step. Add the actual CLT runtime path so
+# Tauri builds link cleanly without requiring a full Xcode.app install.
+rustflags = ["-L", "/Library/Developer/CommandLineTools/usr/lib/clang/17/lib/darwin"]

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import SFIcon from '../SFIcon'
 
 export default function SearchPanel({ editor }) {
   const [query, setQuery] = useState('')
@@ -43,9 +44,12 @@ export default function SearchPanel({ editor }) {
   }
 
   return (
-    <div className="search-panel">
+    <div className="sidebar-panel search-panel">
       <div className="panel-header">
-        <span>SEARCH</span>
+        <div className="panel-header-title">
+          <SFIcon name="magnifyingglass.circle" />
+          <span className="panel-header-label">Search</span>
+        </div>
       </div>
 
       <input

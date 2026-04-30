@@ -4,6 +4,7 @@ import SFIcon from './SFIcon'
 export default function LeftSidebar({
   width,
   onResize,
+  resizing,
   collapsed,
   peeked,
   pinned,
@@ -24,7 +25,7 @@ export default function LeftSidebar({
 }) {
   return (
     <aside
-      className={`sidebar left-sidebar${collapsed && !peeked ? ' collapsed' : ''}`}
+      className={`sidebar left-sidebar${collapsed && !peeked ? ' collapsed' : ''}${resizing ? ' is-resizing' : ''}`}
       style={{ width }}
       onMouseLeave={() => {
         if (!pinned) onAutoCollapse?.()
