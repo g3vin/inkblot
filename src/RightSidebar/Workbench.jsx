@@ -1,3 +1,4 @@
+import SFIcon from '../SFIcon'
 import POSTile from '../POSTile.jsx'
 import SynonymTile from '../SynonymTile.jsx'
 import DefinitionTile from '../DefinitionTile.jsx'
@@ -87,57 +88,60 @@ export default function Workbench({
   }
 
   return (
-
-    <>
+    <div className="sidebar-panel workbench-panel">
       <div className="panel-header workbench-header">
-        <span>WORKBENCH</span>
+        <div className="panel-header-title">
+          <SFIcon name="hammer" />
+          <span className="panel-header-label">Workbench</span>
+        </div>
         {tiles.length > 0 && (
-          <button className="clear-btn tile-btn" onClick={() => setTiles([])}>
+          <button className="panel-action-btn" onClick={() => setTiles([])}>
             Clear All
           </button>
         )}
       </div>
-
-      {tiles.map(tile => {
-        switch (tile.type) {
-          case 'synonym':
-            return (
-              <SynonymTile
-                key={tile.id}
-                word={tile.text}
-                onReplace={(newWord) => replaceWord(tile, newWord)}
-                onSelect={() => selectTileWord(tile)}
-                onRemove={() => removeTile(tile.id)}
-              />
-            )
-          case 'definition':
-            return (
-              <DefinitionTile
-                key={tile.id}
-                word={tile.text}
-                onRemove={() => removeTile(tile.id)}
-              />
-            )
-          case 'rhyme': // ✅ NEW tile type
-            return (
-              <RhymeTile
-                key={tile.id}
-                word={tile.text}
-                onReplace={(newWord) => replaceWord(tile, newWord)}
-                onSelect={() => selectTileWord(tile)}
-                onRemove={() => removeTile(tile.id)}
-              />
-            )
-          default:
-            return (
-              <POSTile
-                key={tile.id}
-                sentence={tile.text}
-                onRemove={() => removeTile(tile.id)}
-              />
-            )
-        }
-      })}
-    </>
+      <div className="sidebar-list workbench-list">
+        {tiles.map(tile => {
+          switch (tile.type) {
+            case 'synonym':
+              return (
+                <SynonymTile
+                  key={tile.id}
+                  word={tile.text}
+                  onReplace={(newWord) => replaceWord(tile, newWord)}
+                  onSelect={() => selectTileWord(tile)}
+                  onRemove={() => removeTile(tile.id)}
+                />
+              )
+            case 'definition':
+              return (
+                <DefinitionTile
+                  key={tile.id}
+                  word={tile.text}
+                  onRemove={() => removeTile(tile.id)}
+                />
+              )
+            case 'rhyme':
+              return (
+                <RhymeTile
+                  key={tile.id}
+                  word={tile.text}
+                  onReplace={(newWord) => replaceWord(tile, newWord)}
+                  onSelect={() => selectTileWord(tile)}
+                  onRemove={() => removeTile(tile.id)}
+                />
+              )
+            default:
+              return (
+                <POSTile
+                  key={tile.id}
+                  sentence={tile.text}
+                  onRemove={() => removeTile(tile.id)}
+                />
+              )
+          }
+        })}
+      </div>
+    </div>
   )
 }

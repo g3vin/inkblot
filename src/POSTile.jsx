@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useMemo } from 'react'
 import nlp from 'compromise'
 
 export default function POSTile({ sentence, onRemove }) {
-  const [analysis, setAnalysis] = useState([])
-
   const tagColors = {
     Noun: '#1f77b4',
     Verb: '#2ca02c',
@@ -17,7 +15,7 @@ export default function POSTile({ sentence, onRemove }) {
     Unknown: '#cccccc'
   }
 
-  const normalizeTag = (tags, wordText) => {
+  const normalizeTag = (tags) => {
     if (!tags || !Array.isArray(tags)) return 'Unknown'
     
     if (tags.some(t => ['Noun', 'Singular', 'Plural', 'ProperNoun', 'Person', 'Place', 'Organization'].includes(t))) return 'Noun'
@@ -33,59 +31,43 @@ export default function POSTile({ sentence, onRemove }) {
     return 'Unknown'
   }
 
-  useEffect(() => {
-    if (!sentence) {
-      setAnalysis([])
-      return
-    }
-
+  const analysis = useMemo(() => {
+    if (!sentence) return []
     const doc = nlp(sentence)
     const termsJson = doc.terms().json()
 
-    const result = termsJson.flatMap(s => s.terms).map(item => ({
+    return termsJson.flatMap(s => s.terms).map(item => ({
       text: item.text,
-      tag: normalizeTag(item.tags, item.text)
+      tag: normalizeTag(item.tags)
     }))
-
-    setAnalysis(result)
   }, [sentence])
 
   return (
-    <div className="tile" style={{
-    }}>
+    <div className="tile sidebar-card">
       <button 
         onClick={onRemove}
-        style={{
-          position: 'absolute', top: '5px', right: '8px',
-          background: 'none', border: 'none', color: '#888',
-          cursor: 'pointer', fontSize: '16px'
-        }}
+        className="sidebar-card-close"
       >
         ×
       </button>
 
-      <div style={{ fontSize: '10px', color: '#ff8500', marginBottom: '8px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+      <div className="sidebar-card-eyebrow sidebar-card-eyebrow--pos">
         Parts of Speech
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+      <div className="sidebar-pos-grid">
         {analysis.map((word, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{
-              fontSize: '9px',
-              color: 'white',
-              backgroundColor: tagColors[word.tag],
-              padding: '1px 4px',
-              borderRadius: '3px',
-              marginBottom: '2px',
-              textTransform: 'uppercase'
-            }}>
+          <div key={i} className="sidebar-pos-token">
+            <span
+              className="sidebar-pos-badge"
+              style={{ backgroundColor: tagColors[word.tag] }}
+            >
               {word.tag}
             </span>
-            <span style={{
-              fontSize: '14px',
-              borderBottom: `2px solid ${tagColors[word.tag]}`
-            }}>
+            <span
+              className="sidebar-pos-word"
+              style={{ borderBottomColor: tagColors[word.tag] }}
+            >
               {word.text}
             </span>
           </div>

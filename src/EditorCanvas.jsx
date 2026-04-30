@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 import { Color } from '@tiptap/extension-color'
+import { Dropcursor } from '@tiptap/extension-dropcursor'
 import { FontFamily } from '@tiptap/extension-font-family'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { Highlight } from '@tiptap/extension-highlight'
 import { Underline } from '@tiptap/extension-underline'
 import { Fragment } from '@tiptap/pm/model'
+import { TextSelection } from '@tiptap/pm/state'
 import ResizableImage from './extensions/ResizableImage'
 import { debounce } from 'lodash'
 
@@ -34,10 +36,21 @@ export default function EditorCanvas({
   activeDoc,
   setActiveDoc,
   setVersions,
+  onMoveClipboardEntryToEditor,
 }) {
   const hasActiveDoc = Boolean(projectName && currentDoc)
+  const primaryPaneRef = useRef(null)
+  const secondaryPaneRef = useRef(null)
+  const [dragCaret, setDragCaret] = useState(null)
 
   const [, forceNoteRender] = useState(0)
+
+  const getMountedEditorView = (instance) => {
+    if (!instance || instance.isDestroyed) return null
+    const view = instance.editorView
+    if (!view || view.isDestroyed) return null
+    return view
+  }
 
   const createPasteHandler = () => {
     return (view, event) => {
@@ -105,6 +118,191 @@ export default function EditorCanvas({
       return false
     }
   }
+
+  const getDraggedClipboardPayload = (event) => {
+    const transfer = event?.dataTransfer
+    const globalDragged = window.__inkblot_draggedClipboardEntry
+    const globalDraggedEditorSelection = window.__inkblot_draggedEditorSelection
+    const raw = transfer?.getData('application/x-inkblot-clipboard-entry')
+    const plainText = transfer?.getData('text/plain') || ''
+    if (!raw && !globalDragged?.text && !plainText) return null
+    if (!raw && !globalDragged?.text && globalDraggedEditorSelection) return null
+
+    let parsed = null
+    if (raw) {
+      try { parsed = JSON.parse(raw) } catch (e) {}
+    }
+
+    const text = parsed?.text || globalDragged?.text || plainText
+    const id = parsed?.id || globalDragged?.id || ''
+    if (!String(text).trim()) return null
+    return { id, text: String(text) }
+  }
+
+  const emitDnDDebug = (phase, status = {}, info = '', transient = false) => {
+    try {
+      window.dispatchEvent(new CustomEvent('inkblot:dnd-debug', {
+        detail: { phase, status, info, transient },
+      }))
+    } catch (e) {}
+  }
+
+  const clearDragGlobals = () => {
+    try { window.__inkblot_draggedClipboardEntry = null } catch (e) {}
+    try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
+    try { window.__inkblot_dragPoint = null } catch (e) {}
+    try { window.__inkblot_dropHandled = false } catch (e) {}
+    emitDnDDebug('drag-globals-cleared', {
+      source: 'none',
+      over: 'none',
+      dropHandled: false,
+      editorSelection: false,
+      clipboardPayload: false,
+    }, '', true)
+  }
+
+  const isPointInRect = (x, y, rect) => {
+    if (!rect) return false
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+  }
+
+  const getTargetEditorAtPoint = (x, y) => {
+    if (x == null || y == null) return null
+
+    const primaryRect = primaryPaneRef.current?.getBoundingClientRect?.()
+    if (editor && isPointInRect(x, y, primaryRect)) return editor
+
+    const secondaryRect = secondaryPaneRef.current?.getBoundingClientRect?.()
+    if (splitView === 'editor' && secondaryEditor && isPointInRect(x, y, secondaryRect)) {
+      return secondaryEditor
+    }
+
+    return null
+  }
+
+  const updateDropCaret = (targetEditor, event) => {
+    const view = getMountedEditorView(targetEditor)
+    if (!view) return
+    const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
+    if (!coords?.pos) return
+
+    const nextSelection = TextSelection.create(view.state.doc, coords.pos)
+    const samePos =
+      view.state.selection.from === nextSelection.from &&
+      view.state.selection.to === nextSelection.to
+
+    if (!samePos) {
+      view.dispatch(view.state.tr.setSelection(nextSelection))
+    }
+
+    const caretCoords = view.coordsAtPos(coords.pos)
+    const paneEl =
+      targetEditor === secondaryEditor ? secondaryPaneRef.current : primaryPaneRef.current
+    const paneRect = paneEl?.getBoundingClientRect?.()
+    if (!paneRect || !caretCoords) return
+
+    setDragCaret({
+      pane: targetEditor === secondaryEditor ? 'secondary' : 'primary',
+      left: Math.max(0, caretCoords.left - paneRect.left),
+      top: Math.max(0, caretCoords.top - paneRect.top),
+      height: Math.max(18, caretCoords.bottom - caretCoords.top),
+    })
+  }
+
+  const handlePaneDragStart = (event, targetEditor, source, docName) => {
+    const { selection, doc } = targetEditor?.state || {}
+    if (!selection || selection.empty) return
+
+    const text = doc.textBetween(selection.from, selection.to, '\n')
+    if (!text.trim()) return
+
+    const payload = {
+      from: selection.from,
+      to: selection.to,
+      text,
+      source,
+      docName: docName || '',
+    }
+
+    try { window.__inkblot_draggedEditorSelection = payload } catch (e) {}
+    try { window.__inkblot_dropHandled = false } catch (e) {}
+    emitDnDDebug('editor-dragstart', {
+      source: 'editor',
+      over: 'none',
+      dropHandled: false,
+      editorSelection: true,
+      clipboardPayload: false,
+    }, `${source}:${docName || ''} len=${text.length}`)
+    try {
+      event.dataTransfer?.setData('application/x-inkblot-editor-selection', JSON.stringify(payload))
+      if (!event.dataTransfer?.getData('text/plain')) {
+        event.dataTransfer?.setData('text/plain', text)
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move'
+      }
+    } catch (e) {}
+  }
+
+  const handlePaneDragOver = (event, targetEditor) => {
+    const payload = getDraggedClipboardPayload(event)
+    if (!payload) return
+    event.preventDefault()
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move'
+    }
+    updateDropCaret(targetEditor, event)
+    emitDnDDebug('editor-dragover', {
+      over: 'editor',
+      clipboardPayload: true,
+    }, '', true)
+  }
+
+  const handlePaneDrop = (event, targetEditor) => {
+    const payload = getDraggedClipboardPayload(event)
+    const view = getMountedEditorView(targetEditor)
+    if (!payload || !view) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
+    const insertPos = coords?.pos ?? view.state.selection.from
+    const tr = view.state.tr.insertText(payload.text, insertPos, insertPos)
+    view.dispatch(tr.scrollIntoView())
+    view.focus()
+
+    onMoveClipboardEntryToEditor?.(payload.id)
+    try { window.__inkblot_dropHandled = true } catch (e) {}
+    setDragCaret(null)
+    emitDnDDebug('editor-drop', {
+      source: 'clipboard',
+      over: 'editor',
+      dropHandled: true,
+      clipboardPayload: true,
+    }, `id=${payload.id || 'none'} len=${payload.text.length}`)
+  }
+
+  const insertClipboardPayloadAtPoint = (payload, targetEditor, x, y) => {
+    const view = getMountedEditorView(targetEditor)
+    if (!payload || !view) return false
+    const coords = view.posAtCoords({ left: x, top: y })
+    const insertPos = coords?.pos ?? view.state.selection.from
+    const tr = view.state.tr.insertText(payload.text, insertPos, insertPos)
+    view.dispatch(tr.scrollIntoView())
+    view.focus()
+    onMoveClipboardEntryToEditor?.(payload.id)
+    try { window.__inkblot_dropHandled = true } catch (e) {}
+    setDragCaret(null)
+    emitDnDDebug('editor-fallback-insert-on-dragend', {
+      source: 'clipboard',
+      over: 'editor',
+      dropHandled: true,
+      clipboardPayload: true,
+    }, `id=${payload.id || 'none'} len=${payload.text.length}`)
+    return true
+  }
+
   const [primaryWordCount, setPrimaryWordCount] = useState(0)
   const [secondaryWordCount, setSecondaryWordCount] = useState(0)
 
@@ -121,6 +319,10 @@ export default function EditorCanvas({
       StarterKit.configure({
         bulletList: { keepMarks: true },
         orderedList: { keepMarks: true },
+      }),
+      Dropcursor.configure({
+        color: 'rgba(84, 165, 255, 0.95)',
+        width: 2,
       }),
       CustomTextStyle,
       Color,
@@ -151,6 +353,10 @@ export default function EditorCanvas({
   const secondaryEditor = useEditor({
     extensions: [
       StarterKit,
+      Dropcursor.configure({
+        color: 'rgba(84, 165, 255, 0.95)',
+        width: 2,
+      }),
       CustomTextStyle,
       Color,
       FontFamily,
@@ -171,6 +377,249 @@ export default function EditorCanvas({
       handlePaste: createPasteHandler(),
     },
   })
+
+  useEffect(() => {
+    const attachDragMeta = (instance, source, docName) => {
+      const dom = getMountedEditorView(instance)?.dom
+      if (!dom || !instance?.state) return () => {}
+
+      const onDragStart = (event) => {
+        const { selection, doc } = instance.state
+        if (!selection || selection.empty) return
+
+        const text = doc.textBetween(selection.from, selection.to, '\n')
+        if (!text.trim()) return
+
+        const payload = {
+          from: selection.from,
+          to: selection.to,
+          text,
+          source,
+          docName: docName || '',
+        }
+
+        try { window.__inkblot_draggedEditorSelection = payload } catch (e) {}
+        emitDnDDebug('editor-dom-dragstart', {
+          source: 'editor',
+          editorSelection: true,
+          dropHandled: false,
+        }, `${source}:${docName || ''} len=${text.length}`)
+        try {
+          event.dataTransfer?.setData('application/x-inkblot-editor-selection', JSON.stringify(payload))
+          event.dataTransfer?.setData('text/plain', text)
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move'
+          }
+        } catch (e) {}
+      }
+
+      const onDragEnd = () => {
+        emitDnDDebug('editor-dom-dragend', {
+          source: 'editor',
+          editorSelection: Boolean(window.__inkblot_draggedEditorSelection),
+        })
+      }
+
+      dom.addEventListener('dragstart', onDragStart, true)
+      dom.addEventListener('dragend', onDragEnd, true)
+      return () => {
+        dom.removeEventListener('dragstart', onDragStart, true)
+        dom.removeEventListener('dragend', onDragEnd, true)
+      }
+    }
+
+    const offPrimary = attachDragMeta(editor, 'primary', currentDoc)
+    const offSecondary = attachDragMeta(secondaryEditor, 'secondary', secondaryDoc)
+    return () => {
+      offPrimary()
+      offSecondary()
+    }
+  }, [editor, secondaryEditor, currentDoc, secondaryDoc])
+
+  useEffect(() => {
+    const pane = primaryPaneRef.current
+    if (!pane || !editor) return
+
+    const onDragStart = (event) => handlePaneDragStart(event, editor, 'primary', currentDoc)
+    const onDragEnd = () => {
+      emitDnDDebug('primary-pane-dragend', {
+        source: 'editor',
+        editorSelection: Boolean(window.__inkblot_draggedEditorSelection),
+        clipboardPayload: Boolean(window.__inkblot_draggedClipboardEntry),
+      }, '', true)
+    }
+    const onDragOver = (event) => handlePaneDragOver(event, editor)
+    const onDrop = (event) => handlePaneDrop(event, editor)
+
+    pane.addEventListener('dragstart', onDragStart, true)
+    pane.addEventListener('dragend', onDragEnd, true)
+    pane.addEventListener('dragover', onDragOver, true)
+    pane.addEventListener('drop', onDrop, true)
+
+    return () => {
+      pane.removeEventListener('dragstart', onDragStart, true)
+      pane.removeEventListener('dragend', onDragEnd, true)
+      pane.removeEventListener('dragover', onDragOver, true)
+      pane.removeEventListener('drop', onDrop, true)
+    }
+  }, [editor, currentDoc])
+
+  useEffect(() => {
+    const pane = secondaryPaneRef.current
+    if (!pane || !secondaryEditor || splitView !== 'editor') return
+
+    const onDragStart = (event) => handlePaneDragStart(event, secondaryEditor, 'secondary', secondaryDoc)
+    const onDragEnd = () => {
+      emitDnDDebug('secondary-pane-dragend', {
+        source: 'editor',
+        editorSelection: Boolean(window.__inkblot_draggedEditorSelection),
+        clipboardPayload: Boolean(window.__inkblot_draggedClipboardEntry),
+      }, '', true)
+    }
+    const onDragOver = (event) => handlePaneDragOver(event, secondaryEditor)
+    const onDrop = (event) => handlePaneDrop(event, secondaryEditor)
+
+    pane.addEventListener('dragstart', onDragStart, true)
+    pane.addEventListener('dragend', onDragEnd, true)
+    pane.addEventListener('dragover', onDragOver, true)
+    pane.addEventListener('drop', onDrop, true)
+
+    return () => {
+      pane.removeEventListener('dragstart', onDragStart, true)
+      pane.removeEventListener('dragend', onDragEnd, true)
+      pane.removeEventListener('dragover', onDragOver, true)
+      pane.removeEventListener('drop', onDrop, true)
+    }
+  }, [secondaryEditor, secondaryDoc, splitView])
+
+  useEffect(() => {
+    const onWindowDragOver = (event) => {
+      try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
+      const payload = getDraggedClipboardPayload(event)
+      if (!payload) {
+        setDragCaret(null)
+        return
+      }
+
+      const targetEditor = getTargetEditorAtPoint(event.clientX, event.clientY)
+      if (!targetEditor) {
+        setDragCaret(null)
+        return
+      }
+
+      event.preventDefault()
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move'
+      }
+      updateDropCaret(targetEditor, event)
+      emitDnDDebug('window-dragover-editor-target', {
+        over: 'editor',
+        clipboardPayload: true,
+      }, '', true)
+    }
+
+    const onWindowDrag = (event) => {
+      try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
+      const payload = window.__inkblot_draggedClipboardEntry || null
+      if (!payload?.text) {
+        setDragCaret(null)
+        return
+      }
+
+      const targetEditor = getTargetEditorAtPoint(event.clientX, event.clientY)
+      if (!targetEditor) {
+        setDragCaret(null)
+        return
+      }
+
+      updateDropCaret(targetEditor, event)
+      emitDnDDebug('window-drag-editor-target', {
+        over: 'editor',
+        clipboardPayload: true,
+      }, '', true)
+    }
+
+    const onWindowDrop = (event) => {
+      const payload = getDraggedClipboardPayload(event)
+      if (!payload) return
+
+      const targetEditor = getTargetEditorAtPoint(event.clientX, event.clientY)
+      if (!targetEditor) return
+
+      handlePaneDrop(event, targetEditor)
+      emitDnDDebug('window-drop-editor-target', {
+        over: 'editor',
+        dropHandled: true,
+      })
+    }
+
+    const onWindowDragEnd = (event) => {
+      if (!window.__inkblot_dragPoint && (event?.clientX || event?.clientY)) {
+        try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
+      }
+      setDragCaret(null)
+      emitDnDDebug('window-dragend', {
+        dropHandled: Boolean(window.__inkblot_dropHandled),
+        clipboardPayload: Boolean(window.__inkblot_draggedClipboardEntry),
+        editorSelection: Boolean(window.__inkblot_draggedEditorSelection),
+      }, `x=${String(event?.clientX ?? window.__inkblot_dragPoint?.x ?? null)} y=${String(event?.clientY ?? window.__inkblot_dragPoint?.y ?? null)}`)
+    }
+
+    window.addEventListener('drag', onWindowDrag, true)
+    window.addEventListener('dragover', onWindowDragOver, true)
+    window.addEventListener('drop', onWindowDrop, true)
+    window.addEventListener('dragend', onWindowDragEnd, true)
+
+    return () => {
+      window.removeEventListener('drag', onWindowDrag, true)
+      window.removeEventListener('dragover', onWindowDragOver, true)
+      window.removeEventListener('drop', onWindowDrop, true)
+      window.removeEventListener('dragend', onWindowDragEnd, true)
+    }
+  }, [editor, secondaryEditor, splitView])
+
+  useEffect(() => {
+    const onClipboardDragEndDrop = (event) => {
+      const detail = event?.detail || {}
+      const point = {
+        x: detail.x ?? window.__inkblot_dragPoint?.x ?? null,
+        y: detail.y ?? window.__inkblot_dragPoint?.y ?? null,
+      }
+      const payload = {
+        id: detail.id || '',
+        text: detail.text || '',
+      }
+
+      if (window.__inkblot_dropHandled) {
+        emitDnDDebug('clipboard-dragend-drop-skipped', {
+          source: 'clipboard',
+          dropHandled: true,
+        }, `id=${payload.id || 'none'}`)
+        setDragCaret(null)
+        clearDragGlobals()
+        return
+      }
+
+      const targetEditor = getTargetEditorAtPoint(point.x, point.y)
+      if (targetEditor && payload.text) {
+        insertClipboardPayloadAtPoint(payload, targetEditor, point.x, point.y)
+      } else {
+        emitDnDDebug('clipboard-dragend-drop-miss', {
+          source: 'clipboard',
+          over: 'none',
+          clipboardPayload: Boolean(payload.text),
+        }, `x=${String(point.x)} y=${String(point.y)}`)
+      }
+
+      setDragCaret(null)
+      clearDragGlobals()
+    }
+
+    window.addEventListener('inkblot:clipboard-dragend-drop', onClipboardDragEndDrop)
+    return () => {
+      window.removeEventListener('inkblot:clipboard-dragend-drop', onClipboardDragEndDrop)
+    }
+  }, [editor, secondaryEditor, splitView])
 
   /* ---------------- Expose Editor ---------------- */
 
@@ -474,6 +923,7 @@ export default function EditorCanvas({
       <div className={`editor-container ${splitView ? 'split-active' : ''}`}>
 
         <div
+          ref={primaryPaneRef}
           className="pane primary-pane"
           onFocus={() => setActiveDoc(currentDoc)}
           onMouseEnter={() => setActiveDoc(currentDoc)}
@@ -482,6 +932,16 @@ export default function EditorCanvas({
           onClick={() => focusEditor(editor)}
           onMouseMove={() => setActiveEditor?.(editor)}
         >
+          {dragCaret?.pane === 'primary' ? (
+            <div
+              className="drag-drop-caret"
+              style={{
+                left: `${dragCaret.left}px`,
+                top: `${dragCaret.top}px`,
+                height: `${dragCaret.height}px`,
+              }}
+            />
+          ) : null}
           <div className="pane-scroll">
             {splitView === 'editor' && (
               <div className="pane-header pane-header-centered">
@@ -496,6 +956,7 @@ export default function EditorCanvas({
 
         {splitView === 'editor' && (
           <div
+            ref={secondaryPaneRef}
             className="pane secondary-pane"
             onFocus={() => setActiveDoc(secondaryDoc)}
             onMouseEnter={() => setActiveDoc(secondaryDoc)}
@@ -504,6 +965,16 @@ export default function EditorCanvas({
             onClick={() => focusEditor(secondaryEditor)}
             onMouseMove={() => setActiveEditor?.(secondaryEditor)}
           >
+            {dragCaret?.pane === 'secondary' ? (
+              <div
+                className="drag-drop-caret"
+                style={{
+                  left: `${dragCaret.left}px`,
+                  top: `${dragCaret.top}px`,
+                  height: `${dragCaret.height}px`,
+                }}
+              />
+            ) : null}
             <div className="pane-scroll">
               <div className="pane-header split-header pane-header-centered">
                 <span>{secondaryDoc}</span>

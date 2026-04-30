@@ -119,8 +119,7 @@ export default function RhymeTile({ word, onReplace, onRemove, onSelect }) {
 
   return (
     <div
-      className="tile"
-      style={{ position: 'relative' }}
+      className="tile sidebar-card"
       onClick={onSelect}
     >
       <button
@@ -128,39 +127,22 @@ export default function RhymeTile({ word, onReplace, onRemove, onSelect }) {
           e.stopPropagation()
           onRemove()
         }}
-        style={{
-          position: 'absolute',
-          top: '5px',
-          right: '8px',
-          background: 'none',
-          border: 'none',
-          color: '#888',
-          cursor: 'pointer',
-          fontSize: '16px',
-        }}
+        className="sidebar-card-close"
       >
         ×
       </button>
 
-      <div
-        style={{
-          fontSize: '10px',
-          color: '#ff9500',
-          marginBottom: '8px',
-          fontWeight: 'bold',
-          textTransform: 'uppercase',
-        }}
-      >
+      <div className="sidebar-card-eyebrow sidebar-card-eyebrow--rhyme">
         Rhymes
       </div>
 
-      <h4 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{normalizedWord}</h4>
+      <h4 className="sidebar-card-title">{normalizedWord}</h4>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+      <div className="sidebar-chip-list">
         {loading ? (
-          <span style={{ color: '#666', fontSize: '12px' }}>Finding rhymes...</span>
+          <span className="sidebar-muted">Finding rhymes...</span>
         ) : error ? (
-          <span style={{ color: '#ff5a5a', fontSize: '12px' }}>{error}</span>
+          <span className="sidebar-error">{error}</span>
         ) : rhymes.length > 0 ? (
           rhymes.map((rhyme, i) => (
             <button
@@ -169,22 +151,13 @@ export default function RhymeTile({ word, onReplace, onRemove, onSelect }) {
                 e.stopPropagation()
                 onReplace(rhyme)
               }}
-              className="rhyme-btn"
-              style={{
-                background: '#1a1a1a',
-                border: '1px solid #444',
-                color: '#ddd',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                fontSize: '13px',
-                cursor: 'pointer',
-              }}
+              className="synonym-btn rhyme-btn"
             >
               {rhyme}
             </button>
           ))
         ) : (
-          <span style={{ color: '#666', fontSize: '12px' }}>No rhymes found.</span>
+          <span className="sidebar-muted">No rhymes found.</span>
         )}
       </div>
     </div>

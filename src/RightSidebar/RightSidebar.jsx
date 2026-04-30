@@ -1,14 +1,15 @@
-import { useEffect } from 'react'
 import SidebarTabs from './SidebarTabs'
 import Workbench from './Workbench'
 import NotesPanel from '../NotesPanel'
 import HistoryPanel from './HistoryPanel'
 import SearchPanel from './SearchPanel'
+import ClipboardPanel from './ClipboardPanel'
 import SFIcon from '../SFIcon'
 
 export default function RightSidebar({
   width,
   onResize,
+  resizing,
   collapsed,
   peeked,
   pinned,
@@ -27,18 +28,14 @@ export default function RightSidebar({
   versions = [],
   editor, 
   setVersions,
+  clipboardHistory,
+  clearClipboardHistory,
+  onDropToClipboard,
   projectName,
 }) {
-
-  useEffect(() => {
-    try {
-      console.debug('[RightSidebar] activeDoc', activeDoc, 'versionsForActiveDocCount', versions?.[activeDoc]?.length)
-    } catch (e) {}
-  }, [activeDoc, versions])
-  
   return (
     <aside
-      className={`sidebar right-sidebar${collapsed && !peeked ? ' collapsed' : ''}`}
+      className={`sidebar right-sidebar${collapsed && !peeked ? ' collapsed' : ''}${resizing ? ' is-resizing' : ''}`}
       style={{ width }}
       onMouseLeave={() => {
         if (!pinned) onAutoCollapse?.()
@@ -65,6 +62,12 @@ export default function RightSidebar({
       <div className="sidebar-content">
         {sidebarTab === 'search' ? (
           <SearchPanel editor={editor} />
+        ) : sidebarTab === 'clipboard' ? (
+          <ClipboardPanel
+            entries={clipboardHistory}
+            onClear={clearClipboardHistory}
+            onDropToClipboard={onDropToClipboard}
+          />
         ) : sidebarTab === 'workbench' ? (
           <Workbench
             tiles={tiles}

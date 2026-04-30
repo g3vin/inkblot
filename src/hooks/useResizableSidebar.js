@@ -123,6 +123,7 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
 
   return {
     width: displayWidth,
+    resizing,
     start: () => {
       draggingRef.current = true
       setResizing(true)

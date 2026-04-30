@@ -43,37 +43,28 @@ export default function DefinitionTile({ word, onRemove }) {
   }, [word])
 
   return (
-    <div className="tile definition-tile" style={{
-    }}>
-      <button onClick={onRemove} style={{ position: 'absolute', top: '5px', right: '8px', background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>×</button>
+    <div className="tile definition-tile sidebar-card">
+      <button onClick={onRemove} className="sidebar-card-close">×</button>
       
-      <div style={{ fontSize: '10px', color: '#ffcc00', marginBottom: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+      <div className="sidebar-card-eyebrow sidebar-card-eyebrow--dictionary">
         Dictionary
       </div>
       
-      <h4 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{word.toLowerCase()}</h4>
+      <h4 className="sidebar-card-title">{word.toLowerCase()}</h4>
 
       {loading ? (
-        <span className="definition-loading" style={{ fontSize: '12px' }}>Looking up...</span>
+        <span className="definition-loading sidebar-muted">Looking up...</span>
       ) : definition ? (
-        <div>
-          <span style={{ 
-            fontStyle: 'italic', 
-            fontSize: '12px', 
-            marginRight: '8px' 
-          }} className="definition-pos">
+        <div className="sidebar-card-copy">
+          <span className="definition-pos">
             ({definition.pos}.)
           </span>
-          <p style={{ 
-            margin: '4px 0 0 0', 
-            fontSize: '13px', 
-            lineHeight: '1.4' 
-          }} className="definition-text">
+          <p className="definition-text">
             {definition.text}
           </p>
         </div>
       ) : (
-        <span className="definition-empty" style={{ fontSize: '12px' }}>No definition found.</span>
+        <span className="definition-empty sidebar-muted">No definition found.</span>
       )}
     </div>
   )

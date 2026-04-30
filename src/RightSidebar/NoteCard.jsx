@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
+import SFIcon from '../SFIcon'
 
 export default function NoteCard({
   note,
@@ -10,7 +11,7 @@ export default function NoteCard({
   const textareaRef = useRef(null)
   const [editing, setEditing] = useState(false)
 
-  const resizeTextarea = () => {
+  const resizeTextarea = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
 
@@ -29,12 +30,12 @@ export default function NoteCard({
 
     const nextHeight = Math.min(el.scrollHeight, maxHeight)
     el.style.height = `${nextHeight}px`
-  }
+  }, [editing])
 
   // Auto-resize on load and whenever content/expand state changes
   useEffect(() => {
     resizeTextarea()
-  }, [note.content, editing])
+  }, [note.content, editing, resizeTextarea])
 
   return (
     <div
@@ -49,8 +50,10 @@ export default function NoteCard({
           const ok = await confirm('Delete note?')
           if (ok) onRemove()
         }}
+        aria-label="Delete note"
+        title="Delete note"
       >
-        ×
+        <SFIcon name="xmark" />
       </button>
 
       {note.type === 'quote' && (

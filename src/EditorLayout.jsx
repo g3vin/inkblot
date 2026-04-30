@@ -79,6 +79,7 @@ export default function EditorLayout(props) {
         <LeftSidebar
           width={left.width}
           onResize={left.start}
+          resizing={left.resizing}
           collapsed={left.collapsed}
           peeked={left.peeked}
           pinned={left.pinned}
@@ -105,6 +106,7 @@ export default function EditorLayout(props) {
         <RightSidebar
           width={right.width}
           onResize={right.start}
+          resizing={right.resizing}
           collapsed={right.collapsed}
           peeked={right.peeked}
           pinned={right.pinned}
@@ -123,6 +125,9 @@ export default function EditorLayout(props) {
 
           versions={props.versions}
           setVersions={props.setVersions}
+          clipboardHistory={props.clipboardHistory}
+          clearClipboardHistory={props.clearClipboardHistory}
+          onDropToClipboard={props.onDropToClipboard}
           activeDoc={props.activeDoc}
           projectName={props.projectName}
 

@@ -13,16 +13,6 @@ if (typeof window !== "undefined" && window.__TAURI__) {
     .catch((err) => console.warn("Tauri API failed to load:", err?.message || err))
 }
 
-// Returns the lemma (base form) of a word using compromise
-function getLemma(word) {
-  const doc = nlp(word)
-  if (doc.has("#Verb")) return doc.verbs().toInfinitive().out("text") || word
-  if (doc.has("#Adjective")) return doc.adjectives().conjugate()?.adjective || word
-  if (doc.has("#Noun")) return doc.nouns().toSingular().out("text") || word
-  return word
-}
-
-
 /**
  * Inflect a candidate antonym to match the input word's tense/form using compromise
  */
@@ -105,25 +95,25 @@ export default function SynonymTile({ word, context, onReplace, onRemove, onSele
   }, [word, context])
 
   return (
-    <div className="tile" onClick={onSelect} style={{ position: "relative" }}>
+    <div className="tile sidebar-card" onClick={onSelect}>
       <button
         onClick={(e) => { e.stopPropagation(); onRemove() }}
-        style={{ position: "absolute", top: 5, right: 8, background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 16 }}
+        className="sidebar-card-close"
       >
         ×
       </button>
 
-      <div style={{ fontSize: 10, color: "#007aff", marginBottom: 8, fontWeight: "bold", textTransform: "uppercase" }}>
+      <div className="sidebar-card-eyebrow sidebar-card-eyebrow--thesaurus">
         Thesaurus
       </div>
 
-      <h4 style={{ margin: "0 0 8px 0", fontSize: 16 }}>{normalizeTerm(word)}</h4>
+      <h4 className="sidebar-card-title">{normalizeTerm(word)}</h4>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <div className="sidebar-chip-list">
         {loading ? (
-          <span style={{ color: "#666", fontSize: 12 }}>Searching...</span>
+          <span className="sidebar-muted">Searching...</span>
         ) : synonyms.length === 0 && antonyms.length === 0 ? (
-          <span style={{ color: "#666", fontSize: 12 }}>No high-quality matches.</span>
+          <span className="sidebar-muted">No high-quality matches.</span>
         ) : (
           <>
             {synonyms.map((syn, i) => (
@@ -136,8 +126,7 @@ export default function SynonymTile({ word, context, onReplace, onRemove, onSele
               <button
                 key={`ant-${ant}-${i}`}
                 onClick={(e) => { e.stopPropagation(); onReplace(ant) }}
-                className="synonym-btn"
-                style={{ color: "red", border: "1px solid red", background: "transparent" }}
+                className="synonym-btn synonym-btn-antonym"
                 title="antonym"
               >
                 {ant}

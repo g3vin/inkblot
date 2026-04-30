@@ -60,6 +60,21 @@ async fn get_webview_url(
     }
 }
 
+#[tauri::command]
+async fn eval_webview(
+    app_handle: AppHandle,
+    label: String,
+    script: String,
+) -> Result<(), String> {
+    if let Some(webview) = app_handle.get_webview_window(&label) {
+        webview
+            .eval(script)
+            .map_err(|e| format!("Failed to evaluate script: {e}"))
+    } else {
+        Err(format!("Webview '{}' not found", label))
+    }
+}
+
 /* ============================================================
    PINTEREST SCRAPER (unchanged logic)
 ============================================================ */
@@ -709,6 +724,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             navigate_webview,
             get_webview_url,
+            eval_webview,
             scrape_pinterest_html,
             get_synonyms,
         ])
