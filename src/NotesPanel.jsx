@@ -27,10 +27,6 @@ export default function NotesPanel({
     setNotes(prev => [createNote(), ...prev])
   }, [setNotes])
 
-  const handleClearAll = useCallback(() => {
-    setNotes([])
-  }, [setNotes])
-
   const handleRemove = useCallback(
     (id) => {
       setNotes(prev => prev.filter(note => note.id !== id))
@@ -71,22 +67,22 @@ export default function NotesPanel({
   /* ----------------------------- */
 
   return (
-    <div className="notes-panel">
-      {/* Header */}
+    <div className="sidebar-panel notes-panel">
       <div className="panel-header">
-        <span>NOTES</span>
-
-      <button
-        className="clear-btn"
-        onClick={handleAddNote}
-        aria-label="Add note"
-        title="Add note"
-      >
-        <SFIcon name="plus" />
-      </button>
+        <div className="panel-header-title">
+          <SFIcon name="doc.text" />
+          <span className="panel-header-label">Notes</span>
+        </div>
+        <button
+          className="panel-action-btn panel-icon-btn"
+          onClick={handleAddNote}
+          aria-label="Add note"
+          title="Add note"
+        >
+          <SFIcon name="plus" />
+        </button>
       </div>
 
-      {/* Search */}
       <input
         className="notes-search"
         type="search"
@@ -95,7 +91,6 @@ export default function NotesPanel({
         onChange={(e) => setQuery(e.target.value)}
       />
 
-      {/* Notes List */}
       <div className="notes-list">
         {filteredNotes.length === 0 ? (
           <div className="notes-empty">

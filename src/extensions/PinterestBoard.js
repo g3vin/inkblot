@@ -1,11 +1,52 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { openPinterest } from '../openPinterest'
 
 const PINTEREST_SCRIPT_ID = 'inkblot-pinterest-pinit-js'
 const PINTEREST_SCRIPT_SRC = 'https://assets.pinterest.com/js/pinit.js'
 
 const PINTEREST_PIDGETS_BASE = 'https://widgets.pinterest.com/v3/pidgets/boards'
-const PINTEREST_LOG = '[PinterestBoard]'
+const SECTION_PUBLIC_PREVIEW_TIMEOUT_MS = 2000
+const SECTION_PRIVATE_PREVIEW_TIMEOUT_MS = 15000
+const PINTEREST_OPEN_WINDOW_EVENT = 'inkblot:pinterest-open-window'
+const PINTEREST_COPY_LINK_EVENT = 'inkblot:pinterest-copy-link'
+
+const ensurePinterestMenuBridge = (() => {
+  let installed = false
+
+  return () => {
+    if (installed) return
+    if (typeof window === 'undefined') return
+
+    window.addEventListener(PINTEREST_OPEN_WINDOW_EVENT, async (event) => {
+      const url = String(event?.detail?.url || '').trim()
+      if (!url) return
+      try {
+        await openPinterest(url)
+      } catch {
+        try {
+          window.open(url, '_blank', 'noopener,noreferrer')
+        } catch {
+          // ignore
+        }
+      }
+    })
+
+    window.addEventListener(PINTEREST_COPY_LINK_EVENT, async (event) => {
+      const url = String(event?.detail?.url || '').trim()
+      if (!url) return
+      try {
+        await navigator.clipboard.writeText(url)
+      } catch {
+        // ignore
+      }
+    })
+
+    installed = true
+  }
+})()
+
+ensurePinterestMenuBridge()
 
 const parsePinterestBoardParts = (pinterestUrl) => {
   if (!pinterestUrl) return null
@@ -291,34 +332,62 @@ const PinterestBoard = Node.create({
       fallback.className = 'pinterest-board-fallback'
       fallback.textContent = 'Loading Pinterest board…'
 
-      const actions = document.createElement('div')
-      actions.className = 'pinterest-board-actions'
+      const refreshPreviewBtn = document.createElement('button')
+      refreshPreviewBtn.type = 'button'
+      refreshPreviewBtn.className = 'pinterest-board-refresh-btn'
+      refreshPreviewBtn.title = 'Refresh preview'
+      refreshPreviewBtn.setAttribute('aria-label', 'Refresh preview')
+      refreshPreviewBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+          <path d="M20 4v6h-6" />
+        </svg>
+      `
 
-      const openInAppBtn = document.createElement('button')
-      openInAppBtn.type = 'button'
-      openInAppBtn.className = 'pinterest-board-open-in-app'
-      openInAppBtn.textContent = 'Open in Pinterest window'
+      const onRefreshPreview = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        refresh()
+      }
 
-      const onOpenInApp = async (e) => {
+      const onTileContextMenu = async (e) => {
         e.preventDefault()
         e.stopPropagation()
         try {
-          const mod = await import('../openPinterest')
-          if (mod && typeof mod.openPinterest === 'function') {
-            await mod.openPinterest(currentUrl)
-          }
+          const { Menu, MenuItem, PredefinedMenuItem } = await import('@tauri-apps/api/menu')
+          const openItem = await MenuItem.new({
+            text: 'Open in Pinterest window',
+            action: () => {
+              window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent(PINTEREST_OPEN_WINDOW_EVENT, {
+                  detail: { url: currentUrl },
+                }))
+              }, 0)
+            },
+          })
+          const copyItem = await MenuItem.new({
+            text: 'Copy link',
+            action: () => {
+              window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent(PINTEREST_COPY_LINK_EVENT, {
+                  detail: { url: currentUrl },
+                }))
+              }, 0)
+            },
+          })
+          const separator = await PredefinedMenuItem.new({ item: 'Separator' })
+          const menu = await Menu.new({ items: [openItem, separator, copyItem] })
+          await menu.popup()
         } catch {
           // ignore
         }
       }
 
-      openInAppBtn.addEventListener('click', onOpenInApp)
-
-      actions.appendChild(openInAppBtn)
+      refreshPreviewBtn.addEventListener('click', onRefreshPreview)
 
       container.appendChild(inner)
+      container.appendChild(refreshPreviewBtn)
       container.appendChild(fallback)
-      container.appendChild(actions)
       container.appendChild(expandHint)
 
       const updateCollapseState = () => {
@@ -430,6 +499,7 @@ const PinterestBoard = Node.create({
       }
 
       container.addEventListener('click', onExpand)
+      container.addEventListener('contextmenu', onTileContextMenu)
       expandHint.addEventListener('click', onExpand)
       attachSelectionClassObserver()
       document.addEventListener('pointerdown', onOutsidePointerDown, true)
@@ -551,6 +621,158 @@ const PinterestBoard = Node.create({
         }
       }
 
+      const resetScrapeMeta = () => {
+        container.dataset.scrapeFinalUrl = ''
+        container.dataset.scrapeReason = ''
+        container.dataset.scrapeError = ''
+      }
+
+      const storeScrapeMeta = (scrapeResult) => {
+        container.dataset.scrapeFinalUrl = String(scrapeResult?.finalUrl || '')
+        container.dataset.scrapeReason = String(scrapeResult?.reason || '')
+        container.dataset.scrapeError = String(scrapeResult?.error || '')
+      }
+
+      const getScrapeHint = (kind) => {
+        const finalUrl = container.dataset.scrapeFinalUrl || ''
+        const reason = container.dataset.scrapeReason || ''
+
+        if (finalUrl && finalUrl !== currentUrl && /\/login\b|\/accounts\b|\/signup\b/i.test(finalUrl)) {
+          return ' Pinterest redirected to login. Sign in, then click the refresh icon.'
+        }
+
+        if (reason === 'eval_failed' || reason === 'eval_probe_failed' || reason === 'eval_noexec') {
+          return ' Pinterest is still loading in the preview session. Click the refresh icon again in a moment.'
+        }
+
+        if (reason === 'timeout') {
+          return ` ${kind} preview timed out. If it's private, sign in to Pinterest, then click the refresh icon.`
+        }
+
+        return ` If this ${kind} is private, sign in to Pinterest, then click the refresh icon.`
+      }
+
+      const showPreviewFallback = ({ message, kind, linkText = 'Open on Pinterest' }) => {
+        fallback.innerHTML = ''
+
+        const msg = document.createElement('div')
+        msg.textContent = `${message}${getScrapeHint(kind)} `
+
+        const a = document.createElement('a')
+        a.href = currentUrl
+        a.target = '_blank'
+        a.rel = 'noreferrer'
+        a.textContent = linkText
+
+        const errText = container.dataset.scrapeError || ''
+        if (errText) {
+          a.title = errText
+        }
+
+        fallback.appendChild(msg)
+        fallback.appendChild(a)
+        fallback.style.display = ''
+      }
+
+      const attemptSessionPreview = async ({
+        runId,
+        strategy = 'session-only',
+        maxPins = 30,
+        timeoutMs = 30000,
+        allowWebviewFallback = true,
+      }) => {
+        try {
+          const mod = await import('../pinterestScrape')
+          if (!mod || typeof mod.scrapePinterestPins !== 'function') {
+            return { ok: false }
+          }
+
+          const timeoutBufferMs = strategy === 'session-only' ? 3000 : 1500
+
+          const scrapeResult = await Promise.race([
+            mod.scrapePinterestPins(currentUrl, {
+              maxPins,
+              timeoutMs,
+              strategy,
+              allowWebviewFallback,
+            }),
+            new Promise(resolve => setTimeout(() => resolve({ pins: [], reason: 'timeout' }), timeoutMs + timeoutBufferMs)),
+          ])
+
+          if (runId !== refreshRunId) {
+            return { ok: false, stale: true }
+          }
+
+          const pins = Array.isArray(scrapeResult)
+            ? scrapeResult
+            : (Array.isArray(scrapeResult?.pins) ? scrapeResult.pins : [])
+
+          if (pins.length) {
+            const okMasonry = renderMasonry(pins)
+            if (okMasonry) {
+              fallback.style.display = 'none'
+              return { ok: true, scrapeResult }
+            }
+          }
+
+          storeScrapeMeta(scrapeResult)
+          return { ok: false, scrapeResult }
+        } catch (error) {
+          storeScrapeMeta({
+            finalUrl: currentUrl,
+            reason: 'session_scrape_failed',
+            error: String(error?.message || error || ''),
+          })
+          return { ok: false }
+        }
+      }
+
+      const tryPublicEmbedPreview = async (runId) => {
+        const ok = await ensurePinterestScriptLoaded()
+        if (!ok) {
+          return { ok: false }
+        }
+
+        return await new Promise(resolve => {
+          setTimeout(() => {
+            const built = buildPinterestEmbeds(container)
+            fallback.style.display = ''
+
+            setTimeout(() => {
+              if (runId !== refreshRunId) {
+                resolve({ ok: false, stale: true })
+                return
+              }
+
+              if (!container.querySelector('iframe')) {
+                const extracted = extractPinsFromEmbedDom()
+                if (extracted.length) {
+                  const okMasonry = renderMasonry(extracted)
+                  if (okMasonry) {
+                    fallback.style.display = 'none'
+                    resolve({ ok: true })
+                    return
+                  }
+                }
+              }
+
+              const hasEmbed =
+                container.querySelector('iframe') ||
+                container.querySelector('[data-pin-href]') ||
+                container.querySelector('.PIN_')
+
+              if (built && hasEmbed) {
+                fallback.style.display = 'none'
+                resolve({ ok: true })
+                return
+              }
+
+              resolve({ ok: false })
+            }, 1200)
+          }, 0)
+        })
+      }
+
       // Start with masonry hidden until we can extract.
       clearMasonry()
 
@@ -567,6 +789,7 @@ const PinterestBoard = Node.create({
         container.classList.remove('is-expanded')
         clearMasonry()
         ensureEmbedLinkPresent()
+        resetScrapeMeta()
 
         // Default to showing the fallback while we work.
         fallback.style.display = ''
@@ -578,114 +801,41 @@ const PinterestBoard = Node.create({
         // filter by section slug. For public sections, we instead scrape the actual
         // section page in a hidden Pinterest webview window.
         if (parts?.section) {
-          console.debug(PINTEREST_LOG, 'section preview start', {
-            url: currentUrl,
-            user: parts.user,
-            board: parts.board,
-            section: parts.section,
-          })
-          fallback.textContent = 'Loading section preview…'
-
-          container.dataset.scrapeFinalUrl = ''
-          container.dataset.scrapeReason = ''
-          container.dataset.scrapeError = ''
-
-          try {
-            const mod = await import('../pinterestScrape')
-            if (mod && typeof mod.scrapePinterestPins === 'function') {
-              const scrapeResult = await Promise.race([
-                mod.scrapePinterestPins(currentUrl, {
-                  maxPins: 30,
-                  timeoutMs: 30000,
-                }),
-                new Promise(resolve => setTimeout(() => resolve({ pins: [], reason: 'timeout' }), 35000)),
-              ])
-
-              console.debug(PINTEREST_LOG, 'section scrape result', {
-                url: currentUrl,
-                resultShape: Array.isArray(scrapeResult) ? 'array' : 'object',
-                reason: Array.isArray(scrapeResult) ? '(legacy-array)' : scrapeResult?.reason,
-                finalUrl: Array.isArray(scrapeResult) ? '' : scrapeResult?.finalUrl,
-                pinCount: Array.isArray(scrapeResult)
-                  ? scrapeResult.length
-                  : (Array.isArray(scrapeResult?.pins) ? scrapeResult.pins.length : 0),
-                error: Array.isArray(scrapeResult) ? '' : scrapeResult?.error,
-              })
-
-              // If a newer refresh started while we were scraping, ignore this result.
-              if (runId !== refreshRunId) return
-
-              const pins = Array.isArray(scrapeResult)
-                ? scrapeResult
-                : (Array.isArray(scrapeResult?.pins) ? scrapeResult.pins : [])
-
-              if (pins.length) {
-                const okMasonry = renderMasonry(pins)
-                console.debug(PINTEREST_LOG, 'section masonry render result', {
-                  url: currentUrl,
-                  pinCount: pins.length,
-                  okMasonry,
-                })
-                if (okMasonry) {
-                  fallback.style.display = 'none'
-                  inFlightForUrl = null
-                  return
-                }
-              }
-
-              // Keep some details around for the fallback message.
-              const finalUrl = !Array.isArray(scrapeResult) ? String(scrapeResult?.finalUrl || '') : ''
-              const reason = !Array.isArray(scrapeResult) ? String(scrapeResult?.reason || '') : ''
-              const errText = !Array.isArray(scrapeResult) ? String(scrapeResult?.error || '') : ''
-
-              container.dataset.scrapeFinalUrl = finalUrl
-              container.dataset.scrapeReason = reason
-              container.dataset.scrapeError = errText
-            }
-          } catch {
-            console.debug(PINTEREST_LOG, 'section scrape threw error', { url: currentUrl })
-            // ignore
-          }
-
-          // If scrape fails, avoid falling back to the full parent board.
           fallback.innerHTML = ''
-          const msg = document.createElement('div')
-          const finalUrl = container.dataset.scrapeFinalUrl || ''
-          const reason = container.dataset.scrapeReason || ''
-          const errText = container.dataset.scrapeError || ''
+          fallback.textContent = 'Checking public section preview…'
 
-          let hint = ''
-          if (finalUrl && finalUrl !== currentUrl && /\/login\b|\/accounts\b|\/signup\b/i.test(finalUrl)) {
-            hint = ' (Pinterest redirected to login — open Pinterest and sign in, then try again.)'
-          } else if (reason === 'eval_failed') {
-            hint = ' (scrape window not ready yet — retry in a moment.)'
-          } else if (reason === 'timeout') {
-            hint = ' (timed out.)'
-          }
-
-          msg.textContent = `Couldn't load section preview.${hint} `
-          const a = document.createElement('a')
-          a.href = currentUrl
-          a.target = '_blank'
-          a.rel = 'noreferrer'
-          a.textContent = 'Open on Pinterest'
-          fallback.appendChild(msg)
-          fallback.appendChild(a)
-
-          // If we got a concrete error string, surface it in a tooltip for debugging.
-          if (errText) {
-            a.title = errText
-          }
-
-          console.debug(PINTEREST_LOG, 'section preview fallback shown', {
-            url: currentUrl,
-            reason,
-            finalUrl,
-            errText,
-            hint,
+          const sectionPreview = await attemptSessionPreview({
+            runId,
+            strategy: 'auto',
+            maxPins: 30,
+            timeoutMs: SECTION_PUBLIC_PREVIEW_TIMEOUT_MS,
+            allowWebviewFallback: false,
           })
+          if (sectionPreview.stale) return
+          if (sectionPreview.ok) {
+            inFlightForUrl = null
+            return
+          }
 
-          fallback.style.display = ''
+          fallback.innerHTML = ''
+          fallback.textContent = 'Opening your Pinterest session…'
+
+          const privateSectionPreview = await attemptSessionPreview({
+            runId,
+            strategy: 'session-only',
+            maxPins: 30,
+            timeoutMs: SECTION_PRIVATE_PREVIEW_TIMEOUT_MS,
+          })
+          if (privateSectionPreview.stale) return
+          if (privateSectionPreview.ok) {
+            inFlightForUrl = null
+            return
+          }
+
+          showPreviewFallback({
+            message: 'Couldn\'t load section preview.',
+            kind: 'section',
+          })
           inFlightForUrl = null
           return
         }
@@ -728,66 +878,36 @@ const PinterestBoard = Node.create({
           }
         }
 
-        const ok = await ensurePinterestScriptLoaded()
-        if (!ok) {
-          fallback.innerHTML = ''
-          const a = document.createElement('a')
-          a.href = currentUrl
-          a.target = '_blank'
-          a.rel = 'noreferrer'
-          a.textContent = 'Open Pinterest board'
-          fallback.appendChild(a)
-          fallback.style.display = ''
+        fallback.innerHTML = ''
+        fallback.textContent = 'Loading Pinterest board…'
+
+        const publicEmbedPreview = await tryPublicEmbedPreview(runId)
+        if (publicEmbedPreview.stale) return
+        if (publicEmbedPreview.ok) {
           inFlightForUrl = null
           return
         }
 
-        // Give the script a tick to register PinUtils.
-        setTimeout(() => {
-          const built = buildPinterestEmbeds(container)
-          // Even if build() runs, Pinterest may refuse to render (e.g. private boards).
-          // Check shortly after for an iframe/widget.
-          fallback.style.display = ''
+        fallback.innerHTML = ''
+        fallback.textContent = 'Trying your Pinterest session…'
 
-          setTimeout(() => {
-            // If Pinterest rendered spans (non-iframe path), extract pins and render our own masonry.
-            // If it rendered an iframe, we can't access contents; fall back.
-            if (!container.querySelector('iframe')) {
-              const extracted = extractPinsFromEmbedDom()
-              if (extracted.length) {
-                const okMasonry = renderMasonry(extracted)
-                if (okMasonry) {
-                  fallback.style.display = 'none'
-                  return
-                }
-              }
-            }
+        const privatePreview = await attemptSessionPreview({
+          runId,
+          strategy: 'session-only',
+          maxPins: 30,
+          timeoutMs: 30000,
+        })
+        if (privatePreview.stale) return
+        if (privatePreview.ok) {
+          inFlightForUrl = null
+          return
+        }
 
-            const hasEmbed =
-              container.querySelector('iframe') ||
-              container.querySelector('[data-pin-href]') ||
-              container.querySelector('.PIN_')
-
-            if (built && hasEmbed) {
-              fallback.style.display = 'none'
-              inFlightForUrl = null
-              return
-            }
-
-            fallback.innerHTML = ''
-            const msg = document.createElement('div')
-            msg.textContent = 'Couldn\'t load embed (board may be private). '
-            const a = document.createElement('a')
-            a.href = currentUrl
-            a.target = '_blank'
-            a.rel = 'noreferrer'
-            a.textContent = 'Open on Pinterest'
-            fallback.appendChild(msg)
-            fallback.appendChild(a)
-            fallback.style.display = ''
-            inFlightForUrl = null
-          }, 1200)
-        }, 0)
+        showPreviewFallback({
+          message: 'Couldn\'t load board preview.',
+          kind: 'board',
+        })
+        inFlightForUrl = null
       }
 
       refresh()
@@ -817,8 +937,9 @@ const PinterestBoard = Node.create({
           return true
         },
         destroy: () => {
-          openInAppBtn.removeEventListener('click', onOpenInApp)
+          refreshPreviewBtn.removeEventListener('click', onRefreshPreview)
           container.removeEventListener('click', onExpand)
+          container.removeEventListener('contextmenu', onTileContextMenu)
           expandHint.removeEventListener('click', onExpand)
           document.removeEventListener('pointerdown', onOutsidePointerDown, true)
           document.removeEventListener('selectionchange', onSelectionChange)
