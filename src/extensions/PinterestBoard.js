@@ -6,10 +6,119 @@ const PINTEREST_SCRIPT_ID = 'inkblot-pinterest-pinit-js'
 const PINTEREST_SCRIPT_SRC = 'https://assets.pinterest.com/js/pinit.js'
 
 const PINTEREST_PIDGETS_BASE = 'https://widgets.pinterest.com/v3/pidgets/boards'
-const SECTION_PUBLIC_PREVIEW_TIMEOUT_MS = 2000
 const SECTION_PRIVATE_PREVIEW_TIMEOUT_MS = 15000
 const PINTEREST_OPEN_WINDOW_EVENT = 'inkblot:pinterest-open-window'
 const PINTEREST_COPY_LINK_EVENT = 'inkblot:pinterest-copy-link'
+const PINTEREST_CACHE_PREFIX = 'inkblot:pinterest-preview:'
+const PINTEREST_PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
+const PINTEREST_PROJECT_OPEN_ID_KEY = 'inkblot:project-open-id'
+const PINTEREST_CACHE_VERSION = 1
+const PINTEREST_CACHE_MAX_ITEMS = 80
+
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
+
+const getPinterestCacheKey = (url) => {
+  const normalized = normalizePinterestBoardUrl(url)
+  if (!normalized) return null
+  return `${PINTEREST_CACHE_PREFIX}${normalized}`
+}
+
+const getProjectOpenId = () => {
+  if (typeof window === 'undefined') return 'default'
+  return String(
+    window.__inkblotProjectOpenId ||
+    window.sessionStorage?.getItem(PINTEREST_PROJECT_OPEN_ID_KEY) ||
+    'default'
+  )
+}
+
+const getProjectRefreshKey = (url) => {
+  const cacheKey = getPinterestCacheKey(url)
+  if (!cacheKey) return null
+  return `${PINTEREST_PROJECT_REFRESH_PREFIX}${getProjectOpenId()}:${cacheKey}`
+}
+
+const hasRefreshedForCurrentProjectOpen = (url) => {
+  if (typeof window === 'undefined') return false
+  const key = getProjectRefreshKey(url)
+  if (!key) return false
+  try {
+    return window.sessionStorage?.getItem(key) === 'true'
+  } catch {
+    return false
+  }
+}
+
+const markRefreshedForCurrentProjectOpen = (url) => {
+  if (typeof window === 'undefined') return
+  const key = getProjectRefreshKey(url)
+  if (!key) return
+  try {
+    window.sessionStorage?.setItem(key, 'true')
+  } catch {
+    // Session refresh markers are best-effort.
+  }
+}
+
+const normalizeCachedPins = (items) => {
+  const out = []
+  const seen = new Set()
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const pinHref = String(item?.pinHref || '').trim()
+    const imageUrl = String(item?.imageUrl || '').trim()
+    if (!pinHref || !imageUrl) continue
+    if (!/^https?:\/\//i.test(pinHref) || !/^https?:\/\//i.test(imageUrl)) continue
+
+    const key = `${pinHref}::${imageUrl}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ pinHref, imageUrl })
+    if (out.length >= PINTEREST_CACHE_MAX_ITEMS) break
+  }
+
+  return out
+}
+
+const readPinterestCache = (url) => {
+  if (typeof window === 'undefined') return null
+  const key = getPinterestCacheKey(url)
+  if (!key) return null
+
+  try {
+    const raw = window.localStorage?.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed?.version !== PINTEREST_CACHE_VERSION) return null
+    const pins = normalizeCachedPins(parsed?.pins)
+    if (!pins.length) return null
+    return {
+      pins,
+      savedAt: Number(parsed?.savedAt || 0),
+    }
+  } catch {
+    return null
+  }
+}
+
+const writePinterestCache = (url, pins) => {
+  if (typeof window === 'undefined') return
+  const key = getPinterestCacheKey(url)
+  if (!key) return
+
+  const normalizedPins = normalizeCachedPins(pins)
+  if (!normalizedPins.length) return
+
+  try {
+    window.localStorage?.setItem(key, JSON.stringify({
+      version: PINTEREST_CACHE_VERSION,
+      savedAt: Date.now(),
+      pins: normalizedPins,
+    }))
+  } catch {
+    // Cache writes are best-effort.
+  }
+}
 
 const ensurePinterestMenuBridge = (() => {
   let installed = false
@@ -300,6 +409,11 @@ const PinterestBoard = Node.create({
       // Avoid restarting expensive async refreshes (scrape/fetch) repeatedly.
       let refreshRunId = 0
       let inFlightForUrl = null
+      let destroyed = false
+      let initialRefreshTimer = null
+      let initialRetryTimer = null
+      let initialRefreshAttempts = 0
+      let showingCachedPreview = false
 
       const COLLAPSE_HEIGHT_PX = 600
 
@@ -339,15 +453,20 @@ const PinterestBoard = Node.create({
       refreshPreviewBtn.setAttribute('aria-label', 'Refresh preview')
       refreshPreviewBtn.innerHTML = `
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-          <path d="M20 4v6h-6" />
+          <path d="M3 12a9 9 0 0 1 15.74-6.26L21 8" />
+          <path d="M21 3v5h-5" />
+          <path d="M21 12a9 9 0 0 1-15.74 6.26L3 16" />
+          <path d="M3 21v-5h5" />
         </svg>
       `
 
       const onRefreshPreview = (e) => {
         e.preventDefault()
         e.stopPropagation()
-        refresh()
+        if (!showingCachedPreview) {
+          renderCachedMasonry()
+        }
+        refresh({ preserveCurrent: showingCachedPreview })
       }
 
       const onTileContextMenu = async (e) => {
@@ -509,16 +628,25 @@ const PinterestBoard = Node.create({
       const clearMasonry = () => {
         masonry.innerHTML = ''
         masonry.style.display = 'none'
+        showingCachedPreview = false
         updateCollapseState()
       }
 
-      const renderMasonry = (items) => {
+      const renderMasonry = (items, { cache = false, fromCache = false } = {}) => {
         clearMasonry()
         if (!items?.length) return false
 
+        const normalizedItems = normalizeCachedPins(items)
+        if (!normalizedItems.length) return false
+
+        if (cache) {
+          writePinterestCache(currentUrl, normalizedItems)
+        }
+
+        showingCachedPreview = fromCache
         masonry.style.display = 'block'
         attachResizeObserver()
-        for (const item of items) {
+        for (const item of normalizedItems) {
           const a = document.createElement('a')
           a.className = 'pinterest-board-masonry-item'
           a.href = item.pinHref
@@ -549,6 +677,18 @@ const PinterestBoard = Node.create({
         setTimeout(() => updateCollapseState(), 1200)
 
         return true
+      }
+
+      const renderCachedMasonry = () => {
+        const cached = readPinterestCache(currentUrl)
+        if (!cached?.pins?.length) return false
+
+        const ok = renderMasonry(cached.pins, { fromCache: true })
+        if (ok) {
+          fallback.style.display = 'none'
+          container.dataset.scrapeReason = 'cache'
+        }
+        return ok
       }
 
       const extractPinsFromEmbedDom = () => {
@@ -708,7 +848,7 @@ const PinterestBoard = Node.create({
             : (Array.isArray(scrapeResult?.pins) ? scrapeResult.pins : [])
 
           if (pins.length) {
-            const okMasonry = renderMasonry(pins)
+            const okMasonry = renderMasonry(pins, { cache: true })
             if (okMasonry) {
               fallback.style.display = 'none'
               return { ok: true, scrapeResult }
@@ -747,7 +887,7 @@ const PinterestBoard = Node.create({
               if (!container.querySelector('iframe')) {
                 const extracted = extractPinsFromEmbedDom()
                 if (extracted.length) {
-                  const okMasonry = renderMasonry(extracted)
+                  const okMasonry = renderMasonry(extracted, { cache: true })
                   if (okMasonry) {
                     fallback.style.display = 'none'
                     resolve({ ok: true })
@@ -776,7 +916,25 @@ const PinterestBoard = Node.create({
       // Start with masonry hidden until we can extract.
       clearMasonry()
 
-      const refresh = async () => {
+      const scheduleInitialRetry = () => {
+        if (destroyed) return false
+        if (initialRefreshAttempts >= 2) return false
+
+        initialRefreshAttempts += 1
+        if (!showingCachedPreview) {
+          fallback.innerHTML = ''
+          fallback.textContent = 'Loading Pinterest preview…'
+        }
+        initialRetryTimer = window.setTimeout(() => {
+          initialRetryTimer = null
+          if (destroyed) return
+          refresh({ allowInitialRetry: false, preserveCurrent: showingCachedPreview })
+        }, 900)
+        return true
+      }
+
+      const refresh = async ({ allowInitialRetry = false, preserveCurrent = false } = {}) => {
+        if (destroyed) return
         currentUrl = link.href
 
         // If we already have a refresh running for this URL, don't restart it.
@@ -784,32 +942,46 @@ const PinterestBoard = Node.create({
         inFlightForUrl = currentUrl
 
         const runId = ++refreshRunId
+        const keepCurrentPreview = preserveCurrent && showingCachedPreview
 
         expanded = false
         container.classList.remove('is-expanded')
-        clearMasonry()
-        ensureEmbedLinkPresent()
+        if (!keepCurrentPreview) {
+          clearMasonry()
+          ensureEmbedLinkPresent()
+        }
         resetScrapeMeta()
 
-        // Default to showing the fallback while we work.
-        fallback.style.display = ''
+        if (isOffline()) {
+          if (keepCurrentPreview || renderCachedMasonry()) {
+            fallback.style.display = 'none'
+          } else {
+            fallback.innerHTML = ''
+            fallback.textContent = 'Pinterest preview is offline and no cached images are available.'
+            fallback.style.display = ''
+          }
+          inFlightForUrl = null
+          return
+        }
+
+        // Default to showing the fallback while we work unless cached pins are already visible.
+        fallback.style.display = keepCurrentPreview ? 'none' : ''
 
         const parts = parsePinterestBoardParts(currentUrl)
 
         // Board section (sub-board) preview.
         // Pinterest's embedBoard (and the board-pins pidgets endpoint) do not reliably
-        // filter by section slug. For public sections, we instead scrape the actual
-        // section page in a hidden Pinterest webview window.
+        // filter by section slug, and private sections require the logged-in Pinterest
+        // session. Scrape the actual section page from the session webview first.
         if (parts?.section) {
           fallback.innerHTML = ''
-          fallback.textContent = 'Checking public section preview…'
+          fallback.textContent = 'Loading section from your Pinterest session…'
 
           const sectionPreview = await attemptSessionPreview({
             runId,
-            strategy: 'auto',
+            strategy: 'session-only',
             maxPins: 30,
-            timeoutMs: SECTION_PUBLIC_PREVIEW_TIMEOUT_MS,
-            allowWebviewFallback: false,
+            timeoutMs: SECTION_PRIVATE_PREVIEW_TIMEOUT_MS,
           })
           if (sectionPreview.stale) return
           if (sectionPreview.ok) {
@@ -817,17 +989,13 @@ const PinterestBoard = Node.create({
             return
           }
 
-          fallback.innerHTML = ''
-          fallback.textContent = 'Opening your Pinterest session…'
+          if (allowInitialRetry) {
+            inFlightForUrl = null
+            if (scheduleInitialRetry()) return
+          }
 
-          const privateSectionPreview = await attemptSessionPreview({
-            runId,
-            strategy: 'session-only',
-            maxPins: 30,
-            timeoutMs: SECTION_PRIVATE_PREVIEW_TIMEOUT_MS,
-          })
-          if (privateSectionPreview.stale) return
-          if (privateSectionPreview.ok) {
+          if (showingCachedPreview) {
+            fallback.style.display = 'none'
             inFlightForUrl = null
             return
           }
@@ -865,7 +1033,7 @@ const PinterestBoard = Node.create({
                 .filter(Boolean)
 
               if (items.length) {
-                const okMasonry = renderMasonry(items)
+                const okMasonry = renderMasonry(items, { cache: true })
                 if (okMasonry) {
                   fallback.style.display = 'none'
                   inFlightForUrl = null
@@ -878,18 +1046,24 @@ const PinterestBoard = Node.create({
           }
         }
 
-        fallback.innerHTML = ''
-        fallback.textContent = 'Loading Pinterest board…'
+        if (!keepCurrentPreview) {
+          fallback.innerHTML = ''
+          fallback.textContent = 'Loading Pinterest board…'
+          ensureEmbedLinkPresent()
 
-        const publicEmbedPreview = await tryPublicEmbedPreview(runId)
-        if (publicEmbedPreview.stale) return
-        if (publicEmbedPreview.ok) {
-          inFlightForUrl = null
-          return
+          const publicEmbedPreview = await tryPublicEmbedPreview(runId)
+          if (publicEmbedPreview.stale) return
+          if (publicEmbedPreview.ok) {
+            inFlightForUrl = null
+            return
+          }
         }
 
         fallback.innerHTML = ''
         fallback.textContent = 'Trying your Pinterest session…'
+        if (keepCurrentPreview) {
+          fallback.style.display = 'none'
+        }
 
         const privatePreview = await attemptSessionPreview({
           runId,
@@ -903,6 +1077,17 @@ const PinterestBoard = Node.create({
           return
         }
 
+        if (allowInitialRetry) {
+          inFlightForUrl = null
+          if (scheduleInitialRetry()) return
+        }
+
+        if (showingCachedPreview) {
+          fallback.style.display = 'none'
+          inFlightForUrl = null
+          return
+        }
+
         showPreviewFallback({
           message: 'Couldn\'t load board preview.',
           kind: 'board',
@@ -910,7 +1095,39 @@ const PinterestBoard = Node.create({
         inFlightForUrl = null
       }
 
-      refresh()
+      const hasCachedPreview = renderCachedMasonry()
+      const alreadyRefreshedForProjectOpen = hasRefreshedForCurrentProjectOpen(currentUrl)
+
+      if (isOffline()) {
+        markRefreshedForCurrentProjectOpen(currentUrl)
+        if (hasCachedPreview) {
+          fallback.style.display = 'none'
+        } else {
+          fallback.innerHTML = ''
+          fallback.textContent = 'Pinterest preview is offline and no cached images are available.'
+          fallback.style.display = ''
+        }
+      } else if (!alreadyRefreshedForProjectOpen) {
+        markRefreshedForCurrentProjectOpen(currentUrl)
+        initialRefreshAttempts = 1
+        initialRefreshTimer = window.setTimeout(() => {
+          initialRefreshTimer = null
+          if (destroyed) return
+          requestAnimationFrame(() => {
+            if (destroyed) return
+            refresh({
+              allowInitialRetry: true,
+              preserveCurrent: showingCachedPreview,
+            })
+          })
+        }, hasCachedPreview ? 450 : 650)
+      } else if (hasCachedPreview) {
+        fallback.style.display = 'none'
+      } else {
+        fallback.innerHTML = ''
+        fallback.textContent = 'No cached Pinterest preview yet. Click the refresh icon to load it.'
+        fallback.style.display = ''
+      }
 
       return {
         dom: container,
@@ -933,10 +1150,32 @@ const PinterestBoard = Node.create({
           link.setAttribute('data-pin-scale-height', String(updatedNode.attrs.scaleHeight || 320))
           link.setAttribute('data-pin-scale-width', String(updatedNode.attrs.scaleWidth || 80))
 
-          refresh()
+          const hasUpdatedCachedPreview = renderCachedMasonry()
+          if (!hasUpdatedCachedPreview) {
+            clearMasonry()
+          }
+          if (isOffline()) {
+            if (!hasUpdatedCachedPreview) {
+              fallback.innerHTML = ''
+              fallback.textContent = 'Pinterest preview is offline and no cached images are available.'
+              fallback.style.display = ''
+            }
+          } else if (!hasRefreshedForCurrentProjectOpen(currentUrl)) {
+            markRefreshedForCurrentProjectOpen(currentUrl)
+            refresh({ preserveCurrent: showingCachedPreview })
+          }
           return true
         },
         destroy: () => {
+          destroyed = true
+          if (initialRefreshTimer) {
+            window.clearTimeout(initialRefreshTimer)
+            initialRefreshTimer = null
+          }
+          if (initialRetryTimer) {
+            window.clearTimeout(initialRetryTimer)
+            initialRetryTimer = null
+          }
           refreshPreviewBtn.removeEventListener('click', onRefreshPreview)
           container.removeEventListener('click', onExpand)
           container.removeEventListener('contextmenu', onTileContextMenu)

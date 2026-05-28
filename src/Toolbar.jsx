@@ -1,7 +1,18 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import './Toolbar.css'
-import { openPinterest } from './openPinterest'
 import SFIcon from './SFIcon'
+import DictationControl from './DictationControl'
+import ReadAloudControl from './ReadAloudControl'
+
+const isEditorReady = (editor) => Boolean(
+  editor &&
+  !editor.isDestroyed &&
+  editor.state?.schema?.nodes &&
+  editor.view &&
+  !editor.view.isDestroyed &&
+  editor.commands &&
+  typeof editor.chain === 'function'
+)
 
 export default function Toolbar({ editor }) {
   const [color, setColor] = useState('#000000')
@@ -16,12 +27,15 @@ export default function Toolbar({ editor }) {
     italic: false,
     underline: false,
     strike: false,
+    table: false,
   })
 
-  if (!editor) return null
-
   useEffect(() => {
+    if (!isEditorReady(editor)) return undefined
+
     const updateToolbar = () => {
+      if (!isEditorReady(editor)) return
+
       const attrs = editor.getAttributes('textStyle') || {}
       const colorAttr = attrs.color || '#000000'
       const fontAttr = attrs.fontFamily || 'Georgia'
@@ -57,6 +71,7 @@ export default function Toolbar({ editor }) {
         italic: getMarkActive('italic'),
         underline: getMarkActive('underline'),
         strike: getMarkActive('strike'),
+        table: editor.isActive('table'),
       })
 
       if (!userSelectingHighlight) {
@@ -69,39 +84,60 @@ export default function Toolbar({ editor }) {
     updateToolbar()
 
     return () => {
-      editor.off('selectionUpdate', updateToolbar)
-      editor.off('transaction', updateToolbar)
+      if (!editor.isDestroyed) {
+        editor.off('selectionUpdate', updateToolbar)
+        editor.off('transaction', updateToolbar)
+      }
     }
   }, [editor, userSelectingHighlight, highlight])
 
+  if (!isEditorReady(editor)) return null
+
+  const runEditorCommand = (command) => {
+    if (!isEditorReady(editor)) return
+    command(editor)
+  }
+
   const applyColor = (c) => {
     setColor(c)
-    editor.chain().focus().setColor(c).run()
+    runEditorCommand(currentEditor => currentEditor.chain().focus().setColor(c).run())
   }
 
   const applyHighlight = (c) => {
     setHighlight(c)
-    if (editor.storage) editor.storage.lastHighlightColor = c
-    editor.chain().focus().setHighlight({ color: c }).run()
+    if (editor.storage) Reflect.set(editor.storage, 'lastHighlightColor', c)
+    runEditorCommand(currentEditor => currentEditor.chain().focus().setHighlight({ color: c }).run())
   }
 
   const applyFont = (f) => {
     setFont(f)
-    editor.chain().focus().setFontFamily(f).run()
+    runEditorCommand(currentEditor => currentEditor.chain().focus().setFontFamily(f).run())
   }
 
   const applyFontSize = (size) => {
     setFontSize(size)
-    editor.chain().focus().setMark('textStyle', { fontSize: size }).run()
+    runEditorCommand(currentEditor => currentEditor.chain().focus().setMark('textStyle', { fontSize: size }).run())
   }
 
   const applyAlignment = (align) => {
     setAlignment(align)
-    try {
-      editor.chain().focus().setTextAlign(align).run()
-    } catch {
-      editor.chain().focus().updateAttributes('paragraph', { textAlign: align }).run()
-    }
+    runEditorCommand(currentEditor => {
+      try {
+        currentEditor.chain().focus().setTextAlign(align).run()
+      } catch {
+        currentEditor.chain().focus().updateAttributes('paragraph', { textAlign: align }).run()
+      }
+    })
+  }
+
+  const insertTable = () => {
+    runEditorCommand(currentEditor => {
+      currentEditor
+        .chain()
+        .focus()
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run()
+    })
   }
 
   return (
@@ -109,7 +145,7 @@ export default function Toolbar({ editor }) {
       <div className="toolbar">
         <button
           className={activeMarks.bold ? 'active' : ''}
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          onClick={() => runEditorCommand(currentEditor => currentEditor.chain().focus().toggleBold().run())}
           aria-label="Bold"
           title="Bold"
         >
@@ -117,7 +153,7 @@ export default function Toolbar({ editor }) {
         </button>
         <button
           className={activeMarks.italic ? 'active' : ''}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          onClick={() => runEditorCommand(currentEditor => currentEditor.chain().focus().toggleItalic().run())}
           aria-label="Italic"
           title="Italic"
         >
@@ -125,7 +161,7 @@ export default function Toolbar({ editor }) {
         </button>
         <button
           className={activeMarks.underline ? 'active' : ''}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          onClick={() => runEditorCommand(currentEditor => currentEditor.chain().focus().toggleUnderline().run())}
           aria-label="Underline"
           title="Underline"
         >
@@ -133,7 +169,7 @@ export default function Toolbar({ editor }) {
         </button>
         <button
           className={activeMarks.strike ? 'active' : ''}
-          onClick={() => editor.chain().focus().toggleStrike().run()}
+          onClick={() => runEditorCommand(currentEditor => currentEditor.chain().focus().toggleStrike().run())}
           aria-label="Strikethrough"
           title="Strikethrough"
         >
@@ -202,6 +238,22 @@ export default function Toolbar({ editor }) {
         >
           <SFIcon name="text.alignright" />
         </button>
+
+        <div className="separator" />
+
+        <button
+          className={activeMarks.table ? 'active' : ''}
+          onClick={insertTable}
+          aria-label="Insert table"
+          title="Insert table"
+        >
+          <SFIcon name="table.grid" />
+        </button>
+
+        <div className="separator" />
+
+        <DictationControl editor={editor} />
+        <ReadAloudControl editor={editor} />
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useMemo } from "react"
 import nlp from "compromise"
 import "./Bubble.css"
 
@@ -292,14 +292,11 @@ function TreeNode({ node }) {
 ============================================================ */
 
 export default function Bubble({ sentence }) {
-  const [trees, setTrees] = useState([])
-
-  useEffect(() => {
-    if (!sentence) return
+  const trees = useMemo(() => {
+    if (!sentence) return []
 
     log("Parsing:", sentence)
-    const parses = ckyParse(sentence, 5)
-    setTrees(parses)
+    return ckyParse(sentence, 5)
   }, [sentence])
 
   return (

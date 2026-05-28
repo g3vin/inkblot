@@ -26,11 +26,25 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
 
   const unpin = useCallback(() => {
     setPinned(false)
-  }, [])
+    setCollapsed(false)
+    setPeeked(true)
+    setWidth(lastWidthRef.current || min)
+  }, [min])
+
+  const open = useCallback(() => {
+    setCollapsed(false)
+    setPeeked(false)
+    setWidth(lastWidthRef.current || min)
+  }, [min])
 
   const togglePin = useCallback(() => {
     setPinned(prev => {
-      if (prev) return false
+      if (prev) {
+        setCollapsed(false)
+        setPeeked(true)
+        setWidth(lastWidthRef.current || min)
+        return false
+      }
       setCollapsed(false)
       setPeeked(false)
       setWidth(lastWidthRef.current || min)
@@ -133,6 +147,7 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
     peeked,
     pin,
     unpin,
+    open,
     togglePin,
     collapse,
   }

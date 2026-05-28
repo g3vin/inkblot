@@ -1,42 +1,280 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+.accent-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(7, 10, 14, 0.3);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.accent-dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 20%, rgba(255, 255, 255, 0.08));
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-color) 20%, transparent), transparent 42%),
+    linear-gradient(180deg, rgba(20, 23, 28, 0.98), rgba(11, 13, 17, 0.98));
+  color: #eff5fa;
+  box-shadow:
+    0 28px 60px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+.accent-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.accent-dialog-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.accent-dialog-eyebrow {
+  margin: 0 0 6px;
+  color: color-mix(in srgb, var(--accent-color) 64%, white);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.accent-dialog-close,
+.accent-reset-btn,
+.accent-swatch {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.accent-dialog-close {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #c8d4dc;
+  font-size: 1.25rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.accent-dialog-close:hover {
+  border-color: var(--accent-border);
+  color: #ffffff;
+  background: var(--accent-surface);
+}
+
+.accent-dialog-copy {
+  margin: 10px 0 16px;
+  color: #b7c3cc;
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.accent-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.accent-preview-chip {
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent-preview) 84%, white), var(--accent-preview));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 14px 28px color-mix(in srgb, var(--accent-preview) 24%, transparent);
+}
+
+.accent-preview-label {
+  color: #93a1ac;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.accent-preview code {
+  display: inline-block;
+  margin-top: 3px;
+  color: #f7fbff;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.accent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.accent-swatch {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #edf4f8;
+  text-align: left;
+}
+
+.accent-swatch:hover {
+  border-color: var(--accent-border);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.accent-swatch.active {
+  border-color: color-mix(in srgb, var(--swatch-color) 42%, transparent);
+  background: color-mix(in srgb, var(--swatch-color) 18%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--swatch-color) 18%, transparent);
+}
+
+.accent-swatch-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--swatch-color);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  flex: 0 0 auto;
+}
+
+.accent-swatch-label {
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.accent-custom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.accent-custom-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #c7d2da;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.accent-custom-input input[type='color'] {
+  width: 46px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.accent-reset-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  color: #edf4f8;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.accent-reset-btn:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--accent-surface);
+}
+
+.accent-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+:root[data-theme='light'] .accent-dialog {
+  border-color: color-mix(in srgb, var(--accent-color) 18%, rgba(0, 0, 0, 0.08));
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-color) 14%, transparent), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(247, 249, 252, 0.99));
+  color: #213547;
+  box-shadow:
+    0 24px 52px rgba(17, 24, 39, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+:root[data-theme='light'] .accent-dialog-copy,
+:root[data-theme='light'] .accent-custom-input,
+:root[data-theme='light'] .accent-preview-label {
+  color: #617180;
+}
+
+:root[data-theme='light'] .accent-dialog-close,
+:root[data-theme='light'] .accent-reset-btn,
+:root[data-theme='light'] .accent-swatch,
+:root[data-theme='light'] .accent-preview {
+  border-color: rgba(0, 0, 0, 0.09);
+  background: rgba(17, 24, 39, 0.04);
+  color: #213547;
+}
+
+:root[data-theme='light'] .accent-preview code {
+  color: #213547;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .accent-dialog {
+    border-color: color-mix(in srgb, var(--accent-color) 18%, rgba(0, 0, 0, 0.08));
+    background:
+      radial-gradient(circle at top left, color-mix(in srgb, var(--accent-color) 14%, transparent), transparent 42%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(247, 249, 252, 0.99));
+    color: #213547;
+    box-shadow:
+      0 24px 52px rgba(17, 24, 39, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.95);
   }
-  to {
-    transform: rotate(360deg);
+
+  :root:not([data-theme]) .accent-dialog-copy,
+  :root:not([data-theme]) .accent-custom-input,
+  :root:not([data-theme]) .accent-preview-label {
+    color: #617180;
   }
-}
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  :root:not([data-theme]) .accent-dialog-close,
+  :root:not([data-theme]) .accent-reset-btn,
+  :root:not([data-theme]) .accent-swatch,
+  :root:not([data-theme]) .accent-preview {
+    border-color: rgba(0, 0, 0, 0.09);
+    background: rgba(17, 24, 39, 0.04);
+    color: #213547;
   }
-}
 
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+  :root:not([data-theme]) .accent-preview code {
+    color: #213547;
+  }
 }

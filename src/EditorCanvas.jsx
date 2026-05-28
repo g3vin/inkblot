@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment as ReactFragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 import { Color } from '@tiptap/extension-color'
@@ -6,19 +6,598 @@ import { Dropcursor } from '@tiptap/extension-dropcursor'
 import { FontFamily } from '@tiptap/extension-font-family'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { Highlight } from '@tiptap/extension-highlight'
+import { Table } from '@tiptap/extension-table'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { TableRow } from '@tiptap/extension-table-row'
 import { Underline } from '@tiptap/extension-underline'
+import { createDocument } from '@tiptap/core'
 import { Fragment } from '@tiptap/pm/model'
-import { TextSelection } from '@tiptap/pm/state'
+import { EditorState, TextSelection } from '@tiptap/pm/state'
 import ResizableImage from './extensions/ResizableImage'
 import { debounce } from 'lodash'
 
-import Toolbar from './Toolbar'
 import { CustomTextStyle } from './extensions/CustomTextStyle'
-import { NoteAnnotation } from './extensions/NoteAnnotation'
+import { DictationInline } from './extensions/DictationInline'
+import { NoteAnnotation, syncEditorNotes } from './extensions/NoteAnnotation'
 import PinterestBoard, { normalizePinterestBoardUrl } from './extensions/PinterestBoard'
+import { ReadAloudHighlight } from './extensions/ReadAloudHighlight'
 import TabIndent from './extensions/TabIndent'
-import { saveDocument, loadDocument, appendVersion, getVersions } from './FileSystem'
+import { saveDocument, loadDocument, getVersions } from './FileSystem'
 import SFIcon from './SFIcon'
+
+const EMPTY_NOTES = []
+const EMPTY_DOC_CONTENT = '<p></p>'
+const FOCUS_MODE_SETTINGS_KEY = 'inkblot-focus-mode-settings'
+const DEFAULT_FOCUS_MODE_SETTINGS = {
+  before: 0,
+  after: 0,
+  fontSize: 42,
+  contextFontSize: 28,
+  paragraphContext: false,
+}
+
+const countWords = (text = '') => {
+  const trimmed = text.trim()
+  if (!trimmed) return 0
+  return trimmed.split(/\s+/).length
+}
+
+const emptyWordStats = {
+  total: 0,
+  selected: null,
+}
+
+const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value))
+
+const loadFocusModeSettings = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FOCUS_MODE_SETTINGS_KEY) || '{}')
+    return {
+      before: clampNumber(Number(parsed.before) || DEFAULT_FOCUS_MODE_SETTINGS.before, 0, 6),
+      after: clampNumber(Number(parsed.after) || DEFAULT_FOCUS_MODE_SETTINGS.after, 0, 6),
+      fontSize: clampNumber(Number(parsed.fontSize) || DEFAULT_FOCUS_MODE_SETTINGS.fontSize, 28, 72),
+      contextFontSize: clampNumber(
+        Number(parsed.contextFontSize) || DEFAULT_FOCUS_MODE_SETTINGS.contextFontSize,
+        18,
+        56
+      ),
+      paragraphContext: Boolean(parsed.paragraphContext),
+    }
+  } catch {
+    return DEFAULT_FOCUS_MODE_SETTINGS
+  }
+}
+
+const saveFocusModeSettings = (settings) => {
+  try {
+    localStorage.setItem(FOCUS_MODE_SETTINGS_KEY, JSON.stringify(settings))
+  } catch {
+    // Ignore storage failures; focus mode can still use the in-memory settings.
+  }
+}
+
+const getSentenceSpans = (text = '') => {
+  const spans = []
+  const regex = /[^.!?\n]+(?:[.!?]+["')\]]*)?/g
+  let match
+
+  while ((match = regex.exec(text)) !== null) {
+    const raw = match[0]
+    const leading = raw.match(/^\s*/)?.[0]?.length || 0
+    const trailing = raw.match(/\s*$/)?.[0]?.length || 0
+    const start = match.index + leading
+    const end = match.index + raw.length - trailing
+
+    if (end > start) {
+      spans.push({
+        start,
+        end,
+        text: text.slice(start, end),
+      })
+    }
+  }
+
+  return spans
+}
+
+const getVisibleFocusSentences = (spans, fullText, activeIndex, before, after, paragraphContext = false) => {
+  const start = paragraphContext ? 0 : Math.max(0, activeIndex - before)
+  const end = paragraphContext ? spans.length : Math.min(spans.length, activeIndex + after + 1)
+  const slicedSpans = spans.slice(start, end)
+
+  return {
+    visibleSentences: slicedSpans.map((span, index) => {
+      const previousSpan = index > 0 ? slicedSpans[index - 1] : null
+      return {
+        ...span,
+        prefix: previousSpan ? fullText.slice(previousSpan.end, span.start) : '',
+      }
+    }),
+    currentIndex: activeIndex - start,
+  }
+}
+
+const getFocusOffsetFromSelection = (textMap, selection) => {
+  const startOffset = getTextOffsetForDocPosition(textMap.positions, selection.from)
+  if (selection.empty) return startOffset
+
+  const endOffset = getTextOffsetForDocPosition(textMap.positions, selection.to)
+  const selectedText = textMap.text.slice(startOffset, endOffset)
+  const firstSelectedCharacter = selectedText.search(/\S/)
+
+  if (firstSelectedCharacter !== -1) {
+    return startOffset + firstSelectedCharacter
+  }
+
+  return startOffset
+}
+
+const buildFocusTextMap = (doc) => {
+  const chunks = []
+  const positions = []
+  let previousBlock = null
+
+  doc.descendants((node, pos, parent) => {
+    if (!node.isText || !node.text) return
+
+    const block = parent?.isBlock ? parent : null
+    if (chunks.length && block && block !== previousBlock) {
+      chunks.push('\n')
+      positions.push(pos)
+    }
+
+    for (let index = 0; index < node.text.length; index += 1) {
+      chunks.push(node.text[index])
+      positions.push(pos + index)
+    }
+
+    previousBlock = block
+  })
+
+  const fallbackPos = Math.max(1, doc.content.size - 1)
+  positions.push(positions.length ? positions[positions.length - 1] + 1 : fallbackPos)
+
+  return {
+    text: chunks.join(''),
+    positions,
+  }
+}
+
+const getTextOffsetForDocPosition = (positions, docPosition) => {
+  if (!positions.length) return 0
+
+  for (let index = 0; index < positions.length; index += 1) {
+    if (positions[index] >= docPosition) return index
+  }
+
+  return Math.max(0, positions.length - 1)
+}
+
+const getTextOffsetInElement = (element, targetNode, targetOffset) => {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let offset = 0
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode
+    const textLength = node.nodeValue?.length || 0
+    if (node === targetNode) {
+      return offset + clampNumber(targetOffset, 0, textLength)
+    }
+    offset += textLength
+  }
+
+  return null
+}
+
+const getOffsetFromClick = (event, text) => {
+  const element = event.currentTarget
+  const caretPosition = document.caretPositionFromPoint?.(event.clientX, event.clientY)
+  if (caretPosition?.offsetNode && element.contains(caretPosition.offsetNode)) {
+    const offset = getTextOffsetInElement(element, caretPosition.offsetNode, caretPosition.offset)
+    if (offset !== null) return clampNumber(offset, 0, text.length)
+  }
+
+  const caretRange = document.caretRangeFromPoint?.(event.clientX, event.clientY)
+  if (caretRange?.startContainer && element.contains(caretRange.startContainer)) {
+    const offset = getTextOffsetInElement(element, caretRange.startContainer, caretRange.startOffset)
+    if (offset !== null) return clampNumber(offset, 0, text.length)
+  }
+
+  const rect = element.getBoundingClientRect()
+  return event.clientX < rect.left + rect.width / 2 ? 0 : text.length
+}
+
+const isEditorReady = (instance) => Boolean(
+  instance &&
+  !instance.isDestroyed &&
+  instance.state?.schema?.nodes &&
+  instance.view &&
+  !instance.view.isDestroyed &&
+  instance.commandManager &&
+  instance.commands &&
+  typeof instance.chain === 'function'
+)
+
+const areNoteArraysEqual = (left = [], right = []) => {
+  if (left === right) return true
+  if (!Array.isArray(left) || !Array.isArray(right)) return false
+  if (left.length !== right.length) return false
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftNote = left[index]
+    const rightNote = right[index]
+
+    if (leftNote === rightNote) continue
+    if (!leftNote || !rightNote) return false
+
+    const leftKeys = Object.keys(leftNote)
+    const rightKeys = Object.keys(rightNote)
+    if (leftKeys.length !== rightKeys.length) return false
+
+    for (const key of leftKeys) {
+      if (leftNote[key] !== rightNote[key]) {
+        return false
+      }
+    }
+  }
+
+  return true
+}
+
+function FocusModeOverlay({ editor, onExit }) {
+  const [settings, setSettings] = useState(loadFocusModeSettings)
+  const [visibleSentences, setVisibleSentences] = useState([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [cursorOffset, setCursorOffset] = useState(0)
+  const [focusTextOffset, setFocusTextOffset] = useState(0)
+  const overlayRef = useRef(null)
+  const focusTextRef = useRef(null)
+  const sentenceRefs = useRef(new Map())
+  const textMapRef = useRef({ text: '', positions: [] })
+  const sentenceSpansRef = useRef([])
+  const activeSentenceIndexRef = useRef(0)
+
+  const updateVisibleSentences = useCallback(() => {
+    if (!isEditorReady(editor)) {
+      setVisibleSentences([])
+      setCurrentIndex(0)
+      textMapRef.current = { text: '', positions: [] }
+      sentenceSpansRef.current = []
+      activeSentenceIndexRef.current = 0
+      return
+    }
+
+    const { doc, selection } = editor.state
+    const textMap = buildFocusTextMap(doc)
+    textMapRef.current = textMap
+    const fullText = textMap.text
+    const cursorOffset = getFocusOffsetFromSelection(textMap, selection)
+    const spans = getSentenceSpans(fullText)
+    sentenceSpansRef.current = spans
+    setCursorOffset(cursorOffset)
+
+    if (!spans.length) {
+      setVisibleSentences([])
+      setCurrentIndex(0)
+      activeSentenceIndexRef.current = 0
+      return
+    }
+
+    let activeIndex = spans.findIndex((span, index) => (
+      cursorOffset >= span.start &&
+      (cursorOffset < span.end || (index === spans.length - 1 && cursorOffset <= span.end))
+    ))
+    if (activeIndex === -1) {
+      const nextIndex = spans.findIndex(span => cursorOffset < span.start)
+      activeIndex = nextIndex === -1 ? spans.length - 1 : Math.max(0, nextIndex - 1)
+    }
+    const nextFocusWindow = getVisibleFocusSentences(
+      spans,
+      fullText,
+      activeIndex,
+      settings.before,
+      settings.after,
+      settings.paragraphContext
+    )
+
+    activeSentenceIndexRef.current = activeIndex
+    setVisibleSentences(nextFocusWindow.visibleSentences)
+    setCurrentIndex(nextFocusWindow.currentIndex)
+  }, [editor, settings.after, settings.before, settings.paragraphContext])
+
+  const updateSetting = useCallback((key, value) => {
+    setSettings((current) => {
+      const next = {
+        ...current,
+        [key]: key === 'fontSize'
+          ? clampNumber(Number(value), 28, 72)
+          : key === 'contextFontSize'
+            ? clampNumber(Number(value), 18, 56)
+            : key === 'paragraphContext'
+              ? Boolean(value)
+              : clampNumber(Number(value), 0, 6),
+      }
+      saveFocusModeSettings(next)
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    updateVisibleSentences()
+    if (!isEditorReady(editor)) return undefined
+
+    const handler = () => updateVisibleSentences()
+    editor.on('transaction', handler)
+    editor.on('selectionUpdate', handler)
+    editor.commands.focus()
+
+    return () => {
+      if (!editor.isDestroyed) {
+        editor.off('transaction', handler)
+        editor.off('selectionUpdate', handler)
+      }
+    }
+  }, [editor, updateVisibleSentences])
+
+  const focusEditor = useCallback(() => {
+    if (isEditorReady(editor)) {
+      editor.commands.focus()
+    }
+  }, [editor])
+
+  const placeCursorAtTextOffset = useCallback((textOffset) => {
+    if (!isEditorReady(editor)) return
+
+    const normalizedTextOffset = clampNumber(textOffset, 0, textMapRef.current.positions.length - 1)
+    const docPosition = textMapRef.current.positions[normalizedTextOffset]
+    if (!Number.isFinite(docPosition)) return
+
+    const selectionPosition = clampNumber(docPosition, 1, editor.state.doc.content.size)
+    try {
+      const tr = editor.state.tr.setSelection(TextSelection.create(editor.state.doc, selectionPosition))
+      editor.view.dispatch(tr.scrollIntoView())
+      editor.commands.focus()
+      setCursorOffset(normalizedTextOffset)
+    } catch (error) {
+      console.warn('Failed to place focus mode cursor:', error)
+      editor.commands.focus()
+    }
+  }, [editor])
+
+  const moveCursorToSentenceClick = useCallback((event, sentence) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const localOffset = getOffsetFromClick(event, sentence.text)
+    placeCursorAtTextOffset(sentence.start + localOffset)
+  }, [placeCursorAtTextOffset])
+
+  const moveToAdjacentSentence = useCallback((direction) => {
+    const spans = sentenceSpansRef.current
+    if (!spans.length) return
+
+    const targetIndex = clampNumber(activeSentenceIndexRef.current + direction, 0, spans.length - 1)
+    const targetSentence = spans[targetIndex]
+    if (!targetSentence) return
+
+    const nextFocusWindow = getVisibleFocusSentences(
+      spans,
+      textMapRef.current.text || '',
+      targetIndex,
+      settings.before,
+      settings.after,
+      settings.paragraphContext
+    )
+
+    activeSentenceIndexRef.current = targetIndex
+    setVisibleSentences(nextFocusWindow.visibleSentences)
+    setCurrentIndex(nextFocusWindow.currentIndex)
+    setCursorOffset(targetSentence.start)
+    placeCursorAtTextOffset(targetSentence.start)
+  }, [placeCursorAtTextOffset, settings.after, settings.before, settings.paragraphContext])
+
+  const renderFocusSentenceText = (sentence, index) => {
+    if (index !== currentIndex) return sentence.text
+
+    const caretOffset = clampNumber(cursorOffset - sentence.start, 0, sentence.text.length)
+    const before = sentence.text.slice(0, caretOffset)
+    const after = sentence.text.slice(caretOffset)
+
+    return (
+      <>
+        {before}
+        <span className="focus-mode-caret" aria-hidden="true" />
+        {after}
+      </>
+    )
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation?.()
+        onExit?.()
+        return
+      }
+
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+      if (event.target instanceof Element && event.target.closest('.focus-mode-control-zone')) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation?.()
+      moveToAdjacentSentence(event.key === 'ArrowUp' ? -1 : 1)
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [moveToAdjacentSentence, onExit])
+
+  const updateFocusTextPosition = useCallback(() => {
+    const overlayElement = overlayRef.current
+    const focusTextElement = focusTextRef.current
+    const sentence = visibleSentences[currentIndex]
+    const sentenceElement = sentence ? sentenceRefs.current.get(`${sentence.start}-${sentence.end}`) : null
+
+    if (!overlayElement || !focusTextElement || !sentenceElement) {
+      setFocusTextOffset(0)
+      return
+    }
+
+    const overlayRect = overlayElement.getBoundingClientRect()
+    const sentenceRect = sentenceElement.getBoundingClientRect()
+    setFocusTextOffset((current) => {
+      const sentenceCenterWithoutTransform =
+        sentenceRect.top - current + sentenceRect.height / 2
+      const desiredOffset =
+        overlayRect.top + overlayRect.height / 2 - sentenceCenterWithoutTransform
+
+      return Math.abs(current - desiredOffset) < 0.5 ? current : desiredOffset
+    })
+  }, [currentIndex, visibleSentences])
+
+  useLayoutEffect(() => {
+    updateFocusTextPosition()
+  }, [
+    settings.contextFontSize,
+    settings.fontSize,
+    settings.paragraphContext,
+    updateFocusTextPosition,
+  ])
+
+  useEffect(() => {
+    const handleResize = () => {
+      updateFocusTextPosition()
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [updateFocusTextPosition])
+
+  return (
+    <div
+      ref={overlayRef}
+      className="focus-mode-overlay"
+      style={{
+        '--focus-mode-font-size': `${settings.fontSize}px`,
+        '--focus-mode-context-font-size': `${settings.contextFontSize}px`,
+      }}
+      onMouseDown={focusEditor}
+    >
+      <div
+        className={`focus-mode-text${settings.paragraphContext ? ' is-paragraph-context' : ''}`}
+        ref={focusTextRef}
+        style={{ '--focus-mode-text-offset': `${focusTextOffset}px` }}
+        aria-live="polite"
+      >
+        {visibleSentences.length ? (
+          visibleSentences.map((sentence, index) => (
+            <ReactFragment key={`${sentence.start}-${sentence.end}`}>
+              {settings.paragraphContext && sentence.prefix ? (
+                <span className="focus-mode-prefix" aria-hidden="true">
+                  {sentence.prefix}
+                </span>
+              ) : null}
+              <span
+                ref={(element) => {
+                  const key = `${sentence.start}-${sentence.end}`
+                  if (element) {
+                    sentenceRefs.current.set(key, element)
+                  } else {
+                    sentenceRefs.current.delete(key)
+                  }
+                }}
+                className={`focus-mode-sentence${index === currentIndex ? ' current' : ''}`}
+                onMouseDown={(event) => moveCursorToSentenceClick(event, sentence)}
+              >
+                {renderFocusSentenceText(sentence, index)}
+              </span>
+            </ReactFragment>
+          ))
+        ) : (
+          <span className="focus-mode-sentence current">
+            <span className="focus-mode-caret" aria-hidden="true" />
+          </span>
+        )}
+      </div>
+
+      <div className="focus-mode-control-zone" onMouseDown={(event) => event.stopPropagation()}>
+        <div className={`focus-mode-controls${settings.paragraphContext ? ' is-paragraph-mode' : ''}`}>
+          <div className="focus-mode-display-toggle" role="group" aria-label="Focus mode display">
+            <button
+              type="button"
+              className={!settings.paragraphContext ? 'active' : ''}
+              onClick={() => updateSetting('paragraphContext', false)}
+            >
+              Sentence
+            </button>
+            <button
+              type="button"
+              className={settings.paragraphContext ? 'active' : ''}
+              onClick={() => updateSetting('paragraphContext', true)}
+            >
+              Paragraph
+            </button>
+          </div>
+          {!settings.paragraphContext ? (
+            <>
+              <label className="focus-mode-slider">
+                <span>Before</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="6"
+                  value={settings.before}
+                  onChange={(event) => updateSetting('before', event.target.value)}
+                />
+                <strong>{settings.before}</strong>
+              </label>
+              <label className="focus-mode-slider">
+                <span>After</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="6"
+                  value={settings.after}
+                  onChange={(event) => updateSetting('after', event.target.value)}
+                />
+                <strong>{settings.after}</strong>
+              </label>
+            </>
+          ) : null}
+          <label className="focus-mode-slider focus-mode-slider-wide">
+            <span>Focus</span>
+            <input
+              type="range"
+              min="28"
+              max="72"
+              value={settings.fontSize}
+              onChange={(event) => updateSetting('fontSize', event.target.value)}
+            />
+            <strong>{settings.fontSize}</strong>
+          </label>
+          <label className="focus-mode-slider focus-mode-slider-wide">
+            <span>Context</span>
+            <input
+              type="range"
+              min="18"
+              max="56"
+              value={settings.contextFontSize}
+              onChange={(event) => updateSetting('contextFontSize', event.target.value)}
+            />
+            <strong>{settings.contextFontSize}</strong>
+          </label>
+          <button className="focus-mode-exit" type="button" onClick={onExit}>
+            Exit
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function EditorCanvas({
   setEditor,
@@ -36,18 +615,93 @@ export default function EditorCanvas({
   activeDoc,
   setActiveDoc,
   setVersions,
+  showWordCountBadge = true,
   onMoveClipboardEntryToEditor,
+  activeEditor,
+  focusModeOpen = false,
+  onExitFocusMode,
 }) {
   const hasActiveDoc = Boolean(projectName && currentDoc)
   const primaryPaneRef = useRef(null)
   const secondaryPaneRef = useRef(null)
   const [dragCaret, setDragCaret] = useState(null)
+  const notesByDocRef = useRef(notesByDoc)
+  const loadedDocsRef = useRef(new Set())
+  const docStateCacheRef = useRef(new Map())
+  const primaryAutosaveRef = useRef(null)
+  const secondaryAutosaveRef = useRef(null)
+  const isLoadingPrimaryRef = useRef(false)
+  const isLoadingSecondaryRef = useRef(false)
 
-  const [, forceNoteRender] = useState(0)
+  const getDocCacheKey = useCallback((docProjectName, docName, paneId) => (
+    docProjectName && docName && paneId ? `${docProjectName}::${paneId}::${docName}` : ''
+  ), [])
+
+  const hasNotesForDoc = useCallback((docName) => (
+    Object.prototype.hasOwnProperty.call(notesByDocRef.current || {}, docName)
+  ), [])
+
+  const createEditorStateFromContent = useCallback((targetEditor, content) => {
+    const doc = createDocument(
+      content || EMPTY_DOC_CONTENT,
+      targetEditor.schema,
+      {},
+      { errorOnInvalidContent: targetEditor.options.enableContentCheck }
+    )
+
+    return EditorState.create({
+      doc,
+      schema: targetEditor.schema,
+      plugins: targetEditor.state.plugins,
+    })
+  }, [])
+
+  const installEditorState = useCallback((targetEditor, nextState) => {
+    targetEditor.view.updateState(nextState)
+    targetEditor.createNodeViews?.()
+  }, [])
+
+  const stashEditorState = useCallback((targetEditor, docName, paneId) => {
+    if (!isEditorReady(targetEditor)) return
+    const cacheKey = getDocCacheKey(projectName, docName, paneId)
+    if (!cacheKey || !loadedDocsRef.current.has(cacheKey)) return
+    docStateCacheRef.current.set(cacheKey, targetEditor.state)
+  }, [getDocCacheKey, projectName])
+
+  const flushAutosave = useCallback((handlerRef) => {
+    const handler = handlerRef.current
+    if (handler && typeof handler.flush === 'function') {
+      handler.flush()
+    }
+  }, [])
+
+  const restoreEditorStateForDoc = useCallback((targetEditor, docName, paneId, loadedDoc) => {
+    const cacheKey = getDocCacheKey(projectName, docName, paneId)
+    const cachedState = cacheKey ? docStateCacheRef.current.get(cacheKey) : null
+    const nextState = cachedState || createEditorStateFromContent(targetEditor, loadedDoc?.content)
+
+    installEditorState(targetEditor, nextState)
+    if (cacheKey) {
+      loadedDocsRef.current.add(cacheKey)
+    }
+
+    if (!hasNotesForDoc(docName)) {
+      setNotesForDoc(docName, loadedDoc?.notes || [])
+    }
+
+    return Boolean(cachedState)
+  }, [
+    createEditorStateFromContent,
+    getDocCacheKey,
+    hasNotesForDoc,
+    installEditorState,
+    projectName,
+    setNotesForDoc,
+  ])
 
   const getMountedEditorView = (instance) => {
-    if (!instance || instance.isDestroyed) return null
-    const view = instance.editorView
+    if (!isEditorReady(instance)) return null
+    const view = instance.editorView || instance.view
     if (!view || view.isDestroyed) return null
     return view
   }
@@ -170,10 +824,10 @@ export default function EditorCanvas({
     if (x == null || y == null) return null
 
     const primaryRect = primaryPaneRef.current?.getBoundingClientRect?.()
-    if (editor && isPointInRect(x, y, primaryRect)) return editor
+    if (isEditorReady(editor) && isPointInRect(x, y, primaryRect)) return editor
 
     const secondaryRect = secondaryPaneRef.current?.getBoundingClientRect?.()
-    if (splitView === 'editor' && secondaryEditor && isPointInRect(x, y, secondaryRect)) {
+    if (splitView === 'editor' && isEditorReady(secondaryEditor) && isPointInRect(x, y, secondaryRect)) {
       return secondaryEditor
     }
 
@@ -210,6 +864,7 @@ export default function EditorCanvas({
   }
 
   const handlePaneDragStart = (event, targetEditor, source, docName) => {
+    if (!isEditorReady(targetEditor)) return
     const { selection, doc } = targetEditor?.state || {}
     if (!selection || selection.empty) return
 
@@ -246,7 +901,7 @@ export default function EditorCanvas({
 
   const handlePaneDragOver = (event, targetEditor) => {
     const payload = getDraggedClipboardPayload(event)
-    if (!payload) return
+    if (!payload || !isEditorReady(targetEditor)) return
     event.preventDefault()
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move'
@@ -303,14 +958,35 @@ export default function EditorCanvas({
     return true
   }
 
-  const [primaryWordCount, setPrimaryWordCount] = useState(0)
-  const [secondaryWordCount, setSecondaryWordCount] = useState(0)
+  const [primaryWordStats, setPrimaryWordStats] = useState(emptyWordStats)
+  const [secondaryWordStats, setSecondaryWordStats] = useState(emptyWordStats)
+  const currentDocNotes = notesByDoc?.[currentDoc] ?? EMPTY_NOTES
+  const secondaryDocNotes = notesByDoc?.[secondaryDoc] ?? EMPTY_NOTES
+  const activeDocNotes = notesByDoc?.[activeDoc] ?? EMPTY_NOTES
 
-  const countWords = (text = '') => {
-    const trimmed = text.trim()
-    if (!trimmed) return 0
-    return trimmed.split(/\s+/).length
+  const getWordStats = useCallback((targetEditor) => {
+    if (!isEditorReady(targetEditor)) return emptyWordStats
+
+    const { selection, doc } = targetEditor.state
+    const selectedText = selection?.empty
+      ? ''
+      : doc.textBetween(selection.from, selection.to, '\n')
+
+    return {
+      total: countWords(targetEditor.getText()),
+      selected: selection?.empty ? null : countWords(selectedText),
+    }
+  }, [])
+
+  const formatWordStats = ({ total, selected }) => {
+    const count = selected == null ? total : selected
+    const wordLabel = count === 1 ? 'word' : 'words'
+    return selected == null ? `${count} ${wordLabel}` : `${count} ${wordLabel} selected`
   }
+
+  useEffect(() => {
+    notesByDocRef.current = notesByDoc
+  }, [notesByDoc])
 
   /* ---------------- Primary Editor ---------------- */
 
@@ -328,15 +1004,23 @@ export default function EditorCanvas({
       Color,
       FontFamily,
       NoteAnnotation,
+      ReadAloudHighlight,
+      DictationInline,
       PinterestBoard,
       TabIndent,
       Underline,
       TextAlign.configure({
-        types: ['heading', 'paragraph'],
+        types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
       }),
       Highlight.configure({
         multicolor: true,
       }),
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
       ResizableImage.configure({
         inline: true,
         allowBase64: true,
@@ -360,13 +1044,22 @@ export default function EditorCanvas({
       CustomTextStyle,
       Color,
       FontFamily,
+      NoteAnnotation,
+      ReadAloudHighlight,
+      DictationInline,
       PinterestBoard,
       TabIndent,
       Underline,
       TextAlign.configure({
-        types: ['heading', 'paragraph'],
+        types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
       }),
       Highlight.configure({ multicolor: true }),
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
       ResizableImage.configure({
         inline: true,
         allowBase64: true,
@@ -438,7 +1131,7 @@ export default function EditorCanvas({
 
   useEffect(() => {
     const pane = primaryPaneRef.current
-    if (!pane || !editor) return
+    if (!pane || !isEditorReady(editor)) return
 
     const onDragStart = (event) => handlePaneDragStart(event, editor, 'primary', currentDoc)
     const onDragEnd = () => {
@@ -462,11 +1155,13 @@ export default function EditorCanvas({
       pane.removeEventListener('dragover', onDragOver, true)
       pane.removeEventListener('drop', onDrop, true)
     }
+  // DnD helpers intentionally read the current editor globals at event time.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, currentDoc])
 
   useEffect(() => {
     const pane = secondaryPaneRef.current
-    if (!pane || !secondaryEditor || splitView !== 'editor') return
+    if (!pane || !isEditorReady(secondaryEditor) || splitView !== 'editor') return
 
     const onDragStart = (event) => handlePaneDragStart(event, secondaryEditor, 'secondary', secondaryDoc)
     const onDragEnd = () => {
@@ -490,6 +1185,8 @@ export default function EditorCanvas({
       pane.removeEventListener('dragover', onDragOver, true)
       pane.removeEventListener('drop', onDrop, true)
     }
+  // DnD helpers intentionally read the current editor globals at event time.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondaryEditor, secondaryDoc, splitView])
 
   useEffect(() => {
@@ -576,6 +1273,8 @@ export default function EditorCanvas({
       window.removeEventListener('drop', onWindowDrop, true)
       window.removeEventListener('dragend', onWindowDragEnd, true)
     }
+  // Window DnD listeners depend on stable DOM globals and active editor refs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, secondaryEditor, splitView])
 
   useEffect(() => {
@@ -619,95 +1318,147 @@ export default function EditorCanvas({
     return () => {
       window.removeEventListener('inkblot:clipboard-dragend-drop', onClipboardDragEndDrop)
     }
+  // Clipboard drag completion reads the current drop globals at event time.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, secondaryEditor, splitView])
 
   /* ---------------- Expose Editor ---------------- */
 
   useEffect(() => {
-    if (editor) setEditor(editor)
-  }, [editor, setEditor])
+    if (isEditorReady(editor)) setEditor(editor)
+    return () => {
+      setEditor(current => (current === editor ? null : current))
+      setActiveEditor?.(current => (current === editor ? null : current))
+    }
+  }, [editor, setActiveEditor, setEditor])
 
   useEffect(() => {
-    if (secondaryEditor) setSecondaryEditor?.(secondaryEditor)
-  }, [secondaryEditor, setSecondaryEditor])
+    if (isEditorReady(secondaryEditor)) setSecondaryEditor?.(secondaryEditor)
+    return () => {
+      setSecondaryEditor?.(current => (current === secondaryEditor ? null : current))
+      setActiveEditor?.(current => (current === secondaryEditor ? null : current))
+    }
+  }, [secondaryEditor, setActiveEditor, setSecondaryEditor])
 
   /* ---------------- Load Primary Doc ---------------- */
 
   useEffect(() => {
-    if (!editor || !currentDoc) return
+    if (!isEditorReady(editor) || !currentDoc) return
+    let cancelled = false
+    const cacheKey = getDocCacheKey(projectName, currentDoc, 'primary')
 
     const load = async () => {
-      const doc = await loadDocument(projectName, currentDoc)
+      isLoadingPrimaryRef.current = true
+      loadedDocsRef.current.delete(cacheKey)
 
-      if (!doc) {
-        editor.commands.setContent('<p></p>')
-        setNotesForDoc(currentDoc, [])
-        editor.commands.focus('start')
-        return
-      }
-
-      editor.commands.setContent(doc.content || '<p></p>')
-      setNotesForDoc(currentDoc, doc.notes || [])
-      if (!doc.content || doc.content?.content?.length === 0) {
-        editor.commands.focus('start')
-      }
-
-      // load versions for the right sidebar
       try {
-        const vs = await getVersions(projectName, currentDoc)
-        setVersions?.(currentDoc, vs)
-      } catch (e) {
-        console.error('Failed to load versions:', e)
-        setVersions?.(currentDoc, [])
+        const doc = await loadDocument(projectName, currentDoc)
+        if (cancelled || !isEditorReady(editor)) return
+
+        restoreEditorStateForDoc(editor, currentDoc, 'primary', doc)
+        if (!doc?.content || doc.content?.content?.length === 0) {
+          editor.commands.focus('start')
+        }
+        setPrimaryWordStats(getWordStats(editor))
+
+        // load versions for the right sidebar
+        try {
+          const vs = await getVersions(projectName, currentDoc)
+          setVersions?.(currentDoc, vs)
+        } catch (e) {
+          console.error('Failed to load versions:', e)
+          setVersions?.(currentDoc, [])
+        }
+      } finally {
+        isLoadingPrimaryRef.current = false
       }
     }
 
     load()
-  }, [editor, currentDoc, projectName, setNotesForDoc])
+    return () => {
+      cancelled = true
+      flushAutosave(primaryAutosaveRef)
+      stashEditorState(editor, currentDoc, 'primary')
+    }
+  }, [
+    currentDoc,
+    editor,
+    flushAutosave,
+    getWordStats,
+    getDocCacheKey,
+    projectName,
+    restoreEditorStateForDoc,
+    setVersions,
+    stashEditorState,
+  ])
 
   /* ---------------- Load Secondary Doc ---------------- */
 
   useEffect(() => {
-    if (!secondaryEditor || splitView !== 'editor' || !secondaryDoc) return
+    if (!isEditorReady(secondaryEditor) || splitView !== 'editor' || !secondaryDoc) return
+    let cancelled = false
+    const cacheKey = getDocCacheKey(projectName, secondaryDoc, 'secondary')
 
     const load = async () => {
-      const doc = await loadDocument(projectName, secondaryDoc)
+      isLoadingSecondaryRef.current = true
+      loadedDocsRef.current.delete(cacheKey)
 
-      if (!doc) {
-        secondaryEditor.commands.setContent('<p></p>')
-        return
+      try {
+        const doc = await loadDocument(projectName, secondaryDoc)
+        if (cancelled || !isEditorReady(secondaryEditor)) return
+
+        restoreEditorStateForDoc(secondaryEditor, secondaryDoc, 'secondary', doc)
+        setSecondaryWordStats(getWordStats(secondaryEditor))
+      } finally {
+        isLoadingSecondaryRef.current = false
       }
-
-      secondaryEditor.commands.setContent(doc.content || '<p></p>')
-      setNotesForDoc(secondaryDoc, doc.notes || [])
     }
 
     load()
-  }, [secondaryEditor, secondaryDoc, splitView, projectName, setNotesForDoc])
+    return () => {
+      cancelled = true
+      flushAutosave(secondaryAutosaveRef)
+      stashEditorState(secondaryEditor, secondaryDoc, 'secondary')
+    }
+  }, [
+    flushAutosave,
+    getDocCacheKey,
+    getWordStats,
+    projectName,
+    restoreEditorStateForDoc,
+    secondaryDoc,
+    secondaryEditor,
+    splitView,
+    stashEditorState,
+  ])
 
   /* ---------------- Sync Notes → Editor Storage ---------------- */
 
   useEffect(() => {
-    if (!editor) return
-    editor.storage.noteAnnotation.notes = (notesByDoc?.[currentDoc] || [])
-    forceNoteRender(v => v + 1)
-  }, [editor, notesByDoc, currentDoc])
+    if (!isEditorReady(editor)) return
+    syncEditorNotes(editor, currentDocNotes, currentDoc)
+  }, [currentDoc, currentDocNotes, editor])
+
+  useEffect(() => {
+    if (!isEditorReady(secondaryEditor) || splitView !== 'editor') return
+    syncEditorNotes(secondaryEditor, secondaryDocNotes, secondaryDoc)
+  }, [secondaryDoc, secondaryDocNotes, secondaryEditor, splitView])
 
   /* ---------------- Autosave ---------------- */
 
   useEffect(() => {
-    if (!editor || !currentDoc) return
-    console.debug('[autosave] effect init', { projectName, currentDoc })
+    if (!isEditorReady(editor) || !currentDoc) return
     const handler = debounce(async () => {
-      try { console.debug('[autosave] handler fired', { projectName, currentDoc }) } catch (e) {}
+      if (!isEditorReady(editor)) return
+      if (isLoadingPrimaryRef.current) return
+      if (!loadedDocsRef.current.has(getDocCacheKey(projectName, currentDoc, 'primary'))) return
+
       const contentJson = editor.getJSON()
       const contentHtml = editor.getHTML()
 
-      console.debug('[autosave] saving', { projectName, currentDoc, contentLength: contentHtml?.length })
-
       await saveDocument(projectName, currentDoc, {
         content: contentJson,
-        notes: notesByDoc?.[currentDoc] || [],
+        notes: notesByDocRef.current?.[currentDoc] || [],
         _appendVersion: true,
         _version: {
           contentHtml,
@@ -716,84 +1467,101 @@ export default function EditorCanvas({
       })
 
       try {
-        console.debug('[autosave] calling appendVersion', { projectName, currentDoc })
-        await appendVersion(projectName, currentDoc, { contentHtml, contentJson })
-        console.debug('[autosave] appendVersion done', { projectName, currentDoc })
-      } catch (e) {
-        console.error('[autosave] appendVersion failed', e)
-      }
-
-      try {
-        console.debug('[autosave] about to getVersions', { projectName, currentDoc })
         const vs = await getVersions(projectName, currentDoc)
-        console.debug('[autosave] getVersions returned', { projectName, currentDoc, count: Array.isArray(vs) ? vs.length : 0 })
         setVersions?.(currentDoc, vs)
-        console.debug('[autosave] setVersions called', { projectName, currentDoc })
       } catch (e) {
         console.error('Failed to refresh versions:', e)
       }
     }, 800)
 
+    primaryAutosaveRef.current = handler
     editor.on('update', handler)
-    console.debug('[autosave] handler attached', { projectName, currentDoc })
 
     return () => {
-      editor.off('update', handler)
-      console.debug('[autosave] handler detached', { projectName, currentDoc })
+      if (!editor.isDestroyed) editor.off('update', handler)
+      handler.flush()
       handler.cancel()
+      if (primaryAutosaveRef.current === handler) {
+        primaryAutosaveRef.current = null
+      }
     }
-  }, [editor, currentDoc, projectName, notesByDoc])
+  }, [currentDoc, editor, getDocCacheKey, projectName, setVersions])
 
   /* ---------------- Word Count ---------------- */
 
   useEffect(() => {
-    if (!editor) return
+    if (!isEditorReady(editor)) return
 
     const update = () => {
-      setPrimaryWordCount(countWords(editor.getText()))
+      if (!isEditorReady(editor)) return
+      setPrimaryWordStats(getWordStats(editor))
     }
 
     editor.on('update', update)
+    editor.on('selectionUpdate', update)
     update()
 
-    return () => editor.off('update', update)
-  }, [editor])
+    return () => {
+      if (!editor.isDestroyed) {
+        editor.off('update', update)
+        editor.off('selectionUpdate', update)
+      }
+    }
+  }, [editor, getWordStats])
 
   useEffect(() => {
-    if (!secondaryEditor || splitView !== 'editor' || !secondaryDoc) return
+    if (!isEditorReady(secondaryEditor) || splitView !== 'editor' || !secondaryDoc) return
 
     const handler = debounce(async () => {
+      if (!isEditorReady(secondaryEditor)) return
+      if (isLoadingSecondaryRef.current) return
+      if (!loadedDocsRef.current.has(getDocCacheKey(projectName, secondaryDoc, 'secondary'))) return
+
       await saveDocument(projectName, secondaryDoc, {
         content: secondaryEditor.getJSON(),
-        notes: notesByDoc?.[secondaryDoc] || [],
+        notes: notesByDocRef.current?.[secondaryDoc] || [],
       })
     }, 800)
 
+    secondaryAutosaveRef.current = handler
     secondaryEditor.on('update', handler)
 
     return () => {
-      secondaryEditor.off('update', handler)
+      if (!secondaryEditor.isDestroyed) secondaryEditor.off('update', handler)
+      handler.flush()
       handler.cancel()
+      if (secondaryAutosaveRef.current === handler) {
+        secondaryAutosaveRef.current = null
+      }
     }
-  }, [secondaryEditor, secondaryDoc, splitView, projectName, notesByDoc])
+  }, [getDocCacheKey, projectName, secondaryDoc, secondaryEditor, splitView])
 
   useEffect(() => {
-    if (!secondaryEditor || splitView !== 'editor') return
+    if (!isEditorReady(secondaryEditor) || splitView !== 'editor') return
 
     const update = () => {
-      setSecondaryWordCount(countWords(secondaryEditor.getText()))
+      if (!isEditorReady(secondaryEditor)) return
+      setSecondaryWordStats(getWordStats(secondaryEditor))
     }
 
     secondaryEditor.on('update', update)
+    secondaryEditor.on('selectionUpdate', update)
     update()
 
-    return () => secondaryEditor.off('update', update)
-  }, [secondaryEditor, splitView])
+    return () => {
+      if (!secondaryEditor.isDestroyed) {
+        secondaryEditor.off('update', update)
+        secondaryEditor.off('selectionUpdate', update)
+      }
+    }
+  }, [getWordStats, secondaryEditor, splitView])
 
   /* ---------------- Autosave Notes ---------------- */
 
   useEffect(() => {
     if (!activeDoc) return
+    const activePaneId = activeDoc === secondaryDoc && activeDoc !== currentDoc ? 'secondary' : 'primary'
+    if (!loadedDocsRef.current.has(getDocCacheKey(projectName, activeDoc, activePaneId))) return
 
     const getEditorForDoc = (docName) => {
       if (docName === currentDoc) return editor
@@ -802,14 +1570,22 @@ export default function EditorCanvas({
     }
 
     const targetEditor = getEditorForDoc(activeDoc)
-    if (!targetEditor) return
+    if (!isEditorReady(targetEditor)) return
 
     const handler = debounce(async () => {
+      if (!isEditorReady(targetEditor)) return
+      if (
+        (activeDoc === currentDoc && isLoadingPrimaryRef.current) ||
+        (activeDoc === secondaryDoc && isLoadingSecondaryRef.current)
+      ) {
+        return
+      }
+
       const contentJson = targetEditor.getJSON()
       const contentHtml = targetEditor.getHTML && targetEditor.getHTML()
       await saveDocument(projectName, activeDoc, {
         content: contentJson,
-        notes: notesByDoc?.[activeDoc] || [],
+        notes: activeDocNotes,
         _appendVersion: true,
         _version: { contentHtml, contentJson },
       })
@@ -821,19 +1597,25 @@ export default function EditorCanvas({
     return () => {
       handler.cancel()
     }
-  }, [editor, secondaryEditor, activeDoc, currentDoc, secondaryDoc, projectName, notesByDoc])
+  }, [activeDoc, activeDocNotes, currentDoc, editor, getDocCacheKey, projectName, secondaryDoc, secondaryEditor])
 
   /* ---------------- Anchor Remapping ---------------- */
 
   useEffect(() => {
-    if (!editor) return
+    if (!isEditorReady(editor)) return
 
     const handler = ({ transaction }) => {
+      if (!isEditorReady(editor)) return
       if (!transaction.docChanged) return
+      if (isLoadingPrimaryRef.current) return
+
+      const existingNotes = notesByDocRef.current?.[currentDoc] || []
+      const hasQuoteNotes = existingNotes.some(note => note.type === 'quote')
+      if (!hasQuoteNotes) return
 
       const mapping = transaction.mapping
 
-      const updated = (notesByDoc?.[currentDoc] || [])
+      const updated = existingNotes
         .map(note => {
           if (note.type !== 'quote') return note
 
@@ -851,13 +1633,19 @@ export default function EditorCanvas({
         })
         .filter(Boolean)
 
+      if (areNoteArraysEqual(existingNotes, updated)) {
+        return
+      }
+
       setNotesForDoc(currentDoc, updated)
     }
 
     editor.on('transaction', handler)
-    return () => editor.off('transaction', handler)
+    return () => {
+      if (!editor.isDestroyed) editor.off('transaction', handler)
+    }
 
-  }, [editor, notesByDoc, currentDoc, setNotesForDoc])
+  }, [editor, currentDoc, setNotesForDoc])
 
   /* ---------------- Render ---------------- */
 
@@ -874,13 +1662,18 @@ export default function EditorCanvas({
   }
 
   const focusEditor = (target) => {
-    if (!target) return
+    if (!isEditorReady(target)) return
     if (target.isEmpty) {
       target.commands.focus('start')
       return
     }
     target.chain().focus().run()
   }
+
+  const liveEditor = isEditorReady(editor) ? editor : null
+  const liveSecondaryEditor = isEditorReady(secondaryEditor) ? secondaryEditor : null
+  const liveActiveEditor = isEditorReady(activeEditor) ? activeEditor : null
+  const focusModeEditor = liveActiveEditor || liveEditor || liveSecondaryEditor
 
   if (!hasActiveDoc) {
     return (
@@ -912,25 +1705,26 @@ export default function EditorCanvas({
 
   return (
     <div className="middle-section">
-      {editor && (
-        <Toolbar
-          editor={editor}
-          splitView={splitView}
-          setSplitView={setSplitView}
-        />
-      )}
-
       <div className={`editor-container ${splitView ? 'split-active' : ''}`}>
 
         <div
           ref={primaryPaneRef}
           className="pane primary-pane"
-          onFocus={() => setActiveDoc(currentDoc)}
-          onMouseEnter={() => setActiveDoc(currentDoc)}
-          onWheel={() => setActiveDoc(currentDoc)}
-          onMouseDown={() => focusEditor(editor)}
-          onClick={() => focusEditor(editor)}
-          onMouseMove={() => setActiveEditor?.(editor)}
+          onFocus={() => {
+            setActiveDoc(currentDoc)
+            setActiveEditor?.(liveEditor)
+          }}
+          onMouseEnter={() => {
+            setActiveDoc(currentDoc)
+            setActiveEditor?.(liveEditor)
+          }}
+          onWheel={() => {
+            setActiveDoc(currentDoc)
+            setActiveEditor?.(liveEditor)
+          }}
+          onMouseDown={() => focusEditor(liveEditor)}
+          onClick={() => focusEditor(liveEditor)}
+          onMouseMove={() => setActiveEditor?.(liveEditor)}
         >
           {dragCaret?.pane === 'primary' ? (
             <div
@@ -949,21 +1743,32 @@ export default function EditorCanvas({
                 <button onClick={closePrimary}>×</button>
               </div>
             )}
-            <EditorContent editor={editor} className="editor" />
+            {liveEditor ? <EditorContent editor={liveEditor} className="editor" /> : null}
           </div>
-          <div className="word-count">{primaryWordCount} words</div>
+          {showWordCountBadge ? (
+            <div className="word-count">{formatWordStats(primaryWordStats)}</div>
+          ) : null}
         </div>
 
         {splitView === 'editor' && (
           <div
             ref={secondaryPaneRef}
             className="pane secondary-pane"
-            onFocus={() => setActiveDoc(secondaryDoc)}
-            onMouseEnter={() => setActiveDoc(secondaryDoc)}
-            onWheel={() => setActiveDoc(secondaryDoc)}
-            onMouseDown={() => focusEditor(secondaryEditor)}
-            onClick={() => focusEditor(secondaryEditor)}
-            onMouseMove={() => setActiveEditor?.(secondaryEditor)}
+            onFocus={() => {
+              setActiveDoc(secondaryDoc)
+              setActiveEditor?.(liveSecondaryEditor)
+            }}
+            onMouseEnter={() => {
+              setActiveDoc(secondaryDoc)
+              setActiveEditor?.(liveSecondaryEditor)
+            }}
+            onWheel={() => {
+              setActiveDoc(secondaryDoc)
+              setActiveEditor?.(liveSecondaryEditor)
+            }}
+            onMouseDown={() => focusEditor(liveSecondaryEditor)}
+            onClick={() => focusEditor(liveSecondaryEditor)}
+            onMouseMove={() => setActiveEditor?.(liveSecondaryEditor)}
           >
             {dragCaret?.pane === 'secondary' ? (
               <div
@@ -980,11 +1785,19 @@ export default function EditorCanvas({
                 <span>{secondaryDoc}</span>
                 <button onClick={closeSecondary}>×</button>
               </div>
-              <EditorContent editor={secondaryEditor} className="editor" />
+              {liveSecondaryEditor ? <EditorContent editor={liveSecondaryEditor} className="editor" /> : null}
             </div>
-            <div className="word-count">{secondaryWordCount} words</div>
+            {showWordCountBadge ? (
+              <div className="word-count">{formatWordStats(secondaryWordStats)}</div>
+            ) : null}
           </div>
         )}
+        {focusModeOpen ? (
+          <FocusModeOverlay
+            editor={focusModeEditor}
+            onExit={onExitFocusMode}
+          />
+        ) : null}
       </div>
     </div>
   )

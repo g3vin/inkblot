@@ -1,0 +1,216 @@
+export const DEFAULT_NOTE_COLOR = '#ffd54f'
+
+export const NOTE_COLOR_OPTIONS = [
+  '#ffd54f',
+  '#ff9aa2',
+  '#9ad0f5',
+  '#9ee493',
+  '#c7a8ff',
+  '#ffb86b',
+]
+
+export const NOTE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Notes' },
+  { value: 'pinned', label: 'Pinned' },
+  { value: 'quote', label: 'Anchored' },
+  { value: 'free', label: 'Free Notes' },
+]
+
+const nowIso = () => new Date().toISOString()
+
+export const formatNoteTimestamp = (value) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return String(value)
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(parsed)
+}
+
+const normalizeColor = (value) => {
+  if (typeof value !== 'string') return DEFAULT_NOTE_COLOR
+  const trimmed = value.trim()
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(trimmed) ? trimmed : DEFAULT_NOTE_COLOR
+}
+
+const normalizeDate = (value, fallback) => {
+  if (typeof value !== 'string') return fallback
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString()
+}
+
+const normalizeRangeValue = (value) => {
+  return Number.isFinite(value) ? value : null
+}
+
+const normalizeOptionalId = (value) => {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+const normalizePreviewLayout = (value) => {
+  if (!value || typeof value !== 'object') return { offsetX: 0, offsetY: 0 }
+
+  return {
+    offsetX: Number.isFinite(value.offsetX) ? value.offsetX : 0,
+    offsetY: Number.isFinite(value.offsetY) ? value.offsetY : 0,
+  }
+}
+
+const normalizePreviewSize = (value) => {
+  if (!value || typeof value !== 'object') {
+    return { width: 260, height: 88 }
+  }
+
+  return {
+    width: Number.isFinite(value.width) ? Math.max(220, value.width) : 260,
+    height: Number.isFinite(value.height) ? Math.max(64, value.height) : 88,
+  }
+}
+
+const normalizeNoteImage = (image = {}) => {
+  if (!image || typeof image !== 'object') return null
+  if (typeof image.src !== 'string' || !image.src.trim()) return null
+
+  return {
+    id: typeof image.id === 'string' && image.id.trim() ? image.id : crypto.randomUUID(),
+    src: image.src,
+    mimeType: typeof image.mimeType === 'string' ? image.mimeType : 'image/png',
+  }
+}
+
+const normalizeNoteImages = (images = []) => (
+  Array.isArray(images)
+    ? images.map(normalizeNoteImage).filter(Boolean)
+    : []
+)
+
+export const normalizeNote = (note = {}) => {
+  const fallbackDate = nowIso()
+  const createdAt = normalizeDate(note.createdAt, normalizeDate(note.updatedAt, fallbackDate))
+  const updatedAt = normalizeDate(note.updatedAt, createdAt)
+
+  return {
+    ...note,
+    id: note.id || crypto.randomUUID(),
+    type: note.type === 'quote' ? 'quote' : 'free',
+    content: typeof note.content === 'string' ? note.content : '',
+    anchor: typeof note.anchor === 'string' ? note.anchor : '',
+    from: normalizeRangeValue(note.from),
+    to: normalizeRangeValue(note.to),
+    color: normalizeColor(note.color),
+    pinned: Boolean(note.pinned),
+    parentNoteId: normalizeOptionalId(note.parentNoteId),
+    collapsedChildren: Boolean(note.collapsedChildren),
+    previewLayout: normalizePreviewLayout(note.previewLayout),
+    previewSize: normalizePreviewSize(note.previewSize),
+    images: normalizeNoteImages(note.images),
+    createdAt,
+    updatedAt,
+    timestamp: formatNoteTimestamp(updatedAt),
+  }
+}
+
+export const normalizeNotes = (notes = []) => (
+  Array.isArray(notes) ? notes.map(normalizeNote) : []
+)
+
+export const createFreeNote = (color = DEFAULT_NOTE_COLOR) => {
+  const createdAt = nowIso()
+  return normalizeNote({
+    id: crypto.randomUUID(),
+    type: 'free',
+    content: '',
+    color,
+    pinned: false,
+    createdAt,
+    updatedAt: createdAt,
+  })
+}
+
+export const createQuoteNote = ({
+  from,
+  to,
+  anchor,
+  color = DEFAULT_NOTE_COLOR,
+} = {}) => {
+  const createdAt = nowIso()
+  return normalizeNote({
+    id: crypto.randomUUID(),
+    type: 'quote',
+    from,
+    to,
+    anchor,
+    content: '',
+    color,
+    pinned: false,
+    createdAt,
+    updatedAt: createdAt,
+  })
+}
+
+export const touchNote = (note, changes = {}) => (
+  normalizeNote({
+    ...note,
+    ...changes,
+    updatedAt: nowIso(),
+  })
+)
+
+export const collectNoteBranchIds = (notes = [], rootId) => {
+  if (!rootId) return []
+
+  const childrenByParent = new Map()
+  notes.forEach((note) => {
+    if (!note.parentNoteId) return
+    if (!childrenByParent.has(note.parentNoteId)) {
+      childrenByParent.set(note.parentNoteId, [])
+    }
+    childrenByParent.get(note.parentNoteId).push(note.id)
+  })
+
+  const ids = []
+  const stack = [rootId]
+
+  while (stack.length > 0) {
+    const nextId = stack.pop()
+    if (!nextId || ids.includes(nextId)) continue
+    ids.push(nextId)
+    const children = childrenByParent.get(nextId) || []
+    children.forEach((childId) => stack.push(childId))
+  }
+
+  return ids
+}
+
+const compareDatesDesc = (a, b) => {
+  const aTime = new Date(a || 0).getTime()
+  const bTime = new Date(b || 0).getTime()
+  return bTime - aTime
+}
+
+export const compareNotes = (a, b) => {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+
+  const aIsFree = a.type === 'free'
+  const bIsFree = b.type === 'free'
+
+  if (aIsFree !== bIsFree) return aIsFree ? 1 : -1
+
+  if (!aIsFree && !bIsFree) {
+    const aFrom = Number.isFinite(a.from) ? a.from : Number.MAX_SAFE_INTEGER
+    const bFrom = Number.isFinite(b.from) ? b.from : Number.MAX_SAFE_INTEGER
+    if (aFrom !== bFrom) return aFrom - bFrom
+    return compareDatesDesc(a.updatedAt, b.updatedAt)
+  }
+
+  return compareDatesDesc(a.updatedAt, b.updatedAt)
+}
+
+export const matchesNoteFilter = (note, filterValue = 'all') => {
+  if (filterValue === 'pinned') return note.pinned
+  if (filterValue === 'quote') return note.type === 'quote'
+  if (filterValue === 'free') return note.type === 'free'
+  return true
+}

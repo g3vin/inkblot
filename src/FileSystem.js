@@ -54,7 +54,6 @@ export async function renameFile(projectName, oldName, newName) {
 
 export async function saveDocument(projectName, docName, docData) {
   try {
-    console.debug('[saveDocument] called', { projectName, docName, append: !!docData?._appendVersion })
     const nestedPath = docName?.split('/')?.slice(0, -1).join('/')
     const dir = nestedPath ? `${projectName}/${nestedPath}` : projectName
     const filePath = `${projectName}/${docName}.json`
@@ -69,7 +68,7 @@ export async function saveDocument(projectName, docName, docData) {
         try {
           const raw = await readTextFile(filePath, { baseDir: BaseDirectory.AppData })
           existing = JSON.parse(raw || '{}')
-        } catch (e) {
+        } catch {
           existing = null
         }
 
@@ -82,16 +81,11 @@ export async function saveDocument(projectName, docName, docData) {
           contentJson: docData._version?.contentJson || null,
         }
 
-        console.debug('[saveDocument] appendVersion', { projectName, docName, newEntryId: newEntry.id })
-
         // avoid duplicate consecutive
         if (!(versions[0] && versions[0].contentHtml && newEntry.contentHtml && versions[0].contentHtml === newEntry.contentHtml)) {
           versions.unshift(newEntry)
           // cap versions list
           if (versions.length > 200) versions.length = 200
-          console.debug('[saveDocument] merged version; versionsCount=', versions.length)
-        } else {
-          console.debug('[saveDocument] skipped duplicate consecutive version')
         }
 
         await writeTextFile(
@@ -104,18 +98,12 @@ export async function saveDocument(projectName, docName, docData) {
           { baseDir: BaseDirectory.AppData }
         )
         try {
-          const verifyRaw = await readTextFile(filePath, { baseDir: BaseDirectory.AppData })
-          const verify = JSON.parse(verifyRaw || '{}')
-          console.debug('[saveDocument] write verified', { filePath, writtenVersions: Array.isArray(verify.versions) ? verify.versions.length : 0 })
-        } catch (ve) {
-          console.debug('[saveDocument] write verify failed', { filePath, err: String(ve) })
-        }
-        try {
           if (typeof window !== 'undefined' && window?.dispatchEvent) {
             window.dispatchEvent(new CustomEvent('versions:changed', { detail: { projectName, docName } }))
-            console.debug('[saveDocument] dispatched versions:changed', { projectName, docName })
           }
-        } catch (e) {}
+        } catch {
+          void 0
+        }
         return
       } catch (e) {
         console.error('[saveDocument] version merge failed:', e)
@@ -130,13 +118,6 @@ export async function saveDocument(projectName, docName, docData) {
       }),
       { baseDir: BaseDirectory.AppData }
     )
-    try {
-      const verifyRaw2 = await readTextFile(filePath, { baseDir: BaseDirectory.AppData })
-      const verify2 = JSON.parse(verifyRaw2 || '{}')
-      console.debug('[saveDocument] write verified (no-versions)', { filePath, hasVersions: Array.isArray(verify2.versions) ? verify2.versions.length : 0 })
-    } catch (ve2) {
-      console.debug('[saveDocument] write verify failed (no-versions)', { filePath, err: String(ve2) })
-    }
   } catch (error) {
     console.error('Failed to save document:', error)
   }
@@ -161,16 +142,13 @@ export async function appendVersion(projectName, docName, { contentHtml, content
     try {
       const raw = await readTextFile(versionsFile, { baseDir: BaseDirectory.AppData })
       existing = JSON.parse(raw || '[]')
-    } catch (e) {
+    } catch {
       existing = []
     }
-
-    console.debug('[appendVersion] writing to', { versionsFile, projectName, docName })
 
     // Avoid duplicate consecutive entries
     const latest = existing[0]
     if (latest && latest.contentHtml && contentHtml && latest.contentHtml === contentHtml) {
-      console.debug('[appendVersion] skipped duplicate consecutive entry')
       return
     }
 
@@ -185,13 +163,11 @@ export async function appendVersion(projectName, docName, { contentHtml, content
     existing.unshift(entry)
 
     await writeTextFile(versionsFile, JSON.stringify(existing), { baseDir: BaseDirectory.AppData })
-    console.debug('[appendVersion] wrote version', { id: entry.id, versionsFile, total: existing.length })
     try {
       if (typeof window !== 'undefined' && window?.dispatchEvent) {
         window.dispatchEvent(new CustomEvent('versions:changed', { detail: { projectName, docName } }))
-        console.debug('[appendVersion] dispatched versions:changed', { projectName, docName })
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   } catch (e) {
@@ -206,12 +182,10 @@ export async function getVersions(projectName, docName) {
     try {
       const raw = await readTextFile(docPath, { baseDir: BaseDirectory.AppData })
       const parsed = JSON.parse(raw || '{}')
-      const found = Array.isArray(parsed.versions) ? parsed.versions.length : 0
-      console.debug('[getVersions] read from doc file', { docPath, projectName, docName, found })
       if (Array.isArray(parsed.versions) && parsed.versions.length) return parsed.versions
       // fallthrough to .versions file fallback
-    } catch (e) {
-      console.debug('[getVersions] failed reading doc file, will try .versions fallback', { docPath, projectName, docName, err: String(e) })
+    } catch {
+      void 0
     }
 
     // Fallback: check for a .versions file stored alongside the project (used by appendVersion)
@@ -221,10 +195,8 @@ export async function getVersions(projectName, docName) {
       try {
         const raw2 = await readTextFile(versionsFile, { baseDir: BaseDirectory.AppData })
         const parsed2 = JSON.parse(raw2 || '[]')
-        console.debug('[getVersions] read from .versions file', { versionsFile, projectName, docName, found: Array.isArray(parsed2) ? parsed2.length : 0 })
         return Array.isArray(parsed2) ? parsed2 : []
-      } catch (e2) {
-        console.debug('[getVersions] no .versions file found or failed to read', { versionsFile, err: String(e2) })
+      } catch {
         return []
       }
     } catch (e3) {
@@ -323,6 +295,32 @@ export async function deleteProject(projectName) {
   } catch (e) {
     console.error('Delete project failed:', e)
     return false
+  }
+}
+
+export async function renameProject(projectName, newName) {
+  try {
+    const currentName = projectName?.trim()
+    const nextName = newName?.trim()
+    if (!currentName || !nextName) return null
+    if (currentName === nextName) return nextName
+
+    const projectExists = await exists(currentName, { baseDir: BaseDirectory.AppData })
+    if (!projectExists) return null
+
+    const targetExists = await exists(nextName, { baseDir: BaseDirectory.AppData })
+    if (targetExists) return null
+
+    const baseDir = await appDataDir()
+    const joinPath = (a, b) => `${a.replace(/[\\/]+$/, '')}/${b.replace(/^[/\\]+/, '')}`
+    const absoluteOldPath = joinPath(baseDir, currentName)
+    const absoluteNewPath = joinPath(baseDir, nextName)
+
+    await rename(absoluteOldPath, absoluteNewPath)
+    return nextName
+  } catch (e) {
+    console.error('Rename project failed:', e)
+    return null
   }
 }
 
