@@ -1,0 +1,78 @@
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+
+export const DEFAULT_DICTATION_MODEL_PATH = '/Users/gavin/inkblot-dictation/models/ggml-small.en.bin'
+
+export async function loadDictationModel(modelPath = DEFAULT_DICTATION_MODEL_PATH) {
+  return invoke('load_dictation_model', {
+    modelPath,
+  })
+}
+
+export async function startDictation() {
+  return invoke('start_dictation_session', {
+    options: {
+      language: 'en',
+      partialIntervalMs: 1200,
+      silenceMs: 1700,
+      minChunkMs: 1600,
+      maxChunkMs: 30000,
+      silenceRmsThreshold: 0.012,
+      cleanup: true,
+    },
+  })
+}
+
+export async function stopDictation() {
+  return invoke('stop_dictation_session')
+}
+
+export async function cancelDictation() {
+  return invoke('cancel_dictation_session')
+}
+
+export async function dictationStatus() {
+  return invoke('dictation_status')
+}
+
+export async function setupDictationListeners({
+  onStarted,
+  onPartial,
+  onFinal,
+  onLevel,
+  onStopped,
+  onError,
+} = {}) {
+  const unlistenStarted = await listen('dictation://started', (event) => {
+    onStarted?.(event.payload)
+  })
+
+  const unlistenPartial = await listen('dictation://partial', (event) => {
+    onPartial?.(event.payload)
+  })
+
+  const unlistenFinal = await listen('dictation://final', (event) => {
+    onFinal?.(event.payload)
+  })
+
+  const unlistenLevel = await listen('dictation://level', (event) => {
+    onLevel?.(event.payload)
+  })
+
+  const unlistenStopped = await listen('dictation://stopped', (event) => {
+    onStopped?.(event.payload)
+  })
+
+  const unlistenError = await listen('dictation://error', (event) => {
+    onError?.(event.payload)
+  })
+
+  return () => {
+    unlistenStarted()
+    unlistenPartial()
+    unlistenFinal()
+    unlistenLevel()
+    unlistenStopped()
+    unlistenError()
+  }
+}

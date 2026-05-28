@@ -66,17 +66,6 @@ const fetchLatestRelease = async (repo) => {
   }
 }
 
-const headRaw = async (repo) => {
-  const rawUrl = `https://raw.githubusercontent.com/${repo}/${REPO_REF}/${ASSET}`
-  try {
-    const res = await fetch(rawUrl, { method: 'HEAD', headers: makeHeaders({ Accept: '*/*' }) })
-    if (!res.ok) return null
-    return res.headers.get('etag') || res.headers.get('last-modified') || null
-  } catch (e) {
-    return null
-  }
-}
-
 const downloadFromRepo = async (repo, meta) => {
   const outPath = path.join(TARGET_DIR, ASSET)
 
@@ -132,17 +121,6 @@ const downloadFromRepo = async (repo, meta) => {
 
     console.log(`Downloaded ${ASSET} successfully`)
     return true
-
-
-  // If file exists but we couldn't get a remote tag, still attempt HEAD/download unless exists and user requested skip.
-  console.log(`Downloading ${ASSET} raw from ${repo} -> ${outPath}`)
-  await downloadFile(rawUrl, outPath)
-  console.log(`Downloaded ${ASSET} raw from ${repo}`)
-  if (remoteTag) {
-    meta[ASSET] = remoteTag
-    saveMeta(meta)
-  }
-  return true
 }
 
 const main = async () => {

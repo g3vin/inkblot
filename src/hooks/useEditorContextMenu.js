@@ -1,35 +1,8 @@
 import { useCallback } from 'react'
-import { renameEntry, deleteEntry, deleteProject } from '../FileSystem'
+import { deleteEntry, deleteProject } from '../FileSystem'
 import { confirm } from '@tauri-apps/plugin-dialog'
-
-const updateOrder = (projectName, updater) => {
-  const key = `inkblot-order:${projectName}`
-  const current = JSON.parse(localStorage.getItem(key) || '{}')
-  const next = updater({ ...current })
-  localStorage.setItem(key, JSON.stringify(next))
-}
-
-const remapOrderForFolder = (orderState, fromPath, toPath) => {
-  const next = {}
-  Object.entries(orderState).forEach(([key, list]) => {
-    const newKey = key === fromPath || key.startsWith(`${fromPath}/`)
-      ? key.replace(fromPath, toPath)
-      : key
-
-    const newList = list.map(id => {
-      if (id.startsWith(`file:${fromPath}/`) || id === `file:${fromPath}`) {
-        return id.replace(`file:${fromPath}`, `file:${toPath}`)
-      }
-      if (id.startsWith(`folder:${fromPath}/`) || id === `folder:${fromPath}`) {
-        return id.replace(`folder:${fromPath}`, `folder:${toPath}`)
-      }
-      return id
-    })
-
-    next[newKey] = newList
-  })
-  return next
-}
+import { createQuoteNote } from '../noteUtils'
+import { STORY_FOLDER_PRESETS } from '../storyStructure'
 
 /* ------------------------------------------------------------
    Helper: Remove highlight only within selection (native behavior)
@@ -65,7 +38,7 @@ export function useEditorContextMenu({
   editor,
   setTiles,
   setNotes,
-  setSidebarTab,
+  openRightSidebarTab,
   setSplitView,
   setSecondaryDoc,
   setCurrentDoc,
@@ -75,8 +48,8 @@ export function useEditorContextMenu({
   activeDoc,
   projectName,
   refreshFiles,
-  onSelectDoc,
   setBubbleSentence,
+  onEnterFocusMode,
 }) {
   return useCallback(
     async (e) => {
@@ -100,10 +73,29 @@ export function useEditorContextMenu({
       const treeView = fileTreeEl?.getAttribute('data-view')
       const fileItem = e.target.closest('.file-item')
       const projectItem = e.target.closest('.file-item.project')
+      const isFileTreeArea = fileTree || leftSidebar
 
       if (projectItem && treeView === 'projects') {
         const projectNameToDelete = projectItem.getAttribute('data-project-name')
         if (projectNameToDelete) {
+          items.push(
+            await MenuItem.new({
+              text: 'Rename Project',
+              action: async () => {
+                window.dispatchEvent(
+                  new CustomEvent('filetree:new-entry', {
+                    detail: {
+                      rename: true,
+                      path: projectNameToDelete,
+                      type: 'project',
+                      name: projectNameToDelete,
+                    },
+                  })
+                )
+              },
+            })
+          )
+
           items.push(
             await MenuItem.new({
               text: 'Delete Project',
@@ -215,7 +207,6 @@ export function useEditorContextMenu({
       }
 
       /* ---------- 2️⃣ FILE TREE EMPTY SPACE ---------- */
-      const isFileTreeArea = e.target.closest('.file-tree') || e.target.closest('.left-sidebar')
       const isFileListArea = e.target.closest('.file-list')
       const isProjectItem = e.target.closest('.file-item.project')
       if ((isFileTreeArea || isFileListArea) && treeView !== 'projects' && !fileItem && !isProjectItem) {
@@ -244,10 +235,64 @@ export function useEditorContextMenu({
             },
           })
         )
+
+        for (const preset of STORY_FOLDER_PRESETS) {
+          items.push(
+            await MenuItem.new({
+              text: `New ${preset.menuLabel}`,
+              action: async () => {
+                window.dispatchEvent(
+                  new CustomEvent('filetree:new-entry', {
+                    detail: { type: 'folder', parent: '', presetKey: preset.key },
+                  })
+                )
+              },
+            })
+          )
+        }
+      }
+
+      if (isFileTreeArea && treeView !== 'projects') {
+        items.push(
+          await MenuItem.new({
+            text: 'Expand All Folders',
+            action: () => {
+              window.dispatchEvent(
+                new CustomEvent('filetree:folders-visibility', {
+                  detail: { action: 'expand-all' },
+                })
+              )
+            },
+          }),
+          await MenuItem.new({
+            text: 'Collapse All Folders',
+            action: () => {
+              window.dispatchEvent(
+                new CustomEvent('filetree:folders-visibility', {
+                  detail: { action: 'collapse-all' },
+                })
+              )
+            },
+          }),
+          await PredefinedMenuItem.new({ item: 'Separator' })
+        )
       }
 
       /* ---------- 3️⃣ EDITOR CONTEXT ---------- */
       if (!fileItem && editor) {
+        const isEditorArea = e.target.closest('.editor, .pane')
+        if (isEditorArea) {
+          items.push(
+            await MenuItem.new({
+              text: 'Focus Mode',
+              action: () => {
+                onEnterFocusMode?.()
+              },
+            }),
+            await PredefinedMenuItem.new({ item: 'Separator' })
+          )
+        }
+
         const { from, to } = editor.state.selection
         const text = editor.state.doc.textBetween(from, to, ' ')
         if (text.trim()) {
@@ -301,7 +346,7 @@ export function useEditorContextMenu({
           items.push(
             await MenuItem.new({
               text: 'Analyze POS',
-              action: () =>
+              action: () => {
                 setTiles((p) => [
                   {
                     id: Date.now(),
@@ -313,7 +358,9 @@ export function useEditorContextMenu({
                     doc: activeDoc || currentDoc,
                   },
                   ...p,
-                ]),
+                ])
+                openRightSidebarTab?.('workbench')
+              },
             })
           )
 
@@ -321,7 +368,7 @@ export function useEditorContextMenu({
             items.push(
               await MenuItem.new({
                 text: 'Define Word',
-                action: () =>
+                action: () => {
                   setTiles((p) => [
                     {
                       id: Date.now(),
@@ -333,7 +380,9 @@ export function useEditorContextMenu({
                       doc: activeDoc || currentDoc,
                     },
                     ...p,
-                  ]),
+                  ])
+                  openRightSidebarTab?.('workbench')
+                },
               })
             )
           }
@@ -342,7 +391,7 @@ export function useEditorContextMenu({
             items.push(
               await MenuItem.new({
                 text: 'Find Synonyms',
-                action: () =>
+                action: () => {
                   setTiles((p) => [
                     {
                       id: Date.now(),
@@ -354,7 +403,9 @@ export function useEditorContextMenu({
                       doc: activeDoc || currentDoc,
                     },
                     ...p,
-                  ]),
+                  ])
+                  openRightSidebarTab?.('workbench')
+                },
               })
             )
           }
@@ -363,7 +414,7 @@ export function useEditorContextMenu({
             items.push(
               await MenuItem.new({
                 text: 'Find Rhymes',
-                action: () =>
+                action: () => {
                   setTiles((p) => [
                     {
                       id: Date.now(),
@@ -375,7 +426,9 @@ export function useEditorContextMenu({
                       doc: activeDoc || currentDoc,
                     },
                     ...p,
-                  ]),
+                  ])
+                  openRightSidebarTab?.('workbench')
+                },
               })
             )
           }
@@ -389,19 +442,15 @@ export function useEditorContextMenu({
                 const { from, to } = editor.state.selection
 
                 setNotes(p => [
-                  {
-                    id: crypto.randomUUID(),
-                    type: 'quote',
+                  createQuoteNote({
                     from,
                     to,
                     anchor: editor.state.doc.textBetween(from, to),
-                    content: '',
-                    timestamp: new Date().toLocaleTimeString(),
-                  },
+                  }),
                   ...p,
                 ])
 
-                setSidebarTab('notes')
+                openRightSidebarTab?.('notes')
               },
             })
           )
@@ -418,6 +467,25 @@ export function useEditorContextMenu({
                   }
                 } catch (err) {
                   console.warn('Failed to open Pinterest window:', err)
+                }
+              },
+            })
+          )
+
+          items.push(
+            await MenuItem.new({
+              text: 'Search Web',
+              action: async () => {
+                const query = String(text || '').trim()
+                if (!query) return
+
+                const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+
+                try {
+                  const { openUrl } = await import('@tauri-apps/plugin-opener')
+                  await openUrl(url)
+                } catch (err) {
+                  console.warn('Failed to open browser search:', err)
                 }
               },
             })
@@ -476,7 +544,7 @@ export function useEditorContextMenu({
       editor,
       setTiles,
       setNotes,
-      setSidebarTab,
+      openRightSidebarTab,
       setSplitView,
       setSecondaryDoc,
       setCurrentDoc,
@@ -486,8 +554,8 @@ export function useEditorContextMenu({
       activeDoc,
       projectName,
       refreshFiles,
-      onSelectDoc,
       setBubbleSentence,
+      onEnterFocusMode,
     ]
   )
 }
