@@ -1,52 +1,57 @@
 import SFIcon from '../SFIcon'
+import { RIGHT_SIDEBAR_TABS } from './sidebarTabsConfig'
 
-export default function SidebarTabs({ tab, setTab }) {
+const TAB_GAP_PX = 4
+const TAB_BAR_PADDING_PX = 8
+const TAB_SNAP_DURATION_MS = 260
+const TAB_SNAP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+export default function SidebarTabs({
+  tab,
+  setTab,
+  visualProgress = 0,
+  gestureActive = false,
+  reducedMotion = false,
+}) {
+  const committedActiveIndex = Math.max(0, RIGHT_SIDEBAR_TABS.findIndex(({ id }) => id === tab))
+  const visualActiveIndex = gestureActive
+    ? clamp(Math.round(visualProgress), 0, RIGHT_SIDEBAR_TABS.length - 1)
+    : committedActiveIndex
+  const indicatorWidth = `calc((100% - ${((RIGHT_SIDEBAR_TABS.length - 1) * TAB_GAP_PX) + TAB_BAR_PADDING_PX}px) / ${RIGHT_SIDEBAR_TABS.length})`
+  const indicatorTransform = `translateX(calc(${visualProgress * 100}% + ${visualProgress * TAB_GAP_PX}px))`
+
   return (
-    <div className="sidebar-tabs">
-      <button
-        className={tab === 'search' ? 'active' : ''}
-        onClick={() => setTab('search')}
-        aria-label="Search"
-        title="Search"
-      >
-        <SFIcon name="magnifyingglass.circle" filled={tab === 'search'} />
-      </button>
+    <div className={`sidebar-tabs${gestureActive ? ' is-gesture-active' : ''}`}>
+      <span
+        className="sidebar-tabs-indicator"
+        aria-hidden="true"
+        style={{
+          width: indicatorWidth,
+          transform: indicatorTransform,
+          transition: gestureActive || reducedMotion
+            ? 'none'
+            : `transform ${TAB_SNAP_DURATION_MS}ms ${TAB_SNAP_EASING}`,
+        }}
+      />
 
-      <button
-        className={tab === 'clipboard' ? 'active' : ''}
-        onClick={() => setTab('clipboard')}
-        aria-label="Clipboard"
-        title="Clipboard"
-      >
-        <SFIcon name="doc.on.clipboard" filled={tab === 'clipboard'} />
-      </button>
-
-      <button
-        className={tab === 'workbench' ? 'active' : ''}
-        onClick={() => setTab('workbench')}
-        aria-label="Workbench"
-        title="Workbench"
-      >
-        <SFIcon name="hammer" filled={tab === 'workbench'} />
-      </button>
-
-      <button
-        className={tab === 'notes' ? 'active' : ''}
-        onClick={() => setTab('notes')}
-        aria-label="Notes"
-        title="Notes"
-      >
-        <SFIcon name="doc.text" filled={tab === 'notes'} />
-      </button>
-
-      <button
-        className={tab === 'history' ? 'active' : ''}
-        onClick={() => setTab('history')}
-        aria-label="History"
-        title="History"
-      >
-        <SFIcon name="clock" filled={tab === 'history'} />
-      </button>
+      {RIGHT_SIDEBAR_TABS.map(({ id, icon, label }, index) => {
+        const active = index === visualActiveIndex
+        const selected = tab === id
+        return (
+          <button
+            key={id}
+            className={active ? 'active' : ''}
+            onClick={() => setTab(id)}
+            aria-label={label}
+            title={label}
+            aria-pressed={selected}
+          >
+            <SFIcon name={icon} filled={active} forceAnimate={gestureActive && active} />
+          </button>
+        )
+      })}
     </div>
   )
 }

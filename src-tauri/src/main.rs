@@ -11,25 +11,27 @@ use url::Url;
 use once_cell::sync::Lazy;
 
 use ndarray::Array;
-use ort::value::Tensor;
-use ort::session::Session;
 use ort::session::builder::SessionBuilder;
+use ort::session::Session;
+use ort::value::Tensor;
 
-use reqwest;
+mod dictation_commands;
+mod kokoro_commands;
+
+use dictation_commands::{
+    cancel_dictation_session, dictation_status, load_dictation_model, start_dictation_session,
+    stop_dictation_session, AppDictationState,
+};
+use kokoro_commands::{generate_kokoro_speech, prewarm_kokoro_speech, KokoroSpeechState};
 
 /* ============================================================
    WEBVIEW COMMANDS
 ============================================================ */
 
 #[tauri::command]
-async fn navigate_webview(
-    app_handle: AppHandle,
-    label: String,
-    url: String,
-) -> Result<(), String> {
+async fn navigate_webview(app_handle: AppHandle, label: String, url: String) -> Result<(), String> {
     if let Some(webview) = app_handle.get_webview_window(&label) {
-        let parsed_url =
-            Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
+        let parsed_url = Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
 
         let webview_clone = webview.clone();
 
@@ -46,10 +48,7 @@ async fn navigate_webview(
 }
 
 #[tauri::command]
-async fn get_webview_url(
-    app_handle: AppHandle,
-    label: String,
-) -> Result<String, String> {
+async fn get_webview_url(app_handle: AppHandle, label: String) -> Result<String, String> {
     if let Some(webview) = app_handle.get_webview_window(&label) {
         webview
             .url()
@@ -61,11 +60,7 @@ async fn get_webview_url(
 }
 
 #[tauri::command]
-async fn eval_webview(
-    app_handle: AppHandle,
-    label: String,
-    script: String,
-) -> Result<(), String> {
+async fn eval_webview(app_handle: AppHandle, label: String, script: String) -> Result<(), String> {
     if let Some(webview) = app_handle.get_webview_window(&label) {
         webview
             .eval(script)
@@ -133,199 +128,18 @@ fn extract_attr(tag: &str, attr: &str) -> Option<String> {
     Some(rest[..end].to_string())
 }
 
-/// Extract (username, board_slug, section_slug) from a Pinterest URL path.
-/// e.g. /soupyorangecat/constellations/koa/ → Some(("soupyorangecat", "constellations", Some("koa")))
-fn parse_pinterest_path(path: &str) -> Option<(String, String, Option<String>)> {
-    let trimmed = path.trim_matches('/');
-    let parts: Vec<&str> = trimmed.split('/').collect();
-    match parts.len() {
-        2 => Some((parts[0].to_string(), parts[1].to_string(), None)),
-        3 => Some((parts[0].to_string(), parts[1].to_string(), Some(parts[2].to_string()))),
-        _ => None,
-    }
-}
-
-/// Try to scrape pins via Pinterest's internal resource API (structured JSON).
-async fn scrape_via_pinterest_api(
-    client: &reqwest::Client,
-    url: &Url,
-    csrf_token: &str,
-    max: usize,
-) -> Result<Vec<ScrapedPin>, String> {
-    let (username, board_slug, section_slug) = parse_pinterest_path(url.path())
-        .ok_or_else(|| "Could not parse Pinterest path into username/board/section".to_string())?;
-
-    let source_url = url.path().to_string();
-    let mut out: Vec<ScrapedPin> = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
-
-    eprintln!("[pinterest-api] csrf_token length: {}", csrf_token.len());
-
-    // Helper closure to build a POST request with all required Pinterest headers.
-    // Pinterest's /resource/*/get/ endpoints use POST with form-encoded body.
-    let referer = url.to_string();
-    let csrf_owned = csrf_token.to_string();
-    let build_req = |api_url: &str, data: &str| {
-        let mut req = client
-            .post(api_url)
-            .form(&[("source_url", source_url.as_str()), ("data", data)])
-            .header("X-Requested-With", "XMLHttpRequest")
-            .header("Accept", "application/json, text/javascript, */*; q=0.01")
-            .header("Referer", &referer)
-            .header("Origin", "https://www.pinterest.com")
-            .header("X-Pinterest-AppState", "active")
-            .header("X-APP-VERSION", "unknown");
-        if !csrf_owned.is_empty() {
-            req = req.header("X-CSRFToken", csrf_owned.as_str());
-        }
-        req
-    };
-
-    // Helper: send a request and return (status, body)
-    async fn send_and_log(
-        req: reqwest::RequestBuilder,
-        label: &str,
-    ) -> Result<String, String> {
-        let resp = req.send().await.map_err(|e| format!("{label} request failed: {e}"))?;
-        let status = resp.status();
-        let body = resp.text().await.map_err(|e| format!("{label} read failed: {e}"))?;
-        eprintln!("[pinterest-api] {label}: status={status}, len={}, body_preview={:.300}",
-            body.len(), body);
-        Ok(body)
-    }
-
-    if let Some(ref section) = section_slug {
-        // --- Board Section: first get section_id, then get pins ---
-        let section_data = format!(
-            r#"{{"options":{{"board_slug":"{}","section_slug":"{}","username":"{}"}},"context":{{}}}}"#,
-            board_slug, section, username
-        );
-        let section_resp = send_and_log(
-            build_req(
-                "https://www.pinterest.com/resource/BoardSectionResource/get/",
-                &section_data,
-            ),
-            "BoardSectionResource",
-        ).await?;
-
-        let section_json: serde_json::Value = serde_json::from_str(&section_resp)
-            .map_err(|e| format!("BoardSectionResource JSON parse failed: {e}"))?;
-
-        let section_id = section_json
-            .pointer("/resource_response/data/id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                format!(
-                    "No section id found in BoardSectionResource response: {}",
-                    &section_resp[..section_resp.len().min(500)]
-                )
-            })?
-            .to_string();
-
-        eprintln!("[pinterest-api] section_id = {}", section_id);
-
-        // Now fetch pins for this section
-        let pins_data = format!(
-            r#"{{"options":{{"section_id":"{}","page_size":{},"bookmark":""}},"context":{{}}}}"#,
-            section_id, max.min(50)
-        );
-        let pins_resp = send_and_log(
-            build_req(
-                "https://www.pinterest.com/resource/BoardSectionPinsResource/get/",
-                &pins_data,
-            ),
-            "BoardSectionPinsResource",
-        ).await?;
-
-        let pins_json: serde_json::Value = serde_json::from_str(&pins_resp)
-            .map_err(|e| format!("BoardSectionPinsResource JSON parse failed: {e}"))?;
-
-        if let Some(pins_arr) = pins_json.pointer("/resource_response/data").and_then(|v| v.as_array()) {
-            for pin in pins_arr {
-                if out.len() >= max { break; }
-
-                let pin_id = pin.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                if pin_id.is_empty() { continue; }
-
-                // Try to get the best image URL from the images map
-                let image_url = pin.pointer("/images/736x/url")
-                    .or_else(|| pin.pointer("/images/474x/url"))
-                    .or_else(|| pin.pointer("/images/564x/url"))
-                    .or_else(|| pin.pointer("/images/236x/url"))
-                    .or_else(|| pin.pointer("/images/orig/url"))
-                    .or_else(|| pin.pointer("/image_large_url"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-
-                if image_url.is_empty() || !image_url.contains("i.pinimg.com") { continue; }
-
-                let pin_href = format!("https://www.pinterest.com/pin/{}/", pin_id);
-                let key = format!("{}::{}", pin_href, image_url);
-                if seen.contains(&key) { continue; }
-                seen.insert(key);
-                out.push(ScrapedPin {
-                    pin_href,
-                    image_url: image_url.to_string(),
-                });
-            }
-        }
-    } else {
-        // --- Board (no section): use BoardFeedResource ---
-        let feed_data = format!(
-            r#"{{"options":{{"board_slug":"{}","username":"{}","page_size":{}}},"context":{{}}}}"#,
-            board_slug, username, max.min(50)
-        );
-        let feed_resp = send_and_log(
-            build_req(
-                "https://www.pinterest.com/resource/BoardFeedResource/get/",
-                &feed_data,
-            ),
-            "BoardFeedResource",
-        ).await?;
-
-        let feed_json: serde_json::Value = serde_json::from_str(&feed_resp)
-            .map_err(|e| format!("BoardFeedResource JSON parse failed: {e}"))?;
-
-        if let Some(pins_arr) = feed_json.pointer("/resource_response/data").and_then(|v| v.as_array()) {
-            for pin in pins_arr {
-                if out.len() >= max { break; }
-
-                let pin_id = pin.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                if pin_id.is_empty() { continue; }
-
-                let image_url = pin.pointer("/images/736x/url")
-                    .or_else(|| pin.pointer("/images/474x/url"))
-                    .or_else(|| pin.pointer("/images/564x/url"))
-                    .or_else(|| pin.pointer("/images/236x/url"))
-                    .or_else(|| pin.pointer("/images/orig/url"))
-                    .or_else(|| pin.pointer("/image_large_url"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-
-                if image_url.is_empty() || !image_url.contains("i.pinimg.com") { continue; }
-
-                let pin_href = format!("https://www.pinterest.com/pin/{}/", pin_id);
-                let key = format!("{}::{}", pin_href, image_url);
-                if seen.contains(&key) { continue; }
-                seen.insert(key);
-                out.push(ScrapedPin {
-                    pin_href,
-                    image_url: image_url.to_string(),
-                });
-            }
-        }
-    }
-
-    eprintln!("[pinterest-api] total pins extracted: {}", out.len());
-    Ok(out)
-}
-
 #[tauri::command]
-async fn scrape_pinterest_html(url: String, max_pins: Option<usize>) -> Result<ScrapeResult, String> {
+async fn scrape_pinterest_html(
+    url: String,
+    max_pins: Option<usize>,
+) -> Result<ScrapeResult, String> {
     let parsed = Url::parse(&url).map_err(|e| format!("Invalid URL: {e}"))?;
     let host = parsed.host_str().unwrap_or("").to_lowercase();
     if host != "www.pinterest.com" && host != "pinterest.com" {
-        return Ok(ScrapeResult { pins: Vec::new(), html: String::new() });
+        return Ok(ScrapeResult {
+            pins: Vec::new(),
+            html: String::new(),
+        });
     }
 
     let max = max_pins.unwrap_or(30).clamp(1, 200);
@@ -336,46 +150,16 @@ async fn scrape_pinterest_html(url: String, max_pins: Option<usize>) -> Result<S
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
-    // --- Strategy 0: Pinterest internal resource API (most reliable) ---
-    // First visit the page to get cookies (csrftoken etc.), then call the API.
     let response = client
         .get(parsed.as_str())
         .send()
         .await
         .map_err(|e| format!("Failed to fetch Pinterest HTML: {e}"))?;
 
-    // Extract csrftoken from Set-Cookie headers before consuming the body.
-    let mut csrf_token = String::new();
-    for val in response.headers().get_all("set-cookie") {
-        if let Ok(s) = val.to_str() {
-            if let Some(pos) = s.find("csrftoken=") {
-                let after = &s[pos + 10..];
-                let token: String = after.chars().take_while(|c| *c != ';' && *c != ' ').collect();
-                if token.len() >= 8 {
-                    csrf_token = token;
-                }
-            }
-        }
-    }
-    eprintln!("[pinterest] csrftoken from Set-Cookie: len={}, preview={:.20}", csrf_token.len(), csrf_token);
-
     let html: String = response
         .text()
         .await
         .map_err(|e| format!("Failed to read Pinterest HTML: {e}"))?;
-
-    match scrape_via_pinterest_api(&client, &parsed, &csrf_token, max).await {
-        Ok(api_pins) if !api_pins.is_empty() => {
-            eprintln!("[pinterest] Strategy 0 (API) succeeded: {} pins", api_pins.len());
-            return Ok(ScrapeResult { pins: api_pins, html });
-        }
-        Ok(_) => {
-            eprintln!("[pinterest] Strategy 0 (API) returned 0 pins, falling back to HTML parsing");
-        }
-        Err(e) => {
-            eprintln!("[pinterest] Strategy 0 (API) failed: {}, falling back to HTML parsing", e);
-        }
-    }
 
     let mut out: Vec<ScrapedPin> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
@@ -432,7 +216,10 @@ async fn scrape_pinterest_html(url: String, max_pins: Option<usize>) -> Result<S
             continue;
         }
         seen.insert(key);
-        out.push(ScrapedPin { pin_href, image_url });
+        out.push(ScrapedPin {
+            pin_href,
+            image_url,
+        });
         if out.len() >= max {
             break;
         }
@@ -449,9 +236,7 @@ async fn scrape_pinterest_html(url: String, max_pins: Option<usize>) -> Result<S
                 if let Some(end_tag) = html[data_start..].find("</script>") {
                     let json_blob = &html[data_start..data_start + end_tag];
                     // Decode escaped forward slashes that Pinterest uses.
-                    let decoded = json_blob
-                        .replace("\\u002F", "/")
-                        .replace("\\/", "/");
+                    let decoded = json_blob.replace("\\u002F", "/").replace("\\/", "/");
 
                     // Use a regex-like manual scan for pin-id + nearby pinimg URL pairs.
                     // Pattern: "/pin/<digits>/" followed within ~2000 chars by an i.pinimg.com URL.
@@ -475,8 +260,7 @@ async fn scrape_pinterest_html(url: String, max_pins: Option<usize>) -> Result<S
                             continue;
                         }
 
-                        let pin_href =
-                            format!("https://www.pinterest.com/pin/{}/", digits);
+                        let pin_href = format!("https://www.pinterest.com/pin/{}/", digits);
 
                         // Look ahead for a nearby i.pinimg.com URL.
                         let look_end = (search_pos + 2500).min(decoded.len());
@@ -534,11 +318,8 @@ use tokenizers::Tokenizer;
 
 static TOKENIZER: Lazy<Tokenizer> = Lazy::new(|| {
     println!("[INFO] Loading HuggingFace tokenizer...");
-    Tokenizer::from_pretrained(
-        "sentence-transformers/all-MiniLM-L6-v2",
-        None,
-    )
-    .expect("Failed to load tokenizer")
+    Tokenizer::from_pretrained("sentence-transformers/all-MiniLM-L6-v2", None)
+        .expect("Failed to load tokenizer")
 });
 
 struct SynonymModel {
@@ -546,11 +327,7 @@ struct SynonymModel {
     vocab: Vec<String>,
 }
 
-fn find_target_position(
-    encoding: &tokenizers::Encoding,
-    text: &str,
-    target: &str,
-) -> i64 {
+fn find_target_position(encoding: &tokenizers::Encoding, text: &str, target: &str) -> i64 {
     let offsets = encoding.get_offsets(); // Vec<(u32,u32)> typically
     let start_char = text.find(target).unwrap_or(0);
 
@@ -566,8 +343,7 @@ fn find_target_position(
     0
 }
 
-static MODEL: Lazy<Mutex<Option<SynonymModel>>> =
-    Lazy::new(|| Mutex::new(None));
+static MODEL: Lazy<Mutex<Option<SynonymModel>>> = Lazy::new(|| Mutex::new(None));
 
 fn init_synonym_model() {
     let mut guard = MODEL.lock().unwrap();
@@ -583,12 +359,10 @@ fn init_synonym_model() {
         .commit_from_file("../public/synonym.onnx")
         .unwrap();
 
-    let vocab: Vec<String> =
-        serde_json::from_str(
-            &std::fs::read_to_string("../public/vocab_kaggle.json")
-                .expect("Failed to read vocab"),
-        )
-        .expect("Invalid vocab JSON");
+    let vocab: Vec<String> = serde_json::from_str(
+        &std::fs::read_to_string("../public/vocab_kaggle.json").expect("Failed to read vocab"),
+    )
+    .expect("Invalid vocab JSON");
 
     *guard = Some(SynonymModel { session, vocab });
 
@@ -602,10 +376,7 @@ struct SynonymResponse {
 }
 
 #[tauri::command]
-async fn get_synonyms(
-    _text: String,
-    target_word: String,
-) -> Result<SynonymResponse, String> {
+async fn get_synonyms(_text: String, target_word: String) -> Result<SynonymResponse, String> {
     // ----- pull model from the global -----
     let mut guard = MODEL.lock().unwrap();
     let model = guard.as_mut().ok_or("Model not initialized")?;
@@ -619,11 +390,7 @@ async fn get_synonyms(
         .map_err(|e| format!("tokenizer.encode error: {}", e))?;
 
     // convert ids / mask to i64 Vec
-    let mut input_ids_i64: Vec<i64> = encoding
-        .get_ids()
-        .iter()
-        .map(|&id| id as i64)
-        .collect();
+    let mut input_ids_i64: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
 
     let mut attention_mask_i64: Vec<i64> = encoding
         .get_attention_mask()
@@ -686,7 +453,8 @@ async fn get_synonyms(
     let mut synonyms = Vec::new();
     let mut antonyms = Vec::new();
 
-    for idx in high.iter().take(200) { // iterate more, then filter like Python
+    for idx in high.iter().take(200) {
+        // iterate more, then filter like Python
         if let Some(word) = model.vocab.get(*idx) {
             if word != &target_word {
                 synonyms.push(word.clone());
@@ -703,7 +471,8 @@ async fn get_synonyms(
                 antonyms.push(word.clone());
             }
         }
-        if antonyms.len() >= 5 { // you said you wanted 5 antonyms
+        if antonyms.len() >= 5 {
+            // you said you wanted 5 antonyms
             break;
         }
     }
@@ -719,6 +488,9 @@ fn main() {
     init_synonym_model();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .manage(AppDictationState::default())
+        .manage(KokoroSpeechState::default())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -727,6 +499,13 @@ fn main() {
             eval_webview,
             scrape_pinterest_html,
             get_synonyms,
+            load_dictation_model,
+            start_dictation_session,
+            stop_dictation_session,
+            cancel_dictation_session,
+            dictation_status,
+            generate_kokoro_speech,
+            prewarm_kokoro_speech,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

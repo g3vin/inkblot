@@ -1,21 +1,74 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import EditorLayout from './EditorLayout'
-import { debounce } from 'lodash'
-import { saveDocument, loadDocument, listProjects, documentExists } from './FileSystem'
+import { loadDocument, listProjects, documentExists, createProject, listProjectTree } from './FileSystem'
+import { normalizeNotes } from './noteUtils'
+import SFIcon from './SFIcon'
+import appIconUrl from '../src-tauri/icons/icon.png'
 
 import './Editor.css'
 
 const PERSIST_KEY = 'inkblot-session'
 const CLIPBOARD_PERSIST_KEY = 'inkblot-clipboard-history'
 const MAX_CLIPBOARD_ENTRIES = 80
+const RIGHT_SIDEBAR_TAB_IDS = new Set(['search', 'clipboard', 'workbench', 'notes', 'history'])
+const LANDING_WINDOW_DRAG_HEIGHT = 52
+const LANDING_WINDOW_DRAG_BLOCKER_SELECTOR = [
+  'button',
+  'input',
+  'select',
+  'textarea',
+  'a',
+  'label',
+  '[role="button"]',
+].join(',')
+
+const createEmptySession = (fallbackProject) => ({
+  lastProject: fallbackProject || '',
+  projects: {},
+})
+
+const normalizeProjectSession = (session = {}) => ({
+  currentDoc: session.currentDoc || '',
+  secondaryDoc: session.secondaryDoc || null,
+  splitView: session.splitView || null,
+  activeDoc: session.activeDoc || session.currentDoc || '',
+  sidebarTab: RIGHT_SIDEBAR_TAB_IDS.has(session.sidebarTab) ? session.sidebarTab : 'workbench',
+  tiles: Array.isArray(session.tiles) ? session.tiles : [],
+  updatedAt: session.updatedAt || null,
+})
 
 const loadSession = (fallbackProject) => {
   try {
     const raw = localStorage.getItem(PERSIST_KEY)
-    if (!raw) return { projectName: fallbackProject }
-    return { projectName: fallbackProject, ...JSON.parse(raw) }
+    if (!raw) return createEmptySession(fallbackProject)
+
+    const parsed = JSON.parse(raw)
+    if (parsed?.projects && typeof parsed.projects === 'object') {
+      return {
+        ...createEmptySession(fallbackProject),
+        ...parsed,
+        projects: Object.fromEntries(
+          Object.entries(parsed.projects).map(([projectName, projectSession]) => [
+            projectName,
+            normalizeProjectSession(projectSession),
+          ])
+        ),
+      }
+    }
+
+    if (parsed?.projectName) {
+      return {
+        lastProject: parsed.projectName,
+        projects: {
+          [parsed.projectName]: normalizeProjectSession(parsed),
+        },
+      }
+    }
+
+    return createEmptySession(fallbackProject)
   } catch {
-    return { projectName: fallbackProject }
+    return createEmptySession(fallbackProject)
   }
 }
 
@@ -38,33 +91,313 @@ const getMountedEditorView = (instance) => {
   return view
 }
 
-export default function Editor({ projectName: initialProject = 'DefaultProject' }) {
-  const session = loadSession(initialProject)
-  const [projectName, setProjectName] = useState(session.projectName || initialProject)
+const countTreeEntries = (node) => {
+  const totals = { files: 0, folders: 0 }
+
+  const visit = (entry) => {
+    if (!entry) return
+    if (entry.type === 'file') {
+      totals.files += 1
+      return
+    }
+    if (entry.type === 'folder' && entry.path) {
+      totals.folders += 1
+    }
+    ;(entry.children || []).forEach(visit)
+  }
+
+  visit(node)
+  return totals
+}
+
+const formatRecentDate = (value) => {
+  if (!value) return 'No recent activity'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'No recent activity'
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
+}
+
+function ProjectLanding({
+  projectSessions,
+  onOpenProject,
+  onCreateProject,
+}) {
+  const [projects, setProjects] = useState([])
+  const [query, setQuery] = useState('')
+  const [newProjectName, setNewProjectName] = useState('')
+  const [createPromptOpen, setCreatePromptOpen] = useState(false)
+  const [status, setStatus] = useState('')
+
+  const refreshProjects = useCallback(async () => {
+    const names = await listProjects()
+    const summaries = await Promise.all(
+      names.map(async (name) => {
+        try {
+          const tree = await listProjectTree(name)
+          return { name, ...countTreeEntries(tree) }
+        } catch {
+          return { name, files: 0, folders: 0 }
+        }
+      })
+    )
+    setProjects(summaries)
+  }, [])
+
+  useEffect(() => {
+    refreshProjects()
+  }, [refreshProjects])
+
+  const handleLandingMouseDown = useCallback((event) => {
+    if (event.button !== 0) return
+    if (event.clientY > LANDING_WINDOW_DRAG_HEIGHT) return
+    if (event.target instanceof Element && event.target.closest(LANDING_WINDOW_DRAG_BLOCKER_SELECTOR)) {
+      return
+    }
+
+    event.preventDefault()
+    getCurrentWindow().startDragging().catch(error => {
+      console.warn('Failed to start landing window drag:', error)
+    })
+  }, [])
+
+  const visibleProjects = projects
+    .filter(project => project.name.toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((left, right) => {
+      const leftTime = new Date(projectSessions[left.name]?.updatedAt || 0).getTime() || 0
+      const rightTime = new Date(projectSessions[right.name]?.updatedAt || 0).getTime() || 0
+      if (rightTime !== leftTime) return rightTime - leftTime
+      return left.name.localeCompare(right.name)
+    })
+
+  const handleCreateProject = async (event) => {
+    event?.preventDefault?.()
+    const trimmed = newProjectName.trim()
+    if (!trimmed) return
+
+    if (projects.some(project => project.name.toLowerCase() === trimmed.toLowerCase())) {
+      setStatus('A project with that name already exists.')
+      return
+    }
+
+    const ok = await createProject(trimmed)
+    if (!ok) {
+      setStatus('Could not create that project.')
+      return
+    }
+
+    setStatus('')
+    setNewProjectName('')
+    setCreatePromptOpen(false)
+    await refreshProjects()
+    onCreateProject(trimmed)
+  }
+
+  return (
+    <div className="landing-page" onMouseDownCapture={handleLandingMouseDown} data-tauri-drag-region>
+      <div className="landing-shell">
+        <header className="landing-header">
+          <svg className="landing-app-icon" viewBox="0 0 512 512" role="img" aria-label="Inkblot">
+            <defs>
+              <filter id="landing-app-icon-remove-bg" colorInterpolationFilters="sRGB">
+                <feColorMatrix
+                  type="matrix"
+                  values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -4 -4 -4 0 11.1"
+                />
+              </filter>
+            </defs>
+            <image
+              href={appIconUrl}
+              width="512"
+              height="512"
+              preserveAspectRatio="xMidYMid meet"
+              filter="url(#landing-app-icon-remove-bg)"
+            />
+          </svg>
+        </header>
+
+        <div className="landing-controls">
+          <label className="landing-search">
+            <SFIcon name="magnifyingglass.circle" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search projects"
+              aria-label="Search projects"
+            />
+          </label>
+        </div>
+
+        {status && !createPromptOpen ? <div className="landing-status">{status}</div> : null}
+
+        <div className="landing-project-actions">
+          <button
+            type="button"
+            className="landing-create-button"
+            onClick={() => {
+              setCreatePromptOpen(true)
+              setStatus('')
+            }}
+            aria-label="Create project"
+            title="Create project"
+          >
+            <SFIcon name="plus" size={22} strokeWidth={1.7} />
+          </button>
+        </div>
+
+        <div className="landing-project-grid">
+          {visibleProjects.length === 0 ? (
+            <div className="landing-empty">
+              {projects.length === 0 ? 'Create a project to begin.' : 'No projects match your search.'}
+            </div>
+          ) : (
+            visibleProjects.map((project) => {
+              const projectSession = projectSessions[project.name] || {}
+              return (
+                <button
+                  key={project.name}
+                  type="button"
+                  className="landing-project-tile"
+                  onClick={() => onOpenProject(project.name)}
+                >
+                  <div className="landing-project-icon">
+                    <SFIcon name="folder" />
+                  </div>
+                  <div className="landing-project-main">
+                    <div className="landing-project-name">{project.name}</div>
+                    <div className="landing-project-meta">
+                      <span>{project.files} file{project.files === 1 ? '' : 's'}</span>
+                      <span>{formatRecentDate(projectSession.updatedAt)}</span>
+                    </div>
+                  </div>
+                </button>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {createPromptOpen ? (
+        <div className="landing-create-overlay" onMouseDown={() => setCreatePromptOpen(false)}>
+          <form
+            className="landing-create-dialog"
+            onSubmit={handleCreateProject}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="landing-create-dialog-header">
+              <h2>New Project</h2>
+              <button
+                type="button"
+                className="landing-create-close"
+                onClick={() => setCreatePromptOpen(false)}
+                aria-label="Close"
+              >
+                <SFIcon name="xmark" />
+              </button>
+            </div>
+            <input
+              value={newProjectName}
+              onChange={(event) => {
+                setNewProjectName(event.target.value)
+                setStatus('')
+              }}
+              placeholder="Project name"
+              aria-label="Project name"
+              autoFocus
+            />
+            {status ? <div className="landing-status landing-dialog-status">{status}</div> : null}
+            <button type="submit" className="landing-create-submit">
+              Create
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export default function Editor({
+  projectName: initialProject = 'DefaultProject',
+  showWordCountBadge = true,
+}) {
+  const [initialSession] = useState(() => loadSession(initialProject))
+  const [projectSessions, setProjectSessions] = useState(initialSession.projects || {})
+  const [projectName, setProjectNameState] = useState('')
   const [editor, setEditor] = useState(null)
   const [secondaryEditor, setSecondaryEditor] = useState(null)
   const [activeEditor, setActiveEditor] = useState(null)
 
-  const [currentDoc, setCurrentDoc] = useState(session.currentDoc || 'doc1')
+  const [currentDoc, setCurrentDoc] = useState('')
   const [sidebarTab, setSidebarTab] = useState('workbench')
   const [tiles, setTiles] = useState([])
   const [notesByDoc, setNotesByDoc] = useState({})
   const [clipboardHistory, setClipboardHistory] = useState(() => loadClipboardHistory())
-  const [activeDoc, setActiveDoc] = useState(session.activeDoc || session.currentDoc || 'doc1')
+  const [activeDoc, setActiveDoc] = useState('')
   const [versions, setVersionsState] = useState({})
   const setVersions = useCallback((docName, vs) => {
     if (!docName) return
-    try {
-      console.debug('[setVersions] set', { docName, count: Array.isArray(vs) ? vs.length : 0 })
-    } catch (e) {}
     setVersionsState(prev => ({ ...prev, [docName]: vs || [] }))
   }, [])
 
-  const [splitView, setSplitView] = useState(session.splitView || null) // null, 'editor', or 'pinterest'
-  const [secondaryDoc, setSecondaryDoc] = useState(session.secondaryDoc || null) // The name of the second file
+  const [splitView, setSplitView] = useState(null) // null, 'editor', or 'pinterest'
+  const [secondaryDoc, setSecondaryDoc] = useState(null) // The name of the second file
   const refreshFilesRef = useRef(null)
-  const initialProjectRef = useRef(projectName)
   const draggedSelectionRef = useRef(null)
+
+  const openProject = useCallback((nextProjectName) => {
+    if (!nextProjectName) {
+      setProjectNameState('')
+      setCurrentDoc('')
+      setActiveDoc('')
+      setSecondaryDoc(null)
+      setSplitView(null)
+      setSidebarTab('workbench')
+      setTiles([])
+      setNotesByDoc({})
+      setVersionsState({})
+      return
+    }
+
+    const projectOpenId = `${nextProjectName}:${Date.now()}:${Math.random().toString(16).slice(2)}`
+    try {
+      window.__inkblotProjectOpenId = projectOpenId
+      window.__inkblotProjectName = nextProjectName
+      window.sessionStorage?.setItem('inkblot:project-open-id', projectOpenId)
+      window.sessionStorage?.setItem('inkblot:project-name', nextProjectName)
+      window.dispatchEvent(new CustomEvent('inkblot:project-opened', {
+        detail: { projectName: nextProjectName, projectOpenId },
+      }))
+    } catch {
+      // Session markers are best-effort; project opening should never depend on them.
+    }
+
+    const projectSession = normalizeProjectSession(projectSessions[nextProjectName] || {})
+    setProjectNameState(nextProjectName)
+    setCurrentDoc(projectSession.currentDoc)
+    setActiveDoc(projectSession.activeDoc || projectSession.currentDoc)
+    setSecondaryDoc(projectSession.secondaryDoc)
+    setSplitView(projectSession.splitView)
+    setSidebarTab(projectSession.sidebarTab)
+    setTiles(projectSession.tiles)
+    setNotesByDoc({})
+    setVersionsState({})
+  }, [projectSessions])
+
+  const createAndOpenProject = useCallback((nextProjectName) => {
+    const now = new Date().toISOString()
+    setProjectSessions(prev => ({
+      ...prev,
+      [nextProjectName]: normalizeProjectSession({
+        ...(prev[nextProjectName] || {}),
+        updatedAt: now,
+      }),
+    }))
+    openProject(nextProjectName)
+  }, [openProject])
 
   const getClipboardDropZoneRect = useCallback(() => {
     const clipboardPanel = document.querySelector('.clipboard-panel')
@@ -96,21 +429,8 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
     )
   }, [isPointInsideRect])
 
-  const handleSplit = (docName, type = 'editor') => {
-    setSecondaryDoc(docName);
-    setSplitView(type);
-  };
-    
-
   const docRef = useRef(currentDoc)
   useEffect(() => { docRef.current = currentDoc }, [currentDoc])
-
-  useEffect(() => {
-    if (projectName === initialProjectRef.current) return
-    setNotesByDoc({})
-    setSecondaryDoc(null)
-    setSplitView(null)
-  }, [projectName])
 
   useEffect(() => {
     let cancelled = false
@@ -121,7 +441,7 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
       if (cancelled) return
 
       if (!projects.includes(projectName)) {
-        setProjectName('')
+        openProject('')
         setCurrentDoc('')
         setActiveDoc('')
         setSecondaryDoc(null)
@@ -154,18 +474,44 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
     return () => {
       cancelled = true
     }
-  }, [projectName, currentDoc, secondaryDoc])
+  }, [projectName, currentDoc, secondaryDoc, openProject])
 
   useEffect(() => {
+    if (projectName) return
     const payload = {
-      projectName,
+      lastProject: initialSession.lastProject || '',
+      projects: projectSessions,
+    }
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
+  }, [initialSession.lastProject, projectName, projectSessions])
+
+  useEffect(() => {
+    if (!projectName) return
+    const now = new Date().toISOString()
+    const nextProjectSession = normalizeProjectSession({
       currentDoc,
       secondaryDoc,
       splitView,
       activeDoc,
-    }
-    localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
-  }, [projectName, currentDoc, secondaryDoc, splitView, activeDoc])
+      sidebarTab,
+      tiles,
+      updatedAt: now,
+    })
+
+    setProjectSessions(prev => {
+      const nextProjectSessions = {
+        ...prev,
+        [projectName]: nextProjectSession,
+      }
+
+      const payload = {
+        lastProject: projectName,
+        projects: nextProjectSessions,
+      }
+      localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
+      return nextProjectSessions
+    })
+  }, [projectName, currentDoc, secondaryDoc, splitView, activeDoc, sidebarTab, tiles])
 
   useEffect(() => {
     localStorage.setItem(CLIPBOARD_PERSIST_KEY, JSON.stringify(clipboardHistory))
@@ -183,7 +529,7 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
     setNotesByDoc(prev => {
       const current = prev[docName] || []
       const next = typeof updater === 'function' ? updater(current) : updater
-      return { ...prev, [docName]: next }
+      return { ...prev, [docName]: normalizeNotes(next) }
     })
   }, [])
 
@@ -284,13 +630,6 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
       window.removeEventListener('inkblot:editor-dragend-drop-to-clipboard', onEditorDragEndDropToClipboard)
     }
   }, [handleDropToClipboard])
-
-  const debouncedSave = useCallback(
-    debounce(async content => {
-      await saveDocument(projectName, docRef.current, content)
-    }, 2000),
-    [projectName]
-  )
 
   useEffect(() => {
     const onDragStart = (event) => {
@@ -532,9 +871,19 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
     window.addEventListener('keydown', handlePasteWithFormat, { capture: true });
 
     return () => {
-      window.removeEventListener('keydown', handlePasteWithFormat, { capture: true });
+    window.removeEventListener('keydown', handlePasteWithFormat, { capture: true });
     };
   }, [activeEditor, editor, secondaryEditor])
+
+  if (!projectName) {
+    return (
+      <ProjectLanding
+        projectSessions={projectSessions}
+        onOpenProject={openProject}
+        onCreateProject={createAndOpenProject}
+      />
+    )
+  }
 
   return (
     <>
@@ -550,7 +899,7 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
         setActiveEditor={setActiveEditor}
 
         projectName={projectName}
-        setProjectName={setProjectName}
+        setProjectName={openProject}
         currentDoc={currentDoc}
         setCurrentDoc={setCurrentDoc}
         secondaryDoc={secondaryDoc}
@@ -575,8 +924,8 @@ export default function Editor({ projectName: initialProject = 'DefaultProject' 
         clearClipboardHistory={clearClipboardHistory}
         onDropToClipboard={handleDropToClipboard}
         onMoveClipboardEntryToEditor={moveClipboardEntryToEditor}
+        showWordCountBadge={showWordCountBadge}
 
-        debouncedSave={debouncedSave}
         loadDocument={loadDocument}
         refreshFiles={() => refreshFilesRef.current?.()}
         registerRefreshFiles={(fn) => { refreshFilesRef.current = fn }}

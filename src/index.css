@@ -2,6 +2,13 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  --accent-color: #7aaef7;
+  --accent-surface: color-mix(in srgb, var(--accent-color) 18%, transparent);
+  --accent-surface-strong: color-mix(in srgb, var(--accent-color) 26%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent-color) 42%, transparent);
+  --accent-ring: color-mix(in srgb, var(--accent-color) 18%, transparent);
+  --accent-glow: color-mix(in srgb, var(--accent-color) 24%, transparent);
+  --accent-foreground: color-mix(in srgb, var(--accent-color) 72%, white);
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
@@ -19,6 +26,7 @@
   color: #213547;
   background-color: #ffffff;
   --tile-color: rgb(246, 246, 246);
+  --accent-foreground: color-mix(in srgb, var(--accent-color) 74%, black);
 }
 
 :root[data-theme='dark'] {
@@ -85,7 +93,8 @@ button:focus-visible {
     color: #213547;
     background-color: #ffffff;
     box-shadow: rgba(0,0,0,0.1);
-    --tile-color: #2b2b2b;
+    --tile-color: rgb(246, 246, 246);
+    --accent-foreground: color-mix(in srgb, var(--accent-color) 74%, black);
   }
   a:hover {
     color: #747bff;

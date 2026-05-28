@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { useEffect, useMemo, useState } from 'react'
 import * as ort from 'onnxruntime-web/ort-wasm'
 

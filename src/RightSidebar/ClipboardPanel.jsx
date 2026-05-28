@@ -281,6 +281,8 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
       window.removeEventListener('dragend', onWindowDragEnd, true)
       window.removeEventListener('inkblot:editor-selection-dragend', onEditorSelectionDragEnd)
     }
+  // Drag handlers intentionally read live window DnD state at event time.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onDropToClipboard])
 
   return (
