@@ -71,6 +71,82 @@ async fn eval_webview(app_handle: AppHandle, label: String, script: String) -> R
 }
 
 /* ============================================================
+   HAPTICS
+============================================================ */
+
+/// Tap the trackpad.
+///
+/// `NSHapticFeedbackPattern`: Generic = 0, Alignment = 1, LevelChange = 2.
+/// Alignment is the light tick AppKit uses when a dragged object snaps to a
+/// guide; LevelChange is the heavier one. Both are no-ops on hardware without a
+/// Force Touch trackpad, and on a user who has turned feedback off in System
+/// Settings — the OS decides, which is why nothing here tries to.
+#[cfg(target_os = "macos")]
+fn perform_haptic_pattern(pattern: isize) {
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+
+    unsafe {
+        let performer: *mut AnyObject = msg_send![class!(NSHapticFeedbackManager), defaultPerformer];
+        if performer.is_null() {
+            return;
+        }
+
+        // performanceTime: NSHapticFeedbackPerformanceTimeNow = 1.
+        let _: () = msg_send![performer, performFeedbackPattern: pattern, performanceTime: 1isize];
+    }
+}
+
+#[tauri::command]
+fn perform_haptic(app_handle: AppHandle, pattern: String) -> Result<(), String> {
+    let _ = &pattern;
+
+    #[cfg(target_os = "macos")]
+    {
+        let raw: isize = match pattern.as_str() {
+            "alignment" => 1,
+            "level" => 2,
+            _ => 0,
+        };
+
+        // AppKit's feedback manager is main-thread only; commands are not.
+        app_handle
+            .run_on_main_thread(move || perform_haptic_pattern(raw))
+            .map_err(|e| format!("Failed to perform haptic: {e}"))?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = app_handle;
+
+    Ok(())
+}
+
+/* ============================================================
+   SYSTEM FONTS
+============================================================ */
+
+/// Every font family installed on the machine, so anything the user adds in
+/// Font Book shows up in the editor without a rebuild.
+///
+/// Families whose names start with a dot are Apple's private system faces
+/// (".SF NS", ".LastResort", …). They are hidden from Font Book too, and
+/// several refuse to render, so they are filtered out.
+#[tauri::command]
+async fn list_system_fonts() -> Result<Vec<String>, String> {
+    use font_kit::source::SystemSource;
+
+    let mut families = SystemSource::new()
+        .all_families()
+        .map_err(|e| format!("Failed to enumerate system fonts: {e}"))?;
+
+    families.retain(|family| !family.trim().is_empty() && !family.starts_with('.'));
+    families.sort_by_key(|family| family.to_lowercase());
+    families.dedup();
+
+    Ok(families)
+}
+
+/* ============================================================
    PINTEREST SCRAPER (unchanged logic)
 ============================================================ */
 
@@ -498,6 +574,8 @@ fn main() {
             get_webview_url,
             eval_webview,
             scrape_pinterest_html,
+            list_system_fonts,
+            perform_haptic,
             get_synonyms,
             load_dictation_model,
             start_dictation_session,

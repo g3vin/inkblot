@@ -1,3 +1,11 @@
+/**
+ * Bubble.jsx — the "Analytic Bubble" sentence-structure overlay.
+ *
+ * Parses the selected sentence with a small probabilistic CNF grammar
+ * (CKY algorithm) over compromise POS tags and renders the best parse
+ * tree, so a writer can inspect a sentence's grammatical structure.
+ * Opened from the editor context menu.
+ */
 import React, { useMemo } from "react"
 import nlp from "compromise"
 import "./Bubble.css"

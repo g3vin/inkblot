@@ -1,0 +1,312 @@
+/* VersionComparePane.css — the side-by-side version diff, inside the editor area.
+
+   The pane fills .editor-container rather than floating over the window: it is a
+   way of reading the document, not a dialog about it. Column widths come from
+   --vcp-ratio (a 0–1 number set by the divider drag); the headers, every diff row,
+   and the divider all read the same variable, so the three stay in lockstep. */
+
+/* The pane is an ordinary flex child of .editor-container and the panes beneath it
+   are hidden, rather than the pane being absolutely positioned over them. Two
+   reasons: .editor-container is not a positioning context (Focus Mode's overlay
+   resolves against .middle-section and must keep doing so), and `display: none`
+   leaves the TipTap EditorContent mounted — so "Apply merge" still has a live
+   editor to write into and autosave never sees the document vanish. */
+.editor-container.is-comparing > .pane,
+.editor-container.is-comparing > .split-resizer {
+  display: none;
+}
+
+.vcp-pane {
+  /* The gutter between columns and the pane's own side padding. The divider has to
+     do the same arithmetic as the column tracks to land on the seam, so both read
+     these rather than repeating the numbers. */
+  --vcp-gap: 16px;
+  --vcp-pad: 16px;
+
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-1);
+}
+
+.vcp-pane.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* One shared column track: the headers and every diff row are the same grid, so a
+   drag moves all of them together. Half the gutter comes off the left column so the
+   gap is spent once, not once per column. Percentages here resolve against the
+   content box, which is already inset by --vcp-pad. */
+.vcp-headers,
+.vcp-row,
+.vcp-choice-row {
+  display: grid;
+  grid-template-columns:
+    calc(var(--vcp-ratio, 0.5) * 100% - var(--vcp-gap) / 2)
+    1fr;
+  gap: var(--vcp-gap);
+}
+
+.vcp-headers {
+  padding: 10px var(--vcp-pad) 8px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.vcp-column-label {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vcp-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.vcp-stats-hint {
+  color: var(--text-subtle);
+  opacity: 0.8;
+}
+
+/* Sits above the columns, so it is never crossed by the divider. */
+.vcp-notice {
+  margin: 0 var(--vcp-pad) 4px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-muted);
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--text-subtle);
+  font-size: 12px;
+  text-align: center;
+}
+
+.vcp-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.vcp-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 12px var(--vcp-pad) 24px;
+}
+
+/* ---- The divider ----
+   Absolutely placed on the column seam so it spans the full body height regardless
+   of how the rows below it flow. The rows live inside --vcp-pad, so the seam is at
+   pad + ratio × (width − 2·pad) — measuring the ratio against the body's full width
+   instead would only line up at exactly 50%. */
+
+.vcp-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(
+    var(--vcp-pad) + var(--vcp-ratio, 0.5) * (100% - 2 * var(--vcp-pad))
+  );
+  width: 11px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+}
+
+.vcp-divider-grip {
+  width: 1px;
+  height: 100%;
+  background: var(--border-muted);
+  transition: background 120ms ease, width 120ms ease;
+}
+
+.vcp-divider:hover .vcp-divider-grip,
+.vcp-pane.is-resizing .vcp-divider-grip {
+  width: 2px;
+  background: var(--accent-surface-strong);
+}
+
+/* ---- Diff rows ---- */
+
+.vcp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vcp-changed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vcp-cell {
+  min-width: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  overflow-wrap: break-word;
+}
+
+.vcp-row-equal .vcp-cell {
+  background: transparent;
+  color: var(--text-subtle);
+}
+
+.vcp-cell-left {
+  background: color-mix(in srgb, var(--status-error) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-error) 22%, transparent);
+}
+
+.vcp-cell-right {
+  background: color-mix(in srgb, var(--status-success) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-success) 22%, transparent);
+}
+
+.vcp-cell-empty {
+  background: var(--surface-3);
+  border: 1px dashed var(--border-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vcp-empty-hint {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.vcp-difftext {
+  margin: 0;
+}
+
+.vcp-mark-removed {
+  color: var(--status-error-soft);
+  text-decoration-color: color-mix(in srgb, var(--status-error) 60%, transparent);
+}
+
+.vcp-mark-added {
+  background: color-mix(in srgb, var(--status-success) 22%, transparent);
+  color: var(--text-primary);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.vcp-equal-collapsed {
+  width: 100%;
+  background: var(--surface-3);
+  border: 1px dashed var(--border-muted);
+  border-radius: 8px;
+  color: var(--text-subtle);
+  font-size: 11px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.vcp-equal-collapsed:hover {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+.vcp-html :first-child {
+  margin-top: 0;
+}
+
+.vcp-html :last-child {
+  margin-bottom: 0;
+}
+
+.vcp-html img {
+  max-width: 100%;
+  height: auto;
+}
+
+.vcp-kind {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.vcp-card-text {
+  font-size: 13px;
+}
+
+/* ---- Merge choice: one toggle per column ----
+   Each button is centered under the side it keeps, on the same grid track as the
+   cell above it — so nothing lands on the divider. */
+
+.vcp-keep {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 12px;
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.vcp-keep:hover:not(.is-on) {
+  background: var(--surface-active);
+  color: var(--text-secondary);
+}
+
+.vcp-keep.is-on {
+  border-color: transparent;
+  background: var(--accent-surface-strong);
+  color: var(--accent-foreground);
+}
+
+/* ---- Titlebar controls ----
+   These ride in the shared toolbar slot and inherit .toolbar / .toolbar-group
+   from Toolbar.css; only the bits with no equivalent there are set here. */
+
+.toolbar-select-version {
+  width: 150px;
+  text-overflow: ellipsis;
+}
+
+.toolbar-group-merge > button {
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toolbar-group-merge > button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toolbar-group-merge > button.vcp-apply {
+  background: var(--accent-surface-strong);
+  color: var(--accent-foreground);
+}
+
+.toolbar-group-merge > button.vcp-apply:hover:not(:disabled) {
+  filter: brightness(1.08);
+}

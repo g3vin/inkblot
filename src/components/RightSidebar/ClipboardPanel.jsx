@@ -1,3 +1,12 @@
+/**
+ * ClipboardPanel.jsx — the Clipboard tab of the right sidebar.
+ *
+ * Shows the copy history as draggable tiles: dragging a tile into an editor
+ * pane moves the text into the document, and dropping editor selections or
+ * external text onto this panel adds a clipboard entry. Uses the shared
+ * window-global drag state (window.__inkblot_*) to coordinate with
+ * EditorCanvas across native drag events.
+ */
 import { useEffect, useRef, useState } from 'react'
 import SFIcon from '../SFIcon'
 
@@ -12,18 +21,18 @@ const formatTimestamp = (iso) => {
   }
 }
 
-export default function ClipboardPanel({ entries = [], onClear, onDropToClipboard }) {
+export default function ClipboardPanel({ entries = [], query = '', onDropToClipboard }) {
   const [copiedId, setCopiedId] = useState('')
   const [dropActive, setDropActive] = useState(false)
   const panelRef = useRef(null)
-
-  const emitDnDDebug = (phase, status = {}, info = '', transient = false) => {
-    try {
-      window.dispatchEvent(new CustomEvent('inkblot:dnd-debug', {
-        detail: { phase, status, info, transient },
-      }))
-    } catch (e) {}
-  }
+  const normalizedQuery = query.trim().toLowerCase()
+  const visibleEntries = normalizedQuery
+    ? entries.filter((entry) => (
+        `${entry.docName || ''} ${entry.text || ''} ${entry.timestamp || ''}`
+          .toLowerCase()
+          .includes(normalizedQuery)
+      ))
+    : entries
 
   const getDropZoneRect = () => {
     const panel = panelRef.current
@@ -68,11 +77,6 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
         event.dataTransfer.effectAllowed = 'move'
       }
       window.__inkblot_draggedClipboardEntry = { id: entry.id, text: entry.text || '' }
-      emitDnDDebug('clipboard-tile-dragstart', {
-        source: 'clipboard',
-        clipboardPayload: true,
-        dropHandled: false,
-      }, `id=${entry.id} len=${(entry.text || '').length}`)
     } catch (e) {}
   }
 
@@ -97,12 +101,6 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
       }))
     } catch (e) {}
 
-    emitDnDDebug('clipboard-tile-dragend', {
-      source: 'clipboard',
-      clipboardPayload: Boolean(entry?.text),
-      dropHandled: Boolean(window.__inkblot_dropHandled),
-    }, `x=${String(point.x)} y=${String(point.y)}`)
-
     try { window.__inkblot_draggedClipboardEntry = null } catch (e) {}
     try { window.__inkblot_dragPoint = null } catch (e) {}
     setDropActive(false)
@@ -114,9 +112,6 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move'
     }
-    emitDnDDebug('clipboard-dragover', {
-      over: 'clipboard',
-    }, '', true)
   }
 
   const handleDragLeave = (event) => {
@@ -125,6 +120,8 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
     }
   }
 
+  // Accept drops of editor selections or plain text; ignore drops of our own
+  // clipboard tiles (those are reorders, not new entries).
   const handleDrop = (event) => {
     event.preventDefault()
     event.stopPropagation()
@@ -150,13 +147,7 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
       } catch (e) {}
     }
 
-    if (parsedClipboard && !parsedSelection) {
-      emitDnDDebug('clipboard-drop-ignored-tile', {
-        over: 'clipboard',
-        clipboardPayload: true,
-      })
-      return
-    }
+    if (parsedClipboard && !parsedSelection) return
 
     const droppedText = parsedSelection?.text || plainText || parsedClipboard?.text || ''
     if (!droppedText.trim()) return
@@ -172,13 +163,10 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
       fromEditorSelection,
       selection: parsedSelection || null,
     })
-    emitDnDDebug('clipboard-drop', {
-      over: 'clipboard',
-      dropHandled: true,
-      editorSelection: fromEditorSelection,
-    }, `len=${droppedText.length}`)
   }
 
+  // Window-level fallbacks: track the drag point globally and accept drops /
+  // dragends that land over the panel even when the DOM drop event is missed.
   useEffect(() => {
     const insidePanel = (x, y) => {
       const rect = getDropZoneRect()
@@ -190,7 +178,6 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
       try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
       if (!insidePanel(event.clientX, event.clientY)) {
         setDropActive(false)
-        emitDnDDebug('clipboard-dragover-outside', { over: 'none' }, '', true)
         return
       }
 
@@ -199,7 +186,6 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
       if (event.dataTransfer) {
         event.dataTransfer.dropEffect = 'move'
       }
-      emitDnDDebug('clipboard-window-dragover-target', { over: 'clipboard' }, '', true)
     }
 
     const onWindowDrag = (event) => {
@@ -225,17 +211,8 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
           selection,
         })
         try { window.__inkblot_dropHandled = true } catch (e) {}
-        emitDnDDebug('clipboard-fallback-drop-on-dragend', {
-          over: 'clipboard',
-          dropHandled: true,
-          editorSelection: true,
-        }, `len=${selection.text.length}`)
       }
       setDropActive(false)
-      emitDnDDebug('clipboard-window-dragend', {
-        over: 'none',
-        dropHandled: Boolean(window.__inkblot_dropHandled),
-      }, `fallback=${String(!dropHandled)}`)
     }
 
     const onEditorSelectionDragEnd = (event) => {
@@ -247,13 +224,7 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
       }
 
       if (window.__inkblot_dropHandled) return
-      if (!selection?.text || !insidePanel(point.x, point.y)) {
-        emitDnDDebug('clipboard-editor-selection-dragend-miss', {
-          over: 'none',
-          editorSelection: Boolean(selection?.text),
-        }, `x=${String(point.x)} y=${String(point.y)}`)
-        return
-      }
+      if (!selection?.text || !insidePanel(point.x, point.y)) return
 
       onDropToClipboard?.({
         text: selection.text,
@@ -261,11 +232,6 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
         selection,
       })
       try { window.__inkblot_dropHandled = true } catch (e) {}
-      emitDnDDebug('clipboard-editor-selection-dragend-target', {
-        over: 'clipboard',
-        dropHandled: true,
-        editorSelection: true,
-      }, `len=${selection.text.length}`)
     }
 
     window.addEventListener('drag', onWindowDrag, true)
@@ -294,21 +260,13 @@ export default function ClipboardPanel({ entries = [], onClear, onDropToClipboar
       onDragLeaveCapture={handleDragLeave}
       onDropCapture={handleDrop}
     >
-      <div className="panel-header">
-        <div className="panel-header-title">
-          <SFIcon name="doc.on.clipboard" />
-          <span className="panel-header-label">Clipboard</span>
-        </div>
-        {entries.length > 0 ? (
-          <button className="panel-action-btn" onClick={onClear}>Clear</button>
-        ) : null}
-      </div>
-
-      <div className={`clipboard-list${entries.length === 0 ? ' is-empty' : ''}`}>
-        {entries.length === 0 ? (
-          <div className="notes-empty clipboard-empty-state">Copy text or drag selected text here.</div>
+      <div className={`clipboard-list${visibleEntries.length === 0 ? ' is-empty' : ''}`}>
+        {visibleEntries.length === 0 ? (
+          <div className="notes-empty clipboard-empty-state">
+            {entries.length === 0 ? 'Copy text or drag selected text here.' : 'No matching clipboard items.'}
+          </div>
         ) : (
-          entries.map((entry) => (
+          visibleEntries.map((entry) => (
             <div
               key={entry.id}
               className="tile clipboard-item"

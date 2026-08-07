@@ -1,3 +1,7 @@
+/**
+ * CustomTextStyle.js — TextStyle mark extended with a fontSize attribute,
+ * so the toolbar's font-size picker persists through the textStyle mark.
+ */
 import { TextStyle } from '@tiptap/extension-text-style'
 
 export const CustomTextStyle = TextStyle.extend({

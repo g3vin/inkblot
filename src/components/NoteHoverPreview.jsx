@@ -1,9 +1,22 @@
+/**
+ * NoteHoverPreview.jsx — floating note cards over the editor.
+ *
+ * When the user hovers (or pins, via click) a note marker in the editor,
+ * this layer shows the note and its child notes as draggable, resizable
+ * cards connected by curved "strings" (SVG paths) back to the anchor.
+ * Communication with the editor happens through the NOTE_PREVIEW_* window
+ * events emitted by the NoteAnnotation extension. Card positions/sizes are
+ * persisted onto each note (previewLayout/previewSize); dragging a card with
+ * children pulls the descendants along on an elastic spring animation.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import SFIcon from './SFIcon'
 import NoteImageGallery from './NoteImageGallery'
-import { readClipboardImages } from './noteImageUtils'
-import { collectNoteBranchIds, createFreeNote, touchNote } from './noteUtils'
+import AudioNotes from './AudioNotes'
+import { readClipboardImages } from '../lib/noteImageUtils'
+import { collectNoteBranchIds, createFreeNote, touchNote } from '../lib/noteUtils'
+import { RESIZE_ICON_PATHS } from '../lib/resizeIcon'
 import {
   clearEditorActiveNote,
   NOTE_PREVIEW_ENTER_EVENT,
@@ -11,7 +24,7 @@ import {
   NOTE_PREVIEW_PIN_EVENT,
   setEditorActiveNote,
   setEditorHoveredNote,
-} from './extensions/NoteAnnotation'
+} from '../extensions/NoteAnnotation'
 
 const TILE_WIDTH = 260
 const TILE_MIN_HEIGHT = 88
@@ -20,6 +33,7 @@ const TILE_MIN_RESIZE_HEIGHT = 64
 const VIEWPORT_PADDING = 20
 const HIDE_DELAY_MS = 110
 const EDGE_GRAB_THRESHOLD = 18
+const DRAG_MIN_DELTA = 3
 const CHILD_OFFSET_X = 0
 const CHILD_OFFSET_Y = 184
 
@@ -30,6 +44,7 @@ const clampPosition = (position, size = { width: TILE_WIDTH, height: TILE_MIN_HE
   y: clamp(position.y, VIEWPORT_PADDING, window.innerHeight - size.height - VIEWPORT_PADDING),
 })
 
+/** Default root-card position beside the anchor: right of it when there's room, else left. */
 const getInitialTilePosition = (anchorRect, tileWidth = TILE_WIDTH, tileHeight = TILE_MIN_HEIGHT) => {
   const prefersRight = anchorRect.right + tileWidth + 28 <= window.innerWidth - VIEWPORT_PADDING
   const x = prefersRight
@@ -62,6 +77,7 @@ const getDefaultChildOffset = (index, total) => ({
   offsetY: CHILD_OFFSET_Y,
 })
 
+/** Quadratic bezier "string" between two points, bowing upward with distance. */
 const getCurvePath = (fromPoint, toPoint) => {
   const distance = Math.hypot(toPoint.x - fromPoint.x, toPoint.y - fromPoint.y)
   const sway = clamp(distance * 0.12, 18, 70)
@@ -73,6 +89,7 @@ const getCurvePath = (fromPoint, toPoint) => {
   return `M ${fromPoint.x} ${fromPoint.y} Q ${controlPoint.x} ${controlPoint.y} ${toPoint.x} ${toPoint.y}`
 }
 
+/** Find the live bounding rect of a note's marker element in the editor DOM. */
 const queryAnchorRect = (noteId, editorView) => {
   if (!noteId || typeof document === 'undefined') return null
   const selector = `.note-marker[data-note-id="${CSS.escape(String(noteId))}"]`
@@ -97,6 +114,36 @@ const isDragEdge = (clientX, clientY, rect) => (
   clientY - rect.top <= EDGE_GRAB_THRESHOLD ||
   rect.bottom - clientY <= EDGE_GRAB_THRESHOLD
 )
+
+const setPointerCaptureSafely = (target, pointerId) => {
+  try {
+    target?.setPointerCapture?.(pointerId)
+  } catch {
+    // Pointer capture is a nice-to-have; window listeners still keep drag working.
+  }
+}
+
+const releasePointerCaptureSafely = (target, pointerId) => {
+  try {
+    target?.releasePointerCapture?.(pointerId)
+  } catch {
+    // Ignore stale pointer ids after the drag has ended.
+  }
+}
+
+const addPointerDragListeners = (target, handlePointerMove, handlePointerUp) => {
+  window.addEventListener('pointermove', handlePointerMove, true)
+  window.addEventListener('pointerup', handlePointerUp, true)
+  target?.addEventListener?.('pointermove', handlePointerMove, true)
+  target?.addEventListener?.('pointerup', handlePointerUp, true)
+
+  return () => {
+    window.removeEventListener('pointermove', handlePointerMove, true)
+    window.removeEventListener('pointerup', handlePointerUp, true)
+    target?.removeEventListener?.('pointermove', handlePointerMove, true)
+    target?.removeEventListener?.('pointerup', handlePointerUp, true)
+  }
+}
 
 const hasStoredChildOffset = (note) => (
   Math.abs(note?.previewLayout?.offsetX || 0) > 1 ||
@@ -135,6 +182,7 @@ const areRectsEqual = (left, right) => {
 export default function NoteHoverPreview({
   notesByDoc = {},
   setNotesForDoc,
+  projectName,
 }) {
   const [preview, setPreview] = useState(null)
   const [dragLayouts, setDragLayouts] = useState({})
@@ -222,6 +270,7 @@ export default function NoteHoverPreview({
     return noteById.get(preview.note.id) || preview.note
   }, [noteById, preview])
 
+  // Mirror hover/pin state back into the editor so the anchored text highlights.
   useEffect(() => {
     const previous = previousPreviewRef.current
 
@@ -262,6 +311,7 @@ export default function NoteHoverPreview({
     window.setTimeout(() => setFocusNoteId(null), 0)
   }, [docNotes, focusNoteId])
 
+  // Open/close the preview in response to marker hover, pin, and leave events.
   useEffect(() => {
     const openPreview = (detail, locked) => {
       if (!detail?.note || !detail?.anchorRect) return
@@ -316,6 +366,7 @@ export default function NoteHoverPreview({
     }
   }, [clearHideTimeout, scheduleHide])
 
+  // Keep the anchor rect current while the page scrolls/resizes so the strings follow.
   useEffect(() => {
     if (!preview?.note?.id) return undefined
 
@@ -352,6 +403,7 @@ export default function NoteHoverPreview({
   useEffect(() => {
     const handlePointerDown = (event) => {
       if (!preview?.locked) return
+      if (dragStateRef.current) return
       if (event.target instanceof HTMLElement && event.target.closest('.note-preview-card, .note-marker')) {
         return
       }
@@ -372,6 +424,9 @@ export default function NoteHoverPreview({
     }
   }, [preview])
 
+  // Compute card positions/sizes and connecting edges for the whole visible
+  // branch. Child positions are offsets from their parent (stored on the note
+  // or overridden mid-drag), so moving a parent shifts its subtree.
   const layout = useMemo(() => {
     if (!preview?.anchorRect || !rootNote) return null
 
@@ -447,6 +502,8 @@ export default function NoteHoverPreview({
 
   useEffect(() => () => cancelAnimationFrame(elasticFrameRef.current), [])
 
+  // Spring-animate descendant cards toward their layout targets while a parent
+  // is being dragged ('move') and until they settle afterwards ('settle').
   const startElasticLoop = useCallback(() => {
     if (elasticFrameRef.current) return
 
@@ -550,6 +607,10 @@ export default function NoteHoverPreview({
     }))
   }, [updateNote])
 
+  const handleChangeAudio = useCallback((noteId, audio) => {
+    updateNote(noteId, (note) => touchNote(note, { audio }))
+  }, [updateNote])
+
   const handleToggleCollapse = useCallback((noteId) => {
     lockPreview()
     updateNote(noteId, (note) => ({
@@ -597,6 +658,8 @@ export default function NoteHoverPreview({
     }))
   }, [updateNote])
 
+  // A drag starts from the drag handle or by grabbing near a card edge —
+  // never from the close button or interactive controls.
   const shouldStartDrag = useCallback((event) => {
     if (!(event.target instanceof HTMLElement)) return false
     if (event.target.closest('.note-preview-close')) return false
@@ -618,6 +681,8 @@ export default function NoteHoverPreview({
 
     event.preventDefault()
     event.stopPropagation()
+    const dragTarget = event.currentTarget
+    setPointerCaptureSafely(dragTarget, event.pointerId)
     lockPreview()
 
     const parentPosition = note.parentNoteId ? layout.positions.get(note.parentNoteId) || null : null
@@ -648,15 +713,22 @@ export default function NoteHoverPreview({
       rootBase,
       pointerOffsetX: event.clientX - position.x,
       pointerOffsetY: event.clientY - position.y,
+      originX: event.clientX,
+      originY: event.clientY,
+      hasMoved: false,
     }
 
     const handlePointerMove = (moveEvent) => {
       const dragState = dragStateRef.current
       if (!dragState) return
+      moveEvent.preventDefault()
 
       const size = cardSizesRef.current[dragState.noteId]
         || noteById.get(dragState.noteId)?.previewSize
         || { width: TILE_WIDTH, height: TILE_MIN_HEIGHT }
+      const hasMoved = dragState.hasMoved ||
+        Math.abs(moveEvent.clientX - dragState.originX) + Math.abs(moveEvent.clientY - dragState.originY) >= DRAG_MIN_DELTA
+      dragState.hasMoved = hasMoved
       const nextPosition = clampPosition({
         x: moveEvent.clientX - dragState.pointerOffsetX,
         y: moveEvent.clientY - dragState.pointerOffsetY,
@@ -672,20 +744,27 @@ export default function NoteHoverPreview({
             offsetY: nextPosition.y - dragState.rootBase.y,
           }
 
-      setDragLayouts((current) => ({
-        ...current,
-        [dragState.noteId]: nextLayout,
-      }))
+      if (hasMoved) {
+        dragLayoutsRef.current = {
+          ...dragLayoutsRef.current,
+          [dragState.noteId]: nextLayout,
+        }
+        setDragLayouts((current) => ({
+          ...current,
+          [dragState.noteId]: nextLayout,
+        }))
+      }
 
       if (dragState.descendantIds?.size > 0) {
         startElasticLoop()
       }
     }
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (upEvent) => {
       const dragState = dragStateRef.current
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
+      removePointerListeners()
+      releasePointerCaptureSafely(dragTarget, event.pointerId)
+      upEvent?.preventDefault?.()
 
       if (!dragState) return
       const finalLayout = dragLayoutsRef.current[dragState.noteId]
@@ -705,8 +784,7 @@ export default function NoteHoverPreview({
       dragStateRef.current = null
     }
 
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
+    const removePointerListeners = addPointerDragListeners(dragTarget, handlePointerMove, handlePointerUp)
   }, [childMap, commitLayout, layout, lockPreview, noteById, preview, shouldStartDrag, startElasticLoop])
 
   const handleResizeStart = useCallback((noteId, event) => {
@@ -717,6 +795,8 @@ export default function NoteHoverPreview({
 
     event.preventDefault()
     event.stopPropagation()
+    const dragTarget = event.currentTarget
+    setPointerCaptureSafely(dragTarget, event.pointerId)
     lockPreview()
 
     dragStateRef.current = {
@@ -732,6 +812,7 @@ export default function NoteHoverPreview({
     const handlePointerMove = (moveEvent) => {
       const dragState = dragStateRef.current
       if (!dragState || dragState.mode !== 'resize') return
+      moveEvent.preventDefault()
 
       const nextWidth = Math.max(
         TILE_MIN_RESIZE_WIDTH,
@@ -746,25 +827,29 @@ export default function NoteHoverPreview({
         height: Math.min(nextHeight, window.innerHeight - dragState.position.y - VIEWPORT_PADDING),
       }
 
+      cardSizesRef.current = {
+        ...cardSizesRef.current,
+        [noteId]: clampedSize,
+      }
       setCardSizes((current) => ({
         ...current,
         [noteId]: clampedSize,
       }))
     }
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (upEvent) => {
       const dragState = dragStateRef.current
       dragStateRef.current = null
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
+      removePointerListeners()
+      releasePointerCaptureSafely(dragTarget, event.pointerId)
+      upEvent?.preventDefault?.()
 
       if (!dragState || dragState.mode !== 'resize') return
       const finalSize = cardSizesRef.current[noteId] || currentSize
       commitSize(noteId, finalSize)
     }
 
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
+    const removePointerListeners = addPointerDragListeners(dragTarget, handlePointerMove, handlePointerUp)
   }, [commitSize, layout, lockPreview, noteById])
 
   const handleDeleteNote = useCallback(async (noteId) => {
@@ -869,6 +954,7 @@ export default function NoteHoverPreview({
             onPointerDown={(event) => handleDragStart(note.id, event)}
             onMouseEnter={clearHideTimeout}
             onMouseLeave={() => {
+              if (dragStateRef.current) return
               if (!preview.locked) scheduleHide()
             }}
           >
@@ -926,6 +1012,15 @@ export default function NoteHoverPreview({
               onRemoveImage={(imageId) => handleRemoveImage(note.id, imageId)}
             />
 
+            {/* Voice memos are stored on the note, so one recorded here is the same
+                memo the notes panel and any canvas card show. */}
+            <AudioNotes
+              audio={note.audio}
+              projectName={projectName}
+              onChange={(audio) => handleChangeAudio(note.id, audio)}
+              compact
+            />
+
             <div className="note-footer note-preview-footer">
               <div className="note-preview-branch-actions">
                 <button
@@ -978,7 +1073,23 @@ export default function NoteHoverPreview({
               onClick={(event) => event.preventDefault()}
               aria-label="Resize note"
               title="Resize note"
-            />
+            >
+              <svg
+                className="resize-corner-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {RESIZE_ICON_PATHS.map(path => <path key={path} d={path} />)}
+              </svg>
+            </button>
           </article>
         )
       })}

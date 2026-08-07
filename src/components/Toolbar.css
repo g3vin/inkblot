@@ -1,36 +1,28 @@
+/* Toolbar.css — formatting toolbar in the titlebar, plus the dictation and read-aloud popovers. */
+
 .toolbar-wrapper {
   position: relative;
   z-index: 10;
   height: var(--app-titlebar-height, 44px);
   min-width: 0;
+  max-width: 100%;
   width: 100%;
   background: transparent;
   pointer-events: auto;
   display: flex;
   justify-content: center;
   align-items: stretch;
+  overflow: hidden;
   isolation: isolate;
-}
-
-
-
-:root[data-theme='light'] .toolbar-wrapper {
-  background: transparent;
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) .toolbar-wrapper {
-    background: transparent;
-  }
 }
 
 .toolbar {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   height: 100%;
   padding: 0 12px;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   pointer-events: auto;
   width: 100%;
   min-width: 0;
@@ -46,35 +38,245 @@
   display: none;
 }
 
-.toolbar button,
-.toolbar select {
-  font-size: 11px;
-  padding: 4px 8px;
+/* Nothing in the toolbar may shrink. The titlebar column is narrow and flex
+   items default to shrinking, which used to squash the color swatches down to
+   an unclickable sliver; the toolbar scrolls instead. */
+.toolbar > * {
+  flex: 0 0 auto;
 }
 
-.toolbar button {
+/* ---- Segmented groups -------------------------------------------------
+   The group owns the background and border; its members are transparent
+   until hovered or active, so a cluster reads as one control while each
+   button stays individually toggleable. */
+
+/* border-box so the group measures 28px overall and lines up with the align
+   trigger, which is a <button> and therefore border-box from the UA sheet. */
+.toolbar-group {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 28px;
+  padding: 3px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--control-bg);
+}
+
+.toolbar-group-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--border-color);
+}
+
+/* Geometry only — no `color` here, or it would outrank the dictation and
+   read-aloud buttons' own .loading/.error status colors. */
+.toolbar-group > button,
+.toolbar-group > .dictation-control > button,
+.toolbar-group > .read-aloud-control > button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 11px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.toolbar-group > button {
+  color: var(--text-primary);
+}
+
+.toolbar-group > button:hover:not(.active),
+.toolbar-group > .dictation-control > button:hover:not(.active),
+.toolbar-group > .read-aloud-control > button:hover:not(.active) {
+  background: var(--surface-active);
+}
+
+.toolbar-group > button.active,
+.toolbar-group > .dictation-control > button.active,
+.toolbar-group > .read-aloud-control > button.active {
+  background: var(--accent-surface-strong);
+  color: var(--accent-foreground);
+}
+
+/* ---- Font & size selects ---- */
+
+.toolbar-select {
+  height: 22px;
+  min-height: 22px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.toolbar-select:hover,
+.toolbar-select:focus-visible {
+  background: var(--surface-active);
+}
+
+/* Font names are arbitrary now that the list comes from the OS, so clip long
+   ones rather than letting the control stretch the titlebar. */
+.toolbar-select-font {
+  width: 104px;
+  text-overflow: ellipsis;
+}
+
+.toolbar-select-size {
+  width: 34px;
+  text-align: center;
+}
+
+/* ---- Color swatches ----
+   The native input covers the whole control and is invisible, so the glyph +
+   color bar act as the button while a click still opens the OS picker. */
+
+.toolbar-color {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 26px;
+  height: 22px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.toolbar-color:hover,
+.toolbar-color:focus-within {
+  background: var(--surface-active);
+}
+
+.toolbar-color-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 13px;
+  color: var(--text-primary);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.toolbar-color-glyph-text {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.toolbar-color-bar {
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.toolbar-color input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ---- Alignment dropdown ---- */
+
+.toolbar-align {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.toolbar-align-trigger {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 5px 0 7px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--control-bg);
+  color: var(--text-primary);
+  font-size: 11px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.toolbar-align-trigger:hover,
+.toolbar-align-trigger.open {
+  background: var(--accent-surface);
+  color: var(--accent-foreground);
+}
+
+.toolbar-align-caret {
+  opacity: 0.6;
+}
+
+.toolbar-align-menu {
+  position: fixed;
+  top: var(--align-menu-top, 52px);
+  left: var(--align-menu-left, 16px);
+  z-index: 95;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--floating-note-border);
+  border-radius: 10px;
+  background: var(--floating-note-bg);
+  box-shadow: var(--floating-note-shadow);
+  pointer-events: auto;
+  animation: dictation-pop 140ms ease-out both;
+}
+
+.toolbar-align-menu > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 28px;
-  min-height: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-primary);
 }
 
-.toolbar button:hover:not(.active) {
-  background: var(--accent-surface);
-  border-color: var(--accent-border);
-  color: var(--accent-foreground);
+.toolbar-align-menu > button:hover {
+  background: var(--surface-active);
 }
 
-.toolbar input[type='color'] {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-}
-
-.toolbar button.active {
+.toolbar-align-menu > button.active {
   background: var(--accent-surface-strong);
-  border-color: var(--accent-border);
   color: var(--accent-foreground);
 }
 
@@ -97,7 +299,7 @@
 }
 
 .dictation-mic-btn.loading {
-  color: #ffd54f;
+  color: var(--status-warning);
 }
 
 .dictation-button-wave {
@@ -133,13 +335,11 @@
   right: var(--dictation-popover-right, 16px);
   width: min(320px, calc(100vw - 24px));
   padding: 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: #1b1e22;
-  box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  color: #edf4f8;
+  border-radius: var(--floating-note-radius);
+  border: 1px solid var(--floating-note-border);
+  background: var(--floating-note-bg);
+  box-shadow: var(--floating-note-shadow);
+  color: var(--text-primary);
   pointer-events: auto;
   z-index: 90;
   transform: translate(var(--dictation-popover-x, 0), var(--dictation-popover-y, 0));
@@ -188,10 +388,10 @@
   align-items: center;
   gap: 8px;
   min-height: 30px;
-  color: #9ea6ae;
+  color: var(--floating-note-title);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -199,17 +399,17 @@
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: #6df0a8;
+  background: var(--status-success);
   box-shadow: 0 0 0 4px rgba(109, 240, 168, 0.12);
 }
 
 .dictation-popover.loading .dictation-live-dot {
-  background: #ffd54f;
+  background: var(--status-warning);
   box-shadow: 0 0 0 4px rgba(255, 213, 79, 0.13);
 }
 
 .dictation-popover.error .dictation-live-dot {
-  background: #ff8f8f;
+  background: var(--status-error);
   box-shadow: 0 0 0 4px rgba(255, 143, 143, 0.13);
 }
 
@@ -222,15 +422,15 @@
   border: 0;
   border-radius: 999px;
   background: none;
-  color: #9ea6ae;
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .dictation-close-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  background: var(--surface-active);
 }
 
 .dictation-wave {
@@ -282,11 +482,11 @@
 }
 
 .read-aloud-btn.loading {
-  color: #ffd54f;
+  color: var(--status-warning);
 }
 
 .read-aloud-btn.error {
-  color: #ff9b9b;
+  color: var(--status-error-soft);
   border-color: rgba(255, 143, 143, 0.48);
 }
 
@@ -296,13 +496,11 @@
   right: var(--read-aloud-popover-right, 16px);
   width: min(320px, calc(100vw - 24px));
   padding: 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: #1b1e22;
-  color: #f3f7fa;
-  box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: var(--floating-note-radius);
+  border: 1px solid var(--floating-note-border);
+  background: var(--floating-note-bg);
+  color: var(--text-primary);
+  box-shadow: var(--floating-note-shadow);
   pointer-events: auto;
   z-index: 90;
   animation: dictation-pop 180ms ease-out both;
@@ -320,14 +518,14 @@
 .read-aloud-title {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
-  color: #9ea6ae;
+  color: var(--floating-note-title);
 }
 
 .read-aloud-subtitle {
   margin-top: 3px;
-  color: #f3f7fa;
+  color: var(--text-primary);
   font-size: 11px;
   font-weight: 600;
 }
@@ -341,8 +539,8 @@
   min-width: 54px;
   padding: 3px 8px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--border-color);
+  background: var(--control-bg);
 }
 
 .read-aloud-wave-bar {
@@ -368,10 +566,10 @@
   display: grid;
   gap: 6px;
   margin-bottom: 10px;
-  color: #9ea6ae;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -380,9 +578,9 @@
   height: 38px;
   padding: 0 11px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  background: rgba(255, 255, 255, 0.045);
-  color: #edf4f8;
+  border: 1px solid var(--border-color);
+  background: var(--control-bg);
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
   outline: none;
@@ -402,15 +600,15 @@
   min-height: 36px;
   padding: 9px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  background: rgba(255, 255, 255, 0.045);
-  color: #f3f7fa;
+  border: 1px solid var(--border-color);
+  background: var(--control-bg);
+  color: var(--text-primary);
   font-size: 12px;
   line-height: 1.35;
 }
 
 .read-aloud-status.error {
-  color: #ffd0d0;
+  color: var(--status-error-soft);
 }
 
 .read-aloud-action {
@@ -423,7 +621,7 @@
   color: var(--accent-foreground);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -437,15 +635,15 @@
   overflow: auto;
   padding: 10px 11px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  background: rgba(255, 255, 255, 0.045);
-  color: #f1f6fa;
+  border: 1px solid var(--border-color);
+  background: var(--control-bg);
+  color: var(--text-primary);
   font-size: 13px;
   line-height: 1.4;
 }
 
 .dictation-popover.error .dictation-preview {
-  color: #ffb8b8;
+  color: var(--status-error-soft);
 }
 
 .dictation-flight {
@@ -468,111 +666,5 @@
     opacity: 0;
     transform: translate(-170px, 82px) scale(0.74);
     filter: blur(1px);
-  }
-}
-
-:root[data-theme='light'] .read-aloud-btn {
-  color: #213547;
-}
-
-:root[data-theme='light'] .read-aloud-popover {
-  border-color: rgba(17, 24, 39, 0.16);
-  background: #ffffff;
-  color: #213547;
-  box-shadow:
-    0 18px 36px rgba(17, 24, 39, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
-}
-
-:root[data-theme='light'] .read-aloud-title,
-:root[data-theme='light'] .read-aloud-subtitle,
-:root[data-theme='light'] .read-aloud-field {
-  color: #687786;
-}
-
-:root[data-theme='light'] .read-aloud-wave,
-:root[data-theme='light'] .read-aloud-status,
-:root[data-theme='light'] .read-aloud-voice-select {
-  border-color: rgba(17, 24, 39, 0.18);
-  background: rgba(17, 24, 39, 0.045);
-  color: #213547;
-}
-
-:root[data-theme='light'] .dictation-popover {
-  border-color: rgba(17, 24, 39, 0.16);
-  background: #ffffff;
-  box-shadow:
-    0 18px 36px rgba(17, 24, 39, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
-  color: #213547;
-}
-
-:root[data-theme='light'] .dictation-preview {
-  border-color: rgba(17, 24, 39, 0.18);
-  background: rgba(17, 24, 39, 0.045);
-  color: #213547;
-}
-
-:root[data-theme='light'] .dictation-menu-title,
-:root[data-theme='light'] .dictation-close-btn {
-  color: #687786;
-}
-
-:root[data-theme='light'] .dictation-close-btn:hover {
-  color: #213547;
-  background: rgba(0, 0, 0, 0.05);
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) .read-aloud-btn {
-    color: #213547;
-  }
-
-  :root:not([data-theme]) .read-aloud-popover {
-    border-color: rgba(17, 24, 39, 0.16);
-    background: #ffffff;
-    color: #213547;
-    box-shadow:
-      0 18px 36px rgba(17, 24, 39, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.92);
-  }
-
-  :root:not([data-theme]) .read-aloud-title,
-  :root:not([data-theme]) .read-aloud-subtitle,
-  :root:not([data-theme]) .read-aloud-field {
-    color: #687786;
-  }
-
-  :root:not([data-theme]) .read-aloud-wave,
-  :root:not([data-theme]) .read-aloud-status,
-  :root:not([data-theme]) .read-aloud-voice-select {
-    border-color: rgba(17, 24, 39, 0.18);
-    background: rgba(17, 24, 39, 0.045);
-    color: #213547;
-  }
-
-  :root:not([data-theme]) .dictation-popover {
-    border-color: rgba(17, 24, 39, 0.16);
-    background: #ffffff;
-    box-shadow:
-      0 18px 36px rgba(17, 24, 39, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.92);
-    color: #213547;
-  }
-
-  :root:not([data-theme]) .dictation-preview {
-    border-color: rgba(17, 24, 39, 0.18);
-    background: rgba(17, 24, 39, 0.045);
-    color: #213547;
-  }
-
-  :root:not([data-theme]) .dictation-menu-title,
-  :root:not([data-theme]) .dictation-close-btn {
-    color: #687786;
-  }
-
-  :root:not([data-theme]) .dictation-close-btn:hover {
-    color: #213547;
-    background: rgba(0, 0, 0, 0.05);
   }
 }

@@ -1,5 +1,23 @@
+/**
+ * ResizableImage.js — Image node with in-editor editing tools.
+ *
+ * Extends TipTap's Image with width/rotation/flip/align/layout/crop
+ * attributes (all serialized as data-* so documents round-trip through
+ * HTML), and a DOM node view that shows, when the image is selected, a
+ * floating toolbar (crop, rotate, flip, layout mode) plus a drag handle
+ * for resizing. Cropping is non-destructive: the crop rectangle is stored
+ * as fractional coordinates and applied by offsetting the img inside a
+ * fixed-aspect viewport.
+ */
 import { Image } from '@tiptap/extension-image'
 import { NodeSelection } from '@tiptap/pm/state'
+import {
+  ICON_ARROW_RIGHT_LEFT_PATHS,
+  ICON_ARROW_UP_DOWN_PATHS,
+  createFrameIconElement,
+  createResizeIconElement,
+  createSvgIconElement,
+} from '../lib/resizeIcon'
 
 const MIN_WIDTH = 80
 const MIN_CROP_SIZE = 0.08
@@ -35,6 +53,7 @@ const normalizeLayout = (value) => (
   VALID_LAYOUTS.has(value) ? value : 'inline'
 )
 
+/** Clamp crop attrs to a valid rectangle fully inside the image (fractions of width/height). */
 const normalizeCrop = (attrs = {}) => {
   const cropX = clamp(parseNumber(attrs.cropX, DEFAULT_CROP.cropX), 0, 1)
   const cropY = clamp(parseNumber(attrs.cropY, DEFAULT_CROP.cropY), 0, 1)
@@ -56,11 +75,16 @@ const cropIsFullFrame = (crop) => (
   crop.cropHeight === 1
 )
 
-const makeButton = (label, title, onClick) => {
+const makeButton = (content, title, onClick) => {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'image-tool-button'
-  button.textContent = label
+  if (typeof content === 'string') {
+    button.textContent = content
+  } else {
+    button.classList.add('image-tool-button-icon-only')
+    button.appendChild(content)
+  }
   button.title = title
   button.setAttribute('aria-label', title)
   button.contentEditable = 'false'
@@ -212,6 +236,7 @@ const ResizableImage = Image.extend({
       resizeHandle.className = 'image-resize-handle'
       resizeHandle.style.display = 'none'
       resizeHandle.contentEditable = 'false'
+      resizeHandle.appendChild(createResizeIconElement())
 
       const selectImage = () => {
         const pos = typeof getPos === 'function' ? getPos() : null
@@ -220,6 +245,7 @@ const ResizableImage = Image.extend({
         dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)))
       }
 
+      // Write attribute changes into the document and keep the node selected.
       const commitAttributes = (attrs) => {
         const pos = typeof getPos === 'function' ? getPos() : null
         if (pos == null) return
@@ -235,13 +261,9 @@ const ResizableImage = Image.extend({
 
       const updateToolbarState = () => {
         const attrs = currentNode.attrs
-        const align = normalizeAlignment(attrs.align)
-        const layout = normalizeLayout(attrs.layout)
 
-        toolbar.querySelectorAll('[data-align]').forEach((button) => {
-          button.classList.toggle('active', button.dataset.align === align && !layout.startsWith('wrap-'))
-        })
-        if (layoutSelect) layoutSelect.value = layout
+        if (layoutSelect) layoutSelect.value = normalizeLayout(attrs.layout)
+        toolbar.querySelector('[data-action="crop"]')?.classList.toggle('active', isCropping)
         toolbar.querySelector('[data-action="flip-x"]')?.classList.toggle('active', Boolean(attrs.flipX))
         toolbar.querySelector('[data-action="flip-y"]')?.classList.toggle('active', Boolean(attrs.flipY))
       }
@@ -263,7 +285,7 @@ const ResizableImage = Image.extend({
         draftCrop = normalizeCrop(currentNode.attrs)
         container.classList.toggle('is-cropping', isCropping)
         cropOverlay.style.display = isCropping ? 'block' : 'none'
-        resizeHandle.style.display = isSelected && !isCropping ? 'block' : 'none'
+        resizeHandle.style.display = isSelected && !isCropping ? 'inline-flex' : 'none'
         setCropBoxStyle()
         syncView()
       }
@@ -292,7 +314,8 @@ const ResizableImage = Image.extend({
         return button
       }
 
-      const cropButton = makeToolButton('Crop', 'Crop image', () => setCropMode(!isCropping))
+      const cropButton = makeToolButton(createFrameIconElement(), 'Crop image', () => setCropMode(!isCropping))
+      cropButton.dataset.action = 'crop'
       const applyCropButton = makeToolButton('Apply', 'Apply crop', applyCrop, 'image-crop-action')
       const cancelCropButton = makeToolButton('Cancel', 'Cancel crop', () => setCropMode(false), 'image-crop-action')
       const resetCropButton = makeToolButton('Reset', 'Reset crop frame', resetCrop, 'image-crop-action')
@@ -303,27 +326,23 @@ const ResizableImage = Image.extend({
       const rotateRightButton = makeToolButton('↻', 'Rotate right', () => {
         commitAttributes({ rotation: normalizeRotation(currentNode.attrs.rotation + 90) })
       })
-      const flipHorizontalButton = makeToolButton('Flip H', 'Flip horizontally', () => {
-        commitAttributes({ flipX: !currentNode.attrs.flipX })
-      })
+      const flipHorizontalButton = makeToolButton(
+        createSvgIconElement(ICON_ARROW_RIGHT_LEFT_PATHS, 16, 'image-tool-icon image-tool-icon-flip-horizontal'),
+        'Flip horizontally',
+        () => {
+          commitAttributes({ flipX: !currentNode.attrs.flipX })
+        },
+      )
       flipHorizontalButton.dataset.action = 'flip-x'
 
-      const flipVerticalButton = makeToolButton('Flip V', 'Flip vertically', () => {
-        commitAttributes({ flipY: !currentNode.attrs.flipY })
-      })
+      const flipVerticalButton = makeToolButton(
+        createSvgIconElement(ICON_ARROW_UP_DOWN_PATHS, 16, 'image-tool-icon image-tool-icon-flip-vertical'),
+        'Flip vertically',
+        () => {
+          commitAttributes({ flipY: !currentNode.attrs.flipY })
+        },
+      )
       flipVerticalButton.dataset.action = 'flip-y'
-
-      const makeAlignButton = (align, label) => {
-        const button = makeToolButton(label, `Align ${align}`, () => {
-          const layout = normalizeLayout(currentNode.attrs.layout)
-          commitAttributes({
-            align,
-            layout: layout.startsWith('wrap-') ? 'block' : layout,
-          })
-        })
-        button.dataset.align = align
-        return button
-      }
 
       layoutSelect = document.createElement('select')
       layoutSelect.className = 'image-tool-select'
@@ -379,12 +398,6 @@ const ResizableImage = Image.extend({
       addSeparator()
       toolbar.append(rotateLeftButton, rotateRightButton, flipHorizontalButton, flipVerticalButton)
       addSeparator()
-      toolbar.append(
-        makeAlignButton('left', 'L'),
-        makeAlignButton('center', 'C'),
-        makeAlignButton('right', 'R'),
-      )
-      addSeparator()
       toolbar.append(layoutSelect)
 
       const syncCropToolbar = () => {
@@ -394,6 +407,8 @@ const ResizableImage = Image.extend({
         cancelCropButton.style.display = isCropping ? '' : 'none'
       }
 
+      // Re-render the node view from current attrs: container classes/width,
+      // viewport aspect ratio, and the img's crop offset + rotate/flip transform.
       const syncView = () => {
         const attrs = currentNode.attrs
         const crop = normalizeCrop(attrs)
@@ -467,6 +482,8 @@ const ResizableImage = Image.extend({
         selectImage()
       }
 
+      // Drag interactions inside the crop overlay: 'move' shifts the crop
+      // rectangle; edge/corner handles resize it (mode comes from data-handle).
       const onCropPointerDown = (event) => {
         if (!isCropping) return
         event.preventDefault()
@@ -557,7 +574,7 @@ const ResizableImage = Image.extend({
         selectNode: () => {
           isSelected = true
           toolbar.style.display = 'flex'
-          resizeHandle.style.display = isCropping ? 'none' : 'block'
+          resizeHandle.style.display = isCropping ? 'none' : 'inline-flex'
           syncView()
         },
         deselectNode: () => {

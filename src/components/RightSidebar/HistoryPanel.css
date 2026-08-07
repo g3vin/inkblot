@@ -1,0 +1,197 @@
+/* ============================================================
+   History panel — condensed timeline
+   ============================================================ */
+
+.history-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 10px;
+}
+
+.history-snapshot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.is-active-filter {
+  background: var(--accent-surface);
+  border-color: var(--accent-border);
+  color: var(--accent-foreground);
+}
+
+.history-day {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-day-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  padding: 6px 2px 0;
+}
+
+/* ---------- session color dot ---------- */
+
+.history-session-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+/* ---------- one version row ---------- */
+
+.history-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-tile.is-named {
+  border-color: var(--accent-border);
+}
+
+.history-tile.in-group {
+  background: var(--surface-3);
+}
+
+.history-tile-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 0;
+}
+
+.history-tile-header .history-timestamp {
+  flex: 0 0 auto;
+}
+
+.history-tile-header .history-actions {
+  margin-left: auto;
+}
+
+.history-icon-btn {
+  width: 26px;
+  height: 26px;
+}
+
+.history-btn-danger {
+  border-color: var(--status-error);
+  color: var(--status-error);
+}
+
+.history-delta {
+  display: inline-flex;
+  gap: 5px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-delta-added {
+  color: color-mix(in srgb, var(--status-success) 78%, var(--text-primary));
+}
+
+.history-delta-removed {
+  color: var(--status-error-soft);
+}
+
+/* ---------- naming ---------- */
+
+.history-name {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.history-name.is-placeholder {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-subtle);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.history-tile:hover .history-name.is-placeholder,
+.history-name.is-placeholder:focus-visible {
+  opacity: 1;
+}
+
+.history-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-3);
+  border: 1px solid var(--accent-border);
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+/* ---------- collapsed edit bursts ---------- */
+
+.history-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-group-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border-muted);
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.history-group-row:hover {
+  background: var(--surface-hover);
+  border-color: var(--sidebar-card-border-hover);
+}
+
+.history-group-chevron {
+  display: inline-flex;
+  transform: rotate(-90deg);
+  transition: transform 160ms ease;
+  color: var(--text-subtle);
+}
+
+.history-group-chevron.is-open {
+  transform: rotate(0deg);
+}
+
+.history-group-count {
+  color: var(--text-subtle);
+}
+
+.history-group-row .history-delta {
+  margin-left: auto;
+}
+
+.history-group-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border-muted);
+  margin-left: 6px;
+}

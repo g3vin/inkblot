@@ -1,3 +1,7 @@
+/**
+ * NoteImageGallery.jsx — thumbnail strip of a note's attached images,
+ * each with an optional remove button. Used by NoteCard and NoteHoverPreview.
+ */
 import SFIcon from './SFIcon'
 
 export default function NoteImageGallery({

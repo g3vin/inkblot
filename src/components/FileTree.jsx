@@ -1,3 +1,13 @@
+/**
+ * FileTree.jsx — project/file browser in the left sidebar.
+ *
+ * Two views: a project list and the open project's file tree. Handles
+ * creating/renaming files, folders, story-preset folders, and projects;
+ * custom (mouse-driven) drag & drop for reordering and re-parenting entries;
+ * and per-project persistence of manual ordering and folder expansion in
+ * localStorage. Other parts of the app talk to it through `filetree:*`
+ * window events (new-entry, refresh-projects, folders-visibility, …).
+ */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -7,20 +17,33 @@ import {
   saveDocument,
   createFolder,
   moveEntry,
-} from './FileSystem'
+} from '../lib/FileSystem'
+import { saveCanvasDocument } from '../lib/canvasFileSystem'
+import { createEmptyCanvas } from '../lib/canvasModel'
+import { getDocDisplayName, isCanvasDoc, stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
+import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
+import {
+  announceTreeDragEnd,
+  announceTreeDragStart,
+  dispatchTabDockDropDoc,
+  tabDockAt,
+} from '../lib/tabDockEvents'
 import SFIcon from './SFIcon'
 import {
   STORY_FOLDER_PRESETS,
+  getStoryFolderAncestor,
   getStoryFolderPresetByKey,
   getStoryFolderPresetForEntry,
-} from './storyStructure'
+} from '../lib/storyStructure'
 
 const MotionDiv = motion.div
 
 const ORDER_PREFIX = 'inkblot-order:'
 const EXPANDED_PREFIX = 'inkblot-expanded:'
-const DRAG_DEBUG = false
-const DRAG_SLOT_HEIGHT = 28
+const DRAG_SLOT_HEIGHT = 22
+const TREE_ROOT_INDENT = 8
+const TREE_DEPTH_INDENT = 10
+const FOLDER_STICKY_STEP = 22
 
 const itemRevealVariants = {
   collapsed: {
@@ -63,6 +86,8 @@ const folderChildrenVariants = {
   },
 }
 
+/* ---------- localStorage persistence for manual order & expanded folders ---------- */
+
 const loadOrder = (projectName) => {
   try {
     return JSON.parse(localStorage.getItem(`${ORDER_PREFIX}${projectName}`) || '{}')
@@ -90,6 +115,7 @@ const saveExpanded = (projectName, expandedList) => {
   localStorage.setItem(`${EXPANDED_PREFIX}${projectName}`, JSON.stringify(expandedList))
 }
 
+/** Carry a project's order/expanded localStorage keys across a project rename. */
 const migrateProjectTreeState = (fromProjectName, toProjectName) => {
   if (!fromProjectName || !toProjectName || fromProjectName === toProjectName) return
 
@@ -108,6 +134,11 @@ const migrateProjectTreeState = (fromProjectName, toProjectName) => {
 
 const getParentPath = (path = '') => path.split('/').slice(0, -1).join('/')
 
+/* ----------------------------------------------------------------------------
+   Manual ordering. Each folder maps to an ordered list of "type:path" ids;
+   entries missing from the stored order are appended, stale ids are dropped.
+---------------------------------------------------------------------------- */
+
 const ensureOrder = (order, folderPath, children) => {
   const folderKey = folderPath || ''
   const ids = children.map(child => `${child.type}:${child.path}`)
@@ -119,6 +150,7 @@ const ensureOrder = (order, folderPath, children) => {
   return { next, changed }
 }
 
+/** Recursively sort a tree's children by the stored manual order (unknown items last, A→Z). */
 const applyOrderToTree = (node, order) => {
   if (!node || node.type !== 'folder') return node
 
@@ -147,6 +179,7 @@ const applyOrderToTree = (node, order) => {
   }
 }
 
+/** Rewrite order keys/ids after a folder moves or is renamed (fromPath → toPath). */
 const remapOrderForFolder = (orderState, fromPath, toPath) => {
   const next = {}
   Object.entries(orderState).forEach(([key, list]) => {
@@ -169,6 +202,7 @@ const remapOrderForFolder = (orderState, fromPath, toPath) => {
   return next
 }
 
+/** Rewrite order ids after any entry rename (delegates to the folder variant for folders). */
 const remapOrderForEntry = (orderState, type, fromPath, toPath) => {
   if (type === 'folder') {
     return remapOrderForFolder(orderState, fromPath, toPath)
@@ -185,6 +219,7 @@ const remapOrderForEntry = (orderState, type, fromPath, toPath) => {
   return next
 }
 
+/** Rewrite expanded-folder paths after a folder moves or is renamed. */
 const remapExpandedForFolder = (expandedSet, fromPath, toPath) => {
   const next = new Set()
 
@@ -220,7 +255,6 @@ export default function FileTree({
   activeDoc,
   onSelectDoc,
   onSelectProject,
-  onExitProject,
   registerRefreshFiles,
 }) {
   const prefersReducedMotion = useReducedMotion()
@@ -237,6 +271,7 @@ export default function FileTree({
   const [renameValue, setRenameValue] = useState('')
   const [isAddingProject, setIsAddingProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectLocation, setNewProjectLocation] = useState(null)
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
   const [dragOverPath, setDragOverPath] = useState(null)
   const [dragInsert, setDragInsert] = useState(null)
@@ -244,46 +279,20 @@ export default function FileTree({
   const [isDragging, setIsDragging] = useState(false)
   const [dragPreview, setDragPreview] = useState(null)
   const [dragSourceId, setDragSourceId] = useState(null)
-  const [entryMenu, setEntryMenu] = useState(null)
   const createMenuRef = useRef(null)
-  const entryMenuRef = useRef(null)
   const manualDragRef = useRef(null)
   const manualDragActiveRef = useRef(false)
   const dragInsertRef = useRef(null)
   const dragOverFolderRef = useRef(null)
+  // Where the pointer was last seen during a manual drag. `onUp` receives no event,
+  // but it has to know whether the drop landed on a canvas — see the guard there.
+  const dragPointRef = useRef(null)
   const orderRef = useRef({})
   const expandedRef = useRef(new Set(['']))
 
   const refreshProjects = useCallback(async () => {
     const list = await listProjects()
     setProjects(list)
-  }, [])
-
-  useEffect(() => {
-    if (!DRAG_DEBUG) return
-    const onDragOver = (event) => {
-      console.debug('[FileTree] window dragover', {
-        target: event.target?.className || event.target?.tagName,
-      })
-    }
-    const onDragEnter = (event) => {
-      console.debug('[FileTree] window dragenter', {
-        target: event.target?.className || event.target?.tagName,
-      })
-    }
-    const onDrop = (event) => {
-      console.debug('[FileTree] window drop', {
-        target: event.target?.className || event.target?.tagName,
-      })
-    }
-    window.addEventListener('dragover', onDragOver)
-    window.addEventListener('dragenter', onDragEnter)
-    window.addEventListener('drop', onDrop)
-    return () => {
-      window.removeEventListener('dragover', onDragOver)
-      window.removeEventListener('dragenter', onDragEnter)
-      window.removeEventListener('drop', onDrop)
-    }
   }, [])
 
   const refreshTree = useCallback(async () => {
@@ -396,7 +405,10 @@ export default function FileTree({
     setNewEntryName('')
     setIsAddingEntry(true)
     setIsCreateMenuOpen(false)
-  }, [])
+    // The name box renders among the folder's children, which only exist while
+    // the folder is open.
+    if (parent) expandPath(parent)
+  }, [expandPath])
 
   const ensureOrderItem = useCallback((folderKey, itemId) => {
     updateOrder(orderState => {
@@ -428,10 +440,10 @@ export default function FileTree({
         setRenamingEntry({
           path: detail.path || detail.name,
           type: detail.type,
-          oldName: detail.name,
+          oldName: stripCanvasSuffix(detail.name),
           parent: detail.parent || '',
         })
-        setRenameValue(detail.name)
+        setRenameValue(stripCanvasSuffix(detail.name))
         setIsAddingEntry(false)
         setIsAddingProject(false)
         setIsCreateMenuOpen(false)
@@ -458,65 +470,32 @@ export default function FileTree({
     return () => window.removeEventListener('pointerdown', handlePointerDown)
   }, [])
 
-  useEffect(() => {
-    const handlePointerDown = (event) => {
-      const target = event.target
-      if (!(target instanceof HTMLElement)) return
-      if (target.closest('.file-item-menu-btn')) return
-      if (entryMenuRef.current?.contains(target)) return
-      setEntryMenu(null)
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setEntryMenu(null)
-    }
-
-    window.addEventListener('pointerdown', handlePointerDown)
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown)
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [])
-
-  const openEntryMenu = useCallback((event, node) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const rect = event.currentTarget.getBoundingClientRect()
-    const menuWidth = 190
-    const preferredLeft = rect.right + 8
-    const viewportWidth = window.innerWidth || 0
-    const left = viewportWidth
-      ? Math.min(preferredLeft, Math.max(12, viewportWidth - menuWidth - 12))
-      : preferredLeft
-
-    setEntryMenu({
-      id: `${node.type}:${node.path}`,
-      type: node.type,
-      name: node.name,
-      left,
-      top: rect.top + rect.height / 2,
-    })
-  }, [])
-
   const confirmNewEntry = async () => {
     if (!newEntryName.trim()) return
-    const trimmed = newEntryName.trim()
-    const path = newEntryParent ? `${newEntryParent}/${trimmed}` : trimmed
+    // The `.canvas` suffix is what routes a document to the canvas editor, so it
+    // follows the kind being created — never whatever the user typed. Without
+    // this, a text file named "plan.canvas" would collide with a real canvas.
+    const bare = stripCanvasSuffix(newEntryName.trim())
+    if (!bare) return
+    const name = newEntryType === 'canvas' ? withCanvasSuffix(bare) : bare
+    const path = newEntryParent ? `${newEntryParent}/${name}` : name
 
     if (newEntryType === 'folder') {
       await createFolder(projectName, path)
+    } else if (newEntryType === 'canvas') {
+      await saveCanvasDocument(projectName, path, createEmptyCanvas())
     } else {
-      await saveDocument(projectName, path, { type: 'doc', content: [] })
+      await saveDocument(projectName, path, { content: [] })
     }
 
-    ensureOrderItem(newEntryParent || '', `${newEntryType}:${path}`)
+    // Folders and files are the only entry kinds the tree orders; a canvas is a file.
+    const orderType = newEntryType === 'folder' ? 'folder' : 'file'
+    ensureOrderItem(newEntryParent || '', `${orderType}:${path}`)
 
     setNewEntryName('')
     setIsAddingEntry(false)
     await refreshTree()
-    if (newEntryType === 'file') onSelectDoc(path)
+    if (newEntryType !== 'folder') onSelectDoc(path)
   }
 
   const handleSelectProject = async (name) => {
@@ -541,11 +520,28 @@ export default function FileTree({
   const handleNewProject = async () => {
     if (!newProjectName.trim()) return
     const trimmed = newProjectName.trim()
-    const created = await createProject(trimmed)
+    const created = await createProject(trimmed, newProjectLocation || null)
     if (created) {
       setNewProjectName('')
+      setNewProjectLocation(null)
       setIsAddingProject(false)
       await refreshProjects()
+    }
+  }
+
+  const chooseNewProjectLocation = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Choose a folder to store this project',
+      })
+      if (typeof selected === 'string' && selected) {
+        setNewProjectLocation(selected)
+      }
+    } catch (err) {
+      console.warn('Failed to choose project location:', err)
     }
   }
 
@@ -570,20 +566,6 @@ export default function FileTree({
 
       const insertIndex = Math.max(0, Math.min(requestedIndex, toList.length))
 
-      if (DRAG_DEBUG) {
-        console.debug('[FileTree] moveOrderItem', {
-          itemId,
-          fromKey,
-          toKey,
-          fromIndex,
-          targetIndex,
-          requestedIndex,
-          insertIndex,
-          fromList,
-          toList,
-        })
-      }
-
       toList.splice(insertIndex, 0, itemId)
       orderState[toKey] = toList
 
@@ -591,16 +573,14 @@ export default function FileTree({
     })
   }, [updateOrder])
 
+  // Move an entry to a target folder/index: same-folder moves only touch the
+  // stored order; cross-folder moves also move the entry on disk.
   const performMove = useCallback(async ({ path, type }, targetFolder, targetIndex) => {
     const fromParent = getParentPath(path)
 
     if (type === 'folder' && targetFolder.startsWith(`${path}/`)) return
 
     let nextPath = path
-
-    if (DRAG_DEBUG) {
-      console.debug('[FileTree] performMove', { path, type, fromParent, targetFolder, targetIndex })
-    }
 
     // Moving to a different folder - need filesystem operation
     if (fromParent !== targetFolder) {
@@ -651,21 +631,12 @@ export default function FileTree({
         ? (order[targetParent || ''] || []).indexOf(`${targetNode.type}:${targetNode.path}`)
         : undefined)
 
-    if (DRAG_DEBUG) {
-      console.debug('[FileTree] drop', {
-        item: data,
-        targetFolder,
-        targetIndex,
-        dragInsert,
-        dragOverFolder,
-        targetNode,
-        targetParent,
-      })
-    }
-
     await performMove(data, targetFolder, targetIndex)
   }
 
+  // Hit-test the pointer during a manual drag: hovering a folder's middle
+  // third targets "drop into folder", the outer thirds target an insert slot
+  // before/after the hovered item.
   const updateManualDrag = useCallback((clientX, clientY) => {
     const el = document.elementFromPoint(clientX, clientY)
     if (!el) return
@@ -718,10 +689,14 @@ export default function FileTree({
     }
   }, [order])
 
+  // Mouse-driven drag & drop (not HTML5 DnD): a drag arms on item mousedown
+  // and activates after ~4px of movement, showing a ghost preview; mouseup
+  // commits the move.
   useEffect(() => {
     const onMove = (event) => {
       const drag = manualDragRef.current
       if (!drag) return
+      dragPointRef.current = { x: event.clientX, y: event.clientY }
       const dx = Math.abs(event.clientX - drag.startX)
       const dy = Math.abs(event.clientY - drag.startY)
       if (!manualDragActiveRef.current) {
@@ -736,9 +711,9 @@ export default function FileTree({
           iconName: drag.iconName,
           iconFilled: drag.iconFilled,
         })
-        if (DRAG_DEBUG) {
-          console.debug('[FileTree] manual drag start', drag)
-        }
+        // The tab dock opens while a document is in flight, so there is something
+        // to aim at before the pointer gets there.
+        announceTreeDragStart({ path: drag.path, type: drag.type })
       }
       setDragPreview((current) => current ? {
         ...current,
@@ -754,24 +729,53 @@ export default function FileTree({
       const didDrag = manualDragActiveRef.current
       const insert = dragInsertRef.current
       const folder = dragOverFolderRef.current
+      const point = dragPointRef.current
 
       manualDragRef.current = null
       manualDragActiveRef.current = false
+      dragPointRef.current = null
       setIsDragging(false)
       setDragPreview(null)
       setDragSourceId(null)
       setDragOverPath(null)
       setDragInsert(null)
       setDragOverFolder(null)
+      if (didDrag) announceTreeDragEnd()
 
-      if (didDrag) {
-        const targetFolder = folder || (insert ? insert.parentPath : getParentPath(drag.path))
-        const targetIndex = insert ? insert.index : undefined
-        if (DRAG_DEBUG) {
-          console.debug('[FileTree] manual drop', { drag, targetFolder, targetIndex, dragInsert, dragOverFolder })
+      if (!didDrag) return
+
+      // Like the canvas drop below, a drop onto the tab dock MUST NOT fall through
+      // to performMove — the tree still believes it is reordering, and would
+      // silently move the document into whatever folder it was dragged over.
+      if (point && drag.type === 'file') {
+        const dock = tabDockAt(point.x, point.y)
+        if (dock) {
+          dispatchTabDockDropDoc(dock, { path: drag.path })
+          return
         }
-        await performMove({ path: drag.path, type: drag.type }, targetFolder, targetIndex)
       }
+
+      // A drop onto an open canvas adds a card there, and MUST NOT fall through to
+      // performMove — the pointer never left the tree's own drag state, so the tree
+      // still believes it is reordering, and would silently move the document.
+      //
+      // Canvases are droppable too (they render as a minimap and open on
+      // double-click); the surface itself refuses a canvas dropped onto ITSELF.
+      if (point && drag.type === 'file') {
+        const surface = canvasSurfaceAt(point.x, point.y)
+        if (surface) {
+          dispatchCanvasDropDoc(surface, {
+            path: drag.path,
+            clientX: point.x,
+            clientY: point.y,
+          })
+          return
+        }
+      }
+
+      const targetFolder = folder || (insert ? insert.parentPath : getParentPath(drag.path))
+      const targetIndex = insert ? insert.index : undefined
+      await performMove({ path: drag.path, type: drag.type }, targetFolder, targetIndex)
     }
 
     window.addEventListener('mousemove', onMove)
@@ -794,7 +798,7 @@ export default function FileTree({
     const { path, type } = renamingEntry
 
     if (type === 'project') {
-      const { renameProject } = await import('./FileSystem')
+      const { renameProject } = await import('../lib/FileSystem')
       const nextName = await renameProject(path, trimmed)
       if (nextName) {
         migrateProjectTreeState(path, nextName)
@@ -808,8 +812,18 @@ export default function FileTree({
       return
     }
 
-    const { renameEntry } = await import('./FileSystem')
-    const nextPath = await renameEntry(projectName, path, trimmed, type)
+    // Renaming must not change a document's kind: re-apply the `.canvas` suffix
+    // to a canvas (the edit box shows the bare name) and strip it from anything else.
+    const bare = stripCanvasSuffix(trimmed)
+    if (!bare) {
+      setRenamingEntry(null)
+      setRenameValue('')
+      return
+    }
+    const nextName = type === 'file' && isCanvasDoc(path) ? withCanvasSuffix(bare) : bare
+
+    const { renameEntry } = await import('../lib/FileSystem')
+    const nextPath = await renameEntry(projectName, path, nextName, type)
     if (nextPath) {
       updateOrder(orderState => remapOrderForEntry(orderState, type, path, nextPath))
       if (type === 'folder') {
@@ -821,6 +835,68 @@ export default function FileTree({
     await refreshTree()
   }, [onSelectProject, projectName, refreshProjects, refreshTree, renamingEntry, renameValue, updateExpanded, updateOrder])
 
+  // Render helpers (plain functions, not components, so inputs keep focus across re-renders).
+
+  const renderDropSlot = (indentPx) => (
+    <MotionDiv
+      className="file-drop-slot"
+      style={{ marginLeft: `${indentPx}px` }}
+      initial={prefersReducedMotion ? false : { height: 0, opacity: 0, scaleY: 0.5 }}
+      animate={prefersReducedMotion ? undefined : { height: DRAG_SLOT_HEIGHT, opacity: 1, scaleY: 1 }}
+      exit={prefersReducedMotion ? undefined : { height: 0, opacity: 0, scaleY: 0.5 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+    >
+      <div className="file-drop-slot-inner" />
+    </MotionDiv>
+  )
+
+  const renderNewEntryInput = (style) => (
+    <div className="new-file-input" style={style}>
+      <input
+        autoFocus
+        value={newEntryName}
+        onChange={(e) => setNewEntryName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            confirmNewEntry()
+          }
+        }}
+        onBlur={() => {
+          if (!newEntryName.trim()) setIsAddingEntry(false)
+        }}
+        placeholder={
+          newEntryType === 'folder'
+            ? 'Folder name...'
+            : newEntryType === 'canvas'
+              ? 'Canvas name...'
+              : 'File name...'
+        }
+      />
+    </div>
+  )
+
+  const renderRenameInput = (style) => (
+    <input
+      className="new-file-input"
+      autoFocus
+      value={renameValue}
+      onChange={e => setRenameValue(e.target.value)}
+      onKeyDown={async e => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          await handleRenameConfirm()
+        } else if (e.key === 'Escape') {
+          setRenamingEntry(null)
+          setRenameValue('')
+        }
+      }}
+      onBlur={handleRenameConfirm}
+      style={style}
+    />
+  )
+
+  // Render one tree node (file or folder) plus its drop slots and children.
   const renderNode = (node, depth = 0, siblings = []) => {
     if (!node) return null
     const isFolder = node.type === 'folder'
@@ -831,10 +907,12 @@ export default function FileTree({
     const storyPreset = getStoryFolderPresetForEntry(node.path, node.type)
     const parentPath = getParentPath(node.path)
     const nodeId = `${node.type}:${node.path}`
+    const isCanvas = !isFolder && isCanvasDoc(node.path)
     const iconName = isFolder
       ? (storyPreset?.folderIcon || (isExpanded ? 'folder.fill' : 'folder'))
-      : 'doc'
-    const iconFilled = !isFolder && isActive
+      : (isCanvas ? 'canvas' : null)
+    const hasEntryIcon = Boolean(iconName)
+    const iconFilled = !isFolder && isActive && hasEntryIcon
     const showInlineInput =
       isAddingEntry && newEntryParent === node.path && (isFolder || newEntryParent)
     const siblingIndex = siblings.findIndex(child => child.path === node.path && child.type === node.type)
@@ -844,7 +922,6 @@ export default function FileTree({
 
     const isRenaming = renamingEntry && renamingEntry.path === node.path && renamingEntry.type === node.type
     const isDragSource = dragSourceId === nodeId
-    const isMenuOpen = entryMenu?.id === nodeId
     const showFolderDivider = isFolder && isExpanded
     return (
       <MotionDiv
@@ -857,23 +934,12 @@ export default function FileTree({
         custom={siblingIndex}
       >
         <AnimatePresence initial={false}>
-          {showInsertSlot ? (
-            <MotionDiv
-              className="file-drop-slot"
-              style={{ marginLeft: `${10 + depth * 12}px` }}
-              initial={prefersReducedMotion ? false : { height: 0, opacity: 0, scaleY: 0.5 }}
-              animate={prefersReducedMotion ? undefined : { height: DRAG_SLOT_HEIGHT, opacity: 1, scaleY: 1 }}
-              exit={prefersReducedMotion ? undefined : { height: 0, opacity: 0, scaleY: 0.5 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-            >
-              <div className="file-drop-slot-inner" />
-            </MotionDiv>
-          ) : null}
+          {showInsertSlot ? renderDropSlot(TREE_ROOT_INDENT + depth * TREE_DEPTH_INDENT) : null}
         </AnimatePresence>
 
         <MotionDiv
           layout="position"
-          className={`file-item${isFolder ? ' folder' : ''}${isPrimary ? ' active' : ''}${isSecondary ? ' secondary' : ''}${dragOverPath === node.path ? ' drag-over' : ''}${isDragSource ? ' is-drag-source' : ''}${isMenuOpen ? ' menu-open' : ''}`}
+          className={`file-item${isFolder ? ' folder' : ''}${isPrimary ? ' active' : ''}${isSecondary ? ' secondary' : ''}${dragOverPath === node.path ? ' drag-over' : ''}${isDragSource ? ' is-drag-source' : ''}`}
           data-entry-type={node.type}
           data-entry-path={node.path}
           data-entry-parent={parentPath}
@@ -889,7 +955,7 @@ export default function FileTree({
             manualDragRef.current = {
               path: node.path,
               type: node.type,
-              name: node.name,
+              name: getDocDisplayName(node.name),
               iconName,
               iconFilled,
               startX: e.clientX,
@@ -915,53 +981,24 @@ export default function FileTree({
             }
           }}
           style={{
-            paddingLeft: `${10 + depth * 12}px`,
-            '--folder-sticky-top': `${depth * 28}px`,
+            paddingLeft: `${TREE_ROOT_INDENT + depth * TREE_DEPTH_INDENT}px`,
+            '--folder-divider-left': `${TREE_ROOT_INDENT + depth * TREE_DEPTH_INDENT}px`,
+            '--folder-sticky-top': `${depth * FOLDER_STICKY_STEP}px`,
             '--folder-sticky-depth': depth,
           }}
         >
-          <SFIcon
-            name={iconName}
-            filled={iconFilled}
-            className="file-item-icon"
-          />
-          {isRenaming ? (
-            <input
-              className="new-file-input"
-              autoFocus
-              value={renameValue}
-              onChange={e => setRenameValue(e.target.value)}
-              onKeyDown={async e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  await handleRenameConfirm();
-                } else if (e.key === 'Escape') {
-                  setRenamingEntry(null);
-                  setRenameValue('');
-                }
-              }}
-              onBlur={handleRenameConfirm}
-              style={{ marginLeft: 4, minWidth: 80 }}
+          {hasEntryIcon ? (
+            <SFIcon
+              name={iconName}
+              filled={iconFilled}
+              className="file-item-icon"
             />
-          ) : (
-            <span className="file-item-label">{node.name}</span>
-          )}
-
-          {!isRenaming ? (
-            <button
-              type="button"
-              className="file-item-menu-btn"
-              aria-label={`${isFolder ? 'Folder' : 'Document'} options`}
-              title="Options"
-              onMouseDown={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-              }}
-              onClick={(event) => openEntryMenu(event, node)}
-            >
-              <SFIcon name="ellipsis" size={15} />
-            </button>
           ) : null}
+          {isRenaming ? (
+            renderRenameInput({ marginLeft: hasEntryIcon ? 4 : 0, minWidth: 80 })
+          ) : (
+            <span className="file-item-label">{isFolder ? node.name : getDocDisplayName(node.name)}</span>
+          )}
 
           <AnimatePresence initial={false}>
             {showFolderDivider ? (
@@ -985,18 +1022,7 @@ export default function FileTree({
         </MotionDiv>
 
         <AnimatePresence initial={false}>
-          {showInsertAfterLast ? (
-            <MotionDiv
-              className="file-drop-slot"
-              style={{ marginLeft: `${10 + depth * 12}px` }}
-              initial={prefersReducedMotion ? false : { height: 0, opacity: 0, scaleY: 0.5 }}
-              animate={prefersReducedMotion ? undefined : { height: DRAG_SLOT_HEIGHT, opacity: 1, scaleY: 1 }}
-              exit={prefersReducedMotion ? undefined : { height: 0, opacity: 0, scaleY: 0.5 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-            >
-              <div className="file-drop-slot-inner" />
-            </MotionDiv>
-          ) : null}
+          {showInsertAfterLast ? renderDropSlot(TREE_ROOT_INDENT + depth * TREE_DEPTH_INDENT) : null}
         </AnimatePresence>
 
         {isFolder ? (
@@ -1019,25 +1045,9 @@ export default function FileTree({
                 }}
                 onDrop={(e) => handleDrop(e, null, node.path)}
               >
-                {showInlineInput && (
-                  <div className="new-file-input" style={{ paddingLeft: `${10 + (depth + 1) * 12}px` }}>
-                    <input
-                      autoFocus
-                      value={newEntryName}
-                      onChange={(e) => setNewEntryName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          confirmNewEntry()
-                        }
-                      }}
-                      onBlur={() => {
-                        if (!newEntryName.trim()) setIsAddingEntry(false)
-                      }}
-                      placeholder={newEntryType === 'folder' ? 'Folder name...' : 'File name...'}
-                    />
-                  </div>
-                )}
+                {showInlineInput && renderNewEntryInput({
+                  paddingLeft: `${TREE_ROOT_INDENT + (depth + 1) * TREE_DEPTH_INDENT}px`,
+                })}
                 {(node.children || []).map(child => renderNode(child, depth + 1, node.children || []))}
               </MotionDiv>
             ) : null}
@@ -1049,11 +1059,15 @@ export default function FileTree({
 
   const orderedRoot = useMemo(() => {
     const result = applyOrderToTree(tree, { ...order })
-    if (DRAG_DEBUG) {
-      console.debug('[FileTree] orderedRoot computed', { order, rootChildren: result.children?.map(c => c.path) })
-    }
     return result
   }, [tree, order])
+
+  // Contextual create button: while a document inside a story-preset folder is
+  // open, offer a sibling of the same kind ("New Character" in Characters/…).
+  const storyFolderContext = useMemo(
+    () => getStoryFolderAncestor(activeDoc || currentDoc || ''),
+    [activeDoc, currentDoc]
+  )
 
   useEffect(() => {
     if (!projectName) return
@@ -1065,13 +1079,6 @@ export default function FileTree({
     <div
       className={`file-tree${isDragging ? ' dragging' : ''}`}
       data-view={view}
-      onDragEnter={(e) => {
-        if (DRAG_DEBUG) {
-          console.debug('[FileTree] root dragenter', {
-            target: e.target?.className || e.target?.tagName,
-          })
-        }
-      }}
       onMouseMove={(e) => {
         if (!manualDragRef.current || !manualDragActiveRef.current) return
         updateManualDrag(e.clientX, e.clientY)
@@ -1080,111 +1087,123 @@ export default function FileTree({
         e.preventDefault()
         e.dataTransfer.dropEffect = 'move'
       }}
-      onDragOverCapture={(e) => {
-        if (DRAG_DEBUG) {
-          console.debug('[FileTree] capture dragover', {
-            target: e.target?.className || e.target?.tagName,
-          })
-        }
-      }}
-      onDropCapture={(e) => {
-        if (DRAG_DEBUG) {
-          console.debug('[FileTree] capture drop', {
-            target: e.target?.className || e.target?.tagName,
-          })
-        }
-      }}
       onDrop={(e) => handleDrop(e, null, '')}
     >
       <div className="file-tree-header">
         {view === 'files' ? (
-          <button
-            className="file-tree-back"
-            onClick={() => {
-              setView('projects')
-              onExitProject?.()
-            }}
-            title="Back to projects"
-            aria-label="Back to projects"
-          >
-            <SFIcon name="chevron.left" />
-          </button>
+          <div className="file-tree-actions" ref={createMenuRef}>
+            <button
+              className="file-tree-action"
+              onClick={() => beginNewEntry('file', '')}
+              title="New document"
+              aria-label="New document"
+            >
+              <SFIcon name="doc" />
+            </button>
+            <button
+              className="file-tree-action"
+              onClick={() => beginNewEntry('canvas', '')}
+              title="New canvas"
+              aria-label="New canvas"
+            >
+              <SFIcon name="canvas" />
+            </button>
+            <button
+              className="file-tree-action"
+              onClick={() => beginNewEntry('folder', '')}
+              title="New folder"
+              aria-label="New folder"
+            >
+              <SFIcon name="folder" />
+            </button>
+            <button
+              className="file-tree-action"
+              onClick={() => setIsCreateMenuOpen(open => !open)}
+              title="Other…"
+              aria-label="Other"
+              aria-expanded={isCreateMenuOpen}
+            >
+              <SFIcon name="ellipsis" />
+            </button>
+
+            {storyFolderContext ? (
+              <button
+                className="file-tree-action file-tree-action-smart"
+                onClick={() => beginNewEntry('file', storyFolderContext.path)}
+                title={`New ${storyFolderContext.preset.entryLabel}`}
+                aria-label={`New ${storyFolderContext.preset.entryLabel}`}
+              >
+                <SFIcon name={storyFolderContext.preset.fileIcon} />
+              </button>
+            ) : null}
+
+            {isCreateMenuOpen && (
+              <div className="file-tree-create-menu">
+                {STORY_FOLDER_PRESETS.map(preset => (
+                  <button
+                    key={preset.key}
+                    className="file-tree-create-option"
+                    onClick={() => {
+                      void createStoryFolder(preset.key, '')
+                    }}
+                  >
+                    <SFIcon name={preset.folderIcon} className="file-tree-create-icon" />
+                    <span>{preset.menuLabel}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
-          <span className="file-tree-title">Projects</span>
+          <>
+            <span className="file-tree-title">Projects</span>
+            <button
+              className="file-tree-add"
+              onClick={() => setIsAddingProject(true)}
+              aria-label="New project"
+              title="New project"
+            >
+              <SFIcon name="plus" />
+            </button>
+          </>
         )}
-
-        {view === 'files' ? (
-          <span className="file-tree-title">{projectName}</span>
-        ) : null}
-
-        <div className="file-tree-add-wrap" ref={createMenuRef}>
-          <button
-            className="file-tree-add"
-            onClick={() => {
-              if (view === 'projects') {
-                setIsAddingProject(true)
-                return
-              }
-              setIsCreateMenuOpen(open => !open)
-            }}
-            aria-label={view === 'projects' ? 'New project' : 'Create new'}
-            title={view === 'projects' ? 'New project' : 'Create new'}
-          >
-            <SFIcon name="plus" />
-          </button>
-
-          {view === 'files' && isCreateMenuOpen && (
-            <div className="file-tree-create-menu">
-              <button
-                className="file-tree-create-option"
-                onClick={() => beginNewEntry('file', '')}
-              >
-                <SFIcon name="doc" className="file-tree-create-icon" />
-                <span>New File</span>
-              </button>
-              <button
-                className="file-tree-create-option"
-                onClick={() => beginNewEntry('folder', '')}
-              >
-                <SFIcon name="folder" className="file-tree-create-icon" />
-                <span>New Folder</span>
-              </button>
-              {STORY_FOLDER_PRESETS.map(preset => (
-                <button
-                  key={preset.key}
-                  className="file-tree-create-option"
-                  onClick={() => {
-                    void createStoryFolder(preset.key, '')
-                  }}
-                >
-                  <SFIcon name={preset.folderIcon} className="file-tree-create-icon" />
-                  <span>{preset.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {view === 'projects' && (
         <>
           {isAddingProject && (
-            <div className="new-file-input">
-              <input
-                autoFocus
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleNewProject()
-                  }
-                }}
-                onBlur={() => {
-                  if (!newProjectName.trim()) setIsAddingProject(false)
-                }}
-                placeholder="Project name..."
-              />
+            <div className="new-project-input">
+              <div className="new-file-input">
+                <input
+                  autoFocus
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleNewProject()
+                    } else if (e.key === 'Escape') {
+                      setIsAddingProject(false)
+                      setNewProjectName('')
+                      setNewProjectLocation(null)
+                    }
+                  }}
+                  placeholder="Project name..."
+                />
+              </div>
+              <button
+                type="button"
+                className="new-project-location"
+                onClick={chooseNewProjectLocation}
+                title={newProjectLocation || 'Stored in the app’s default location'}
+              >
+                <SFIcon name="folder" className="new-project-location-icon" />
+                <span className="new-project-location-label">
+                  {newProjectLocation
+                    ? newProjectLocation.split('/').filter(Boolean).pop()
+                    : 'Default location'}
+                </span>
+              </button>
             </div>
           )}
           <div className="file-list">
@@ -1209,23 +1228,7 @@ export default function FileTree({
                   >
                     <SFIcon name="folder" className="file-item-icon" />
                     {isRenamingProject ? (
-                      <input
-                        className="new-file-input"
-                        autoFocus
-                        value={renameValue}
-                        onChange={e => setRenameValue(e.target.value)}
-                        onKeyDown={async e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            await handleRenameConfirm()
-                          } else if (e.key === 'Escape') {
-                            setRenamingEntry(null)
-                            setRenameValue('')
-                          }
-                        }}
-                        onBlur={handleRenameConfirm}
-                        style={{ marginLeft: 4, minWidth: 80 }}
-                      />
+                      renderRenameInput({ marginLeft: 4, minWidth: 80 })
                     ) : (
                       <span className="file-item-label">{project}</span>
                     )}
@@ -1240,42 +1243,15 @@ export default function FileTree({
       {view === 'files' && (
         <>
           <MotionDiv className="file-list" layout>
-            {isAddingEntry && newEntryParent === '' && (
-              <div className="new-file-input">
-                <input
-                  autoFocus
-                  value={newEntryName}
-                  onChange={(e) => setNewEntryName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      confirmNewEntry()
-                    }
-                  }}
-                  onBlur={() => {
-                    if (!newEntryName.trim()) setIsAddingEntry(false)
-                  }}
-                  placeholder={newEntryType === 'folder' ? 'Folder name...' : 'File name...'}
-                />
-              </div>
-            )}
+            {isAddingEntry && newEntryParent === '' && renderNewEntryInput()}
             {(orderedRoot.children || []).length === 0 ? (
               <div className="file-tree-empty">No files yet.</div>
             ) : (
               <AnimatePresence initial={false}>
                 {(orderedRoot.children || []).map(child => renderNode(child, 0, orderedRoot.children || []))}
-                {dragInsert && dragInsert.parentPath === '' && dragInsert.index === (orderedRoot.children || []).length ? (
-                  <MotionDiv
-                    className="file-drop-slot"
-                    style={{ marginLeft: '10px' }}
-                    initial={prefersReducedMotion ? false : { height: 0, opacity: 0, scaleY: 0.5 }}
-                    animate={prefersReducedMotion ? undefined : { height: DRAG_SLOT_HEIGHT, opacity: 1, scaleY: 1 }}
-                    exit={prefersReducedMotion ? undefined : { height: 0, opacity: 0, scaleY: 0.5 }}
-                    transition={{ duration: 0.18, ease: 'easeOut' }}
-                  >
-                    <div className="file-drop-slot-inner" />
-                  </MotionDiv>
-                ) : null}
+                {dragInsert && dragInsert.parentPath === '' && dragInsert.index === (orderedRoot.children || []).length
+                  ? renderDropSlot(TREE_ROOT_INDENT)
+                  : null}
               </AnimatePresence>
             )}
           </MotionDiv>
@@ -1283,45 +1259,27 @@ export default function FileTree({
       )}
 
       <AnimatePresence>
-        {entryMenu ? (
-          <MotionDiv
-            ref={entryMenuRef}
-            className="file-entry-floating-menu"
-            style={{
-              left: `${entryMenu.left}px`,
-              top: `${entryMenu.top}px`,
-            }}
-            initial={prefersReducedMotion ? false : { opacity: 0, x: -4, y: '-50%', scale: 0.96 }}
-            animate={prefersReducedMotion ? undefined : { opacity: 1, x: 0, y: '-50%', scale: 1 }}
-            exit={prefersReducedMotion ? undefined : { opacity: 0, x: -4, y: '-50%', scale: 0.96 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
-          >
-            <div className="file-entry-floating-title">
-              {entryMenu.type === 'folder' ? 'Folder' : 'Document'}
-            </div>
-            <div className="file-entry-floating-name">{entryMenu.name}</div>
-            <div className="file-entry-floating-placeholder">Options coming soon</div>
-          </MotionDiv>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
         {dragPreview ? (
           <MotionDiv
             className="file-tree-drag-ghost"
-            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.94, rotate: -3 }}
-            animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1, rotate: -2 }}
-            exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.94, rotate: -4 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.94 }}
+            animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1 }}
+            exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.94 }}
+            // The ghost hangs off the pointer rather than sitting away from it: the
+            // cursor rides just inside its leading edge, level with its middle.
+            // (Offset in px, not a transform — framer owns this element's transform.)
             style={{
-              left: dragPreview.x + 14,
-              top: dragPreview.y + 12,
+              left: dragPreview.x - 10,
+              top: dragPreview.y - 18,
             }}
           >
-            <SFIcon
-              name={dragPreview.iconName}
-              filled={dragPreview.iconFilled}
-              className="file-item-icon"
-            />
+            {dragPreview.iconName ? (
+              <SFIcon
+                name={dragPreview.iconName}
+                filled={dragPreview.iconFilled}
+                className="file-item-icon"
+              />
+            ) : null}
             <span className="file-tree-drag-ghost-label">{dragPreview.name}</span>
           </MotionDiv>
         ) : null}
