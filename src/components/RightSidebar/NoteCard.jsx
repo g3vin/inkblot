@@ -1,8 +1,16 @@
+/**
+ * NoteCard.jsx — a single note in the NotesPanel tree.
+ *
+ * Shows the quote anchor (for anchored notes), an auto-resizing textarea for
+ * the note body, attached images, and per-note actions (collapse branch,
+ * recolor, pin, delete). Pasting images into the textarea attaches them.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import SFIcon from '../SFIcon'
 import NoteImageGallery from '../NoteImageGallery'
-import { readClipboardImages } from '../noteImageUtils'
+import { AudioClipList, AudioRecordButton } from '../AudioNotes'
+import { pickNoteImages, readClipboardImages } from '../../lib/noteImageUtils'
 
 export default function NoteCard({
   note,
@@ -15,12 +23,15 @@ export default function NoteCard({
   onStopEditing,
   onAddImages,
   onRemoveImage,
+  onChangeAudio,
+  projectName,
   hasChildren = false,
   depth = 0,
 }) {
   const textareaRef = useRef(null)
   const [editing, setEditing] = useState(false)
 
+  // Grow the textarea to fit its content; when not editing, cap at the CSS max-height.
   const resizeTextarea = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
@@ -145,8 +156,55 @@ export default function NoteCard({
         onRemoveImage={onRemoveImage}
       />
 
+      {/* The clips stay visible whether or not the note is being edited — a memo has
+          to be playable without first clicking into the note to edit it. Only the
+          controls that CREATE something are tucked away in the footer. */}
+      <AudioClipList
+        audio={note.audio}
+        projectName={projectName}
+        onChange={onChangeAudio}
+      />
+
       <div className="note-footer">
         <div className="note-color-chip" />
+
+        {/*
+          Attach controls live between the colour chip and the timestamp, and only
+          while the note is being edited: a wall of buttons on every note in a long
+          list is noise, and these are only useful once you are actually writing.
+
+          `editing` is cleared by the textarea's blur — so the controls must keep the
+          focus, or clicking one would dismiss the very row it lives in before the
+          click landed. onMouseDown/preventDefault is what stops that.
+        */}
+        {editing ? (
+          <div
+            className="note-attach-actions"
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            <AudioRecordButton
+              audio={note.audio}
+              projectName={projectName}
+              onChange={onChangeAudio}
+              iconOnly
+            />
+
+            <button
+              type="button"
+              className="note-attach-btn"
+              onClick={async (event) => {
+                event.stopPropagation()
+                const images = await pickNoteImages()
+                if (images.length) onAddImages?.(images)
+              }}
+              aria-label="Add image"
+              title="Add image"
+            >
+              <SFIcon name="photo" size={12} />
+            </button>
+          </div>
+        ) : null}
+
         <div className="note-timestamp">
           {note.timestamp}
         </div>

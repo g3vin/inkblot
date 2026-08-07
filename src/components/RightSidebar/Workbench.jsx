@@ -1,31 +1,42 @@
-import SFIcon from '../SFIcon'
-import POSTile from '../POSTile.jsx'
-import SynonymTile from '../SynonymTile.jsx'
-import DefinitionTile from '../DefinitionTile.jsx'
-import RhymeTile from '../RhymeTile.jsx'
+/**
+ * Workbench.jsx — the Workbench tab of the right sidebar.
+ *
+ * Renders the language-tool tiles (part-of-speech, synonyms, definition,
+ * rhymes) created from the editor context menu. Tiles remember the text
+ * range they were created from so replacements land back in the document.
+ */
+import POSTile from '../tiles/POSTile.jsx'
+import SynonymTile from '../tiles/SynonymTile.jsx'
+import DefinitionTile from '../tiles/DefinitionTile.jsx'
+import RhymeTile from '../tiles/RhymeTile.jsx'
 
 export default function Workbench({
   tiles,
   setTiles,
   editor,
   secondaryEditor,
-  currentDoc,
   secondaryDoc,
-  activeDoc,
+  query = '',
 }) {
   const removeTile = id => setTiles(prev => prev.filter(t => t.id !== id))
+  const normalizedQuery = query.trim().toLowerCase()
+  const visibleTiles = normalizedQuery
+    ? tiles.filter((tile) => (
+        `${tile.type || ''} ${tile.text || ''} ${tile.anchor || ''} ${tile.doc || ''}`
+          .toLowerCase()
+          .includes(normalizedQuery)
+      ))
+    : tiles
 
+  // Tiles created from the secondary pane target that pane's editor; everything
+  // else goes to the primary editor.
   const getEditorForTile = (tile) => {
-    if (!tile?.doc) return editor
-    if (tile.doc === secondaryDoc) return secondaryEditor || editor
-    if (tile.doc === currentDoc) return editor
-    if (tile.doc === activeDoc) {
-      if (tile.doc === secondaryDoc) return secondaryEditor || editor
-      return editor
-    }
+    if (tile?.doc && tile.doc === secondaryDoc) return secondaryEditor || editor
     return editor
   }
 
+  // Locate the tile's source text: trust its stored from/to range if that text
+  // still exists, otherwise search the document for the anchor string.
   const findAnchorRange = (targetEditor, tile) => {
     if (!targetEditor || !tile) return null
 
@@ -65,6 +76,7 @@ export default function Workbench({
       .run()
   }
 
+  // Replace the tile's word in the document and retarget the tile to the new text.
   const replaceWord = (tile, newWord) => {
     const targetEditor = getEditorForTile(tile)
     if (!targetEditor) return
@@ -89,19 +101,18 @@ export default function Workbench({
 
   return (
     <div className="sidebar-panel workbench-panel">
-      <div className="panel-header workbench-header">
-        <div className="panel-header-title">
-          <SFIcon name="hammer" />
-          <span className="panel-header-label">Workbench</span>
-        </div>
-        {tiles.length > 0 && (
+      {tiles.length > 0 && (
+        <div className="panel-header panel-header-actions-only workbench-header">
           <button className="panel-action-btn" onClick={() => setTiles([])}>
             Clear All
           </button>
-        )}
-      </div>
+        </div>
+      )}
       <div className="sidebar-list workbench-list">
-        {tiles.map(tile => {
+        {visibleTiles.length === 0 && tiles.length > 0 ? (
+          <div className="notes-empty">No matching workbench items.</div>
+        ) : null}
+        {visibleTiles.map(tile => {
           switch (tile.type) {
             case 'synonym':
               return (

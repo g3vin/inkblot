@@ -1,3 +1,14 @@
+/**
+ * noteUtils.js — note data model.
+ *
+ * Notes come in two types: 'quote' notes anchored to a text range in a
+ * document (from/to/anchor) and 'free' notes with no anchor. Notes can nest
+ * via parentNoteId, carry attached images and voice memos, and remember their
+ * hover-preview layout/size. Everything entering app state should pass through
+ * normalizeNote(s) so downstream code can rely on the shape.
+ */
+import { normalizeNoteAudio } from './audioNotes'
+
 export const DEFAULT_NOTE_COLOR = '#ffd54f'
 
 export const NOTE_COLOR_OPTIONS = [
@@ -18,6 +29,7 @@ export const NOTE_FILTER_OPTIONS = [
 
 const nowIso = () => new Date().toISOString()
 
+/** Format a note timestamp as a short local time (e.g. "5:32 PM"). */
 export const formatNoteTimestamp = (value) => {
   if (!value) return ''
   const parsed = new Date(value)
@@ -86,6 +98,7 @@ const normalizeNoteImages = (images = []) => (
     : []
 )
 
+/** Fill in defaults/coerce every note field; safe to call on untrusted or legacy data. */
 export const normalizeNote = (note = {}) => {
   const fallbackDate = nowIso()
   const createdAt = normalizeDate(note.createdAt, normalizeDate(note.updatedAt, fallbackDate))
@@ -106,6 +119,9 @@ export const normalizeNote = (note = {}) => {
     previewLayout: normalizePreviewLayout(note.previewLayout),
     previewSize: normalizePreviewSize(note.previewSize),
     images: normalizeNoteImages(note.images),
+    // Voice memos. Unlike images (base64 in the note), these are asset paths — see
+    // audioNotes.js for why.
+    audio: normalizeNoteAudio(note.audio),
     createdAt,
     updatedAt,
     timestamp: formatNoteTimestamp(updatedAt),
@@ -150,6 +166,7 @@ export const createQuoteNote = ({
   })
 }
 
+/** Apply changes to a note and bump its updatedAt. */
 export const touchNote = (note, changes = {}) => (
   normalizeNote({
     ...note,
@@ -158,6 +175,7 @@ export const touchNote = (note, changes = {}) => (
   })
 )
 
+/** Collect a note's id plus all descendant note ids (children via parentNoteId). */
 export const collectNoteBranchIds = (notes = [], rootId) => {
   if (!rootId) return []
 
@@ -190,6 +208,7 @@ const compareDatesDesc = (a, b) => {
   return bTime - aTime
 }
 
+/** Sort order for the notes panel: pinned first, then anchored notes by position, then free notes by recency. */
 export const compareNotes = (a, b) => {
   if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
 

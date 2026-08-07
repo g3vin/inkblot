@@ -1,7 +1,16 @@
+/**
+ * LeftSidebar.jsx — collapsible left panel hosting the FileTree.
+ *
+ * Pin/peek behavior is driven by useResizableSidebar (via EditorLayout);
+ * this component adds the pin button, project title, resize handle, and a
+ * Cmd+S shortcut that pins/unpins the sidebar while hovering it.
+ */
 import { useCallback, useEffect, useRef } from 'react'
 import FileTree from './FileTree'
 import SFIcon from './SFIcon'
 
+// When unpinned, the sidebar peeks open only while the pointer is within this
+// distance of the window's left edge.
 const EDGE_REVEAL_ZONE_PX = 12
 
 export default function LeftSidebar({
@@ -45,6 +54,8 @@ export default function LeftSidebar({
     lastPointerXRef.current = event.clientX
   }, [])
 
+  // Cmd+S while hovering the sidebar toggles its pinned state (collapses first
+  // if it's pinned and the pointer isn't in the edge-reveal zone).
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (!hoveredRef.current) return
@@ -84,6 +95,11 @@ export default function LeftSidebar({
         >
           <SFIcon name="pin" filled={pinned} />
         </button>
+        {projectName ? (
+          <span className="panel-header-label left-sidebar-project-title" title={projectName}>
+            {projectName}
+          </span>
+        ) : null}
       </div>
       <div className="sidebar-content">
         <FileTree
@@ -94,11 +110,6 @@ export default function LeftSidebar({
           activeDoc={activeDoc}
           onSelectProject={(nextProject) => {
             setProjectName?.(nextProject)
-          }}
-          onExitProject={() => {
-            setProjectName?.('')
-            setCurrentDoc('')
-            setActiveDoc?.('')
           }}
           registerRefreshFiles={registerRefreshFiles}
           onSelectDoc={doc => {

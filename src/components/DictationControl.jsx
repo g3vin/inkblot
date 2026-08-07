@@ -1,3 +1,12 @@
+/**
+ * DictationControl.jsx — toolbar button + popover for voice dictation.
+ *
+ * Talks to the Rust whisper.cpp backend through lib/dictation: loads the
+ * model on first use, streams partial transcripts into the editor as a
+ * draft range (styled by the DictationInline extension), and commits text
+ * on final transcripts, filtering out non-speech tags like [silence].
+ * Includes a live mic level-meter driven by dictation://level events.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
 import SFIcon from './SFIcon'
@@ -7,12 +16,12 @@ import {
   setupDictationListeners,
   startDictation,
   stopDictation,
-} from './dictation'
+} from '../lib/dictation'
 import {
   clearDictationInlineRange,
   getDictationInlineState,
   setDictationInlineRange,
-} from './extensions/DictationInline'
+} from '../extensions/DictationInline'
 
 const FINALIZE_DECORATION_MS = 520
 const RECENT_FINAL_SUPPRESS_MS = 2600

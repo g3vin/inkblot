@@ -1,13 +1,27 @@
+/**
+ * RightSidebar.jsx — right panel with Search / Clipboard / Workbench /
+ * Notes / History tabs.
+ *
+ * Tabs can be switched by clicking or by horizontal trackpad swipe. Most of
+ * this file is the swipe-gesture engine: it distinguishes slow drags (panels
+ * track the finger, snapping at a 25% threshold) from quick flicks (advance
+ * exactly one tab), while filtering out vertical scrolling and macOS wheel
+ * momentum events so tabs don't keep sliding after the fingers lift.
+ * The SWIPE_* constants below are its tuning knobs.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useReducedMotion } from 'framer-motion'
 import SidebarTabs from './SidebarTabs'
-import { RIGHT_SIDEBAR_TABS } from './sidebarTabsConfig'
+import { getRightSidebarTabs } from './sidebarTabsConfig'
 import Workbench from './Workbench'
 import NotesPanel from '../NotesPanel'
 import HistoryPanel from './HistoryPanel'
-import SearchPanel from './SearchPanel'
+import SidebarSearch from './SidebarSearch'
 import ClipboardPanel from './ClipboardPanel'
 import SFIcon from '../SFIcon'
+import { isFilterScope } from '../../lib/sidebarSearch'
+import { HAPTIC_ALIGNMENT, HAPTIC_LEVEL, performHaptic } from '../../lib/haptics'
 
 const SWIPE_PIXELS_PER_TAB = 220
 const SWIPE_INTENT_THRESHOLD_PX = 1.5
@@ -37,8 +51,14 @@ const SWIPE_FLICK_REARM_DECAYED_DELTA_PX = 18
 const SWIPE_FLICK_REARM_GROWTH = 1.85
 const SWIPE_FLICK_REARM_GROWTH_DELTA_PX = 14
 const EDGE_REVEAL_ZONE_PX = 12
+/** Must match .search-overlay-card's width in Editor.css — the fly-in scales against it. */
+const SEARCH_OVERLAY_WIDTH = 640
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+// WebKit exposes wheel gesture phase as a bitmask on wheel events
+// (webkitPhase / webkitMomentumPhase); used to tell live finger input
+// from post-release momentum.
 const WHEEL_PHASE_BEGAN = 1
 const WHEEL_PHASE_STATIONARY = 2
 const WHEEL_PHASE_CHANGED = 4
@@ -59,6 +79,7 @@ const hasEndedWheelPhase = (phase) => (
   hasWheelPhase(phase, WHEEL_PHASE_CANCELLED)
 )
 
+/** Snap a fractional tab position to an index once 25% of the next tab is revealed. */
 const getThresholdSnapIndex = (rawIndex, direction) => {
   if (direction > 0) {
     const baseIndex = Math.floor(rawIndex)
@@ -101,15 +122,28 @@ export default function RightSidebar({
   editor,
   setVersions,
   clipboardHistory,
-  clearClipboardHistory,
   onDropToClipboard,
   projectName,
   jumpToText,
   onOpenSearchTarget,
+  refreshFiles,
+  onOpenDocInTab,
+  onOpenCompare,
 }) {
   const prefersReducedMotion = useReducedMotion()
-  const tabIds = useMemo(() => RIGHT_SIDEBAR_TABS.map(({ id }) => id), [])
+  const tabs = useMemo(() => getRightSidebarTabs(activeDoc), [activeDoc])
+  const tabIds = useMemo(() => tabs.map(({ id }) => id), [tabs])
   const activeTabIndex = Math.max(0, tabIds.indexOf(sidebarTab))
+
+  // If the strip ever changes shape again, never leave the sidebar on a tab that
+  // no longer exists — no panel active, and the strip pointing at nothing.
+  useEffect(() => {
+    if (!tabIds.includes(sidebarTab)) setSidebarTab(tabIds[0])
+  }, [sidebarTab, setSidebarTab, tabIds])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchScope, setSearchScope] = useState('panel')
+  const [searchOverlay, setSearchOverlay] = useState(null)
+  const searchAnchorRef = useRef(null)
   const [visualTabProgress, setVisualTabProgress] = useState(activeTabIndex)
   const [gestureActive, setGestureActive] = useState(false)
   const settleTimerRef = useRef(null)
@@ -131,6 +165,59 @@ export default function RightSidebar({
   const lastWheelEventAtRef = useRef(0)
   const hoveredRef = useRef(false)
   const lastPointerXRef = useRef(null)
+  // Which panel the swipe was last felt over, so a crossing taps exactly once.
+  const hapticIndexRef = useRef(activeTabIndex)
+
+  /**
+   * Open the centered search.
+   *
+   * When the sidebar is on screen the overlay grows out of the search bar's real
+   * position, so it reads as the same bar moving rather than a new thing
+   * appearing. With the sidebar collapsed there is nothing to fly from, so it
+   * simply pops in the middle.
+   *
+   * The scope goes to 'All documents': `panel` means "filter the panel below
+   * me", which is meaningless for a box floating in the middle of the screen.
+   */
+  const openSearchOverlay = useCallback(() => {
+    const onScreen = !collapsed || peeked
+    const rect = onScreen ? searchAnchorRef.current?.getBoundingClientRect() : null
+
+    /*
+     * The overlay centers in the gap between the two sidebars' inner edges —
+     * or a window edge where a sidebar is collapsed. Measured from the DOM at
+     * open time: this component only knows its own collapsed state, not the
+     * left sidebar's, and both are always mounted (collapsed means width 0).
+     */
+    const leftRect = document.querySelector('.main-layout > .left-sidebar')?.getBoundingClientRect()
+    const rightRect = document.querySelector('.main-layout > .right-sidebar')?.getBoundingClientRect()
+    const leftEdge = leftRect && leftRect.width > 1 ? leftRect.right : 0
+    const rightEdge = rightRect && rightRect.width > 1 ? rightRect.left : window.innerWidth
+
+    setSearchScope((current) => (current === 'panel' ? 'project' : current))
+    setSearchOverlay({
+      centerX: (leftEdge + rightEdge) / 2,
+      zoneWidth: Math.max(rightEdge - leftEdge, 320),
+      origin: rect && rect.width > 0
+        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width }
+        : null,
+    })
+  }, [collapsed, peeked])
+
+  const closeSearchOverlay = useCallback(() => setSearchOverlay(null), [])
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return
+      event.preventDefault()
+
+      if (searchOverlay) closeSearchOverlay()
+      else openSearchOverlay()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [closeSearchOverlay, openSearchOverlay, searchOverlay])
 
   const clearSettleTimer = useCallback(() => {
     if (settleTimerRef.current) {
@@ -213,6 +300,8 @@ export default function RightSidebar({
     clearVerticalScrollLockTimer()
   }, [clearDragMomentumLockTimer, clearSettleTimer, clearVerticalScrollLockTimer, clearWheelGestureEndTimer])
 
+  // End the current gesture: pick the final tab (flicks move exactly one tab,
+  // drags snap by threshold), reset gesture state, and commit the tab change.
   const finalizeGesture = useCallback((rawIndex = visualTabProgressRef.current) => {
     clearSettleTimer()
 
@@ -235,11 +324,16 @@ export default function RightSidebar({
     nextIndex = clamp(nextIndex, minGestureIndex, maxGestureIndex)
     const nextTab = tabIds[nextIndex]
 
+    // Landing. Only ever reached from the swipe engine — selecting a tab by
+    // click goes through handleSelectTab and stays silent, as asked.
+    if (gestureTotalDeltaRef.current !== 0) performHaptic(HAPTIC_LEVEL)
+
     visualTabProgressRef.current = nextIndex
     gestureOriginIndexRef.current = nextIndex
     gestureTotalDeltaRef.current = 0
     gestureModeRef.current = 'idle'
     gestureStartedAtRef.current = 0
+    hapticIndexRef.current = nextIndex
     setGestureActive(false)
     setVisualTabProgress(nextIndex)
 
@@ -260,6 +354,9 @@ export default function RightSidebar({
     gestureTotalDeltaRef.current = 0
     gestureModeRef.current = 'idle'
     gestureStartedAtRef.current = 0
+    // Silent (a click is not a swipe), but the crossing tracker still has to
+    // follow along, or the next swipe would tick for a panel it never crossed.
+    hapticIndexRef.current = nextIndex
     wheelFlickCommittedRef.current = false
     wheelFlickCommittedAtRef.current = 0
     wheelFlickDirectionRef.current = 0
@@ -289,6 +386,7 @@ export default function RightSidebar({
     lastPointerXRef.current = event.clientX
   }, [])
 
+  // Cmd+S while hovering the sidebar toggles its pinned state (mirrors LeftSidebar).
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (!hoveredRef.current) return
@@ -311,6 +409,9 @@ export default function RightSidebar({
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [isPointerInRevealZone, onAutoCollapse, pinned, togglePin])
 
+  // The swipe engine. Classifies each wheel event (fresh horizontal intent,
+  // vertical scroll, momentum tail, flick re-arm) and drives the gesture state
+  // machine: idle → undecided → hold (drag) or flick → finalize.
   const handleSidebarWheel = useCallback((event) => {
     const nativeEvent = event.nativeEvent || event
     const eventTime = Number.isFinite(event.timeStamp) ? event.timeStamp : performance.now()
@@ -511,6 +612,14 @@ export default function RightSidebar({
     visualTabProgressRef.current = nextProgress
     setVisualTabProgress(nextProgress)
 
+    // Crossing. A light tick each time the drag passes over another panel, which
+    // is the moment the panel under the finger changes.
+    const crossedIndex = clamp(Math.round(nextProgress), 0, tabIds.length - 1)
+    if (crossedIndex !== hapticIndexRef.current) {
+      hapticIndexRef.current = crossedIndex
+      performHaptic(HAPTIC_ALIGNMENT)
+    }
+
     if (isWheelPhaseEnded && gestureModeRef.current !== 'flick') {
       finalizeGesture(nextProgress)
       scheduleDragMomentumUnlock()
@@ -527,36 +636,98 @@ export default function RightSidebar({
   }, [clearDragMomentumLockTimer, clearSettleTimer, clearVerticalScrollLockTimer, clearWheelGestureEndTimer, finalizeGesture, scheduleDragMomentumUnlock, scheduleVerticalScrollUnlock, scheduleWheelGestureEnd, tabIds.length])
 
   const panelTrackStyle = {
-    width: `${RIGHT_SIDEBAR_TABS.length * 100}%`,
-    transform: `translateX(-${visualTabProgress * (100 / RIGHT_SIDEBAR_TABS.length)}%)`,
+    '--sidebar-pane-count': tabs.length,
+    width: `${tabs.length * 100}%`,
+    transform: `translateX(-${visualTabProgress * (100 / tabs.length)}%)`,
     transition: gestureActive || prefersReducedMotion
       ? 'none'
       : `transform ${SWIPE_SNAP_DURATION_MS}ms ${SWIPE_SNAP_EASING}`,
   }
 
-  const renderPanel = (tabId) => {
-    if (tabId === 'search') {
-      return (
-        <SearchPanel
-          activeEditor={activeEditor}
-          editor={editor}
-          secondaryEditor={secondaryEditor}
-          currentDoc={currentDoc}
-          secondaryDoc={secondaryDoc}
-          activeDoc={activeDoc}
-          notesByDoc={notesByDoc}
-          projectName={projectName}
-          jumpToText={jumpToText}
-          onOpenSearchTarget={onOpenSearchTarget}
-        />
-      )
-    }
+  // Only mount the active panel — plus the neighbors while swiping, so
+  // partially revealed panels have content.
+  const renderedPanelIds = useMemo(() => {
+    const ids = new Set([sidebarTab])
+    if (!gestureActive) return ids
 
+    const visualIndex = clamp(Math.round(visualTabProgress), 0, tabIds.length - 1)
+    ;[
+      activeTabIndex,
+      visualIndex - 1,
+      visualIndex,
+      visualIndex + 1,
+    ].forEach((index) => {
+      const id = tabIds[index]
+      if (id) ids.add(id)
+    })
+
+    return ids
+  }, [activeTabIndex, gestureActive, sidebarTab, tabIds, visualTabProgress])
+
+  // Panels only filter while the bar is in its `panel` scope. Once it is
+  // searching a document, notes, or files, the list underneath must be left
+  // alone — otherwise a document search would also empty out the panel behind it.
+  const panelQuery = isFilterScope(searchScope) ? searchQuery : ''
+
+  // One search, two places it can be drawn. Both copies share this state, so the
+  // overlay opens on whatever you had already typed.
+  const searchProps = {
+    query: searchQuery,
+    setQuery: setSearchQuery,
+    scope: searchScope,
+    setScope: setSearchScope,
+    tab: sidebarTab,
+    activeEditor,
+    editor,
+    secondaryEditor,
+    currentDoc,
+    secondaryDoc,
+    activeDoc,
+    notesByDoc,
+    projectName,
+    onOpenSearchTarget,
+  }
+
+  const searchOverlayNode = searchOverlay ? createPortal(
+    <div
+      className="search-overlay"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) closeSearchOverlay()
+      }}
+    >
+      <div
+        className={`search-overlay-card${searchOverlay.origin ? ' is-flying' : ''}`}
+        style={{
+          '--search-center-x': `${searchOverlay.centerX}px`,
+          '--search-zone-width': `${searchOverlay.zoneWidth}px`,
+          ...(searchOverlay.origin ? {
+            // The fly-in lands on the zone's center, so it starts offset from THAT.
+            '--search-fly-dx': `${searchOverlay.origin.x - searchOverlay.centerX}px`,
+            '--search-fly-dy': `${searchOverlay.origin.y - window.innerHeight / 2}px`,
+            '--search-fly-scale': searchOverlay.origin.width / SEARCH_OVERLAY_WIDTH,
+          } : null),
+        }}
+      >
+        <SidebarSearch
+          {...searchProps}
+          variant="overlay"
+          onCloseOverlay={closeSearchOverlay}
+          onOpenSearchTarget={(target) => {
+            closeSearchOverlay()
+            onOpenSearchTarget?.(target)
+          }}
+        />
+      </div>
+    </div>,
+    document.body,
+  ) : null
+
+  const renderPanel = (tabId) => {
     if (tabId === 'clipboard') {
       return (
         <ClipboardPanel
           entries={clipboardHistory}
-          onClear={clearClipboardHistory}
+          query={panelQuery}
           onDropToClipboard={onDropToClipboard}
         />
       )
@@ -569,9 +740,8 @@ export default function RightSidebar({
           setTiles={setTiles}
           editor={editor}
           secondaryEditor={secondaryEditor}
-          currentDoc={currentDoc}
           secondaryDoc={secondaryDoc}
-          activeDoc={activeDoc}
+          query={panelQuery}
         />
       )
     }
@@ -581,6 +751,9 @@ export default function RightSidebar({
         <NotesPanel
           notes={notes}
           setNotes={setNotes}
+          docName={activeDoc}
+          projectName={projectName}
+          query={panelQuery}
           jumpToText={jumpToText}
           clearActiveNoteHighlight={clearActiveNoteHighlight}
         />
@@ -591,9 +764,14 @@ export default function RightSidebar({
       <HistoryPanel
         versions={versions?.[activeDoc] || []}
         setVersions={setVersions}
-        editor={editor}
+        // The history acts on the ACTIVE document, which may live in either pane.
+        editor={activeDoc === secondaryDoc && activeDoc !== currentDoc ? secondaryEditor : editor}
         projectName={projectName}
         docName={activeDoc}
+        query={panelQuery}
+        refreshFiles={refreshFiles}
+        onOpenDocInTab={onOpenDocInTab}
+        onOpenCompare={onOpenCompare}
       />
     )
   }
@@ -610,6 +788,23 @@ export default function RightSidebar({
       <div className="resizer resizer-left" onMouseDown={onResize} />
 
       <div className="sidebar-topbar">
+        <div className="right-sidebar-global-title" aria-hidden="true">
+          <div
+            className="right-sidebar-global-title-track"
+            style={{
+              '--right-sidebar-title-progress': visualTabProgress,
+              transition: gestureActive || prefersReducedMotion
+                ? 'none'
+                : `transform ${SWIPE_SNAP_DURATION_MS}ms ${SWIPE_SNAP_EASING}`,
+            }}
+          >
+            {tabs.map(({ id, label }) => (
+              <span key={id} className="panel-header-label right-sidebar-global-title-label">
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
         <button
           className={`sidebar-pin${pinned ? ' active' : ''}`}
           onClick={togglePin}
@@ -621,6 +816,7 @@ export default function RightSidebar({
       </div>
 
       <SidebarTabs
+        tabs={tabs}
         tab={sidebarTab}
         setTab={handleSelectTab}
         visualProgress={visualTabProgress}
@@ -628,23 +824,39 @@ export default function RightSidebar({
         reducedMotion={prefersReducedMotion}
       />
 
+      {/* While the overlay is up it IS this bar, so the copy here would be a
+          duplicate. It is hidden rather than unmounted: the header keeps its box,
+          so the panels below do not jump as the overlay opens and closes. */}
+      <div
+        className={`right-sidebar-global-header${searchOverlay ? ' is-search-detached' : ''}`}
+        ref={searchAnchorRef}
+      >
+        <SidebarSearch
+          {...searchProps}
+          active={!searchOverlay}
+          onOpenOverlay={openSearchOverlay}
+        />
+      </div>
+
       <div className="sidebar-content">
         <div className={`sidebar-panels-viewport${gestureActive ? ' is-gesture-active' : ''}`}>
           <div className="sidebar-panels-track" style={panelTrackStyle}>
-            {RIGHT_SIDEBAR_TABS.map(({ id }) => (
+            {tabs.map(({ id }) => (
               <section
                 key={id}
                 className={`sidebar-panel-pane${sidebarTab === id ? ' is-active' : ''}`}
                 aria-hidden={sidebarTab !== id}
               >
                 <div className="sidebar-panel-page">
-                  {renderPanel(id)}
+                  {renderedPanelIds.has(id) ? renderPanel(id) : null}
                 </div>
               </section>
             ))}
           </div>
         </div>
       </div>
+
+      {searchOverlayNode}
     </aside>
   )
 }

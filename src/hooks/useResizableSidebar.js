@@ -1,4 +1,18 @@
+/**
+ * useResizableSidebar.js — width/visibility state machine for the two
+ * sidebars.
+ *
+ * States: pinned (always visible), collapsed (width 0), and peeked
+ * (temporarily revealed while unpinned — triggered by hovering the window
+ * edge). Dragging the resizer adjusts width within [min, max]; dragging
+ * past the collapse threshold collapses the sidebar. The sidebar component
+ * itself decides when a peek ends (see onAutoCollapse usage).
+ */
 import { useState, useCallback, useEffect, useRef } from 'react'
+
+// Matches --sidebar-floating-offset: the gap between the window edge and the
+// sidebar shell, which sits between the cursor and the width being dragged.
+const FLOATING_OFFSET = 8
 
 export function useResizableSidebar(initial, min, max, side = 'left') {
   const [width, setWidth] = useState(initial)
@@ -58,8 +72,8 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
       lastClientXRef.current = e.clientX
       const value =
         side === 'left'
-          ? e.clientX
-          : window.innerWidth - e.clientX
+          ? e.clientX - FLOATING_OFFSET
+          : window.innerWidth - e.clientX - FLOATING_OFFSET
       const collapseThreshold = 40
 
       if (value <= collapseThreshold) {
@@ -114,6 +128,7 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
     }
   }, [onMouseMove, resizing, side, width, collapse])
 
+  // Hovering within 4px of the window edge peeks a collapsed, unpinned sidebar open.
   useEffect(() => {
     const onEdgeHover = (e) => {
       if (pinned || !collapsed || draggingRef.current) return

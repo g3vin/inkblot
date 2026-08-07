@@ -1,3 +1,10 @@
+/**
+ * ReadAloudHighlight.js — decoration-based highlight for the word currently
+ * being spoken by read-aloud. The highlight is a ProseMirror decoration (not
+ * a mark), so it never touches document content or undo history. The
+ * setEditorHighlight/clear helpers at the bottom are the API used by
+ * ReadAloudControl.
+ */
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'

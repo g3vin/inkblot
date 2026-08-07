@@ -1,3 +1,12 @@
+/**
+ * pinterestScrape.js — scrapes pins from Pinterest boards the user can see.
+ *
+ * Used for boards the public widget API can't serve (private boards and
+ * board sections). Opens a hidden webview that shares the logged-in
+ * Pinterest session, injects a scraping script that scrolls the board and
+ * collects pin images/links, and relays results back over Tauri events.
+ * PinterestBoard.js consumes this via dynamic import.
+ */
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
 

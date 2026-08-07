@@ -1,3 +1,9 @@
+/**
+ * dictation.js — thin JS wrapper over the Rust dictation backend
+ * (whisper.cpp). Exposes the model-load/start/stop/cancel commands and a
+ * helper that subscribes to all `dictation://*` events (partial/final
+ * transcripts, mic level, lifecycle) and returns one unsubscribe function.
+ */
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 

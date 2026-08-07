@@ -1,0 +1,133 @@
+/**
+ * editorExtensions.js — the TipTap extension sets used across the app.
+ *
+ * Extracted from EditorCanvas so canvas cards can share one definition of "what
+ * a document can contain" with the main panes. Keeping them in one place means
+ * a Toolbar button can't work in a pane and throw in a card.
+ */
+import { StarterKit } from '@tiptap/starter-kit'
+import { Color } from '@tiptap/extension-color'
+import { Dropcursor } from '@tiptap/extension-dropcursor'
+import { FontFamily } from '@tiptap/extension-font-family'
+import { TextAlign } from '@tiptap/extension-text-align'
+import { Highlight } from '@tiptap/extension-highlight'
+import { Table } from '@tiptap/extension-table'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { TableRow } from '@tiptap/extension-table-row'
+import { getSchema } from '@tiptap/core'
+
+import { CustomTextStyle } from '../extensions/CustomTextStyle'
+import ConversationTile from '../extensions/ConversationTile'
+import { DictationInline } from '../extensions/DictationInline'
+import { NoteAnnotation } from '../extensions/NoteAnnotation'
+import PinterestBoard from '../extensions/PinterestBoard'
+import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
+import ResizableImage from '../extensions/ResizableImage'
+import TabIndent from '../extensions/TabIndent'
+
+/**
+ * Everything both panes and cards understand.
+ *
+ * No Underline here: StarterKit v3 already provides it, and adding
+ * @tiptap/extension-underline on top registered the mark twice — TipTap warns
+ * "Duplicate extension names found: ['underline']" and the second definition
+ * silently wins.
+ */
+const sharedExtensions = () => [
+  CustomTextStyle,
+  Color,
+  FontFamily,
+  ReadAloudHighlight,
+  DictationInline,
+  TabIndent,
+  TextAlign.configure({
+    types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
+  }),
+  Highlight.configure({ multicolor: true }),
+  Table.configure({ resizable: true }),
+  TableRow,
+  TableHeader,
+  TableCell,
+  ResizableImage.configure({
+    inline: true,
+    allowBase64: true,
+  }),
+]
+
+/**
+ * The full document extension set. `starterKit` is injected because the primary
+ * pane configures list marks differently from the secondary one.
+ */
+export const buildEditorExtensions = (starterKit) => [
+  starterKit,
+  Dropcursor.configure({
+    color: 'rgba(84, 165, 255, 0.95)',
+    width: 2,
+  }),
+  NoteAnnotation,
+  ConversationTile,
+  PinterestBoard,
+  ...sharedExtensions(),
+]
+
+/**
+ * The extension set for a canvas card.
+ *
+ * Drops three document-scoped extensions that have no meaning inside a card:
+ * NoteAnnotation (its anchors are positions in a document's notes list),
+ * ConversationTile, and PinterestBoard. Everything the Toolbar can invoke stays,
+ * so a card's editor answers the same commands a pane's editor does.
+ *
+ * Returns a fresh array each call — TipTap extension instances are stateful and
+ * must not be shared between live editors.
+ */
+export const buildCardExtensions = () => [
+  StarterKit.configure({
+    bulletList: { keepMarks: true },
+    orderedList: { keepMarks: true },
+  }),
+  ...sharedExtensions(),
+]
+
+/**
+ * Schema for rendering a card's stored JSON to static HTML. Built once: a schema
+ * is immutable and generateHTML() only reads each node's renderHTML, so no node
+ * view ever runs for a card that isn't being edited.
+ */
+let cardSchemaCache = null
+export const getCardSchema = () => {
+  if (!cardSchemaCache) cardSchemaCache = getSchema(buildCardExtensions())
+  return cardSchemaCache
+}
+
+/** The extension list generateHTML() needs. Stable identity, safe to memo against. */
+let cardExtensionsCache = null
+export const getCardExtensions = () => {
+  if (!cardExtensionsCache) cardExtensionsCache = buildCardExtensions()
+  return cardExtensionsCache
+}
+
+/**
+ * The extension set for rendering a PROJECT DOCUMENT to static HTML — the preview on
+ * a canvas document card (useDocPreview).
+ *
+ * Deliberately NOT getCardExtensions(). A document is authored with the full pane
+ * schema, so it can hold the three nodes a card deliberately drops: ConversationTile,
+ * PinterestBoard, and NoteAnnotation's decorations. generateHTML() throws on a node
+ * type its schema doesn't know, and that throw is caught one level up — so rendering
+ * a document with the card schema would blank the ENTIRE preview of any chapter that
+ * happens to contain one Pinterest board. With the document set, those nodes render.
+ */
+let docPreviewExtensionsCache = null
+export const getDocPreviewExtensions = () => {
+  if (!docPreviewExtensionsCache) {
+    docPreviewExtensionsCache = buildEditorExtensions(
+      StarterKit.configure({
+        bulletList: { keepMarks: true },
+        orderedList: { keepMarks: true },
+      })
+    )
+  }
+  return docPreviewExtensionsCache
+}

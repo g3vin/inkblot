@@ -1,0 +1,1110 @@
+/* ==== Canvas ====
+ *
+ * The canvas surface and its contents. Everything here consumes the shared
+ * tokens from index.css (--surface-*, --text-*, --border-*, --accent-*, and the
+ * --floating-note-* set used for popovers), so light/dark mode needs no work of
+ * its own.
+ */
+
+.canvas-pane {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/*
+ * Sits directly inside .pane (which is overflow: hidden) rather than inside
+ * .pane-scroll — a canvas must have no scrolling ancestor to fight with, since
+ * it consumes wheel events itself for pan and zoom.
+ *
+ * --canvas-grid-* are written imperatively by useCanvasViewport on every frame:
+ * the grid is a background, so it cannot ride the world layer's transform.
+ */
+.canvas-surface {
+  --canvas-grid-size: 24px;
+  --canvas-grid-x: 0px;
+  --canvas-grid-y: 0px;
+
+  /*
+   * The default colour of an uncoloured card, group, and arrow: near-black on a
+   * light canvas, near-white on a dark one. Deliberately NOT the accent — the accent
+   * marks what is selected, and when every arrow was already accent-blue, selecting
+   * one said nothing. resolveCanvasColor() returns var(--canvas-ink) for an unset
+   * colour, so this token is the single place the neutral default is defined.
+   */
+  --canvas-ink: #1b1f27;
+
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  background-color: var(--surface-0);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    var(--border-muted) 1px,
+    transparent 0
+  );
+  background-size: var(--canvas-grid-size) var(--canvas-grid-size);
+  /* The dot is drawn at (1px, 1px) inside its tile (so its 1px radius never
+     clips at the tile edge), which puts its CENTER 1px right and below the
+     world grid point the tile origin represents. Shift the whole pattern back
+     by that 1px so snap-to-grid (which lands cards on exact multiples of
+     GRID_SIZE) puts corners dead on the dots instead of just past them. */
+  background-position:
+    calc(var(--canvas-grid-x) - 1px)
+    calc(var(--canvas-grid-y) - 1px);
+}
+
+/* Follows the app's theming: an explicit data-theme wins, otherwise the OS. */
+:root[data-theme='dark'] .canvas-surface {
+  --canvas-ink: #eef1f6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .canvas-surface {
+    --canvas-ink: #eef1f6;
+  }
+}
+
+.canvas-surface.is-pannable {
+  cursor: grab;
+}
+
+.canvas-surface.is-panning {
+  cursor: grabbing;
+}
+
+/*
+ * The one transformed element. Everything inside is positioned in world
+ * coordinates; the viewport is applied here as translate() + scale().
+ */
+.canvas-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* ---- empty state ---- */
+
+/*
+ * Sits in the WORLD layer at the origin, not pinned to the viewport: the hint is the
+ * empty canvas itself, so it pans and zooms with the canvas and stays where the
+ * content will appear. (Pinned to the screen it would trail the user around as they
+ * panned, like a stuck overlay.)
+ */
+.canvas-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 520px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+  text-align: center;
+}
+
+.canvas-placeholder-title {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.canvas-placeholder-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+/* ---- toolbar ----
+   Lives in the titlebar and is built from Toolbar.css's .toolbar / .toolbar-group
+   classes, so it is the editor toolbar's twin. Only what is specific to the
+   canvas belongs here. */
+
+.canvas-toolbar-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-toolbar {
+  user-select: none;
+}
+
+/* Reads as a value, not a label: fixed width so the toolbar does not shift as
+   the zoom ticks between 90% and 100%. */
+.toolbar-group > button.canvas-toolbar-zoom {
+  min-width: 42px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbar-group > button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.toolbar-group > button:disabled:hover {
+  background: transparent;
+}
+
+/* ---- color picker ----
+   Portaled to the body and positioned from the button's measured rect: the
+   toolbar scrolls and the titlebar clips, so it cannot be laid out inside them. */
+
+.canvas-color-menu {
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 95;
+  display: grid;
+  grid-template-columns: repeat(4, 20px);
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--popover-border);
+  border-radius: 10px;
+  background: var(--popover-bg);
+  box-shadow: var(--shadow-popover);
+}
+
+.canvas-color-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-muted);
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.canvas-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+/* The "no color" swatch reads as an outline rather than a filled dot. */
+.canvas-color-swatch-none {
+  position: relative;
+  background: transparent !important;
+}
+
+.canvas-color-swatch-none::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--accent-color);
+}
+
+/* ---- nodes ---- */
+
+/*
+ * Positioned by transform, not left/top: useCanvasDrag overwrites the transform
+ * directly during a gesture, and transforms skip layout.
+ *
+ * Containment is `layout style` only — deliberately NOT `paint`, and no
+ * `content-visibility`. Both of those clip to the padding box, which would slice
+ * off the resize handles and connection ports that straddle the card's border.
+ * Culling offscreen nodes, if it is ever needed, has to happen in JS instead.
+ */
+.canvas-node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  contain: layout style;
+}
+
+/*
+ * No `overflow: hidden` here: this class lands on the SAME element as
+ * .canvas-node, so clipping would take the ports and resize handles with it.
+ * The body clips its own content instead.
+ *
+ * COLOUR comes from the app-wide card recipe (--card-tint / --card-edge in
+ * index.css), the same one the notes panel and in-line note previews use: the colour
+ * washes the whole card softly and the border takes it several shades stronger. A
+ * canvas card and a note are the same kind of object, so they should not need two
+ * different explanations of what "this card is red" looks like.
+ */
+.canvas-node-text,
+.canvas-node-file {
+  --card-color: var(--node-color);
+
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--floating-note-radius, 16px);
+  background: var(--card-tint);
+  box-shadow: var(--shadow-soft);
+  cursor: default;
+  transition: box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.canvas-node-text:hover,
+.canvas-node-file:hover {
+  box-shadow: var(--shadow-popover);
+  border-color: var(--card-edge-hover);
+}
+
+.canvas-node.is-selected .canvas-node-text,
+.canvas-node.is-selected.canvas-node-group {
+  outline: 2px solid color-mix(in srgb, var(--accent-color) 68%, transparent);
+  outline-offset: 2px;
+}
+
+.canvas-card-body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 14px;
+  overflow: hidden;
+  /* Keep content inside the card's rounded corners now that the card itself
+     no longer clips (see .canvas-node-text). */
+  border-radius: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.canvas-card-body p {
+  margin: 0 0 0.5em;
+}
+
+.canvas-card-body p:last-child {
+  margin-bottom: 0;
+}
+
+.canvas-card-empty {
+  color: var(--text-placeholder);
+}
+
+/* ---- a card while it is being edited ---- */
+
+.canvas-node.is-editing .canvas-node-text {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-popover);
+}
+
+/*
+ * Text selection and scrolling only make sense on the card holding the live
+ * editor; every other card is static and drag-only.
+ */
+.canvas-card-editing {
+  overflow-y: auto;
+  user-select: text;
+  cursor: text;
+}
+
+.canvas-card-editing .ProseMirror {
+  min-height: 100%;
+  outline: none;
+}
+
+/*
+ * Only the INNER ProseMirror of a live editor loses its padding — the padding lives
+ * on .canvas-card-editing, which wraps it.
+ *
+ * A static card must NOT be included here. It carries both classes on one element
+ * (`.canvas-card-body.ProseMirror`), so zeroing padding by that selector stripped the
+ * card's own 12/14 padding — and since a card only gains the ProseMirror class once
+ * it HAS content, the text sat flush against the border the moment you finished
+ * typing and clicked away. That was the "padding disappears after editing" bug.
+ *
+ * The pane's editor padding it was guarding against is scoped to `.editor .ProseMirror`
+ * and never applied inside a canvas card in the first place.
+ */
+.canvas-card-editing .ProseMirror {
+  padding: 0;
+}
+
+/* ---- file nodes (images, and documents in M6) ---- */
+
+/*
+ * Also NO `overflow: hidden` (invariant 7) — it would clip this card's ports and
+ * resize handles just as it did the Pinterest card's. The picture rounds its own
+ * corners instead, which is all the clipping an image card actually needed.
+ */
+.canvas-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Resizing the card crops rather than distorts. */
+  object-fit: cover;
+  border-radius: inherit;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.canvas-file-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  user-select: none;
+}
+
+.canvas-file-path {
+  color: var(--text-subtle);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+/* ---- document cards ---- */
+
+.canvas-doc {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.canvas-doc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-muted);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.canvas-doc-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * The preview is a thumbnail, not a document: it is not interactive (double-click
+ * opens the real thing), so it must not swallow the pointer or offer its own
+ * scrollbar. It is simply cropped by the card.
+ */
+.canvas-doc-body {
+  flex: 1;
+  padding: 10px 12px;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 12px;
+  /* Fade the cut-off bottom, so a crop reads as "there is more" and not as a bug. */
+  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+
+.canvas-doc-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Marks a document card that points at another canvas rather than at prose. */
+.canvas-doc-kind {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ---- the minimap of a referenced canvas ---- */
+
+/*
+ * The viewBox is the referenced canvas's own bounding box, so the SVG does all the
+ * scaling: the minimap stays correct at any card size with no arithmetic here.
+ */
+.canvas-minimap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 10px;
+  pointer-events: none;
+}
+
+.canvas-minimap-node {
+  fill: color-mix(in srgb, var(--shape-color) 22%, var(--surface-1));
+  stroke: color-mix(in srgb, var(--shape-color) 55%, transparent);
+  /* The shapes are drawn in the referenced canvas's coordinates, which can be
+     thousands of units across — a plain stroke-width would scale to a slab. */
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1;
+}
+
+.canvas-minimap-node.is-group {
+  fill: color-mix(in srgb, var(--shape-color) 7%, transparent);
+  stroke-dasharray: 3 2;
+}
+
+.canvas-minimap-edge {
+  stroke: var(--text-subtle);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.5;
+}
+
+/* ---- note cards (a note from a document, living on the canvas) ---- */
+
+.canvas-note {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.canvas-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-muted);
+  color: var(--text-subtle);
+  font-size: 11px;
+  user-select: none;
+}
+
+.canvas-note-source {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.canvas-note-kind {
+  flex: none;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 10px;
+}
+
+/* The thread scrolls inside the card — the canvas itself must never scroll. */
+.canvas-note-thread {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 10px 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* A reply is indented under the note it answers, so a thread reads as a thread. */
+.canvas-note-item {
+  margin-left: calc(var(--note-depth, 0) * 14px);
+  padding-top: 6px;
+}
+
+.canvas-note-item + .canvas-note-item {
+  border-top: 1px solid var(--border-muted);
+}
+
+/*
+ * The text the note was written ABOUT. A note without its anchor is a reply with no
+ * question — "this contradicts chapter 2" is meaningless on a canvas unless you can
+ * see what "this" was.
+ */
+.canvas-note-anchor {
+  margin: 0 0 6px;
+  padding: 4px 0 4px 8px;
+  border-left: 2px solid var(--note-color, var(--accent-color));
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.4;
+  /* Long quotes must not push the note's own body out of the card. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.canvas-note-text {
+  width: 100%;
+  min-height: 42px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.canvas-note-actions {
+  display: flex;
+  gap: 6px;
+  /* Kept out of the way until the note is worth acting on. */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.canvas-note-item:hover .canvas-note-actions,
+.canvas-note-item:focus-within .canvas-note-actions {
+  opacity: 1;
+}
+
+.canvas-note-actions button {
+  padding: 2px 7px;
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--text-subtle);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.canvas-note-actions button:hover {
+  background: var(--control-hover-bg);
+  color: var(--text-primary);
+}
+
+/* ---- link cards and Pinterest boards ---- */
+
+/*
+ * A board on the canvas reuses the in-document board's masonry classes
+ * (.pinterest-board-masonry / -masonry-item), so the two are restyled together and
+ * cannot drift apart. Only the card chrome around it is canvas-specific.
+ */
+/*
+ * NO `overflow: hidden` here — invariant 7. This class lands on the SAME element as
+ * .canvas-node, and the ports and resize handles sit at negative offsets straddling
+ * the border, so clipping to the padding box slices them off. (That is exactly what
+ * cut the four arrow dots off a Pinterest card.) The card's inner body clips instead.
+ */
+.canvas-node-link {
+  --card-color: var(--node-color);
+
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--floating-note-radius, 16px);
+  background: var(--card-tint);
+  box-shadow: var(--shadow-soft);
+  transition: box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.canvas-node-link:hover {
+  box-shadow: var(--shadow-popover);
+  border-color: var(--card-edge-hover);
+}
+
+.canvas-board {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  /* The card body clips, because the node element must not (invariant 7). */
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.canvas-board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  border-bottom: 1px solid var(--border-muted);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.canvas-board-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.canvas-board-open {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.canvas-board-open:hover {
+  background: var(--control-hover-bg);
+  color: var(--text-primary);
+}
+
+/*
+ * The board scrolls inside its card — the canvas itself must never scroll.
+ *
+ * The scroller and the multi-column layout MUST be two different elements. A
+ * multi-column box with a definite height does not overflow downwards: it fragments
+ * its content into fresh columns along the INLINE axis, marching off to the right.
+ * Putting `column-count` and a flex-constrained height on one element is what pushed
+ * half the pins outside the card and clipped them.
+ *
+ * Giving the multicol element auto height inside a fixed-height scroller lets it grow
+ * downwards, which is what a masonry of pins is supposed to do.
+ */
+.canvas-board-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  /* Clip the pins to the card's rounded bottom, now that the node itself must not. */
+  border-radius: inherit;
+}
+
+.canvas-board-masonry {
+  column-count: 2;
+  column-gap: 8px;
+  /* The columns must measure against the scroller's content box, scrollbar included. */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.canvas-board-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.canvas-link {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 14px 16px;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.canvas-link-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.canvas-link-url {
+  color: var(--text-subtle);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- groups ---- */
+
+.canvas-node-group {
+  border: 2px solid var(--node-color);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--node-color) 7%, transparent);
+}
+
+/*
+ * The chip is filled with the group's colour, so its text must be the CANVAS's
+ * background, not a fixed white: the default colour is ink, which is near-white in
+ * dark mode — white-on-white. --surface-0 inverts with the theme exactly as the ink
+ * does, so the label stays legible for every colour including the default.
+ */
+.canvas-group-label {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--node-color);
+  color: var(--surface-0);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.canvas-group-label-input {
+  border: none;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  min-width: 80px;
+}
+
+/* ---- alignment guides ---- */
+
+/*
+ * Lives in the world layer, so its coordinates are world coordinates and it pans
+ * and zooms with the content. useCanvasDrag writes the line endpoints straight to
+ * the DOM during a gesture — a drag dispatches nothing until pointer-up.
+ */
+.canvas-guides {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.canvas-guides line {
+  stroke: var(--accent-color);
+  /* Cancel the world scale, so a guide is a hairline at every zoom level. */
+  stroke-width: calc(1px / var(--canvas-zoom, 1));
+  stroke-dasharray: calc(4px / var(--canvas-zoom, 1)) calc(3px / var(--canvas-zoom, 1));
+}
+
+/* ---- resize zones ---- */
+
+/*
+ * Invisible strips lying along the card's border — you resize by grabbing the edge,
+ * as you would in any other app, so there is nothing to draw. (These replace the
+ * little squares that used to pop up on selection.)
+ *
+ * Sizes are divided by --canvas-zoom rather than transform-scaled: a transform would
+ * scale a strip about its centre and leave it off the border. Dividing keeps the grab
+ * zone a constant ~9px on screen at every zoom, which is the property that matters.
+ */
+.canvas-resize-handle {
+  --grab: calc(9px / var(--canvas-zoom, 1));
+  --grab-half: calc(var(--grab) / 2);
+  --corner: calc(14px / var(--canvas-zoom, 1));
+  --corner-half: calc(var(--corner) / 2);
+
+  position: absolute;
+  background: transparent;
+}
+
+/* Sides: full-length strips straddling each border. */
+.canvas-resize-n {
+  top: calc(var(--grab-half) * -1);
+  left: 0;
+  right: 0;
+  height: var(--grab);
+  cursor: ns-resize;
+}
+
+.canvas-resize-s {
+  bottom: calc(var(--grab-half) * -1);
+  left: 0;
+  right: 0;
+  height: var(--grab);
+  cursor: ns-resize;
+}
+
+.canvas-resize-w {
+  left: calc(var(--grab-half) * -1);
+  top: 0;
+  bottom: 0;
+  width: var(--grab);
+  cursor: ew-resize;
+}
+
+.canvas-resize-e {
+  right: calc(var(--grab-half) * -1);
+  top: 0;
+  bottom: 0;
+  width: var(--grab);
+  cursor: ew-resize;
+}
+
+/* Corners are bigger, and lifted above the side strips they overlap — a side strip
+   spans the full border including its ends, so without this a corner would be buried
+   under one and dragging it would resize a single axis. */
+.canvas-resize-nw,
+.canvas-resize-ne,
+.canvas-resize-sw,
+.canvas-resize-se {
+  width: var(--corner);
+  height: var(--corner);
+  z-index: 1;
+}
+
+.canvas-resize-nw {
+  top: calc(var(--corner-half) * -1);
+  left: calc(var(--corner-half) * -1);
+  cursor: nwse-resize;
+}
+
+.canvas-resize-ne {
+  top: calc(var(--corner-half) * -1);
+  right: calc(var(--corner-half) * -1);
+  cursor: nesw-resize;
+}
+
+.canvas-resize-sw {
+  bottom: calc(var(--corner-half) * -1);
+  left: calc(var(--corner-half) * -1);
+  cursor: nesw-resize;
+}
+
+.canvas-resize-se {
+  bottom: calc(var(--corner-half) * -1);
+  right: calc(var(--corner-half) * -1);
+  cursor: nwse-resize;
+}
+
+/* ---- edges ---- */
+
+/*
+ * A coordinate space, not a box: zero-sized with overflow visible, sitting inside
+ * the world layer so its units ARE world units.
+ */
+.canvas-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.canvas-edge-line,
+.canvas-edge-pending {
+  fill: none;
+  stroke-width: 2;
+  /* Hold a constant on-screen width instead of scaling with the canvas. */
+  vector-effect: non-scaling-stroke;
+}
+
+/* Ink like every other arrow; the dash is what marks it as still in flight. */
+.canvas-edge-pending {
+  stroke: var(--canvas-ink);
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+}
+
+/*
+ * The grab target: a fat invisible stroke under the visible one. Gives a constant
+ * ~14px hit zone at any zoom, and saves computing point-to-bezier distance.
+ */
+.canvas-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.canvas-edge:hover .canvas-edge-line {
+  stroke-width: 3;
+}
+
+.canvas-edge.is-selected .canvas-edge-line {
+  stroke: var(--accent-color);
+  stroke-width: 3;
+}
+
+.canvas-edge-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 180px;
+  padding: 2px 7px;
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.canvas-edge-label.is-editing {
+  border-color: var(--accent-color);
+}
+
+.canvas-edge-label-input {
+  width: 90px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+}
+
+/* ---- connection ports ---- */
+
+.canvas-port {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--accent-color);
+  border-radius: 50%;
+  background: var(--surface-0);
+  opacity: 0;
+  cursor: crosshair;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  /* Ports are chrome, not content — keep them a constant size as the canvas zooms. */
+  transform: scale(calc(1 / var(--canvas-zoom, 1)));
+}
+
+/* Revealed on hover so an arrow can be dragged without selecting the card first. */
+.canvas-node:hover .canvas-port,
+.canvas-node.is-selected .canvas-port {
+  opacity: 1;
+}
+
+.canvas-port:hover {
+  transform: scale(calc(1.35 / var(--canvas-zoom, 1)));
+  background: var(--accent-color);
+}
+
+.canvas-port-top    { top: -6px; left: calc(50% - 5.5px); }
+.canvas-port-bottom { bottom: -6px; left: calc(50% - 5.5px); }
+.canvas-port-left   { left: -6px; top: calc(50% - 5.5px); }
+.canvas-port-right  { right: -6px; top: calc(50% - 5.5px); }
+
+/* ---- marquee ---- */
+
+.canvas-marquee {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px solid var(--accent-color);
+  background: var(--accent-surface);
+  pointer-events: none;
+}
+
+/* ---- read mode (the canvas is locked) ---- */
+
+/*
+ * Locked, the canvas is for reading: cards can scroll their contents, links open,
+ * memos play — but nothing moves, resizes, or gets created. The ports and resize
+ * strips are not rendered at all in this mode (CanvasNode), so there is nothing to
+ * hide here; what remains is to stop the cards LOOKING draggable.
+ */
+.canvas-surface.is-locked .canvas-node-text,
+.canvas-surface.is-locked .canvas-node-file,
+.canvas-surface.is-locked .canvas-node-link {
+  cursor: default;
+}
+
+/* The card contents become scrollable and selectable, which is the whole point. */
+.canvas-surface.is-locked [data-canvas-scroll] {
+  cursor: auto;
+}
+
+.canvas-surface.is-locked .canvas-card-body {
+  user-select: text;
+}
+
+/* ---- recording from the toolbar ----
+   Selector matches Toolbar.css's `.toolbar-group > button.active` in weight and
+   then some, or the group's accent styling would paint over the red. */
+
+.toolbar-group > button.canvas-toolbar-record.is-recording {
+  width: auto;
+  gap: 5px;
+  padding: 0 9px;
+  color: var(--status-error);
+  background: color-mix(in srgb, var(--status-error) 14%, transparent);
+}
+
+.canvas-toolbar-record-time {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- a voice memo card ---- */
+
+.canvas-audio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+}
+
+.canvas-audio-play {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--card-edge);
+  border-radius: 50%;
+  background: var(--control-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.canvas-audio-play:hover:not(:disabled) {
+  background: var(--control-hover-bg);
+}
+
+.canvas-audio-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Click anywhere on the track to seek. */
+.canvas-audio-track {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  cursor: pointer;
+}
+
+.canvas-audio-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--node-color);
+}
+
+.canvas-audio-time {
+  flex: none;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

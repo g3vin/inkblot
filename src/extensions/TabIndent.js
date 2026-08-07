@@ -1,3 +1,8 @@
+/**
+ * TabIndent.js — keyboard behavior for Tab/Shift-Tab: indent/outdent when
+ * inside a list, otherwise insert a literal tab character (and swallow the
+ * browser's default focus change).
+ */
 import { Extension } from '@tiptap/core'
 
 const TabIndent = Extension.create({
@@ -8,12 +13,10 @@ const TabIndent = Extension.create({
       Tab: () => {
         const { editor } = this
 
-        // 🔹 If inside a list → indent
         if (editor.isActive('listItem')) {
           return editor.commands.sinkListItem('listItem')
         }
 
-        // 🔹 Otherwise insert a tab
         editor.commands.insertContent('\t')
         return true
       },
@@ -21,7 +24,6 @@ const TabIndent = Extension.create({
       'Shift-Tab': () => {
         const { editor } = this
 
-        // 🔹 If inside a list → outdent
         if (editor.isActive('listItem')) {
           return editor.commands.liftListItem('listItem')
         }

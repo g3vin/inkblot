@@ -1,17 +1,31 @@
+/**
+ * Editor.jsx — top-level editor state container.
+ *
+ * Owns everything scoped to the open project: which documents are open
+ * (primary/secondary/split view), per-document notes, workbench tiles,
+ * clipboard history, version lists, and the right-sidebar tab. Persists
+ * per-project session state to localStorage and restores it on launch.
+ *
+ * Renders the ProjectLanding screen when no project is open, otherwise
+ * hands all state down to EditorLayout.
+ */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import EditorLayout from './EditorLayout'
-import { loadDocument, listProjects, documentExists, createProject, listProjectTree } from './FileSystem'
-import { normalizeNotes } from './noteUtils'
+import { loadDocument, listProjects, documentExists, createProject, linkProject, listProjectTree, moveProject, getProjectRoot } from '../lib/FileSystem'
+import { readDetachedTarget } from '../lib/docWindow'
+import { normalizeNotes } from '../lib/noteUtils'
 import SFIcon from './SFIcon'
-import appIconUrl from '../src-tauri/icons/icon.png'
+import appIconUrl from '../../src-tauri/icons/icon.png'
 
 import './Editor.css'
 
 const PERSIST_KEY = 'inkblot-session'
 const CLIPBOARD_PERSIST_KEY = 'inkblot-clipboard-history'
 const MAX_CLIPBOARD_ENTRIES = 80
-const RIGHT_SIDEBAR_TAB_IDS = new Set(['search', 'clipboard', 'workbench', 'notes', 'history'])
+// No 'search': search is the sidebar's search bar, not a tab. A session saved
+// before that change restores to the default tab rather than a tab that is gone.
+const RIGHT_SIDEBAR_TAB_IDS = new Set(['clipboard', 'workbench', 'notes', 'history'])
 const LANDING_WINDOW_DRAG_HEIGHT = 52
 const LANDING_WINDOW_DRAG_BLOCKER_SELECTOR = [
   'button',
@@ -28,16 +42,102 @@ const createEmptySession = (fallbackProject) => ({
   projects: {},
 })
 
+/**
+ * Drop malformed tabs from a restored session. A tab is a document, or a draft
+ * (docPath null) that has not decided what document it is yet. An `ephemeral`
+ * tab is one the dock created on its own for a document opened from the file
+ * tree — see ensureTabsForOpenDocs.
+ */
+const normalizeTabs = (tabs) => {
+  if (!Array.isArray(tabs)) return []
+  return tabs
+    .filter(tab => tab && typeof tab.id === 'string')
+    .map(tab => ({
+      id: tab.id,
+      docPath: typeof tab.docPath === 'string' && tab.docPath ? tab.docPath : null,
+      ephemeral: Boolean(tab.ephemeral),
+    }))
+}
+
+const SPLIT_RATIO_MIN = 0.2
+const SPLIT_RATIO_MAX = 0.8
+
+const clampSplitRatio = (value) => {
+  const ratio = Number(value)
+  if (!Number.isFinite(ratio)) return 0.5
+  return Math.min(SPLIT_RATIO_MAX, Math.max(SPLIT_RATIO_MIN, ratio))
+}
+
+/** Fill in defaults for a persisted per-project session so downstream code can trust the shape. */
 const normalizeProjectSession = (session = {}) => ({
   currentDoc: session.currentDoc || '',
   secondaryDoc: session.secondaryDoc || null,
   splitView: session.splitView || null,
+  splitOrientation: session.splitOrientation === 'rows' ? 'rows' : 'columns',
+  splitRatio: clampSplitRatio(session.splitRatio ?? 0.5),
   activeDoc: session.activeDoc || session.currentDoc || '',
   sidebarTab: RIGHT_SIDEBAR_TAB_IDS.has(session.sidebarTab) ? session.sidebarTab : 'workbench',
   tiles: Array.isArray(session.tiles) ? session.tiles : [],
+  docTabs: normalizeTabs(session.docTabs),
+  activeTabId: session.activeTabId || null,
   updatedAt: session.updatedAt || null,
 })
 
+const createTabId = () => `tab-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+
+/**
+ * Every open document has a dot, whether or not it was opened deliberately.
+ *
+ * Opening a document *replaces the active tab*: clicking through the file tree,
+ * a search result, or a canvas card reuses the tab you are standing on instead
+ * of piling new ones up. Tabs are only ever added on purpose — the new-tab
+ * button, "Open in New Tab", a drop on the dock, or a split — and each of those
+ * paths creates its tab itself, so by the time this runs the document already
+ * has one and the active tab is left alone.
+ *
+ * The split's second document is the exception: it is on screen *beside* the
+ * primary one, so it cannot share a tab and gets its own. That tab stays
+ * ephemeral — closing the split takes it away again.
+ *
+ * Returns `tabs` unchanged when nothing needs to happen, so this is safe to run
+ * from an effect on every document change.
+ */
+const ensureTabsForOpenDocs = (tabs, { currentDoc, secondaryDoc, activeTabId }) => {
+  const open = [currentDoc, secondaryDoc].filter(Boolean)
+  let next = tabs
+  let changed = false
+
+  if (currentDoc && !next.some(tab => tab.docPath === currentDoc)) {
+    const active = next.find(tab => tab.id === activeTabId)
+
+    // A draft tab holds only a filename being typed, never document content, so
+    // adopting one cannot lose written work.
+    next = active
+      ? next.map(tab => (
+        tab.id === active.id ? { ...tab, docPath: currentDoc, ephemeral: false } : tab
+      ))
+      : [...next, { id: createTabId(), docPath: currentDoc, ephemeral: false }]
+    changed = true
+  }
+
+  if (secondaryDoc && !next.some(tab => tab.docPath === secondaryDoc)) {
+    next = [...next, { id: createTabId(), docPath: secondaryDoc, ephemeral: true }]
+    changed = true
+  }
+
+  const kept = next.filter(tab => (
+    !tab.ephemeral || (tab.docPath && open.includes(tab.docPath))
+  ))
+  if (kept.length !== next.length) changed = true
+
+  return changed ? kept : tabs
+}
+
+/**
+ * Load the persisted session from localStorage. Supports both the current
+ * multi-project shape ({ lastProject, projects }) and the legacy single-project
+ * shape ({ projectName, ... }), which is migrated on the fly.
+ */
 const loadSession = (fallbackProject) => {
   try {
     const raw = localStorage.getItem(PERSIST_KEY)
@@ -72,6 +172,7 @@ const loadSession = (fallbackProject) => {
   }
 }
 
+/** Load persisted clipboard-history entries, dropping anything malformed. */
 const loadClipboardHistory = () => {
   try {
     const raw = localStorage.getItem(CLIPBOARD_PERSIST_KEY)
@@ -84,6 +185,7 @@ const loadClipboardHistory = () => {
   }
 }
 
+/** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
   if (!instance || instance.isDestroyed) return null
   const view = instance.editorView
@@ -91,25 +193,14 @@ const getMountedEditorView = (instance) => {
   return view
 }
 
-const countTreeEntries = (node) => {
-  const totals = { files: 0, folders: 0 }
-
-  const visit = (entry) => {
-    if (!entry) return
-    if (entry.type === 'file') {
-      totals.files += 1
-      return
-    }
-    if (entry.type === 'folder' && entry.path) {
-      totals.folders += 1
-    }
-    ;(entry.children || []).forEach(visit)
-  }
-
-  visit(node)
-  return totals
+/** Count the files in a project tree (for the landing-page project cards). */
+const countTreeFiles = (node) => {
+  if (!node) return 0
+  if (node.type === 'file') return 1
+  return (node.children || []).reduce((sum, child) => sum + countTreeFiles(child), 0)
 }
 
+/** Format a timestamp like "Jul 10, 5:32 PM" for the landing page, or a fallback label. */
 const formatRecentDate = (value) => {
   if (!value) return 'No recent activity'
   const date = new Date(value)
@@ -122,6 +213,10 @@ const formatRecentDate = (value) => {
   }).format(date)
 }
 
+/**
+ * Full-window landing screen shown when no project is open: searchable
+ * project grid (sorted by recent activity) plus a create-project dialog.
+ */
 function ProjectLanding({
   projectSessions,
   onOpenProject,
@@ -130,8 +225,20 @@ function ProjectLanding({
   const [projects, setProjects] = useState([])
   const [query, setQuery] = useState('')
   const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectLocation, setNewProjectLocation] = useState(null)
   const [createPromptOpen, setCreatePromptOpen] = useState(false)
   const [status, setStatus] = useState('')
+  const [statusTone, setStatusTone] = useState('error')
+  const [settingsMenuProject, setSettingsMenuProject] = useState(null)
+
+  const showError = (text) => {
+    setStatus(text)
+    setStatusTone('error')
+  }
+  const showNotice = (text) => {
+    setStatus(text)
+    setStatusTone('ok')
+  }
 
   const refreshProjects = useCallback(async () => {
     const names = await listProjects()
@@ -139,9 +246,9 @@ function ProjectLanding({
       names.map(async (name) => {
         try {
           const tree = await listProjectTree(name)
-          return { name, ...countTreeEntries(tree) }
+          return { name, files: countTreeFiles(tree) }
         } catch {
-          return { name, files: 0, folders: 0 }
+          return { name, files: 0 }
         }
       })
     )
@@ -152,6 +259,7 @@ function ProjectLanding({
     refreshProjects()
   }, [refreshProjects])
 
+  // The landing page has no native titlebar, so dragging near the top edge moves the window.
   const handleLandingMouseDown = useCallback((event) => {
     if (event.button !== 0) return
     if (event.clientY > LANDING_WINDOW_DRAG_HEIGHT) return
@@ -180,21 +288,126 @@ function ProjectLanding({
     if (!trimmed) return
 
     if (projects.some(project => project.name.toLowerCase() === trimmed.toLowerCase())) {
-      setStatus('A project with that name already exists.')
+      showError('A project with that name already exists.')
       return
     }
 
-    const ok = await createProject(trimmed)
+    const ok = await createProject(trimmed, newProjectLocation || null)
     if (!ok) {
-      setStatus('Could not create that project.')
+      showError('Could not create that project.')
       return
     }
 
     setStatus('')
     setNewProjectName('')
+    setNewProjectLocation(null)
     setCreatePromptOpen(false)
     await refreshProjects()
     onCreateProject(trimmed)
+  }
+
+  const chooseNewProjectLocation = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Choose a folder to store this project',
+      })
+      if (typeof selected === 'string' && selected) {
+        setNewProjectLocation(selected)
+      }
+    } catch (err) {
+      console.warn('Failed to choose project location:', err)
+    }
+  }
+
+  /**
+   * Point the app back at a project folder that already exists on disk — the way
+   * out when a project stops appearing because its folder moved, or because the
+   * app was reinstalled and lost the registry that knew where it lived.
+   */
+  const handleLinkExistingProject = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Choose an existing project folder',
+      })
+      if (typeof selected !== 'string' || !selected) return
+
+      const result = await linkProject(selected)
+      if (!result?.ok) {
+        showError(
+          result?.error === 'name-exists'
+            ? `A different project is already named “${result.name}”. Rename one of the folders, then link again.`
+            : result?.error === 'invalid-name'
+              ? 'That folder’s name can’t be used for a project.'
+              : 'Could not link that folder.'
+        )
+        return
+      }
+
+      // The project may not match whatever is in the search box; clearing it
+      // guarantees the tile the user just linked is actually on screen.
+      setQuery('')
+      await refreshProjects()
+      showNotice(
+        result.alreadyLinked
+          ? `“${result.name}” was already linked.`
+          : `Linked “${result.name}”.`
+      )
+    } catch (err) {
+      console.warn('Failed to link project:', err)
+      showError('Could not link that folder.')
+    }
+  }
+
+  // Close the per-project settings menu on any outside interaction.
+  useEffect(() => {
+    if (!settingsMenuProject) return
+    const close = () => setSettingsMenuProject(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [settingsMenuProject])
+
+  const handleMoveProjectLocation = async (name) => {
+    setSettingsMenuProject(null)
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const target = await open({
+        directory: true,
+        multiple: false,
+        title: `Choose a new folder for "${name}"`,
+      })
+      if (typeof target !== 'string' || !target) return
+
+      const result = await moveProject(name, target)
+      if (!result?.ok) {
+        const { message } = await import('@tauri-apps/plugin-dialog')
+        const reason =
+          result?.error === 'target-exists'
+            ? 'A folder with that project name already exists there.'
+            : 'Could not move the project.'
+        await message(reason, { title: 'Move Project', kind: 'error' })
+        return
+      }
+      await refreshProjects()
+    } catch (err) {
+      console.warn('Failed to move project:', err)
+    }
+  }
+
+  const handleRevealProject = async (name) => {
+    setSettingsMenuProject(null)
+    try {
+      const root = await getProjectRoot(name)
+      const { revealItemInDir } = await import('@tauri-apps/plugin-opener')
+      await revealItemInDir(root)
+    } catch (err) {
+      console.warn('Failed to reveal project:', err)
+    }
   }
 
   return (
@@ -232,7 +445,9 @@ function ProjectLanding({
           </label>
         </div>
 
-        {status && !createPromptOpen ? <div className="landing-status">{status}</div> : null}
+        {status && !createPromptOpen ? (
+          <div className={`landing-status${statusTone === 'ok' ? ' landing-status-ok' : ''}`}>{status}</div>
+        ) : null}
 
         <div className="landing-project-actions">
           <button
@@ -240,12 +455,22 @@ function ProjectLanding({
             className="landing-create-button"
             onClick={() => {
               setCreatePromptOpen(true)
+              setNewProjectLocation(null)
               setStatus('')
             }}
             aria-label="Create project"
             title="Create project"
           >
             <SFIcon name="plus" size={22} strokeWidth={1.7} />
+          </button>
+          <button
+            type="button"
+            className="landing-create-button"
+            onClick={handleLinkExistingProject}
+            aria-label="Link an existing project folder"
+            title="Link an existing project folder"
+          >
+            <SFIcon name="folder" size={22} strokeWidth={1.7} />
           </button>
         </div>
 
@@ -257,12 +482,20 @@ function ProjectLanding({
           ) : (
             visibleProjects.map((project) => {
               const projectSession = projectSessions[project.name] || {}
+              const menuOpen = settingsMenuProject === project.name
               return (
-                <button
+                <div
                   key={project.name}
-                  type="button"
-                  className="landing-project-tile"
+                  role="button"
+                  tabIndex={0}
+                  className={`landing-project-tile${menuOpen ? ' menu-open' : ''}`}
                   onClick={() => onOpenProject(project.name)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      onOpenProject(project.name)
+                    }
+                  }}
                 >
                   <div className="landing-project-icon">
                     <SFIcon name="folder" />
@@ -274,7 +507,46 @@ function ProjectLanding({
                       <span>{formatRecentDate(projectSession.updatedAt)}</span>
                     </div>
                   </div>
-                </button>
+
+                  <button
+                    type="button"
+                    className="landing-project-settings"
+                    aria-label={`Settings for ${project.name}`}
+                    title="Project settings"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setSettingsMenuProject((current) =>
+                        current === project.name ? null : project.name
+                      )
+                    }}
+                  >
+                    <SFIcon name="gearshape" />
+                  </button>
+
+                  {menuOpen ? (
+                    <div
+                      className="landing-project-settings-menu"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="landing-project-settings-option"
+                        onClick={() => handleMoveProjectLocation(project.name)}
+                      >
+                        <SFIcon name="folder" />
+                        <span>Move Folder Location…</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="landing-project-settings-option"
+                        onClick={() => handleRevealProject(project.name)}
+                      >
+                        <SFIcon name="magnifyingglass" />
+                        <span>Reveal in Finder</span>
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               )
             })
           )}
@@ -309,6 +581,20 @@ function ProjectLanding({
               aria-label="Project name"
               autoFocus
             />
+            <button
+              type="button"
+              className="landing-create-location"
+              onClick={chooseNewProjectLocation}
+              title={newProjectLocation || 'Stored in the app’s default location'}
+            >
+              <SFIcon name="folder" />
+              <span className="landing-create-location-label">
+                {newProjectLocation
+                  ? `Location: ${newProjectLocation}`
+                  : 'Location: Default (app storage)'}
+              </span>
+              <span className="landing-create-location-action">Change…</span>
+            </button>
             {status ? <div className="landing-status landing-dialog-status">{status}</div> : null}
             <button type="submit" className="landing-create-submit">
               Create
@@ -324,6 +610,9 @@ export default function Editor({
   projectName: initialProject = 'DefaultProject',
   showWordCountBadge = true,
 }) {
+  // Set in a window opened by "Open in New Window": that window boots straight
+  // into one document and never writes the session back (see docWindow.js).
+  const [detachedTarget] = useState(() => readDetachedTarget())
   const [initialSession] = useState(() => loadSession(initialProject))
   const [projectSessions, setProjectSessions] = useState(initialSession.projects || {})
   const [projectName, setProjectNameState] = useState('')
@@ -343,18 +632,41 @@ export default function Editor({
     setVersionsState(prev => ({ ...prev, [docName]: vs || [] }))
   }, [])
 
+  // The version comparison showing in the editor area: { docName, leftId, rightId }.
+  // Deliberately NOT part of splitView — compare borrows the editor's space without
+  // disturbing the panes underneath, so a split stays intact while you read a diff.
+  const [compare, setCompare] = useState(null)
+  const openCompare = useCallback((docName, leftId, rightId = 'current') => {
+    if (!docName) return
+    setCompare({ docName, leftId: String(leftId), rightId: String(rightId) })
+  }, [])
+  const closeCompare = useCallback(() => setCompare(null), [])
+
   const [splitView, setSplitView] = useState(null) // null, 'editor', or 'pinterest'
+  const [splitOrientation, setSplitOrientation] = useState('columns') // 'columns' (side by side) | 'rows' (stacked)
+  const [splitRatio, setSplitRatioState] = useState(0.5) // share of the split taken by the primary pane
   const [secondaryDoc, setSecondaryDoc] = useState(null) // The name of the second file
+  // The dock's tabs. A tab is { id, docPath }, where docPath: null is a draft —
+  // a tab that has not decided what document it is yet (see DraftTabPane).
+  const [tabs, setTabs] = useState([])
+  const [activeTabId, setActiveTabId] = useState(null)
   const refreshFilesRef = useRef(null)
   const draggedSelectionRef = useRef(null)
 
+  // Switch to a project (or back to the landing page when passed a falsy name),
+  // restoring that project's persisted docs/tiles/sidebar state.
   const openProject = useCallback((nextProjectName) => {
     if (!nextProjectName) {
       setProjectNameState('')
       setCurrentDoc('')
       setActiveDoc('')
       setSecondaryDoc(null)
+      setCompare(null)
       setSplitView(null)
+      setSplitOrientation('columns')
+      setSplitRatioState(0.5)
+      setTabs([])
+      setActiveTabId(null)
       setSidebarTab('workbench')
       setTiles([])
       setNotesByDoc({})
@@ -381,6 +693,10 @@ export default function Editor({
     setActiveDoc(projectSession.activeDoc || projectSession.currentDoc)
     setSecondaryDoc(projectSession.secondaryDoc)
     setSplitView(projectSession.splitView)
+    setSplitOrientation(projectSession.splitOrientation)
+    setSplitRatioState(projectSession.splitRatio)
+    setTabs(projectSession.docTabs)
+    setActiveTabId(projectSession.activeTabId)
     setSidebarTab(projectSession.sidebarTab)
     setTiles(projectSession.tiles)
     setNotesByDoc({})
@@ -399,6 +715,200 @@ export default function Editor({
     openProject(nextProjectName)
   }, [openProject])
 
+  // A comparison borrows the editor area from the document it is about. Once that
+  // document is no longer in either pane, the diff on screen describes something
+  // you can't see and can no longer merge into — so it closes with it.
+  useEffect(() => {
+    if (!compare) return
+    if (compare.docName !== currentDoc && compare.docName !== secondaryDoc) setCompare(null)
+  }, [compare, currentDoc, secondaryDoc])
+
+  /* ---------------- Tabs ---------------- */
+
+  // Whatever the panes are showing has a dot, however it was opened. An open
+  // that did not create its own tab lands in the active one (see above).
+  useEffect(() => {
+    setTabs(prev => ensureTabsForOpenDocs(prev, { currentDoc, secondaryDoc, activeTabId }))
+  }, [activeTabId, currentDoc, secondaryDoc])
+
+  // The active tab follows the primary pane, so opening a document anywhere —
+  // the tree, a canvas card, a search result — lights the right dot.
+  useEffect(() => {
+    if (!currentDoc) return
+    const match = tabs.find(tab => tab.docPath === currentDoc)
+    if (match) setActiveTabId(match.id)
+  }, [currentDoc, tabs])
+
+  /** Add a permanent tab for a document, or promote the ephemeral one it already has. */
+  const withTabForDoc = useCallback((prev, docPath) => {
+    const existing = prev.find(tab => tab.docPath === docPath)
+    if (!existing) return [...prev, { id: createTabId(), docPath, ephemeral: false }]
+    if (!existing.ephemeral) return prev
+    return prev.map(tab => (
+      tab.docPath === docPath ? { ...tab, ephemeral: false } : tab
+    ))
+  }, [])
+
+  /** Open a document as a tab in the primary pane (right-click → new tab, or dropped on the dock). */
+  const openDocInTab = useCallback((docPath) => {
+    if (!docPath) return
+    setTabs(prev => withTabForDoc(prev, docPath))
+    setCurrentDoc(docPath)
+    setActiveDoc(docPath)
+  }, [withTabForDoc])
+
+  const selectTab = useCallback((tabId) => {
+    const tab = tabs.find(item => item.id === tabId)
+    if (!tab) return
+
+    setActiveTabId(tabId)
+    // A draft has no document, so the pane empties and DraftTabPane takes over.
+    setCurrentDoc(tab.docPath || '')
+    setActiveDoc(tab.docPath || '')
+  }, [tabs])
+
+  const newDraftTab = useCallback(() => {
+    const id = createTabId()
+    setTabs(prev => [...prev, { id, docPath: null, ephemeral: false }])
+    setActiveTabId(id)
+    setCurrentDoc('')
+    setActiveDoc('')
+  }, [])
+
+  /** A draft became a real document: the tab it was opened from adopts it. */
+  const adoptDraftDoc = useCallback((docPath) => {
+    if (!docPath) return
+    setTabs(prev => prev.map(tab => (
+      tab.id === activeTabId && !tab.docPath
+        ? { ...tab, docPath, ephemeral: false }
+        : tab
+    )))
+    setCurrentDoc(docPath)
+    setActiveDoc(docPath)
+  }, [activeTabId])
+
+  const closeTab = useCallback((tabId) => {
+    const tab = tabs.find(item => item.id === tabId)
+    if (!tab) return
+
+    const remaining = tabs.filter(item => item.id !== tabId)
+    setTabs(remaining)
+
+    // Closing the tab a pane is showing closes the document with it.
+    if (tab.docPath && tab.docPath === secondaryDoc) {
+      setSecondaryDoc(null)
+      setSplitView(null)
+      if (tab.docPath !== currentDoc) return
+    }
+
+    const showsPrimary = tab.docPath ? tab.docPath === currentDoc : tabId === activeTabId
+    if (!showsPrimary) return
+
+    const fallback = remaining.find(item => item.docPath && item.docPath !== secondaryDoc)
+      || remaining.find(item => item.docPath)
+      || null
+
+    if (fallback) {
+      setActiveTabId(fallback.id)
+      setCurrentDoc(fallback.docPath)
+      setActiveDoc(fallback.docPath)
+      return
+    }
+
+    // Nothing left in the dock, but the split may still be holding a document —
+    // promote it rather than emptying the workspace.
+    if (secondaryDoc && secondaryDoc !== tab.docPath) {
+      setCurrentDoc(secondaryDoc)
+      setActiveDoc(secondaryDoc)
+      setSecondaryDoc(null)
+      setSplitView(null)
+      return
+    }
+
+    setActiveTabId(null)
+    setCurrentDoc('')
+    setActiveDoc('')
+  }, [activeTabId, currentDoc, secondaryDoc, tabs])
+
+  /** Promote an ephemeral tab so the next tree-opened document stops replacing it. */
+  const keepTab = useCallback((tabId) => {
+    setTabs(prev => prev.map(tab => (
+      tab.id === tabId ? { ...tab, ephemeral: false } : tab
+    )))
+  }, [])
+
+  /**
+   * Close a set of tabs at once (close others / to the right / all).
+   *
+   * `keptIds` is the whole surviving set, so the pane fallback can be decided in
+   * one place: whatever the panes were showing that no longer has a tab has to
+   * give the pane up.
+   */
+  const closeTabsTo = useCallback((keptIds) => {
+    const kept = tabs.filter(tab => keptIds.has(tab.id))
+    setTabs(kept)
+
+    const keptDocs = kept.map(tab => tab.docPath).filter(Boolean)
+
+    if (secondaryDoc && !keptDocs.includes(secondaryDoc)) {
+      setSecondaryDoc(null)
+      setSplitView(null)
+    }
+
+    if (currentDoc && !keptDocs.includes(currentDoc)) {
+      const fallback = kept.find(tab => tab.docPath)
+      setActiveTabId(fallback ? fallback.id : null)
+      setCurrentDoc(fallback?.docPath || '')
+      setActiveDoc(fallback?.docPath || '')
+    }
+  }, [currentDoc, secondaryDoc, tabs])
+
+  const closeOtherTabs = useCallback((tabId) => {
+    closeTabsTo(new Set([tabId]))
+  }, [closeTabsTo])
+
+  const closeTabsToTheRight = useCallback((tabId) => {
+    const index = tabs.findIndex(tab => tab.id === tabId)
+    if (index === -1) return
+    closeTabsTo(new Set(tabs.slice(0, index + 1).map(tab => tab.id)))
+  }, [closeTabsTo, tabs])
+
+  const closeAllTabs = useCallback(() => {
+    closeTabsTo(new Set())
+  }, [closeTabsTo])
+
+  /**
+   * Put a document in the secondary pane. Splitting a document against itself
+   * would show the same file twice (and have two editors autosaving it), so a
+   * tab that is already in the primary pane splits against the next tab instead.
+   */
+  const openDocInSplit = useCallback((docPath, orientation) => {
+    const nextOrientation = orientation === 'rows' ? 'rows' : 'columns'
+    const target = docPath && docPath !== currentDoc
+      ? docPath
+      : tabs.find(tab => tab.docPath && tab.docPath !== currentDoc)?.docPath || null
+    if (!target) return
+
+    setTabs(prev => withTabForDoc(prev, target))
+    setSplitOrientation(nextOrientation)
+    setSecondaryDoc(target)
+    setSplitView('editor')
+  }, [currentDoc, tabs, withTabForDoc])
+
+  const closeSplit = useCallback(() => {
+    setSecondaryDoc(null)
+    setSplitView(null)
+  }, [])
+
+  /** Where the divider sits, as the primary pane's share of the split. */
+  const setSplitRatio = useCallback((ratio) => {
+    setSplitRatioState(clampSplitRatio(ratio))
+  }, [])
+
+  const activeTab = tabs.find(tab => tab.id === activeTabId) || null
+  const draftTabActive = Boolean(activeTab && !activeTab.docPath)
+
+  // Bounding rect of the clipboard panel (or its sidebar container) used as the drag-drop target.
   const getClipboardDropZoneRect = useCallback(() => {
     const clipboardPanel = document.querySelector('.clipboard-panel')
     if (!clipboardPanel) return null
@@ -432,6 +942,8 @@ export default function Editor({
   const docRef = useRef(currentDoc)
   useEffect(() => { docRef.current = currentDoc }, [currentDoc])
 
+  // Validate the restored session against disk: bail out to the landing page if the
+  // project vanished, and close docs that no longer exist.
   useEffect(() => {
     let cancelled = false
 
@@ -468,33 +980,67 @@ export default function Editor({
           setSplitView(null)
         }
       }
+
+      // A tab whose document was deleted (or renamed) elsewhere would be a dot
+      // that opens nothing, so the dock drops it. Drafts have no document to check.
+      const tabDocs = tabs.map(tab => tab.docPath).filter(Boolean)
+      if (tabDocs.length) {
+        const existence = await Promise.all(
+          tabDocs.map(docPath => documentExists(projectName, docPath))
+        )
+        if (cancelled) return
+
+        const missing = new Set(tabDocs.filter((docPath, index) => !existence[index]))
+        if (missing.size) {
+          setTabs(prev => prev.filter(tab => !tab.docPath || !missing.has(tab.docPath)))
+        }
+      }
     }
 
     validateSession()
     return () => {
       cancelled = true
     }
-  }, [projectName, currentDoc, secondaryDoc, openProject])
+  }, [projectName, currentDoc, secondaryDoc, tabs, openProject])
 
+  // A detached window opens its one document and nothing else — no landing page,
+  // no restored tabs.
   useEffect(() => {
+    if (!detachedTarget) return
+    openProject(detachedTarget.projectName)
+    setCurrentDoc(detachedTarget.docPath)
+    setActiveDoc(detachedTarget.docPath)
+    // Boot-once: re-running this would yank the window back to its opening document.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Persist the session while on the landing page (covers project deletes/renames).
+  useEffect(() => {
+    if (detachedTarget) return
     if (projectName) return
     const payload = {
       lastProject: initialSession.lastProject || '',
       projects: projectSessions,
     }
     localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
-  }, [initialSession.lastProject, projectName, projectSessions])
+  }, [detachedTarget, initialSession.lastProject, projectName, projectSessions])
 
+  // Persist the open project's session whenever any of its state changes.
   useEffect(() => {
+    if (detachedTarget) return
     if (!projectName) return
     const now = new Date().toISOString()
     const nextProjectSession = normalizeProjectSession({
       currentDoc,
       secondaryDoc,
       splitView,
+      splitOrientation,
+      splitRatio,
       activeDoc,
       sidebarTab,
       tiles,
+      docTabs: tabs,
+      activeTabId,
       updatedAt: now,
     })
 
@@ -511,20 +1057,20 @@ export default function Editor({
       localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
       return nextProjectSessions
     })
-  }, [projectName, currentDoc, secondaryDoc, splitView, activeDoc, sidebarTab, tiles])
+  }, [detachedTarget, projectName, currentDoc, secondaryDoc, splitView, splitOrientation, splitRatio, activeDoc, sidebarTab, tiles, tabs, activeTabId])
 
   useEffect(() => {
     localStorage.setItem(CLIPBOARD_PERSIST_KEY, JSON.stringify(clipboardHistory))
   }, [clipboardHistory])
 
+  // Outside of an editor split (or with no secondary doc), the primary doc is always active.
   useEffect(() => {
-    if (splitView !== 'editor') {
-      setActiveDoc(currentDoc)
-    } else if (!secondaryDoc) {
+    if (splitView !== 'editor' || !secondaryDoc) {
       setActiveDoc(currentDoc)
     }
   }, [currentDoc, splitView, secondaryDoc])
 
+  // Notes are stored per document; `notes`/`setNotes` below are views onto the active doc's list.
   const setNotesForDoc = useCallback((docName, updater) => {
     setNotesByDoc(prev => {
       const current = prev[docName] || []
@@ -538,6 +1084,7 @@ export default function Editor({
     setNotesForDoc(activeDoc, updater)
   }, [activeDoc, setNotesForDoc])
 
+  // Push a new entry onto the clipboard history (deduped, capped at MAX_CLIPBOARD_ENTRIES).
   const addClipboardEntry = useCallback((text) => {
     const normalized = (text || '').trim()
     if (!normalized) return
@@ -564,6 +1111,8 @@ export default function Editor({
     setClipboardHistory(prev => prev.filter(entry => entry.id !== entryId))
   }, [])
 
+  // Handle text dropped onto the clipboard panel. If the drag originated from an
+  // editor selection, this is a "move": the selection is deleted from its source doc.
   const handleDropToClipboard = useCallback((payload) => {
     const text = (payload?.text || '').trim()
     if (!text) return
@@ -592,20 +1141,6 @@ export default function Editor({
             .setTextSelection({ from, to })
             .deleteSelection()
             .run()
-          try {
-            window.dispatchEvent(new CustomEvent('inkblot:dnd-debug', {
-              detail: {
-                phase: 'editor-selection-removed',
-                textLength: text.length,
-                from,
-                to,
-                status: {
-                  source: 'editor',
-                  over: 'clipboard',
-                },
-              },
-            }))
-          } catch (e) {}
         }
       }
     }
@@ -615,6 +1150,7 @@ export default function Editor({
     try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
   }, [addClipboardEntry, editor, secondaryEditor])
 
+  // Bridge: EditorCanvas fires this event when a selection drag ends over the clipboard panel.
   useEffect(() => {
     const onEditorDragEndDropToClipboard = (event) => {
       const detail = event?.detail || {}
@@ -631,6 +1167,10 @@ export default function Editor({
     }
   }, [handleDropToClipboard])
 
+  // Track drags that start from an editor selection so we can tell, on dragend,
+  // whether the text was dropped back into an editor pane (reorder) or onto the
+  // clipboard panel (move to clipboard). State is mirrored on window globals
+  // because native drag events cross React boundaries.
   useEffect(() => {
     const onDragStart = (event) => {
       const targetNode = event?.target
@@ -686,21 +1226,6 @@ export default function Editor({
 
       const endedInEditorPane = isPointInAnyEditorPane(point.x, point.y)
       if (endedInEditorPane) {
-        try {
-          window.dispatchEvent(new CustomEvent('inkblot:dnd-debug', {
-            detail: {
-              phase: 'editor-dragend-cancelled-in-editor',
-              info: `x=${String(point.x)} y=${String(point.y)}`,
-              status: {
-                source: 'editor',
-                over: 'editor',
-                dropHandled: false,
-                editorSelection: true,
-              },
-            },
-          }))
-        } catch (e) {}
-
         window.setTimeout(() => {
           draggedSelectionRef.current = null
           try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
@@ -743,18 +1268,6 @@ export default function Editor({
             },
           }))
           window.__inkblot_dropHandled = true
-          window.dispatchEvent(new CustomEvent('inkblot:dnd-debug', {
-            detail: {
-              phase: 'editor-dragend-drop-to-clipboard',
-              info: `x=${String(point.x)} y=${String(point.y)} len=${draggedSelection.text.length}`,
-              status: {
-                source: 'editor',
-                over: 'clipboard',
-                dropHandled: true,
-                editorSelection: true,
-              },
-            },
-          }))
         } catch (e) {}
       }
 
@@ -775,6 +1288,7 @@ export default function Editor({
     }
   }, [currentDoc, editor, getClipboardDropZoneRect, isPointInAnyEditorPane, secondaryDoc, secondaryEditor])
 
+  // Record every copy (from the editor or any input) into the clipboard history.
   useEffect(() => {
     const getSelectedText = (target) => {
       const selectedInWindow = window.getSelection?.()?.toString?.()
@@ -803,76 +1317,61 @@ export default function Editor({
     }
   }, [addClipboardEntry])
 
+  // Cmd+Shift+V: paste clipboard contents as plain text (HTML/styles stripped).
   useEffect(() => {
-    const handlePasteWithFormat = async (event) => {
-      // Cmd+Shift+V (metaKey + shiftKey + 'v') — normalize key to lower
-      if (event.metaKey && event.shiftKey && event.key && event.key.toLowerCase() === 'v') {
-        // Prevent other handlers and default browser UI
-        event.preventDefault();
-        event.stopPropagation();
-        if (typeof event.stopImmediatePropagation === 'function') {
-          event.stopImmediatePropagation();
+    const handlePastePlain = async (event) => {
+      if (!(event.metaKey && event.shiftKey && event.key?.toLowerCase() === 'v')) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation?.()
+
+      try {
+        const clipboardText = await navigator.clipboard.readText()
+        const doc = new DOMParser().parseFromString(clipboardText, 'text/html')
+        const plainText = doc.body.textContent || ''
+
+        // Prefer the focused TipTap editor, then its raw ProseMirror view,
+        // then whatever editable element currently has focus.
+        const targetEditor = activeEditor || editor || secondaryEditor
+        if (typeof targetEditor?.chain === 'function') {
+          targetEditor.chain().focus().insertContent(plainText).run()
+          return
         }
 
-        try {
-          const clipboardText = await navigator.clipboard.readText();
+        const view = getMountedEditorView(targetEditor)
+        if (view?.state && view.dispatch) {
+          view.dispatch(view.state.tr.insertText(plainText).scrollIntoView())
+          view.dom?.focus?.()
+          return
+        }
 
-          // Sanitize: strip HTML and styles, keep plain text
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(clipboardText, 'text/html');
-          const plainText = doc.body.textContent || '';
-
-          // Prefer the explicit activeTipTap editor, fall back to primary/secondary editor
-          const targetEditor = activeEditor || editor || secondaryEditor;
-
-          if (targetEditor && typeof targetEditor.chain === 'function') {
-            // TipTap editor API
-            targetEditor.chain().focus().insertContent(plainText).run();
-            return;
-          }
-
-          // Fallback: if we have a ProseMirror view (TipTap exposes `view`), use tr.insertText
-          const view = getMountedEditorView(targetEditor)
-          if (view && view.state && view.dispatch) {
-            const tr = view.state.tr.insertText(plainText);
-            view.dispatch(tr.scrollIntoView());
-            if (view.dom && typeof view.dom.focus === 'function') view.dom.focus();
-            return;
-          }
-
-          // Last resort: try to paste into the active element (textarea or contenteditable)
-          const activeEl = document.activeElement;
-          if (activeEl && (activeEl.isContentEditable || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) {
-            // For inputs/textareas, use setRangeText or value insertion
-            if (typeof activeEl.setRangeText === 'function') {
-              try {
-                activeEl.setRangeText(plainText);
-              } catch (e) {
-                activeEl.value = (activeEl.value || '') + plainText;
-              }
-            } else if (typeof document.execCommand === 'function') {
-              document.execCommand('insertText', false, plainText);
-            } else {
-              activeEl.textContent = (activeEl.textContent || '') + plainText;
+        const activeEl = document.activeElement
+        if (activeEl && (activeEl.isContentEditable || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) {
+          if (typeof activeEl.setRangeText === 'function') {
+            try {
+              activeEl.setRangeText(plainText)
+            } catch {
+              activeEl.value = (activeEl.value || '') + plainText
             }
-            // restore focus
-            try { activeEl.focus(); } catch (e) {}
-            return;
+          } else if (typeof document.execCommand === 'function') {
+            document.execCommand('insertText', false, plainText)
+          } else {
+            activeEl.textContent = (activeEl.textContent || '') + plainText
           }
-
-          console.error('No suitable editor target to paste into.');
-        } catch (error) {
-          console.error('Failed to read clipboard content:', error);
+          try { activeEl.focus() } catch {}
+          return
         }
+
+        console.error('No suitable editor target to paste into.')
+      } catch (error) {
+        console.error('Failed to read clipboard content:', error)
       }
-    };
+    }
 
-    // Use capture so we get the event before other listeners
-    window.addEventListener('keydown', handlePasteWithFormat, { capture: true });
-
-    return () => {
-    window.removeEventListener('keydown', handlePasteWithFormat, { capture: true });
-    };
+    // Capture phase so this runs before TipTap's own paste handling.
+    window.addEventListener('keydown', handlePastePlain, { capture: true })
+    return () => window.removeEventListener('keydown', handlePastePlain, { capture: true })
   }, [activeEditor, editor, secondaryEditor])
 
   if (!projectName) {
@@ -886,10 +1385,27 @@ export default function Editor({
   }
 
   return (
-    <>
       <EditorLayout
         splitView={splitView}
         setSplitView={setSplitView}
+        splitOrientation={splitOrientation}
+        splitRatio={splitRatio}
+        setSplitRatio={setSplitRatio}
+
+        tabs={tabs}
+        activeTabId={activeTabId}
+        draftTabActive={draftTabActive}
+        onSelectTab={selectTab}
+        onCloseTab={closeTab}
+        onCloseOtherTabs={closeOtherTabs}
+        onCloseTabsToTheRight={closeTabsToTheRight}
+        onCloseAllTabs={closeAllTabs}
+        onKeepTab={keepTab}
+        onNewTab={newDraftTab}
+        onOpenDocInTab={openDocInTab}
+        onOpenDocInSplit={openDocInSplit}
+        onCloseSplit={closeSplit}
+        onDraftCreated={adoptDraftDoc}
 
         editor={editor}
         setEditor={setEditor}
@@ -920,6 +1436,9 @@ export default function Editor({
 
         versions={versions}
         setVersions={setVersions}
+        compare={compare}
+        openCompare={openCompare}
+        closeCompare={closeCompare}
         clipboardHistory={clipboardHistory}
         clearClipboardHistory={clearClipboardHistory}
         onDropToClipboard={handleDropToClipboard}
@@ -930,6 +1449,5 @@ export default function Editor({
         refreshFiles={() => refreshFilesRef.current?.()}
         registerRefreshFiles={(fn) => { refreshFilesRef.current = fn }}
       />
-    </>
   )
 }
