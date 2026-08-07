@@ -1,6 +1,26 @@
+/**
+ * PinterestBoard.js — embedded Pinterest board node.
+ *
+ * Created automatically when a Pinterest board URL is pasted (see
+ * EditorCanvas's paste handler / normalizePinterestBoardUrl). Public
+ * boards embed via Pinterest's pinit.js widget or the pidgets JSON API;
+ * private boards/sections fall back to scraping pins through the
+ * pinterestScrape window bridge. Pin thumbnails are cached in
+ * localStorage (refreshed once per project-open) so boards render
+ * offline and instantly on reopen.
+ */
 import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { openPinterest } from '../openPinterest'
+import { openPinterest } from '../lib/openPinterest'
+import {
+  normalizePinterestBoardUrl,
+  normalizePins as normalizeCachedPins,
+  readPinterestCache,
+  writePinterestCache,
+} from '../lib/pinterestBoard'
+
+// Re-exported: EditorCanvas's paste handler imports it from here.
+export { normalizePinterestBoardUrl }
 
 const PINTEREST_SCRIPT_ID = 'inkblot-pinterest-pinit-js'
 const PINTEREST_SCRIPT_SRC = 'https://assets.pinterest.com/js/pinit.js'
@@ -57,66 +77,6 @@ const markRefreshedForCurrentProjectOpen = (url) => {
     window.sessionStorage?.setItem(key, 'true')
   } catch {
     // Session refresh markers are best-effort.
-  }
-}
-
-const normalizeCachedPins = (items) => {
-  const out = []
-  const seen = new Set()
-
-  for (const item of Array.isArray(items) ? items : []) {
-    const pinHref = String(item?.pinHref || '').trim()
-    const imageUrl = String(item?.imageUrl || '').trim()
-    if (!pinHref || !imageUrl) continue
-    if (!/^https?:\/\//i.test(pinHref) || !/^https?:\/\//i.test(imageUrl)) continue
-
-    const key = `${pinHref}::${imageUrl}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push({ pinHref, imageUrl })
-    if (out.length >= PINTEREST_CACHE_MAX_ITEMS) break
-  }
-
-  return out
-}
-
-const readPinterestCache = (url) => {
-  if (typeof window === 'undefined') return null
-  const key = getPinterestCacheKey(url)
-  if (!key) return null
-
-  try {
-    const raw = window.localStorage?.getItem(key)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (parsed?.version !== PINTEREST_CACHE_VERSION) return null
-    const pins = normalizeCachedPins(parsed?.pins)
-    if (!pins.length) return null
-    return {
-      pins,
-      savedAt: Number(parsed?.savedAt || 0),
-    }
-  } catch {
-    return null
-  }
-}
-
-const writePinterestCache = (url, pins) => {
-  if (typeof window === 'undefined') return
-  const key = getPinterestCacheKey(url)
-  if (!key) return
-
-  const normalizedPins = normalizeCachedPins(pins)
-  if (!normalizedPins.length) return
-
-  try {
-    window.localStorage?.setItem(key, JSON.stringify({
-      version: PINTEREST_CACHE_VERSION,
-      savedAt: Date.now(),
-      pins: normalizedPins,
-    }))
-  } catch {
-    // Cache writes are best-effort.
   }
 }
 
@@ -182,69 +142,6 @@ const parsePinterestBoardParts = (pinterestUrl) => {
   const section = third && !reservedThird.has(third.toLowerCase()) ? third : null
 
   return { user, board, section }
-}
-
-/**
- * returns a Pinterest board URL if `text` looks like a board URL
- * otherwise returns null
- */
-export function normalizePinterestBoardUrl(text) {
-  if (!text) return null
-  const trimmed = String(text).trim()
-  if (!trimmed) return null
-
-  // only consider pinterest.com URLs
-  if (!/^https?:\/\//i.test(trimmed)) return null
-
-  let url
-  try {
-    url = new URL(trimmed)
-  } catch {
-    return null
-  }
-
-  const host = url.hostname.toLowerCase()
-  if (!(host === 'pinterest.com' || host === 'www.pinterest.com')) return null
-
-  // board URLs are typically: /{username}/{board}/
-  const segments = url.pathname
-    .split('/')
-    .map(s => s.trim())
-    .filter(Boolean)
-
-  if (segments.length < 2) return null
-
-  const [first, second] = segments
-
-  // ignore non-board routes.
-  const blocked = new Set([
-    'pin',
-    'search',
-    'ideas',
-    'explore',
-    'today',
-    'topics',
-    'settings',
-    '_tools',
-  ])
-
-  if (blocked.has(first.toLowerCase())) return null
-
-  const allowedThird = new Set(['pins', 'activity', 'ideas', 'more_ideas'])
-
-  // Pinterest board *sections* (what you're calling sub-boards) look like:
-  //   /{user}/{board}/{section}/
-  // In that case, preserve the section path so we only render that section.
-  if (segments.length >= 3) {
-    const third = segments[2]
-    if (allowedThird.has(third.toLowerCase())) {
-      return `https://www.pinterest.com/${encodeURIComponent(first)}/${encodeURIComponent(second)}/`
-    }
-    return `https://www.pinterest.com/${encodeURIComponent(first)}/${encodeURIComponent(second)}/${encodeURIComponent(third)}/`
-  }
-
-  // Strip query/hash and normalize trailing slash.
-  return `https://www.pinterest.com/${encodeURIComponent(first)}/${encodeURIComponent(second)}/`
 }
 
 const pidgetsPinsUrlFromPinterestUrl = (pinterestUrl) => {
@@ -822,7 +719,7 @@ const PinterestBoard = Node.create({
         allowWebviewFallback = true,
       }) => {
         try {
-          const mod = await import('../pinterestScrape')
+          const mod = await import('../lib/pinterestScrape')
           if (!mod || typeof mod.scrapePinterestPins !== 'function') {
             return { ok: false }
           }

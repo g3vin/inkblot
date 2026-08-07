@@ -1,7 +1,17 @@
+/**
+ * ReadAloudControl.jsx — toolbar button + popover for read-aloud playback.
+ *
+ * Drives the Kokoro TTS pipeline in lib/readAloud: builds chunks from the
+ * editor text (or selection), generates audio ahead of playback
+ * (READ_ALOUD_PREFETCH_AHEAD), plays chunks back-to-back while highlighting
+ * the spoken word via the ReadAloudHighlight extension, and animates a
+ * level-meter visualization. Voice choice persists to localStorage; falls
+ * back to the system speechSynthesis voices if Kokoro can't load.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import SFIcon from './SFIcon'
-import { clearReadAloudHighlight, setReadAloudHighlight } from './extensions/ReadAloudHighlight'
+import { clearReadAloudHighlight, setReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import {
   DEFAULT_READ_ALOUD_VOICE,
   READ_ALOUD_VOICES,
@@ -10,7 +20,7 @@ import {
   getReadableEditorPayload,
   isKokoroGenerationTimeoutError,
   prewarmReadAloud,
-} from './readAloud'
+} from '../lib/readAloud'
 
 const READ_ALOUD_VOICE_STORAGE_KEY = 'inkblot:read-aloud-voice'
 const INITIAL_READ_ALOUD_LEVELS = [0.08, 0.12, 0.16, 0.1, 0.14, 0.09]
@@ -638,7 +648,7 @@ export default function ReadAloudControl({ editor }) {
         aria-label="Read aloud options"
         title="Read aloud"
       >
-        <SFIcon name="speech" size={16} />
+        <SFIcon name="read.aloud" size={16} />
       </button>
       {popover}
     </div>

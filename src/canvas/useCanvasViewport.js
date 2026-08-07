@@ -1,0 +1,351 @@
+/**
+ * useCanvasViewport.js — pan/zoom for the canvas surface.
+ *
+ * The viewport lives in a ref, not React state: a pan or zoom writes the world
+ * layer's transform directly and commits to state only on the trailing frame, so
+ * a gesture never costs one render per event. Read `viewportRef.current` for the
+ * live value; the returned `viewport` is for rendering (zoom %, culling) and may
+ * lag by a frame.
+ */
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  clampZoom,
+  fitViewport,
+  nodesBounds,
+  panBy,
+  screenToWorld,
+  worldTransform,
+  zoomAt,
+  zoomTo,
+} from '../lib/canvasGeometry'
+
+/** World units. Exported so snap-to-grid lands on the grid the user can see. */
+export const GRID_SIZE = 24
+const WHEEL_ZOOM_SENSITIVITY = 0.01
+const ZOOM_STEP = 1.2
+
+/**
+ * Can this element still scroll in the direction the wheel is going?
+ *
+ * Checked at the boundary too, so that once a board is scrolled to its end the wheel
+ * goes back to panning the canvas instead of dead-ending on the card.
+ */
+function canScrollBy(el, deltaY) {
+  const scrollable = el.scrollHeight - el.clientHeight
+  if (scrollable <= 1) return false
+  if (deltaY < 0) return el.scrollTop > 0
+  if (deltaY > 0) return el.scrollTop < scrollable - 1
+  return false
+}
+
+export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef }) {
+  const surfaceRef = useRef(null)
+  const worldRef = useRef(null)
+  const viewportRef = useRef(initialViewport)
+  const frameRef = useRef(0)
+  const [viewport, setViewportState] = useState(initialViewport)
+  const [isPanning, setIsPanning] = useState(false)
+  const onViewportChangeRef = useRef(onViewportChange)
+
+  useEffect(() => {
+    onViewportChangeRef.current = onViewportChange
+  }, [onViewportChange])
+
+  /** Write the viewport to the DOM now; sync React (and the saver) on the next frame. */
+  const applyViewport = useCallback((next) => {
+    viewportRef.current = next
+
+    if (worldRef.current) {
+      worldRef.current.style.transform = worldTransform(next)
+    }
+    // The dot grid is a background on the surface, so it has to be panned/scaled
+    // by hand rather than riding the world layer's transform. --canvas-zoom lets
+    // chrome inside the world (resize handles) cancel the scale and hold a
+    // constant on-screen size.
+    if (surfaceRef.current) {
+      const style = surfaceRef.current.style
+      style.setProperty('--canvas-zoom', String(next.zoom))
+      style.setProperty('--canvas-grid-size', `${GRID_SIZE * next.zoom}px`)
+      style.setProperty('--canvas-grid-x', `${-next.x * next.zoom}px`)
+      style.setProperty('--canvas-grid-y', `${-next.y * next.zoom}px`)
+    }
+
+    if (frameRef.current) return
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = 0
+      setViewportState(viewportRef.current)
+      onViewportChangeRef.current?.(viewportRef.current)
+    })
+  }, [])
+
+  /*
+   * Resetting the id to 0 is load-bearing, not tidiness.
+   *
+   * `applyViewport` skips scheduling when frameRef is non-zero ("a sync is already
+   * pending"). StrictMode mounts, tears down, and re-mounts on the SAME refs, so if
+   * this cleanup only cancelled the frame and left the id behind, the guard above
+   * would see a stale non-zero id forever and never schedule again. React state —
+   * and so the zoom readout — would freeze at its initial value, while the canvas
+   * kept zooming, because the transform is written to the DOM directly a few lines
+   * up. That is exactly the "stuck at 100%" bug.
+   */
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(frameRef.current)
+      frameRef.current = 0
+    },
+    []
+  )
+
+  // Push the initial viewport into the DOM on mount (the layer starts untransformed).
+  useEffect(() => {
+    applyViewport(viewportRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** Pointer position relative to the surface, which is what the math expects. */
+  const toSurfacePoint = useCallback((clientX, clientY) => {
+    const rect = surfaceRef.current?.getBoundingClientRect()
+    if (!rect) return { x: 0, y: 0 }
+    return { x: clientX - rect.left, y: clientY - rect.top }
+  }, [])
+
+  const screenToWorldAt = useCallback((clientX, clientY) => {
+    const point = toSurfacePoint(clientX, clientY)
+    return screenToWorld(point.x, point.y, viewportRef.current)
+  }, [toSurfacePoint])
+
+  /* ---------------- wheel: pan, and zoom on ctrl/⌘ ---------------- */
+
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface) return
+
+    // Must be a native listener: React attaches `wheel` passively, so
+    // preventDefault() inside an onWheel prop is silently ignored and the
+    // surrounding pane scrolls instead.
+    const onWheel = (event) => {
+      /*
+       * The canvas normally swallows every wheel event to pan and zoom, which
+       * leaves the contents of a card — a Pinterest board, a long note thread —
+       * with no way to scroll at all. Two states hand the wheel back to the card:
+       *
+       *   - READ MODE (locked): every scrollable card scrolls, because reading
+       *     is the whole point of the mode.
+       *   - a SELECTED card: clicking a board says "I'm looking at this one",
+       *     so the wheel scrolls it instead of dragging the world out from
+       *     under it. Click the background to deselect and pan again.
+       *
+       * No preventDefault, so the browser scrolls natively — and once the card
+       * hits its end the wheel goes back to panning, so the gesture never
+       * dead-ends.
+       */
+      if (event.target instanceof Element) {
+        const scroller = event.target.closest('[data-canvas-scroll]')
+        if (
+          scroller &&
+          (lockedRef?.current || scroller.closest('.canvas-node.is-selected')) &&
+          canScrollBy(scroller, event.deltaY)
+        ) return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      // deltaMode 1 is lines, 2 is pages — normalize both to pixels.
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? surface.clientHeight : 1
+
+      // A trackpad pinch arrives as a wheel event with ctrlKey set.
+      if (event.ctrlKey || event.metaKey) {
+        const point = toSurfacePoint(event.clientX, event.clientY)
+        const factor = Math.exp(-event.deltaY * unit * WHEEL_ZOOM_SENSITIVITY)
+        applyViewport(zoomAt(viewportRef.current, factor, point.x, point.y))
+        return
+      }
+
+      applyViewport(panBy(viewportRef.current, event.deltaX * unit, event.deltaY * unit))
+    }
+
+    surface.addEventListener('wheel', onWheel, { passive: false })
+    return () => surface.removeEventListener('wheel', onWheel)
+  }, [applyViewport, lockedRef, toSurfacePoint])
+
+  /* ---------------- pinch: WebKit gesture events ---------------- */
+
+  /*
+   * A trackpad pinch in WKWebView does NOT always arrive as a ctrl+wheel the way it
+   * does in Chrome. WebKit has its own non-standard gesture events, and if nothing
+   * handles them the webview applies its own page magnification — which scales the
+   * whole app, canvas and toolbar together. That looks like the canvas zoomed while
+   * the zoom readout sits at 100% forever, because the canvas's own zoom never moved.
+   *
+   * Handling them here (and preventing the default) puts pinch back under our control.
+   * These events do not exist outside WebKit, so elsewhere this is simply inert.
+   */
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface) return
+
+    // Zoom at gesture start; event.scale is cumulative and relative to it.
+    let baseZoom = 1
+    let anchor = { x: 0, y: 0 }
+
+    const onGestureStart = (event) => {
+      event.preventDefault()
+      baseZoom = viewportRef.current.zoom
+      anchor = toSurfacePoint(event.clientX, event.clientY)
+    }
+
+    const onGestureChange = (event) => {
+      event.preventDefault()
+      const target = clampZoom(baseZoom * event.scale)
+      const current = viewportRef.current
+      applyViewport(zoomAt(current, target / current.zoom, anchor.x, anchor.y))
+    }
+
+    const onGestureEnd = (event) => event.preventDefault()
+
+    surface.addEventListener('gesturestart', onGestureStart, { passive: false })
+    surface.addEventListener('gesturechange', onGestureChange, { passive: false })
+    surface.addEventListener('gestureend', onGestureEnd, { passive: false })
+    return () => {
+      surface.removeEventListener('gesturestart', onGestureStart)
+      surface.removeEventListener('gesturechange', onGestureChange)
+      surface.removeEventListener('gestureend', onGestureEnd)
+    }
+  }, [applyViewport, toSurfacePoint])
+
+  /* ---------------- drag to pan: middle mouse, or space held ---------------- */
+
+  const spaceHeldRef = useRef(false)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.code !== 'Space' || spaceHeldRef.current) return
+      // Space is a legitimate keystroke while typing in a card.
+      const target = event.target
+      if (target instanceof HTMLElement && target.closest('input, textarea, [contenteditable="true"]')) {
+        return
+      }
+      spaceHeldRef.current = true
+      setSpaceHeld(true)
+    }
+    const onKeyUp = (event) => {
+      if (event.code !== 'Space') return
+      spaceHeldRef.current = false
+      setSpaceHeld(false)
+    }
+    // Releasing space outside the window would otherwise leave the hand cursor stuck.
+    const onBlur = () => {
+      spaceHeldRef.current = false
+      setSpaceHeld(false)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [])
+
+  /** Call from the surface's onPointerDown. Returns true if it started a pan. */
+  const startPan = useCallback((event) => {
+    const isMiddleButton = event.button === 1
+    const isSpaceDrag = event.button === 0 && spaceHeldRef.current
+    if (!isMiddleButton && !isSpaceDrag) return false
+
+    event.preventDefault()
+    setIsPanning(true)
+
+    let lastX = event.clientX
+    let lastY = event.clientY
+
+    const onMove = (moveEvent) => {
+      // Dragging the surface right should pull the world right, i.e. move the
+      // viewport left — hence the negated delta.
+      applyViewport(
+        panBy(viewportRef.current, -(moveEvent.clientX - lastX), -(moveEvent.clientY - lastY))
+      )
+      lastX = moveEvent.clientX
+      lastY = moveEvent.clientY
+    }
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove, true)
+      window.removeEventListener('pointerup', onUp, true)
+      window.removeEventListener('pointercancel', onUp, true)
+      setIsPanning(false)
+    }
+
+    window.addEventListener('pointermove', onMove, true)
+    window.addEventListener('pointerup', onUp, true)
+    window.addEventListener('pointercancel', onUp, true)
+    return true
+  }, [applyViewport])
+
+  /* ---------------- zoom commands ---------------- */
+
+  const surfaceSize = useCallback(() => {
+    const rect = surfaceRef.current?.getBoundingClientRect()
+    return { width: rect?.width || 0, height: rect?.height || 0 }
+  }, [])
+
+  const zoomBy = useCallback((factor) => {
+    const { width, height } = surfaceSize()
+    applyViewport(zoomAt(viewportRef.current, factor, width / 2, height / 2))
+  }, [applyViewport, surfaceSize])
+
+  const zoomIn = useCallback(() => zoomBy(ZOOM_STEP), [zoomBy])
+  const zoomOut = useCallback(() => zoomBy(1 / ZOOM_STEP), [zoomBy])
+
+  const setZoom = useCallback((zoom) => {
+    const { width, height } = surfaceSize()
+    applyViewport(zoomTo(viewportRef.current, clampZoom(zoom), width, height))
+  }, [applyViewport, surfaceSize])
+
+  const resetZoom = useCallback(() => setZoom(1), [setZoom])
+
+  /** Frame `nodes` (all of them, or just a selection) in the visible area. */
+  const zoomToFit = useCallback((nodes, options) => {
+    const { width, height } = surfaceSize()
+    applyViewport(fitViewport(nodesBounds(nodes), width, height, options))
+  }, [applyViewport, surfaceSize])
+
+  /**
+   * Center one node, holding the current zoom. Revealing a search hit should move
+   * the user to it, not rescale their canvas out from under them — which is what
+   * zoomToFit([node]) would do.
+   */
+  const centerOn = useCallback((node) => {
+    if (!node) return
+    const { width, height } = surfaceSize()
+    const { zoom } = viewportRef.current
+    applyViewport({
+      zoom,
+      x: node.x + node.width / 2 - width / (2 * zoom),
+      y: node.y + node.height / 2 - height / (2 * zoom),
+    })
+  }, [applyViewport, surfaceSize])
+
+  return {
+    surfaceRef,
+    worldRef,
+    viewport,
+    viewportRef,
+    applyViewport,
+    screenToWorldAt,
+    startPan,
+    isPanning,
+    spaceHeld,
+    zoomIn,
+    zoomOut,
+    setZoom,
+    resetZoom,
+    zoomToFit,
+    centerOn,
+  }
+}

@@ -1,3 +1,11 @@
+/**
+ * openPinterest.js — manages the single shared Pinterest webview window.
+ *
+ * The window keeps the user's Pinterest login session, which is what lets
+ * private boards be previewed/scraped. openPinterest() reuses the existing
+ * window when possible (navigating it via the Rust `navigate_webview`
+ * command) and can open it hidden for background scraping.
+ */
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
 

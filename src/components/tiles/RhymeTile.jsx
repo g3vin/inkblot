@@ -1,14 +1,21 @@
-/* eslint-disable react-refresh/only-export-components */
+/**
+ * RhymeTile.jsx — "Find Rhymes" workbench tile.
+ *
+ * Scores rhyme candidates with a local ONNX model (public/rhyme_model.onnx +
+ * public/vocab.json) running in onnxruntime-web. Candidates are pre-filtered
+ * by shared word suffix, then ranked by model score; clicking a rhyme
+ * replaces the source word in the document.
+ */
 import React, { useEffect, useMemo, useState } from 'react'
 import * as ort from 'onnxruntime-web/ort-wasm'
 
+// Model session and vocabulary are module-level singletons shared by all tiles.
 let session
 let vocab = []
 let word2idx = {}
 
-export async function initRhymeModel() {
+async function initRhymeModel() {
   if (!session) {
-    console.log('Loading ONNX model...')
     ort.env.wasm.numThreads = 1
     ort.env.wasm.simd = false
     session = await ort.InferenceSession.create('/rhyme_model.onnx', {
@@ -17,29 +24,11 @@ export async function initRhymeModel() {
   }
 
   if (!vocab.length) {
-    console.log('Loading vocab...')
     vocab = await fetch('/vocab.json').then((r) => r.json())
     word2idx = Object.fromEntries(vocab.map((w, i) => [w, i]))
   }
 
   return { session, vocab, word2idx }
-}
-
-export async function getRhymeScore(wordA, wordB) {
-  const { session, word2idx } = await initRhymeModel()
-
-  const a = word2idx[wordA.toLowerCase()]
-  const b = word2idx[wordB.toLowerCase()]
-  if (a === undefined || b === undefined) {
-    throw new Error('One or both words not found in vocabulary.')
-  }
-
-  const inputA = new ort.Tensor('int64', BigInt64Array.from([BigInt(a)]), [1])
-  const inputB = new ort.Tensor('int64', BigInt64Array.from([BigInt(b)]), [1])
-
-  const outputs = await session.run({ word_a: inputA, word_b: inputB })
-  const score = outputs.rhyme_score.data[0]
-  return score
 }
 
 export default function RhymeTile({ word, onReplace, onRemove, onSelect }) {

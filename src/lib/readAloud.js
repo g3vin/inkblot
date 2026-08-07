@@ -1,3 +1,17 @@
+/**
+ * readAloud.js — text-to-speech engine for the read-aloud feature.
+ *
+ * Responsibilities:
+ *  - Extract readable text from the editor along with a char→doc-position
+ *    map and per-word ranges, so the UI can highlight the word being spoken.
+ *  - Split that text into speakable chunks at paragraph/sentence/clause
+ *    boundaries (Kokoro degrades on long inputs).
+ *  - Generate audio with the Kokoro TTS model: prefers the native Rust
+ *    backend (kokoro_commands), falling back to kokoro-js running in WASM.
+ *    Voice .bin files ship in the app bundle (see KOKORO_VOICE_ASSETS) and
+ *    fetches for them are patched to resolve locally instead of hitting
+ *    HuggingFace.
+ */
 import { invoke } from '@tauri-apps/api/core'
 
 const KOKORO_MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX'
@@ -42,34 +56,34 @@ export const READ_ALOUD_VOICES = [
   { id: 'bm_daniel', name: 'Daniel', language: 'British', gender: 'Male', grade: 'D' },
 ]
 const KOKORO_VOICE_ASSETS = import.meta.glob([
-  '../node_modules/kokoro-js/voices/af_heart.bin',
-  '../node_modules/kokoro-js/voices/af_bella.bin',
-  '../node_modules/kokoro-js/voices/af_nicole.bin',
-  '../node_modules/kokoro-js/voices/af_sarah.bin',
-  '../node_modules/kokoro-js/voices/af_kore.bin',
-  '../node_modules/kokoro-js/voices/af_aoede.bin',
-  '../node_modules/kokoro-js/voices/af_nova.bin',
-  '../node_modules/kokoro-js/voices/af_alloy.bin',
-  '../node_modules/kokoro-js/voices/af_sky.bin',
-  '../node_modules/kokoro-js/voices/af_river.bin',
-  '../node_modules/kokoro-js/voices/af_jessica.bin',
-  '../node_modules/kokoro-js/voices/am_michael.bin',
-  '../node_modules/kokoro-js/voices/am_fenrir.bin',
-  '../node_modules/kokoro-js/voices/am_puck.bin',
-  '../node_modules/kokoro-js/voices/am_echo.bin',
-  '../node_modules/kokoro-js/voices/am_eric.bin',
-  '../node_modules/kokoro-js/voices/am_liam.bin',
-  '../node_modules/kokoro-js/voices/am_onyx.bin',
-  '../node_modules/kokoro-js/voices/am_santa.bin',
-  '../node_modules/kokoro-js/voices/am_adam.bin',
-  '../node_modules/kokoro-js/voices/bf_emma.bin',
-  '../node_modules/kokoro-js/voices/bf_isabella.bin',
-  '../node_modules/kokoro-js/voices/bf_alice.bin',
-  '../node_modules/kokoro-js/voices/bf_lily.bin',
-  '../node_modules/kokoro-js/voices/bm_george.bin',
-  '../node_modules/kokoro-js/voices/bm_fable.bin',
-  '../node_modules/kokoro-js/voices/bm_lewis.bin',
-  '../node_modules/kokoro-js/voices/bm_daniel.bin',
+  '../../node_modules/kokoro-js/voices/af_heart.bin',
+  '../../node_modules/kokoro-js/voices/af_bella.bin',
+  '../../node_modules/kokoro-js/voices/af_nicole.bin',
+  '../../node_modules/kokoro-js/voices/af_sarah.bin',
+  '../../node_modules/kokoro-js/voices/af_kore.bin',
+  '../../node_modules/kokoro-js/voices/af_aoede.bin',
+  '../../node_modules/kokoro-js/voices/af_nova.bin',
+  '../../node_modules/kokoro-js/voices/af_alloy.bin',
+  '../../node_modules/kokoro-js/voices/af_sky.bin',
+  '../../node_modules/kokoro-js/voices/af_river.bin',
+  '../../node_modules/kokoro-js/voices/af_jessica.bin',
+  '../../node_modules/kokoro-js/voices/am_michael.bin',
+  '../../node_modules/kokoro-js/voices/am_fenrir.bin',
+  '../../node_modules/kokoro-js/voices/am_puck.bin',
+  '../../node_modules/kokoro-js/voices/am_echo.bin',
+  '../../node_modules/kokoro-js/voices/am_eric.bin',
+  '../../node_modules/kokoro-js/voices/am_liam.bin',
+  '../../node_modules/kokoro-js/voices/am_onyx.bin',
+  '../../node_modules/kokoro-js/voices/am_santa.bin',
+  '../../node_modules/kokoro-js/voices/am_adam.bin',
+  '../../node_modules/kokoro-js/voices/bf_emma.bin',
+  '../../node_modules/kokoro-js/voices/bf_isabella.bin',
+  '../../node_modules/kokoro-js/voices/bf_alice.bin',
+  '../../node_modules/kokoro-js/voices/bf_lily.bin',
+  '../../node_modules/kokoro-js/voices/bm_george.bin',
+  '../../node_modules/kokoro-js/voices/bm_fable.bin',
+  '../../node_modules/kokoro-js/voices/bm_lewis.bin',
+  '../../node_modules/kokoro-js/voices/bm_daniel.bin',
 ], {
   query: '?url',
   import: 'default',
@@ -88,6 +102,11 @@ export function getReadableEditorText(editor) {
   return getReadableEditorPayload(editor).text
 }
 
+/**
+ * Flatten the editor doc (or current selection) into plain text plus:
+ * charToPos (text offset → doc position) and word ranges, used for
+ * spoken-word highlighting.
+ */
 export function getReadableEditorPayload(editor) {
   if (!editor || editor.isDestroyed) {
     return { text: '', originalSelection: null, words: [] }

@@ -1,8 +1,17 @@
+/**
+ * App.jsx — application root.
+ *
+ * Owns app-wide chrome and preferences that live above the editor:
+ * theme (light/dark/system), accent color, and the word-count badge
+ * toggle. Wires those preferences into the native Tauri "View" menu
+ * and persists them to localStorage. Renders the Editor plus the
+ * accent-color picker dialog.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { openPinterest } from './openPinterest'
-import Editor from './Editor.jsx'
+import { openPinterest } from './lib/openPinterest'
+import Editor from './components/Editor.jsx'
 import './App.css'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
@@ -20,12 +29,14 @@ const ACCENT_PRESETS = [
 
 const DEFAULT_ACCENT = ACCENT_PRESETS[0].value
 
+/** Coerce any stored/user value to a valid 6-digit hex color, falling back to the default accent. */
 const normalizeAccentColor = (value) => {
   if (typeof value !== 'string') return DEFAULT_ACCENT
   const trimmed = value.trim()
   return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toLowerCase() : DEFAULT_ACCENT
 }
 
+/** Modal dialog for choosing the app accent color (presets + custom picker). */
 function AccentColorPanel({ open, accentColor, onChange, onClose }) {
   if (!open) return null
 
@@ -109,6 +120,7 @@ export default function App() {
   const [isAccentPickerOpen, setIsAccentPickerOpen] = useState(false)
   const [showWordCountBadge, setShowWordCountBadge] = useState(true)
 
+  // Resolve 'system' to the OS-reported light/dark preference.
   const getResolvedTheme = useCallback((theme) => {
     if (theme !== 'system') return theme
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -116,6 +128,7 @@ export default function App() {
       : 'light'
   }, [])
 
+  // Keep the native View-menu labels/checkmarks in sync with the active theme.
   const updateMenu = useCallback((theme) => {
     const resolved = getResolvedTheme(theme)
     const toggleLabel = resolved === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'
@@ -128,6 +141,7 @@ export default function App() {
     }
   }, [getResolvedTheme])
 
+  // Apply a theme to the document root and persist it ('system' clears the override).
   const applyTheme = useCallback((theme) => {
     if (!theme) return
     currentThemeRef.current = theme
@@ -162,6 +176,7 @@ export default function App() {
     menuRefs.current.wordCountItem?.setChecked(nextVisible)
   }, [])
 
+  // Backend-initiated Pinterest searches (e.g. from a native menu) open the scraper window.
   useEffect(() => {
     let unlisten
 
@@ -177,6 +192,7 @@ export default function App() {
     }
   }, [])
 
+  // On startup: restore persisted preferences, then build the native View menu entries.
   useEffect(() => {
     const stored = localStorage.getItem(THEME_STORAGE_KEY) || 'system'
     const storedAccent = normalizeAccentColor(localStorage.getItem(ACCENT_STORAGE_KEY))
@@ -256,6 +272,7 @@ export default function App() {
     setupMenu()
   }, [applyAccentColor, applyTheme, applyWordCountBadgeVisibility, getResolvedTheme, updateMenu])
 
+  // Refresh menu labels when the OS theme flips while in 'system' mode.
   useEffect(() => {
     if (!window.matchMedia) return
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -269,6 +286,7 @@ export default function App() {
     return () => media.removeEventListener?.('change', handler)
   }, [updateMenu])
 
+  // Escape closes the accent picker first; otherwise it exits fullscreen.
   useEffect(() => {
     const appWindow = getCurrentWindow()
     const onKeyDown = async (e) => {

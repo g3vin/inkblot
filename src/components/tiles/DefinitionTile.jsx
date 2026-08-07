@@ -1,3 +1,7 @@
+/**
+ * DefinitionTile.jsx — "Define Word" workbench tile.
+ * Fetches the first definition from the free dictionaryapi.dev API.
+ */
 import React, { useEffect, useState } from 'react'
 
 export default function DefinitionTile({ word, onRemove }) {

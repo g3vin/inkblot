@@ -1,42 +1,42 @@
-import { Fragment as ReactFragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+/**
+ * EditorCanvas.jsx — the writing surface.
+ *
+ * Creates the primary and secondary TipTap editors (secondary appears in
+ * split view), loads/saves documents through FileSystem, and manages:
+ *  - autosave (debounced) plus slower version-history checkpoints
+ *  - per-pane word-count badges
+ *  - caching editor state per document so switching docs is instant
+ *  - drag & drop of clipboard entries and editor selections between panes
+ *  - pasting images and Pinterest board URLs as rich nodes
+ *  - remapping quote-note anchors as the document changes
+ *  - the Focus Mode overlay (see FocusModeOverlay.jsx)
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
-import { Color } from '@tiptap/extension-color'
-import { Dropcursor } from '@tiptap/extension-dropcursor'
-import { FontFamily } from '@tiptap/extension-font-family'
-import { TextAlign } from '@tiptap/extension-text-align'
-import { Highlight } from '@tiptap/extension-highlight'
-import { Table } from '@tiptap/extension-table'
-import { TableCell } from '@tiptap/extension-table-cell'
-import { TableHeader } from '@tiptap/extension-table-header'
-import { TableRow } from '@tiptap/extension-table-row'
-import { Underline } from '@tiptap/extension-underline'
 import { createDocument } from '@tiptap/core'
 import { Fragment } from '@tiptap/pm/model'
 import { EditorState, TextSelection } from '@tiptap/pm/state'
-import ResizableImage from './extensions/ResizableImage'
 import { debounce } from 'lodash'
 
-import { CustomTextStyle } from './extensions/CustomTextStyle'
-import { DictationInline } from './extensions/DictationInline'
-import { NoteAnnotation, syncEditorNotes } from './extensions/NoteAnnotation'
-import PinterestBoard, { normalizePinterestBoardUrl } from './extensions/PinterestBoard'
-import { ReadAloudHighlight } from './extensions/ReadAloudHighlight'
-import TabIndent from './extensions/TabIndent'
-import { saveDocument, loadDocument, getVersions } from './FileSystem'
+import { syncEditorNotes } from '../extensions/NoteAnnotation'
+import { normalizePinterestBoardUrl } from '../extensions/PinterestBoard'
+import { buildEditorExtensions } from '../lib/editorExtensions'
+import { saveDocument, loadDocument, getVersions } from '../lib/FileSystem'
+import { isEditorReady } from '../lib/editorUtils'
+import { isCanvasDoc } from '../lib/docKind'
+import CanvasPane from '../canvas/CanvasPane'
+import DraftTabPane from './DraftTabPane'
+import FocusModeOverlay from './FocusModeOverlay'
+import VersionComparePane from './VersionComparePane'
 import SFIcon from './SFIcon'
 
 const EMPTY_NOTES = []
 const EMPTY_DOC_CONTENT = '<p></p>'
-const FOCUS_MODE_SETTINGS_KEY = 'inkblot-focus-mode-settings'
-const DEFAULT_FOCUS_MODE_SETTINGS = {
-  before: 0,
-  after: 0,
-  fontSize: 42,
-  contextFontSize: 28,
-  paragraphContext: false,
-}
+const WORD_COUNT_DEBOUNCE_MS = 300
+const HISTORY_CHECKPOINT_DEBOUNCE_MS = 15000
 
+/** Whitespace-delimited word count. */
 const countWords = (text = '') => {
   const trimmed = text.trim()
   if (!trimmed) return 0
@@ -48,177 +48,12 @@ const emptyWordStats = {
   selected: null,
 }
 
-const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value))
-
-const loadFocusModeSettings = () => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(FOCUS_MODE_SETTINGS_KEY) || '{}')
-    return {
-      before: clampNumber(Number(parsed.before) || DEFAULT_FOCUS_MODE_SETTINGS.before, 0, 6),
-      after: clampNumber(Number(parsed.after) || DEFAULT_FOCUS_MODE_SETTINGS.after, 0, 6),
-      fontSize: clampNumber(Number(parsed.fontSize) || DEFAULT_FOCUS_MODE_SETTINGS.fontSize, 28, 72),
-      contextFontSize: clampNumber(
-        Number(parsed.contextFontSize) || DEFAULT_FOCUS_MODE_SETTINGS.contextFontSize,
-        18,
-        56
-      ),
-      paragraphContext: Boolean(parsed.paragraphContext),
-    }
-  } catch {
-    return DEFAULT_FOCUS_MODE_SETTINGS
-  }
-}
-
-const saveFocusModeSettings = (settings) => {
-  try {
-    localStorage.setItem(FOCUS_MODE_SETTINGS_KEY, JSON.stringify(settings))
-  } catch {
-    // Ignore storage failures; focus mode can still use the in-memory settings.
-  }
-}
-
-const getSentenceSpans = (text = '') => {
-  const spans = []
-  const regex = /[^.!?\n]+(?:[.!?]+["')\]]*)?/g
-  let match
-
-  while ((match = regex.exec(text)) !== null) {
-    const raw = match[0]
-    const leading = raw.match(/^\s*/)?.[0]?.length || 0
-    const trailing = raw.match(/\s*$/)?.[0]?.length || 0
-    const start = match.index + leading
-    const end = match.index + raw.length - trailing
-
-    if (end > start) {
-      spans.push({
-        start,
-        end,
-        text: text.slice(start, end),
-      })
-    }
-  }
-
-  return spans
-}
-
-const getVisibleFocusSentences = (spans, fullText, activeIndex, before, after, paragraphContext = false) => {
-  const start = paragraphContext ? 0 : Math.max(0, activeIndex - before)
-  const end = paragraphContext ? spans.length : Math.min(spans.length, activeIndex + after + 1)
-  const slicedSpans = spans.slice(start, end)
-
-  return {
-    visibleSentences: slicedSpans.map((span, index) => {
-      const previousSpan = index > 0 ? slicedSpans[index - 1] : null
-      return {
-        ...span,
-        prefix: previousSpan ? fullText.slice(previousSpan.end, span.start) : '',
-      }
-    }),
-    currentIndex: activeIndex - start,
-  }
-}
-
-const getFocusOffsetFromSelection = (textMap, selection) => {
-  const startOffset = getTextOffsetForDocPosition(textMap.positions, selection.from)
-  if (selection.empty) return startOffset
-
-  const endOffset = getTextOffsetForDocPosition(textMap.positions, selection.to)
-  const selectedText = textMap.text.slice(startOffset, endOffset)
-  const firstSelectedCharacter = selectedText.search(/\S/)
-
-  if (firstSelectedCharacter !== -1) {
-    return startOffset + firstSelectedCharacter
-  }
-
-  return startOffset
-}
-
-const buildFocusTextMap = (doc) => {
-  const chunks = []
-  const positions = []
-  let previousBlock = null
-
-  doc.descendants((node, pos, parent) => {
-    if (!node.isText || !node.text) return
-
-    const block = parent?.isBlock ? parent : null
-    if (chunks.length && block && block !== previousBlock) {
-      chunks.push('\n')
-      positions.push(pos)
-    }
-
-    for (let index = 0; index < node.text.length; index += 1) {
-      chunks.push(node.text[index])
-      positions.push(pos + index)
-    }
-
-    previousBlock = block
-  })
-
-  const fallbackPos = Math.max(1, doc.content.size - 1)
-  positions.push(positions.length ? positions[positions.length - 1] + 1 : fallbackPos)
-
-  return {
-    text: chunks.join(''),
-    positions,
-  }
-}
-
-const getTextOffsetForDocPosition = (positions, docPosition) => {
-  if (!positions.length) return 0
-
-  for (let index = 0; index < positions.length; index += 1) {
-    if (positions[index] >= docPosition) return index
-  }
-
-  return Math.max(0, positions.length - 1)
-}
-
-const getTextOffsetInElement = (element, targetNode, targetOffset) => {
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-  let offset = 0
-
-  while (walker.nextNode()) {
-    const node = walker.currentNode
-    const textLength = node.nodeValue?.length || 0
-    if (node === targetNode) {
-      return offset + clampNumber(targetOffset, 0, textLength)
-    }
-    offset += textLength
-  }
-
-  return null
-}
-
-const getOffsetFromClick = (event, text) => {
-  const element = event.currentTarget
-  const caretPosition = document.caretPositionFromPoint?.(event.clientX, event.clientY)
-  if (caretPosition?.offsetNode && element.contains(caretPosition.offsetNode)) {
-    const offset = getTextOffsetInElement(element, caretPosition.offsetNode, caretPosition.offset)
-    if (offset !== null) return clampNumber(offset, 0, text.length)
-  }
-
-  const caretRange = document.caretRangeFromPoint?.(event.clientX, event.clientY)
-  if (caretRange?.startContainer && element.contains(caretRange.startContainer)) {
-    const offset = getTextOffsetInElement(element, caretRange.startContainer, caretRange.startOffset)
-    if (offset !== null) return clampNumber(offset, 0, text.length)
-  }
-
-  const rect = element.getBoundingClientRect()
-  return event.clientX < rect.left + rect.width / 2 ? 0 : text.length
-}
-
-const isEditorReady = (instance) => Boolean(
-  instance &&
-  !instance.isDestroyed &&
-  instance.state?.schema?.nodes &&
-  instance.view &&
-  !instance.view.isDestroyed &&
-  instance.commandManager &&
-  instance.commands &&
-  typeof instance.chain === 'function'
+const areWordStatsEqual = (left, right) => (
+  left.total === right.total &&
+  left.selected === right.selected
 )
 
+/** Shallow-compare two note arrays (per-note key/value equality) to avoid redundant state updates. */
 const areNoteArraysEqual = (left = [], right = []) => {
   if (left === right) return true
   if (!Array.isArray(left) || !Array.isArray(right)) return false
@@ -245,360 +80,6 @@ const areNoteArraysEqual = (left = [], right = []) => {
   return true
 }
 
-function FocusModeOverlay({ editor, onExit }) {
-  const [settings, setSettings] = useState(loadFocusModeSettings)
-  const [visibleSentences, setVisibleSentences] = useState([])
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [cursorOffset, setCursorOffset] = useState(0)
-  const [focusTextOffset, setFocusTextOffset] = useState(0)
-  const overlayRef = useRef(null)
-  const focusTextRef = useRef(null)
-  const sentenceRefs = useRef(new Map())
-  const textMapRef = useRef({ text: '', positions: [] })
-  const sentenceSpansRef = useRef([])
-  const activeSentenceIndexRef = useRef(0)
-
-  const updateVisibleSentences = useCallback(() => {
-    if (!isEditorReady(editor)) {
-      setVisibleSentences([])
-      setCurrentIndex(0)
-      textMapRef.current = { text: '', positions: [] }
-      sentenceSpansRef.current = []
-      activeSentenceIndexRef.current = 0
-      return
-    }
-
-    const { doc, selection } = editor.state
-    const textMap = buildFocusTextMap(doc)
-    textMapRef.current = textMap
-    const fullText = textMap.text
-    const cursorOffset = getFocusOffsetFromSelection(textMap, selection)
-    const spans = getSentenceSpans(fullText)
-    sentenceSpansRef.current = spans
-    setCursorOffset(cursorOffset)
-
-    if (!spans.length) {
-      setVisibleSentences([])
-      setCurrentIndex(0)
-      activeSentenceIndexRef.current = 0
-      return
-    }
-
-    let activeIndex = spans.findIndex((span, index) => (
-      cursorOffset >= span.start &&
-      (cursorOffset < span.end || (index === spans.length - 1 && cursorOffset <= span.end))
-    ))
-    if (activeIndex === -1) {
-      const nextIndex = spans.findIndex(span => cursorOffset < span.start)
-      activeIndex = nextIndex === -1 ? spans.length - 1 : Math.max(0, nextIndex - 1)
-    }
-    const nextFocusWindow = getVisibleFocusSentences(
-      spans,
-      fullText,
-      activeIndex,
-      settings.before,
-      settings.after,
-      settings.paragraphContext
-    )
-
-    activeSentenceIndexRef.current = activeIndex
-    setVisibleSentences(nextFocusWindow.visibleSentences)
-    setCurrentIndex(nextFocusWindow.currentIndex)
-  }, [editor, settings.after, settings.before, settings.paragraphContext])
-
-  const updateSetting = useCallback((key, value) => {
-    setSettings((current) => {
-      const next = {
-        ...current,
-        [key]: key === 'fontSize'
-          ? clampNumber(Number(value), 28, 72)
-          : key === 'contextFontSize'
-            ? clampNumber(Number(value), 18, 56)
-            : key === 'paragraphContext'
-              ? Boolean(value)
-              : clampNumber(Number(value), 0, 6),
-      }
-      saveFocusModeSettings(next)
-      return next
-    })
-  }, [])
-
-  useEffect(() => {
-    updateVisibleSentences()
-    if (!isEditorReady(editor)) return undefined
-
-    const handler = () => updateVisibleSentences()
-    editor.on('transaction', handler)
-    editor.on('selectionUpdate', handler)
-    editor.commands.focus()
-
-    return () => {
-      if (!editor.isDestroyed) {
-        editor.off('transaction', handler)
-        editor.off('selectionUpdate', handler)
-      }
-    }
-  }, [editor, updateVisibleSentences])
-
-  const focusEditor = useCallback(() => {
-    if (isEditorReady(editor)) {
-      editor.commands.focus()
-    }
-  }, [editor])
-
-  const placeCursorAtTextOffset = useCallback((textOffset) => {
-    if (!isEditorReady(editor)) return
-
-    const normalizedTextOffset = clampNumber(textOffset, 0, textMapRef.current.positions.length - 1)
-    const docPosition = textMapRef.current.positions[normalizedTextOffset]
-    if (!Number.isFinite(docPosition)) return
-
-    const selectionPosition = clampNumber(docPosition, 1, editor.state.doc.content.size)
-    try {
-      const tr = editor.state.tr.setSelection(TextSelection.create(editor.state.doc, selectionPosition))
-      editor.view.dispatch(tr.scrollIntoView())
-      editor.commands.focus()
-      setCursorOffset(normalizedTextOffset)
-    } catch (error) {
-      console.warn('Failed to place focus mode cursor:', error)
-      editor.commands.focus()
-    }
-  }, [editor])
-
-  const moveCursorToSentenceClick = useCallback((event, sentence) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const localOffset = getOffsetFromClick(event, sentence.text)
-    placeCursorAtTextOffset(sentence.start + localOffset)
-  }, [placeCursorAtTextOffset])
-
-  const moveToAdjacentSentence = useCallback((direction) => {
-    const spans = sentenceSpansRef.current
-    if (!spans.length) return
-
-    const targetIndex = clampNumber(activeSentenceIndexRef.current + direction, 0, spans.length - 1)
-    const targetSentence = spans[targetIndex]
-    if (!targetSentence) return
-
-    const nextFocusWindow = getVisibleFocusSentences(
-      spans,
-      textMapRef.current.text || '',
-      targetIndex,
-      settings.before,
-      settings.after,
-      settings.paragraphContext
-    )
-
-    activeSentenceIndexRef.current = targetIndex
-    setVisibleSentences(nextFocusWindow.visibleSentences)
-    setCurrentIndex(nextFocusWindow.currentIndex)
-    setCursorOffset(targetSentence.start)
-    placeCursorAtTextOffset(targetSentence.start)
-  }, [placeCursorAtTextOffset, settings.after, settings.before, settings.paragraphContext])
-
-  const renderFocusSentenceText = (sentence, index) => {
-    if (index !== currentIndex) return sentence.text
-
-    const caretOffset = clampNumber(cursorOffset - sentence.start, 0, sentence.text.length)
-    const before = sentence.text.slice(0, caretOffset)
-    const after = sentence.text.slice(caretOffset)
-
-    return (
-      <>
-        {before}
-        <span className="focus-mode-caret" aria-hidden="true" />
-        {after}
-      </>
-    )
-  }
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
-        event.stopImmediatePropagation?.()
-        onExit?.()
-        return
-      }
-
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-      if (event.target instanceof Element && event.target.closest('.focus-mode-control-zone')) return
-
-      event.preventDefault()
-      event.stopPropagation()
-      event.stopImmediatePropagation?.()
-      moveToAdjacentSentence(event.key === 'ArrowUp' ? -1 : 1)
-    }
-
-    window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [moveToAdjacentSentence, onExit])
-
-  const updateFocusTextPosition = useCallback(() => {
-    const overlayElement = overlayRef.current
-    const focusTextElement = focusTextRef.current
-    const sentence = visibleSentences[currentIndex]
-    const sentenceElement = sentence ? sentenceRefs.current.get(`${sentence.start}-${sentence.end}`) : null
-
-    if (!overlayElement || !focusTextElement || !sentenceElement) {
-      setFocusTextOffset(0)
-      return
-    }
-
-    const overlayRect = overlayElement.getBoundingClientRect()
-    const sentenceRect = sentenceElement.getBoundingClientRect()
-    setFocusTextOffset((current) => {
-      const sentenceCenterWithoutTransform =
-        sentenceRect.top - current + sentenceRect.height / 2
-      const desiredOffset =
-        overlayRect.top + overlayRect.height / 2 - sentenceCenterWithoutTransform
-
-      return Math.abs(current - desiredOffset) < 0.5 ? current : desiredOffset
-    })
-  }, [currentIndex, visibleSentences])
-
-  useLayoutEffect(() => {
-    updateFocusTextPosition()
-  }, [
-    settings.contextFontSize,
-    settings.fontSize,
-    settings.paragraphContext,
-    updateFocusTextPosition,
-  ])
-
-  useEffect(() => {
-    const handleResize = () => {
-      updateFocusTextPosition()
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [updateFocusTextPosition])
-
-  return (
-    <div
-      ref={overlayRef}
-      className="focus-mode-overlay"
-      style={{
-        '--focus-mode-font-size': `${settings.fontSize}px`,
-        '--focus-mode-context-font-size': `${settings.contextFontSize}px`,
-      }}
-      onMouseDown={focusEditor}
-    >
-      <div
-        className={`focus-mode-text${settings.paragraphContext ? ' is-paragraph-context' : ''}`}
-        ref={focusTextRef}
-        style={{ '--focus-mode-text-offset': `${focusTextOffset}px` }}
-        aria-live="polite"
-      >
-        {visibleSentences.length ? (
-          visibleSentences.map((sentence, index) => (
-            <ReactFragment key={`${sentence.start}-${sentence.end}`}>
-              {settings.paragraphContext && sentence.prefix ? (
-                <span className="focus-mode-prefix" aria-hidden="true">
-                  {sentence.prefix}
-                </span>
-              ) : null}
-              <span
-                ref={(element) => {
-                  const key = `${sentence.start}-${sentence.end}`
-                  if (element) {
-                    sentenceRefs.current.set(key, element)
-                  } else {
-                    sentenceRefs.current.delete(key)
-                  }
-                }}
-                className={`focus-mode-sentence${index === currentIndex ? ' current' : ''}`}
-                onMouseDown={(event) => moveCursorToSentenceClick(event, sentence)}
-              >
-                {renderFocusSentenceText(sentence, index)}
-              </span>
-            </ReactFragment>
-          ))
-        ) : (
-          <span className="focus-mode-sentence current">
-            <span className="focus-mode-caret" aria-hidden="true" />
-          </span>
-        )}
-      </div>
-
-      <div className="focus-mode-control-zone" onMouseDown={(event) => event.stopPropagation()}>
-        <div className={`focus-mode-controls${settings.paragraphContext ? ' is-paragraph-mode' : ''}`}>
-          <div className="focus-mode-display-toggle" role="group" aria-label="Focus mode display">
-            <button
-              type="button"
-              className={!settings.paragraphContext ? 'active' : ''}
-              onClick={() => updateSetting('paragraphContext', false)}
-            >
-              Sentence
-            </button>
-            <button
-              type="button"
-              className={settings.paragraphContext ? 'active' : ''}
-              onClick={() => updateSetting('paragraphContext', true)}
-            >
-              Paragraph
-            </button>
-          </div>
-          {!settings.paragraphContext ? (
-            <>
-              <label className="focus-mode-slider">
-                <span>Before</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="6"
-                  value={settings.before}
-                  onChange={(event) => updateSetting('before', event.target.value)}
-                />
-                <strong>{settings.before}</strong>
-              </label>
-              <label className="focus-mode-slider">
-                <span>After</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="6"
-                  value={settings.after}
-                  onChange={(event) => updateSetting('after', event.target.value)}
-                />
-                <strong>{settings.after}</strong>
-              </label>
-            </>
-          ) : null}
-          <label className="focus-mode-slider focus-mode-slider-wide">
-            <span>Focus</span>
-            <input
-              type="range"
-              min="28"
-              max="72"
-              value={settings.fontSize}
-              onChange={(event) => updateSetting('fontSize', event.target.value)}
-            />
-            <strong>{settings.fontSize}</strong>
-          </label>
-          <label className="focus-mode-slider focus-mode-slider-wide">
-            <span>Context</span>
-            <input
-              type="range"
-              min="18"
-              max="56"
-              value={settings.contextFontSize}
-              onChange={(event) => updateSetting('contextFontSize', event.target.value)}
-            />
-            <strong>{settings.contextFontSize}</strong>
-          </label>
-          <button className="focus-mode-exit" type="button" onClick={onExit}>
-            Exit
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function EditorCanvas({
   setEditor,
   setSecondaryEditor,
@@ -608,6 +89,9 @@ export default function EditorCanvas({
   setCurrentDoc,
   splitView,
   setSplitView,
+  splitOrientation = 'columns',
+  splitRatio = 0.5,
+  setSplitRatio,
   secondaryDoc,
   setSecondaryDoc,
   notesByDoc,
@@ -620,19 +104,34 @@ export default function EditorCanvas({
   activeEditor,
   focusModeOpen = false,
   onExitFocusMode,
+  draftTabActive = false,
+  onDraftCreated,
+  refreshFiles,
+  compare = null,
+  closeCompare,
+  onOpenDocInTab,
 }) {
-  const hasActiveDoc = Boolean(projectName && currentDoc)
+  // A draft tab holds the primary pane without holding a document: the pane is
+  // "open" (and any split stays up) while DraftTabPane asks what it should be.
+  const hasActiveDoc = Boolean(projectName && (currentDoc || draftTabActive))
   const primaryPaneRef = useRef(null)
   const secondaryPaneRef = useRef(null)
+  const splitContainerRef = useRef(null)
+  const [isResizingSplit, setIsResizingSplit] = useState(false)
   const [dragCaret, setDragCaret] = useState(null)
   const notesByDocRef = useRef(notesByDoc)
   const loadedDocsRef = useRef(new Set())
   const docStateCacheRef = useRef(new Map())
   const primaryAutosaveRef = useRef(null)
   const secondaryAutosaveRef = useRef(null)
+  const primaryVersionCheckpointRef = useRef(null)
   const isLoadingPrimaryRef = useRef(false)
   const isLoadingSecondaryRef = useRef(false)
+  const activeDocRef = useRef(activeDoc)
+  const activeEditorRef = useRef(activeEditor)
 
+  // Editor state is cached per project/pane/doc so revisiting a doc restores
+  // scroll, selection, and undo history instantly without re-parsing content.
   const getDocCacheKey = useCallback((docProjectName, docName, paneId) => (
     docProjectName && docName && paneId ? `${docProjectName}::${paneId}::${docName}` : ''
   ), [])
@@ -641,6 +140,7 @@ export default function EditorCanvas({
     Object.prototype.hasOwnProperty.call(notesByDocRef.current || {}, docName)
   ), [])
 
+  // Build a fresh ProseMirror EditorState from stored document content.
   const createEditorStateFromContent = useCallback((targetEditor, content) => {
     const doc = createDocument(
       content || EMPTY_DOC_CONTENT,
@@ -661,6 +161,7 @@ export default function EditorCanvas({
     targetEditor.createNodeViews?.()
   }, [])
 
+  // Save the pane's current editor state into the doc cache before switching away.
   const stashEditorState = useCallback((targetEditor, docName, paneId) => {
     if (!isEditorReady(targetEditor)) return
     const cacheKey = getDocCacheKey(projectName, docName, paneId)
@@ -675,6 +176,16 @@ export default function EditorCanvas({
     }
   }, [])
 
+  useEffect(() => {
+    activeDocRef.current = activeDoc
+  }, [activeDoc])
+
+  useEffect(() => {
+    activeEditorRef.current = activeEditor
+  }, [activeEditor])
+
+  // Install a doc into a pane: prefer the cached state, else build one from
+  // the loaded content; also seed the doc's notes on first open.
   const restoreEditorStateForDoc = useCallback((targetEditor, docName, paneId, loadedDoc) => {
     const cacheKey = getDocCacheKey(projectName, docName, paneId)
     const cachedState = cacheKey ? docStateCacheRef.current.get(cacheKey) : null
@@ -706,6 +217,9 @@ export default function EditorCanvas({
     return view
   }
 
+  // Paste interception: images become image nodes, Pinterest board URLs become
+  // embedded boards, and a globally-requested plain paste inserts raw text.
+  // Everything else falls through to TipTap's default handling.
   const createPasteHandler = () => {
     return (view, event) => {
       const items = event.clipboardData?.items
@@ -773,6 +287,9 @@ export default function EditorCanvas({
     }
   }
 
+  // Resolve the {id, text} being dragged from the clipboard panel, from the
+  // dataTransfer payload or the window-global fallbacks. Returns null for
+  // drags that originated as editor selections.
   const getDraggedClipboardPayload = (event) => {
     const transfer = event?.dataTransfer
     const globalDragged = window.__inkblot_draggedClipboardEntry
@@ -793,26 +310,11 @@ export default function EditorCanvas({
     return { id, text: String(text) }
   }
 
-  const emitDnDDebug = (phase, status = {}, info = '', transient = false) => {
-    try {
-      window.dispatchEvent(new CustomEvent('inkblot:dnd-debug', {
-        detail: { phase, status, info, transient },
-      }))
-    } catch (e) {}
-  }
-
   const clearDragGlobals = () => {
     try { window.__inkblot_draggedClipboardEntry = null } catch (e) {}
     try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
     try { window.__inkblot_dragPoint = null } catch (e) {}
     try { window.__inkblot_dropHandled = false } catch (e) {}
-    emitDnDDebug('drag-globals-cleared', {
-      source: 'none',
-      over: 'none',
-      dropHandled: false,
-      editorSelection: false,
-      clipboardPayload: false,
-    }, '', true)
   }
 
   const isPointInRect = (x, y, rect) => {
@@ -834,6 +336,8 @@ export default function EditorCanvas({
     return null
   }
 
+  // Move the target editor's selection under the drag point and position the
+  // visual drop caret within the pane.
   const updateDropCaret = (targetEditor, event) => {
     const view = getMountedEditorView(targetEditor)
     if (!view) return
@@ -881,13 +385,6 @@ export default function EditorCanvas({
 
     try { window.__inkblot_draggedEditorSelection = payload } catch (e) {}
     try { window.__inkblot_dropHandled = false } catch (e) {}
-    emitDnDDebug('editor-dragstart', {
-      source: 'editor',
-      over: 'none',
-      dropHandled: false,
-      editorSelection: true,
-      clipboardPayload: false,
-    }, `${source}:${docName || ''} len=${text.length}`)
     try {
       event.dataTransfer?.setData('application/x-inkblot-editor-selection', JSON.stringify(payload))
       if (!event.dataTransfer?.getData('text/plain')) {
@@ -907,37 +404,18 @@ export default function EditorCanvas({
       event.dataTransfer.dropEffect = 'move'
     }
     updateDropCaret(targetEditor, event)
-    emitDnDDebug('editor-dragover', {
-      over: 'editor',
-      clipboardPayload: true,
-    }, '', true)
   }
 
   const handlePaneDrop = (event, targetEditor) => {
     const payload = getDraggedClipboardPayload(event)
-    const view = getMountedEditorView(targetEditor)
-    if (!payload || !view) return
+    if (!payload || !getMountedEditorView(targetEditor)) return
 
     event.preventDefault()
     event.stopPropagation()
-
-    const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
-    const insertPos = coords?.pos ?? view.state.selection.from
-    const tr = view.state.tr.insertText(payload.text, insertPos, insertPos)
-    view.dispatch(tr.scrollIntoView())
-    view.focus()
-
-    onMoveClipboardEntryToEditor?.(payload.id)
-    try { window.__inkblot_dropHandled = true } catch (e) {}
-    setDragCaret(null)
-    emitDnDDebug('editor-drop', {
-      source: 'clipboard',
-      over: 'editor',
-      dropHandled: true,
-      clipboardPayload: true,
-    }, `id=${payload.id || 'none'} len=${payload.text.length}`)
+    insertClipboardPayloadAtPoint(payload, targetEditor, event.clientX, event.clientY)
   }
 
+  // Insert dragged clipboard text at the drop point and consume the entry.
   const insertClipboardPayloadAtPoint = (payload, targetEditor, x, y) => {
     const view = getMountedEditorView(targetEditor)
     if (!payload || !view) return false
@@ -949,12 +427,6 @@ export default function EditorCanvas({
     onMoveClipboardEntryToEditor?.(payload.id)
     try { window.__inkblot_dropHandled = true } catch (e) {}
     setDragCaret(null)
-    emitDnDDebug('editor-fallback-insert-on-dragend', {
-      source: 'clipboard',
-      over: 'editor',
-      dropHandled: true,
-      clipboardPayload: true,
-    }, `id=${payload.id || 'none'} len=${payload.text.length}`)
     return true
   }
 
@@ -964,7 +436,7 @@ export default function EditorCanvas({
   const secondaryDocNotes = notesByDoc?.[secondaryDoc] ?? EMPTY_NOTES
   const activeDocNotes = notesByDoc?.[activeDoc] ?? EMPTY_NOTES
 
-  const getWordStats = useCallback((targetEditor) => {
+  const getWordStats = useCallback((targetEditor, previousTotal = 0, includeTotal = true) => {
     if (!isEditorReady(targetEditor)) return emptyWordStats
 
     const { selection, doc } = targetEditor.state
@@ -973,7 +445,7 @@ export default function EditorCanvas({
       : doc.textBetween(selection.from, selection.to, '\n')
 
     return {
-      total: countWords(targetEditor.getText()),
+      total: includeTotal ? countWords(targetEditor.getText()) : previousTotal,
       selected: selection?.empty ? null : countWords(selectedText),
     }
   }, [])
@@ -988,89 +460,31 @@ export default function EditorCanvas({
     notesByDocRef.current = notesByDoc
   }, [notesByDoc])
 
-  /* ---------------- Primary Editor ---------------- */
+  /* ---------------- Editors ---------------- */
 
   const editor = useEditor({
-    extensions: [
+    extensions: buildEditorExtensions(
       StarterKit.configure({
         bulletList: { keepMarks: true },
         orderedList: { keepMarks: true },
-      }),
-      Dropcursor.configure({
-        color: 'rgba(84, 165, 255, 0.95)',
-        width: 2,
-      }),
-      CustomTextStyle,
-      Color,
-      FontFamily,
-      NoteAnnotation,
-      ReadAloudHighlight,
-      DictationInline,
-      PinterestBoard,
-      TabIndent,
-      Underline,
-      TextAlign.configure({
-        types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
-      }),
-      Highlight.configure({
-        multicolor: true,
-      }),
-      Table.configure({
-        resizable: true,
-      }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      ResizableImage.configure({
-        inline: true,
-        allowBase64: true,
-      }),
-    ],
+      })
+    ),
     content: '',
     editorProps: {
       handlePaste: createPasteHandler(),
     },
   })
-
-  /* ---------------- Secondary Editor ---------------- */
 
   const secondaryEditor = useEditor({
-    extensions: [
-      StarterKit,
-      Dropcursor.configure({
-        color: 'rgba(84, 165, 255, 0.95)',
-        width: 2,
-      }),
-      CustomTextStyle,
-      Color,
-      FontFamily,
-      NoteAnnotation,
-      ReadAloudHighlight,
-      DictationInline,
-      PinterestBoard,
-      TabIndent,
-      Underline,
-      TextAlign.configure({
-        types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
-      }),
-      Highlight.configure({ multicolor: true }),
-      Table.configure({
-        resizable: true,
-      }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      ResizableImage.configure({
-        inline: true,
-        allowBase64: true,
-      }),
-    ],
+    extensions: buildEditorExtensions(StarterKit),
     content: '',
     editorProps: {
       handlePaste: createPasteHandler(),
     },
   })
 
+  // Tag drags that start inside an editor's DOM with the selection payload so
+  // other drop targets (clipboard panel, opposite pane) know what is moving.
   useEffect(() => {
     const attachDragMeta = (instance, source, docName) => {
       const dom = getMountedEditorView(instance)?.dom
@@ -1092,11 +506,6 @@ export default function EditorCanvas({
         }
 
         try { window.__inkblot_draggedEditorSelection = payload } catch (e) {}
-        emitDnDDebug('editor-dom-dragstart', {
-          source: 'editor',
-          editorSelection: true,
-          dropHandled: false,
-        }, `${source}:${docName || ''} len=${text.length}`)
         try {
           event.dataTransfer?.setData('application/x-inkblot-editor-selection', JSON.stringify(payload))
           event.dataTransfer?.setData('text/plain', text)
@@ -1106,18 +515,9 @@ export default function EditorCanvas({
         } catch (e) {}
       }
 
-      const onDragEnd = () => {
-        emitDnDDebug('editor-dom-dragend', {
-          source: 'editor',
-          editorSelection: Boolean(window.__inkblot_draggedEditorSelection),
-        })
-      }
-
       dom.addEventListener('dragstart', onDragStart, true)
-      dom.addEventListener('dragend', onDragEnd, true)
       return () => {
         dom.removeEventListener('dragstart', onDragStart, true)
-        dom.removeEventListener('dragend', onDragEnd, true)
       }
     }
 
@@ -1134,24 +534,15 @@ export default function EditorCanvas({
     if (!pane || !isEditorReady(editor)) return
 
     const onDragStart = (event) => handlePaneDragStart(event, editor, 'primary', currentDoc)
-    const onDragEnd = () => {
-      emitDnDDebug('primary-pane-dragend', {
-        source: 'editor',
-        editorSelection: Boolean(window.__inkblot_draggedEditorSelection),
-        clipboardPayload: Boolean(window.__inkblot_draggedClipboardEntry),
-      }, '', true)
-    }
     const onDragOver = (event) => handlePaneDragOver(event, editor)
     const onDrop = (event) => handlePaneDrop(event, editor)
 
     pane.addEventListener('dragstart', onDragStart, true)
-    pane.addEventListener('dragend', onDragEnd, true)
     pane.addEventListener('dragover', onDragOver, true)
     pane.addEventListener('drop', onDrop, true)
 
     return () => {
       pane.removeEventListener('dragstart', onDragStart, true)
-      pane.removeEventListener('dragend', onDragEnd, true)
       pane.removeEventListener('dragover', onDragOver, true)
       pane.removeEventListener('drop', onDrop, true)
     }
@@ -1164,24 +555,15 @@ export default function EditorCanvas({
     if (!pane || !isEditorReady(secondaryEditor) || splitView !== 'editor') return
 
     const onDragStart = (event) => handlePaneDragStart(event, secondaryEditor, 'secondary', secondaryDoc)
-    const onDragEnd = () => {
-      emitDnDDebug('secondary-pane-dragend', {
-        source: 'editor',
-        editorSelection: Boolean(window.__inkblot_draggedEditorSelection),
-        clipboardPayload: Boolean(window.__inkblot_draggedClipboardEntry),
-      }, '', true)
-    }
     const onDragOver = (event) => handlePaneDragOver(event, secondaryEditor)
     const onDrop = (event) => handlePaneDrop(event, secondaryEditor)
 
     pane.addEventListener('dragstart', onDragStart, true)
-    pane.addEventListener('dragend', onDragEnd, true)
     pane.addEventListener('dragover', onDragOver, true)
     pane.addEventListener('drop', onDrop, true)
 
     return () => {
       pane.removeEventListener('dragstart', onDragStart, true)
-      pane.removeEventListener('dragend', onDragEnd, true)
       pane.removeEventListener('dragover', onDragOver, true)
       pane.removeEventListener('drop', onDrop, true)
     }
@@ -1209,10 +591,6 @@ export default function EditorCanvas({
         event.dataTransfer.dropEffect = 'move'
       }
       updateDropCaret(targetEditor, event)
-      emitDnDDebug('window-dragover-editor-target', {
-        over: 'editor',
-        clipboardPayload: true,
-      }, '', true)
     }
 
     const onWindowDrag = (event) => {
@@ -1230,10 +608,6 @@ export default function EditorCanvas({
       }
 
       updateDropCaret(targetEditor, event)
-      emitDnDDebug('window-drag-editor-target', {
-        over: 'editor',
-        clipboardPayload: true,
-      }, '', true)
     }
 
     const onWindowDrop = (event) => {
@@ -1244,10 +618,6 @@ export default function EditorCanvas({
       if (!targetEditor) return
 
       handlePaneDrop(event, targetEditor)
-      emitDnDDebug('window-drop-editor-target', {
-        over: 'editor',
-        dropHandled: true,
-      })
     }
 
     const onWindowDragEnd = (event) => {
@@ -1255,11 +625,6 @@ export default function EditorCanvas({
         try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
       }
       setDragCaret(null)
-      emitDnDDebug('window-dragend', {
-        dropHandled: Boolean(window.__inkblot_dropHandled),
-        clipboardPayload: Boolean(window.__inkblot_draggedClipboardEntry),
-        editorSelection: Boolean(window.__inkblot_draggedEditorSelection),
-      }, `x=${String(event?.clientX ?? window.__inkblot_dragPoint?.x ?? null)} y=${String(event?.clientY ?? window.__inkblot_dragPoint?.y ?? null)}`)
     }
 
     window.addEventListener('drag', onWindowDrag, true)
@@ -1290,10 +655,6 @@ export default function EditorCanvas({
       }
 
       if (window.__inkblot_dropHandled) {
-        emitDnDDebug('clipboard-dragend-drop-skipped', {
-          source: 'clipboard',
-          dropHandled: true,
-        }, `id=${payload.id || 'none'}`)
         setDragCaret(null)
         clearDragGlobals()
         return
@@ -1302,12 +663,6 @@ export default function EditorCanvas({
       const targetEditor = getTargetEditorAtPoint(point.x, point.y)
       if (targetEditor && payload.text) {
         insertClipboardPayloadAtPoint(payload, targetEditor, point.x, point.y)
-      } else {
-        emitDnDDebug('clipboard-dragend-drop-miss', {
-          source: 'clipboard',
-          over: 'none',
-          clipboardPayload: Boolean(payload.text),
-        }, `x=${String(point.x)} y=${String(point.y)}`)
       }
 
       setDragCaret(null)
@@ -1344,6 +699,9 @@ export default function EditorCanvas({
 
   useEffect(() => {
     if (!isEditorReady(editor) || !currentDoc) return
+    // A canvas has no TipTap content — feeding its JSON to createDocument() would
+    // throw. CanvasPane loads and saves it instead; this editor stays idle.
+    if (isCanvasDoc(currentDoc)) return
     let cancelled = false
     const cacheKey = getDocCacheKey(projectName, currentDoc, 'primary')
 
@@ -1356,7 +714,11 @@ export default function EditorCanvas({
         if (cancelled || !isEditorReady(editor)) return
 
         restoreEditorStateForDoc(editor, currentDoc, 'primary', doc)
-        if (!doc?.content || doc.content?.content?.length === 0) {
+        // Open an empty document ready to write in — caret placed and blinking,
+        // no click needed. Asking the editor whether it is empty is the only
+        // reliable test: a new document is stored as `content: []`, which is
+        // neither missing nor a node with children, so shape checks miss it.
+        if (editor.isEmpty) {
           editor.commands.focus('start')
         }
         setPrimaryWordStats(getWordStats(editor))
@@ -1378,6 +740,7 @@ export default function EditorCanvas({
     return () => {
       cancelled = true
       flushAutosave(primaryAutosaveRef)
+      flushAutosave(primaryVersionCheckpointRef)
       stashEditorState(editor, currentDoc, 'primary')
     }
   }, [
@@ -1396,6 +759,7 @@ export default function EditorCanvas({
 
   useEffect(() => {
     if (!isEditorReady(secondaryEditor) || splitView !== 'editor' || !secondaryDoc) return
+    if (isCanvasDoc(secondaryDoc)) return
     let cancelled = false
     const cacheKey = getDocCacheKey(projectName, secondaryDoc, 'secondary')
 
@@ -1444,73 +808,123 @@ export default function EditorCanvas({
     syncEditorNotes(secondaryEditor, secondaryDocNotes, secondaryDoc)
   }, [secondaryDoc, secondaryDocNotes, secondaryEditor, splitView])
 
+  const saveVersionCheckpoint = useCallback(async (targetEditor, docName, paneId) => {
+    if (!isEditorReady(targetEditor) || !docName) return
+    // Canvas checkpoints are written by useCanvasDocument, not this TipTap path.
+    if (isCanvasDoc(docName)) return
+    if (!loadedDocsRef.current.has(getDocCacheKey(projectName, docName, paneId))) return
+    if (
+      (paneId === 'primary' && isLoadingPrimaryRef.current) ||
+      (paneId === 'secondary' && isLoadingSecondaryRef.current)
+    ) {
+      return
+    }
+
+    const contentJson = targetEditor.getJSON()
+    const contentHtml = targetEditor.getHTML()
+
+    await saveDocument(projectName, docName, {
+      content: contentJson,
+      notes: notesByDocRef.current?.[docName] || [],
+      _appendVersion: true,
+      _version: {
+        contentHtml,
+        contentJson,
+      },
+    })
+
+    try {
+      const vs = await getVersions(projectName, docName)
+      setVersions?.(docName, vs)
+    } catch (e) {
+      console.error('Failed to refresh versions:', e)
+    }
+  }, [getDocCacheKey, projectName, setVersions])
+
   /* ---------------- Autosave ---------------- */
 
   useEffect(() => {
     if (!isEditorReady(editor) || !currentDoc) return
+    if (isCanvasDoc(currentDoc)) return
     const handler = debounce(async () => {
       if (!isEditorReady(editor)) return
       if (isLoadingPrimaryRef.current) return
       if (!loadedDocsRef.current.has(getDocCacheKey(projectName, currentDoc, 'primary'))) return
 
       const contentJson = editor.getJSON()
-      const contentHtml = editor.getHTML()
 
       await saveDocument(projectName, currentDoc, {
         content: contentJson,
         notes: notesByDocRef.current?.[currentDoc] || [],
-        _appendVersion: true,
-        _version: {
-          contentHtml,
-          contentJson,
-        },
       })
 
-      try {
-        const vs = await getVersions(projectName, currentDoc)
-        setVersions?.(currentDoc, vs)
-      } catch (e) {
-        console.error('Failed to refresh versions:', e)
-      }
     }, 800)
 
+    const checkpointHandler = debounce(() => {
+      void saveVersionCheckpoint(editor, currentDoc, 'primary')
+    }, HISTORY_CHECKPOINT_DEBOUNCE_MS)
+
+    const handleUpdate = () => {
+      handler()
+      checkpointHandler()
+    }
+
     primaryAutosaveRef.current = handler
-    editor.on('update', handler)
+    primaryVersionCheckpointRef.current = checkpointHandler
+    editor.on('update', handleUpdate)
 
     return () => {
-      if (!editor.isDestroyed) editor.off('update', handler)
+      if (!editor.isDestroyed) editor.off('update', handleUpdate)
       handler.flush()
       handler.cancel()
+      checkpointHandler.flush()
+      checkpointHandler.cancel()
       if (primaryAutosaveRef.current === handler) {
         primaryAutosaveRef.current = null
       }
+      if (primaryVersionCheckpointRef.current === checkpointHandler) {
+        primaryVersionCheckpointRef.current = null
+      }
     }
-  }, [currentDoc, editor, getDocCacheKey, projectName, setVersions])
+  }, [currentDoc, editor, getDocCacheKey, projectName, saveVersionCheckpoint])
 
   /* ---------------- Word Count ---------------- */
 
   useEffect(() => {
-    if (!isEditorReady(editor)) return
+    if (!showWordCountBadge || !isEditorReady(editor)) return
 
-    const update = () => {
+    const updateSelectedCount = () => {
       if (!isEditorReady(editor)) return
-      setPrimaryWordStats(getWordStats(editor))
+      setPrimaryWordStats((current) => {
+        const next = getWordStats(editor, current.total, false)
+        return areWordStatsEqual(current, next) ? current : next
+      })
     }
 
-    editor.on('update', update)
-    editor.on('selectionUpdate', update)
-    update()
+    const updateTotalCount = debounce(() => {
+      if (!isEditorReady(editor)) return
+      setPrimaryWordStats((current) => {
+        const next = getWordStats(editor)
+        return areWordStatsEqual(current, next) ? current : next
+      })
+    }, WORD_COUNT_DEBOUNCE_MS)
+
+    editor.on('update', updateTotalCount)
+    editor.on('selectionUpdate', updateSelectedCount)
+    updateTotalCount()
 
     return () => {
       if (!editor.isDestroyed) {
-        editor.off('update', update)
-        editor.off('selectionUpdate', update)
+        editor.off('update', updateTotalCount)
+        editor.off('selectionUpdate', updateSelectedCount)
       }
+      updateTotalCount.cancel()
     }
-  }, [editor, getWordStats])
+  }, [editor, getWordStats, showWordCountBadge])
 
   useEffect(() => {
     if (!isEditorReady(secondaryEditor) || splitView !== 'editor' || !secondaryDoc) return
+    if (isCanvasDoc(secondaryDoc)) return
 
     const handler = debounce(async () => {
       if (!isEditorReady(secondaryEditor)) return
@@ -1523,11 +937,15 @@ export default function EditorCanvas({
       })
     }, 800)
 
+    const handleUpdate = () => {
+      handler()
+    }
+
     secondaryAutosaveRef.current = handler
-    secondaryEditor.on('update', handler)
+    secondaryEditor.on('update', handleUpdate)
 
     return () => {
-      if (!secondaryEditor.isDestroyed) secondaryEditor.off('update', handler)
+      if (!secondaryEditor.isDestroyed) secondaryEditor.off('update', handleUpdate)
       handler.flush()
       handler.cancel()
       if (secondaryAutosaveRef.current === handler) {
@@ -1537,24 +955,36 @@ export default function EditorCanvas({
   }, [getDocCacheKey, projectName, secondaryDoc, secondaryEditor, splitView])
 
   useEffect(() => {
-    if (!isEditorReady(secondaryEditor) || splitView !== 'editor') return
+    if (!showWordCountBadge || !isEditorReady(secondaryEditor) || splitView !== 'editor') return
 
-    const update = () => {
+    const updateSelectedCount = () => {
       if (!isEditorReady(secondaryEditor)) return
-      setSecondaryWordStats(getWordStats(secondaryEditor))
+      setSecondaryWordStats((current) => {
+        const next = getWordStats(secondaryEditor, current.total, false)
+        return areWordStatsEqual(current, next) ? current : next
+      })
     }
 
-    secondaryEditor.on('update', update)
-    secondaryEditor.on('selectionUpdate', update)
-    update()
+    const updateTotalCount = debounce(() => {
+      if (!isEditorReady(secondaryEditor)) return
+      setSecondaryWordStats((current) => {
+        const next = getWordStats(secondaryEditor)
+        return areWordStatsEqual(current, next) ? current : next
+      })
+    }, WORD_COUNT_DEBOUNCE_MS)
+
+    secondaryEditor.on('update', updateTotalCount)
+    secondaryEditor.on('selectionUpdate', updateSelectedCount)
+    updateTotalCount()
 
     return () => {
       if (!secondaryEditor.isDestroyed) {
-        secondaryEditor.off('update', update)
-        secondaryEditor.off('selectionUpdate', update)
+        secondaryEditor.off('update', updateTotalCount)
+        secondaryEditor.off('selectionUpdate', updateSelectedCount)
       }
+      updateTotalCount.cancel()
     }
-  }, [getWordStats, secondaryEditor, splitView])
+  }, [getWordStats, secondaryEditor, showWordCountBadge, splitView])
 
   /* ---------------- Autosave Notes ---------------- */
 
@@ -1582,25 +1012,41 @@ export default function EditorCanvas({
       }
 
       const contentJson = targetEditor.getJSON()
-      const contentHtml = targetEditor.getHTML && targetEditor.getHTML()
       await saveDocument(projectName, activeDoc, {
         content: contentJson,
         notes: activeDocNotes,
-        _appendVersion: true,
-        _version: { contentHtml, contentJson },
       })
     }, 800)
 
-    // run once to persist notes immediately, include version snapshot to avoid overwriting versions
+    const checkpointHandler = debounce(() => {
+      void saveVersionCheckpoint(targetEditor, activeDoc, activePaneId)
+    }, HISTORY_CHECKPOINT_DEBOUNCE_MS)
+
+    // Persist notes promptly; create a history snapshot only after a slower idle checkpoint.
     try { handler() } catch (e) {}
+    try { checkpointHandler() } catch (e) {}
 
     return () => {
       handler.cancel()
+      checkpointHandler.cancel()
     }
-  }, [activeDoc, activeDocNotes, currentDoc, editor, getDocCacheKey, projectName, secondaryDoc, secondaryEditor])
+  }, [
+    activeDoc,
+    activeDocNotes,
+    currentDoc,
+    editor,
+    getDocCacheKey,
+    projectName,
+    saveVersionCheckpoint,
+    secondaryDoc,
+    secondaryEditor,
+  ])
 
   /* ---------------- Anchor Remapping ---------------- */
 
+  // Keep quote-note positions in sync with edits: map each note's from/to
+  // through every transaction and refresh its anchor text, dropping notes
+  // whose range collapses to nothing.
   useEffect(() => {
     if (!isEditorReady(editor)) return
 
@@ -1670,10 +1116,43 @@ export default function EditorCanvas({
     target.chain().focus().run()
   }
 
+  const activatePane = useCallback((docName, targetEditor) => {
+    if (docName && activeDocRef.current !== docName) {
+      activeDocRef.current = docName
+      setActiveDoc(docName)
+    }
+
+    if (targetEditor && activeEditorRef.current !== targetEditor) {
+      activeEditorRef.current = targetEditor
+      setActiveEditor?.(targetEditor)
+    }
+  }, [setActiveDoc, setActiveEditor])
+
+  // Double-clicking a document card on a canvas opens that document in the pane the
+  // canvas is in — the card is a window onto the document, so following it swaps
+  // what the pane shows, exactly as clicking the file tree would.
+  const openDocs = useMemo(
+    () => [currentDoc, secondaryDoc].filter(Boolean),
+    [currentDoc, secondaryDoc]
+  )
+
+  const openDocFromCanvas = useCallback((pane, docPath) => {
+    if (!docPath) return
+    if (pane === 'secondary') setSecondaryDoc?.(docPath)
+    else setCurrentDoc?.(docPath)
+    activatePane(docPath, null)
+  }, [activatePane, setCurrentDoc, setSecondaryDoc])
+
   const liveEditor = isEditorReady(editor) ? editor : null
   const liveSecondaryEditor = isEditorReady(secondaryEditor) ? secondaryEditor : null
   const liveActiveEditor = isEditorReady(activeEditor) ? activeEditor : null
   const focusModeEditor = liveActiveEditor || liveEditor || liveSecondaryEditor
+
+  // A canvas pane renders CanvasPane instead of an EditorContent. The two TipTap
+  // editors above still exist (hooks can't be conditional) — they just sit idle,
+  // holding no document, and must never be handed to the canvas pane.
+  const primaryIsCanvas = isCanvasDoc(currentDoc)
+  const secondaryIsCanvas = isCanvasDoc(secondaryDoc)
 
   if (!hasActiveDoc) {
     return (
@@ -1703,28 +1182,85 @@ export default function EditorCanvas({
     )
   }
 
+  // A comparison hides the panes and takes the container for itself, so the split
+  // grid must stand down while it is up — otherwise the compare pane would be laid
+  // into the primary pane's track instead of the full width. The split is only
+  // suspended, not closed: it comes back exactly as it was when compare closes.
+  const comparing = Boolean(
+    compare && (compare.docName === currentDoc || compare.docName === secondaryDoc)
+  )
+
+  const splitClassName = `${comparing ? ' is-comparing' : ''}${
+    splitView && !comparing
+      ? ` split-active${splitOrientation === 'rows' ? ' split-rows' : ''}${isResizingSplit ? ' is-split-resizing' : ''}`
+      : ''
+  }`
+  const showDraftPane = draftTabActive && !currentDoc
+  const primaryPaneOwnsFocus = primaryIsCanvas || showDraftPane
+
+  // The divider is a track in the split grid, so the two panes are sized by the
+  // ratio and the gutter never has to be accounted for twice.
+  const splitStyle = splitView === 'editor' && !comparing
+    ? (splitOrientation === 'rows'
+      ? {
+        gridTemplateColumns: '1fr',
+        gridTemplateRows: `${splitRatio}fr var(--split-gutter) ${1 - splitRatio}fr`,
+      }
+      : {
+        gridTemplateColumns: `${splitRatio}fr var(--split-gutter) ${1 - splitRatio}fr`,
+        gridTemplateRows: '1fr',
+      })
+    : undefined
+
+  const compareEditor = compare?.docName === secondaryDoc && compare?.docName !== currentDoc
+    ? liveSecondaryEditor
+    : liveEditor
+
+  const startSplitResize = (event) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+
+    const container = splitContainerRef.current
+    if (!container) return
+
+    setIsResizingSplit(true)
+
+    const onMove = (moveEvent) => {
+      const rect = container.getBoundingClientRect()
+      const ratio = splitOrientation === 'rows'
+        ? (moveEvent.clientY - rect.top) / rect.height
+        : (moveEvent.clientX - rect.left) / rect.width
+      // Editor owns the clamp, so the ratio can never strand a pane off screen.
+      setSplitRatio?.(ratio)
+    }
+
+    const onUp = () => {
+      setIsResizingSplit(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   return (
     <div className="middle-section">
-      <div className={`editor-container ${splitView ? 'split-active' : ''}`}>
+      <div ref={splitContainerRef} className={`editor-container${splitClassName}`} style={splitStyle}>
 
         <div
           ref={primaryPaneRef}
           className="pane primary-pane"
-          onFocus={() => {
-            setActiveDoc(currentDoc)
-            setActiveEditor?.(liveEditor)
-          }}
-          onMouseEnter={() => {
-            setActiveDoc(currentDoc)
-            setActiveEditor?.(liveEditor)
-          }}
-          onWheel={() => {
-            setActiveDoc(currentDoc)
-            setActiveEditor?.(liveEditor)
-          }}
-          onMouseDown={() => focusEditor(liveEditor)}
-          onClick={() => focusEditor(liveEditor)}
-          onMouseMove={() => setActiveEditor?.(liveEditor)}
+          // A canvas owns its own wheel/pointer handling and stops propagation, so
+          // it activates its pane itself rather than through these editor handlers.
+          // A draft pane has no document either, and its form must keep focus —
+          // handing it to the idle editor would steal the caret out of the name box.
+          onFocus={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor)}
+          onMouseEnter={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor)}
+          onWheel={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor)}
+          onMouseDown={primaryPaneOwnsFocus ? undefined : () => focusEditor(liveEditor)}
+          onClick={primaryPaneOwnsFocus ? undefined : () => focusEditor(liveEditor)}
+          onMouseMove={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor)}
         >
           {dragCaret?.pane === 'primary' ? (
             <div
@@ -1736,39 +1272,66 @@ export default function EditorCanvas({
               }}
             />
           ) : null}
-          <div className="pane-scroll">
-            {splitView === 'editor' && (
-              <div className="pane-header pane-header-centered">
-                <span>{currentDoc}</span>
-                <button onClick={closePrimary}>×</button>
-              </div>
-            )}
-            {liveEditor ? <EditorContent editor={liveEditor} className="editor" /> : null}
-          </div>
-          {showWordCountBadge ? (
+          {showDraftPane ? (
+            <DraftTabPane
+              projectName={projectName}
+              onCreated={onDraftCreated}
+              refreshFiles={refreshFiles}
+            />
+          ) : primaryIsCanvas ? (
+            <CanvasPane
+              projectName={projectName}
+              docPath={currentDoc}
+              setActiveEditor={setActiveEditor}
+              onActivate={() => activatePane(currentDoc, null)}
+              onOpenDoc={(docPath) => openDocFromCanvas('primary', docPath)}
+              notesByDoc={notesByDoc}
+              setNotesForDoc={setNotesForDoc}
+              openDocs={openDocs}
+              showHeader={splitView === 'editor'}
+              onClose={closePrimary}
+              isActive={activeDoc === currentDoc}
+            />
+          ) : (
+            <div className="pane-scroll">
+              {splitView === 'editor' && (
+                <div className="pane-header pane-header-centered">
+                  <span>{currentDoc}</span>
+                  <button onClick={closePrimary}>×</button>
+                </div>
+              )}
+              {liveEditor ? <EditorContent editor={liveEditor} className="editor" /> : null}
+            </div>
+          )}
+          {showWordCountBadge && !primaryIsCanvas && !showDraftPane ? (
             <div className="word-count">{formatWordStats(primaryWordStats)}</div>
           ) : null}
         </div>
 
         {splitView === 'editor' && (
           <div
+            className="split-resizer"
+            role="separator"
+            aria-orientation={splitOrientation === 'rows' ? 'horizontal' : 'vertical'}
+            aria-label="Resize split"
+            title="Drag to resize · double-click to even out"
+            onMouseDown={startSplitResize}
+            onDoubleClick={() => setSplitRatio?.(0.5)}
+          >
+            <span className="split-resizer-grip" />
+          </div>
+        )}
+
+        {splitView === 'editor' && (
+          <div
             ref={secondaryPaneRef}
             className="pane secondary-pane"
-            onFocus={() => {
-              setActiveDoc(secondaryDoc)
-              setActiveEditor?.(liveSecondaryEditor)
-            }}
-            onMouseEnter={() => {
-              setActiveDoc(secondaryDoc)
-              setActiveEditor?.(liveSecondaryEditor)
-            }}
-            onWheel={() => {
-              setActiveDoc(secondaryDoc)
-              setActiveEditor?.(liveSecondaryEditor)
-            }}
-            onMouseDown={() => focusEditor(liveSecondaryEditor)}
-            onClick={() => focusEditor(liveSecondaryEditor)}
-            onMouseMove={() => setActiveEditor?.(liveSecondaryEditor)}
+            onFocus={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor)}
+            onMouseEnter={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor)}
+            onWheel={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor)}
+            onMouseDown={secondaryIsCanvas ? undefined : () => focusEditor(liveSecondaryEditor)}
+            onClick={secondaryIsCanvas ? undefined : () => focusEditor(liveSecondaryEditor)}
+            onMouseMove={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor)}
           >
             {dragCaret?.pane === 'secondary' ? (
               <div
@@ -1780,19 +1343,50 @@ export default function EditorCanvas({
                 }}
               />
             ) : null}
-            <div className="pane-scroll">
-              <div className="pane-header split-header pane-header-centered">
-                <span>{secondaryDoc}</span>
-                <button onClick={closeSecondary}>×</button>
+            {secondaryIsCanvas ? (
+              <CanvasPane
+                projectName={projectName}
+                docPath={secondaryDoc}
+                setActiveEditor={setActiveEditor}
+                onActivate={() => activatePane(secondaryDoc, null)}
+                onOpenDoc={(docPath) => openDocFromCanvas('secondary', docPath)}
+                notesByDoc={notesByDoc}
+                setNotesForDoc={setNotesForDoc}
+                openDocs={openDocs}
+                showHeader
+                onClose={closeSecondary}
+                isActive={activeDoc === secondaryDoc}
+              />
+            ) : (
+              <div className="pane-scroll">
+                <div className="pane-header split-header pane-header-centered">
+                  <span>{secondaryDoc}</span>
+                  <button onClick={closeSecondary}>×</button>
+                </div>
+                {liveSecondaryEditor ? <EditorContent editor={liveSecondaryEditor} className="editor" /> : null}
               </div>
-              {liveSecondaryEditor ? <EditorContent editor={liveSecondaryEditor} className="editor" /> : null}
-            </div>
-            {showWordCountBadge ? (
+            )}
+            {showWordCountBadge && !secondaryIsCanvas ? (
               <div className="word-count">{formatWordStats(secondaryWordStats)}</div>
             ) : null}
           </div>
         )}
-        {focusModeOpen ? (
+        {comparing ? (
+          <VersionComparePane
+            projectName={projectName}
+            docName={compare.docName}
+            editor={compareEditor}
+            initialLeftId={compare.leftId}
+            initialRightId={compare.rightId}
+            onClose={closeCompare}
+            refreshFiles={refreshFiles}
+            onOpenDocInTab={onOpenDocInTab}
+            setVersions={setVersions}
+          />
+        ) : null}
+
+        {/* Focus Mode is a prose surface — it has nothing to show for a canvas or a draft. */}
+        {focusModeOpen && !showDraftPane && !isCanvasDoc(activeDoc || currentDoc) ? (
           <FocusModeOverlay
             editor={focusModeEditor}
             onExit={onExitFocusMode}

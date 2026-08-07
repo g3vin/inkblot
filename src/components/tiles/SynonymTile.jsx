@@ -1,9 +1,17 @@
+/**
+ * SynonymTile.jsx — "Find Synonyms" workbench tile.
+ *
+ * Asks the Rust backend's `get_synonyms` command (a local ONNX NLP model)
+ * for synonyms and antonyms of the selected word in its sentence context.
+ * Antonyms are inflected to match the original word's tense/form, and
+ * clicking any chip replaces the word in the document.
+ */
 import React, { useEffect, useState } from "react"
 import nlp from "compromise"
 
 const normalizeTerm = (term) => term.trim().toLowerCase()
 
-// Lazy-loaded invoke function
+// Tauri's invoke is loaded lazily so the tile also renders in a plain browser.
 let invokeFn = null
 if (typeof window !== "undefined" && window.__TAURI__) {
   import("@tauri-apps/api/core")

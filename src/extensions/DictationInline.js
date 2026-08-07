@@ -1,3 +1,11 @@
+/**
+ * DictationInline.js — decorates the live dictation range in the editor.
+ *
+ * While dictating, DictationControl inserts draft text and marks its range
+ * here; the plugin styles it (draft vs. finalizing) with decorations and
+ * remaps the range through document edits. The exported helpers are the
+ * API used by DictationControl.
+ */
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'

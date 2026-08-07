@@ -1,3 +1,13 @@
+/**
+ * NoteAnnotation.js — renders note markers (colored dots) in the editor.
+ *
+ * A ProseMirror decoration plugin places a widget dot at the end of every
+ * quote note's anchored range. Hovering/clicking a dot emits the
+ * NOTE_PREVIEW_* window events consumed by NoteHoverPreview. React pushes
+ * note lists into the plugin via syncEditorNotes (EditorCanvas calls it
+ * whenever a doc's notes change); decorations are only rebuilt when the
+ * note signature actually changes.
+ */
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
@@ -11,6 +21,8 @@ export const NOTE_PREVIEW_PIN_EVENT = 'inkblot:note-preview-pin'
 const EMPTY_STATE = {
   docName: null,
   notes: [],
+  signature: '',
+  decorations: DecorationSet.empty,
 }
 
 const getViewFromTarget = (target) => {
@@ -94,6 +106,7 @@ const dispatchNoteMeta = (editor, notes, docName = null) => {
   return true
 }
 
+// If the editor view isn't ready yet, retry the sync on the next animation frame.
 const scheduleNoteSync = (editor, notes, docName = null) => {
   if (!editor || editor.isDestroyed) return
 
@@ -110,12 +123,16 @@ const scheduleNoteSync = (editor, notes, docName = null) => {
   pendingSyncByEditor.set(editor, frameId)
 }
 
+/** Push a document's notes into the annotation plugin (public API for React code). */
 export const syncEditorNotes = (editor, notes, docName = null) => {
   if (!dispatchNoteMeta(editor, notes, docName)) {
     scheduleNoteSync(editor, notes, docName)
   }
 }
 
+// Intentional no-ops: NoteHoverPreview still calls these to signal hover/active
+// note state, but the in-editor text highlight they used to drive was removed.
+// Kept as stubs so the hook points survive if that highlight returns.
 export const setEditorHoveredNote = () => {}
 export const setEditorActiveNote = () => {}
 export const clearEditorActiveNote = () => {}
@@ -147,6 +164,87 @@ const dispatchPreviewEvent = (eventName, note, marker, view, docName) => {
   }))
 }
 
+/** Cheap change-detection key over the quote notes that affect decorations. */
+const getNoteSignature = (notes = [], docName = null, docSize = 0) => (
+  `${docName || ''}:${docSize}:${
+    (Array.isArray(notes) ? notes : [])
+      .filter(note => note?.type === 'quote')
+      .map(note => [
+        note.id || '',
+        note.from,
+        note.to,
+        note.color || '',
+      ].join(':'))
+      .join('|')
+  }`
+)
+
+const buildNoteDecorations = (doc, notes = [], docName = null) => {
+  const decorations = []
+  const docSize = doc.content.size
+
+  notes.forEach((note) => {
+    if (note.type !== 'quote') return
+    if (!Number.isFinite(note.from) || !Number.isFinite(note.to)) return
+    if (note.from < 0 || note.to > docSize || note.from >= note.to) return
+
+    decorations.push(
+      Decoration.widget(
+        note.to,
+        (view) => {
+          const marker = document.createElement('span')
+          marker.className = 'note-marker'
+          marker.dataset.noteId = note.id
+          marker.style.setProperty('--note-color', note.color || '#007aff')
+
+          const dot = document.createElement('span')
+          dot.className = 'note-dot'
+          dot.style.backgroundColor = note.color || '#007aff'
+
+          marker.appendChild(dot)
+          marker.onmousedown = (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+          }
+          marker.onmouseenter = () => {
+            dispatchPreviewEvent(
+              NOTE_PREVIEW_ENTER_EVENT,
+              note,
+              marker,
+              view,
+              docName
+            )
+          }
+          marker.onmouseleave = () => {
+            dispatchPreviewEvent(
+              NOTE_PREVIEW_LEAVE_EVENT,
+              note,
+              marker,
+              view,
+              docName
+            )
+          }
+          marker.onclick = (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            dispatchPreviewEvent(
+              NOTE_PREVIEW_PIN_EVENT,
+              note,
+              marker,
+              view,
+              docName
+            )
+          }
+          return marker
+        },
+        { side: 1, key: `note-widget:${note.id}` }
+      )
+    )
+  })
+
+  return DecorationSet.create(doc, decorations)
+}
+
 export const NoteAnnotation = Extension.create({
   name: 'noteAnnotation',
 
@@ -160,81 +258,40 @@ export const NoteAnnotation = Extension.create({
           },
           apply(transaction, pluginState) {
             const meta = transaction.getMeta(NOTE_ANNOTATION_PLUGIN_KEY)
-            if (!meta) return pluginState
+            if (!meta) {
+              if (!transaction.docChanged) return pluginState
+              return {
+                ...pluginState,
+                decorations: (pluginState.decorations || DecorationSet.empty)
+                  .map(transaction.mapping, transaction.doc),
+              }
+            }
+
+            const nextDocName = typeof meta.docName === 'string' ? meta.docName : pluginState.docName
+            const nextNotes = Array.isArray(meta.notes) ? meta.notes : pluginState.notes
+            const nextSignature = getNoteSignature(nextNotes, nextDocName, transaction.doc.content.size)
+
+            if (pluginState.signature === nextSignature && pluginState.decorations) {
+              return {
+                docName: nextDocName,
+                notes: nextNotes,
+                signature: nextSignature,
+                decorations: pluginState.decorations,
+              }
+            }
 
             return {
-              docName: typeof meta.docName === 'string' ? meta.docName : pluginState.docName,
-              notes: Array.isArray(meta.notes) ? meta.notes : pluginState.notes,
+              docName: nextDocName,
+              notes: nextNotes,
+              signature: nextSignature,
+              decorations: buildNoteDecorations(transaction.doc, nextNotes, nextDocName),
             }
           },
         },
         props: {
           decorations(state) {
             const pluginState = NOTE_ANNOTATION_PLUGIN_KEY.getState(state) || EMPTY_STATE
-            const notes = pluginState.notes || []
-            const decorations = []
-            const docSize = state.doc.content.size
-
-            notes.forEach((note) => {
-              if (note.type !== 'quote') return
-              if (!Number.isFinite(note.from) || !Number.isFinite(note.to)) return
-              if (note.from < 0 || note.to > docSize || note.from >= note.to) return
-
-              decorations.push(
-                Decoration.widget(
-                  note.to,
-                  (view) => {
-                    const marker = document.createElement('span')
-                    marker.className = 'note-marker'
-                    marker.dataset.noteId = note.id
-                    marker.style.setProperty('--note-color', note.color || '#007aff')
-
-                    const dot = document.createElement('span')
-                    dot.className = 'note-dot'
-                    dot.style.backgroundColor = note.color || '#007aff'
-
-                    marker.appendChild(dot)
-                    marker.onmousedown = (event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                    }
-                    marker.onmouseenter = () => {
-                      dispatchPreviewEvent(
-                        NOTE_PREVIEW_ENTER_EVENT,
-                        note,
-                        marker,
-                        view,
-                        pluginState.docName
-                      )
-                    }
-                    marker.onmouseleave = () => {
-                      dispatchPreviewEvent(
-                        NOTE_PREVIEW_LEAVE_EVENT,
-                        note,
-                        marker,
-                        view,
-                        pluginState.docName
-                      )
-                    }
-                    marker.onclick = (event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      dispatchPreviewEvent(
-                        NOTE_PREVIEW_PIN_EVENT,
-                        note,
-                        marker,
-                        view,
-                        pluginState.docName
-                      )
-                    }
-                    return marker
-                  },
-                  { side: 1, key: `note-widget:${note.id}` }
-                )
-              )
-            })
-
-            return DecorationSet.create(state.doc, decorations)
+            return pluginState.decorations || DecorationSet.empty
           },
         },
       }),
