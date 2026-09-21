@@ -37,8 +37,11 @@
     color-mix(in srgb, var(--accent-color) 18%, transparent) 64%,
     transparent 100%
   );
-  background-size: 220% 100%;
-  animation: dictation-inline-flow 960ms linear infinite;
+  /* Fixed px, not %: the draft grows with every revision, and a width-relative
+     sweep would stretch and jump each time it does. */
+  background-size: 240px 100%;
+  background-repeat: repeat-x;
+  animation: dictation-inline-flow-a 960ms linear infinite;
 }
 
 .dictation-inline-finalizing {
@@ -46,12 +49,24 @@
   animation: dictation-inline-finalize 520ms ease-out forwards;
 }
 
-@keyframes dictation-inline-flow {
+/* Two identical sets. DictationInline alternates between them so re-applying
+   the anchored `animation-delay` restarts the sweep instead of letting the
+   browser keep the old start time and lurch the phase forward. */
+@keyframes dictation-inline-flow-a {
   from {
-    background-position: 120% 0;
+    background-position: 240px 0;
   }
   to {
-    background-position: -120% 0;
+    background-position: 0 0;
+  }
+}
+
+@keyframes dictation-inline-flow-b {
+  from {
+    background-position: 240px 0;
+  }
+  to {
+    background-position: 0 0;
   }
 }
 

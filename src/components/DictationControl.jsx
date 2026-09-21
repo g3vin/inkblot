@@ -21,10 +21,17 @@ import {
   clearDictationInlineRange,
   getDictationInlineState,
   setDictationInlineRange,
+  withDictationInlineRange,
 } from '../extensions/DictationInline'
 
 const FINALIZE_DECORATION_MS = 520
 const RECENT_FINAL_SUPPRESS_MS = 2600
+// `dictation://stopped` only means the mic closed: whisper is still chewing on
+// the audio already captured, so partials and a final for the tail arrive
+// after it. Keep the draft range open through a short drain so those land in
+// place instead of being re-inserted at the cursor as a duplicate.
+const DRAIN_QUIET_MS = 1800
+const DRAIN_MAX_MS = 8000
 const INITIAL_BAR_LEVELS = [0.08, 0.12, 0.16, 0.1, 0.14, 0.09]
 const BAR_RESPONSE = [0.54, 0.86, 1, 0.72, 0.94, 0.62]
 const BAR_KEYS = ['sub', 'low', 'lowMid', 'highMid', 'presence', 'air']
@@ -72,6 +79,11 @@ export default function DictationControl({ editor }) {
   const draftRangeRef = useRef(null)
   const draftTextRef = useRef('')
   const recentFinalRef = useRef({ text: '', at: 0 })
+  // 'idle' | 'live' | 'draining' — which transcripts we still accept.
+  const phaseRef = useRef('idle')
+  const sessionIdRef = useRef(null)
+  const drainTimerRef = useRef(null)
+  const drainDeadlineRef = useRef(0)
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
   const [barLevels, setBarLevels] = useState(INITIAL_BAR_LEVELS)
@@ -83,6 +95,9 @@ export default function DictationControl({ editor }) {
   useEffect(() => () => {
     if (finalizeTimerRef.current) {
       window.clearTimeout(finalizeTimerRef.current)
+    }
+    if (drainTimerRef.current) {
+      window.clearTimeout(drainTimerRef.current)
     }
   }, [])
 
@@ -128,19 +143,61 @@ export default function DictationControl({ editor }) {
       to: state.selection.to,
     }
     const replaceRange = existingRange || selectionRange
-    const tr = state.tr.insertText(text, replaceRange.from, replaceRange.to)
     const nextRange = {
       from: replaceRange.from,
       to: replaceRange.from + text.length,
     }
 
+    // Rewrite only the part of the draft that actually changed. Whisper
+    // revisions usually just extend the tail, and leaving the untouched text
+    // alone keeps ProseMirror from rebuilding the whole decorated span.
+    const currentText = replaceRange.to > replaceRange.from
+      ? state.doc.textBetween(replaceRange.from, replaceRange.to, '\n', '\n')
+      : ''
+    const canDiff = currentText.length === replaceRange.to - replaceRange.from
+
+    if (canDiff && currentText === text) {
+      draftRangeRef.current = nextRange
+      draftTextRef.current = text
+      setDictationInlineRange(targetEditor, nextRange, decorationStatus)
+      return nextRange
+    }
+
+    let changedFrom = replaceRange.from
+    let changedTo = replaceRange.to
+    let insertion = text
+
+    if (canDiff) {
+      const maxShared = Math.min(currentText.length, text.length)
+
+      let prefix = 0
+      while (prefix < maxShared && currentText[prefix] === text[prefix]) prefix += 1
+
+      let suffix = 0
+      while (
+        suffix < maxShared - prefix &&
+        currentText[currentText.length - 1 - suffix] === text[text.length - 1 - suffix]
+      ) suffix += 1
+
+      changedFrom = replaceRange.from + prefix
+      changedTo = replaceRange.to - suffix
+      insertion = text.slice(prefix, text.length - suffix)
+    }
+
+    const tr = insertion
+      ? state.tr.insertText(insertion, changedFrom, changedTo)
+      : state.tr.delete(changedFrom, changedTo)
+
     tr.setSelection(TextSelection.create(tr.doc, nextRange.to))
+    // Same transaction as the text edit — see withDictationInlineRange.
+    withDictationInlineRange(tr, nextRange, decorationStatus)
     targetEditor.view.dispatch(tr.scrollIntoView())
-    targetEditor.view.focus()
+    if (!targetEditor.view.hasFocus()) {
+      targetEditor.view.focus()
+    }
 
     draftRangeRef.current = nextRange
     draftTextRef.current = text
-    setDictationInlineRange(targetEditor, nextRange, decorationStatus)
     return nextRange
   }, [getCurrentDraftRange])
 
@@ -171,6 +228,19 @@ export default function DictationControl({ editor }) {
     const comparableText = getComparableDictationText(text)
     const recentFinal = recentFinalRef.current
     if (!comparableText || comparableText !== recentFinal.text) return false
+
+    const now = performance.now()
+    return now - recentFinal.at <= RECENT_FINAL_SUPPRESS_MS
+  }, [])
+
+  // Chunks are transcribed concurrently, so a partial can land after the final
+  // that supersedes it. A stale partial is always a prefix of that final, so
+  // drop it instead of letting it re-open a draft at the cursor.
+  const isSupersededByRecentFinal = useCallback((text) => {
+    const comparableText = getComparableDictationText(text)
+    const recentFinal = recentFinalRef.current
+    if (!comparableText || !recentFinal.text) return false
+    if (!recentFinal.text.startsWith(comparableText)) return false
 
     const now = performance.now()
     return now - recentFinal.at <= RECENT_FINAL_SUPPRESS_MS
@@ -211,7 +281,6 @@ export default function DictationControl({ editor }) {
     if (!nextRange) return
 
     rememberFinalText(cleaned)
-    setDictationInlineRange(targetEditor, nextRange, 'finalizing')
     draftRangeRef.current = null
     draftTextRef.current = ''
     finalizeTimerRef.current = window.setTimeout(() => {
@@ -244,21 +313,84 @@ export default function DictationControl({ editor }) {
     }, FINALIZE_DECORATION_MS)
   }, [clearFinalizeTimer, getCurrentDraftRange])
 
+  const clearDrainTimer = useCallback(() => {
+    if (drainTimerRef.current) {
+      window.clearTimeout(drainTimerRef.current)
+      drainTimerRef.current = null
+    }
+  }, [])
+
+  const endDrain = useCallback(() => {
+    clearDrainTimer()
+    drainDeadlineRef.current = 0
+    phaseRef.current = 'idle'
+    sessionIdRef.current = null
+    settleCurrentDraft()
+    setStatus((current) => (current === 'finishing' ? 'idle' : current))
+  }, [clearDrainTimer, settleCurrentDraft])
+
+  // Each late transcript pushes the drain out a little, up to a hard cap, so a
+  // slow tail still lands but a dead session cannot keep the draft open.
+  const scheduleDrainEnd = useCallback(() => {
+    clearDrainTimer()
+
+    const now = performance.now()
+    if (!drainDeadlineRef.current) {
+      drainDeadlineRef.current = now + DRAIN_MAX_MS
+    }
+
+    const wait = Math.max(0, Math.min(DRAIN_QUIET_MS, drainDeadlineRef.current - now))
+    drainTimerRef.current = window.setTimeout(() => {
+      drainTimerRef.current = null
+      endDrain()
+    }, wait)
+  }, [clearDrainTimer, endDrain])
+
+  const beginDrain = useCallback(() => {
+    if (phaseRef.current === 'idle') return
+    if (phaseRef.current !== 'draining') {
+      phaseRef.current = 'draining'
+      drainDeadlineRef.current = performance.now() + DRAIN_MAX_MS
+    }
+    scheduleDrainEnd()
+    setStatus((current) => (current === 'error' ? current : 'finishing'))
+  }, [scheduleDrainEnd])
+
+  const acceptsTranscript = useCallback((payload) => {
+    if (phaseRef.current === 'idle') return false
+
+    const eventSessionId = payload?.sessionId
+    const activeSessionId = sessionIdRef.current
+    return !eventSessionId || !activeSessionId || eventSessionId === activeSessionId
+  }, [])
+
   useEffect(() => {
     let disposed = false
     let cleanup = null
 
     setupDictationListeners({
-      onStarted: () => {
+      onStarted: (payload) => {
+        if (payload?.sessionId) sessionIdRef.current = payload.sessionId
+        phaseRef.current = 'live'
+        clearDrainTimer()
+        drainDeadlineRef.current = 0
         setStatus('listening')
         setError('')
       },
       onPartial: (payload) => {
+        if (!acceptsTranscript(payload)) return
+
         const text = sanitizeDictationText(getEventText(payload))
-        setStatus('listening')
-        setError('')
+
+        if (phaseRef.current === 'draining') {
+          scheduleDrainEnd()
+        } else {
+          setStatus('listening')
+          setError('')
+        }
+
         if (text) {
-          if (isRecentFinalRepeat(text)) {
+          if (isSupersededByRecentFinal(text)) {
             const targetEditor = editorRef.current
             const currentDraft = getCurrentDraftRange(targetEditor)
             if (
@@ -275,6 +407,12 @@ export default function DictationControl({ editor }) {
         }
       },
       onFinal: (payload) => {
+        if (!acceptsTranscript(payload)) return
+
+        if (phaseRef.current === 'draining') {
+          scheduleDrainEnd()
+        }
+
         finalizeInlineDraft(getEventText(payload))
       },
       onLevel: (payload) => {
@@ -283,10 +421,13 @@ export default function DictationControl({ editor }) {
           applyWaveLevel(level)
         }
       },
-      onStopped: () => {
-        settleCurrentDraft()
-        setStatus('idle')
+      onStopped: (payload) => {
         setBarLevels(INITIAL_BAR_LEVELS)
+
+        if (!acceptsTranscript(payload)) return
+
+        // The tail transcript is still coming — hold the draft open for it.
+        beginDrain()
       },
       onError: (payload) => {
         setStatus('error')
@@ -307,9 +448,24 @@ export default function DictationControl({ editor }) {
       disposed = true
       cleanup?.()
     }
-  }, [applyWaveLevel, clearFinalizeTimer, clearInlineDraft, finalizeInlineDraft, getCurrentDraftRange, isRecentFinalRepeat, replaceInlineDraft, settleCurrentDraft])
+  }, [
+    acceptsTranscript,
+    applyWaveLevel,
+    beginDrain,
+    clearDrainTimer,
+    clearFinalizeTimer,
+    clearInlineDraft,
+    finalizeInlineDraft,
+    getCurrentDraftRange,
+    isSupersededByRecentFinal,
+    replaceInlineDraft,
+    scheduleDrainEnd,
+  ])
 
   const start = useCallback(async () => {
+    // Settle whatever the previous session left draining before reusing the refs.
+    endDrain()
+    recentFinalRef.current = { text: '', at: 0 }
     setStatus('loading')
     setError('')
 
@@ -319,25 +475,38 @@ export default function DictationControl({ editor }) {
         modelLoadedRef.current = true
       }
 
-      await startDictation()
-      setStatus('listening')
+      phaseRef.current = 'live'
+      const sessionId = await startDictation()
+      if (typeof sessionId === 'string' && sessionId) {
+        sessionIdRef.current = sessionId
+      }
+      setStatus((current) => (current === 'loading' ? 'listening' : current))
     } catch (err) {
+      phaseRef.current = 'idle'
+      sessionIdRef.current = null
       setStatus('error')
       setError(err?.message || String(err))
     }
-  }, [])
+  }, [endDrain])
 
   const stop = useCallback(async () => {
+    const wasRunning = phaseRef.current !== 'idle'
+    beginDrain()
+
     try {
       await stopDictation()
     } catch (err) {
-      setStatus('error')
-      setError(err?.message || String(err))
+      endDrain()
+      if (wasRunning) {
+        setStatus('error')
+        setError(err?.message || String(err))
+      } else {
+        setStatus('idle')
+      }
     } finally {
-      setStatus('idle')
       setBarLevels(INITIAL_BAR_LEVELS)
     }
-  }, [])
+  }, [beginDrain, endDrain])
 
   const toggle = useCallback(() => {
     if (status === 'listening' || status === 'loading') {
@@ -349,14 +518,21 @@ export default function DictationControl({ editor }) {
 
   const live = status === 'listening'
   const loading = status === 'loading'
-  const active = live || loading
-  const buttonTitle = error || (live ? 'Stop dictation' : 'Start dictation')
+  const finishing = status === 'finishing'
+  const active = live || loading || finishing
+  const buttonTitle = error || (
+    live
+      ? 'Stop dictation'
+      : finishing
+        ? 'Finishing transcription…'
+        : 'Start dictation'
+  )
 
   return (
     <div className="dictation-control">
       <button
         type="button"
-        className={`dictation-mic-btn${live ? ' active' : ''}${loading ? ' loading' : ''}${status === 'error' ? ' error' : ''}`}
+        className={`dictation-mic-btn${live ? ' active' : ''}${loading ? ' loading' : ''}${finishing ? ' finishing' : ''}${status === 'error' ? ' error' : ''}`}
         onClick={toggle}
         aria-label={live ? 'Stop dictation' : 'Start dictation'}
         title={buttonTitle}
