@@ -30,9 +30,39 @@ import {
   rename,
   remove,
 } from '@tauri-apps/plugin-fs'
-import { appDataDir } from '@tauri-apps/api/path'
 import { CANVAS_SUFFIX, isCanvasDoc } from './docKind'
-import { EDIT_SESSION_ID, countWords, countCanvasWords } from './versionHistory'
+import { EDIT_SESSION_ID } from './versionHistory'
+import {
+  ORDER_FILE,
+  CANVAS_SUFFIX_LENGTH,
+  appDataRoot,
+  getProjectRoot,
+  joinPath,
+  normalizePath,
+  parentOf,
+  stripTrailingSlash,
+} from './projectPaths'
+import { withDocLock } from './docLock'
+import {
+  buildTextVersionEntry,
+  emitVersionsChanged,
+  pushVersionEntry,
+  versionsSidecarPath,
+} from './versionStore'
+
+/* This was one 956-line module. Paths, the per-document write lock and version
+   history now live in their own files; they are re-exported here so the call
+   sites that import them from FileSystem keep working. */
+export { getProjectRoot } from './projectPaths'
+export {
+  buildTextVersionEntry,
+  buildCanvasVersionEntry,
+  getVersions,
+  appendVersionEntry,
+  appendCanvasVersion,
+  updateVersionEntry,
+  deleteVersionEntry,
+} from './versionStore'
 import {
   listLocations,
   getProjectLocation,
@@ -41,171 +71,6 @@ import {
   renameProjectLocation,
 } from './projectLocations'
 
-const ORDER_FILE = '.inkblot-order.json'
-const CANVAS_SUFFIX_LENGTH = CANVAS_SUFFIX.length
-
-/* ---------- path helpers (all filesystem access uses absolute paths) ---------- */
-
-const stripTrailingSlash = (p) => String(p || '').replace(/[\\/]+$/, '')
-const stripLeadingSlash = (p) => String(p || '').replace(/^[/\\]+/, '')
-
-/** Join absolute/relative parts with exactly one separator between them. */
-const joinPath = (...parts) =>
-  parts
-    .filter((p) => p != null && p !== '')
-    .map((p, i) => (i === 0 ? stripTrailingSlash(p) : stripLeadingSlash(stripTrailingSlash(p))))
-    .join('/')
-
-const parentOf = (absPath) => stripTrailingSlash(absPath).split('/').slice(0, -1).join('/')
-
-let appDataRootCache = null
-async function appDataRoot() {
-  if (!appDataRootCache) appDataRootCache = stripTrailingSlash(await appDataDir())
-  return appDataRootCache
-}
-
-/** Absolute directory path for a project (custom location or AppData default). */
-export async function getProjectRoot(projectName) {
-  const custom = await getProjectLocation(projectName)
-  if (custom) return stripTrailingSlash(custom)
-  return joinPath(await appDataRoot(), projectName)
-}
-
-/* ---------- version history storage ---------- */
-
-// Unnamed checkpoints beyond this are dropped oldest-first. Named versions are
-// landmarks the user placed deliberately and are NEVER evicted by the cap.
-const VERSION_CAP = 200
-
-const newVersionId = () =>
-  `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-
-const emitVersionsChanged = (projectName, docName) => {
-  try {
-    if (typeof window !== 'undefined' && window?.dispatchEvent) {
-      window.dispatchEvent(new CustomEvent('versions:changed', { detail: { projectName, docName } }))
-    }
-  } catch {
-    void 0
-  }
-}
-
-/* ---------- one writer at a time, per document ---------- */
-
-// Every write below is a read-modify-write of the same file: read the version list,
-// add to it, write the whole thing back. Left unsynchronized they interleave — an
-// autosave reads the list, the user hits "Snapshot now", the snapshot lands, and
-// then the autosave writes back the list it read BEFORE the snapshot existed. The
-// snapshot is gone, and nothing errors. Queueing per document makes each cycle see
-// the previous one's result.
-const docWriteQueues = new Map()
-
-function withDocLock(projectName, docName, task) {
-  const key = `${projectName}\u0000${docName}`
-  const previous = docWriteQueues.get(key) || Promise.resolve()
-
-  // `task` runs whether the previous write resolved or rejected — one failed save
-  // must not wedge the queue for the rest of the session.
-  const run = previous.then(task, task)
-  const settled = run.catch(() => {})
-
-  docWriteQueues.set(key, settled)
-  settled.then(() => {
-    if (docWriteQueues.get(key) === settled) docWriteQueues.delete(key)
-  })
-
-  return run
-}
-
-/** A version entry for a text document, stamped with session + word count. */
-export const buildTextVersionEntry = ({ contentHtml, contentJson, name = null, auto = true }) => ({
-  id: newVersionId(),
-  timestamp: new Date().toISOString(),
-  kind: 'text',
-  name: name || null,
-  auto,
-  sessionId: EDIT_SESSION_ID,
-  words: countWords(contentHtml || ''),
-  contentHtml: contentHtml || null,
-  contentJson: contentJson || null,
-})
-
-/** A version entry holding a full serialized canvas. */
-export const buildCanvasVersionEntry = ({ canvas, name = null, auto = true }) => ({
-  id: newVersionId(),
-  timestamp: new Date().toISOString(),
-  kind: 'canvas',
-  name: name || null,
-  auto,
-  sessionId: EDIT_SESSION_ID,
-  words: countCanvasWords(canvas),
-  canvas,
-})
-
-/** Two entries hold the same document state (viewport and metadata aside). */
-const sameVersionContent = (a, b) => {
-  if (!a || !b) return false
-  if (a.canvas || b.canvas) {
-    try {
-      return JSON.stringify({ n: a.canvas?.nodes, e: a.canvas?.edges }) ===
-        JSON.stringify({ n: b.canvas?.nodes, e: b.canvas?.edges })
-    } catch {
-      return false
-    }
-  }
-  return Boolean(a.contentHtml) && a.contentHtml === b.contentHtml
-}
-
-/**
- * Push `entry` onto a newest-first version list. Consecutive duplicates fold
- * away — naming a state identical to the latest checkpoint names that
- * checkpoint instead of stacking a twin on top of it. The cap only ever evicts
- * unnamed entries.
- */
-const pushVersionEntry = (versions, entry) => {
-  const next = Array.isArray(versions) ? versions.slice() : []
-
-  if (next[0] && sameVersionContent(next[0], entry)) {
-    if (entry.name && !next[0].name) {
-      next[0] = { ...next[0], name: entry.name, auto: false }
-      return next
-    }
-    if (!entry.name) return next
-  }
-
-  next.unshift(entry)
-
-  let unnamed = next.reduce((count, v) => count + (v.name ? 0 : 1), 0)
-  for (let i = next.length - 1; i >= 0 && unnamed > VERSION_CAP; i--) {
-    if (!next[i].name) {
-      next.splice(i, 1)
-      unnamed--
-    }
-  }
-
-  return next
-}
-
-const versionsSidecarPath = (root, docName) => {
-  const rel = normalizePath(docName)
-  return joinPath(root, '.versions', `${rel || docName}.versions.json`)
-}
-
-async function readSidecarVersions(root, docName) {
-  try {
-    const raw = await readTextFile(versionsSidecarPath(root, docName))
-    const parsed = JSON.parse(raw || '[]')
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-async function writeSidecarVersions(root, docName, versions) {
-  const filePath = versionsSidecarPath(root, docName)
-  await mkdir(parentOf(filePath), { recursive: true })
-  await writeTextFile(filePath, JSON.stringify(versions))
-}
 
 /**
  * Write a document file verbatim — no key whitelist, no version merging.
@@ -317,147 +182,6 @@ export async function saveDocument(projectName, docName, docData) {
       if (appended) emitVersionsChanged(projectName, docName)
     } catch (error) {
       console.error('Failed to save document:', error)
-    }
-  })
-}
-
-/**
- * Load a document's version history.
- *
- * Text documents embed their versions in the document file; canvases keep
- * theirs in a `.versions/` sidecar (the canvas file itself is spec-shaped JSON
- * Canvas and must stay that way). The sidecar is also the legacy fallback for
- * text documents written by older app versions.
- */
-export async function getVersions(projectName, docName) {
-  try {
-    const root = await getProjectRoot(projectName)
-
-    if (!isCanvasDoc(docName)) {
-      try {
-        const raw = await readTextFile(joinPath(root, `${docName}.json`))
-        const parsed = JSON.parse(raw || '{}')
-        if (Array.isArray(parsed.versions) && parsed.versions.length) return parsed.versions
-        // fallthrough to the sidecar fallback
-      } catch {
-        void 0
-      }
-    }
-
-    return await readSidecarVersions(root, docName)
-  } catch (e) {
-    console.error('[getVersions] failed:', e)
-    return []
-  }
-}
-
-/**
- * Where a document's versions live and what they currently are — the one place
- * that knows embedded-vs-sidecar, so every mutation below shares it.
- */
-async function readVersionStore(projectName, docName) {
-  const root = await getProjectRoot(projectName)
-
-  if (isCanvasDoc(docName)) {
-    return { root, store: 'sidecar', doc: null, versions: await readSidecarVersions(root, docName) }
-  }
-
-  let doc = null
-  try {
-    const raw = await readTextFile(joinPath(root, `${docName}.json`))
-    doc = JSON.parse(raw || '{}')
-  } catch {
-    doc = null
-  }
-
-  if (doc && Array.isArray(doc.versions) && doc.versions.length) {
-    return { root, store: 'embedded', doc, versions: doc.versions }
-  }
-
-  // No embedded history yet: legacy sidecar if present, otherwise start
-  // embedding (a text doc must exist to version).
-  const legacy = await readSidecarVersions(root, docName)
-  if (legacy.length) return { root, store: 'sidecar', doc, versions: legacy }
-  return doc ? { root, store: 'embedded', doc, versions: [] } : null
-}
-
-async function writeVersionStore(projectName, docName, location, versions) {
-  if (location.store === 'sidecar') {
-    await writeSidecarVersions(location.root, docName, versions)
-  } else {
-    await writeTextFile(
-      joinPath(location.root, `${docName}.json`),
-      JSON.stringify({ ...location.doc, versions })
-    )
-  }
-  emitVersionsChanged(projectName, docName)
-}
-
-/**
- * Append a version entry outside the autosave path — manual snapshots, the
- * safety checkpoint taken before a restore, and canvas checkpoints all land
- * here. Returns the entry actually stored (deduping may fold it into the
- * latest one) or null on failure.
- */
-export async function appendVersionEntry(projectName, docName, entry) {
-  return withDocLock(projectName, docName, async () => {
-    try {
-      const location = await readVersionStore(projectName, docName)
-      if (!location) return null
-
-      const versions = pushVersionEntry(location.versions, entry)
-      await writeVersionStore(projectName, docName, location, versions)
-      return versions[0] || null
-    } catch (e) {
-      console.error('[appendVersionEntry] failed:', e)
-      return null
-    }
-  })
-}
-
-/** Debounced canvas checkpoint: store the full serialized canvas as a version. */
-export async function appendCanvasVersion(projectName, docPath, canvas, { name = null, auto = true } = {}) {
-  return appendVersionEntry(projectName, docPath, buildCanvasVersionEntry({ canvas, name, auto }))
-}
-
-/** Rename (or un-name) a version, or patch any of its metadata. */
-export async function updateVersionEntry(projectName, docName, versionId, patch) {
-  return withDocLock(projectName, docName, async () => {
-    try {
-      const location = await readVersionStore(projectName, docName)
-      if (!location) return false
-
-      let found = false
-      const versions = location.versions.map((entry) => {
-        if (String(entry.id) !== String(versionId)) return entry
-        found = true
-        return { ...entry, ...patch }
-      })
-      if (!found) return false
-
-      await writeVersionStore(projectName, docName, location, versions)
-      return true
-    } catch (e) {
-      console.error('[updateVersionEntry] failed:', e)
-      return false
-    }
-  })
-}
-
-export async function deleteVersionEntry(projectName, docName, versionId) {
-  return withDocLock(projectName, docName, async () => {
-    try {
-      const location = await readVersionStore(projectName, docName)
-      if (!location) return false
-
-      const versions = location.versions.filter((entry) => String(entry.id) !== String(versionId))
-      if (versions.length === location.versions.length) return false
-
-      await writeVersionStore(projectName, docName, location, versions)
-      return true
-    } catch (e) {
-      console.error('[deleteVersionEntry] failed:', e)
-      return false
     }
   })
 }
@@ -746,7 +470,6 @@ export async function createFolder(projectName, folderPath) {
 
 /* ---------- entry helpers (files and folders addressed by tree path) ---------- */
 
-const normalizePath = (path) => path?.replace(/\/+/, '/').replace(/^\//, '') || ''
 
 const filePathFor = (root, entryPath) => {
   const rel = normalizePath(entryPath)
