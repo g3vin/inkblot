@@ -14,6 +14,10 @@ const DEFAULT_REPOS = [
 const REPO_REF = process.env.SYNONYM_REF || 'main'
 const TARGET_DIR = process.env.SYNONYM_DIR || path.join(__dirname, '..', 'public')
 const ASSET = process.env.SYNONYM_ASSET || 'synonym.onnx'
+// The ONNX model stores its weights as external data — commit_from_file()
+// fails at runtime with an opaque "unknown exception in Initialize()" if
+// this companion file isn't sitting next to the .onnx file.
+const ASSETS = [ASSET, `${ASSET}.data`]
 const META_FILE = path.join(TARGET_DIR, '.synonym_meta.json')
 
 const TOKEN = process.env.GITHUB_TOKEN || ''
@@ -66,34 +70,34 @@ const fetchLatestRelease = async (repo) => {
   }
 }
 
-const downloadFromRepo = async (repo, meta) => {
-  const outPath = path.join(TARGET_DIR, ASSET)
+const downloadAssetFromRepo = async (repo, meta, asset) => {
+  const outPath = path.join(TARGET_DIR, asset)
 
   // 1) Try release asset
   const release = await fetchLatestRelease(repo)
   if (release && Array.isArray(release.assets)) {
-    const asset = release.assets.find((a) => a.name === ASSET)
-    if (asset) {
-      const remoteTag = asset.updated_at || String(asset.id) || asset.browser_download_url
-      const have = meta[ASSET]
+    const releaseAsset = release.assets.find((a) => a.name === asset)
+    if (releaseAsset) {
+      const remoteTag = releaseAsset.updated_at || String(releaseAsset.id) || releaseAsset.browser_download_url
+      const have = meta[asset]
       if (have && fs.existsSync(outPath) && have === remoteTag) {
-        console.log(`Skipping ${ASSET} from ${repo} — release unchanged.`)
+        console.log(`Skipping ${asset} from ${repo} — release unchanged.`)
         return true
       }
 
-      console.log(`Downloading ${ASSET} from release in ${repo} -> ${outPath}`)
-      await downloadFile(asset.browser_download_url, outPath)
-      console.log(`Downloaded ${ASSET} from release in ${repo}`)
-      meta[ASSET] = remoteTag
+      console.log(`Downloading ${asset} from release in ${repo} -> ${outPath}`)
+      await downloadFile(releaseAsset.browser_download_url, outPath)
+      console.log(`Downloaded ${asset} from release in ${repo}`)
+      meta[asset] = remoteTag
       saveMeta(meta)
       return true
     }
   }
 
   // 2) Download via GitHub contents API (works with LFS)
-    const contentsUrl = `https://api.github.com/repos/${repo}/contents/${ASSET}?ref=${REPO_REF}`
+    const contentsUrl = `https://api.github.com/repos/${repo}/contents/${asset}?ref=${REPO_REF}`
 
-    console.log(`Fetching file metadata from ${repo}`)
+    console.log(`Fetching file metadata for ${asset} from ${repo}`)
 
     const res = await fetch(contentsUrl, { headers: makeHeaders() })
     if (!res.ok) {
@@ -108,19 +112,26 @@ const downloadFromRepo = async (repo, meta) => {
 
     const remoteTag = json.sha
 
-    if (remoteTag && meta[ASSET] && fs.existsSync(outPath) && meta[ASSET] === remoteTag) {
-    console.log(`Skipping ${ASSET} from ${repo} — unchanged.`)
+    if (remoteTag && meta[asset] && fs.existsSync(outPath) && meta[asset] === remoteTag) {
+    console.log(`Skipping ${asset} from ${repo} — unchanged.`)
     return true
     }
 
-    console.log(`Downloading ${ASSET} from ${json.download_url}`)
+    console.log(`Downloading ${asset} from ${json.download_url}`)
     await downloadFile(json.download_url, outPath)
 
-    meta[ASSET] = remoteTag
+    meta[asset] = remoteTag
     saveMeta(meta)
 
-    console.log(`Downloaded ${ASSET} successfully`)
+    console.log(`Downloaded ${asset} successfully`)
     return true
+}
+
+const downloadFromRepo = async (repo, meta) => {
+  for (const asset of ASSETS) {
+    await downloadAssetFromRepo(repo, meta, asset)
+  }
+  return true
 }
 
 const main = async () => {
@@ -132,7 +143,7 @@ const main = async () => {
       await downloadFromRepo(repo, meta)
       return
     } catch (err) {
-      console.warn(`Failed to download ${ASSET} from ${repo}: ${err?.message || err}`)
+      console.warn(`Failed to download synonym model assets from ${repo}: ${err?.message || err}`)
     }
   }
 
