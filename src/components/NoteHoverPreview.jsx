@@ -26,68 +26,32 @@ import {
   setEditorHoveredNote,
 } from '../extensions/NoteAnnotation'
 
-const TILE_WIDTH = 260
-const TILE_MIN_HEIGHT = 88
-const TILE_MIN_RESIZE_WIDTH = 220
-const TILE_MIN_RESIZE_HEIGHT = 64
-const VIEWPORT_PADDING = 20
-const HIDE_DELAY_MS = 110
-const EDGE_GRAB_THRESHOLD = 18
-const DRAG_MIN_DELTA = 3
-const CHILD_OFFSET_X = 0
-const CHILD_OFFSET_Y = 184
-
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
-
-const clampPosition = (position, size = { width: TILE_WIDTH, height: TILE_MIN_HEIGHT }) => ({
-  x: clamp(position.x, VIEWPORT_PADDING, window.innerWidth - size.width - VIEWPORT_PADDING),
-  y: clamp(position.y, VIEWPORT_PADDING, window.innerHeight - size.height - VIEWPORT_PADDING),
-})
-
-/** Default root-card position beside the anchor: right of it when there's room, else left. */
-const getInitialTilePosition = (anchorRect, tileWidth = TILE_WIDTH, tileHeight = TILE_MIN_HEIGHT) => {
-  const prefersRight = anchorRect.right + tileWidth + 28 <= window.innerWidth - VIEWPORT_PADDING
-  const x = prefersRight
-    ? anchorRect.right + 22
-    : anchorRect.left - tileWidth - 22
-  const y = clamp(
-    anchorRect.top - tileHeight * 0.3,
-    VIEWPORT_PADDING,
-    window.innerHeight - tileHeight - VIEWPORT_PADDING
-  )
-
-  return {
-    x: clamp(x, VIEWPORT_PADDING, window.innerWidth - tileWidth - VIEWPORT_PADDING),
-    y,
-  }
-}
-
-const getDotPoint = (anchorRect) => ({
-  x: anchorRect.left + anchorRect.width / 2,
-  y: anchorRect.top + anchorRect.height / 2,
-})
-
-const getCardCenter = (position, size = { width: TILE_WIDTH, height: TILE_MIN_HEIGHT }) => ({
-  x: position.x + size.width / 2,
-  y: position.y + size.height / 2,
-})
-
-const getDefaultChildOffset = (index, total) => ({
-  offsetX: (index - (total - 1) / 2) * 48 + CHILD_OFFSET_X,
-  offsetY: CHILD_OFFSET_Y,
-})
-
-/** Quadratic bezier "string" between two points, bowing upward with distance. */
-const getCurvePath = (fromPoint, toPoint) => {
-  const distance = Math.hypot(toPoint.x - fromPoint.x, toPoint.y - fromPoint.y)
-  const sway = clamp(distance * 0.12, 18, 70)
-  const controlPoint = {
-    x: (fromPoint.x + toPoint.x) / 2,
-    y: (fromPoint.y + toPoint.y) / 2 - sway,
-  }
-
-  return `M ${fromPoint.x} ${fromPoint.y} Q ${controlPoint.x} ${controlPoint.y} ${toPoint.x} ${toPoint.y}`
-}
+import {
+  TILE_WIDTH,
+  TILE_MIN_HEIGHT,
+  TILE_MIN_RESIZE_WIDTH,
+  TILE_MIN_RESIZE_HEIGHT,
+  VIEWPORT_PADDING,
+  HIDE_DELAY_MS,
+  EDGE_GRAB_THRESHOLD,
+  DRAG_MIN_DELTA,
+  CHILD_OFFSET_X,
+  CHILD_OFFSET_Y,
+  clampPosition,
+  getInitialTilePosition,
+  getDotPoint,
+  getCardCenter,
+  getDefaultChildOffset,
+  getCurvePath,
+  isSamePreviewIdentity,
+  isDragEdge,
+  setPointerCaptureSafely,
+  releasePointerCaptureSafely,
+  addPointerDragListeners,
+  hasStoredChildOffset,
+  collectDescendantIds,
+  areRectsEqual,
+} from '../lib/notePreviewGeometry'
 
 /** Find the live bounding rect of a note's marker element in the editor DOM. */
 const queryAnchorRect = (noteId, editorView) => {
@@ -97,87 +61,6 @@ const queryAnchorRect = (noteId, editorView) => {
   return marker?.getBoundingClientRect?.() || null
 }
 
-const isSamePreviewIdentity = (left, right) => {
-  if (left === right) return true
-  if (!left || !right) return false
-
-  return (
-    left.note?.id === right.note?.id &&
-    left.locked === right.locked &&
-    left.editorView === right.editorView
-  )
-}
-
-const isDragEdge = (clientX, clientY, rect) => (
-  clientX - rect.left <= EDGE_GRAB_THRESHOLD ||
-  rect.right - clientX <= EDGE_GRAB_THRESHOLD ||
-  clientY - rect.top <= EDGE_GRAB_THRESHOLD ||
-  rect.bottom - clientY <= EDGE_GRAB_THRESHOLD
-)
-
-const setPointerCaptureSafely = (target, pointerId) => {
-  try {
-    target?.setPointerCapture?.(pointerId)
-  } catch {
-    // Pointer capture is a nice-to-have; window listeners still keep drag working.
-  }
-}
-
-const releasePointerCaptureSafely = (target, pointerId) => {
-  try {
-    target?.releasePointerCapture?.(pointerId)
-  } catch {
-    // Ignore stale pointer ids after the drag has ended.
-  }
-}
-
-const addPointerDragListeners = (target, handlePointerMove, handlePointerUp) => {
-  window.addEventListener('pointermove', handlePointerMove, true)
-  window.addEventListener('pointerup', handlePointerUp, true)
-  target?.addEventListener?.('pointermove', handlePointerMove, true)
-  target?.addEventListener?.('pointerup', handlePointerUp, true)
-
-  return () => {
-    window.removeEventListener('pointermove', handlePointerMove, true)
-    window.removeEventListener('pointerup', handlePointerUp, true)
-    target?.removeEventListener?.('pointermove', handlePointerMove, true)
-    target?.removeEventListener?.('pointerup', handlePointerUp, true)
-  }
-}
-
-const hasStoredChildOffset = (note) => (
-  Math.abs(note?.previewLayout?.offsetX || 0) > 1 ||
-  Math.abs(note?.previewLayout?.offsetY || 0) > 1
-)
-
-const collectDescendantIds = (childMap, rootId) => {
-  const ids = new Set()
-  const stack = [...(childMap.get(rootId) || [])]
-
-  while (stack.length > 0) {
-    const note = stack.pop()
-    if (!note || ids.has(note.id)) continue
-    ids.add(note.id)
-    const children = childMap.get(note.id) || []
-    children.forEach((child) => stack.push(child))
-  }
-
-  return ids
-}
-
-const areRectsEqual = (left, right) => {
-  if (left === right) return true
-  if (!left || !right) return false
-
-  return (
-    left.left === right.left &&
-    left.top === right.top &&
-    left.right === right.right &&
-    left.bottom === right.bottom &&
-    left.width === right.width &&
-    left.height === right.height
-  )
-}
 
 export default function NoteHoverPreview({
   notesByDoc = {},
