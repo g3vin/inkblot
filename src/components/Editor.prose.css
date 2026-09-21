@@ -88,3 +88,18 @@
   display: block;
 }
 
+/* List rules sat under the "History panel" banner in the original Editor.css —
+   misfiled, not intentional. They are ProseMirror content styling. */
+
+.editor ul,
+.editor ol {
+  padding-left: 1.5em;
+}
+
+.editor li {
+  margin: 4px 0;
+}
+
+.editor li > p {
+  margin: 0;
+}
