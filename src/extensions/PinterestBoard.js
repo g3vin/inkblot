@@ -22,63 +22,24 @@ import {
 // Re-exported: EditorCanvas's paste handler imports it from here.
 export { normalizePinterestBoardUrl }
 
-const PINTEREST_SCRIPT_ID = 'inkblot-pinterest-pinit-js'
-const PINTEREST_SCRIPT_SRC = 'https://assets.pinterest.com/js/pinit.js'
-
-const PINTEREST_PIDGETS_BASE = 'https://widgets.pinterest.com/v3/pidgets/boards'
 const SECTION_PRIVATE_PREVIEW_TIMEOUT_MS = 15000
 const PINTEREST_OPEN_WINDOW_EVENT = 'inkblot:pinterest-open-window'
 const PINTEREST_COPY_LINK_EVENT = 'inkblot:pinterest-copy-link'
-const PINTEREST_CACHE_PREFIX = 'inkblot:pinterest-preview:'
-const PINTEREST_PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
-const PINTEREST_PROJECT_OPEN_ID_KEY = 'inkblot:project-open-id'
-const PINTEREST_CACHE_VERSION = 1
-const PINTEREST_CACHE_MAX_ITEMS = 80
 
-const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
-
-const getPinterestCacheKey = (url) => {
-  const normalized = normalizePinterestBoardUrl(url)
-  if (!normalized) return null
-  return `${PINTEREST_CACHE_PREFIX}${normalized}`
-}
-
-const getProjectOpenId = () => {
-  if (typeof window === 'undefined') return 'default'
-  return String(
-    window.__inkblotProjectOpenId ||
-    window.sessionStorage?.getItem(PINTEREST_PROJECT_OPEN_ID_KEY) ||
-    'default'
-  )
-}
-
-const getProjectRefreshKey = (url) => {
-  const cacheKey = getPinterestCacheKey(url)
-  if (!cacheKey) return null
-  return `${PINTEREST_PROJECT_REFRESH_PREFIX}${getProjectOpenId()}:${cacheKey}`
-}
-
-const hasRefreshedForCurrentProjectOpen = (url) => {
-  if (typeof window === 'undefined') return false
-  const key = getProjectRefreshKey(url)
-  if (!key) return false
-  try {
-    return window.sessionStorage?.getItem(key) === 'true'
-  } catch {
-    return false
-  }
-}
-
-const markRefreshedForCurrentProjectOpen = (url) => {
-  if (typeof window === 'undefined') return
-  const key = getProjectRefreshKey(url)
-  if (!key) return
-  try {
-    window.sessionStorage?.setItem(key, 'true')
-  } catch {
-    // Session refresh markers are best-effort.
-  }
-}
+import {
+  PINTEREST_CACHE_MAX_ITEMS,
+  PINTEREST_CACHE_PREFIX,
+  PINTEREST_CACHE_VERSION,
+  hasRefreshedForCurrentProjectOpen,
+  isOffline,
+  markRefreshedForCurrentProjectOpen,
+} from './pinterestCache'
+import {
+  buildPinterestEmbeds,
+  ensurePinterestScriptLoaded,
+  parsePinterestBoardParts,
+  pidgetsPinsUrlFromPinterestUrl,
+} from './pinterestEmbed'
 
 const ensurePinterestMenuBridge = (() => {
   let installed = false
@@ -117,95 +78,6 @@ const ensurePinterestMenuBridge = (() => {
 
 ensurePinterestMenuBridge()
 
-const parsePinterestBoardParts = (pinterestUrl) => {
-  if (!pinterestUrl) return null
-  let url
-  try {
-    url = new URL(String(pinterestUrl))
-  } catch {
-    return null
-  }
-
-  const host = url.hostname.toLowerCase()
-  if (!(host === 'pinterest.com' || host === 'www.pinterest.com')) return null
-
-  const segments = url.pathname
-    .split('/')
-    .map(s => s.trim())
-    .filter(Boolean)
-
-  if (segments.length < 2) return null
-
-  const [user, board] = segments
-  const reservedThird = new Set(['pins', 'activity', 'ideas', 'more_ideas'])
-  const third = segments[2]
-  const section = third && !reservedThird.has(third.toLowerCase()) ? third : null
-
-  return { user, board, section }
-}
-
-const pidgetsPinsUrlFromPinterestUrl = (pinterestUrl) => {
-  const parts = parsePinterestBoardParts(pinterestUrl)
-  if (!parts) return null
-
-  const base = `${PINTEREST_PIDGETS_BASE}/${encodeURIComponent(parts.user)}/${encodeURIComponent(parts.board)}/pins/`
-
-  // NOTE: `?section=<slug>` appears accepted but is NOT reliably filtered.
-  // We keep the base endpoint here and handle section-specific fetching elsewhere.
-  return base
-}
-
-const ensurePinterestScriptLoaded = (() => {
-  let promise = null
-
-  return () => {
-    if (typeof window === 'undefined') return Promise.resolve(false)
-
-    // Already loaded
-    if (window.PinUtils && typeof window.PinUtils.build === 'function') {
-      return Promise.resolve(true)
-    }
-
-    if (promise) return promise
-
-    promise = new Promise(resolve => {
-      const existing = document.getElementById(PINTEREST_SCRIPT_ID)
-      if (existing) {
-        existing.addEventListener('load', () => resolve(true), { once: true })
-        existing.addEventListener('error', () => resolve(false), { once: true })
-        return
-      }
-
-      const script = document.createElement('script')
-      script.id = PINTEREST_SCRIPT_ID
-      script.async = true
-      script.defer = true
-      script.src = PINTEREST_SCRIPT_SRC
-      script.onload = () => resolve(true)
-      script.onerror = () => resolve(false)
-      document.head.appendChild(script)
-    })
-
-    return promise
-  }
-})()
-
-const buildPinterestEmbeds = (rootEl) => {
-  try {
-    if (window.PinUtils && typeof window.PinUtils.build === 'function') {
-      // PinUtils.build() accepts an optional root element.
-      try {
-        window.PinUtils.build(rootEl)
-      } catch {
-        window.PinUtils.build()
-      }
-      return true
-    }
-  } catch {
-    // ignore
-  }
-  return false
-}
 
 const PinterestBoard = Node.create({
   name: 'pinterestBoard',
