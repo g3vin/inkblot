@@ -1,0 +1,151 @@
+
+.workbench {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ============================================================
+   Sidebar tiles (shared tile shell)
+   ============================================================ */
+
+.tile {
+  background-color: var(--tile-color);
+  border: 1px solid var(--sidebar-card-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 0;
+  position: relative;
+  box-shadow: var(--sidebar-card-shadow);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tile-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.tile button:not(.synonym-btn) {
+  background: var(--control-bg);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tile button:not(.synonym-btn):hover {
+  background: var(--control-hover-bg);
+  color: var(--text-primary);
+}
+
+.synonym-btn {
+  background-color: var(--tile-color);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tile .synonym-btn:hover,
+.tile .synonym-btn:active,
+.tile .synonym-btn:focus-visible {
+  background: var(--text-secondary);
+  color: var(--tile-color) !important;
+  border-color: var(--text-secondary);
+}
+
+.synonym-btn:focus,
+.synonym-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: var(--text-secondary);
+}
+
+.definition-tile .definition-pos {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.definition-tile .definition-text {
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.definition-tile .definition-loading,
+.definition-tile .definition-empty {
+  color: var(--text-subtle);
+}
+
+.middle-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  box-sizing: border-box;
+  padding-top: var(--app-titlebar-height);
+  overflow: hidden;
+}
+
+/*
+ * Documents scroll under the titlebar. The titlebar clearance moves from the
+ * layout (padding on .middle-section) into the scroller's own content padding:
+ * the resting position is identical, but once you scroll, text keeps going up
+ * past the scroller's top edge and fades out under the titlebar gradient
+ * (.app-titlebar::before) — vanishing off the top of the editor.
+ *
+ * Canvas-underlay mode is excluded: a canvas pans instead of scrolling, so it
+ * keeps the plain layout padding.
+ */
+.main-layout:not(.is-canvas-underlay) .middle-section {
+  padding-top: 0;
+}
+
+.main-layout:not(.is-canvas-underlay) .pane-scroll {
+  padding-top: var(--app-titlebar-height);
+  /* Programmatic scrolls (jump-to-text, search hits) must land clear of the fade. */
+  scroll-padding-top: calc(var(--app-titlebar-height) + 20px);
+}
+
+/* Only panes touching the window top scroll under the titlebar; the bottom
+   pane of a row split sits under the divider, not the titlebar. */
+.main-layout:not(.is-canvas-underlay) .split-rows .secondary-pane .pane-scroll {
+  padding-top: 0;
+}
+
+/* Non-scrolling pane contents still need the titlebar clearance the layout
+   used to give them. */
+.main-layout:not(.is-canvas-underlay) .draft-pane {
+  padding-top: calc(32px + var(--app-titlebar-height));
+}
+
+.main-layout:not(.is-canvas-underlay) .empty-state {
+  padding-top: var(--app-titlebar-height);
+}
+
+.main-layout:not(.is-canvas-underlay) .canvas-pane {
+  box-sizing: border-box;
+  padding-top: var(--app-titlebar-height);
+}
+

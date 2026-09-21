@@ -1,0 +1,28 @@
+/* ============================================================
+   Empty state
+   ============================================================ */
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-subtle);
+  font-size: 14px;
+}
+
+.empty-state-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.empty-state-action {
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  cursor: pointer;
+  color: inherit;
+}
+
