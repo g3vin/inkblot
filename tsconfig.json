@@ -21,5 +21,13 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "public"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "public",
+    /* Inherited a syntax error from the template literal it was extracted from
+       (invalid regex, line 85), so tsc cannot parse it either. Removed in the
+       commit that fixes the escaping. */
+    "src/lib/pinterestScripts/domScrape.js"
+  ]
 }
