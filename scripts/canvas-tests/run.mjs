@@ -1,6 +1,7 @@
 /**
  * Headless checks for the canvas feature.
  *
+ *   npm test                                               (from the repo root)
  *   node --experimental-loader ./loader.mjs run.mjs        (from this directory)
  *
  * The app is a Tauri desktop app, so most of it can only be exercised in the
@@ -17,6 +18,8 @@
  *   group  group create/ungroup, and the geometric membership a drag resolves
  *   snap   the alignment math behind a drag
  *   search finding text in a canvas (which used to silently match nothing)
+ *   note   the note model, and note cards as file nodes
+ *   audio  voice memos: mime resolution, the asset store, dedupe
  *   html   generateHTML(): how every non-editing card and document preview renders
  *   dom    the real CanvasSurface mounted in jsdom, under StrictMode like the app
  *
@@ -34,13 +37,30 @@
  */
 const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom']
 
-let failed = false
+const failures = []
 
 for (const suite of SUITES) {
   console.log(`\n=== ${suite} ===`)
-  const before = process.exitCode
-  await import(`./${suite}.mjs`)
-  if (process.exitCode && process.exitCode !== before) failed = true
+
+  // Each suite reports by setting process.exitCode, so snapshot and clear it around
+  // every import — otherwise the first failure masks each one after it.
+  process.exitCode = 0
+  try {
+    await import(`./${suite}.mjs`)
+  } catch (error) {
+    // A suite that throws must not take the rest of the run down with it. That is
+    // how four suites sat silently unrun behind one stale assertion.
+    console.error(`ERROR  ${suite} threw and was abandoned:`)
+    console.error(error)
+    process.exitCode = 1
+  }
+  if (process.exitCode) failures.push(suite)
 }
 
-console.log(failed ? '\nFAILURES above.' : '\nAll suites passed.')
+if (failures.length) {
+  console.log(`\nFAILURES in: ${failures.join(', ')}`)
+  process.exitCode = 1
+} else {
+  process.exitCode = 0
+  console.log('\nAll suites passed.')
+}

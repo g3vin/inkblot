@@ -1,0 +1,17 @@
+[package]
+name = "inkblot-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+description = "Inkblot's shell-independent domain logic"
+
+[lib]
+# rlib for the Tauri app; staticlib so a native Swift shell can link the same crate.
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
+reqwest = { workspace = true }
+font-kit = { workspace = true }

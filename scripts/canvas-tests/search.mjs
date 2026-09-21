@@ -9,6 +9,13 @@ const C = '../../src'
 const { collectCanvasMatches } = await import(`${C}/lib/canvasSearch.js`)
 const { serializeCanvas, createEmptyCanvas, makeTextNode, makeGroupNode, makeFileNode, makeEdge } =
   await import(`${C}/lib/canvasModel.js`)
+const { createMatcher } = await import(`${C}/lib/sidebarSearch.js`)
+
+// collectCanvasMatches takes a COMPILED matcher, not a query string — the same one
+// sidebarSearch builds, so every scope honours the same case/whole-word/regex
+// switches. Passing a bare string makes it return [] silently, which is the exact
+// failure this suite exists to catch.
+const m = (query, options) => createMatcher(query, options)
 const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
 
 const state = createEmptyCanvas()
@@ -25,7 +32,7 @@ state.edgeOrder.push(edge.id)
 
 // Search reads the on-disk shape, which is what SearchPanel loads.
 const raw = serializeCanvas(state)
-const hits = collectCanvasMatches(raw, 'lighthouse', 'Notes/Plot.canvas')
+const hits = collectCanvasMatches(raw, m('lighthouse'), 'Notes/Plot.canvas')
 
 ok('a canvas yields matches at all', hits.length > 0)
 
@@ -65,17 +72,17 @@ const upper = collectCanvasMatches(
     s.nodeOrder.push(n.id)
     return s
   })()),
-  'lighthouse',
+  m('lighthouse'),
   'x.canvas'
 )
 ok('matching ignores case', upper.length === 1)
 
 /* ---- degenerate inputs must not throw ---- */
 
-ok('an empty canvas yields nothing', collectCanvasMatches(serializeCanvas(createEmptyCanvas()), 'x', 'x.canvas').length === 0)
-ok('a null document yields nothing', collectCanvasMatches(null, 'x', 'x.canvas').length === 0)
-ok('an empty query yields nothing', collectCanvasMatches(raw, '', 'x.canvas').length === 0)
-ok('garbage yields nothing', collectCanvasMatches({ nodes: 'nope' }, 'x', 'x.canvas').length === 0)
+ok('an empty canvas yields nothing', collectCanvasMatches(serializeCanvas(createEmptyCanvas()), m('x'), 'x.canvas').length === 0)
+ok('a null document yields nothing', collectCanvasMatches(null, m('x'), 'x.canvas').length === 0)
+ok('an empty query yields nothing', collectCanvasMatches(raw, m(''), 'x.canvas').length === 0)
+ok('garbage yields nothing', collectCanvasMatches({ nodes: 'nope' }, m('x'), 'x.canvas').length === 0)
 
 /* ---- the result cap is honored ---- */
 
@@ -85,4 +92,4 @@ for (let i = 0; i < 50; i += 1) {
   many.nodes[node.id] = node
   many.nodeOrder.push(node.id)
 }
-ok('the limit caps results', collectCanvasMatches(serializeCanvas(many), 'match', 'x.canvas', { limit: 24 }).length === 24)
+ok('the limit caps results', collectCanvasMatches(serializeCanvas(many), m('match'), 'x.canvas', { limit: 24 }).length === 24)

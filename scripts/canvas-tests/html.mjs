@@ -11,17 +11,13 @@
  * the app uses.
  */
 import { JSDOM } from 'jsdom'
+import { installGlobals } from './install-globals.mjs'
 
 // Must be installed before @tiptap/core is imported: prosemirror-model binds to the
 // global document at module scope.
 const dom = new JSDOM('<!doctype html><html><body></body></html>')
-globalThis.window = dom.window
-globalThis.document = dom.window.document
-globalThis.navigator = dom.window.navigator
-globalThis.DOMParser = dom.window.DOMParser
-globalThis.Node = dom.window.Node
-globalThis.Element = dom.window.Element
-globalThis.HTMLElement = dom.window.HTMLElement
+installGlobals(dom.window, ['document', 'navigator', 'DOMParser', 'Node', 'Element', 'HTMLElement'])
+Object.defineProperty(globalThis, 'window', { value: dom.window, writable: true, configurable: true })
 
 const C = '../../src'
 const { generateHTML } = await import('@tiptap/core')

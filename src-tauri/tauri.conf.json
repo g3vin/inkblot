@@ -9,7 +9,6 @@
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
-  
   "app": {
     "withGlobalTauri": true,
     "windows": [
@@ -31,14 +30,18 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": [],
+    "resources": [
+      "resources/minilm-tokenizer.json"
+    ],
     "macOS": {
       "infoPlist": "Info.plist"
     },

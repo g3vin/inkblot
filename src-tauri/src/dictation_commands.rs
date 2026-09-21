@@ -13,7 +13,7 @@ use inkblot_dictation::{
 };
 use parking_lot::Mutex;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct AppDictationState {
     pub service: Mutex<DictationService>,
@@ -56,15 +56,75 @@ impl DictationLevelMeter {
     }
 }
 
+/// Where a whisper model is looked for when the caller does not name one.
+///
+/// The path used to be a constant in `src/lib/dictation.js` pointing at one developer's
+/// home directory, so dictation could not work for anybody else. Resolution now happens
+/// here, nearest-first, and the legacy location is kept last so existing setups survive.
+fn default_dictation_model(app: &AppHandle) -> Vec<std::path::PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Ok(explicit) = std::env::var("INKBLOT_DICTATION_MODEL") {
+        if !explicit.trim().is_empty() {
+            candidates.push(std::path::PathBuf::from(explicit));
+        }
+    }
+
+    if let Ok(dir) = app.path().app_data_dir() {
+        candidates.push(dir.join("models").join("ggml-small.en.bin"));
+    }
+
+    if let Some(home) = std::env::var_os("HOME") {
+        candidates.push(
+            std::path::PathBuf::from(home)
+                .join("inkblot-dictation")
+                .join("models")
+                .join("ggml-small.en.bin"),
+        );
+    }
+
+    candidates
+}
+
 #[tauri::command]
 pub async fn load_dictation_model(
+    app: AppHandle,
     state: State<'_, AppDictationState>,
-    model_path: String,
+    model_path: Option<String>,
 ) -> Result<ModelInfo, String> {
-    let mut service = state.service.lock();
+    let resolved = match model_path {
+        Some(path) if !path.trim().is_empty() => std::path::PathBuf::from(path),
+        _ => {
+            let candidates = default_dictation_model(&app);
+            candidates
+                .iter()
+                .find(|path| path.is_file())
+                .cloned()
+                .ok_or_else(|| {
+                    // A sentinel plus the search path, so the UI can both branch on it
+                    // and tell the user where to put the file.
+                    format!(
+                        "DICTATION_MODEL_NOT_INSTALLED: looked in {}",
+                        candidates
+                            .iter()
+                            .map(|p| p.display().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })?
+        }
+    };
 
+    if !resolved.is_file() {
+        return Err(format!(
+            "DICTATION_MODEL_NOT_INSTALLED: no file at {}",
+            resolved.display()
+        ));
+    }
+
+    let mut service = state.service.lock();
     service
-        .load_model(model_path)
+        .load_model(resolved.to_string_lossy().to_string())
         .map_err(|err| err.to_string())
 }
 
