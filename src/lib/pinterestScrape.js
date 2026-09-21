@@ -10,7 +10,6 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
 import sessionScrapeBody from './pinterestScripts/sessionScrape.js?raw'
-import domScrapeBody from './pinterestScripts/domScrape.js?raw'
 
 let scrapeWindow = null
 
@@ -337,20 +336,18 @@ export async function scrapePinterestPins(
     const elapsedSoFar = Date.now() - parseInt(requestId.split('-')[0], 10)
     const scriptTimeout = Math.max(3000, reqTimeoutMs - elapsedSoFar)
 
-    const script = scrapeStrategy === 'session-only'
-      ? buildPinterestSessionScrapeScript({
-        requestId,
-        maxPins: reqMaxPins,
-        timeoutMs: scriptTimeout,
-        targetUrl,
-      })
-      : buildPinterestScrapeScript({
-        requestId,
-        maxPins: reqMaxPins,
-        timeoutMs: scriptTimeout,
-        targetUrl,
-      })
-    if (scrapeStrategy === 'session-only') {
+    // One script for both strategies. The 'auto' path used to inject a separate
+    // DOM-only scraper, but that script was never valid JavaScript — backslashes
+    // in its regexes were eaten by the template literal it was written in, so it
+    // failed to parse in the page. Nothing ever requested 'auto' for the webview
+    // step (every caller passes 'session-only'), so it had no working users.
+    const script = buildPinterestSessionScrapeScript({
+      requestId,
+      maxPins: reqMaxPins,
+      timeoutMs: scriptTimeout,
+      targetUrl,
+    })
+    {
       try {
         // Validate generated script syntax in our own app context before
         // sending it into the Pinterest page, where parse failures are opaque.
@@ -426,19 +423,4 @@ const buildPinterestSessionScrapeScript = ({ requestId, maxPins, timeoutMs, targ
   const timeoutMs = ${Number(timeoutMs) || 15000};
   const requestedUrl = ${JSON.stringify(String(targetUrl || ''))};
 ${sessionScrapeBody}})();`
-}
-
-const buildPinterestScrapeScript = ({ requestId, maxPins, timeoutMs, targetUrl }) => {
-  // IMPORTANT: This string is evaluated inside the Pinterest page.
-  // Avoid template-literals inside this script.
-  return `(() => {
-  const requestId = ${JSON.stringify(String(requestId))};
-  const maxPins = ${Number(maxPins) || 50};
-  const timeoutMs = ${Number(timeoutMs) || 15000};
-  const debugState = {
-    requestedUrl: ${JSON.stringify(String(targetUrl || ''))},
-    initialLocationHref: location.href,
-    initialPathname: location.pathname,
-  };
-${domScrapeBody}})();`
 }
