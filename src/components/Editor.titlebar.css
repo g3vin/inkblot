@@ -1,0 +1,131 @@
+/* ============================================================
+   Titlebar & toolbar chrome
+   ============================================================ */
+
+.app-titlebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns:
+    var(--titlebar-left-width, 86px)
+    minmax(0, 1fr)
+    var(--titlebar-right-width, 0px);
+  align-items: stretch;
+  height: var(--app-titlebar-height);
+  flex: none;
+  min-height: var(--app-titlebar-height);
+  background: transparent;
+  overflow: visible;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The bar behind every titlebar button: solid at the window edge, gone by a
+   little past the titlebar's bottom. Editor content scrolls UNDER it (see the
+   .pane-scroll padding swap below), so text sliding up dissolves into the top
+   of the window instead of hitting a hard line. */
+.app-titlebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--app-titlebar-height) + 20px);
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--app-bg) 0%,
+    var(--app-bg) 45%,
+    transparent 100%
+  );
+}
+
+.app-titlebar-spacer {
+  min-width: 0;
+  background: transparent;
+}
+
+.app-titlebar-spacer-left {
+  min-width: 86px;
+}
+
+.app-titlebar-toolbar {
+  position: relative;
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  pointer-events: auto;
+  background: transparent;
+  overflow: hidden;
+}
+
+.app-titlebar-toolbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 1px);
+  height: 20px;
+  pointer-events: none;
+  z-index: 0;
+  background: transparent;
+}
+
+.app-titlebar-toolbar > * {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.toolbar-placeholder {
+  flex: 1;
+}
+
+.main-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/*
+ * Canvas only: the board runs the full width of the window and the sidebars float
+ * on top of it, so the canvas reads as the surface everything else sits on.
+ *
+ * Taking the sidebars out of flow is all this needs — .middle-section is `flex: 1`,
+ * so it claims the whole row on its own. A document is unchanged: it keeps its
+ * column between the two sidebars, which is already the look this is after.
+ */
+.main-layout.is-canvas-underlay > .sidebar {
+  position: absolute;
+  top: 0;
+  z-index: 50;
+}
+
+.main-layout.is-canvas-underlay > .left-sidebar {
+  left: 0;
+}
+
+.main-layout.is-canvas-underlay > .right-sidebar {
+  right: 0;
+}
+
+.editor-page-wrapper.is-focus-mode .app-titlebar,
+.editor-page-wrapper.is-focus-mode .left-sidebar,
+.editor-page-wrapper.is-focus-mode .right-sidebar {
+  display: none;
+}
+
+.editor-page-wrapper.is-focus-mode .main-layout {
+  min-height: 0;
+}
+

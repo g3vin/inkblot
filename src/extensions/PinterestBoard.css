@@ -1,0 +1,170 @@
+/* ============================================================
+   Pinterest board embeds
+   ============================================================ */
+
+/*
+ * A board is a card like any other in the app: same radius, same surface, same
+ * shadow language as a note or a canvas card. It used to sit in a flat translucent
+ * box with square-ish corners that matched nothing around it.
+ */
+.pinterest-board-node {
+  display: block;
+  margin: 14px 0;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--floating-note-radius, 16px);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  position: relative;
+  transition: box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.pinterest-board-node:hover {
+  box-shadow: var(--shadow-popover);
+}
+
+.pinterest-board-node.is-selected {
+  outline: 2px solid color-mix(in srgb, var(--accent-color) 68%, transparent);
+  outline-offset: 2px;
+}
+
+.pinterest-board-inner {
+  display: block;
+}
+
+.pinterest-board-masonry {
+  width: 100%;
+  column-count: 3;
+  column-width: 180px;
+  column-gap: 10px;
+}
+
+.pinterest-board-node.is-collapsed .pinterest-board-inner {
+  max-height: 600px;
+  overflow: hidden;
+}
+
+.pinterest-board-node.is-expanded .pinterest-board-inner {
+  max-height: none;
+  overflow: visible;
+}
+
+.pinterest-board-expand-hint {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 36px 12px 12px;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--app-bg) 76%, transparent)
+  );
+}
+
+.pinterest-board-node.is-collapsed .pinterest-board-expand-hint {
+  display: block;
+}
+
+.pinterest-board-masonry-item {
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 10px;
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  text-decoration: none;
+}
+
+/*
+ * A pin lifts slightly on hover instead of just getting brighter. The old
+ * `filter: brightness()` washed the image out and read as a rendering glitch rather
+ * than as a control you could click.
+ */
+.pinterest-board-masonry-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px var(--shadow-color);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.pinterest-board-masonry-item:hover img {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+}
+
+.pinterest-board-fallback {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 8px;
+}
+
+.pinterest-board-fallback a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.pinterest-board-refresh-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--text-subtle);
+  cursor: pointer;
+  line-height: 1;
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.pinterest-board-refresh-btn:hover {
+  background: var(--control-hover-bg);
+  color: var(--text-primary);
+}
+
+.pinterest-board-refresh-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Optional: make sure caret is visible at top-left in empty document */
+.editor:empty::before {
+  content: "\200B"; /* zero-width space forces a place to type */
+  display: block;
+  height: 1.6em;
+  color: transparent;
+}
+
+
+.editor *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
