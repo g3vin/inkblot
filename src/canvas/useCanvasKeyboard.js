@@ -92,6 +92,7 @@ export function useCanvasKeyboard({
     redo,
     selectAll,
     selectionRef,
+    stateRef,
     surfaceRef,
     toggleLocked,
     undo,
