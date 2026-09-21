@@ -38,214 +38,28 @@ import {
 
 const MotionDiv = motion.div
 
-const ORDER_PREFIX = 'inkblot-order:'
-const EXPANDED_PREFIX = 'inkblot-expanded:'
 const DRAG_SLOT_HEIGHT = 22
 const TREE_ROOT_INDENT = 8
 const TREE_DEPTH_INDENT = 10
 const FOLDER_STICKY_STEP = 22
 
-const itemRevealVariants = {
-  collapsed: {
-    opacity: 0,
-    y: -8,
-  },
-  expanded: (index = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.2,
-      ease: 'easeOut',
-      delay: Math.min(index, 8) * 0.024,
-    },
-  }),
-}
+import { itemRevealVariants, folderChildrenVariants } from './fileTreeVariants'
+import {
+  applyOrderToTree,
+  collectFolderPaths,
+  getParentPath,
+  remapExpandedForFolder,
+  remapOrderForEntry,
+  remapOrderForFolder,
+} from '../lib/fileTreeOrder'
+import {
+  loadExpanded,
+  loadOrder,
+  migrateProjectTreeState,
+  saveExpanded,
+  saveOrder,
+} from '../lib/fileTreeState'
 
-const folderChildrenVariants = {
-  collapsed: {
-    height: 0,
-    opacity: 0,
-    transition: {
-      duration: 0.18,
-      ease: 'easeInOut',
-      when: 'afterChildren',
-      staggerChildren: 0.018,
-      staggerDirection: -1,
-    },
-  },
-  expanded: {
-    height: 'auto',
-    opacity: 1,
-    transition: {
-      duration: 0.24,
-      ease: 'easeOut',
-      when: 'beforeChildren',
-      staggerChildren: 0.03,
-      delayChildren: 0.02,
-    },
-  },
-}
-
-/* ---------- localStorage persistence for manual order & expanded folders ---------- */
-
-const loadOrder = (projectName) => {
-  try {
-    return JSON.parse(localStorage.getItem(`${ORDER_PREFIX}${projectName}`) || '{}')
-  } catch {
-    return {}
-  }
-}
-
-const saveOrder = (projectName, order) => {
-  localStorage.setItem(`${ORDER_PREFIX}${projectName}`, JSON.stringify(order))
-}
-
-const loadExpanded = (projectName) => {
-  try {
-    const raw = localStorage.getItem(`${EXPANDED_PREFIX}${projectName}`)
-    if (!raw) return ['']
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : ['']
-  } catch {
-    return ['']
-  }
-}
-
-const saveExpanded = (projectName, expandedList) => {
-  localStorage.setItem(`${EXPANDED_PREFIX}${projectName}`, JSON.stringify(expandedList))
-}
-
-/** Carry a project's order/expanded localStorage keys across a project rename. */
-const migrateProjectTreeState = (fromProjectName, toProjectName) => {
-  if (!fromProjectName || !toProjectName || fromProjectName === toProjectName) return
-
-  const pairs = [
-    [`${ORDER_PREFIX}${fromProjectName}`, `${ORDER_PREFIX}${toProjectName}`],
-    [`${EXPANDED_PREFIX}${fromProjectName}`, `${EXPANDED_PREFIX}${toProjectName}`],
-  ]
-
-  pairs.forEach(([fromKey, toKey]) => {
-    const value = localStorage.getItem(fromKey)
-    if (value == null) return
-    localStorage.setItem(toKey, value)
-    localStorage.removeItem(fromKey)
-  })
-}
-
-const getParentPath = (path = '') => path.split('/').slice(0, -1).join('/')
-
-/* ----------------------------------------------------------------------------
-   Manual ordering. Each folder maps to an ordered list of "type:path" ids;
-   entries missing from the stored order are appended, stale ids are dropped.
----------------------------------------------------------------------------- */
-
-const ensureOrder = (order, folderPath, children) => {
-  const folderKey = folderPath || ''
-  const ids = children.map(child => `${child.type}:${child.path}`)
-  const existing = order[folderKey] || []
-  const filtered = existing.filter(id => ids.includes(id))
-  const missing = ids.filter(id => !filtered.includes(id))
-  const next = [...filtered, ...missing]
-  const changed = existing.length !== next.length || existing.some((id, idx) => id !== next[idx])
-  return { next, changed }
-}
-
-/** Recursively sort a tree's children by the stored manual order (unknown items last, A→Z). */
-const applyOrderToTree = (node, order) => {
-  if (!node || node.type !== 'folder') return node
-
-  const children = node.children || []
-  const { next, changed } = ensureOrder(order, node.path, children)
-  if (changed) {
-    order[node.path || ''] = next
-  }
-
-  const indexMap = new Map(next.map((id, index) => [id, index]))
-  const sorted = [...children].sort((a, b) => {
-    const aId = `${a.type}:${a.path}`
-    const bId = `${b.type}:${b.path}`
-    const aIndex = indexMap.get(aId)
-    const bIndex = indexMap.get(bId)
-
-    if (aIndex == null && bIndex == null) return a.name.localeCompare(b.name)
-    if (aIndex == null) return 1
-    if (bIndex == null) return -1
-    return aIndex - bIndex
-  })
-
-  return {
-    ...node,
-    children: sorted.map(child => applyOrderToTree(child, order)),
-  }
-}
-
-/** Rewrite order keys/ids after a folder moves or is renamed (fromPath → toPath). */
-const remapOrderForFolder = (orderState, fromPath, toPath) => {
-  const next = {}
-  Object.entries(orderState).forEach(([key, list]) => {
-    const newKey = key === fromPath || key.startsWith(`${fromPath}/`)
-      ? key.replace(fromPath, toPath)
-      : key
-
-    const newList = list.map(id => {
-      if (id.startsWith(`file:${fromPath}/`) || id === `file:${fromPath}`) {
-        return id.replace(`file:${fromPath}`, `file:${toPath}`)
-      }
-      if (id.startsWith(`folder:${fromPath}/`) || id === `folder:${fromPath}`) {
-        return id.replace(`folder:${fromPath}`, `folder:${toPath}`)
-      }
-      return id
-    })
-
-    next[newKey] = newList
-  })
-  return next
-}
-
-/** Rewrite order ids after any entry rename (delegates to the folder variant for folders). */
-const remapOrderForEntry = (orderState, type, fromPath, toPath) => {
-  if (type === 'folder') {
-    return remapOrderForFolder(orderState, fromPath, toPath)
-  }
-
-  const fromId = `${type}:${fromPath}`
-  const toId = `${type}:${toPath}`
-  const next = {}
-
-  Object.entries(orderState).forEach(([key, list]) => {
-    next[key] = list.map(id => (id === fromId ? toId : id))
-  })
-
-  return next
-}
-
-/** Rewrite expanded-folder paths after a folder moves or is renamed. */
-const remapExpandedForFolder = (expandedSet, fromPath, toPath) => {
-  const next = new Set()
-
-  expandedSet.forEach(path => {
-    if (path === fromPath || path.startsWith(`${fromPath}/`)) {
-      next.add(path.replace(fromPath, toPath))
-    } else {
-      next.add(path)
-    }
-  })
-
-  return next
-}
-
-const collectFolderPaths = (node) => {
-  const paths = []
-
-  const visit = (entry) => {
-    if (!entry || entry.type !== 'folder') return
-    if (entry.path) paths.push(entry.path)
-    ;(entry.children || []).forEach(visit)
-  }
-
-  visit(node)
-  return paths
-}
 
 export default function FileTree({
   projectName,
