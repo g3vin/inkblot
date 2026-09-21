@@ -20,6 +20,7 @@ import './Editor.css'
 
 import ProjectLanding from './ProjectLanding'
 import { useTabs } from './useTabs'
+import { useClipboardHistory } from './useClipboardHistory'
 import {
   CLIPBOARD_PERSIST_KEY,
   MAX_CLIPBOARD_ENTRIES,
@@ -185,35 +186,22 @@ export default function Editor({
   })
 
   // Bounding rect of the clipboard panel (or its sidebar container) used as the drag-drop target.
-  const getClipboardDropZoneRect = useCallback(() => {
-    const clipboardPanel = document.querySelector('.clipboard-panel')
-    if (!clipboardPanel) return null
-    const rightSidebar = clipboardPanel.closest('.right-sidebar')
-    const sidebarContent = clipboardPanel.closest('.sidebar-content')
-    return (
-      rightSidebar?.getBoundingClientRect?.() ||
-      sidebarContent?.getBoundingClientRect?.() ||
-      clipboardPanel.getBoundingClientRect?.() ||
-      null
-    )
-  }, [])
+  const {
+    getClipboardDropZoneRect,
+    isPointInAnyEditorPane,
+    addClipboardEntry,
+    clearClipboardHistory,
+    moveClipboardEntryToEditor,
+    handleDropToClipboard,
+  } = useClipboardHistory({
+    activeDoc,
+    currentDoc,
+    draggedSelectionRef,
+    editor,
+    secondaryEditor,
+    setClipboardHistory,
+  })
 
-  const isPointInsideRect = useCallback((x, y, rect) => {
-    if (!rect || x == null || y == null) return false
-    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
-  }, [])
-
-  const isPointInAnyEditorPane = useCallback((x, y) => {
-    const primaryPane = document.querySelector('.primary-pane')
-    const secondaryPane = document.querySelector('.secondary-pane')
-    const primaryRect = primaryPane?.getBoundingClientRect?.() || null
-    const secondaryRect = secondaryPane?.getBoundingClientRect?.() || null
-
-    return (
-      isPointInsideRect(x, y, primaryRect) ||
-      isPointInsideRect(x, y, secondaryRect)
-    )
-  }, [isPointInsideRect])
 
   const docRef = useRef(currentDoc)
   useEffect(() => { docRef.current = currentDoc }, [currentDoc])
@@ -361,70 +349,6 @@ export default function Editor({
   }, [activeDoc, setNotesForDoc])
 
   // Push a new entry onto the clipboard history (deduped, capped at MAX_CLIPBOARD_ENTRIES).
-  const addClipboardEntry = useCallback((text) => {
-    const normalized = (text || '').trim()
-    if (!normalized) return
-
-    setClipboardHistory(prev => {
-      const nextEntry = {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        text: normalized,
-        docName: activeDoc || currentDoc || '',
-        timestamp: new Date().toISOString(),
-      }
-
-      const deduped = prev.filter(entry => entry.text !== nextEntry.text)
-      return [nextEntry, ...deduped].slice(0, MAX_CLIPBOARD_ENTRIES)
-    })
-  }, [activeDoc, currentDoc])
-
-  const clearClipboardHistory = useCallback(() => {
-    setClipboardHistory([])
-  }, [])
-
-  const moveClipboardEntryToEditor = useCallback((entryId) => {
-    if (!entryId) return
-    setClipboardHistory(prev => prev.filter(entry => entry.id !== entryId))
-  }, [])
-
-  // Handle text dropped onto the clipboard panel. If the drag originated from an
-  // editor selection, this is a "move": the selection is deleted from its source doc.
-  const handleDropToClipboard = useCallback((payload) => {
-    const text = (payload?.text || '').trim()
-    if (!text) return
-
-    const draggedSelection = draggedSelectionRef.current || payload?.selection
-    const matchesDraggedSelection = Boolean(
-      draggedSelection && draggedSelection.text?.trim() === text
-    )
-    const shouldRemoveFromDoc = Boolean(
-      draggedSelection && (payload?.fromEditorSelection || matchesDraggedSelection)
-    )
-
-    if (shouldRemoveFromDoc) {
-      const sourceEditor =
-        draggedSelection.source === 'secondary' ? secondaryEditor : editor
-
-      if (sourceEditor) {
-        const docSize = sourceEditor.state?.doc?.content?.size ?? 0
-        const from = Math.max(0, Math.min(draggedSelection.from, docSize))
-        const to = Math.max(from, Math.min(draggedSelection.to, docSize))
-
-        if (to > from) {
-          sourceEditor
-            .chain()
-            .focus()
-            .setTextSelection({ from, to })
-            .deleteSelection()
-            .run()
-        }
-      }
-    }
-
-    addClipboardEntry(text)
-    draggedSelectionRef.current = null
-    try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
-  }, [addClipboardEntry, editor, secondaryEditor])
 
   // Bridge: EditorCanvas fires this event when a selection drag ends over the clipboard panel.
   useEffect(() => {

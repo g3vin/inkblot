@@ -30,7 +30,7 @@ export function useTabs({
   // that did not create its own tab lands in the active one (see above).
   useEffect(() => {
     setTabs(prev => ensureTabsForOpenDocs(prev, { currentDoc, secondaryDoc, activeTabId }))
-  }, [activeTabId, currentDoc, secondaryDoc])
+  }, [activeTabId, currentDoc, secondaryDoc, setTabs])
 
   // The active tab follows the primary pane, so opening a document anywhere —
   // the tree, a canvas card, a search result — lights the right dot.
@@ -38,7 +38,7 @@ export function useTabs({
     if (!currentDoc) return
     const match = tabs.find(tab => tab.docPath === currentDoc)
     if (match) setActiveTabId(match.id)
-  }, [currentDoc, tabs])
+  }, [currentDoc, tabs, setActiveTabId])
 
   /** Add a permanent tab for a document, or promote the ephemeral one it already has. */
   const withTabForDoc = useCallback((prev, docPath) => {
