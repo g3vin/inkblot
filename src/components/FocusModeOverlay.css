@@ -1,0 +1,334 @@
+/* ============================================================
+   Focus mode overlay
+   ============================================================ */
+
+.focus-mode-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(32px, 8vh, 96px) clamp(28px, 10vw, 150px);
+  background: transparent;
+  color: var(--focus-mode-fg);
+  isolation: isolate;
+}
+
+.focus-mode-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--focus-mode-bg);
+  clip-path: circle(150% at 50% 50%);
+  pointer-events: none;
+}
+
+.focus-mode-overlay.is-opening::before {
+  animation: focus-mode-bg-reveal 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.focus-mode-text {
+  position: relative;
+  z-index: 1;
+  width: min(980px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.72em;
+  line-height: 1.38;
+  font-weight: 520;
+  text-align: left;
+  transform: translateY(var(--focus-mode-text-offset, 0px));
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.focus-mode-text.is-paragraph-context {
+  display: block;
+}
+
+.focus-mode-sentence {
+  color: var(--focus-mode-muted);
+  cursor: text;
+  display: block;
+  font-size: var(--focus-mode-context-font-size, 28px);
+  white-space: pre-wrap;
+  transition:
+    color 220ms ease,
+    font-size 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.focus-mode-text.is-paragraph-context .focus-mode-sentence {
+  display: inline;
+}
+
+.focus-mode-text:not(.is-paragraph-context) .focus-mode-sentence.has-line-break-before {
+  margin-top: 0.14em;
+}
+
+.focus-mode-text:not(.is-paragraph-context) .focus-mode-sentence.has-paragraph-break-before {
+  margin-top: 0.78em;
+}
+
+.focus-mode-sentence.current {
+  color: var(--focus-mode-fg);
+  font-size: var(--focus-mode-font-size, 42px);
+}
+
+.focus-mode-prefix {
+  color: var(--focus-mode-muted);
+  font-size: var(--focus-mode-context-font-size, 28px);
+  white-space: pre-wrap;
+  transition: font-size 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.focus-mode-overlay.is-opening .focus-mode-sentence,
+.focus-mode-overlay.is-opening .focus-mode-prefix {
+  opacity: 0;
+  transform:
+    translateY(calc(var(--focus-mode-sentence-direction, 0) * 12px))
+    scale(0.985);
+  animation:
+    focus-mode-context-line-in 280ms cubic-bezier(0.2, 0.82, 0.2, 1) var(--focus-mode-sentence-delay, 360ms)
+    both;
+}
+
+.focus-mode-overlay.is-opening .focus-mode-sentence.current {
+  transform: translateY(0) scale(0.92);
+  animation-name: focus-mode-current-line-in;
+  animation-duration: 300ms;
+}
+
+.focus-mode-caret {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  vertical-align: -0.12em;
+  pointer-events: none;
+  animation: focus-mode-caret-blink 1s steps(2, start) infinite;
+}
+
+.focus-mode-caret::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.04em;
+  width: 0.08em;
+  height: 1.08em;
+  border-radius: 999px;
+  background: var(--accent-color);
+}
+
+@keyframes focus-mode-caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes focus-mode-bg-reveal {
+  from {
+    clip-path: circle(0% at 50% 50%);
+  }
+  to {
+    clip-path: circle(150% at 50% 50%);
+  }
+}
+
+@keyframes focus-mode-current-line-in {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.92);
+  }
+  68% {
+    opacity: 1;
+    transform: translateY(0) scale(1.035);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes focus-mode-context-line-in {
+  from {
+    opacity: 0;
+    transform:
+      translateY(calc(var(--focus-mode-sentence-direction, 0) * 12px))
+      scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.focus-mode-control-zone {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 176px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 20px 22px;
+  pointer-events: none;
+}
+
+.focus-mode-controls {
+  width: min(980px, 100%);
+  display: grid;
+  grid-template-columns:
+    minmax(170px, auto)
+    minmax(110px, 0.9fr)
+    minmax(110px, 0.9fr)
+    minmax(150px, 1.25fr)
+    minmax(150px, 1.25fr)
+    auto
+    auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--focus-mode-border);
+  border-radius: 14px;
+  background: var(--focus-mode-panel);
+  box-shadow: var(--focus-mode-shadow);
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: auto;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.focus-mode-controls.is-paragraph-mode {
+  grid-template-columns:
+    minmax(170px, auto)
+    minmax(150px, 1fr)
+    minmax(150px, 1fr)
+    auto;
+}
+
+.focus-mode-control-zone:hover .focus-mode-controls,
+.focus-mode-control-zone:focus-within .focus-mode-controls {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.focus-mode-overlay.is-opening .focus-mode-control-zone .focus-mode-controls {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+.focus-mode-display-toggle {
+  position: relative;
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid var(--focus-mode-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--focus-mode-panel) 78%, transparent);
+  overflow: hidden;
+}
+
+.focus-mode-display-toggle::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: var(--accent-surface);
+  border: 1px solid var(--accent-border);
+  transform: translateX(0);
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.focus-mode-controls.is-paragraph-mode .focus-mode-display-toggle::before {
+  transform: translateX(100%);
+}
+
+.focus-mode-display-toggle button {
+  position: relative;
+  z-index: 1;
+  min-height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--focus-mode-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  padding: 0 10px;
+}
+
+.focus-mode-display-toggle button.active {
+  color: var(--accent-foreground);
+}
+
+.focus-mode-slider {
+  display: grid;
+  grid-template-columns: auto minmax(72px, 1fr) 22px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--focus-mode-fg);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.focus-mode-slider input {
+  width: 100%;
+  accent-color: var(--accent-color);
+}
+
+.focus-mode-slider strong {
+  color: var(--focus-mode-muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.focus-mode-exit {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--focus-mode-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--focus-mode-fg);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.focus-mode-exit:hover,
+.focus-mode-exit:focus-visible {
+  border-color: var(--accent-border);
+  background: var(--accent-surface);
+  color: var(--accent-foreground);
+}
+
+@media (max-width: 760px) {
+  .focus-mode-overlay {
+    padding-inline: 24px;
+  }
+
+  .focus-mode-controls {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -1,0 +1,93 @@
+
+.tiptap {
+  white-space: pre-wrap;
+  tab-size: 4;
+}
+
+.read-aloud-word-highlight {
+  border-radius: 0.34em;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 224, 113, 0.18) 0%,
+      rgba(255, 196, 57, 0.44) 68%,
+      rgba(255, 171, 26, 0.36) 100%
+    );
+  box-shadow: 0 0 0 2px rgba(255, 202, 75, 0.16);
+  color: inherit;
+  pointer-events: none;
+}
+
+.dictation-inline-draft {
+  border-radius: 0.24em;
+  color: var(--accent-color);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent-color) 18%, transparent) 36%,
+    color-mix(in srgb, var(--accent-color) 30%, transparent) 50%,
+    color-mix(in srgb, var(--accent-color) 18%, transparent) 64%,
+    transparent 100%
+  );
+  /* Fixed px, not %: the draft grows with every revision, and a width-relative
+     sweep would stretch and jump each time it does. */
+  background-size: 240px 100%;
+  background-repeat: repeat-x;
+  animation: dictation-inline-flow-a 960ms linear infinite;
+}
+
+.dictation-inline-finalizing {
+  border-radius: 0.24em;
+  animation: dictation-inline-finalize 520ms ease-out forwards;
+}
+
+/* Two identical sets. DictationInline alternates between them so re-applying
+   the anchored `animation-delay` restarts the sweep instead of letting the
+   browser keep the old start time and lurch the phase forward. */
+@keyframes dictation-inline-flow-a {
+  from {
+    background-position: 240px 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@keyframes dictation-inline-flow-b {
+  from {
+    background-position: 240px 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@keyframes dictation-inline-finalize {
+  from {
+    color: var(--accent-color);
+    background: color-mix(in srgb, var(--accent-color) 18%, transparent);
+  }
+  to {
+    color: inherit;
+    background: transparent;
+  }
+}
+
+.editor-page-wrapper {
+  --app-titlebar-height: 44px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Hold the resize cursor for the whole drag. Without this it flickers back to
+   a text caret whenever the pointer outruns the 3px handle. */
+.editor-page-wrapper.is-sidebar-resizing,
+.editor-page-wrapper.is-sidebar-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+

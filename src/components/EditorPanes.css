@@ -1,0 +1,235 @@
+/* ============================================================
+   Editor panes & split view
+   ============================================================ */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 10;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.panel-header-actions-only {
+  justify-content: flex-end;
+}
+
+.panel-header-title {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-height: 30px;
+  min-width: 0;
+}
+
+.panel-header-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  padding: 2px 0 0;
+  position: relative;
+}
+
+.right-sidebar .sidebar-panel::before {
+  display: none;
+}
+
+.sidebar-panel-sticky {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.sidebar-panel > .panel-header > *,
+.sidebar-panel-sticky > * {
+  position: relative;
+  z-index: 2;
+}
+
+.sidebar-panel-sticky .panel-header {
+  position: static;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar-panels-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar-panels-track {
+  display: flex;
+  height: 100%;
+  will-change: transform;
+}
+
+/* One pane fills the viewport: the track is (count × 100%) wide, so a pane is
+   1/count OF THE TRACK. Hardcoding 20% assumed five tabs, and once Search stopped
+   being one every panel rendered at 80% width with a gap down the right. */
+.sidebar-panel-pane {
+  flex: 0 0 calc(100% / var(--sidebar-pane-count, 4));
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebar-panel-pane::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.sidebar-panel-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 0 12px;
+}
+
+/* Shared scroll-list shell used by every sidebar panel list. */
+.sidebar-list,
+.notes-list,
+.search-results,
+.clipboard-list,
+.history-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.left-sidebar .file-list::before,
+.sidebar-list::before,
+.notes-list::before,
+.search-results::before,
+.clipboard-list::before,
+.history-list::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  display: block;
+  flex: 0 0 var(--sidebar-top-fade-height);
+  height: var(--sidebar-top-fade-height);
+  width: 100%;
+  pointer-events: none;
+  z-index: 5;
+  background: linear-gradient(
+    to bottom,
+    var(--sidebar-fade-solid) 0%,
+    var(--sidebar-fade-strong) 42%,
+    var(--sidebar-fade-soft) 76%,
+    transparent 100%
+  );
+}
+
+.left-sidebar .file-list::before {
+  display: none;
+}
+
+.sidebar-list::before,
+.notes-list::before,
+.search-results::before,
+.clipboard-list::before,
+.history-list::before {
+  margin-bottom: calc((var(--sidebar-top-fade-height) + 12px) * -1);
+}
+
+.right-sidebar .sidebar-list::before,
+.right-sidebar .notes-list::before,
+.right-sidebar .search-results::before,
+.right-sidebar .clipboard-list::before,
+.right-sidebar .history-list::before {
+  display: none;
+}
+
+.sidebar-list::-webkit-scrollbar,
+.notes-list::-webkit-scrollbar,
+.search-results::-webkit-scrollbar,
+.clipboard-list::-webkit-scrollbar,
+.history-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.panel-action-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.panel-action-btn:hover {
+  background: var(--accent-surface);
+  border-color: var(--accent-border);
+  color: var(--accent-foreground);
+}
+
+.panel-action-btn-small {
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+.panel-icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workbench-header {
+  padding-right: 0;
+}
+
