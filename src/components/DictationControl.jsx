@@ -11,7 +11,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
 import SFIcon from './SFIcon'
 import {
-  DEFAULT_DICTATION_MODEL_PATH,
   loadDictationModel,
   setupDictationListeners,
   startDictation,
@@ -471,7 +470,7 @@ export default function DictationControl({ editor }) {
 
     try {
       if (!modelLoadedRef.current) {
-        await loadDictationModel(DEFAULT_DICTATION_MODEL_PATH)
+        await loadDictationModel()
         modelLoadedRef.current = true
       }
 
