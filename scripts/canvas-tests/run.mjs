@@ -34,7 +34,10 @@
  *   bridge the Phase 4 protocol client, both ends: that a command reaches the editor
  *          it names, that a request is always answered rather than left hanging, that
  *          coalescing drops intermediate values and never the last one, and that the
- *          drag hand-off arbitrates instead of depending on running order
+ *          drag hand-off arbitrates instead of depending on running order; and that
+ *          the native shell can join the wire beside the React one (Phase 5)
+ *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
+ *          through the real @tauri-apps/api modules
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -48,7 +51,7 @@
  * Still not covered: anything involving layout, pointer events, or the asset://
  * protocol. Those need the real webview.
  */
-const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge']
+const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim']
 
 const failures = []
 
