@@ -727,7 +727,7 @@ gitignored because it must come from the same build as the library (see
 
 | Piece | State |
 |---|---|
-| Window chrome | No title and no titlebar row: the page's toolbar is the top of the window. The traffic lights float over the file tree; with the tree hidden (or with the right sidebar closed, for its reopen button) the shell sends `setTitlebarInset` and the page leaves room. The page's top strip drags the window again — the shim's `start_dragging` becomes `performDrag` with the mouse-down recorded on the way in. The sidebars toggle from View ▸ Show/Hide Sidebar and Inspector. |
+| Window chrome and toolbar | Standard macOS 26 chrome: a unified toolbar without a title, NavigationSplitView's sidebar toggle, an inspector toggle item; AppKit places the traffic lights. The **formatting toolbar is native** (`Shell/FormattingToolbar.swift`): font (pinned/recent/installed, same preference keys as the page), size, marks, text and highlight colour, alignment, insert table and conversation — rendering the pushed `ToolbarState` and sending commands. The page draws its toolbar row only for a canvas's own toolbar or a comparison's, below the window's (`nativeOwns('toolbar')`). **Dictation and Read Aloud have no native buttons yet** — their engines are the Rust features still in the Tauri crate (item 2 below). |
 | File tree | Native. Browse, open, New Document / Canvas / Folder, Rename, Move (menu and drag), Duplicate, Delete, Reveal. **Every change is a command the page performs** (`createEntry`, `renameEntry`, …) through `useEntryOperations` — see below. |
 | Right sidebar | Native inspector: a glass selector bar under its own toggle (Xcode-style; the selection bubble can be grabbed and slid), a search bar with scopes and match options, and the Clipboard, Workbench, Notes and History panels. State stays the page's; `useNativeSidebar` publishes it and applies the shell's edits. Version rows and search come from the core through `inkblot-ffi`. |
 | Note hover cards | Native Liquid Glass over the web view (`Notes/`), placed from marker events the page publishes (`useNativeNotePreviews`): hover, leave, pin, the anchor following a scroll, dismissal. Draggable, resizable, replies on strings, layout stored on the note. |
@@ -776,9 +776,9 @@ Two rules held that are worth keeping:
    workbench's synonym and rhyme tiles say "not available in the native app yet" through
    `LanguageServices` — the one file that changes when they move into a crate
    `inkblot-ffi` can link. Rhymes never worked in either shell (see Known broken).
-3. **The formatting toolbar** is still the page's, and at the top of the window now,
-   which is where the user asked for it. Porting it natively would move it into a
-   titlebar row that was just removed at their request — decide with them before doing it.
+3. **Dictation and Read Aloud buttons** in the native toolbar, once their engines can
+   be linked (item 2). The page's `DictationControl`/`ReadAloudControl` are not shown
+   under the shell.
 4. **Detached document windows and the Pinterest webviews** (`WebviewWindow`, answered
    with nothing by the shim).
 5. **Finder drag-and-drop onto a canvas** (Tauri's `drag-drop` event with paths; in
@@ -808,12 +808,11 @@ Two rules held that are worth keeping:
   to `.with(content:` everywhere also rewrote the call inside `.with`, which then
   recursed; it compiled, and every native note edit would have overflowed the stack.
   `NotePreviewTests.aPatchNamesOnlyWhatChanged` is the guard.
-- **A real window toolbar would swallow the page's clicks.** AppKit keeps a toolbar's
-  whole band (its empty space drags the window), and the page's toolbar lives in that
-  band. So the window uses a hidden titlebar, which passes clicks through, and
-  `WindowChrome` moves the traffic lights to where a toolbar window has them — AppKit
-  resets them on every titlebar layout, so it re-places them on resize and full screen.
-  The toggles are drawn at toolbar-button size on the same line.
+- **A hidden titlebar with hand-placed traffic lights does not hold.** An earlier
+  version kept the page's toolbar in the toolbar band (where a real toolbar would have
+  swallowed its clicks) and moved the traffic lights itself; AppKit resets them on every
+  titlebar layout, including collapsing a split view column, and the fight showed as a
+  flicker. The fix was to make the formatting toolbar native and use a real toolbar.
 - **A `GlassEffectContainer` draws its glass over plain content inside it.** Apply
   `.glassEffect` to the content view (glass goes behind it), or keep the content outside
   the container — the selector bar's icons were frosted over until they moved out.
