@@ -11,6 +11,7 @@ use typeshare::typeshare;
 
 use super::common::{Alignment, EditorTarget, Pane, TextAnchor};
 use crate::types::json::JsonValue;
+use super::sidebar::{ClipboardChanged, NotesChanged, ShowSidebarTab, TilesChanged, VersionsChanged};
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
@@ -339,4 +340,9 @@ pub enum WebviewEvent {
     DragMoved(DragMoved),
     DragEnded(DragEnded),
     ProjectChanged(ProjectChanged),
+    NotesChanged(NotesChanged),
+    ClipboardChanged(ClipboardChanged),
+    TilesChanged(TilesChanged),
+    VersionsChanged(VersionsChanged),
+    ShowSidebarTab(ShowSidebarTab),
 }

@@ -170,6 +170,136 @@ impl InkblotCore {
     }
 }
 
+/* ---------------- version history ---------------- */
+
+/// One document's history, read once and asked about many times.
+///
+/// The History panel draws a row per entry and a delta per burst of edits, and every one
+/// of those is computed against the entry before it — so the whole list is loaded here
+/// and the questions are asked of it, rather than re-reading the file per question.
+/// A snapshot: re-create it when `versionsChanged` says the history moved on.
+#[derive(uniffi::Object)]
+pub struct VersionHistory {
+    versions: Vec<inkblot_core::types::VersionEntry>,
+}
+
+#[uniffi::export]
+impl VersionHistory {
+    #[uniffi::constructor]
+    pub fn load(core: Arc<InkblotCore>, project_name: String, doc_name: String) -> Arc<Self> {
+        Arc::new(Self { versions: core.projects.get_versions(&project_name, &doc_name) })
+    }
+
+    pub fn count(&self) -> u32 {
+        self.versions.len() as u32
+    }
+
+    /// `[VersionRow]`, newest first, as JSON.
+    pub fn rows_json(&self) -> Result<String, CoreError> {
+        Ok(serde_json::to_string(&inkblot_core::version_history::version_rows(&self.versions))?)
+    }
+
+    /// The `WordDelta` across a burst, from the entry before `oldest_id` to `newest_id`,
+    /// as JSON. `{added: 0, removed: 0}` if either id is unknown.
+    pub fn span_delta_json(&self, newest_id: String, oldest_id: String) -> Result<String, CoreError> {
+        let index_of = |id: &str| self.versions.iter().position(|v| v.id == id);
+        let delta = match (index_of(&newest_id), index_of(&oldest_id)) {
+            (Some(newest), Some(oldest)) => {
+                inkblot_core::version_history::span_delta(&self.versions, newest, oldest)
+            }
+            _ => Default::default(),
+        };
+        Ok(serde_json::to_string(&delta)?)
+    }
+
+    /// The plain text of a version, for filtering the timeline by what it said.
+    pub fn text_of(&self, version_id: String) -> String {
+        self.versions
+            .iter()
+            .find(|v| v.id == version_id)
+            .and_then(|v| v.content_html.as_deref())
+            .map(inkblot_core::version_history::html_to_text)
+            .unwrap_or_default()
+    }
+}
+
+/* ---------------- search ---------------- */
+
+/// How a query is matched. The same three switches the page's search bar has.
+#[derive(uniffi::Record)]
+pub struct SearchOptions {
+    pub match_case: bool,
+    pub whole_word: bool,
+    pub use_regex: bool,
+}
+
+fn matcher(query: &str, options: &SearchOptions) -> Result<inkblot_core::search::matcher::Matcher, CoreError> {
+    let matcher = inkblot_core::search::matcher::Matcher::new(
+        query,
+        inkblot_core::search::matcher::MatcherOptions {
+            match_case: options.match_case,
+            whole_word: options.whole_word,
+            use_regex: options.use_regex,
+        },
+    );
+    if !matcher.valid {
+        return Err(CoreError::Failed(matcher.error.clone()));
+    }
+    Ok(matcher)
+}
+
+#[uniffi::export]
+impl InkblotCore {
+    /// `[SearchResult]` as JSON, for the `notes`, `files` and `project` scopes. Reads
+    /// the saved files, so the open document can be up to one autosave behind — which
+    /// is why results are opened by their text, not their offsets.
+    pub fn search_project_json(
+        &self,
+        project_name: String,
+        scope: String,
+        query: String,
+        options: SearchOptions,
+    ) -> Result<String, CoreError> {
+        let scope: inkblot_core::types::SearchScope =
+            serde_json::from_value(serde_json::Value::String(scope.clone()))
+                .map_err(|_| CoreError::Failed(format!("Unknown search scope: {scope}")))?;
+        let matcher = matcher(&query, &options)?;
+        let results = inkblot_core::search::search_project(
+            &self.projects, &project_name, scope, &matcher, |_| None, || false,
+        )?;
+        Ok(serde_json::to_string(&results)?)
+    }
+
+    /// `[SearchResult]` as JSON, within one saved document — text or canvas.
+    pub fn search_document_json(
+        &self,
+        project_name: String,
+        doc_name: String,
+        query: String,
+        options: SearchOptions,
+    ) -> Result<String, CoreError> {
+        let matcher = matcher(&query, &options)?;
+        let Some(raw) = self.projects.load_document(&project_name, &doc_name)? else {
+            return Ok("[]".into());
+        };
+        let results = if inkblot_core::doc_kind::is_canvas_doc(&doc_name) {
+            inkblot_core::search::collect_canvas_matches(&raw, &matcher, &doc_name, usize::MAX)
+        } else {
+            inkblot_core::search::collect_matches_from_doc_json(&raw["content"], &matcher, &doc_name)
+        };
+        Ok(serde_json::to_string(&results)?)
+    }
+}
+
+/// The hue for an editing session, as `hsl(…)` — or empty for no session.
+#[uniffi::export]
+pub fn session_color(session_id: String) -> String {
+    if session_id.is_empty() {
+        return String::new();
+    }
+    inkblot_core::version_history::session_color(&session_id)
+}
+
 /* ---------------- free functions ---------------- */
 
 /// Installed font families, sorted and without Apple's private dot-faces.
@@ -235,6 +365,69 @@ mod tests {
         assert_eq!(tree["name"], "Novel");
         assert_eq!(tree["children"][0]["name"], "Part One");
         assert_eq!(core.list_projects(), vec!["Novel".to_string()]);
+    }
+
+    #[test]
+    fn a_history_is_read_once_and_described_row_by_row() {
+        let root = scratch_root("history");
+        let core = InkblotCore::new(root.clone(), "s".into());
+        core.create_project("Novel".into(), None).unwrap();
+        std::fs::write(
+            format!("{root}/Novel/one.json"),
+            serde_json::json!({
+                "content": [], "notes": [],
+                "versions": [
+                    { "id": "v2", "timestamp": "2026-09-22T12:05:00.000Z", "kind": "text", "name": null,
+                      "auto": true, "sessionId": "s", "contentHtml": "<p>she hesitated at the door</p>" },
+                    { "id": "v1", "timestamp": "2026-09-22T12:00:00.000Z", "kind": "text", "name": null,
+                      "auto": true, "sessionId": "s", "contentHtml": "<p>she hesitated</p>" }
+                ]
+            }).to_string(),
+        )
+        .unwrap();
+
+        let history = VersionHistory::load(core.clone(), "Novel".into(), "one".into());
+        assert_eq!(history.count(), 2);
+        let rows: serde_json::Value = serde_json::from_str(&history.rows_json().unwrap()).unwrap();
+        assert_eq!(rows[0]["delta"], serde_json::json!({ "added": 3, "removed": 0 }));
+        assert_eq!(history.text_of("v1".into()).trim(), "she hesitated");
+        let span: serde_json::Value =
+            serde_json::from_str(&history.span_delta_json("v2".into(), "v1".into()).unwrap()).unwrap();
+        assert_eq!(span["added"], 5);
+    }
+
+    #[test]
+    fn search_reads_the_saved_project() {
+        let root = scratch_root("search");
+        let core = InkblotCore::new(root.clone(), "s".into());
+        core.create_project("Novel".into(), None).unwrap();
+        std::fs::write(
+            format!("{root}/Novel/one.json"),
+            serde_json::json!({
+                "content": { "type": "doc", "content": [
+                    { "type": "paragraph", "content": [{ "type": "text", "text": "she hesitated at the door" }] }
+                ]},
+                "notes": []
+            }).to_string(),
+        )
+        .unwrap();
+        let options = || SearchOptions { match_case: false, whole_word: false, use_regex: false };
+
+        let found: serde_json::Value = serde_json::from_str(
+            &core.search_project_json("Novel".into(), "project".into(), "HESITATED".into(), options()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(found[0]["docName"], "one");
+        assert_eq!(found[0]["matchText"], "hesitated");
+
+        let in_doc: serde_json::Value = serde_json::from_str(
+            &core.search_document_json("Novel".into(), "one".into(), "door".into(), options()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(in_doc.as_array().unwrap().len(), 1);
+
+        let regex = SearchOptions { use_regex: true, ..options() };
+        assert!(core.search_project_json("Novel".into(), "project".into(), "(".into(), regex).is_err());
     }
 
     #[test]

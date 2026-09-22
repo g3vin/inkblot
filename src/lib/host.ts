@@ -19,8 +19,10 @@ import { detectNativeHost } from '../bridge/transport'
  *  - `fileTree`     the left sidebar — the shell draws the project's tree natively
  *  - `windowChrome` the titlebar: dragging, traffic-light spacing, fullscreen tracking.
  *                   A real titlebar makes all three the window's business again.
+ *  - `rightSidebar` search, clipboard, workbench, notes and history — drawn by the shell
+ *                   from what `useNativeSidebar` publishes
  */
-export type NativeChrome = 'fileTree' | 'windowChrome'
+export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null

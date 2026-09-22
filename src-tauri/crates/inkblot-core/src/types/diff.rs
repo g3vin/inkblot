@@ -126,3 +126,30 @@ pub struct CanvasDiff {
     pub edges_added: Vec<CanvasEdge>,
     pub edges_removed: Vec<CanvasEdge>,
 }
+
+/// One row of the History timeline, everything but the grouping — which is by local
+/// day and so belongs to whoever is drawing the timeline.
+///
+/// Computed from the whole history rather than per entry because each row describes
+/// the change *from the entry before it*, which a filtered list may be hiding.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionRow {
+    pub id: String,
+    pub timestamp: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub auto: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// `hsl(…)`, the same hue the page's timeline gives this session.
+    pub session_color: String,
+    pub delta: WordDelta,
+    /// A text version's change against its predecessor, trimmed to a readable snippet:
+    /// a little context, then what changed. Empty for a canvas.
+    pub snippet: Vec<DiffOp>,
+    /// A canvas version's change in words ("2 cards added"); absent for text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}

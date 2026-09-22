@@ -22,7 +22,7 @@ pub mod search;
 pub mod story;
 
 pub use diff::{
-    CanvasDiff, CanvasNodeChange, DiffChunk, DiffChunkType, DiffOp, DiffOpType, HtmlBlock, MergeChoice, WordDelta,
+    CanvasDiff, CanvasNodeChange, DiffChunk, DiffChunkType, DiffOp, DiffOpType, HtmlBlock, MergeChoice, WordDelta, VersionRow,
 };
 pub use canvas::{
     CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState,

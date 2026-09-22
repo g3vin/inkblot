@@ -11,6 +11,11 @@ use typeshare::typeshare;
 
 use super::common::{Alignment, EditorTarget, MarkKind, Pane, RangeEdit, TextAnchor};
 use crate::types::json::JsonValue;
+use super::sidebar::{
+    ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
+    RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
+    TileRef, UpdateNoteCommand, VersionActionCommand,
+};
 use crate::types::note::Note;
 
 /// A command aimed at an editor with nothing else to say.
@@ -420,4 +425,16 @@ pub enum NativeCommand {
     MoveEntry(MoveEntryCommand),
     DeleteEntry(DeleteEntryCommand),
     DuplicateEntry(DuplicateEntryCommand),
+    UpdateNote(UpdateNoteCommand),
+    RemoveNote(NoteRef),
+    JumpToNote(NoteRef),
+    ClipboardDrop(ClipboardDropCommand),
+    RemoveClipboardEntries(RemoveClipboardEntriesCommand),
+    InsertClipboardEntry(InsertClipboardEntryCommand),
+    RemoveTiles(RemoveTilesCommand),
+    ReplaceTileWord(ReplaceTileWordCommand),
+    SelectTileWord(TileRef),
+    VersionAction(VersionActionCommand),
+    RenameVersion(RenameVersionCommand),
+    RevealSearchResult(RevealSearchResultCommand),
 }
