@@ -1,0 +1,123 @@
+/**
+ * useEditorNotes — keeping notes and the document pointing at each other.
+ *
+ * Outward: a note's anchor is a pair of ProseMirror positions, and every edit
+ * invalidates them. Each transaction maps them forward and re-reads the text they
+ * now cover, so a note made on "she hesitated" still points at those words after a
+ * paragraph is inserted above. A note whose range collapses to nothing has lost what
+ * it was about and is dropped rather than left aimed at whatever moved in.
+ *
+ * Nothing here reports an error. If the remap stops, notes quietly drift onto the
+ * wrong words, and nobody finds out until they open one.
+ *
+ * Inward: syncEditorNotes publishes the notes into editor storage, which is what the
+ * NoteAnnotation decorations render from.
+ */
+import { useEffect } from 'react'
+
+import { syncEditorNotes } from '../extensions/NoteAnnotation'
+import { isEditorReady } from '../lib/editorUtils'
+
+/** Shallow-compare two note arrays (per-note key/value equality) to avoid redundant state updates. */
+const areNoteArraysEqual = (left = [], right = []) => {
+  if (left === right) return true
+  if (!Array.isArray(left) || !Array.isArray(right)) return false
+  if (left.length !== right.length) return false
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftNote = left[index]
+    const rightNote = right[index]
+
+    if (leftNote === rightNote) continue
+    if (!leftNote || !rightNote) return false
+
+    const leftKeys = Object.keys(leftNote)
+    const rightKeys = Object.keys(rightNote)
+    if (leftKeys.length !== rightKeys.length) return false
+
+    for (const key of leftKeys) {
+      if (leftNote[key] !== rightNote[key]) {
+        return false
+      }
+    }
+  }
+
+  return true
+}
+
+export function useEditorNotes({
+  currentDoc,
+  currentDocNotes,
+  docCache,
+  editor,
+  getNotesForDoc,
+  secondaryDoc,
+  secondaryDocNotes,
+  secondaryEditor,
+  setNotesForDoc,
+  splitView,
+}) {
+  const { isPaneLoading } = docCache
+
+  /* ---------------- Notes → editor storage ---------------- */
+
+  useEffect(() => {
+    if (!isEditorReady(editor)) return
+    syncEditorNotes(editor, currentDocNotes, currentDoc)
+  }, [currentDoc, currentDocNotes, editor])
+
+  useEffect(() => {
+    if (!isEditorReady(secondaryEditor) || splitView !== 'editor') return
+    syncEditorNotes(secondaryEditor, secondaryDocNotes, secondaryDoc)
+  }, [secondaryDoc, secondaryDocNotes, secondaryEditor, splitView])
+
+  /* ---------------- Anchor remapping ---------------- */
+
+  useEffect(() => {
+    if (!isEditorReady(editor)) return
+
+    const handler = ({ transaction }) => {
+      if (!isEditorReady(editor)) return
+      if (!transaction.docChanged) return
+      // Loading a document replaces the whole doc in one transaction. Mapping
+      // through that would land every note at position 0.
+      if (isPaneLoading('primary')) return
+
+      const existingNotes = getNotesForDoc(currentDoc)
+      const hasQuoteNotes = existingNotes.some(note => note.type === 'quote')
+      if (!hasQuoteNotes) return
+
+      const mapping = transaction.mapping
+
+      const updated = existingNotes
+        .map(note => {
+          if (note.type !== 'quote') return note
+
+          const newFrom = mapping.map(note.from)
+          const newTo = mapping.map(note.to)
+
+          if (newFrom >= newTo) return null
+
+          return {
+            ...note,
+            from: newFrom,
+            to: newTo,
+            anchor: editor.state.doc.textBetween(newFrom, newTo),
+          }
+        })
+        .filter(Boolean)
+
+      if (areNoteArraysEqual(existingNotes, updated)) {
+        return
+      }
+
+      setNotesForDoc(currentDoc, updated)
+    }
+
+    editor.on('transaction', handler)
+    return () => {
+      if (!editor.isDestroyed) editor.off('transaction', handler)
+    }
+
+  }, [currentDoc, editor, getNotesForDoc, isPaneLoading, setNotesForDoc])
+}
