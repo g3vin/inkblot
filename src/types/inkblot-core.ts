@@ -257,3 +257,12 @@ export interface TreeNode {
 	children?: TreeNode[];
 }
 
+/**
+ * Which kind of document a tree path refers to. A pure function of the path — see
+ * `doc_kind` for why it is never read from a field inside the file.
+ */
+export enum DocKind {
+	Canvas = "canvas",
+	Text = "text",
+}
+
