@@ -410,7 +410,7 @@ export default function FileTree({
     }
     const nextName = type === 'file' && isCanvasDoc(path) ? withCanvasSuffix(bare) : bare
 
-    const { renameEntry } = await import('../lib/FileSystem')
+    const { renameEntry } = await import('../lib/entryOperations')
     const nextPath = await renameEntry(projectName, path, nextName, type)
     if (nextPath) {
       updateOrder(orderState => remapOrderForEntry(orderState, type, path, nextPath))

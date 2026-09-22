@@ -80,6 +80,14 @@ import {
  * with their own shape (canvases) persist through here instead.
  */
 export async function writeDocumentRaw(projectName, docName, data) {
+  // Under the document's lock like every other write to it, so something that needs
+  // the last write to have landed — a rename, see entryOperations.ts — can wait for it.
+  return withDocLock(projectName, docName, () => writeDocumentUnlocked(projectName, docName, data))
+}
+
+// For callers already holding the document's lock. The lock is a queue, not a
+// re-entrant mutex: taking it again from inside waits on itself forever.
+async function writeDocumentUnlocked(projectName, docName, data) {
   const root = await getProjectRoot(projectName)
   const filePath = joinPath(root, `${docName}.json`)
   await mkdir(parentOf(filePath), { recursive: true })
@@ -118,7 +126,7 @@ export async function saveDocumentNotes(projectName, docName, notes) {
       // longer there must not resurrect it as an empty stub.
       if (!existing) return false
 
-      await writeDocumentRaw(projectName, docName, {
+      await writeDocumentUnlocked(projectName, docName, {
         ...existing,
         notes: Array.isArray(notes) ? notes : [],
       })

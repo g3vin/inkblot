@@ -306,6 +306,80 @@ pub struct InsertPlainTextCommand {
     pub text: String,
 }
 
+/// What kind of entry `createEntry` makes.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EntryKind {
+    Document,
+    Canvas,
+    Folder,
+}
+
+/// Create a document, canvas or folder in the open project, and open it if it is a
+/// document.
+///
+/// The page does the writing, not the shell, for the same reason as every command
+/// below: a new document gets a tab and a place in the tree's stored order, and those
+/// live in the page. The empty canvas is also the page's to define — it is
+/// `createEmptyCanvas()` serialized as JSON Canvas.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateEntryCommand {
+    /// Tree path of the folder to create in; empty for the project root.
+    pub parent_folder: String,
+    /// The bare name. For a canvas the page adds the `.canvas` suffix.
+    pub name: String,
+    pub kind: EntryKind,
+}
+
+/// Rename a file or folder in place.
+///
+/// **Why the page performs these rather than the shell.** A rename changes a path the
+/// page may be holding — the open document, a tab, the split pane, notes and versions
+/// keyed by path — and the autosave that fires when a pane lets go of a document writes
+/// to the path it had. Done from outside, that final save lands on the old path and
+/// recreates the file. The page closes what the entry touches, waits for those final
+/// saves, does the disk operation, and reopens at the new paths (`useEntryOperations`).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameEntryCommand {
+    pub path: String,
+    pub is_folder: bool,
+    /// The bare name. A canvas keeps its `.canvas` suffix whatever this says.
+    pub new_name: String,
+}
+
+/// Move a file or folder into another folder. See `RenameEntryCommand`.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveEntryCommand {
+    pub path: String,
+    pub is_folder: bool,
+    /// Tree path; empty for the project root.
+    pub target_folder: String,
+}
+
+/// Delete a file or folder. The shell has already asked the user.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteEntryCommand {
+    pub path: String,
+    pub is_folder: bool,
+}
+
+/// Copy a document beside itself as "<name> copy", and open the copy.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateEntryCommand {
+    pub path: String,
+}
+
 /// Everything the shell can ask the document surface to do.
 ///
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
@@ -341,4 +415,9 @@ pub enum NativeCommand {
     CanvasReveal(CanvasRevealCommand),
     CanvasRestore(CanvasRestoreCommand),
     InsertPlainText(InsertPlainTextCommand),
+    CreateEntry(CreateEntryCommand),
+    RenameEntry(RenameEntryCommand),
+    MoveEntry(MoveEntryCommand),
+    DeleteEntry(DeleteEntryCommand),
+    DuplicateEntry(DuplicateEntryCommand),
 }

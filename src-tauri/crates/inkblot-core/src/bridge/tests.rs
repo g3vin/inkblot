@@ -229,6 +229,26 @@ fn every_command() -> Vec<NativeCommand> {
             target: EditorTarget::Primary,
             text: "pasted".into(),
         }),
+        NativeCommand::CreateEntry(CreateEntryCommand {
+            parent_folder: "Part One".into(),
+            name: "Board".into(),
+            kind: EntryKind::Canvas,
+        }),
+        NativeCommand::RenameEntry(RenameEntryCommand {
+            path: "Part One/Chapter 1".into(),
+            is_folder: false,
+            new_name: "Opening".into(),
+        }),
+        NativeCommand::MoveEntry(MoveEntryCommand {
+            path: "Part One".into(),
+            is_folder: true,
+            target_folder: "".into(),
+        }),
+        NativeCommand::DeleteEntry(DeleteEntryCommand {
+            path: "Part One/Chapter 1".into(),
+            is_folder: false,
+        }),
+        NativeCommand::DuplicateEntry(DuplicateEntryCommand { path: "Part One/Chapter 1".into() }),
     ]
 }
 
@@ -358,6 +378,11 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
             "canvasReveal",
             "canvasRestore",
             "insertPlainText",
+            "createEntry",
+            "renameEntry",
+            "moveEntry",
+            "deleteEntry",
+            "duplicateEntry",
         ]
     );
 }

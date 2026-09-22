@@ -4,7 +4,7 @@
  * Pops its own menu and reports handled: a dot is a document, not a place in a
  * document, so none of the text or canvas actions apply.
  */
-import { deleteEntry } from '../../lib/FileSystem'
+import { deleteEntry } from '../../lib/entryOperations'
 import { getDocDisplayName } from '../../lib/docKind'
 import { openDocumentWindow } from '../../lib/docWindow'
 

@@ -7,7 +7,7 @@
  * with document.elementFromPoint.
  */
 import { useCallback, useEffect } from 'react'
-import { moveEntry } from '../lib/FileSystem'
+import { moveEntry } from '../lib/entryOperations'
 import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
 import {
   announceTreeDragEnd,
