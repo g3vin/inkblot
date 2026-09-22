@@ -3,11 +3,17 @@
  *
  * Shows the copy history as draggable tiles: dragging a tile into an editor
  * pane moves the text into the document, and dropping editor selections or
- * external text onto this panel adds a clipboard entry. Uses the shared
- * window-global drag state (window.__inkblot_*) to coordinate with
- * EditorCanvas across native drag events.
+ * external text onto this panel adds a clipboard entry.
+ *
+ * This panel and the editor are the two ends of one drag, and they used to meet on
+ * `window.__inkblot_*`. They meet on `bridge/dragHandoff` now — same shape, one owner,
+ * and a drop that is *claimed* rather than flagged, so which of the two handles a drop
+ * both of them can see no longer depends on the order their listeners happen to run
+ * in. This panel is going native in Phase 5, so it is one of the two ends that will
+ * genuinely be in a different process.
  */
 import { useEffect, useRef, useState } from 'react'
+import { dragHandoff, DragPayloadKind } from '../../bridge'
 import SFIcon from '../SFIcon'
 
 const formatTimestamp = (iso) => {
@@ -49,7 +55,8 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
 
   useEffect(() => {
     return () => {
-      try { window.__inkblot_draggedClipboardEntry = null } catch (e) {}
+      // Unmounting mid-drag ends it: there is no longer a source to move from.
+      if (dragHandoff.current()?.kind === DragPayloadKind.ClipboardEntry) dragHandoff.end()
     }
   }, [])
 
@@ -64,9 +71,15 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     }
   }
 
+  const beginTileDrag = (entry) => dragHandoff.begin({
+    kind: DragPayloadKind.ClipboardEntry,
+    text: entry.text || '',
+    sourceId: entry.id,
+  })
+
   const startTileDrag = (event, entry) => {
+    beginTileDrag(entry)
     try {
-      window.__inkblot_dropHandled = false
       const payload = JSON.stringify({ id: entry.id, text: entry.text })
       event.dataTransfer?.setData(
         'application/x-inkblot-clipboard-entry',
@@ -76,33 +89,25 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
       if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = 'move'
       }
-      window.__inkblot_draggedClipboardEntry = { id: entry.id, text: entry.text || '' }
     } catch (e) {}
   }
 
-  const primeTileDrag = (entry) => {
-    try { window.__inkblot_draggedClipboardEntry = { id: entry.id, text: entry.text || '' } } catch (e) {}
-  }
+  // The pointer can reach a tile before `dragstart` fires, and the drop caret needs
+  // the payload during `dragover` — where dataTransfer is unreadable.
+  const primeTileDrag = (entry) => { beginTileDrag(entry) }
 
   const endTileDrag = (event, entry) => {
-    const point = {
-      x: event?.clientX ?? window.__inkblot_dragPoint?.x ?? null,
-      y: event?.clientY ?? window.__inkblot_dragPoint?.y ?? null,
-    }
+    const point = dragHandoff.point()
+    const x = event?.clientX ?? point?.x ?? null
+    const y = event?.clientY ?? point?.y ?? null
 
     try {
       window.dispatchEvent(new CustomEvent('inkblot:clipboard-dragend-drop', {
-        detail: {
-          id: entry.id,
-          text: entry.text || '',
-          x: point.x,
-          y: point.y,
-        },
+        detail: { id: entry.id, text: entry.text || '', x, y },
       }))
     } catch (e) {}
 
-    try { window.__inkblot_draggedClipboardEntry = null } catch (e) {}
-    try { window.__inkblot_dragPoint = null } catch (e) {}
+    dragHandoff.end({ x, y })
     setDropActive(false)
   }
 
@@ -126,14 +131,17 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     event.preventDefault()
     event.stopPropagation()
     setDropActive(false)
-    try { window.__inkblot_dropHandled = true } catch (e) {}
+    dragHandoff.claim()
 
     const selectionPayload = event.dataTransfer?.getData('application/x-inkblot-editor-selection')
     const clipboardPayload = event.dataTransfer?.getData('application/x-inkblot-clipboard-entry')
     const plainText = event.dataTransfer?.getData('text/plain') || ''
-    const globalDraggedSelection = window.__inkblot_draggedEditorSelection || null
+    const session = dragHandoff.current()
+    const draggedSelection = session?.kind === DragPayloadKind.EditorSelection
+      ? { text: session.text, from: session.anchor?.from, to: session.anchor?.to, docName: session.docPath || '' }
+      : null
 
-    let parsedSelection = globalDraggedSelection
+    let parsedSelection = draggedSelection
     if (selectionPayload) {
       try {
         parsedSelection = JSON.parse(selectionPayload)
@@ -154,7 +162,7 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
 
     const fromEditorSelection = Boolean(
       parsedSelection ||
-      globalDraggedSelection ||
+      draggedSelection ||
       event.dataTransfer?.types?.includes('application/x-inkblot-editor-selection')
     )
 
@@ -165,7 +173,7 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     })
   }
 
-  // Window-level fallbacks: track the drag point globally and accept drops /
+  // Window-level fallbacks: track the drag point on the hand-off and accept drops /
   // dragends that land over the panel even when the DOM drop event is missed.
   useEffect(() => {
     const insidePanel = (x, y) => {
@@ -175,7 +183,7 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     }
 
     const onWindowDragOver = (event) => {
-      try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
+      dragHandoff.moveTo(event.clientX, event.clientY)
       if (!insidePanel(event.clientX, event.clientY)) {
         setDropActive(false)
         return
@@ -189,7 +197,7 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     }
 
     const onWindowDrag = (event) => {
-      try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
+      dragHandoff.moveTo(event.clientX, event.clientY)
     }
 
     const onWindowDrop = (event) => {
@@ -198,19 +206,27 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     }
 
     const onWindowDragEnd = (event) => {
-      if (!window.__inkblot_dragPoint && (event?.clientX || event?.clientY)) {
-        try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
+      if (!dragHandoff.point() && (event?.clientX || event?.clientY)) {
+        dragHandoff.moveTo(event.clientX, event.clientY)
       }
-      const dropHandled = Boolean(window.__inkblot_dropHandled)
-      const point = window.__inkblot_dragPoint || null
-      const selection = window.__inkblot_draggedEditorSelection || null
-      if (!dropHandled && selection?.text && point && insidePanel(point.x, point.y)) {
-        onDropToClipboard?.({
-          text: selection.text,
-          fromEditorSelection: true,
-          selection,
-        })
-        try { window.__inkblot_dropHandled = true } catch (e) {}
+      const point = dragHandoff.point()
+      const session = dragHandoff.current()
+      const isSelection = session?.kind === DragPayloadKind.EditorSelection
+      if (isSelection && session.text && point && insidePanel(point.x, point.y)) {
+        // Claim first: if some other target already took this drop, `claim` is false
+        // and the entry must not be added twice.
+        if (dragHandoff.claim()) {
+          onDropToClipboard?.({
+            text: session.text,
+            fromEditorSelection: true,
+            selection: {
+              text: session.text,
+              from: session.anchor?.from,
+              to: session.anchor?.to,
+              docName: session.docPath || '',
+            },
+          })
+        }
       }
       setDropActive(false)
     }
@@ -218,20 +234,17 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     const onEditorSelectionDragEnd = (event) => {
       const detail = event?.detail || {}
       const selection = detail.selection || null
-      const point = {
-        x: detail.x ?? window.__inkblot_dragPoint?.x ?? null,
-        y: detail.y ?? window.__inkblot_dragPoint?.y ?? null,
-      }
+      const held = dragHandoff.point()
+      const point = { x: detail.x ?? held?.x ?? null, y: detail.y ?? held?.y ?? null }
 
-      if (window.__inkblot_dropHandled) return
       if (!selection?.text || !insidePanel(point.x, point.y)) return
+      if (!dragHandoff.claim()) return
 
       onDropToClipboard?.({
         text: selection.text,
         fromEditorSelection: true,
         selection,
       })
-      try { window.__inkblot_dropHandled = true } catch (e) {}
     }
 
     window.addEventListener('drag', onWindowDrag, true)

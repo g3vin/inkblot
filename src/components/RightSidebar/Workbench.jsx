@@ -5,6 +5,7 @@
  * rhymes) created from the editor context menu. Tiles remember the text
  * range they were created from so replacements land back in the document.
  */
+import { resolveAnchor } from '../../bridge/anchors'
 import POSTile from '../tiles/POSTile.jsx'
 import SynonymTile from '../tiles/SynonymTile.jsx'
 import DefinitionTile from '../tiles/DefinitionTile.jsx'
@@ -35,32 +36,24 @@ export default function Workbench({
     return editor
   }
 
-  // Locate the tile's source text: trust its stored from/to range if that text
-  // still exists, otherwise search the document for the anchor string.
+  // Locate the tile's source text.
+  //
+  // The other of the two places the handoff points at for sharp edge #3, and it now
+  // goes through the same `resolveAnchor` the protocol uses. The change in behaviour
+  // is the same one: this used to trust its stored range whenever that range was not
+  // empty, without checking that it still held the tile's word — so a tile could
+  // rewrite whatever had moved under it.
   const findAnchorRange = (targetEditor, tile) => {
     if (!targetEditor || !tile) return null
 
-    if (typeof tile.from === 'number' && typeof tile.to === 'number') {
-      const currentText = targetEditor.state.doc.textBetween(tile.from, tile.to, ' ')
-      if (currentText) {
-        return { from: tile.from, to: tile.to }
-      }
-    }
+    const text = tile.anchor || tile.text
+    if (!text) return null
 
-    const needle = tile.anchor || tile.text
-    if (!needle) return null
-
-    let found = null
-    targetEditor.state.doc.descendants((node, pos) => {
-      if (!node.isText) return
-      const idx = node.text.indexOf(needle)
-      if (idx !== -1) {
-        found = { from: pos + idx, to: pos + idx + needle.length }
-        return false
-      }
+    return resolveAnchor(targetEditor, {
+      from: typeof tile.from === 'number' ? tile.from : -1,
+      to: typeof tile.to === 'number' ? tile.to : -1,
+      text,
     })
-
-    return found
   }
 
   const selectTileWord = (tile) => {

@@ -12,6 +12,7 @@
  * once per project-open in the background.
  */
 import { getPreference, setPreference, getSessionValue, setSessionValue } from './preferences'
+import { getProjectOpenId } from './projectContext'
 
 const CACHE_PREFIX = 'inkblot:pinterest-preview:'
 const PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
@@ -96,14 +97,9 @@ const cacheKey = (url) => {
   return normalized ? `${CACHE_PREFIX}${normalized}` : null
 }
 
-const projectOpenId = () => {
-  if (typeof window === 'undefined') return 'default'
-  return String(
-    window.__inkblotProjectOpenId ||
-      getSessionValue(PROJECT_OPEN_ID_KEY) ||
-      'default'
-  )
-}
+// Was `window.__inkblotProjectOpenId`; see lib/projectContext for why it is still
+// ambient and why it is no longer a window property.
+const projectOpenId = () => getProjectOpenId()
 
 const refreshKey = (url) => {
   const key = cacheKey(url)

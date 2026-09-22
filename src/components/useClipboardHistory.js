@@ -6,6 +6,7 @@
  * hence the hit-testing helpers alongside the entry list.
  */
 import { useCallback } from 'react'
+import { dragHandoff, DragPayloadKind } from '../bridge'
 import { CLIPBOARD_PERSIST_KEY, MAX_CLIPBOARD_ENTRIES } from '../lib/editorSession'
 
 export function useClipboardHistory({
@@ -109,7 +110,9 @@ export function useClipboardHistory({
 
     addClipboardEntry(text)
     draggedSelectionRef.current = null
-    try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
+    // The selection has been moved out of the document; the drag it belonged to is
+    // over whether or not a dragend has arrived yet.
+    if (dragHandoff.current()?.kind === DragPayloadKind.EditorSelection) dragHandoff.end()
   }, [addClipboardEntry, editor, secondaryEditor, draggedSelectionRef])
 
   return {
