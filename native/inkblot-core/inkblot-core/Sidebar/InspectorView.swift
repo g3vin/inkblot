@@ -13,13 +13,9 @@ struct InspectorView: View {
         @Bindable var sidebar = model.sidebar
 
         VStack(spacing: 10) {
-            // Xcode's arrangement: the panel's toggle in its top-right corner on the
-            // traffic lights' line, the selector bar beneath it, then the panel.
-            HStack {
-                Spacer()
-                SidebarToggleButton(edge: .trailing, isPresented: $sidebar.isPresented)
-            }
-            .padding(.trailing, 4)
+            // Xcode's arrangement: the toggle (the window's, see ContentView) on the
+            // traffic lights' line above, the selector bar beneath it, then the panel.
+            Color.clear.frame(height: WindowChrome.toggleSize)
 
             GlassTabBar(
                 tabs: SidebarModel.Tab.allCases,

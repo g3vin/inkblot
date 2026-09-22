@@ -22,9 +22,15 @@ enum WindowChrome {
     /// Standard glass toolbar button.
     static let toggleSize: CGFloat = 36
     static let toggleInset: CGFloat = centerY - toggleSize / 2
+    /// The trailing toggle's distance from the window's right edge.
+    static let trailingToggleInset: CGFloat = 16
 
-    /// Move the traffic lights into the band. AppKit puts them back on every layout pass
-    /// that touches the titlebar, so this is re-run on resize and around full screen.
+    /// Move the traffic lights into the band.
+    ///
+    /// AppKit puts them back whenever it lays the titlebar out again — on resize, around
+    /// full screen, and when a split view collapses a column, which posts no window
+    /// notification at all. So `Keeper` watches the close button's own frame: whatever
+    /// moved it back, the move is seen and undone.
     @MainActor
     static func placeTrafficLights(in window: NSWindow) {
         guard !window.styleMask.contains(.fullScreen),
@@ -34,42 +40,63 @@ enum WindowChrome {
               let container = close.superview?.superview
         else { return }
 
-        var frame = container.frame
-        frame.size.height = bandHeight
-        frame.origin.y = window.frame.height - bandHeight
-        container.frame = frame
+        if container.frame.height != bandHeight {
+            var frame = container.frame
+            frame.size.height = bandHeight
+            frame.origin.y = window.frame.height - bandHeight
+            container.frame = frame
+        }
 
         let spacing = mini.frame.minX - close.frame.minX
         for (index, button) in [close, mini, zoom].enumerated() {
-            button.setFrameOrigin(NSPoint(
-                x: trafficLightsLeading + CGFloat(index) * spacing,
-                y: (bandHeight - button.frame.height) / 2))
+            let origin = NSPoint(x: trafficLightsLeading + CGFloat(index) * spacing,
+                                 y: (bandHeight - button.frame.height) / 2)
+            // Only when it differs: the frame observer below fires on our own moves too.
+            if button.frame.origin != origin { button.setFrameOrigin(origin) }
         }
     }
 
-    /// Keeps a window's traffic lights placed. Held by the window's content for as long
-    /// as the window lives.
+    /// Keeps a window's traffic lights placed, for as long as the window lives.
     @MainActor
     final class Keeper {
         private var observers: [NSObjectProtocol] = []
+        private var placing = false
 
         init(window: NSWindow) {
             let center = NotificationCenter.default
-            let names: [Notification.Name] = [
+            let place: () -> Void = { [weak self, weak window] in
+                guard let self, let window, !placing else { return }
+                placing = true
+                WindowChrome.placeTrafficLights(in: window)
+                placing = false
+            }
+
+            let windowEvents: [Notification.Name] = [
                 NSWindow.didResizeNotification,
                 NSWindow.didEndLiveResizeNotification,
                 NSWindow.didExitFullScreenNotification,
                 NSWindow.didBecomeKeyNotification,
                 NSWindow.didResignKeyNotification,
             ]
-            observers = names.map { name in
-                center.addObserver(forName: name, object: window, queue: .main) { [weak window] _ in
-                    MainActor.assumeIsolated {
-                        if let window { WindowChrome.placeTrafficLights(in: window) }
-                    }
+            observers = windowEvents.map { name in
+                center.addObserver(forName: name, object: window, queue: .main) { _ in
+                    MainActor.assumeIsolated { place() }
                 }
             }
-            WindowChrome.placeTrafficLights(in: window)
+
+            // The close button and the titlebar container: AppKit resets one or the other
+            // when it re-lays out the titlebar, whatever caused it.
+            let watched = [window.standardWindowButton(.closeButton),
+                           window.standardWindowButton(.closeButton)?.superview?.superview].compactMap { $0 }
+            for view in watched {
+                view.postsFrameChangedNotifications = true
+                observers.append(center.addObserver(
+                    forName: NSView.frameDidChangeNotification, object: view, queue: .main) { _ in
+                    // After the current layout pass, or AppKit's own move wins.
+                    DispatchQueue.main.async { MainActor.assumeIsolated { place() } }
+                })
+            }
+            place()
         }
 
         deinit {
