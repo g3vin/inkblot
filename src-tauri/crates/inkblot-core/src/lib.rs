@@ -10,3 +10,4 @@
 
 pub mod fonts;
 pub mod pinterest;
+pub mod types;
