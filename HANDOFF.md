@@ -1,7 +1,6 @@
 # Inkblot — Migration Handoff
 
-State of the hybrid-native migration, what each remaining phase involves, and the
-things that cost time to discover the first time.
+State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
 **Current branch:** `phase-0-foundations`, 20 commits ahead of `main` (`b7ceed8`).
 `main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
