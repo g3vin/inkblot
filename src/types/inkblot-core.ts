@@ -262,11 +262,102 @@ export interface Note {
 	timestamp: string;
 }
 
+/**
+ * One word of readable text, with where it sits in the readable string and where it
+ * sits in the document.
+ * 
+ * `start_offset`/`end_offset` are offsets into the readable text, in UTF-16 code
+ * units. `from`/`to` are ProseMirror positions — what the highlight scheduler resolves
+ * against as the audio plays. Both are absent on a word that came from plain text with
+ * no document behind it.
+ */
+export interface ReadAloudWord {
+	text: string;
+	startOffset?: number;
+	endOffset?: number;
+	from?: number;
+	to?: number;
+}
+
+/**
+ * One call to the speech engine.
+ * 
+ * `text` is what is spoken — normalized, with line breaks closed up into spaces.
+ * `words` is what it was built from, kept so the scheduler can map audio time back to
+ * document positions.
+ */
+export interface ReadAloudChunk {
+	text: string;
+	words: ReadAloudWord[];
+}
+
+/** The readable text of a document, and the words resolved out of it. */
+export interface ReadAloudPayload {
+	text: string;
+	words: ReadAloudWord[];
+}
+
 export interface Rect {
 	x: number;
 	y: number;
 	width: number;
 	height: number;
+}
+
+export enum SearchResultType {
+	/** A hit in a saved document, addressed by ProseMirror position. */
+	ProjectMatch = "project-match",
+	/** A hit in the open document. */
+	DocumentMatch = "document-match",
+	/** A file or folder whose path matched. */
+	FileEntry = "file-entry",
+	NoteMatch = "note-match",
+	/** A hit on a canvas, addressed by node id — a canvas has no positions. */
+	CanvasMatch = "canvas-match",
+}
+
+/**
+ * One row of results.
+ * 
+ * Which fields are set depends on `result_type`, and the absences are meaningful: a
+ * `file-entry` has no position, a `canvas-match` has a `node_id` instead of one. Like
+ * `DiffChunk`, this is a struct rather than an enum because the wire format is
+ * internally tagged and typeshare only generates adjacently-tagged enums.
+ */
+export interface SearchResult {
+	id: string;
+	type: SearchResultType;
+	docName: string;
+	title: string;
+	path: string;
+	preview: string;
+	/** A ProseMirror position — a count of UTF-16 code units, not bytes. */
+	from?: number;
+	to?: number;
+	matchText?: string;
+	/** The canvas node to select and center. */
+	nodeId?: string;
+	note?: unknown;
+}
+
+/** The scopes, in the order they appear in the bar. */
+export enum SearchScope {
+	/**
+	 * The default, and what the bar did before it could search: filter whatever panel
+	 * is showing. Every other scope searches content and shows its own results, so the
+	 * panel underneath is left unfiltered.
+	 */
+	Panel = "panel",
+	Document = "document",
+	Notes = "notes",
+	Files = "files",
+	Project = "project",
+}
+
+export interface SearchScopeInfo {
+	value: SearchScope;
+	label: string;
+	hint: string;
 }
 
 export interface StoryFolderPreset {

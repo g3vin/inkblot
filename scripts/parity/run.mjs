@@ -15,6 +15,13 @@
  * distinctions JSON cannot carry (`undefined` keys, NaN, ±Infinity all collapse the
  * same way on both sides). Numbers that survive are compared with Object.is, so a
  * -0 or a last-bit float difference fails rather than passes.
+ *
+ * One class of case cannot be compared at all: a JS result containing an UNPAIRED
+ * SURROGATE. JS strings are UTF-16 and can hold half of an astral character — a regex
+ * without the `u` flag matches the halves separately, and `slice` will cut between
+ * them — while a Rust `String` is UTF-8 and cannot represent one at all. Those cases
+ * are counted as unrepresentable rather than failed, and a function where EVERY case
+ * is unrepresentable fails, because that means nothing was actually checked.
  */
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -24,11 +31,13 @@ import canvasGeometry from './cases/canvasGeometry.mjs'
 import canvasModel from './cases/canvasModel.mjs'
 import docKind from './cases/docKind.mjs'
 import jsNumber from './cases/jsNumber.mjs'
+import readAloudNotes from './cases/readAloudNotes.mjs'
+import search from './cases/search.mjs'
 import store from './cases/store.mjs'
 import storyStructure from './cases/storyStructure.mjs'
 import versionHistory from './cases/versionHistory.mjs'
 
-const MODULES = [jsNumber, docKind, canvasGeometry, canvasModel, storyStructure, versionHistory, store]
+const MODULES = [jsNumber, docKind, canvasGeometry, canvasModel, storyStructure, versionHistory, store, search, readAloudNotes]
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const TAURI = path.resolve(HERE, '../../src-tauri')
@@ -84,7 +93,28 @@ const same = (a, b) => {
 
 const show = (value) => JSON.stringify(value) ?? String(value)
 
+/** A UTF-16 code unit with no partner — something Rust's String cannot hold. */
+const hasLoneSurrogate = (value) => {
+  if (typeof value === 'string') {
+    for (let index = 0; index < value.length; index += 1) {
+      const code = value.charCodeAt(index)
+      if (code >= 0xd800 && code <= 0xdbff) {
+        const next = value.charCodeAt(index + 1)
+        if (!(next >= 0xdc00 && next <= 0xdfff)) return true
+        index += 1
+      } else if (code >= 0xdc00 && code <= 0xdfff) {
+        return true
+      }
+    }
+    return false
+  }
+  if (Array.isArray(value)) return value.some(hasLoneSurrogate)
+  if (value && typeof value === 'object') return Object.values(value).some(hasLoneSurrogate)
+  return false
+}
+
 const counts = new Map()
+const unrepresentable = new Map()
 const failures = []
 
 for (const testCase of cases) {
@@ -99,6 +129,11 @@ for (const testCase of cases) {
   const result = results.get(testCase.id)
   const expected = settle(testCase.expected)
 
+  if (hasLoneSurrogate(expected)) {
+    unrepresentable.set(key, (unrepresentable.get(key) || 0) + 1)
+    continue
+  }
+
   if (!result) {
     failures.push({ key, testCase, detail: 'no result returned' })
   } else if ('err' in result) {
@@ -111,8 +146,21 @@ for (const testCase of cases) {
 const failed = new Set(failures.map((failure) => failure.key))
 for (const [key, count] of counts) {
   const bad = failures.filter((failure) => failure.key === key).length
-  const label = bad ? `FAIL  ${key} — ${bad} of ${count} differ` : `PASS  ${key} — ${count} cases identical`
-  console.log(label)
+  const skipped = unrepresentable.get(key) || 0
+
+  if (skipped === count) {
+    console.log(`FAIL  ${key} — all ${count} cases unrepresentable; nothing was checked`)
+    failed.add(key)
+    process.exitCode = 1
+    continue
+  }
+
+  const aside = skipped ? `, ${skipped} unrepresentable in UTF-8` : ''
+  console.log(
+    bad
+      ? `FAIL  ${key} — ${bad} of ${count} differ${aside}`
+      : `PASS  ${key} — ${count - skipped} cases identical${aside}`
+  )
 }
 
 if (failures.length) {
@@ -123,6 +171,7 @@ if (failures.length) {
   console.log(`\nFAILURES in: ${[...failed].join(', ')}`)
   process.exitCode = 1
 } else {
-  console.log(`\n${cases.length} cases, JS and Rust identical.`)
-  process.exitCode = 0
+  const skipped = [...unrepresentable.values()].reduce((total, count) => total + count, 0)
+  const aside = skipped ? ` (${skipped} unrepresentable in UTF-8, see above)` : ''
+  console.log(`\n${cases.length - skipped} cases, JS and Rust identical${aside}.`)
 }

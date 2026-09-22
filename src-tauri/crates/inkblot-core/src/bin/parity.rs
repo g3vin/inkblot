@@ -18,8 +18,12 @@ use serde_json::{json, Map, Value};
 
 use inkblot_core::types::{
     CanvasEdge, CanvasFile, CanvasNode, CanvasNodeType, DiffChunk, EdgeSide, HtmlBlock, MergeChoice,
-    Point, Rect, VersionEntry, Viewport,
+    Note, Point, ReadAloudPayload, Rect, SearchScope, VersionEntry, Viewport,
 };
+use inkblot_core::search::matcher::{Matcher, MatcherOptions};
+use inkblot_core::search::{self, ProjectFile};
+use inkblot_core::notes::{self, NoteDefaults};
+use inkblot_core::read_aloud;
 use inkblot_core::store::{paths, versions};
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
@@ -220,6 +224,43 @@ fn named_choices(value: &Value) -> HashMap<String, MergeChoice> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+fn matcher_options(value: &Value) -> MatcherOptions {
+    MatcherOptions {
+        match_case: value["matchCase"].as_bool().unwrap_or(false),
+        whole_word: value["wholeWord"].as_bool().unwrap_or(false),
+        use_regex: value["useRegex"].as_bool().unwrap_or(false),
+    }
+}
+
+fn search_scope(value: &Value) -> SearchScope {
+    match value.as_str() {
+        Some("document") => SearchScope::Document,
+        Some("notes") => SearchScope::Notes,
+        Some("files") => SearchScope::Files,
+        Some("project") => SearchScope::Project,
+        _ => SearchScope::Panel,
+    }
+}
+
+/// A hit, shaped the way `findAll` returns it in JS.
+fn hit_json(hit: &inkblot_core::search::matcher::Hit) -> Value {
+    json!({ "index": hit.index, "length": hit.length, "text": hit.text })
+}
+
+/// The shell's three contributions to a normalize, made deterministic.
+///
+/// `now` comes from the corpus so both sides fall back to the same instant; ids and the
+/// formatted timestamp are constants the harness blanks on the JS side too. It takes a
+/// callback because `NoteDefaults` borrows its closures and they cannot outlive the
+/// function that builds them.
+fn with_note_defaults<T>(now: &str, use_defaults: impl FnOnce(&NoteDefaults) -> T) -> T {
+    let new_id = || "generated".to_string();
+    let now = now.to_string();
+    let now_iso = move || now.clone();
+    let format_time = |_: &str| "formatted".to_string();
+    use_defaults(&NoteDefaults { new_id: &new_id, now_iso: &now_iso, format_time: &format_time })
 }
 
 fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
@@ -438,6 +479,107 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             args[1].as_str().map(str::to_string),
             args[2].as_bool().unwrap_or(true)
         )),
+
+        /* ---- search ---- */
+        "matcherState" => {
+            let matcher = Matcher::new(args[0].as_str().unwrap_or_default(), matcher_options(&args[1]));
+            // The error TEXT is each engine's own wording; only whether it compiled is
+            // comparable.
+            json!({ "isEmpty": matcher.is_empty, "valid": matcher.valid })
+        }
+        "findAll" => {
+            let matcher = Matcher::new(args[0].as_str().unwrap_or_default(), matcher_options(&args[1]));
+            let hits = matcher.find_all(args[2].as_str().unwrap_or_default(), usize::MAX);
+            json!(hits.iter().map(hit_json).collect::<Vec<_>>())
+        }
+        "buildPreview" => json!(search::build_preview(
+            args[0].as_str().unwrap_or_default(),
+            args[1].as_u64().unwrap_or(0) as usize,
+            args[2].as_u64().unwrap_or(0) as usize,
+            args[3].as_u64().unwrap_or(34) as usize
+        )),
+        "getEntryLabel" => json!(search::get_entry_label(args[0].as_str().unwrap_or_default())),
+        "collectMatchesFromDocJson" => {
+            let matcher = Matcher::new(args[1].as_str().unwrap_or_default(), matcher_options(&args[2]));
+            json!(search::collect_matches_from_doc_json(
+                &args[0],
+                &matcher,
+                args[3].as_str().unwrap_or_default()
+            ))
+        }
+        "collectCanvasMatches" => {
+            let matcher = Matcher::new(args[1].as_str().unwrap_or_default(), matcher_options(&args[2]));
+            json!(search::collect_canvas_matches(
+                &args[0],
+                &matcher,
+                args[3].as_str().unwrap_or_default(),
+                args[4].as_u64().unwrap_or(u64::MAX) as usize
+            ))
+        }
+        "searchScopes" => json!(search::search_scopes()),
+        "isFilterScope" => json!(search::is_filter_scope(search_scope(&args[0]))),
+        "getPanelNoun" => json!(search::get_panel_noun(args[0].as_str().unwrap_or_default())),
+        "getSearchPlaceholder" => json!(search::get_search_placeholder(
+            search_scope(&args[0]),
+            args[1].as_str().unwrap_or_default()
+        )),
+        "getRecommendedScopes" => {
+            json!(search::get_recommended_scopes(args[0].as_str().unwrap_or_default()))
+        }
+        "flattenProjectFiles" => {
+            let tree = parse::<inkblot_core::types::TreeNode>(&args[0], "tree")?;
+            let files: Vec<Value> = search::flatten_project_files(&tree)
+                .iter()
+                .map(|ProjectFile { path, name }| json!({ "path": path, "name": name }))
+                .collect();
+            json!(files)
+        }
+
+        /* ---- read_aloud ---- */
+        "splitReadAloudText" => json!(read_aloud::split_read_aloud_text(
+            args[0].as_str().unwrap_or_default(),
+            args[1].as_u64().unwrap_or(220) as usize
+        )),
+        "buildReadAloudChunks" => json!(read_aloud::build_read_aloud_chunks(
+            &parse::<ReadAloudPayload>(&args[0], "payload")?,
+            args[1].as_u64().unwrap_or(220) as usize
+        )),
+
+        /* ---- notes ---- */
+        "normalizeNote" => with_note_defaults(args[1].as_str().unwrap_or_default(), |defaults| {
+            json!(notes::normalize_note(&args[0], defaults))
+        }),
+        "normalizeNotes" => with_note_defaults(args[1].as_str().unwrap_or_default(), |defaults| {
+            json!(notes::normalize_notes(&args[0], defaults))
+        }),
+        "normalizeAudioClip" => {
+            let now = args[1].as_str().unwrap_or_default().to_string();
+            json!(notes::normalize_audio_clip(
+                &args[0],
+                &|| "generated".to_string(),
+                &move || now.clone()
+            ))
+        }
+        "normalizeNoteAudio" => {
+            let now = args[1].as_str().unwrap_or_default().to_string();
+            json!(notes::normalize_note_audio(
+                &args[0],
+                &|| "generated".to_string(),
+                &move || now.clone()
+            ))
+        }
+        "formatDuration" => json!(notes::format_duration(f64_arg(args, 0)?)),
+        "collectNoteBranchIds" => {
+            with_note_defaults(args[2].as_str().unwrap_or_default(), |defaults| {
+                let all = notes::normalize_notes(&args[0], defaults);
+                json!(notes::collect_note_branch_ids(&all, args[1].as_str().unwrap_or_default()))
+            })
+        }
+        "sortNotes" => with_note_defaults(args[1].as_str().unwrap_or_default(), |defaults| {
+            let mut all: Vec<Note> = notes::normalize_notes(&args[0], defaults);
+            all.sort_by(notes::compare_notes);
+            json!(all)
+        }),
 
         unknown => return Err(format!("no such function: {unknown}")),
     })
