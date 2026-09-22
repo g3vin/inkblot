@@ -8,6 +8,8 @@
 //! documents, projects, version history and its diff engine, search, the canvas
 //! model, notes. Today it holds the pieces that were already shell-agnostic.
 
+pub mod doc_kind;
 pub mod fonts;
+pub mod js_number;
 pub mod pinterest;
 pub mod types;

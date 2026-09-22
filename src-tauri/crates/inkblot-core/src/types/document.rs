@@ -11,6 +11,16 @@ use super::note::Note;
 /// landmarks the user placed deliberately and are NEVER evicted by the cap.
 pub const VERSION_CAP: usize = 200;
 
+/// Which kind of document a tree path refers to. A pure function of the path — see
+/// `doc_kind` for why it is never read from a field inside the file.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DocKind {
+    Canvas,
+    Text,
+}
+
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

@@ -9,6 +9,7 @@
     "test": "node --experimental-loader ./scripts/canvas-tests/loader.mjs scripts/canvas-tests/run.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "parity": "node --experimental-loader ./scripts/canvas-tests/loader.mjs scripts/parity/run.mjs",
     "types": "./scripts/generate-types.sh",
     "types:check": "./scripts/generate-types.sh --check",
     "preview": "vite preview"
