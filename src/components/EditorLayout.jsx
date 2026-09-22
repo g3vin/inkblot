@@ -17,6 +17,7 @@ const EMPTY_ACTIVE_EDITOR = {}
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
 import { nativeOwns } from '../lib/host'
 import { useNativeSidebar } from './useNativeSidebar'
+import { useNativeNotePreviews } from './useNativeNotePreviews'
 import EditorCanvas from './EditorCanvas'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
@@ -115,6 +116,8 @@ export default function EditorLayout(props) {
       ? 86
       : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
   const nativeRightSidebar = nativeOwns('rightSidebar')
+  const nativeNotePreviews = nativeOwns('notePreviews')
+  useNativeNotePreviews({ enabled: nativeNotePreviews })
   const titlebarRightWidth = nativeRightSidebar ? 0 : right.collapsed && !right.peeked
     ? 0
     : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
@@ -576,11 +579,11 @@ export default function EditorLayout(props) {
           />
         ) : null}
 
-        <NoteHoverPreview
+        {nativeNotePreviews ? null : <NoteHoverPreview
           notesByDoc={props.notesByDoc}
           setNotesForDoc={props.setNotesForDoc}
           projectName={props.projectName}
-        />
+        />}
 
         <TabDock
           // The dock centers on the editor area, not the window: the sidebars are

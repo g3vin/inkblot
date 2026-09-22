@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use super::common::{EditorTarget, TextAnchor};
-use crate::types::note::{AudioClip, Note, NoteImage};
+use crate::types::note::{AudioClip, Note, NoteImage, NotePreviewLayout, NotePreviewSize};
 
 /* ---------------- notes ---------------- */
 
@@ -43,6 +43,31 @@ pub struct NotePatch {
     /// The whole list, as for images.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<Vec<AudioClip>>,
+    /// Where the hover card was dragged to — for a root card, relative to its default
+    /// place beside the anchor; for a reply, relative to its parent's card.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_layout: Option<NotePreviewLayout>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_size: Option<NotePreviewSize>,
+}
+
+/// Add an empty reply beneath a note, as the hover card's "reply" button does. The
+/// page makes the note (it owns ids, timestamps and the default layout for a new reply).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddReplyCommand {
+    pub doc_path: String,
+    pub parent_note_id: String,
+}
+
+/// The open hover preview should close: the user clicked somewhere in the document
+/// that is not a note marker. The page is the only one who sees that click.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotePreviewDismissed {
+    pub note_id: String,
 }
 
 #[typeshare]

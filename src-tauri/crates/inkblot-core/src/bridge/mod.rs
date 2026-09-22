@@ -45,7 +45,7 @@ pub use command::{
     SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,
 };
 pub use sidebar::{
-    ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,
+    AddReplyCommand, NotePreviewDismissed, ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,
     NoteRef, NotesChanged, RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
     ReplaceTileWordCommand, RevealSearchResultCommand, ShowSidebarTab, SidebarTab, TileKind, TileRef,
     TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,

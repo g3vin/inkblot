@@ -149,7 +149,17 @@ final class SidebarModel {
 
     func updateNote(_ note: Note, _ patch: NotePatch) {
         guard let docPath = notesDocPath else { return }
+        updateNote(note, in: docPath, patch)
+    }
+
+    /// For the hover cards, which know which document their marker is in — it may not
+    /// be the one the Notes tab is showing.
+    func updateNote(_ note: Note, in docPath: String, _ patch: NotePatch) {
         bridge.send(.updateNote(UpdateNoteCommand(docPath: docPath, noteId: note.id, patch: patch)))
+    }
+
+    func addReply(to note: Note, in docPath: String) {
+        bridge.send(.addReply(AddReplyCommand(docPath: docPath, parentNoteId: note.id)))
     }
 
     func removeNote(_ note: Note) {

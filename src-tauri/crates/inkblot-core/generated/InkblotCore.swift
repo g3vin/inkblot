@@ -62,6 +62,18 @@ public struct ActiveMarks: Codable, Equatable {
 	}
 }
 
+/// Add an empty reply beneath a note, as the hover card's "reply" button does. The
+/// page makes the note (it owns ids, timestamps and the default layout for a new reply).
+public struct AddReplyCommand: Codable, Equatable {
+	public let docPath: String
+	public let parentNoteId: String
+
+	public init(docPath: String, parentNoteId: String) {
+		self.docPath = docPath
+		self.parentNoteId = parentNoteId
+	}
+}
+
 /// The marks the toolbar can toggle.
 /// 
 /// A closed set rather than a string because the toolbar is going native: a Swift
@@ -498,6 +510,7 @@ public enum NativeCommand: Codable, Equatable {
 	case versionAction(VersionActionCommand)
 	case renameVersion(RenameVersionCommand)
 	case revealSearchResult(RevealSearchResultCommand)
+	case addReply(AddReplyCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -541,7 +554,8 @@ public enum NativeCommand: Codable, Equatable {
 			selectTileWord,
 			versionAction,
 			renameVersion,
-			revealSearchResult
+			revealSearchResult,
+			addReply
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -762,6 +776,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .revealSearchResult(content)
 					return
 				}
+			case .addReply:
+				if let content = try? container.decode(AddReplyCommand.self, forKey: .payload) {
+					self = .addReply(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -895,6 +914,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .revealSearchResult(let content):
 			try container.encode(CodingKeys.revealSearchResult, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .addReply(let content):
+			try container.encode(CodingKeys.addReply, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -1262,6 +1284,11 @@ public enum WebviewEvent: Codable, Equatable {
 	case tilesChanged(TilesChanged)
 	case versionsChanged(VersionsChanged)
 	case showSidebarTab(ShowSidebarTab)
+	/// The marker of an open hover preview moved — the document scrolled or reflowed.
+	/// Coalesced to one per frame; it carries the whole rect, so a dropped one is
+	/// superseded by the next.
+	case noteMarkerMoved(NoteMarkerEvent)
+	case notePreviewDismissed(NotePreviewDismissed)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case toolbarState,
@@ -1283,7 +1310,9 @@ public enum WebviewEvent: Codable, Equatable {
 			clipboardChanged,
 			tilesChanged,
 			versionsChanged,
-			showSidebarTab
+			showSidebarTab,
+			noteMarkerMoved,
+			notePreviewDismissed
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1394,6 +1423,16 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .showSidebarTab(content)
 					return
 				}
+			case .noteMarkerMoved:
+				if let content = try? container.decode(NoteMarkerEvent.self, forKey: .payload) {
+					self = .noteMarkerMoved(content)
+					return
+				}
+			case .notePreviewDismissed:
+				if let content = try? container.decode(NotePreviewDismissed.self, forKey: .payload) {
+					self = .notePreviewDismissed(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
@@ -1461,6 +1500,12 @@ public enum WebviewEvent: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .showSidebarTab(let content):
 			try container.encode(CodingKeys.showSidebarTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .noteMarkerMoved(let content):
+			try container.encode(CodingKeys.noteMarkerMoved, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .notePreviewDismissed(let content):
+			try container.encode(CodingKeys.notePreviewDismissed, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -1705,14 +1750,30 @@ public struct NotePatch: Codable, Equatable {
 	public let images: [NoteImage]?
 	/// The whole list, as for images.
 	public let audio: [AudioClip]?
+	/// Where the hover card was dragged to — for a root card, relative to its default
+	/// place beside the anchor; for a reply, relative to its parent's card.
+	public let previewLayout: NotePreviewLayout?
+	public let previewSize: NotePreviewSize?
 
-	public init(content: String?, color: String?, pinned: Bool?, collapsedChildren: Bool?, images: [NoteImage]?, audio: [AudioClip]?) {
+	public init(content: String?, color: String?, pinned: Bool?, collapsedChildren: Bool?, images: [NoteImage]?, audio: [AudioClip]?, previewLayout: NotePreviewLayout?, previewSize: NotePreviewSize?) {
 		self.content = content
 		self.color = color
 		self.pinned = pinned
 		self.collapsedChildren = collapsedChildren
 		self.images = images
 		self.audio = audio
+		self.previewLayout = previewLayout
+		self.previewSize = previewSize
+	}
+}
+
+/// The open hover preview should close: the user clicked somewhere in the document
+/// that is not a note marker. The page is the only one who sees that click.
+public struct NotePreviewDismissed: Codable, Equatable {
+	public let noteId: String
+
+	public init(noteId: String) {
+		self.noteId = noteId
 	}
 }
 

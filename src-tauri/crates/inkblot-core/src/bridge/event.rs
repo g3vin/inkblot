@@ -11,7 +11,9 @@ use typeshare::typeshare;
 
 use super::common::{Alignment, EditorTarget, Pane, TextAnchor};
 use crate::types::json::JsonValue;
-use super::sidebar::{ClipboardChanged, NotesChanged, ShowSidebarTab, TilesChanged, VersionsChanged};
+use super::sidebar::{
+    ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged, VersionsChanged,
+};
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
@@ -345,4 +347,9 @@ pub enum WebviewEvent {
     TilesChanged(TilesChanged),
     VersionsChanged(VersionsChanged),
     ShowSidebarTab(ShowSidebarTab),
+    /// The marker of an open hover preview moved — the document scrolled or reflowed.
+    /// Coalesced to one per frame; it carries the whole rect, so a dropped one is
+    /// superseded by the next.
+    NoteMarkerMoved(NoteMarkerEvent),
+    NotePreviewDismissed(NotePreviewDismissed),
 }
