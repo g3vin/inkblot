@@ -36,11 +36,6 @@ rust-version = "1.77.2"
 name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[dev-dependencies]
-# `rt` and `macros` are only needed by #[tokio::test]; the library itself runs on the
-# runtime Tauri already started.
-tokio = { version = "1", features = ["time", "sync", "rt", "macros"] }
-
 [build-dependencies]
 tauri-build = { version = "2.5.4", features = [] }
 
@@ -48,18 +43,10 @@ tauri-build = { version = "2.5.4", features = [] }
 serde_json = { workspace = true }
 serde = { workspace = true }
 inkblot-core = { path = "crates/inkblot-core" }
+# The synonym model, Kokoro, whisper dictation and the scrape channel. The
+# `*_commands.rs` modules are the Tauri glue over it; inkblot-ffi is the Swift glue.
+inkblot-models = { path = "crates/inkblot-models", features = ["metal"] }
 url = { workspace = true }
-log = "0.4"
-ndarray = "0.17.2"
-ort = { version = "2.0.0-rc.11", features = ["ndarray"] }
-once_cell = { workspace = true }
-tokenizers = { version = "0.15", features = ["http"] }
-parking_lot = "0.12"
-# Tauri already runs on tokio; this is for the scrape channel's timeout and its
-# notify, so a waiting command parks instead of polling.
-tokio = { version = "1", features = ["time", "sync"] }
-cpal = "0.17.3"
-inkblot-dictation = { git = "https://github.com/g3vin/inkblot-dictation.git", branch = "main", features = ["metal"] }
 
 
 tauri = { version = "2.10.0", features = ["protocol-asset"] }

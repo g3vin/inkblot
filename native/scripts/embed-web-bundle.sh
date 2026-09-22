@@ -1,5 +1,6 @@
 #!/bin/sh
-# Copy the built editor bundle (the repo's dist/) into the app, as Resources/web.
+# Copy the built editor bundle (the repo's dist/) into the app, as Resources/web — and
+# the synonym tokenizer beside it.
 #
 # Run by the app target's "Embed Web Bundle" build phase. It copies rather than builds:
 # Xcode's build environment does not reliably have node on PATH, and a phase that runs
@@ -24,3 +25,7 @@ fi
 
 mkdir -p "$dest"
 rsync -a --delete "$dist/" "$dest/"
+
+# The synonym model's tokenizer, which both shells bundle rather than download — the
+# Tauri app lists it under `bundle.resources`. `ModelService` looks for it here.
+cp "$root/src-tauri/resources/minilm-tokenizer.json" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/"

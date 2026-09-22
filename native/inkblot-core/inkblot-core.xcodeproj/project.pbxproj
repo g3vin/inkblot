@@ -453,6 +453,17 @@
 					"-framework",
 					CoreGraphics,
 					"-liconv",
+					"-lc++",
+					"-framework",
+					Accelerate,
+					"-framework",
+					Metal,
+					"-framework",
+					MetalKit,
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "soupyorangecat.inkblot-core";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -507,6 +518,17 @@
 					"-framework",
 					CoreGraphics,
 					"-liconv",
+					"-lc++",
+					"-framework",
+					Accelerate,
+					"-framework",
+					Metal,
+					"-framework",
+					MetalKit,
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "soupyorangecat.inkblot-core";
 				PRODUCT_NAME = "$(TARGET_NAME)";

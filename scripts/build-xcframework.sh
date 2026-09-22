@@ -35,6 +35,17 @@ fi
 # to load ("mis-aligned LINKEDIT string pool"), failing the build a hundred crates in.
 unset MACOSX_DEPLOYMENT_TARGET
 
+# The C and C++ underneath the models — whisper.cpp, and oniguruma inside
+# `tokenizers` — are compiled by cc/cmake, which without a deployment target build for
+# the machine's own macOS, not the app's. The linker then warns that each object is
+# "built for newer macOS", and the app would not load on the oldest macOS it claims.
+# The flag goes to C and C++ only, where it cannot reach the proc-macro dylibs.
+min_macos="26.4"
+for triple in aarch64_apple_darwin x86_64_apple_darwin; do
+  export "CFLAGS_$triple=-mmacosx-version-min=$min_macos"
+  export "CXXFLAGS_$triple=-mmacosx-version-min=$min_macos"
+done
+
 # Every Apple Silicon Mac this app can run on is arm64; Intel is built only if its
 # target is installed, and then the two are merged with lipo.
 targets=(aarch64-apple-darwin)
@@ -76,7 +87,16 @@ xcodebuild -create-xcframework \
   -output "$build/InkblotFFI.xcframework" >/dev/null
 
 mkdir -p "$swift_out"
-cp "$build/bindings/inkblot_ffi.swift" "$swift_out/inkblot_ffi.swift"
+# The app target defaults every declaration to the main actor
+# (SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor), and the bindings are compiled into it —
+# so without this, every call into Rust is main-actor-only, and a model load or a
+# download would freeze the window. The generated code holds no UI state and UniFFI
+# already marks its objects Sendable; `nonisolated` says so to the compiler. Every
+# declaration uniffi writes at column 0 gets it — members too, where it is redundant
+# but harmless — which is cruder than parsing Swift and much less likely to break
+# when uniffi changes its formatting.
+sed -E 's/^(public|open|fileprivate|private|internal|extension|final|struct|class|enum|protocol|func|let|var) /nonisolated \1 /' \
+  "$build/bindings/inkblot_ffi.swift" > "$swift_out/inkblot_ffi.swift"
 
 echo "Wrote $build/InkblotFFI.xcframework"
 echo "Wrote $swift_out/inkblot_ffi.swift"

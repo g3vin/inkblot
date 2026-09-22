@@ -70,6 +70,11 @@ final class EditorWebController: NSObject {
             self?.webView.evaluateJavaScript("window.__inkblotTauri.activateMenuItem(\(rid))")
         }
 
+        // Model progress and dictation, as the Tauri events the page already listens for.
+        ModelService.shared.emit = { [weak self] event, payloadJSON in
+            self?.emitTauriEvent(event, payloadJSON: payloadJSON)
+        }
+
         _ = MouseDownRecorder.shared
         webView.load(URLRequest(url: Self.startURL))
     }
@@ -130,6 +135,19 @@ final class EditorWebController: NSObject {
         let literal = String(decoding: data, as: UTF8.self)
         webView.evaluateJavaScript("window.__inkblotNative.deliver(\(literal))") { [log] _, error in
             if let error { log.error("Delivering to the page failed: \(error.localizedDescription, privacy: .public)") }
+        }
+    }
+
+    /// Raise a Tauri event in the page, through the shim's listener table.
+    private func emitTauriEvent(_ event: String, payloadJSON: String) {
+        // Both go in as JSON string literals and the payload is parsed on the other
+        // side, so neither can close the script early whatever it contains.
+        guard let name = try? JSONEncoder().encode(event),
+              let payload = try? JSONEncoder().encode(payloadJSON)
+        else { return }
+        let script = "window.__inkblotTauri.emit(\(String(decoding: name, as: UTF8.self)), JSON.parse(\(String(decoding: payload, as: UTF8.self))))"
+        webView.evaluateJavaScript(script) { [log] _, error in
+            if let error { log.error("Emitting \(event, privacy: .public) failed: \(error.localizedDescription, privacy: .public)") }
         }
     }
 

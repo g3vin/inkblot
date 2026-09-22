@@ -1,0 +1,39 @@
+[package]
+name = "inkblot-models"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+description = "Inkblot's on-device models — synonyms, Kokoro speech, whisper dictation — without a shell"
+publish = false
+
+# Everything here used to live in the Tauri app crate (`src-tauri/src/*_commands.rs`),
+# where the Swift shell could not link it. What made it Tauri's was only ever the
+# glue — `AppHandle` for a directory, `emit` for progress, `State` for a cache — so
+# that glue is now a path, a callback and a struct the caller owns, and both shells
+# wrap the same code.
+
+[features]
+default = ["dictation"]
+# whisper.cpp, built by cmake. Its own feature so a target it does not build for yet
+# (an iOS slice, Phase 6) can leave it out without losing the other models.
+dictation = ["dep:inkblot-dictation", "dep:cpal"]
+metal = ["inkblot-dictation?/metal"]
+
+[dependencies]
+inkblot-core = { path = "../inkblot-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+log = "0.4"
+ndarray = "0.17.2"
+ort = { version = "2.0.0-rc.11", features = ["ndarray"] }
+# No `http`: the tokenizer is always read from a file, and the http feature is what
+# made the first use of synonyms need the network.
+tokenizers = "0.15"
+parking_lot = "0.12"
+tokio = { version = "1", features = ["time", "sync", "rt"] }
+cpal = { version = "0.17.3", optional = true }
+inkblot-dictation = { git = "https://github.com/g3vin/inkblot-dictation.git", branch = "main", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["time", "sync", "rt", "macros"] }
