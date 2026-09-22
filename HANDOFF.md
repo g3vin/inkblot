@@ -2,10 +2,10 @@
 
 State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
-**Current branch:** `phase-0-foundations`, 31 commits ahead of `main` (`b7ceed8`).
+**Current branch:** `phase-0-foundations`, 37 commits ahead of `main` (`b7ceed8`).
 `main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
 
-**Size today:** 34,343 JS/JSX · 8,984 CSS · 4,466 Rust.
+**Size today:** 34,704 JS/JSX · 8,984 CSS · 9,524 Rust.
 
 ---
 
@@ -15,13 +15,13 @@ Run all seven after every change. They are fast and they have each caught someth
 the others missed.
 
 ```bash
-npm test           # 379 assertions, 15 suites
-npm run lint       # 0 errors AND 0 warnings is the current bar
-npm run typecheck  # tsc --noEmit
-npm run build      # the only thing that resolves dynamic imports and named exports
-npm run parity     # 11,503 cases through BOTH the JS and the Rust implementation
-npm run types:check # fails if the generated TS/Swift is stale
-(cd src-tauri && cargo build --workspace && cargo test -p inkblot-core)
+npm test            # 434 assertions, 17 suites
+npm run lint        # 0 errors AND 0 warnings is the current bar
+npm run typecheck   # tsc --noEmit
+npm run build       # the only thing that resolves dynamic imports and named exports
+npm run parity      # 15,915 cases through BOTH the JS and the Rust implementation
+npm run types:check # fails if the generated TS/Swift is stale, and typechecks the Swift
+(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 103 tests
 ```
 
 `parity` and `types:check` arrived with Phase 2 and need `cargo` and
@@ -40,6 +40,8 @@ tidy: see the table below.
 | serde_json's float parser off by 1 ULP — every canvas coordinate shifting in its last bit on every load | `parity` only (785 of 6,044 numbers) |
 | Rust and JS breaking exact float ties in opposite directions | `parity` only |
 | `Math.hypot` ≠ `f64::hypot`, changing an emitted SVG path string | `parity` only |
+| A query of only a byte order mark counted as a search, not as an empty one | `parity` only |
+| `pinned: "yes"` read as not pinned, because `as_bool()` is not `Boolean()` | `parity` only |
 
 ---
 
@@ -92,11 +94,15 @@ The last three items, the ones held back as too risky to do blind:
 
 ---
 
-## Phase 2 — Rust core
+## Phase 2 — Rust core — done
 
-Move non-UI domain logic into `src-tauri/crates/inkblot-core`, which exists and
-builds a `staticlib` (verified: `libinkblot_core.a` is produced — that is the
-artifact a Swift shell links).
+Non-UI domain logic now lives in `src-tauri/crates/inkblot-core`, which builds a
+`staticlib` (verified: `libinkblot_core.a` is produced — that is the artifact a Swift
+shell links).
+
+**Two things are owed and cannot be checked from here**, both flagged in their sections
+below: Read Aloud on a machine with no Python, and a Pinterest scrape against a live
+logged-in session.
 
 ### Domain types — done
 
@@ -163,9 +169,9 @@ you trust a green run. Every port below was verified that way.
 | 2 | `canvasGeometry.js` | **done** — `canvas_geometry.rs` |
 | 3 | `canvasModel.js` + `storyStructure.js` | **done** — `canvas_model.rs`, `story_structure.rs` |
 | 4 | `versionHistory.js` diff engine (`:96-340`) | **done** — `version_history.rs`, with the differential test over real documents |
-| 5 | `FileSystem.js` + `projectPaths.js` + `docLock.js` + `versionStore.js` | biggest win. `withDocLock` becomes a real `Mutex` and gets *more* correct. Replace the `versions:changed` DOM CustomEvent with a Tauri event |
-| 6 | `sidebarSearch.js` matcher + JSON walk + `canvasSearch.js` | **caveat:** Rust's `regex` has no backreferences or lookaround. `useRegex` mode needs `fancy-regex` or a documented behaviour change |
-| 7 | `readAloud.js` chunker (`:426-627`), `noteUtils`/`audioNotes` normalizers | pure string/offset logic |
+| 5 | `FileSystem.js` + `projectPaths.js` + `docLock.js` + `versionStore.js` | **done** — `store/`. `withDocLock` is a real `Mutex`; `versions:changed` is a listener the shell wires up |
+| 6 | `sidebarSearch.js` matcher + JSON walk + `canvasSearch.js` | **done** — `search/`, on `fancy-regex` with the JS dialect translated |
+| 7 | `readAloud.js` chunker, `noteUtils`/`audioNotes` normalizers | **done** — `read_aloud.rs`, `notes.rs` |
 
 **The JS is still in place and still what the app runs.** These are parallel
 implementations kept honest by the harness; deleting a JS module is Phase 4 work,
@@ -173,10 +179,17 @@ once the bridge exists to call the Rust one. Nothing per-frame — `worldTransfo
 `panBy` — can survive an IPC round-trip, so those particular ones only lose their JS
 copy in the Swift shell.
 
-### Four ways "the same arithmetic" is not the same arithmetic
+### Where the I/O modules are verified instead
 
-Every one of these was found by the harness and none by reading. They will come up
-again in #6 and #7.
+#5's path arithmetic and `pushVersionEntry` go through the parity harness; its **I/O
+does not**, and deliberately. The JS runs against an in-memory stub that does not model
+directories, so a differential test there would be comparing against a fiction. The
+filesystem half is covered by 20 Rust tests against a real temp directory, and the same
+split applies to `search_project`.
+
+### Six ways "the same arithmetic" is not the same arithmetic
+
+Every one of these was found by the harness and none by reading.
 
 - **serde_json's float parser is off by up to 1 ULP** without the `float_roundtrip`
   feature. It is enabled in the workspace now. Do not remove it.
@@ -189,11 +202,24 @@ again in #6 and #7.
   `canvas_geometry`'s `js_min`/`js_max`.
 - **`Math.hypot` is not `f64::hypot`.** V8's is a scale-and-Kahan-sum and is not
   correctly rounded. `js_hypot` transcribes V8's.
+- **`Math.round` breaks ties toward +Infinity**; Rust's breaks them away from zero.
+- **`Boolean(x)` is not `as_bool()`.** `pinned: "yes"` is pinned. See `notes::js_truthy`.
 
-Two more of the same family, from the diff engine: `charCodeAt` iterates **UTF-16
-code units** (use `encode_utf16()`), and JS's `\s` includes **U+FEFF**, which
-Unicode's `White_Space` does not — so the class is spelled out in
-`version_history.rs` rather than borrowed from `regex`.
+Two more of the same family: `charCodeAt` iterates **UTF-16 code units** (use
+`encode_utf16()`), and JS's `\s` and `trim()` include **U+FEFF**, which Unicode's
+`White_Space` does not. Both live in `js_string.rs` now.
+
+**Every offset in this codebase is a UTF-16 code unit.** A JS string index, a
+ProseMirror position and `String.length` all count them, and a Rust byte or `char`
+offset counts neither — an emoji is one `char`, four bytes and two units. A match
+reported in either of the other two puts the caret in the wrong place in any document
+containing one. `js_string` holds the conversions; use them.
+
+**The one thing that cannot be made to agree.** A JS regex without the `u` flag matches
+UTF-16 code units, so `\W` against an emoji finds its two surrogate halves separately —
+and a Rust `&str` cannot hold half of one. The harness spots a JS result containing an
+unpaired surrogate, counts it unrepresentable rather than failed, and fails a function
+where *every* case is unrepresentable, since that means nothing was checked.
 
 ### One deliberate divergence, and one deliberate improvement
 
@@ -206,62 +232,117 @@ the top of the module and covered by a unit test.
 `JSON.stringify` of it, so two TipTap documents with the same content in a different
 key order are no longer counted as an edit.
 
-### Move `localStorage` to disk — non-negotiable
+`store::rename_project` **refuses a name another project already holds**, anywhere.
+`renameProject` only checks the new path inside the same parent, so a custom-located
+project can be renamed onto an AppData project's name; both then answer to it,
+`getProjectRoot` resolves to the registry entry, and the AppData project becomes
+unreachable. That is the exact stranding `linkProject` goes out of its way to avoid.
 
-A native shell cannot see any of this. Every key currently in use:
+`notes::normalize_note` **accepts a non-object**. `normalizeNote(note = {})` defaults
+on `undefined` and not on `null`, so `normalizeNotes([null])` throws — on a function
+documented as safe for untrusted data, reachable from a corrupt document.
+
+Both of those are **pre-existing bugs in the JS, found by porting.** The JS is
+untouched: it is still what ships, and changing its behaviour is a decision, not a
+port. Two decisions owed.
+
+### `localStorage` moved to disk — done
+
+A native shell cannot see any of it: a `WKWebView` gets its own per-origin store that
+no native code can read. All 28 call sites go through `lib/preferences.js` onto
+`inkblot_core::store::preferences`, which writes under AppData.
+
+**The API stayed synchronous**, because every call site reads during render — a
+`useState` initializer, a node view's constructor — and none can await. `main.jsx`
+hydrates the whole store before React mounts; reads answer from that cache and writes
+reach disk on their own time. Mounting first would mean a frame of the wrong theme, an
+editor that opens with no tabs and then replaces them, and a file tree that expands
+everything before collapsing it again.
+
+**Three files, not one:** `preferences.json`, `file-tree-state.json`,
+`pinterest-cache.json`. The first is read at every launch and is tiny; the last holds
+pin data per board and is by far the largest. Keeping them apart means a corrupt or
+enormous cache cannot take the theme with it.
+
+Two things deliberately did not move:
+
+- **`sessionStorage`.** The project-open id and the per-project Pinterest refresh flag
+  describe one app launch; on disk they would outlive what they describe, and a stale
+  "already refreshed" flag is a board that never refreshes again. They are an in-memory
+  Map in the facade.
+- **The file tree's order and expansion stay machine-local**, in AppData rather than in
+  the project. `fileTreeState.js` says plainly they are kept out of the project so they
+  do not travel with it, so `.inkblot-order.json` stays reserved and unwritten — using
+  it would put one machine's collapsed folders into another's checkout.
+
+The `prefs` suite covers the half that only exists in the webview, and above all
+**which file a key lands in**: a key routed to the wrong scope is written to one file
+and read from another, so the setting appears to save and is simply gone next launch.
+
+### Kokoro's Python dependency — done
+
+`kokoro_commands.rs` no longer spawns anything. The model runs through `ort`, and the
+work splits across the seam:
 
 ```
-inkblot-session                     open tabs, panes, split ratio, active doc
-inkblot-clipboard-history           clipboard panel entries (max 80)
-inkblot-order:<project>             file tree sort order
-inkblot-expanded:<project>          file tree expansion state
-inkblot-theme, inkblot-accent-color
-inkblot-show-word-count-badge
-inkblot-focus-mode-settings
-inkblot.canvas.snap                 snap/guide preferences
-inkblot.search.recent               recent searches
-inkblot.fonts.pinned, .recent
-inkblot:read-aloud-voice
-inkblot:pinterest-preview:<url>     scraped pin cache
-inkblot:pinterest-project-refresh:  per-project-open refresh flag (sessionStorage)
-inkblot:project-open-id             (sessionStorage)
+webview:  text -> normalize -> phonemize -> token ids   (lib/readAloudVoice.js)
+native:   token ids + voice style + speed -> ONNX -> f32 @ 24kHz
 ```
 
-Concentrated in `lib/fileTreeState.js` (9 sites), `App.jsx` (8), `lib/editorSession.js`,
-`lib/pinterestBoard.js`, `extensions/pinterestCache.js`. Phase 1 deliberately moved
-the file-tree and Pinterest ones into files *named after the concern*, so they are
-easy to find. Note `.inkblot-order.json` is already reserved as a filename in
-`FileSystem.js` but never written.
+Phonemization stayed in the webview: a correct English grapheme-to-phoneme pass is a
+lexicon and several thousand rules, `phonemizer` already implements one, and none of it
+is a subprocess — so none of it blocks iOS, which is the whole point.
 
-### Replace Kokoro's Python dependency — this blocks iOS
+Two things are **never written down** in our source. The phoneme→id vocabulary is
+downloaded with the weights and read back through `kokoro_vocab`; transcribing it from
+memory is the one mistake that produces fluent, confident, wrong speech. The voice
+style vector is sliced out of the model's own voice file by `inkblot_core::kokoro`,
+whose index arithmetic is unit-tested — get it wrong and nothing fails, the voice just
+sounds wrong.
 
-`kokoro_commands.rs:47` spawns a **long-lived Python child process**, with
-`python_candidates()` probing anaconda/homebrew/system Python, and requires the user
-to have run `pip install 'kokoro>=0.9.4' soundfile misaki[en]`. Consequences:
+**The normalizer IS a transcription, and is tested as one.** kokoro-js keeps it
+module-private and reaching it loads the model into the webview. The `voice` suite
+slices the real function out of the installed bundle *at test time*, evaluates it, and
+runs both over 27 inputs. It tracks the dependency rather than a snapshot of it. If
+kokoro-js is upgraded and that suite starts failing, the bundle's layout moved — fix
+the slice, then look at what actually changed.
 
-- Read Aloud works on the original dev machine and silently falls back to WASM elsewhere
-- **Subprocesses are impossible on iOS/iPadOS**, so this blocks two of the three new targets
+Model, tokenizer and voice download on first use into `<AppData>/models/kokoro/`, from
+the same public repo the WASM fallback fetches from, so the two paths cannot end up on
+different weights.
 
-`ort` and `ndarray` are already dependencies. Port it to pure-Rust ONNX. Once native
-TTS is reliable, drop the `kokoro-js` WASM fallback — that also deletes the
-`window.fetch`/`window.caches` monkey-patches at `readAloud.js:366-410` and the
-`onnxruntime-web` dependency.
+**Still owed — this is the acceptance test:** Read Aloud on a machine with **no Python
+installed**. Nothing in this repo can run the model or listen to it, so what is proven
+is the arithmetic, the normalizer, the path handling and the build. The `kokoro-js`
+WASM fallback is still in place; dropping it (and with it the `window.fetch` /
+`window.caches` monkey-patches at `readAloud.js:366-410`, the `onnxruntime-web`
+dependency and `public/ort/`'s 109MB) is the reward for confirming the native path
+works.
 
-**Acceptance test: Read Aloud works on a machine with no Python installed.**
+### The Pinterest return channel — done
 
-### Rewrite the Pinterest return channel
+`eval_webview` throws its result away, so the injected script used to smuggle its
+payload out through `location.hash` while the app polled `get_webview_url` every 220ms.
+It now calls `pinterest_report_scrape` directly.
 
-`eval_webview` discards its result (`main.rs`: `webview.eval(script)` returns
-`Result<(), String>`). So the injected script smuggles data out through
-`location.hash` while JS polls `get_webview_url` **every 220ms**
-(`pinterestScrape.js:137`). Give Rust a real IPC handler and return
-`Vec<ScrapedPin>` directly. That deletes the hash protocol, the poller, the
-progress-payload dance, and the `new Function` syntax pre-check.
+That works because Tauri injects `__TAURI_INTERNALS__` into the main frame of **every**
+webview it creates, including one showing pinterest.com, and app commands are only
+ACL-gated when the app ships its own permission manifest — which this one does not
+(`gen/schemas/acl-manifests.json` has no `__app__` key). **If a `permissions/`
+directory is ever added to `src-tauri`, that stops being true and this breaks.**
 
-In a Swift shell this collapses further: `WKUserContentController` gives a real
-message handler and `evaluateJavaScript(completionHandler:)` a real return value.
+Two commands, not one: the report arrives on the Pinterest webview's IPC and the result
+is wanted on the app's. `pinterest_begin_scrape` opens a slot *before* the script is
+injected, which is what makes it impossible for a report to arrive before anything is
+listening — a race the polling version could not have had.
 
----
+Gone: the hash protocol, the poller, and the progress-payload dance. **Kept, against
+the original plan: the `new Function` syntax pre-check.** IPC carries a real error for
+a script that *throws*, but not for one that fails to *parse*, because the wrapper's
+catch never runs. That is the bug this repo has already shipped once.
+
+**Still owed:** it needs a live logged-in session and a real webview to exercise, and
+it is already on the manual list. This makes that check more important, not less.
 
 ## Phase 3 — TypeScript (runs alongside Phase 2)
 
@@ -272,6 +353,8 @@ Scoped deliberately: **bridge and domain layers, not components.**
   ready-made candidates: `lib/fileTreeOrder.js`, `lib/editorSession.js`,
   `lib/notePreviewGeometry.js`, `extensions/conversationModel.js`,
   `lib/projectPaths.js`, `lib/docLock.js` — all pure, no React, no I/O
+- `lib/preferences.js` and `lib/readAloudVoice.js` are Phase 2's additions to that
+  list: both pure, both already the only door to what they wrap
 - `canvasReducer.js` (285) is a textbook discriminated-union win, covered by `red.mjs`
 - Type the bridge client (Phase 4) fully — this is where TS earns the most
 
@@ -456,8 +539,19 @@ being reimplemented, which is why it catches real persistence bugs.
 **Covered:** canvas geometry/reducer/groups/snapping/search, document persistence,
 notes, audio, `generateHTML` rendering, `CanvasSurface` mounting, `EditorCanvas`
 mounting (autosave reaching disk, version checkpoints, the per-doc editor-state
-cache, note anchor remapping, split-pane autosave, the unmount flush), and the file
-tree's per-row decisions.
+cache, note anchor remapping, split-pane autosave, the unmount flush), the file
+tree's per-row decisions, the preference store's scope routing, and the Read Aloud
+normalizer against kokoro-js's own.
+
+`loader.mjs` also neutralizes `import.meta.glob`, which is a Vite build-time transform
+with no Node equivalent — a module using it threw on import before any of its exports
+existed, which is what had kept `readAloud.js` unreachable from the harness entirely.
+
+**`scripts/parity/` is the other half.** It is not a suite; it runs both
+implementations of a ported module over one corpus. Its rule: **check it is not
+passing vacuously by breaking the Rust side deliberately** before trusting a green
+run. Every port in Phase 2 was verified that way, and one injected "break" turned out
+to be a no-op, which was worth learning about that branch.
 
 When adding to `editor.mjs`: autosave debounces at 800ms and the checkpoint at 15s,
 and the suite does not wait them out. Switching documents tears both effects down
