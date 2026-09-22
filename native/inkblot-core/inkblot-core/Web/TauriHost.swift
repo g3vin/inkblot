@@ -22,13 +22,16 @@ final class TauriHost {
     private let models = ModelService.shared
     private let log = Logger(subsystem: "inkblot", category: "tauri")
     weak var window: NSWindow?
+    /// Which window's page this answers: `main`, or a detached document's label.
+    let label: String
 
     /// `@tauri-apps/api/path`'s `BaseDirectory.AppData`.
     private static let appDataBaseDirectory = 14
 
-    init(core: CoreService, menus: WebMenus) {
+    init(core: CoreService, menus: WebMenus, label: String = AuxiliaryWindows.mainLabel) {
         self.core = core
         self.menus = menus
+        self.label = label
     }
 
     struct Failure: LocalizedError {
@@ -205,6 +208,9 @@ final class TauriHost {
             return .value(menus.popup(tree, in: window))
 
         case "menu.setApp":
+            // The menu bar is the main window's page's: its items activate there, so a
+            // detached window's menu would install items nothing could answer.
+            guard label == AuxiliaryWindows.mainLabel else { return .value(nil) }
             guard let tree = args["menu"] as? [String: Any] else { throw Failure("No menu to install") }
             menus.setAppMenu(tree)
             return .value(nil)
@@ -225,6 +231,40 @@ final class TauriHost {
         case "window.setTitle":
             window?.title = args["title"] as? String ?? ""
             return .value(nil)
+
+        /* ---------------- other windows: docWindow.js, openPinterest.js, pinterestScrape.js ---------------- */
+
+        case "window.list":
+            return .value(AuxiliaryWindows.shared.labels)
+
+        case "window.create":
+            try AuxiliaryWindows.shared.create(args["options"] as? [String: Any] ?? [:], core: core, menus: menus)
+            return .value(nil)
+
+        case "window.op":
+            let target = args["label"] as? String ?? label
+            let op = try string(args, "op")
+            if target == label {
+                return .value(window.flatMap { WindowOps.perform(op, value: args["value"], on: $0) })
+            }
+            if target == AuxiliaryWindows.mainLabel {
+                let main = AuxiliaryWindows.shared.mainWindow
+                return .value(main.flatMap { WindowOps.perform(op, value: args["value"], on: $0) })
+            }
+            return .value(AuxiliaryWindows.shared.window(target)?.perform(op, value: args["value"]))
+
+        case "navigate_webview":
+            let aux = try auxiliary(args)
+            guard let url = URL(string: try string(args, "url")) else { throw Failure("Invalid URL") }
+            aux.navigate(to: url)
+            return .value(nil)
+
+        case "eval_webview":
+            try auxiliary(args).evaluate(try string(args, "script"))
+            return .value(nil)
+
+        case "get_webview_url":
+            return .value(try auxiliary(args).currentURL)
 
         /* ---------------- the app's own commands (src-tauri/src/lib.rs and friends) ---------------- */
 
@@ -272,6 +312,15 @@ final class TauriHost {
     }
 
     /* ---------------- arguments ---------------- */
+
+    /// The window a `*_webview` command names, refused as Tauri refuses it.
+    private func auxiliary(_ args: [String: Any]) throws -> AuxiliaryWindow {
+        let target = try string(args, "label")
+        guard let window = AuxiliaryWindows.shared.window(target) else {
+            throw Failure("Webview '\(target)' not found")
+        }
+        return window
+    }
 
     private func string(_ args: [String: Any], _ key: String) throws -> String {
         guard let value = args[key] as? String else { throw Failure("Missing \(key)") }
