@@ -9,7 +9,8 @@
  * `fileItem` reaches beyond it — the canvas and editor branches both key off it.
  */
 import { confirm } from '@tauri-apps/plugin-dialog'
-import { getEntryFilePath, listProjectTree, moveEntry } from '../../lib/FileSystem'
+import { getEntryFilePath, listProjectTree } from '../../lib/FileSystem'
+import { moveEntry } from '../../lib/entryOperations'
 import { getDocDisplayName } from '../../lib/docKind'
 
 export async function createMenuContext(e, props) {

@@ -20,6 +20,7 @@ import './Editor.css'
 
 import ProjectLanding from './ProjectLanding'
 import { useTabs } from './useTabs'
+import { useEntryOperations } from './useEntryOperations'
 import { useClipboardHistory } from './useClipboardHistory'
 import {
   CLIPBOARD_PERSIST_KEY,
@@ -193,6 +194,23 @@ export default function Editor({
     setSplitView,
     setTabs,
     tabs,
+  })
+
+  // Rename, move, delete and duplicate — from the tree, a menu, or the native shell —
+  // without the pane's final autosave recreating the old path. See useEntryOperations.
+  useEntryOperations({
+    projectName,
+    currentDoc,
+    secondaryDoc,
+    setActiveDoc,
+    setCurrentDoc,
+    setNotesByDoc,
+    setSecondaryDoc,
+    setSplitView,
+    setTabs,
+    setVersionsState,
+    refreshFilesRef,
+    openDocInTab,
   })
 
   // Bounding rect of the clipboard panel (or its sidebar container) used as the drag-drop target.

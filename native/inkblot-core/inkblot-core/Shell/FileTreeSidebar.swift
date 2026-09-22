@@ -3,33 +3,18 @@ import SwiftUI
 
 /// The project's files, natively — what replaces the page's `LeftSidebar`/`FileTree`.
 ///
-/// **What it does:** browse, open (as `openDocument` over the bridge, into the pane the
-/// page elects), create documents and folders, reveal in the Finder.
-///
-/// **What it does not do yet, and why.** Rename, move and delete are not here. Each
-/// one changes a path the page may be holding — the open document, a tab, a split
-/// pane, the per-document editor-state cache — and the page's own tree updates all of
-/// those in the same breath as it touches the disk. Doing the disk half from here
-/// would leave the page autosaving to a path that no longer exists, which recreates
-/// the file under its old name. Those operations need protocol commands the page
-/// applies (`entryRenamed`, `entryDeleted`) before they can move. HANDOFF.md tracks it.
+/// Browsing is local: the tree is read from disk by the core and kept current by
+/// FSEvents (`ProjectTree`). **Every change goes through the page**, as a protocol
+/// command — `createEntry`, `renameEntry`, `moveEntry`, `deleteEntry`,
+/// `duplicateEntry`. That is not deference, it is correctness: the page may be holding
+/// the path being changed, and its pane's last autosave would otherwise recreate the
+/// old one (see `useEntryOperations`). The page closes what the entry touches, waits for
+/// those saves, does the disk operation and reopens at the new paths.
 struct FileTreeSidebar: View {
     @Environment(AppModel.self) private var model
     @State private var selection: String?
-    @State private var creating: NewEntryKind?
-    @State private var newName = ""
-    @State private var createError: String?
-
-    enum NewEntryKind: Identifiable {
-        case document(parent: String)
-        case folder(parent: String)
-        var id: String {
-            switch self {
-            case .document(let parent): "doc:\(parent)"
-            case .folder(let parent): "folder:\(parent)"
-            }
-        }
-    }
+    @State private var prompt: NamePrompt?
+    @State private var pendingDelete: TreeEntry?
 
     var body: some View {
         Group {
@@ -58,12 +43,31 @@ struct FileTreeSidebar: View {
                   path != model.bridge.activeEditor?.docPath else { return }
             model.bridge.send(.openDocument(OpenDocumentCommand(path: path, pane: .primary)))
         }
-        .sheet(item: $creating) { kind in
-            NewEntrySheet(kind: kind, name: $newName, error: createError) { commit(kind) } cancel: {
-                creating = nil
+        .sheet(item: $prompt) { current in
+            NamePromptSheet(prompt: current) { name in
+                perform(current.action, name: name)
+                prompt = nil
+            } cancel: {
+                prompt = nil
             }
         }
+        .confirmationDialog(
+            pendingDelete.map { "Delete “\($0.displayName)”?" } ?? "",
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { entry in
+            Button("Delete", role: .destructive) {
+                model.bridge.send(.deleteEntry(DeleteEntryCommand(path: entry.path, isFolder: entry.isFolder)))
+            }
+        } message: { entry in
+            Text(entry.isFolder
+                 ? "The folder and everything in it will be deleted. This can’t be undone."
+                 : "This can’t be undone.")
+        }
     }
+
+    /* ---------------- the list ---------------- */
 
     private var list: some View {
         List(selection: $selection) {
@@ -75,13 +79,14 @@ struct FileTreeSidebar: View {
         }
         .listStyle(.sidebar)
         .contextMenu(forSelectionType: String.self) { paths in
-            contextMenu(for: paths.first)
+            contextMenu(for: paths.first.map(entry(at:)))
         }
+        // Dropping on the empty part of the list moves to the project root.
+        .dropDestination(for: String.self) { paths, _ in move(paths, to: "") }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Menu {
-                    Button("New Document", systemImage: "doc") { begin(.document(parent: "")) }
-                    Button("New Folder", systemImage: "folder") { begin(.folder(parent: "")) }
+                    newItems(in: "")
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -91,21 +96,29 @@ struct FileTreeSidebar: View {
                 .fixedSize()
                 .padding(8)
                 .glassEffect(.regular.interactive(), in: .circle)
-                .help("New Document or Folder")
+                .help("New Document, Canvas or Folder")
                 Spacer()
             }
             .padding(10)
         }
     }
 
+    @ViewBuilder
     private func row(_ node: TreeNode) -> some View {
-        Label {
+        let label = Label {
             Text(node.type == .folder ? node.name : docDisplayName(path: node.path))
                 .lineLimit(1)
         } icon: {
             Image(systemName: icon(for: node))
         }
         .tag(node.path)
+        .draggable(node.path)
+
+        if node.type == .folder {
+            label.dropDestination(for: String.self) { paths, _ in move(paths, to: node.path) }
+        } else {
+            label
+        }
     }
 
     private func icon(for node: TreeNode) -> String {
@@ -113,104 +126,182 @@ struct FileTreeSidebar: View {
         return isCanvasDoc(path: node.path) ? "rectangle.on.rectangle" : "doc.text"
     }
 
+    /* ---------------- menus ---------------- */
+
     @ViewBuilder
-    private func contextMenu(for path: String?) -> some View {
-        let parent = path.map(parentFolder(of:)) ?? ""
-        Button("New Document") { begin(.document(parent: parent)) }
-        Button("New Folder") { begin(.folder(parent: parent)) }
-        if let path {
+    private func newItems(in folder: String) -> some View {
+        Button("New Document", systemImage: "doc.text") { ask(.create(.document, in: folder)) }
+        Button("New Canvas", systemImage: "rectangle.on.rectangle") { ask(.create(.canvas, in: folder)) }
+        Button("New Folder", systemImage: "folder") { ask(.create(.folder, in: folder)) }
+    }
+
+    @ViewBuilder
+    private func contextMenu(for entry: TreeEntry?) -> some View {
+        newItems(in: entry?.containingFolder ?? "")
+        if let entry {
             Divider()
-            Button("Reveal in Finder") { reveal(path) }
-        }
-    }
-
-    /* ---------------- creating ---------------- */
-
-    /// The folder a new entry goes in: the folder itself if a folder was clicked, the
-    /// file's folder if a file was.
-    private func parentFolder(of path: String) -> String {
-        if !model.tree.filePaths.contains(path) { return path }
-        return path.split(separator: "/").dropLast().joined(separator: "/")
-    }
-
-    private func begin(_ kind: NewEntryKind) {
-        newName = ""
-        createError = nil
-        creating = kind
-    }
-
-    private func commit(_ kind: NewEntryKind) {
-        guard let project = model.tree.projectName else { return }
-        // A slash would make a nested path out of a name, and `.canvas` would route a
-        // text document to the canvas editor — the same rule the page's tree applies.
-        let name = newName.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "/", with: "-")
-        guard !name.isEmpty, !name.hasPrefix(".") else {
-            createError = "Choose a name that does not start with a dot."
-            return
-        }
-
-        do {
-            switch kind {
-            case .document(let parent):
-                let path = parent.isEmpty ? name : "\(parent)/\(name)"
-                guard !isCanvasDoc(path: path) else {
-                    createError = "Documents can’t end in .canvas."
-                    return
+            Button("Rename…") { ask(.rename(entry)) }
+            if !entry.isFolder {
+                Button("Duplicate") {
+                    model.bridge.send(.duplicateEntry(DuplicateEntryCommand(path: entry.path)))
                 }
-                try model.core.core.createDocument(projectName: project, docName: path)
-                model.tree.reload()
-                selection = path
-            case .folder(let parent):
-                let path = parent.isEmpty ? name : "\(parent)/\(name)"
-                try model.core.core.createFolder(projectName: project, folderPath: path)
-                model.tree.reload()
             }
-            creating = nil
-        } catch {
-            createError = error.localizedDescription
+            Menu("Move To") {
+                ForEach(moveTargets(for: entry), id: \.self) { folder in
+                    Button(folder.isEmpty ? (model.tree.projectName ?? "Project") : folder) {
+                        _ = move([entry.path], to: folder)
+                    }
+                }
+            }
+            Divider()
+            Button("Reveal in Finder") { reveal(entry) }
+            Divider()
+            Button("Delete…", role: .destructive) { pendingDelete = entry }
         }
     }
 
-    private func reveal(_ path: String) {
+    /* ---------------- entries ---------------- */
+
+    private func entry(at path: String) -> TreeEntry {
+        TreeEntry(path: path, isFolder: !model.tree.filePaths.contains(path))
+    }
+
+    /// Every folder an entry could move into: not where it already is, and — for a
+    /// folder — not into itself or anything under it.
+    private func moveTargets(for entry: TreeEntry) -> [String] {
+        var folders = [""]
+        func walk(_ node: TreeNode) {
+            for child in node.children ?? [] where child.type == .folder {
+                folders.append(child.path)
+                walk(child)
+            }
+        }
+        model.tree.root.map(walk)
+        return folders.filter { folder in
+            folder != entry.containingFolder
+                && !(entry.isFolder && (folder == entry.path || folder.hasPrefix(entry.path + "/")))
+        }
+    }
+
+    @discardableResult
+    private func move(_ paths: [String], to folder: String) -> Bool {
+        var moved = false
+        for path in paths {
+            let source = entry(at: path)
+            guard moveTargets(for: source).contains(folder) else { continue }
+            model.bridge.send(.moveEntry(MoveEntryCommand(path: path, isFolder: source.isFolder, targetFolder: folder)))
+            moved = true
+        }
+        return moved
+    }
+
+    private func ask(_ action: NamePrompt.Action) {
+        prompt = NamePrompt(action: action)
+    }
+
+    private func perform(_ action: NamePrompt.Action, name: String) {
+        switch action {
+        case .create(let kind, let folder):
+            model.bridge.send(.createEntry(CreateEntryCommand(parentFolder: folder, name: name, kind: kind)))
+        case .rename(let entry):
+            model.bridge.send(.renameEntry(RenameEntryCommand(path: entry.path, isFolder: entry.isFolder, newName: name)))
+        }
+    }
+
+    private func reveal(_ entry: TreeEntry) {
         guard let root = model.tree.projectRoot else { return }
-        let base = URL(fileURLWithPath: root).appendingPathComponent(path)
-        let target = model.tree.filePaths.contains(path) ? base.appendingPathExtension("json") : base
-        NSWorkspace.shared.activateFileViewerSelecting([target])
+        let base = URL(fileURLWithPath: root).appendingPathComponent(entry.path)
+        NSWorkspace.shared.activateFileViewerSelecting([entry.isFolder ? base : base.appendingPathExtension("json")])
     }
 }
 
-private struct NewEntrySheet: View {
-    let kind: FileTreeSidebar.NewEntryKind
-    @Binding var name: String
-    let error: String?
-    let commit: () -> Void
-    let cancel: () -> Void
+/// One row of the tree, as the menus and commands need it.
+struct TreeEntry: Hashable, Identifiable {
+    let path: String
+    let isFolder: Bool
 
-    private var title: String {
-        switch kind {
-        case .document: "New Document"
-        case .folder: "New Folder"
+    var id: String { path }
+    var name: String { String(path.split(separator: "/").last ?? "") }
+    var displayName: String { isFolder ? name : docDisplayName(path: path) }
+    /// Where a new entry made "here" goes: inside a folder, or beside a file.
+    var containingFolder: String {
+        isFolder ? path : path.split(separator: "/").dropLast().joined(separator: "/")
+    }
+}
+
+/// A question that ends in a name: creating something, or renaming it.
+struct NamePrompt: Identifiable {
+    enum Action {
+        case create(EntryKind, in: String)
+        case rename(TreeEntry)
+    }
+
+    let id = UUID()
+    let action: Action
+
+    var title: String {
+        switch action {
+        case .create(.document, _): "New Document"
+        case .create(.canvas, _): "New Canvas"
+        case .create(.folder, _): "New Folder"
+        case .rename(let entry): "Rename “\(entry.displayName)”"
         }
     }
 
+    var confirm: String {
+        if case .rename = action { return "Rename" }
+        return "Create"
+    }
+
+    var initialName: String {
+        if case .rename(let entry) = action { return entry.displayName }
+        return ""
+    }
+}
+
+private struct NamePromptSheet: View {
+    let prompt: NamePrompt
+    let commit: (String) -> Void
+    let cancel: () -> Void
+    @State private var name = ""
+    @State private var error: String?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
+            Text(prompt.title).font(.headline)
             TextField("Name", text: $name)
                 .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 260)
-                .onSubmit(commit)
+                .frame(minWidth: 280)
+                .onSubmit(submit)
             if let error {
                 Text(error).font(.callout).foregroundStyle(.red)
             }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
-                Button("Create", action: commit)
+                Button(prompt.confirm, action: submit)
                     .keyboardShortcut(.defaultAction)
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .padding(20)
+        .onAppear { name = prompt.initialName }
+    }
+
+    /// The same rules the page's tree applies: no slash (it would make a path), no
+    /// leading dot (the tree hides dotfiles, so the entry would vanish). The `.canvas`
+    /// suffix is the page's to add or strip, by kind.
+    private func submit() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        guard !trimmed.contains("/") else {
+            error = "Names can’t contain “/”."
+            return
+        }
+        guard !trimmed.hasPrefix(".") else {
+            error = "Names can’t start with a dot."
+            return
+        }
+        commit(trimmed)
     }
 }

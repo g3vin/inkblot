@@ -5,7 +5,8 @@
  * branches append to the shared item list and fall through to the common actions,
  * which is how the original single callback behaved.
  */
-import { deleteEntry, deleteProject, duplicateEntry, getProjectRoot, moveProject } from '../../lib/FileSystem'
+import { deleteProject, getProjectRoot, moveProject } from '../../lib/FileSystem'
+import { deleteEntry, duplicateEntry } from '../../lib/entryOperations'
 import { STORY_FOLDER_PRESETS } from '../../lib/storyStructure'
 import { openDocumentWindow } from '../../lib/docWindow'
 
