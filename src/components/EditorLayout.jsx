@@ -15,6 +15,7 @@ import { EditorTarget } from '../types'
 /** A stable identity, so useBridgeState's initial value is not a new object each render. */
 const EMPTY_ACTIVE_EDITOR = {}
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
+import { nativeOwns } from '../lib/host'
 import EditorCanvas from './EditorCanvas'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
@@ -103,9 +104,15 @@ export default function EditorLayout(props) {
     setActiveDoc,
     setCurrentDoc,
   } = props
-  const titlebarLeftWidth = left.collapsed && !left.peeked
-    ? 86
-    : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
+  // Under the Swift shell the file tree and the traffic lights are both outside the
+  // page, so nothing on the left needs room made for it.
+  const nativeFileTree = nativeOwns('fileTree')
+  const nativeWindowChrome = nativeOwns('windowChrome')
+  const titlebarLeftWidth = nativeFileTree
+    ? (nativeWindowChrome ? 0 : 86)
+    : left.collapsed && !left.peeked
+      ? 86
+      : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
   const titlebarRightWidth = right.collapsed && !right.peeked
     ? 0
     : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
@@ -140,6 +147,7 @@ export default function EditorLayout(props) {
   // unless it landed on something interactive. Bound to the window rather than
   // the titlebar element so the strip also covers the sidebars beneath it.
   useEffect(() => {
+    if (nativeWindowChrome) return undefined
     const handleWindowDragMouseDown = (event) => {
       if (event.button !== 0) return
       if (event.clientY > WINDOW_DRAG_STRIP_HEIGHT) return
@@ -155,13 +163,17 @@ export default function EditorLayout(props) {
 
     window.addEventListener('mousedown', handleWindowDragMouseDown, true)
     return () => window.removeEventListener('mousedown', handleWindowDragMouseDown, true)
-  }, [])
+  }, [nativeWindowChrome])
 
   // Track (and predict) fullscreen state so the layout can restyle its chrome.
   // macOS reports fullscreen late during the animation, so we also treat
   // near-monitor-sized windows and clicks on the green traffic-light button as
   // fullscreen, then re-sync with the real state once things settle.
+  //
+  // Under a real titlebar none of this applies — and the traffic-light hit box below
+  // would land on the toolbar's first buttons, flipping the chrome on ordinary clicks.
   useEffect(() => {
+    if (nativeWindowChrome) return undefined
     let cancelled = false
     let unlistenResize = null
     let settleTimeout = null
@@ -235,7 +247,7 @@ export default function EditorLayout(props) {
       window.removeEventListener('pointerdown', handleFullscreenButtonPointerDown, true)
       unlistenResize?.()
     }
-  }, [])
+  }, [nativeWindowChrome])
 
   useEffect(() => {
     pendingSearchTargetRef.current = pendingSearchTarget
@@ -466,7 +478,7 @@ export default function EditorLayout(props) {
 
       <div className={`main-layout${activeIsCanvas ? ' is-canvas-underlay' : ''}`}>
 
-        <LeftSidebar
+        {nativeFileTree ? null : <LeftSidebar
           {...props}
           width={left.width}
           onResize={left.start}
@@ -476,7 +488,7 @@ export default function EditorLayout(props) {
           pinned={left.pinned}
           togglePin={left.togglePin}
           onAutoCollapse={left.collapse}
-        />
+        />}
 
         <EditorCanvas
           {...props}

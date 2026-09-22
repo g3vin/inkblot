@@ -291,6 +291,21 @@ pub struct CanvasRestoreCommand {
     pub canvas: JsonValue,
 }
 
+/// Insert text at the selection with no formatting of its own — the text takes on the
+/// marks around it.
+///
+/// This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
+/// webview: `WKWebView` cannot read the clipboard without a user gesture inside the
+/// page, and the menu item is not one. It replaces `__inkblot_forcePlainPaste`, a flag
+/// that was read and never set.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsertPlainTextCommand {
+    pub target: EditorTarget,
+    pub text: String,
+}
+
 /// Everything the shell can ask the document surface to do.
 ///
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
@@ -325,4 +340,5 @@ pub enum NativeCommand {
     CanvasDropNote(CanvasDropNoteCommand),
     CanvasReveal(CanvasRevealCommand),
     CanvasRestore(CanvasRestoreCommand),
+    InsertPlainText(InsertPlainTextCommand),
 }

@@ -13,16 +13,22 @@
  * difference is that this one has a type, one owner, and a seam it is deliberately
  * shaped around.
  *
- * **What changes in Phase 5.** This file, and only this file: `createInProcessTransports`
- * becomes a `WKWebView` pair, the shell end moves to Swift, and the surface end stays
- * exactly as it is. Nothing that imports from here has to know.
+ * **What changed in Phase 5.** This file, and only this file: inside the Swift shell the
+ * transports come from `createNativeHostTransports`, which puts the native shell on the
+ * wire beside the React chrome rather than instead of it — the chrome moves to Swift a
+ * piece at a time, and both drive the same surface until the last piece has moved.
+ * Outside it (the Tauri app, the test harness) nothing changed. Nothing that imports
+ * from here has to know which.
  */
-import { createInProcessTransports } from './transport'
+import { createInProcessTransports, createNativeHostTransports, detectNativeHost } from './transport'
 import { createShellBridge, createSurfaceBridge } from './client'
 import { createEditorRegistry } from './editorRegistry'
 import { createDocumentSurface } from './surface'
 
-const transports = createInProcessTransports()
+const nativeHost = detectNativeHost()
+const transports = nativeHost
+  ? createNativeHostTransports(nativeHost)
+  : createInProcessTransports()
 
 /** The shell's end. The chrome sends commands and listens for events on this. */
 export const shellBridge = createShellBridge(transports.shell)

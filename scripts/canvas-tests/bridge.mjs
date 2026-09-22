@@ -36,7 +36,11 @@ const dom = new JSDOM('<!doctype html><html><body></body></html>', { pretendToBe
 installGlobals(dom.window, ['window', 'document', 'requestAnimationFrame', 'cancelAnimationFrame'])
 
 const C = '../../src'
-const { createInProcessTransports, createDeferredTransports } = await import(`${C}/bridge/transport.ts`)
+const {
+  createInProcessTransports,
+  createDeferredTransports,
+  createNativeHostTransports,
+} = await import(`${C}/bridge/transport.ts`)
 const { createShellBridge, createSurfaceBridge, BridgeRequestError } = await import(`${C}/bridge/client.ts`)
 const { createEditorRegistry } = await import(`${C}/bridge/editorRegistry.ts`)
 const { createDocumentSurface } = await import(`${C}/bridge/surface.ts`)
@@ -530,6 +534,152 @@ function wire({ deferred = false } = {}) {
   })
   ok('a gap in the sequence is reported rather than passing unnoticed', gaps.length === 1)
 
+  surface.dispose()
+}
+
+/* ---------------- the native shell joins the wire (Phase 5) ----------------
+   Inside the Swift shell, the React chrome and the native chrome both drive the
+   surface until the last piece of chrome has moved. What has to hold: both are
+   heard, neither sees a gap, and each gets its own answers — the React toolbar's
+   `r0` and the native shell's `r0` are different questions. */
+
+/** What `window.__inkblotNative` looks like, minus WebKit. Strings both ways. */
+function makeNativeHost() {
+  const posted = []
+  let listener = null
+  const queue = []
+  return {
+    posted,
+    post: (json) => { posted.push(JSON.parse(json)) },
+    listen: (handler) => {
+      listener = handler
+      while (queue.length) handler(queue.shift())
+      return () => { if (listener === handler) listener = null }
+    },
+    /** What Swift's `evaluateJavaScript` ends up calling. */
+    deliver: (message) => {
+      const json = typeof message === 'string' ? message : JSON.stringify(message)
+      if (listener) listener(json)
+      else queue.push(json)
+    },
+  }
+}
+
+function wireNative() {
+  const host = makeNativeHost()
+  const gaps = []
+  const malformed = []
+  const transports = createNativeHostTransports(host, {
+    onGap: (message) => gaps.push(message),
+    onMalformed: (message) => malformed.push(message),
+  })
+  const onGap = (message) => { throw new Error(message) }
+  const shell = createShellBridge(transports.shell, { onGap })
+  const bridge = createSurfaceBridge(transports.surface, { onGap })
+  const registry = createEditorRegistry()
+  const surface = createDocumentSurface({ bridge, registry, scheduler: immediateScheduler })
+  return { host, gaps, malformed, transports, shell, registry, surface }
+}
+
+let nativeSeq = 0
+const nativeCommand = (type, payload, seq = nativeSeq++) =>
+  ({ kind: 'command', message: { seq, command: { type, payload } } })
+
+{
+  nativeSeq = 0
+  const { host, gaps, shell, registry, surface, transports } = wireNative()
+  const editor = makeEditor()
+  registry.register(EditorTarget.Primary, { getEditor: () => editor })
+  registry.setActive(EditorTarget.Primary)
+
+  host.deliver(nativeCommand('applyMark', { target: EditorTarget.Primary, mark: MarkKind.Bold }))
+  ok('a command from the native shell reaches the editor',
+    editor.calls.some(([m]) => m === 'toggleBold'))
+
+  // Interleaved: each shell numbers from zero. The surface's own gap check throws in
+  // this suite, so reaching the next line at all is the assertion.
+  let threw = null
+  try {
+    shell.send('setColor', { target: EditorTarget.Primary, color: '#00ff00' })
+    host.deliver(nativeCommand('applyMark', { target: EditorTarget.Primary, mark: MarkKind.Italic }))
+    shell.send('setColor', { target: EditorTarget.Primary, color: '#0000ff' })
+  } catch (error) { threw = error }
+  ok('two shells interleaving commands is not a gap on the surface', threw === null)
+  ok('and every one of them landed',
+    editor.calls.some(([m]) => m === 'toggleItalic') &&
+    editor.calls.some(([m, arg]) => m === 'setColor' && arg === '#0000ff'))
+  ok('and the native stream was in order', gaps.length === 0)
+
+  // A native command that skips a number is a message Swift sent and the page lost.
+  host.deliver(nativeCommand('applyMark', { target: EditorTarget.Primary, mark: MarkKind.Bold }, nativeSeq + 3))
+  ok('a gap in the native stream is reported', gaps.length === 1 && /native command/.test(gaps[0]))
+
+  transports.dispose()
+  surface.dispose()
+}
+
+{
+  nativeSeq = 0
+  const { host, shell, registry, surface, transports } = wireNative()
+  const editor = makeEditor()
+  registry.register(EditorTarget.Primary, { getEditor: () => editor })
+  registry.setActive(EditorTarget.Primary)
+
+  // Both ask first, so both are `r0`. Each must get its own answer and only its own.
+  const localAnswer = shell.request('getDocumentText', { target: EditorTarget.Primary })
+  host.deliver({ kind: 'request', message: { id: 'r0', request: { type: 'getToolbarState', payload: {} } } })
+
+  const nativeReplies = host.posted.filter((m) => m.kind === 'reply')
+  ok('the native shell is answered under the id it asked with',
+    nativeReplies.length === 1 && nativeReplies[0].message.id === 'r0')
+  ok('with the answer to its own question, not the React shell\'s',
+    nativeReplies[0].message.reply.type === 'toolbarState')
+
+  const text = await localAnswer
+  ok('and the React shell still gets its own', text.text === 'she hesitated at the door')
+
+  host.posted.length = 0
+  surface.publishActiveEditor({ target: EditorTarget.Primary, docPath: 'one.md' })
+  const heard = []
+  const off = shell.on('activeEditorChanged', (payload) => heard.push(payload))
+  surface.publishActiveEditor({ target: EditorTarget.Primary, docPath: 'two.md' })
+  off()
+  ok('events reach the native shell',
+    host.posted.some((m) => m.kind === 'event' && m.message.event.type === 'activeEditorChanged'))
+  ok('and the React shell, from the same stream', heard.length === 1 && heard[0].docPath === 'two.md')
+  const seqs = host.posted.filter((m) => m.kind === 'event').map((m) => m.message.seq)
+  ok('with sequence numbers the native shell can check',
+    seqs.every((seq, index) => index === 0 || seq === seqs[index - 1] + 1))
+
+  transports.dispose()
+  surface.dispose()
+}
+
+{
+  const { host, malformed, surface, transports } = wireNative()
+  let threw = false
+  try {
+    host.deliver('{not json')
+    host.deliver({ kind: 'shout', message: {} })
+  } catch { threw = true }
+  ok('malformed native input is reported, not thrown into WebKit', !threw && malformed.length === 2)
+  transports.dispose()
+  surface.dispose()
+}
+
+/* ---------------- Paste and Match Style (insertPlainText) ---------------- */
+{
+  const { shell, registry, surface } = wire()
+  const editor = makeEditor()
+  const pasted = []
+  editor.view = { isDestroyed: false, focus: () => {}, pasteText: (text) => { pasted.push(text); return true } }
+  registry.register(EditorTarget.Primary, { getEditor: () => editor })
+
+  shell.send('insertPlainText', { target: EditorTarget.Primary, text: '<b>not bold</b>\nsecond' })
+  ok('insertPlainText goes through the editor\'s plain-text paste, markup and all',
+    pasted.length === 1 && pasted[0] === '<b>not bold</b>\nsecond')
+  ok('and never through insertContent, which would parse it as HTML',
+    !editor.calls.some(([m]) => m === 'insertContent'))
   surface.dispose()
 }
 

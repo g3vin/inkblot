@@ -32,6 +32,7 @@ import type {
   NoteMarkerEvent,
   NotesRemapped,
   OpenDocumentCommand,
+  ProjectChanged,
   ReadAloudPayloadEvent,
   SearchMatches,
   SelectionContext,
@@ -105,6 +106,8 @@ export interface DocumentSurface {
   publishSearchMatches(payload: SearchMatches): void
   publishFocusModeView(payload: FocusModeView): void
   publishReadAloudPayload(payload: ReadAloudPayloadEvent): void
+  /** Which project is open. Not coalesced — it changes when the user picks one. */
+  publishProjectChanged(payload: ProjectChanged): void
 
   /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
   publishDragStarted(): void
@@ -222,6 +225,9 @@ export function createDocumentSurface({
   handle('setCaretAtDocPos', (payload) => {
     withEditor(payload, (editor) => { commands.setCaretAtDocPos(editor, payload) })
   })
+  handle('insertPlainText', (payload) => {
+    withEditor(payload, (editor) => { commands.insertPlainText(editor, payload) })
+  })
 
   /* Delegated: these change what the app is showing, which the surface does not own. */
   handle('openDocument', (payload) => delegates.openDocument?.(payload))
@@ -329,6 +335,7 @@ export function createDocumentSurface({
     publishSearchMatches(payload) { bridge.emit('searchMatches', payload) },
     publishFocusModeView(payload) { bridge.emit('focusModeView', payload) },
     publishReadAloudPayload(payload) { bridge.emit('readAloudPayload', payload) },
+    publishProjectChanged(payload) { bridge.emit('projectChanged', payload) },
 
     publishDragStarted() {
       const session = drag.current()
