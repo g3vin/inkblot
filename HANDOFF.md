@@ -2,25 +2,31 @@
 
 State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
-**Current branch:** `phase-0-foundations`, 25 commits ahead of `main` (`b7ceed8`).
+**Current branch:** `phase-0-foundations`, 31 commits ahead of `main` (`b7ceed8`).
 `main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
 
-**Size today:** 34,343 JS/JSX · 8,984 CSS · 1,462 Rust.
+**Size today:** 34,343 JS/JSX · 8,984 CSS · 4,466 Rust.
 
 ---
 
 ## The gates
 
-Run all five after every change. They are fast and they have each caught something
+Run all seven after every change. They are fast and they have each caught something
 the others missed.
 
 ```bash
-npm test          # 379 assertions, 15 suites
-npm run lint      # 0 errors AND 0 warnings is the current bar
-npm run typecheck # tsc --noEmit
-npm run build     # the only thing that resolves dynamic imports and named exports
-(cd src-tauri && cargo build --workspace)
+npm test           # 379 assertions, 15 suites
+npm run lint       # 0 errors AND 0 warnings is the current bar
+npm run typecheck  # tsc --noEmit
+npm run build      # the only thing that resolves dynamic imports and named exports
+npm run parity     # 11,503 cases through BOTH the JS and the Rust implementation
+npm run types:check # fails if the generated TS/Swift is stale
+(cd src-tauri && cargo build --workspace && cargo test -p inkblot-core)
 ```
+
+`parity` and `types:check` arrived with Phase 2 and need `cargo` and
+`cargo install typeshare-cli --locked` on PATH. Both are load-bearing rather than
+tidy: see the table below.
 
 **They are not redundant.** Concrete cases from this work:
 
@@ -31,6 +37,9 @@ npm run build     # the only thing that resolves dynamic imports and named expor
 | A named import the module did not export | build only |
 | Linker failure from a stale clang path | `cargo build` only — `cargo check` does not link |
 | `useEditorDnd({ editor })` read in its temporal dead zone — EditorCanvas threw on **every** mount | the `editor` suite only. Lint, tsc *and* build all passed; nothing mounted the component |
+| serde_json's float parser off by 1 ULP — every canvas coordinate shifting in its last bit on every load | `parity` only (785 of 6,044 numbers) |
+| Rust and JS breaking exact float ties in opposite directions | `parity` only |
+| `Math.hypot` ≠ `f64::hypot`, changing an emitted SVG path string | `parity` only |
 
 ---
 
@@ -89,39 +98,113 @@ Move non-UI domain logic into `src-tauri/crates/inkblot-core`, which exists and
 builds a `staticlib` (verified: `libinkblot_core.a` is produced — that is the
 artifact a Swift shell links).
 
-### Do this first: domain types
+### Domain types — done
 
-Define them once in Rust and generate TypeScript **and** Swift with
-[`typeshare`](https://github.com/1Password/typeshare). This is the keystone of the
-whole migration — it is what stops three languages drifting. Dependency order:
+Defined in `crates/inkblot-core/src/types/`, generated into TypeScript and Swift by
+`./scripts/generate-types.sh` (`npm run types`). The generated files —
+`src/types/inkblot-core.ts` and `crates/inkblot-core/generated/InkblotCore.swift` —
+are never hand-edited; `npm run types:check` regenerates into a temp dir and diffs,
+so a stale one fails rather than rots. It also runs `swiftc -typecheck` over the
+Swift against a stub `AnyCodable` — otherwise nothing would look at that file until
+the Phase 5 Xcode target exists, which is much too late to find out that a Rust type
+generates something Swift will not accept. Skipped where `swiftc` is absent.
+
+Declared in dependency order:
 
 ```
-Viewport, Rect, EdgeSide
+Viewport, Rect, Point, EdgeSide
   → CanvasNode, CanvasEdge, CanvasState, CanvasFile
   → NoteImage, AudioClip, Note
   → VersionEntry → TreeNode → TextDocument
+  → DiffOp, HtmlBlock, DiffChunk, CanvasDiff   (the diff engine's results)
 ```
 
-Two subtleties to encode:
-- **A note node is a `file` node carrying an extra `inkblotNoteId`** (`canvasModel.js:95-104`
-  explains why: the document stays the single source of truth).
-- **`normalizeNote` spreads unknown keys** (`noteUtils.js:107`). Decide explicitly
-  whether to preserve or drop them — an index signature or a documented drop.
+Both subtleties are encoded. A note node is a `file` node with an extra
+`inkblotNoteId`, documented on the type. **Unknown keys are preserved, not dropped**
+— canvas nodes, canvas edges and notes each carry a `#[serde(flatten)]` extras map.
 
-### Move order (each has existing test coverage where noted)
+Three things typeshare cannot do, and what was done instead:
 
-| # | Module | Notes |
+- **It rejects `#[serde(flatten)]` outright.** The extras fields are
+  `#[typeshare(skip)]`, and the index signature lives in the hand-written façade at
+  `src/types/index.ts` as `StoredCanvasNode` / `StoredCanvasEdge` / `StoredNote`.
+  Use a `Stored*` type for anything that came off disk or is going back to it.
+- **It only generates adjacently-tagged enums** (`{ type, content }`). `DiffChunk`
+  is internally tagged on the wire (`{ type: 'equal', blocks }`), so it is a struct
+  with optional fields and constructors, not an enum. Do not "fix" this without
+  changing the compare panel that reads it.
+- **It does not map `BTreeMap`.** Use `HashMap`, which becomes `Record<K, V>` and
+  `[K: V]`. `CanvasState`'s maps are therefore unordered — `nodeOrder`/`edgeOrder`
+  are the only thing that may decide sequence.
+
+Swift reaches arbitrary JSON through `AnyCodable`, which the Phase 5 Xcode target
+supplies; it is only reachable from TipTap content and the extras maps.
+
+### The parity harness — the thing that makes any of this safe
+
+`npm run parity` (`scripts/parity/`) sends one corpus through both implementations
+in a single run and compares. A corpus each half maintains is a corpus that drifts.
+
+Each module under `scripts/parity/cases/` yields `{ fn, args, expected }` rows where
+`expected` comes from calling the real function in `src/lib/`; the runner pipes the
+same rows to the Rust `parity` binary and deep-compares after a JSON round-trip on
+both sides. A module may supply a `canon(value, case)` hook that runs on **both**
+sides — `canvasModel` uses it to rewrite generated ids — so it can only erase a
+difference it erases symmetrically.
+
+**Check it is not passing vacuously** by breaking the Rust side deliberately before
+you trust a green run. Every port below was verified that way.
+
+### Move order
+
+| # | Module | Status |
 |---|---|---|
-| 1 | `docKind.js` (37 lines, 0 imports) | imported by 14 files; `getDocKind` returns a literal union |
-| 2 | `canvasGeometry.js` (259, 0 imports) | pure float math — covered by `geo.mjs` |
-| 3 | `canvasModel.js` + `storyStructure.js` | covered by `red.mjs`, `group.mjs`, `m0.mjs` |
-| 4 | `versionHistory.js` diff engine (`:96-340`) | LCS over a `Uint32Array` DP table. Highest-value CPU move. Leave `htmlToBlocks` (`DOMParser`) and the `toLocaleString` formatters in JS |
+| 1 | `docKind.js` | **done** — `doc_kind.rs` |
+| 2 | `canvasGeometry.js` | **done** — `canvas_geometry.rs` |
+| 3 | `canvasModel.js` + `storyStructure.js` | **done** — `canvas_model.rs`, `story_structure.rs` |
+| 4 | `versionHistory.js` diff engine (`:96-340`) | **done** — `version_history.rs`, with the differential test over real documents |
 | 5 | `FileSystem.js` + `projectPaths.js` + `docLock.js` + `versionStore.js` | biggest win. `withDocLock` becomes a real `Mutex` and gets *more* correct. Replace the `versions:changed` DOM CustomEvent with a Tauri event |
 | 6 | `sidebarSearch.js` matcher + JSON walk + `canvasSearch.js` | **caveat:** Rust's `regex` has no backreferences or lookaround. `useRegex` mode needs `fancy-regex` or a documented behaviour change |
 | 7 | `readAloud.js` chunker (`:426-627`), `noteUtils`/`audioNotes` normalizers | pure string/offset logic |
 
-For #4, add a **differential test**: run the JS and Rust diff engines over the same
-corpus of real documents and assert identical chunk output *before* deleting the JS.
+**The JS is still in place and still what the app runs.** These are parallel
+implementations kept honest by the harness; deleting a JS module is Phase 4 work,
+once the bridge exists to call the Rust one. Nothing per-frame — `worldTransform`,
+`panBy` — can survive an IPC round-trip, so those particular ones only lose their JS
+copy in the Swift shell.
+
+### Four ways "the same arithmetic" is not the same arithmetic
+
+Every one of these was found by the harness and none by reading. They will come up
+again in #6 and #7.
+
+- **serde_json's float parser is off by up to 1 ULP** without the `float_roundtrip`
+  feature. It is enabled in the workspace now. Do not remove it.
+- **Exact ties round differently.** ECMA-262 §6.1.6.1.20 takes the even last digit,
+  Rust takes the larger: `2083078717175940.25` is `…40.2` in JS and `…40.3` in Rust.
+  Handled in `js_number::format_js_number`, which also fixes the envelope — Rust
+  never goes exponential, JS does outside `1e-7 .. 1e21`. **Any string the core
+  builds out of a float must go through it**, not through `Display`.
+- **`Math.min`/`Math.max` propagate NaN; `f64::min`/`max` swallow it.** Use
+  `canvas_geometry`'s `js_min`/`js_max`.
+- **`Math.hypot` is not `f64::hypot`.** V8's is a scale-and-Kahan-sum and is not
+  correctly rounded. `js_hypot` transcribes V8's.
+
+Two more of the same family, from the diff engine: `charCodeAt` iterates **UTF-16
+code units** (use `encode_utf16()`), and JS's `\s` includes **U+FEFF**, which
+Unicode's `White_Space` does not — so the class is spelled out in
+`version_history.rs` rather than borrowed from `regex`.
+
+### One deliberate divergence, and one deliberate improvement
+
+`canvas_model::normalize_canvas` **drops an edge whose `fromNode`/`toNode` is not a
+string**, where JS uses the raw value as an object key and so finds the node `"5"`
+for `fromNode: 5`. Coercing would change what gets written back out. Documented at
+the top of the module and covered by a unit test.
+
+`version_history::diff_canvases` compares parsed content rather than
+`JSON.stringify` of it, so two TipTap documents with the same content in a different
+key order are no longer counted as an edit.
 
 ### Move `localStorage` to disk — non-negotiable
 
