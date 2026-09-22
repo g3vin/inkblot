@@ -11,7 +11,6 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @State private var columns: NavigationSplitViewVisibility = .all
-    @State private var fullScreen = false
     @State private var chromeKeeper: WindowChrome.Keeper?
 
     var body: some View {
@@ -20,48 +19,33 @@ struct ContentView: View {
             FileTreeSidebar()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 340)
                 .toolbar(removing: .sidebarToggle)
-                .overlay(alignment: .topLeading) {
-                    SidebarToggleButton(edge: .leading, isPresented: treeBinding)
-                        .padding(.leading, WindowChrome.leadingToggleX)
-                        .padding(.top, WindowChrome.toggleInset)
-                        .ignoresSafeArea(.container, edges: .top)
-                }
         } detail: {
             EditorWebView(controller: model.web)
                 .overlay { NotePreviewOverlay() }
-                .overlay(alignment: .topLeading) {
-                    if columns == .detailOnly {
-                        SidebarToggleButton(edge: .leading, isPresented: treeBinding)
-                            .padding(.leading, fullScreen ? WindowChrome.trafficLightsLeading : WindowChrome.leadingToggleX)
-                            .padding(.top, WindowChrome.toggleInset)
-                            .transition(.opacity)
-                    }
-                }
-                .overlay(alignment: .topTrailing) {
-                    if !sidebar.isPresented {
-                        SidebarToggleButton(edge: .trailing, isPresented: $sidebar.isPresented)
-                            .padding(.trailing, 16)
-                            .padding(.top, WindowChrome.toggleInset)
-                            .transition(.opacity)
-                    }
-                }
                 .ignoresSafeArea(.all, edges: [.top, .bottom])
         }
         .inspector(isPresented: $sidebar.isPresented) {
             InspectorView()
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 520)
         }
+        // The toggles belong to the window, not to the panels they open: they stay put in
+        // the top corners whether their sidebar is open or closed.
+        .overlay(alignment: .topLeading) {
+            SidebarToggleButton(edge: .leading, isPresented: treeBinding)
+                .padding(.leading, WindowChrome.leadingToggleX)
+                .padding(.top, WindowChrome.toggleInset)
+                .ignoresSafeArea(.container, edges: .top)
+        }
+        .overlay(alignment: .topTrailing) {
+            SidebarToggleButton(edge: .trailing, isPresented: $sidebar.isPresented)
+                .padding(.trailing, WindowChrome.trailingToggleInset)
+                .padding(.top, WindowChrome.toggleInset)
+                .ignoresSafeArea(.container, edges: .top)
+        }
         .background(WindowAccessor { window in
             chromeKeeper = WindowChrome.Keeper(window: window)
         })
         .onChange(of: columns, initial: true) { sendInset() }
-        .onChange(of: fullScreen) { sendInset() }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
-            fullScreen = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
-            fullScreen = false
-        }
         .onChange(of: model.bridge.project.projectName) { sendInset() }
         .onChange(of: model.sidebar.isPresented) { sendInset() }
     }
@@ -71,13 +55,17 @@ struct ContentView: View {
                 set: { visible in withAnimation(.spring(duration: 0.3)) { columns = visible ? .all : .detailOnly } })
     }
 
-    /// What the floating controls cover of the page's top row.
+    /// What the floating controls cover of the page's top row. The toggles never move, so
+    /// this only changes with which sidebars are open: an open sidebar is under its own
+    /// toggle (and the lights), a closed one leaves them over the page.
     private func sendInset() {
         let gap: Double = 12
-        let toggleEnd = Double(fullScreen ? WindowChrome.trafficLightsLeading : WindowChrome.leadingToggleX)
-            + Double(WindowChrome.toggleSize)
-        let leading = columns == .detailOnly ? toggleEnd + gap : 0
-        let trailing = model.sidebar.isPresented ? 0 : 16 + Double(WindowChrome.toggleSize) + gap
+        let leading = columns == .detailOnly
+            ? Double(WindowChrome.leadingToggleX + WindowChrome.toggleSize) + gap
+            : 0
+        let trailing = model.sidebar.isPresented
+            ? 0
+            : Double(WindowChrome.trailingToggleInset + WindowChrome.toggleSize) + gap
         model.bridge.send(.setTitlebarInset(SetTitlebarInsetCommand(leading: leading, trailing: trailing)))
     }
 }
