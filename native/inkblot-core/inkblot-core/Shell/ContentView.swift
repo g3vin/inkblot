@@ -3,46 +3,46 @@ import SwiftUI
 
 /// The window: the native file tree, the document surface, the native sidebar.
 ///
-/// There is no titlebar row. The page's own toolbar is the top of the window, the
-/// traffic lights float over the file tree (or, with the tree hidden, over the start of
-/// the page's toolbar — the shell tells the page how much room to leave), and each
-/// sidebar has its own glass toggle in its top corner. See `setTitlebarInset`.
+/// No title and no toolbar row. The page's own toolbar is the top of the window; the
+/// traffic lights and the two sidebar toggles float on the same line over it, placed by
+/// `WindowChrome` to macOS 26's toolbar-window metrics. The page is told how much of its
+/// top row they cover (`setTitlebarInset`): with the file tree showing, the lights and
+/// the left toggle are over the tree and cover nothing of the page.
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @State private var columns: NavigationSplitViewVisibility = .all
     @State private var fullScreen = false
-
-    /// The traffic lights' span from the window's leading edge, plus a little air.
-    private static let trafficLightsInset: Double = 78
+    @State private var chromeKeeper: WindowChrome.Keeper?
 
     var body: some View {
         @Bindable var sidebar = model.sidebar
         NavigationSplitView(columnVisibility: $columns) {
-            FileTreeSidebar(isPresented: Binding(
-                get: { columns != .detailOnly },
-                set: { columns = $0 ? .all : .detailOnly }))
-                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+            FileTreeSidebar()
+                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 340)
                 .toolbar(removing: .sidebarToggle)
+                .overlay(alignment: .topLeading) {
+                    SidebarToggleButton(edge: .leading, isPresented: treeBinding)
+                        .padding(.leading, WindowChrome.leadingToggleX)
+                        .padding(.top, WindowChrome.toggleInset)
+                        .ignoresSafeArea(.container, edges: .top)
+                }
         } detail: {
             EditorWebView(controller: model.web)
                 .overlay { NotePreviewOverlay() }
-                .overlay(alignment: .topTrailing) {
-                    // With a sidebar closed, the way back to it floats where its own
-                    // button was. The page leaves room for both (see sendInset).
-                    if !sidebar.isPresented {
-                        SidebarToggleButton(edge: .trailing, isPresented: $sidebar.isPresented)
-                            .padding(.top, SidebarToggleButton.topInset)
-                            .padding(.trailing, 12)
-                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                    }
-                }
                 .overlay(alignment: .topLeading) {
                     if columns == .detailOnly {
-                        SidebarToggleButton(edge: .leading, isPresented: Binding(
-                            get: { false }, set: { if $0 { columns = .all } }))
-                            .padding(.top, SidebarToggleButton.topInset)
-                            .padding(.leading, fullScreen ? 12 : Self.trafficLightsInset)
-                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                        SidebarToggleButton(edge: .leading, isPresented: treeBinding)
+                            .padding(.leading, fullScreen ? WindowChrome.trafficLightsLeading : WindowChrome.leadingToggleX)
+                            .padding(.top, WindowChrome.toggleInset)
+                            .transition(.opacity)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if !sidebar.isPresented {
+                        SidebarToggleButton(edge: .trailing, isPresented: $sidebar.isPresented)
+                            .padding(.trailing, 16)
+                            .padding(.top, WindowChrome.toggleInset)
+                            .transition(.opacity)
                     }
                 }
                 .ignoresSafeArea(.all, edges: [.top, .bottom])
@@ -51,10 +51,10 @@ struct ContentView: View {
             InspectorView()
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 520)
         }
-        .toolbar(removing: .title)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        .background(WindowAccessor { window in
+            chromeKeeper = WindowChrome.Keeper(window: window)
+        })
         .onChange(of: columns, initial: true) { sendInset() }
-        .animation(.spring(duration: 0.3), value: columns)
         .onChange(of: fullScreen) { sendInset() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
             fullScreen = true
@@ -66,14 +66,33 @@ struct ContentView: View {
         .onChange(of: model.sidebar.isPresented) { sendInset() }
     }
 
-    /// Room for the traffic lights only when they are over the page: the file tree is
-    /// hidden, and the window is not full screen (which has none).
+    private var treeBinding: Binding<Bool> {
+        Binding(get: { columns != .detailOnly },
+                set: { visible in withAnimation(.spring(duration: 0.3)) { columns = visible ? .all : .detailOnly } })
+    }
+
+    /// What the floating controls cover of the page's top row.
     private func sendInset() {
-        // Hidden tree: the traffic lights (unless full screen) and then its toggle.
-        let toggle = Double(SidebarToggleButton.size) + 12
-        let treeShowing = columns != .detailOnly
-        let leading = treeShowing ? 0 : (fullScreen ? 12 : Self.trafficLightsInset) + toggle
-        let trailing: Double = model.sidebar.isPresented ? 0 : toggle + 12
+        let gap: Double = 12
+        let toggleEnd = Double(fullScreen ? WindowChrome.trafficLightsLeading : WindowChrome.leadingToggleX)
+            + Double(WindowChrome.toggleSize)
+        let leading = columns == .detailOnly ? toggleEnd + gap : 0
+        let trailing = model.sidebar.isPresented ? 0 : 16 + Double(WindowChrome.toggleSize) + gap
         model.bridge.send(.setTitlebarInset(SetTitlebarInsetCommand(leading: leading, trailing: trailing)))
     }
+}
+
+/// Hands the hosting window to SwiftUI code once it exists.
+private struct WindowAccessor: NSViewRepresentable {
+    let onWindow: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { [weak view] in
+            if let window = view?.window { onWindow(window) }
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {}
 }
