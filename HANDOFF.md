@@ -2,10 +2,10 @@
 
 State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
-**Current branch:** `phase-0-foundations`, 20 commits ahead of `main` (`b7ceed8`).
+**Current branch:** `phase-0-foundations`, 25 commits ahead of `main` (`b7ceed8`).
 `main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
 
-**Size today:** 33,803 JS/JSX · 8,984 CSS · 1,462 Rust.
+**Size today:** 34,343 JS/JSX · 8,984 CSS · 1,462 Rust.
 
 ---
 
@@ -15,7 +15,7 @@ Run all five after every change. They are fast and they have each caught somethi
 the others missed.
 
 ```bash
-npm test          # 315 assertions, 13 suites
+npm test          # 379 assertions, 15 suites
 npm run lint      # 0 errors AND 0 warnings is the current bar
 npm run typecheck # tsc --noEmit
 npm run build     # the only thing that resolves dynamic imports and named exports
@@ -30,6 +30,7 @@ npm run build     # the only thing that resolves dynamic imports and named expor
 | `await import('../lib/openPinterest')` after moving a file deeper | build only |
 | A named import the module did not export | build only |
 | Linker failure from a stale clang path | `cargo build` only — `cargo check` does not link |
+| `useEditorDnd({ editor })` read in its temporal dead zone — EditorCanvas threw on **every** mount | the `editor` suite only. Lint, tsc *and* build all passed; nothing mounted the component |
 
 ---
 
@@ -46,24 +47,39 @@ workspace split with `crates/inkblot-core`.
 `<AppData>/models/` without reaching HuggingFace and (b) dictation resolves its
 model. No build gate can prove either.
 
-### Phase 1 — done except three items
+### Phase 1 — done
 
-Eleven oversized files split. `Editor.css` 5,620 → 39. `useEditorContextMenu.js`
+Fourteen oversized files split. `Editor.css` 5,620 → 39. `useEditorContextMenu.js`
 904 → 61. Full table in `~/.claude/plans/` or `git log`.
 
-**Not done, deliberately:**
+The last three items, the ones held back as too risky to do blind:
 
-1. **`EditorCanvas.jsx` autosave + version checkpoints.** Nothing in the test suite
-   mounts this component, and a subtle break loses the user's writing *silently*,
-   possibly days later. Write a suite that mounts it first (copy the pattern from
-   `scripts/canvas-tests/dom.mjs`), or do a manual save/restore/version pass.
-   Its editor-state cache is also interleaved with autosave refs rather than
-   contiguous — it needs five separate slices, not one.
-2. **`PinterestBoard.js` preview-fetch state machine** (~330 lines). Reassigns
-   `currentUrl` and `expanded` in the node view closure, so it needs setter
-   callbacks, not parameters. Also the least verifiable feature in the app.
-3. **`FileTree.jsx` `renderNode`** (~160 lines, recursive). Becoming a component
-   means a 20+ prop list. Decide whether that is actually better.
+1. **`EditorCanvas.jsx`** 1,209 → 740, as five hooks: `useEditorDocCache` (what each
+   pane holds and whether it is mid-swap), `useEditorDocLoader`, `useEditorAutosave`,
+   `useEditorWordCount`, `useEditorNotes`.
+
+   `scripts/canvas-tests/editor.mjs` went in first and **found a live crash**:
+   `useEditorDnd` was handed the `editor` binding forty lines before its own
+   `const editor = useEditor()`, so every mount threw. Both editor bindings are now
+   passed as accessors. Worth internalising — lint, tsc and the production build all
+   passed on a component that could not mount. If a component is not mounted by a
+   test, nothing you can run knows whether it works.
+
+2. **`PinterestBoard.js`** 1,028 → 358, as `pinterestBoardPreview.js` (the four-route
+   fetch: cache → pidgets JSON → pinit.js embed → session scrape, with
+   `refreshRunId`/`inFlightForUrl` keeping concurrent attempts apart) and
+   `pinterestBoardCollapse.js`. Factories, not modules of functions, for the reason
+   this file predicted: the node view reassigns `currentUrl`, `expanded` and
+   `showingCachedPreview` from half a dozen callbacks. Verified by comparing
+   normalized line multisets across the three files — every difference is a dead
+   import dropped, a call requalified, or a seam added.
+
+3. **`FileTree.jsx` `renderNode` — decided: not a component.** It reads two dozen
+   values out of its closure and nearly all of them are plumbing for the markup and
+   the handlers, not for the decisions; a `<FileNode>` would be a two-dozen-prop
+   interface that moved nothing hard. The cut went the other way: the ~20 derived
+   constants are now `lib/fileTreeNodeState.js`, pure and testable, and the JSX
+   stayed put. `tree.mjs` is the first coverage FileTree has ever had.
 
 ---
 
@@ -221,7 +237,7 @@ reference implementation. Skipping this is how the port becomes a rewrite.
    already do the anchor-fallback dance (`EditorLayout.jsx:291-304`,
    `Workbench.jsx:40-64`); make that the standard.
 
-4. **`notesRemapped` fires on every transaction** (`EditorCanvas.jsx`, note anchor
+4. **`notesRemapped` fires on every transaction** (`useEditorNotes.js`, note anchor
    remapping). Batch it or it saturates the bridge.
 
 5. **`activeEditor` election is driven by mouse movement** over a pane, and has a
@@ -290,10 +306,17 @@ on the canvas, and a native keyboard accessory replacing the toolbar.
   template literal. `\S` inside a template literal collapses to `S` — the source and
   the emitted string are *not the same program*. This is how the Pinterest DOM
   scraper shipped as invalid JavaScript and was never noticed.
-- **Assert every slice brace-balanced and comment-balanced before writing it.**
-  Line-range slicing breaks silently on comments. One cut ended mid-JSDoc, leaving an
-  unterminated `/**` that commented out an exported function — lint *and* tsc both
-  passed. This check then caught three more bad boundaries.
+- **Assert every slice brace-balanced and comment-balanced before writing it —
+  every slice, not the big ones.** Line-range slicing breaks silently on comments.
+  One cut ended mid-JSDoc, leaving an unterminated `/**` that commented out an
+  exported function; lint *and* tsc both passed. The check then caught three more bad
+  boundaries — and, the one time it was skipped as overkill for a 30-line context
+  menu, that slice ended one line short of its closing brace.
+- **A hook call that takes `editor` must come after `const editor = useEditor()`.**
+  Reading a `const` before its declaration throws, and because the call sites are
+  hook arguments rather than statements, nothing static sees it. Pass accessors —
+  `getEditor: () => editor` — when the order cannot be changed, which it often
+  cannot: `editor`'s own `editorProps.handlePaste` comes out of the same hook.
 - **Check for closure writes before extracting.** If a region reassigns `let`s
   declared outside it, parameters will break silently (reassigning a destructured
   binding does not propagate). Move that state *into* the extracted module and make
@@ -331,7 +354,7 @@ on the canvas, and a native keyboard accessory replacing the toolbar.
 
 ### The test suite
 
-`scripts/canvas-tests/` — 13 suites, custom Node ESM loader, jsdom, in-memory fs
+`scripts/canvas-tests/` — 15 suites, custom Node ESM loader, jsdom, in-memory fs
 stubs. The **real** `FileSystem.js`/`assets.js` run against the stubs rather than
 being reimplemented, which is why it catches real persistence bugs.
 
@@ -339,17 +362,30 @@ being reimplemented, which is why it catches real persistence bugs.
   imports, and transpiles `.jsx` with esbuild
 - `dom.mjs` mounts the real `CanvasSurface` under **StrictMode** — which
   double-invokes effect setup/teardown, the case that catches cleanup bugs
+- `editor.mjs` mounts the real `EditorCanvas` the same way. Its harness passes
+  **stable** callback props, and that is load-bearing rather than tidy: the
+  document-load effect depends on `setVersions`, so a fresh identity each render
+  gives load → setVersions → render → load and the suite hangs instead of failing
 - `run.mjs` resets `process.exitCode` per suite and catches throws, so one broken
   suite cannot hide the rest. It could before, and did: four suites sat unrun behind
   one stale assertion.
 
 **Covered:** canvas geometry/reducer/groups/snapping/search, document persistence,
-notes, audio, `generateHTML` rendering, `CanvasSurface` mounting.
+notes, audio, `generateHTML` rendering, `CanvasSurface` mounting, `EditorCanvas`
+mounting (autosave reaching disk, version checkpoints, the per-doc editor-state
+cache, note anchor remapping, split-pane autosave, the unmount flush), and the file
+tree's per-row decisions.
 
-**Not covered, and these are where Phase 1 moved the most code:** the context menu,
-session restore, file-tree drag, note previews, Pinterest embeds, editor paste/drag,
-and everything in `EditorCanvas.jsx`. Adding a mounting suite for `EditorCanvas`
-would unblock the riskiest remaining refactor.
+When adding to `editor.mjs`: autosave debounces at 800ms and the checkpoint at 15s,
+and the suite does not wait them out. Switching documents tears both effects down
+and their cleanups flush — which is the same path the app takes when you click
+another file, so it is the path worth asserting on anyway.
+
+**Still not covered:** the context menu, session restore, file-tree *drag*, note
+previews, Pinterest embeds, and editor paste/drag. Pinterest is the least verifiable
+thing in the app — it needs a live logged-in session and a real webview — so treat
+`pinterestBoardPreview.js` as the piece where a careful reading is the only review
+you get.
 
 ### Known broken / dead weight
 
