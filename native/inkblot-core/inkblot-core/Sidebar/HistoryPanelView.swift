@@ -1,0 +1,290 @@
+import SwiftUI
+
+/// The History tab: the document's versions as a timeline of days and bursts of edits.
+///
+/// Rows come from the core (`VersionHistory.rowsJson` — deltas, diff snippets and
+/// session colours, all computed by the same diff engine the page used). Grouping into
+/// days is done here because a "day" is the viewer's, in their time zone; the burst
+/// rule is the page's `groupVersions`: a new group at a named version, a new session,
+/// or a gap of more than fifteen minutes.
+///
+/// Every action is a command, performed by the page under the lock its autosave writes
+/// the history with; the page then announces `versionsChanged` and this re-reads.
+struct HistoryPanelView: View {
+    @Environment(AppModel.self) private var model
+    @State private var namedOnly = false
+    @State private var expanded: Set<String> = []
+    @State private var renaming: VersionRow?
+    @State private var pendingDelete: VersionRow?
+
+    var body: some View {
+        let sidebar = model.sidebar
+        VStack(spacing: 0) {
+            HStack {
+                Button("Snapshot Now", systemImage: "plus") { sidebar.versionAction(.snapshot) }
+                    .disabled(sidebar.historyDocPath == nil)
+                    .help("Save the current state as a version you can name")
+                Spacer()
+                Toggle(isOn: $namedOnly) { Image(systemName: "tag") }
+                    .toggleStyle(.button)
+                    .help(namedOnly ? "Show all versions" : "Show only named versions")
+            }
+            .padding(12)
+
+            if sections.isEmpty {
+                ContentUnavailableView(
+                    emptyTitle, systemImage: "clock",
+                    description: Text(sidebar.historyDocPath == nil
+                                      ? "Open a document to see its history."
+                                      : "Checkpoints appear as you write."))
+            } else {
+                List {
+                    ForEach(sections) { section in
+                        Section(section.label) {
+                            ForEach(section.groups) { group in
+                                groupView(group)
+                            }
+                        }
+                    }
+                }
+                .listStyle(.inset)
+            }
+        }
+        .sheet(item: $renaming) { row in
+            RenameVersionSheet(row: row) { name in
+                sidebar.renameVersion(row, to: name)
+                renaming = nil
+            } cancel: { renaming = nil }
+        }
+        .confirmationDialog("Delete this version?", isPresented: Binding(
+            get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
+        ), presenting: pendingDelete) { row in
+            Button("Delete", role: .destructive) { sidebar.versionAction(.delete, row) }
+        }
+    }
+
+    private var emptyTitle: String {
+        model.sidebar.historyRows.isEmpty ? "No Versions Yet" : (namedOnly ? "No Named Versions" : "No Matching Versions")
+    }
+
+    /* ---------------- grouping ---------------- */
+
+    struct Group: Identifiable {
+        let id: String
+        var rows: [VersionRow]
+        let named: Bool
+    }
+
+    struct DaySection: Identifiable {
+        let id: String
+        let label: String
+        var groups: [Group]
+    }
+
+    private static let burstGap: TimeInterval = 15 * 60
+
+    private var sections: [DaySection] {
+        let sidebar = model.sidebar
+        var list = sidebar.historyRows
+        if namedOnly { list = list.filter { $0.name != nil } }
+        if !sidebar.query.isEmpty {
+            list = list.filter { row in
+                sidebar.matchesFilter(row.name ?? "", row.timestamp, sidebar.versionText(row))
+            }
+        }
+
+        var sections: [DaySection] = []
+        var previousTime: Date?
+        var previousSession: String?
+        let calendar = Calendar.current
+
+        for row in list {
+            let time = Self.date(row.timestamp) ?? .distantPast
+            let dayKey = calendar.startOfDay(for: time)
+            let dayId = "\(dayKey.timeIntervalSince1970)"
+
+            if sections.last?.id != dayId {
+                sections.append(DaySection(id: dayId, label: Self.dayLabel(time), groups: []))
+                previousTime = nil
+            }
+
+            let gap = previousTime.map { abs($0.timeIntervalSince(time)) } ?? .infinity
+            let sameSession = row.sessionId == previousSession
+            let last = sections[sections.count - 1].groups.last
+            if row.name != nil || last == nil || last!.named || gap > Self.burstGap || !sameSession {
+                sections[sections.count - 1].groups.append(Group(id: row.id, rows: [row], named: row.name != nil))
+            } else {
+                sections[sections.count - 1].groups[sections[sections.count - 1].groups.count - 1].rows.append(row)
+            }
+            previousTime = time
+            previousSession = row.sessionId
+        }
+        return sections
+    }
+
+    /* ---------------- rows ---------------- */
+
+    @ViewBuilder
+    private func groupView(_ group: Group) -> some View {
+        if group.rows.count == 1 {
+            rowView(group.rows[0])
+        } else {
+            let newest = group.rows[0]
+            let oldest = group.rows[group.rows.count - 1]
+            DisclosureGroup(isExpanded: Binding(
+                get: { expanded.contains(group.id) },
+                set: { if $0 { expanded.insert(group.id) } else { expanded.remove(group.id) } }
+            )) {
+                ForEach(group.rows, id: \.id) { rowView($0) }
+            } label: {
+                HStack(spacing: 6) {
+                    SessionDot(color: newest.sessionColor)
+                    Text("\(Self.time(oldest.timestamp)) – \(Self.time(newest.timestamp))")
+                    Text("\(group.rows.count) edits").foregroundStyle(.secondary)
+                    Spacer()
+                    DeltaBadge(delta: model.sidebar.spanDelta(newest: newest, oldest: oldest))
+                }
+                .font(.callout)
+            }
+        }
+    }
+
+    private func rowView(_ row: VersionRow) -> some View {
+        let sidebar = model.sidebar
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                SessionDot(color: row.sessionColor)
+                Text(Self.time(row.timestamp)).font(.callout)
+                DeltaBadge(delta: row.delta)
+                Spacer()
+                Menu {
+                    Button("Restore This Version", systemImage: "clock.arrow.circlepath") { sidebar.versionAction(.restore, row) }
+                    Button("Compare with Current", systemImage: "arrow.left.arrow.right") { sidebar.versionAction(.compare, row) }
+                    Button("Make a Copy", systemImage: "doc.on.doc") { sidebar.versionAction(.makeCopy, row) }
+                    Divider()
+                    Button(row.name == nil ? "Name This Version…" : "Rename…", systemImage: "tag") { renaming = row }
+                    Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = row }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
+            if let name = row.name {
+                Text(name).font(.headline)
+            }
+            preview(row)
+                .font(.callout)
+                .lineLimit(3)
+        }
+        .padding(.vertical, 2)
+        .help(Self.fullTimestamp(row.timestamp))
+        .contextMenu {
+            Button("Restore This Version") { sidebar.versionAction(.restore, row) }
+            Button("Compare with Current") { sidebar.versionAction(.compare, row) }
+            Button("Make a Copy") { sidebar.versionAction(.makeCopy, row) }
+        }
+    }
+
+    /// The change, as the page's ChangeSnippet drew it: context, then what was added
+    /// and what was struck out.
+    private func preview(_ row: VersionRow) -> Text {
+        if let summary = row.summary { return Text(summary).foregroundStyle(.secondary) }
+        return row.snippet.reduce(Text("")) { text, op in
+            let words = op.tokens.joined(separator: " ") + " "
+            switch op.type {
+            case .equal: return text + Text(words).foregroundStyle(.secondary)
+            case .added: return text + Text(words).foregroundStyle(.green)
+            case .removed: return text + Text(words).strikethrough().foregroundStyle(.red)
+            }
+        }
+    }
+
+    /* ---------------- formatting ---------------- */
+
+    private static let isoParser: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static func date(_ iso: String) -> Date? {
+        isoParser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+    }
+
+    static func time(_ iso: String) -> String {
+        date(iso)?.formatted(date: .omitted, time: .shortened) ?? ""
+    }
+
+    static func fullTimestamp(_ iso: String) -> String {
+        date(iso)?.formatted(date: .abbreviated, time: .standard) ?? iso
+    }
+
+    static func dayLabel(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        return date.formatted(date: .complete, time: .omitted)
+    }
+}
+
+/// The editing-session colour. The core gives it as CSS `hsl(h, s%, l%)`.
+struct SessionDot: View {
+    let color: String
+    var body: some View {
+        Circle()
+            .fill(Self.parse(color) ?? Color.secondary)
+            .frame(width: 8, height: 8)
+    }
+
+    static func parse(_ css: String) -> Color? {
+        let numbers = css.components(separatedBy: CharacterSet(charactersIn: "0123456789.").inverted)
+            .compactMap(Double.init)
+        guard css.hasPrefix("hsl"), numbers.count >= 3 else { return nil }
+        // HSL to HSB: SwiftUI has no HSL initializer.
+        let h = numbers[0] / 360, s = numbers[1] / 100, l = numbers[2] / 100
+        let v = l + s * min(l, 1 - l)
+        let sv = v == 0 ? 0 : 2 * (1 - l / v)
+        return Color(hue: h, saturation: sv, brightness: v)
+    }
+}
+
+struct DeltaBadge: View {
+    let delta: WordDelta
+    var body: some View {
+        HStack(spacing: 3) {
+            if delta.added > 0 { Text("+\(delta.added)").foregroundStyle(.green) }
+            if delta.removed > 0 { Text("−\(delta.removed)").foregroundStyle(.red) }
+        }
+        .font(.caption.monospacedDigit())
+    }
+}
+
+private struct RenameVersionSheet: View {
+    let row: VersionRow
+    let commit: (String) -> Void
+    let cancel: () -> Void
+    @State private var name = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Name This Version").font(.headline)
+            TextField("e.g. First Draft", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .frame(minWidth: 280)
+                .onSubmit { commit(name) }
+            Text("Leave it empty to make it an ordinary checkpoint again.")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
+                Button("Save") { commit(name) }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .onAppear { name = row.name ?? "" }
+    }
+}
+
+extension VersionRow: Identifiable {}

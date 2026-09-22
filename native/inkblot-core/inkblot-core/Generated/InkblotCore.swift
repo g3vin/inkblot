@@ -412,6 +412,43 @@ public struct CanvasState: Codable, Equatable {
 	}
 }
 
+public struct ClipboardEntry: Codable, Equatable {
+	public let id: String
+	public let text: String
+	/// The document it was copied from, if any.
+	public let docName: String?
+	public let timestamp: String?
+
+	public init(id: String, text: String, docName: String?, timestamp: String?) {
+		self.id = id
+		self.text = text
+		self.docName = docName
+		self.timestamp = timestamp
+	}
+}
+
+/// The clipboard history, newest first — the whole list.
+public struct ClipboardChanged: Codable, Equatable {
+	public let entries: [ClipboardEntry]
+
+	public init(entries: [ClipboardEntry]) {
+		self.entries = entries
+	}
+}
+
+/// Text dropped on the shell's clipboard panel.
+/// 
+/// If it is the selection the user is dragging out of an editor, the page removes it
+/// from the document — dropping a selection on the clipboard is a move, as it always
+/// was. The page decides that, because only the page knows what is being dragged.
+public struct ClipboardDropCommand: Codable, Equatable {
+	public let text: String
+
+	public init(text: String) {
+		self.text = text
+	}
+}
+
 /// Everything the shell can ask the document surface to do.
 /// 
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
@@ -449,6 +486,18 @@ public enum NativeCommand: Codable, Equatable {
 	case moveEntry(MoveEntryCommand)
 	case deleteEntry(DeleteEntryCommand)
 	case duplicateEntry(DuplicateEntryCommand)
+	case updateNote(UpdateNoteCommand)
+	case removeNote(NoteRef)
+	case jumpToNote(NoteRef)
+	case clipboardDrop(ClipboardDropCommand)
+	case removeClipboardEntries(RemoveClipboardEntriesCommand)
+	case insertClipboardEntry(InsertClipboardEntryCommand)
+	case removeTiles(RemoveTilesCommand)
+	case replaceTileWord(ReplaceTileWordCommand)
+	case selectTileWord(TileRef)
+	case versionAction(VersionActionCommand)
+	case renameVersion(RenameVersionCommand)
+	case revealSearchResult(RevealSearchResultCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -480,7 +529,19 @@ public enum NativeCommand: Codable, Equatable {
 			renameEntry,
 			moveEntry,
 			deleteEntry,
-			duplicateEntry
+			duplicateEntry,
+			updateNote,
+			removeNote,
+			jumpToNote,
+			clipboardDrop,
+			removeClipboardEntries,
+			insertClipboardEntry,
+			removeTiles,
+			replaceTileWord,
+			selectTileWord,
+			versionAction,
+			renameVersion,
+			revealSearchResult
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -641,6 +702,66 @@ public enum NativeCommand: Codable, Equatable {
 					self = .duplicateEntry(content)
 					return
 				}
+			case .updateNote:
+				if let content = try? container.decode(UpdateNoteCommand.self, forKey: .payload) {
+					self = .updateNote(content)
+					return
+				}
+			case .removeNote:
+				if let content = try? container.decode(NoteRef.self, forKey: .payload) {
+					self = .removeNote(content)
+					return
+				}
+			case .jumpToNote:
+				if let content = try? container.decode(NoteRef.self, forKey: .payload) {
+					self = .jumpToNote(content)
+					return
+				}
+			case .clipboardDrop:
+				if let content = try? container.decode(ClipboardDropCommand.self, forKey: .payload) {
+					self = .clipboardDrop(content)
+					return
+				}
+			case .removeClipboardEntries:
+				if let content = try? container.decode(RemoveClipboardEntriesCommand.self, forKey: .payload) {
+					self = .removeClipboardEntries(content)
+					return
+				}
+			case .insertClipboardEntry:
+				if let content = try? container.decode(InsertClipboardEntryCommand.self, forKey: .payload) {
+					self = .insertClipboardEntry(content)
+					return
+				}
+			case .removeTiles:
+				if let content = try? container.decode(RemoveTilesCommand.self, forKey: .payload) {
+					self = .removeTiles(content)
+					return
+				}
+			case .replaceTileWord:
+				if let content = try? container.decode(ReplaceTileWordCommand.self, forKey: .payload) {
+					self = .replaceTileWord(content)
+					return
+				}
+			case .selectTileWord:
+				if let content = try? container.decode(TileRef.self, forKey: .payload) {
+					self = .selectTileWord(content)
+					return
+				}
+			case .versionAction:
+				if let content = try? container.decode(VersionActionCommand.self, forKey: .payload) {
+					self = .versionAction(content)
+					return
+				}
+			case .renameVersion:
+				if let content = try? container.decode(RenameVersionCommand.self, forKey: .payload) {
+					self = .renameVersion(content)
+					return
+				}
+			case .revealSearchResult:
+				if let content = try? container.decode(RevealSearchResultCommand.self, forKey: .payload) {
+					self = .revealSearchResult(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -738,6 +859,42 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .duplicateEntry(let content):
 			try container.encode(CodingKeys.duplicateEntry, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .updateNote(let content):
+			try container.encode(CodingKeys.updateNote, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .removeNote(let content):
+			try container.encode(CodingKeys.removeNote, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .jumpToNote(let content):
+			try container.encode(CodingKeys.jumpToNote, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .clipboardDrop(let content):
+			try container.encode(CodingKeys.clipboardDrop, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .removeClipboardEntries(let content):
+			try container.encode(CodingKeys.removeClipboardEntries, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .insertClipboardEntry(let content):
+			try container.encode(CodingKeys.insertClipboardEntry, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .removeTiles(let content):
+			try container.encode(CodingKeys.removeTiles, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .replaceTileWord(let content):
+			try container.encode(CodingKeys.replaceTileWord, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .selectTileWord(let content):
+			try container.encode(CodingKeys.selectTileWord, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .versionAction(let content):
+			try container.encode(CodingKeys.versionAction, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .renameVersion(let content):
+			try container.encode(CodingKeys.renameVersion, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .revealSearchResult(let content):
+			try container.encode(CodingKeys.revealSearchResult, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -1100,6 +1257,11 @@ public enum WebviewEvent: Codable, Equatable {
 	case dragMoved(DragMoved)
 	case dragEnded(DragEnded)
 	case projectChanged(ProjectChanged)
+	case notesChanged(NotesChanged)
+	case clipboardChanged(ClipboardChanged)
+	case tilesChanged(TilesChanged)
+	case versionsChanged(VersionsChanged)
+	case showSidebarTab(ShowSidebarTab)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case toolbarState,
@@ -1116,7 +1278,12 @@ public enum WebviewEvent: Codable, Equatable {
 			dragStarted,
 			dragMoved,
 			dragEnded,
-			projectChanged
+			projectChanged,
+			notesChanged,
+			clipboardChanged,
+			tilesChanged,
+			versionsChanged,
+			showSidebarTab
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1202,6 +1369,31 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .projectChanged(content)
 					return
 				}
+			case .notesChanged:
+				if let content = try? container.decode(NotesChanged.self, forKey: .payload) {
+					self = .notesChanged(content)
+					return
+				}
+			case .clipboardChanged:
+				if let content = try? container.decode(ClipboardChanged.self, forKey: .payload) {
+					self = .clipboardChanged(content)
+					return
+				}
+			case .tilesChanged:
+				if let content = try? container.decode(TilesChanged.self, forKey: .payload) {
+					self = .tilesChanged(content)
+					return
+				}
+			case .versionsChanged:
+				if let content = try? container.decode(VersionsChanged.self, forKey: .payload) {
+					self = .versionsChanged(content)
+					return
+				}
+			case .showSidebarTab:
+				if let content = try? container.decode(ShowSidebarTab.self, forKey: .payload) {
+					self = .showSidebarTab(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
@@ -1255,6 +1447,21 @@ public enum WebviewEvent: Codable, Equatable {
 		case .projectChanged(let content):
 			try container.encode(CodingKeys.projectChanged, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .notesChanged(let content):
+			try container.encode(CodingKeys.notesChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .clipboardChanged(let content):
+			try container.encode(CodingKeys.clipboardChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .tilesChanged(let content):
+			try container.encode(CodingKeys.tilesChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .versionsChanged(let content):
+			try container.encode(CodingKeys.versionsChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .showSidebarTab(let content):
+			try container.encode(CodingKeys.showSidebarTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -1290,6 +1497,18 @@ public struct FocusModeView: Codable, Equatable {
 		self.paragraphIndex = paragraphIndex
 		self.paragraphCount = paragraphCount
 		self.wordCount = wordCount
+	}
+}
+
+/// Insert an entry at the caret of an editor, and take it off the history — what
+/// dragging a tile into the editor did.
+public struct InsertClipboardEntryCommand: Codable, Equatable {
+	public let id: String
+	public let target: EditorTarget
+
+	public init(id: String, target: EditorTarget) {
+		self.id = id
+		self.target = target
 	}
 }
 
@@ -1476,6 +1695,49 @@ public struct NoteMarkerEvent: Codable, Equatable {
 	}
 }
 
+/// The fields of a note the shell can change. `None` leaves a field alone.
+public struct NotePatch: Codable, Equatable {
+	public let content: String?
+	public let color: String?
+	public let pinned: Bool?
+	public let collapsedChildren: Bool?
+	/// The whole list — images are added and removed, not edited.
+	public let images: [NoteImage]?
+	/// The whole list, as for images.
+	public let audio: [AudioClip]?
+
+	public init(content: String?, color: String?, pinned: Bool?, collapsedChildren: Bool?, images: [NoteImage]?, audio: [AudioClip]?) {
+		self.content = content
+		self.color = color
+		self.pinned = pinned
+		self.collapsedChildren = collapsedChildren
+		self.images = images
+		self.audio = audio
+	}
+}
+
+/// Remove a note and every reply beneath it, as the page's panel does.
+public struct NoteRef: Codable, Equatable {
+	public let docPath: String
+	public let noteId: String
+
+	public init(docPath: String, noteId: String) {
+		self.docPath = docPath
+		self.noteId = noteId
+	}
+}
+
+/// A document's notes changed — the whole list, so it is safe to coalesce.
+public struct NotesChanged: Codable, Equatable {
+	public let docPath: String
+	public let notes: [Note]
+
+	public init(docPath: String, notes: [Note]) {
+		self.docPath = docPath
+		self.notes = notes
+	}
+}
+
 /// Note anchors after a remap.
 /// 
 /// **Sharp edge #4.** `useEditorNotes` remaps on every transaction — every keystroke
@@ -1638,6 +1900,24 @@ public struct Rect: Codable, Equatable {
 	}
 }
 
+/// Remove entries from the history. `None` clears it.
+public struct RemoveClipboardEntriesCommand: Codable, Equatable {
+	public let ids: [String]?
+
+	public init(ids: [String]?) {
+		self.ids = ids
+	}
+}
+
+/// Remove tiles. `None` clears the workbench.
+public struct RemoveTilesCommand: Codable, Equatable {
+	public let ids: [String]?
+
+	public init(ids: [String]?) {
+		self.ids = ids
+	}
+}
+
 /// Rename a file or folder in place.
 /// 
 /// **Why the page performs these rather than the shell.** A rename changes a path the
@@ -1659,6 +1939,19 @@ public struct RenameEntryCommand: Codable, Equatable {
 	}
 }
 
+/// Name a version, or clear its name with `None`.
+public struct RenameVersionCommand: Codable, Equatable {
+	public let docPath: String
+	public let versionId: String
+	public let name: String?
+
+	public init(docPath: String, versionId: String, name: String?) {
+		self.docPath = docPath
+		self.versionId = versionId
+		self.name = name
+	}
+}
+
 public struct ReplaceRangesCommand: Codable, Equatable {
 	public let target: EditorTarget
 	public let edits: [RangeEdit]
@@ -1666,6 +1959,18 @@ public struct ReplaceRangesCommand: Codable, Equatable {
 	public init(target: EditorTarget, edits: [RangeEdit]) {
 		self.target = target
 		self.edits = edits
+	}
+}
+
+/// Replace the tile's word in its document (a synonym chosen, say), and retarget the
+/// tile at the new word. The page finds the word by its anchor, not by position.
+public struct ReplaceTileWordCommand: Codable, Equatable {
+	public let id: String
+	public let word: String
+
+	public init(id: String, word: String) {
+		self.id = id
+		self.word = word
 	}
 }
 
@@ -1832,6 +2137,30 @@ public struct RequestEnvelope: Codable, Equatable {
 	public init(id: String, request: BridgeRequest) {
 		self.id = id
 		self.request = request
+	}
+}
+
+/// Open a search result: switch to its document if needed, then select the match (or
+/// reveal the canvas node, or jump to the note).
+/// 
+/// Not the `SearchResult` itself: that carries bare offsets, and nothing on this wire
+/// does (see `only_set_caret_addresses_a_document_by_bare_position`, which is what
+/// caught it). A result found on disk may be a few hundred milliseconds stale against
+/// the open editor, so the match goes as an anchor — positions *and* the text they
+/// covered — and the page resolves it by the text if the positions have moved on.
+public struct RevealSearchResultCommand: Codable, Equatable {
+	public let docPath: String
+	public let anchor: TextAnchor?
+	/// A canvas match names the node rather than a place in text.
+	public let nodeId: String?
+	/// A notes-scope match names the note.
+	public let noteId: String?
+
+	public init(docPath: String, anchor: TextAnchor?, nodeId: String?, noteId: String?) {
+		self.docPath = docPath
+		self.anchor = anchor
+		self.nodeId = nodeId
+		self.noteId = noteId
 	}
 }
 
@@ -2086,6 +2415,23 @@ public struct SetSelectionCommand: Codable, Equatable {
 	}
 }
 
+public enum SidebarTab: String, Codable, Equatable {
+	case clipboard
+	case workbench
+	case notes
+	case history
+}
+
+/// The page wants a sidebar tab shown — "Add note", "Open Version History", a new
+/// workbench tile. The shell owns the sidebar now, so the page asks rather than opens.
+public struct ShowSidebarTab: Codable, Equatable {
+	public let tab: SidebarTab
+
+	public init(tab: SidebarTab) {
+		self.tab = tab
+	}
+}
+
 public struct StoryFolderPreset: Codable, Equatable {
 	public let key: String
 	public let name: String
@@ -2205,6 +2551,47 @@ public struct TextDocument: Codable, Equatable {
 	}
 }
 
+public struct TileRef: Codable, Equatable {
+	public let id: String
+
+	public init(id: String) {
+		self.id = id
+	}
+}
+
+public enum TileKind: String, Codable, Equatable {
+	case pos
+	case synonym
+	case definition
+	case rhyme
+}
+
+/// A language-tool tile, made from a selection by the editor's context menu.
+public struct WorkbenchTile: Codable, Equatable {
+	/// Always a string on the wire; the page's ids are timestamps.
+	public let id: String
+	public let type: TileKind
+	/// The word or sentence the tile is about.
+	public let text: String
+	/// The document it was made in.
+	public let doc: String?
+
+	public init(id: String, type: TileKind, text: String, doc: String?) {
+		self.id = id
+		self.type = type
+		self.text = text
+		self.doc = doc
+	}
+}
+
+public struct TilesChanged: Codable, Equatable {
+	public let tiles: [WorkbenchTile]
+
+	public init(tiles: [WorkbenchTile]) {
+		self.tiles = tiles
+	}
+}
+
 /// The formatting at the selection, pushed.
 /// 
 /// **Sharp edge #1.** `Toolbar.jsx:102-145` pulls this today: on every
@@ -2270,6 +2657,44 @@ public struct TreeNode: Codable, Equatable {
 	}
 }
 
+public struct UpdateNoteCommand: Codable, Equatable {
+	public let docPath: String
+	public let noteId: String
+	public let patch: NotePatch
+
+	public init(docPath: String, noteId: String, patch: NotePatch) {
+		self.docPath = docPath
+		self.noteId = noteId
+		self.patch = patch
+	}
+}
+
+public enum VersionAction: String, Codable, Equatable {
+	/// Save the current state as a version now. No `version_id`.
+	case snapshot
+	/// Restore a version, after a safety checkpoint of the current state.
+	case restore
+	/// Open the side-by-side comparison of a version against the current state.
+	case compare
+	/// Materialize a version as a new document beside this one, and open it.
+	case makeCopy
+	case delete
+}
+
+/// Something done to a document's history. The page does it, under the same lock its
+/// autosave writes the history with.
+public struct VersionActionCommand: Codable, Equatable {
+	public let docPath: String
+	public let action: VersionAction
+	public let versionId: String?
+
+	public init(docPath: String, action: VersionAction, versionId: String?) {
+		self.docPath = docPath
+		self.action = action
+		self.versionId = versionId
+	}
+}
+
 /// How many words a change added and removed.
 public struct WordDelta: Codable, Equatable {
 	public let added: UInt32
@@ -2278,6 +2703,48 @@ public struct WordDelta: Codable, Equatable {
 	public init(added: UInt32, removed: UInt32) {
 		self.added = added
 		self.removed = removed
+	}
+}
+
+/// One row of the History timeline, everything but the grouping — which is by local
+/// day and so belongs to whoever is drawing the timeline.
+/// 
+/// Computed from the whole history rather than per entry because each row describes
+/// the change *from the entry before it*, which a filtered list may be hiding.
+public struct VersionRow: Codable, Equatable {
+	public let id: String
+	public let timestamp: String
+	public let name: String?
+	public let auto: Bool
+	public let sessionId: String?
+	/// `hsl(…)`, the same hue the page's timeline gives this session.
+	public let sessionColor: String
+	public let delta: WordDelta
+	/// A text version's change against its predecessor, trimmed to a readable snippet:
+	/// a little context, then what changed. Empty for a canvas.
+	public let snippet: [DiffOp]
+	/// A canvas version's change in words ("2 cards added"); absent for text.
+	public let summary: String?
+
+	public init(id: String, timestamp: String, name: String?, auto: Bool, sessionId: String?, sessionColor: String, delta: WordDelta, snippet: [DiffOp], summary: String?) {
+		self.id = id
+		self.timestamp = timestamp
+		self.name = name
+		self.auto = auto
+		self.sessionId = sessionId
+		self.sessionColor = sessionColor
+		self.delta = delta
+		self.snippet = snippet
+		self.summary = summary
+	}
+}
+
+/// A document's history changed on disk. The shell re-reads it through the core.
+public struct VersionsChanged: Codable, Equatable {
+	public let docPath: String
+
+	public init(docPath: String) {
+		self.docPath = docPath
 	}
 }
 

@@ -249,6 +249,38 @@ fn every_command() -> Vec<NativeCommand> {
             is_folder: false,
         }),
         NativeCommand::DuplicateEntry(DuplicateEntryCommand { path: "Part One/Chapter 1".into() }),
+        NativeCommand::UpdateNote(UpdateNoteCommand {
+            doc_path: "one".into(),
+            note_id: "n1".into(),
+            patch: NotePatch { pinned: Some(true), ..Default::default() },
+        }),
+        NativeCommand::RemoveNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
+        NativeCommand::JumpToNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
+        NativeCommand::ClipboardDrop(ClipboardDropCommand { text: "moved".into() }),
+        NativeCommand::RemoveClipboardEntries(RemoveClipboardEntriesCommand { ids: None }),
+        NativeCommand::InsertClipboardEntry(InsertClipboardEntryCommand {
+            id: "c1".into(),
+            target: EditorTarget::Primary,
+        }),
+        NativeCommand::RemoveTiles(RemoveTilesCommand { ids: Some(vec!["t1".into()]) }),
+        NativeCommand::ReplaceTileWord(ReplaceTileWordCommand { id: "t1".into(), word: "paused".into() }),
+        NativeCommand::SelectTileWord(TileRef { id: "t1".into() }),
+        NativeCommand::VersionAction(VersionActionCommand {
+            doc_path: "one".into(),
+            action: VersionAction::Restore,
+            version_id: Some("v1".into()),
+        }),
+        NativeCommand::RenameVersion(RenameVersionCommand {
+            doc_path: "one".into(),
+            version_id: "v1".into(),
+            name: Some("First Draft".into()),
+        }),
+        NativeCommand::RevealSearchResult(RevealSearchResultCommand {
+            doc_path: "one".into(),
+            anchor: Some(anchor()),
+            node_id: None,
+            note_id: None,
+        }),
     ]
 }
 
@@ -343,6 +375,25 @@ fn every_event() -> Vec<WebviewEvent> {
             project_name: Some("Novel".into()),
             project_root: Some("/Users/me/Novel".into()),
         }),
+        WebviewEvent::NotesChanged(NotesChanged { doc_path: "one".into(), notes: Vec::new() }),
+        WebviewEvent::ClipboardChanged(ClipboardChanged {
+            entries: vec![ClipboardEntry {
+                id: "c1".into(),
+                text: "copied".into(),
+                doc_name: "one".into(),
+                timestamp: "2026-09-22T12:00:00.000Z".into(),
+            }],
+        }),
+        WebviewEvent::TilesChanged(TilesChanged {
+            tiles: vec![WorkbenchTile {
+                id: "1758556800000".into(),
+                kind: TileKind::Synonym,
+                text: "hesitated".into(),
+                doc: Some("one".into()),
+            }],
+        }),
+        WebviewEvent::VersionsChanged(VersionsChanged { doc_path: "one".into() }),
+        WebviewEvent::ShowSidebarTab(ShowSidebarTab { tab: SidebarTab::History }),
     ]
 }
 
@@ -383,6 +434,18 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
             "moveEntry",
             "deleteEntry",
             "duplicateEntry",
+            "updateNote",
+            "removeNote",
+            "jumpToNote",
+            "clipboardDrop",
+            "removeClipboardEntries",
+            "insertClipboardEntry",
+            "removeTiles",
+            "replaceTileWord",
+            "selectTileWord",
+            "versionAction",
+            "renameVersion",
+            "revealSearchResult",
         ]
     );
 }
@@ -409,6 +472,11 @@ fn every_event_has_the_wire_name_the_handoff_promised() {
             "dragMoved",
             "dragEnded",
             "projectChanged",
+            "notesChanged",
+            "clipboardChanged",
+            "tilesChanged",
+            "versionsChanged",
+            "showSidebarTab",
         ]
     );
 }

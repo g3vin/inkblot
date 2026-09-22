@@ -14,6 +14,10 @@ final class AppModel {
     let bridge: ShellBridge
     let menus: WebMenus
     let tree: ProjectTree
+    let sidebar: SidebarModel
+    let memoRecorder = AudioMemoRecorder()
+    let memoPlayer = AudioMemoPlayer()
+    let language = LanguageServices()
     @ObservationIgnored private(set) lazy var web = EditorWebController(bridge: bridge, menus: menus, core: core)
 
     init() {
@@ -21,6 +25,7 @@ final class AppModel {
         bridge = ShellBridge()
         menus = WebMenus()
         tree = ProjectTree(core: core)
+        sidebar = SidebarModel(bridge: bridge, core: core)
 
         bridge.addListener { [weak self] event in
             guard let self else { return }

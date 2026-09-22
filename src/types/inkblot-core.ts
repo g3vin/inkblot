@@ -304,6 +304,30 @@ export interface CanvasState {
 	edgeOrder: string[];
 }
 
+export interface ClipboardEntry {
+	id: string;
+	text: string;
+	/** The document it was copied from, if any. */
+	docName?: string;
+	timestamp?: string;
+}
+
+/** The clipboard history, newest first — the whole list. */
+export interface ClipboardChanged {
+	entries: ClipboardEntry[];
+}
+
+/**
+ * Text dropped on the shell's clipboard panel.
+ * 
+ * If it is the selection the user is dragging out of an editor, the page removes it
+ * from the document — dropping a selection on the clipboard is a move, as it always
+ * was. The page decides that, because only the page knows what is being dragged.
+ */
+export interface ClipboardDropCommand {
+	text: string;
+}
+
 /**
  * Everything the shell can ask the document surface to do.
  * 
@@ -342,7 +366,19 @@ export type NativeCommand =
 	| { type: "renameEntry", payload: RenameEntryCommand }
 	| { type: "moveEntry", payload: MoveEntryCommand }
 	| { type: "deleteEntry", payload: DeleteEntryCommand }
-	| { type: "duplicateEntry", payload: DuplicateEntryCommand };
+	| { type: "duplicateEntry", payload: DuplicateEntryCommand }
+	| { type: "updateNote", payload: UpdateNoteCommand }
+	| { type: "removeNote", payload: NoteRef }
+	| { type: "jumpToNote", payload: NoteRef }
+	| { type: "clipboardDrop", payload: ClipboardDropCommand }
+	| { type: "removeClipboardEntries", payload: RemoveClipboardEntriesCommand }
+	| { type: "insertClipboardEntry", payload: InsertClipboardEntryCommand }
+	| { type: "removeTiles", payload: RemoveTilesCommand }
+	| { type: "replaceTileWord", payload: ReplaceTileWordCommand }
+	| { type: "selectTileWord", payload: TileRef }
+	| { type: "versionAction", payload: VersionActionCommand }
+	| { type: "renameVersion", payload: RenameVersionCommand }
+	| { type: "revealSearchResult", payload: RevealSearchResultCommand };
 
 /**
  * A command, with its place in the stream.
@@ -640,7 +676,12 @@ export type WebviewEvent =
 	| { type: "dragStarted", payload: DragStarted }
 	| { type: "dragMoved", payload: DragMoved }
 	| { type: "dragEnded", payload: DragEnded }
-	| { type: "projectChanged", payload: ProjectChanged };
+	| { type: "projectChanged", payload: ProjectChanged }
+	| { type: "notesChanged", payload: NotesChanged }
+	| { type: "clipboardChanged", payload: ClipboardChanged }
+	| { type: "tilesChanged", payload: TilesChanged }
+	| { type: "versionsChanged", payload: VersionsChanged }
+	| { type: "showSidebarTab", payload: ShowSidebarTab };
 
 export interface EventEnvelope {
 	seq: number;
@@ -663,6 +704,15 @@ export interface FocusModeView {
 	paragraphIndex: number;
 	paragraphCount: number;
 	wordCount: number;
+}
+
+/**
+ * Insert an entry at the caret of an editor, and take it off the history — what
+ * dragging a tile into the editor did.
+ */
+export interface InsertClipboardEntryCommand {
+	id: string;
+	target: EditorTarget;
 }
 
 /**
@@ -792,6 +842,30 @@ export interface NoteMarkerEvent {
 	note?: Note;
 }
 
+/** The fields of a note the shell can change. `None` leaves a field alone. */
+export interface NotePatch {
+	content?: string;
+	color?: string;
+	pinned?: boolean;
+	collapsedChildren?: boolean;
+	/** The whole list — images are added and removed, not edited. */
+	images?: NoteImage[];
+	/** The whole list, as for images. */
+	audio?: AudioClip[];
+}
+
+/** Remove a note and every reply beneath it, as the page's panel does. */
+export interface NoteRef {
+	docPath: string;
+	noteId: string;
+}
+
+/** A document's notes changed — the whole list, so it is safe to coalesce. */
+export interface NotesChanged {
+	docPath: string;
+	notes: Note[];
+}
+
 /**
  * Note anchors after a remap.
  * 
@@ -916,6 +990,16 @@ export interface Rect {
 	height: number;
 }
 
+/** Remove entries from the history. `None` clears it. */
+export interface RemoveClipboardEntriesCommand {
+	ids?: string[];
+}
+
+/** Remove tiles. `None` clears the workbench. */
+export interface RemoveTilesCommand {
+	ids?: string[];
+}
+
 /**
  * Rename a file or folder in place.
  * 
@@ -933,9 +1017,25 @@ export interface RenameEntryCommand {
 	newName: string;
 }
 
+/** Name a version, or clear its name with `None`. */
+export interface RenameVersionCommand {
+	docPath: string;
+	versionId: string;
+	name?: string;
+}
+
 export interface ReplaceRangesCommand {
 	target: EditorTarget;
 	edits: RangeEdit[];
+}
+
+/**
+ * Replace the tile's word in its document (a synonym chosen, say), and retarget the
+ * tile at the new word. The page finds the word by its anchor, not by position.
+ */
+export interface ReplaceTileWordCommand {
+	id: string;
+	word: string;
 }
 
 export type BridgeReply = 
@@ -967,6 +1067,25 @@ export interface RequestEnvelope {
 	/** Correlates the reply. Opaque to the webview, which echoes it back. */
 	id: string;
 	request: BridgeRequest;
+}
+
+/**
+ * Open a search result: switch to its document if needed, then select the match (or
+ * reveal the canvas node, or jump to the note).
+ * 
+ * Not the `SearchResult` itself: that carries bare offsets, and nothing on this wire
+ * does (see `only_set_caret_addresses_a_document_by_bare_position`, which is what
+ * caught it). A result found on disk may be a few hundred milliseconds stale against
+ * the open editor, so the match goes as an anchor — positions *and* the text they
+ * covered — and the page resolves it by the text if the positions have moved on.
+ */
+export interface RevealSearchResultCommand {
+	docPath: string;
+	anchor?: TextAnchor;
+	/** A canvas match names the node rather than a place in text. */
+	nodeId?: string;
+	/** A notes-scope match names the note. */
+	noteId?: string;
 }
 
 export enum SearchResultType {
@@ -1165,6 +1284,21 @@ export interface SetSelectionCommand {
 	focus: boolean;
 }
 
+export enum SidebarTab {
+	Clipboard = "clipboard",
+	Workbench = "workbench",
+	Notes = "notes",
+	History = "history",
+}
+
+/**
+ * The page wants a sidebar tab shown — "Add note", "Open Version History", a new
+ * workbench tile. The shell owns the sidebar now, so the page asks rather than opens.
+ */
+export interface ShowSidebarTab {
+	tab: SidebarTab;
+}
+
 export interface StoryFolderPreset {
 	key: string;
 	name: string;
@@ -1251,6 +1385,32 @@ export interface TextDocument {
 	versions?: VersionEntry[];
 }
 
+export interface TileRef {
+	id: string;
+}
+
+export enum TileKind {
+	Pos = "pos",
+	Synonym = "synonym",
+	Definition = "definition",
+	Rhyme = "rhyme",
+}
+
+/** A language-tool tile, made from a selection by the editor's context menu. */
+export interface WorkbenchTile {
+	/** Always a string on the wire; the page's ids are timestamps. */
+	id: string;
+	type: TileKind;
+	/** The word or sentence the tile is about. */
+	text: string;
+	/** The document it was made in. */
+	doc?: string;
+}
+
+export interface TilesChanged {
+	tiles: WorkbenchTile[];
+}
+
 /**
  * The formatting at the selection, pushed.
  * 
@@ -1308,10 +1468,68 @@ export interface TreeNode {
 	children?: TreeNode[];
 }
 
+export interface UpdateNoteCommand {
+	docPath: string;
+	noteId: string;
+	patch: NotePatch;
+}
+
+export enum VersionAction {
+	/** Save the current state as a version now. No `version_id`. */
+	Snapshot = "snapshot",
+	/** Restore a version, after a safety checkpoint of the current state. */
+	Restore = "restore",
+	/** Open the side-by-side comparison of a version against the current state. */
+	Compare = "compare",
+	/** Materialize a version as a new document beside this one, and open it. */
+	MakeCopy = "makeCopy",
+	Delete = "delete",
+}
+
+/**
+ * Something done to a document's history. The page does it, under the same lock its
+ * autosave writes the history with.
+ */
+export interface VersionActionCommand {
+	docPath: string;
+	action: VersionAction;
+	versionId?: string;
+}
+
 /** How many words a change added and removed. */
 export interface WordDelta {
 	added: number;
 	removed: number;
+}
+
+/**
+ * One row of the History timeline, everything but the grouping — which is by local
+ * day and so belongs to whoever is drawing the timeline.
+ * 
+ * Computed from the whole history rather than per entry because each row describes
+ * the change *from the entry before it*, which a filtered list may be hiding.
+ */
+export interface VersionRow {
+	id: string;
+	timestamp: string;
+	name?: string;
+	auto: boolean;
+	sessionId?: string;
+	/** `hsl(…)`, the same hue the page's timeline gives this session. */
+	sessionColor: string;
+	delta: WordDelta;
+	/**
+	 * A text version's change against its predecessor, trimmed to a readable snippet:
+	 * a little context, then what changed. Empty for a canvas.
+	 */
+	snippet: DiffOp[];
+	/** A canvas version's change in words ("2 cards added"); absent for text. */
+	summary?: string;
+}
+
+/** A document's history changed on disk. The shell re-reads it through the core. */
+export interface VersionsChanged {
+	docPath: string;
 }
 
 /**

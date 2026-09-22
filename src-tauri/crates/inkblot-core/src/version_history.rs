@@ -25,7 +25,7 @@ use regex::Regex;
 use crate::js_string::JS_WHITESPACE_CLASS;
 use crate::types::{
     CanvasDiff, CanvasEdge, CanvasFile, CanvasNode, CanvasNodeChange, DiffChunk, DiffOp,
-    DiffOpType, HtmlBlock, MergeChoice, VersionEntry, WordDelta,
+    DiffOpType, HtmlBlock, MergeChoice, VersionEntry, VersionRow, WordDelta,
 };
 
 /* ============================================================
@@ -140,6 +140,96 @@ pub fn version_words(entry: &VersionEntry) -> u32 {
         return count_canvas_words(canvas);
     }
     count_words(entry.content_html.as_deref().unwrap_or(""), true)
+}
+
+/* ============================================================
+   Timeline rows
+   ============================================================ */
+
+fn entry_text(entry: Option<&VersionEntry>) -> String {
+    entry.map(|e| html_to_text(e.content_html.as_deref().unwrap_or(""))).unwrap_or_default()
+}
+
+fn canvas_delta(newer: &VersionEntry, older: Option<&VersionEntry>) -> WordDelta {
+    let diff = version_words(newer) as i64 - older.map(version_words).unwrap_or(0) as i64;
+    WordDelta { added: diff.max(0) as u32, removed: (-diff).max(0) as u32 }
+}
+
+/// A word diff trimmed to what `ChangeSnippet` in `HistoryPanel.jsx` shows: three words
+/// of context, then up to 24 words of change, stopping at the first long unchanged run.
+/// With no change at all, the first twelve words.
+pub fn change_snippet(ops: &[DiffOp]) -> Vec<DiffOp> {
+    let op = |op_type, tokens: &[String]| DiffOp { op_type, tokens: tokens.to_vec() };
+    let Some(first_change) = ops.iter().position(|o| o.op_type != DiffOpType::Equal) else {
+        let tokens = ops.first().map(|o| &o.tokens[..o.tokens.len().min(12)]).unwrap_or(&[]);
+        return vec![op(DiffOpType::Equal, tokens)];
+    };
+
+    let mut parts = Vec::new();
+    let mut budget = 24usize;
+    if first_change > 0 {
+        let context = &ops[first_change - 1].tokens;
+        parts.push(op(DiffOpType::Equal, &context[context.len().saturating_sub(3)..]));
+    }
+    for current in &ops[first_change..] {
+        if budget == 0 {
+            break;
+        }
+        let tokens = &current.tokens[..current.tokens.len().min(budget)];
+        if current.op_type == DiffOpType::Equal && current.tokens.len() > 6 {
+            break;
+        }
+        parts.push(op(current.op_type, tokens));
+        budget -= tokens.len();
+    }
+    parts
+}
+
+/// Every entry's row, newest first as stored. See [`VersionRow`].
+pub fn version_rows(versions: &[VersionEntry]) -> Vec<VersionRow> {
+    versions
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            let previous = versions.get(index + 1);
+            let (delta, snippet, summary) = if let Some(canvas) = &entry.canvas {
+                let summary = match previous.and_then(|p| p.canvas.as_ref()) {
+                    Some(before) => describe_canvas_diff(&diff_canvases(before, canvas)),
+                    None => {
+                        let cards = canvas.nodes.len();
+                        format!("Snapshot · {cards} card{}", if cards == 1 { "" } else { "s" })
+                    }
+                };
+                (canvas_delta(entry, previous), Vec::new(), Some(summary))
+            } else {
+                let before = entry_text(previous);
+                let after = entry_text(Some(entry));
+                (word_delta(&before, &after), change_snippet(&diff_words(&before, &after)), None)
+            };
+            VersionRow {
+                id: entry.id.clone(),
+                timestamp: entry.timestamp.clone(),
+                name: entry.name.clone(),
+                auto: entry.auto,
+                session_id: entry.session_id.clone(),
+                session_color: session_color(entry.session_id.as_deref().unwrap_or("")),
+                delta,
+                snippet,
+                summary,
+            }
+        })
+        .collect()
+}
+
+/// The change across a burst of edits: from the entry before `oldest` to `newest`,
+/// both given as indices into the newest-first list.
+pub fn span_delta(versions: &[VersionEntry], newest: usize, oldest: usize) -> WordDelta {
+    let Some(newer) = versions.get(newest) else { return WordDelta::default() };
+    let before = versions.get(oldest + 1);
+    if newer.canvas.is_some() {
+        return canvas_delta(newer, before);
+    }
+    word_delta(&entry_text(before), &entry_text(Some(newer)))
 }
 
 /* ============================================================
@@ -577,6 +667,66 @@ mod tests {
 
     fn words(text: &str) -> Vec<String> {
         text_words(text)
+    }
+
+    fn text_version(id: &str, html: &str, session: &str) -> VersionEntry {
+        VersionEntry {
+            id: id.into(),
+            timestamp: "2026-09-22T12:00:00.000Z".into(),
+            kind: crate::types::VersionKind::Text,
+            name: None,
+            auto: true,
+            session_id: Some(session.into()),
+            words: None,
+            content_html: Some(html.into()),
+            content_json: None,
+            canvas: None,
+        }
+    }
+
+    #[test]
+    fn a_row_describes_the_change_from_the_entry_before_it() {
+        // Newest first, as stored.
+        let versions = vec![
+            text_version("v3", "<p>she hesitated at the red door</p>", "s2"),
+            text_version("v2", "<p>she hesitated at the door</p>", "s1"),
+            text_version("v1", "<p>she stood</p>", "s1"),
+        ];
+        let rows = version_rows(&versions);
+        assert_eq!(rows[0].delta, WordDelta { added: 1, removed: 0 });
+        assert_eq!(
+            rows[0].snippet.iter().map(|op| (op.op_type, op.tokens.join(" "))).collect::<Vec<_>>(),
+            vec![
+                (DiffOpType::Equal, "hesitated at the".to_string()),
+                (DiffOpType::Added, "red".to_string()),
+                (DiffOpType::Equal, "door".to_string()),
+            ]
+        );
+        // The oldest has nothing before it, so all of it is new.
+        assert_eq!(rows[2].delta, WordDelta { added: 2, removed: 0 });
+        assert_eq!(rows[0].session_color, session_color("s2"));
+        assert!(rows[0].summary.is_none());
+    }
+
+    #[test]
+    fn a_burst_is_measured_from_before_its_oldest_entry() {
+        let versions = vec![
+            text_version("v3", "<p>one two three four</p>", "s"),
+            text_version("v2", "<p>one two three</p>", "s"),
+            text_version("v1", "<p>one</p>", "s"),
+        ];
+        // The burst v3..v2 is measured against v1.
+        assert_eq!(span_delta(&versions, 0, 1), WordDelta { added: 3, removed: 0 });
+        assert_eq!(span_delta(&versions, 9, 9), WordDelta::default());
+    }
+
+    #[test]
+    fn a_snippet_stops_at_a_long_unchanged_run() {
+        let long_tail = "a b c d e f g h";
+        let ops = diff_words("start old", &format!("start new {long_tail} changed"));
+        let snippet = change_snippet(&ops);
+        assert!(snippet.iter().all(|op| op.tokens.join(" ") != long_tail));
+        assert_eq!(change_snippet(&[]).len(), 1);
     }
 
     #[test]
