@@ -17,7 +17,7 @@ struct InspectorView: View {
             // bar beneath it, then the panel.
             HStack {
                 Spacer()
-                SidebarToggleButton(isPresented: $sidebar.isPresented)
+                SidebarToggleButton(edge: .trailing, isPresented: $sidebar.isPresented)
             }
 
             GlassTabBar(
@@ -46,7 +46,10 @@ struct InspectorView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, 12)
-        .padding(.top, 10)
+        .padding(.top, SidebarToggleButton.topInset)
+        // The hidden titlebar still reserves a safe area; without this the toggle sits a
+        // titlebar's height below the corner it belongs in.
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     private var searchBar: some View {
@@ -160,21 +163,28 @@ struct SearchResultsView: View {
     }
 }
 
-/// The glass button that shows and hides the right sidebar — at the top of the sidebar
-/// while it is open, floating at the window's top-right while it is closed.
+/// The glass buttons that show and hide the sidebars — in the sidebar's top corner while
+/// it is open, floating at the window's edge while it is closed.
 struct SidebarToggleButton: View {
+    enum Edge { case leading, trailing }
+
+    let edge: Edge
     @Binding var isPresented: Bool
+
+    /// Where the toggles sit: level with the traffic lights, which the hidden titlebar
+    /// centres about 19pt from the top of the window.
+    static let topInset: CGFloat = 3
+    static let size: CGFloat = 32
 
     var body: some View {
         Button { withAnimation(.spring(duration: 0.3)) { isPresented.toggle() } } label: {
-            Image(systemName: "sidebar.right")
+            Image(systemName: edge == .leading ? "sidebar.left" : "sidebar.right")
                 .font(.system(size: 14, weight: .medium))
-                .frame(width: 32, height: 32)
+                .frame(width: Self.size, height: Self.size)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .circle)
         .help(isPresented ? "Hide the sidebar" : "Show the sidebar")
-        .keyboardShortcut("0", modifiers: [.command, .option])
     }
 }
