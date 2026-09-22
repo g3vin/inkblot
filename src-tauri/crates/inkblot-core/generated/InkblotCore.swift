@@ -443,6 +443,7 @@ public enum NativeCommand: Codable, Equatable {
 	case canvasDropNote(CanvasDropNoteCommand)
 	case canvasReveal(CanvasRevealCommand)
 	case canvasRestore(CanvasRestoreCommand)
+	case insertPlainText(InsertPlainTextCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -468,7 +469,8 @@ public enum NativeCommand: Codable, Equatable {
 			canvasDropDoc,
 			canvasDropNote,
 			canvasReveal,
-			canvasRestore
+			canvasRestore,
+			insertPlainText
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -599,6 +601,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .canvasRestore(content)
 					return
 				}
+			case .insertPlainText:
+				if let content = try? container.decode(InsertPlainTextCommand.self, forKey: .payload) {
+					self = .insertPlainText(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -678,6 +685,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .canvasRestore(let content):
 			try container.encode(CodingKeys.canvasRestore, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .insertPlainText(let content):
+			try container.encode(CodingKeys.insertPlainText, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -991,6 +1001,7 @@ public enum WebviewEvent: Codable, Equatable {
 	case dragStarted(DragStarted)
 	case dragMoved(DragMoved)
 	case dragEnded(DragEnded)
+	case projectChanged(ProjectChanged)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case toolbarState,
@@ -1006,7 +1017,8 @@ public enum WebviewEvent: Codable, Equatable {
 			readAloudPayload,
 			dragStarted,
 			dragMoved,
-			dragEnded
+			dragEnded,
+			projectChanged
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1087,6 +1099,11 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .dragEnded(content)
 					return
 				}
+			case .projectChanged:
+				if let content = try? container.decode(ProjectChanged.self, forKey: .payload) {
+					self = .projectChanged(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
@@ -1137,6 +1154,9 @@ public enum WebviewEvent: Codable, Equatable {
 		case .dragEnded(let content):
 			try container.encode(CodingKeys.dragEnded, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .projectChanged(let content):
+			try container.encode(CodingKeys.projectChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -1172,6 +1192,23 @@ public struct FocusModeView: Codable, Equatable {
 		self.paragraphIndex = paragraphIndex
 		self.paragraphCount = paragraphCount
 		self.wordCount = wordCount
+	}
+}
+
+/// Insert text at the selection with no formatting of its own — the text takes on the
+/// marks around it.
+/// 
+/// This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
+/// webview: `WKWebView` cannot read the clipboard without a user gesture inside the
+/// page, and the menu item is not one. It replaces `__inkblot_forcePlainPaste`, a flag
+/// that was read and never set.
+public struct InsertPlainTextCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let text: String
+
+	public init(target: EditorTarget, text: String) {
+		self.target = target
+		self.text = text
 	}
 }
 
@@ -1363,6 +1400,23 @@ public struct OpenDocumentCommand: Codable, Equatable {
 	public init(path: String, pane: Pane) {
 		self.path = path
 		self.pane = pane
+	}
+}
+
+/// The project the webview has open changed.
+/// 
+/// The project picker and its session restore are still in the webview, and the
+/// native sidebar has to show the tree of whatever project that is. `None` is the
+/// landing screen: no project is open.
+public struct ProjectChanged: Codable, Equatable {
+	public let projectName: String?
+	/// Absolute. Present whenever `project_name` is, so the shell never has to
+	/// re-derive a relocated project's root.
+	public let projectRoot: String?
+
+	public init(projectName: String?, projectRoot: String?) {
+		self.projectName = projectName
+		self.projectRoot = projectRoot
 	}
 }
 

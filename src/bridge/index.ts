@@ -11,7 +11,13 @@ export { dragHandoff, createDragHandoff, DragPayloadKind } from './dragHandoff'
 export type { DragHandoff, DragOrigin, DragSession } from './dragHandoff'
 export { createShellBridge, createSurfaceBridge, BridgeRequestError } from './client'
 export type { ShellBridge, SurfaceBridge, CommandPayload, EventPayload } from './client'
-export { createInProcessTransports, createDeferredTransports } from './transport'
+export {
+  createInProcessTransports,
+  createDeferredTransports,
+  createNativeHostTransports,
+  detectNativeHost,
+} from './transport'
+export type { NativeHost } from './transport'
 export { createEditorRegistry } from './editorRegistry'
 export { createDocumentSurface } from './surface'
 export { createCoalescer, frameScheduler, immediateScheduler } from './coalesce'

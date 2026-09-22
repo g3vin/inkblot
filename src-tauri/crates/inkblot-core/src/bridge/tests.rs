@@ -225,6 +225,10 @@ fn every_command() -> Vec<NativeCommand> {
             doc_path: "board.canvas".into(),
             canvas: json!({ "nodes": [], "edges": [] }),
         }),
+        NativeCommand::InsertPlainText(InsertPlainTextCommand {
+            target: EditorTarget::Primary,
+            text: "pasted".into(),
+        }),
     ]
 }
 
@@ -315,6 +319,10 @@ fn every_event() -> Vec<WebviewEvent> {
             client_x: Some(5.0),
             client_y: Some(6.0),
         }),
+        WebviewEvent::ProjectChanged(ProjectChanged {
+            project_name: Some("Novel".into()),
+            project_root: Some("/Users/me/Novel".into()),
+        }),
     ]
 }
 
@@ -349,6 +357,7 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
             "canvasDropNote",
             "canvasReveal",
             "canvasRestore",
+            "insertPlainText",
         ]
     );
 }
@@ -374,6 +383,7 @@ fn every_event_has_the_wire_name_the_handoff_promised() {
             "dragStarted",
             "dragMoved",
             "dragEnded",
+            "projectChanged",
         ]
     );
 }

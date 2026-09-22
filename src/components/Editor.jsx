@@ -32,7 +32,8 @@ import {
 } from '../lib/editorSession'
 import { setPreference, setSessionValue } from '../lib/preferences'
 import { setOpenProject, clearOpenProject } from '../lib/projectContext'
-import { dragHandoff, DragPayloadKind } from '../bridge'
+import { dragHandoff, documentSurface, DragPayloadKind } from '../bridge'
+import { getProjectRoot } from '../lib/projectPaths'
 
 /** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
@@ -211,6 +212,26 @@ export default function Editor({
     setClipboardHistory,
   })
 
+
+  // Tell the shell which project is open. The picker and session restore are still
+  // here, and a native sidebar showing a file tree has to be told whose tree it is.
+  // The root is resolved here rather than by the shell so a relocated project is
+  // answered by the same registry every other read goes through.
+  useEffect(() => {
+    let cancelled = false
+    if (!projectName) {
+      documentSurface.publishProjectChanged({})
+      return () => { cancelled = true }
+    }
+    getProjectRoot(projectName)
+      .then((projectRoot) => {
+        if (!cancelled) documentSurface.publishProjectChanged({ projectName, projectRoot })
+      })
+      .catch(() => {
+        if (!cancelled) documentSurface.publishProjectChanged({ projectName })
+      })
+    return () => { cancelled = true }
+  }, [projectName])
 
   const docRef = useRef(currentDoc)
   useEffect(() => { docRef.current = currentDoc }, [currentDoc])

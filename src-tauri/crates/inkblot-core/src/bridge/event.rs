@@ -302,6 +302,23 @@ pub struct DragEnded {
     pub client_y: Option<f64>,
 }
 
+/// The project the webview has open changed.
+///
+/// The project picker and its session restore are still in the webview, and the
+/// native sidebar has to show the tree of whatever project that is. `None` is the
+/// landing screen: no project is open.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectChanged {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_name: Option<String>,
+    /// Absolute. Present whenever `project_name` is, so the shell never has to
+    /// re-derive a relocated project's root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_root: Option<String>,
+}
+
 /// Everything the document surface reports to the shell.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -321,4 +338,5 @@ pub enum WebviewEvent {
     DragStarted(DragStarted),
     DragMoved(DragMoved),
     DragEnded(DragEnded),
+    ProjectChanged(ProjectChanged),
 }
