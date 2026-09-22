@@ -40,6 +40,7 @@ export function useCanvasExternalEvents({
   handleZoomToFit,
   importImageAt,
   onActivate,
+  reorderSelection,
   screenToWorldAt,
   selectNode,
   stateRef,
@@ -192,6 +193,12 @@ export function useCanvasExternalEvents({
         case 'delete':
           deleteSelection()
           break
+        case 'bring-to-front':
+          reorderSelection('front')
+          break
+        case 'send-to-back':
+          reorderSelection('back')
+          break
         case 'zoom-to-fit':
           handleZoomToFit()
           break
@@ -209,6 +216,7 @@ export function useCanvasExternalEvents({
     handleToggleRecording,
     handleZoomToFit,
     importImageAt,
+    reorderSelection,
     screenToWorldAt,
     surfaceRef,
     toggleLocked,

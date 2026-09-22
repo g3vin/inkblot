@@ -46,7 +46,14 @@ import type {
   SyncNotesCommand,
   ToolbarState,
 } from '../types'
-import type { CommandPayload, CommandType, SurfaceBridge, Unsubscribe } from './client'
+import type {
+  CommandPayload,
+  CommandType,
+  RequestHandler,
+  RequestType,
+  SurfaceBridge,
+  Unsubscribe,
+} from './client'
 import type { EditorRegistry, ResolvedEditor } from './editorRegistry'
 import { createCoalescer, frameScheduler, type Scheduler } from './coalesce'
 import { TOOLBAR_DEFAULTS, readSelectionContext, readToolbarState } from './readState'
@@ -95,6 +102,14 @@ export interface DocumentSurface {
     type: T,
     handler: (payload: CommandPayload<T>) => void
   ): Unsubscribe
+
+  /**
+   * Answer a request, for the component that owns the answer — `ReadAloudControl` and
+   * `getReadAloudPayload`, which needs the read aloud module this file does not load.
+   * One handler per request: a later registration replaces an earlier one, and
+   * unsubscribing a replaced handler leaves its replacement in place.
+   */
+  onRequest<T extends RequestType>(type: T, handler: RequestHandler<T>): Unsubscribe
 
   /** The remembered highlight color, which is now protocol state rather than editor storage. */
   lastHighlightColor(): string
@@ -317,9 +332,9 @@ export function createDocumentSurface({
   }))
 
   /* `getReadAloudPayload` has no handler here on purpose. Building it needs the read
-     aloud chunker and the document's block structure, which `ReadAloudControl` owns;
-     it registers its own handler while it is mounted. An unanswered request replies
-     with an error rather than hanging — see `createSurfaceBridge`. */
+     aloud module, which loads Kokoro and which `ReadAloudControl` already owns; it
+     registers the handler through `onRequest` while it is mounted. When it is not, the
+     request replies with an error rather than hanging — see `createSurfaceBridge`. */
 
   /* ---------------- publishers ---------------- */
 
@@ -345,6 +360,11 @@ export function createDocumentSurface({
   return {
     setDelegates(next) { delegates = next },
     onCommand: (type, handler) => bridge.onCommand(type, handler),
+    onRequest(type, handler) {
+      const unsubscribe = bridge.onRequest(type, handler)
+      subscriptions.push(unsubscribe)
+      return unsubscribe
+    },
     lastHighlightColor: () => lastHighlightColor,
 
     publishToolbarState,

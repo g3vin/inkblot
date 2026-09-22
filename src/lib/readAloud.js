@@ -106,15 +106,26 @@ export function getReadableEditorText(editor) {
  * Flatten the editor doc (or current selection) into plain text plus:
  * charToPos (text offset → doc position) and word ranges, used for
  * spoken-word highlighting.
+ *
+ * `scope` is what the Read button means by default: a non-empty selection, else from
+ * the caret to the end. The bridge's `getReadAloudPayload` asks for one of the other
+ * two outright — `'selection'` (nothing when the selection is empty) or `'document'`.
  */
-export function getReadableEditorPayload(editor) {
+export function getReadableEditorPayload(editor, { scope = 'auto' } = {}) {
   if (!editor || editor.isDestroyed) {
     return { text: '', originalSelection: null, words: [] }
   }
 
   const { selection, doc } = editor.state
-  const from = selection && !selection.empty ? selection.from : selection?.from ?? 0
-  const to = selection && !selection.empty ? selection.to : doc.content.size
+  const hasSelection = selection && !selection.empty
+  let from = hasSelection ? selection.from : selection?.from ?? 0
+  let to = hasSelection ? selection.to : doc.content.size
+  if (scope === 'document') {
+    from = 0
+    to = doc.content.size
+  } else if (scope === 'selection' && !hasSelection) {
+    to = from
+  }
   const originalSelection = selection ? { from: selection.from, to: selection.to } : null
   let text = ''
   let charToPos = []
