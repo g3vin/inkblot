@@ -25,6 +25,9 @@ use inkblot_core::store::{DocumentBody, ProjectStore, StoreError};
 
 uniffi::setup_scaffolding!();
 
+mod models;
+pub use models::{InkblotModels, ModelEventSink};
+
 /// Everything the core can refuse, flattened to a message.
 ///
 /// The Swift callers either surface the message or fall back, exactly as the webview's

@@ -24,5 +24,10 @@ bindgen = ["uniffi/cli"]
 
 [dependencies]
 inkblot-core = { path = "../inkblot-core" }
+inkblot-models = { path = "../inkblot-models", features = ["metal"] }
+serde = { workspace = true }
 serde_json = { workspace = true }
+# The models' downloads and the scrape wait are async; Swift has no runtime to lend
+# them, so `InkblotModels` owns one.
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
 uniffi = "0.29"
