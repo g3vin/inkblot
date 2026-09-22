@@ -23,10 +23,13 @@ import { detectNativeHost } from '../bridge/transport'
  *                   traffic lights need (`setTitlebarInset`) and does the drag itself.
  *  - `rightSidebar` search, clipboard, workbench, notes and history — drawn by the shell
  *                   from what `useNativeSidebar` publishes
+ *  - `toolbar`      the formatting toolbar — a real window toolbar, driven by the pushed
+ *                   `ToolbarState`. The page then draws its toolbar row only for a canvas's
+ *                   own toolbar or a comparison's, below the window's.
  *  - `notePreviews` the cards that open over a note's marker — drawn by the shell as
  *                   Liquid Glass, placed from what `useNativeNotePreviews` publishes
  */
-export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar' | 'notePreviews'
+export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar' | 'notePreviews' | 'toolbar'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null
