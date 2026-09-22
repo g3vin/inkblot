@@ -2,7 +2,7 @@
 
 State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
-**Current branch:** `phase-0-foundations`, 48 commits ahead of `main` (`b7ceed8`).
+**Current branch:** `phase-0-foundations`, 54 commits ahead of `main` (`b7ceed8`).
 `main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
 
 **Size today:** 33,415 JS/JSX · 5,367 TS · 8,984 CSS · 11,023 Rust.
@@ -15,20 +15,20 @@ Run all seven after every change, and the Swift tests below once you touch `nati
 They are fast and they have each caught something the others missed.
 
 ```bash
-npm test            # 540 assertions, 19 suites
+npm test            # 598 assertions, 21 suites
 npm run lint        # 0 errors AND 0 warnings is the current bar
 npm run typecheck   # tsc --noEmit
 npm run build       # the only thing that resolves dynamic imports and named exports
 npm run parity      # 15,915 cases through BOTH the JS and the Rust implementation
 npm run types:check # fails if the generated TS/Swift is stale, and typechecks the Swift
-(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 120 tests
+(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 125 tests
 ```
 
 And for the Swift shell (Phase 5), after `./scripts/build-xcframework.sh` and `npm run build`:
 
 ```bash
 xcodebuild test -project native/inkblot-core/inkblot-core.xcodeproj -scheme inkblot-core \
-  -destination 'platform=macOS' -only-testing:inkblot-coreTests      # 19 tests
+  -destination 'platform=macOS' -only-testing:inkblot-coreTests      # 30 tests
 ```
 
 `parity` and `types:check` arrived with Phase 2 and need `cargo` and
@@ -727,60 +727,66 @@ gitignored because it must come from the same build as the library (see
 
 | Piece | State |
 |---|---|
-| File tree | Native (`Shell/FileTreeSidebar.swift`). Browse, open (`openDocument`), new document/folder (through the core, so the file is byte-for-byte what the web tree writes), Reveal in Finder. FSEvents keeps it current. |
-| Window chrome | Real titlebar and toolbar. The page's drag strip, traffic-light spacing and fullscreen guessing are off (`nativeOwns('windowChrome')`). |
-| Menu bar | SwiftUI. **Format** shows `ToolbarState` (checkmarks follow the selection) and sends `applyMark`/`setAlignment`. **Edit ▸ Paste and Match Style** reads the pasteboard and sends the new `insertPlainText`. The page's View items (theme, accent, word count) are merged into View. |
-| Context menus | Native `NSMenu`s, built from the page's menu tree by the shim. Edit items go to the first responder. |
-| Dialogs | `NSOpenPanel`/`NSSavePanel`/`NSAlert`, as sheets on the window. |
-| Preferences, fonts, haptics | Through `inkblot-ffi` / AppKit. |
+| Window chrome | No title and no titlebar row: the page's toolbar is the top of the window. The traffic lights float over the file tree; with the tree hidden (or with the right sidebar closed, for its reopen button) the shell sends `setTitlebarInset` and the page leaves room. The page's top strip drags the window again — the shim's `start_dragging` becomes `performDrag` with the mouse-down recorded on the way in. The sidebars toggle from View ▸ Show/Hide Sidebar and Inspector. |
+| File tree | Native. Browse, open, New Document / Canvas / Folder, Rename, Move (menu and drag), Duplicate, Delete, Reveal. **Every change is a command the page performs** (`createEntry`, `renameEntry`, …) through `useEntryOperations` — see below. |
+| Right sidebar | Native inspector: a glass selector bar under its own toggle (Xcode-style; the selection bubble can be grabbed and slid), a search bar with scopes and match options, and the Clipboard, Workbench, Notes and History panels. State stays the page's; `useNativeSidebar` publishes it and applies the shell's edits. Version rows and search come from the core through `inkblot-ffi`. |
+| Note hover cards | Native Liquid Glass over the web view (`Notes/`), placed from marker events the page publishes (`useNativeNotePreviews`): hover, leave, pin, the anchor following a scroll, dismissal. Draggable, resizable, replies on strings, layout stored on the note. |
+| Voice memos | AVFoundation, content-addressed into `.assets/` exactly as `assets.js` does, so either shell plays the other's. Needs the audio-input entitlement (`Inkblot.entitlements`) under the hardened runtime. |
+| Menu bar | Format (checkmarks follow `ToolbarState`), Edit ▸ Paste and Match Style (`insertPlainText`), and the page's View items. |
+| Context menus, dialogs, preferences, fonts, haptics | As before: through the shim and `TauriHost`. |
 
-Format items have **no key equivalents on purpose.** `WKWebView` offers ⌘B to the page
-before the menu sees it, so a menu shortcut as well would toggle twice.
+### Rename, move and delete — a bug the Tauri app had too
+
+An earlier version of this section said the page's own tree retargets open documents
+when it renames one. **It did not.** A pane that lets go of a document flushes its
+pending autosave to the path it had, so renaming the open document recreated it under
+the old name, and deleting it did not stick. `useEntryOperations` now closes what an
+entry touches (with `flushSync`, so the flushes run now), waits for those writes on the
+document locks, does the disk operation, and reopens at the new paths with tabs, notes
+and versions carried across. Every caller goes through `lib/entryOperations`.
+`writeDocumentRaw` takes the lock too (a canvas save was the one write that did not),
+and `saveDocumentNotes`, which already holds it, writes through an unlocked twin —
+the lock is a queue, not re-entrant, and taking it twice hangs. The `entries` suite
+mounts the real `EditorCanvas`, types without waiting out the debounce, and renames
+and deletes the open document; a control case shows the ghost file without the fix.
 
 ### Protocol additions this phase
 
-- `insertPlainText { target, text }`: Paste and Match Style. It runs through
-  ProseMirror's `pasteText`, not `insertContent`, which would parse `<b>` as bold. It
-  replaces the dead `__inkblot_forcePlainPaste`, as Phase 4 asked.
-- `projectChanged { projectName?, projectRoot? }`: the picker is still in the page,
-  and the native tree has to be told whose tree it is.
-- `openDocument` finally has a handler. It was on the protocol with no delegate.
+`insertPlainText`, `projectChanged`, the entry commands (`createEntry`, `renameEntry`,
+`moveEntry`, `deleteEntry`, `duplicateEntry`), the sidebar's (`bridge/sidebar.rs`:
+notes by patch, clipboard, tiles, version actions, `revealSearchResult`, `addReply`),
+the preview events (`noteMarkerMoved`, `notePreviewDismissed`) and `setTitlebarInset`.
+Two rules held that are worth keeping:
+
+- **Notes are edited by `NotePatch`, never sent whole.** `Note` flattens unknown keys
+  that typeshare cannot express, so the shell's copy lacks them; a whole note sent back
+  would drop them.
+- **No bare document positions**, still. `revealSearchResult` first carried a
+  `SearchResult` with raw offsets and `only_set_caret_addresses_a_document_by_bare_position`
+  failed the build; it carries a `TextAnchor` now.
 
 ### Still owed, in the order I'd do them
 
-1. **Click through it** (see above). The page's landing screen, opening a project, the
-   tree opening a file, a context menu, an autosave landing on disk.
-2. **Rename, move and delete in the native tree.** They are deliberately absent. Each
-   changes a path the page is holding (the open document, tabs, split pane, per-doc
-   editor cache), and the page's tree fixes all of those in the same breath as it
-   touches the disk. Done from Swift, the page would keep autosaving to the old path
-   and recreate the file. They need commands the page applies first — `entryRenamed` /
-   `entryDeleted` — then the disk half can move. Until then, **the native shell cannot
-   rename or delete a document**. That is the biggest regression against the Tauri app.
-3. **The toolbar.** Still the page's, because it also hosts dictation, Read Aloud and
-   the canvas and compare toolbars, which portal into its slot. The protocol side is
-   ready: `ToolbarState` already drives the Format menu.
-4. **The Rust features that live in the Tauri app crate, not the core:** synonyms,
-   Kokoro, whisper dictation, the Pinterest scrape. `TauriHost` rejects their commands
-   by name ("not available in the native shell yet"), so the page's fallbacks run. Each
-   has to move into `inkblot-core` (or a sibling crate) before `inkblot-ffi` can expose
-   it. Dictation also needs the `dictationSource` equivalent in Swift, sending
-   `dictationPartial`/`Final`/`Level` over the bridge. Then
-   `src/bridge/dictationSource.ts` is deleted.
-5. **Detached document windows and the Pinterest webviews** use `WebviewWindow`, which
-   the shim answers with nothing. They need real `NSWindow`s.
-6. **Finder drag-and-drop onto a canvas** listens for Tauri's `drag-drop` event with
-   paths. In `WKWebView` a drop is an HTML5 drop with `File` objects, so
-   `useCanvasImageImport` needs that path too.
-7. **Canvas creation in the native tree.** The empty on-disk canvas shape is written by
-   `saveCanvasDocument`, and the core has no equivalent yet.
-8. Everything from the original list that has not moved: `TabDock`, `ClipboardPanel`,
-   `NotesPanel`, `AudioNotes` → AVFoundation, `DraftTabPane`, `Bubble`,
-   `useResizableSidebar`. Then delete `RightSidebar.jsx:415-636` (the momentum hack)
-   once the right sidebar is an `NSScrollView`.
-
-Still true from the original plan: the document surface, `FocusModeOverlay` and the
-Read Aloud highlight scheduler stay in the webview. Keep `NoteHoverPreview` there too.
+1. **Click through it.** Much has now been built without being seen. The user has
+   been testing the window and the sidebar; nobody has yet exercised a rename of an
+   open document in the native tree, a restore from native History, a voice memo, or a
+   glass note card being dragged.
+2. **The Rust features that live in the Tauri app crate:** synonyms, Kokoro, whisper
+   dictation, the Pinterest scrape. `TauriHost` rejects their commands by name and the
+   workbench's synonym and rhyme tiles say "not available in the native app yet" through
+   `LanguageServices` — the one file that changes when they move into a crate
+   `inkblot-ffi` can link. Rhymes never worked in either shell (see Known broken).
+3. **The formatting toolbar** is still the page's, and at the top of the window now,
+   which is where the user asked for it. Porting it natively would move it into a
+   titlebar row that was just removed at their request — decide with them before doing it.
+4. **Detached document windows and the Pinterest webviews** (`WebviewWindow`, answered
+   with nothing by the shim).
+5. **Finder drag-and-drop onto a canvas** (Tauri's `drag-drop` event with paths; in
+   `WKWebView` it is an HTML5 drop with `File` objects).
+6. `TabDock`, `DraftTabPane`, `Bubble`, `useResizableSidebar`. The momentum hack in
+   `RightSidebar.jsx` can be deleted only when the Tauri app stops shipping that sidebar.
+7. **Dragging a note from the native Notes panel onto a canvas** — the page's version
+   hit-tests the canvas with a pointer drag, which a native drag cannot reach.
 
 ### Things that bit
 
@@ -798,6 +804,14 @@ Read Aloud highlight scheduler stay in the webview. Keep `NoteHoverPreview` ther
 - **Reset the bridge's counters when a navigation commits, not when it finishes.** The
   page starts sending as soon as its scripts run. Resetting at `didFinish` counted
   those early events as a gap.
+- **A find-and-replace can make a function call itself.** Renaming `NotePatch(content:`
+  to `.with(content:` everywhere also rewrote the call inside `.with`, which then
+  recursed; it compiled, and every native note edit would have overflowed the stack.
+  `NotePreviewTests.aPatchNamesOnlyWhatChanged` is the guard.
+- **A `GlassEffectContainer` draws its glass over plain content inside it.** Apply
+  `.glassEffect` to the content view (glass goes behind it), or keep the content outside
+  the container — the selector bar's icons were frosted over until they moved out.
+- **jsdom has no `CSS.escape`.** WebKit does; `useNativeNotePreviews` falls back anyway.
 - **The generated protocol decodes with `try?` per case,** so a payload missing one
   required field fails the whole message. `ShellBridge` logs the raw JSON when that
   happens. That log line is the first place to look if the native side seems deaf.
