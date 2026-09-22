@@ -7,7 +7,7 @@
  * that already exists rather than stacking duplicates.
  *
  * A detached window deliberately does NOT persist its session: two windows
- * writing the same localStorage key would each clobber the other's idea of what
+ * writing the same session key would each clobber the other's idea of what
  * is open. The main window stays the one that remembers.
  */
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'

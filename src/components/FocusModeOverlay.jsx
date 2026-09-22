@@ -11,6 +11,7 @@
 import { Fragment as ReactFragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
 import { isEditorReady } from '../lib/editorUtils'
+import { getPreference, setPreference } from '../lib/preferences'
 
 const FOCUS_MODE_SETTINGS_KEY = 'inkblot-focus-mode-settings'
 const FOCUS_MODE_WHEEL_SENTENCE_PX = 92
@@ -37,7 +38,7 @@ const normalizeWheelDeltaY = (event) => {
 /** Load persisted focus-mode settings, clamping each value to its valid range. */
 const loadFocusModeSettings = () => {
   try {
-    const parsed = JSON.parse(localStorage.getItem(FOCUS_MODE_SETTINGS_KEY) || '{}')
+    const parsed = JSON.parse(getPreference(FOCUS_MODE_SETTINGS_KEY) || '{}')
     return {
       before: clampNumber(Number(parsed.before) || DEFAULT_FOCUS_MODE_SETTINGS.before, 0, 6),
       after: clampNumber(Number(parsed.after) || DEFAULT_FOCUS_MODE_SETTINGS.after, 0, 6),
@@ -56,7 +57,7 @@ const loadFocusModeSettings = () => {
 
 const saveFocusModeSettings = (settings) => {
   try {
-    localStorage.setItem(FOCUS_MODE_SETTINGS_KEY, JSON.stringify(settings))
+    setPreference(FOCUS_MODE_SETTINGS_KEY, JSON.stringify(settings))
   } catch {
     // Ignore storage failures; focus mode can still use the in-memory settings.
   }

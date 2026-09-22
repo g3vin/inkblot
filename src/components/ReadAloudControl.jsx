@@ -5,7 +5,7 @@
  * editor text (or selection), generates audio ahead of playback
  * (READ_ALOUD_PREFETCH_AHEAD), plays chunks back-to-back while highlighting
  * the spoken word via the ReadAloudHighlight extension, and animates a
- * level-meter visualization. Voice choice persists to localStorage; falls
+ * level-meter visualization. Voice choice persists to the preference store; falls
  * back to the system speechSynthesis voices if Kokoro can't load.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -21,6 +21,7 @@ import {
   isKokoroGenerationTimeoutError,
   prewarmReadAloud,
 } from '../lib/readAloud'
+import { getPreference, setPreference } from '../lib/preferences'
 
 const READ_ALOUD_VOICE_STORAGE_KEY = 'inkblot:read-aloud-voice'
 const INITIAL_READ_ALOUD_LEVELS = [0.08, 0.12, 0.16, 0.1, 0.14, 0.09]
@@ -122,7 +123,7 @@ export default function ReadAloudControl({ editor }) {
   const useSystemSpeechRef = useRef(false)
   const [open, setOpen] = useState(false)
   const [voice, setVoice] = useState(() => {
-    const storedVoice = window.localStorage?.getItem(READ_ALOUD_VOICE_STORAGE_KEY)
+    const storedVoice = getPreference(READ_ALOUD_VOICE_STORAGE_KEY)
     return READ_ALOUD_VOICES.some((option) => option.id === storedVoice)
       ? storedVoice
       : DEFAULT_READ_ALOUD_VOICE
@@ -159,7 +160,7 @@ export default function ReadAloudControl({ editor }) {
   }, [open, updatePopoverAnchor])
 
   useEffect(() => {
-    window.localStorage?.setItem(READ_ALOUD_VOICE_STORAGE_KEY, voice)
+    setPreference(READ_ALOUD_VOICE_STORAGE_KEY, voice)
   }, [voice])
 
   useEffect(() => {

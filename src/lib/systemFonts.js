@@ -11,6 +11,7 @@
  * back to the web-safe families that ship with every macOS install.
  */
 import { invoke } from '@tauri-apps/api/core'
+import { getPreference, setPreference } from './preferences'
 
 /** Pinned to the top of the picker so the common choices stay one click away. */
 export const SUGGESTED_FONTS = [
@@ -81,7 +82,7 @@ export const fromCssFontFamily = (value) => {
 }
 
 /* ---- Pinned & recent fonts -------------------------------------------------
-   Both are persisted to localStorage (the same place the theme and accent live)
+   Both are persisted to the preference store (the same place the theme and accent live)
    and surfaced as sections at the top of the native font menu. */
 
 const PINNED_STORAGE_KEY = 'inkblot.fonts.pinned'
@@ -92,7 +93,7 @@ export const MAX_RECENT_FONTS = 5
 
 const readStoredFonts = (key) => {
   try {
-    const parsed = JSON.parse(localStorage.getItem(key) || '[]')
+    const parsed = JSON.parse(getPreference(key) || '[]')
     if (!Array.isArray(parsed)) return []
     return [...new Set(parsed.filter(font => typeof font === 'string' && font.trim()))]
   } catch {
@@ -102,9 +103,9 @@ const readStoredFonts = (key) => {
 
 const writeStoredFonts = (key, fonts) => {
   try {
-    localStorage.setItem(key, JSON.stringify(fonts))
+    setPreference(key, JSON.stringify(fonts))
   } catch {
-    // A full or unavailable localStorage must not take the font picker down.
+    // A failed write must not take the font picker down.
   }
 }
 

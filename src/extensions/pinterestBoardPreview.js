@@ -3,7 +3,7 @@
  *
  * Four sources, tried in order, because no single one covers every board:
  *
- *   1. the localStorage cache, rendered immediately so a reopened board is not blank
+ *   1. the cached pins, rendered immediately so a reopened board is not blank
  *      while the network is asked — and the only thing that works offline
  *   2. the pidgets JSON API, which is cheap and handles `?section=`
  *   3. Pinterest's own pinit.js embed, scraped back out of the DOM it builds
