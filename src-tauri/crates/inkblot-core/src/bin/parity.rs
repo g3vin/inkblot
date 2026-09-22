@@ -15,7 +15,10 @@ use std::io::{self, Read, Write};
 use serde_json::{json, Map, Value};
 
 use inkblot_core::types::{CanvasEdge, CanvasNode, CanvasNodeType, EdgeSide, Point, Rect, Viewport};
-use inkblot_core::{canvas_geometry as geo, doc_kind, js_number::format_js_number};
+use inkblot_core::{
+    canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
+    story_structure as story,
+};
 
 /// `String(x || '')`, the coercion the JS entry points open with.
 ///
@@ -144,6 +147,31 @@ fn canvas_edge(value: &Value) -> CanvasEdge {
     }
 }
 
+/// `newId()`, deterministically.
+///
+/// The real one is 16 random hex chars; this one counts, so a corpus case that leaves
+/// a node without an id produces something the harness can line up against the JS
+/// side. `scripts/parity/cases/canvasModel.mjs` rewrites every id that was not in the
+/// input, on both sides, before comparing.
+fn counting_ids() -> impl FnMut() -> String {
+    let mut counter: u64 = 0;
+    move || {
+        counter += 1;
+        format!("{counter:016x}")
+    }
+}
+
+fn canvas_state(value: &Value) -> inkblot_core::types::CanvasState {
+    model::normalize_canvas_with(value, counting_ids())
+}
+
+fn string_list(value: &Value) -> Vec<String> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(|item| item.as_str().map(String::from)).collect())
+        .unwrap_or_default()
+}
+
 fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
     let text = || js_string_or_empty(args.first());
 
@@ -214,6 +242,61 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             &canvas_node(&args[2])
         )),
         "inferSide" => json!(geo::infer_side(rect(&args[0]), point(&args[1]))),
+
+        /* ---- canvas_model ---- */
+        "normalizeCanvas" => json!(canvas_state(&args[0])),
+        "readViewport" => json!(model::read_viewport(&args[0])),
+        "serializeCanvas" => {
+            json!(model::serialize_canvas(&canvas_state(&args[0]), viewport(&args[1])))
+        }
+        "resolveCanvasColor" => {
+            // JS does `String(color)` before the lookup, so the preset number 1 and
+            // the preset string "1" resolve alike. That coercion is the shim's job.
+            let coerced = match &args[0] {
+                Value::Number(number) => Some(format_js_number(number.as_f64().unwrap_or(f64::NAN))),
+                Value::String(text) => Some(text.clone()),
+                Value::Bool(true) => Some("true".to_string()),
+                _ => None,
+            };
+            json!(model::resolve_canvas_color(coerced.as_deref()))
+        }
+        "groupMemberIds" => {
+            json!(model::group_member_ids(&canvas_state(&args[0]), args[1].as_str().unwrap_or_default()))
+        }
+        "groupFitRect" => {
+            let state = canvas_state(&args[0]);
+            json!(model::group_fit_rect(&state.nodes, &string_list(&args[1]), f64_arg(args, 2)?))
+        }
+        "groupsToRefit" => {
+            // JS returns an object keyed by group id; the Rust version returns pairs,
+            // because the key order is `nodeOrder` and a map would throw it away.
+            let fits = model::groups_to_refit(&canvas_state(&args[0]), &string_list(&args[1]));
+            let object: Map<String, Value> =
+                fits.into_iter().map(|(id, members)| (id, json!(members))).collect();
+            Value::Object(object)
+        }
+        "expandGroupSelection" => {
+            json!(model::expand_group_selection(&canvas_state(&args[0]), &string_list(&args[1])))
+        }
+        "incidentEdgeIds" => {
+            json!(model::incident_edge_ids(&canvas_state(&args[0]), &string_list(&args[1])))
+        }
+
+        /* ---- story_structure ---- */
+        "storyFolderPresets" => json!(story::story_folder_presets()),
+        "getStoryFolderPresetByKey" => {
+            json!(story::get_story_folder_preset_by_key(args[0].as_str().unwrap_or_default()))
+        }
+        "getStoryFolderPresetByName" => {
+            json!(story::get_story_folder_preset_by_name(args[0].as_str().unwrap_or_default()))
+        }
+        "getStoryFolderPresetForEntry" => json!(story::get_story_folder_preset_for_entry(
+            args[0].as_str().unwrap_or_default(),
+            args.get(1).and_then(Value::as_str).unwrap_or("file")
+        )),
+        "getStoryFolderAncestor" => {
+            json!(story::get_story_folder_ancestor(args[0].as_str().unwrap_or_default()))
+        }
 
         unknown => return Err(format!("no such function: {unknown}")),
     })

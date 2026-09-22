@@ -9,8 +9,10 @@
 //! model, notes. Today it holds the pieces that were already shell-agnostic.
 
 pub mod canvas_geometry;
+pub mod canvas_model;
 pub mod doc_kind;
 pub mod fonts;
 pub mod js_number;
 pub mod pinterest;
+pub mod story_structure;
 pub mod types;
