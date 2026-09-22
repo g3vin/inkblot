@@ -21,8 +21,10 @@ import { detectNativeHost } from '../bridge/transport'
  *                   A real titlebar makes all three the window's business again.
  *  - `rightSidebar` search, clipboard, workbench, notes and history — drawn by the shell
  *                   from what `useNativeSidebar` publishes
+ *  - `notePreviews` the cards that open over a note's marker — drawn by the shell as
+ *                   Liquid Glass, placed from what `useNativeNotePreviews` publishes
  */
-export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar'
+export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar' | 'notePreviews'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null

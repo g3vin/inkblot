@@ -316,9 +316,10 @@ extension NotePatch {
     /// field; this is the one with defaults.
     static func with(content: String? = nil, color: String? = nil, pinned: Bool? = nil,
                      collapsedChildren: Bool? = nil, images: [NoteImage]? = nil,
-                     audio: [AudioClip]? = nil) -> NotePatch {
-        .with(content: content, color: color, pinned: pinned, collapsedChildren: collapsedChildren,
-                  images: images, audio: audio)
+                     audio: [AudioClip]? = nil, previewLayout: NotePreviewLayout? = nil,
+                     previewSize: NotePreviewSize? = nil) -> NotePatch {
+        NotePatch(content: content, color: color, pinned: pinned, collapsedChildren: collapsedChildren,
+                  images: images, audio: audio, previewLayout: previewLayout, previewSize: previewSize)
     }
 }
 

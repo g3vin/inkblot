@@ -17,7 +17,8 @@
 import { useEffect, useRef } from 'react'
 import { documentSurface, editorRegistry } from '../bridge'
 import { claimEndedSelectionDrag } from '../bridge/recentSelectionDrag'
-import { collectNoteBranchIds, touchNote } from '../lib/noteUtils'
+import { collectNoteBranchIds, createFreeNote, touchNote } from '../lib/noteUtils'
+import { getDefaultChildOffset } from '../lib/notePreviewGeometry'
 import {
   copyVersionAsDocument,
   deleteVersion,
@@ -123,13 +124,19 @@ export function useNativeSidebar({
     const offs = [
       /* notes */
       documentSurface.onCommand('updateNote', ({ docPath, noteId, patch }) => {
-        const { collapsedChildren, ...changes } = patch || {}
+        const { collapsedChildren, previewLayout, previewSize, ...changes } = patch || {}
         state().setNotesForDoc?.(docPath, (notes) => notes.map((note) => {
           if (note.id !== noteId) return note
-          // Folding a branch is a view change, not an edit: it does not touch the note's
-          // timestamp, exactly as in NotesPanel.
-          const folded = collapsedChildren === undefined ? note : { ...note, collapsedChildren }
-          return Object.keys(changes).length ? touchNote(folded, changes) : folded
+          // Folding a branch or moving a hover card is a view change, not an edit: it
+          // does not touch the note's timestamp, exactly as NotesPanel and
+          // NoteHoverPreview did.
+          const viewed = {
+            ...note,
+            ...(collapsedChildren === undefined ? {} : { collapsedChildren }),
+            ...(previewLayout ? { previewLayout } : {}),
+            ...(previewSize ? { previewSize } : {}),
+          }
+          return Object.keys(changes).length ? touchNote(viewed, changes) : viewed
         }))
       }),
 
@@ -137,6 +144,22 @@ export function useNativeSidebar({
         state().setNotesForDoc?.(docPath, (notes) => {
           const doomed = new Set(collectNoteBranchIds(notes, noteId))
           return notes.filter((note) => !doomed.has(note.id))
+        })
+      }),
+
+      // NoteHoverPreview's "add reply": an empty free note under the parent, placed
+      // where the next reply goes by default.
+      documentSurface.onCommand('addReply', ({ docPath, parentNoteId }) => {
+        state().setNotesForDoc?.(docPath, (notes) => {
+          const parent = notes.find((note) => note.id === parentNoteId)
+          if (!parent) return notes
+          const siblings = notes.filter((note) => note.parentNoteId === parentNoteId).length
+          const reply = touchNote(createFreeNote(parent.color), {
+            parentNoteId,
+            previewLayout: getDefaultChildOffset(siblings, siblings + 1),
+            collapsedChildren: false,
+          })
+          return [...notes, reply]
         })
       }),
 
