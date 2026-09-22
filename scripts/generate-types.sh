@@ -28,6 +28,33 @@ generate() {
   typeshare "$crate/src" --lang=swift --config-file="$crate/typeshare.toml" --output-file="$swift"
 }
 
+# Typecheck the Swift. `npm run typecheck` covers the TypeScript; nothing else looks
+# at the Swift until the Phase 5 Xcode target exists, which is much too late to find
+# out that a Rust type generates something Swift will not accept.
+#
+# AnyCodable is stubbed because the real one comes from a package the Xcode target
+# will add. Skipped where swiftc is absent, so this still runs on Linux.
+check_swift() {
+  local swift="$1"
+  if ! command -v swiftc >/dev/null 2>&1; then
+    echo "swiftc not found; skipping the Swift typecheck."
+    return 0
+  fi
+
+  local stub
+  stub="$(mktemp -d)/AnyCodable.swift"
+  cat > "$stub" <<'SWIFT'
+public struct AnyCodable: Codable, Equatable {
+    public static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool { true }
+    public init(from decoder: Decoder) throws {}
+    public func encode(to encoder: Encoder) throws {}
+}
+SWIFT
+
+  swiftc -typecheck "$stub" "$swift"
+  echo "Swift typechecks."
+}
+
 if [[ "${1:-}" == "--check" ]]; then
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' EXIT
@@ -39,10 +66,12 @@ if [[ "${1:-}" == "--check" ]]; then
     echo "Generated types are stale. Run ./scripts/generate-types.sh and commit." >&2
     exit 1
   fi
+  check_swift "$swift_out"
   echo "Generated types are up to date."
   exit 0
 fi
 
 generate "$ts_out" "$swift_out"
+check_swift "$swift_out"
 echo "Wrote $ts_out"
 echo "Wrote $swift_out"
