@@ -3,13 +3,15 @@
 //! Unauthenticated, so it only sees public boards — the session-backed path runs in a
 //! webview and is driven from the shell. Pure request/parse: no Tauri, no DOM.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use url::Url;
 
 
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+// `default` so that one malformed pin in a report cannot fail the deserialization of
+// the whole scrape and lose every other pin with it.
+#[serde(rename_all = "camelCase", default)]
 pub struct ScrapedPin {
     pub pin_href: String,
     pub image_url: String,
@@ -20,6 +22,30 @@ pub struct ScrapedPin {
 pub struct ScrapeResult {
     pub pins: Vec<ScrapedPin>,
     pub html: String,
+}
+
+/// What the scraping script running inside the Pinterest page sends back.
+///
+/// The session-backed scrape happens in a webview showing the user's logged-in
+/// Pinterest session, driven by an injected script. This is that script's side of the
+/// conversation: one report per stage, and one final report carrying the pins.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ScrapeReport {
+    /// Which scrape this belongs to. One run, one id.
+    pub request_id: String,
+    /// `location.href` at the moment the report was sent — which is how the caller
+    /// learns it was redirected to a login page.
+    pub url: String,
+    pub pins: Vec<ScrapedPin>,
+    /// Why the script stopped: `session_api`, `stable`, `max`, `timeout`, `empty`,
+    /// `script_error`, or `probe` for the channel check.
+    pub reason: String,
+    /// Where in the script it was, for debugging a scrape that found nothing.
+    pub stage: String,
+    /// True for a report that is only saying how it is going. A progress report never
+    /// ends the wait.
+    pub progress: bool,
 }
 
 pub(crate) fn best_url_from_srcset(srcset: &str) -> Option<String> {
