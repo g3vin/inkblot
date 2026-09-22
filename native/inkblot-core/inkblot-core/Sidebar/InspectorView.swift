@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The right sidebar: one search bar over four panels, as the page's was.
+/// The right sidebar: a selector bar and one search bar over four panels.
 ///
 /// With the scope on "This Panel" the bar filters the panel beneath it. Any other scope
 /// turns it into a search, and the results replace the panel until the scope goes back
@@ -12,10 +12,23 @@ struct InspectorView: View {
     var body: some View {
         @Bindable var sidebar = model.sidebar
 
-        VStack(spacing: 0) {
+        VStack(spacing: 10) {
+            // Xcode's arrangement: the panel's own close button top-right, the selector
+            // bar beneath it, then the panel.
+            HStack {
+                Spacer()
+                SidebarToggleButton(isPresented: $sidebar.isPresented)
+            }
+
+            GlassTabBar(
+                tabs: SidebarModel.Tab.allCases,
+                selection: $sidebar.tab,
+                symbol: \.symbol,
+                title: \.title)
+                .disabled(sidebar.isSearching)
+                .opacity(sidebar.isSearching ? 0.5 : 1)
+
             searchBar
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
 
             Group {
                 if sidebar.isSearching {
@@ -29,27 +42,11 @@ struct InspectorView: View {
                     }
                 }
             }
+            .padding(.horizontal, -12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .padding(.top, 8)
-            // Room under the last row for the floating bar, as a content inset — so a
-            // list scrolls beneath the glass and still ends clear of it.
-            .safeAreaPadding(.bottom, sidebar.isSearching ? 0 : 64)
         }
-        // The tab bar floats over the bottom of the panel, as it does on iOS: the list
-        // scrolls on underneath the glass rather than stopping above it.
-        .overlay(alignment: .bottom) {
-            if !sidebar.isSearching {
-                GlassTabBar(
-                    tabs: SidebarModel.Tab.allCases,
-                    selection: $sidebar.tab,
-                    symbol: \.symbol,
-                    title: \.title)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(.spring(duration: 0.3), value: sidebar.isSearching)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
     }
 
     private var searchBar: some View {
@@ -160,5 +157,24 @@ struct SearchResultsView: View {
                 .listStyle(.inset)
             }
         }
+    }
+}
+
+/// The glass button that shows and hides the right sidebar — at the top of the sidebar
+/// while it is open, floating at the window's top-right while it is closed.
+struct SidebarToggleButton: View {
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        Button { withAnimation(.spring(duration: 0.3)) { isPresented.toggle() } } label: {
+            Image(systemName: "sidebar.right")
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 32, height: 32)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .circle)
+        .help(isPresented ? "Hide the sidebar" : "Show the sidebar")
+        .keyboardShortcut("0", modifiers: [.command, .option])
     }
 }

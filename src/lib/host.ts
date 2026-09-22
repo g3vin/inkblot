@@ -17,8 +17,10 @@ import { detectNativeHost } from '../bridge/transport'
  * The pieces the shell can take over.
  *
  *  - `fileTree`     the left sidebar — the shell draws the project's tree natively
- *  - `windowChrome` the titlebar: dragging, traffic-light spacing, fullscreen tracking.
- *                   A real titlebar makes all three the window's business again.
+ *  - `windowChrome` traffic-light spacing and fullscreen tracking. The shell draws no
+ *                   titlebar row, so the page's toolbar is the top of the window and
+ *                   still the place to drag it by; the shell says how much room the
+ *                   traffic lights need (`setTitlebarInset`) and does the drag itself.
  *  - `rightSidebar` search, clipboard, workbench, notes and history — drawn by the shell
  *                   from what `useNativeSidebar` publishes
  *  - `notePreviews` the cards that open over a note's marker — drawn by the shell as

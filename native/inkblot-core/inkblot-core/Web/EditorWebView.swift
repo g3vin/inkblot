@@ -70,6 +70,7 @@ final class EditorWebController: NSObject {
             self?.webView.evaluateJavaScript("window.__inkblotTauri.activateMenuItem(\(rid))")
         }
 
+        _ = MouseDownRecorder.shared
         webView.load(URLRequest(url: Self.startURL))
     }
 

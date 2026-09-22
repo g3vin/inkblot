@@ -385,6 +385,22 @@ pub struct DuplicateEntryCommand {
     pub path: String,
 }
 
+/// How much of the page's top-left corner the window's own controls cover.
+///
+/// The shell draws no titlebar row: the page's toolbar is the top of the window, and
+/// the traffic lights float over whatever is beneath them. When the native file tree is
+/// showing they float over it and the page needs no room; when it is hidden they float
+/// over the page's toolbar, which must start after them. Only the shell knows which.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTitlebarInsetCommand {
+    pub leading: f64,
+    /// Room at the right end, for the button that reopens a hidden native sidebar.
+    #[serde(default)]
+    pub trailing: f64,
+}
+
 /// Everything the shell can ask the document surface to do.
 ///
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
@@ -438,4 +454,5 @@ pub enum NativeCommand {
     RenameVersion(RenameVersionCommand),
     RevealSearchResult(RevealSearchResultCommand),
     AddReply(AddReplyCommand),
+    SetTitlebarInset(SetTitlebarInsetCommand),
 }

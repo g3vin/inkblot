@@ -110,15 +110,26 @@ export default function EditorLayout(props) {
   // page, so nothing on the left needs room made for it.
   const nativeFileTree = nativeOwns('fileTree')
   const nativeWindowChrome = nativeOwns('windowChrome')
+  // Under the Swift shell there is no titlebar row: this page's toolbar is the top of
+  // the window, and the shell says how much of its left end the traffic lights cover.
+  const [nativeTitlebarInset, setNativeTitlebarInset] = useState(0)
+  const [nativeTitlebarTrailing, setNativeTitlebarTrailing] = useState(0)
+  useEffect(() => {
+    if (!nativeWindowChrome) return undefined
+    return documentSurface.onCommand('setTitlebarInset', ({ leading, trailing }) => {
+      setNativeTitlebarInset(Math.max(0, Number(leading) || 0))
+      setNativeTitlebarTrailing(Math.max(0, Number(trailing) || 0))
+    })
+  }, [nativeWindowChrome])
   const titlebarLeftWidth = nativeFileTree
-    ? (nativeWindowChrome ? 0 : 86)
+    ? (nativeWindowChrome ? nativeTitlebarInset : 86)
     : left.collapsed && !left.peeked
       ? 86
       : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
   const nativeRightSidebar = nativeOwns('rightSidebar')
   const nativeNotePreviews = nativeOwns('notePreviews')
   useNativeNotePreviews({ enabled: nativeNotePreviews })
-  const titlebarRightWidth = nativeRightSidebar ? 0 : right.collapsed && !right.peeked
+  const titlebarRightWidth = nativeRightSidebar ? nativeTitlebarTrailing : right.collapsed && !right.peeked
     ? 0
     : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
   // On a canvas, the only editor the Toolbar may drive is a card's own editor.
@@ -151,8 +162,10 @@ export default function EditorLayout(props) {
   // Custom titlebar: a left-click anywhere in the drag strip moves the window,
   // unless it landed on something interactive. Bound to the window rather than
   // the titlebar element so the strip also covers the sidebars beneath it.
+  //
+  // Under the Swift shell too: it draws no titlebar, so this strip is the only thing
+  // left to drag the window by, and the shell turns the call into a native drag.
   useEffect(() => {
-    if (nativeWindowChrome) return undefined
     const handleWindowDragMouseDown = (event) => {
       if (event.button !== 0) return
       if (event.clientY > WINDOW_DRAG_STRIP_HEIGHT) return
@@ -168,7 +181,7 @@ export default function EditorLayout(props) {
 
     window.addEventListener('mousedown', handleWindowDragMouseDown, true)
     return () => window.removeEventListener('mousedown', handleWindowDragMouseDown, true)
-  }, [nativeWindowChrome])
+  }, [])
 
   // Track (and predict) fullscreen state so the layout can restyle its chrome.
   // macOS reports fullscreen late during the animation, so we also treat

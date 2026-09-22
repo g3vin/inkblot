@@ -282,6 +282,7 @@ fn every_command() -> Vec<NativeCommand> {
             note_id: None,
         }),
         NativeCommand::AddReply(AddReplyCommand { doc_path: "one".into(), parent_note_id: "n1".into() }),
+        NativeCommand::SetTitlebarInset(SetTitlebarInsetCommand { leading: 78.0, trailing: 52.0 }),
     ]
 }
 
@@ -458,6 +459,7 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
             "renameVersion",
             "revealSearchResult",
             "addReply",
+            "setTitlebarInset",
         ]
     );
 }
