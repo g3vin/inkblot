@@ -325,10 +325,9 @@
   const WINDOW_LABEL = 'main'
 
   const windows = {
-    // The window's own toolbar is what drags it. The page's drag strips are off under
-    // the shell (`nativeOwns('toolbar')`); this answers any stray call rather than
-    // rejecting it, because the bundle logs a warning per rejected drag.
-    start_dragging() {},
+    // The shell draws no titlebar row, so the page's top strip is what the window is
+    // dragged by — and only the shell can move a window.
+    start_dragging() { return native('window.startDrag') },
     get_all_windows() { return [WINDOW_LABEL] },
     is_fullscreen() { return native('window.isFullscreen') },
     set_title({ value }) { return native('window.setTitle', { title: value }) },

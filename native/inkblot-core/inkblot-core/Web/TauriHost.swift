@@ -210,6 +210,16 @@ final class TauriHost {
             menus.setAppMenu(tree)
             return .value(nil)
 
+        case "window.startDrag":
+            // The page asks after its mousedown has already been delivered, so the
+            // event that started the drag is the one recorded on the way in — and the
+            // drag only starts if that button is still down.
+            guard let window, let mouseDown = MouseDownRecorder.shared.last,
+                  NSEvent.pressedMouseButtons & 1 == 1
+            else { return .value(nil) }
+            window.performDrag(with: mouseDown)
+            return .value(nil)
+
         case "window.isFullscreen":
             return .value(window?.styleMask.contains(.fullScreen) ?? false)
 
@@ -354,5 +364,21 @@ final class TauriHost {
             response = alert.runModal()
         }
         return response == .alertFirstButtonReturn
+    }
+}
+
+/// The last left mouse-down in the app, for a window drag the page asks for after the
+/// event has gone by. `performDrag(with:)` needs the event that began the gesture.
+@MainActor
+final class MouseDownRecorder {
+    static let shared = MouseDownRecorder()
+    private(set) var last: NSEvent?
+    private var monitor: Any?
+
+    private init() {
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            self?.last = event
+            return event
+        }
     }
 }

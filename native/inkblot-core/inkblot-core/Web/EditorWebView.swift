@@ -19,7 +19,7 @@ import os
 final class EditorWebController: NSObject {
     /// The parts of the chrome this shell draws itself; the page stops drawing them.
     /// See `src/lib/host.ts`.
-    static let nativeChrome = ["fileTree", "windowChrome", "rightSidebar", "notePreviews", "toolbar"]
+    static let nativeChrome = ["fileTree", "windowChrome", "rightSidebar", "notePreviews"]
 
     let webView: WKWebView
     private let bridge: ShellBridge
@@ -70,6 +70,7 @@ final class EditorWebController: NSObject {
             self?.webView.evaluateJavaScript("window.__inkblotTauri.activateMenuItem(\(rid))")
         }
 
+        _ = MouseDownRecorder.shared
         webView.load(URLRequest(url: Self.startURL))
     }
 

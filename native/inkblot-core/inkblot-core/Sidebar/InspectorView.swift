@@ -13,8 +13,9 @@ struct InspectorView: View {
         @Bindable var sidebar = model.sidebar
 
         VStack(spacing: 10) {
-            // Xcode's arrangement: the toggle in the toolbar above, the selector bar
-            // beneath it, then the panel.
+            // Xcode's arrangement: the toggle (the window's, see ContentView) on the
+            // traffic lights' line above, the selector bar beneath it, then the panel.
+            Color.clear.frame(height: WindowChrome.toggleSize)
 
             GlassTabBar(
                 tabs: SidebarModel.Tab.allCases,
@@ -42,7 +43,10 @@ struct InspectorView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, 12)
-        .padding(.top, 8)
+        .padding(.top, WindowChrome.toggleInset)
+        // The toggle belongs on the traffic lights' line, not below the safe area the
+        // hidden titlebar still reserves.
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     private var searchBar: some View {
