@@ -376,6 +376,55 @@ public struct Note: Codable, Equatable {
 	}
 }
 
+/// One word of readable text, with where it sits in the readable string and where it
+/// sits in the document.
+/// 
+/// `start_offset`/`end_offset` are offsets into the readable text, in UTF-16 code
+/// units. `from`/`to` are ProseMirror positions — what the highlight scheduler resolves
+/// against as the audio plays. Both are absent on a word that came from plain text with
+/// no document behind it.
+public struct ReadAloudWord: Codable, Equatable {
+	public let text: String
+	public let startOffset: UInt32?
+	public let endOffset: UInt32?
+	public let from: UInt32?
+	public let to: UInt32?
+
+	public init(text: String, startOffset: UInt32?, endOffset: UInt32?, from: UInt32?, to: UInt32?) {
+		self.text = text
+		self.startOffset = startOffset
+		self.endOffset = endOffset
+		self.from = from
+		self.to = to
+	}
+}
+
+/// One call to the speech engine.
+/// 
+/// `text` is what is spoken — normalized, with line breaks closed up into spaces.
+/// `words` is what it was built from, kept so the scheduler can map audio time back to
+/// document positions.
+public struct ReadAloudChunk: Codable, Equatable {
+	public let text: String
+	public let words: [ReadAloudWord]
+
+	public init(text: String, words: [ReadAloudWord]) {
+		self.text = text
+		self.words = words
+	}
+}
+
+/// The readable text of a document, and the words resolved out of it.
+public struct ReadAloudPayload: Codable, Equatable {
+	public let text: String
+	public let words: [ReadAloudWord]
+
+	public init(text: String, words: [ReadAloudWord]) {
+		self.text = text
+		self.words = words
+	}
+}
+
 public struct Rect: Codable, Equatable {
 	public let x: Double
 	public let y: Double
@@ -387,6 +436,78 @@ public struct Rect: Codable, Equatable {
 		self.y = y
 		self.width = width
 		self.height = height
+	}
+}
+
+public enum SearchResultType: String, Codable, Equatable {
+	/// A hit in a saved document, addressed by ProseMirror position.
+	case projectMatch = "project-match"
+	/// A hit in the open document.
+	case documentMatch = "document-match"
+	/// A file or folder whose path matched.
+	case fileEntry = "file-entry"
+	case noteMatch = "note-match"
+	/// A hit on a canvas, addressed by node id — a canvas has no positions.
+	case canvasMatch = "canvas-match"
+}
+
+/// One row of results.
+/// 
+/// Which fields are set depends on `result_type`, and the absences are meaningful: a
+/// `file-entry` has no position, a `canvas-match` has a `node_id` instead of one. Like
+/// `DiffChunk`, this is a struct rather than an enum because the wire format is
+/// internally tagged and typeshare only generates adjacently-tagged enums.
+public struct SearchResult: Codable, Equatable {
+	public let id: String
+	public let type: SearchResultType
+	public let docName: String
+	public let title: String
+	public let path: String
+	public let preview: String
+	/// A ProseMirror position — a count of UTF-16 code units, not bytes.
+	public let from: UInt32?
+	public let to: UInt32?
+	public let matchText: String?
+	/// The canvas node to select and center.
+	public let nodeId: String?
+	public let note: AnyCodable?
+
+	public init(id: String, type: SearchResultType, docName: String, title: String, path: String, preview: String, from: UInt32?, to: UInt32?, matchText: String?, nodeId: String?, note: AnyCodable?) {
+		self.id = id
+		self.type = type
+		self.docName = docName
+		self.title = title
+		self.path = path
+		self.preview = preview
+		self.from = from
+		self.to = to
+		self.matchText = matchText
+		self.nodeId = nodeId
+		self.note = note
+	}
+}
+
+/// The scopes, in the order they appear in the bar.
+public enum SearchScope: String, Codable, Equatable {
+	/// The default, and what the bar did before it could search: filter whatever panel
+	/// is showing. Every other scope searches content and shows its own results, so the
+	/// panel underneath is left unfiltered.
+	case panel
+	case document
+	case notes
+	case files
+	case project
+}
+
+public struct SearchScopeInfo: Codable, Equatable {
+	public let value: SearchScope
+	public let label: String
+	public let hint: String
+
+	public init(value: SearchScope, label: String, hint: String) {
+		self.value = value
+		self.label = label
+		self.hint = hint
 	}
 }
 
