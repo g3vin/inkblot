@@ -231,11 +231,16 @@ export default function EditorCanvas({
     handlePaneDrop,
     insertClipboardPayloadAtPoint,
   } = useEditorDnd({
-    editor,
+    // Accessors, not values: this hook runs before `editor` and `secondaryEditor`
+    // are declared below — `editor` supplies useEditor's paste handler, so the
+    // order cannot be swapped — and passing the bindings directly reads them in
+    // their temporal dead zone, which throws on every mount. Both are only ever
+    // needed at event time, by which point the declarations have run.
+    getEditor: () => editor,
     getMountedEditorView,
+    getSecondaryEditor: () => secondaryEditor,
     onMoveClipboardEntryToEditor,
     primaryPaneRef,
-    secondaryEditor,
     secondaryPaneRef,
     setDragCaret,
     splitView,

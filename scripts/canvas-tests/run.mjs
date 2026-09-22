@@ -22,6 +22,9 @@
  *   audio  voice memos: mime resolution, the asset store, dedupe
  *   html   generateHTML(): how every non-editing card and document preview renders
  *   dom    the real CanvasSurface mounted in jsdom, under StrictMode like the app
+ *   editor the real EditorCanvas mounted in jsdom: autosave, version checkpoints,
+ *          the per-doc editor-state cache, and note anchor remapping — the paths
+ *          where a bug loses the user's writing without saying anything
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -35,7 +38,7 @@
  * Still not covered: anything involving layout, pointer events, or the asset://
  * protocol. Those need the real webview.
  */
-const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom']
+const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor']
 
 const failures = []
 
