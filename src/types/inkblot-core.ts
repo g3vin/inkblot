@@ -197,6 +197,27 @@ export interface Rect {
 	height: number;
 }
 
+export interface StoryFolderPreset {
+	key: string;
+	name: string;
+	menuLabel: string;
+	/**
+	 * What one document inside the folder is, for the file tree's contextual
+	 * "New …" button.
+	 */
+	entryLabel: string;
+	folderIcon: string;
+	fileIcon: string;
+	/** Other folder names that resolve to this preset. */
+	aliases: string[];
+}
+
+/** The nearest preset folder a file lives in, and the path to create siblings in. */
+export interface StoryFolderAncestor {
+	preset: StoryFolderPreset;
+	path: string;
+}
+
 export enum VersionKind {
 	Text = "text",
 	Canvas = "canvas",
