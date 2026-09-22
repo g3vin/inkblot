@@ -7,7 +7,14 @@
 //! Phase 2 of the migration moves the remaining JS domain modules down here —
 //! documents, projects, version history and its diff engine, search, the canvas
 //! model, notes. Today it holds the pieces that were already shell-agnostic.
+//!
+//! `bridge` is the one module that is about a seam rather than about the domain. The
+//! document surface stays in a web view under every shell, so shell and surface have to
+//! talk; Phase 4 defines what they say here, for the same reason `types` is here, so
+//! that TypeScript and Swift are generated from one definition instead of agreeing by
+//! hand. It still depends on nothing — it is types, not transport.
 
+pub mod bridge;
 pub mod canvas_geometry;
 pub mod canvas_model;
 pub mod doc_kind;
