@@ -13,6 +13,7 @@ pub mod canvas_model;
 pub mod doc_kind;
 pub mod fonts;
 pub mod js_number;
+pub mod kokoro;
 pub mod js_string;
 pub mod notes;
 pub mod pinterest;

@@ -29,6 +29,8 @@
  *          drop indicator goes
  *   prefs  the preference store's webview half: which file a key lands in, that reads
  *          are synchronous after hydration, and that a failed write is survivable
+ *   voice  the Read Aloud text normalizer, against the one inside kokoro-js — a
+ *          transcription, so it is compared with its original rather than trusted
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -42,7 +44,7 @@
  * Still not covered: anything involving layout, pointer events, or the asset://
  * protocol. Those need the real webview.
  */
-const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs']
+const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice']
 
 const failures = []
 
