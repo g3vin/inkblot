@@ -14,6 +14,7 @@ pub mod doc_kind;
 pub mod fonts;
 pub mod js_number;
 pub mod pinterest;
+pub mod store;
 pub mod story_structure;
 pub mod types;
 pub mod version_history;
