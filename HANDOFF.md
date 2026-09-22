@@ -15,7 +15,7 @@ Run all seven after every change. They are fast and they have each caught someth
 the others missed.
 
 ```bash
-npm test            # 494 assertions, 18 suites
+npm test            # 501 assertions, 18 suites
 npm run lint        # 0 errors AND 0 warnings is the current bar
 npm run typecheck   # tsc --noEmit
 npm run build       # the only thing that resolves dynamic imports and named exports
@@ -530,6 +530,16 @@ no movement.
    `canvasCard`, and `bridge/editorRegistry.ts` is the only thing that turns a name back
    into an object. `__inkblotCanvasCard` is gone.
 
+### The Toolbar is mounted by a test
+
+It is the most heavily rewritten file in this phase and it had no coverage anywhere in
+the harness — which is precisely the position `EditorCanvas` was in when it threw on
+every mount while lint, tsc and the build all passed. The `bridge` suite mounts it,
+asserts that it renders a pushed `ToolbarState` **without touching the editor**, and
+that clicking Bold leaves as an `applyMark` command watched on the surface end of the
+app's own bridge. Both halves were verified by breaking them: a binding read in its
+temporal dead zone, and `applyMark` made a no-op.
+
 ### The globals are gone, all seven
 
 | Was | Is | Note |
@@ -578,10 +588,15 @@ instead.
   `schedule` may run its callback before returning, so the canceller it hands back is
   already stale, and the guard then saw work outstanding that had in fact been
   delivered. It would have published exactly one toolbar state for the life of the app.
-- **The `bridge` suite's fake editor was missing `schema.nodes`**, which `isEditorReady`
-  checks — so four assertions about commands reaching an editor were passing without
-  ever running one. Worth repeating as a general warning: a fake that is *almost* right
-  makes assertions pass for the wrong reason.
+- **The `bridge` suite's fake editor was wrong three times**, and each way was
+  instructive. Missing `schema.nodes`, which `isEditorReady` checks, made four
+  assertions about commands reaching an editor pass without ever running one. Missing
+  `on`/`off` broke the Toolbar mount from inside `ReadAloudControl`, two hundred lines
+  from the fake. And `commands: {}` threw on unmount, *after* every assertion had
+  printed `PASS` — `run.mjs` reported the suite abandoned, which is the only reason it
+  was noticed at all. A fake that is almost right makes assertions pass for the wrong
+  reason; the proxies it uses now are there so that the failure is a missing assertion
+  rather than a false one.
 - **`CanvasCardEditor` had been writing a ref during render** for as long as the file
   had existed. Lint only saw it once the `__inkblotCanvasCard` mutation was removed and
   the component became analyzable.

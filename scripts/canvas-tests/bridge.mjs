@@ -89,16 +89,35 @@ function makeEditor(text = 'she hesitated at the door') {
     },
   })
 
+  // `on`/`off` are here because real consumers subscribe: useSurfacePublisher listens
+  // for selectionUpdate, and ReadAloudControl calls editor.on during mount. A fake
+  // without them does not fail its own assertions — it fails whatever mounts it, two
+  // hundred lines away, which is how the missing `schema.nodes` above wasted a run.
+  const listeners = new Map()
+
   return {
     calls,
+    listeners,
     isDestroyed: false,
     state,
     view: { isDestroyed: false },
     commandManager: {},
-    commands: {},
+    // A proxy rather than `{}` for the same reason `chain` is one: real consumers call
+    // extension-contributed commands by name, and ReadAloudControl's unmount calls
+    // `clearReadAloudHighlight`. An empty object turns every one of those into a
+    // TypeError during teardown — which `run.mjs` catches and reports as the whole
+    // suite being abandoned, after its assertions have already printed PASS.
+    commands: new Proxy({}, { get: () => () => true }),
+    storage: {},
     chain: () => chain,
+    on: (event, handler) => {
+      if (!listeners.has(event)) listeners.set(event, new Set())
+      listeners.get(event).add(handler)
+    },
+    off: (event, handler) => { listeners.get(event)?.delete(handler) },
     getAttributes: (name) => (name === 'textStyle' ? { color: '#ff0000', fontSize: '20px' } : {}),
     isActive: () => false,
+    getText: () => text,
   }
 }
 
@@ -512,4 +531,93 @@ function wire({ deferred = false } = {}) {
   ok('a gap in the sequence is reported rather than passing unnoticed', gaps.length === 1)
 
   surface.dispose()
+}
+
+/* ------------------------------------------------------------------
+   The Toolbar, mounted.
+
+   This is the assertion the handoff's own hardest-won lesson demands.
+   `useEditorDnd({ editor })` was read in its temporal dead zone and threw on
+   every single mount of EditorCanvas, while lint, tsc and the production
+   build all passed — because nothing mounted the component. The Toolbar is
+   the most heavily rewritten file in this phase and it is in exactly that
+   position: it has no coverage anywhere else in the harness.
+
+   What is checked is the inversion itself. It must render from a pushed
+   ToolbarState without touching the editor, and a click must leave as a
+   command rather than as an editor.chain() call.
+------------------------------------------------------------------ */
+{
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  installGlobals(dom.window, ['navigator', 'HTMLElement', 'Element', 'Node', 'getComputedStyle',
+    'CustomEvent', 'Event', 'MouseEvent', 'KeyboardEvent'])
+
+  const { act } = await import('react')
+  const React = (await import('react')).default
+  const { createRoot } = await import('react-dom/client')
+  const Toolbar = (await import(`${C}/components/Toolbar.jsx`)).default
+  const { documentSurface, editorRegistry } = await import(`${C}/bridge/index.ts`)
+
+  const editor = makeEditor()
+  editorRegistry.register(EditorTarget.Primary, { getEditor: () => editor })
+  editorRegistry.setActive(EditorTarget.Primary)
+
+  const host = dom.window.document.createElement('div')
+  dom.window.document.body.appendChild(host)
+  const root = createRoot(host)
+
+  let mountError = null
+  try {
+    await act(async () => { root.render(React.createElement(Toolbar, { editor })) })
+  } catch (error) {
+    mountError = error
+  }
+
+  if (mountError) console.error('MOUNT ERROR:', mountError)
+  ok('the Toolbar mounts at all', mountError === null)
+  ok('and renders its controls', host.querySelectorAll('button').length > 0)
+
+  // It must show what the bridge pushed, having asked the editor nothing.
+  //
+  // The app's own surface coalesces on real animation frames, so the publish has to
+  // be waited out rather than asserted on immediately — which is the behaviour, not
+  // an inconvenience: a toolbar that updated synchronously per selectionUpdate is the
+  // thing this phase removed.
+  const settleFrame = () => act(async () => {
+    await new Promise((resolve) => dom.window.requestAnimationFrame(() => resolve()))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+
+  const callsBefore = editor.calls.length
+  await act(async () => { documentSurface.publishToolbarState() })
+  await settleFrame()
+  const boldButton = host.querySelector('button[aria-label="Bold"]')
+  ok('a bold button is rendered', Boolean(boldButton))
+  ok('rendering a pushed state reads nothing off the editor',
+    editor.calls.length === callsBefore)
+
+  // And a click must leave as a command. Watched on the surface end of the app's own
+  // bridge, so what is asserted is the message actually crossing, not a spy wedged
+  // into the component.
+  const commands = []
+  const unsubscribeBold = documentSurface.onCommand('applyMark', (payload) => commands.push(payload))
+
+  await act(async () => {
+    boldButton.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  })
+
+  ok('clicking Bold sends applyMark rather than calling the editor directly',
+    commands.length === 1 && commands[0].mark === MarkKind.Bold)
+  ok('and the command names the editor the state came from',
+    commands[0].target === EditorTarget.Primary)
+
+  unsubscribeBold()
+  let unmountError = null
+  try {
+    await act(async () => { root.unmount() })
+  } catch (error) {
+    unmountError = error
+  }
+  ok('and it unmounts without throwing', unmountError === null)
+  host.remove()
 }
