@@ -15,11 +15,11 @@ import { normalizePinterestBoardUrl } from '../extensions/PinterestBoard'
 import { isEditorReady } from '../lib/editorUtils'
 
 export function useEditorDnd({
-  editor,
+  getEditor,
   getMountedEditorView,
+  getSecondaryEditor,
   onMoveClipboardEntryToEditor,
   primaryPaneRef,
-  secondaryEditor,
   secondaryPaneRef,
   setDragCaret,
   splitView,
@@ -130,9 +130,11 @@ export function useEditorDnd({
   const getTargetEditorAtPoint = (x, y) => {
     if (x == null || y == null) return null
 
+    const editor = getEditor()
     const primaryRect = primaryPaneRef.current?.getBoundingClientRect?.()
     if (isEditorReady(editor) && isPointInRect(x, y, primaryRect)) return editor
 
+    const secondaryEditor = getSecondaryEditor()
     const secondaryRect = secondaryPaneRef.current?.getBoundingClientRect?.()
     if (splitView === 'editor' && isEditorReady(secondaryEditor) && isPointInRect(x, y, secondaryRect)) {
       return secondaryEditor
@@ -158,14 +160,14 @@ export function useEditorDnd({
       view.dispatch(view.state.tr.setSelection(nextSelection))
     }
 
+    const isSecondary = targetEditor === getSecondaryEditor()
     const caretCoords = view.coordsAtPos(coords.pos)
-    const paneEl =
-      targetEditor === secondaryEditor ? secondaryPaneRef.current : primaryPaneRef.current
+    const paneEl = isSecondary ? secondaryPaneRef.current : primaryPaneRef.current
     const paneRect = paneEl?.getBoundingClientRect?.()
     if (!paneRect || !caretCoords) return
 
     setDragCaret({
-      pane: targetEditor === secondaryEditor ? 'secondary' : 'primary',
+      pane: isSecondary ? 'secondary' : 'primary',
       left: Math.max(0, caretCoords.left - paneRect.left),
       top: Math.max(0, caretCoords.top - paneRect.top),
       height: Math.max(18, caretCoords.bottom - caretCoords.top),
