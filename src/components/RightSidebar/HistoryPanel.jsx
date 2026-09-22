@@ -17,16 +17,7 @@
  * beside it so you can swap versions while reading one.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  appendVersionEntry,
-  buildCanvasVersionEntry,
-  buildTextVersionEntry,
-  createDocumentFromVersion,
-  deleteVersionEntry,
-  getVersions,
-  loadDocument,
-  updateVersionEntry,
-} from '../../lib/FileSystem'
+import { getVersions } from '../../lib/FileSystem'
 import { isCanvasDoc } from '../../lib/docKind'
 import {
   describeCanvasDiff,
@@ -40,7 +31,13 @@ import {
   versionWords,
   wordDelta,
 } from '../../lib/versionHistory'
-import { dispatchCanvasRestore } from '../../canvas/canvasEvents'
+import {
+  copyVersionAsDocument,
+  deleteVersion,
+  renameVersion,
+  restoreVersion,
+  snapshotVersion,
+} from '../../lib/versionActions'
 import SFIcon from '../SFIcon'
 import './HistoryPanel.css'
 
@@ -189,25 +186,7 @@ export default function HistoryPanel({
     if (busy || !projectName || !docName) return
     setBusy(true)
     try {
-      let stored = null
-      if (isCanvas) {
-        const raw = await loadDocument(projectName, docName)
-        if (raw) {
-          stored = await appendVersionEntry(
-            projectName, docName,
-            buildCanvasVersionEntry({ canvas: raw, auto: false })
-          )
-        }
-      } else if (editor) {
-        stored = await appendVersionEntry(
-          projectName, docName,
-          buildTextVersionEntry({
-            contentHtml: editor.getHTML(),
-            contentJson: editor.getJSON(),
-            auto: false,
-          })
-        )
-      }
+      const stored = await snapshotVersion({ projectName, docName, editor })
       await refresh()
       // A deliberate snapshot is usually about to be named — drop straight into
       // the rename field rather than making the user hunt for the row.
@@ -218,61 +197,24 @@ export default function HistoryPanel({
     } finally {
       setBusy(false)
     }
-  }, [busy, docName, editor, isCanvas, projectName, refresh])
+  }, [busy, docName, editor, projectName, refresh])
 
   const handleRestore = useCallback(async (version) => {
     if (busy || !projectName || !docName) return
     setBusy(true)
     try {
-      const restoredName = `Restored from ${formatFullTimestamp(version.timestamp)}`
-
-      if (isCanvas) {
-        // Safety checkpoint of what's on disk now (autosave keeps it ≤1s stale),
-        // then swap the live canvas — one undoable doc/replace.
-        const current = await loadDocument(projectName, docName)
-        if (current) {
-          await appendVersionEntry(
-            projectName, docName,
-            buildCanvasVersionEntry({ canvas: current, auto: true })
-          )
-        }
-        dispatchCanvasRestore(docName, version.canvas)
-        await appendVersionEntry(
-          projectName, docName,
-          buildCanvasVersionEntry({ canvas: version.canvas, name: restoredName, auto: false })
-        )
-      } else if (editor) {
-        await appendVersionEntry(
-          projectName, docName,
-          buildTextVersionEntry({
-            contentHtml: editor.getHTML(),
-            contentJson: editor.getJSON(),
-            auto: true,
-          })
-        )
-        editor.commands.setContent(version.contentJson || version.contentHtml || '<p></p>')
-        await appendVersionEntry(
-          projectName, docName,
-          buildTextVersionEntry({
-            contentHtml: version.contentHtml,
-            contentJson: version.contentJson,
-            name: restoredName,
-            auto: false,
-          })
-        )
-      }
+      await restoreVersion({ projectName, docName, editor, version })
       await refresh()
     } finally {
       setBusy(false)
     }
-  }, [busy, docName, editor, isCanvas, projectName, refresh])
+  }, [busy, docName, editor, projectName, refresh])
 
   const handleMakeCopy = useCallback(async (version) => {
     if (busy || !projectName || !docName) return
     setBusy(true)
     try {
-      const label = version.name || formatFullTimestamp(version.timestamp)
-      const newPath = await createDocumentFromVersion(projectName, docName, version, label)
+      const newPath = await copyVersionAsDocument({ projectName, docName, version })
       if (newPath) {
         await refreshFiles?.()
         onOpenDocInTab?.(newPath)
@@ -286,8 +228,7 @@ export default function HistoryPanel({
     const id = renamingId
     setRenamingId(null)
     if (!id) return
-    const name = renameValue.trim()
-    await updateVersionEntry(projectName, docName, id, { name: name || null, auto: !name })
+    await renameVersion({ projectName, docName, versionId: id, name: renameValue })
     await refresh()
   }, [docName, projectName, refresh, renameValue, renamingId])
 
@@ -297,7 +238,7 @@ export default function HistoryPanel({
       return
     }
     setConfirmDeleteId(null)
-    await deleteVersionEntry(projectName, docName, version.id)
+    await deleteVersion({ projectName, docName, versionId: version.id })
     await refresh()
   }, [confirmDeleteId, docName, projectName, refresh])
 

@@ -32,7 +32,12 @@ import type {
   NoteMarkerEvent,
   NotesRemapped,
   OpenDocumentCommand,
+  ClipboardChanged,
+  NotesChanged,
   ProjectChanged,
+  ShowSidebarTab,
+  TilesChanged,
+  VersionsChanged,
   ReadAloudPayloadEvent,
   SearchMatches,
   SelectionContext,
@@ -108,6 +113,17 @@ export interface DocumentSurface {
   publishReadAloudPayload(payload: ReadAloudPayloadEvent): void
   /** Which project is open. Not coalesced — it changes when the user picks one. */
   publishProjectChanged(payload: ProjectChanged): void
+  /**
+   * The right sidebar's state, for a shell that draws the sidebar itself. Notes, the
+   * clipboard and tiles each carry the whole list, which is what makes coalescing
+   * them to one per frame safe (sharp edge #4) — a keystroke in a note would otherwise
+   * be a message per keystroke.
+   */
+  publishNotesChanged(payload: NotesChanged): void
+  publishClipboardChanged(payload: ClipboardChanged): void
+  publishTilesChanged(payload: TilesChanged): void
+  publishVersionsChanged(payload: VersionsChanged): void
+  publishShowSidebarTab(payload: ShowSidebarTab): void
 
   /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
   publishDragStarted(): void
@@ -153,6 +169,22 @@ export function createDocumentSurface({
     notesByDoc.set(docPath, created)
     return created
   }
+  const notesChangedByDoc = new Map<string, ReturnType<typeof createCoalescer<NotesChanged>>>()
+  const notesChangedFor = (docPath: string) => {
+    const existing = notesChangedByDoc.get(docPath)
+    if (existing) return existing
+    const created = createCoalescer<NotesChanged>((payload) => bridge.emit('notesChanged', payload), scheduler)
+    notesChangedByDoc.set(docPath, created)
+    return created
+  }
+  const clipboardChanges = createCoalescer<ClipboardChanged>(
+    (payload) => bridge.emit('clipboardChanged', payload),
+    scheduler
+  )
+  const tileChanges = createCoalescer<TilesChanged>(
+    (payload) => bridge.emit('tilesChanged', payload),
+    scheduler
+  )
   const dragMoves = createCoalescer<{ dragId: string; clientX: number; clientY: number }>(
     (moved) => bridge.emit('dragMoved', moved),
     scheduler
@@ -336,6 +368,11 @@ export function createDocumentSurface({
     publishFocusModeView(payload) { bridge.emit('focusModeView', payload) },
     publishReadAloudPayload(payload) { bridge.emit('readAloudPayload', payload) },
     publishProjectChanged(payload) { bridge.emit('projectChanged', payload) },
+    publishNotesChanged(payload) { notesChangedFor(payload.docPath).push(payload) },
+    publishClipboardChanged(payload) { clipboardChanges.push(payload) },
+    publishTilesChanged(payload) { tileChanges.push(payload) },
+    publishVersionsChanged(payload) { bridge.emit('versionsChanged', payload) },
+    publishShowSidebarTab(payload) { bridge.emit('showSidebarTab', payload) },
 
     publishDragStarted() {
       const session = drag.current()
@@ -361,15 +398,22 @@ export function createDocumentSurface({
       toolbar.flush()
       selection.flush()
       dragMoves.flush()
+      clipboardChanges.flush()
+      tileChanges.flush()
       for (const coalescer of notesByDoc.values()) coalescer.flush()
+      for (const coalescer of notesChangedByDoc.values()) coalescer.flush()
     },
 
     dispose() {
       toolbar.cancel()
       selection.cancel()
       dragMoves.cancel()
+      clipboardChanges.cancel()
+      tileChanges.cancel()
       for (const coalescer of notesByDoc.values()) coalescer.cancel()
+      for (const coalescer of notesChangedByDoc.values()) coalescer.cancel()
       notesByDoc.clear()
+      notesChangedByDoc.clear()
       for (const unsubscribe of subscriptions) unsubscribe()
       subscriptions.length = 0
     },

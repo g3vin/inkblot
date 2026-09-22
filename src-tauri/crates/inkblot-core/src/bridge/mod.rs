@@ -33,6 +33,7 @@ pub mod command;
 pub mod common;
 pub mod envelope;
 pub mod event;
+pub mod sidebar;
 
 pub use command::{
     ApplyMarkCommand, CanvasCommandRequest, CanvasDropDocCommand, CanvasDropNoteCommand,
@@ -42,6 +43,13 @@ pub use command::{
     OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand,
     SetColorCommand, SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand,
     SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,
+};
+pub use sidebar::{
+    ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,
+    NoteRef, NotesChanged, RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
+    ReplaceTileWordCommand, RevealSearchResultCommand, ShowSidebarTab, SidebarTab, TileKind, TileRef,
+    TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,
+    WorkbenchTile,
 };
 pub use common::{Alignment, EditorTarget, MarkKind, Pane, RangeEdit, TextAnchor};
 pub use envelope::{

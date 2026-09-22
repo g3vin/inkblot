@@ -9,13 +9,14 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { resolveAnchor } from '../bridge/anchors'
-import { useBridgeState } from '../bridge'
+import { documentSurface, useBridgeState } from '../bridge'
 import { EditorTarget } from '../types'
 
 /** A stable identity, so useBridgeState's initial value is not a new object each render. */
 const EMPTY_ACTIVE_EDITOR = {}
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
 import { nativeOwns } from '../lib/host'
+import { useNativeSidebar } from './useNativeSidebar'
 import EditorCanvas from './EditorCanvas'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
@@ -113,7 +114,8 @@ export default function EditorLayout(props) {
     : left.collapsed && !left.peeked
       ? 86
       : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
-  const titlebarRightWidth = right.collapsed && !right.peeked
+  const nativeRightSidebar = nativeOwns('rightSidebar')
+  const titlebarRightWidth = nativeRightSidebar ? 0 : right.collapsed && !right.peeked
     ? 0
     : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
   // On a canvas, the only editor the Toolbar may drive is a card's own editor.
@@ -253,10 +255,16 @@ export default function EditorLayout(props) {
     pendingSearchTargetRef.current = pendingSearchTarget
   }, [pendingSearchTarget])
 
+  // Under the Swift shell the sidebar is native, so "show the notes tab" is a request
+  // to the shell rather than something this page can do.
   const openRightSidebarTab = useCallback((tab) => {
     setSidebarTab(tab)
+    if (nativeRightSidebar) {
+      documentSurface.publishShowSidebarTab({ tab })
+      return
+    }
     openRightSidebar()
-  }, [setSidebarTab, openRightSidebar])
+  }, [nativeRightSidebar, setSidebarTab, openRightSidebar])
 
   const handleContextMenu = useEditorContextMenu({
     editor: props.activeEditor,
@@ -381,6 +389,30 @@ export default function EditorLayout(props) {
     }
   }, [activeDoc, currentDoc, jumpToText, setActiveDoc, setCurrentDoc])
 
+  // The right sidebar's state and edits, for a shell that draws the sidebar itself.
+  // Here, after openSearchTarget, because a hook argument is read during render.
+  useNativeSidebar({
+    enabled: nativeRightSidebar,
+    projectName: props.projectName,
+    activeDoc,
+    currentDoc,
+    secondaryDoc: props.secondaryDoc,
+    editor,
+    secondaryEditor: props.secondaryEditor,
+    notesByDoc,
+    setNotesForDoc: props.setNotesForDoc,
+    clipboardHistory: props.clipboardHistory,
+    clearClipboardHistory: props.clearClipboardHistory,
+    onDropToClipboard: props.onDropToClipboard,
+    onMoveClipboardEntryToEditor: props.onMoveClipboardEntryToEditor,
+    tiles: props.tiles,
+    setTiles: props.setTiles,
+    openCompare: props.openCompare,
+    refreshFiles: props.refreshFiles,
+    onOpenDocInTab: props.onOpenDocInTab,
+    openSearchTarget,
+  })
+
   // Complete a queued search jump once the target document's editor is mounted
   // (retries briefly while the editor initializes).
   useEffect(() => {
@@ -496,7 +528,7 @@ export default function EditorLayout(props) {
           onExitFocusMode={() => setFocusModeOpen(false)}
         />
 
-        <RightSidebar
+        {nativeRightSidebar ? null : <RightSidebar
           width={right.width}
           onResize={right.start}
           resizing={right.resizing}
@@ -535,7 +567,7 @@ export default function EditorLayout(props) {
 
           refreshFiles={props.refreshFiles}
           onOpenDocInTab={props.onOpenDocInTab}
-        />
+        />}
 
         {bubbleSentence ? (
           <Bubble
