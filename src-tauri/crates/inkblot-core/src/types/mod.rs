@@ -12,12 +12,16 @@
 //! ```
 
 pub mod canvas;
+pub mod diff;
 pub mod document;
 pub mod geometry;
 pub mod json;
 pub mod note;
 pub mod story;
 
+pub use diff::{
+    CanvasDiff, CanvasNodeChange, DiffChunk, DiffChunkType, DiffOp, DiffOpType, HtmlBlock, MergeChoice, WordDelta,
+};
 pub use canvas::{
     CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState,
 };

@@ -12,12 +12,17 @@
 
 use std::io::{self, Read, Write};
 
+use std::collections::HashMap;
+
 use serde_json::{json, Map, Value};
 
-use inkblot_core::types::{CanvasEdge, CanvasNode, CanvasNodeType, EdgeSide, Point, Rect, Viewport};
+use inkblot_core::types::{
+    CanvasEdge, CanvasFile, CanvasNode, CanvasNodeType, DiffChunk, EdgeSide, HtmlBlock, MergeChoice,
+    Point, Rect, VersionEntry, Viewport,
+};
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
-    story_structure as story,
+    story_structure as story, version_history as history,
 };
 
 /// `String(x || '')`, the coercion the JS entry points open with.
@@ -172,6 +177,50 @@ fn string_list(value: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Deserialize a corpus value into a domain type.
+///
+/// Unlike `normalize_canvas`, this is not tolerant of a malformed shape — and does not
+/// need to be. Everything it parses here is something Inkblot itself wrote:
+/// `serializeCanvas` output, a version entry, the blocks `htmlToBlocks` produced.
+fn parse<T: serde::de::DeserializeOwned>(value: &Value, what: &str) -> Result<T, String> {
+    serde_json::from_value(value.clone()).map_err(|error| format!("bad {what}: {error}"))
+}
+
+fn merge_choice(value: &Value) -> Option<MergeChoice> {
+    match value.as_str() {
+        Some("left") => Some(MergeChoice::Left),
+        Some("right") => Some(MergeChoice::Right),
+        Some("both") => Some(MergeChoice::Both),
+        _ => None,
+    }
+}
+
+/// `{ "0": "left" }` — the compare panel keys its choices by chunk index.
+fn indexed_choices(value: &Value) -> HashMap<usize, MergeChoice> {
+    value
+        .as_object()
+        .map(|fields| {
+            fields
+                .iter()
+                .filter_map(|(key, choice)| Some((key.parse().ok()?, merge_choice(choice)?)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// `{ "edited:<id>": "left" }` — the canvas merge keys its decisions by change.
+fn named_choices(value: &Value) -> HashMap<String, MergeChoice> {
+    value
+        .as_object()
+        .map(|fields| {
+            fields
+                .iter()
+                .filter_map(|(key, choice)| Some((key.clone(), merge_choice(choice)?)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
     let text = || js_string_or_empty(args.first());
 
@@ -296,6 +345,56 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         )),
         "getStoryFolderAncestor" => {
             json!(story::get_story_folder_ancestor(args[0].as_str().unwrap_or_default()))
+        }
+
+        /* ---- version_history ---- */
+        "htmlToText" => json!(history::html_to_text(args[0].as_str().unwrap_or_default())),
+        "textWords" => json!(history::text_words(args[0].as_str().unwrap_or_default())),
+        "countWords" => json!(history::count_words(
+            args[0].as_str().unwrap_or_default(),
+            args[1].as_bool().unwrap_or(true)
+        )),
+        "countCanvasWords" => json!(history::count_canvas_words(&parse::<CanvasFile>(&args[0], "canvas")?)),
+        "versionWords" => json!(history::version_words(&parse::<VersionEntry>(&args[0], "version entry")?)),
+        "sessionColor" => json!(history::session_color(args[0].as_str().unwrap_or_default())),
+        "diffTokens" => json!(history::diff_tokens(
+            &parse::<Vec<String>>(&args[0], "tokens")?,
+            &parse::<Vec<String>>(&args[1], "tokens")?
+        )),
+        "diffWords" => json!(history::diff_words(
+            args[0].as_str().unwrap_or_default(),
+            args[1].as_str().unwrap_or_default()
+        )),
+        "wordDelta" => json!(history::word_delta(
+            args[0].as_str().unwrap_or_default(),
+            args[1].as_str().unwrap_or_default()
+        )),
+        "diffBlockLists" => json!(history::diff_block_lists(
+            &parse::<Vec<HtmlBlock>>(&args[0], "blocks")?,
+            &parse::<Vec<HtmlBlock>>(&args[1], "blocks")?
+        )),
+        "mergeChunksToHtml" => json!(history::merge_chunks_to_html(
+            &parse::<Vec<DiffChunk>>(&args[0], "chunks")?,
+            &indexed_choices(&args[1])
+        )),
+        "canvasNodeText" => json!(history::canvas_node_text(&parse::<CanvasNode>(&args[0], "node")?)),
+        "diffCanvases" => json!(history::diff_canvases(
+            &parse::<CanvasFile>(&args[0], "canvas")?,
+            &parse::<CanvasFile>(&args[1], "canvas")?
+        )),
+        "canvasDiffIsEmpty" => json!(history::canvas_diff_is_empty(&history::diff_canvases(
+            &parse::<CanvasFile>(&args[0], "canvas")?,
+            &parse::<CanvasFile>(&args[1], "canvas")?
+        ))),
+        "describeCanvasDiff" => json!(history::describe_canvas_diff(&history::diff_canvases(
+            &parse::<CanvasFile>(&args[0], "canvas")?,
+            &parse::<CanvasFile>(&args[1], "canvas")?
+        ))),
+        "mergeCanvases" => {
+            let left = parse::<CanvasFile>(&args[0], "canvas")?;
+            let right = parse::<CanvasFile>(&args[1], "canvas")?;
+            let diff = history::diff_canvases(&left, &right);
+            json!(history::merge_canvases(&right, &diff, &named_choices(&args[2])))
         }
 
         unknown => return Err(format!("no such function: {unknown}")),
