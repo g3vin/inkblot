@@ -20,6 +20,7 @@ use inkblot_core::types::{
     CanvasEdge, CanvasFile, CanvasNode, CanvasNodeType, DiffChunk, EdgeSide, HtmlBlock, MergeChoice,
     Point, Rect, VersionEntry, Viewport,
 };
+use inkblot_core::store::{paths, versions};
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
     story_structure as story, version_history as history,
@@ -396,6 +397,47 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             let diff = history::diff_canvases(&left, &right);
             json!(history::merge_canvases(&right, &diff, &named_choices(&args[2])))
         }
+
+        /* ---- store::paths ---- */
+        "stripTrailingSlash" => json!(paths::strip_trailing_slash(args[0].as_str().unwrap_or_default())),
+        "stripLeadingSlash" => json!(paths::strip_leading_slash(args[0].as_str().unwrap_or_default())),
+        "parentOf" => json!(paths::parent_of(args[0].as_str().unwrap_or_default())),
+        "normalizePath" => json!(paths::normalize_path(args[0].as_str().unwrap_or_default())),
+        "joinPath" => {
+            let parts: Vec<&str> =
+                args[0].as_array().map(|list| list.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+            json!(paths::join_path(&parts))
+        }
+        "versionsSidecarPath" => json!(paths::versions_sidecar_path(
+            args[0].as_str().unwrap_or_default(),
+            args[1].as_str().unwrap_or_default()
+        )),
+
+        /* ---- store::versions ---- */
+        "pushVersionEntry" => json!(versions::push_version_entry(
+            &parse::<Vec<VersionEntry>>(&args[0], "versions")?,
+            parse::<VersionEntry>(&args[1], "entry")?
+        )),
+        "buildTextVersionEntry" => {
+            // The stamps are the clock's; the harness blanks them on both sides.
+            json!(versions::build_text_version_entry(versions::NewTextVersion {
+                id: "stamped".to_string(),
+                timestamp: "stamped".to_string(),
+                session_id: "stamped".to_string(),
+                content_html: args[0]["contentHtml"].as_str().map(str::to_string),
+                content_json: Some(args[0]["contentJson"].clone()).filter(|value| !value.is_null()),
+                name: args[0]["name"].as_str().map(str::to_string),
+                auto: args[0]["auto"].as_bool().unwrap_or(true),
+            }))
+        }
+        "buildCanvasVersionEntry" => json!(versions::build_canvas_version_entry(
+            "stamped".to_string(),
+            "stamped".to_string(),
+            "stamped".to_string(),
+            parse::<CanvasFile>(&args[0], "canvas")?,
+            args[1].as_str().map(str::to_string),
+            args[2].as_bool().unwrap_or(true)
+        )),
 
         unknown => return Err(format!("no such function: {unknown}")),
     })

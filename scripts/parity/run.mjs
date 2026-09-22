@@ -24,10 +24,11 @@ import canvasGeometry from './cases/canvasGeometry.mjs'
 import canvasModel from './cases/canvasModel.mjs'
 import docKind from './cases/docKind.mjs'
 import jsNumber from './cases/jsNumber.mjs'
+import store from './cases/store.mjs'
 import storyStructure from './cases/storyStructure.mjs'
 import versionHistory from './cases/versionHistory.mjs'
 
-const MODULES = [jsNumber, docKind, canvasGeometry, canvasModel, storyStructure, versionHistory]
+const MODULES = [jsNumber, docKind, canvasGeometry, canvasModel, storyStructure, versionHistory, store]
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const TAURI = path.resolve(HERE, '../../src-tauri')
