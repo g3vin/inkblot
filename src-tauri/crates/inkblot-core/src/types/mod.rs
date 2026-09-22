@@ -17,6 +17,8 @@ pub mod document;
 pub mod geometry;
 pub mod json;
 pub mod note;
+pub mod read_aloud;
+pub mod search;
 pub mod story;
 
 pub use diff::{
@@ -28,6 +30,8 @@ pub use canvas::{
 pub use document::{DocKind, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind, VERSION_CAP};
 pub use geometry::{BezierPath, EdgeSide, Point, Rect, Viewport};
 pub use json::{JsonMap, JsonValue};
+pub use read_aloud::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
+pub use search::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
 pub use story::{StoryFolderAncestor, StoryFolderPreset};
 pub use note::{
     AudioClip, Note, NoteImage, NotePreviewLayout, NotePreviewSize, NoteType,

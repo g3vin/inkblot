@@ -22,6 +22,7 @@ use std::collections::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use crate::js_string::JS_WHITESPACE_CLASS;
 use crate::types::{
     CanvasDiff, CanvasEdge, CanvasFile, CanvasNode, CanvasNodeChange, DiffChunk, DiffOp,
     DiffOpType, HtmlBlock, MergeChoice, VersionEntry, WordDelta,
@@ -60,16 +61,9 @@ static BLOCK_TAG_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)</(p|h[1-6]|li|blockquote|pre|div|tr)>|<br\s*/?>").unwrap());
 static TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"<[^>]+>").unwrap());
 
-/// The characters JavaScript's `\s` matches.
-///
-/// Not the same set as the `regex` crate's `\s`, which is `\p{White_Space}`: that omits
-/// U+FEFF, which JS includes. A zero-width no-break space between two words would then
-/// make them one word here and two words in the webview.
-const JS_WHITESPACE: &str =
-    "\t\n\u{b}\u{c}\r \u{a0}\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}\u{feff}";
-
+/// `\s+`, spelled out rather than borrowed from `regex` — see [`JS_WHITESPACE_CLASS`].
 static WHITESPACE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(&format!("[{JS_WHITESPACE}]+")).unwrap());
+    Lazy::new(|| Regex::new(&format!("[{JS_WHITESPACE_CLASS}]+")).unwrap());
 
 /// HTML → plain text, with block boundaries becoming line breaks.
 pub fn html_to_text(html: &str) -> String {

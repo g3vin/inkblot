@@ -1,10 +1,11 @@
 /**
  * Node ESM loader for the canvas suites.
  *
- * Three jobs:
+ * Four jobs:
  *   1. map the @tauri-apps modules onto the in-memory stubs
  *   2. resolve the extensionless relative imports Vite allows but Node does not
  *   3. transpile .jsx, so a suite can mount a real component
+ *   4. neutralize `import.meta.glob`, which is Vite's and has no Node equivalent
  *
  * (3) is what lets the `dom` suite render CanvasSurface itself. esbuild comes with
  * Vite, so this adds no dependency. The automatic JSX runtime is used, matching the
@@ -65,6 +66,26 @@ export async function load(url, context, next) {
   // CSS is imported for its side effect only (CanvasPane imports Canvas.css).
   if (url.endsWith('.css')) {
     return { format: 'module', source: 'export default {}', shortCircuit: true }
+  }
+
+  /**
+   * `import.meta.glob` is a Vite build-time transform, not a runtime function, so a
+   * module using it throws on import under Node before any of its exports exist —
+   * which is what kept readAloud.js, and its chunker, unreachable from here.
+   *
+   * It is rewritten to a call returning an empty map. Anything that actually needs the
+   * globbed assets (the bundled Kokoro voice files) cannot work outside the app
+   * anyway; everything else in the module becomes importable.
+   */
+  if (url.endsWith('.js') && url.includes('/src/')) {
+    const source = readFileSync(fileURLToPath(url), 'utf8')
+    if (source.includes('import.meta.glob')) {
+      return {
+        format: 'module',
+        source: source.replaceAll('import.meta.glob', '(() => ({}))'),
+        shortCircuit: true,
+      }
+    }
   }
 
   return next(url, context)
