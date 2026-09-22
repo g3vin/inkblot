@@ -92,6 +92,26 @@ export function dispatchCanvasDropNote(surface, { docPath, noteId, clientX, clie
 }
 
 /**
+ * A note dragged out of the Swift shell's Notes panel: `inkblot-note://note?doc=…&id=…`
+ * (`NoteDrag.swift` writes it), which WebKit hands over as `text/uri-list` on an
+ * ordinary drop. Null for anything else.
+ */
+export function noteDragURL(uriList) {
+  for (const line of String(uriList || '').split(/\r?\n/)) {
+    if (!line.startsWith('inkblot-note:')) continue
+    try {
+      const url = new URL(line.trim())
+      const docPath = url.searchParams.get('doc')
+      const noteId = url.searchParams.get('id')
+      if (docPath && noteId) return { docPath, noteId }
+    } catch {
+      // Not a URL after all; keep looking.
+    }
+  }
+  return null
+}
+
+/**
  * Restore a canvas to a version-history state. Window-level like reveal — the
  * history panel has no reference to the surface element — and carrying the doc
  * path so only the targeted canvas replaces itself. `canvas` is the serialized

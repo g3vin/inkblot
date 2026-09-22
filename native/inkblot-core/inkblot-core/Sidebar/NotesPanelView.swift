@@ -65,6 +65,7 @@ struct NoteTree: Identifiable {
 }
 
 private struct NoteBranchView: View {
+    @Environment(AppModel.self) private var model
     let branch: NoteTree
     let depth: Int
     let filtering: Bool
@@ -73,6 +74,15 @@ private struct NoteBranchView: View {
         VStack(alignment: .leading, spacing: 8) {
             NoteCardView(note: branch.note, hasChildren: !branch.children.isEmpty)
                 .padding(.leading, CGFloat(depth) * 16)
+                // Onto a canvas: the page reads this URL off an ordinary HTML5 drop
+                // (`noteDragURL` in canvasEvents.js). A native drag cannot hit-test the
+                // canvas the way the page's own pointer drag does, so it doesn't try.
+                .onDrag {
+                    guard let url = NoteDrag.url(docPath: model.sidebar.notesDocPath, noteId: branch.note.id) else {
+                        return NSItemProvider()
+                    }
+                    return NSItemProvider(object: url as NSURL)
+                }
             if !branch.note.collapsedChildren || filtering {
                 ForEach(branch.children) { child in
                     NoteBranchView(branch: child, depth: depth + 1, filtering: filtering)
