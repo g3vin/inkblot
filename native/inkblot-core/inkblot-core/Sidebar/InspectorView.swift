@@ -17,18 +17,6 @@ struct InspectorView: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 10)
 
-            Picker("Panel", selection: $sidebar.tab) {
-                ForEach(SidebarModel.Tab.allCases) { tab in
-                    Label(tab.title, systemImage: tab.symbol).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelStyle(.iconOnly)
-            .padding(12)
-            .disabled(sidebar.isSearching)
-
-            Divider()
-
             Group {
                 if sidebar.isSearching {
                     SearchResultsView(replacement: $replacement)
@@ -42,7 +30,26 @@ struct InspectorView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, 8)
+            // Room under the last row for the floating bar, as a content inset — so a
+            // list scrolls beneath the glass and still ends clear of it.
+            .safeAreaPadding(.bottom, sidebar.isSearching ? 0 : 64)
         }
+        // The tab bar floats over the bottom of the panel, as it does on iOS: the list
+        // scrolls on underneath the glass rather than stopping above it.
+        .overlay(alignment: .bottom) {
+            if !sidebar.isSearching {
+                GlassTabBar(
+                    tabs: SidebarModel.Tab.allCases,
+                    selection: $sidebar.tab,
+                    symbol: \.symbol,
+                    title: \.title)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.3), value: sidebar.isSearching)
     }
 
     private var searchBar: some View {
