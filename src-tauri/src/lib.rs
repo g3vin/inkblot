@@ -14,6 +14,7 @@ use url::Url;
 
 mod dictation_commands;
 mod kokoro_commands;
+mod pinterest_commands;
 mod preferences_commands;
 mod synonym_commands;
 
@@ -22,6 +23,9 @@ use dictation_commands::{
     stop_dictation_session, AppDictationState,
 };
 use kokoro_commands::{generate_kokoro_speech, prewarm_kokoro_speech, KokoroSpeechState};
+use pinterest_commands::{
+    pinterest_await_scrape, pinterest_begin_scrape, pinterest_report_scrape, ScrapeChannels,
+};
 use preferences_commands::{
     preferences_load, preferences_remove, preferences_rename_prefix, preferences_set,
 };
@@ -157,6 +161,7 @@ pub fn run() {
         .manage(AppDictationState::default())
         .manage(KokoroSpeechState::default())
         .manage(SynonymState::default())
+        .manage(ScrapeChannels::default())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -180,6 +185,9 @@ pub fn run() {
             preferences_set,
             preferences_remove,
             preferences_rename_prefix,
+            pinterest_begin_scrape,
+            pinterest_report_scrape,
+            pinterest_await_scrape,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

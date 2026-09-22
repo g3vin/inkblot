@@ -4,8 +4,13 @@
  * Used for boards the public widget API can't serve (private boards and
  * board sections). Opens a hidden webview that shares the logged-in
  * Pinterest session, injects a scraping script that scrolls the board and
- * collects pin images/links, and relays results back over Tauri events.
+ * collects pin images/links, and takes the result back over Tauri's IPC.
  * PinterestBoard.js consumes this via dynamic import.
+ *
+ * The script used to smuggle its payload out through `location.hash` while this file
+ * polled `get_webview_url` every 220ms, because `eval_webview` throws its result away.
+ * It now calls `pinterest_report_scrape` directly and Rust hands back a typed report —
+ * see src-tauri/src/pinterest_commands.rs for why that works from a remote page.
  */
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
@@ -57,30 +62,26 @@ const evalWithRetry = async (label, script, { attempts = 35, delayMs = 200 } = {
   const d = Math.max(50, Math.min(1000, Number(delayMs) || 200))
   const requestIdMatch = script.match(/const requestId = "([^"]+)"/)
   const wrappedRequestId = requestIdMatch ? requestIdMatch[1] : ''
+  // A script that throws while running reports the throw itself, so the caller gets a
+  // reason instead of a timeout. A script that fails to PARSE cannot — which is what
+  // the syntax pre-check below is for.
   const wrappedScript = `(() => {
     try {
       ${script}
     } catch (error) {
       try {
-        const message = String(error && error.message ? error.message : error);
-        const stack = String(error && error.stack ? error.stack : '');
         const requestId = ${JSON.stringify(wrappedRequestId)};
         if (requestId) {
-          const payload = {
-            requestId,
-            url: location.href,
-            pins: [],
-            reason: 'wrapper_eval_error',
-            stage: 'wrapper-eval-error',
-            progress: false,
-            debug: {
-              wrapperError: message,
-              wrapperStack: stack.slice(0, 1200),
-              locationHref: location.href,
-              pathname: location.pathname,
+          window.__TAURI_INTERNALS__.invoke('pinterest_report_scrape', {
+            report: {
+              requestId,
+              url: location.href,
+              pins: [],
+              reason: 'wrapper_eval_error',
+              stage: String(error && error.message ? error.message : error).slice(0, 200),
+              progress: false,
             },
-          };
-          location.hash = 'inkblot-scrape-' + requestId + '=' + encodeURIComponent(JSON.stringify(payload));
+          });
         }
       } catch (_) {
         // ignore secondary failures
@@ -110,54 +111,23 @@ const evalWithRetry = async (label, script, { attempts = 35, delayMs = 200 } = {
   return { ok: false, error: lastErr, exhausted: true }
 }
 
-const readScrapePayloadFromUrl = (url, requestId) => {
-  if (!url) return null
-  let parsed
+/**
+ * Open a slot for this run, then wait for the page to fill it.
+ *
+ * `begin` has to happen before the script is injected — that ordering is the whole
+ * reason the report cannot arrive before anything is listening for it.
+ */
+const openScrapeSlot = (requestId) => invoke('pinterest_begin_scrape', { requestId })
+
+const waitForScrapeReport = async (requestId, timeoutMs) => {
   try {
-    parsed = new URL(url)
+    return await invoke('pinterest_await_scrape', {
+      requestId,
+      timeoutMs: Math.max(1000, Number(timeoutMs) || 15000),
+    })
   } catch {
     return null
   }
-
-  const hash = String(parsed.hash || '').replace(/^#/, '')
-  const prefix = `inkblot-scrape-${requestId}=`
-  if (!hash.startsWith(prefix)) return null
-
-  const encoded = hash.slice(prefix.length)
-  if (!encoded) return null
-
-  try {
-    const payload = JSON.parse(decodeURIComponent(encoded))
-    if (!payload || typeof payload !== 'object') return null
-    return payload
-  } catch {
-    return null
-  }
-}
-
-const waitForScrapePayload = async (label, requestId, timeoutMs) => {
-  const started = Date.now()
-  const deadline = started + Math.max(1000, Number(timeoutMs) || 15000)
-
-  while (Date.now() < deadline) {
-    try {
-      const currentUrl = await invoke('get_webview_url', { label })
-      const payload = readScrapePayloadFromUrl(currentUrl, requestId)
-      if (payload) {
-        if (payload?.progress) {
-          await sleep(220)
-          continue
-        }
-        return payload
-      }
-    } catch {
-      // ignore and retry
-    }
-
-    await sleep(220)
-  }
-
-  return null
 }
 
 const ensureScrapeWindow = async (url) => {
@@ -309,8 +279,11 @@ export async function scrapePinterestPins(
     // The probe script will confirm execution works before we proceed.
     await sleep(scrapeStrategy === 'session-only' ? 250 : 150)
 
-    // Probe whether injected JS actually executes in this remote page.
+    // Probe whether injected JS actually executes in this remote page AND can reach
+    // Rust. Both are the same question now, and answering it up front turns "the
+    // channel is broken" from a fifteen-second timeout into an immediate reason.
     const probeRequestId = `${requestId}-probe`
+    await openScrapeSlot(probeRequestId)
     const probeScript = buildPinterestProbeScript({ requestId: probeRequestId })
     const probeEval = await evalWithRetry(activeLabel, probeScript, { attempts: 20, delayMs: 150 })
     if (!probeEval.ok) {
@@ -322,7 +295,7 @@ export async function scrapePinterestPins(
       }
     }
 
-    const probePayload = await waitForScrapePayload(activeLabel, probeRequestId, scrapeStrategy === 'session-only' ? 2500 : 1500)
+    const probePayload = await waitForScrapeReport(probeRequestId, scrapeStrategy === 'session-only' ? 2500 : 1500)
     if (!probePayload) {
       return {
         pins: [],
@@ -361,6 +334,7 @@ export async function scrapePinterestPins(
         }
       }
     }
+    await openScrapeSlot(requestId)
     const evalResult = await evalWithRetry(activeLabel, script, { attempts: 35, delayMs: 200 })
     if (!evalResult.ok) {
       return {
@@ -370,7 +344,7 @@ export async function scrapePinterestPins(
         error: String(evalResult?.error?.message || evalResult?.error || ''),
       }
     }
-    const payload = await waitForScrapePayload(activeLabel, requestId, scriptTimeout + payloadWaitBufferMs)
+    const payload = await waitForScrapeReport(requestId, scriptTimeout + payloadWaitBufferMs)
     if (!payload) {
       return {
         pins: [],
@@ -401,15 +375,22 @@ export async function scrapePinterestPins(
 
 
 /**
- * Lightweight probe script – sets the URL hash to prove JS execution works
- * inside the Pinterest webview before we inject the heavier scrape script.
+ * Lightweight probe script — proves that injected JS runs inside the Pinterest webview
+ * AND that it can reach Rust, before the heavier scrape script is sent after it.
  */
 const buildPinterestProbeScript = ({ requestId }) => {
   return `(() => {
   try {
-    var payload = { requestId: ${JSON.stringify(String(requestId))}, reason: 'probe', url: location.href, pins: [], debug: { locationHref: location.href, pathname: location.pathname } };
-    var encoded = encodeURIComponent(JSON.stringify(payload));
-    location.hash = 'inkblot-scrape-' + ${JSON.stringify(String(requestId))} + '=' + encoded;
+    window.__TAURI_INTERNALS__.invoke('pinterest_report_scrape', {
+      report: {
+        requestId: ${JSON.stringify(String(requestId))},
+        reason: 'probe',
+        url: location.href,
+        pins: [],
+        stage: 'probe',
+        progress: false,
+      },
+    });
   } catch (e) {
     // ignore
   }
