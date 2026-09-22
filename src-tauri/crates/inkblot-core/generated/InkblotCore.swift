@@ -293,6 +293,40 @@ public struct Rect: Codable, Equatable {
 	}
 }
 
+public struct StoryFolderPreset: Codable, Equatable {
+	public let key: String
+	public let name: String
+	public let menuLabel: String
+	/// What one document inside the folder is, for the file tree's contextual
+	/// "New …" button.
+	public let entryLabel: String
+	public let folderIcon: String
+	public let fileIcon: String
+	/// Other folder names that resolve to this preset.
+	public let aliases: [String]
+
+	public init(key: String, name: String, menuLabel: String, entryLabel: String, folderIcon: String, fileIcon: String, aliases: [String]) {
+		self.key = key
+		self.name = name
+		self.menuLabel = menuLabel
+		self.entryLabel = entryLabel
+		self.folderIcon = folderIcon
+		self.fileIcon = fileIcon
+		self.aliases = aliases
+	}
+}
+
+/// The nearest preset folder a file lives in, and the path to create siblings in.
+public struct StoryFolderAncestor: Codable, Equatable {
+	public let preset: StoryFolderPreset
+	public let path: String
+
+	public init(preset: StoryFolderPreset, path: String) {
+		self.preset = preset
+		self.path = path
+	}
+}
+
 public enum VersionKind: String, Codable, Equatable {
 	case text
 	case canvas

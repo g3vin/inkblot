@@ -21,10 +21,12 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 import canvasGeometry from './cases/canvasGeometry.mjs'
+import canvasModel from './cases/canvasModel.mjs'
 import docKind from './cases/docKind.mjs'
 import jsNumber from './cases/jsNumber.mjs'
+import storyStructure from './cases/storyStructure.mjs'
 
-const MODULES = [jsNumber, docKind, canvasGeometry]
+const MODULES = [jsNumber, docKind, canvasGeometry, canvasModel, storyStructure]
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const TAURI = path.resolve(HERE, '../../src-tauri')
@@ -42,7 +44,9 @@ if (build.status !== 0) {
 }
 
 const cases = []
+const canonicalizers = new Map()
 for (const module of MODULES) {
+  if (module.canon) canonicalizers.set(module.name, module.canon)
   for (const row of module.cases()) {
     cases.push({ id: cases.length, module: module.name, ...row })
   }
@@ -85,15 +89,20 @@ for (const testCase of cases) {
   const key = `${testCase.module}.${testCase.fn}`
   counts.set(key, (counts.get(key) || 0) + 1)
 
+  // A module may canonicalize before comparing — see canvasModel's generated ids.
+  // It runs on BOTH sides, so it can only erase a difference it erases symmetrically.
+  const canon = canonicalizers.get(testCase.module)
+  const settle = (value) => (canon ? canon(throughJson(value), testCase) : throughJson(value))
+
   const result = results.get(testCase.id)
-  const expected = throughJson(testCase.expected)
+  const expected = settle(testCase.expected)
 
   if (!result) {
     failures.push({ key, testCase, detail: 'no result returned' })
   } else if ('err' in result) {
     failures.push({ key, testCase, detail: `rust: ${result.err}` })
-  } else if (!same(expected, result.ok)) {
-    failures.push({ key, testCase, detail: `js ${show(expected)} !== rust ${show(result.ok)}` })
+  } else if (!same(expected, settle(result.ok))) {
+    failures.push({ key, testCase, detail: `js ${show(expected)} !== rust ${show(settle(result.ok))}` })
   }
 }
 

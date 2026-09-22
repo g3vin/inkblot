@@ -16,6 +16,7 @@ pub mod document;
 pub mod geometry;
 pub mod json;
 pub mod note;
+pub mod story;
 
 pub use canvas::{
     CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState,
@@ -23,6 +24,7 @@ pub use canvas::{
 pub use document::{DocKind, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind, VERSION_CAP};
 pub use geometry::{BezierPath, EdgeSide, Point, Rect, Viewport};
 pub use json::{JsonMap, JsonValue};
+pub use story::{StoryFolderAncestor, StoryFolderPreset};
 pub use note::{
     AudioClip, Note, NoteImage, NotePreviewLayout, NotePreviewSize, NoteType,
     DEFAULT_NOTE_COLOR, NOTE_COLOR_OPTIONS,
