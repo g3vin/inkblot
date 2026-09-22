@@ -196,4 +196,56 @@ ok('unlocking restores Add card', !!button('Add card'))
   ok('Bring to Front puts it back on top', order().at(-1) === added && order()[0] === card.id)
 }
 
+/* A file dropped from Finder in WKWebView: an HTML5 drop carrying a File, which Tauri
+   never delivers (it swallows the drop and sends paths). */
+{
+  // jsdom loads no images, so measuring one would wait forever; fail it at once, which
+  // is the path a broken image takes and still lands a node.
+  globalThis.Image = class { set src(_url) { setTimeout(() => this.onerror?.()) } }
+  const before = document.querySelectorAll('.canvas-node').length
+
+  const drop = (type, files, types = ['Files']) => {
+    const event = new dom.window.Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', { value: { types, files, dropEffect: 'none' } })
+    Object.assign(event, { clientX: 10, clientY: 10 })
+    surface().dispatchEvent(event)
+    return event
+  }
+
+  const over = drop('dragover', [])
+  ok('a drag carrying files is accepted, so WebKit does not navigate to the file', over.defaultPrevented)
+  ok('a drag carrying anything else is left alone', !drop('dragover', [], ['text/plain']).defaultPrevented)
+
+  const png = new File([new Uint8Array([137, 80, 78, 71])], 'photo.png', { type: 'image/png' })
+  const text = new File(['hi'], 'notes.txt', { type: 'text/plain' })
+  await act(async () => { drop('drop', [png, text]) })
+  await settle()
+  ok('a dropped image becomes a node, and a dropped text file does not',
+    document.querySelectorAll('.canvas-node').length === before + 1)
+
+  // A note dragged from the native Notes panel carries its URL.
+  const { noteDragURL } = await import('../../src/canvas/canvasEvents.js')
+  ok('a note URL names its document and note',
+    JSON.stringify(noteDragURL('inkblot-note://note?doc=ch%2Fone&id=n1')) === '{"docPath":"ch/one","noteId":"n1"}')
+  ok('and anything else is not a note', noteDragURL('https://example.com\nfile:///x.png') === null)
+
+  const urlDrop = (uriList) => {
+    const event = new dom.window.Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { types: ['text/uri-list'], files: [], getData: (type) => (type === 'text/uri-list' ? uriList : '') },
+    })
+    Object.assign(event, { clientX: 20, clientY: 20 })
+    surface().dispatchEvent(event)
+    return event
+  }
+  const withNote = document.querySelectorAll('.canvas-node').length
+  let event
+  await act(async () => { event = urlDrop('inkblot-note://note?doc=ch%2Fone&id=n1') })
+  await settle()
+  ok('dropping a native note makes a note card',
+    event.defaultPrevented && document.querySelectorAll('.canvas-node').length === withNote + 1)
+  await act(async () => { event = urlDrop('https://example.com') })
+  ok('a plain link dropped on the canvas is left for someone else', !event.defaultPrevented)
+}
+
 await act(async () => { root.unmount() })

@@ -71,9 +71,13 @@ final class EditorWebController: NSObject {
         }
 
         // Model progress and dictation, as the Tauri events the page already listens for.
+        // The main window's page only: a detached window starting dictation too would
+        // have its words typed into both.
         ModelService.shared.emit = { [weak self] event, payloadJSON in
             self?.emitTauriEvent(event, payloadJSON: payloadJSON)
         }
+        // Detached and Pinterest windows opening, loading and closing.
+        AuxiliaryWindows.shared.register(self)
 
         _ = MouseDownRecorder.shared
         webView.load(URLRequest(url: Self.startURL))
@@ -82,6 +86,7 @@ final class EditorWebController: NSObject {
     /// Where the window's chrome lives, for sheets and fullscreen checks.
     func attach(to window: NSWindow?) {
         host.window = window
+        AuxiliaryWindows.shared.mainWindow = window
     }
 
     func reload() {
@@ -90,7 +95,7 @@ final class EditorWebController: NSObject {
 
     /* ---------------- where the page comes from ---------------- */
 
-    private static var webRoot: URL {
+    static var webRoot: URL {
         Bundle.main.resourceURL!.appendingPathComponent("web", isDirectory: true)
     }
 
@@ -98,14 +103,14 @@ final class EditorWebController: NSObject {
     /// scheme's environment (e.g. `http://localhost:5173`), Vite's dev server, so a web
     /// edit shows up without rebuilding the app. Everything else is the same either way:
     /// the scripts are injected by WebKit, not served.
-    private static var startURL: URL {
+    static var startURL: URL {
         if let dev = ProcessInfo.processInfo.environment["INKBLOT_DEV_URL"], let url = URL(string: dev) {
             return url
         }
         return AppSchemeHandler.appURL
     }
 
-    private static func resource(_ name: String) -> String {
+    static func resource(_ name: String) -> String {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js"),
               let source = try? String(contentsOf: url, encoding: .utf8)
         else {
@@ -114,7 +119,7 @@ final class EditorWebController: NSObject {
         return source
     }
 
-    private static func script(_ source: String) -> WKUserScript {
+    static func script(_ source: String) -> WKUserScript {
         WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)
     }
 
@@ -138,15 +143,10 @@ final class EditorWebController: NSObject {
         }
     }
 
-    /// Raise a Tauri event in the page, through the shim's listener table.
-    private func emitTauriEvent(_ event: String, payloadJSON: String) {
-        // Both go in as JSON string literals and the payload is parsed on the other
-        // side, so neither can close the script early whatever it contains.
-        guard let name = try? JSONEncoder().encode(event),
-              let payload = try? JSONEncoder().encode(payloadJSON)
-        else { return }
-        let script = "window.__inkblotTauri.emit(\(String(decoding: name, as: UTF8.self)), JSON.parse(\(String(decoding: payload, as: UTF8.self))))"
-        webView.evaluateJavaScript(script) { [log] _, error in
+    /// Raise a Tauri event in the page, through the shim's listener table — aimed at
+    /// one window's listeners when `label` names one.
+    func emitTauriEvent(_ event: String, payloadJSON: String, label: String? = nil) {
+        webView.evaluateJavaScript(TauriEvents.script(event, payloadJSON: payloadJSON, label: label)) { [log] _, error in
             if let error { log.error("Emitting \(event, privacy: .public) failed: \(error.localizedDescription, privacy: .public)") }
         }
     }
@@ -174,6 +174,8 @@ final class EditorWebController: NSObject {
 }
 
 /* ---------------- navigation ---------------- */
+
+extension EditorWebController: TauriEventTarget {}
 
 extension EditorWebController: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {

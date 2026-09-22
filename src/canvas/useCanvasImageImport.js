@@ -1,13 +1,17 @@
 /**
  * useCanvasImageImport.js — getting images onto the canvas.
  *
- * Two routes in:
+ * Routes in:
  *   - paste (⌘V) — a normal clipboard event
- *   - dragging a file from Finder — NOT a normal drop event. Tauri's webview
- *     handles OS drags natively and swallows the DOM `drop`, so `dataTransfer.
- *     files` is always empty. The paths only arrive through onDragDropEvent.
+ *   - dragging a file from Finder, which depends on the shell:
+ *       - Tauri handles OS drags natively and swallows the DOM `drop`, so
+ *         `dataTransfer.files` is always empty. The paths only arrive through
+ *         onDragDropEvent.
+ *       - The Swift shell's WKWebView does the opposite: an ordinary HTML5 drop
+ *         with `File` objects and no paths, so it takes the paste route.
+ *     Each shell only ever fires one of the two, so both are always listening.
  *
- * Both land as JSON Canvas `file` nodes pointing into the project's .assets
+ * All land as JSON Canvas `file` nodes pointing into the project's .assets
  * folder — never base64 inlined.
  */
 import { useCallback, useEffect } from 'react'
@@ -140,7 +144,54 @@ export function useCanvasImageImport({
     return () => surface.removeEventListener('paste', onPaste)
   }, [addImageNode, onActivate, projectName, screenToWorldAt, surfaceRef])
 
-  /* ---------------- drag from the OS ---------------- */
+  /* ---------------- drag from the OS: the HTML5 route (WKWebView) ---------------- */
+
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface || !projectName) return
+
+    const carriesFiles = (event) => [...(event.dataTransfer?.types || [])].includes('Files')
+
+    // Without this the drop is refused — and a file dropped on a web view that
+    // refuses it is a navigation to that file.
+    const onDragOver = (event) => {
+      if (!carriesFiles(event)) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'copy'
+    }
+
+    const onDrop = async (event) => {
+      if (!carriesFiles(event)) return
+      event.preventDefault()
+      const images = [...(event.dataTransfer.files || [])].filter(
+        (file) => file.type.startsWith('image/') || isImagePath(file.name)
+      )
+      if (!images.length) return
+
+      onActivate?.()
+      const point = screenToWorldAt(event.clientX, event.clientY)
+      for (const [index, file] of images.entries()) {
+        try {
+          const relativePath = await writeAssetFromFile(projectName, file)
+          await addImageNode(relativePath, {
+            x: point.x + index * CASCADE_STEP,
+            y: point.y + index * CASCADE_STEP,
+          })
+        } catch (error) {
+          console.error('[canvas] failed to import dropped image:', error)
+        }
+      }
+    }
+
+    surface.addEventListener('dragover', onDragOver)
+    surface.addEventListener('drop', onDrop)
+    return () => {
+      surface.removeEventListener('dragover', onDragOver)
+      surface.removeEventListener('drop', onDrop)
+    }
+  }, [addImageNode, onActivate, projectName, screenToWorldAt, surfaceRef])
+
+  /* ---------------- drag from the OS: the Tauri route ---------------- */
 
   useEffect(() => {
     if (!projectName) return

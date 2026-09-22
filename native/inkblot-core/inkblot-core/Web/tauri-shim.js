@@ -119,14 +119,21 @@
 
   /* ---------------- events ---------------- */
 
-  const listeners = new Map() // event -> Map<eventId, callbackId>
+  // event -> Map<eventId, { callbackId, label }>. `label` is the window a listener was
+  // aimed at (`win.once('tauri://destroyed', …)` targets that window), or null for any.
+  const listeners = new Map()
   let nextEventId = 1
 
+  const targetLabel = (target) =>
+    target && typeof target === 'object' && target.kind !== 'Any' && typeof target.label === 'string'
+      ? target.label
+      : null
+
   const events = {
-    listen({ event, handler: callbackId }) {
+    listen({ event, target, handler: callbackId }) {
       const eventId = nextEventId++
       if (!listeners.has(event)) listeners.set(event, new Map())
-      listeners.get(event).set(eventId, callbackId)
+      listeners.get(event).set(eventId, { callbackId, label: targetLabel(target) })
       return eventId
     },
     unlisten({ event, eventId }) {
@@ -135,13 +142,22 @@
     emit({ event, payload }) {
       dispatchEvent(event, payload)
     },
+    emit_to({ target, event, payload }) {
+      dispatchEvent(event, payload, targetLabel(target))
+    },
   }
 
-  const dispatchEvent = (event, payload) => {
+  /**
+   * Deliver to every listener, or — for an event about one window — to the listeners
+   * for any window and the ones aimed at that window. Two Pinterest windows' `destroyed`
+   * handlers must not both fire when one of them closes.
+   */
+  const dispatchEvent = (event, payload, label = null) => {
     const registered = listeners.get(event)
     if (!registered) return
-    for (const [eventId, callbackId] of [...registered]) {
-      runCallback(callbackId, { event, id: eventId, payload })
+    for (const [eventId, listener] of [...registered]) {
+      if (label != null && listener.label != null && listener.label !== label) continue
+      runCallback(listener.callbackId, { event, id: eventId, payload })
     }
   }
 
@@ -322,15 +338,32 @@
 
   /* ---------------- windows ---------------- */
 
-  const WINDOW_LABEL = 'main'
+  // A detached document window is told its label before this runs; the main window is
+  // `main`, as it is under Tauri.
+  const WINDOW_LABEL = window.__inkblotWindowLabel || 'main'
+
+  const isOwn = (args) => args == null || args.label == null || args.label === WINDOW_LABEL
 
   const windows = {
     // The shell draws no titlebar row, so the page's top strip is what the window is
     // dragged by — and only the shell can move a window.
     start_dragging() { return native('window.startDrag') },
-    get_all_windows() { return [WINDOW_LABEL] },
+    get_all_windows() { return native('window.list') },
     is_fullscreen() { return native('window.isFullscreen') },
-    set_title({ value }) { return native('window.setTitle', { title: value }) },
+    set_title(args) {
+      return isOwn(args)
+        ? native('window.setTitle', { title: args.value })
+        : native('window.op', { label: args.label, op: 'set_title', value: args.value })
+    },
+  }
+
+  /** Any other window verb — `show`, `hide`, `set_focus`, `destroy` — on any window, by label. */
+  const windowOp = (name) => (args) =>
+    native('window.op', { label: args?.label ?? WINDOW_LABEL, op: name, value: args?.value ?? null })
+
+  const webviews = {
+    // `new WebviewWindow(label, options)`: a detached document, or a Pinterest page.
+    create_webview_window({ options }) { return native('window.create', { options }) },
   }
 
   /* ---------------- dispatch ---------------- */
@@ -339,8 +372,8 @@
     const [plugin, name] = cmd.startsWith('plugin:') ? cmd.slice(7).split('|') : [null, cmd]
     if (plugin === 'event') return events[name]
     if (plugin === 'menu') return menus[name]
-    if (plugin === 'window') return windows[name] || (() => null)
-    if (plugin === 'webview') return () => null
+    if (plugin === 'window') return windows[name] || windowOp(name)
+    if (plugin === 'webview') return webviews[name] || (() => null)
     if (plugin === 'resources' && name === 'close') return () => null
     return null
   }
