@@ -12,6 +12,7 @@ import SwiftUI
 /// those saves, does the disk operation and reopens at the new paths.
 struct FileTreeSidebar: View {
     @Environment(AppModel.self) private var model
+    @Binding var isPresented: Bool
     @State private var selection: String?
     @State private var prompt: NamePrompt?
     @State private var pendingDelete: TreeEntry?
@@ -33,6 +34,14 @@ struct FileTreeSidebar: View {
             }
         }
         .navigationTitle(model.tree.projectName ?? "Inkblot")
+        // The toggle sits beside the traffic lights, in the sidebar's top-right corner,
+        // as Xcode's does. The list starts below the lights on its own.
+        .overlay(alignment: .topTrailing) {
+            SidebarToggleButton(edge: .leading, isPresented: $isPresented)
+                .padding(.top, SidebarToggleButton.topInset)
+                .padding(.trailing, 10)
+                .ignoresSafeArea(.container, edges: .top)
+        }
         .onChange(of: model.bridge.activeEditor?.docPath) { _, docPath in
             // Follow the page: a document opened from a tab, a search result or a
             // canvas card is selected here too — without sending it back as a command.

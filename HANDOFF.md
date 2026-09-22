@@ -28,7 +28,7 @@ And for the Swift shell (Phase 5), after `./scripts/build-xcframework.sh` and `n
 
 ```bash
 xcodebuild test -project native/inkblot-core/inkblot-core.xcodeproj -scheme inkblot-core \
-  -destination 'platform=macOS' -only-testing:inkblot-coreTests      # 30 tests
+  -destination 'platform=macOS' -only-testing:inkblot-coreTests      # 29 tests
 ```
 
 `parity` and `types:check` arrived with Phase 2 and need `cargo` and
