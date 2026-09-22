@@ -7,7 +7,7 @@
  * implementation (two groups that each contain the other).
  */
 const C = '../../src'
-const { historyReducer, createHistory } = await import(`${C}/canvas/canvasReducer.js`)
+const { historyReducer, createHistory } = await import(`${C}/canvas/canvasReducer.ts`)
 const {
   createEmptyCanvas,
   makeTextNode,

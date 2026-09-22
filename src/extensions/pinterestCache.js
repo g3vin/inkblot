@@ -3,7 +3,7 @@
  *
  * Scraping a board is slow and rate-limited, so results are cached per board URL
  * and refreshed at most once per project-open. The "project open" identity lives
- * in per-launch memory, the pins in the preference store — see lib/preferences.js, and
+ * in per-launch memory, the pins in the preference store — see lib/preferences.ts, and
  * survives into a native shell.
  */
 import { normalizePinterestBoardUrl } from '../lib/pinterestBoard'

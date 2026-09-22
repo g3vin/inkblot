@@ -1,5 +1,5 @@
 /**
- * readAloudVoice.js — text to phoneme token ids, for the native speech path.
+ * readAloudVoice.ts — text to phoneme token ids, for the native speech path.
  *
  * Read Aloud's native voice used to be a **long-lived Python child process**, which
  * worked on the machine it was set up on, silently fell back to WASM everywhere else,
@@ -32,6 +32,15 @@
 import { invoke } from '@tauri-apps/api/core'
 import { phonemize } from 'phonemizer'
 
+/**
+ * A voice's first letter: 'a' for American English, 'b' for British. It picks both
+ * the eSpeak dialect and one of the post-phonemize fixes.
+ */
+export type VoiceLanguage = 'a' | 'b'
+
+/** The model's phoneme → token id map, as `kokoro_vocab` returns it. */
+export type KokoroVocab = Record<string, number>
+
 /** Split on punctuation runs; those are kept verbatim rather than phonemized. */
 const PUNCTUATION = ';:,.!?¡¿—…"«»“”(){}[]'
 const PUNCTUATION_SPLIT = new RegExp(
@@ -40,7 +49,7 @@ const PUNCTUATION_SPLIT = new RegExp(
 )
 
 /** A year or a time: "1984" -> "19 84", "3:05" -> "3 oh 5". */
-const speakNumber = (value) => {
+const speakNumber = (value: string): string => {
   if (value.includes('.')) return value
   if (value.includes(':')) {
     const [hour, minute] = value.split(':').map(Number)
@@ -63,7 +72,7 @@ const speakNumber = (value) => {
 }
 
 /** "$12.50" -> "12 dollars and 50 cents". */
-const speakMoney = (value) => {
+const speakMoney = (value: string): string => {
   const unit = value[0] === '$' ? 'dollar' : 'pound'
   if (isNaN(Number(value.slice(1)))) return `${value.slice(1)} ${unit}s`
 
@@ -81,13 +90,13 @@ const speakMoney = (value) => {
 }
 
 /** "3.14" -> "3 point 1 4". */
-const speakDecimal = (value) => {
+const speakDecimal = (value: string): string => {
   const [whole, fraction] = value.split('.')
   return `${whole} point ${fraction.split('').join(' ')}`
 }
 
 /** The pre-phonemize pass. Every replacement below is kokoro-js's, in its order. */
-export const normalizeForSpeech = (text) =>
+export const normalizeForSpeech = (text: string): string =>
   String(text)
     .replace(/[‘’]/g, "'")
     .replace(/«/g, '“')
@@ -124,8 +133,8 @@ export const normalizeForSpeech = (text) =>
     .trim()
 
 /** Split into the runs that get phonemized and the punctuation that does not. */
-const splitOnPunctuation = (text) => {
-  const parts = []
+const splitOnPunctuation = (text: string): { match: boolean; text: string }[] => {
+  const parts: { match: boolean; text: string }[] = []
   let cursor = 0
   for (const match of text.matchAll(PUNCTUATION_SPLIT)) {
     if (cursor < match.index) parts.push({ match: false, text: text.slice(cursor, match.index) })
@@ -137,7 +146,7 @@ const splitOnPunctuation = (text) => {
 }
 
 /** Fixes applied after phonemizing, again kokoro-js's and in its order. */
-const fixPhonemes = (phonemes, language) => {
+const fixPhonemes = (phonemes: string, language: VoiceLanguage): string => {
   let fixed = phonemes
     .replace(/kəkˈoːɹoʊ/g, 'kˈoʊkəɹoʊ')
     .replace(/kəkˈɔːɹəʊ/g, 'kˈəʊkəɹəʊ')
@@ -157,7 +166,11 @@ const fixPhonemes = (phonemes, language) => {
  *
  * `language` is the voice's first letter: 'a' for American English, 'b' for British.
  */
-export async function textToPhonemes(text, language = 'a', normalize = true) {
+export async function textToPhonemes(
+  text: string,
+  language: VoiceLanguage = 'a',
+  normalize: boolean = true,
+): Promise<string> {
   const prepared = normalize ? normalizeForSpeech(text) : String(text)
   const dialect = language === 'a' ? 'en-us' : 'en'
 
@@ -172,7 +185,7 @@ export async function textToPhonemes(text, language = 'a', normalize = true) {
 
 /* ---------------- the vocabulary ---------------- */
 
-let vocabPromise = null
+let vocabPromise: Promise<KokoroVocab> | null = null
 
 /**
  * The model's own phoneme→id map, read back from the downloaded tokenizer.
@@ -181,9 +194,9 @@ let vocabPromise = null
  * transcription error in it would not throw, it would shift every phoneme by one and
  * produce fluent, confident, wrong speech.
  */
-export function getKokoroVocab() {
+export function getKokoroVocab(): Promise<KokoroVocab> {
   if (!vocabPromise) {
-    vocabPromise = invoke('kokoro_vocab').catch((error) => {
+    vocabPromise = invoke<KokoroVocab>('kokoro_vocab').catch((error) => {
       vocabPromise = null
       throw error
     })
@@ -199,7 +212,7 @@ export function getKokoroVocab() {
  * goes to Rust, not added there. A phoneme the vocabulary does not have is dropped,
  * which is what the tokenizer does with it too.
  */
-export function phonemesToTokens(phonemes, vocab) {
+export function phonemesToTokens(phonemes: string, vocab: KokoroVocab): number[] {
   const ids = [0]
   for (const symbol of String(phonemes)) {
     const id = vocab[symbol]
@@ -210,8 +223,11 @@ export function phonemesToTokens(phonemes, vocab) {
 }
 
 /** Text → the token ids for `voice`, ready to synthesize. */
-export async function textToTokens(text, voice) {
-  const language = String(voice || 'a').charAt(0) === 'b' ? 'b' : 'a'
+export async function textToTokens(
+  text: string,
+  voice: string,
+): Promise<{ phonemes: string; tokens: number[] }> {
+  const language: VoiceLanguage = String(voice || 'a').charAt(0) === 'b' ? 'b' : 'a'
   const [phonemes, vocab] = await Promise.all([textToPhonemes(text, language), getKokoroVocab()])
   return { phonemes, tokens: phonemesToTokens(phonemes, vocab) }
 }

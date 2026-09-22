@@ -4,7 +4,7 @@
  * Owns everything scoped to the open project: which documents are open
  * (primary/secondary/split view), per-document notes, workbench tiles,
  * clipboard history, version lists, and the right-sidebar tab. Persists
- * per-project session state through lib/preferences.js and restores it on launch.
+ * per-project session state through lib/preferences.ts and restores it on launch.
  *
  * Renders the ProjectLanding screen when no project is open, otherwise
  * hands all state down to EditorLayout.

@@ -50,7 +50,7 @@ const reference = new Function('e', `${helpers}\n${normalizerBody};`)
 
 /* ---------------- ours ---------------- */
 
-const { normalizeForSpeech, phonemesToTokens } = await import('../../src/lib/readAloudVoice.js')
+const { normalizeForSpeech, phonemesToTokens } = await import('../../src/lib/readAloudVoice.ts')
 
 /* ---------------- the corpus ---------------- */
 

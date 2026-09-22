@@ -2,10 +2,10 @@
 
 State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
-**Current branch:** `phase-0-foundations`, 37 commits ahead of `main` (`b7ceed8`).
+**Current branch:** `phase-0-foundations`, 38 commits ahead of `main` (`b7ceed8`).
 `main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
 
-**Size today:** 34,704 JS/JSX · 8,984 CSS · 9,524 Rust.
+**Size today:** 33,330 JS/JSX · 2,300 TS · 8,984 CSS · 9,527 Rust.
 
 ---
 
@@ -344,24 +344,107 @@ catch never runs. That is the bug this repo has already shipped once.
 **Still owed:** it needs a live logged-in session and a real webview to exercise, and
 it is already on the manual list. This makes that check more important, not less.
 
-## Phase 3 — TypeScript (runs alongside Phase 2)
+## Phase 3 — TypeScript — done
 
-Scoped deliberately: **bridge and domain layers, not components.**
+Scoped deliberately: **bridge and domain layers, not components.** Nine modules moved,
+in dependency order, each one verified against the JavaScript it replaced before the
+next was started.
 
-- `typeshare` output lands as generated types — do not hand-write these
-- Hand-convert the pure modules in the Phase 2 order. Phase 1 created several
-  ready-made candidates: `lib/fileTreeOrder.js`, `lib/editorSession.js`,
-  `lib/notePreviewGeometry.js`, `extensions/conversationModel.js`,
-  `lib/projectPaths.js`, `lib/docLock.js` — all pure, no React, no I/O
-- `lib/preferences.js` and `lib/readAloudVoice.js` are Phase 2's additions to that
-  list: both pure, both already the only door to what they wrap
-- `canvasReducer.js` (285) is a textbook discriminated-union win, covered by `red.mjs`
-- Type the bridge client (Phase 4) fully — this is where TS earns the most
+| Module | Was | What the types bought |
+|---|---|---|
+| `lib/docLock.ts` | 29 | `withDocLock<T>` — the queue no longer erases the task's return type |
+| `lib/projectPaths.ts` | 43 | `PathInput`: absent and empty are both ordinary, and now say so |
+| `lib/fileTreeOrder.ts` | 124 | `OrderMap`, and `TreeNode` from the generated types |
+| `lib/preferences.ts` | 143 | `PreferenceScope` — the three scope strings are a wire format shared with Rust |
+| `lib/editorSession.ts` | 163 | `ProjectSession`/`DocTab`; the restore path's shape was previously only in prose |
+| `lib/notePreviewGeometry.ts` | 154 | `Point`/`NotePreviewSize` from the generated types; `AnchorRect` for the DOM half |
+| `lib/readAloudVoice.ts` | 217 | `VoiceLanguage`, `KokoroVocab`; `invoke<KokoroVocab>` types the Rust boundary |
+| `extensions/conversationModel.ts` | 216 | `ConversationAttrs`, `Message`, `ReceiptStatus` |
+| `canvas/canvasReducer.ts` | 285 | `CanvasAction` — the discriminated union |
 
-`tsconfig.json` is already set to `allowJs: true, checkJs: false, strict: true`, so
-conversion is file-by-file with no big-bang.
+`tsconfig.json` was already `allowJs: true, checkJs: false, strict: true`, so this was
+file-by-file with no big-bang, and the unconverted JavaScript that imports these
+modules is unaffected.
 
-**Not converting:** `components/`, node views, anything touching a live TipTap instance.
+**Not converted:** `components/`, node views, anything touching a live TipTap instance.
+
+### The three things that cost time
+
+**The test loader had to learn `.ts` first.** `scripts/canvas-tests/loader.mjs` now
+probes `.ts` when resolving an extensionless import and transpiles it with esbuild
+(erasing types — it does not typecheck, and should not; `npm run typecheck` is what
+looks at them). Without that, the first conversion takes its suite with it. Its
+`import.meta.glob` rewrite now runs *before* the transpile rather than instead of it,
+because a module can need both.
+
+**A rename breaks the explicit `.js` specifiers.** Most imports here are
+extensionless, but the suites and the parity cases spell the extension out —
+`` await import(`${C}/canvas/canvasReducer.js`) `` — and a few doc comments name the
+file. Grep for `<name>.js` across `scripts/` and `src/` after every rename. The
+failure is loud (`run.mjs` catches the throw and names the suite), but it is a failure,
+not a warning.
+
+**The generated enums are string enums, so a literal does not compare.**
+`node.type !== 'folder'` stops compiling the moment `node` is a `TreeNode`; it has to
+be `TreeNodeType.Folder`. The emitted value is the same string, so this is a
+compile-time change only — but it does mean a converted module imports the generated
+file for its *values*, not just its types.
+
+### Two additions to the types façade
+
+- **`Loose<T>`** — `{ [K in keyof T]?: unknown }`, the input side of a normalizer.
+  Most of what Phase 3 converted is a normalizer, and all of them exist because their
+  input came from somewhere they do not control. The output is `T`; the input is this.
+- **`StoredCanvasState`** — a whole canvas in memory between a load and the save that
+  follows, so its nodes and edges are `StoredCanvasNode`/`StoredCanvasEdge` and keep
+  the keys we do not model. This is what the reducer holds.
+
+### The casts are assertions, not checks
+
+`normalizeProjectSession` reads `session.currentDoc || ''` where the field is
+`unknown`. Coercing it properly — `typeof x === 'string' ? x : ''` — would be a
+**behaviour change**: today a stored `5` comes back out as `5`. So it is an `as`,
+which is erased, and the module answers exactly as it did. Same in
+`conversationModel`'s `parseNumber` and `safeJsonParse`. Fixing any of them is a
+decision, not a port; they are noted where they sit.
+
+### How the ports were verified
+
+`tsc` proves nothing about a port — it never saw the JavaScript. So each module was
+checked the way Phase 2 checked its Rust: **both implementations, one corpus, one
+run.**
+
+The pre-conversion file is copied out of `HEAD` beside its replacement
+(`git show HEAD:src/lib/x.js > src/lib/__pre_x.js` — the relative imports still
+resolve from there), and a throwaway harness imports both, compares their export sets,
+and runs a corpus of arguments through each, JSON-comparing results, thrown messages
+included. `Math.random`, `Date.now` and `crypto` are pinned and reset before each
+side, so a generated id becomes *comparable* rather than disappearing — a difference
+in which branch generates one still shows.
+
+91 checks, 0 differing. Then the rule that makes a green run mean something: **every
+module was broken on purpose and the corpus was made to catch it** — `HISTORY_LIMIT`
+halved, `joinPath`'s separator doubled, one prefix dropped from `scopeFor`,
+`phonemesToTokens`'s leading pad changed. All nine caught. The harness is not
+committed, because after the commit there is no second implementation for it to
+compare against; it is reproducible from this paragraph.
+
+`readAloudVoice`'s regexes were **not retyped** — the file is a transcription of
+kokoro-js's normalizer, and the emitted string is the program. Only signature lines
+were edited, and the regex lines were diffed byte-for-byte against `HEAD`.
+
+### Found while porting, not fixed
+
+- **`phonemizer` is an undeclared direct dependency.** `readAloudVoice.ts` imports it;
+  it is in `node_modules` only because `kokoro-js` pulls it in. A kokoro-js release
+  that drops or moves it breaks Read Aloud's native path with no version to point at.
+- **`nodes/reorder` is dispatched by nothing.** The case is live in the reducer, typed
+  with the rest, and unreachable — send-to-front/send-to-back is not wired up.
+
+### Still owed
+
+Type the bridge client in Phase 4 fully — that is where TypeScript earns the most, and
+it is the one part of the scope that cannot be done before the protocol exists.
 
 ---
 
@@ -525,7 +608,7 @@ stubs. The **real** `FileSystem.js`/`assets.js` run against the stubs rather tha
 being reimplemented, which is why it catches real persistence bugs.
 
 - `loader.mjs` maps `@tauri-apps/*` and `lodash` to stubs, resolves extensionless
-  imports, and transpiles `.jsx` with esbuild
+  imports (`.js`, `.jsx`, `.ts`), and transpiles `.jsx` and `.ts` with esbuild
 - `dom.mjs` mounts the real `CanvasSurface` under **StrictMode** — which
   double-invokes effect setup/teardown, the case that catches cleanup bugs
 - `editor.mjs` mounts the real `EditorCanvas` the same way. Its harness passes

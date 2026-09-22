@@ -1,15 +1,28 @@
 /**
- * conversationModel.js — the shape of a conversation tile, and how it is coerced.
+ * conversationModel.ts — the shape of a conversation tile, and how it is coerced.
  *
  * A tile's attributes arrive from the document (so from whatever an older version
  * of the app wrote, or from a hand-edited file), and every field is normalized
  * here before anything renders. Pure data: no DOM, no ProseMirror.
+ *
+ * Which is why the input of every function here is `Loose<T>` and its output is `T`:
+ * the normalizers are the boundary, and past them the rest of the tile may rely on
+ * the shape.
  */
+import type { Loose } from '../types'
+
 export const MIN_WIDTH = 240
 export const DEFAULT_WIDTH = 360
 export const MAX_SNAPSHOT_WIDTH = 720
 export const VALID_ALIGNMENTS = new Set(['left', 'center', 'right'])
-export const MESSAGE_RECEIPTS = [
+
+/** How the tile sits in the paragraph flow. */
+export type Alignment = 'left' | 'center' | 'right'
+
+/** The tick under a sent message. `''` is "no receipt", which is a choice, not absence. */
+export type ReceiptStatus = '' | 'sent' | 'delivered' | 'read' | 'notDelivered'
+
+export const MESSAGE_RECEIPTS: [ReceiptStatus, string][] = [
   ['', 'No receipt'],
   ['sent', 'Sent'],
   ['delivered', 'Delivered'],
@@ -18,7 +31,34 @@ export const MESSAGE_RECEIPTS = [
 ]
 export const MESSAGE_RECEIPT_LABELS = Object.fromEntries(MESSAGE_RECEIPTS)
 
-export const DEFAULT_MESSAGES = [
+/** Who sent a message. The two sides are the model — a group chat names them instead. */
+export type Sender = 'you' | 'them'
+
+export interface Message {
+  id: string
+  sender: Sender
+  name: string
+  text: string
+  timestamp: string
+  receiptStatus: ReceiptStatus
+  imageSrc: string
+}
+
+/** A message as it sits in the document, before `normalizeMessage` fills it in. */
+export type StoredMessage = Loose<Message>
+
+export interface Participants {
+  you: string
+  them: string
+}
+
+export interface GroupMember {
+  id: string
+  name: string
+  avatarSrc: string
+}
+
+export const DEFAULT_MESSAGES: StoredMessage[] = [
   {
     id: 'msg-1',
     sender: 'you',
@@ -38,17 +78,43 @@ export const DEFAULT_MESSAGES = [
   },
 ]
 
-export const DEFAULT_PARTICIPANTS = {
+export const DEFAULT_PARTICIPANTS: Participants = {
   you: 'You',
   them: 'Sam',
 }
 
-export const DEFAULT_GROUP_MEMBERS = [
+export const DEFAULT_GROUP_MEMBERS: GroupMember[] = [
   { id: 'you', name: DEFAULT_PARTICIPANTS.you, avatarSrc: '' },
   { id: 'them', name: DEFAULT_PARTICIPANTS.them, avatarSrc: '' },
 ]
 
-export const DEFAULT_ATTRS = {
+/** Every attribute of a conversation tile, after normalization. */
+export interface ConversationAttrs {
+  width: number
+  align: Alignment
+  /** Measured once the tile has rendered; null until then. */
+  snapshotHeight: number | null
+  saved: boolean
+  /** The rendered SVG of a saved tile. */
+  snapshot: string
+  groupChat: boolean
+  showTimestamps: boolean
+  showReadReceipts: boolean
+  outgoingColor: string
+  incomingColor: string
+  outgoingTextColor: string
+  incomingTextColor: string
+  participants: Participants
+  groupMembers: GroupMember[]
+  messages: Message[]
+}
+
+/**
+ * The node's defaults. `messages` is the one field that is not already normalized:
+ * the sample conversation is written the way a user's would be, and `normalizeAttrs`
+ * fills the rest in.
+ */
+export const DEFAULT_ATTRS: Omit<ConversationAttrs, 'messages'> & { messages: StoredMessage[] } = {
   width: DEFAULT_WIDTH,
   align: 'left',
   snapshotHeight: null,
@@ -66,24 +132,36 @@ export const DEFAULT_ATTRS = {
   messages: DEFAULT_MESSAGES,
 }
 
-export const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+export const clamp = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value))
 
-export const parseNumber = (value, fallback) => {
-  const parsed = Number.parseFloat(value)
+/**
+ * A DOM attribute or a stored value as a number, or `fallback` when it is not one.
+ *
+ * `fallback` is generic because two call sites want `null` back rather than a number:
+ * an unmeasured `snapshotHeight` is not a height of zero.
+ */
+export const parseNumber = <T,>(value: unknown, fallback: T): number | T => {
+  // parseFloat stringifies whatever it is given, which is the coercion this relies on.
+  const parsed = Number.parseFloat(value as string)
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-export const safeJsonParse = (value, fallback) => {
+/**
+ * The cast is an assertion about what the attribute held, not a check — every caller
+ * passes the result straight to the normalizer that does check it.
+ */
+export const safeJsonParse = <T,>(value: string | null | undefined, fallback: T): T => {
   if (!value) return fallback
   try {
     const parsed = JSON.parse(value)
-    return parsed ?? fallback
+    return (parsed ?? fallback) as T
   } catch {
     return fallback
   }
 }
 
-export const normalizeParticipants = (participants = {}) => ({
+export const normalizeParticipants = (participants: Loose<Participants> = {}): Participants => ({
   you: typeof participants.you === 'string' && participants.you.trim()
     ? participants.you
     : DEFAULT_PARTICIPANTS.you,
@@ -92,27 +170,29 @@ export const normalizeParticipants = (participants = {}) => ({
     : DEFAULT_PARTICIPANTS.them,
 })
 
-export const normalizeAlignment = (value) => (
-  VALID_ALIGNMENTS.has(value) ? value : 'left'
+export const normalizeAlignment = (value: unknown): Alignment => (
+  VALID_ALIGNMENTS.has(value as string) ? value as Alignment : 'left'
 )
 
-export const normalizeReceiptStatus = (value) => (
-  Object.prototype.hasOwnProperty.call(MESSAGE_RECEIPT_LABELS, value) ? value : ''
+export const normalizeReceiptStatus = (value: unknown): ReceiptStatus => (
+  Object.prototype.hasOwnProperty.call(MESSAGE_RECEIPT_LABELS, value as string)
+    ? value as ReceiptStatus
+    : ''
 )
 
-export const makeId = () => (
+export const makeId = (): string => (
   globalThis.crypto?.randomUUID?.() || `msg-${Date.now()}-${Math.round(Math.random() * 10000)}`
 )
 
-export const getInitials = (name = '') => {
+export const getInitials = (name: unknown = ''): string => {
   const parts = String(name).trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '?'
   return parts.slice(0, 2).map(part => part[0]?.toUpperCase()).join('')
 }
 
-let textMeasureCanvas = null
+let textMeasureCanvas: HTMLCanvasElement | null = null
 
-export const measureTextWidth = (text = '', font = '15px sans-serif') => {
+export const measureTextWidth = (text: string = '', font: string = '15px sans-serif'): number => {
   if (!textMeasureCanvas) textMeasureCanvas = document.createElement('canvas')
   const context = textMeasureCanvas.getContext('2d')
   if (!context) return String(text).length * 7.4
@@ -120,8 +200,11 @@ export const measureTextWidth = (text = '', font = '15px sans-serif') => {
   return context.measureText(text).width
 }
 
-export const normalizeMessage = (message = {}, participants = DEFAULT_PARTICIPANTS) => {
-  const sender = message.sender === 'you' ? 'you' : 'them'
+export const normalizeMessage = (
+  message: StoredMessage = {},
+  participants: Participants = DEFAULT_PARTICIPANTS,
+): Message => {
+  const sender: Sender = message.sender === 'you' ? 'you' : 'them'
   return {
     id: typeof message.id === 'string' && message.id ? message.id : makeId(),
     sender,
@@ -135,17 +218,21 @@ export const normalizeMessage = (message = {}, participants = DEFAULT_PARTICIPAN
   }
 }
 
-export const normalizeMessages = (messages, participants) => {
+export const normalizeMessages = (messages: unknown, participants?: Participants): Message[] => {
   const source = Array.isArray(messages) && messages.length ? messages : DEFAULT_MESSAGES
   return source.map(message => normalizeMessage(message, participants))
 }
 
-export const normalizeGroupMembers = (members, participants, messages = []) => {
-  const normalized = []
-  const seenNames = new Set()
-  const seenIds = new Set()
+export const normalizeGroupMembers = (
+  members: unknown,
+  participants: Participants,
+  messages: Message[] = [],
+): GroupMember[] => {
+  const normalized: GroupMember[] = []
+  const seenNames = new Set<string>()
+  const seenIds = new Set<string>()
 
-  const pushMember = (member = {}, fallbackId = '') => {
+  const pushMember = (member: Loose<GroupMember> | null | undefined = {}, fallbackId: string = '') => {
     const memberValue = member && typeof member === 'object' ? member : {}
     const rawName = typeof memberValue.name === 'string' ? memberValue.name.trim() : ''
     const name = rawName || (fallbackId === 'you' ? participants.you : fallbackId === 'them' ? participants.them : '')
@@ -189,8 +276,8 @@ export const normalizeGroupMembers = (members, participants, messages = []) => {
   return normalized.length ? normalized : DEFAULT_GROUP_MEMBERS
 }
 
-export const normalizeAttrs = (attrs = {}) => {
-  const participants = normalizeParticipants(attrs.participants)
+export const normalizeAttrs = (attrs: Loose<ConversationAttrs> = {}): ConversationAttrs => {
+  const participants = normalizeParticipants(attrs.participants as Loose<Participants>)
   const messages = normalizeMessages(attrs.messages, participants)
   return {
     width: clamp(parseNumber(attrs.width, DEFAULT_WIDTH), MIN_WIDTH, 1200),
