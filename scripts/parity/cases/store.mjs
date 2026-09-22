@@ -14,7 +14,7 @@
  */
 import {
   stripTrailingSlash, stripLeadingSlash, joinPath, parentOf, normalizePath,
-} from '../../../src/lib/projectPaths.js'
+} from '../../../src/lib/projectPaths.ts'
 import {
   versionsSidecarPath, pushVersionEntry, buildTextVersionEntry, buildCanvasVersionEntry,
 } from '../../../src/lib/versionStore.js'

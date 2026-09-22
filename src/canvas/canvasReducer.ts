@@ -1,5 +1,5 @@
 /**
- * canvasReducer.js — canvas document state, with undo/redo layered on top.
+ * canvasReducer.ts — canvas document state, with undo/redo layered on top.
  *
  * The reducer never mutates: an untouched node keeps its object identity, which
  * is what lets React.memo skip it and what makes whole-document history entries
@@ -13,6 +13,11 @@
  *
  * The viewport is deliberately NOT part of this state: panning is not an edit
  * and must never land in the undo stack.
+ *
+ * `CanvasAction` is the reason this file is TypeScript. Every action was a bare
+ * object literal whose payload you learned by reading the case that consumed it;
+ * as a discriminated union, `action.patch` is only reachable on the actions that
+ * carry one, and a `case` that reads the wrong field does not compile.
  */
 import {
   incidentEdgeIds,
@@ -21,8 +26,93 @@ import {
   DEFAULT_GROUP_PADDING,
 } from '../lib/canvasModel'
 import { nodesBounds, padRect } from '../lib/canvasGeometry'
+import {
+  CanvasNodeType,
+  type Point,
+  type Rect,
+  type StoredCanvasEdge,
+  type StoredCanvasNode,
+  type StoredCanvasState,
+} from '../types'
 
 const HISTORY_LIMIT = 100
+
+/**
+ * Group id → the members it held when the gesture began, from `groupFitsFor`.
+ * Membership is a snapshot on purpose: see the note on that function.
+ */
+export type FitGroups = Record<string, string[]>
+
+/** What an action says about how it should land in history, rather than what it does. */
+export interface ActionMeta {
+  /** Loading a document is not an edit — it resets the stacks instead of pushing. */
+  silent?: boolean
+  /** Edits sharing a key collapse into the one history entry they started. */
+  coalesce?: string | null
+}
+
+/** Every action that changes the document. */
+export type CanvasDocAction = ({
+  type: 'doc/replace'
+  doc: StoredCanvasState
+} | {
+  type: 'nodes/add'
+  nodes: StoredCanvasNode[]
+} | {
+  type: 'nodes/setPositions'
+  positions: Record<string, Point>
+  fitGroups?: FitGroups | null
+} | {
+  type: 'nodes/setRects'
+  rects: Record<string, Rect>
+  fitGroups?: FitGroups | null
+} | {
+  type: 'nodes/patch'
+  id: string
+  patch: Partial<StoredCanvasNode>
+} | {
+  type: 'nodes/patchMany'
+  patches: Record<string, Partial<StoredCanvasNode>>
+} | {
+  type: 'nodes/reorder'
+  ids: string[]
+  to: 'back' | 'front'
+} | {
+  type: 'group/create'
+  nodeIds?: string[]
+  padding?: number
+  label?: string
+} | {
+  type: 'group/ungroup'
+  groupIds?: string[]
+} | {
+  type: 'edges/add'
+  edges: StoredCanvasEdge[]
+} | {
+  type: 'edges/patch'
+  id: string
+  patch: Partial<StoredCanvasEdge>
+} | {
+  type: 'selection/delete'
+  nodeIds?: string[]
+  edgeIds?: string[]
+}) & { meta?: ActionMeta }
+
+/** Every action that moves through history without changing the document itself. */
+export type CanvasHistoryAction =
+  | { type: 'history/undo' }
+  | { type: 'history/redo' }
+  | { type: 'history/breakCoalesce' }
+
+export type CanvasAction = CanvasDocAction | CanvasHistoryAction
+
+/** The undo stack, the document, and the redo stack. */
+export interface CanvasHistory {
+  past: StoredCanvasState[]
+  present: StoredCanvasState
+  future: StoredCanvasState[]
+  coalesceKey: string | null
+}
 
 /**
  * Grow or shrink each group in `fitGroups` around the members it held when the
@@ -31,12 +121,15 @@ const HISTORY_LIMIT = 100
  *
  * `nodes` is always a fresh copy by the time this is called, so it writes in place.
  */
-function applyGroupFits(nodes, fitGroups) {
+function applyGroupFits(
+  nodes: Record<string, StoredCanvasNode>,
+  fitGroups: FitGroups | null | undefined,
+): void {
   if (!fitGroups) return
 
   for (const [groupId, memberIds] of Object.entries(fitGroups)) {
     const group = nodes[groupId]
-    if (!group || group.type !== 'group') continue
+    if (!group || group.type !== CanvasNodeType.Group) continue
 
     const rect = groupFitRect(nodes, memberIds)
     // A group whose members are all gone keeps its frame rather than collapsing.
@@ -54,7 +147,7 @@ function applyGroupFits(nodes, fitGroups) {
 
 /* ---------------- document reducer ---------------- */
 
-function docReducer(doc, action) {
+function docReducer(doc: StoredCanvasState, action: CanvasAction): StoredCanvasState {
   switch (action.type) {
     case 'doc/replace':
       return action.doc
@@ -65,7 +158,7 @@ function docReducer(doc, action) {
       for (const node of action.nodes) {
         nodes[node.id] = node
         // Groups render behind everything, so they belong at the back of the order.
-        if (node.type === 'group') nodeOrder.unshift(node.id)
+        if (node.type === CanvasNodeType.Group) nodeOrder.unshift(node.id)
         else nodeOrder.push(node.id)
       }
       return { ...doc, nodes, nodeOrder }
@@ -131,16 +224,19 @@ function docReducer(doc, action) {
       // now encloses them (see groupMemberIds).
       const members = (action.nodeIds || [])
         .map((id) => doc.nodes[id])
-        .filter((node) => node && node.type !== 'group')
+        .filter((node) => node && node.type !== CanvasNodeType.Group)
       if (!members.length) return doc
 
       const bounds = nodesBounds(members)
       if (!bounds) return doc
 
+      // `makeGroupNode` is still JavaScript, so its return type is inferred rather
+      // than declared and `type` comes back as a plain `string`. The assertion is
+      // the seam with the unconverted half, and it goes when canvasModel does.
       const group = makeGroupNode({
         ...padRect(bounds, action.padding ?? DEFAULT_GROUP_PADDING),
         label: action.label || '',
-      })
+      }) as StoredCanvasNode
 
       return {
         ...doc,
@@ -154,11 +250,11 @@ function docReducer(doc, action) {
       // Removes the group frame only. Its members were never "in" it in any stored
       // sense, so they simply stay where they are — nothing to reparent.
       const doomed = new Set(
-        (action.groupIds || []).filter((id) => doc.nodes[id]?.type === 'group')
+        (action.groupIds || []).filter((id) => doc.nodes[id]?.type === CanvasNodeType.Group)
       )
       if (!doomed.size) return doc
 
-      const nodes = {}
+      const nodes: Record<string, StoredCanvasNode> = {}
       for (const id of doc.nodeOrder) {
         if (!doomed.has(id)) nodes[id] = doc.nodes[id]
       }
@@ -193,14 +289,17 @@ function docReducer(doc, action) {
       const doomedNodes = new Set(nodeIds)
       // Deleting a node must take its edges with it, in the same step, or undo
       // would restore the node without its connections.
-      const doomedEdges = new Set([...(action.edgeIds || []), ...incidentEdgeIds(doc, nodeIds)])
+      const doomedEdges = new Set<string>([
+        ...(action.edgeIds || []),
+        ...incidentEdgeIds(doc, nodeIds),
+      ])
       if (!doomedNodes.size && !doomedEdges.size) return doc
 
-      const nodes = {}
+      const nodes: Record<string, StoredCanvasNode> = {}
       for (const id of doc.nodeOrder) {
         if (!doomedNodes.has(id)) nodes[id] = doc.nodes[id]
       }
-      const edges = {}
+      const edges: Record<string, StoredCanvasEdge> = {}
       for (const id of doc.edgeOrder) {
         if (!doomedEdges.has(id)) edges[id] = doc.edges[id]
       }
@@ -220,14 +319,14 @@ function docReducer(doc, action) {
 
 /* ---------------- history wrapper ---------------- */
 
-export const createHistory = (doc) => ({
+export const createHistory = (doc: StoredCanvasState): CanvasHistory => ({
   past: [],
   present: doc,
   future: [],
   coalesceKey: null,
 })
 
-export function historyReducer(history, action) {
+export function historyReducer(history: CanvasHistory, action: CanvasAction): CanvasHistory {
   if (action.type === 'history/undo') {
     if (!history.past.length) return history
     return {
@@ -281,5 +380,5 @@ export function historyReducer(history, action) {
   }
 }
 
-export const canUndo = (history) => history.past.length > 0
-export const canRedo = (history) => history.future.length > 0
+export const canUndo = (history: CanvasHistory): boolean => history.past.length > 0
+export const canRedo = (history: CanvasHistory): boolean => history.future.length > 0

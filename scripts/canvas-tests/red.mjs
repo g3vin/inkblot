@@ -1,5 +1,5 @@
 const C = '../../src'
-const { historyReducer, createHistory, canUndo, canRedo } = await import(`${C}/canvas/canvasReducer.js`)
+const { historyReducer, createHistory, canUndo, canRedo } = await import(`${C}/canvas/canvasReducer.ts`)
 const { createEmptyCanvas, makeTextNode, makeEdge } = await import(`${C}/lib/canvasModel.js`)
 const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
 
