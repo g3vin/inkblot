@@ -12,9 +12,17 @@
  *
  * Inward: syncEditorNotes publishes the notes into editor storage, which is what the
  * NoteAnnotation decorations render from.
+ *
+ * Outward again, and this is sharp edge #4 of the bridge protocol: the shell is
+ * holding these positions too, so every remap is also published on the bridge. The
+ * event fires on every transaction, which is every keystroke in a document with quote
+ * notes, so the surface coalesces it to one per frame — safely, because the event
+ * carries the whole remapped set rather than a delta, and the last one is always
+ * complete. See bridge/coalesce.ts.
  */
 import { useEffect } from 'react'
 
+import { documentSurface } from '../bridge'
 import { syncEditorNotes } from '../extensions/NoteAnnotation'
 import { isEditorReady } from '../lib/editorUtils'
 
@@ -112,6 +120,18 @@ export function useEditorNotes({
       }
 
       setNotesForDoc(currentDoc, updated)
+
+      // A note whose range collapsed has lost what it was about and is gone from
+      // `updated`. Naming it separately is what lets the shell tell "deleted" apart
+      // from "never sent" without diffing two sets it may only have half of.
+      const survivingIds = new Set(updated.map(note => note.id))
+      documentSurface.publishNotesRemapped({
+        docPath: currentDoc,
+        notes: updated,
+        droppedNoteIds: existingNotes
+          .filter(note => note.type === 'quote' && !survivingIds.has(note.id))
+          .map(note => note.id),
+      })
     }
 
     editor.on('transaction', handler)

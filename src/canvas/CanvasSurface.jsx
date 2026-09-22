@@ -31,6 +31,7 @@ import { useCanvasConnect } from './useCanvasConnect'
 import { useCanvasImageImport } from './useCanvasImageImport'
 import { useCanvasKeyboard } from './useCanvasKeyboard'
 import { useCanvasExternalEvents } from './useCanvasExternalEvents'
+import { registerCanvasSurface } from './canvasEvents'
 import { filePathToDocPath } from './useDocPreview'
 import CanvasNode from './CanvasNode'
 import CanvasEdges from './CanvasEdges'
@@ -505,6 +506,10 @@ export default function CanvasSurface({
     viewCenter,
   })
 
+
+  // Claim an id for this surface, so the bridge can address it without hit-testing
+  // the DOM — which a native shell cannot do. See canvasEvents' surface-id section.
+  useEffect(() => registerCanvasSurface(surfaceRef.current), [surfaceRef])
 
   const isEmpty = state.nodeOrder.length === 0
   const hasSelection = selection.nodes.size > 0 || selection.edges.size > 0

@@ -8,6 +8,12 @@
  * and search results, and the analytic Bubble overlay.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { resolveAnchor } from '../bridge/anchors'
+import { useBridgeState } from '../bridge'
+import { EditorTarget } from '../types'
+
+/** A stable identity, so useBridgeState's initial value is not a new object each render. */
+const EMPTY_ACTIVE_EDITOR = {}
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
 import EditorCanvas from './EditorCanvas'
 import LeftSidebar from './LeftSidebar'
@@ -103,9 +109,17 @@ export default function EditorLayout(props) {
   const titlebarRightWidth = right.collapsed && !right.peeked
     ? 0
     : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
-  // On a canvas, the only editor the Toolbar may drive is a card's own editor
-  // (tagged when it mounts). Falling back to the pane's TipTap editors would
-  // point the Toolbar at an idle instance holding no document.
+  // On a canvas, the only editor the Toolbar may drive is a card's own editor.
+  // Falling back to the pane's TipTap editors would point the Toolbar at an idle
+  // instance holding no document.
+  //
+  // Which one that is used to be read off the editor object as `__inkblotCanvasCard`
+  // — a property set by the card and read here, across what becomes a process
+  // boundary in Phase 5. The election result arrives as a protocol event now, and
+  // `canvasCard` is one of the three names it can carry (sharp edge #5). The live
+  // editor below is still resolved locally, because the dictation and read-aloud
+  // controls inside the Toolbar genuinely need the instance.
+  const activeEditorInfo = useBridgeState('activeEditorChanged', EMPTY_ACTIVE_EDITOR)
   const activeIsCanvas = isCanvasDoc(activeDoc || currentDoc)
   // The titlebar element the active canvas portals its toolbar into. A ref
   // callback rather than a ref object, so mounting/unmounting the slot re-renders
@@ -114,7 +128,7 @@ export default function EditorLayout(props) {
   const [compareToolbarSlot, setCompareToolbarSlot] = useState(null)
   const liveActiveEditor = getLiveEditor(activeEditor)
   const toolbarEditor = activeIsCanvas
-    ? (liveActiveEditor?.__inkblotCanvasCard ? liveActiveEditor : null)
+    ? (activeEditorInfo.target === EditorTarget.CanvasCard ? liveActiveEditor : null)
     : (liveActiveEditor || getLiveEditor(editor) || getLiveEditor(props.secondaryEditor))
 
   // While a comparison is up it owns the titlebar: the editor underneath is hidden,
@@ -269,9 +283,15 @@ export default function EditorLayout(props) {
     return () => window.removeEventListener('filetree:new-entry', reveal)
   }, [openLeftSidebar])
 
-  // Select and scroll to a note's text in the active editor. Accepts a note
-  // object (uses stored from/to when valid) or a plain anchor string, falling
-  // back to a document-wide text search for the anchor.
+  // Select and scroll to a note's text in the active editor. Accepts a note object
+  // (which carries stored from/to) or a plain anchor string.
+  //
+  // This used to do the anchor-fallback dance by hand, and one of the two places the
+  // handoff points at for sharp edge #3. It now goes through `resolveAnchor`, which
+  // is the same dance with one difference that matters: it *verifies* that the stored
+  // positions still cover the anchor text before trusting them, where this trusted any
+  // pair of finite numbers. A note whose positions went stale used to put the caret on
+  // whatever had moved into that range.
   const jumpToText = useCallback((noteOrAnchor) => {
     const currentEditor = activeEditor || editor
     if (!currentEditor) return
@@ -279,41 +299,28 @@ export default function EditorLayout(props) {
     const note = typeof noteOrAnchor === 'object' && noteOrAnchor !== null
       ? noteOrAnchor
       : null
-    const anchor = typeof noteOrAnchor === 'string'
-      ? noteOrAnchor
-      : note?.anchor
+    const text = typeof noteOrAnchor === 'string' ? noteOrAnchor : note?.anchor
+    if (!text) return
 
-    if (!anchor) return
+    const range = resolveAnchor(currentEditor, {
+      from: Number.isFinite(note?.from) ? note.from : -1,
+      to: Number.isFinite(note?.to) ? note.to : -1,
+      text,
+    })
 
-    let from = Number.isFinite(note?.from) ? note.from : -1
-    let to = Number.isFinite(note?.to) ? note.to : -1
+    // Null means the text is gone. Doing nothing is the right answer: the note has
+    // lost what it was about, and a guessed position is worse than no movement.
+    if (!range) return
 
-    if (from === -1 || to === -1) {
-      let foundPos = -1
-      currentEditor.state.doc.descendants((node, pos) => {
-        if (node.isText && node.text.includes(anchor)) {
-          foundPos = pos + node.text.indexOf(anchor)
-          return false
-        }
+    currentEditor
+      .chain()
+      .focus()
+      .setTextSelection({
+        from: range.from,
+        to: range.to > range.from ? range.to : range.from,
       })
-
-      if (foundPos !== -1) {
-        from = foundPos
-        to = foundPos + anchor.length
-      }
-    }
-
-    if (from !== -1) {
-      currentEditor
-        .chain()
-        .focus()
-        .setTextSelection({
-          from,
-          to: to > from ? to : from,
-        })
-        .scrollIntoView()
-        .run()
-    }
+      .scrollIntoView()
+      .run()
   }, [activeEditor, editor])
 
   // Open a search result: jump immediately if its doc is already open,

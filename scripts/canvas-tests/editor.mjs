@@ -39,6 +39,7 @@ const { saveDocument, loadDocument, getVersions } = await import('../../src/lib/
 const { saveCanvasDocument, loadCanvasDocument } = await import('../../src/lib/canvasFileSystem.js')
 const { createEmptyCanvas, makeTextNode } = await import('../../src/lib/canvasModel.js')
 const { files } = await import('./stub-fs.mjs')
+const { shellBridge } = await import('../../src/bridge/index.ts')
 
 const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 50)) })
@@ -218,6 +219,13 @@ await settle()
 // A quote note holds ProseMirror positions, and every edit invalidates them. The
 // remap runs on each transaction; if it stops, notes drift onto the wrong words
 // with no error anywhere.
+//
+// Since Phase 4 the shell is holding those positions too, so each remap is also
+// published on the bridge. Listening here rather than in bridge.mjs is the point:
+// that suite proves the protocol works, this one proves the app is actually wired to
+// it — a publish call deleted from useEditorNotes would pass every test there.
+const remaps = []
+shellBridge.on('notesRemapped', (payload) => remaps.push(payload))
 const text = control.editor.getText()
 const quoteStart = text.indexOf('first') + 1
 await act(async () => {
@@ -249,6 +257,15 @@ await act(async () => {
 })
 await settle()
 ok('a note whose range is deleted is dropped', (control.notesByDoc.one || []).length === 0)
+
+// The bridge half of the same two edits.
+ok('a remap is published to the shell, not just to React state', remaps.length > 0)
+ok('and it names the document it was about',
+  remaps.every((remap) => remap.docPath === 'one'))
+ok('the shifted note reached the shell with its new positions',
+  remaps.some((remap) => remap.notes.some((note) => note.from === quoteStart + 7)))
+ok('and a note that lost its text is reported as dropped, not merely absent',
+  remaps.some((remap) => remap.droppedNoteIds.includes('q1')))
 
 /* ---------------- Split view ---------------- */
 

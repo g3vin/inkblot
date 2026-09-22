@@ -1,21 +1,33 @@
 /**
  * DictationControl.jsx — toolbar button + popover for voice dictation.
  *
- * Talks to the Rust whisper.cpp backend through lib/dictation: loads the
- * model on first use, streams partial transcripts into the editor as a
- * draft range (styled by the DictationInline extension), and commits text
- * on final transcripts, filtering out non-speech tags like [silence].
- * Includes a live mic level-meter driven by dictation://level events.
+ * Loads the whisper model on first use, streams partial transcripts into the editor
+ * as a draft range (styled by the DictationInline extension), and commits text on
+ * final transcripts, filtering out non-speech tags like [silence]. Includes a live
+ * mic level-meter.
+ *
+ * **Transcripts arrive over the bridge, and the draft machine does not.** This is
+ * sharp edge #2 of Phase 4, and the split is deliberate: `replaceInlineDraft` below
+ * reads the text the draft range currently covers, diffs it against the new
+ * transcript, and dispatches the changed slice plus its decoration in one
+ * transaction — at speaking rate. A round trip inside that loop would lose the race
+ * with whisper. So the engine sends nothing but `dictationPartial` / `dictationFinal`
+ * / `dictationLevel`, everything below stays on this side, and none of it has to
+ * change when the engine moves into Swift.
+ *
+ * `bridge/dictationSource.ts` is what sends those commands today; it is a stand-in
+ * for the Swift that will.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
 import SFIcon from './SFIcon'
 import {
   loadDictationModel,
-  setupDictationListeners,
   startDictation,
   stopDictation,
 } from '../lib/dictation'
+import { documentSurface } from '../bridge'
+import { startDictationSource } from '../bridge/dictationSource'
 import {
   clearDictationInlineRange,
   getDictationInlineState,
@@ -59,12 +71,6 @@ const sanitizeDictationText = (text) => {
   if (/[A-Za-z0-9]/.test(cleaned)) return cleaned
   if (!hadNonSpeechTag && /[.,!?;:]/.test(cleaned)) return cleaned
   return ''
-}
-
-const getEventLevel = (payload) => {
-  const value = payload?.level ?? payload?.rms ?? payload?.volume ?? payload?.audioLevel
-  if (!Number.isFinite(value)) return null
-  return Math.max(0, Math.min(1, value > 1 ? value / 100 : value))
 }
 
 const getComparableDictationText = (text) => (
@@ -367,16 +373,11 @@ export default function DictationControl({ editor }) {
     let disposed = false
     let cleanup = null
 
-    setupDictationListeners({
-      onStarted: (payload) => {
-        if (payload?.sessionId) sessionIdRef.current = payload.sessionId
-        phaseRef.current = 'live'
-        clearDrainTimer()
-        drainDeadlineRef.current = 0
-        setStatus('listening')
-        setError('')
-      },
-      onPartial: (payload) => {
+    // The transcripts, off the protocol. `acceptsTranscript` still guards them:
+    // chunks are transcribed concurrently, so one can outlive the session that
+    // produced it, and the command carries the session id for exactly that reason.
+    const unsubscribeCommands = [
+      documentSurface.onCommand('dictationPartial', (payload) => {
         if (!acceptsTranscript(payload)) return
 
         const text = sanitizeDictationText(getEventText(payload))
@@ -404,8 +405,9 @@ export default function DictationControl({ editor }) {
           clearFinalizeTimer()
           replaceInlineDraft(text, 'draft')
         }
-      },
-      onFinal: (payload) => {
+      }),
+
+      documentSurface.onCommand('dictationFinal', (payload) => {
         if (!acceptsTranscript(payload)) return
 
         if (phaseRef.current === 'draining') {
@@ -413,12 +415,27 @@ export default function DictationControl({ editor }) {
         }
 
         finalizeInlineDraft(getEventText(payload))
-      },
-      onLevel: (payload) => {
-        const level = getEventLevel(payload)
-        if (level !== null) {
-          applyWaveLevel(level)
-        }
+      }),
+
+      documentSurface.onCommand('dictationLevel', ({ level }) => {
+        if (Number.isFinite(level)) applyWaveLevel(level)
+      }),
+
+      documentSurface.onCommand('dictationCancel', ({ deleteText }) => {
+        clearInlineDraft(Boolean(deleteText))
+      }),
+    ]
+
+    // The engine's lifecycle is not on the protocol: it is about the microphone, not
+    // about the document, and a native shell owns its own start/stop.
+    startDictationSource({
+      onStarted: (payload) => {
+        if (payload?.sessionId) sessionIdRef.current = payload.sessionId
+        phaseRef.current = 'live'
+        clearDrainTimer()
+        drainDeadlineRef.current = 0
+        setStatus('listening')
+        setError('')
       },
       onStopped: (payload) => {
         setBarLevels(INITIAL_BAR_LEVELS)
@@ -446,6 +463,7 @@ export default function DictationControl({ editor }) {
     return () => {
       disposed = true
       cleanup?.()
+      for (const unsubscribe of unsubscribeCommands) unsubscribe()
     }
   }, [
     acceptsTranscript,
