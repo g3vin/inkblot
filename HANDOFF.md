@@ -2,7 +2,7 @@
 
 State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
-**Current branch:** `phase-0-foundations`, 41 commits ahead of `main` (`b7ceed8`).
+**Current branch:** `phase-0-foundations`, 48 commits ahead of `main` (`b7ceed8`).
 `main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
 
 **Size today:** 33,415 JS/JSX · 5,367 TS · 8,984 CSS · 11,023 Rust.
@@ -11,17 +11,24 @@ State of the hybrid-native migration, what each remaining phase involves, and th
 
 ## The gates
 
-Run all seven after every change. They are fast and they have each caught something
-the others missed.
+Run all seven after every change, and the Swift tests below once you touch `native/`.
+They are fast and they have each caught something the others missed.
 
 ```bash
-npm test            # 501 assertions, 18 suites
+npm test            # 540 assertions, 19 suites
 npm run lint        # 0 errors AND 0 warnings is the current bar
 npm run typecheck   # tsc --noEmit
 npm run build       # the only thing that resolves dynamic imports and named exports
 npm run parity      # 15,915 cases through BOTH the JS and the Rust implementation
 npm run types:check # fails if the generated TS/Swift is stale, and typechecks the Swift
-(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 116 tests
+(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 120 tests
+```
+
+And for the Swift shell (Phase 5), after `./scripts/build-xcframework.sh` and `npm run build`:
+
+```bash
+xcodebuild test -project native/inkblot-core/inkblot-core.xcodeproj -scheme inkblot-core \
+  -destination 'platform=macOS' -only-testing:inkblot-coreTests      # 19 tests
 ```
 
 `parity` and `types:check` arrived with Phase 2 and need `cargo` and
@@ -617,54 +624,183 @@ instead.
 
 ---
 
-## Phase 5 — Swift shell (macOS 26+)
+## Phase 5 — Swift shell (macOS 26+) — foundation done
 
-Xcode project; `inkblot-core` as an XCFramework via UniFFI; `WKWebView` hosting the
-built editor bundle with `WKUserContentController` for the bridge.
+`native/inkblot-core/` is a SwiftUI app that hosts the unmodified `dist/` in a
+`WKWebView`, links `inkblot-core` as an XCFramework through UniFFI, and speaks the Phase 4
+protocol from Swift. The Tauri app is untouched and still ships: one bundle serves both
+shells, and it asks the host which chrome to draw rather than being built differently.
 
-**The bridge is already written.** Phase 4 left a working reference implementation and a
-generated `InkblotCore.swift` containing the whole protocol — `NativeCommand`,
-`WebviewEvent`, both envelopes, every payload, all `Codable`. The Swift side of the
-seam is a transport: post `InboundMessage` JSON with `evaluateJavaScript`, receive
-`OutboundMessage` JSON in a `WKScriptMessageHandler`, and replace
-`src/bridge/appBridge.ts`'s `createInProcessTransports()` with the webview pair.
-Nothing above that file in the web layer changes.
+**Verified:** the app builds warning-free, the page boots in it, preferences load
+through the Rust core, the page's View menu reaches the native menu bar, and
+`projectChanged` arrives over the bridge as event seq 0 (read off the unified log).
+**Not verified — nobody has clicked through it yet:** opening a project, the native
+tree opening a document, a context menu, a save. The session that built this had no
+screen-recording or UI-scripting permission. Do that first, with the Tauri app closed
+(both use the same data folder).
 
-Two things the Xcode target still has to supply: `AnyCodable` (a package —
-`scripts/generate-types.sh` typechecks the generated Swift against a stub today), and a
-`dictationSource` equivalent, since `src/bridge/dictationSource.ts` is a stand-in for
-Swift that should be deleted when the real one lands.
+### Building and running it
 
-**Goes native immediately — zero editor coupling today:** `LeftSidebar`, `FileTree`,
-`TabDock`, `ClipboardPanel`, `NotesPanel`, `NoteCard`, `SidebarTabs`, `AudioNotes`
-(→ AVFoundation), `DraftTabPane`, `Bubble`, the theme/accent/menu layer,
-`useResizableSidebar`.
+```bash
+npm run build                        # the shell embeds dist/; it does not build it
+./scripts/build-xcframework.sh       # after any change to inkblot-core or inkblot-ffi
+open native/inkblot-core/inkblot-core.xcodeproj    # ⌘R
+```
 
-**Deleted, not ported:**
-- `EditorLayout.jsx:128-224` — a JS reimplementation of macOS titlebar chrome
-- `RightSidebar.jsx:415-636` — ~450 lines reverse-engineering WebKit's private
-  `webkitMomentumPhase` to fake trackpad momentum
+- The **Embed Web Bundle** phase copies `dist/` into `Resources/web`. It warns when
+  `src/` is newer than `dist/`, and fails if `dist/` is missing.
+- Set `INKBLOT_DEV_URL=http://localhost:5173` in the scheme's environment and run
+  `npm run dev` to load the page from Vite instead. That gives hot reload inside the
+  native shell, and the injected scripts work the same either way.
+- Debug builds send the page's `console.error`, uncaught errors and unhandled
+  rejections to the unified log, along with a trace of every bridge message and Tauri
+  call. Debug-level lines are not persisted, so stream them:
+  `/usr/bin/log stream --level debug --predicate 'subsystem == "inkblot"'`. (Plain
+  `log` in zsh is a shell builtin.)
+- Web Inspector: the web view is `isInspectable`, so Safari ▸ Develop ▸ *your Mac*.
+- The project name, target and product are still Xcode's `inkblot-core` template names.
+  The window and Finder say "Inkblot". Rename the target when you like; nothing
+  depends on the name except the test target's `@testable import inkblot_core`.
 
-`NSScrollView` and real window chrome give both for free.
+**Project settings changed from the template, deliberately:**
+- **App sandbox off.** The shell must read `~/Library/Application Support/com.inkblot.app`,
+  which is the Tauri app's folder and not this bundle ID's, and projects can live
+  anywhere on disk. A sandboxed build would see an empty container.
+- **macOS only.** The XCFramework is `macos-arm64`, so building for iOS would fail to
+  link. Phase 6 adds the iOS slices and turns the platforms back on.
+- **User script sandboxing off.** The Embed Web Bundle phase has to read `dist/`.
+- `OTHER_LDFLAGS` adds CoreText, CoreGraphics and libiconv, which font-kit needs. A Rust
+  staticlib carries no autolink information; `cargo rustc -- --print native-static-libs`
+  is where the list came from.
 
-**Mechanical async, semantics intact:** `HistoryPanel.handleRestore` (already async
-and busy-gated), `VersionComparePane` (its toolbar portal becomes native titlebar
-content — *simpler*), `Workbench.selectTileWord/replaceWord`, `jumpToText`, the
-context menu (already async for the Tauri menu import; `getSelectionContext` now exists
-on the protocol and is what it should call before building).
+### How the pieces fit
 
-**Stays in the webview:** the whole document surface, `FocusModeOverlay` (re-derives
-from the full doc on every transaction — pushing that per keystroke is the cost to
-watch), `ReadAloudControl`'s highlight scheduler (position mapping cannot cross the
-boundary; only audio generation/playback goes native).
+```text
+ SwiftUI (Shell/)                              WKWebView — dist/, unmodified
+ ─────────────────                             ──────────────────────────────
+ FileTreeSidebar ─┐                            React chrome (toolbar, panes, right
+ InkblotCommands ─┼─ ShellBridge ◄─ inkblotBridge ─► createNativeHostTransports
+ AppModel        ─┘   (protocol JSON)            (src/bridge/transport.ts)
+                                                     │  merged with the in-process
+ TauriHost ◄──────── tauri (reply handler) ──── tauri-shim.js   React shell
+   fs / path / dialog / opener / menus /            (window.__TAURI_INTERNALS__)
+   preferences / fonts / haptics
+ CoreService ── InkblotFFI.xcframework (inkblot-ffi → inkblot-core)
+ AppSchemeHandler: inkblot://app/ (dist) · asset://localhost/ (disk)
+```
 
-**`NoteHoverPreview` is the one honest casualty.** It needs
-`marker.getBoundingClientRect()` from inside the document, re-queried on every scroll
-and resize, to draw SVG strings from floating cards to in-document text — and
-`NoteAnnotation.js:155` ships a live `EditorView` object in its event payload. Either
-keep previews inside the webview (recommended) or accept a frame of lag.
+**The native shell joins the wire alongside the React shell. It does not replace it.**
+`createNativeHostTransports` merges the Swift shell onto the surface's wire next to the
+in-process React chrome:
+- Events go to both shells.
+- Commands from both are re-sequenced into one stream. Otherwise each shell's own
+  numbering would look like a gap on every interleave.
+- Replies go back to whoever asked. Native request ids are prefixed going in and
+  stripped coming out, so two `r0`s cannot cross.
 
-Liquid Glass via `.glassEffect()` / `GlassEffectContainer`, no fallback path.
+That is what lets chrome move a piece at a time: until the last piece moves, both
+shells drive the same document. `bridge.mjs` covers it, and two deliberate breaks
+(no re-sequencing, reply routing off) both fail it.
+
+**The Tauri shim is what lets the bundle run unmodified.** Every save goes through
+`@tauri-apps/plugin-fs`, every delete confirmation through `plugin-dialog`, and every
+context menu through `api/menu`. All of them call `window.__TAURI_INTERNALS__` and
+nothing else. `Web/tauri-shim.js` implements that object:
+- It keeps callbacks, channels, event listeners and the whole menu resource tree in the
+  page. Building a menu costs nothing; showing it costs one round trip.
+- It forwards to `TauriHost` only what needs the machine.
+- Bytes cross as base64 inside JSON.
+
+`scripts/canvas-tests/shim.mjs` drives the shim through the **real** `@tauri-apps/api`
+modules, imported by path so `loader.mjs` does not stub them. It found a cross-realm
+`instanceof` bug on its first run.
+
+**Structured values cross UniFFI as JSON strings.** They decode into the
+typeshare-generated `Codable` types, so there is one definition per type. A UniFFI
+`Record` for `TreeNode` would have been a second definition, made by a second tool.
+The UniFFI object is `InkblotCore` in `Generated/inkblot_ffi.swift`; that file is
+gitignored because it must come from the same build as the library (see
+`build-xcframework.sh` on checksums). `Generated/InkblotCore.swift` *is* committed:
+`generate-types.sh` writes it, and `types:check` diffs it.
+
+### What is native now
+
+| Piece | State |
+|---|---|
+| File tree | Native (`Shell/FileTreeSidebar.swift`). Browse, open (`openDocument`), new document/folder (through the core, so the file is byte-for-byte what the web tree writes), Reveal in Finder. FSEvents keeps it current. |
+| Window chrome | Real titlebar and toolbar. The page's drag strip, traffic-light spacing and fullscreen guessing are off (`nativeOwns('windowChrome')`). |
+| Menu bar | SwiftUI. **Format** shows `ToolbarState` (checkmarks follow the selection) and sends `applyMark`/`setAlignment`. **Edit ▸ Paste and Match Style** reads the pasteboard and sends the new `insertPlainText`. The page's View items (theme, accent, word count) are merged into View. |
+| Context menus | Native `NSMenu`s, built from the page's menu tree by the shim. Edit items go to the first responder. |
+| Dialogs | `NSOpenPanel`/`NSSavePanel`/`NSAlert`, as sheets on the window. |
+| Preferences, fonts, haptics | Through `inkblot-ffi` / AppKit. |
+
+Format items have **no key equivalents on purpose.** `WKWebView` offers ⌘B to the page
+before the menu sees it, so a menu shortcut as well would toggle twice.
+
+### Protocol additions this phase
+
+- `insertPlainText { target, text }`: Paste and Match Style. It runs through
+  ProseMirror's `pasteText`, not `insertContent`, which would parse `<b>` as bold. It
+  replaces the dead `__inkblot_forcePlainPaste`, as Phase 4 asked.
+- `projectChanged { projectName?, projectRoot? }`: the picker is still in the page,
+  and the native tree has to be told whose tree it is.
+- `openDocument` finally has a handler. It was on the protocol with no delegate.
+
+### Still owed, in the order I'd do them
+
+1. **Click through it** (see above). The page's landing screen, opening a project, the
+   tree opening a file, a context menu, an autosave landing on disk.
+2. **Rename, move and delete in the native tree.** They are deliberately absent. Each
+   changes a path the page is holding (the open document, tabs, split pane, per-doc
+   editor cache), and the page's tree fixes all of those in the same breath as it
+   touches the disk. Done from Swift, the page would keep autosaving to the old path
+   and recreate the file. They need commands the page applies first — `entryRenamed` /
+   `entryDeleted` — then the disk half can move. Until then, **the native shell cannot
+   rename or delete a document**. That is the biggest regression against the Tauri app.
+3. **The toolbar.** Still the page's, because it also hosts dictation, Read Aloud and
+   the canvas and compare toolbars, which portal into its slot. The protocol side is
+   ready: `ToolbarState` already drives the Format menu.
+4. **The Rust features that live in the Tauri app crate, not the core:** synonyms,
+   Kokoro, whisper dictation, the Pinterest scrape. `TauriHost` rejects their commands
+   by name ("not available in the native shell yet"), so the page's fallbacks run. Each
+   has to move into `inkblot-core` (or a sibling crate) before `inkblot-ffi` can expose
+   it. Dictation also needs the `dictationSource` equivalent in Swift, sending
+   `dictationPartial`/`Final`/`Level` over the bridge. Then
+   `src/bridge/dictationSource.ts` is deleted.
+5. **Detached document windows and the Pinterest webviews** use `WebviewWindow`, which
+   the shim answers with nothing. They need real `NSWindow`s.
+6. **Finder drag-and-drop onto a canvas** listens for Tauri's `drag-drop` event with
+   paths. In `WKWebView` a drop is an HTML5 drop with `File` objects, so
+   `useCanvasImageImport` needs that path too.
+7. **Canvas creation in the native tree.** The empty on-disk canvas shape is written by
+   `saveCanvasDocument`, and the core has no equivalent yet.
+8. Everything from the original list that has not moved: `TabDock`, `ClipboardPanel`,
+   `NotesPanel`, `AudioNotes` → AVFoundation, `DraftTabPane`, `Bubble`,
+   `useResizableSidebar`. Then delete `RightSidebar.jsx:415-636` (the momentum hack)
+   once the right sidebar is an `NSScrollView`.
+
+Still true from the original plan: the document surface, `FocusModeOverlay` and the
+Read Aloud highlight scheduler stay in the webview. Keep `NoteHoverPreview` there too.
+
+### Things that bit
+
+- **`MACOSX_DEPLOYMENT_TARGET` in the environment breaks the Rust build.** It reaches
+  the host proc-macro dylibs as well as the target, and the linker then emits dylibs
+  that dyld refuses to load ("mis-aligned LINKEDIT string pool"), a hundred crates in.
+  Leave it unset; rustc's default is older than the app, which is the harmless
+  direction. If it has been set once, delete the stale `target/release/deps/*.dylib`.
+- **`uniffi-bindgen --library` runs `cargo metadata` in the working directory,** so it
+  must run from `src-tauri/`.
+- **UniFFI already makes its error type `LocalizedError`.** Adding the conformance is a
+  redeclaration error.
+- **`WKWebView` refuses module scripts from `file://`,** hence the `inkblot://` scheme
+  rather than `loadFileURL`.
+- **Reset the bridge's counters when a navigation commits, not when it finishes.** The
+  page starts sending as soon as its scripts run. Resetting at `didFinish` counted
+  those early events as a gap.
+- **The generated protocol decodes with `try?` per case,** so a payload missing one
+  required field fails the whole message. `ShellBridge` logs the raw JSON when that
+  happens. That log line is the first place to look if the native side seems deaf.
 
 ---
 
