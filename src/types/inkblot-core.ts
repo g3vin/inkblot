@@ -337,7 +337,12 @@ export type NativeCommand =
 	| { type: "canvasDropNote", payload: CanvasDropNoteCommand }
 	| { type: "canvasReveal", payload: CanvasRevealCommand }
 	| { type: "canvasRestore", payload: CanvasRestoreCommand }
-	| { type: "insertPlainText", payload: InsertPlainTextCommand };
+	| { type: "insertPlainText", payload: InsertPlainTextCommand }
+	| { type: "createEntry", payload: CreateEntryCommand }
+	| { type: "renameEntry", payload: RenameEntryCommand }
+	| { type: "moveEntry", payload: MoveEntryCommand }
+	| { type: "deleteEntry", payload: DeleteEntryCommand }
+	| { type: "duplicateEntry", payload: DuplicateEntryCommand };
 
 /**
  * A command, with its place in the stream.
@@ -350,6 +355,36 @@ export type NativeCommand =
 export interface CommandEnvelope {
 	seq: number;
 	command: NativeCommand;
+}
+
+/** What kind of entry `createEntry` makes. */
+export enum EntryKind {
+	Document = "document",
+	Canvas = "canvas",
+	Folder = "folder",
+}
+
+/**
+ * Create a document, canvas or folder in the open project, and open it if it is a
+ * document.
+ * 
+ * The page does the writing, not the shell, for the same reason as every command
+ * below: a new document gets a tab and a place in the tree's stored order, and those
+ * live in the page. The empty canvas is also the page's to define — it is
+ * `createEmptyCanvas()` serialized as JSON Canvas.
+ */
+export interface CreateEntryCommand {
+	/** Tree path of the folder to create in; empty for the project root. */
+	parentFolder: string;
+	/** The bare name. For a canvas the page adds the `.canvas` suffix. */
+	name: string;
+	kind: EntryKind;
+}
+
+/** Delete a file or folder. The shell has already asked the user. */
+export interface DeleteEntryCommand {
+	path: string;
+	isFolder: boolean;
 }
 
 /**
@@ -575,6 +610,11 @@ export interface DragStarted {
 	detail?: unknown;
 }
 
+/** Copy a document beside itself as "<name> copy", and open the copy. */
+export interface DuplicateEntryCommand {
+	path: string;
+}
+
 /** A question aimed at a particular editor, or at whichever one is active. */
 export interface EditorQuery {
 	/**
@@ -664,6 +704,14 @@ export interface JumpToAnchorCommand {
 	 * on disk.
 	 */
 	preferPositions: boolean;
+}
+
+/** Move a file or folder into another folder. See `RenameEntryCommand`. */
+export interface MoveEntryCommand {
+	path: string;
+	isFolder: boolean;
+	/** Tree path; empty for the project root. */
+	targetFolder: string;
 }
 
 export enum NoteType {
@@ -866,6 +914,23 @@ export interface Rect {
 	y: number;
 	width: number;
 	height: number;
+}
+
+/**
+ * Rename a file or folder in place.
+ * 
+ * **Why the page performs these rather than the shell.** A rename changes a path the
+ * page may be holding — the open document, a tab, the split pane, notes and versions
+ * keyed by path — and the autosave that fires when a pane lets go of a document writes
+ * to the path it had. Done from outside, that final save lands on the old path and
+ * recreates the file. The page closes what the entry touches, waits for those final
+ * saves, does the disk operation, and reopens at the new paths (`useEntryOperations`).
+ */
+export interface RenameEntryCommand {
+	path: string;
+	isFolder: boolean;
+	/** The bare name. A canvas keeps its `.canvas` suffix whatever this says. */
+	newName: string;
 }
 
 export interface ReplaceRangesCommand {

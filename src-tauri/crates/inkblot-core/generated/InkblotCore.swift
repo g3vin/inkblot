@@ -444,6 +444,11 @@ public enum NativeCommand: Codable, Equatable {
 	case canvasReveal(CanvasRevealCommand)
 	case canvasRestore(CanvasRestoreCommand)
 	case insertPlainText(InsertPlainTextCommand)
+	case createEntry(CreateEntryCommand)
+	case renameEntry(RenameEntryCommand)
+	case moveEntry(MoveEntryCommand)
+	case deleteEntry(DeleteEntryCommand)
+	case duplicateEntry(DuplicateEntryCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -470,7 +475,12 @@ public enum NativeCommand: Codable, Equatable {
 			canvasDropNote,
 			canvasReveal,
 			canvasRestore,
-			insertPlainText
+			insertPlainText,
+			createEntry,
+			renameEntry,
+			moveEntry,
+			deleteEntry,
+			duplicateEntry
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -606,6 +616,31 @@ public enum NativeCommand: Codable, Equatable {
 					self = .insertPlainText(content)
 					return
 				}
+			case .createEntry:
+				if let content = try? container.decode(CreateEntryCommand.self, forKey: .payload) {
+					self = .createEntry(content)
+					return
+				}
+			case .renameEntry:
+				if let content = try? container.decode(RenameEntryCommand.self, forKey: .payload) {
+					self = .renameEntry(content)
+					return
+				}
+			case .moveEntry:
+				if let content = try? container.decode(MoveEntryCommand.self, forKey: .payload) {
+					self = .moveEntry(content)
+					return
+				}
+			case .deleteEntry:
+				if let content = try? container.decode(DeleteEntryCommand.self, forKey: .payload) {
+					self = .deleteEntry(content)
+					return
+				}
+			case .duplicateEntry:
+				if let content = try? container.decode(DuplicateEntryCommand.self, forKey: .payload) {
+					self = .duplicateEntry(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -689,6 +724,21 @@ public enum NativeCommand: Codable, Equatable {
 		case .insertPlainText(let content):
 			try container.encode(CodingKeys.insertPlainText, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .createEntry(let content):
+			try container.encode(CodingKeys.createEntry, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .renameEntry(let content):
+			try container.encode(CodingKeys.renameEntry, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .moveEntry(let content):
+			try container.encode(CodingKeys.moveEntry, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .deleteEntry(let content):
+			try container.encode(CodingKeys.deleteEntry, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .duplicateEntry(let content):
+			try container.encode(CodingKeys.duplicateEntry, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -706,6 +756,45 @@ public struct CommandEnvelope: Codable, Equatable {
 	public init(seq: UInt32, command: NativeCommand) {
 		self.seq = seq
 		self.command = command
+	}
+}
+
+/// What kind of entry `createEntry` makes.
+public enum EntryKind: String, Codable, Equatable {
+	case document
+	case canvas
+	case folder
+}
+
+/// Create a document, canvas or folder in the open project, and open it if it is a
+/// document.
+/// 
+/// The page does the writing, not the shell, for the same reason as every command
+/// below: a new document gets a tab and a place in the tree's stored order, and those
+/// live in the page. The empty canvas is also the page's to define — it is
+/// `createEmptyCanvas()` serialized as JSON Canvas.
+public struct CreateEntryCommand: Codable, Equatable {
+	/// Tree path of the folder to create in; empty for the project root.
+	public let parentFolder: String
+	/// The bare name. For a canvas the page adds the `.canvas` suffix.
+	public let name: String
+	public let kind: EntryKind
+
+	public init(parentFolder: String, name: String, kind: EntryKind) {
+		self.parentFolder = parentFolder
+		self.name = name
+		self.kind = kind
+	}
+}
+
+/// Delete a file or folder. The shell has already asked the user.
+public struct DeleteEntryCommand: Codable, Equatable {
+	public let path: String
+	public let isFolder: Bool
+
+	public init(path: String, isFolder: Bool) {
+		self.path = path
+		self.isFolder = isFolder
 	}
 }
 
@@ -971,6 +1060,15 @@ public struct DragStarted: Codable, Equatable {
 		self.docPath = docPath
 		self.anchor = anchor
 		self.detail = detail
+	}
+}
+
+/// Copy a document beside itself as "<name> copy", and open the copy.
+public struct DuplicateEntryCommand: Codable, Equatable {
+	public let path: String
+
+	public init(path: String) {
+		self.path = path
 	}
 }
 
@@ -1245,6 +1343,20 @@ public struct JumpToAnchorCommand: Codable, Equatable {
 		self.target = target
 		self.anchor = anchor
 		self.preferPositions = preferPositions
+	}
+}
+
+/// Move a file or folder into another folder. See `RenameEntryCommand`.
+public struct MoveEntryCommand: Codable, Equatable {
+	public let path: String
+	public let isFolder: Bool
+	/// Tree path; empty for the project root.
+	public let targetFolder: String
+
+	public init(path: String, isFolder: Bool, targetFolder: String) {
+		self.path = path
+		self.isFolder = isFolder
+		self.targetFolder = targetFolder
 	}
 }
 
@@ -1523,6 +1635,27 @@ public struct Rect: Codable, Equatable {
 		self.y = y
 		self.width = width
 		self.height = height
+	}
+}
+
+/// Rename a file or folder in place.
+/// 
+/// **Why the page performs these rather than the shell.** A rename changes a path the
+/// page may be holding — the open document, a tab, the split pane, notes and versions
+/// keyed by path — and the autosave that fires when a pane lets go of a document writes
+/// to the path it had. Done from outside, that final save lands on the old path and
+/// recreates the file. The page closes what the entry touches, waits for those final
+/// saves, does the disk operation, and reopens at the new paths (`useEntryOperations`).
+public struct RenameEntryCommand: Codable, Equatable {
+	public let path: String
+	public let isFolder: Bool
+	/// The bare name. A canvas keeps its `.canvas` suffix whatever this says.
+	public let newName: String
+
+	public init(path: String, isFolder: Bool, newName: String) {
+		self.path = path
+		self.isFolder = isFolder
+		self.newName = newName
 	}
 }
 
