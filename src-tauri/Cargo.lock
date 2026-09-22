@@ -2490,6 +2490,8 @@ name = "inkblot-core"
 version = "0.1.0"
 dependencies = [
  "font-kit",
+ "once_cell",
+ "regex",
  "reqwest 0.12.28",
  "serde",
  "serde_json",

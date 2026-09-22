@@ -16,3 +16,4 @@ pub mod js_number;
 pub mod pinterest;
 pub mod story_structure;
 pub mod types;
+pub mod version_history;
