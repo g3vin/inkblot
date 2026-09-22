@@ -13,12 +13,13 @@ struct InspectorView: View {
         @Bindable var sidebar = model.sidebar
 
         VStack(spacing: 10) {
-            // Xcode's arrangement: the panel's own close button top-right, the selector
-            // bar beneath it, then the panel.
+            // Xcode's arrangement: the panel's toggle in its top-right corner on the
+            // traffic lights' line, the selector bar beneath it, then the panel.
             HStack {
                 Spacer()
                 SidebarToggleButton(edge: .trailing, isPresented: $sidebar.isPresented)
             }
+            .padding(.trailing, 4)
 
             GlassTabBar(
                 tabs: SidebarModel.Tab.allCases,
@@ -46,9 +47,9 @@ struct InspectorView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, 12)
-        .padding(.top, SidebarToggleButton.topInset)
-        // The hidden titlebar still reserves a safe area; without this the toggle sits a
-        // titlebar's height below the corner it belongs in.
+        .padding(.top, WindowChrome.toggleInset)
+        // The toggle belongs on the traffic lights' line, not below the safe area the
+        // hidden titlebar still reserves.
         .ignoresSafeArea(.container, edges: .top)
     }
 
@@ -160,31 +161,5 @@ struct SearchResultsView: View {
                 .listStyle(.inset)
             }
         }
-    }
-}
-
-/// The glass buttons that show and hide the sidebars — in the sidebar's top corner while
-/// it is open, floating at the window's edge while it is closed.
-struct SidebarToggleButton: View {
-    enum Edge { case leading, trailing }
-
-    let edge: Edge
-    @Binding var isPresented: Bool
-
-    /// Where the toggles sit: level with the traffic lights, which the hidden titlebar
-    /// centres about 19pt from the top of the window.
-    static let topInset: CGFloat = 3
-    static let size: CGFloat = 32
-
-    var body: some View {
-        Button { withAnimation(.spring(duration: 0.3)) { isPresented.toggle() } } label: {
-            Image(systemName: edge == .leading ? "sidebar.left" : "sidebar.right")
-                .font(.system(size: 14, weight: .medium))
-                .frame(width: Self.size, height: Self.size)
-                .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .circle)
-        .help(isPresented ? "Hide the sidebar" : "Show the sidebar")
     }
 }
