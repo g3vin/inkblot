@@ -12,8 +12,9 @@ struct InkblotApp: App {
                 .frame(minWidth: 760, minHeight: 480)
         }
         .defaultSize(width: 1200, height: 800)
-        // A standard unified toolbar, without the title — see ContentView.
-        .windowToolbarStyle(.unified(showsTitle: false))
+        // No title and no toolbar row — see WindowChrome for why not a real toolbar, and
+        // for how the traffic lights still get a toolbar window's placement.
+        .windowStyle(.hiddenTitleBar)
         .commands {
             // View ▸ Show/Hide Sidebar and Show/Hide Inspector, beside the toolbar toggles.
             SidebarCommands()

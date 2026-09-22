@@ -127,7 +127,6 @@ export default function EditorLayout(props) {
       ? 86
       : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
   const nativeRightSidebar = nativeOwns('rightSidebar')
-  const nativeToolbar = nativeOwns('toolbar')
   const nativeNotePreviews = nativeOwns('notePreviews')
   useNativeNotePreviews({ enabled: nativeNotePreviews })
   const titlebarRightWidth = nativeRightSidebar ? nativeTitlebarTrailing : right.collapsed && !right.peeked
@@ -164,10 +163,9 @@ export default function EditorLayout(props) {
   // unless it landed on something interactive. Bound to the window rather than
   // the titlebar element so the strip also covers the sidebars beneath it.
   //
-  // Not under a native toolbar: the window's own toolbar is what drags it then, and
-  // the top of this page is document.
+  // Under the Swift shell too: it draws no titlebar, so this strip is the only thing
+  // left to drag the window by, and the shell turns the call into a native drag.
   useEffect(() => {
-    if (nativeToolbar) return undefined
     const handleWindowDragMouseDown = (event) => {
       if (event.button !== 0) return
       if (event.clientY > WINDOW_DRAG_STRIP_HEIGHT) return
@@ -183,7 +181,7 @@ export default function EditorLayout(props) {
 
     window.addEventListener('mousedown', handleWindowDragMouseDown, true)
     return () => window.removeEventListener('mousedown', handleWindowDragMouseDown, true)
-  }, [nativeToolbar])
+  }, [])
 
   // Track (and predict) fullscreen state so the layout can restyle its chrome.
   // macOS reports fullscreen late during the animation, so we also treat
@@ -494,25 +492,18 @@ export default function EditorLayout(props) {
 
   const sidebarResizing = left.resizing || right.resizing
 
-  // Under the Swift shell the formatting toolbar is native, in the window's own
-  // toolbar. The page still has a toolbar row to offer in two cases — a canvas's own
-  // toolbar, and a version comparison's — and draws the row only then; otherwise it
-  // collapses to nothing and the document starts right under the native toolbar.
-  const pageToolbarRow = !nativeToolbar || comparing || (activeIsCanvas && !toolbarEditor)
-
   return (
     <CanvasToolbarSlotContext.Provider value={comparing ? null : canvasToolbarSlot}>
     <CompareToolbarSlotContext.Provider value={comparing ? compareToolbarSlot : null}>
     <div
       className={`editor-page-wrapper${isFullscreenChrome ? ' is-fullscreen' : ''}${focusModeOpen ? ' is-focus-mode' : ''}${sidebarResizing ? ' is-sidebar-resizing' : ''}`}
-      style={pageToolbarRow ? undefined : { '--app-titlebar-height': '0px' }}
       onContextMenu={handleContextMenu}
     >
-      {pageToolbarRow ? <div
+      <div
         className="app-titlebar"
         style={{
-          '--titlebar-left-width': `${nativeToolbar ? 0 : titlebarLeftWidth}px`,
-          '--titlebar-right-width': `${nativeToolbar ? 0 : titlebarRightWidth}px`,
+          '--titlebar-left-width': `${titlebarLeftWidth}px`,
+          '--titlebar-right-width': `${titlebarRightWidth}px`,
         }}
       >
         {/* One slot, four states, in precedence order: a comparison takes the
@@ -523,7 +514,7 @@ export default function EditorLayout(props) {
         <div className="app-titlebar-toolbar">
           {comparing ? (
             <div className="canvas-toolbar-slot" ref={setCompareToolbarSlot} />
-          ) : toolbarEditor && !nativeToolbar ? (
+          ) : toolbarEditor ? (
             <Toolbar editor={toolbarEditor} />
           ) : activeIsCanvas ? (
             <div className="canvas-toolbar-slot" ref={setCanvasToolbarSlot} />
@@ -531,7 +522,7 @@ export default function EditorLayout(props) {
             <div className="toolbar-placeholder" data-tauri-drag-region />
           )}
         </div>
-      </div> : null}
+      </div>
 
       <div className={`main-layout${activeIsCanvas ? ' is-canvas-underlay' : ''}`}>
 
