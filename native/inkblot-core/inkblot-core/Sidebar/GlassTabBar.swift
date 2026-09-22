@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// A Liquid Glass tab bar — the floating kind at the bottom of an iOS 26 app.
+/// A Liquid Glass selector bar — Xcode's navigator bar, with the grab-and-slide bubble of
+/// an iOS 26 tab bar.
 ///
 /// The icons sit in a glass capsule and the selection is a second, tinted glass bubble
 /// under the selected one. The bubble is a thing you can hold: press on it and it lifts
@@ -9,7 +10,8 @@ import SwiftUI
 /// plain click on any icon still just selects it.
 ///
 /// Both pieces of glass live in one `GlassEffectContainer`, so as the bubble travels it
-/// is refracted *by* the bar it is sliding along rather than stacked on top of it.
+/// is refracted *by* the bar it is sliding along rather than stacked on top of it. The
+/// icons are drawn above the container, never inside it.
 struct GlassTabBar<Tab: Hashable>: View {
     let tabs: [Tab]
     @Binding var selection: Tab
@@ -21,7 +23,7 @@ struct GlassTabBar<Tab: Hashable>: View {
     @State private var grabOffset: CGFloat = 0
     @State private var pressedOnBubble = false
 
-    private let height: CGFloat = 44
+    private let height: CGFloat = 36
     private let inset: CGFloat = 4
 
     var body: some View {
@@ -33,37 +35,43 @@ struct GlassTabBar<Tab: Hashable>: View {
             let hovered = Self.index(at: bubbleX, slot: slot, count: tabs.count)
             let lifted = dragX != nil
 
-            GlassEffectContainer(spacing: 8) {
-                ZStack(alignment: .topLeading) {
-                    Capsule()
-                        .fill(.clear)
-                        .frame(width: proxy.size.width, height: height)
-                        .glassEffect(.regular, in: .capsule)
+            ZStack(alignment: .topLeading) {
+                // The glass only. A GlassEffectContainer draws its glass *over* any plain
+                // content inside it, so the icons cannot live in here — they did at
+                // first, and sat frosted over under the bar and the bubble.
+                GlassEffectContainer(spacing: 8) {
+                    ZStack(alignment: .topLeading) {
+                        Capsule()
+                            .fill(.clear)
+                            .frame(width: proxy.size.width, height: height)
+                            .glassEffect(.regular, in: .capsule)
 
-                    Capsule()
-                        .fill(.clear)
-                        .frame(width: slot - inset * 2, height: height - inset * 2)
-                        .glassEffect(.regular.tint(.accentColor.opacity(lifted ? 0.28 : 0.18)).interactive(),
-                                     in: .capsule)
-                        .scaleEffect(lifted ? 1.16 : 1)
-                        .shadow(color: .black.opacity(lifted ? 0.18 : 0), radius: 10, y: 4)
-                        .offset(x: bubbleX - (slot - inset * 2) / 2, y: inset)
-
-                    HStack(spacing: 0) {
-                        ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                            Image(systemName: symbol(tab))
-                                .font(.system(size: 15, weight: index == hovered ? .semibold : .regular))
-                                .foregroundStyle(index == hovered ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                                .scaleEffect(lifted && index == hovered ? 1.12 : 1)
-                                .frame(width: slot, height: height)
-                                .contentShape(.rect)
-                                .accessibilityLabel(title(tab))
-                                .accessibilityAddTraits(tab == selection ? .isSelected : [])
-                                .help(title(tab))
-                        }
+                        Capsule()
+                            .fill(.clear)
+                            .frame(width: slot - inset * 2, height: height - inset * 2)
+                            .glassEffect(.regular.tint(.accentColor.opacity(lifted ? 0.28 : 0.18)).interactive(),
+                                         in: .capsule)
+                            .scaleEffect(lifted ? 1.16 : 1)
+                            .shadow(color: .black.opacity(lifted ? 0.18 : 0), radius: 10, y: 4)
+                            .offset(x: bubbleX - (slot - inset * 2) / 2, y: inset)
                     }
-                    .allowsHitTesting(false)
                 }
+
+                // The icons, above the glass.
+                HStack(spacing: 0) {
+                    ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                        Image(systemName: symbol(tab))
+                            .font(.system(size: 15, weight: index == hovered ? .semibold : .regular))
+                            .foregroundStyle(index == hovered ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                            .scaleEffect(lifted && index == hovered ? 1.12 : 1)
+                            .frame(width: slot, height: height)
+                            .contentShape(.rect)
+                            .accessibilityLabel(title(tab))
+                            .accessibilityAddTraits(tab == selection ? .isSelected : [])
+                            .help(title(tab))
+                    }
+                }
+                .allowsHitTesting(false)
             }
             .contentShape(.capsule)
             .gesture(

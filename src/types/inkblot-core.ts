@@ -388,7 +388,8 @@ export type NativeCommand =
 	| { type: "versionAction", payload: VersionActionCommand }
 	| { type: "renameVersion", payload: RenameVersionCommand }
 	| { type: "revealSearchResult", payload: RevealSearchResultCommand }
-	| { type: "addReply", payload: AddReplyCommand };
+	| { type: "addReply", payload: AddReplyCommand }
+	| { type: "setTitlebarInset", payload: SetTitlebarInsetCommand };
 
 /**
  * A command, with its place in the stream.
@@ -1313,6 +1314,20 @@ export interface SetSelectionCommand {
 	anchor: TextAnchor;
 	scrollIntoView: boolean;
 	focus: boolean;
+}
+
+/**
+ * How much of the page's top-left corner the window's own controls cover.
+ * 
+ * The shell draws no titlebar row: the page's toolbar is the top of the window, and
+ * the traffic lights float over whatever is beneath them. When the native file tree is
+ * showing they float over it and the page needs no room; when it is hidden they float
+ * over the page's toolbar, which must start after them. Only the shell knows which.
+ */
+export interface SetTitlebarInsetCommand {
+	leading: number;
+	/** Room at the right end, for the button that reopens a hidden native sidebar. */
+	trailing?: number;
 }
 
 export enum SidebarTab {
