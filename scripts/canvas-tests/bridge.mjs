@@ -256,6 +256,23 @@ function wire({ deferred = false } = {}) {
   ok('an unhandled request is refused, so a shell cannot hang on it',
     error instanceof BridgeRequestError && error.code === 'failed')
 
+  // `ReadAloudControl` answers it through the surface while it is mounted.
+  const payload = { docPath: 'ch/one.md', payload: { text: 'she hesitated', words: [] } }
+  let asked = null
+  const stop = surface.onRequest('getReadAloudPayload', (query) => { asked = query; return payload })
+  const answered = shell.request('getReadAloudPayload', { selectionOnly: true })
+  await transports.flush()
+  const reply = await answered
+  ok('a component can answer a request through the surface', reply.docPath === 'ch/one.md')
+  ok('and it is handed the query', asked?.selectionOnly === true)
+
+  stop()
+  const afterStop = shell.request('getReadAloudPayload', { selectionOnly: false })
+  await transports.flush()
+  error = null
+  try { await afterStop } catch (caught) { error = caught }
+  ok('once it unmounts, the request is refused again', error?.code === 'failed')
+
   surface.dispose()
 }
 

@@ -15,6 +15,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { debounce } from 'lodash'
 
 import { isEditorReady } from '../lib/editorUtils'
+import { documentSurface, editorRegistry } from '../bridge'
+import { EditorTarget, Pane } from '../types'
 
 const WORD_COUNT_DEBOUNCE_MS = 300
 
@@ -49,6 +51,47 @@ const getWordStats = (targetEditor, previousTotal = 0, includeTotal = true) => {
   }
 }
 
+/**
+ * Tell the shell a pane's document changed, with its counts.
+ *
+ * `userEdit` is false for a load — the protocol's way of saying "do not treat this as
+ * the user's edit". The document path comes from the registry, whose accessors read the
+ * pane's current document, rather than being threaded through as a prop.
+ */
+const publishDocChanged = (paneId, targetEditor, userEdit) => {
+  if (!isEditorReady(targetEditor)) return
+  const pane = paneId === 'secondary' ? Pane.Secondary : Pane.Primary
+  const target = paneId === 'secondary' ? EditorTarget.Secondary : EditorTarget.Primary
+  const docPath = editorRegistry.resolve(target)?.docPath
+  if (!docPath) return
+  const text = targetEditor.getText()
+  documentSurface.publishDocChanged({
+    pane,
+    docPath,
+    userEdit,
+    wordCount: countWords(text),
+    charCount: text.length,
+  })
+}
+
+/**
+ * Publish `docChanged` for one pane on every edit, debounced like the total count.
+ *
+ * Independent of the badge: the badge is a preference, and a shell listening for
+ * changes should not go deaf because the user hid a label.
+ */
+const useDocChangedPublisher = (paneId, targetEditor, enabled) => {
+  useEffect(() => {
+    if (!enabled || !isEditorReady(targetEditor)) return undefined
+    const publish = debounce(() => publishDocChanged(paneId, targetEditor, true), WORD_COUNT_DEBOUNCE_MS)
+    targetEditor.on('update', publish)
+    return () => {
+      if (!targetEditor.isDestroyed) targetEditor.off('update', publish)
+      publish.flush()
+    }
+  }, [enabled, paneId, targetEditor])
+}
+
 export const formatWordStats = ({ total, selected }) => {
   const count = selected == null ? total : selected
   const wordLabel = count === 1 ? 'word' : 'words'
@@ -64,7 +107,11 @@ export function useEditorWordCount({ editor, secondaryEditor, showWordCountBadge
   const syncWordStats = useCallback((paneId, targetEditor) => {
     const setStats = paneId === 'secondary' ? setSecondaryWordStats : setPrimaryWordStats
     setStats(getWordStats(targetEditor))
+    publishDocChanged(paneId, targetEditor, false)
   }, [])
+
+  useDocChangedPublisher('primary', editor, true)
+  useDocChangedPublisher('secondary', secondaryEditor, splitView === 'editor')
 
   useEffect(() => {
     if (!showWordCountBadge || !isEditorReady(editor)) return
