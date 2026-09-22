@@ -2,10 +2,10 @@
 
 State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
-**Current branch:** `phase-0-foundations`, 38 commits ahead of `main` (`b7ceed8`).
+**Current branch:** `phase-0-foundations`, 41 commits ahead of `main` (`b7ceed8`).
 `main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
 
-**Size today:** 33,330 JS/JSX · 2,300 TS · 8,984 CSS · 9,527 Rust.
+**Size today:** 33,415 JS/JSX · 5,367 TS · 8,984 CSS · 11,023 Rust.
 
 ---
 
@@ -15,13 +15,13 @@ Run all seven after every change. They are fast and they have each caught someth
 the others missed.
 
 ```bash
-npm test            # 434 assertions, 17 suites
+npm test            # 494 assertions, 18 suites
 npm run lint        # 0 errors AND 0 warnings is the current bar
 npm run typecheck   # tsc --noEmit
 npm run build       # the only thing that resolves dynamic imports and named exports
 npm run parity      # 15,915 cases through BOTH the JS and the Rust implementation
 npm run types:check # fails if the generated TS/Swift is stale, and typechecks the Swift
-(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 103 tests
+(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 116 tests
 ```
 
 `parity` and `types:check` arrived with Phase 2 and need `cargo` and
@@ -42,6 +42,8 @@ tidy: see the table below.
 | `Math.hypot` ≠ `f64::hypot`, changing an emitted SVG path string | `parity` only |
 | A query of only a byte order mark counted as a search, not as an empty one | `parity` only |
 | `pinned: "yes"` read as not pinned, because `as_bool()` is not `Boolean()` | `parity` only |
+| A coalescer that stopped delivering after its first push under a synchronous scheduler — one toolbar state for the life of the app | the `bridge` suite only |
+| A ref written during render in `CanvasCardEditor`, invisible for as long as the file had existed | `lint` only, and only once an unrelated mutation was removed and the component became analyzable |
 
 ---
 
@@ -441,63 +443,162 @@ were edited, and the regex lines were diffed byte-for-byte against `HEAD`.
 - **`nodes/reorder` is dispatched by nothing.** The case is live in the reducer, typed
   with the rest, and unreachable — send-to-front/send-to-back is not wired up.
 
-### Still owed
+### Still owed — done in Phase 4
 
-Type the bridge client in Phase 4 fully — that is where TypeScript earns the most, and
-it is the one part of the scope that cannot be done before the protocol exists.
+The bridge client was the one part of the Phase 3 scope that could not be written before
+the protocol existed, and it is where TypeScript earned the most: `send('setColor', …)`
+does not compile with a `SetFontSizeCommand`'s fields, and `onCommand('setColor', …)`
+hands its handler a `SetColorCommand`. `src/bridge/` is 1,500 lines of it.
 
 ---
 
-## Phase 4 — Bridge protocol — *the phase that decides whether this works*
+## Phase 4 — Bridge protocol — done
 
-Define the protocol in Rust, then **refactor the existing React shell onto it while
-everything is still in one process.** This proves the protocol, keeps the app
-shippable, and means the Swift shell is built against a contract with a working
-reference implementation. Skipping this is how the port becomes a rewrite.
+The protocol is defined in Rust (`crates/inkblot-core/src/bridge/`), generated into
+TypeScript and Swift like the domain types, and **the React shell now runs on it** —
+both halves in one process, talking through `src/bridge/`. That second part is what
+makes it a contract rather than a guess: every wrong assumption became a failing test
+here instead of a puzzling silence in an Xcode debugger, and the app stayed shippable
+the whole way.
 
-**Native → webview:** `applyMark`, `setColor`, `setHighlight`, `setFontFamily`,
-`setFontSize`, `setAlignment`, `insertTable`, `insertConversationTile`,
-`openDocument`, `setSelection`, `jumpToAnchor`, `setContent`, `replaceRanges`,
-`setCaretAtDocPos`, `dictationPartial/Final/Cancel`, `syncNotes`, `canvasCommand`,
-`canvasDropDoc`, `canvasDropNote`, `canvasReveal`, `canvasRestore`.
+### The shape of it
 
-**Webview → native:** `toolbarState`, `selectionContext`, `docChanged`,
-`notesRemapped`, `noteMarkerHover/leave/pin`, `activeEditorChanged`, `searchMatches`,
-`focusModeView`, `readAloudPayload`, drag hand-off.
+`InboundMessage` (shell → surface) and `OutboundMessage` (surface → shell), each
+wrapping an adjacently-tagged enum. Adjacent tagging is the only representation
+typeshare emits, and here it is also the one to want: a discriminated union in
+TypeScript, a real `Codable` enum in Swift, so an unhandled case is a compile error on
+both sides rather than a silent no-op.
 
-### The five sharp edges
+- **24 commands**, the list from the original scope plus `dictationLevel`.
+- **14 events**, the original list with the drag hand-off split into
+  `dragStarted`/`dragMoved`/`dragEnded`.
+- **4 requests and their replies.** Not in the original scope and not optional: the
+  context menu is built at the moment of the right-click and has to be built from the
+  selection *as it is then*, so a pushed `selectionContext` from the last selection
+  change is a different question's answer. A reply is always sent, including an error
+  one — a shell blocked on an answer that never arrives is a hang with no symptom, and
+  the commonest cause is entirely ordinary: the user closed the pane.
 
-1. **`Toolbar.jsx` inverts from pull to push.** `readToolbarState()` (`:102-145`)
-   synchronously reads ~10 selection facts per `selectionUpdate`. The webview must
-   emit a `ToolbarState` struct instead. It also mutates
-   `editor.storage.lastHighlightColor` (`:240`) and reads it back in
-   `contextMenu/editorMenu.js` — shared mutable state across the seam; move it into
-   the protocol.
+### The one rule to carry forward
 
-2. **`DictationControl.replaceInlineDraft`** is read-modify-write **at speaking
-   rate**: it reads the draft range, diffs prefix/suffix, and dispatches text +
-   decoration in one transaction. Round-tripping each partial would race whisper.
-   The whole draft state machine stays in the webview; native sends only
-   `onPartial/onFinal/onLevel`.
+**No message carries a bare ProseMirror position.** Every place in a document is a
+`TextAnchor` — positions *plus the text they covered*. In one process a bare position
+is survivable because the holder remaps through every transaction and is never more
+than a tick stale. Across a process boundary it is not: native holds positions from
+before an edit it never saw, and trusting them puts the caret in the wrong place with
+no signal that anything went wrong.
 
-3. **ProseMirror positions are the currency, and every edit invalidates them.**
-   Anything native holds — notes, workbench tiles, search results, read-aloud words —
-   must be re-pushed after each remap or re-resolved by anchor text. Two places
-   already do the anchor-fallback dance (`EditorLayout.jsx:291-304`,
-   `Workbench.jsx:40-64`); make that the standard.
+`only_set_caret_addresses_a_document_by_bare_position` walks the serialized form of
+every command and asserts that exactly one — `setCaretAtDocPos`, which addresses a
+caret and so has no text to be about — is an exception. That is what keeps the
+exception at one.
 
-4. **`notesRemapped` fires on every transaction** (`useEditorNotes.js`, note anchor
-   remapping). Batch it or it saturates the bridge.
+`bridge/anchors.ts` is the other half: `resolveAnchor` trusts the positions only if
+they still cover the anchor's text, searches for the text otherwise, and returns null
+when the text is gone. Null is a real outcome callers must handle — a note whose words
+were deleted has genuinely lost what it was about, and a guessed position is worse than
+no movement.
 
-5. **`activeEditor` election is driven by mouse movement** over a pane, and has a
-   third state — a canvas card being double-click edited, tagged
-   `editor.__inkblotCanvasCard`. Decide how that resolves across a process boundary.
+### The five sharp edges, as they turned out
 
-Also in this phase: delete the `window.__inkblot_*` globals
-(`__inkblot_draggedEditorSelection`, `__inkblot_draggedClipboardEntry`,
-`__inkblot_dragPoint`, `__inkblot_dropHandled`, `__inkblot_forcePlainPaste`,
-`__inkblotProjectOpenId`, `__inkblotProjectName`). They cannot survive a process
-boundary.
+1. **The toolbar inverted.** `Toolbar.jsx` no longer holds an editor. The ten-fact read
+   is `bridge/readState.ts`, the `requestAnimationFrame` coalescing is
+   `bridge/coalesce.ts`, and `bridge/useSurfacePublisher.ts` follows the election and
+   decides when to publish. `editor.storage.lastHighlightColor` — written by the
+   toolbar, read by `editorMenu.js` — is protocol state now: `setHighlight` says what
+   to remember, `ToolbarState` reports it back.
+
+2. **Dictation split where it had to.** `bridge/dictationSource.ts` sends
+   `dictationPartial`/`Final`/`Level` and is a stand-in for Swift; the whole draft state
+   machine stays in the webview. Confirmed rather than assumed: the real machine now
+   runs against the real protocol.
+
+3. **The anchor dance is the standard.** Both hand-rolled versions
+   (`EditorLayout.jumpToText`, `Workbench.findAnchorRange`) go through `resolveAnchor`.
+   **This changed behaviour deliberately** — neither checked that its stored positions
+   still covered the text they were made from (`jumpToText` trusted any pair of finite
+   numbers, `findAnchorRange` any non-empty range), so a stale range acted on whatever
+   had moved into it.
+
+4. **`notesRemapped` is coalesced to one per frame**, per document. Safe only because
+   the event carries the *whole* remapped set rather than a delta: dropping an
+   intermediate value loses nothing when the next one is complete. Check that property
+   before reaching for `createCoalescer` — a delta stream coalesced the same way would
+   corrupt silently.
+
+5. **The election result is a name.** `EditorTarget` is `primary` | `secondary` |
+   `canvasCard`, and `bridge/editorRegistry.ts` is the only thing that turns a name back
+   into an object. `__inkblotCanvasCard` is gone.
+
+### The globals are gone, all seven
+
+| Was | Is | Note |
+|---|---|---|
+| `__inkblot_draggedEditorSelection` | `dragHandoff` session | carries a `TextAnchor`, so a move survives an edit the target did not see |
+| `__inkblot_draggedClipboardEntry` | same session, different `kind` | |
+| `__inkblot_dragPoint` | `dragHandoff.point()` | |
+| `__inkblot_dropHandled` | `dragHandoff.claim()` | **test-and-set, not a flag** — see below |
+| `__inkblot_forcePlainPaste` | deleted | read and never set; the branch was unreachable |
+| `__inkblotProjectOpenId` | `lib/projectContext` | still ambient, now owned |
+| `__inkblotProjectName` | `lib/projectContext` | |
+
+`claim()` is the one worth understanding. Two drop targets can see the same drop — an
+editor and the clipboard panel underneath it — and the flag they each set and checked
+made correctness depend on an order nobody had written down. The first caller now gets
+`true` and everyone after gets `false`, so the arbitration has an answer even when the
+order changes.
+
+`__inkblot_forcePlainPaste` gated a plain-paste branch whose comment referred to a
+"Cmd+Shift+V handler" that does not exist. macOS's **"Paste and Match Style" is a real
+thing a native Edit menu will want in Phase 5** — it should arrive as a command on the
+protocol, not as a resurrected flag.
+
+`lib/projectContext` is still ambient because a TipTap node view has no React path to
+reach, but it has one owner, a type, and the same fall-through to the session store the
+readers already had. It is now also cleared when the last project closes, which the
+window property never was — a Pinterest board mounting on the landing screen kept the
+previous project's cache key.
+
+### Where the transports are
+
+`bridge/transport.ts`. `createInProcessTransports` is what runs today;
+`createDeferredTransports` is the same pair delivering on a later turn, and the suite
+runs through it to prove the client never relies on a reply having already arrived.
+Phase 5 replaces this file and nothing above it.
+
+**Every message is round-tripped through JSON**, which is slower than passing the object
+and is the point: a payload holding something unserializable fails here rather than in
+Phase 5. `NoteAnnotation.js:155` ships a live `EditorView` in an event payload today,
+which is exactly the class of bug this catches — `NoteMarkerEvent` carries a rect
+instead.
+
+### What this phase found
+
+- **The coalescer wedged after its first push** under a synchronous scheduler.
+  `schedule` may run its callback before returning, so the canceller it hands back is
+  already stale, and the guard then saw work outstanding that had in fact been
+  delivered. It would have published exactly one toolbar state for the life of the app.
+- **The `bridge` suite's fake editor was missing `schema.nodes`**, which `isEditorReady`
+  checks — so four assertions about commands reaching an editor were passing without
+  ever running one. Worth repeating as a general warning: a fake that is *almost* right
+  makes assertions pass for the wrong reason.
+- **`CanvasCardEditor` had been writing a ref during render** for as long as the file
+  had existed. Lint only saw it once the `__inkblotCanvasCard` mutation was removed and
+  the component became analyzable.
+
+### Still owed
+
+- **`getReadAloudPayload` has no handler.** The surface deliberately does not answer it;
+  building the payload needs the chunker and the document's block structure, which
+  `ReadAloudControl` owns. It should register its own handler while mounted. Until it
+  does, the request replies with an error rather than hanging — which is correct, but it
+  is not the same as working.
+- **`docChanged`, `searchMatches` and `focusModeView` have publishers and no callers.**
+  The protocol and the plumbing exist and are tested; the three components that should
+  emit them (`useEditorWordCount`, `SidebarSearch`, `FocusModeOverlay`) still only talk
+  to React state. Nothing is broken by that — the shell is in the same process and reads
+  the state directly — and it is exactly the work that has no consumer until Phase 5.
+- **`nodes/reorder` is still dispatched by nothing** (carried over from Phase 3).
 
 ---
 
@@ -505,6 +606,19 @@ boundary.
 
 Xcode project; `inkblot-core` as an XCFramework via UniFFI; `WKWebView` hosting the
 built editor bundle with `WKUserContentController` for the bridge.
+
+**The bridge is already written.** Phase 4 left a working reference implementation and a
+generated `InkblotCore.swift` containing the whole protocol — `NativeCommand`,
+`WebviewEvent`, both envelopes, every payload, all `Codable`. The Swift side of the
+seam is a transport: post `InboundMessage` JSON with `evaluateJavaScript`, receive
+`OutboundMessage` JSON in a `WKScriptMessageHandler`, and replace
+`src/bridge/appBridge.ts`'s `createInProcessTransports()` with the webview pair.
+Nothing above that file in the web layer changes.
+
+Two things the Xcode target still has to supply: `AnyCodable` (a package —
+`scripts/generate-types.sh` typechecks the generated Swift against a stub today), and a
+`dictationSource` equivalent, since `src/bridge/dictationSource.ts` is a stand-in for
+Swift that should be deleted when the real one lands.
 
 **Goes native immediately — zero editor coupling today:** `LeftSidebar`, `FileTree`,
 `TabDock`, `ClipboardPanel`, `NotesPanel`, `NoteCard`, `SidebarTabs`, `AudioNotes`
@@ -521,8 +635,8 @@ built editor bundle with `WKUserContentController` for the bridge.
 **Mechanical async, semantics intact:** `HistoryPanel.handleRestore` (already async
 and busy-gated), `VersionComparePane` (its toolbar portal becomes native titlebar
 content — *simpler*), `Workbench.selectTileWord/replaceWord`, `jumpToText`, the
-context menu (already async for the Tauri menu import; needs a `getSelectionContext()`
-call before building).
+context menu (already async for the Tauri menu import; `getSelectionContext` now exists
+on the protocol and is what it should call before building).
 
 **Stays in the webview:** the whole document surface, `FocusModeOverlay` (re-derives
 from the full doc on every transaction — pushing that per keystroke is the cost to
