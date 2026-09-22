@@ -13,6 +13,7 @@
 import { Alignment, MarkKind } from '../types'
 import type {
   ApplyMarkCommand,
+  InsertPlainTextCommand,
   InsertTableCommand,
   JumpToAnchorCommand,
   ReplaceRangesCommand,
@@ -223,6 +224,30 @@ export function setCaretAtDocPos(editor: unknown, { pos }: SetCaretAtDocPosComma
   return run(editor, (chain) => {
     chain.focus().setTextSelection({ from: clamped, to: clamped }).scrollIntoView().run()
   })
+}
+
+/**
+ * Paste and Match Style: the shell's plain text, through the editor's own paste path.
+ *
+ * `pasteText` rather than `insertText` so a multi-line paste becomes paragraphs the way
+ * a ⌘V of plain text does, and rather than `insertContent` because that one parses a
+ * string that looks like HTML *as* HTML — a paste of `<b>` would come out bold, which
+ * is the one thing this command exists to prevent.
+ */
+export function insertPlainText(editor: unknown, { text }: InsertPlainTextCommand): boolean {
+  if (!isEditorReady(editor) || !text) return false
+  const view = (editor as { view?: {
+    focus(): void
+    pasteText?(text: string): boolean
+    state: { tr: { insertText(text: string): unknown } }
+    dispatch(tr: unknown): void
+  } }).view
+  if (!view) return false
+
+  view.focus()
+  if (typeof view.pasteText === 'function') return view.pasteText(text)
+  view.dispatch(view.state.tr.insertText(text))
+  return true
 }
 
 export { Alignment, MarkKind }

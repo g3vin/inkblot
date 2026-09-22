@@ -401,14 +401,6 @@ export default function EditorCanvas({
   // whichever editor is active. This is the loop Toolbar.jsx used to run on itself.
   useSurfacePublisher()
 
-  // The commands the surface cannot serve alone. The canvas ones need nothing from
-  // React — they resolve a surface id and dispatch what the canvas already listens
-  // for — so they are a module; anything needing app state would be composed in here
-  // beside them.
-  useEffect(() => {
-    documentSurface.setDelegates({ ...canvasDelegates })
-  }, [])
-
   /* ---------------- Expose Editor, to the bridge ---------------- */
 
   // The same two editors, under the names the protocol uses. A pane keeps its TipTap
@@ -528,6 +520,19 @@ export default function EditorCanvas({
     else setCurrentDoc?.(docPath)
     activatePane(docPath, null)
   }, [activatePane, setCurrentDoc, setSecondaryDoc])
+
+  // The commands the surface cannot serve alone. The canvas ones need nothing from
+  // React — they resolve a surface id and dispatch what the canvas already listens
+  // for — so they are a module. `openDocument` needs app state, and is the same swap
+  // a canvas card's double-click makes, so it is that callback. Declared here, after
+  // `openDocFromCanvas`, because a dependency array is read during render and this
+  // file has already shipped one crash from reading a binding in its temporal dead zone.
+  useEffect(() => {
+    documentSurface.setDelegates({
+      ...canvasDelegates,
+      openDocument: ({ path, pane }) => openDocFromCanvas(pane, path),
+    })
+  }, [openDocFromCanvas])
 
   const liveEditor = isEditorReady(editor) ? editor : null
   const liveSecondaryEditor = isEditorReady(secondaryEditor) ? secondaryEditor : null

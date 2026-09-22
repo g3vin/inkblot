@@ -336,7 +336,8 @@ export type NativeCommand =
 	| { type: "canvasDropDoc", payload: CanvasDropDocCommand }
 	| { type: "canvasDropNote", payload: CanvasDropNoteCommand }
 	| { type: "canvasReveal", payload: CanvasRevealCommand }
-	| { type: "canvasRestore", payload: CanvasRestoreCommand };
+	| { type: "canvasRestore", payload: CanvasRestoreCommand }
+	| { type: "insertPlainText", payload: InsertPlainTextCommand };
 
 /**
  * A command, with its place in the stream.
@@ -598,7 +599,8 @@ export type WebviewEvent =
 	| { type: "readAloudPayload", payload: ReadAloudPayloadEvent }
 	| { type: "dragStarted", payload: DragStarted }
 	| { type: "dragMoved", payload: DragMoved }
-	| { type: "dragEnded", payload: DragEnded };
+	| { type: "dragEnded", payload: DragEnded }
+	| { type: "projectChanged", payload: ProjectChanged };
 
 export interface EventEnvelope {
 	seq: number;
@@ -621,6 +623,20 @@ export interface FocusModeView {
 	paragraphIndex: number;
 	paragraphCount: number;
 	wordCount: number;
+}
+
+/**
+ * Insert text at the selection with no formatting of its own — the text takes on the
+ * marks around it.
+ * 
+ * This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
+ * webview: `WKWebView` cannot read the clipboard without a user gesture inside the
+ * page, and the menu item is not one. It replaces `__inkblot_forcePlainPaste`, a flag
+ * that was read and never set.
+ */
+export interface InsertPlainTextCommand {
+	target: EditorTarget;
+	text: string;
 }
 
 export interface InsertTableCommand {
@@ -760,6 +776,22 @@ export interface OpenDocumentCommand {
 	 */
 	path: string;
 	pane: Pane;
+}
+
+/**
+ * The project the webview has open changed.
+ * 
+ * The project picker and its session restore are still in the webview, and the
+ * native sidebar has to show the tree of whatever project that is. `None` is the
+ * landing screen: no project is open.
+ */
+export interface ProjectChanged {
+	projectName?: string;
+	/**
+	 * Absolute. Present whenever `project_name` is, so the shell never has to
+	 * re-derive a relocated project's root.
+	 */
+	projectRoot?: string;
 }
 
 /**

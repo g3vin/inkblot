@@ -37,7 +37,7 @@ pub mod event;
 pub use command::{
     ApplyMarkCommand, CanvasCommandRequest, CanvasDropDocCommand, CanvasDropNoteCommand,
     CanvasRestoreCommand, CanvasRevealCommand, DictationCancelCommand, DictationLevelCommand,
-    DictationTranscript, InsertTableCommand, JumpToAnchorCommand, NativeCommand,
+    DictationTranscript, InsertPlainTextCommand, InsertTableCommand, JumpToAnchorCommand, NativeCommand,
     OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand,
     SetColorCommand, SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand,
     SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,
@@ -50,7 +50,7 @@ pub use envelope::{
 };
 pub use event::{
     ActiveEditorChanged, ActiveMarks, DocChanged, DragEnded, DragMoved, DragPayloadKind,
-    DragStarted, FocusModeView, NoteMarkerEvent, NotesRemapped, ReadAloudPayloadEvent,
+    DragStarted, FocusModeView, NoteMarkerEvent, NotesRemapped, ProjectChanged, ReadAloudPayloadEvent,
     SearchMatches, SelectionContext, ToolbarState, WebviewEvent,
 };
 
