@@ -29,29 +29,6 @@ export interface BezierPath {
 }
 
 /**
- * Which side of a card an edge attaches to. Serializes as the lowercase strings the
- * JSON Canvas spec uses, so an unset side in a foreign file is simply absent.
- */
-export enum EdgeSide {
-	Top = "top",
-	Right = "right",
-	Bottom = "bottom",
-	Left = "left",
-}
-
-export interface CanvasEdge {
-	id: string;
-	fromNode: string;
-	fromSide?: EdgeSide;
-	toNode: string;
-	toSide?: EdgeSide;
-	fromEnd?: string;
-	toEnd?: string;
-	color?: string;
-	label?: string;
-}
-
-/**
  * The node types we understand. `draw` is reserved: it round-trips untouched so a
  * future freehand layer needs no format migration.
  */
@@ -85,6 +62,54 @@ export interface CanvasNode {
 	inkblotTipTap?: unknown;
 	/** Set on a `file` node that shows one note out of the document it points at. */
 	inkblotNoteId?: string;
+}
+
+/** A card that exists on both sides, before and after. */
+export interface CanvasNodeChange {
+	before: CanvasNode;
+	after: CanvasNode;
+}
+
+/**
+ * Which side of a card an edge attaches to. Serializes as the lowercase strings the
+ * JSON Canvas spec uses, so an unset side in a foreign file is simply absent.
+ */
+export enum EdgeSide {
+	Top = "top",
+	Right = "right",
+	Bottom = "bottom",
+	Left = "left",
+}
+
+export interface CanvasEdge {
+	id: string;
+	fromNode: string;
+	fromSide?: EdgeSide;
+	toNode: string;
+	toSide?: EdgeSide;
+	fromEnd?: string;
+	toEnd?: string;
+	color?: string;
+	label?: string;
+}
+
+/**
+ * Card-level diff of two serialized canvases.
+ * 
+ * Geometry-only changes are kept apart from edits so the panel can say "3 cards
+ * moved" without burying real writing changes.
+ */
+export interface CanvasDiff {
+	/** Cards present only on the right. */
+	added: CanvasNode[];
+	/** Cards present only on the left. */
+	removed: CanvasNode[];
+	/** Same card, different content — text, color, target. */
+	edited: CanvasNodeChange[];
+	/** Same card, same content, different geometry. */
+	moved: CanvasNodeChange[];
+	edgesAdded: CanvasEdge[];
+	edgesRemoved: CanvasEdge[];
 }
 
 export interface Viewport {
@@ -128,6 +153,53 @@ export interface CanvasState {
 	nodeOrder: string[];
 	edges: Record<string, CanvasEdge>;
 	edgeOrder: string[];
+}
+
+export enum DiffChunkType {
+	/** An identical run, carried by `blocks`. */
+	Equal = "equal",
+	/** The left run was replaced by the right one, carried by `left` and `right`. */
+	Changed = "changed",
+}
+
+/**
+ * One top-level block of rendered HTML: its exact markup, so a merge preserves
+ * formatting, plus a normalized text key for matching.
+ */
+export interface HtmlBlock {
+	html: string;
+	text: string;
+}
+
+/**
+ * One row of a two-column compare view.
+ * 
+ * This wants to be an enum, and cannot be one: the wire format is internally tagged
+ * (`{ type: 'equal', blocks }`), typeshare only generates algebraic enums that are
+ * adjacently tagged (`{ type, content }`), and changing the shape would mean changing
+ * the compare panel that reads it. So the variants are optional fields, with
+ * constructors that make only the valid combinations reachable.
+ * 
+ * `left` or `right` may be present and *empty* on a `changed` chunk: that is a pure
+ * deletion or a pure insertion, and it is not the same as being absent.
+ */
+export interface DiffChunk {
+	type: DiffChunkType;
+	blocks?: HtmlBlock[];
+	left?: HtmlBlock[];
+	right?: HtmlBlock[];
+}
+
+export enum DiffOpType {
+	Equal = "equal",
+	Added = "added",
+	Removed = "removed",
+}
+
+/** A run of tokens that were all kept, all added, or all removed. */
+export interface DiffOp {
+	type: DiffOpType;
+	tokens: string[];
 }
 
 export enum NoteType {
@@ -289,6 +361,12 @@ export interface TreeNode {
 	children?: TreeNode[];
 }
 
+/** How many words a change added and removed. */
+export interface WordDelta {
+	added: number;
+	removed: number;
+}
+
 /**
  * Which kind of document a tree path refers to. A pure function of the path — see
  * `doc_kind` for why it is never read from a field inside the file.
@@ -296,5 +374,12 @@ export interface TreeNode {
 export enum DocKind {
 	Canvas = "canvas",
 	Text = "text",
+}
+
+/** Which side of a chunk or a card-level change the user kept. */
+export enum MergeChoice {
+	Left = "left",
+	Right = "right",
+	Both = "both",
 }
 

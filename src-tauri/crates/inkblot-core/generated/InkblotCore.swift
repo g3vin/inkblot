@@ -46,39 +46,6 @@ public struct BezierPath: Codable, Equatable {
 	}
 }
 
-/// Which side of a card an edge attaches to. Serializes as the lowercase strings the
-/// JSON Canvas spec uses, so an unset side in a foreign file is simply absent.
-public enum EdgeSide: String, Codable, Equatable {
-	case top
-	case right
-	case bottom
-	case left
-}
-
-public struct CanvasEdge: Codable, Equatable {
-	public let id: String
-	public let fromNode: String
-	public let fromSide: EdgeSide?
-	public let toNode: String
-	public let toSide: EdgeSide?
-	public let fromEnd: String?
-	public let toEnd: String?
-	public let color: String?
-	public let label: String?
-
-	public init(id: String, fromNode: String, fromSide: EdgeSide?, toNode: String, toSide: EdgeSide?, fromEnd: String?, toEnd: String?, color: String?, label: String?) {
-		self.id = id
-		self.fromNode = fromNode
-		self.fromSide = fromSide
-		self.toNode = toNode
-		self.toSide = toSide
-		self.fromEnd = fromEnd
-		self.toEnd = toEnd
-		self.color = color
-		self.label = label
-	}
-}
-
 /// The node types we understand. `draw` is reserved: it round-trips untouched so a
 /// future freehand layer needs no format migration.
 public enum CanvasNodeType: String, Codable, Equatable {
@@ -124,6 +91,76 @@ public struct CanvasNode: Codable, Equatable {
 		self.label = label
 		self.inkblotTipTap = inkblotTipTap
 		self.inkblotNoteId = inkblotNoteId
+	}
+}
+
+/// A card that exists on both sides, before and after.
+public struct CanvasNodeChange: Codable, Equatable {
+	public let before: CanvasNode
+	public let after: CanvasNode
+
+	public init(before: CanvasNode, after: CanvasNode) {
+		self.before = before
+		self.after = after
+	}
+}
+
+/// Which side of a card an edge attaches to. Serializes as the lowercase strings the
+/// JSON Canvas spec uses, so an unset side in a foreign file is simply absent.
+public enum EdgeSide: String, Codable, Equatable {
+	case top
+	case right
+	case bottom
+	case left
+}
+
+public struct CanvasEdge: Codable, Equatable {
+	public let id: String
+	public let fromNode: String
+	public let fromSide: EdgeSide?
+	public let toNode: String
+	public let toSide: EdgeSide?
+	public let fromEnd: String?
+	public let toEnd: String?
+	public let color: String?
+	public let label: String?
+
+	public init(id: String, fromNode: String, fromSide: EdgeSide?, toNode: String, toSide: EdgeSide?, fromEnd: String?, toEnd: String?, color: String?, label: String?) {
+		self.id = id
+		self.fromNode = fromNode
+		self.fromSide = fromSide
+		self.toNode = toNode
+		self.toSide = toSide
+		self.fromEnd = fromEnd
+		self.toEnd = toEnd
+		self.color = color
+		self.label = label
+	}
+}
+
+/// Card-level diff of two serialized canvases.
+/// 
+/// Geometry-only changes are kept apart from edits so the panel can say "3 cards
+/// moved" without burying real writing changes.
+public struct CanvasDiff: Codable, Equatable {
+	/// Cards present only on the right.
+	public let added: [CanvasNode]
+	/// Cards present only on the left.
+	public let removed: [CanvasNode]
+	/// Same card, different content — text, color, target.
+	public let edited: [CanvasNodeChange]
+	/// Same card, same content, different geometry.
+	public let moved: [CanvasNodeChange]
+	public let edgesAdded: [CanvasEdge]
+	public let edgesRemoved: [CanvasEdge]
+
+	public init(added: [CanvasNode], removed: [CanvasNode], edited: [CanvasNodeChange], moved: [CanvasNodeChange], edgesAdded: [CanvasEdge], edgesRemoved: [CanvasEdge]) {
+		self.added = added
+		self.removed = removed
+		self.edited = edited
+		self.moved = moved
+		self.edgesAdded = edgesAdded
+		self.edgesRemoved = edgesRemoved
 	}
 }
 
@@ -186,6 +223,66 @@ public struct CanvasState: Codable, Equatable {
 		self.nodeOrder = nodeOrder
 		self.edges = edges
 		self.edgeOrder = edgeOrder
+	}
+}
+
+public enum DiffChunkType: String, Codable, Equatable {
+	/// An identical run, carried by `blocks`.
+	case equal
+	/// The left run was replaced by the right one, carried by `left` and `right`.
+	case changed
+}
+
+/// One top-level block of rendered HTML: its exact markup, so a merge preserves
+/// formatting, plus a normalized text key for matching.
+public struct HtmlBlock: Codable, Equatable {
+	public let html: String
+	public let text: String
+
+	public init(html: String, text: String) {
+		self.html = html
+		self.text = text
+	}
+}
+
+/// One row of a two-column compare view.
+/// 
+/// This wants to be an enum, and cannot be one: the wire format is internally tagged
+/// (`{ type: 'equal', blocks }`), typeshare only generates algebraic enums that are
+/// adjacently tagged (`{ type, content }`), and changing the shape would mean changing
+/// the compare panel that reads it. So the variants are optional fields, with
+/// constructors that make only the valid combinations reachable.
+/// 
+/// `left` or `right` may be present and *empty* on a `changed` chunk: that is a pure
+/// deletion or a pure insertion, and it is not the same as being absent.
+public struct DiffChunk: Codable, Equatable {
+	public let type: DiffChunkType
+	public let blocks: [HtmlBlock]?
+	public let left: [HtmlBlock]?
+	public let right: [HtmlBlock]?
+
+	public init(type: DiffChunkType, blocks: [HtmlBlock]?, left: [HtmlBlock]?, right: [HtmlBlock]?) {
+		self.type = type
+		self.blocks = blocks
+		self.left = left
+		self.right = right
+	}
+}
+
+public enum DiffOpType: String, Codable, Equatable {
+	case equal
+	case added
+	case removed
+}
+
+/// A run of tokens that were all kept, all added, or all removed.
+public struct DiffOp: Codable, Equatable {
+	public let type: DiffOpType
+	public let tokens: [String]
+
+	public init(type: DiffOpType, tokens: [String]) {
+		self.type = type
+		self.tokens = tokens
 	}
 }
 
@@ -416,9 +513,27 @@ public struct TreeNode: Codable, Equatable {
 	}
 }
 
+/// How many words a change added and removed.
+public struct WordDelta: Codable, Equatable {
+	public let added: UInt32
+	public let removed: UInt32
+
+	public init(added: UInt32, removed: UInt32) {
+		self.added = added
+		self.removed = removed
+	}
+}
+
 /// Which kind of document a tree path refers to. A pure function of the path — see
 /// `doc_kind` for why it is never read from a field inside the file.
 public enum DocKind: String, Codable, Equatable {
 	case canvas
 	case text
+}
+
+/// Which side of a chunk or a card-level change the user kept.
+public enum MergeChoice: String, Codable, Equatable {
+	case left
+	case right
+	case both
 }

@@ -16,3 +16,5 @@ url = { workspace = true }
 reqwest = { workspace = true }
 font-kit = { workspace = true }
 typeshare = { workspace = true }
+regex = { workspace = true }
+once_cell = { workspace = true }
