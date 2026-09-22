@@ -51,6 +51,17 @@ pub enum EdgeSide {
     Left,
 }
 
+/// A cubic bezier between two side anchors, plus the point an edge label sits on.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BezierPath {
+    /// An SVG path `d` attribute, spelled exactly as JavaScript would spell it — see
+    /// `js_number`.
+    pub d: String,
+    /// t = 0.5 on the curve.
+    pub mid: Point,
+}
+
 impl EdgeSide {
     /// The order `EDGE_SIDES` declares in canvasGeometry.js.
     pub const ALL: [EdgeSide; 4] = [EdgeSide::Top, EdgeSide::Right, EdgeSide::Bottom, EdgeSide::Left];

@@ -14,7 +14,8 @@ use std::io::{self, Read, Write};
 
 use serde_json::{json, Map, Value};
 
-use inkblot_core::{doc_kind, js_number::format_js_number};
+use inkblot_core::types::{CanvasEdge, CanvasNode, CanvasNodeType, EdgeSide, Point, Rect, Viewport};
+use inkblot_core::{canvas_geometry as geo, doc_kind, js_number::format_js_number};
 
 /// `String(x || '')`, the coercion the JS entry points open with.
 ///
@@ -46,20 +47,100 @@ fn js_string_or_empty(value: Option<&Value>) -> Result<String, String> {
     })
 }
 
-fn f64_arg(args: &[Value], index: usize) -> Result<f64, String> {
-    match args.get(index) {
-        Some(Value::Number(number)) => number
-            .as_f64()
-            .ok_or_else(|| format!("arg {index} is not representable as f64")),
-        // JSON has no NaN or Infinity; the corpus spells them as strings.
-        Some(Value::String(text)) => match text.as_str() {
-            "NaN" => Ok(f64::NAN),
-            "Infinity" => Ok(f64::INFINITY),
-            "-Infinity" => Ok(f64::NEG_INFINITY),
-            "-0" => Ok(-0.0),
-            other => Err(format!("arg {index}: {other} is not a number")),
+/// A number out of the corpus. JSON has no NaN, Infinity or -0, so those arrive as
+/// the string spellings `scripts/parity/encode.mjs` writes.
+fn js_f64(value: &Value) -> f64 {
+    match value {
+        Value::Number(number) => number.as_f64().unwrap_or(f64::NAN),
+        Value::String(text) => match text.as_str() {
+            "Infinity" => f64::INFINITY,
+            "-Infinity" => f64::NEG_INFINITY,
+            "-0" => -0.0,
+            _ => f64::NAN,
         },
-        other => Err(format!("arg {index} is missing or not a number: {other:?}")),
+        // `undefined` reaching arithmetic is NaN in JS too.
+        _ => f64::NAN,
+    }
+}
+
+fn f64_arg(args: &[Value], index: usize) -> Result<f64, String> {
+    args.get(index)
+        .map(js_f64)
+        .ok_or_else(|| format!("arg {index} is missing"))
+}
+
+fn viewport(value: &Value) -> Viewport {
+    Viewport { x: js_f64(&value["x"]), y: js_f64(&value["y"]), zoom: js_f64(&value["zoom"]) }
+}
+
+fn point(value: &Value) -> Point {
+    Point { x: js_f64(&value["x"]), y: js_f64(&value["y"]) }
+}
+
+fn rect(value: &Value) -> Rect {
+    Rect {
+        x: js_f64(&value["x"]),
+        y: js_f64(&value["y"]),
+        width: js_f64(&value["width"]),
+        height: js_f64(&value["height"]),
+    }
+}
+
+/// A side out of the corpus, including the ones a foreign canvas file might carry.
+/// `sideAnchor` and `sideNormal` both fall through to `right` for anything they do not
+/// recognise, and an absent side is the same case.
+fn edge_side(value: &Value) -> EdgeSide {
+    match value.as_str() {
+        Some("top") => EdgeSide::Top,
+        Some("bottom") => EdgeSide::Bottom,
+        Some("left") => EdgeSide::Left,
+        _ => EdgeSide::Right,
+    }
+}
+
+/// The optional form, for a field where the default is `left` rather than `right`.
+fn optional_edge_side(value: &Value) -> Option<EdgeSide> {
+    match value.as_str() {
+        Some("top") => Some(EdgeSide::Top),
+        Some("right") => Some(EdgeSide::Right),
+        Some("bottom") => Some(EdgeSide::Bottom),
+        Some("left") => Some(EdgeSide::Left),
+        _ => None,
+    }
+}
+
+/// Only the fields the geometry reads; the corpus builds nothing else.
+fn canvas_node(value: &Value) -> CanvasNode {
+    CanvasNode {
+        id: value["id"].as_str().unwrap_or_default().to_string(),
+        node_type: CanvasNodeType::Text,
+        x: js_f64(&value["x"]),
+        y: js_f64(&value["y"]),
+        width: js_f64(&value["width"]),
+        height: js_f64(&value["height"]),
+        color: None,
+        text: None,
+        file: None,
+        url: None,
+        label: None,
+        inkblot_tip_tap: None,
+        inkblot_note_id: None,
+        extra: Default::default(),
+    }
+}
+
+fn canvas_edge(value: &Value) -> CanvasEdge {
+    CanvasEdge {
+        id: value["id"].as_str().unwrap_or_default().to_string(),
+        from_node: value["fromNode"].as_str().unwrap_or_default().to_string(),
+        from_side: optional_edge_side(&value["fromSide"]),
+        to_node: value["toNode"].as_str().unwrap_or_default().to_string(),
+        to_side: optional_edge_side(&value["toSide"]),
+        from_end: None,
+        to_end: None,
+        color: None,
+        label: None,
+        extra: Default::default(),
     }
 }
 
@@ -77,8 +158,86 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         "stripCanvasSuffix" => json!(doc_kind::strip_canvas_suffix(&text()?)),
         "getDocDisplayName" => json!(doc_kind::get_doc_display_name(&text()?)),
 
+        /* ---- canvas_geometry ---- */
+        "clamp" => json!(geo::clamp(f64_arg(args, 0)?, f64_arg(args, 1)?, f64_arg(args, 2)?)),
+        "clampZoom" => json!(geo::clamp_zoom(f64_arg(args, 0)?)),
+        "worldToScreen" => {
+            json!(geo::world_to_screen(f64_arg(args, 0)?, f64_arg(args, 1)?, viewport(&args[2])))
+        }
+        "screenToWorld" => {
+            json!(geo::screen_to_world(f64_arg(args, 0)?, f64_arg(args, 1)?, viewport(&args[2])))
+        }
+        "worldTransform" => json!(geo::world_transform(viewport(&args[0]))),
+        "zoomAt" => json!(geo::zoom_at(
+            viewport(&args[0]),
+            f64_arg(args, 1)?,
+            f64_arg(args, 2)?,
+            f64_arg(args, 3)?
+        )),
+        "zoomTo" => json!(geo::zoom_to(
+            viewport(&args[0]),
+            f64_arg(args, 1)?,
+            f64_arg(args, 2)?,
+            f64_arg(args, 3)?
+        )),
+        "panBy" => json!(geo::pan_by(viewport(&args[0]), f64_arg(args, 1)?, f64_arg(args, 2)?)),
+        "nodesBounds" => {
+            let rects: Vec<Rect> = args[0].as_array().map(|list| list.iter().map(rect).collect()).unwrap_or_default();
+            json!(geo::nodes_bounds(&rects))
+        }
+        "fitViewport" => {
+            let bounds = if args[0].is_object() { Some(rect(&args[0])) } else { None };
+            let options = geo::FitOptions {
+                padding: js_f64(&args[3]["padding"]),
+                max_zoom: js_f64(&args[3]["maxZoom"]),
+            };
+            json!(geo::fit_viewport(bounds, f64_arg(args, 1)?, f64_arg(args, 2)?, options))
+        }
+        "rectsIntersect" => json!(geo::rects_intersect(rect(&args[0]), rect(&args[1]))),
+        "rectContains" => json!(geo::rect_contains(rect(&args[0]), rect(&args[1]))),
+        "padRect" => json!(geo::pad_rect(rect(&args[0]), f64_arg(args, 1)?)),
+        "rectFromPoints" => json!(geo::rect_from_points(point(&args[0]), point(&args[1]))),
+        "sideAnchor" => json!(geo::side_anchor(rect(&args[0]), edge_side(&args[1]))),
+        "sideNormal" => json!(geo::side_normal(edge_side(&args[0]))),
+        "bezierPath" => json!(geo::bezier_path(
+            point(&args[0]),
+            edge_side(&args[1]),
+            point(&args[2]),
+            edge_side(&args[3])
+        )),
+        "offsetAnchor" => {
+            json!(geo::offset_anchor(point(&args[0]), edge_side(&args[1]), f64_arg(args, 2)?))
+        }
+        "edgeGeometry" => json!(geo::edge_geometry(
+            &canvas_edge(&args[0]),
+            &canvas_node(&args[1]),
+            &canvas_node(&args[2])
+        )),
+        "inferSide" => json!(geo::infer_side(rect(&args[0]), point(&args[1]))),
+
         unknown => return Err(format!("no such function: {unknown}")),
     })
+}
+
+/// Serialize the way `JSON.stringify` would, so the two sides are compared on equal
+/// terms rather than on Rust's serializer being more precise.
+///
+/// The only place they differ is the sign of zero: serde_json writes `-0.0`, JS writes
+/// `0`, and the comparison is exact. `clamp(-0, -1, 1)` really does return -0 in both
+/// implementations — `canvas_geometry::tests::clamp_keeps_the_sign_of_zero` is where
+/// that is asserted, because this harness cannot see it.
+fn as_javascript_json(value: Value) -> Value {
+    match value {
+        Value::Number(ref number) => match number.as_f64() {
+            Some(float) if float == 0.0 && float.is_sign_negative() => json!(0.0),
+            _ => value,
+        },
+        Value::Array(items) => Value::Array(items.into_iter().map(as_javascript_json).collect()),
+        Value::Object(fields) => Value::Object(
+            fields.into_iter().map(|(key, inner)| (key, as_javascript_json(inner))).collect(),
+        ),
+        other => other,
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -99,7 +258,7 @@ fn main() -> io::Result<()> {
             let mut row = Map::new();
             row.insert("id".to_string(), id);
             match dispatch(name, &args) {
-                Ok(value) => row.insert("ok".to_string(), value),
+                Ok(value) => row.insert("ok".to_string(), as_javascript_json(value)),
                 Err(message) => row.insert("err".to_string(), Value::String(message)),
             };
             Value::Object(row)
