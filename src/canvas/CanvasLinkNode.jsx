@@ -6,7 +6,7 @@
  * so a canvas with a board on it still opens correctly in Obsidian — it just shows a
  * link there, which is exactly what it is.
  *
- * Pins come from the SAME localStorage cache the in-document board uses
+ * Pins come from the SAME preference-store cache the in-document board uses
  * (lib/pinterestBoard.js), so a board you have already looked at appears instantly,
  * with no scrape and no spinner. A refresh runs in the background at most once per
  * project-open.

@@ -44,4 +44,4 @@ export const folderChildrenVariants = {
   },
 }
 
-/* ---------- localStorage persistence for manual order & expanded folders ---------- */
+/* ---------- persistence for manual order & expanded folders ---------- */

@@ -1,11 +1,12 @@
 /**
  * editorSession.js — the shape of a saved editor session, and how it is restored.
  *
- * Open tabs, panes, split ratio and clipboard history live in localStorage under
+ * Open tabs, panes, split ratio and clipboard history live in the preference store under
  * `inkblot-session`. Everything here is pure: normalizers, defaults and clamps,
  * with no React and no filesystem, so a malformed or outdated stored session is
  * coerced into something usable rather than throwing on load.
  */
+import { getPreference } from './preferences'
 export const PERSIST_KEY = 'inkblot-session'
 export const CLIPBOARD_PERSIST_KEY = 'inkblot-clipboard-history'
 export const MAX_CLIPBOARD_ENTRIES = 80
@@ -110,13 +111,13 @@ export const ensureTabsForOpenDocs = (tabs, { currentDoc, secondaryDoc, activeTa
 }
 
 /**
- * Load the persisted session from localStorage. Supports both the current
+ * Load the persisted session. Supports both the current
  * multi-project shape ({ lastProject, projects }) and the legacy single-project
  * shape ({ projectName, ... }), which is migrated on the fly.
  */
 export const loadSession = (fallbackProject) => {
   try {
-    const raw = localStorage.getItem(PERSIST_KEY)
+    const raw = getPreference(PERSIST_KEY)
     if (!raw) return createEmptySession(fallbackProject)
 
     const parsed = JSON.parse(raw)
@@ -151,7 +152,7 @@ export const loadSession = (fallbackProject) => {
 /** Load persisted clipboard-history entries, dropping anything malformed. */
 export const loadClipboardHistory = () => {
   try {
-    const raw = localStorage.getItem(CLIPBOARD_PERSIST_KEY)
+    const raw = getPreference(CLIPBOARD_PERSIST_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []

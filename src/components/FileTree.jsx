@@ -5,7 +5,7 @@
  * creating/renaming files, folders, story-preset folders, and projects;
  * custom (mouse-driven) drag & drop for reordering and re-parenting entries;
  * and per-project persistence of manual ordering and folder expansion in
- * localStorage. Other parts of the app talk to it through `filetree:*`
+ * the preference store. Other parts of the app talk to it through `filetree:*`
  * window events (new-entry, refresh-projects, folders-visibility, …).
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'

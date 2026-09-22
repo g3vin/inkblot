@@ -3,10 +3,11 @@
  *
  * Scraping a board is slow and rate-limited, so results are cached per board URL
  * and refreshed at most once per project-open. The "project open" identity lives
- * in sessionStorage, the pins in localStorage — both per-webview, so none of it
+ * in per-launch memory, the pins in the preference store — see lib/preferences.js, and
  * survives into a native shell.
  */
 import { normalizePinterestBoardUrl } from '../lib/pinterestBoard'
+import { getSessionValue, setSessionValue } from '../lib/preferences'
 
 export const PINTEREST_CACHE_PREFIX = 'inkblot:pinterest-preview:'
 export const PINTEREST_PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
@@ -26,7 +27,7 @@ export const getProjectOpenId = () => {
   if (typeof window === 'undefined') return 'default'
   return String(
     window.__inkblotProjectOpenId ||
-    window.sessionStorage?.getItem(PINTEREST_PROJECT_OPEN_ID_KEY) ||
+    getSessionValue(PINTEREST_PROJECT_OPEN_ID_KEY) ||
     'default'
   )
 }
@@ -41,20 +42,12 @@ export const hasRefreshedForCurrentProjectOpen = (url) => {
   if (typeof window === 'undefined') return false
   const key = getProjectRefreshKey(url)
   if (!key) return false
-  try {
-    return window.sessionStorage?.getItem(key) === 'true'
-  } catch {
-    return false
-  }
+  return getSessionValue(key) === 'true'
 }
 
 export const markRefreshedForCurrentProjectOpen = (url) => {
   if (typeof window === 'undefined') return
   const key = getProjectRefreshKey(url)
   if (!key) return
-  try {
-    window.sessionStorage?.setItem(key, 'true')
-  } catch {
-    // Session refresh markers are best-effort.
-  }
+  setSessionValue(key, 'true')
 }

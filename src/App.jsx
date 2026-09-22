@@ -4,7 +4,7 @@
  * Owns app-wide chrome and preferences that live above the editor:
  * theme (light/dark/system), accent color, and the word-count badge
  * toggle. Wires those preferences into the native Tauri "View" menu
- * and persists them to localStorage. Renders the Editor plus the
+ * and persists them through lib/preferences.js. Renders the Editor plus the
  * accent-color picker dialog.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -13,6 +13,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import './App.css'
+import { getPreference, setPreference, removePreference } from './lib/preferences'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -150,28 +151,28 @@ export default function App() {
     if (theme === 'system') {
       root.removeAttribute('data-theme')
       root.style.colorScheme = 'light dark'
-      localStorage.removeItem(THEME_STORAGE_KEY)
+      removePreference(THEME_STORAGE_KEY)
       updateMenu(theme)
       return
     }
 
     root.setAttribute('data-theme', theme)
     root.style.colorScheme = theme
-    localStorage.setItem(THEME_STORAGE_KEY, theme)
+    setPreference(THEME_STORAGE_KEY, theme)
     updateMenu(theme)
   }, [updateMenu])
 
   const applyAccentColor = useCallback((nextAccent) => {
     const normalized = normalizeAccentColor(nextAccent)
     document.documentElement.style.setProperty('--accent-color', normalized)
-    localStorage.setItem(ACCENT_STORAGE_KEY, normalized)
+    setPreference(ACCENT_STORAGE_KEY, normalized)
     setAccentColor(normalized)
   }, [])
 
   const applyWordCountBadgeVisibility = useCallback((visible) => {
     const nextVisible = Boolean(visible)
     showWordCountBadgeRef.current = nextVisible
-    localStorage.setItem(WORD_COUNT_BADGE_STORAGE_KEY, nextVisible ? 'true' : 'false')
+    setPreference(WORD_COUNT_BADGE_STORAGE_KEY, nextVisible ? 'true' : 'false')
     setShowWordCountBadge(nextVisible)
     menuRefs.current.wordCountItem?.setChecked(nextVisible)
   }, [])
@@ -194,9 +195,9 @@ export default function App() {
 
   // On startup: restore persisted preferences, then build the native View menu entries.
   useEffect(() => {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY) || 'system'
-    const storedAccent = normalizeAccentColor(localStorage.getItem(ACCENT_STORAGE_KEY))
-    const storedWordCountBadge = localStorage.getItem(WORD_COUNT_BADGE_STORAGE_KEY)
+    const stored = getPreference(THEME_STORAGE_KEY) || 'system'
+    const storedAccent = normalizeAccentColor(getPreference(ACCENT_STORAGE_KEY))
+    const storedWordCountBadge = getPreference(WORD_COUNT_BADGE_STORAGE_KEY)
     const showStoredWordCountBadge = storedWordCountBadge !== 'false'
     applyAccentColor(storedAccent)
     applyTheme(stored)

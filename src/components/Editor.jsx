@@ -4,7 +4,7 @@
  * Owns everything scoped to the open project: which documents are open
  * (primary/secondary/split view), per-document notes, workbench tiles,
  * clipboard history, version lists, and the right-sidebar tab. Persists
- * per-project session state to localStorage and restores it on launch.
+ * per-project session state through lib/preferences.js and restores it on launch.
  *
  * Renders the ProjectLanding screen when no project is open, otherwise
  * hands all state down to EditorLayout.
@@ -30,6 +30,7 @@ import {
   loadSession,
   normalizeProjectSession,
 } from '../lib/editorSession'
+import { setPreference, setSessionValue } from '../lib/preferences'
 
 /** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
@@ -111,8 +112,8 @@ export default function Editor({
     try {
       window.__inkblotProjectOpenId = projectOpenId
       window.__inkblotProjectName = nextProjectName
-      window.sessionStorage?.setItem('inkblot:project-open-id', projectOpenId)
-      window.sessionStorage?.setItem('inkblot:project-name', nextProjectName)
+      setSessionValue('inkblot:project-open-id', projectOpenId)
+      setSessionValue('inkblot:project-name', nextProjectName)
       window.dispatchEvent(new CustomEvent('inkblot:project-opened', {
         detail: { projectName: nextProjectName, projectOpenId },
       }))
@@ -286,7 +287,7 @@ export default function Editor({
       lastProject: initialSession.lastProject || '',
       projects: projectSessions,
     }
-    localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
+    setPreference(PERSIST_KEY, JSON.stringify(payload))
   }, [detachedTarget, initialSession.lastProject, projectName, projectSessions])
 
   // Persist the open project's session whenever any of its state changes.
@@ -318,13 +319,13 @@ export default function Editor({
         lastProject: projectName,
         projects: nextProjectSessions,
       }
-      localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
+      setPreference(PERSIST_KEY, JSON.stringify(payload))
       return nextProjectSessions
     })
   }, [detachedTarget, projectName, currentDoc, secondaryDoc, splitView, splitOrientation, splitRatio, activeDoc, sidebarTab, tiles, tabs, activeTabId])
 
   useEffect(() => {
-    localStorage.setItem(CLIPBOARD_PERSIST_KEY, JSON.stringify(clipboardHistory))
+    setPreference(CLIPBOARD_PERSIST_KEY, JSON.stringify(clipboardHistory))
   }, [clipboardHistory])
 
   // Outside of an editor split (or with no secondary doc), the primary doc is always active.
