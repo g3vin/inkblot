@@ -325,10 +325,9 @@
   const WINDOW_LABEL = 'main'
 
   const windows = {
-    // The native titlebar is real now, so the page no longer moves the window. The
-    // call is answered rather than rejected because the bundle logs a warning on
-    // every rejected drag, and there would be one per click on the toolbar strip.
-    start_dragging() {},
+    // The shell draws no titlebar row, so the page's top strip is what the window is
+    // dragged by — and only the shell can move a window.
+    start_dragging() { return native('window.startDrag') },
     get_all_windows() { return [WINDOW_LABEL] },
     is_fullscreen() { return native('window.isFullscreen') },
     set_title({ value }) { return native('window.setTitle', { title: value }) },

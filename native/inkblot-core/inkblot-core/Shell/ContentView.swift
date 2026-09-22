@@ -1,43 +1,65 @@
+import AppKit
 import SwiftUI
 
-/// The window: the native file tree beside the document surface.
+/// The window: the native file tree, the document surface, the native sidebar.
 ///
-/// The page draws the middle — the formatting toolbar, the panes, the tab dock — until
-/// each of those moves too. Both sidebars are native. What it
-/// no longer draws is the file tree and the titlebar chrome it used to fake (traffic
-/// light spacing, drag strip, fullscreen guessing); see `EditorWebController.nativeChrome`.
+/// There is no titlebar row. The page's own toolbar is the top of the window, the
+/// traffic lights float over the file tree (or, with the tree hidden, over the start of
+/// the page's toolbar — the shell tells the page how much room to leave), and the right
+/// sidebar has its own glass toggle at its top. See `setTitlebarInset`.
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @State private var columns: NavigationSplitViewVisibility = .all
+    @State private var fullScreen = false
+
+    /// The traffic lights' span from the window's leading edge, plus a little air.
+    private static let trafficLightsInset: Double = 78
 
     var body: some View {
         @Bindable var sidebar = model.sidebar
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             FileTreeSidebar()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+                .toolbar(removing: .sidebarToggle)
         } detail: {
             EditorWebView(controller: model.web)
                 .overlay { NotePreviewOverlay() }
-                .ignoresSafeArea(.container, edges: .bottom)
+                .overlay(alignment: .topTrailing) {
+                    // With the sidebar closed, the way back to it floats where its own
+                    // button was. The page leaves room for it (see sendInset).
+                    if !sidebar.isPresented {
+                        SidebarToggleButton(isPresented: $sidebar.isPresented)
+                            .padding(.top, 10)
+                            .padding(.trailing, 12)
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                    }
+                }
+                .ignoresSafeArea(.all, edges: [.top, .bottom])
         }
-        .navigationSubtitle(subtitle)
         .inspector(isPresented: $sidebar.isPresented) {
             InspectorView()
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 520)
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Reload", systemImage: "arrow.clockwise") { model.web.reload() }
-                    .help("Reload the editor (autosave has already saved your work)")
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Sidebar", systemImage: "sidebar.right") { sidebar.isPresented.toggle() }
-                    .help(sidebar.isPresented ? "Hide the sidebar" : "Show the sidebar")
-            }
+        .toolbar(removing: .title)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        .onChange(of: columns, initial: true) { sendInset() }
+        .onChange(of: fullScreen) { sendInset() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
+            fullScreen = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
+            fullScreen = false
+        }
+        .onChange(of: model.bridge.project.projectName) { sendInset() }
+        .onChange(of: model.sidebar.isPresented) { sendInset() }
     }
 
-    private var subtitle: String {
-        guard let path = model.bridge.activeEditor?.docPath else { return "" }
-        return docDisplayName(path: path)
+    /// Room for the traffic lights only when they are over the page: the file tree is
+    /// hidden, and the window is not full screen (which has none).
+    private func sendInset() {
+        let treeShowing = columns != .detailOnly
+        let leading = treeShowing || fullScreen ? 0 : Self.trafficLightsInset
+        let trailing: Double = model.sidebar.isPresented ? 0 : 56
+        model.bridge.send(.setTitlebarInset(SetTitlebarInsetCommand(leading: leading, trailing: trailing)))
     }
 }

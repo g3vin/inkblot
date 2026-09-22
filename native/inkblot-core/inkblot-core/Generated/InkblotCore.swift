@@ -511,6 +511,7 @@ public enum NativeCommand: Codable, Equatable {
 	case renameVersion(RenameVersionCommand)
 	case revealSearchResult(RevealSearchResultCommand)
 	case addReply(AddReplyCommand)
+	case setTitlebarInset(SetTitlebarInsetCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -555,7 +556,8 @@ public enum NativeCommand: Codable, Equatable {
 			versionAction,
 			renameVersion,
 			revealSearchResult,
-			addReply
+			addReply,
+			setTitlebarInset
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -781,6 +783,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .addReply(content)
 					return
 				}
+			case .setTitlebarInset:
+				if let content = try? container.decode(SetTitlebarInsetCommand.self, forKey: .payload) {
+					self = .setTitlebarInset(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -917,6 +924,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .addReply(let content):
 			try container.encode(CodingKeys.addReply, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setTitlebarInset(let content):
+			try container.encode(CodingKeys.setTitlebarInset, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -2473,6 +2483,23 @@ public struct SetSelectionCommand: Codable, Equatable {
 		self.anchor = anchor
 		self.scrollIntoView = scrollIntoView
 		self.focus = focus
+	}
+}
+
+/// How much of the page's top-left corner the window's own controls cover.
+/// 
+/// The shell draws no titlebar row: the page's toolbar is the top of the window, and
+/// the traffic lights float over whatever is beneath them. When the native file tree is
+/// showing they float over it and the page needs no room; when it is hidden they float
+/// over the page's toolbar, which must start after them. Only the shell knows which.
+public struct SetTitlebarInsetCommand: Codable, Equatable {
+	public let leading: Double
+	/// Room at the right end, for the button that reopens a hidden native sidebar.
+	public let trailing: Double?
+
+	public init(leading: Double, trailing: Double?) {
+		self.leading = leading
+		self.trailing = trailing
 	}
 }
 

@@ -39,7 +39,7 @@ pub use command::{
     ApplyMarkCommand, CanvasCommandRequest, CanvasDropDocCommand, CanvasDropNoteCommand,
     CanvasRestoreCommand, CanvasRevealCommand, DictationCancelCommand, DictationLevelCommand,
     CreateEntryCommand, DeleteEntryCommand, DictationTranscript, DuplicateEntryCommand, EntryKind,
-    InsertPlainTextCommand, MoveEntryCommand, RenameEntryCommand, InsertTableCommand, JumpToAnchorCommand, NativeCommand,
+    InsertPlainTextCommand, MoveEntryCommand, RenameEntryCommand, SetTitlebarInsetCommand, InsertTableCommand, JumpToAnchorCommand, NativeCommand,
     OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand,
     SetColorCommand, SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand,
     SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,

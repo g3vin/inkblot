@@ -12,7 +12,14 @@ struct InkblotApp: App {
                 .frame(minWidth: 760, minHeight: 480)
         }
         .defaultSize(width: 1200, height: 800)
+        // No title, no titlebar row: the page's toolbar is the top of the window.
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
+            // View ▸ Show/Hide Sidebar and Show/Hide Inspector — the toggles that used to
+            // be toolbar buttons.
+            SidebarCommands()
+            InspectorCommands()
             InkblotCommands(model: model)
         }
     }
