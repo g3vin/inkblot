@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// At rest it is what Apple's is: a low glass capsule of small, plain glyphs in the label
 /// colour, the selected one in the accent colour on a faint grey pill. Press on the
-/// selection and the pill lifts off the bar as a *clear* glass lens — overhanging the bar
+/// selection and the pill lifts off the bar as a see-through lens — overhanging the bar
 /// a little, magnifying the glyph it is over — follows the pointer, and on release settles
 /// back into the grey pill on the tab it was let go over. A plain click on any icon just
 /// selects it.
@@ -14,10 +14,11 @@ import SwiftUI
 ///   - the bar's glass is at the bottom
 ///   - the resting pill is plain fill, *under* the icons
 ///   - the icons
-///   - the lifted lens is glass *above* the icons, because glass refracts what is behind
-///     it — that is what makes it read as a lens and not a highlight
-/// A `GlassEffectContainer` draws its glass over plain content inside it, so nothing here
-/// shares one: an earlier version put the icons in a container and they came out frosted.
+///   - the lifted lens *above* the icons, drawn by hand (`Lens`) rather than as glass
+/// Glass cannot sample other glass: a `.glassEffect` lens over the bar's glass renders its
+/// own frosted backdrop and hides the bar, where Apple's is clear straight through. And a
+/// `GlassEffectContainer` draws its glass over plain content inside it, so the icons stay
+/// out of one: an earlier version put them in a container and they came out frosted.
 struct GlassTabBar<Tab: Hashable>: View {
     let tabs: [Tab]
     @Binding var selection: Tab
@@ -85,13 +86,11 @@ struct GlassTabBar<Tab: Hashable>: View {
                 }
                 .allowsHitTesting(false)
 
-                // The lens: clear glass, above everything, refracting the icons below.
+                // The lens: see-through, above everything. Only its rim and shadow are
+                // drawn; the bar and the magnified glyph show straight through it.
                 if lifted {
-                    Capsule()
-                        .fill(.clear)
+                    Lens()
                         .frame(width: lens.width, height: lens.height)
-                        .glassEffect(.clear.interactive(), in: .capsule)
-                        .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
                         .offset(x: lensX - lens.width / 2, y: (height - lens.height) / 2)
                         .allowsHitTesting(false)
                         .transition(.scale(scale: pill.height / lens.height).combined(with: .opacity))
@@ -135,5 +134,30 @@ struct GlassTabBar<Tab: Hashable>: View {
     static func index(at x: CGFloat, slot: CGFloat, count: Int) -> Int {
         guard slot > 0, count > 0 else { return 0 }
         return min(max(Int(x / slot), 0), count - 1)
+    }
+}
+
+/// The lifted lens: nothing inside but a whisper of light, a rim lit from above and a soft
+/// shadow beneath — so whatever is under it stays in plain view.
+private struct Lens: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let dark = colorScheme == .dark
+        Capsule()
+            .fill(Color.white.opacity(dark ? 0.04 : 0.1))
+            .overlay {
+                Capsule().strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(dark ? 0.55 : 0.95), .white.opacity(dark ? 0.12 : 0.35)],
+                        startPoint: .top, endPoint: .bottom),
+                    lineWidth: 1)
+            }
+            .overlay {
+                Capsule()
+                    .strokeBorder(Color.black.opacity(dark ? 0.35 : 0.1), lineWidth: 0.5)
+                    .padding(-0.5)
+            }
+            .shadow(color: .black.opacity(dark ? 0.35 : 0.14), radius: 7, y: 3)
     }
 }
