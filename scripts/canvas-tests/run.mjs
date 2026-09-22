@@ -25,6 +25,8 @@
  *   editor the real EditorCanvas mounted in jsdom: autosave, version checkpoints,
  *          the per-doc editor-state cache, and note anchor remapping — the paths
  *          where a bug loses the user's writing without saying anything
+ *   tree   the file tree's per-row decisions: highlight states, icons, and where a
+ *          drop indicator goes
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -38,7 +40,7 @@
  * Still not covered: anything involving layout, pointer events, or the asset://
  * protocol. Those need the real webview.
  */
-const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor']
+const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree']
 
 const failures = []
 

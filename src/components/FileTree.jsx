@@ -19,16 +19,16 @@ import {
 } from '../lib/FileSystem'
 import { saveCanvasDocument } from '../lib/canvasFileSystem'
 import { createEmptyCanvas } from '../lib/canvasModel'
-import { getDocDisplayName, isCanvasDoc, stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
+import { isCanvasDoc, stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
 import {
 } from '../lib/tabDockEvents'
 import SFIcon from './SFIcon'
 import { useFileTreeDrag } from './useFileTreeDrag'
+import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import {
   STORY_FOLDER_PRESETS,
   getStoryFolderAncestor,
   getStoryFolderPresetByKey,
-  getStoryFolderPresetForEntry,
 } from '../lib/storyStructure'
 
 const MotionDiv = motion.div
@@ -487,30 +487,43 @@ export default function FileTree({
   // Render one tree node (file or folder) plus its drop slots and children.
   const renderNode = (node, depth = 0, siblings = []) => {
     if (!node) return null
-    const isFolder = node.type === 'folder'
-    const isExpanded = expanded.has(node.path)
-    const isPrimary = currentDoc === node.path
-    const isActive = activeDoc ? activeDoc === node.path : isPrimary
-    const isSecondary = splitView === 'editor' && secondaryDoc === node.path
-    const storyPreset = getStoryFolderPresetForEntry(node.path, node.type)
-    const parentPath = getParentPath(node.path)
-    const nodeId = `${node.type}:${node.path}`
-    const isCanvas = !isFolder && isCanvasDoc(node.path)
-    const iconName = isFolder
-      ? (storyPreset?.folderIcon || (isExpanded ? 'folder.fill' : 'folder'))
-      : (isCanvas ? 'canvas' : null)
-    const hasEntryIcon = Boolean(iconName)
-    const iconFilled = !isFolder && isActive && hasEntryIcon
-    const showInlineInput =
-      isAddingEntry && newEntryParent === node.path && (isFolder || newEntryParent)
-    const siblingIndex = siblings.findIndex(child => child.path === node.path && child.type === node.type)
-    const showInsertSlot = dragInsert && dragInsert.parentPath === parentPath && dragInsert.index === siblingIndex
-    const showInsertAfterLast =
-      dragInsert && dragInsert.parentPath === parentPath && dragInsert.index === siblings.length && siblingIndex === siblings.length - 1
+    // Every decision this row makes lives in fileTreeNodeState.js; what is left
+    // below is markup and handlers.
+    const {
+      dragName,
+      hasEntryIcon,
+      iconFilled,
+      iconName,
+      isDragOver,
+      isDragSource,
+      isExpanded,
+      isFolder,
+      isPrimary,
+      isRenaming,
+      isSecondary,
+      label,
+      nodeId,
+      parentPath,
+      showFolderDivider,
+      showInlineInput,
+      showInsertAfterLast,
+      showInsertSlot,
+      siblingIndex,
+    } = deriveFileNodeState(node, {
+      activeDoc,
+      currentDoc,
+      dragInsert,
+      dragOverPath,
+      dragSourceId,
+      expanded,
+      isAddingEntry,
+      newEntryParent,
+      renamingEntry,
+      secondaryDoc,
+      siblings,
+      splitView,
+    })
 
-    const isRenaming = renamingEntry && renamingEntry.path === node.path && renamingEntry.type === node.type
-    const isDragSource = dragSourceId === nodeId
-    const showFolderDivider = isFolder && isExpanded
     return (
       <MotionDiv
         key={nodeId}
@@ -527,7 +540,7 @@ export default function FileTree({
 
         <MotionDiv
           layout="position"
-          className={`file-item${isFolder ? ' folder' : ''}${isPrimary ? ' active' : ''}${isSecondary ? ' secondary' : ''}${dragOverPath === node.path ? ' drag-over' : ''}${isDragSource ? ' is-drag-source' : ''}`}
+          className={`file-item${isFolder ? ' folder' : ''}${isPrimary ? ' active' : ''}${isSecondary ? ' secondary' : ''}${isDragOver ? ' drag-over' : ''}${isDragSource ? ' is-drag-source' : ''}`}
           data-entry-type={node.type}
           data-entry-path={node.path}
           data-entry-parent={parentPath}
@@ -543,7 +556,7 @@ export default function FileTree({
             manualDragRef.current = {
               path: node.path,
               type: node.type,
-              name: getDocDisplayName(node.name),
+              name: dragName,
               iconName,
               iconFilled,
               startX: e.clientX,
@@ -585,7 +598,7 @@ export default function FileTree({
           {isRenaming ? (
             renderRenameInput({ marginLeft: hasEntryIcon ? 4 : 0, minWidth: 80 })
           ) : (
-            <span className="file-item-label">{isFolder ? node.name : getDocDisplayName(node.name)}</span>
+            <span className="file-item-label">{label}</span>
           )}
 
           <AnimatePresence initial={false}>
