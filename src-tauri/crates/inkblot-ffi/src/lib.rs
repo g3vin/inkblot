@@ -21,7 +21,7 @@
 use std::sync::Arc;
 
 use inkblot_core::store::preferences::{PreferenceScope, PreferenceStore};
-use inkblot_core::store::{ProjectStore, StoreError};
+use inkblot_core::store::{DocumentBody, ProjectStore, StoreError};
 
 uniffi::setup_scaffolding!();
 
@@ -150,6 +150,24 @@ impl InkblotCore {
     pub fn document_exists(&self, project_name: String, doc_name: String) -> bool {
         self.projects.document_exists(&project_name, &doc_name)
     }
+
+    /// A new, empty text document — `{ content: [], notes: [], versions: [] }`, which is
+    /// what the web tree's "New Document" writes through `saveDocument`. Through the
+    /// core's `save_document` rather than a raw write, so the key whitelist is the one
+    /// both shells share.
+    ///
+    /// Refuses an existing document rather than emptying it: the caller picked a name,
+    /// and a name that is taken is a question for the user, not a reason to lose a file.
+    pub fn create_document(&self, project_name: String, doc_name: String) -> Result<(), CoreError> {
+        if self.projects.document_exists(&project_name, &doc_name) {
+            return Err(CoreError::Failed(format!("{doc_name} already exists")));
+        }
+        let body = DocumentBody {
+            content: serde_json::json!([]),
+            notes: serde_json::json!([]),
+        };
+        Ok(self.projects.save_document(&project_name, &doc_name, &body, None)?)
+    }
 }
 
 /* ---------------- free functions ---------------- */
@@ -217,5 +235,22 @@ mod tests {
         assert_eq!(tree["name"], "Novel");
         assert_eq!(tree["children"][0]["name"], "Part One");
         assert_eq!(core.list_projects(), vec!["Novel".to_string()]);
+    }
+
+    #[test]
+    fn a_new_document_is_the_shape_the_web_tree_writes_and_never_overwrites() {
+        let root = scratch_root("create");
+        let core = InkblotCore::new(root.clone(), "s".into());
+        core.create_project("Novel".into(), None).unwrap();
+        core.create_document("Novel".into(), "Part One/Chapter 1".into()).unwrap();
+
+        let written: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(format!("{root}/Novel/Part One/Chapter 1.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(written, serde_json::json!({ "content": [], "notes": [], "versions": [] }));
+
+        assert!(core.create_document("Novel".into(), "Part One/Chapter 1".into()).is_err());
+        assert!(core.create_document("Novel".into(), "board.canvas".into()).is_err());
     }
 }
