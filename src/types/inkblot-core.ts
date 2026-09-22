@@ -53,6 +53,15 @@ export interface ActiveMarks {
 }
 
 /**
+ * Add an empty reply beneath a note, as the hover card's "reply" button does. The
+ * page makes the note (it owns ids, timestamps and the default layout for a new reply).
+ */
+export interface AddReplyCommand {
+	docPath: string;
+	parentNoteId: string;
+}
+
+/**
  * The marks the toolbar can toggle.
  * 
  * A closed set rather than a string because the toolbar is going native: a Swift
@@ -378,7 +387,8 @@ export type NativeCommand =
 	| { type: "selectTileWord", payload: TileRef }
 	| { type: "versionAction", payload: VersionActionCommand }
 	| { type: "renameVersion", payload: RenameVersionCommand }
-	| { type: "revealSearchResult", payload: RevealSearchResultCommand };
+	| { type: "revealSearchResult", payload: RevealSearchResultCommand }
+	| { type: "addReply", payload: AddReplyCommand };
 
 /**
  * A command, with its place in the stream.
@@ -681,7 +691,14 @@ export type WebviewEvent =
 	| { type: "clipboardChanged", payload: ClipboardChanged }
 	| { type: "tilesChanged", payload: TilesChanged }
 	| { type: "versionsChanged", payload: VersionsChanged }
-	| { type: "showSidebarTab", payload: ShowSidebarTab };
+	| { type: "showSidebarTab", payload: ShowSidebarTab }
+	/**
+	 * The marker of an open hover preview moved — the document scrolled or reflowed.
+	 * Coalesced to one per frame; it carries the whole rect, so a dropped one is
+	 * superseded by the next.
+	 */
+	| { type: "noteMarkerMoved", payload: NoteMarkerEvent }
+	| { type: "notePreviewDismissed", payload: NotePreviewDismissed };
 
 export interface EventEnvelope {
 	seq: number;
@@ -852,6 +869,20 @@ export interface NotePatch {
 	images?: NoteImage[];
 	/** The whole list, as for images. */
 	audio?: AudioClip[];
+	/**
+	 * Where the hover card was dragged to — for a root card, relative to its default
+	 * place beside the anchor; for a reply, relative to its parent's card.
+	 */
+	previewLayout?: NotePreviewLayout;
+	previewSize?: NotePreviewSize;
+}
+
+/**
+ * The open hover preview should close: the user clicked somewhere in the document
+ * that is not a note marker. The page is the only one who sees that click.
+ */
+export interface NotePreviewDismissed {
+	noteId: string;
 }
 
 /** Remove a note and every reply beneath it, as the page's panel does. */

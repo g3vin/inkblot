@@ -281,6 +281,7 @@ fn every_command() -> Vec<NativeCommand> {
             node_id: None,
             note_id: None,
         }),
+        NativeCommand::AddReply(AddReplyCommand { doc_path: "one".into(), parent_note_id: "n1".into() }),
     ]
 }
 
@@ -394,6 +395,16 @@ fn every_event() -> Vec<WebviewEvent> {
         }),
         WebviewEvent::VersionsChanged(VersionsChanged { doc_path: "one".into() }),
         WebviewEvent::ShowSidebarTab(ShowSidebarTab { tab: SidebarTab::History }),
+        WebviewEvent::NoteMarkerMoved(NoteMarkerEvent {
+            note_id: "n1".into(),
+            doc_path: "chapters/one.md".into(),
+            anchor_left: 1.0,
+            anchor_top: 2.0,
+            anchor_right: 3.0,
+            anchor_bottom: 4.0,
+            note: None,
+        }),
+        WebviewEvent::NotePreviewDismissed(NotePreviewDismissed { note_id: "n1".into() }),
     ]
 }
 
@@ -446,6 +457,7 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
             "versionAction",
             "renameVersion",
             "revealSearchResult",
+            "addReply",
         ]
     );
 }
@@ -477,6 +489,8 @@ fn every_event_has_the_wire_name_the_handoff_promised() {
             "tilesChanged",
             "versionsChanged",
             "showSidebarTab",
+            "noteMarkerMoved",
+            "notePreviewDismissed",
         ]
     );
 }

@@ -12,7 +12,7 @@ use typeshare::typeshare;
 use super::common::{Alignment, EditorTarget, MarkKind, Pane, RangeEdit, TextAnchor};
 use crate::types::json::JsonValue;
 use super::sidebar::{
-    ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
+    AddReplyCommand, ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
     RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
     TileRef, UpdateNoteCommand, VersionActionCommand,
 };
@@ -437,4 +437,5 @@ pub enum NativeCommand {
     VersionAction(VersionActionCommand),
     RenameVersion(RenameVersionCommand),
     RevealSearchResult(RevealSearchResultCommand),
+    AddReply(AddReplyCommand),
 }

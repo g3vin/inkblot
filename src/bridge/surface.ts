@@ -30,6 +30,7 @@ import type {
   FocusModeView,
   Note,
   NoteMarkerEvent,
+  NotePreviewDismissed,
   NotesRemapped,
   OpenDocumentCommand,
   ClipboardChanged,
@@ -124,6 +125,9 @@ export interface DocumentSurface {
   publishTilesChanged(payload: TilesChanged): void
   publishVersionsChanged(payload: VersionsChanged): void
   publishShowSidebarTab(payload: ShowSidebarTab): void
+  /** An open preview's marker moved. Coalesced — each carries the whole rect. */
+  publishNoteMarkerMoved(payload: NoteMarkerEvent): void
+  publishNotePreviewDismissed(payload: NotePreviewDismissed): void
 
   /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
   publishDragStarted(): void
@@ -183,6 +187,10 @@ export function createDocumentSurface({
   )
   const tileChanges = createCoalescer<TilesChanged>(
     (payload) => bridge.emit('tilesChanged', payload),
+    scheduler
+  )
+  const markerMoves = createCoalescer<NoteMarkerEvent>(
+    (payload) => bridge.emit('noteMarkerMoved', payload),
     scheduler
   )
   const dragMoves = createCoalescer<{ dragId: string; clientX: number; clientY: number }>(
@@ -373,6 +381,13 @@ export function createDocumentSurface({
     publishTilesChanged(payload) { tileChanges.push(payload) },
     publishVersionsChanged(payload) { bridge.emit('versionsChanged', payload) },
     publishShowSidebarTab(payload) { bridge.emit('showSidebarTab', payload) },
+    publishNoteMarkerMoved(payload) { markerMoves.push(payload) },
+    publishNotePreviewDismissed(payload) {
+      // A move queued for a preview that is closing would reopen nothing, but it would
+      // arrive after the dismissal and be one message the shell has to reason about.
+      markerMoves.cancel()
+      bridge.emit('notePreviewDismissed', payload)
+    },
 
     publishDragStarted() {
       const session = drag.current()
@@ -400,6 +415,7 @@ export function createDocumentSurface({
       dragMoves.flush()
       clipboardChanges.flush()
       tileChanges.flush()
+      markerMoves.flush()
       for (const coalescer of notesByDoc.values()) coalescer.flush()
       for (const coalescer of notesChangedByDoc.values()) coalescer.flush()
     },
@@ -410,6 +426,7 @@ export function createDocumentSurface({
       dragMoves.cancel()
       clipboardChanges.cancel()
       tileChanges.cancel()
+      markerMoves.cancel()
       for (const coalescer of notesByDoc.values()) coalescer.cancel()
       for (const coalescer of notesChangedByDoc.values()) coalescer.cancel()
       notesByDoc.clear()

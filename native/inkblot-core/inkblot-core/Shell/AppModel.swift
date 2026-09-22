@@ -15,6 +15,7 @@ final class AppModel {
     let menus: WebMenus
     let tree: ProjectTree
     let sidebar: SidebarModel
+    let notePreviews: NotePreviewModel
     let memoRecorder = AudioMemoRecorder()
     let memoPlayer = AudioMemoPlayer()
     let language = LanguageServices()
@@ -26,6 +27,7 @@ final class AppModel {
         menus = WebMenus()
         tree = ProjectTree(core: core)
         sidebar = SidebarModel(bridge: bridge, core: core)
+        notePreviews = NotePreviewModel(bridge: bridge)
 
         bridge.addListener { [weak self] event in
             guard let self else { return }

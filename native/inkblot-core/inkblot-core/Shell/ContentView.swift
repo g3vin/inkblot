@@ -16,6 +16,7 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         } detail: {
             EditorWebView(controller: model.web)
+                .overlay { NotePreviewOverlay() }
                 .ignoresSafeArea(.container, edges: .bottom)
         }
         .navigationSubtitle(subtitle)

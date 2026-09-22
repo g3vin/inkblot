@@ -22,6 +22,8 @@ const React = (await import('react')).default
 const { act, useState, useCallback } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { useNativeSidebar } = await import('../../src/components/useNativeSidebar.js')
+const { useNativeNotePreviews } = await import('../../src/components/useNativeNotePreviews.js')
+const { NOTE_PREVIEW_ENTER_EVENT, NOTE_PREVIEW_PIN_EVENT } = await import('../../src/extensions/NoteAnnotation.js')
 const { shellBridge } = await import('../../src/bridge/index.ts')
 const drag = await import('../../src/bridge/recentSelectionDrag.ts')
 const { saveDocument, getVersions } = await import('../../src/lib/FileSystem.js')
@@ -48,7 +50,10 @@ ok('and a stale one is let go', drag.claimEndedSelectionDrag('she hesitated', 90
 
 const P = 'Sidebar'
 const control = { drops: [], searchTargets: [], compares: [] }
-const heard = { notesChanged: [], clipboardChanged: [], tilesChanged: [], versionsChanged: [] }
+const heard = {
+  notesChanged: [], clipboardChanged: [], tilesChanged: [], versionsChanged: [],
+  noteMarkerHover: [], noteMarkerPin: [], noteMarkerMoved: [], notePreviewDismissed: [],
+}
 for (const type of Object.keys(heard)) shellBridge.on(type, (payload) => heard[type].push(payload))
 
 const initialNotes = [
@@ -104,6 +109,7 @@ function Harness() {
     onOpenDocInTab: () => {},
     openSearchTarget: (target) => control.searchTargets.push(target),
   })
+  useNativeNotePreviews({ enabled: true })
   return null
 }
 
@@ -208,5 +214,72 @@ await act(async () => {
   shellBridge.send('revealSearchResult', { docPath: 'board.canvas', nodeId: 'card-1' })
 })
 ok('a canvas match names the node', control.searchTargets.at(-1)?.nodeId === 'card-1')
+
+/* ---------------- glass hover previews ---------------- */
+
+await act(async () => {
+  shellBridge.send('updateNote', { docPath: 'one', noteId: 'n3', patch: { previewLayout: { offsetX: 40, offsetY: -12 } } })
+})
+const moved = control.notesByDoc.one.find((note) => note.id === 'n3')
+ok('dragging a hover card stores its layout without touching the note\'s timestamp',
+  moved.previewLayout.offsetX === 40 && moved.updatedAt === before)
+
+await act(async () => { shellBridge.send('addReply', { docPath: 'one', parentNoteId: 'n3' }) })
+const reply = control.notesByDoc.one.find((note) => note.parentNoteId === 'n3')
+ok('addReply makes an empty free note under the parent, placed below it',
+  reply && reply.type === 'free' && reply.content === '' && reply.previewLayout.offsetY > 0)
+
+// A marker in the page, where NoteAnnotation would have put one.
+const marker = document.createElement('span')
+marker.className = 'note-marker'
+marker.dataset.noteId = 'n3'
+marker.getBoundingClientRect = () => ({ left: 100, top: 200, right: 108, bottom: 216, width: 8, height: 16 })
+document.body.appendChild(marker)
+
+await act(async () => {
+  window.dispatchEvent(new CustomEvent(NOTE_PREVIEW_ENTER_EVENT, {
+    detail: {
+      note: { ...control.notesByDoc.one.find((note) => note.id === 'n3'), docName: 'one' },
+      anchorRect: { left: 100, top: 200, right: 108, bottom: 216, width: 8, height: 16 },
+      editorView: { not: 'serializable', self: null },
+    },
+  }))
+})
+const hover = heard.noteMarkerHover.at(-1)
+ok('a marker hover reaches the shell with the marker\'s rect',
+  hover?.noteId === 'n3' && hover.docPath === 'one' && hover.anchorLeft === 100 && hover.anchorBottom === 216)
+ok('and without the live EditorView NoteAnnotation still attaches', !('editorView' in hover))
+ok('or the docName it tacks onto the note', hover.note && !('docName' in hover.note))
+
+marker.getBoundingClientRect = () => ({ left: 100, top: 150, right: 108, bottom: 166, width: 8, height: 16 })
+await act(async () => { document.body.dispatchEvent(new dom.window.Event('scroll')) })
+// Two frames: one for the hook's own read of the marker, one for the coalescer.
+await frame()
+await frame()
+ok('scrolling moves the open card\'s anchor', heard.noteMarkerMoved.at(-1)?.anchorTop === 150)
+
+await act(async () => {
+  window.dispatchEvent(new CustomEvent(NOTE_PREVIEW_PIN_EVENT, {
+    detail: { note: { id: 'n3', docName: 'one' }, anchorRect: { left: 100, top: 150, right: 108, bottom: 166, width: 8, height: 16 } },
+  }))
+})
+ok('a click on the marker pins it', heard.noteMarkerPin.at(-1)?.noteId === 'n3')
+
+await act(async () => { marker.dispatchEvent(new dom.window.Event('pointerdown', { bubbles: true })) })
+ok('a press on the marker itself is not a dismissal', heard.notePreviewDismissed.length === 0)
+await act(async () => { document.body.dispatchEvent(new dom.window.Event('pointerdown', { bubbles: true })) })
+ok('a press anywhere else in the page dismisses the card', heard.notePreviewDismissed.at(-1)?.noteId === 'n3')
+
+await act(async () => {
+  window.dispatchEvent(new CustomEvent(NOTE_PREVIEW_ENTER_EVENT, {
+    detail: { note: { id: 'n3', docName: 'one' }, anchorRect: { left: 1, top: 1, right: 2, bottom: 2, width: 1, height: 1 } },
+  }))
+})
+marker.remove()
+const dismissedBefore = heard.notePreviewDismissed.length
+await act(async () => { document.body.dispatchEvent(new dom.window.Event('scroll')) })
+await frame()
+ok('a card whose marker has gone from the page is dismissed',
+  heard.notePreviewDismissed.length === dismissedBefore + 1)
 
 await act(async () => { root.unmount() })
