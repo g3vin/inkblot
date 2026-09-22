@@ -12,12 +12,11 @@ struct InkblotApp: App {
                 .frame(minWidth: 760, minHeight: 480)
         }
         .defaultSize(width: 1200, height: 800)
-        // No title, no titlebar row: the page's toolbar is the top of the window.
+        // No title and no toolbar row — see WindowChrome for why not a real toolbar, and
+        // for how the traffic lights still get a toolbar window's placement.
         .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
-            // View ▸ Show/Hide Sidebar and Show/Hide Inspector — the toggles that used to
-            // be toolbar buttons.
+            // View ▸ Show/Hide Sidebar and Show/Hide Inspector, beside the toolbar toggles.
             SidebarCommands()
             InspectorCommands()
             InkblotCommands(model: model)

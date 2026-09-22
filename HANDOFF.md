@@ -808,6 +808,12 @@ Two rules held that are worth keeping:
   to `.with(content:` everywhere also rewrote the call inside `.with`, which then
   recursed; it compiled, and every native note edit would have overflowed the stack.
   `NotePreviewTests.aPatchNamesOnlyWhatChanged` is the guard.
+- **A real window toolbar would swallow the page's clicks.** AppKit keeps a toolbar's
+  whole band (its empty space drags the window), and the page's toolbar lives in that
+  band. So the window uses a hidden titlebar, which passes clicks through, and
+  `WindowChrome` moves the traffic lights to where a toolbar window has them — AppKit
+  resets them on every titlebar layout, so it re-places them on resize and full screen.
+  The toggles are drawn at toolbar-button size on the same line.
 - **A `GlassEffectContainer` draws its glass over plain content inside it.** Apply
   `.glassEffect` to the content view (glass goes behind it), or keep the content outside
   the container — the selector bar's icons were frosted over until they moved out.
