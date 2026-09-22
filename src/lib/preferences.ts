@@ -1,5 +1,5 @@
 /**
- * preferences.js — where the app's settings live now that `localStorage` cannot.
+ * preferences.ts — where the app's settings live now that `localStorage` cannot.
  *
  * A native shell cannot see `localStorage`. A `WKWebView` in a Swift app gets its own
  * store, per origin, that no native code can read — so a theme chosen in the webview
@@ -31,17 +31,29 @@
  */
 import { invoke } from '@tauri-apps/api/core'
 
-const SCOPES = ['app', 'file-tree', 'pinterest-cache']
+/**
+ * The three files. These strings are the wire format: `preferences_set` and its
+ * neighbours parse them back into `inkblot_core`'s `PreferenceScope`, so a value
+ * added here has to exist there too.
+ */
+export type PreferenceScope = 'app' | 'file-tree' | 'pinterest-cache'
+
+const SCOPES: PreferenceScope[] = ['app', 'file-tree', 'pinterest-cache']
+
+/** What `preferences_load` answers with: every scope's whole map, in one call. */
+type PreferenceSnapshot = Partial<Record<PreferenceScope, Record<string, string>>>
 
 /** Key prefix → scope. Anything unmatched is an ordinary app preference. */
-const scopeFor = (key) => {
+const scopeFor = (key: string): PreferenceScope => {
   if (key.startsWith('inkblot:pinterest-preview:')) return 'pinterest-cache'
   if (key.startsWith('inkblot-order:') || key.startsWith('inkblot-expanded:')) return 'file-tree'
   return 'app'
 }
 
 /** scope → { key: value }. Populated by `hydratePreferences`. */
-const cache = new Map(SCOPES.map((scope) => [scope, new Map()]))
+const cache = new Map<PreferenceScope, Map<string, string>>(
+  SCOPES.map((scope) => [scope, new Map()])
+)
 
 let hydrated = false
 
@@ -51,9 +63,9 @@ let hydrated = false
  * Failure is survivable: every caller defaults when a key is absent, so an app that
  * cannot read its preferences starts with the defaults rather than not starting.
  */
-export async function hydratePreferences() {
+export async function hydratePreferences(): Promise<void> {
   try {
-    const loaded = await invoke('preferences_load')
+    const loaded = await invoke<PreferenceSnapshot | null>('preferences_load')
     for (const scope of SCOPES) {
       cache.set(scope, new Map(Object.entries(loaded?.[scope] || {})))
     }
@@ -64,14 +76,20 @@ export async function hydratePreferences() {
 }
 
 /** Whether the cache has been filled. False in tests and before boot finishes. */
-export const isHydrated = () => hydrated
+export const isHydrated = (): boolean => hydrated
 
-export function getPreference(key) {
+/** The stored string, or null when the key was never written — `getItem`'s contract. */
+export function getPreference(key: string): string | null {
   const value = cache.get(scopeFor(key))?.get(key)
   return value === undefined ? null : value
 }
 
-export function setPreference(key, value) {
+/**
+ * Values are strings, because that is what the store holds and what `getPreference`
+ * hands back. The `String()` is still here for the call sites that are plain JS and
+ * so are not held to this signature yet.
+ */
+export function setPreference(key: string, value: string): void {
   const scope = scopeFor(key)
   const stored = String(value)
   cache.get(scope)?.set(key, stored)
@@ -81,7 +99,7 @@ export function setPreference(key, value) {
   })
 }
 
-export function removePreference(key) {
+export function removePreference(key: string): void {
   const scope = scopeFor(key)
   cache.get(scope)?.delete(key)
 
@@ -96,7 +114,7 @@ export function removePreference(key) {
  * A project rename has to carry the file tree's stored order and expansion with it, or
  * the renamed project opens with every folder collapsed and its manual order lost.
  */
-export function renamePreferencePrefix(fromPrefix, toPrefix) {
+export function renamePreferencePrefix(fromPrefix: string, toPrefix: string): void {
   const scope = scopeFor(fromPrefix)
   const scoped = cache.get(scope)
 
@@ -114,8 +132,8 @@ export function renamePreferencePrefix(fromPrefix, toPrefix) {
 }
 
 /** Every key currently held in a scope — what a prefix scan used to need. */
-export function preferenceKeys(prefix = '') {
-  const keys = []
+export function preferenceKeys(prefix: string = ''): string[] {
+  const keys: string[] = []
   for (const scoped of cache.values()) {
     for (const key of scoped.keys()) {
       if (key.startsWith(prefix)) keys.push(key)
@@ -131,13 +149,13 @@ export function preferenceKeys(prefix = '') {
  * memory: written to disk it would outlive the launch it describes, and a stale
  * "already refreshed this project" flag means a board that never refreshes again.
  */
-const sessionState = new Map()
+const sessionState = new Map<string, string>()
 
-export function getSessionValue(key) {
+export function getSessionValue(key: string): string | null {
   const value = sessionState.get(key)
   return value === undefined ? null : value
 }
 
-export function setSessionValue(key, value) {
+export function setSessionValue(key: string, value: string): void {
   sessionState.set(key, String(value))
 }

@@ -4,7 +4,7 @@
  * Owns app-wide chrome and preferences that live above the editor:
  * theme (light/dark/system), accent color, and the word-count badge
  * toggle. Wires those preferences into the native Tauri "View" menu
- * and persists them through lib/preferences.js. Renders the Editor plus the
+ * and persists them through lib/preferences.ts. Renders the Editor plus the
  * accent-color picker dialog.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'

@@ -33,7 +33,7 @@ setInvokeHandler(async (command, args) => {
   return null
 })
 
-const prefs = await import('../../src/lib/preferences.js')
+const prefs = await import('../../src/lib/preferences.ts')
 
 /* ---------------- hydration ---------------- */
 

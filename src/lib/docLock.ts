@@ -1,5 +1,5 @@
 /**
- * docLock.js — one writer at a time, per document.
+ * docLock.ts — one writer at a time, per document.
  */
 
 // Every write below is a read-modify-write of the same file: read the version list,
@@ -8,9 +8,13 @@
 // then the autosave writes back the list it read BEFORE the snapshot existed. The
 // snapshot is gone, and nothing errors. Queueing per document makes each cycle see
 // the previous one's result.
-const docWriteQueues = new Map()
+const docWriteQueues = new Map<string, Promise<unknown>>()
 
-export function withDocLock(projectName, docName, task) {
+export function withDocLock<T>(
+  projectName: string,
+  docName: string,
+  task: () => T | PromiseLike<T>,
+): Promise<T> {
   const key = `${projectName}\u0000${docName}`
   const previous = docWriteQueues.get(key) || Promise.resolve()
 
@@ -26,4 +30,3 @@ export function withDocLock(projectName, docName, task) {
 
   return run
 }
-
