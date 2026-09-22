@@ -305,15 +305,28 @@ export async function prewarmReadAloud({ voice = DEFAULT_READ_ALOUD_VOICE } = {}
   }
 }
 
+/**
+ * The native path: phonemize here, synthesize in Rust.
+ *
+ * It used to hand the raw text to a Python child process that did both. Python is
+ * gone — it only ever worked on the machine it was installed on, and a subprocess
+ * cannot exist on iOS — so the grapheme-to-phoneme pass stays in the webview, where
+ * there is a working one, and only the model runs natively. See lib/readAloudVoice.js.
+ */
 async function generateNativeKokoroAudio(text, {
   voice = DEFAULT_READ_ALOUD_VOICE,
   speed = 1,
   onPhase,
 } = {}) {
+  onPhase?.('Preparing Kokoro voice...')
+
+  const { textToTokens } = await import('./readAloudVoice')
+  const { phonemes, tokens } = await textToTokens(text, voice)
+
   onPhase?.('Starting native Kokoro...')
 
   const response = await withTimeout(
-    invoke('generate_kokoro_speech', { text, voice, speed }),
+    invoke('generate_kokoro_speech', { tokens, voice, speed }),
     NATIVE_KOKORO_GENERATE_TIMEOUT_MS,
     'Native Kokoro took too long to generate audio.'
   )
@@ -323,9 +336,9 @@ async function generateNativeKokoroAudio(text, {
   return {
     audio: base64ToFloat32Array(response.audioBase64),
     sampling_rate: response.sampleRate || 24000,
-    engine: response.engine || 'kokoro-python',
-    graphemes: response.graphemes || [],
-    phonemes: response.phonemes || [],
+    engine: response.engine || 'kokoro-onnx',
+    graphemes: [],
+    phonemes: [phonemes],
   }
 }
 

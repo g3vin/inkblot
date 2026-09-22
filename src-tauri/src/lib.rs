@@ -22,7 +22,10 @@ use dictation_commands::{
     cancel_dictation_session, dictation_status, load_dictation_model, start_dictation_session,
     stop_dictation_session, AppDictationState,
 };
-use kokoro_commands::{generate_kokoro_speech, prewarm_kokoro_speech, KokoroSpeechState};
+use kokoro_commands::{
+    download_kokoro_model, generate_kokoro_speech, kokoro_model_status, kokoro_vocab,
+    prewarm_kokoro_speech, KokoroSpeechState,
+};
 use pinterest_commands::{
     pinterest_await_scrape, pinterest_begin_scrape, pinterest_report_scrape, ScrapeChannels,
 };
@@ -181,6 +184,9 @@ pub fn run() {
             dictation_status,
             generate_kokoro_speech,
             prewarm_kokoro_speech,
+            kokoro_model_status,
+            download_kokoro_model,
+            kokoro_vocab,
             preferences_load,
             preferences_set,
             preferences_remove,
