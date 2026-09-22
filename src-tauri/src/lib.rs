@@ -14,6 +14,7 @@ use url::Url;
 
 mod dictation_commands;
 mod kokoro_commands;
+mod preferences_commands;
 mod synonym_commands;
 
 use dictation_commands::{
@@ -21,6 +22,9 @@ use dictation_commands::{
     stop_dictation_session, AppDictationState,
 };
 use kokoro_commands::{generate_kokoro_speech, prewarm_kokoro_speech, KokoroSpeechState};
+use preferences_commands::{
+    preferences_load, preferences_remove, preferences_rename_prefix, preferences_set,
+};
 use synonym_commands::{
     download_synonym_model, get_synonyms, synonym_model_status, SynonymState,
 };
@@ -172,6 +176,10 @@ pub fn run() {
             dictation_status,
             generate_kokoro_speech,
             prewarm_kokoro_speech,
+            preferences_load,
+            preferences_set,
+            preferences_remove,
+            preferences_rename_prefix,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

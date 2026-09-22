@@ -27,6 +27,8 @@
  *          where a bug loses the user's writing without saying anything
  *   tree   the file tree's per-row decisions: highlight states, icons, and where a
  *          drop indicator goes
+ *   prefs  the preference store's webview half: which file a key lands in, that reads
+ *          are synchronous after hydration, and that a failed write is survivable
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -40,7 +42,7 @@
  * Still not covered: anything involving layout, pointer events, or the asset://
  * protocol. Those need the real webview.
  */
-const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree']
+const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs']
 
 const failures = []
 

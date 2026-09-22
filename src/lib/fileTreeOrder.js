@@ -5,7 +5,7 @@
  * folder path to child list. These functions keep that map consistent when
  * entries are renamed, moved between folders, or deleted.
  *
- * Deliberately pure: no React, no filesystem, no localStorage. Callers hand in
+ * Deliberately pure: no React, no filesystem, no stored state. Callers hand in
  * the order map and get a new one back.
  */
 export const getParentPath = (path = '') => path.split('/').slice(0, -1).join('/')
