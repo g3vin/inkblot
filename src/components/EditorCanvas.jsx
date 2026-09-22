@@ -21,6 +21,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 
+import { EditorTarget } from '../types'
+import { documentSurface, dragHandoff, DragPayloadKind, editorRegistry, useRegisterEditor } from '../bridge'
+import { readAnchor } from '../bridge/anchors'
+import { canvasDelegates } from '../bridge/canvasDelegates'
+import { useSurfacePublisher } from '../bridge/useSurfacePublisher'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { isEditorReady } from '../lib/editorUtils'
 import { isCanvasDoc } from '../lib/docKind'
@@ -193,7 +198,13 @@ export default function EditorCanvas({
           docName: docName || '',
         }
 
-        try { window.__inkblot_draggedEditorSelection = payload } catch (e) {}
+        dragHandoff.begin({
+          kind: DragPayloadKind.EditorSelection,
+          text,
+          docPath: docName || null,
+          anchor: readAnchor(instance, selection.from, selection.to),
+          detail: { source },
+        })
         try {
           event.dataTransfer?.setData('application/x-inkblot-editor-selection', JSON.stringify(payload))
           event.dataTransfer?.setData('text/plain', text)
@@ -261,7 +272,7 @@ export default function EditorCanvas({
 
   useEffect(() => {
     const onWindowDragOver = (event) => {
-      try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
+      dragHandoff.moveTo(event.clientX, event.clientY)
       const payload = getDraggedClipboardPayload(event)
       if (!payload) {
         setDragCaret(null)
@@ -282,8 +293,9 @@ export default function EditorCanvas({
     }
 
     const onWindowDrag = (event) => {
-      try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
-      const payload = window.__inkblot_draggedClipboardEntry || null
+      dragHandoff.moveTo(event.clientX, event.clientY)
+      const session = dragHandoff.current()
+      const payload = session?.kind === DragPayloadKind.ClipboardEntry ? session : null
       if (!payload?.text) {
         setDragCaret(null)
         return
@@ -309,8 +321,8 @@ export default function EditorCanvas({
     }
 
     const onWindowDragEnd = (event) => {
-      if (!window.__inkblot_dragPoint && (event?.clientX || event?.clientY)) {
-        try { window.__inkblot_dragPoint = { x: event.clientX, y: event.clientY } } catch (e) {}
+      if (!dragHandoff.point() && (event?.clientX || event?.clientY)) {
+        dragHandoff.moveTo(event.clientX, event.clientY)
       }
       setDragCaret(null)
     }
@@ -333,16 +345,16 @@ export default function EditorCanvas({
   useEffect(() => {
     const onClipboardDragEndDrop = (event) => {
       const detail = event?.detail || {}
-      const point = {
-        x: detail.x ?? window.__inkblot_dragPoint?.x ?? null,
-        y: detail.y ?? window.__inkblot_dragPoint?.y ?? null,
-      }
+      const held = dragHandoff.point()
+      const point = { x: detail.x ?? held?.x ?? null, y: detail.y ?? held?.y ?? null }
       const payload = {
         id: detail.id || '',
         text: detail.text || '',
       }
 
-      if (window.__inkblot_dropHandled) {
+      // Somebody already took this drop — the clipboard panel, most likely, since it
+      // is the other end of this same drag.
+      if (dragHandoff.isClaimed()) {
         setDragCaret(null)
         clearDragGlobals()
         return
@@ -382,6 +394,34 @@ export default function EditorCanvas({
       setActiveEditor?.(current => (current === secondaryEditor ? null : current))
     }
   }, [secondaryEditor, setActiveEditor, setSecondaryEditor])
+
+  /* ---------------- The bridge ---------------- */
+
+  // Follows the election and publishes toolbar state and selection context for
+  // whichever editor is active. This is the loop Toolbar.jsx used to run on itself.
+  useSurfacePublisher()
+
+  // The commands the surface cannot serve alone. The canvas ones need nothing from
+  // React — they resolve a surface id and dispatch what the canvas already listens
+  // for — so they are a module; anything needing app state would be composed in here
+  // beside them.
+  useEffect(() => {
+    documentSurface.setDelegates({ ...canvasDelegates })
+  }, [])
+
+  /* ---------------- Expose Editor, to the bridge ---------------- */
+
+  // The same two editors, under the names the protocol uses. A pane keeps its TipTap
+  // instance across document swaps, so both of these are registered once and answer
+  // for whatever the pane is showing — which is why they are accessors and not values.
+  useRegisterEditor(EditorTarget.Primary, {
+    getEditor: () => editor,
+    getDocPath: () => currentDoc || null,
+  })
+  useRegisterEditor(EditorTarget.Secondary, {
+    getEditor: () => secondaryEditor,
+    getDocPath: () => secondaryDoc || null,
+  })
 
   /* ---------------- Documents, saving, counting, notes ---------------- */
 
@@ -458,7 +498,7 @@ export default function EditorCanvas({
     target.chain().focus().run()
   }
 
-  const activatePane = useCallback((docName, targetEditor) => {
+  const activatePane = useCallback((docName, targetEditor, target) => {
     if (docName && activeDocRef.current !== docName) {
       activeDocRef.current = docName
       setActiveDoc(docName)
@@ -468,6 +508,10 @@ export default function EditorCanvas({
       activeEditorRef.current = targetEditor
       setActiveEditor?.(targetEditor)
     }
+
+    // The election result, as a name. This is the half that survives a process
+    // boundary — `setActiveEditor` above hands out a live object, which does not.
+    if (target) editorRegistry.setActive(target)
   }, [setActiveDoc, setActiveEditor])
 
   // Double-clicking a document card on a canvas opens that document in the pane the
@@ -597,12 +641,12 @@ export default function EditorCanvas({
           // it activates its pane itself rather than through these editor handlers.
           // A draft pane has no document either, and its form must keep focus —
           // handing it to the idle editor would steal the caret out of the name box.
-          onFocus={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor)}
-          onMouseEnter={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor)}
-          onWheel={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor)}
+          onFocus={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor, EditorTarget.Primary)}
+          onMouseEnter={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor, EditorTarget.Primary)}
+          onWheel={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor, EditorTarget.Primary)}
           onMouseDown={primaryPaneOwnsFocus ? undefined : () => focusEditor(liveEditor)}
           onClick={primaryPaneOwnsFocus ? undefined : () => focusEditor(liveEditor)}
-          onMouseMove={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor)}
+          onMouseMove={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor, EditorTarget.Primary)}
         >
           {dragCaret?.pane === 'primary' ? (
             <div
@@ -668,12 +712,12 @@ export default function EditorCanvas({
           <div
             ref={secondaryPaneRef}
             className="pane secondary-pane"
-            onFocus={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor)}
-            onMouseEnter={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor)}
-            onWheel={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor)}
+            onFocus={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
+            onMouseEnter={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
+            onWheel={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
             onMouseDown={secondaryIsCanvas ? undefined : () => focusEditor(liveSecondaryEditor)}
             onClick={secondaryIsCanvas ? undefined : () => focusEditor(liveSecondaryEditor)}
-            onMouseMove={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor)}
+            onMouseMove={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
           >
             {dragCaret?.pane === 'secondary' ? (
               <div

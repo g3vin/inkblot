@@ -1,9 +1,16 @@
 /**
  * useEditorDnd — pasting into a pane, and dragging text between panes.
  *
- * Covers the paste handler (images, Pinterest URLs, forced plain paste), the drop
- * caret that tracks the pointer through the document, and moving a selection from
- * one pane to another or out to the clipboard panel.
+ * Covers the paste handler (images, Pinterest URLs), the drop caret that tracks the
+ * pointer through the document, and moving a selection from one pane to another or out
+ * to the clipboard panel.
+ *
+ * **The drag state used to live on `window`.** Four `window.__inkblot_*` variables
+ * coordinated one drag across this hook, the clipboard panel, EditorCanvas and
+ * Editor — because a drag starts in one React tree and finishes in another, and
+ * `dataTransfer` is unreadable during `dragover`, which is exactly when the drop caret
+ * needs it. It now goes through `bridge/dragHandoff`, which has the same shape and one
+ * owner. See that file for why the drop is *claimed* rather than flagged.
  *
  * Plain functions rather than useCallback, as they were in EditorCanvas: they are
  * re-created each render and only ever called from event handlers, so memoizing
@@ -11,6 +18,8 @@
  */
 import { Fragment } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
+import { dragHandoff, DragPayloadKind } from '../bridge'
+import { readAnchor } from '../bridge/anchors'
 import { normalizePinterestBoardUrl } from '../extensions/PinterestBoard'
 import { isEditorReady } from '../lib/editorUtils'
 
@@ -72,55 +81,43 @@ export function useEditorDnd({
         return true
       }
 
-      // If a plain-paste was explicitly requested elsewhere (e.g. Cmd+Shift+V handler),
-      // handle it here by inserting plain text only. Otherwise, let default paste proceed
-      // so normal Cmd+V preserves formatting.
-      if (window.__inkblot_forcePlainPaste) {
-        try { event.preventDefault(); } catch (e) {}
+      // A forced-plain-paste branch used to sit here, gated on
+      // `window.__inkblot_forcePlainPaste`. Nothing in the app ever set that flag —
+      // the "Cmd+Shift+V handler" its comment referred to does not exist — so the
+      // branch was unreachable and went out with the rest of the globals. macOS's
+      // "Paste and Match Style" is a real thing a native Edit menu will want in
+      // Phase 5; it should arrive as a command on the protocol, not as a flag.
 
-        const plainTextFromClipboard = event.clipboardData?.getData('text/plain') || ''
-        const { tr, selection } = view.state
-        tr.insertText(plainTextFromClipboard, selection.from, selection.to)
-        view.dispatch(tr.scrollIntoView())
-        // reset the flag so subsequent pastes behave normally
-        try { window.__inkblot_forcePlainPaste = false } catch (e) {}
-        return true
-      }
-
-      // Not a forced plain paste — return false to allow TipTap's default paste handling
+      // Nothing special about this paste — let TipTap's default handling preserve
+      // formatting, as Cmd+V should.
       return false
     }
   }
 
   // Resolve the {id, text} being dragged from the clipboard panel, from the
-  // dataTransfer payload or the window-global fallbacks. Returns null for
-  // drags that originated as editor selections.
+  // dataTransfer payload or the hand-off session. Returns null for drags that
+  // originated as editor selections — those move text rather than paste it.
   const getDraggedClipboardPayload = (event) => {
     const transfer = event?.dataTransfer
-    const globalDragged = window.__inkblot_draggedClipboardEntry
-    const globalDraggedEditorSelection = window.__inkblot_draggedEditorSelection
+    const session = dragHandoff.current()
+    const sessionEntry = session?.kind === DragPayloadKind.ClipboardEntry ? session : null
     const raw = transfer?.getData('application/x-inkblot-clipboard-entry')
     const plainText = transfer?.getData('text/plain') || ''
-    if (!raw && !globalDragged?.text && !plainText) return null
-    if (!raw && !globalDragged?.text && globalDraggedEditorSelection) return null
+    if (!raw && !sessionEntry?.text && !plainText) return null
+    if (!raw && !sessionEntry?.text && session?.kind === DragPayloadKind.EditorSelection) return null
 
     let parsed = null
     if (raw) {
       try { parsed = JSON.parse(raw) } catch (e) {}
     }
 
-    const text = parsed?.text || globalDragged?.text || plainText
-    const id = parsed?.id || globalDragged?.id || ''
+    const text = parsed?.text || sessionEntry?.text || plainText
+    const id = parsed?.id || sessionEntry?.sourceId || ''
     if (!String(text).trim()) return null
     return { id, text: String(text) }
   }
 
-  const clearDragGlobals = () => {
-    try { window.__inkblot_draggedClipboardEntry = null } catch (e) {}
-    try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
-    try { window.__inkblot_dragPoint = null } catch (e) {}
-    try { window.__inkblot_dropHandled = false } catch (e) {}
-  }
+  const clearDragGlobals = () => { dragHandoff.end() }
 
   const isPointInRect = (x, y, rect) => {
     if (!rect) return false
@@ -190,8 +187,16 @@ export function useEditorDnd({
       docName: docName || '',
     }
 
-    try { window.__inkblot_draggedEditorSelection = payload } catch (e) {}
-    try { window.__inkblot_dropHandled = false } catch (e) {}
+    // The anchor is what makes this survive an edit the drop target did not see: a
+    // drag that ends as a *move* has to delete the source range, and bare positions
+    // would have gone stale by then. See bridge/anchors.
+    dragHandoff.begin({
+      kind: DragPayloadKind.EditorSelection,
+      text,
+      docPath: docName || null,
+      anchor: readAnchor(targetEditor, selection.from, selection.to),
+      detail: { source },
+    })
     try {
       event.dataTransfer?.setData('application/x-inkblot-editor-selection', JSON.stringify(payload))
       if (!event.dataTransfer?.getData('text/plain')) {
@@ -232,7 +237,9 @@ export function useEditorDnd({
     view.dispatch(tr.scrollIntoView())
     view.focus()
     onMoveClipboardEntryToEditor?.(payload.id)
-    try { window.__inkblot_dropHandled = true } catch (e) {}
+    // First target to claim it wins; a second drop target seeing the same event gets
+    // false and leaves it alone.
+    dragHandoff.claim()
     setDragCaret(null)
     return true
   }

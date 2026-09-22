@@ -31,6 +31,8 @@ import {
   normalizeProjectSession,
 } from '../lib/editorSession'
 import { setPreference, setSessionValue } from '../lib/preferences'
+import { setOpenProject, clearOpenProject } from '../lib/projectContext'
+import { dragHandoff, DragPayloadKind } from '../bridge'
 
 /** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
@@ -105,13 +107,19 @@ export default function Editor({
       setTiles([])
       setNotesByDoc({})
       setVersionsState({})
+      // Nothing is open, so nothing should still answer for "the current project" —
+      // the window property this replaces was never cleared here, and a Pinterest
+      // board mounting on the landing screen kept the last project's cache key.
+      clearOpenProject()
       return
     }
 
     const projectOpenId = `${nextProjectName}:${Date.now()}:${Math.random().toString(16).slice(2)}`
     try {
-      window.__inkblotProjectOpenId = projectOpenId
-      window.__inkblotProjectName = nextProjectName
+      // Was two `window.__inkblot*` properties. The Pinterest node views that read it
+      // have no React path to reach, so it is still ambient — but owned, typed, and
+      // backed by the same session value it already fell through to.
+      setOpenProject({ projectName: nextProjectName, projectOpenId })
       setSessionValue('inkblot:project-open-id', projectOpenId)
       setSessionValue('inkblot:project-name', nextProjectName)
       window.dispatchEvent(new CustomEvent('inkblot:project-opened', {
@@ -403,7 +411,13 @@ export default function Editor({
       }
 
       draggedSelectionRef.current = payload
-      try { window.__inkblot_draggedEditorSelection = payload } catch (e) {}
+      dragHandoff.begin({
+        kind: DragPayloadKind.EditorSelection,
+        text: selectedText,
+        docPath: sourceDocName || null,
+        anchor: { from, to, text: selectedText },
+        detail: { source: payload.source },
+      })
 
       try {
         event.dataTransfer?.setData('application/x-inkblot-editor-selection', JSON.stringify(payload))
@@ -417,22 +431,36 @@ export default function Editor({
     }
 
     const onDragEnd = (event) => {
-      const draggedSelection = draggedSelectionRef.current || window.__inkblot_draggedEditorSelection || null
+      const session = dragHandoff.current()
+      const draggedSelection = draggedSelectionRef.current
+        || (session?.kind === DragPayloadKind.EditorSelection
+          ? {
+              text: session.text,
+              from: session.anchor?.from,
+              to: session.anchor?.to,
+              source: session.detail?.source,
+              docName: session.docPath || '',
+            }
+          : null)
       if (!draggedSelection) return
 
+      const held = dragHandoff.point()
       const point = {
-        x: event?.clientX ?? window.__inkblot_dragPoint?.x ?? null,
-        y: event?.clientY ?? window.__inkblot_dragPoint?.y ?? null,
+        x: event?.clientX ?? held?.x ?? null,
+        y: event?.clientY ?? held?.y ?? null,
       }
+
+      // The timeout is load-bearing: a drop handler on another target runs after this
+      // dragend, and clearing the hand-off synchronously would take the payload out
+      // from under it.
+      const finish = () => window.setTimeout(() => {
+        draggedSelectionRef.current = null
+        dragHandoff.end({ x: point.x, y: point.y })
+      }, 0)
 
       const endedInEditorPane = isPointInAnyEditorPane(point.x, point.y)
       if (endedInEditorPane) {
-        window.setTimeout(() => {
-          draggedSelectionRef.current = null
-          try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
-          try { window.__inkblot_dragPoint = null } catch (e) {}
-          try { window.__inkblot_dropHandled = false } catch (e) {}
-        }, 0)
+        finish()
         return
       }
 
@@ -458,7 +486,7 @@ export default function Editor({
         point.y <= rect.bottom
       )
 
-      if (!window.__inkblot_dropHandled && endedOverClipboard) {
+      if (endedOverClipboard && dragHandoff.claim()) {
         try {
           window.dispatchEvent(new CustomEvent('inkblot:editor-dragend-drop-to-clipboard', {
             detail: {
@@ -468,16 +496,10 @@ export default function Editor({
               y: point.y,
             },
           }))
-          window.__inkblot_dropHandled = true
         } catch (e) {}
       }
 
-      window.setTimeout(() => {
-        draggedSelectionRef.current = null
-        try { window.__inkblot_draggedEditorSelection = null } catch (e) {}
-        try { window.__inkblot_dragPoint = null } catch (e) {}
-        try { window.__inkblot_dropHandled = false } catch (e) {}
-      }, 0)
+      finish()
     }
 
     window.addEventListener('dragstart', onDragStart, true)

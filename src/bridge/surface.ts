@@ -75,6 +75,20 @@ export interface DocumentSurface {
   /** Replace the delegates — React's callbacks change identity on every render. */
   setDelegates(delegates: SurfaceDelegates): void
 
+  /**
+   * Handle a command directly, alongside the delegates.
+   *
+   * For the components that own a command outright rather than on the app's behalf:
+   * `DictationControl` is the whole reason this exists. The delegate table is set in
+   * one place by one component, which is right for commands the app routes, and wrong
+   * for a command whose only possible handler is a control that may not be mounted.
+   * Several handlers may register for the same command; all of them are called.
+   */
+  onCommand<T extends CommandType>(
+    type: T,
+    handler: (payload: CommandPayload<T>) => void
+  ): Unsubscribe
+
   /** The remembered highlight color, which is now protocol state rather than editor storage. */
   lastHighlightColor(): string
 
@@ -284,6 +298,7 @@ export function createDocumentSurface({
 
   return {
     setDelegates(next) { delegates = next },
+    onCommand: (type, handler) => bridge.onCommand(type, handler),
     lastHighlightColor: () => lastHighlightColor,
 
     publishToolbarState,
