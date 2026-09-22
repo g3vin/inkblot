@@ -1,84 +1,42 @@
 /**
  * EditorCanvas.jsx — the writing surface.
  *
- * Creates the primary and secondary TipTap editors (secondary appears in
- * split view), loads/saves documents through FileSystem, and manages:
- *  - autosave (debounced) plus slower version-history checkpoints
- *  - per-pane word-count badges
- *  - caching editor state per document so switching docs is instant
- *  - drag & drop of clipboard entries and editor selections between panes
- *  - pasting images and Pinterest board URLs as rich nodes
- *  - remapping quote-note anchors as the document changes
- *  - the Focus Mode overlay (see FocusModeOverlay.jsx)
+ * Creates the primary and secondary TipTap editors (secondary appears in split
+ * view), lays the panes out, and hosts the split-view divider, the drop caret, the
+ * draft pane, the canvas pane, the version-compare pane and the Focus Mode overlay.
+ *
+ * What a pane *does* with a document lives in five hooks beside this file, each one
+ * a path where a bug is silent rather than loud:
+ *
+ *   useEditorDocCache    what each pane is holding, and whether it is mid-swap
+ *   useEditorDocLoader   reading a document in, and flushing the last one out
+ *   useEditorAutosave    debounced saves and slower version-history checkpoints
+ *   useEditorWordCount   the per-pane word-count badge
+ *   useEditorNotes       note storage, and remapping quote anchors across edits
+ *   useEditorDnd         pasting, and dragging text between panes
+ *
+ * scripts/canvas-tests/editor.mjs mounts this component and exercises all of them.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
-import { createDocument } from '@tiptap/core'
-import { Fragment } from '@tiptap/pm/model'
-import { EditorState, TextSelection } from '@tiptap/pm/state'
-import { debounce } from 'lodash'
 
-import { syncEditorNotes } from '../extensions/NoteAnnotation'
 import { buildEditorExtensions } from '../lib/editorExtensions'
-import { saveDocument, loadDocument, getVersions } from '../lib/FileSystem'
 import { isEditorReady } from '../lib/editorUtils'
 import { isCanvasDoc } from '../lib/docKind'
 import CanvasPane from '../canvas/CanvasPane'
+import { useEditorAutosave } from './useEditorAutosave'
 import { useEditorDnd } from './useEditorDnd'
+import { useEditorDocCache } from './useEditorDocCache'
+import { useEditorDocLoader } from './useEditorDocLoader'
+import { useEditorNotes } from './useEditorNotes'
+import { formatWordStats, useEditorWordCount } from './useEditorWordCount'
 import DraftTabPane from './DraftTabPane'
 import FocusModeOverlay from './FocusModeOverlay'
 import VersionComparePane from './VersionComparePane'
 import SFIcon from './SFIcon'
 
 const EMPTY_NOTES = []
-const EMPTY_DOC_CONTENT = '<p></p>'
-const WORD_COUNT_DEBOUNCE_MS = 300
-const HISTORY_CHECKPOINT_DEBOUNCE_MS = 15000
-
-/** Whitespace-delimited word count. */
-const countWords = (text = '') => {
-  const trimmed = text.trim()
-  if (!trimmed) return 0
-  return trimmed.split(/\s+/).length
-}
-
-const emptyWordStats = {
-  total: 0,
-  selected: null,
-}
-
-const areWordStatsEqual = (left, right) => (
-  left.total === right.total &&
-  left.selected === right.selected
-)
-
-/** Shallow-compare two note arrays (per-note key/value equality) to avoid redundant state updates. */
-const areNoteArraysEqual = (left = [], right = []) => {
-  if (left === right) return true
-  if (!Array.isArray(left) || !Array.isArray(right)) return false
-  if (left.length !== right.length) return false
-
-  for (let index = 0; index < left.length; index += 1) {
-    const leftNote = left[index]
-    const rightNote = right[index]
-
-    if (leftNote === rightNote) continue
-    if (!leftNote || !rightNote) return false
-
-    const leftKeys = Object.keys(leftNote)
-    const rightKeys = Object.keys(rightNote)
-    if (leftKeys.length !== rightKeys.length) return false
-
-    for (const key of leftKeys) {
-      if (leftNote[key] !== rightNote[key]) {
-        return false
-      }
-    }
-  }
-
-  return true
-}
 
 export default function EditorCanvas({
   setEditor,
@@ -119,62 +77,26 @@ export default function EditorCanvas({
   const splitContainerRef = useRef(null)
   const [isResizingSplit, setIsResizingSplit] = useState(false)
   const [dragCaret, setDragCaret] = useState(null)
+  // The pane's live view of notesByDoc. The hooks below run from editor events and
+  // debounced timers, so they must read the notes as they are when the save fires,
+  // not as they were when the effect was set up.
   const notesByDocRef = useRef(notesByDoc)
-  const loadedDocsRef = useRef(new Set())
-  const docStateCacheRef = useRef(new Map())
-  const primaryAutosaveRef = useRef(null)
-  const secondaryAutosaveRef = useRef(null)
-  const primaryVersionCheckpointRef = useRef(null)
-  const isLoadingPrimaryRef = useRef(false)
-  const isLoadingSecondaryRef = useRef(false)
   const activeDocRef = useRef(activeDoc)
   const activeEditorRef = useRef(activeEditor)
 
-  // Editor state is cached per project/pane/doc so revisiting a doc restores
-  // scroll, selection, and undo history instantly without re-parsing content.
-  const getDocCacheKey = useCallback((docProjectName, docName, paneId) => (
-    docProjectName && docName && paneId ? `${docProjectName}::${paneId}::${docName}` : ''
+  useEffect(() => {
+    notesByDocRef.current = notesByDoc
+  }, [notesByDoc])
+
+  const getNotesForDoc = useCallback((docName) => (
+    notesByDocRef.current?.[docName] || []
   ), [])
 
+  // Whether the doc has an entry at all, which is not the same as having notes: an
+  // absent key means "never opened", and only then are the stored notes seeded in.
   const hasNotesForDoc = useCallback((docName) => (
     Object.prototype.hasOwnProperty.call(notesByDocRef.current || {}, docName)
   ), [])
-
-  // Build a fresh ProseMirror EditorState from stored document content.
-  const createEditorStateFromContent = useCallback((targetEditor, content) => {
-    const doc = createDocument(
-      content || EMPTY_DOC_CONTENT,
-      targetEditor.schema,
-      {},
-      { errorOnInvalidContent: targetEditor.options.enableContentCheck }
-    )
-
-    return EditorState.create({
-      doc,
-      schema: targetEditor.schema,
-      plugins: targetEditor.state.plugins,
-    })
-  }, [])
-
-  const installEditorState = useCallback((targetEditor, nextState) => {
-    targetEditor.view.updateState(nextState)
-    targetEditor.createNodeViews?.()
-  }, [])
-
-  // Save the pane's current editor state into the doc cache before switching away.
-  const stashEditorState = useCallback((targetEditor, docName, paneId) => {
-    if (!isEditorReady(targetEditor)) return
-    const cacheKey = getDocCacheKey(projectName, docName, paneId)
-    if (!cacheKey || !loadedDocsRef.current.has(cacheKey)) return
-    docStateCacheRef.current.set(cacheKey, targetEditor.state)
-  }, [getDocCacheKey, projectName])
-
-  const flushAutosave = useCallback((handlerRef) => {
-    const handler = handlerRef.current
-    if (handler && typeof handler.flush === 'function') {
-      handler.flush()
-    }
-  }, [])
 
   useEffect(() => {
     activeDocRef.current = activeDoc
@@ -184,31 +106,7 @@ export default function EditorCanvas({
     activeEditorRef.current = activeEditor
   }, [activeEditor])
 
-  // Install a doc into a pane: prefer the cached state, else build one from
-  // the loaded content; also seed the doc's notes on first open.
-  const restoreEditorStateForDoc = useCallback((targetEditor, docName, paneId, loadedDoc) => {
-    const cacheKey = getDocCacheKey(projectName, docName, paneId)
-    const cachedState = cacheKey ? docStateCacheRef.current.get(cacheKey) : null
-    const nextState = cachedState || createEditorStateFromContent(targetEditor, loadedDoc?.content)
-
-    installEditorState(targetEditor, nextState)
-    if (cacheKey) {
-      loadedDocsRef.current.add(cacheKey)
-    }
-
-    if (!hasNotesForDoc(docName)) {
-      setNotesForDoc(docName, loadedDoc?.notes || [])
-    }
-
-    return Boolean(cachedState)
-  }, [
-    createEditorStateFromContent,
-    getDocCacheKey,
-    hasNotesForDoc,
-    installEditorState,
-    projectName,
-    setNotesForDoc,
-  ])
+  const docCache = useEditorDocCache({ hasNotesForDoc, projectName, setNotesForDoc })
 
   const getMountedEditorView = (instance) => {
     if (!isEditorReady(instance)) return null
@@ -246,35 +144,9 @@ export default function EditorCanvas({
     splitView,
   })
 
-  const [primaryWordStats, setPrimaryWordStats] = useState(emptyWordStats)
-  const [secondaryWordStats, setSecondaryWordStats] = useState(emptyWordStats)
   const currentDocNotes = notesByDoc?.[currentDoc] ?? EMPTY_NOTES
   const secondaryDocNotes = notesByDoc?.[secondaryDoc] ?? EMPTY_NOTES
   const activeDocNotes = notesByDoc?.[activeDoc] ?? EMPTY_NOTES
-
-  const getWordStats = useCallback((targetEditor, previousTotal = 0, includeTotal = true) => {
-    if (!isEditorReady(targetEditor)) return emptyWordStats
-
-    const { selection, doc } = targetEditor.state
-    const selectedText = selection?.empty
-      ? ''
-      : doc.textBetween(selection.from, selection.to, '\n')
-
-    return {
-      total: includeTotal ? countWords(targetEditor.getText()) : previousTotal,
-      selected: selection?.empty ? null : countWords(selectedText),
-    }
-  }, [])
-
-  const formatWordStats = ({ total, selected }) => {
-    const count = selected == null ? total : selected
-    const wordLabel = count === 1 ? 'word' : 'words'
-    return selected == null ? `${count} ${wordLabel}` : `${count} ${wordLabel} selected`
-  }
-
-  useEffect(() => {
-    notesByDocRef.current = notesByDoc
-  }, [notesByDoc])
 
   /* ---------------- Editors ---------------- */
 
@@ -511,403 +383,57 @@ export default function EditorCanvas({
     }
   }, [secondaryEditor, setActiveEditor, setSecondaryEditor])
 
-  /* ---------------- Load Primary Doc ---------------- */
+  /* ---------------- Documents, saving, counting, notes ---------------- */
 
-  useEffect(() => {
-    if (!isEditorReady(editor) || !currentDoc) return
-    // A canvas has no TipTap content — feeding its JSON to createDocument() would
-    // throw. CanvasPane loads and saves it instead; this editor stays idle.
-    if (isCanvasDoc(currentDoc)) return
-    let cancelled = false
-    const cacheKey = getDocCacheKey(projectName, currentDoc, 'primary')
-
-    const load = async () => {
-      isLoadingPrimaryRef.current = true
-      loadedDocsRef.current.delete(cacheKey)
-
-      try {
-        const doc = await loadDocument(projectName, currentDoc)
-        if (cancelled || !isEditorReady(editor)) return
-
-        restoreEditorStateForDoc(editor, currentDoc, 'primary', doc)
-        // Open an empty document ready to write in — caret placed and blinking,
-        // no click needed. Asking the editor whether it is empty is the only
-        // reliable test: a new document is stored as `content: []`, which is
-        // neither missing nor a node with children, so shape checks miss it.
-        if (editor.isEmpty) {
-          editor.commands.focus('start')
-        }
-        setPrimaryWordStats(getWordStats(editor))
-
-        // load versions for the right sidebar
-        try {
-          const vs = await getVersions(projectName, currentDoc)
-          setVersions?.(currentDoc, vs)
-        } catch (e) {
-          console.error('Failed to load versions:', e)
-          setVersions?.(currentDoc, [])
-        }
-      } finally {
-        isLoadingPrimaryRef.current = false
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
-      flushAutosave(primaryAutosaveRef)
-      flushAutosave(primaryVersionCheckpointRef)
-      stashEditorState(editor, currentDoc, 'primary')
-    }
-  }, [
-    currentDoc,
-    editor,
-    flushAutosave,
-    getWordStats,
-    getDocCacheKey,
-    projectName,
-    restoreEditorStateForDoc,
-    setVersions,
-    stashEditorState,
-  ])
-
-  /* ---------------- Load Secondary Doc ---------------- */
-
-  useEffect(() => {
-    if (!isEditorReady(secondaryEditor) || splitView !== 'editor' || !secondaryDoc) return
-    if (isCanvasDoc(secondaryDoc)) return
-    let cancelled = false
-    const cacheKey = getDocCacheKey(projectName, secondaryDoc, 'secondary')
-
-    const load = async () => {
-      isLoadingSecondaryRef.current = true
-      loadedDocsRef.current.delete(cacheKey)
-
-      try {
-        const doc = await loadDocument(projectName, secondaryDoc)
-        if (cancelled || !isEditorReady(secondaryEditor)) return
-
-        restoreEditorStateForDoc(secondaryEditor, secondaryDoc, 'secondary', doc)
-        setSecondaryWordStats(getWordStats(secondaryEditor))
-      } finally {
-        isLoadingSecondaryRef.current = false
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
-      flushAutosave(secondaryAutosaveRef)
-      stashEditorState(secondaryEditor, secondaryDoc, 'secondary')
-    }
-  }, [
-    flushAutosave,
-    getDocCacheKey,
-    getWordStats,
-    projectName,
-    restoreEditorStateForDoc,
-    secondaryDoc,
-    secondaryEditor,
-    splitView,
-    stashEditorState,
-  ])
-
-  /* ---------------- Sync Notes → Editor Storage ---------------- */
-
-  useEffect(() => {
-    if (!isEditorReady(editor)) return
-    syncEditorNotes(editor, currentDocNotes, currentDoc)
-  }, [currentDoc, currentDocNotes, editor])
-
-  useEffect(() => {
-    if (!isEditorReady(secondaryEditor) || splitView !== 'editor') return
-    syncEditorNotes(secondaryEditor, secondaryDocNotes, secondaryDoc)
-  }, [secondaryDoc, secondaryDocNotes, secondaryEditor, splitView])
-
-  const saveVersionCheckpoint = useCallback(async (targetEditor, docName, paneId) => {
-    if (!isEditorReady(targetEditor) || !docName) return
-    // Canvas checkpoints are written by useCanvasDocument, not this TipTap path.
-    if (isCanvasDoc(docName)) return
-    if (!loadedDocsRef.current.has(getDocCacheKey(projectName, docName, paneId))) return
-    if (
-      (paneId === 'primary' && isLoadingPrimaryRef.current) ||
-      (paneId === 'secondary' && isLoadingSecondaryRef.current)
-    ) {
-      return
-    }
-
-    const contentJson = targetEditor.getJSON()
-    const contentHtml = targetEditor.getHTML()
-
-    await saveDocument(projectName, docName, {
-      content: contentJson,
-      notes: notesByDocRef.current?.[docName] || [],
-      _appendVersion: true,
-      _version: {
-        contentHtml,
-        contentJson,
-      },
-    })
-
-    try {
-      const vs = await getVersions(projectName, docName)
-      setVersions?.(docName, vs)
-    } catch (e) {
-      console.error('Failed to refresh versions:', e)
-    }
-  }, [getDocCacheKey, projectName, setVersions])
-
-  /* ---------------- Autosave ---------------- */
-
-  useEffect(() => {
-    if (!isEditorReady(editor) || !currentDoc) return
-    if (isCanvasDoc(currentDoc)) return
-    const handler = debounce(async () => {
-      if (!isEditorReady(editor)) return
-      if (isLoadingPrimaryRef.current) return
-      if (!loadedDocsRef.current.has(getDocCacheKey(projectName, currentDoc, 'primary'))) return
-
-      const contentJson = editor.getJSON()
-
-      await saveDocument(projectName, currentDoc, {
-        content: contentJson,
-        notes: notesByDocRef.current?.[currentDoc] || [],
-      })
-
-    }, 800)
-
-    const checkpointHandler = debounce(() => {
-      void saveVersionCheckpoint(editor, currentDoc, 'primary')
-    }, HISTORY_CHECKPOINT_DEBOUNCE_MS)
-
-    const handleUpdate = () => {
-      handler()
-      checkpointHandler()
-    }
-
-    primaryAutosaveRef.current = handler
-    primaryVersionCheckpointRef.current = checkpointHandler
-    editor.on('update', handleUpdate)
-
-    return () => {
-      if (!editor.isDestroyed) editor.off('update', handleUpdate)
-      handler.flush()
-      handler.cancel()
-      checkpointHandler.flush()
-      checkpointHandler.cancel()
-      if (primaryAutosaveRef.current === handler) {
-        primaryAutosaveRef.current = null
-      }
-      if (primaryVersionCheckpointRef.current === checkpointHandler) {
-        primaryVersionCheckpointRef.current = null
-      }
-    }
-  }, [currentDoc, editor, getDocCacheKey, projectName, saveVersionCheckpoint])
-
-  /* ---------------- Word Count ---------------- */
-
-  useEffect(() => {
-    if (!showWordCountBadge || !isEditorReady(editor)) return
-
-    const updateSelectedCount = () => {
-      if (!isEditorReady(editor)) return
-      setPrimaryWordStats((current) => {
-        const next = getWordStats(editor, current.total, false)
-        return areWordStatsEqual(current, next) ? current : next
-      })
-    }
-
-    const updateTotalCount = debounce(() => {
-      if (!isEditorReady(editor)) return
-      setPrimaryWordStats((current) => {
-        const next = getWordStats(editor)
-        return areWordStatsEqual(current, next) ? current : next
-      })
-    }, WORD_COUNT_DEBOUNCE_MS)
-
-    editor.on('update', updateTotalCount)
-    editor.on('selectionUpdate', updateSelectedCount)
-    updateTotalCount()
-
-    return () => {
-      if (!editor.isDestroyed) {
-        editor.off('update', updateTotalCount)
-        editor.off('selectionUpdate', updateSelectedCount)
-      }
-      updateTotalCount.cancel()
-    }
-  }, [editor, getWordStats, showWordCountBadge])
-
-  useEffect(() => {
-    if (!isEditorReady(secondaryEditor) || splitView !== 'editor' || !secondaryDoc) return
-    if (isCanvasDoc(secondaryDoc)) return
-
-    const handler = debounce(async () => {
-      if (!isEditorReady(secondaryEditor)) return
-      if (isLoadingSecondaryRef.current) return
-      if (!loadedDocsRef.current.has(getDocCacheKey(projectName, secondaryDoc, 'secondary'))) return
-
-      await saveDocument(projectName, secondaryDoc, {
-        content: secondaryEditor.getJSON(),
-        notes: notesByDocRef.current?.[secondaryDoc] || [],
-      })
-    }, 800)
-
-    const handleUpdate = () => {
-      handler()
-    }
-
-    secondaryAutosaveRef.current = handler
-    secondaryEditor.on('update', handleUpdate)
-
-    return () => {
-      if (!secondaryEditor.isDestroyed) secondaryEditor.off('update', handleUpdate)
-      handler.flush()
-      handler.cancel()
-      if (secondaryAutosaveRef.current === handler) {
-        secondaryAutosaveRef.current = null
-      }
-    }
-  }, [getDocCacheKey, projectName, secondaryDoc, secondaryEditor, splitView])
-
-  useEffect(() => {
-    if (!showWordCountBadge || !isEditorReady(secondaryEditor) || splitView !== 'editor') return
-
-    const updateSelectedCount = () => {
-      if (!isEditorReady(secondaryEditor)) return
-      setSecondaryWordStats((current) => {
-        const next = getWordStats(secondaryEditor, current.total, false)
-        return areWordStatsEqual(current, next) ? current : next
-      })
-    }
-
-    const updateTotalCount = debounce(() => {
-      if (!isEditorReady(secondaryEditor)) return
-      setSecondaryWordStats((current) => {
-        const next = getWordStats(secondaryEditor)
-        return areWordStatsEqual(current, next) ? current : next
-      })
-    }, WORD_COUNT_DEBOUNCE_MS)
-
-    secondaryEditor.on('update', updateTotalCount)
-    secondaryEditor.on('selectionUpdate', updateSelectedCount)
-    updateTotalCount()
-
-    return () => {
-      if (!secondaryEditor.isDestroyed) {
-        secondaryEditor.off('update', updateTotalCount)
-        secondaryEditor.off('selectionUpdate', updateSelectedCount)
-      }
-      updateTotalCount.cancel()
-    }
-  }, [getWordStats, secondaryEditor, showWordCountBadge, splitView])
-
-  /* ---------------- Autosave Notes ---------------- */
-
-  useEffect(() => {
-    if (!activeDoc) return
-    const activePaneId = activeDoc === secondaryDoc && activeDoc !== currentDoc ? 'secondary' : 'primary'
-    if (!loadedDocsRef.current.has(getDocCacheKey(projectName, activeDoc, activePaneId))) return
-
-    const getEditorForDoc = (docName) => {
-      if (docName === currentDoc) return editor
-      if (docName === secondaryDoc) return secondaryEditor
-      return null
-    }
-
-    const targetEditor = getEditorForDoc(activeDoc)
-    if (!isEditorReady(targetEditor)) return
-
-    const handler = debounce(async () => {
-      if (!isEditorReady(targetEditor)) return
-      if (
-        (activeDoc === currentDoc && isLoadingPrimaryRef.current) ||
-        (activeDoc === secondaryDoc && isLoadingSecondaryRef.current)
-      ) {
-        return
-      }
-
-      const contentJson = targetEditor.getJSON()
-      await saveDocument(projectName, activeDoc, {
-        content: contentJson,
-        notes: activeDocNotes,
-      })
-    }, 800)
-
-    const checkpointHandler = debounce(() => {
-      void saveVersionCheckpoint(targetEditor, activeDoc, activePaneId)
-    }, HISTORY_CHECKPOINT_DEBOUNCE_MS)
-
-    // Persist notes promptly; create a history snapshot only after a slower idle checkpoint.
-    try { handler() } catch (e) {}
-    try { checkpointHandler() } catch (e) {}
-
-    return () => {
-      handler.cancel()
-      checkpointHandler.cancel()
-    }
-  }, [
+  // Order matters: the cache is the bookkeeping the other three read; autosave
+  // publishes the flush handles the loader calls on its way out of a document; the
+  // loader is what tells the word-count badge a pane has changed underneath it.
+  const { flushPane } = useEditorAutosave({
     activeDoc,
     activeDocNotes,
     currentDoc,
+    docCache,
     editor,
-    getDocCacheKey,
+    getNotesForDoc,
     projectName,
-    saveVersionCheckpoint,
     secondaryDoc,
     secondaryEditor,
-  ])
+    setVersions,
+    splitView,
+  })
 
-  /* ---------------- Anchor Remapping ---------------- */
+  const { primaryWordStats, secondaryWordStats, syncWordStats } = useEditorWordCount({
+    editor,
+    secondaryEditor,
+    showWordCountBadge,
+    splitView,
+  })
 
-  // Keep quote-note positions in sync with edits: map each note's from/to
-  // through every transaction and refresh its anchor text, dropping notes
-  // whose range collapses to nothing.
-  useEffect(() => {
-    if (!isEditorReady(editor)) return
+  useEditorDocLoader({
+    currentDoc,
+    docCache,
+    editor,
+    flushPane,
+    onPaneLoaded: syncWordStats,
+    projectName,
+    secondaryDoc,
+    secondaryEditor,
+    setVersions,
+    splitView,
+  })
 
-    const handler = ({ transaction }) => {
-      if (!isEditorReady(editor)) return
-      if (!transaction.docChanged) return
-      if (isLoadingPrimaryRef.current) return
-
-      const existingNotes = notesByDocRef.current?.[currentDoc] || []
-      const hasQuoteNotes = existingNotes.some(note => note.type === 'quote')
-      if (!hasQuoteNotes) return
-
-      const mapping = transaction.mapping
-
-      const updated = existingNotes
-        .map(note => {
-          if (note.type !== 'quote') return note
-
-          const newFrom = mapping.map(note.from)
-          const newTo = mapping.map(note.to)
-
-          if (newFrom >= newTo) return null
-
-          return {
-            ...note,
-            from: newFrom,
-            to: newTo,
-            anchor: editor.state.doc.textBetween(newFrom, newTo),
-          }
-        })
-        .filter(Boolean)
-
-      if (areNoteArraysEqual(existingNotes, updated)) {
-        return
-      }
-
-      setNotesForDoc(currentDoc, updated)
-    }
-
-    editor.on('transaction', handler)
-    return () => {
-      if (!editor.isDestroyed) editor.off('transaction', handler)
-    }
-
-  }, [editor, currentDoc, setNotesForDoc])
+  useEditorNotes({
+    currentDoc,
+    currentDocNotes,
+    docCache,
+    editor,
+    getNotesForDoc,
+    secondaryDoc,
+    secondaryDocNotes,
+    secondaryEditor,
+    setNotesForDoc,
+    splitView,
+  })
 
   /* ---------------- Render ---------------- */
 
