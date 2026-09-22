@@ -12,15 +12,14 @@ import WebKit
 /// case below says which package in the bundle makes the call, so that when that
 /// caller moves onto the bridge protocol the case can be deleted with confidence.
 ///
-/// **Not answered yet**, and rejected by name so the bundle's own fallbacks run: the
-/// synonym model, Kokoro speech, whisper dictation and the Pinterest scrape. Each is
-/// a Rust module in the Tauri app crate (`src-tauri/src/*_commands.rs`) rather than in
-/// `inkblot-core`, so there is nothing for `inkblot-ffi` to expose until they move.
-/// HANDOFF.md tracks them.
+/// The synonym model, rhymes, Kokoro speech, whisper dictation and the Pinterest
+/// scrape channel are `ModelService`'s — `inkblot-models` through `inkblot-ffi`, the
+/// same engines the Tauri app's `*_commands.rs` wrap.
 @MainActor
 final class TauriHost {
     private let core: CoreService
     private let menus: WebMenus
+    private let models = ModelService.shared
     private let log = Logger(subsystem: "inkblot", category: "tauri")
     weak var window: NSWindow?
 
@@ -260,6 +259,11 @@ final class TauriHost {
             }
             NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
             return .value(nil)
+
+        /* ---------------- inkblot-models: SynonymTile, RhymeTile, readAloud.js, dictation.js, pinterestScrape.js ---------------- */
+
+        case _ where ModelService.commands.contains(cmd):
+            return .value(try await models.invoke(cmd, args: args))
 
         default:
             log.info("Unanswered Tauri command: \(cmd, privacy: .public)")

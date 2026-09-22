@@ -16,6 +16,7 @@ mod dictation_commands;
 mod kokoro_commands;
 mod pinterest_commands;
 mod preferences_commands;
+mod rhyme_commands;
 mod synonym_commands;
 
 use dictation_commands::{
@@ -26,12 +27,12 @@ use kokoro_commands::{
     download_kokoro_model, generate_kokoro_speech, kokoro_model_status, kokoro_vocab,
     prewarm_kokoro_speech, KokoroSpeechState,
 };
-use pinterest_commands::{
-    pinterest_await_scrape, pinterest_begin_scrape, pinterest_report_scrape, ScrapeChannels,
-};
+use inkblot_models::scrape::ScrapeChannels;
+use pinterest_commands::{pinterest_await_scrape, pinterest_begin_scrape, pinterest_report_scrape};
 use preferences_commands::{
     preferences_load, preferences_remove, preferences_rename_prefix, preferences_set,
 };
+use rhyme_commands::{download_rhyme_dictionary, get_rhymes, rhyme_dictionary_status, RhymeState};
 use synonym_commands::{
     download_synonym_model, get_synonyms, synonym_model_status, SynonymState,
 };
@@ -164,6 +165,7 @@ pub fn run() {
         .manage(AppDictationState::default())
         .manage(KokoroSpeechState::default())
         .manage(SynonymState::default())
+        .manage(RhymeState::default())
         .manage(ScrapeChannels::default())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -177,6 +179,9 @@ pub fn run() {
             get_synonyms,
             synonym_model_status,
             download_synonym_model,
+            get_rhymes,
+            rhyme_dictionary_status,
+            download_rhyme_dictionary,
             load_dictation_model,
             start_dictation_session,
             stop_dictation_session,
