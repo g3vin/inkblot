@@ -4,6 +4,86 @@
 
 import Foundation
 
+/// Which editor a message concerns.
+/// 
+/// This is sharp edge #5 made explicit. Today the active editor is elected by mouse
+/// movement over a pane, and the winner is a live TipTap object passed around by
+/// reference — `EditorLayout` reads `__inkblotCanvasCard` off it to tell the third
+/// state apart. An object reference cannot cross a process boundary, so the election
+/// result has to be a *name*, and the three names are these.
+/// 
+/// `CanvasCard` is the third state: a canvas card opened for editing holds the only
+/// live editor on that pane, and the pane's own two TipTap instances sit idle holding
+/// no document. A toolbar pointed at `Primary` while a card is being edited would be
+/// driving an empty editor, which is exactly the bug the `__inkblotCanvasCard` gate
+/// exists to prevent.
+public enum EditorTarget: String, Codable, Equatable {
+	case primary
+	case secondary
+	/// The live editor of a canvas card being edited, wherever that canvas sits.
+	case canvasCard
+}
+
+/// The active editor election changed.
+/// 
+/// **Sharp edge #5.** The election is driven by mouse movement over a pane, which is a
+/// webview-side fact, so the webview stays the returning officer and reports the
+/// result. `surface_id` is set when the winner is a canvas card, and it is what lets a
+/// native canvas command find the right surface when split view shows two.
+public struct ActiveEditorChanged: Codable, Equatable {
+	public let target: EditorTarget?
+	public let docPath: String?
+	/// Set when `target` is `canvasCard`: the surface hosting the card.
+	public let surfaceId: String?
+
+	public init(target: EditorTarget?, docPath: String?, surfaceId: String?) {
+		self.target = target
+		self.docPath = docPath
+		self.surfaceId = surfaceId
+	}
+}
+
+/// Which marks are on at the selection.
+public struct ActiveMarks: Codable, Equatable {
+	public let bold: Bool
+	public let italic: Bool
+	public let underline: Bool
+	public let strike: Bool
+	/// Not a mark — whether the caret is inside a table. It rides along because the
+	/// toolbar's table button is lit by the same read.
+	public let table: Bool
+
+	public init(bold: Bool, italic: Bool, underline: Bool, strike: Bool, table: Bool) {
+		self.bold = bold
+		self.italic = italic
+		self.underline = underline
+		self.strike = strike
+		self.table = table
+	}
+}
+
+/// The marks the toolbar can toggle.
+/// 
+/// A closed set rather than a string because the toolbar is going native: a Swift
+/// button sending `"bolb"` should not compile, and an enum is what makes that true in
+/// all three languages at once.
+public enum MarkKind: String, Codable, Equatable {
+	case bold
+	case italic
+	case underline
+	case strike
+}
+
+public struct ApplyMarkCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let mark: MarkKind
+
+	public init(target: EditorTarget, mark: MarkKind) {
+		self.target = target
+		self.mark = mark
+	}
+}
+
 /// A voice memo attached to a note.
 public struct AudioClip: Codable, Equatable {
 	public let id: String
@@ -43,6 +123,53 @@ public struct BezierPath: Codable, Equatable {
 	public init(d: String, mid: Point) {
 		self.d = d
 		self.mid = mid
+	}
+}
+
+public enum BridgeErrorCode: String, Codable, Equatable {
+	/// No live editor to answer for — an empty pane, or a canvas with no card open.
+	case noEditor
+	/// The editor named by `target` is not the one that exists.
+	case wrongTarget
+	/// The webview raised while answering.
+	case failed
+}
+
+/// Why a request could not be answered.
+/// 
+/// A reply is always sent, including this one. A shell blocked on an answer that never
+/// arrives is a hang, and the commonest cause is entirely ordinary: the user closed the
+/// pane between the right-click and the menu being built.
+public struct BridgeError: Codable, Equatable {
+	public let code: BridgeErrorCode
+	public let message: String
+
+	public init(code: BridgeErrorCode, message: String) {
+		self.code = code
+		self.message = message
+	}
+}
+
+/// Run a command on the canvas the user aimed at.
+/// 
+/// `surface_id` is how a command finds one canvas when split view is showing two. In
+/// the React shell the aiming is done by hit-testing the DOM for a `.canvas-surface`
+/// and dispatching on that element (`canvasEvents.js`); native cannot hit-test the
+/// webview's DOM, so the id is assigned by the webview when a surface mounts and
+/// reported with `activeEditorChanged`.
+public struct CanvasCommandRequest: Codable, Equatable {
+	public let surfaceId: String
+	/// The command name, as `CanvasSurface`'s handler spells it.
+	public let command: String
+	/// Command-specific arguments. Untyped because this is the one place the vocabulary
+	/// is still open — the canvas menu grows items faster than the protocol should
+	/// churn. Everything a native shell sends today is a name and at most a node id.
+	public let detail: AnyCodable?
+
+	public init(surfaceId: String, command: String, detail: AnyCodable?) {
+		self.surfaceId = surfaceId
+		self.command = command
+		self.detail = detail
 	}
 }
 
@@ -164,6 +291,40 @@ public struct CanvasDiff: Codable, Equatable {
 	}
 }
 
+public struct CanvasDropDocCommand: Codable, Equatable {
+	public let surfaceId: String
+	public let path: String
+	/// Where on the canvas, in client coordinates.
+	public let clientX: Double
+	public let clientY: Double
+
+	public init(surfaceId: String, path: String, clientX: Double, clientY: Double) {
+		self.surfaceId = surfaceId
+		self.path = path
+		self.clientX = clientX
+		self.clientY = clientY
+	}
+}
+
+/// Drop a note onto a canvas. `doc_path` is the document that *owns* the note — the
+/// card references it there rather than copying it, which is what keeps the two in
+/// sync.
+public struct CanvasDropNoteCommand: Codable, Equatable {
+	public let surfaceId: String
+	public let docPath: String
+	public let noteId: String
+	public let clientX: Double
+	public let clientY: Double
+
+	public init(surfaceId: String, docPath: String, noteId: String, clientX: Double, clientY: Double) {
+		self.surfaceId = surfaceId
+		self.docPath = docPath
+		self.noteId = noteId
+		self.clientX = clientX
+		self.clientY = clientY
+	}
+}
+
 public struct Viewport: Codable, Equatable {
 	public let x: Double
 	public let y: Double
@@ -205,6 +366,31 @@ public struct CanvasFile: Codable, Equatable {
 	}
 }
 
+public struct CanvasRestoreCommand: Codable, Equatable {
+	public let docPath: String
+	/// The serialized, on-disk-shaped canvas from the version entry.
+	public let canvas: AnyCodable
+
+	public init(docPath: String, canvas: AnyCodable) {
+		self.docPath = docPath
+		self.canvas = canvas
+	}
+}
+
+/// Select and center a node on a canvas that may not be open yet.
+/// 
+/// Addressed by document path rather than surface id for that reason: the request
+/// outlives the switch, and the canvas that mounts a moment later claims it.
+public struct CanvasRevealCommand: Codable, Equatable {
+	public let docPath: String
+	public let nodeId: String
+
+	public init(docPath: String, nodeId: String) {
+		self.docPath = docPath
+		self.nodeId = nodeId
+	}
+}
+
 /// The runtime shape: id→object maps for O(1) patching, plus explicit order arrays
 /// for stable z-order. Groups sort to the front of `node_order` because they render
 /// behind everything else.
@@ -223,6 +409,335 @@ public struct CanvasState: Codable, Equatable {
 		self.nodeOrder = nodeOrder
 		self.edges = edges
 		self.edgeOrder = edgeOrder
+	}
+}
+
+/// Everything the shell can ask the document surface to do.
+/// 
+/// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
+/// representation typeshare generates — and here it is also the one we want: it emits
+/// a discriminated union in TypeScript and a real `Codable` enum in Swift, so an
+/// unhandled command is a compile error on both sides rather than a silent no-op.
+public enum NativeCommand: Codable, Equatable {
+	case applyMark(ApplyMarkCommand)
+	case setColor(SetColorCommand)
+	case setHighlight(SetHighlightCommand)
+	case setFontFamily(SetFontFamilyCommand)
+	case setFontSize(SetFontSizeCommand)
+	case setAlignment(SetAlignmentCommand)
+	case insertTable(InsertTableCommand)
+	case insertConversationTile(TargetOnly)
+	case openDocument(OpenDocumentCommand)
+	case setSelection(SetSelectionCommand)
+	case jumpToAnchor(JumpToAnchorCommand)
+	case setContent(SetContentCommand)
+	case replaceRanges(ReplaceRangesCommand)
+	case setCaretAtDocPos(SetCaretAtDocPosCommand)
+	case dictationPartial(DictationTranscript)
+	case dictationFinal(DictationTranscript)
+	case dictationLevel(DictationLevelCommand)
+	case dictationCancel(DictationCancelCommand)
+	case syncNotes(SyncNotesCommand)
+	case canvasCommand(CanvasCommandRequest)
+	case canvasDropDoc(CanvasDropDocCommand)
+	case canvasDropNote(CanvasDropNoteCommand)
+	case canvasReveal(CanvasRevealCommand)
+	case canvasRestore(CanvasRestoreCommand)
+
+	enum CodingKeys: String, CodingKey, Codable {
+		case applyMark,
+			setColor,
+			setHighlight,
+			setFontFamily,
+			setFontSize,
+			setAlignment,
+			insertTable,
+			insertConversationTile,
+			openDocument,
+			setSelection,
+			jumpToAnchor,
+			setContent,
+			replaceRanges,
+			setCaretAtDocPos,
+			dictationPartial,
+			dictationFinal,
+			dictationLevel,
+			dictationCancel,
+			syncNotes,
+			canvasCommand,
+			canvasDropDoc,
+			canvasDropNote,
+			canvasReveal,
+			canvasRestore
+	}
+
+	private enum ContainerCodingKeys: String, CodingKey {
+		case type, payload
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: ContainerCodingKeys.self)
+		if let type = try? container.decode(CodingKeys.self, forKey: .type) {
+			switch type {
+			case .applyMark:
+				if let content = try? container.decode(ApplyMarkCommand.self, forKey: .payload) {
+					self = .applyMark(content)
+					return
+				}
+			case .setColor:
+				if let content = try? container.decode(SetColorCommand.self, forKey: .payload) {
+					self = .setColor(content)
+					return
+				}
+			case .setHighlight:
+				if let content = try? container.decode(SetHighlightCommand.self, forKey: .payload) {
+					self = .setHighlight(content)
+					return
+				}
+			case .setFontFamily:
+				if let content = try? container.decode(SetFontFamilyCommand.self, forKey: .payload) {
+					self = .setFontFamily(content)
+					return
+				}
+			case .setFontSize:
+				if let content = try? container.decode(SetFontSizeCommand.self, forKey: .payload) {
+					self = .setFontSize(content)
+					return
+				}
+			case .setAlignment:
+				if let content = try? container.decode(SetAlignmentCommand.self, forKey: .payload) {
+					self = .setAlignment(content)
+					return
+				}
+			case .insertTable:
+				if let content = try? container.decode(InsertTableCommand.self, forKey: .payload) {
+					self = .insertTable(content)
+					return
+				}
+			case .insertConversationTile:
+				if let content = try? container.decode(TargetOnly.self, forKey: .payload) {
+					self = .insertConversationTile(content)
+					return
+				}
+			case .openDocument:
+				if let content = try? container.decode(OpenDocumentCommand.self, forKey: .payload) {
+					self = .openDocument(content)
+					return
+				}
+			case .setSelection:
+				if let content = try? container.decode(SetSelectionCommand.self, forKey: .payload) {
+					self = .setSelection(content)
+					return
+				}
+			case .jumpToAnchor:
+				if let content = try? container.decode(JumpToAnchorCommand.self, forKey: .payload) {
+					self = .jumpToAnchor(content)
+					return
+				}
+			case .setContent:
+				if let content = try? container.decode(SetContentCommand.self, forKey: .payload) {
+					self = .setContent(content)
+					return
+				}
+			case .replaceRanges:
+				if let content = try? container.decode(ReplaceRangesCommand.self, forKey: .payload) {
+					self = .replaceRanges(content)
+					return
+				}
+			case .setCaretAtDocPos:
+				if let content = try? container.decode(SetCaretAtDocPosCommand.self, forKey: .payload) {
+					self = .setCaretAtDocPos(content)
+					return
+				}
+			case .dictationPartial:
+				if let content = try? container.decode(DictationTranscript.self, forKey: .payload) {
+					self = .dictationPartial(content)
+					return
+				}
+			case .dictationFinal:
+				if let content = try? container.decode(DictationTranscript.self, forKey: .payload) {
+					self = .dictationFinal(content)
+					return
+				}
+			case .dictationLevel:
+				if let content = try? container.decode(DictationLevelCommand.self, forKey: .payload) {
+					self = .dictationLevel(content)
+					return
+				}
+			case .dictationCancel:
+				if let content = try? container.decode(DictationCancelCommand.self, forKey: .payload) {
+					self = .dictationCancel(content)
+					return
+				}
+			case .syncNotes:
+				if let content = try? container.decode(SyncNotesCommand.self, forKey: .payload) {
+					self = .syncNotes(content)
+					return
+				}
+			case .canvasCommand:
+				if let content = try? container.decode(CanvasCommandRequest.self, forKey: .payload) {
+					self = .canvasCommand(content)
+					return
+				}
+			case .canvasDropDoc:
+				if let content = try? container.decode(CanvasDropDocCommand.self, forKey: .payload) {
+					self = .canvasDropDoc(content)
+					return
+				}
+			case .canvasDropNote:
+				if let content = try? container.decode(CanvasDropNoteCommand.self, forKey: .payload) {
+					self = .canvasDropNote(content)
+					return
+				}
+			case .canvasReveal:
+				if let content = try? container.decode(CanvasRevealCommand.self, forKey: .payload) {
+					self = .canvasReveal(content)
+					return
+				}
+			case .canvasRestore:
+				if let content = try? container.decode(CanvasRestoreCommand.self, forKey: .payload) {
+					self = .canvasRestore(content)
+					return
+				}
+			}
+		}
+		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: ContainerCodingKeys.self)
+		switch self {
+		case .applyMark(let content):
+			try container.encode(CodingKeys.applyMark, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setColor(let content):
+			try container.encode(CodingKeys.setColor, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setHighlight(let content):
+			try container.encode(CodingKeys.setHighlight, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setFontFamily(let content):
+			try container.encode(CodingKeys.setFontFamily, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setFontSize(let content):
+			try container.encode(CodingKeys.setFontSize, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setAlignment(let content):
+			try container.encode(CodingKeys.setAlignment, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .insertTable(let content):
+			try container.encode(CodingKeys.insertTable, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .insertConversationTile(let content):
+			try container.encode(CodingKeys.insertConversationTile, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .openDocument(let content):
+			try container.encode(CodingKeys.openDocument, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setSelection(let content):
+			try container.encode(CodingKeys.setSelection, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .jumpToAnchor(let content):
+			try container.encode(CodingKeys.jumpToAnchor, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setContent(let content):
+			try container.encode(CodingKeys.setContent, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .replaceRanges(let content):
+			try container.encode(CodingKeys.replaceRanges, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setCaretAtDocPos(let content):
+			try container.encode(CodingKeys.setCaretAtDocPos, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .dictationPartial(let content):
+			try container.encode(CodingKeys.dictationPartial, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .dictationFinal(let content):
+			try container.encode(CodingKeys.dictationFinal, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .dictationLevel(let content):
+			try container.encode(CodingKeys.dictationLevel, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .dictationCancel(let content):
+			try container.encode(CodingKeys.dictationCancel, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .syncNotes(let content):
+			try container.encode(CodingKeys.syncNotes, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .canvasCommand(let content):
+			try container.encode(CodingKeys.canvasCommand, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .canvasDropDoc(let content):
+			try container.encode(CodingKeys.canvasDropDoc, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .canvasDropNote(let content):
+			try container.encode(CodingKeys.canvasDropNote, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .canvasReveal(let content):
+			try container.encode(CodingKeys.canvasReveal, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .canvasRestore(let content):
+			try container.encode(CodingKeys.canvasRestore, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		}
+	}
+}
+
+/// A command, with its place in the stream.
+/// 
+/// `seq` is monotonic per direction. It is not used for ordering — the transports this
+/// protocol is built for deliver in order — but for *noticing*: a gap means a message
+/// was dropped, and a bridge that silently drops a `setContent` loses the user's
+/// document. The reference transport asserts on a gap rather than logging one.
+public struct CommandEnvelope: Codable, Equatable {
+	public let seq: UInt32
+	public let command: NativeCommand
+
+	public init(seq: UInt32, command: NativeCommand) {
+		self.seq = seq
+		self.command = command
+	}
+}
+
+/// Abandon the current draft. `delete_text` distinguishes the user cancelling
+/// (the draft text goes away with it) from the session ending (it stays).
+public struct DictationCancelCommand: Codable, Equatable {
+	public let deleteText: Bool
+
+	public init(deleteText: Bool) {
+		self.deleteText = deleteText
+	}
+}
+
+public struct DictationLevelCommand: Codable, Equatable {
+	/// Mic level, 0..=1.
+	public let level: Double
+
+	public init(level: Double) {
+		self.level = level
+	}
+}
+
+/// One transcript from the speech engine.
+/// 
+/// Sharp edge #2 is why this is so thin. `DictationControl.replaceInlineDraft` is a
+/// read-modify-write at speaking rate: it reads the text the draft range currently
+/// covers, diffs the common prefix and suffix against the new transcript, and
+/// dispatches the changed slice plus its decoration in a single transaction. Asking
+/// native for the current draft text and waiting for the answer would put a round trip
+/// inside that loop, and whisper would win the race. So the whole draft state machine —
+/// the range, the diff, the drain, the duplicate suppression — stays in the webview,
+/// and native sends nothing but the transcripts and the mic level.
+public struct DictationTranscript: Codable, Equatable {
+	public let text: String
+	/// Which dictation session this came from. Chunks are transcribed concurrently, so
+	/// a transcript can outlive the session that produced it; the webview drops one
+	/// whose session is no longer current.
+	public let sessionId: String?
+
+	public init(text: String, sessionId: String?) {
+		self.text = text
+		self.sessionId = sessionId
 	}
 }
 
@@ -283,6 +798,416 @@ public struct DiffOp: Codable, Equatable {
 	public init(type: DiffOpType, tokens: [String]) {
 		self.type = type
 		self.tokens = tokens
+	}
+}
+
+/// Which pane a document-level message concerns.
+/// 
+/// Distinct from `EditorTarget` on purpose: a pane can be showing a canvas, which has
+/// no editor at all, so "open this document in the right-hand pane" and "apply bold in
+/// the right-hand editor" are not the same address.
+public enum Pane: String, Codable, Equatable {
+	case primary
+	case secondary
+}
+
+/// The document changed.
+/// 
+/// Fires on every transaction that touched the document, so it carries no content —
+/// only the facts a shell needs to decide whether to do something expensive. A shell
+/// that wants the text asks for it.
+public struct DocChanged: Codable, Equatable {
+	public let pane: Pane
+	public let docPath: String
+	/// False while a document load is in flight, so autosave and version checkpoints
+	/// do not treat a load as the user's edit.
+	public let userEdit: Bool
+	public let wordCount: UInt32
+	public let charCount: UInt32
+
+	public init(pane: Pane, docPath: String, userEdit: Bool, wordCount: UInt32, charCount: UInt32) {
+		self.pane = pane
+		self.docPath = docPath
+		self.userEdit = userEdit
+		self.wordCount = wordCount
+		self.charCount = charCount
+	}
+}
+
+/// The plain text of a document, with the positions it was read from.
+public struct DocumentText: Codable, Equatable {
+	public let docPath: String
+	public let text: String
+
+	public init(docPath: String, text: String) {
+		self.docPath = docPath
+		self.text = text
+	}
+}
+
+/// The drag ended — however it ended.
+/// 
+/// `handled` is the one that used to be `__inkblot_dropHandled`, and it is a
+/// *report*, not a negotiation: whichever drop target accepted the payload says so
+/// when it does, and this event carries the final answer so the source knows whether
+/// to remove what it was dragging. Two targets can see the same drop (an editor and
+/// the clipboard panel underneath it); the first to claim it wins, which is what the
+/// flag arbitrated before.
+public struct DragEnded: Codable, Equatable {
+	public let dragId: String
+	public let handled: Bool
+	public let clientX: Double?
+	public let clientY: Double?
+
+	public init(dragId: String, handled: Bool, clientX: Double?, clientY: Double?) {
+		self.dragId = dragId
+		self.handled = handled
+		self.clientX = clientX
+		self.clientY = clientY
+	}
+}
+
+/// The pointer moved during a drag.
+/// 
+/// Carried explicitly because the DOM's own drag events do not reliably give a
+/// position — which is why `__inkblot_dragPoint` existed. Coalesced to one per frame
+/// by the sender, like `notesRemapped`, and for the same reason: only the last one
+/// means anything.
+public struct DragMoved: Codable, Equatable {
+	public let dragId: String
+	public let clientX: Double
+	public let clientY: Double
+
+	public init(dragId: String, clientX: Double, clientY: Double) {
+		self.dragId = dragId
+		self.clientX = clientX
+		self.clientY = clientY
+	}
+}
+
+/// What is being dragged.
+/// 
+/// This is what replaces the `window.__inkblot_*` globals. They are six mutable
+/// variables on `window` that four unrelated components read and write to coordinate
+/// one drag — the clipboard panel writes what it picked up, the editor reads it on
+/// drop and writes back whether it handled it, and the last pointer position is parked
+/// there because the HTML5 drag events do not carry a usable one. None of that
+/// survives a process boundary: `window` is the webview's, and a native drag source is
+/// not in it.
+public enum DragPayloadKind: String, Codable, Equatable {
+	/// A selection dragged out of an editor.
+	case editorSelection
+	/// An entry dragged out of the clipboard history panel.
+	case clipboardEntry
+	/// A document dragged out of the file tree.
+	case document
+	/// A note card dragged out of the notes panel.
+	case noteCard
+}
+
+/// A place in a document, as the protocol carries it.
+/// 
+/// **This is the one type sharp edge #3 is about, so it is worth reading the reason.**
+/// A ProseMirror position is an index into a document that every edit invalidates.
+/// In one process that is survivable: the holder maps its positions through each
+/// transaction's mapping and is never more than a tick out of date. Across a process
+/// boundary it is not — native holds a note, a workbench tile, a search result or a
+/// read-aloud word, the user types, and the positions native is holding now address
+/// different text with no signal that they do.
+/// 
+/// So nothing in this protocol carries a bare position. Everything carries the text
+/// the position was resolved from as well, and the webview re-resolves by that text
+/// when the positions no longer cover it. Two places in the React shell already do
+/// exactly this dance by hand (`EditorLayout.jsx:291-304`, `Workbench.jsx:40-64`);
+/// this type is that dance promoted to the protocol.
+/// 
+/// `from` and `to` are **UTF-16 code units**, like every other offset in this
+/// codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
+/// wrong place in any document containing an emoji.
+public struct TextAnchor: Codable, Equatable {
+	public let from: UInt32
+	public let to: UInt32
+	/// The text `from..to` covered when this anchor was made. The webview falls back
+	/// to searching for it when the positions no longer do.
+	public let text: String
+
+	public init(from: UInt32, to: UInt32, text: String) {
+		self.from = from
+		self.to = to
+		self.text = text
+	}
+}
+
+public struct DragStarted: Codable, Equatable {
+	public let dragId: String
+	public let kind: DragPayloadKind
+	/// The plain text being dragged, where there is any.
+	public let text: String
+	/// The entry, document or note the drag came from.
+	public let sourceId: String?
+	public let docPath: String?
+	/// Where in the source document the selection came from, for a drag that will move
+	/// rather than copy.
+	public let anchor: TextAnchor?
+	/// Anything the drop target needs that the fields above do not model — a
+	/// clipboard entry's rich content, a note's color.
+	public let detail: AnyCodable?
+
+	public init(dragId: String, kind: DragPayloadKind, text: String, sourceId: String?, docPath: String?, anchor: TextAnchor?, detail: AnyCodable?) {
+		self.dragId = dragId
+		self.kind = kind
+		self.text = text
+		self.sourceId = sourceId
+		self.docPath = docPath
+		self.anchor = anchor
+		self.detail = detail
+	}
+}
+
+/// A question aimed at a particular editor, or at whichever one is active.
+public struct EditorQuery: Codable, Equatable {
+	/// Absent means "whichever editor is active" — which is what a context menu wants,
+	/// since the click that opened it is what decided.
+	public let target: EditorTarget?
+
+	public init(target: EditorTarget?) {
+		self.target = target
+	}
+}
+
+/// Everything the document surface reports to the shell.
+public enum WebviewEvent: Codable, Equatable {
+	case toolbarState(ToolbarState)
+	case selectionContext(SelectionContext)
+	case docChanged(DocChanged)
+	case notesRemapped(NotesRemapped)
+	case noteMarkerHover(NoteMarkerEvent)
+	case noteMarkerLeave(NoteMarkerEvent)
+	case noteMarkerPin(NoteMarkerEvent)
+	case activeEditorChanged(ActiveEditorChanged)
+	case searchMatches(SearchMatches)
+	case focusModeView(FocusModeView)
+	case readAloudPayload(ReadAloudPayloadEvent)
+	case dragStarted(DragStarted)
+	case dragMoved(DragMoved)
+	case dragEnded(DragEnded)
+
+	enum CodingKeys: String, CodingKey, Codable {
+		case toolbarState,
+			selectionContext,
+			docChanged,
+			notesRemapped,
+			noteMarkerHover,
+			noteMarkerLeave,
+			noteMarkerPin,
+			activeEditorChanged,
+			searchMatches,
+			focusModeView,
+			readAloudPayload,
+			dragStarted,
+			dragMoved,
+			dragEnded
+	}
+
+	private enum ContainerCodingKeys: String, CodingKey {
+		case type, payload
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: ContainerCodingKeys.self)
+		if let type = try? container.decode(CodingKeys.self, forKey: .type) {
+			switch type {
+			case .toolbarState:
+				if let content = try? container.decode(ToolbarState.self, forKey: .payload) {
+					self = .toolbarState(content)
+					return
+				}
+			case .selectionContext:
+				if let content = try? container.decode(SelectionContext.self, forKey: .payload) {
+					self = .selectionContext(content)
+					return
+				}
+			case .docChanged:
+				if let content = try? container.decode(DocChanged.self, forKey: .payload) {
+					self = .docChanged(content)
+					return
+				}
+			case .notesRemapped:
+				if let content = try? container.decode(NotesRemapped.self, forKey: .payload) {
+					self = .notesRemapped(content)
+					return
+				}
+			case .noteMarkerHover:
+				if let content = try? container.decode(NoteMarkerEvent.self, forKey: .payload) {
+					self = .noteMarkerHover(content)
+					return
+				}
+			case .noteMarkerLeave:
+				if let content = try? container.decode(NoteMarkerEvent.self, forKey: .payload) {
+					self = .noteMarkerLeave(content)
+					return
+				}
+			case .noteMarkerPin:
+				if let content = try? container.decode(NoteMarkerEvent.self, forKey: .payload) {
+					self = .noteMarkerPin(content)
+					return
+				}
+			case .activeEditorChanged:
+				if let content = try? container.decode(ActiveEditorChanged.self, forKey: .payload) {
+					self = .activeEditorChanged(content)
+					return
+				}
+			case .searchMatches:
+				if let content = try? container.decode(SearchMatches.self, forKey: .payload) {
+					self = .searchMatches(content)
+					return
+				}
+			case .focusModeView:
+				if let content = try? container.decode(FocusModeView.self, forKey: .payload) {
+					self = .focusModeView(content)
+					return
+				}
+			case .readAloudPayload:
+				if let content = try? container.decode(ReadAloudPayloadEvent.self, forKey: .payload) {
+					self = .readAloudPayload(content)
+					return
+				}
+			case .dragStarted:
+				if let content = try? container.decode(DragStarted.self, forKey: .payload) {
+					self = .dragStarted(content)
+					return
+				}
+			case .dragMoved:
+				if let content = try? container.decode(DragMoved.self, forKey: .payload) {
+					self = .dragMoved(content)
+					return
+				}
+			case .dragEnded:
+				if let content = try? container.decode(DragEnded.self, forKey: .payload) {
+					self = .dragEnded(content)
+					return
+				}
+			}
+		}
+		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: ContainerCodingKeys.self)
+		switch self {
+		case .toolbarState(let content):
+			try container.encode(CodingKeys.toolbarState, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .selectionContext(let content):
+			try container.encode(CodingKeys.selectionContext, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .docChanged(let content):
+			try container.encode(CodingKeys.docChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .notesRemapped(let content):
+			try container.encode(CodingKeys.notesRemapped, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .noteMarkerHover(let content):
+			try container.encode(CodingKeys.noteMarkerHover, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .noteMarkerLeave(let content):
+			try container.encode(CodingKeys.noteMarkerLeave, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .noteMarkerPin(let content):
+			try container.encode(CodingKeys.noteMarkerPin, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .activeEditorChanged(let content):
+			try container.encode(CodingKeys.activeEditorChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .searchMatches(let content):
+			try container.encode(CodingKeys.searchMatches, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .focusModeView(let content):
+			try container.encode(CodingKeys.focusModeView, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .readAloudPayload(let content):
+			try container.encode(CodingKeys.readAloudPayload, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .dragStarted(let content):
+			try container.encode(CodingKeys.dragStarted, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .dragMoved(let content):
+			try container.encode(CodingKeys.dragMoved, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .dragEnded(let content):
+			try container.encode(CodingKeys.dragEnded, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		}
+	}
+}
+
+public struct EventEnvelope: Codable, Equatable {
+	public let seq: UInt32
+	public let event: WebviewEvent
+
+	public init(seq: UInt32, event: WebviewEvent) {
+		self.seq = seq
+		self.event = event
+	}
+}
+
+/// What focus mode is showing.
+/// 
+/// `FocusModeOverlay` re-derives this from the full document on every transaction, and
+/// the handoff flags that as the cost to watch: at a keystroke's rate this is the
+/// largest payload on the bridge. It stays in the webview in Phase 5 for exactly that
+/// reason, and this event exists so a native shell can mirror the *state* — which
+/// paragraph, how far through — without receiving the text.
+public struct FocusModeView: Codable, Equatable {
+	public let active: Bool
+	public let docPath: String
+	/// Index of the paragraph the caret is in.
+	public let paragraphIndex: UInt32
+	public let paragraphCount: UInt32
+	public let wordCount: UInt32
+
+	public init(active: Bool, docPath: String, paragraphIndex: UInt32, paragraphCount: UInt32, wordCount: UInt32) {
+		self.active = active
+		self.docPath = docPath
+		self.paragraphIndex = paragraphIndex
+		self.paragraphCount = paragraphCount
+		self.wordCount = wordCount
+	}
+}
+
+public struct InsertTableCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let rows: UInt32
+	public let cols: UInt32
+	public let withHeaderRow: Bool
+
+	public init(target: EditorTarget, rows: UInt32, cols: UInt32, withHeaderRow: Bool) {
+		self.target = target
+		self.rows = rows
+		self.cols = cols
+		self.withHeaderRow = withHeaderRow
+	}
+}
+
+/// Put the selection on some text, re-finding it if the positions have gone stale.
+/// 
+/// The difference from `setSelection` is which half of the anchor is authoritative.
+/// `setSelection` trusts the positions and uses the text only to check them;
+/// `jumpToAnchor` trusts the text and uses the positions only as a starting guess.
+/// Search results, workbench tiles and notes — anything native has been holding
+/// across edits it did not see — use this one.
+public struct JumpToAnchorCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let anchor: TextAnchor
+	/// Try the anchor's positions before searching. False for anything whose positions
+	/// were never meaningful in this document, such as a hit found by scanning a file
+	/// on disk.
+	public let preferPositions: Bool
+
+	public init(target: EditorTarget, anchor: TextAnchor, preferPositions: Bool) {
+		self.target = target
+		self.anchor = anchor
+		self.preferPositions = preferPositions
 	}
 }
 
@@ -376,6 +1301,87 @@ public struct Note: Codable, Equatable {
 	}
 }
 
+/// The pointer entered, left, or clicked a note marker in the document.
+/// 
+/// `anchor_rect` is in client coordinates *inside the webview*, so a native shell must
+/// offset it by the web view's frame. This is the event that `NoteAnnotation.js:155`
+/// currently ships a live `EditorView` object in — an object, over an event, to a
+/// listener in the same process. That field is gone: nothing here is a reference.
+public struct NoteMarkerEvent: Codable, Equatable {
+	public let noteId: String
+	public let docPath: String
+	public let anchorLeft: Double
+	public let anchorTop: Double
+	public let anchorRight: Double
+	public let anchorBottom: Double
+	public let note: Note?
+
+	public init(noteId: String, docPath: String, anchorLeft: Double, anchorTop: Double, anchorRight: Double, anchorBottom: Double, note: Note?) {
+		self.noteId = noteId
+		self.docPath = docPath
+		self.anchorLeft = anchorLeft
+		self.anchorTop = anchorTop
+		self.anchorRight = anchorRight
+		self.anchorBottom = anchorBottom
+		self.note = note
+	}
+}
+
+/// Note anchors after a remap.
+/// 
+/// **Sharp edge #4.** `useEditorNotes` remaps on every transaction — every keystroke
+/// in a document with quote notes — and native is holding those positions. Two things
+/// keep that off the bridge's back:
+/// 
+/// 1. The event is coalesced to one per frame by the sender. Sending per transaction
+/// saturates the bridge with nothing new; a caret that moved three times in one
+/// frame has one final answer.
+/// 2. It carries the **whole** remapped set, never a delta. That is what makes
+/// coalescing safe: dropping an intermediate state loses nothing, because the next
+/// one is complete. A delta stream would not survive a single dropped message.
+public struct NotesRemapped: Codable, Equatable {
+	public let docPath: String
+	public let notes: [Note]
+	/// Notes whose range collapsed to nothing in this remap. They have lost what they
+	/// were about and have been dropped from `notes`; they are named here so a shell
+	/// can tell "deleted" from "never sent".
+	public let droppedNoteIds: [String]
+
+	public init(docPath: String, notes: [Note], droppedNoteIds: [String]) {
+		self.docPath = docPath
+		self.notes = notes
+		self.droppedNoteIds = droppedNoteIds
+	}
+}
+
+public struct OpenDocumentCommand: Codable, Equatable {
+	/// A project-relative tree path. A `.canvas` suffix makes it a canvas — routing is
+	/// purely by suffix (`doc_kind`), so there is no kind field to get wrong.
+	public let path: String
+	public let pane: Pane
+
+	public init(path: String, pane: Pane) {
+		self.path = path
+		self.pane = pane
+	}
+}
+
+/// One edit in a `replaceRanges` batch.
+/// 
+/// Batched because the ranges in a batch are resolved against one document state and
+/// applied in one transaction. Sent one at a time, each would be resolved against a
+/// document the previous one had already moved.
+public struct RangeEdit: Codable, Equatable {
+	public let anchor: TextAnchor
+	/// What to put there. Empty deletes the range.
+	public let text: String
+
+	public init(anchor: TextAnchor, text: String) {
+		self.anchor = anchor
+		self.text = text
+	}
+}
+
 /// One word of readable text, with where it sits in the readable string and where it
 /// sits in the document.
 /// 
@@ -425,6 +1431,33 @@ public struct ReadAloudPayload: Codable, Equatable {
 	}
 }
 
+/// The readable text of the document and the words resolved out of it.
+/// 
+/// Sent when Read Aloud starts, not continuously: it is the whole document. The
+/// highlight scheduler that consumes it stays in the webview — mapping audio time back
+/// to a ProseMirror position cannot cross the boundary — so what goes native is audio
+/// generation and playback, and this is what they are given.
+public struct ReadAloudPayloadEvent: Codable, Equatable {
+	public let docPath: String
+	public let payload: ReadAloudPayload
+
+	public init(docPath: String, payload: ReadAloudPayload) {
+		self.docPath = docPath
+		self.payload = payload
+	}
+}
+
+public struct ReadAloudQuery: Codable, Equatable {
+	public let target: EditorTarget?
+	/// Read only the selection rather than the whole document.
+	public let selectionOnly: Bool
+
+	public init(target: EditorTarget?, selectionOnly: Bool) {
+		self.target = target
+		self.selectionOnly = selectionOnly
+	}
+}
+
 public struct Rect: Codable, Equatable {
 	public let x: Double
 	public let y: Double
@@ -436,6 +1469,182 @@ public struct Rect: Codable, Equatable {
 		self.y = y
 		self.width = width
 		self.height = height
+	}
+}
+
+public struct ReplaceRangesCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let edits: [RangeEdit]
+
+	public init(target: EditorTarget, edits: [RangeEdit]) {
+		self.target = target
+		self.edits = edits
+	}
+}
+
+public enum BridgeReply: Codable, Equatable {
+	case selectionContext(SelectionContext)
+	case toolbarState(ToolbarState)
+	case readAloudPayload(ReadAloudPayloadEvent)
+	case documentText(DocumentText)
+	case error(BridgeError)
+
+	enum CodingKeys: String, CodingKey, Codable {
+		case selectionContext,
+			toolbarState,
+			readAloudPayload,
+			documentText,
+			error
+	}
+
+	private enum ContainerCodingKeys: String, CodingKey {
+		case type, payload
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: ContainerCodingKeys.self)
+		if let type = try? container.decode(CodingKeys.self, forKey: .type) {
+			switch type {
+			case .selectionContext:
+				if let content = try? container.decode(SelectionContext.self, forKey: .payload) {
+					self = .selectionContext(content)
+					return
+				}
+			case .toolbarState:
+				if let content = try? container.decode(ToolbarState.self, forKey: .payload) {
+					self = .toolbarState(content)
+					return
+				}
+			case .readAloudPayload:
+				if let content = try? container.decode(ReadAloudPayloadEvent.self, forKey: .payload) {
+					self = .readAloudPayload(content)
+					return
+				}
+			case .documentText:
+				if let content = try? container.decode(DocumentText.self, forKey: .payload) {
+					self = .documentText(content)
+					return
+				}
+			case .error:
+				if let content = try? container.decode(BridgeError.self, forKey: .payload) {
+					self = .error(content)
+					return
+				}
+			}
+		}
+		throw DecodingError.typeMismatch(BridgeReply.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for BridgeReply"))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: ContainerCodingKeys.self)
+		switch self {
+		case .selectionContext(let content):
+			try container.encode(CodingKeys.selectionContext, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .toolbarState(let content):
+			try container.encode(CodingKeys.toolbarState, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .readAloudPayload(let content):
+			try container.encode(CodingKeys.readAloudPayload, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .documentText(let content):
+			try container.encode(CodingKeys.documentText, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .error(let content):
+			try container.encode(CodingKeys.error, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		}
+	}
+}
+
+public struct ReplyEnvelope: Codable, Equatable {
+	public let id: String
+	public let reply: BridgeReply
+
+	public init(id: String, reply: BridgeReply) {
+		self.id = id
+		self.reply = reply
+	}
+}
+
+/// What the shell can ask the document surface.
+/// 
+/// Kept deliberately small. Every question here is one that only a live ProseMirror
+/// document can answer; anything answerable from a file on disk belongs in
+/// `inkblot-core` proper, where it needs no round trip at all.
+public enum BridgeRequest: Codable, Equatable {
+	case getSelectionContext(EditorQuery)
+	case getToolbarState(EditorQuery)
+	case getReadAloudPayload(ReadAloudQuery)
+	case getDocumentText(EditorQuery)
+
+	enum CodingKeys: String, CodingKey, Codable {
+		case getSelectionContext,
+			getToolbarState,
+			getReadAloudPayload,
+			getDocumentText
+	}
+
+	private enum ContainerCodingKeys: String, CodingKey {
+		case type, payload
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: ContainerCodingKeys.self)
+		if let type = try? container.decode(CodingKeys.self, forKey: .type) {
+			switch type {
+			case .getSelectionContext:
+				if let content = try? container.decode(EditorQuery.self, forKey: .payload) {
+					self = .getSelectionContext(content)
+					return
+				}
+			case .getToolbarState:
+				if let content = try? container.decode(EditorQuery.self, forKey: .payload) {
+					self = .getToolbarState(content)
+					return
+				}
+			case .getReadAloudPayload:
+				if let content = try? container.decode(ReadAloudQuery.self, forKey: .payload) {
+					self = .getReadAloudPayload(content)
+					return
+				}
+			case .getDocumentText:
+				if let content = try? container.decode(EditorQuery.self, forKey: .payload) {
+					self = .getDocumentText(content)
+					return
+				}
+			}
+		}
+		throw DecodingError.typeMismatch(BridgeRequest.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for BridgeRequest"))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: ContainerCodingKeys.self)
+		switch self {
+		case .getSelectionContext(let content):
+			try container.encode(CodingKeys.getSelectionContext, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .getToolbarState(let content):
+			try container.encode(CodingKeys.getToolbarState, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .getReadAloudPayload(let content):
+			try container.encode(CodingKeys.getReadAloudPayload, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .getDocumentText(let content):
+			try container.encode(CodingKeys.getDocumentText, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		}
+	}
+}
+
+public struct RequestEnvelope: Codable, Equatable {
+	/// Correlates the reply. Opaque to the webview, which echoes it back.
+	public let id: String
+	public let request: BridgeRequest
+
+	public init(id: String, request: BridgeRequest) {
+		self.id = id
+		self.request = request
 	}
 }
 
@@ -487,6 +1696,26 @@ public struct SearchResult: Codable, Equatable {
 	}
 }
 
+/// Search results from inside the open document.
+/// 
+/// Project-wide search is `inkblot-core`'s job and does not come through here; this is
+/// only the part that needs a live document, because a ProseMirror position cannot be
+/// computed from a file on disk.
+public struct SearchMatches: Codable, Equatable {
+	public let query: String
+	public let docPath: String
+	public let results: [SearchResult]
+	/// Which result is current, as an index into `results`.
+	public let activeIndex: UInt32?
+
+	public init(query: String, docPath: String, results: [SearchResult], activeIndex: UInt32?) {
+		self.query = query
+		self.docPath = docPath
+		self.results = results
+		self.activeIndex = activeIndex
+	}
+}
+
 /// The scopes, in the order they appear in the bar.
 public enum SearchScope: String, Codable, Equatable {
 	/// The default, and what the bar did before it could search: filter whatever panel
@@ -508,6 +1737,165 @@ public struct SearchScopeInfo: Codable, Equatable {
 		self.value = value
 		self.label = label
 		self.hint = hint
+	}
+}
+
+/// Everything a context menu needs to build itself, resolved in one read.
+/// 
+/// Phase 5 needs this as a *request*, not a push: the menu is built when the user
+/// right-clicks, and it must be built from the selection as it is at that moment. It
+/// is also pushed on selection change, because a native shell wants to enable and
+/// disable menu bar items without asking.
+public struct SelectionContext: Codable, Equatable {
+	public let target: EditorTarget?
+	public let docPath: String?
+	/// What is selected. `anchor.text` is the selected text, which is what every item
+	/// the menu offers is built from — the workbench tiles, the quote note, the
+	/// analytic bubble all take it verbatim. There is no separate `word` or `sentence`
+	/// field because nothing derives one: `editorMenu.js` reads the selection and
+	/// stops.
+	public let anchor: TextAnchor
+	public let empty: Bool
+	/// Whether the selection overlaps a highlight mark, which is what decides between
+	/// offering "Highlight" and "Remove Highlight".
+	public let touchesHighlight: Bool
+	/// True when the pane is showing a canvas. The editor items do not apply.
+	public let isCanvas: Bool
+
+	public init(target: EditorTarget?, docPath: String?, anchor: TextAnchor, empty: Bool, touchesHighlight: Bool, isCanvas: Bool) {
+		self.target = target
+		self.docPath = docPath
+		self.anchor = anchor
+		self.empty = empty
+		self.touchesHighlight = touchesHighlight
+		self.isCanvas = isCanvas
+	}
+}
+
+/// Text alignment, as the toolbar offers it.
+public enum Alignment: String, Codable, Equatable {
+	case left
+	case center
+	case right
+}
+
+/// Set alignment on whatever the selection is.
+/// 
+/// Deliberately one command and not three. Alignment means a different edit depending
+/// on what is selected — a conversation tile and an image take it as a node attribute,
+/// text takes it as a block attribute, and an image additionally has to drop out of a
+/// wrap layout. All of that is schema knowledge, so it stays in the webview.
+public struct SetAlignmentCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let alignment: Alignment
+
+	public init(target: EditorTarget, alignment: Alignment) {
+		self.target = target
+		self.alignment = alignment
+	}
+}
+
+public struct SetCaretAtDocPosCommand: Codable, Equatable {
+	public let target: EditorTarget
+	/// A ProseMirror position in UTF-16 code units. Clamped to the document.
+	public let pos: UInt32
+
+	public init(target: EditorTarget, pos: UInt32) {
+		self.target = target
+		self.pos = pos
+	}
+}
+
+public struct SetColorCommand: Codable, Equatable {
+	public let target: EditorTarget
+	/// A CSS color. Not validated here — the webview passes it to TipTap as given.
+	public let color: String
+
+	public init(target: EditorTarget, color: String) {
+		self.target = target
+		self.color = color
+	}
+}
+
+public struct SetContentCommand: Codable, Equatable {
+	public let pane: Pane
+	/// The document path this content belongs to. Checked before applying: a load that
+	/// resolves after the user has already switched documents must not overwrite the
+	/// one now open.
+	public let docPath: String
+	/// A TipTap document, or a serialized canvas for a canvas pane.
+	public let content: AnyCodable
+	/// Whether this replacement is a document *load* rather than an edit. Loads are
+	/// the transaction note anchors must not be mapped through — mapping through a
+	/// whole-document replacement lands every note at position 0
+	/// (`useEditorNotes.js`).
+	public let isLoad: Bool
+
+	public init(pane: Pane, docPath: String, content: AnyCodable, isLoad: Bool) {
+		self.pane = pane
+		self.docPath = docPath
+		self.content = content
+		self.isLoad = isLoad
+	}
+}
+
+public struct SetFontFamilyCommand: Codable, Equatable {
+	public let target: EditorTarget
+	/// The family *name* ("Georgia"), not a CSS font stack. The webview quotes it —
+	/// `toCssFontFamily` — because the quoting rules are a CSS detail and a native
+	/// shell should not have to know them.
+	public let family: String
+
+	public init(target: EditorTarget, family: String) {
+		self.target = target
+		self.family = family
+	}
+}
+
+public struct SetFontSizeCommand: Codable, Equatable {
+	public let target: EditorTarget
+	/// A CSS length, e.g. `"18px"`. Carried as written because that is what is stored
+	/// on the mark and what the toolbar displays.
+	public let size: String
+
+	public init(target: EditorTarget, size: String) {
+		self.target = target
+		self.size = size
+	}
+}
+
+/// Set the highlight color, and say what the remembered color becomes.
+/// 
+/// This is sharp edge #1's second half. `Toolbar.jsx:240` writes the chosen color to
+/// `editor.storage.lastHighlightColor` and `contextMenu/editorMenu.js:78` reads it
+/// back — shared mutable state on a live editor object, reachable from both sides of
+/// a seam that does not exist yet. The value is part of the protocol instead: the
+/// command says what to remember, and `ToolbarState` reports it back.
+public struct SetHighlightCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let color: String
+	/// Whether this color becomes the one the context menu's "Highlight" item uses.
+	/// False for a preview while the user is still dragging in the color picker.
+	public let remember: Bool
+
+	public init(target: EditorTarget, color: String, remember: Bool) {
+		self.target = target
+		self.color = color
+		self.remember = remember
+	}
+}
+
+public struct SetSelectionCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let anchor: TextAnchor
+	public let scrollIntoView: Bool
+	public let focus: Bool
+
+	public init(target: EditorTarget, anchor: TextAnchor, scrollIntoView: Bool, focus: Bool) {
+		self.target = target
+		self.anchor = anchor
+		self.scrollIntoView = scrollIntoView
+		self.focus = focus
 	}
 }
 
@@ -542,6 +1930,27 @@ public struct StoryFolderAncestor: Codable, Equatable {
 	public init(preset: StoryFolderPreset, path: String) {
 		self.preset = preset
 		self.path = path
+	}
+}
+
+/// Publish a document's notes into the editor, which is what the annotation
+/// decorations render from.
+public struct SyncNotesCommand: Codable, Equatable {
+	public let docPath: String
+	public let notes: [Note]
+
+	public init(docPath: String, notes: [Note]) {
+		self.docPath = docPath
+		self.notes = notes
+	}
+}
+
+/// A command aimed at an editor with nothing else to say.
+public struct TargetOnly: Codable, Equatable {
+	public let target: EditorTarget
+
+	public init(target: EditorTarget) {
+		self.target = target
 	}
 }
 
@@ -609,6 +2018,46 @@ public struct TextDocument: Codable, Equatable {
 	}
 }
 
+/// The formatting at the selection, pushed.
+/// 
+/// **Sharp edge #1.** `Toolbar.jsx:102-145` pulls this today: on every
+/// `selectionUpdate` it reaches into the live editor and reads about ten facts —
+/// text-style attributes, four mark states resolved against the adjacent text node
+/// when the selection is collapsed, the alignment of whichever of three node kinds is
+/// selected. All of it is synchronous, and none of it survives a process boundary.
+/// 
+/// So the direction inverts: the webview does the reading, once per animation frame,
+/// and sends the answer. A native toolbar renders this struct and never asks a
+/// question. The frame coalescing is not an optimization — `selectionUpdate` fires on
+/// every cursor move, including every keystroke.
+public struct ToolbarState: Codable, Equatable {
+	/// Absent when no editor is live — a canvas with no card open, or an empty pane.
+	/// The toolbar renders disabled rather than stale.
+	public let target: EditorTarget?
+	public let color: String
+	public let highlight: String
+	/// The family *name*, already parsed back out of the CSS font stack
+	/// (`fromCssFontFamily`). A native font menu should not have to unquote CSS.
+	public let font: String
+	public let fontSize: String
+	public let alignment: Alignment
+	public let activeMarks: ActiveMarks
+	/// The color the context menu's "Highlight" item would apply — what used to live
+	/// on `editor.storage.lastHighlightColor`. See `SetHighlightCommand`.
+	public let lastHighlightColor: String
+
+	public init(target: EditorTarget?, color: String, highlight: String, font: String, fontSize: String, alignment: Alignment, activeMarks: ActiveMarks, lastHighlightColor: String) {
+		self.target = target
+		self.color = color
+		self.highlight = highlight
+		self.font = font
+		self.fontSize = fontSize
+		self.alignment = alignment
+		self.activeMarks = activeMarks
+		self.lastHighlightColor = lastHighlightColor
+	}
+}
+
 public enum TreeNodeType: String, Codable, Equatable {
 	case file
 	case folder
@@ -652,9 +2101,101 @@ public enum DocKind: String, Codable, Equatable {
 	case text
 }
 
+/// Everything the shell sends in.
+public enum InboundMessage: Codable, Equatable {
+	case command(CommandEnvelope)
+	case request(RequestEnvelope)
+
+	enum CodingKeys: String, CodingKey, Codable {
+		case command,
+			request
+	}
+
+	private enum ContainerCodingKeys: String, CodingKey {
+		case kind, message
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: ContainerCodingKeys.self)
+		if let type = try? container.decode(CodingKeys.self, forKey: .kind) {
+			switch type {
+			case .command:
+				if let content = try? container.decode(CommandEnvelope.self, forKey: .message) {
+					self = .command(content)
+					return
+				}
+			case .request:
+				if let content = try? container.decode(RequestEnvelope.self, forKey: .message) {
+					self = .request(content)
+					return
+				}
+			}
+		}
+		throw DecodingError.typeMismatch(InboundMessage.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for InboundMessage"))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: ContainerCodingKeys.self)
+		switch self {
+		case .command(let content):
+			try container.encode(CodingKeys.command, forKey: .kind)
+			try container.encode(content, forKey: .message)
+		case .request(let content):
+			try container.encode(CodingKeys.request, forKey: .kind)
+			try container.encode(content, forKey: .message)
+		}
+	}
+}
+
 /// Which side of a chunk or a card-level change the user kept.
 public enum MergeChoice: String, Codable, Equatable {
 	case left
 	case right
 	case both
+}
+
+/// Everything the document surface sends out.
+public enum OutboundMessage: Codable, Equatable {
+	case event(EventEnvelope)
+	case reply(ReplyEnvelope)
+
+	enum CodingKeys: String, CodingKey, Codable {
+		case event,
+			reply
+	}
+
+	private enum ContainerCodingKeys: String, CodingKey {
+		case kind, message
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: ContainerCodingKeys.self)
+		if let type = try? container.decode(CodingKeys.self, forKey: .kind) {
+			switch type {
+			case .event:
+				if let content = try? container.decode(EventEnvelope.self, forKey: .message) {
+					self = .event(content)
+					return
+				}
+			case .reply:
+				if let content = try? container.decode(ReplyEnvelope.self, forKey: .message) {
+					self = .reply(content)
+					return
+				}
+			}
+		}
+		throw DecodingError.typeMismatch(OutboundMessage.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for OutboundMessage"))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: ContainerCodingKeys.self)
+		switch self {
+		case .event(let content):
+			try container.encode(CodingKeys.event, forKey: .kind)
+			try container.encode(content, forKey: .message)
+		case .reply(let content):
+			try container.encode(CodingKeys.reply, forKey: .kind)
+			try container.encode(content, forKey: .message)
+		}
+	}
 }
