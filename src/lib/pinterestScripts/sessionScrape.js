@@ -41,9 +41,14 @@
           ...(extra.debug || {}),
         },
       };
-      location.hash = 'inkblot-scrape-' + requestId + '=' + encodeURIComponent(JSON.stringify(payload));
+      // Straight to Rust. This used to go out through `location.hash`, with the app
+      // polling the webview's URL ten times a second to notice it; Tauri puts its IPC
+      // on the main frame of every webview it creates, including this one showing
+      // pinterest.com, so the page can just say what it found.
+      window.__TAURI_INTERNALS__.invoke('pinterest_report_scrape', { report: payload });
     } catch {
-      // ignore
+      // A report that cannot be sent is not worth failing the scrape over: the caller
+      // times out and says so, which is what it would have done anyway.
     }
   };
 
