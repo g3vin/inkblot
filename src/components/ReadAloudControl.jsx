@@ -22,6 +22,7 @@ import {
   prewarmReadAloud,
 } from '../lib/readAloud'
 import { getPreference, setPreference } from '../lib/preferences'
+import { documentSurface, editorRegistry } from '../bridge'
 
 const READ_ALOUD_VOICE_STORAGE_KEY = 'inkblot:read-aloud-voice'
 const INITIAL_READ_ALOUD_LEVELS = [0.08, 0.12, 0.16, 0.1, 0.14, 0.09]
@@ -110,6 +111,25 @@ const getWordSpeechWeight = (word) => {
   return Math.max(1, cleanLength || word.text.length) + pauseWeight
 }
 
+/** The wire shape: text and words, without the local-only `originalSelection`. */
+const toWirePayload = ({ text, words }) => ({ text, words })
+
+/**
+ * Answer `getReadAloudPayload` for whichever editor the shell names.
+ *
+ * Resolved through the registry rather than this control's `editor` prop: the shell
+ * may name a pane that is not the toolbar's. `null` is the protocol's "no editor",
+ * which the bridge turns into a `noEditor` reply.
+ */
+const answerReadAloudPayload = ({ target, selectionOnly }) => {
+  const resolved = target ? editorRegistry.resolve(target) : editorRegistry.active()
+  if (!resolved?.editor || resolved.editor.isDestroyed) return null
+  const payload = getReadableEditorPayload(resolved.editor, {
+    scope: selectionOnly ? 'selection' : 'document',
+  })
+  return { docPath: resolved.docPath ?? '', payload: toWirePayload(payload) }
+}
+
 export default function ReadAloudControl({ editor }) {
   const buttonRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -162,6 +182,8 @@ export default function ReadAloudControl({ editor }) {
   useEffect(() => {
     setPreference(READ_ALOUD_VOICE_STORAGE_KEY, voice)
   }, [voice])
+
+  useEffect(() => documentSurface.onRequest('getReadAloudPayload', answerReadAloudPayload), [])
 
   useEffect(() => {
     if (!open || status === 'loading' || status === 'playing') return
@@ -457,6 +479,11 @@ export default function ReadAloudControl({ editor }) {
       setOpen(true)
       return
     }
+
+    documentSurface.publishReadAloudPayload({
+      docPath: editorRegistry.active()?.docPath ?? '',
+      payload: toWirePayload(payload),
+    })
 
     const requestId = requestIdRef.current + 1
     requestIdRef.current = requestId

@@ -124,6 +124,9 @@ function Harness() {
   })
 }
 
+const docChanges = []
+shellBridge.on('docChanged', (payload) => docChanges.push(payload))
+
 const root = createRoot(document.getElementById('root'))
 await act(async () => {
   root.render(React.createElement(StrictMode, null, React.createElement(Harness)))
@@ -141,6 +144,26 @@ ok('EditorCanvas mounts under StrictMode', !!document.querySelector('.middle-sec
 ok('the primary pane is present', !!document.querySelector('.primary-pane'))
 ok('the loaded document renders', paneText().includes('the first chapter'))
 ok('the word-count badge counts the loaded text', wordCount() === '3 words')
+
+/* ---------------- docChanged ---------------- */
+
+// A load is announced as not the user's edit, so a shell does not autosave it back.
+const loaded = docChanges.find((change) => change.docPath === 'one')
+ok('loading a document publishes docChanged', !!loaded)
+ok('and marks it as not a user edit', loaded?.userEdit === false)
+ok('with the counts the badge shows', loaded?.wordCount === 3 && loaded?.charCount > 0)
+
+await act(async () => {
+  control.editor.commands.insertContentAt(control.editor.state.doc.content.size - 1, ' today')
+})
+await act(async () => { await new Promise((r) => setTimeout(r, 350)) })
+const edited = docChanges.at(-1)
+ok('typing publishes docChanged as a user edit', edited?.userEdit === true && edited.docPath === 'one')
+ok('with the new count', edited?.wordCount === 4)
+// Put it back and let the autosave (800ms) land, so the next section starts with
+// nothing pending — it asserts on the debounce holding a write back.
+await act(async () => { control.editor.commands.undo() })
+await act(async () => { await new Promise((r) => setTimeout(r, 1000)) })
 
 /* ---------------- Autosave ---------------- */
 

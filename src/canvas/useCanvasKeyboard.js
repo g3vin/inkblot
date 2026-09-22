@@ -13,6 +13,7 @@ export function useCanvasKeyboard({
   groupSelection,
   locked,
   redo,
+  reorderSelection,
   selectAll,
   selectionRef,
   stateRef,
@@ -69,6 +70,14 @@ export function useCanvasKeyboard({
         return
       }
 
+      // ⌘⇧] and ⌘⇧[ — the keys Keynote and Figma use for front and back. By code,
+      // because with Shift held `key` is `}` or `{` on some layouts and not others.
+      if (mod && event.shiftKey && (event.code === 'BracketRight' || event.code === 'BracketLeft')) {
+        event.preventDefault()
+        reorderSelection(event.code === 'BracketRight' ? 'front' : 'back')
+        return
+      }
+
       if (event.key === 'Backspace' || event.key === 'Delete') {
         const current = selectionRef.current
         if (!current.nodes.size && !current.edges.size) return
@@ -90,6 +99,7 @@ export function useCanvasKeyboard({
     groupSelection,
     locked,
     redo,
+    reorderSelection,
     selectAll,
     selectionRef,
     stateRef,

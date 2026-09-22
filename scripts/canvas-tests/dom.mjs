@@ -174,4 +174,26 @@ await settle()
 ok('unlocking restores the resize zones', document.querySelectorAll('.canvas-resize-handle').length === 8)
 ok('unlocking restores Add card', !!button('Add card'))
 
+/* Stacking. `nodes/reorder` sat in the reducer for two phases with nothing dispatching
+   it; these go through the same command event the context menu and the bridge use. */
+{
+  const { dispatchCanvasCommand } = await import('../../src/canvas/canvasEvents.js')
+  const order = () => [...document.querySelectorAll('.canvas-node[data-node-id]')]
+    .map((element) => element.getAttribute('data-node-id'))
+
+  // A new card is selected and on top.
+  await act(async () => { dispatchCanvasCommand(surface(), 'add-card', {}) })
+  await settle()
+  const added = order().find((id) => id !== card.id)
+  ok('a new card lands on top', order().at(-1) === added)
+
+  await act(async () => { dispatchCanvasCommand(surface(), 'send-to-back', {}) })
+  await settle()
+  ok('Send to Back puts the selection under everything', order()[0] === added)
+
+  await act(async () => { dispatchCanvasCommand(surface(), 'bring-to-front', {}) })
+  await settle()
+  ok('Bring to Front puts it back on top', order().at(-1) === added && order()[0] === card.id)
+}
+
 await act(async () => { root.unmount() })
