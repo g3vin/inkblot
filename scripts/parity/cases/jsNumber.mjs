@@ -7,14 +7,7 @@
  * deliberately straddles both switchover points, 1e21 and 1e-7.
  */
 
-/** JSON cannot carry NaN, ±Infinity or -0; the Rust side reads these spellings. */
-const encode = (value) => {
-  if (Number.isNaN(value)) return 'NaN'
-  if (value === Infinity) return 'Infinity'
-  if (value === -Infinity) return '-Infinity'
-  if (Object.is(value, -0)) return '-0'
-  return value
-}
+import { encodeNumber } from '../encode.mjs'
 
 const VALUES = [
   0, -0, 1, -1, 42, -42, 0.5, -0.5, 0.1, 0.2, 0.1 + 0.2, 1 / 3, 2 / 3,
@@ -50,7 +43,7 @@ export default {
   name: 'jsNumber',
   *cases() {
     for (const value of [...VALUES, ...generated()]) {
-      yield { fn: 'formatJsNumber', args: [encode(value)], expected: String(value) }
+      yield { fn: 'formatJsNumber', args: [encodeNumber(value)], expected: String(value) }
     }
   },
 }

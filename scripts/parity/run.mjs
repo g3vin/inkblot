@@ -20,10 +20,11 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
+import canvasGeometry from './cases/canvasGeometry.mjs'
 import docKind from './cases/docKind.mjs'
 import jsNumber from './cases/jsNumber.mjs'
 
-const MODULES = [jsNumber, docKind]
+const MODULES = [jsNumber, docKind, canvasGeometry]
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const TAURI = path.resolve(HERE, '../../src-tauri')

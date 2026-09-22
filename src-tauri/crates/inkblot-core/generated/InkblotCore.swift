@@ -22,6 +22,30 @@ public struct AudioClip: Codable, Equatable {
 	}
 }
 
+public struct Point: Codable, Equatable {
+	public let x: Double
+	public let y: Double
+
+	public init(x: Double, y: Double) {
+		self.x = x
+		self.y = y
+	}
+}
+
+/// A cubic bezier between two side anchors, plus the point an edge label sits on.
+public struct BezierPath: Codable, Equatable {
+	/// An SVG path `d` attribute, spelled exactly as JavaScript would spell it — see
+	/// `js_number`.
+	public let d: String
+	/// t = 0.5 on the curve.
+	public let mid: Point
+
+	public init(d: String, mid: Point) {
+		self.d = d
+		self.mid = mid
+	}
+}
+
 /// Which side of a card an edge attaches to. Serializes as the lowercase strings the
 /// JSON Canvas spec uses, so an unset side in a foreign file is simply absent.
 public enum EdgeSide: String, Codable, Equatable {
@@ -252,16 +276,6 @@ public struct Note: Codable, Equatable {
 		self.createdAt = createdAt
 		self.updatedAt = updatedAt
 		self.timestamp = timestamp
-	}
-}
-
-public struct Point: Codable, Equatable {
-	public let x: Double
-	public let y: Double
-
-	public init(x: Double, y: Double) {
-		self.x = x
-		self.y = y
 	}
 }
 

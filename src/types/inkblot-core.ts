@@ -12,6 +12,22 @@ export interface AudioClip {
 	createdAt: string;
 }
 
+export interface Point {
+	x: number;
+	y: number;
+}
+
+/** A cubic bezier between two side anchors, plus the point an edge label sits on. */
+export interface BezierPath {
+	/**
+	 * An SVG path `d` attribute, spelled exactly as JavaScript would spell it — see
+	 * `js_number`.
+	 */
+	d: string;
+	/** t = 0.5 on the curve. */
+	mid: Point;
+}
+
 /**
  * Which side of a card an edge attaches to. Serializes as the lowercase strings the
  * JSON Canvas spec uses, so an unset side in a foreign file is simply absent.
@@ -172,11 +188,6 @@ export interface Note {
 	 * locale-dependent, so nothing may read it back as data — recompute it instead.
 	 */
 	timestamp: string;
-}
-
-export interface Point {
-	x: number;
-	y: number;
 }
 
 export interface Rect {

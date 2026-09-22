@@ -21,7 +21,7 @@ pub use canvas::{
     CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState,
 };
 pub use document::{DocKind, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind, VERSION_CAP};
-pub use geometry::{EdgeSide, Point, Rect, Viewport};
+pub use geometry::{BezierPath, EdgeSide, Point, Rect, Viewport};
 pub use json::{JsonMap, JsonValue};
 pub use note::{
     AudioClip, Note, NoteImage, NotePreviewLayout, NotePreviewSize, NoteType,
