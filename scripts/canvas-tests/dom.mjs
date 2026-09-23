@@ -174,6 +174,49 @@ await settle()
 ok('unlocking restores the resize zones', document.querySelectorAll('.canvas-resize-handle').length === 8)
 ok('unlocking restores Add card', !!button('Add card'))
 
+/* Touch (Phase 6). A finger on the empty canvas pans; the Pencil does what the mouse
+   does; a second finger ends the first one's pan, because two fingers are a pinch. */
+{
+  const world = () => document.querySelector('.canvas-world')
+  const pointer = (target, type, { id, kind, x, y }) => {
+    const event = new dom.window.MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y })
+    Object.defineProperty(event, 'pointerType', { value: kind })
+    Object.defineProperty(event, 'pointerId', { value: id })
+    target.dispatchEvent(event)
+  }
+
+  const before = world().style.transform
+  await act(async () => {
+    pointer(surface(), 'pointerdown', { id: 1, kind: 'touch', x: 100, y: 100 })
+    pointer(dom.window, 'pointermove', { id: 1, kind: 'touch', x: 160, y: 130 })
+  })
+  await settle()
+  const panned = world().style.transform
+  ok('a finger on the empty canvas pans it', panned && panned !== before)
+  ok('and draws no selection box', !document.querySelector('.canvas-marquee'))
+
+  // A second finger lands: the pan ends, and the first finger no longer moves anything.
+  await act(async () => {
+    pointer(surface(), 'pointerdown', { id: 2, kind: 'touch', x: 300, y: 100 })
+    pointer(dom.window, 'pointermove', { id: 1, kind: 'touch', x: 400, y: 400 })
+  })
+  await settle()
+  ok('a second finger ends the pan — two fingers are a pinch', world().style.transform === panned)
+  await act(async () => {
+    pointer(dom.window, 'pointerup', { id: 1, kind: 'touch', x: 400, y: 400 })
+    pointer(dom.window, 'pointerup', { id: 2, kind: 'touch', x: 300, y: 100 })
+  })
+
+  await act(async () => {
+    pointer(surface(), 'pointerdown', { id: 3, kind: 'pen', x: 100, y: 100 })
+    pointer(dom.window, 'pointermove', { id: 3, kind: 'pen', x: 200, y: 200 })
+  })
+  await settle()
+  ok('the Pencil does not pan', world().style.transform === panned)
+  await act(async () => { pointer(dom.window, 'pointerup', { id: 3, kind: 'pen', x: 200, y: 200 }) })
+  await settle()
+}
+
 /* Stacking. `nodes/reorder` sat in the reducer for two phases with nothing dispatching
    it; these go through the same command event the context menu and the bridge use. */
 {

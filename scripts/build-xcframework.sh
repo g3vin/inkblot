@@ -45,6 +45,15 @@ for triple in aarch64_apple_darwin x86_64_apple_darwin; do
   export "CFLAGS_$triple=-mmacosx-version-min=$min_macos"
   export "CXXFLAGS_$triple=-mmacosx-version-min=$min_macos"
 done
+# The same for the iOS slices (Phase 6) — and for the Rust itself: rustc reads
+# IPHONEOS_DEPLOYMENT_TARGET for iOS targets only, so unlike the macOS variable it
+# cannot reach the host's proc-macro dylibs.
+min_ios="26.4"
+export IPHONEOS_DEPLOYMENT_TARGET="$min_ios"
+export CFLAGS_aarch64_apple_ios="-miphoneos-version-min=$min_ios"
+export CXXFLAGS_aarch64_apple_ios="-miphoneos-version-min=$min_ios"
+export CFLAGS_aarch64_apple_ios_sim="-mios-simulator-version-min=$min_ios"
+export CXXFLAGS_aarch64_apple_ios_sim="-mios-simulator-version-min=$min_ios"
 
 # Every Apple Silicon Mac this app can run on is arm64; Intel is built only if its
 # target is installed, and then the two are merged with lipo.
@@ -81,10 +90,35 @@ echo "Generating Swift bindings…"
 cp "$build/bindings/inkblot_ffiFFI.h" "$build/headers/"
 cp "$build/bindings/inkblot_ffiFFI.modulemap" "$build/headers/module.modulemap"
 
-xcodebuild -create-xcframework \
-  -library "$build/lib/libinkblot_ffi.a" \
-  -headers "$build/headers" \
-  -output "$build/InkblotFFI.xcframework" >/dev/null
+# iOS and iPadOS (Phase 6), when their targets are installed:
+#   rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+# Built without the models: `ort` has no iOS library to link. The stand-in has the same
+# interface (src-tauri/crates/inkblot-ffi/src/models_unavailable.rs), and the diff below
+# holds it to that — one set of bindings serves every slice, so a stand-in that drifted
+# would build cleanly and then fail its checksum at first call on the device.
+slices=(-library "$build/lib/libinkblot_ffi.a" -headers "$build/headers")
+for target in aarch64-apple-ios aarch64-apple-ios-sim; do
+  rustup target list --installed 2>/dev/null | grep -qx "$target" || continue
+  echo "Building inkblot-ffi for $target ($profile, without the models)…"
+  cargo build --manifest-path "$workspace/Cargo.toml" -p inkblot-ffi --lib --no-default-features \
+    --target "$target" "${cargo_profile[@]}"
+  (cd "$workspace" && cargo run -q -p inkblot-ffi --features bindgen --bin uniffi-bindgen -- \
+    generate --library "$workspace/target/$target/$profile/libinkblot_ffi.dylib" \
+    --language swift --out-dir "$build/bindings-$target")
+  # What UniFFI checks at runtime: the C interface, and each function's checksum.
+  # (Doc comments differ between the two files and do not matter.)
+  interface() { cat "$1/inkblot_ffiFFI.h"; grep -E 'checksum.* != [0-9]+' "$1/inkblot_ffi.swift"; }
+  if ! diff -q <(interface "$build/bindings") <(interface "$build/bindings-$target") >/dev/null; then
+    echo "error: $target's interface differs from macOS's: models_unavailable.rs has drifted from models.rs." >&2
+    diff <(interface "$build/bindings") <(interface "$build/bindings-$target") | head -20 >&2
+    exit 1
+  fi
+  mkdir -p "$build/lib-$target"
+  cp "$workspace/target/$target/$profile/libinkblot_ffi.a" "$build/lib-$target/"
+  slices+=(-library "$build/lib-$target/libinkblot_ffi.a" -headers "$build/headers")
+done
+
+xcodebuild -create-xcframework "${slices[@]}" -output "$build/InkblotFFI.xcframework" >/dev/null
 
 mkdir -p "$swift_out"
 # The app target defaults every declaration to the main actor

@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// The Clipboard tab: the copy history.
@@ -91,8 +90,7 @@ struct ClipboardPanelView: View {
     }
 
     private func copy(_ entry: ClipboardEntry) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(entry.text, forType: .string)
+        Platform.copy(entry.text)
         copiedId = entry.id
         Task {
             try? await Task.sleep(for: .seconds(1.1))

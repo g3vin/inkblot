@@ -25,8 +25,24 @@ use inkblot_core::store::{DocumentBody, ProjectStore, StoreError};
 
 uniffi::setup_scaffolding!();
 
+/// Where a model's events go: a Tauri event name the page listens for
+/// (`synonym://download`, `kokoro://download`, `dictation://partial`, …) and its
+/// payload as JSON. Swift implements it by emitting into the page through the shim.
+#[uniffi::export(with_foreign)]
+pub trait ModelEventSink: Send + Sync {
+    fn emit(&self, event: String, payload_json: String);
+}
+
+// The models, or — where they do not build yet (iOS: `ort` ships no iOS library and
+// whisper.cpp's cmake is untested there) — a stand-in with exactly the same interface.
+// Same interface is the point: the Swift bindings are generated once for every slice of
+// the XCFramework, and UniFFI checks each function's checksum at first call.
+#[cfg(feature = "models")]
 mod models;
-pub use models::{InkblotModels, ModelEventSink};
+#[cfg(not(feature = "models"))]
+#[path = "models_unavailable.rs"]
+mod models;
+pub use models::InkblotModels;
 
 /// Everything the core can refuse, flattened to a message.
 ///
