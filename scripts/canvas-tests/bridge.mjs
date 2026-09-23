@@ -1,30 +1,28 @@
 /**
  * The bridge protocol's client, both ends of it.
  *
- * This is the suite the phase is for. The protocol is defined in Rust and its wire
- * format is tested there; what is checked here is the half that has to be *right*
- * rather than merely agreed — the client that sits between a shell and a live
- * ProseMirror document, and the four behaviours a Swift shell will depend on without
- * being able to see this file:
+ * The protocol is defined in Rust and its wire format is tested there; what is
+ * checked here is the half that has to be *right* rather than merely agreed — the
+ * client that sits between a shell and a live ProseMirror document, and the four
+ * behaviours a Swift shell depends on without being able to see this file:
  *
  *   - **a command reaches the right editor, and no editor at all is survivable.** A
  *     shell decides to send before it can know the pane still exists.
  *   - **a request is always answered.** A shell blocked on a reply that never comes is
  *     a hang with no symptom, and the commonest cause — the user closed the pane
  *     between the right-click and the menu — is entirely ordinary.
- *   - **coalescing drops intermediate values and never the last one.** Sharp edge #4:
- *     note anchors remap on every keystroke, and the shell's copy is only correct if
+ *   - **coalescing drops intermediate values and never the last one.** Note anchors remap on every keystroke, and the shell's copy is only correct if
  *     the final state always arrives.
  *   - **the drag hand-off arbitrates.** Two drop targets can see the same drop, and
- *     `window.__inkblot_dropHandled` decided it by running order.
+ *     exactly one may handle it, whatever order their listeners run in.
  *
  * Everything runs through the JSON-copying transport, so a payload that could not
- * cross a process boundary fails here rather than in Phase 5.
+ * cross a process boundary fails here rather than only in the Swift app.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 // readState/commands reach isEditorReady, which touches nothing global, but the
 // coalescer looks for requestAnimationFrame. A DOM makes the frame path real rather
@@ -60,7 +58,7 @@ function makeEditor(text = 'she hesitated at the door') {
   const state = {
     // `nodes` is here because isEditorReady checks for it. Leaving it out makes every
     // editor look torn down, and the assertions that expect a command to land pass by
-    // never running one — which is exactly how this fake was wrong the first time.
+    // never running one.
     schema: {
       nodes: { paragraph: 'paragraphNode', doc: 'docNode' },
       marks: { bold: 'boldMark', italic: 'italicMark', highlight: 'highlightMark' },
@@ -96,7 +94,7 @@ function makeEditor(text = 'she hesitated at the door') {
   // `on`/`off` are here because real consumers subscribe: useSurfacePublisher listens
   // for selectionUpdate, and ReadAloudControl calls editor.on during mount. A fake
   // without them does not fail its own assertions — it fails whatever mounts it, two
-  // hundred lines away, which is how the missing `schema.nodes` above wasted a run.
+  // hundred lines away.
   const listeners = new Map()
 
   return {
@@ -308,8 +306,7 @@ function wire({ deferred = false } = {}) {
   ok('the toolbar state is pushed, and reads the live editor',
     states.length === 1 && states[0].fontSize === '20px')
 
-  // Sharp edge #1: the remembered highlight was `editor.storage.lastHighlightColor`,
-  // shared mutable state across a seam that does not exist yet.
+  // The remembered highlight is protocol state, not state on the editor object.
   shell.send('setHighlight', { target: EditorTarget.Primary, color: '#ff00ff', remember: true })
   ok('a remembered highlight becomes protocol state',
     surface.lastHighlightColor() === '#ff00ff')
@@ -324,18 +321,17 @@ function wire({ deferred = false } = {}) {
   surface.dispose()
 }
 
-/* ---------------- coalescing (sharp edge #4) ---------------- */
+/* ---------------- coalescing ---------------- */
 {
   const delivered = []
   const coalescer = createCoalescer((value) => delivered.push(value), immediateScheduler)
   coalescer.push(1)
   ok('an immediate scheduler delivers at once', delivered.length === 1 && delivered[0] === 1)
 
-  // Regression. A scheduler may run its callback synchronously, in which case `send`
-  // has already cleared the pending slot before `schedule` returns — so holding on to
-  // the canceller it returns leaves the coalescer looking permanently busy, and every
-  // push after the first is swallowed. It delivered exactly one toolbar state for the
-  // life of the app.
+  // A scheduler may run its callback synchronously, in which case `send` has already
+  // cleared the pending slot before `schedule` returns — so holding on to the
+  // canceller it returns would leave the coalescer looking permanently busy, and every
+  // push after the first would be swallowed.
   coalescer.push(2)
   coalescer.push(3)
   ok('and keeps delivering after the first push, rather than wedging',
@@ -412,12 +408,11 @@ function wire({ deferred = false } = {}) {
   ok('a drag has an id, so two drags cannot be confused', Boolean(session.dragId))
   ok('and is unclaimed to begin with', drag.isClaimed() === false)
 
-  // What `__inkblot_dropHandled` arbitrated by running order.
   ok('the first target to claim the drop wins', drag.claim() === true)
   ok('and every target after it loses', drag.claim() === false)
 
   drag.moveTo(10, 20)
-  ok('the drag point is remembered, as __inkblot_dragPoint was',
+  ok('the drag point is remembered',
     drag.point().x === 10 && drag.point().y === 20)
 
   const ended = drag.end()
@@ -464,7 +459,7 @@ function wire({ deferred = false } = {}) {
   surface.dispose()
 }
 
-/* ---------------- anchors (sharp edge #3) ---------------- */
+/* ---------------- anchors ---------------- */
 {
   const editor = makeEditor('she hesitated at the door')
 
@@ -472,8 +467,7 @@ function wire({ deferred = false } = {}) {
     JSON.stringify(resolveAnchor(editor, { from: 4, to: 13, text: 'hesitated' })) ===
     JSON.stringify({ from: 4, to: 13 }))
 
-  // The case the two hand-rolled versions get wrong: finite positions that have gone
-  // stale. Both trusted them; this re-finds the text instead.
+  // Finite positions that have gone stale must not be trusted; the text is re-found.
   const stale = resolveAnchor(editor, { from: 90, to: 99, text: 'hesitated' })
   ok('stale positions are re-resolved by text, not trusted',
     stale?.from === 4 && stale?.to === 13)
@@ -504,13 +498,13 @@ function wire({ deferred = false } = {}) {
 
   let threw = null
   try {
-    // What NoteAnnotation.js:155 ships today: a live EditorView in an event payload.
+    // A cyclic object, like a live EditorView, in a payload.
     const live = {}
     live.self = live
     shell.send('canvasRestore', { docPath: 'b.canvas', canvas: live })
   } catch (error) { threw = error }
 
-  ok('a payload that cannot be serialized fails here, not in Phase 5',
+  ok('a payload that cannot be serialized fails here, not across the process boundary',
     threw instanceof TypeError)
 }
 
@@ -554,9 +548,9 @@ function wire({ deferred = false } = {}) {
   surface.dispose()
 }
 
-/* ---------------- the native shell joins the wire (Phase 5) ----------------
+/* ---------------- the native shell joins the wire ----------------
    Inside the Swift shell, the React chrome and the native chrome both drive the
-   surface until the last piece of chrome has moved. What has to hold: both are
+   surface. What has to hold: both are
    heard, neither sees a gap, and each gets its own answers — the React toolbar's
    `r0` and the native shell's `r0` are different questions. */
 
@@ -703,14 +697,11 @@ const nativeCommand = (type, payload, seq = nativeSeq++) =>
 /* ------------------------------------------------------------------
    The Toolbar, mounted.
 
-   This is the assertion the handoff's own hardest-won lesson demands.
-   `useEditorDnd({ editor })` was read in its temporal dead zone and threw on
-   every single mount of EditorCanvas, while lint, tsc and the production
-   build all passed — because nothing mounted the component. The Toolbar is
-   the most heavily rewritten file in this phase and it is in exactly that
-   position: it has no coverage anywhere else in the harness.
+   A component nothing mounts can throw on every render while lint, tsc and
+   the production build all pass. The Toolbar has no other coverage, so it is
+   mounted here.
 
-   What is checked is the inversion itself. It must render from a pushed
+   What is checked: it must render from a pushed
    ToolbarState without touching the editor, and a click must leave as a
    command rather than as an editor.chain() call.
 ------------------------------------------------------------------ */
@@ -747,9 +738,8 @@ const nativeCommand = (type, payload, seq = nativeSeq++) =>
   // It must show what the bridge pushed, having asked the editor nothing.
   //
   // The app's own surface coalesces on real animation frames, so the publish has to
-  // be waited out rather than asserted on immediately — which is the behaviour, not
-  // an inconvenience: a toolbar that updated synchronously per selectionUpdate is the
-  // thing this phase removed.
+  // be waited out rather than asserted on immediately, which is the intended behaviour: one
+  // toolbar state per frame, not one per selectionUpdate.
   const settleFrame = () => act(async () => {
     await new Promise((resolve) => dom.window.requestAnimationFrame(() => resolve()))
     await new Promise((resolve) => setTimeout(resolve, 0))

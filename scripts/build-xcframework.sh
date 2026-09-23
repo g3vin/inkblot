@@ -45,7 +45,7 @@ for triple in aarch64_apple_darwin x86_64_apple_darwin; do
   export "CFLAGS_$triple=-mmacosx-version-min=$min_macos"
   export "CXXFLAGS_$triple=-mmacosx-version-min=$min_macos"
 done
-# The same for the iOS slices (Phase 6) — and for the Rust itself: rustc reads
+# The same for the iOS slices — and for the Rust itself: rustc reads
 # IPHONEOS_DEPLOYMENT_TARGET for iOS targets only, so unlike the macOS variable it
 # cannot reach the host's proc-macro dylibs.
 min_ios="26.4"
@@ -90,7 +90,7 @@ echo "Generating Swift bindings…"
 cp "$build/bindings/inkblot_ffiFFI.h" "$build/headers/"
 cp "$build/bindings/inkblot_ffiFFI.modulemap" "$build/headers/module.modulemap"
 
-# iOS and iPadOS (Phase 6), when their targets are installed:
+# iOS and iPadOS, when their targets are installed:
 #   rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 # Built without the models: `ort` has no iOS library to link. The stand-in has the same
 # interface (src-tauri/crates/inkblot-ffi/src/models_unavailable.rs), and the diff below

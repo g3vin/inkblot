@@ -1,10 +1,14 @@
+/**
+ * Document persistence: canvases and text documents written side by side, and the guard
+ * that stops a stray text autosave from overwriting a canvas with an empty document.
+ */
 import { files } from './stub-fs.mjs'
 const SRC = '../../src/lib'
 const { saveDocument, loadDocument, getVersions } = await import(`${SRC}/FileSystem.js`)
 const { saveCanvasDocument, loadCanvasDocument } = await import(`${SRC}/canvasFileSystem.js`)
 const { createEmptyCanvas, makeTextNode, makeEdge } = await import(`${SRC}/canvasModel.js`)
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const P = 'Novel'
 
 // --- Build a canvas the way the app does, and a text doc beside it in the same folder.
@@ -23,7 +27,7 @@ ok('text doc written to <path>.json',       files.has('/appdata/Novel/Structure/
 ok('the two are different files',           files.size >= 2)
 
 // --- THE data-safety case: a rogue text-autosave fires at the canvas path.
-// Before the backstop, this silently rewrote the file as {"content":[],"notes":[]}.
+// Without the guard in saveDocument, this would rewrite the file as {"content":[],"notes":[]}.
 console.log('\n-- simulating a stray text autosave aimed at the canvas --')
 await saveDocument(P, 'Structure/plan.canvas', { content: { type: 'doc', content: [] }, notes: [] })
 await saveDocument(P, 'Structure/plan.canvas', { content: [], notes: [], _appendVersion: true, _version: { contentHtml: '<p></p>' } })

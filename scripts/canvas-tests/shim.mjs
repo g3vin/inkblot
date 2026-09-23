@@ -1,7 +1,7 @@
 /**
  * The Tauri shim the Swift shell injects (native/…/Web/tauri-shim.js).
  *
- * Under the Swift shell the web bundle is unmodified and still calls Tauri — for every
+ * Under the Swift shell the web bundle is unmodified and calls Tauri — for every
  * document save, every delete confirmation, every context menu. The shim is what
  * answers, and nothing in the build can see it: it is a string Swift injects into a
  * page. If it gets a wire format wrong, the symptom is a menu item that does nothing,
@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs'
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const SHIM = new URL('../../native/inkblot-core/inkblot-core/Web/tauri-shim.js', import.meta.url)
 const HOST = new URL('../../native/inkblot-core/inkblot-core/Web/native-host.js', import.meta.url)

@@ -1,9 +1,8 @@
 /**
  * versionHistory.js's diff engine against `inkblot_core::version_history`.
  *
- * This is the differential test the handoff asks for: the JS and Rust diff engines
- * run over the same corpus of real documents and must produce identical chunk output.
- * It is the precondition for ever deleting the JS copy.
+ * The JS and Rust diff engines run over the same corpus of real documents and must
+ * produce identical chunk output.
  *
  * "Real documents" means prose, not `['a','b','c']`. The corpus starts from four
  * passages and derives the edits a writer actually makes — a word swapped, a sentence
