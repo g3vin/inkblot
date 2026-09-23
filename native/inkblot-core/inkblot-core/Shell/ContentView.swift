@@ -21,6 +21,7 @@ struct ContentView: View {
                 .toolbar(removing: .sidebarToggle)
         } detail: {
             EditorWebView(controller: model.web)
+                .overlay { WorkspaceOverlay() }
                 .overlay { NotePreviewOverlay() }
                 .ignoresSafeArea(.all, edges: [.top, .bottom])
         }

@@ -17,6 +17,7 @@ use super::sidebar::{
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
+use super::workspace::{DraftPaneChanged, SentenceStructure, TabsChanged};
 
 /// Which marks are on at the selection.
 #[typeshare]
@@ -352,4 +353,8 @@ pub enum WebviewEvent {
     /// superseded by the next.
     NoteMarkerMoved(NoteMarkerEvent),
     NotePreviewDismissed(NotePreviewDismissed),
+    /// The tab dock, the new-tab chooser and the sentence bubble (see `workspace.rs`).
+    TabsChanged(TabsChanged),
+    DraftPaneChanged(DraftPaneChanged),
+    SentenceStructure(SentenceStructure),
 }

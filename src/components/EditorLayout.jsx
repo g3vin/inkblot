@@ -18,6 +18,8 @@ import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
 import { nativeOwns } from '../lib/host'
 import { useNativeSidebar } from './useNativeSidebar'
 import { useNativeNotePreviews } from './useNativeNotePreviews'
+import { useNativeTabDock } from './useNativeTabDock'
+import { parseSentence } from '../lib/sentenceParse'
 import EditorCanvas from './EditorCanvas'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
@@ -129,6 +131,33 @@ export default function EditorLayout(props) {
   const nativeRightSidebar = nativeOwns('rightSidebar')
   const nativeNotePreviews = nativeOwns('notePreviews')
   useNativeNotePreviews({ enabled: nativeNotePreviews })
+  const nativeTabDock = nativeOwns('tabDock')
+  useNativeTabDock({
+    enabled: nativeTabDock,
+    tabs: props.tabs,
+    activeTabId: props.activeTabId,
+    currentDoc: props.currentDoc,
+    secondaryDoc: props.secondaryDoc,
+    splitView: props.splitView,
+    onSelectTab: props.onSelectTab,
+    onCloseTab: props.onCloseTab,
+    onNewTab: props.onNewTab,
+    onOpenDocInTab: props.onOpenDocInTab,
+  })
+  // The Analytic Bubble: drawn here, or parsed here and drawn by the shell — anchored
+  // where the right-click was, which the context menu passes along.
+  const nativeSentenceBubble = nativeOwns('sentenceBubble')
+  const openBubble = useCallback((sentence, at) => {
+    if (!nativeSentenceBubble) {
+      setBubbleSentence(sentence)
+      return
+    }
+    documentSurface.publishSentenceStructure({
+      sentence,
+      parses: parseSentence(sentence),
+      ...(at ? { anchor: { x: at.x, y: at.y, width: 0, height: 0 } } : {}),
+    })
+  }, [nativeSentenceBubble])
   const titlebarRightWidth = nativeRightSidebar ? nativeTitlebarTrailing : right.collapsed && !right.peeked
     ? 0
     : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
@@ -296,7 +325,7 @@ export default function EditorLayout(props) {
     activeDoc: props.activeDoc,
     projectName: props.projectName,
     refreshFiles: props.refreshFiles,
-    setBubbleSentence,
+    setBubbleSentence: openBubble,
     onEnterFocusMode: () => setFocusModeOpen(true),
     onOpenDocInTab: props.onOpenDocInTab,
     onOpenDocInSplit: props.onOpenDocInSplit,
@@ -598,7 +627,7 @@ export default function EditorLayout(props) {
           projectName={props.projectName}
         />}
 
-        <TabDock
+        {nativeTabDock ? null : <TabDock
           // The dock centers on the editor area, not the window: the sidebars are
           // in-flow, so it shifts by half their difference to stay over the page.
           style={{ '--tab-dock-offset': `${(titlebarLeftWidth - titlebarRightWidth) / 2}px` }}
@@ -611,7 +640,7 @@ export default function EditorLayout(props) {
           onCloseTab={props.onCloseTab}
           onNewTab={props.onNewTab}
           onDropDoc={props.onOpenDocInTab}
-        />
+        />}
 
       </div>
     </div>

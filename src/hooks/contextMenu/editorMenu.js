@@ -104,7 +104,8 @@ export async function editorMenu(ctx) {
           text: 'Open Analytic Bubble',
           action: () => {
             try {
-              setBubbleSentence?.(text)
+              // Where the right-click was, for a shell that draws the bubble itself.
+              setBubbleSentence?.(text, { x: e.clientX, y: e.clientY })
             } catch (err) {
               console.warn('Failed to open analytic bubble:', err)
             }

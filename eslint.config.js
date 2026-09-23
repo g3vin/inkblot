@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'public/ort', 'src-tauri/target']),
+  globalIgnores(['dist', 'src-tauri/target']),
   {
     files: ['**/*.{js,jsx,mjs,ts,tsx}'],
     extends: [
@@ -46,6 +46,15 @@ export default defineConfig([
         argsIgnorePattern: '^_',
         caughtErrors: 'none',
       }],
+    },
+  },
+  /* typeshare's output. A command with nothing to say (`NewTabCommand`) is an empty
+     struct in Rust and an empty interface here, and it has to exist: adjacent tagging
+     sends a payload for every variant. */
+  {
+    files: ['src/types/inkblot-core.ts'],
+    rules: {
+      '@typescript-eslint/no-empty-object-type': 'off',
     },
   },
   /* Scripts injected into pinterest.com, read with Vite's ?raw. They are not
