@@ -130,13 +130,6 @@ export const syncEditorNotes = (editor, notes, docName = null) => {
   }
 }
 
-// Intentional no-ops: NoteHoverPreview still calls these to signal hover/active
-// note state, but the in-editor text highlight they used to drive was removed.
-// Kept as stubs so the hook points survive if that highlight returns.
-export const setEditorHoveredNote = () => {}
-export const setEditorActiveNote = () => {}
-export const clearEditorActiveNote = () => {}
-
 const serializeRect = (rect) => ({
   left: rect.left,
   top: rect.top,

@@ -319,10 +319,9 @@ export async function prewarmReadAloud({ voice = DEFAULT_READ_ALOUD_VOICE } = {}
 /**
  * The native path: phonemize here, synthesize in Rust.
  *
- * It used to hand the raw text to a Python child process that did both. Python is
- * gone — it only ever worked on the machine it was installed on, and a subprocess
- * cannot exist on iOS — so the grapheme-to-phoneme pass stays in the webview, where
- * there is a working one, and only the model runs natively. See lib/readAloudVoice.js.
+ * The grapheme-to-phoneme pass runs in the webview, where `phonemizer` provides one,
+ * and only the model runs natively; nothing here needs a subprocess, so the same path
+ * can work on iOS. See lib/readAloudVoice.ts.
  */
 async function generateNativeKokoroAudio(text, {
   voice = DEFAULT_READ_ALOUD_VOICE,

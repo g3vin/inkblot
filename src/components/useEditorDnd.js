@@ -5,14 +5,12 @@
  * pointer through the document, and moving a selection from one pane to another or out
  * to the clipboard panel.
  *
- * **The drag state used to live on `window`.** Four `window.__inkblot_*` variables
- * coordinated one drag across this hook, the clipboard panel, EditorCanvas and
- * Editor — because a drag starts in one React tree and finishes in another, and
- * `dataTransfer` is unreadable during `dragover`, which is exactly when the drop caret
- * needs it. It now goes through `bridge/dragHandoff`, which has the same shape and one
- * owner. See that file for why the drop is *claimed* rather than flagged.
+ * A drag starts in one React tree and finishes in another, and `dataTransfer` is
+ * unreadable during `dragover`, exactly when the drop caret needs it; so the drag's
+ * payload lives in `bridge/dragHandoff`, shared with the clipboard panel, EditorCanvas
+ * and Editor. See that file for why a drop is *claimed*.
  *
- * Plain functions rather than useCallback, as they were in EditorCanvas: they are
+ * Plain functions rather than useCallback: they are
  * re-created each render and only ever called from event handlers, so memoizing
  * them would buy nothing.
  */
@@ -80,13 +78,6 @@ export function useEditorDnd({
         )
         return true
       }
-
-      // A forced-plain-paste branch used to sit here, gated on
-      // `window.__inkblot_forcePlainPaste`. Nothing in the app ever set that flag —
-      // the "Cmd+Shift+V handler" its comment referred to does not exist — so the
-      // branch was unreachable and went out with the rest of the globals. macOS's
-      // "Paste and Match Style" is a real thing a native Edit menu will want in
-      // Phase 5; it should arrive as a command on the protocol, not as a flag.
 
       // Nothing special about this paste — let TipTap's default handling preserve
       // formatting, as Cmd+V should.

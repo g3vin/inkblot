@@ -111,9 +111,9 @@ function CanvasNodeInner({
       ) : null}
 
       {/*
-        Resize zones: invisible strips lying along the card's border, not the little
-        boxes that used to appear on selection. You resize by grabbing the edge, the
-        way you would anywhere else, so nothing has to be shown to advertise it.
+        Resize zones: invisible strips lying along the card's border. You resize by
+        grabbing the edge, the way you would anywhere else, so nothing has to be
+        shown to advertise it.
 
         Rendered BEFORE the ports on purpose: a port sits at the midpoint of each
         side, right on top of an edge strip, and the later sibling wins the pointer.

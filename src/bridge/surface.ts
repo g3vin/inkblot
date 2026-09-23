@@ -135,7 +135,7 @@ export interface DocumentSurface {
   /**
    * The right sidebar's state, for a shell that draws the sidebar itself. Notes, the
    * clipboard and tiles each carry the whole list, which is what makes coalescing
-   * them to one per frame safe (sharp edge #4) — a keystroke in a note would otherwise
+   * them to one per frame safe (see `coalesce.ts`) — a keystroke in a note would otherwise
    * be a message per keystroke.
    */
   publishNotesChanged(payload: NotesChanged): void

@@ -1,13 +1,12 @@
 /**
  * SidebarSearch.jsx — the right sidebar's one search bar, on every panel.
  *
- * Collapsed it is the filter box the sidebar always had. Focused, it expands
- * downward into the whole search surface that used to be a separate Search tab:
- * scopes, match options, find-and-replace, results, and — while the query is
+ * Collapsed it is a filter box. Focused, it expands downward into the whole search
+ * surface: scopes, match options, find-and-replace, results, and — while the query is
  * empty — what you probably want to search from where you are standing.
  *
  * The default scope is `panel`, which filters the panel showing beneath it
- * (clipboard entries, tiles, notes, versions) exactly as before. Picking any
+ * (clipboard entries, tiles, notes, versions). Picking any
  * other scope switches the bar from filtering to searching: it renders its own
  * results and stops filtering the panel, so the two never fight.
  */
