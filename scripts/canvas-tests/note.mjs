@@ -7,14 +7,14 @@
  *      a full save that needs a live editor for `content`; a note card editing a note
  *      in a CLOSED document has no editor, and calling saveDocument() with only notes
  *      writes `content: []` — erasing the document. Same class of bug as the canvas
- *      guard in m0.
+ *      guard in the persistence suite.
  *   2. A note card references its note; it never copies it. If a canvas ever stored
  *      note content of its own, the two would fork and "two-way sync" would be a lie.
  */
 const C = '../../src'
 const { saveDocument, loadDocument, saveDocumentNotes } = await import(`${C}/lib/FileSystem.js`)
 const { makeNoteNode, serializeCanvas, createEmptyCanvas } = await import(`${C}/lib/canvasModel.js`)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const P = 'proj'
 const DOC = 'Chapters/One'

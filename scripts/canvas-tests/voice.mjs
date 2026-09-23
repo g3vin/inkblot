@@ -1,14 +1,11 @@
 /**
  * The Read Aloud text normalizer, against kokoro-js's own.
  *
- * Read Aloud's native voice used to be a Python child process. Python is gone — it
- * only worked on the machine it was installed on, and a subprocess cannot exist on
- * iOS — so the model runs through `ort` in Rust and the grapheme-to-phoneme pass
- * stays here.
+ * Read Aloud's native voice runs the model through `ort` in Rust, and the
+ * grapheme-to-phoneme pass lives in the webview (`src/lib/readAloudVoice.ts`).
  *
  * That pass begins with a normalizer that `kokoro-js` keeps module-private. Reaching
- * it means loading the whole TTS class, which loads the model into the webview, which
- * is the thing the change exists to stop. So `readAloudVoice.js` transcribes it — and
+ * it means loading the whole TTS class, which loads the model into the webview. So `readAloudVoice.ts` transcribes it — and
  * a transcribed regex chain is exactly where a silent error lives.
  *
  * This suite pulls the real function out of kokoro-js's bundle **at test time**, by
@@ -18,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs'
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 /* ---------------- the reference, out of the installed bundle ---------------- */
 

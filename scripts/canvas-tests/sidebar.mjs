@@ -6,7 +6,7 @@
  * message crosses the JSON-copying transport — a payload the shell could not receive,
  * or a command the page would silently ignore, fails here. The state is the page's own
  * (notes, clipboard, tiles, versions on disk through the stubbed filesystem), and each
- * edit is checked against what the React panel would have done with it.
+ * edit is checked against what the React panel does with it.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -29,7 +29,7 @@ const drag = await import('../../src/bridge/recentSelectionDrag.ts')
 const { saveDocument, getVersions } = await import('../../src/lib/FileSystem.js')
 const { appendVersionEntry, buildTextVersionEntry } = await import('../../src/lib/FileSystem.js')
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const frame = () => act(async () => {
   await new Promise((resolve) => dom.window.requestAnimationFrame(() => resolve()))
   await new Promise((resolve) => setTimeout(resolve, 10))

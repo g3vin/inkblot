@@ -29,7 +29,7 @@ const CanvasSurface = (await import('../../src/canvas/CanvasSurface.jsx')).defau
 const { CanvasToolbarSlotContext } = await import('../../src/canvas/canvasToolbarSlot.js')
 const { createEmptyCanvas, makeTextNode } = await import('../../src/lib/canvasModel.js')
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 40)) })
 
 const state = createEmptyCanvas()
@@ -174,7 +174,7 @@ await settle()
 ok('unlocking restores the resize zones', document.querySelectorAll('.canvas-resize-handle').length === 8)
 ok('unlocking restores Add card', !!button('Add card'))
 
-/* Touch (Phase 6). A finger on the empty canvas pans; the Pencil does what the mouse
+/* Touch. A finger on the empty canvas pans; the Pencil does what the mouse
    does; a second finger ends the first one's pan, because two fingers are a pinch. */
 {
   const world = () => document.querySelector('.canvas-world')
@@ -217,8 +217,7 @@ ok('unlocking restores Add card', !!button('Add card'))
   await settle()
 }
 
-/* Stacking. `nodes/reorder` sat in the reducer for two phases with nothing dispatching
-   it; these go through the same command event the context menu and the bridge use. */
+/* Stacking: Bring to Front / Send to Back, through the same command event the context menu and the bridge use. */
 {
   const { dispatchCanvasCommand } = await import('../../src/canvas/canvasEvents.js')
   const order = () => [...document.querySelectorAll('.canvas-node[data-node-id]')]
