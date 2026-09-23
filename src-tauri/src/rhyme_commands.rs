@@ -4,7 +4,7 @@
 use std::sync::OnceLock;
 
 use inkblot_models::rhymes::{RhymeDictionaryStatus, RhymeEngine, RhymeResponse};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Default)]
 pub struct RhymeState {
@@ -16,10 +16,7 @@ impl RhymeState {
         if let Some(engine) = self.engine.get() {
             return Ok(engine);
         }
-        let models = app
-            .path()
-            .app_data_dir()
-            .map_err(|e| format!("no app data dir: {e}"))?
+        let models = crate::app_data_dir(app)?
             .join("models");
         Ok(self.engine.get_or_init(|| RhymeEngine::new(models)))
     }

@@ -112,7 +112,7 @@ pub struct Note {
     /// locale-dependent, so nothing may read it back as data — recompute it instead.
     pub timestamp: String,
     /// **Unknown keys are preserved, not dropped.** `normalizeNote` spreads the
-    /// original note before overriding the fields above (noteUtils.js:107), so a key
+    /// original note before overriding the fields above (`src/lib/noteUtils.js`), so a key
     /// written by a newer build survives a round-trip through an older one. This
     /// field is what keeps that true here.
     #[typeshare(skip)]

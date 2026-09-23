@@ -152,9 +152,9 @@ impl DictationEngine {
 
 /// Where a whisper model is looked for when the caller does not name one.
 ///
-/// The path used to be a constant in `src/lib/dictation.js` pointing at one developer's
-/// home directory, so dictation could not work for anybody else. Resolution happens
-/// here, nearest-first, and the legacy location is kept last so existing setups survive.
+/// Nearest first: `$INKBLOT_DICTATION_MODEL`, then `<AppData>/models/ggml-small.en.bin`,
+/// then `~/inkblot-dictation/models/ggml-small.en.bin`, a per-user location that
+/// survives reinstalling the app.
 pub fn default_model_candidates(app_data_dir: &Path) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
@@ -306,13 +306,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_app_data_model_is_looked_for_before_the_legacy_one() {
+    fn the_app_data_model_is_looked_for_before_the_home_directory_one() {
         let candidates = default_model_candidates(Path::new("/data"));
         let app = candidates.iter().position(|p| p == Path::new("/data/models/ggml-small.en.bin"));
-        let legacy = candidates.iter().position(|p| p.ends_with("inkblot-dictation/models/ggml-small.en.bin"));
+        let home = candidates.iter().position(|p| p.ends_with("inkblot-dictation/models/ggml-small.en.bin"));
         assert!(app.is_some());
-        if let Some(legacy) = legacy {
-            assert!(app.unwrap() < legacy);
+        if let Some(home) = home {
+            assert!(app.unwrap() < home);
         }
     }
 

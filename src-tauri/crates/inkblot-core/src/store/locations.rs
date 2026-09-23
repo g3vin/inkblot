@@ -8,7 +8,7 @@
 //! A value is the absolute path to the project directory **itself**, not its parent.
 //! Projects in the default location have no entry.
 //!
-//! Mirrors `src/lib/projectLocations.js`.
+//! Reads and writes the same registry file as `src/lib/projectLocations.js`.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;

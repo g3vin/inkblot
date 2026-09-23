@@ -68,21 +68,14 @@ pub fn resolve_canvas_color(color: Option<&str>) -> String {
         .unwrap_or_else(|| color.to_string())
 }
 
-/// Width and height a new node of each kind starts at.
+/// A node's width and height.
 pub struct NodeSize {
     pub width: f64,
     pub height: f64,
 }
 
+/// The size given to a node stored without dimensions.
 pub const DEFAULT_TEXT_NODE_SIZE: NodeSize = NodeSize { width: 260.0, height: 140.0 };
-pub const DEFAULT_FILE_NODE_SIZE: NodeSize = NodeSize { width: 320.0, height: 220.0 };
-/// Taller than it is wide: a Pinterest board is a column of pins.
-pub const DEFAULT_LINK_NODE_SIZE: NodeSize = NodeSize { width: 340.0, height: 420.0 };
-/// A note card holds a quote, a body, and any replies — it needs room to breathe.
-pub const DEFAULT_NOTE_NODE_SIZE: NodeSize = NodeSize { width: 300.0, height: 240.0 };
-/// A voice memo is a play button and a scrub bar; it has no reason to be tall.
-pub const DEFAULT_AUDIO_NODE_SIZE: NodeSize = NodeSize { width: 260.0, height: 72.0 };
-pub const DEFAULT_GROUP_PADDING: f64 = 24.0;
 pub const MIN_NODE_SIZE: NodeSize = NodeSize { width: 100.0, height: 60.0 };
 
 pub const DEFAULT_VIEWPORT: Viewport = Viewport { x: 0.0, y: 0.0, zoom: 1.0 };

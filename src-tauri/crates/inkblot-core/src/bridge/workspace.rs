@@ -1,5 +1,5 @@
 //! The workspace's half of the protocol: the tab dock, the new-tab chooser, and the
-//! sentence-structure bubble — the last pieces of chrome the page drew for the shell.
+//! sentence-structure bubble, for a shell that draws them natively.
 //!
 //! The rule is the sidebar's (see `sidebar.rs`): the page owns the state and publishes
 //! it, and the shell changes it by command. Tabs are `useTabs`'s, and a tab's document
@@ -123,8 +123,8 @@ pub struct ParseNode {
 }
 
 /// One way the sentence parses, and the grammar's score for it — higher is likelier.
-/// Not a probability: the parser mixes products and log-sums, and the web bubble
-/// printed it as "Probability" anyway, so it is only good for ordering.
+/// Not a probability: the parser mixes products and log-sums, so it is only good for
+/// ordering.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

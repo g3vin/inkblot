@@ -1,19 +1,15 @@
 //! Synonym and antonym suggestions from a local ONNX model.
 //!
-//! Two things here exist to keep the feature genuinely offline and genuinely shippable,
-//! because neither was true before:
+//! Two decisions keep the feature offline and the app small:
 //!
-//!   * The model is ~423 MB, so it is NOT bundled. It downloads once into the app
-//!     data directory and is cached there for good. It used to be fetched at BUILD
-//!     time into `public/`, which meant 426 MB rode along inside the frontend bundle
-//!     even though nothing in the frontend ever read it, and Rust then loaded it by
-//!     the relative path `../public/synonym.onnx` — which resolves only when the
-//!     working directory is `src-tauri/`, i.e. in dev. In a bundled `.app` it panicked.
+//!   * The model is ~423 MB, so it is NOT bundled. It downloads once into
+//!     `<AppData>/models/` and is cached there for good. Never load it by a path
+//!     relative to the working directory: that resolves only in development.
 //!
-//!   * The tokenizer IS bundled (455 KB, `src-tauri/resources/minilm-tokenizer.json`).
-//!     `Tokenizer::from_pretrained(...)` reached out to HuggingFace on first use, so
-//!     the one feature advertised as local inference needed the network to start.
-//!     Each shell passes the path its bundle puts it at.
+//!   * The tokenizer IS bundled (455 KB, `src-tauri/resources/minilm-tokenizer.json`),
+//!     and read from a file — never `Tokenizer::from_pretrained`, which would reach
+//!     out to HuggingFace on first use. Each shell passes the path its bundle puts it
+//!     at (the Swift app's Embed Web Bundle phase copies it in).
 //!
 //! Loading is lazy and fallible: a missing model returns [`MODEL_NOT_INSTALLED`] for the
 //! caller to act on, rather than aborting the process before a window exists.

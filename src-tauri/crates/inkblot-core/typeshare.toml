@@ -1,8 +1,8 @@
 # typeshare maps our two escape-hatch aliases per language; everything else it
 # derives from the Rust definitions in src/types/.
 #
-# Swift's AnyCodable is not in the standard library — the Phase 5 Xcode target
-# supplies it (e.g. Flight-School/AnyCodable). It is only reachable from the three
+# Swift's AnyCodable is not in the standard library; the app defines it in
+# native/inkblot-core/inkblot-core/Support/AnyCodable.swift. It is only reachable from the three
 # places the format is genuinely untyped: TipTap content and the preserved
 # unknown-key maps.
 

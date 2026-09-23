@@ -7,13 +7,10 @@
 //!
 //! Mirrors `src/lib/sidebarSearch.js` and `src/lib/canvasSearch.js`.
 //!
-//! **`collectEditorMatches` stays in JS.** It walks a live ProseMirror document, which
+//! **`collectEditorMatches` lives in the webview.** It walks a live ProseMirror document, which
 //! only exists inside the webview. Its saved-document twin,
 //! [`collect_matches_from_doc_json`], is here — and it is the one that has to be right,
 //! because it is what searches the documents nobody has open.
-//!
-//! **Recent searches stay in JS too.** They live in `localStorage`, and moving that to
-//! disk is its own item in the migration.
 
 pub mod matcher;
 
@@ -27,7 +24,6 @@ use matcher::Matcher;
 
 pub const MAX_RESULTS_PER_DOCUMENT: usize = 24;
 pub const MAX_PROJECT_RESULTS: usize = 120;
-pub const MAX_RECENT_SEARCHES: usize = 6;
 
 const PREVIEW_RADIUS: usize = 34;
 

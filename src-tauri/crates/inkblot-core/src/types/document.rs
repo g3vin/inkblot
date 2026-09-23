@@ -37,7 +37,7 @@ pub enum VersionKind {
 /// The two kinds also live in different places. A text document embeds its
 /// `versions` array in its own file; a canvas keeps history in a `.versions/`
 /// sidecar, because a canvas file must stay spec-shaped JSON Canvas so it round-trips
-/// with Obsidian. The sidecar is also the legacy fallback for old text documents.
+/// with Obsidian. The sidecar is also read for text documents that have no embedded history.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

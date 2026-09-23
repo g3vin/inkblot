@@ -1,11 +1,11 @@
-//! `InkblotModels` where the models are not built — the iOS slices, for now.
+//! `InkblotModels` where the models are not built: the iOS slices.
 //!
 //! Every function `models.rs` exports, with the same names and types, so one set of
 //! Swift bindings serves every slice. Each refuses with a message the page shows as
 //! it would any other failure; none of them claims a model is merely not downloaded,
 //! which would offer a download that could never work.
 //!
-//! What it takes to remove this file: an onnxruntime built for iOS for `ort` to link
+//! To build the real models for iOS instead: an onnxruntime built for iOS for `ort` to link
 //! (it downloads no iOS binaries), whisper.cpp's cmake run for the iOS SDKs, and the
 //! `models` feature turned on for those targets in `scripts/build-xcframework.sh`.
 
