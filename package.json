@@ -1,10 +1,11 @@
 {
-  "name": "inkwell",
+  "name": "inkblot",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "tauri": "tauri",
     "build": "vite build",
     "test": "node --experimental-loader ./scripts/canvas-tests/loader.mjs scripts/canvas-tests/run.mjs",
     "lint": "eslint .",
@@ -15,9 +16,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tauri-apps/api": "2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-opener": "^2.5.3",
+    "@tiptap/core": "^3.23.1",
     "@tiptap/extension-color": "^3.19.0",
     "@tiptap/extension-font-family": "^3.19.0",
     "@tiptap/extension-highlight": "^3.19.0",
@@ -28,7 +31,7 @@
     "@tiptap/extension-table-row": "^3.23.1",
     "@tiptap/extension-text-align": "^3.19.0",
     "@tiptap/extension-text-style": "^3.19.0",
-    "@tiptap/extension-underline": "^3.19.0",
+    "@tiptap/pm": "^3.23.1",
     "@tiptap/react": "^3.19.0",
     "@tiptap/starter-kit": "^3.19.0",
     "compromise": "^14.14.5",
@@ -41,7 +44,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@tauri-apps/api": "2.10.1",
     "@tauri-apps/cli": "^2.10.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",

@@ -19,9 +19,9 @@ import SFIcon from './SFIcon'
 import './Editor.css'
 
 import ProjectLanding from './ProjectLanding'
-import { useTabs } from './useTabs'
-import { useEntryOperations } from './useEntryOperations'
-import { useClipboardHistory } from './useClipboardHistory'
+import { useTabs } from '../hooks/useTabs'
+import { useEntryOperations } from '../hooks/useEntryOperations'
+import { useClipboardHistory } from '../hooks/useClipboardHistory'
 import {
   CLIPBOARD_PERSIST_KEY,
   MAX_CLIPBOARD_ENTRIES,
