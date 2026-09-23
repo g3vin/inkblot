@@ -20,14 +20,18 @@ path = "src/bin/uniffi-bindgen.rs"
 required-features = ["bindgen"]
 
 [features]
+default = ["models"]
 bindgen = ["uniffi/cli"]
+# The on-device models (ort, whisper.cpp). Off for the iOS slices until they build
+# there; `src/models_unavailable.rs` stands in with the same interface.
+models = ["dep:inkblot-models", "dep:tokio"]
 
 [dependencies]
 inkblot-core = { path = "../inkblot-core" }
-inkblot-models = { path = "../inkblot-models", features = ["metal"] }
+inkblot-models = { path = "../inkblot-models", features = ["metal"], optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # The models' downloads and the scrape wait are async; Swift has no runtime to lend
 # them, so `InkblotModels` owns one.
-tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"], optional = true }
 uniffi = "0.29"

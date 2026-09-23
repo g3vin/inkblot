@@ -266,7 +266,7 @@ struct SentenceBubbleView: View {
         .frame(width: width, height: height, alignment: .topLeading)
         .glassEffect(.regular, in: .rect(cornerRadius: 18))
         .offset(origin)
-        .onExitCommand { model.workspace.sentence = nil }
+        .onEscape { model.workspace.sentence = nil }
         .onChange(of: structure.sentence) { shown = 0 }
     }
 

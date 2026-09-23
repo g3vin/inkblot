@@ -24,15 +24,7 @@ use inkblot_models::rhymes::RhymeEngine;
 use inkblot_models::scrape::ScrapeChannels;
 use inkblot_models::synonyms::SynonymEngine;
 
-use crate::CoreError;
-
-/// Where a model's events go: a Tauri event name the page listens for
-/// (`synonym://download`, `kokoro://download`, `dictation://partial`, …) and its
-/// payload as JSON. Swift implements it by emitting into the page through the shim.
-#[uniffi::export(with_foreign)]
-pub trait ModelEventSink: Send + Sync {
-    fn emit(&self, event: String, payload_json: String);
-}
+use crate::{CoreError, ModelEventSink};
 
 fn failed(message: impl Into<String>) -> CoreError {
     CoreError::Failed(message.into())

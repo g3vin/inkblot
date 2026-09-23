@@ -1,4 +1,6 @@
+#if os(macOS)
 import AppKit
+#endif
 import SwiftUI
 
 /// The project's files, natively — what replaces the page's `LeftSidebar`/`FileTree`.
@@ -154,7 +156,11 @@ struct FileTreeSidebar: View {
                 }
             }
             Divider()
+            #if os(macOS)
             Button("Reveal in Finder") { reveal(entry) }
+            #else
+            Button("Show in Files") { reveal(entry) }
+            #endif
             Divider()
             Button("Delete…", role: .destructive) { pendingDelete = entry }
         }
@@ -208,10 +214,17 @@ struct FileTreeSidebar: View {
         }
     }
 
+    /// Show in Finder. There is no Finder on iPadOS; the Files app is the nearest thing,
+    /// and it can only be sent a folder.
     private func reveal(_ entry: TreeEntry) {
         guard let root = model.tree.projectRoot else { return }
         let base = URL(fileURLWithPath: root).appendingPathComponent(entry.path)
+        #if os(macOS)
         NSWorkspace.shared.activateFileViewerSelecting([entry.isFolder ? base : base.appendingPathExtension("json")])
+        #else
+        let folder = entry.isFolder ? base : base.deletingLastPathComponent()
+        if let files = URL(string: "shareddocuments://" + folder.path) { Platform.open(files) }
+        #endif
     }
 }
 

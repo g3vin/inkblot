@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import SwiftUI
 
@@ -85,3 +86,4 @@ private struct WindowAccessor: NSViewRepresentable {
 
     func updateNSView(_ view: NSView, context: Context) {}
 }
+#endif

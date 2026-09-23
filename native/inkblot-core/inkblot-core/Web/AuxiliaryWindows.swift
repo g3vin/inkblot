@@ -1,4 +1,8 @@
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 import WebKit
 import os
 
@@ -31,7 +35,7 @@ final class AuxiliaryWindows {
     private var windows: [String: AuxiliaryWindow] = [:]
     private var targets: [WeakTarget] = []
     /// The main window, for a detached page that addresses `main` by label.
-    weak var mainWindow: NSWindow?
+    weak var mainWindow: PlatformWindow?
 
     private struct WeakTarget {
         weak var target: TauriEventTarget?
@@ -77,6 +81,7 @@ final class AuxiliaryWindows {
     }
 }
 
+#if os(macOS)
 /// One window the page opened.
 @MainActor
 final class AuxiliaryWindow: NSObject {
@@ -290,6 +295,178 @@ enum WindowOps {
         return nil
     }
 }
+
+#else
+/// One web view the page opened, on iPadOS and iOS — where an app does not open
+/// windows of its own.
+///
+/// Shown, it is presented over the app with a Done button (what a Pinterest login needs);
+/// hidden, it is parked off-screen in the key window, still loading and still running
+/// script, because a web view in no window at all is suspended and a scrape would stall.
+/// Done, a swipe down and `close` all end it, as closing its window does on a Mac. A
+/// detached document opens the same way: iPadOS's own multitasking is the way to see
+/// two documents side by side, and the app's scene is one page (see `AppModel`).
+@MainActor
+final class AuxiliaryWindow: NSObject {
+    let label: String
+    let webView: WKWebView
+    private var host: TauriHost?
+    private let isAppPage: Bool
+    private let controller = UIViewController()
+    private var presented: UINavigationController?
+
+    init(label: String, url: URL, options: [String: Any], core: CoreService, menus: WebMenus) {
+        self.label = label
+        isAppPage = url.scheme == AppSchemeHandler.appScheme || url.host == EditorWebController.startURL.host
+
+        let configuration = WKWebViewConfiguration()
+        let content = configuration.userContentController
+        if isAppPage {
+            let schemes = AppSchemeHandler(webRoot: EditorWebController.webRoot)
+            configuration.setURLSchemeHandler(schemes, forURLScheme: AppSchemeHandler.appScheme)
+            configuration.setURLSchemeHandler(schemes, forURLScheme: AppSchemeHandler.assetScheme)
+            let labelLiteral = (try? JSONEncoder().encode(label)).map { String(decoding: $0, as: UTF8.self) } ?? "\"\""
+            content.addUserScript(EditorWebController.script("window.__inkblotWindowLabel = \(labelLiteral);"))
+            content.addUserScript(EditorWebController.script(EditorWebController.resource("tauri-shim")))
+        } else {
+            content.addUserScript(EditorWebController.script(EditorWebController.resource("scrape-bridge")))
+        }
+        let width = (options["width"] as? NSNumber)?.doubleValue ?? 900
+        let height = (options["height"] as? NSNumber)?.doubleValue ?? 700
+        webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: height), configuration: configuration)
+        super.init()
+
+        controller.view = webView
+        controller.title = options["title"] as? String ?? "Inkblot"
+        webView.navigationDelegate = self
+        webView.isInspectable = true
+        if isAppPage {
+            let host = TauriHost(core: core, menus: menus, label: label)
+            self.host = host
+            content.addScriptMessageHandler(AuxReplyHandler(self), contentWorld: .page, name: "tauri")
+        } else {
+            content.add(AuxMessageHandler(self), name: "inkblotScrape")
+        }
+
+        if options["visible"] as? Bool != false, options["focus"] as? Bool != false {
+            show()
+        } else {
+            park()
+        }
+        webView.load(URLRequest(url: url))
+    }
+
+    /* ---------------- showing ---------------- */
+
+    private func show() {
+        guard presented == nil, let presenter = TauriHost.presenter(for: nil) else { return }
+        webView.removeFromSuperview()
+        controller.view = webView
+        let navigation = UINavigationController(rootViewController: controller)
+        controller.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            systemItem: .done, primaryAction: UIAction { [weak self] _ in self?.close() })
+        navigation.presentationController?.delegate = self
+        presented = navigation
+        host?.window = presenter.view.window
+        presenter.present(navigation, animated: true)
+    }
+
+    /// Off-screen in the key window: laid out at a real size, so a page that measures
+    /// itself (Pinterest's grid) loads as it would on screen.
+    private func park() {
+        guard let window = TauriHost.presenter(for: nil)?.view.window else { return }
+        webView.frame.origin = CGPoint(x: -20_000, y: 0)
+        window.addSubview(webView)
+    }
+
+    private func hide() {
+        if let presented {
+            self.presented = nil
+            presented.dismiss(animated: true) { [weak self] in self?.park() }
+        }
+    }
+
+    private func close() {
+        presented?.dismiss(animated: true)
+        presented = nil
+        webView.removeFromSuperview()
+        AuxiliaryWindows.shared.closed(label)
+    }
+
+    /* ---------------- what the page can ask of it ---------------- */
+
+    func perform(_ op: String, value: Any?) -> Any? {
+        switch op {
+        case "show", "set_focus": show()
+        case "hide": hide()
+        case "close", "destroy": close()
+        case "set_title": controller.title = value as? String
+        case "is_visible": return presented != nil
+        case "is_focused": return presented != nil
+        default: return nil
+        }
+        return nil
+    }
+
+    func navigate(to url: URL) {
+        webView.load(URLRequest(url: url))
+    }
+
+    func evaluate(_ script: String) {
+        webView.evaluateJavaScript(script) { _, _ in }
+    }
+
+    var currentURL: String { webView.url?.absoluteString ?? "" }
+
+    fileprivate func receiveTauri(_ body: Any) async -> String {
+        guard let host, let json = body as? String else { return #"{"ok":false,"error":"Request was not a string"}"# }
+        return await host.handle(json: json)
+    }
+
+    fileprivate func receiveScrape(_ body: Any) {
+        guard let json = body as? String,
+              let report = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+        else { return }
+        Task { _ = try? await ModelService.shared.invoke("pinterest_report_scrape", args: ["report": report]) }
+    }
+}
+
+extension AuxiliaryWindow: TauriEventTarget {
+    func emitTauriEvent(_ event: String, payloadJSON: String, label: String?) {
+        guard isAppPage else { return }
+        webView.evaluateJavaScript(TauriEvents.script(event, payloadJSON: payloadJSON, label: label))
+    }
+}
+
+extension AuxiliaryWindow: UIAdaptivePresentationControllerDelegate {
+    /// Swiped away: the same as Done.
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        presented = nil
+        close()
+    }
+}
+
+extension AuxiliaryWindow: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        let payload = (try? JSONSerialization.data(withJSONObject: ["url": currentURL, "event": "finished"]))
+            .map { String(decoding: $0, as: UTF8.self) } ?? "null"
+        AuxiliaryWindows.shared.broadcast("tauri://page-load", label: label, payloadJSON: payload)
+    }
+}
+
+/// The window verbs, on the one window an iOS app has: there is nothing to move, hide
+/// or retitle, so they answer as a window that is simply there would.
+@MainActor
+enum WindowOps {
+    static func perform(_ op: String, value: Any?, on window: UIWindow) -> Any? {
+        switch op {
+        case "is_visible", "is_focused": true
+        case "is_minimized": false
+        default: nil
+        }
+    }
+}
+#endif
 
 /// The one line that raises a Tauri event in a page.
 enum TauriEvents {
