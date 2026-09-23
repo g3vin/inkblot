@@ -3,10 +3,11 @@ import Observation
 
 /// Everything one window is made of, created once.
 ///
-/// One window for now. The page holds per-window state (the open project, its panes
+/// One main window. The page holds per-window state (the open project, its panes
 /// and tabs) and a second `WindowGroup` instance would be a second page over the same
 /// files with no coordination between them — two autosaves racing on one document.
-/// `InkblotApp` uses a single `Window` scene for exactly that reason.
+/// `InkblotApp` uses a single scene for exactly that reason (detached documents are
+/// separate windows with their own page; see `AuxiliaryWindows`).
 @MainActor
 @Observable
 final class AppModel {

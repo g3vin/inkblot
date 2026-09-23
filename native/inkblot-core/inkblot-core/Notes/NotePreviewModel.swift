@@ -5,7 +5,7 @@ import Observation
 /// Which note's hover cards are showing, and where their anchor is.
 ///
 /// The page reports its note markers (`useNativeNotePreviews`); this turns those reports
-/// into the same behaviour `NoteHoverPreview` had:
+/// into the same behaviour `NoteHoverPreview` has in the Tauri app:
 ///
 ///  - hovering a marker opens its cards; leaving the marker closes them after a short
 ///    grace period, unless the pointer has moved onto a card in the meantime
@@ -93,7 +93,7 @@ final class NotePreviewModel {
         }
     }
 
-    /// Working in a card — typing, dragging — pins it, as it did in the page: a card that
+    /// Working in a card — typing, dragging — pins it, as it does in the page: a card that
     /// vanished because the pointer drifted off it mid-sentence would lose the sentence.
     func pin() {
         cancelHide()

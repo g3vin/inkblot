@@ -18,7 +18,7 @@ import SwiftUI
 /// Glass cannot sample other glass: a `.glassEffect` lens over the bar's glass renders its
 /// own frosted backdrop and hides the bar, where Apple's is clear straight through. And a
 /// `GlassEffectContainer` draws its glass over plain content inside it, so the icons stay
-/// out of one: an earlier version put them in a container and they came out frosted.
+/// out of one; inside a container they render frosted.
 struct GlassTabBar<Tab: Hashable>: View {
     let tabs: [Tab]
     @Binding var selection: Tab

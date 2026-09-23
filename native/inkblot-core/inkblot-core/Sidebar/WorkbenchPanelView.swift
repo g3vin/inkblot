@@ -79,7 +79,7 @@ private struct TileCard: View {
 /* ---------------- parts of speech ---------------- */
 
 /// Tagged with the system's own tagger rather than a bundled NLP library — and mapped
-/// onto the same ten categories and colours the page's tile used.
+/// onto the same ten categories and colours as the page's tile.
 struct PartsOfSpeechView: View {
     let sentence: String
 
@@ -140,7 +140,7 @@ struct PartsOfSpeechView: View {
 
 /* ---------------- definition ---------------- */
 
-/// The first sense from the same free dictionary API the page's tile used, so the two
+/// The first sense from the same free dictionary API as the page's tile, so the two
 /// shells define a word the same way.
 struct DefinitionView: View {
     let word: String

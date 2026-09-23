@@ -1,16 +1,13 @@
 /**
  * tauri-shim.js — the Tauri IPC surface, answered by the Swift shell.
  *
- * Injected at document start, before any of the web bundle runs. The bundle was
- * written against Tauri and still is: `@tauri-apps/plugin-fs` persists every
- * document, `plugin-dialog` asks before every delete, `api/menu` builds every context
- * menu. All of those call `window.__TAURI_INTERNALS__`, and nothing else — so
- * implementing that one object is what lets the same `dist/` run under both shells
- * with no build flag and no fork.
- *
- * This is a compatibility layer, not the destination. Each piece of chrome that moves
- * to Swift stops calling through here; when the last one has, what is left is the
- * filesystem, and that belongs on the bridge protocol, not on Tauri's.
+ * Injected at document start, before any of the web bundle runs. The bundle is
+ * written against Tauri: `@tauri-apps/plugin-fs` persists every document,
+ * `plugin-dialog` asks before every delete, `api/menu` builds every context menu. All
+ * of those call `window.__TAURI_INTERNALS__`, and nothing else — so implementing that
+ * one object is what lets the same `dist/` run under both shells with no build flag
+ * and no fork. (Chrome state — tabs, notes, the toolbar — goes over the bridge
+ * protocol instead; this is only Tauri's API.)
  *
  * **What is answered here and what crosses.** Callbacks, channels, event listeners
  * and the menu resource tree are pure bookkeeping, and they live here, because a

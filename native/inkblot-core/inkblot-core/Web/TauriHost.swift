@@ -8,13 +8,13 @@ import os
 import UniformTypeIdentifiers
 import WebKit
 
-/// The Swift side of `Web/tauri-shim.js`: the Tauri commands the bundle still makes,
+/// The Swift side of `Web/tauri-shim.js`: the Tauri commands the bundle makes,
 /// answered natively.
 ///
 /// Only what needs the machine arrives here — callbacks, events and the menu tree are
-/// kept in the page (see the shim's header). What is left is a short list, and each
-/// case below says which package in the bundle makes the call, so that when that
-/// caller moves onto the bridge protocol the case can be deleted with confidence.
+/// kept in the page (see the shim's header). Each case below says which package in the
+/// bundle makes the call. A new Tauri command added to `src-tauri/src/lib.rs` needs a
+/// case here too (or in `ModelService`), or the Swift app answers it with an error.
 ///
 /// The synonym model, rhymes, Kokoro speech, whisper dictation and the Pinterest
 /// scrape channel are `ModelService`'s — `inkblot-models` through `inkblot-ffi`, the
@@ -321,7 +321,7 @@ final class TauriHost {
 
         default:
             log.info("Unanswered Tauri command: \(cmd, privacy: .public)")
-            throw Failure("not available in the native shell yet")
+            throw Failure("not available in the native shell")
         }
     }
 
@@ -457,7 +457,7 @@ final class TauriHost {
     /// reads through plugin-fs. So files are picked `asCopy` — the picker copies them
     /// into the app's container, and those paths are what the page gets. A folder cannot
     /// be copied, so a folder pick is still a lent URL: choosing a project folder
-    /// outside the app's container does not work on iOS yet.
+    /// outside the app's container does not work on iOS.
     private func openPanel(_ options: [String: Any]) async -> Any? {
         let directory = options["directory"] as? Bool ?? false
         let multiple = options["multiple"] as? Bool ?? false
@@ -481,9 +481,9 @@ final class TauriHost {
         return multiple ? paths : paths.first
     }
 
-    /// Not yet: a save panel on iOS exports a file that already exists, and the page
-    /// asks where to write before it writes. A cancelled panel is the answer the page
-    /// already handles.
+    /// Unsupported on iOS: a save panel there exports a file that already exists, and
+    /// the page asks where to write before it writes. Answering as a cancelled panel is
+    /// a case the page already handles.
     private func savePanel(_ options: [String: Any]) async -> Any? { nil }
 
     private func alert(message: String, title: String?, kind: String?, ok: String, cancel: String?) async -> Bool {
