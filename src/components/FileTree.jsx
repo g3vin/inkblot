@@ -23,7 +23,7 @@ import { isCanvasDoc, stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind
 import {
 } from '../lib/tabDockEvents'
 import SFIcon from './SFIcon'
-import { useFileTreeDrag } from './useFileTreeDrag'
+import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import {
   STORY_FOLDER_PRESETS,

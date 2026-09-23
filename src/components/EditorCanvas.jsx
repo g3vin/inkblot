@@ -5,7 +5,7 @@
  * view), lays the panes out, and hosts the split-view divider, the drop caret, the
  * draft pane, the canvas pane, the version-compare pane and the Focus Mode overlay.
  *
- * What a pane *does* with a document lives in five hooks beside this file, each one
+ * What a pane *does* with a document lives in six hooks in src/hooks, each one
  * a path where a bug is silent rather than loud:
  *
  *   useEditorDocCache    what each pane is holding, and whether it is mid-swap
@@ -30,12 +30,12 @@ import { buildEditorExtensions } from '../lib/editorExtensions'
 import { isEditorReady } from '../lib/editorUtils'
 import { isCanvasDoc } from '../lib/docKind'
 import CanvasPane from '../canvas/CanvasPane'
-import { useEditorAutosave } from './useEditorAutosave'
-import { useEditorDnd } from './useEditorDnd'
-import { useEditorDocCache } from './useEditorDocCache'
-import { useEditorDocLoader } from './useEditorDocLoader'
-import { useEditorNotes } from './useEditorNotes'
-import { formatWordStats, useEditorWordCount } from './useEditorWordCount'
+import { useEditorAutosave } from '../hooks/useEditorAutosave'
+import { useEditorDnd } from '../hooks/useEditorDnd'
+import { useEditorDocCache } from '../hooks/useEditorDocCache'
+import { useEditorDocLoader } from '../hooks/useEditorDocLoader'
+import { useEditorNotes } from '../hooks/useEditorNotes'
+import { formatWordStats, useEditorWordCount } from '../hooks/useEditorWordCount'
 import DraftTabPane from './DraftTabPane'
 import NativeDraftPane from './NativeDraftPane'
 import { nativeOwns } from '../lib/host'
