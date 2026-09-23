@@ -1,25 +1,19 @@
 /**
  * anchors.ts — turning a `TextAnchor` back into a place in a live document.
  *
- * This is sharp edge #3 made into one function. A ProseMirror position is invalidated
- * by every edit, and across a process boundary the holder does not see the edits — so
- * everything the protocol carries names its place by position *and* by the text that
- * position covered, and this is where the two are reconciled.
+ * A ProseMirror position is invalidated by every edit, and across a process boundary
+ * the holder does not see the edits. So everything the protocol carries names its
+ * place by position *and* by the text that position covered (`TextAnchor`), and this
+ * is where the two are reconciled.
  *
- * **What changes from the two hand-rolled versions this replaces.** Both
- * `EditorLayout.jsx`'s `jumpToText` and `Workbench.jsx`'s `findAnchorRange` fall back
- * to a text search, but neither checks that the stored positions still cover the text
- * they were made from: `jumpToText` trusts any pair of finite numbers, and
- * `findAnchorRange` trusts any range that is not empty. In one process that is nearly
- * always right, because the holder was remapping through every transaction and is at
- * most a tick stale. Across a process boundary it is not — native can be holding
- * positions from before an edit it never saw, and trusting them puts the caret in the
- * wrong place with no signal that anything went wrong.
+ * `resolveAnchor` verifies before it trusts: the stored positions are used only if
+ * they still cover the anchor's text; otherwise the text is searched for; and if the
+ * text is gone the answer is null. Null is a real outcome every caller must handle — a
+ * note whose words were deleted has lost what it was about, and a guessed position
+ * would put the caret somewhere wrong with no signal that anything went wrong.
  *
- * So `resolveAnchor` verifies before it trusts. That is a deliberate behaviour change
- * at both call sites, and it is the point of the phase rather than a tidy-up: the
- * phase exists to find out where the protocol is not safe, and an unverified position
- * is the place it is least safe.
+ * Every place in the app that turns a stored range back into a selection (jumping to
+ * a note, a Workbench tile, a search result) goes through here.
  */
 import type { TextAnchor } from '../types'
 import { isEditorReady } from '../lib/editorUtils'

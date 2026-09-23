@@ -5,14 +5,12 @@
  * `editingNodeId`), so a canvas with 200 cards still only ever pays for one
  * ProseMirror instance. Every other card is static HTML.
  *
- * This is the third state of the active-editor election, and sharp edge #5 of the
- * bridge protocol. The card registers itself as `EditorTarget.CanvasCard` and wins
- * the election while it is open; the pane's own two TipTap instances are idle and
- * holding no document, so a toolbar pointed at `Primary` would be driving nothing.
- * When the card closes it withdraws, the registry resolves `CanvasCard` to no editor,
- * and the toolbar goes quiet — which is the same outcome the `__inkblotCanvasCard`
- * gate in EditorLayout produces, reached by asking the registry rather than by
- * reading a property off a live object.
+ * This is the third state of the active-editor election (see bridge/editorRegistry).
+ * The card registers itself as `EditorTarget.CanvasCard` and wins the election while
+ * it is open; the pane's own two TipTap instances are idle and hold no document, so a
+ * toolbar pointed at `Primary` would be driving nothing. When the card closes it
+ * withdraws, the registry resolves `CanvasCard` to no editor, and the toolbar goes
+ * quiet.
  */
 import { useEffect, useRef } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
@@ -34,9 +32,7 @@ export default function CanvasCardEditor({ node, setActiveEditor, onCommit, onEx
   // deps — re-running it would tear the editor down mid-edit.
   //
   // Refreshed in an effect rather than during render: writing a ref while rendering
-  // is what the React Compiler forbids, and this component only started being checked
-  // for it once the `__inkblotCanvasCard` mutation was removed and it became
-  // analyzable. No dependency array, so every render leaves the ref holding a commit
+  // is what the React Compiler forbids. No dependency array, so every render leaves the ref holding a commit
   // that closes over the current `editor` and `onCommit`; the unmount cleanup below
   // then calls whatever the last render left.
   const commitRef = useRef(null)
@@ -65,9 +61,6 @@ export default function CanvasCardEditor({ node, setActiveEditor, onCommit, onEx
   useEffect(() => {
     if (!isEditorReady(editor)) return
 
-    // `editor.__inkblotCanvasCard = true` used to be set here for EditorLayout to
-    // read back off the object. The registration above says the same thing in a way
-    // that survives a process boundary, so the tag is gone.
     setActiveEditor?.(editor)
     editorRegistry.setActive(EditorTarget.CanvasCard)
 

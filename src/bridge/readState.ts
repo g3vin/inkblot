@@ -1,11 +1,9 @@
 /**
  * readState.ts — turning a live editor into the two structs the shell renders from.
  *
- * **This is sharp edge #1.** `Toolbar.jsx:102-145` does this work today and then keeps
- * the answer to itself, because it is holding the editor and can ask again whenever it
- * likes. Once the toolbar is an `NSToolbar` it cannot ask at all, so the reading moves
- * here, the answer goes on the bridge, and the toolbar becomes something that renders a
- * struct. Same ten facts, opposite direction.
+ * Chrome never holds an editor. The toolbar (the page's and the native menu bar's
+ * Format menu alike) renders a `ToolbarState` pushed over the bridge, and this is
+ * where that state is read off the active editor.
  *
  * The functions are pure reads — they take an editor and return a value, touching
  * nothing. That is what lets them serve both a pushed event and a request: the context
@@ -114,14 +112,12 @@ export function readActiveMarks(editor: unknown): ActiveMarks {
 export interface ReadToolbarOptions {
   target: EditorTarget | null
   /**
-   * The remembered highlight color — what used to be `editor.storage.lastHighlightColor`.
+   * The remembered highlight color: the last one applied, which `setHighlight` sets
+   * and the editor's context menu reuses.
    *
    * It is also the fallback for `highlight` when the selection carries no highlight
-   * mark. `Toolbar.jsx` falls back to whatever the toolbar was last *showing*, which is
-   * the same value except when the user is mid-drag in the color picker, where the
-   * displayed value has run ahead of anything applied. Falling back to the remembered
-   * color instead is the protocol-correct choice: there is only one value, and both
-   * sides of the seam agree on it.
+   * mark. The remembered color, not whatever a color picker is currently showing mid-
+   * drag, because it is the one value both sides of the bridge agree on.
    */
   lastHighlightColor: string
 }

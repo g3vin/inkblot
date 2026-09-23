@@ -30,11 +30,8 @@
    * The one pop-up surface. Every floating menu, popover and picker in the app wears
    * this — see the shared rule at the bottom of this file.
    *
-   * It is the canvas toolbar's chrome: a clean, solid popover. The menus used to be
-   * split across three different looks (--floating-note-*, which is an accent-tinted
-   * gradient; --sidebar-floating-*; and the landing page's own card), so the same
-   * gesture produced a differently-shaped, differently-coloured menu depending on
-   * which corner of the app you were in.
+   * It is the canvas toolbar's chrome: a clean, solid popover. Use it for any new
+   * menu, so the same gesture produces the same menu in every corner of the app.
    */
   --menu-bg: var(--popover-bg);
   --menu-border: var(--popover-border);
@@ -361,10 +358,9 @@ button:focus-visible {
  * per-component stylesheets (Editor.css, Toolbar.css, Canvas.css) no matter which
  * order the bundler happens to emit them in.
  *
- * The canvas toolbar is deliberately NOT in this list. It used to float over the
- * canvas and so wore this chrome; it now sits in the titlebar as the editor
- * toolbar's twin, and this rule's border and drop shadow would paint straight
- * over that (which, being :root-prefixed, Canvas.css cannot undo).
+ * The canvas toolbar is deliberately NOT in this list. It sits in the titlebar as
+ * the editor toolbar's twin, and this rule's border and drop shadow would paint
+ * straight over that (which, being :root-prefixed, Canvas.css cannot undo).
  */
 :root .canvas-color-menu,
 :root .file-tree-create-menu,

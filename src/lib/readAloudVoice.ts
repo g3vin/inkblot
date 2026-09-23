@@ -1,22 +1,20 @@
 /**
  * readAloudVoice.ts — text to phoneme token ids, for the native speech path.
  *
- * Read Aloud's native voice used to be a **long-lived Python child process**, which
- * worked on the machine it was set up on, silently fell back to WASM everywhere else,
- * and — the reason it had to go — cannot exist on iOS, where subprocesses are not a
- * thing. The model now runs through `ort` in Rust. This is the half that stayed here:
+ * The Kokoro model runs through `ort` in Rust (`inkblot-models/src/kokoro_speech.rs`).
+ * This is the webview's half of the pipeline:
  *
  *   text -> normalize -> phonemize -> token ids  ->  Rust: ONNX -> samples
  *
- * Phonemization stays in the webview because a correct English grapheme-to-phoneme
- * pass is a lexicon and several thousand rules, `phonemizer` already implements one,
- * and none of it is a subprocess — so none of it blocks the new targets.
+ * Phonemization lives here because a correct English grapheme-to-phoneme pass is a
+ * lexicon and several thousand rules, `phonemizer` already implements one, and none
+ * of it needs a subprocess — so it works on every platform the app targets.
  *
  * ## Why this is a transcription, and how it is checked
  *
  * `kokoro-js` does the same normalization before phonemizing, in a module-private
  * function it does not export. Reaching it would mean loading the whole TTS class,
- * which loads the model into the webview — the thing this change exists to stop.
+ * which loads the model into the webview.
  *
  * So it is transcribed. Transcription is exactly where a silent error lives, so the
  * `voice` suite runs this side by side with the real function, pulled out of

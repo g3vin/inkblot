@@ -35,17 +35,6 @@ export interface AnchorRect {
   height: number
 }
 
-/**
- * What the hover preview is showing. `editorView` is a live ProseMirror `EditorView`
- * and is only ever compared by identity here — this module does not touch it, which
- * is what keeps it pure.
- */
-export interface PreviewIdentity {
-  note?: { id?: string } | null
-  locked?: boolean
-  editorView?: unknown
-}
-
 export const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
@@ -110,20 +99,6 @@ export const getCurvePath = (fromPoint: Point, toPoint: Point): string => {
   }
 
   return `M ${fromPoint.x} ${fromPoint.y} Q ${controlPoint.x} ${controlPoint.y} ${toPoint.x} ${toPoint.y}`
-}
-
-export const isSamePreviewIdentity = (
-  left: PreviewIdentity | null | undefined,
-  right: PreviewIdentity | null | undefined,
-): boolean => {
-  if (left === right) return true
-  if (!left || !right) return false
-
-  return (
-    left.note?.id === right.note?.id &&
-    left.locked === right.locked &&
-    left.editorView === right.editorView
-  )
 }
 
 export const isDragEdge = (clientX: number, clientY: number, rect: AnchorRect): boolean => (

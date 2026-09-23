@@ -12,17 +12,17 @@
  * and leaves as the type the app may rely on.
  *
  * The `as` casts below are assertions about what the writer wrote, not checks: they
- * are erased, so a field holding something exotic comes out of here exactly as it did
- * before this file was TypeScript. Coercing instead would be a behaviour change, and
- * this is a port.
+ * are erased, so a field holding something exotic (a stored `5` for `currentDoc`)
+ * passes through unchanged. Coercing with `typeof` checks would be stricter, and a
+ * behaviour change for sessions already on disk.
  */
 import type { Loose } from '../types'
 import { getPreference } from './preferences'
 export const PERSIST_KEY = 'inkblot-session'
 export const CLIPBOARD_PERSIST_KEY = 'inkblot-clipboard-history'
 export const MAX_CLIPBOARD_ENTRIES = 80
-// No 'search': search is the sidebar's search bar, not a tab. A session saved
-// before that change restores to the default tab rather than a tab that is gone.
+// Search is the sidebar's search bar, not a tab, so a stored 'search' (or any
+// unknown id) restores to the default tab.
 export const RIGHT_SIDEBAR_TAB_IDS = new Set(['clipboard', 'workbench', 'notes', 'history'])
 
 /** Which panel the right sidebar is showing. */

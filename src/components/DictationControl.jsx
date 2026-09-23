@@ -6,17 +6,13 @@
  * final transcripts, filtering out non-speech tags like [silence]. Includes a live
  * mic level-meter.
  *
- * **Transcripts arrive over the bridge, and the draft machine does not.** This is
- * sharp edge #2 of Phase 4, and the split is deliberate: `replaceInlineDraft` below
- * reads the text the draft range currently covers, diffs it against the new
- * transcript, and dispatches the changed slice plus its decoration in one
- * transaction — at speaking rate. A round trip inside that loop would lose the race
- * with whisper. So the engine sends nothing but `dictationPartial` / `dictationFinal`
- * / `dictationLevel`, everything below stays on this side, and none of it has to
- * change when the engine moves into Swift.
- *
- * `bridge/dictationSource.ts` is what sends those commands today; it is a stand-in
- * for the Swift that will.
+ * **Transcripts arrive over the bridge; the draft machine stays here.**
+ * `replaceInlineDraft` below reads the text the draft range currently covers, diffs it
+ * against the new transcript, and dispatches the changed slice plus its decoration in
+ * one transaction — at speaking rate. A round trip inside that loop would lose the
+ * race with whisper. So the engine sends nothing but `dictationPartial` /
+ * `dictationFinal` / `dictationLevel` (via `bridge/dictationSource.ts`), and every
+ * decision about the document is made below.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'

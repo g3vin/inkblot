@@ -19,12 +19,9 @@ import { readClipboardImages } from '../lib/noteImageUtils'
 import { collectNoteBranchIds, createFreeNote, touchNote } from '../lib/noteUtils'
 import { RESIZE_ICON_PATHS } from '../lib/resizeIcon'
 import {
-  clearEditorActiveNote,
   NOTE_PREVIEW_ENTER_EVENT,
   NOTE_PREVIEW_LEAVE_EVENT,
   NOTE_PREVIEW_PIN_EVENT,
-  setEditorActiveNote,
-  setEditorHoveredNote,
 } from '../extensions/NoteAnnotation'
 
 import {
@@ -44,7 +41,6 @@ import {
   getCardCenter,
   getDefaultChildOffset,
   getCurvePath,
-  isSamePreviewIdentity,
   hasStoredChildOffset,
   areRectsEqual,
 } from '../lib/notePreviewGeometry'
@@ -69,7 +65,6 @@ export default function NoteHoverPreview({
   const [focusNoteId, setFocusNoteId] = useState(null)
   const [elasticPositions, setElasticPositions] = useState({})
   const previewRef = useRef(null)
-  const previousPreviewRef = useRef(null)
   const hideTimeoutRef = useRef(null)
   const textareaRefs = useRef(new Map())
   const dragStateRef = useRef(null)
@@ -148,29 +143,6 @@ export default function NoteHoverPreview({
     if (!preview?.note?.id) return null
     return noteById.get(preview.note.id) || preview.note
   }, [noteById, preview])
-
-  // Mirror hover/pin state back into the editor so the anchored text highlights.
-  useEffect(() => {
-    const previous = previousPreviewRef.current
-
-    if (previous && !isSamePreviewIdentity(previous, preview)) {
-      if (previous.locked) {
-        clearEditorActiveNote(previous.editorView)
-      } else {
-        setEditorHoveredNote(previous.editorView, null)
-      }
-    }
-
-    if (preview && !isSamePreviewIdentity(previous, preview)) {
-      if (preview.locked) {
-        setEditorActiveNote(preview.editorView, preview.note.id)
-      } else {
-        setEditorHoveredNote(preview.editorView, preview.note.id)
-      }
-    }
-
-    previousPreviewRef.current = preview
-  }, [preview])
 
   useEffect(() => {
     textareaRefs.current.forEach((textarea) => {

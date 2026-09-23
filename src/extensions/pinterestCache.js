@@ -27,10 +27,8 @@ export const getPinterestCacheKey = (url) => {
 /**
  * Which open of which project this is.
  *
- * Was `window.__inkblotProjectOpenId`, set by Editor.jsx and read from here — a node
- * view, with no React path back to the component that knows. It is still ambient for
- * that reason, but it is `lib/projectContext` now rather than a property anything can
- * assign, and that module keeps the same fall-through to the session store.
+ * Read from `lib/projectContext`, because a node view has no React path back to the
+ * component that knows.
  */
 export const getProjectOpenId = () => readProjectOpenId()
 

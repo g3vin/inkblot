@@ -13,8 +13,8 @@
  * Inward: syncEditorNotes publishes the notes into editor storage, which is what the
  * NoteAnnotation decorations render from.
  *
- * Outward again, and this is sharp edge #4 of the bridge protocol: the shell is
- * holding these positions too, so every remap is also published on the bridge. The
+ * Outward again: the shell holds these positions too, so every remap is also
+ * published on the bridge. The
  * event fires on every transaction, which is every keystroke in a document with quote
  * notes, so the surface coalesces it to one per frame — safely, because the event
  * carries the whole remapped set rather than a delta, and the last one is always

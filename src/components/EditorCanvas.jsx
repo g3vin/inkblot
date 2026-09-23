@@ -401,7 +401,7 @@ export default function EditorCanvas({
   /* ---------------- The bridge ---------------- */
 
   // Follows the election and publishes toolbar state and selection context for
-  // whichever editor is active. This is the loop Toolbar.jsx used to run on itself.
+  // whichever editor is active.
   useSurfacePublisher()
 
   /* ---------------- Expose Editor, to the bridge ---------------- */

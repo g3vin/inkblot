@@ -39,8 +39,8 @@
 }
 
 /* Nothing in the toolbar may shrink. The titlebar column is narrow and flex
-   items default to shrinking, which used to squash the color swatches down to
-   an unclickable sliver; the toolbar scrolls instead. */
+   items default to shrinking, which would squash the color swatches down to an
+   unclickable sliver; the toolbar scrolls instead. */
 .toolbar > * {
   flex: 0 0 auto;
 }
