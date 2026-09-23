@@ -5,10 +5,8 @@
  * Dictionary (see `inkblot-models/src/rhymes.rs`); clicking a rhyme replaces the source
  * word in the document.
  *
- * This used to score candidates with an ONNX model in onnxruntime-web, loaded from
- * `/rhyme_model.onnx` and `/vocab.json` — files that never existed, so the tile always
- * failed. The dictionary is 3.6 MB, so when Rust reports `MODEL_NOT_INSTALLED` the
- * tile fetches it without asking, the way it would load any other small resource.
+ * The dictionary is 3.6 MB, so when Rust reports `MODEL_NOT_INSTALLED` the tile
+ * fetches it without asking, the way it would load any other small resource.
  */
 import React, { useEffect, useMemo, useState } from 'react'
 

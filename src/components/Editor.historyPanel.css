@@ -6,13 +6,10 @@
   min-height: 0;
 }
 
-/* The one declaration of each. They used to be split between here and
-   RightSidebar/HistoryPanel.css at equal specificity, with load order deciding:
-   this file loads later, so its `gap: 8px` beat that one's 6px, and its
-   `margin-bottom: 0` is what cancels `.tile-header`'s 8px (which loads between
-   the two). Merged here, in the later position, with the values that already won —
-   so nothing on screen changed. Moving them to the earlier file would have let
-   `.tile-header`'s margin back in. */
+/* `.history-tile` and `.history-tile-header` are declared here, not in
+   RightSidebar/HistoryPanel.css, because this file loads later in Editor.css:
+   `margin-bottom: 0` has to come after `.tile-header`'s 8px (which loads between
+   the two) to cancel it. */
 .history-tile {
   display: flex;
   flex-direction: column;

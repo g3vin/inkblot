@@ -19,9 +19,8 @@ const normalizeTerm = (term) => term.trim().toLowerCase()
 /**
  * Tauri's API is imported lazily so the tile still renders in a plain browser.
  *
- * Held as a PROMISE rather than a resolved function: the module-level import used to
- * be awaited into a `let`, so anything rendering before it settled saw `null` and
- * reported "Tauri API not available" on first paint.
+ * Held as a PROMISE rather than a resolved value, so a render before the import
+ * settles waits for it instead of reporting "Tauri API not available".
  */
 const tauri =
   typeof window !== "undefined" && window.__TAURI__

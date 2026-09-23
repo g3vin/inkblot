@@ -8,9 +8,9 @@
  * The two pieces of the node view that carry state of their own live beside it —
  * pinterestBoardPreview.js, which decides where pins come from, and
  * pinterestBoardCollapse.js, which folds a tall board down. Both are factories
- * rather than modules of functions: the node view closure used to reassign their
- * state (the current URL, whether the board is expanded) from half a dozen
- * callbacks, and a parameter cannot carry a write back out.
+ * rather than modules of functions: their state (the current URL, whether the board
+ * is expanded) is reassigned from half a dozen node-view callbacks, and a parameter
+ * cannot carry a write back out.
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'

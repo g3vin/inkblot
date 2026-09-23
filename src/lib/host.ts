@@ -1,15 +1,13 @@
 /**
- * host.ts — which parts of the chrome this page is still responsible for.
+ * host.ts — which parts of the chrome this page is responsible for drawing.
  *
- * Under Tauri, all of it. Under the Swift shell, whatever has not moved yet: Phase 5
- * moves the chrome a piece at a time, and a piece that has moved must stop rendering
- * here, or the window has two file trees. The shell says which pieces it draws when it
- * injects `window.__inkblotNative` (see `native/…/Web/native-host.js`).
+ * Under Tauri, all of it. Under the Swift shell, only what the shell does not draw
+ * natively: a piece the shell draws must not also render here, or the window has two
+ * file trees. The shell says which pieces it draws when it injects
+ * `window.__inkblotNative` (see `native/inkblot-core/inkblot-core/Web/native-host.js`).
  *
- * Asked, not assumed. A flag compiled into the bundle would make the same `dist/`
- * behave differently depending on which build made it; asking the host keeps one
- * bundle for both shells, which is what lets the Tauri app stay shippable while the
- * port is under way.
+ * Asked, not assumed: one `dist/` serves both shells, so nothing about the host is
+ * compiled into the bundle.
  */
 import { detectNativeHost } from '../bridge/transport'
 
