@@ -48,7 +48,7 @@ final class WorkspaceModel {
     func newTab() { bridge.send(.newTab(NewTabCommand())) }
     func openInTab(_ docPath: String) { bridge.send(.openDocInTab(OpenDocInTabCommand(docPath: docPath))) }
 
-    /// How a tab shows in the dock — what `TabDock.jsx` worked out per dot.
+    /// How a tab shows in the dock — what `TabDock.jsx` works out per dot.
     struct TabPresentation {
         var isDraft: Bool
         var isActive: Bool

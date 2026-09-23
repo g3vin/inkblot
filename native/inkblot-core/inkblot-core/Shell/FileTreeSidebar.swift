@@ -3,7 +3,8 @@ import AppKit
 #endif
 import SwiftUI
 
-/// The project's files, natively — what replaces the page's `LeftSidebar`/`FileTree`.
+/// The project's files, natively — the Swift app's counterpart to the page's
+/// `LeftSidebar`/`FileTree`, which do not render when this does.
 ///
 /// Browsing is local: the tree is read from disk by the core and kept current by
 /// FSEvents (`ProjectTree`). **Every change goes through the page**, as a protocol

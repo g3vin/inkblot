@@ -8,7 +8,7 @@ import SwiftUI
 /// AppKit keeps the whole of a toolbar's band for itself (its empty space drags the
 /// window), and the page's toolbar lives in that band — its buttons would stop taking
 /// clicks. A hidden titlebar passes clicks through to the page. What it does not do is
-/// lay the traffic lights out as a toolbar window would: it keeps the old 28pt titlebar,
+/// lay the traffic lights out as a toolbar window would: it keeps the standard 28pt titlebar,
 /// with the lights jammed into the corner. So this puts them where a unified-toolbar
 /// window has them, and every other control in the band is placed on the same line.
 enum WindowChrome {

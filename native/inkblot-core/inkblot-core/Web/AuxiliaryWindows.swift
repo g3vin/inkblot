@@ -289,7 +289,7 @@ enum WindowOps {
             window.center()
         default:
             // Everything else the page might ask (`onResized` and friends' plumbing, a
-            // theme) answers with nothing, as the shim always answered it.
+            // theme) answers with nothing, as the shim does in the page.
             return nil
         }
         return nil

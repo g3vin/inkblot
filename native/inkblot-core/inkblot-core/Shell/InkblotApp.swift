@@ -1,5 +1,10 @@
 import SwiftUI
 
+/// The Swift app: a SwiftUI shell around the editor bundle (`dist/`), which runs
+/// unmodified in a `WKWebView` (`EditorWebView`). The shell draws the file tree, the
+/// inspector, the tab dock and the menu bar natively, and talks to the page over the
+/// bridge protocol (`ShellBridge`) and the Tauri API shim (`TauriHost`). Domain logic
+/// and models come from Rust through `inkblot-ffi` (`CoreService`, `ModelService`).
 @main
 struct InkblotApp: App {
     @State private var model = AppModel()

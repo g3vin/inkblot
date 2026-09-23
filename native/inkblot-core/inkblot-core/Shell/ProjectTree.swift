@@ -6,7 +6,7 @@ import Observation
 
 /// The open project's tree, kept current.
 ///
-/// The page still writes the tree — every autosave, every canvas card dropped into a
+/// The page writes the tree — every autosave, every canvas card dropped into a
 /// folder, everything the page's own code creates — and it does not say so over the
 /// bridge. So the tree is re-read from disk whenever the disk changes, which also
 /// catches a project moved in the Finder or synced down from iCloud. The core reads

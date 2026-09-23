@@ -279,7 +279,7 @@ struct SentenceBubbleView: View {
     }
 }
 
-/// A phrase over its children, as the web bubble drew it; a leaf is its label alone.
+/// A phrase over its children, as the page's Bubble draws it; a leaf is its label alone.
 private struct ParseTreeView: View {
     let node: ParseNode
 

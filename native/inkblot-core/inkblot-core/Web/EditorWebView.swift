@@ -12,7 +12,7 @@ import os
 ///
 ///  - `inkblotBridge` carries the protocol — `OutboundMessage` JSON from the page to
 ///    `ShellBridge`, and `InboundMessage` JSON back through `evaluateJavaScript`.
-///  - `tauri` carries the compatibility calls the bundle still makes, answered by
+///  - `tauri` carries the Tauri API calls the bundle makes, answered by
 ///    `TauriHost` (see `Web/tauri-shim.js`). It is a reply handler, so each call is a
 ///    promise on the page side.
 ///

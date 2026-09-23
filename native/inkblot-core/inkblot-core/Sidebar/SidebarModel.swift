@@ -25,7 +25,7 @@ final class SidebarModel {
             }
         }
 
-        /// The same symbols the page's tab strip used.
+        /// The same symbols as the page's tab strip.
         var symbol: String {
             switch self {
             case .clipboard: "doc.on.clipboard"
@@ -42,7 +42,7 @@ final class SidebarModel {
     /* ---------------- search ---------------- */
 
     /// `panel` filters whatever tab is showing; every other scope searches and shows
-    /// results instead — the same split the page's search bar had.
+    /// results instead — the same split as the page's search bar.
     var scope: SearchScope = .panel
     var query = ""
     var matchCase = false
@@ -205,7 +205,7 @@ final class SidebarModel {
 
     var isSearching: Bool { scope != .panel }
 
-    /// Does `text` pass the panel filter? Case-insensitive substring, as the page's was.
+    /// Does `text` pass the panel filter? Case-insensitive substring, as in the page.
     func matchesFilter(_ parts: String...) -> Bool {
         let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard !needle.isEmpty, scope == .panel else { return true }

@@ -135,7 +135,7 @@ struct ModelServiceTests {
     }
 }
 
-/// The tab dock's per-tab decisions, which `TabDock.jsx` made per dot.
+/// The tab dock's per-tab decisions, which `TabDock.jsx` makes per dot.
 @MainActor
 struct WorkspaceModelTests {
     @Test func aDocumentTabShowsWhereItIs() throws {
