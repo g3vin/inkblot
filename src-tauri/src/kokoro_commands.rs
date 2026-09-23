@@ -17,9 +17,7 @@ impl KokoroSpeechState {
         if let Some(engine) = self.engine.get() {
             return Ok(engine.clone());
         }
-        let dir = crate::app_data_dir(app)?
-            .join("models")
-            .join("kokoro");
+        let dir = crate::app_data_dir(app)?.join("models").join("kokoro");
         Ok(self.engine.get_or_init(|| KokoroEngine::new(dir)).clone())
     }
 }

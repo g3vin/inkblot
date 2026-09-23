@@ -16,8 +16,7 @@ impl RhymeState {
         if let Some(engine) = self.engine.get() {
             return Ok(engine);
         }
-        let models = crate::app_data_dir(app)?
-            .join("models");
+        let models = crate::app_data_dir(app)?.join("models");
         Ok(self.engine.get_or_init(|| RhymeEngine::new(models)))
     }
 }

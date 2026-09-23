@@ -57,11 +57,11 @@ pub use command::{
     ApplyMarkCommand, CanvasCommandRequest, CanvasDropDocCommand, CanvasDropNoteCommand,
     CanvasRestoreCommand, CanvasRevealCommand, CreateEntryCommand, DeleteEntryCommand,
     DictationCancelCommand, DictationLevelCommand, DictationTranscript, DuplicateEntryCommand,
-    EntryKind, InsertPlainTextCommand, InsertTableCommand, JumpToAnchorCommand,
-    MoveEntryCommand, NativeCommand, OpenDocumentCommand, RenameEntryCommand,
-    ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand, SetColorCommand,
-    SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand, SetHighlightCommand,
-    SetSelectionCommand, SetTitlebarInsetCommand, SyncNotesCommand, TargetOnly,
+    EntryKind, InsertPlainTextCommand, InsertTableCommand, JumpToAnchorCommand, MoveEntryCommand,
+    NativeCommand, OpenDocumentCommand, RenameEntryCommand, ReplaceRangesCommand,
+    SetAlignmentCommand, SetCaretAtDocPosCommand, SetColorCommand, SetContentCommand,
+    SetFontFamilyCommand, SetFontSizeCommand, SetHighlightCommand, SetSelectionCommand,
+    SetTitlebarInsetCommand, SyncNotesCommand, TargetOnly,
 };
 pub use common::{Alignment, EditorTarget, MarkKind, Pane, RangeEdit, TextAnchor};
 pub use envelope::{
@@ -79,8 +79,8 @@ pub use sidebar::{
     InsertClipboardEntryCommand, NotePatch, NotePreviewDismissed, NoteRef, NotesChanged,
     RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
     ReplaceTileWordCommand, RevealSearchResultCommand, ShowSidebarTab, SidebarTab, TileKind,
-    TileRef, TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand,
-    VersionsChanged, WorkbenchTile,
+    TileRef, TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,
+    WorkbenchTile,
 };
 pub use workspace::{
     CreateFromDraftCommand, DocTab, DraftKind, DraftPaneChanged, NewTabCommand,

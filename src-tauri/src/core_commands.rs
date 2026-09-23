@@ -9,6 +9,9 @@ pub async fn list_system_fonts() -> Result<Vec<String>, String> {
 
 /// Fetch a public Pinterest board page and read its pins out of the HTML.
 #[tauri::command]
-pub async fn scrape_pinterest_html(url: String, max_pins: Option<usize>) -> Result<ScrapeResult, String> {
+pub async fn scrape_pinterest_html(
+    url: String,
+    max_pins: Option<usize>,
+) -> Result<ScrapeResult, String> {
     inkblot_core::pinterest::scrape_pinterest_html(url, max_pins).await
 }

@@ -164,7 +164,11 @@ impl SynonymEngine {
         }
 
         let missing = self.missing_assets()?;
-        Ok(SynonymModelStatus { installed: missing.is_empty(), loaded: false, missing })
+        Ok(SynonymModelStatus {
+            installed: missing.is_empty(),
+            loaded: false,
+            missing,
+        })
     }
 
     /// Ten synonyms and five antonyms for `target_word` as it is used in `text`.
@@ -201,8 +205,11 @@ impl SynonymEngine {
                 .map_err(|e| format!("tokenizer.encode: {e}"))?;
 
             let mut ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
-            let mut mask: Vec<i64> =
-                encoding.get_attention_mask().iter().map(|&m| m as i64).collect();
+            let mut mask: Vec<i64> = encoding
+                .get_attention_mask()
+                .iter()
+                .map(|&m| m as i64)
+                .collect();
 
             ids.resize(MAX_LEN, 0);
             mask.resize(MAX_LEN, 0);
@@ -276,10 +283,18 @@ fn rank(sims: &[f32], vocab: &[String], target_word: &str) -> SynonymResponse {
     let indices: Vec<usize> = (0..sims.len()).collect();
 
     let mut high = indices.clone();
-    high.sort_by(|&a, &b| sims[b].partial_cmp(&sims[a]).unwrap_or(std::cmp::Ordering::Equal));
+    high.sort_by(|&a, &b| {
+        sims[b]
+            .partial_cmp(&sims[a])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let mut low = indices;
-    low.sort_by(|&a, &b| sims[a].partial_cmp(&sims[b]).unwrap_or(std::cmp::Ordering::Equal));
+    low.sort_by(|&a, &b| {
+        sims[a]
+            .partial_cmp(&sims[b])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let pick = |order: &[usize], limit: usize| {
         let mut words = Vec::new();
@@ -296,7 +311,10 @@ fn rank(sims: &[f32], vocab: &[String], target_word: &str) -> SynonymResponse {
         words
     };
 
-    SynonymResponse { synonyms: pick(&high, 10), antonyms: pick(&low, 5) }
+    SynonymResponse {
+        synonyms: pick(&high, 10),
+        antonyms: pick(&low, 5),
+    }
 }
 
 #[cfg(test)]
@@ -305,7 +323,10 @@ mod tests {
 
     #[test]
     fn ranking_skips_the_word_itself() {
-        let vocab: Vec<String> = ["happy", "glad", "sad", "joyful"].iter().map(|s| s.to_string()).collect();
+        let vocab: Vec<String> = ["happy", "glad", "sad", "joyful"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         let ranked = rank(&[0.99, 0.9, -0.8, 0.7], &vocab, "happy");
         assert_eq!(ranked.synonyms, vec!["glad", "joyful", "sad"]);
         assert_eq!(ranked.antonyms, vec!["sad", "joyful", "glad"]);
@@ -315,7 +336,10 @@ mod tests {
     fn a_missing_model_is_the_sentinel_not_a_crash() {
         let dir = std::env::temp_dir().join(format!("inkblot-syn-{}", std::process::id()));
         let engine = SynonymEngine::new(&dir, dir.join("no-tokenizer.json"));
-        assert_eq!(engine.synonyms("a b", "a").unwrap_err(), MODEL_NOT_INSTALLED);
+        assert_eq!(
+            engine.synonyms("a b", "a").unwrap_err(),
+            MODEL_NOT_INSTALLED
+        );
         let status = engine.status().unwrap();
         assert!(!status.installed && !status.loaded);
         assert_eq!(status.missing.len(), MODEL_ASSETS.len());

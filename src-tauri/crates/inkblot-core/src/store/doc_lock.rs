@@ -25,11 +25,19 @@ impl DocLocks {
     /// A task that panics must not wedge the document for the rest of the session, so
     /// the poison is cleared rather than propagated — the same reasoning as the JS
     /// running its next task whether the previous one resolved or rejected.
-    pub fn with_doc_lock<T>(&self, project_name: &str, doc_name: &str, task: impl FnOnce() -> T) -> T {
+    pub fn with_doc_lock<T>(
+        &self,
+        project_name: &str,
+        doc_name: &str,
+        task: impl FnOnce() -> T,
+    ) -> T {
         let key = format!("{project_name}\u{0}{doc_name}");
 
         let lock = {
-            let mut locks = self.locks.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut locks = self
+                .locks
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             Arc::clone(locks.entry(key).or_default())
         };
 
@@ -54,8 +62,11 @@ mod tests {
 
         let handles: Vec<_> = (0..8)
             .map(|_| {
-                let (locks, inside, overlaps) =
-                    (Arc::clone(&locks), Arc::clone(&inside), Arc::clone(&overlaps));
+                let (locks, inside, overlaps) = (
+                    Arc::clone(&locks),
+                    Arc::clone(&inside),
+                    Arc::clone(&overlaps),
+                );
                 thread::spawn(move || {
                     for _ in 0..50 {
                         locks.with_doc_lock("p", "doc", || {

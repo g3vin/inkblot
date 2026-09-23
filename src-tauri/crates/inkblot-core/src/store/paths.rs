@@ -57,12 +57,17 @@ pub fn parent_of(abs_path: &str) -> String {
 pub fn normalize_path(path: &str) -> String {
     let collapsed = match path.find('/') {
         Some(start) => {
-            let run_end = path[start..].find(|c| c != '/').map_or(path.len(), |o| start + o);
+            let run_end = path[start..]
+                .find(|c| c != '/')
+                .map_or(path.len(), |o| start + o);
             format!("{}/{}", &path[..start], &path[run_end..])
         }
         None => path.to_string(),
     };
-    collapsed.strip_prefix('/').unwrap_or(&collapsed).to_string()
+    collapsed
+        .strip_prefix('/')
+        .unwrap_or(&collapsed)
+        .to_string()
 }
 
 /// The document file for a tree path: `<root>/<path>.json`.
@@ -115,7 +120,10 @@ mod tests {
 
     #[test]
     fn a_canvas_keeps_its_suffix_through_the_path_mapping() {
-        assert_eq!(file_path_for("/p", "Notes/board.canvas"), "/p/Notes/board.canvas.json");
+        assert_eq!(
+            file_path_for("/p", "Notes/board.canvas"),
+            "/p/Notes/board.canvas.json"
+        );
         assert_eq!(folder_path_for("/p", "Notes"), "/p/Notes");
         assert_eq!(folder_path_for("/p", ""), "/p");
         assert_eq!(

@@ -51,7 +51,9 @@ use webview_commands::{eval_webview, get_webview_url, navigate_webview};
 /// `~/Library/Application Support/com.inkblot.app` on macOS. The Swift app reads and
 /// writes the same folder, so both shells see the same preferences and models.
 pub(crate) fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path().app_data_dir().map_err(|e| format!("no app data dir: {e}"))
+    app.path()
+        .app_data_dir()
+        .map_err(|e| format!("no app data dir: {e}"))
 }
 
 pub fn run() {

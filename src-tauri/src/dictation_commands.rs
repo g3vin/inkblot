@@ -44,7 +44,9 @@ pub async fn start_dictation_session(
     state: State<'_, AppDictationState>,
     options: Option<LiveDictationOptions>,
 ) -> Result<String, String> {
-    state.engine(&app)?.start_session(options, tauri_sink(app.clone()))
+    state
+        .engine(&app)?
+        .start_session(options, tauri_sink(app.clone()))
 }
 
 #[tauri::command]

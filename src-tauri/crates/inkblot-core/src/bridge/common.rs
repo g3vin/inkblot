@@ -67,12 +67,20 @@ pub struct TextAnchor {
 
 impl TextAnchor {
     pub fn new(from: u32, to: u32, text: impl Into<String>) -> Self {
-        Self { from, to, text: text.into() }
+        Self {
+            from,
+            to,
+            text: text.into(),
+        }
     }
 
     /// A caret rather than a range.
     pub fn caret(pos: u32) -> Self {
-        Self { from: pos, to: pos, text: String::new() }
+        Self {
+            from: pos,
+            to: pos,
+            text: String::new(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
