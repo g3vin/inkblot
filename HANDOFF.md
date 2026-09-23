@@ -2,10 +2,13 @@
 
 State of the hybrid-native migration, what each remaining phase involves, and the things that cost time to discover the first time.
 
-**Current branch:** `phase-0-foundations`, 54 commits ahead of `main` (`b7ceed8`).
-`main` is untouched — if you want these on main, `git checkout main && git merge --ff-only phase-0-foundations`.
+**Current branch:** `handoff-remaining`, branched from `phase-0-foundations` at
+`86ff43d` and 67 commits ahead of `main` (`b7ceed8`). It holds the work that finished
+this document's "still owed" lists — Phase 4's loose ends, Phase 5's code items, the
+Known-broken list, and the Phase 6 foundation. `main` is untouched.
 
-**Size today:** 33,415 JS/JSX · 5,367 TS · 8,984 CSS · 11,023 Rust.
+**Size today:** 34,669 JS/JSX · 6,329 TS · 8,984 CSS · 13,548 Rust · 6,686 Swift
+(hand-written; the generated bindings not counted).
 
 ---
 
@@ -15,21 +18,28 @@ Run all seven after every change, and the Swift tests below once you touch `nati
 They are fast and they have each caught something the others missed.
 
 ```bash
-npm test            # 598 assertions, 21 suites
+npm test            # 649 assertions, 22 suites
 npm run lint        # 0 errors AND 0 warnings is the current bar
 npm run typecheck   # tsc --noEmit
 npm run build       # the only thing that resolves dynamic imports and named exports
 npm run parity      # 15,915 cases through BOTH the JS and the Rust implementation
 npm run types:check # fails if the generated TS/Swift is stale, and typechecks the Swift
-(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 125 tests
+(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 146 tests (+1 ignored)
 ```
 
-And for the Swift shell (Phase 5), after `./scripts/build-xcframework.sh` and `npm run build`:
+And for the Swift shell (Phases 5 and 6), after `./scripts/build-xcframework.sh` and
+`npm run build`:
 
 ```bash
 xcodebuild test -project native/inkblot-core/inkblot-core.xcodeproj -scheme inkblot-core \
-  -destination 'platform=macOS' -only-testing:inkblot-coreTests      # 29 tests
+  -destination 'platform=macOS,arch=arm64' -only-testing:inkblot-coreTests   # 35 tests
+# iPadOS / iOS: compile and link only — see Phase 6
+xcodebuild build -project native/inkblot-core/inkblot-core.xcodeproj -scheme inkblot-core \
+  -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
 ```
+
+The ignored Rust test runs the rhyme index against the real pronouncing dictionary:
+`INKBLOT_CMUDICT=/path/to/cmudict.dict cargo test -p inkblot-models -- --ignored`.
 
 `parity` and `types:check` arrived with Phase 2 and need `cargo` and
 `cargo install typeshare-cli --locked` on PATH. Both are load-bearing rather than
@@ -51,6 +61,8 @@ tidy: see the table below.
 | `pinned: "yes"` read as not pinned, because `as_bool()` is not `Boolean()` | `parity` only |
 | A coalescer that stopped delivering after its first push under a synchronous scheduler — one toolbar state for the life of the app | the `bridge` suite only |
 | A ref written during render in `CanvasCardEditor`, invisible for as long as the file had existed | `lint` only, and only once an unrelated mutation was removed and the component became analyzable |
+| The iOS stand-in for the models (`models_unavailable.rs`) lacked two doc comments, which UniFFI folds into checksums — it would have built, then failed at first call on a device | `build-xcframework.sh`'s interface diff only |
+| The Analytic Bubble read compromise 14's tags from the wrong place, so every word was a guessed noun or verb | the `workspace` suite only |
 
 ---
 
@@ -442,13 +454,13 @@ compare against; it is reproducible from this paragraph.
 kokoro-js's normalizer, and the emitted string is the program. Only signature lines
 were edited, and the regex lines were diffed byte-for-byte against `HEAD`.
 
-### Found while porting, not fixed
+### Found while porting — both fixed since
 
-- **`phonemizer` is an undeclared direct dependency.** `readAloudVoice.ts` imports it;
-  it is in `node_modules` only because `kokoro-js` pulls it in. A kokoro-js release
-  that drops or moves it breaks Read Aloud's native path with no version to point at.
-- **`nodes/reorder` is dispatched by nothing.** The case is live in the reducer, typed
-  with the rest, and unreachable — send-to-front/send-to-back is not wired up.
+- **`phonemizer` was an undeclared direct dependency** of `readAloudVoice.ts`, present
+  only because `kokoro-js` pulled it in. It is in `package.json` now.
+- **`nodes/reorder` was dispatched by nothing.** It is Bring to Front / Send to Back
+  now: the canvas menu, ⌘⇧] / ⌘⇧[, and the `bring-to-front` / `send-to-back` canvas
+  commands (so the bridge's `canvasCommand` reaches it too).
 
 ### Still owed — done in Phase 4
 
@@ -608,36 +620,51 @@ instead.
   had existed. Lint only saw it once the `__inkblotCanvasCard` mutation was removed and
   the component became analyzable.
 
-### Still owed
+### What was owed, and how it was done
 
-- **`getReadAloudPayload` has no handler.** The surface deliberately does not answer it;
-  building the payload needs the chunker and the document's block structure, which
-  `ReadAloudControl` owns. It should register its own handler while mounted. Until it
-  does, the request replies with an error rather than hanging — which is correct, but it
-  is not the same as working.
-- **`docChanged`, `searchMatches` and `focusModeView` have publishers and no callers.**
-  The protocol and the plumbing exist and are tested; the three components that should
-  emit them (`useEditorWordCount`, `SidebarSearch`, `FocusModeOverlay`) still only talk
-  to React state. Nothing is broken by that — the shell is in the same process and reads
-  the state directly — and it is exactly the work that has no consumer until Phase 5.
-- **`nodes/reorder` is still dispatched by nothing** (carried over from Phase 3).
+- **`getReadAloudPayload` is answered by `ReadAloudControl`**, through a new
+  `DocumentSurface.onRequest` (one handler per request; a later registration replaces
+  an earlier one). It resolves the target through the registry, so a shell can ask
+  about a pane that is not the toolbar's; `selectionOnly` maps to
+  `getReadableEditorPayload`'s new `scope` option. A read also publishes
+  `readAloudPayload` as it starts. With the control unmounted, the request still
+  replies with an error rather than hanging.
+- **`docChanged`** comes from `useEditorWordCount`: a load publishes with
+  `userEdit: false` (from `syncWordStats`), an edit with `userEdit: true`, debounced
+  like the total count and independent of the badge preference. The docPath is read
+  from the registry. `AppModel` already listened for it to refresh the tree.
+- **`searchMatches`** comes from `SidebarSearch`, document scope only (project results
+  carry no live positions), and only from the active copy of the bar.
+- **`focusModeView`** comes from `FocusModeOverlay` on every selection and update, with
+  `active: false` when the overlay closes. `paragraphIndex` is the caret's top-level
+  block index.
+- **`nodes/reorder`** — see Phase 3 above.
 
 ---
 
-## Phase 5 — Swift shell (macOS 26+) — foundation done
+## Phase 5 — Swift shell (macOS 26+) — built; not yet clicked through
 
 `native/inkblot-core/` is a SwiftUI app that hosts the unmodified `dist/` in a
 `WKWebView`, links `inkblot-core` as an XCFramework through UniFFI, and speaks the Phase 4
 protocol from Swift. The Tauri app is untouched and still ships: one bundle serves both
 shells, and it asks the host which chrome to draw rather than being built differently.
 
-**Verified:** the app builds warning-free, the page boots in it, preferences load
-through the Rust core, the page's View menu reaches the native menu bar, and
-`projectChanged` arrives over the bridge as event seq 0 (read off the unified log).
+**Verified:** the app builds, the page boots in it, preferences load through the Rust
+core, the page's View menu reaches the native menu bar, and `projectChanged` arrives
+over the bridge as event seq 0 (read off the unified log). The models answer through
+`inkblot-ffi` inside the running app (`ModelServiceTests`: statuses, the voice-name
+guard, the scrape channel round trip, the bundled tokenizer).
 **Not verified — nobody has clicked through it yet:** opening a project, the native
-tree opening a document, a context menu, a save. The session that built this had no
-screen-recording or UI-scripting permission. Do that first, with the Tauri app closed
-(both use the same data folder).
+tree opening a document, a context menu, a save — and everything added since: the
+native tab dock, new-tab chooser and Analytic Bubble, detached and Pinterest windows,
+Finder drops and native note drags onto a canvas, and a model download. Neither
+session that built this had screen-recording or UI-scripting permission. Do that
+first, with the Tauri app closed (both use the same data folder).
+
+**Warnings:** four remain, all older than this branch, in files the other in-flight
+work is editing (`NotesPanelView`, `NotePreviewOverlay`, `ClipboardPanelView` —
+main-actor statics called from nonisolated contexts — and `HistoryPanelView`'s
+deprecated `Text` `+`). Fix them when that work lands.
 
 ### Building and running it
 
@@ -666,12 +693,27 @@ open native/inkblot-core/inkblot-core.xcodeproj    # ⌘R
 - **App sandbox off.** The shell must read `~/Library/Application Support/com.inkblot.app`,
   which is the Tauri app's folder and not this bundle ID's, and projects can live
   anywhere on disk. A sandboxed build would see an empty container.
-- **macOS only.** The XCFramework is `macos-arm64`, so building for iOS would fail to
-  link. Phase 6 adds the iOS slices and turns the platforms back on.
-- **User script sandboxing off.** The Embed Web Bundle phase has to read `dist/`.
-- `OTHER_LDFLAGS` adds CoreText, CoreGraphics and libiconv, which font-kit needs. A Rust
-  staticlib carries no autolink information; `cargo rustc -- --print native-static-libs`
-  is where the list came from.
+- **macOS, iPadOS and iOS** (`SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx`).
+  The entitlements file is macOS-only (`CODE_SIGN_ENTITLEMENTS[sdk=macosx*]`), and the
+  simulator excludes x86_64 — the Rust slice is arm64. See Phase 6.
+- **User script sandboxing off.** The Embed Web Bundle phase has to read `dist/`. It
+  also copies `src-tauri/resources/minilm-tokenizer.json` into the bundle, for the
+  synonym model (both shells bundle it; the Tauri app lists it under `resources`).
+- `OTHER_LDFLAGS`: CoreText, CoreGraphics and libiconv (font-kit); `-lc++`, Accelerate,
+  Metal and MetalKit (whisper.cpp and onnxruntime); AudioToolbox and CoreAudio (cpal).
+  A Rust staticlib carries no autolink information; `cargo rustc -p inkblot-ffi --lib
+  --crate-type staticlib --release -- --print native-static-libs` is where the list
+  came from.
+- **The generated UniFFI bindings are `nonisolated`.** The target defaults every
+  declaration to the main actor, bindings included, which made every call into Rust
+  main-actor-only — a model load would freeze the window. `build-xcframework.sh` adds
+  the keyword when it writes `inkblot_ffi.swift`.
+- **C and C++ are built for the app's OS, not the machine's.** Without a deployment
+  target, cc and cmake compile whisper.cpp and oniguruma for the host's macOS and the
+  linker warns on every object. `build-xcframework.sh` sets `CFLAGS_<triple>` and
+  `CXXFLAGS_<triple>` (never `MACOSX_DEPLOYMENT_TARGET` — see "Things that bit"). A
+  cmake dependency caches its build, so after changing these, `cargo clean -p
+  whisper-rs-sys --release --target aarch64-apple-darwin`.
 
 ### How the pieces fit
 
@@ -684,8 +726,11 @@ open native/inkblot-core/inkblot-core.xcodeproj    # ⌘R
                                                      │  merged with the in-process
  TauriHost ◄──────── tauri (reply handler) ──── tauri-shim.js   React shell
    fs / path / dialog / opener / menus /            (window.__TAURI_INTERNALS__)
-   preferences / fonts / haptics
- CoreService ── InkblotFFI.xcframework (inkblot-ffi → inkblot-core)
+   preferences / fonts / haptics / windows
+   ├─ ModelService ── InkblotModels (inkblot-ffi → inkblot-models)
+   └─ AuxiliaryWindows: detached documents (own TauriHost), Pinterest pages
+                        (scrape-bridge.js only)
+ CoreService ── InkblotCore (inkblot-ffi → inkblot-core)
  AppSchemeHandler: inkblot://app/ (dist) · asset://localhost/ (disk)
 ```
 
@@ -733,7 +778,17 @@ gitignored because it must come from the same build as the library (see
 | Note hover cards | Native Liquid Glass over the web view (`Notes/`), placed from marker events the page publishes (`useNativeNotePreviews`): hover, leave, pin, the anchor following a scroll, dismissal. Draggable, resizable, replies on strings, layout stored on the note. |
 | Voice memos | AVFoundation, content-addressed into `.assets/` exactly as `assets.js` does, so either shell plays the other's. Needs the audio-input entitlement (`Inkblot.entitlements`) under the hardened runtime. |
 | Menu bar | Format (checkmarks follow `ToolbarState`), Edit ▸ Paste and Match Style (`insertPlainText`), and the page's View items. |
+| Tab dock, new-tab chooser, Analytic Bubble | Native glass over the web view (`Shell/WorkspaceOverlay.swift`, `WorkspaceModel`). The page keeps the state and publishes it — `useNativeTabDock`, `NativeDraftPane` (which keeps the pane and reports its rectangle), and the bubble's parse from `lib/sentenceParse` — and applies `selectTab`, `closeTab`, `newTab`, `openDocInTab`, `createFromDraft`. A document dragged from the native tree onto the dock opens in a tab. |
+| Models | Synonyms, rhymes, Kokoro speech, whisper dictation and the scrape channel answer the page's `invoke` through `ModelService` (`inkblot-models` via `inkblot-ffi`), with the same JSON and the same `synonym://`, `kokoro://`, `rhyme://` and `dictation://` events as the Tauri app. The native synonym tile offers the 423 MB download; the rhyme tile fetches its 3.6 MB dictionary without asking. |
+| Other windows | `new WebviewWindow` works. A detached document gets its own web view and `TauriHost` and draws all of its own chrome, as under Tauri; a Pinterest page gets `scrape-bridge.js`, which can make exactly one call. `navigate_webview`, `eval_webview`, `get_webview_url`, window verbs by label, `tauri://page-load` and `tauri://destroyed` — the latter aimed at its window; the shim's listeners now remember their target. |
+| Drops onto a canvas | Finder images: the HTML5 `drop` (WKWebView) beside Tauri's `drag-drop` (each shell fires one). Notes from the native Notes panel: an `inkblot-note://note?doc=…&id=…` URL the canvas reads off the drop (`noteDragURL`). |
 | Context menus, dialogs, preferences, fonts, haptics | As before: through the shim and `TauriHost`. |
+
+**Kept in the page, deliberately:** the formatting toolbar (the user's call — a native
+one was built and reverted, `aab8b44`), and `useResizableSidebar`, which has nothing to
+do in this shell — both sidebars are already native, and the hook only sizes the page's
+own. The momentum hack in `RightSidebar.jsx` still goes only when the Tauri app stops
+shipping that sidebar.
 
 ### Rename, move and delete — a bug the Tauri app had too
 
@@ -755,8 +810,10 @@ and deletes the open document; a control case shows the ghost file without the f
 `insertPlainText`, `projectChanged`, the entry commands (`createEntry`, `renameEntry`,
 `moveEntry`, `deleteEntry`, `duplicateEntry`), the sidebar's (`bridge/sidebar.rs`:
 notes by patch, clipboard, tiles, version actions, `revealSearchResult`, `addReply`),
-the preview events (`noteMarkerMoved`, `notePreviewDismissed`) and `setTitlebarInset`.
-Two rules held that are worth keeping:
+the preview events (`noteMarkerMoved`, `notePreviewDismissed`) and `setTitlebarInset`;
+and the workspace's (`bridge/workspace.rs`): `tabsChanged`, `draftPaneChanged` and
+`sentenceStructure`, with `selectTab`, `closeTab`, `newTab`, `openDocInTab` and
+`createFromDraft`. Two rules held that are worth keeping:
 
 - **Notes are edited by `NotePatch`, never sent whole.** `Note` flattens unknown keys
   that typeshare cannot express, so the shell's copy lacks them; a whole note sent back
@@ -767,26 +824,33 @@ Two rules held that are worth keeping:
 
 ### Still owed, in the order I'd do them
 
-1. **Click through it.** Much has now been built without being seen. The user has
-   been testing the window and the sidebar; nobody has yet exercised a rename of an
-   open document in the native tree, a restore from native History, a voice memo, or a
-   glass note card being dragged.
-2. **The Rust features that live in the Tauri app crate:** synonyms, Kokoro, whisper
-   dictation, the Pinterest scrape. `TauriHost` rejects their commands by name and the
-   workbench's synonym and rhyme tiles say "not available in the native app yet" through
-   `LanguageServices` — the one file that changes when they move into a crate
-   `inkblot-ffi` can link. Rhymes never worked in either shell (see Known broken).
-3. **The formatting toolbar** is still the page's, and at the top of the window now,
-   which is where the user asked for it. Porting it natively would move it into a
-   titlebar row that was just removed at their request — decide with them before doing it.
-4. **Detached document windows and the Pinterest webviews** (`WebviewWindow`, answered
-   with nothing by the shim).
-5. **Finder drag-and-drop onto a canvas** (Tauri's `drag-drop` event with paths; in
-   `WKWebView` it is an HTML5 drop with `File` objects).
-6. `TabDock`, `DraftTabPane`, `Bubble`, `useResizableSidebar`. The momentum hack in
-   `RightSidebar.jsx` can be deleted only when the Tauri app stops shipping that sidebar.
-7. **Dragging a note from the native Notes panel onto a canvas** — the page's version
-   hit-tests the canvas with a pointer drag, which a native drag cannot reach.
+Items 2–7 of the last list are done (see "What is native now"); the toolbar was
+decided — it stays the page's. What is left:
+
+1. **Click through it.** More than ever has been built without being seen — the list
+   under "Not verified" at the top of this phase. Start with a model download (the
+   progress events cross three layers), a detached window and a Pinterest board scrape,
+   a rename of the open document in the native tree, and the new-tab chooser.
+2. **A native context menu** built from `getSelectionContext`, which removes the page
+   from the right-click entirely. The compatibility path (`WebMenus.popup`) works on the
+   Mac and does nothing on iOS — see Phase 6.
+
+### How the models moved (item 2 of the old list)
+
+`src-tauri/crates/inkblot-models` is the synonym model, Kokoro, whisper dictation, the
+scrape channel — and rhymes, which are new (see Known broken). What made them Tauri's
+was only the glue: `AppHandle` for a directory, `emit` for progress, `State` for a
+cache. Now that is a path, a callback and an engine the caller owns, and
+`src-tauri/src/*_commands.rs` are thin wrappers over it, as `inkblot-ffi/src/models.rs`
+is on the Swift side. Its `InkblotModels` object blocks (Swift calls it from detached
+tasks) and owns a tokio runtime for the downloads and the scrape wait, because Swift
+has none to lend. Events go out through `ModelEventSink`, a foreign trait Swift
+implements by emitting into the page through the shim.
+
+Download progress is throttled to every 4 MB, as before; a download lands beside its
+destination as `.partial` and is renamed into place (the synonym model used to use
+`.part`, and a leftover `.part` file from an interrupted download is now simply
+ignored and re-fetched).
 
 ### Things that bit
 
@@ -821,14 +885,66 @@ Two rules held that are worth keeping:
 - **The generated protocol decodes with `try?` per case,** so a payload missing one
   required field fails the whole message. `ShellBridge` logs the raw JSON when that
   happens. That log line is the first place to look if the native side seems deaf.
+- **A `#[serde(default)]` field is optional in Swift.** typeshare emits `Bool?` for a
+  defaulted `bool`, so `draft.creating` is compared with `== true`, not used as a Bool.
+- **An empty command payload is still a payload.** `NewTabCommand {}` exists because
+  adjacent tagging sends one for every variant; the generated `interface {}` needs the
+  one ESLint exception in `eslint.config.js`.
+- **UniFFI checksums include doc comments** (some of them). Two builds of the same
+  interface with different docs fail at first call. `build-xcframework.sh` compares the
+  C header and the checksums of every slice against macOS's.
 
 ---
 
-## Phase 6 — iPadOS / iOS
+## Phase 6 — iPadOS / iOS — foundation done
 
-Same Swift view layer with platform-conditional chrome, same core, same editor
-bundle. Unblocked by Phase 2's Kokoro work. New work: touch and Pencil interaction
-on the canvas, and a native keyboard accessory replacing the toolbar.
+The same SwiftUI shell, core and editor bundle now **build and link for iPadOS and iOS
+devices and the simulator** (`generic/platform=iOS`, `generic/platform=iOS Simulator`).
+**Not run:** this Mac has only iOS 18 simulator runtimes, and the app targets 26.4 and
+uses Liquid Glass. Install an iOS 26+ runtime (`xcodebuild -downloadPlatform iOS`) and
+run it before building on any of this.
+
+**What the port is:**
+- `Support/Platform.swift` — the calls AppKit and UIKit spell differently (pasteboard,
+  open a URL, beep, haptics, images, Escape). Anything with no iOS equivalent (the
+  menu bar's NSMenu, Finder, the titlebar) is `#if os(macOS)` in place instead.
+- `Shell/ContentViewTouch.swift` — the iOS window: `NavigationSplitView`'s own sidebar
+  button, the inspector as the platform presents it, the safe area kept. The Mac's
+  `ContentView.swift` and `WindowChrome.swift` are wrapped in `#if os(macOS)` whole.
+- `InkblotApp` — a `WindowGroup` on iOS; still one scene (multiple scenes are not
+  enabled), for the reason `AppModel` gives.
+- `TauriHost` — `UIAlertController` for confirm and message, the document picker for
+  open (files `asCopy`, so the page can read them by path), haptics through
+  `Platform`. Every filesystem write it performs is announced
+  (`.inkblotFileChanged`), and on iOS that is the project tree's change feed, since
+  there are no FSEvents — and in the sandbox nothing else writes a project.
+- `AuxiliaryWindows` — an iOS `AuxiliaryWindow` presents the web view with a Done
+  button when shown, and parks it off-screen in the key window when hidden, so a
+  Pinterest scrape keeps running.
+- The canvas: a finger on the empty canvas pans, the Pencil draws the selection box
+  as the mouse does, and a second finger ends the pan so the existing pinch zoom
+  (WebKit gesture events) takes over. The `dom` suite covers it.
+- `Shell/FormattingAccessory.swift` — marks and alignment above the software
+  keyboard, lit from `toolbarState`. Not WebKit's `inputAccessoryView`: that belongs to
+  a private view inside `WKWebView`, and setting it means swizzling. The page's toolbar
+  stays, as on the Mac.
+
+**Not done on iOS, and why:**
+- **The models.** `ort` downloads no iOS library, and whisper.cpp's cmake has not been
+  run for the iOS SDKs. The iOS slices are built `--no-default-features`, and
+  `inkblot-ffi/src/models_unavailable.rs` answers every call with "not available on
+  this device yet". To turn them on: an onnxruntime built for iOS for `ort` to link
+  (`ORT_LIB_LOCATION`), then drop `--no-default-features` for the iOS targets in
+  `build-xcframework.sh`. Rhymes need no ONNX at all, so splitting `inkblot-models`'
+  features (onnx / dictation / the rest) would bring rhymes and the scrape channel to
+  iOS first.
+- **Context menus.** A long press is WebKit's own menu there; the page's
+  `contextmenu` handler never runs, so `WebMenus.popup` returns nothing.
+- **Save panels**, and **opening a folder outside the app's container** (a picked
+  folder is lent for a security scope nothing holds open while the page reads it).
+  Projects live in the app's own container on iOS for now.
+- **Detached documents side by side.** A detached window is presented over the app,
+  not a second scene.
 
 ---
 
@@ -908,8 +1024,10 @@ being reimplemented, which is why it catches real persistence bugs.
 notes, audio, `generateHTML` rendering, `CanvasSurface` mounting, `EditorCanvas`
 mounting (autosave reaching disk, version checkpoints, the per-doc editor-state
 cache, note anchor remapping, split-pane autosave, the unmount flush), the file
-tree's per-row decisions, the preference store's scope routing, and the Read Aloud
-normalizer against kokoro-js's own.
+tree's per-row decisions, the preference store's scope routing, the Read Aloud
+normalizer against kokoro-js's own, `docChanged` from a load and an edit, canvas
+stacking, touch panning, Finder and native-note drops, the shim's window plumbing, and
+the workspace protocol's page half (`workspace`).
 
 `loader.mjs` also neutralizes `import.meta.glob`, which is a Vite build-time transform
 with no Node equivalent — a module using it threw on import before any of its exports
@@ -934,22 +1052,33 @@ you get.
 
 ### Known broken / dead weight
 
-- **`RhymeTile` does not work.** It loads `/rhyme_model.onnx` and `/vocab.json`;
-  neither exists and nothing downloads them. Best fixed by moving rhyme inference
-  into Rust — which already has `ort` and `tokenizers`.
-- **`public/ort/` is 109 MB** of ~20 onnxruntime-web variants (webgpu, webgl, node…)
-  when `vite.config.js` aliases only `ort.wasm.min.mjs`. That is most of the
-  remaining `dist/` bulk, and moving rhymes to Rust would delete the dependency
-  entirely.
-- **`.history-tile` / `.history-tile-header` are declared at equal specificity** in
-  both `components/Editor.historyPanel.css` and
-  `components/RightSidebar/HistoryPanel.css`. Load order decides the winner. Merging
-  them is a behaviour change, not a refactor — do it deliberately.
 - **`Editor.css` is an ordered `@import` manifest and the order is load-bearing.**
   Several selectors are declared in more than one place (`.toolbar-group` across
   Toolbar/Canvas/VersionComparePane, `.ProseMirror` and `.pane` across Editor and
   Canvas). Do not rearrange it, and do not move a section's import to its component —
   that changes where the rules land in the cascade.
+
+Fixed from this list, and worth knowing how:
+
+- **Rhymes work, without a model.** `RhymeTile` loaded `/rhyme_model.onnx`, which never
+  existed — and the model it described (`ryme.py` in `inkblot-nlp-models`) was trained
+  on a CSV of per-word rhyme *counts* read as if it were rhyme pairs, so it could not
+  have produced rhymes either. `inkblot-models::rhymes` reads perfect rhymes off the
+  CMU Pronouncing Dictionary (from the last stressed vowel to the end), pinned to one
+  commit and downloaded on first use (3.6 MB). The dictionary is mostly surnames by
+  count, so words in the system word list (`/usr/share/dict/words`, lowercase entries)
+  rank first; the list is absent on iOS, where ranking falls back to syllable count and
+  length. The Google-10000 frequency list was considered and rejected: its licence
+  does not allow commercial use.
+- **`public/ort/` (109 MB) and `onnxruntime-web` are gone.** Nothing else used them —
+  kokoro-js's WASM fallback has its own onnxruntime-web and loads its binaries from the
+  CDN.
+- **`.history-tile` / `.history-tile-header` are declared once**, in
+  `Editor.historyPanel.css`, with the values that already won. It had to be the later
+  file: `.tile-header`'s `margin-bottom: 8px` loads between the two, and only the later
+  declaration cancels it. The built rules were compared before and after.
+- **The Analytic Bubble parsed every sentence as nouns and verbs.** It read compromise
+  14's tags from the wrong place, so every word got the N/V fallback.
 
 ### Data model facts worth not rediscovering
 
