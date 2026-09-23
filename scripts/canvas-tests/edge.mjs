@@ -1,3 +1,6 @@
+/**
+ * Edge geometry: side anchors, normals, bezier paths, and which side an edge attaches to.
+ */
 import {
   sideAnchor,
   sideNormal,
@@ -8,7 +11,7 @@ import {
   EDGE_SIDES,
   EDGE_ENDPOINT_GAP,
 } from '../../src/lib/canvasGeometry.js'
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const near = (a, b, e = 1e-6) => Math.abs(a - b) < e
 
 const n = { x: 100, y: 200, width: 200, height: 100 } // center (200, 250)

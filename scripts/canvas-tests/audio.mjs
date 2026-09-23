@@ -16,7 +16,7 @@ const {
   saveAudioClip,
 } = await import(`${C}/lib/audioNotes.js`)
 const { isAudioPath, isImagePath, mimeToExt, isAssetPath } = await import(`${C}/lib/assets.js`)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 /* ---- mime → extension ---- */
 

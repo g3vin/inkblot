@@ -7,7 +7,7 @@
 const C = '../../src'
 const { computeSnap, snapCandidates, SNAP_THRESHOLD_PX } = await import(`${C}/canvas/useCanvasSnapping.js`)
 const { createEmptyCanvas, makeTextNode, makeGroupNode } = await import(`${C}/lib/canvasModel.js`)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const rect = (x, y, width = 100, height = 100) => ({ x, y, width, height })
 const T = SNAP_THRESHOLD_PX

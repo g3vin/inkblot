@@ -25,7 +25,7 @@ const { parseSentence } = await import('../../src/lib/sentenceParse.js')
 const { shellBridge } = await import('../../src/bridge/index.ts')
 const { saveDocument, documentExists } = await import('../../src/lib/FileSystem.js')
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const frame = () => act(async () => {
   await new Promise((resolve) => dom.window.requestAnimationFrame(() => resolve()))
   await new Promise((resolve) => setTimeout(resolve, 10))
