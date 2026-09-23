@@ -9,10 +9,7 @@
  */
 import { useState } from 'react'
 import SFIcon from './SFIcon'
-import { documentExists, saveDocument } from '../lib/FileSystem'
-import { saveCanvasDocument } from '../lib/canvasFileSystem'
-import { createEmptyCanvas } from '../lib/canvasModel'
-import { stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
+import { createDraftDocument, DraftRefusal } from '../lib/draftDocument'
 
 const KINDS = [
   { id: 'doc', label: 'Document', icon: 'doc.text', hint: 'A page for writing' },
@@ -29,39 +26,18 @@ export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
     event?.preventDefault?.()
     if (creating || !projectName) return
 
-    // The `.canvas` suffix is what routes a document to the canvas editor, so it
-    // follows the kind being created — never whatever the user typed.
-    const bare = stripCanvasSuffix(name.trim())
-    if (!bare) {
-      setStatus('Give it a name first.')
-      return
-    }
-    if (bare.includes('/')) {
-      setStatus('Names can’t contain “/”.')
-      return
-    }
-
-    const path = kind === 'canvas' ? withCanvasSuffix(bare) : bare
-
     setCreating(true)
     try {
-      // Writing over a document that already exists would destroy it, and the
-      // draft has no other way to notice — it never listed the project.
-      if (await documentExists(projectName, path)) {
-        setStatus('A document with that name already exists.')
-        return
-      }
-
-      if (kind === 'canvas') {
-        await saveCanvasDocument(projectName, path, createEmptyCanvas())
-      } else {
-        await saveDocument(projectName, path, { content: [] })
-      }
+      const path = await createDraftDocument(projectName, name, kind)
       await refreshFiles?.()
       onCreated?.(path)
     } catch (error) {
-      console.warn('Failed to create document:', error)
-      setStatus('Could not create that document.')
+      if (error instanceof DraftRefusal) {
+        setStatus(error.message)
+      } else {
+        console.warn('Failed to create document:', error)
+        setStatus('Could not create that document.')
+      }
     } finally {
       setCreating(false)
     }

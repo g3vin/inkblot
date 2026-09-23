@@ -27,6 +27,7 @@ import type {
   DictationLevelCommand,
   DictationTranscript,
   DocChanged,
+  DraftPaneChanged,
   FocusModeView,
   Note,
   NoteMarkerEvent,
@@ -42,6 +43,8 @@ import type {
   ReadAloudPayloadEvent,
   SearchMatches,
   SelectionContext,
+  SentenceStructure,
+  TabsChanged,
   SetContentCommand,
   SyncNotesCommand,
   ToolbarState,
@@ -143,6 +146,11 @@ export interface DocumentSurface {
   /** An open preview's marker moved. Coalesced — each carries the whole rect. */
   publishNoteMarkerMoved(payload: NoteMarkerEvent): void
   publishNotePreviewDismissed(payload: NotePreviewDismissed): void
+  /** The tabs, whole. Coalesced — a tab switch changes several of its fields at once. */
+  publishTabsChanged(payload: TabsChanged): void
+  /** Where the new-tab chooser goes. Coalesced — it follows the pane as it resizes. */
+  publishDraftPaneChanged(payload: DraftPaneChanged): void
+  publishSentenceStructure(payload: SentenceStructure): void
 
   /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
   publishDragStarted(): void
@@ -206,6 +214,14 @@ export function createDocumentSurface({
   )
   const markerMoves = createCoalescer<NoteMarkerEvent>(
     (payload) => bridge.emit('noteMarkerMoved', payload),
+    scheduler
+  )
+  const tabChanges = createCoalescer<TabsChanged>(
+    (payload) => bridge.emit('tabsChanged', payload),
+    scheduler
+  )
+  const draftPaneChanges = createCoalescer<DraftPaneChanged>(
+    (payload) => bridge.emit('draftPaneChanged', payload),
     scheduler
   )
   const dragMoves = createCoalescer<{ dragId: string; clientX: number; clientY: number }>(
@@ -408,6 +424,9 @@ export function createDocumentSurface({
       markerMoves.cancel()
       bridge.emit('notePreviewDismissed', payload)
     },
+    publishTabsChanged(payload) { tabChanges.push(payload) },
+    publishDraftPaneChanged(payload) { draftPaneChanges.push(payload) },
+    publishSentenceStructure(payload) { bridge.emit('sentenceStructure', payload) },
 
     publishDragStarted() {
       const session = drag.current()
@@ -436,6 +455,8 @@ export function createDocumentSurface({
       clipboardChanges.flush()
       tileChanges.flush()
       markerMoves.flush()
+      tabChanges.flush()
+      draftPaneChanges.flush()
       for (const coalescer of notesByDoc.values()) coalescer.flush()
       for (const coalescer of notesChangedByDoc.values()) coalescer.flush()
     },
@@ -447,6 +468,8 @@ export function createDocumentSurface({
       clipboardChanges.cancel()
       tileChanges.cancel()
       markerMoves.cancel()
+      tabChanges.cancel()
+      draftPaneChanges.cancel()
       for (const coalescer of notesByDoc.values()) coalescer.cancel()
       for (const coalescer of notesChangedByDoc.values()) coalescer.cancel()
       notesByDoc.clear()

@@ -25,8 +25,20 @@ import { detectNativeHost } from '../bridge/transport'
  *                   from what `useNativeSidebar` publishes
  *  - `notePreviews` the cards that open over a note's marker — drawn by the shell as
  *                   Liquid Glass, placed from what `useNativeNotePreviews` publishes
+ *  - `tabDock`      the floating tab bar at the bottom — the shell draws it from what
+ *                   `useNativeTabDock` publishes and sends back selections and closes
+ *  - `draftPane`    the new-tab chooser. The page keeps the pane (a draft holds it
+ *                   open) and reports where it is; the shell draws the chooser there
+ *  - `sentenceBubble` the Analytic Bubble — the page parses, the shell draws the trees
  */
-export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar' | 'notePreviews'
+export type NativeChrome =
+  | 'fileTree'
+  | 'windowChrome'
+  | 'rightSidebar'
+  | 'notePreviews'
+  | 'tabDock'
+  | 'draftPane'
+  | 'sentenceBubble'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null
