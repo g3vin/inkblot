@@ -1,15 +1,5 @@
 //! Rhymes, from the CMU Pronouncing Dictionary.
 //!
-//! ## What this replaced
-//!
-//! `RhymeTile` loaded `/rhyme_model.onnx` and `/vocab.json` into onnxruntime-web.
-//! Neither file ever existed — nothing built or downloaded them — so the tile always
-//! failed. The model they describe (`ryme.py` in `inkblot-nlp-models`) was trained on a
-//! CSV of per-word rhyme *counts*, read as if it were rhyme pairs, so it could not have
-//! produced rhymes even if it had been published.
-//!
-//! ## What it is now
-//!
 //! A lookup, not a model. Two words rhyme perfectly when their pronunciations agree
 //! from the last stressed vowel to the end — `tiger` /T AY1 G ER0/ and `Geiger`
 //! /G AY1 G ER0/ share `AY G ER`. The dictionary gives every word its phonemes with

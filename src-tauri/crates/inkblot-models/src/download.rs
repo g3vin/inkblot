@@ -1,4 +1,4 @@
-//! Fetching a model file, the one way both models do it.
+//! Fetching a model file, the one way every model does it.
 //!
 //! The file is written beside its destination and renamed into place on completion, so
 //! an interrupted download is never mistaken for an installed model. A half-written

@@ -5,7 +5,7 @@
 use std::sync::OnceLock;
 
 use inkblot_models::kokoro_speech::{KokoroEngine, KokoroModelStatus, KokoroSpeechResponse};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Default)]
 pub struct KokoroSpeechState {
@@ -17,10 +17,7 @@ impl KokoroSpeechState {
         if let Some(engine) = self.engine.get() {
             return Ok(engine.clone());
         }
-        let dir = app
-            .path()
-            .app_data_dir()
-            .map_err(|e| format!("no app data dir: {e}"))?
+        let dir = crate::app_data_dir(app)?
             .join("models")
             .join("kokoro");
         Ok(self.engine.get_or_init(|| KokoroEngine::new(dir)).clone())

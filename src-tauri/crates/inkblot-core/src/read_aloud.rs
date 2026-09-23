@@ -14,8 +14,8 @@
 //! to map audio time back to document positions.
 //!
 //! Mirrors `splitReadAloudText` and `buildReadAloudChunks` in `src/lib/readAloud.js`
-//! (`:426-627`); `npm run parity` asserts the two agree. Everything else in that file
-//! — model loading, the WASM fallback, the highlight scheduler — stays in the webview.
+//! ; `npm run parity` asserts the two agree. Everything else in that file
+//! — model loading, the WASM fallback, the highlight scheduler — lives in the webview.
 //!
 //! **Offsets are UTF-16 code units**, as everywhere that touches a ProseMirror
 //! position. See [`crate::js_string`].
@@ -25,8 +25,6 @@ use regex::Regex;
 
 use crate::js_string::{js_trim, utf16_len, utf16_slice, JS_WHITESPACE_CLASS};
 use crate::types::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
-
-pub const MAX_READ_ALOUD_CHUNK_LENGTH: usize = 220;
 
 /// A word that ends a sentence: terminal punctuation, then any closing quotes or
 /// brackets that trail it.

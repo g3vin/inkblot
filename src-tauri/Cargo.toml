@@ -1,7 +1,7 @@
 [workspace]
 members = ["crates/*"]
 
-# Shared by the app crate and inkblot-core, so a version bump lands in both at once.
+# Shared by the member crates, so a version bump lands in all of them at once.
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 # float_roundtrip: without it serde_json's float parser is off by up to 1 ULP, so a
@@ -23,38 +23,27 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 [package]
 name = "app"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "Inkblot, the Tauri app"
 edition = "2021"
 rust-version = "1.77.2"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
 name = "app_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.5.4", features = [] }
 
 [dependencies]
 serde_json = { workspace = true }
-serde = { workspace = true }
 inkblot-core = { path = "crates/inkblot-core" }
 # The synonym model, Kokoro, whisper dictation and the scrape channel. The
 # `*_commands.rs` modules are the Tauri glue over it; inkblot-ffi is the Swift glue.
 inkblot-models = { path = "crates/inkblot-models", features = ["metal"] }
 url = { workspace = true }
 
-
 tauri = { version = "2.10.0", features = ["protocol-asset"] }
-tauri-plugin-log = "2"
 tauri-plugin-fs = "2.4.5"
 tauri-plugin-dialog = "2.6.0"
-
-reqwest = { workspace = true }
 tauri-plugin-opener = "2"
 
 # NSHapticFeedbackManager. WKWebView exposes no haptics API, so the trackpad can

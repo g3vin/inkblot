@@ -8,8 +8,8 @@
 //!
 //! The JS version is a promise chain per document, which serializes the *scheduling* of
 //! the writes within one webview. This is a real mutex, so it also holds against a
-//! second thread and a second caller from native code — which is the point of moving
-//! it: a Swift shell and the webview can both reach the store.
+//! second thread and a second caller from native code: the Swift app and the webview
+//! can both reach the store.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

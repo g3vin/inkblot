@@ -1,26 +1,16 @@
-//! Read Aloud's native speech, without Python.
+//! Read Aloud's native speech: the Kokoro model, through `ort`.
 //!
-//! ## What this replaced
-//!
-//! A **long-lived Python child process**. The Rust side probed anaconda, homebrew and
-//! system Python for an interpreter that had `pip install 'kokoro>=0.9.4' soundfile
-//! misaki[en]` done to it, spawned it, and spoke JSON over its stdin and stdout. Read
-//! Aloud worked natively on the machine it was set up on and silently fell back to the
-//! in-browser WASM build everywhere else — and **subprocesses are impossible on iOS and
-//! iPadOS**, so it blocked two of the three targets.
-//!
-//! ## What it is now
-//!
-//! The same model, through `ort`. The work splits across the seam:
+//! The work splits across the process boundary:
 //!
 //! ```text
-//!   webview:  text -> normalize -> phonemize -> token ids   (lib/readAloudVoice.ts)
+//!   webview:  text -> normalize -> phonemize -> token ids   (src/lib/readAloudVoice.ts)
 //!   native:   token ids + voice + speed -> ONNX -> f32 @ 24kHz
 //! ```
 //!
-//! Phonemization stays in the webview because a correct English grapheme-to-phoneme
-//! pass is a lexicon plus several thousand rules, there is a working one there already,
-//! and it is not a subprocess, so it does not block iOS.
+//! Phonemization lives in the webview because a correct English grapheme-to-phoneme
+//! pass is a lexicon plus several thousand rules, and `phonemizer` provides one there.
+//! No step needs a subprocess, so the pipeline can run on iOS. When the native path is
+//! unavailable the page falls back to kokoro-js's in-browser WASM build.
 //!
 //! ## The model is downloaded, not bundled
 //!
