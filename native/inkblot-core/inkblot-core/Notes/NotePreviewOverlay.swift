@@ -70,8 +70,6 @@ struct NotePreviewLayoutEngine {
         var id: String { note.id }
     }
 
-    static let tileWidth: CGFloat = 260
-    static let tileMinHeight: CGFloat = 88
     static let minResize = CGSize(width: 220, height: 64)
     static let padding: CGFloat = 20
     static let childOffsetY: CGFloat = 184

@@ -12,7 +12,7 @@ typealias PlatformImage = UIImage
 
 /// The few things the shell asks of the OS that AppKit and UIKit spell differently.
 ///
-/// Phase 6: the same SwiftUI shell runs on macOS, iPadOS and iOS. Where a platform has
+/// The same SwiftUI shell runs on macOS, iPadOS and iOS. Where a platform has
 /// no equivalent at all (a menu bar, revealing a file in Finder, a window's titlebar),
 /// the caller is `#if os(macOS)` instead of going through here — this is only for the
 /// calls that mean the same thing everywhere.
@@ -72,8 +72,9 @@ enum Platform {
 }
 
 extension PlatformImage {
-    /// A `data:` URI's image — how note images are stored (see HANDOFF, "Images take two
-    /// different paths").
+    /// A `data:` URI's image. Note images and images pasted into a document are stored
+    /// as base64 data URIs inside the document's JSON; canvas images and voice memos are
+    /// files in the project's `.assets/`, addressed by content hash.
     static func fromDataURI(_ uri: String) -> PlatformImage? {
         guard let comma = uri.firstIndex(of: ","), uri.hasPrefix("data:") else { return nil }
         guard let data = Data(base64Encoded: String(uri[uri.index(after: comma)...])) else { return nil }

@@ -5,9 +5,9 @@ import SwiftUI
 /// Dragging an entry out is a plain-text drag, so it drops into the editor — or into any
 /// other app — as text. Dropping text *on* the panel adds an entry, and when that text is
 /// the selection being dragged out of the document, the page removes it from the
-/// document: a move, as it always was (see `recentSelectionDrag.ts` for how the page
+/// document: a move (see `recentSelectionDrag.ts` for how the page
 /// knows). "Insert at Cursor" is the other way in: it puts the entry at the caret and
-/// takes it off the history, which is what dropping a tile into the editor did.
+/// takes it off the history, as dropping a tile into the editor does.
 struct ClipboardPanelView: View {
     @Environment(AppModel.self) private var model
     @State private var dropTargeted = false
