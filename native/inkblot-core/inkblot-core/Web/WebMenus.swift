@@ -1,4 +1,7 @@
+#if os(macOS)
 import AppKit
+#endif
+import Foundation
 import Observation
 
 /// Menus the page builds, drawn natively.
@@ -63,6 +66,13 @@ final class WebMenus {
     }
 
     /* ---------------- context menus ---------------- */
+
+    #if !os(macOS)
+    /// Not yet on iOS and iPadOS: a long press there is WebKit's own menu, and the page's
+    /// `contextmenu` handler never runs to ask for one. A dismissed menu is the answer
+    /// the page already handles.
+    func popup(_ tree: [String: Any], in window: PlatformWindow?) -> Int? { nil }
+    #else
 
     /// Show a menu at the pointer and return the rid chosen, or `nil` if dismissed.
     ///
@@ -143,4 +153,5 @@ final class WebMenus {
         }
         return key.isEmpty ? nil : (key, modifiers)
     }
+    #endif
 }

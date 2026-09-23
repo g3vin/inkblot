@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -103,6 +102,7 @@ struct NoteCardView: View {
     @State private var confirmDelete = false
     @FocusState private var editing: Bool
     @State private var commitTask: Task<Void, Never>?
+    @State private var pickingImages = false
 
     static let colors = ["#ffd54f", "#ff9aa2", "#9ad0f5", "#9ee493", "#c7a8ff", "#ffb86b"]
 
@@ -160,6 +160,10 @@ struct NoteCardView: View {
             if !editing { draft = content }
         }
         .dropDestination(for: URL.self) { urls, _ in attachImages(urls) }
+        .fileImporter(isPresented: $pickingImages, allowedContentTypes: [.image],
+                      allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { attachImages(urls) }
+        }
         .confirmationDialog("Delete note?", isPresented: $confirmDelete) {
             Button("Delete", role: .destructive) { sidebar.removeNote(note) }
         } message: {
@@ -209,8 +213,8 @@ struct NoteCardView: View {
         ScrollView(.horizontal) {
             HStack(spacing: 6) {
                 ForEach(note.images, id: \.id) { image in
-                    if let nsImage = NSImage.fromDataURI(image.src) {
-                        Image(nsImage: nsImage)
+                    if let picture = PlatformImage.fromDataURI(image.src) {
+                        Image(platformImage: picture)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 64, height: 64)
@@ -297,17 +301,19 @@ struct NoteCardView: View {
         model.sidebar.updateNote(note, .with(content: text))
     }
 
+    /// `fileImporter` rather than `NSOpenPanel`: the same picker on a Mac, the Files
+    /// sheet on an iPad or a phone.
     private func pickImages() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.image]
-        guard panel.runModal() == .OK else { return }
-        _ = attachImages(panel.urls)
+        pickingImages = true
     }
 
     /// Note images are inlined as data URIs — the page's format, see `NoteImage`.
+    @discardableResult
     private func attachImages(_ urls: [URL]) -> Bool {
         let added = urls.compactMap { url -> NoteImage? in
+            // A picked file outside the app's container is lent, not given (iOS).
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             guard let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .image),
                   let mime = type.preferredMIMEType,
                   let data = try? Data(contentsOf: url) else { return nil }
@@ -330,14 +336,6 @@ extension NotePatch {
                      previewSize: NotePreviewSize? = nil) -> NotePatch {
         NotePatch(content: content, color: color, pinned: pinned, collapsedChildren: collapsedChildren,
                   images: images, audio: audio, previewLayout: previewLayout, previewSize: previewSize)
-    }
-}
-
-extension NSImage {
-    static func fromDataURI(_ uri: String) -> NSImage? {
-        guard uri.hasPrefix("data:"), let comma = uri.firstIndex(of: ",") else { return nil }
-        guard let data = Data(base64Encoded: String(uri[uri.index(after: comma)...])) else { return nil }
-        return NSImage(data: data)
     }
 }
 

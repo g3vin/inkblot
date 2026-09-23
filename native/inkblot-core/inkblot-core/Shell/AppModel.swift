@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 import Observation
 
 /// Everything one window is made of, created once.
@@ -67,8 +67,8 @@ final class AppModel {
     /// Edit ▸ Paste and Match Style. The pasteboard is read here, not in the page —
     /// see `InsertPlainTextCommand` for why it has to be.
     func pasteAndMatchStyle() {
-        guard let target, let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
-            NSSound.beep()
+        guard let target, let text = Platform.pastedText, !text.isEmpty else {
+            Platform.beep()
             return
         }
         bridge.send(.insertPlainText(InsertPlainTextCommand(target: target, text: text)))

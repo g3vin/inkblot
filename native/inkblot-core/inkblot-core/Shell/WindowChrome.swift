@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import SwiftUI
 
@@ -125,3 +126,4 @@ struct SidebarToggleButton: View {
         .help(isPresented ? "Hide the sidebar" : "Show the sidebar")
     }
 }
+#endif

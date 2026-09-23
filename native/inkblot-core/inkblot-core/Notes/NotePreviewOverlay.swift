@@ -41,7 +41,7 @@ struct NotePreviewOverlay: View {
                     }
                 }
                 .animation(.spring(duration: 0.28), value: layout.cards.map(\.id))
-                .onExitCommand { model.notePreviews.close() }
+                .onEscape { model.notePreviews.close() }
             }
         }
     }

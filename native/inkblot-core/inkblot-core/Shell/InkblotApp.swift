@@ -5,6 +5,23 @@ struct InkblotApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {
+        #if os(macOS)
+        mac
+        #else
+        // iOS and iPadOS have no single-window scene. One scene is still the rule (see
+        // `AppModel`); the Info.plist does not enable multiple scenes, so this is one.
+        WindowGroup {
+            ContentView()
+                .environment(model)
+        }
+        .commands {
+            InkblotCommands(model: model)
+        }
+        #endif
+    }
+
+    #if os(macOS)
+    private var mac: some Scene {
         // `Window`, not `WindowGroup` — see `AppModel` on why there is one page.
         Window("Inkblot", id: "main") {
             ContentView()
@@ -22,6 +39,7 @@ struct InkblotApp: App {
             InkblotCommands(model: model)
         }
     }
+    #endif
 }
 
 /// The menu bar.

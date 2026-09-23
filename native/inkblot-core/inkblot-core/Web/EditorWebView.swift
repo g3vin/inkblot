@@ -1,4 +1,8 @@
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 import SwiftUI
 import WebKit
 import os
@@ -67,7 +71,16 @@ final class EditorWebController: NSObject {
         // The page paints its own background; letting the window's show through during
         // the first frame avoids a white flash in dark mode.
         webView.underPageBackgroundColor = .clear
+        #if os(macOS)
         webView.setValue(false, forKey: "drawsBackground")
+        #else
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        // The page scrolls its own panes; the web view bouncing as a whole would move
+        // the toolbar with it.
+        webView.scrollView.bounces = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        #endif
 
         menus.activate = { [weak self] rid in
             self?.webView.evaluateJavaScript("window.__inkblotTauri.activateMenuItem(\(rid))")
@@ -82,12 +95,14 @@ final class EditorWebController: NSObject {
         // Detached and Pinterest windows opening, loading and closing.
         AuxiliaryWindows.shared.register(self)
 
+        #if os(macOS)
         _ = MouseDownRecorder.shared
+        #endif
         webView.load(URLRequest(url: Self.startURL))
     }
 
     /// Where the window's chrome lives, for sheets and fullscreen checks.
-    func attach(to window: NSWindow?) {
+    func attach(to window: PlatformWindow?) {
         host.window = window
         AuxiliaryWindows.shared.mainWindow = window
     }
@@ -216,7 +231,7 @@ extension EditorWebController: WKNavigationDelegate, WKUIDelegate {
         if isApp {
             decisionHandler(.allow)
         } else {
-            NSWorkspace.shared.open(url)
+            Platform.open(url)
             decisionHandler(.cancel)
         }
     }
@@ -228,10 +243,11 @@ extension EditorWebController: WKNavigationDelegate, WKUIDelegate {
         for action: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        if let url = action.request.url { NSWorkspace.shared.open(url) }
+        if let url = action.request.url { Platform.open(url) }
         return nil
     }
 
+    #if os(macOS)
     func webView(
         _ webView: WKWebView,
         runJavaScriptAlertPanelWithMessage message: String,
@@ -258,6 +274,34 @@ extension EditorWebController: WKNavigationDelegate, WKUIDelegate {
         }
         return response == .alertFirstButtonReturn
     }
+    #else
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptAlertPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo
+    ) async {
+        guard let presenter = TauriHost.presenter(for: webView.window) else { return }
+        await withCheckedContinuation { continuation in
+            let alert = UIAlertController(title: message, message: nil, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in continuation.resume() })
+            presenter.present(alert, animated: true)
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo
+    ) async -> Bool {
+        guard let presenter = TauriHost.presenter(for: webView.window) else { return false }
+        return await withCheckedContinuation { continuation in
+            let alert = UIAlertController(title: message, message: nil, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in continuation.resume(returning: true) })
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in continuation.resume(returning: false) })
+            presenter.present(alert, animated: true)
+        }
+    }
+    #endif
 }
 
 /* ---------------- message handlers ----------------
@@ -295,6 +339,7 @@ private final class WeakReplyHandler: NSObject, WKScriptMessageHandlerWithReply 
 
 /// Hands the controller's web view to SwiftUI, and tells the controller which window
 /// it ended up in.
+#if os(macOS)
 struct EditorWebView: NSViewRepresentable {
     let controller: EditorWebController
 
@@ -327,3 +372,37 @@ struct EditorWebView: NSViewRepresentable {
         }
     }
 }
+#else
+struct EditorWebView: UIViewRepresentable {
+    let controller: EditorWebController
+
+    func makeUIView(context: Context) -> WindowReportingContainer {
+        let container = WindowReportingContainer()
+        container.onWindow = { [weak controller] window in controller?.attach(to: window) }
+        container.embed(controller.webView)
+        return container
+    }
+
+    func updateUIView(_ view: WindowReportingContainer, context: Context) {}
+
+    final class WindowReportingContainer: UIView {
+        var onWindow: ((UIWindow?) -> Void)?
+
+        func embed(_ child: UIView) {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(child)
+            NSLayoutConstraint.activate([
+                child.leadingAnchor.constraint(equalTo: leadingAnchor),
+                child.trailingAnchor.constraint(equalTo: trailingAnchor),
+                child.topAnchor.constraint(equalTo: topAnchor),
+                child.bottomAnchor.constraint(equalTo: bottomAnchor),
+            ])
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            onWindow?(window)
+        }
+    }
+}
+#endif
