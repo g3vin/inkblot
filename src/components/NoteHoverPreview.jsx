@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import SFIcon from './SFIcon'
-import { useNoteCardDrag } from './useNoteCardDrag'
+import { useNoteCardDrag } from '../hooks/useNoteCardDrag'
 import NoteImageGallery from './NoteImageGallery'
 import AudioNotes from './AudioNotes'
 import { readClipboardImages } from '../lib/noteImageUtils'

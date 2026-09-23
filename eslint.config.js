@@ -15,7 +15,6 @@ export default defineConfig([
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
         ecmaVersion: 'latest',
@@ -35,7 +34,7 @@ export default defineConfig([
   },
   /* TypeScript files parse with the TS parser and use its unused-vars rule, which
      understands type-only references the base rule flags as unused. Not type-aware
-     yet (no `projectService`) — `npm run typecheck` is what checks types. */
+     (no `projectService`): `npm run typecheck` is what checks types. */
   {
     files: ['**/*.{ts,tsx}'],
     extends: [tseslint.configs.recommended],
