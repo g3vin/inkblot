@@ -72,18 +72,22 @@ impl DictationEngine {
             Some(path) if !path.trim().is_empty() => PathBuf::from(path),
             _ => {
                 let candidates = default_model_candidates(&self.app_data_dir);
-                candidates.iter().find(|path| path.is_file()).cloned().ok_or_else(|| {
-                    // A sentinel plus the search path, so the UI can both branch on it
-                    // and tell the user where to put the file.
-                    format!(
-                        "DICTATION_MODEL_NOT_INSTALLED: looked in {}",
-                        candidates
-                            .iter()
-                            .map(|p| p.display().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )
-                })?
+                candidates
+                    .iter()
+                    .find(|path| path.is_file())
+                    .cloned()
+                    .ok_or_else(|| {
+                        // A sentinel plus the search path, so the UI can both branch on it
+                        // and tell the user where to put the file.
+                        format!(
+                            "DICTATION_MODEL_NOT_INSTALLED: looked in {}",
+                            candidates
+                                .iter()
+                                .map(|p| p.display().to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    })?
             }
         };
 
@@ -130,7 +134,10 @@ impl DictationEngine {
 
     pub fn stop_session(&self) -> Result<(), String> {
         self.stop_level_meter();
-        self.service.lock().stop_session().map_err(|err| err.to_string())
+        self.service
+            .lock()
+            .stop_session()
+            .map_err(|err| err.to_string())
     }
 
     pub fn cancel_session(&self) {
@@ -168,7 +175,10 @@ pub fn default_model_candidates(app_data_dir: &Path) -> Vec<PathBuf> {
 
     if let Some(home) = std::env::var_os("HOME") {
         candidates.push(
-            PathBuf::from(home).join("inkblot-dictation").join("models").join("ggml-small.en.bin"),
+            PathBuf::from(home)
+                .join("inkblot-dictation")
+                .join("models")
+                .join("ggml-small.en.bin"),
         );
     }
 
@@ -190,10 +200,13 @@ fn forward(sink: &DictationSink, event: DictationEvent) {
 
 fn build_level_meter(sink: DictationSink) -> Result<DictationLevelMeter, String> {
     let host = cpal::default_host();
-    let device =
-        host.default_input_device().ok_or_else(|| "No default input device found".to_string())?;
+    let device = host
+        .default_input_device()
+        .ok_or_else(|| "No default input device found".to_string())?;
 
-    let supported_config = device.default_input_config().map_err(|err| err.to_string())?;
+    let supported_config = device
+        .default_input_config()
+        .map_err(|err| err.to_string())?;
     let sample_format = supported_config.sample_format();
     let config: cpal::StreamConfig = supported_config.into();
 
@@ -210,7 +223,11 @@ fn build_level_meter(sink: DictationSink) -> Result<DictationLevelMeter, String>
 
     stream.play().map_err(|err| err.to_string())?;
 
-    Ok(DictationLevelMeter { stop_flag, stream: Some(stream), worker: Some(worker) })
+    Ok(DictationLevelMeter {
+        stop_flag,
+        stream: Some(stream),
+        worker: Some(worker),
+    })
 }
 
 fn build_level_input_stream<T>(
@@ -274,9 +291,10 @@ fn spawn_level_meter_worker(
 }
 
 fn emit_level(sink: &DictationSink, rms: f32, level: f32) {
-    if let Ok(payload) =
-        serde_json::to_value(DictationLevelPayload { rms, level: level.clamp(0.0, 1.0) })
-    {
+    if let Ok(payload) = serde_json::to_value(DictationLevelPayload {
+        rms,
+        level: level.clamp(0.0, 1.0),
+    }) {
         sink("dictation://level", payload);
     }
 }
@@ -308,8 +326,12 @@ mod tests {
     #[test]
     fn the_app_data_model_is_looked_for_before_the_home_directory_one() {
         let candidates = default_model_candidates(Path::new("/data"));
-        let app = candidates.iter().position(|p| p == Path::new("/data/models/ggml-small.en.bin"));
-        let home = candidates.iter().position(|p| p.ends_with("inkblot-dictation/models/ggml-small.en.bin"));
+        let app = candidates
+            .iter()
+            .position(|p| p == Path::new("/data/models/ggml-small.en.bin"));
+        let home = candidates
+            .iter()
+            .position(|p| p.ends_with("inkblot-dictation/models/ggml-small.en.bin"));
         assert!(app.is_some());
         if let Some(home) = home {
             assert!(app.unwrap() < home);
@@ -319,7 +341,9 @@ mod tests {
     #[test]
     fn a_missing_model_is_the_sentinel() {
         let engine = DictationEngine::new("/nonexistent");
-        let error = engine.load_model(Some("/nonexistent/model.bin".into())).unwrap_err();
+        let error = engine
+            .load_model(Some("/nonexistent/model.bin".into()))
+            .unwrap_err();
         assert!(error.starts_with("DICTATION_MODEL_NOT_INSTALLED"));
     }
 

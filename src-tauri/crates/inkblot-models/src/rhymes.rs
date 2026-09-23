@@ -88,13 +88,19 @@ impl RhymeIndex {
                 continue;
             }
             let phonemes: Vec<&str> = parts.collect();
-            let Some(rhyme) = rhyme_part(&phonemes) else { continue };
+            let Some(rhyme) = rhyme_part(&phonemes) else {
+                continue;
+            };
             let syllables = phonemes.iter().filter(|p| is_vowel(p)).count();
 
             let entry = index.words.entry(word.to_string()).or_default();
             if !entry.iter().any(|(existing, _)| existing == &rhyme) {
                 entry.push((rhyme.clone(), syllables));
-                index.by_rhyme.entry(rhyme).or_default().push(word.to_string());
+                index
+                    .by_rhyme
+                    .entry(rhyme)
+                    .or_default()
+                    .push(word.to_string());
             }
         }
         index
@@ -105,7 +111,11 @@ impl RhymeIndex {
     /// The pronouncing dictionary is mostly surnames by count — `fire` has `eir`, `gyr`
     /// and `iyer` before `tire` — so `known` (ordinary words; see [`system_words`])
     /// ranks first when there is one. Then nearer syllable counts, then shorter words.
-    pub fn rhymes_ranked(&self, word: &str, known: Option<&HashSet<String>>) -> Option<Vec<String>> {
+    pub fn rhymes_ranked(
+        &self,
+        word: &str,
+        known: Option<&HashSet<String>>,
+    ) -> Option<Vec<String>> {
         let mut found = self.candidates(word)?;
         let unknown = |candidate: &String| known.is_some_and(|known| !known.contains(candidate));
         found.sort_by(|(a_distance, a), (b_distance, b)| {
@@ -115,7 +125,13 @@ impl RhymeIndex {
                 .then(a.len().cmp(&b.len()))
                 .then(a.cmp(b))
         });
-        Some(found.into_iter().take(MAX_RHYMES).map(|(_, word)| word).collect())
+        Some(
+            found
+                .into_iter()
+                .take(MAX_RHYMES)
+                .map(|(_, word)| word)
+                .collect(),
+        )
     }
 
     pub fn rhymes(&self, word: &str) -> Option<Vec<String>> {
@@ -132,7 +148,10 @@ impl RhymeIndex {
             for candidate in self.by_rhyme.get(rhyme).into_iter().flatten() {
                 // The word itself, and words that merely contain it (`night` for
                 // `tonight`), are not what anyone is looking for.
-                if candidate == &word || candidate.ends_with(&word) || word.ends_with(candidate.as_str()) {
+                if candidate == &word
+                    || candidate.ends_with(&word)
+                    || word.ends_with(candidate.as_str())
+                {
                     continue;
                 }
                 if found.iter().any(|(_, existing)| existing == candidate) {
@@ -174,7 +193,10 @@ pub struct RhymeEngine {
 impl RhymeEngine {
     /// `models_dir` is `<AppData>/models`.
     pub fn new(models_dir: impl Into<PathBuf>) -> Self {
-        Self { models_dir: models_dir.into(), index: Mutex::new(None) }
+        Self {
+            models_dir: models_dir.into(),
+            index: Mutex::new(None),
+        }
     }
 
     fn path(&self) -> Result<PathBuf, String> {
@@ -197,9 +219,13 @@ impl RhymeEngine {
         let path = self.path()?;
         if !path.is_file() {
             let client = download::client()?;
-            download::fetch_to(&client, DICTIONARY_URL, &path, DICTIONARY_FILE, &|received, total| {
-                progress(RhymeDownloadProgress { received, total })
-            })
+            download::fetch_to(
+                &client,
+                DICTIONARY_URL,
+                &path,
+                DICTIONARY_FILE,
+                &|received, total| progress(RhymeDownloadProgress { received, total }),
+            )
             .await?;
         }
         self.status()
@@ -218,7 +244,11 @@ impl RhymeEngine {
             *guard = Some((RhymeIndex::parse(&source), system_words()));
         }
         let (index, known) = guard.as_ref().expect("index just loaded");
-        Ok(RhymeResponse { rhymes: index.rhymes_ranked(word, known.as_ref()).unwrap_or_default() })
+        Ok(RhymeResponse {
+            rhymes: index
+                .rhymes_ranked(word, known.as_ref())
+                .unwrap_or_default(),
+        })
     }
 }
 
@@ -248,7 +278,10 @@ the DH AH0
     #[test]
     fn a_rhyme_is_everything_from_the_last_stressed_vowel() {
         assert_eq!(rhyme_part(&["T", "AY1", "G", "ER0"]).unwrap(), "AY G ER");
-        assert_eq!(rhyme_part(&["R", "EH1", "K", "AH0", "N", "D", "AY2", "T"]).unwrap(), "EH K AH N D AY T");
+        assert_eq!(
+            rhyme_part(&["R", "EH1", "K", "AH0", "N", "D", "AY2", "T"]).unwrap(),
+            "EH K AH N D AY T"
+        );
         // No stress at all: the last vowel.
         assert_eq!(rhyme_part(&["DH", "AH0"]).unwrap(), "AH");
         assert!(rhyme_part(&["HH"]).is_none());
@@ -274,7 +307,10 @@ the DH AH0
     fn known_words_rank_before_names() {
         let index = RhymeIndex::parse(SAMPLE);
         let known: HashSet<String> = ["geiger"].iter().map(|s| s.to_string()).collect();
-        assert_eq!(index.rhymes_ranked("tiger", Some(&known)).unwrap(), vec!["geiger", "liger"]);
+        assert_eq!(
+            index.rhymes_ranked("tiger", Some(&known)).unwrap(),
+            vec!["geiger", "liger"]
+        );
     }
 
     #[test]
@@ -300,10 +336,20 @@ the DH AH0
         let path = std::env::var("INKBLOT_CMUDICT").expect("INKBLOT_CMUDICT");
         let index = RhymeIndex::parse(&std::fs::read_to_string(path).unwrap());
         let known = system_words();
-        for (word, expected) in [("cat", "hat"), ("love", "dove"), ("fire", "tire"), ("Tiger", "geiger")] {
-            let rhymes = index.rhymes_ranked(word, known.as_ref()).unwrap_or_default();
+        for (word, expected) in [
+            ("cat", "hat"),
+            ("love", "dove"),
+            ("fire", "tire"),
+            ("Tiger", "geiger"),
+        ] {
+            let rhymes = index
+                .rhymes_ranked(word, known.as_ref())
+                .unwrap_or_default();
             println!("{word}: {rhymes:?}");
-            assert!(rhymes.contains(&expected.to_string()), "{word} → {rhymes:?}");
+            assert!(
+                rhymes.contains(&expected.to_string()),
+                "{word} → {rhymes:?}"
+            );
         }
         // Orange famously has no perfect rhyme, and saying so is the right answer.
         assert!(index.rhymes("orange").unwrap().is_empty());

@@ -10,14 +10,15 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use super::common::{Alignment, EditorTarget, Pane, TextAnchor};
-use crate::types::json::JsonValue;
 use super::sidebar::{
-    ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged, VersionsChanged,
+    ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged,
+    VersionsChanged,
 };
+use super::workspace::{DraftPaneChanged, SentenceStructure, TabsChanged};
+use crate::types::json::JsonValue;
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
-use super::workspace::{DraftPaneChanged, SentenceStructure, TabsChanged};
 
 /// Which marks are on at the selection.
 #[typeshare]

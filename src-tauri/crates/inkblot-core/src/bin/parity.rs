@@ -16,15 +16,15 @@ use std::collections::HashMap;
 
 use serde_json::{json, Map, Value};
 
-use inkblot_core::types::{
-    CanvasEdge, CanvasFile, CanvasNode, CanvasNodeType, DiffChunk, EdgeSide, HtmlBlock, MergeChoice,
-    Note, Point, ReadAloudPayload, Rect, SearchScope, VersionEntry, Viewport,
-};
-use inkblot_core::search::matcher::{Matcher, MatcherOptions};
-use inkblot_core::search::{self, ProjectFile};
 use inkblot_core::notes::{self, NoteDefaults};
 use inkblot_core::read_aloud;
+use inkblot_core::search::matcher::{Matcher, MatcherOptions};
+use inkblot_core::search::{self, ProjectFile};
 use inkblot_core::store::{paths, versions};
+use inkblot_core::types::{
+    CanvasEdge, CanvasFile, CanvasNode, CanvasNodeType, DiffChunk, EdgeSide, HtmlBlock,
+    MergeChoice, Note, Point, ReadAloudPayload, Rect, SearchScope, VersionEntry, Viewport,
+};
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
     story_structure as story, version_history as history,
@@ -83,11 +83,18 @@ fn f64_arg(args: &[Value], index: usize) -> Result<f64, String> {
 }
 
 fn viewport(value: &Value) -> Viewport {
-    Viewport { x: js_f64(&value["x"]), y: js_f64(&value["y"]), zoom: js_f64(&value["zoom"]) }
+    Viewport {
+        x: js_f64(&value["x"]),
+        y: js_f64(&value["y"]),
+        zoom: js_f64(&value["zoom"]),
+    }
 }
 
 fn point(value: &Value) -> Point {
-    Point { x: js_f64(&value["x"]), y: js_f64(&value["y"]) }
+    Point {
+        x: js_f64(&value["x"]),
+        y: js_f64(&value["y"]),
+    }
 }
 
 fn rect(value: &Value) -> Rect {
@@ -178,7 +185,12 @@ fn canvas_state(value: &Value) -> inkblot_core::types::CanvasState {
 fn string_list(value: &Value) -> Vec<String> {
     value
         .as_array()
-        .map(|items| items.iter().filter_map(|item| item.as_str().map(String::from)).collect())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -260,7 +272,11 @@ fn with_note_defaults<T>(now: &str, use_defaults: impl FnOnce(&NoteDefaults) -> 
     let now = now.to_string();
     let now_iso = move || now.clone();
     let format_time = |_: &str| "formatted".to_string();
-    use_defaults(&NoteDefaults { new_id: &new_id, now_iso: &now_iso, format_time: &format_time })
+    use_defaults(&NoteDefaults {
+        new_id: &new_id,
+        now_iso: &now_iso,
+        format_time: &format_time,
+    })
 }
 
 fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
@@ -278,13 +294,25 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         "getDocDisplayName" => json!(doc_kind::get_doc_display_name(&text()?)),
 
         /* ---- canvas_geometry ---- */
-        "clamp" => json!(geo::clamp(f64_arg(args, 0)?, f64_arg(args, 1)?, f64_arg(args, 2)?)),
+        "clamp" => json!(geo::clamp(
+            f64_arg(args, 0)?,
+            f64_arg(args, 1)?,
+            f64_arg(args, 2)?
+        )),
         "clampZoom" => json!(geo::clamp_zoom(f64_arg(args, 0)?)),
         "worldToScreen" => {
-            json!(geo::world_to_screen(f64_arg(args, 0)?, f64_arg(args, 1)?, viewport(&args[2])))
+            json!(geo::world_to_screen(
+                f64_arg(args, 0)?,
+                f64_arg(args, 1)?,
+                viewport(&args[2])
+            ))
         }
         "screenToWorld" => {
-            json!(geo::screen_to_world(f64_arg(args, 0)?, f64_arg(args, 1)?, viewport(&args[2])))
+            json!(geo::screen_to_world(
+                f64_arg(args, 0)?,
+                f64_arg(args, 1)?,
+                viewport(&args[2])
+            ))
         }
         "worldTransform" => json!(geo::world_transform(viewport(&args[0]))),
         "zoomAt" => json!(geo::zoom_at(
@@ -299,18 +327,34 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             f64_arg(args, 2)?,
             f64_arg(args, 3)?
         )),
-        "panBy" => json!(geo::pan_by(viewport(&args[0]), f64_arg(args, 1)?, f64_arg(args, 2)?)),
+        "panBy" => json!(geo::pan_by(
+            viewport(&args[0]),
+            f64_arg(args, 1)?,
+            f64_arg(args, 2)?
+        )),
         "nodesBounds" => {
-            let rects: Vec<Rect> = args[0].as_array().map(|list| list.iter().map(rect).collect()).unwrap_or_default();
+            let rects: Vec<Rect> = args[0]
+                .as_array()
+                .map(|list| list.iter().map(rect).collect())
+                .unwrap_or_default();
             json!(geo::nodes_bounds(&rects))
         }
         "fitViewport" => {
-            let bounds = if args[0].is_object() { Some(rect(&args[0])) } else { None };
+            let bounds = if args[0].is_object() {
+                Some(rect(&args[0]))
+            } else {
+                None
+            };
             let options = geo::FitOptions {
                 padding: js_f64(&args[3]["padding"]),
                 max_zoom: js_f64(&args[3]["maxZoom"]),
             };
-            json!(geo::fit_viewport(bounds, f64_arg(args, 1)?, f64_arg(args, 2)?, options))
+            json!(geo::fit_viewport(
+                bounds,
+                f64_arg(args, 1)?,
+                f64_arg(args, 2)?,
+                options
+            ))
         }
         "rectsIntersect" => json!(geo::rects_intersect(rect(&args[0]), rect(&args[1]))),
         "rectContains" => json!(geo::rect_contains(rect(&args[0]), rect(&args[1]))),
@@ -325,7 +369,11 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             edge_side(&args[3])
         )),
         "offsetAnchor" => {
-            json!(geo::offset_anchor(point(&args[0]), edge_side(&args[1]), f64_arg(args, 2)?))
+            json!(geo::offset_anchor(
+                point(&args[0]),
+                edge_side(&args[1]),
+                f64_arg(args, 2)?
+            ))
         }
         "edgeGeometry" => json!(geo::edge_geometry(
             &canvas_edge(&args[0]),
@@ -338,13 +386,18 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         "normalizeCanvas" => json!(canvas_state(&args[0])),
         "readViewport" => json!(model::read_viewport(&args[0])),
         "serializeCanvas" => {
-            json!(model::serialize_canvas(&canvas_state(&args[0]), viewport(&args[1])))
+            json!(model::serialize_canvas(
+                &canvas_state(&args[0]),
+                viewport(&args[1])
+            ))
         }
         "resolveCanvasColor" => {
             // JS does `String(color)` before the lookup, so the preset number 1 and
             // the preset string "1" resolve alike. That coercion is the shim's job.
             let coerced = match &args[0] {
-                Value::Number(number) => Some(format_js_number(number.as_f64().unwrap_or(f64::NAN))),
+                Value::Number(number) => {
+                    Some(format_js_number(number.as_f64().unwrap_or(f64::NAN)))
+                }
                 Value::String(text) => Some(text.clone()),
                 Value::Bool(true) => Some("true".to_string()),
                 _ => None,
@@ -352,41 +405,62 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             json!(model::resolve_canvas_color(coerced.as_deref()))
         }
         "groupMemberIds" => {
-            json!(model::group_member_ids(&canvas_state(&args[0]), args[1].as_str().unwrap_or_default()))
+            json!(model::group_member_ids(
+                &canvas_state(&args[0]),
+                args[1].as_str().unwrap_or_default()
+            ))
         }
         "groupFitRect" => {
             let state = canvas_state(&args[0]);
-            json!(model::group_fit_rect(&state.nodes, &string_list(&args[1]), f64_arg(args, 2)?))
+            json!(model::group_fit_rect(
+                &state.nodes,
+                &string_list(&args[1]),
+                f64_arg(args, 2)?
+            ))
         }
         "groupsToRefit" => {
             // JS returns an object keyed by group id; the Rust version returns pairs,
             // because the key order is `nodeOrder` and a map would throw it away.
             let fits = model::groups_to_refit(&canvas_state(&args[0]), &string_list(&args[1]));
-            let object: Map<String, Value> =
-                fits.into_iter().map(|(id, members)| (id, json!(members))).collect();
+            let object: Map<String, Value> = fits
+                .into_iter()
+                .map(|(id, members)| (id, json!(members)))
+                .collect();
             Value::Object(object)
         }
         "expandGroupSelection" => {
-            json!(model::expand_group_selection(&canvas_state(&args[0]), &string_list(&args[1])))
+            json!(model::expand_group_selection(
+                &canvas_state(&args[0]),
+                &string_list(&args[1])
+            ))
         }
         "incidentEdgeIds" => {
-            json!(model::incident_edge_ids(&canvas_state(&args[0]), &string_list(&args[1])))
+            json!(model::incident_edge_ids(
+                &canvas_state(&args[0]),
+                &string_list(&args[1])
+            ))
         }
 
         /* ---- story_structure ---- */
         "storyFolderPresets" => json!(story::story_folder_presets()),
         "getStoryFolderPresetByKey" => {
-            json!(story::get_story_folder_preset_by_key(args[0].as_str().unwrap_or_default()))
+            json!(story::get_story_folder_preset_by_key(
+                args[0].as_str().unwrap_or_default()
+            ))
         }
         "getStoryFolderPresetByName" => {
-            json!(story::get_story_folder_preset_by_name(args[0].as_str().unwrap_or_default()))
+            json!(story::get_story_folder_preset_by_name(
+                args[0].as_str().unwrap_or_default()
+            ))
         }
         "getStoryFolderPresetForEntry" => json!(story::get_story_folder_preset_for_entry(
             args[0].as_str().unwrap_or_default(),
             args.get(1).and_then(Value::as_str).unwrap_or("file")
         )),
         "getStoryFolderAncestor" => {
-            json!(story::get_story_folder_ancestor(args[0].as_str().unwrap_or_default()))
+            json!(story::get_story_folder_ancestor(
+                args[0].as_str().unwrap_or_default()
+            ))
         }
 
         /* ---- version_history ---- */
@@ -396,8 +470,13 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             args[0].as_str().unwrap_or_default(),
             args[1].as_bool().unwrap_or(true)
         )),
-        "countCanvasWords" => json!(history::count_canvas_words(&parse::<CanvasFile>(&args[0], "canvas")?)),
-        "versionWords" => json!(history::version_words(&parse::<VersionEntry>(&args[0], "version entry")?)),
+        "countCanvasWords" => json!(history::count_canvas_words(&parse::<CanvasFile>(
+            &args[0], "canvas"
+        )?)),
+        "versionWords" => json!(history::version_words(&parse::<VersionEntry>(
+            &args[0],
+            "version entry"
+        )?)),
         "sessionColor" => json!(history::session_color(args[0].as_str().unwrap_or_default())),
         "diffTokens" => json!(history::diff_tokens(
             &parse::<Vec<String>>(&args[0], "tokens")?,
@@ -419,7 +498,9 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             &parse::<Vec<DiffChunk>>(&args[0], "chunks")?,
             &indexed_choices(&args[1])
         )),
-        "canvasNodeText" => json!(history::canvas_node_text(&parse::<CanvasNode>(&args[0], "node")?)),
+        "canvasNodeText" => json!(history::canvas_node_text(&parse::<CanvasNode>(
+            &args[0], "node"
+        )?)),
         "diffCanvases" => json!(history::diff_canvases(
             &parse::<CanvasFile>(&args[0], "canvas")?,
             &parse::<CanvasFile>(&args[1], "canvas")?
@@ -436,17 +517,27 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             let left = parse::<CanvasFile>(&args[0], "canvas")?;
             let right = parse::<CanvasFile>(&args[1], "canvas")?;
             let diff = history::diff_canvases(&left, &right);
-            json!(history::merge_canvases(&right, &diff, &named_choices(&args[2])))
+            json!(history::merge_canvases(
+                &right,
+                &diff,
+                &named_choices(&args[2])
+            ))
         }
 
         /* ---- store::paths ---- */
-        "stripTrailingSlash" => json!(paths::strip_trailing_slash(args[0].as_str().unwrap_or_default())),
-        "stripLeadingSlash" => json!(paths::strip_leading_slash(args[0].as_str().unwrap_or_default())),
+        "stripTrailingSlash" => json!(paths::strip_trailing_slash(
+            args[0].as_str().unwrap_or_default()
+        )),
+        "stripLeadingSlash" => json!(paths::strip_leading_slash(
+            args[0].as_str().unwrap_or_default()
+        )),
         "parentOf" => json!(paths::parent_of(args[0].as_str().unwrap_or_default())),
         "normalizePath" => json!(paths::normalize_path(args[0].as_str().unwrap_or_default())),
         "joinPath" => {
-            let parts: Vec<&str> =
-                args[0].as_array().map(|list| list.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+            let parts: Vec<&str> = args[0]
+                .as_array()
+                .map(|list| list.iter().filter_map(Value::as_str).collect())
+                .unwrap_or_default();
             json!(paths::join_path(&parts))
         }
         "versionsSidecarPath" => json!(paths::versions_sidecar_path(
@@ -461,15 +552,18 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         )),
         "buildTextVersionEntry" => {
             // The stamps are the clock's; the harness blanks them on both sides.
-            json!(versions::build_text_version_entry(versions::NewTextVersion {
-                id: "stamped".to_string(),
-                timestamp: "stamped".to_string(),
-                session_id: "stamped".to_string(),
-                content_html: args[0]["contentHtml"].as_str().map(str::to_string),
-                content_json: Some(args[0]["contentJson"].clone()).filter(|value| !value.is_null()),
-                name: args[0]["name"].as_str().map(str::to_string),
-                auto: args[0]["auto"].as_bool().unwrap_or(true),
-            }))
+            json!(versions::build_text_version_entry(
+                versions::NewTextVersion {
+                    id: "stamped".to_string(),
+                    timestamp: "stamped".to_string(),
+                    session_id: "stamped".to_string(),
+                    content_html: args[0]["contentHtml"].as_str().map(str::to_string),
+                    content_json: Some(args[0]["contentJson"].clone())
+                        .filter(|value| !value.is_null()),
+                    name: args[0]["name"].as_str().map(str::to_string),
+                    auto: args[0]["auto"].as_bool().unwrap_or(true),
+                }
+            ))
         }
         "buildCanvasVersionEntry" => json!(versions::build_canvas_version_entry(
             "stamped".to_string(),
@@ -482,13 +576,19 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
 
         /* ---- search ---- */
         "matcherState" => {
-            let matcher = Matcher::new(args[0].as_str().unwrap_or_default(), matcher_options(&args[1]));
+            let matcher = Matcher::new(
+                args[0].as_str().unwrap_or_default(),
+                matcher_options(&args[1]),
+            );
             // The error TEXT is each engine's own wording; only whether it compiled is
             // comparable.
             json!({ "isEmpty": matcher.is_empty, "valid": matcher.valid })
         }
         "findAll" => {
-            let matcher = Matcher::new(args[0].as_str().unwrap_or_default(), matcher_options(&args[1]));
+            let matcher = Matcher::new(
+                args[0].as_str().unwrap_or_default(),
+                matcher_options(&args[1]),
+            );
             let hits = matcher.find_all(args[2].as_str().unwrap_or_default(), usize::MAX);
             json!(hits.iter().map(hit_json).collect::<Vec<_>>())
         }
@@ -498,9 +598,14 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             args[2].as_u64().unwrap_or(0) as usize,
             args[3].as_u64().unwrap_or(34) as usize
         )),
-        "getEntryLabel" => json!(search::get_entry_label(args[0].as_str().unwrap_or_default())),
+        "getEntryLabel" => json!(search::get_entry_label(
+            args[0].as_str().unwrap_or_default()
+        )),
         "collectMatchesFromDocJson" => {
-            let matcher = Matcher::new(args[1].as_str().unwrap_or_default(), matcher_options(&args[2]));
+            let matcher = Matcher::new(
+                args[1].as_str().unwrap_or_default(),
+                matcher_options(&args[2]),
+            );
             json!(search::collect_matches_from_doc_json(
                 &args[0],
                 &matcher,
@@ -508,7 +613,10 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             ))
         }
         "collectCanvasMatches" => {
-            let matcher = Matcher::new(args[1].as_str().unwrap_or_default(), matcher_options(&args[2]));
+            let matcher = Matcher::new(
+                args[1].as_str().unwrap_or_default(),
+                matcher_options(&args[2]),
+            );
             json!(search::collect_canvas_matches(
                 &args[0],
                 &matcher,
@@ -524,7 +632,9 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             args[1].as_str().unwrap_or_default()
         )),
         "getRecommendedScopes" => {
-            json!(search::get_recommended_scopes(args[0].as_str().unwrap_or_default()))
+            json!(search::get_recommended_scopes(
+                args[0].as_str().unwrap_or_default()
+            ))
         }
         "flattenProjectFiles" => {
             let tree = parse::<inkblot_core::types::TreeNode>(&args[0], "tree")?;
@@ -572,7 +682,10 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         "collectNoteBranchIds" => {
             with_note_defaults(args[2].as_str().unwrap_or_default(), |defaults| {
                 let all = notes::normalize_notes(&args[0], defaults);
-                json!(notes::collect_note_branch_ids(&all, args[1].as_str().unwrap_or_default()))
+                json!(notes::collect_note_branch_ids(
+                    &all,
+                    args[1].as_str().unwrap_or_default()
+                ))
             })
         }
         "sortNotes" => with_note_defaults(args[1].as_str().unwrap_or_default(), |defaults| {
@@ -600,7 +713,10 @@ fn as_javascript_json(value: Value) -> Value {
         },
         Value::Array(items) => Value::Array(items.into_iter().map(as_javascript_json).collect()),
         Value::Object(fields) => Value::Object(
-            fields.into_iter().map(|(key, inner)| (key, as_javascript_json(inner))).collect(),
+            fields
+                .into_iter()
+                .map(|(key, inner)| (key, as_javascript_json(inner)))
+                .collect(),
         ),
         other => other,
     }
@@ -610,8 +726,8 @@ fn main() -> io::Result<()> {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
 
-    let request: Value = serde_json::from_str(&input)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let request: Value =
+        serde_json::from_str(&input).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     let cases = request["cases"].as_array().cloned().unwrap_or_default();
 
     let results: Vec<Value> = cases

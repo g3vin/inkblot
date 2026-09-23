@@ -19,8 +19,9 @@ use super::json::JsonMap;
 pub const DEFAULT_NOTE_COLOR: &str = "#ffd54f";
 
 /// `NOTE_COLOR_OPTIONS` in noteUtils.js.
-pub const NOTE_COLOR_OPTIONS: [&str; 6] =
-    ["#ffd54f", "#ff9aa2", "#9ad0f5", "#9ee493", "#c7a8ff", "#ffb86b"];
+pub const NOTE_COLOR_OPTIONS: [&str; 6] = [
+    "#ffd54f", "#ff9aa2", "#9ad0f5", "#9ee493", "#c7a8ff", "#ffb86b",
+];
 
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -75,7 +76,10 @@ pub struct NotePreviewSize {
 
 impl Default for NotePreviewSize {
     fn default() -> Self {
-        Self { width: 260.0, height: 88.0 }
+        Self {
+            width: 260.0,
+            height: 88.0,
+        }
     }
 }
 

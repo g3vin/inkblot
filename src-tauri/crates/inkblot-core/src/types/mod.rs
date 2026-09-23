@@ -32,19 +32,20 @@ pub mod read_aloud;
 pub mod search;
 pub mod story;
 
+pub use canvas::{CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState};
 pub use diff::{
-    CanvasDiff, CanvasNodeChange, DiffChunk, DiffChunkType, DiffOp, DiffOpType, HtmlBlock, MergeChoice, WordDelta, VersionRow,
+    CanvasDiff, CanvasNodeChange, DiffChunk, DiffChunkType, DiffOp, DiffOpType, HtmlBlock,
+    MergeChoice, VersionRow, WordDelta,
 };
-pub use canvas::{
-    CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState,
+pub use document::{
+    DocKind, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind, VERSION_CAP,
 };
-pub use document::{DocKind, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind, VERSION_CAP};
 pub use geometry::{BezierPath, EdgeSide, Point, Rect, Viewport};
 pub use json::{JsonMap, JsonValue};
+pub use note::{
+    AudioClip, Note, NoteImage, NotePreviewLayout, NotePreviewSize, NoteType, DEFAULT_NOTE_COLOR,
+    NOTE_COLOR_OPTIONS,
+};
 pub use read_aloud::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
 pub use search::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
 pub use story::{StoryFolderAncestor, StoryFolderPreset};
-pub use note::{
-    AudioClip, Note, NoteImage, NotePreviewLayout, NotePreviewSize, NoteType,
-    DEFAULT_NOTE_COLOR, NOTE_COLOR_OPTIONS,
-};

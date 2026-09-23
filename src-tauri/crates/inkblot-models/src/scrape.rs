@@ -54,7 +54,10 @@ impl ScrapeChannels {
 
     /// Open a slot for `request_id`. Must happen before the script is injected.
     pub fn begin(&self, request_id: String) {
-        let mut slots = self.slots.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut slots = self
+            .slots
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         slots.insert(request_id, Arc::new(ScrapeSlot::default()));
     }
 
@@ -66,7 +69,11 @@ impl ScrapeChannels {
     /// no pins is much easier to explain with them than without.
     pub fn report(&self, report: ScrapeReport) {
         if report.progress {
-            log::debug!("[pinterest] {} progress: {}", report.request_id, report.stage);
+            log::debug!(
+                "[pinterest] {} progress: {}",
+                report.request_id,
+                report.stage
+            );
             return;
         }
 
@@ -76,7 +83,10 @@ impl ScrapeChannels {
             return;
         };
 
-        *slot.report.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(report);
+        *slot
+            .report
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(report);
         slot.notify.notify_waiters();
     }
 
@@ -98,8 +108,11 @@ impl ScrapeChannels {
                 // Registering the waiter before checking closes the gap where a report
                 // lands between the check and the wait.
                 let notified = slot.notify.notified();
-                if let Some(report) =
-                    slot.report.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take()
+                if let Some(report) = slot
+                    .report
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .take()
                 {
                     return report;
                 }

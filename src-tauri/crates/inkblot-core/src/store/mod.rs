@@ -163,12 +163,18 @@ impl ProjectStore {
     /// Called after a document's version list changes, with the project and document
     /// names.
     pub fn on_versions_changed(&self, listener: impl Fn(&str, &str) + Send + Sync + 'static) {
-        let mut slot = self.listener.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut slot = self
+            .listener
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         *slot = Some(Box::new(listener));
     }
 
     fn emit_versions_changed(&self, project_name: &str, doc_name: &str) {
-        let slot = self.listener.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let slot = self
+            .listener
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(listener) = slot.as_ref() {
             listener(project_name, doc_name);
         }
@@ -193,8 +199,16 @@ impl ProjectStore {
     /// [`Self::save_document`] only ever emits `{ content, notes, versions }`, which is
     /// right for text documents and destructive for anything else. Document kinds with
     /// their own shape — canvases — persist through here instead.
-    pub fn write_document_raw(&self, project_name: &str, doc_name: &str, data: &Value) -> Result<()> {
-        let file_path = join_path(&[&self.project_root(project_name), &format!("{doc_name}.json")]);
+    pub fn write_document_raw(
+        &self,
+        project_name: &str,
+        doc_name: &str,
+        data: &Value,
+    ) -> Result<()> {
+        let file_path = join_path(&[
+            &self.project_root(project_name),
+            &format!("{doc_name}.json"),
+        ]);
         std::fs::create_dir_all(parent_of(&file_path))?;
         std::fs::write(&file_path, serde_json::to_string(data)?)?;
         Ok(())
@@ -277,7 +291,9 @@ impl ProjectStore {
         notes: &Value,
     ) -> Result<bool> {
         if is_canvas_doc(doc_name) {
-            return Err(StoreError::Refused(format!("{doc_name} is a canvas and has no notes")));
+            return Err(StoreError::Refused(format!(
+                "{doc_name} is a canvas and has no notes"
+            )));
         }
 
         self.locks.with_doc_lock(project_name, doc_name, || {
@@ -287,7 +303,11 @@ impl ProjectStore {
             if let Some(fields) = existing.as_object_mut() {
                 fields.insert(
                     "notes".to_string(),
-                    if notes.is_array() { notes.clone() } else { json!([]) },
+                    if notes.is_array() {
+                        notes.clone()
+                    } else {
+                        json!([])
+                    },
                 );
             }
             self.write_document_raw(project_name, doc_name, &existing)?;
@@ -297,20 +317,26 @@ impl ProjectStore {
 
     /// The document's JSON, or `None` when there is no such file.
     pub fn load_document(&self, project_name: &str, doc_name: &str) -> Result<Option<Value>> {
-        let file_path =
-            join_path(&[&self.project_root(project_name), &format!("{doc_name}.json")]);
+        let file_path = join_path(&[
+            &self.project_root(project_name),
+            &format!("{doc_name}.json"),
+        ]);
         if !exists(&file_path) {
             return Ok(None);
         }
-        Ok(Some(serde_json::from_str(&std::fs::read_to_string(&file_path)?)?))
+        Ok(Some(serde_json::from_str(&std::fs::read_to_string(
+            &file_path,
+        )?)?))
     }
 
     pub fn document_exists(&self, project_name: &str, doc_name: &str) -> bool {
         if project_name.is_empty() || doc_name.is_empty() {
             return false;
         }
-        let file_path =
-            join_path(&[&self.project_root(project_name), &format!("{doc_name}.json")]);
+        let file_path = join_path(&[
+            &self.project_root(project_name),
+            &format!("{doc_name}.json"),
+        ]);
         exists(&file_path)
     }
 
@@ -360,9 +386,18 @@ impl ProjectStore {
     ) -> Result<String> {
         let rel = normalize_path(doc_name);
         let is_canvas = is_canvas_doc(&rel);
-        let base = if is_canvas { &rel[..rel.len() - CANVAS_SUFFIX_LENGTH] } else { &rel };
-        let with_suffix =
-            |name: String| if is_canvas { format!("{name}{CANVAS_SUFFIX}") } else { name };
+        let base = if is_canvas {
+            &rel[..rel.len() - CANVAS_SUFFIX_LENGTH]
+        } else {
+            &rel
+        };
+        let with_suffix = |name: String| {
+            if is_canvas {
+                format!("{name}{CANVAS_SUFFIX}")
+            } else {
+                name
+            }
+        };
 
         let mut candidate = with_suffix(name_for(base, None));
         let mut counter = 2;
@@ -475,8 +510,10 @@ impl ProjectStore {
             };
 
             let before = existing.len();
-            let versions: Vec<VersionEntry> =
-                existing.into_iter().filter(|entry| entry.id != version_id).collect();
+            let versions: Vec<VersionEntry> = existing
+                .into_iter()
+                .filter(|entry| entry.id != version_id)
+                .collect();
             if versions.len() == before {
                 return Ok(false);
             }
@@ -576,7 +613,11 @@ impl ProjectStore {
 
     /// Create a project. With `target_parent_dir`, the directory is created inside it
     /// and the custom location recorded; otherwise it goes in the AppData default.
-    pub fn create_project(&self, project_name: &str, target_parent_dir: Option<&str>) -> Result<bool> {
+    pub fn create_project(
+        &self,
+        project_name: &str,
+        target_parent_dir: Option<&str>,
+    ) -> Result<bool> {
         let name = project_name.trim();
         if name.is_empty() {
             return Ok(false);
@@ -615,7 +656,11 @@ impl ProjectStore {
             return Ok(Err(LinkRefusal::SourceMissing));
         }
 
-        let name = dir.split(['/', '\\']).filter(|part| !part.is_empty()).next_back().unwrap_or("");
+        let name = dir
+            .split(['/', '\\'])
+            .filter(|part| !part.is_empty())
+            .next_back()
+            .unwrap_or("");
         // A dotted directory is skipped by list_projects, so linking one would
         // "succeed" into a project that never appears.
         if name.is_empty() || name.starts_with('.') {
@@ -750,7 +795,12 @@ impl ProjectStore {
         }
     }
 
-    pub fn delete_entry(&self, project_name: &str, entry_path: &str, is_folder: bool) -> Result<()> {
+    pub fn delete_entry(
+        &self,
+        project_name: &str,
+        entry_path: &str,
+        is_folder: bool,
+    ) -> Result<()> {
         let root = self.project_root(project_name);
         let rel = normalize_path(entry_path);
         let target = self.entry_file_path(project_name, entry_path, is_folder);
@@ -800,8 +850,11 @@ impl ProjectStore {
         let rel = normalize_path(entry_path);
         let segments: Vec<&str> = rel.split('/').filter(|part| !part.is_empty()).collect();
         let parent = segments[..segments.len().saturating_sub(1)].join("/");
-        let next_path =
-            if parent.is_empty() { new_name.to_string() } else { format!("{parent}/{new_name}") };
+        let next_path = if parent.is_empty() {
+            new_name.to_string()
+        } else {
+            format!("{parent}/{new_name}")
+        };
 
         self.relocate_entry(project_name, &rel, &next_path, is_folder)
     }
@@ -816,7 +869,11 @@ impl ProjectStore {
     ) -> Result<Option<String>> {
         let rel = normalize_path(entry_path);
         let target_folder = normalize_path(target_folder_path);
-        let base_name = rel.split('/').filter(|part| !part.is_empty()).next_back().unwrap_or("");
+        let base_name = rel
+            .split('/')
+            .filter(|part| !part.is_empty())
+            .next_back()
+            .unwrap_or("");
         let next_path = if target_folder.is_empty() {
             base_name.to_string()
         } else {
@@ -836,7 +893,10 @@ impl ProjectStore {
     ) -> Result<Option<String>> {
         let root = self.project_root(project_name);
         let (old_path, new_path) = if is_folder {
-            (folder_path_for(&root, rel), folder_path_for(&root, next_path))
+            (
+                folder_path_for(&root, rel),
+                folder_path_for(&root, next_path),
+            )
         } else {
             (file_path_for(&root, rel), file_path_for(&root, next_path))
         };
@@ -933,10 +993,15 @@ fn copy_dir_recursive(source_dir: &str, dest_dir: &str) -> Result<()> {
 }
 
 fn read_directory(root: &str, relative_path: &str) -> Vec<TreeNode> {
-    let dir_path =
-        if relative_path.is_empty() { root.to_string() } else { join_path(&[root, relative_path]) };
+    let dir_path = if relative_path.is_empty() {
+        root.to_string()
+    } else {
+        join_path(&[root, relative_path])
+    };
 
-    let Ok(entries) = std::fs::read_dir(&dir_path) else { return Vec::new() };
+    let Ok(entries) = std::fs::read_dir(&dir_path) else {
+        return Vec::new();
+    };
 
     // Sorted, because `std::fs::read_dir` yields in directory order and the tree is
     // compared in tests. The UI applies its own order on top (fileTreeOrder.ts).
@@ -950,7 +1015,9 @@ fn read_directory(root: &str, relative_path: &str) -> Vec<TreeNode> {
         if name.is_empty() || name.starts_with('.') || name == ORDER_FILE {
             continue;
         }
-        let Ok(kind) = entry.file_type() else { continue };
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
 
         if kind.is_dir() {
             let folder_path = if relative_path.is_empty() {
@@ -965,7 +1032,9 @@ fn read_directory(root: &str, relative_path: &str) -> Vec<TreeNode> {
                 path: folder_path,
             });
         } else if kind.is_file() {
-            let Some(base_name) = name.strip_suffix(".json") else { continue };
+            let Some(base_name) = name.strip_suffix(".json") else {
+                continue;
+            };
             let file_path = if relative_path.is_empty() {
                 base_name.to_string()
             } else {

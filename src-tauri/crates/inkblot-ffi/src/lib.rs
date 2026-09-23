@@ -127,7 +127,12 @@ impl InkblotCore {
         Ok(serde_json::to_string(&self.preferences.load_all())?)
     }
 
-    pub fn preferences_set(&self, scope: String, key: String, value: String) -> Result<(), CoreError> {
+    pub fn preferences_set(
+        &self,
+        scope: String,
+        key: String,
+        value: String,
+    ) -> Result<(), CoreError> {
         Ok(self.preferences.set(scope_of(&scope)?, &key, &value)?)
     }
 
@@ -141,7 +146,9 @@ impl InkblotCore {
         from_prefix: String,
         to_prefix: String,
     ) -> Result<(), CoreError> {
-        Ok(self.preferences.rename_prefix(scope_of(&scope)?, &from_prefix, &to_prefix)?)
+        Ok(self
+            .preferences
+            .rename_prefix(scope_of(&scope)?, &from_prefix, &to_prefix)?)
     }
 
     /* ---------------- projects ---------------- */
@@ -152,7 +159,9 @@ impl InkblotCore {
 
     /// A project's tree as a `TreeNode`, JSON-encoded — see the module note.
     pub fn project_tree_json(&self, project_name: String) -> Result<String, CoreError> {
-        Ok(serde_json::to_string(&self.projects.list_project_tree(&project_name))?)
+        Ok(serde_json::to_string(
+            &self.projects.list_project_tree(&project_name),
+        )?)
     }
 }
 
@@ -173,7 +182,9 @@ pub struct VersionHistory {
 impl VersionHistory {
     #[uniffi::constructor]
     pub fn load(core: Arc<InkblotCore>, project_name: String, doc_name: String) -> Arc<Self> {
-        Arc::new(Self { versions: core.projects.get_versions(&project_name, &doc_name) })
+        Arc::new(Self {
+            versions: core.projects.get_versions(&project_name, &doc_name),
+        })
     }
 
     pub fn count(&self) -> u32 {
@@ -182,12 +193,18 @@ impl VersionHistory {
 
     /// `[VersionRow]`, newest first, as JSON.
     pub fn rows_json(&self) -> Result<String, CoreError> {
-        Ok(serde_json::to_string(&inkblot_core::version_history::version_rows(&self.versions))?)
+        Ok(serde_json::to_string(
+            &inkblot_core::version_history::version_rows(&self.versions),
+        )?)
     }
 
     /// The `WordDelta` across a burst, from the entry before `oldest_id` to `newest_id`,
     /// as JSON. `{added: 0, removed: 0}` if either id is unknown.
-    pub fn span_delta_json(&self, newest_id: String, oldest_id: String) -> Result<String, CoreError> {
+    pub fn span_delta_json(
+        &self,
+        newest_id: String,
+        oldest_id: String,
+    ) -> Result<String, CoreError> {
         let index_of = |id: &str| self.versions.iter().position(|v| v.id == id);
         let delta = match (index_of(&newest_id), index_of(&oldest_id)) {
             (Some(newest), Some(oldest)) => {
@@ -219,7 +236,10 @@ pub struct SearchOptions {
     pub use_regex: bool,
 }
 
-fn matcher(query: &str, options: &SearchOptions) -> Result<inkblot_core::search::matcher::Matcher, CoreError> {
+fn matcher(
+    query: &str,
+    options: &SearchOptions,
+) -> Result<inkblot_core::search::matcher::Matcher, CoreError> {
     let matcher = inkblot_core::search::matcher::Matcher::new(
         query,
         inkblot_core::search::matcher::MatcherOptions {
@@ -251,7 +271,12 @@ impl InkblotCore {
                 .map_err(|_| CoreError::Failed(format!("Unknown search scope: {scope}")))?;
         let matcher = matcher(&query, &options)?;
         let results = inkblot_core::search::search_project(
-            &self.projects, &project_name, scope, &matcher, |_| None, || false,
+            &self.projects,
+            &project_name,
+            scope,
+            &matcher,
+            |_| None,
+            || false,
         )?;
         Ok(serde_json::to_string(&results)?)
     }
@@ -271,7 +296,11 @@ impl InkblotCore {
         let results = if inkblot_core::doc_kind::is_canvas_doc(&doc_name) {
             inkblot_core::search::collect_canvas_matches(&raw, &matcher, &doc_name, usize::MAX)
         } else {
-            inkblot_core::search::collect_matches_from_doc_json(&raw["content"], &matcher, &doc_name)
+            inkblot_core::search::collect_matches_from_doc_json(
+                &raw["content"],
+                &matcher,
+                &doc_name,
+            )
         };
         Ok(serde_json::to_string(&results)?)
     }
@@ -313,13 +342,16 @@ mod tests {
     #[test]
     fn preferences_round_trip_through_the_json_the_webview_reads() {
         let core = InkblotCore::new(scratch_root("prefs"), "s".into());
-        core.preferences_set("app".into(), "theme".into(), "\"dark\"".into()).unwrap();
+        core.preferences_set("app".into(), "theme".into(), "\"dark\"".into())
+            .unwrap();
 
         let loaded: serde_json::Value =
             serde_json::from_str(&core.preferences_load_json().unwrap()).unwrap();
         assert_eq!(loaded["app"]["theme"], "\"dark\"");
         assert_eq!(
-            core.preferences.get(PreferenceScope::App, "theme").as_deref(),
+            core.preferences
+                .get(PreferenceScope::App, "theme")
+                .as_deref(),
             Some("\"dark\"")
         );
     }
@@ -327,7 +359,9 @@ mod tests {
     #[test]
     fn an_unknown_scope_is_an_error_not_a_path() {
         let core = InkblotCore::new(scratch_root("scope"), "s".into());
-        assert!(core.preferences_set("../escape".into(), "k".into(), "v".into()).is_err());
+        assert!(core
+            .preferences_set("../escape".into(), "k".into(), "v".into())
+            .is_err());
     }
 
     #[test]
@@ -366,10 +400,14 @@ mod tests {
         let history = VersionHistory::load(core.clone(), "Novel".into(), "one".into());
         assert_eq!(history.count(), 2);
         let rows: serde_json::Value = serde_json::from_str(&history.rows_json().unwrap()).unwrap();
-        assert_eq!(rows[0]["delta"], serde_json::json!({ "added": 3, "removed": 0 }));
+        assert_eq!(
+            rows[0]["delta"],
+            serde_json::json!({ "added": 3, "removed": 0 })
+        );
         assert_eq!(history.text_of("v1".into()).trim(), "she hesitated");
         let span: serde_json::Value =
-            serde_json::from_str(&history.span_delta_json("v2".into(), "v1".into()).unwrap()).unwrap();
+            serde_json::from_str(&history.span_delta_json("v2".into(), "v1".into()).unwrap())
+                .unwrap();
         assert_eq!(span["added"], 5);
     }
 
@@ -388,22 +426,40 @@ mod tests {
             }).to_string(),
         )
         .unwrap();
-        let options = || SearchOptions { match_case: false, whole_word: false, use_regex: false };
+        let options = || SearchOptions {
+            match_case: false,
+            whole_word: false,
+            use_regex: false,
+        };
 
         let found: serde_json::Value = serde_json::from_str(
-            &core.search_project_json("Novel".into(), "project".into(), "HESITATED".into(), options()).unwrap(),
+            &core
+                .search_project_json(
+                    "Novel".into(),
+                    "project".into(),
+                    "HESITATED".into(),
+                    options(),
+                )
+                .unwrap(),
         )
         .unwrap();
         assert_eq!(found[0]["docName"], "one");
         assert_eq!(found[0]["matchText"], "hesitated");
 
         let in_doc: serde_json::Value = serde_json::from_str(
-            &core.search_document_json("Novel".into(), "one".into(), "door".into(), options()).unwrap(),
+            &core
+                .search_document_json("Novel".into(), "one".into(), "door".into(), options())
+                .unwrap(),
         )
         .unwrap();
         assert_eq!(in_doc.as_array().unwrap().len(), 1);
 
-        let regex = SearchOptions { use_regex: true, ..options() };
-        assert!(core.search_project_json("Novel".into(), "project".into(), "(".into(), regex).is_err());
+        let regex = SearchOptions {
+            use_regex: true,
+            ..options()
+        };
+        assert!(core
+            .search_project_json("Novel".into(), "project".into(), "(".into(), regex)
+            .is_err());
     }
 }

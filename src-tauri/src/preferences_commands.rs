@@ -57,7 +57,9 @@ pub async fn preferences_remove(
     scope: String,
     key: String,
 ) -> Result<(), String> {
-    store(&app_handle)?.remove(scope_of(&scope)?, &key).map_err(|error| error.to_string())
+    store(&app_handle)?
+        .remove(scope_of(&scope)?, &key)
+        .map_err(|error| error.to_string())
 }
 
 /// Move every key under one prefix to another — what a project rename does to the file

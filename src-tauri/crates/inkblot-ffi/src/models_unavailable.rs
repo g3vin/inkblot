@@ -32,9 +32,14 @@ impl InkblotModels {
         Ok(Arc::new(Self))
     }
 
-    pub fn synonym_model_status_json(&self) -> Result<String, CoreError> { unavailable() }
+    pub fn synonym_model_status_json(&self) -> Result<String, CoreError> {
+        unavailable()
+    }
 
-    pub fn download_synonym_model_json(&self, sink: Arc<dyn ModelEventSink>) -> Result<String, CoreError> {
+    pub fn download_synonym_model_json(
+        &self,
+        sink: Arc<dyn ModelEventSink>,
+    ) -> Result<String, CoreError> {
         let _ = sink;
         unavailable()
     }
@@ -44,9 +49,14 @@ impl InkblotModels {
         unavailable()
     }
 
-    pub fn rhyme_dictionary_status_json(&self) -> Result<String, CoreError> { unavailable() }
+    pub fn rhyme_dictionary_status_json(&self) -> Result<String, CoreError> {
+        unavailable()
+    }
 
-    pub fn download_rhyme_dictionary_json(&self, sink: Arc<dyn ModelEventSink>) -> Result<String, CoreError> {
+    pub fn download_rhyme_dictionary_json(
+        &self,
+        sink: Arc<dyn ModelEventSink>,
+    ) -> Result<String, CoreError> {
         let _ = sink;
         unavailable()
     }
@@ -56,7 +66,9 @@ impl InkblotModels {
         unavailable()
     }
 
-    pub fn kokoro_vocab_json(&self) -> Result<String, CoreError> { unavailable() }
+    pub fn kokoro_vocab_json(&self) -> Result<String, CoreError> {
+        unavailable()
+    }
 
     pub fn kokoro_model_status_json(&self, voice: String) -> Result<String, CoreError> {
         let _ = voice;
@@ -87,7 +99,10 @@ impl InkblotModels {
         unavailable()
     }
 
-    pub fn load_dictation_model_json(&self, model_path: Option<String>) -> Result<String, CoreError> {
+    pub fn load_dictation_model_json(
+        &self,
+        model_path: Option<String>,
+    ) -> Result<String, CoreError> {
         let _ = model_path;
         unavailable()
     }
@@ -102,7 +117,9 @@ impl InkblotModels {
         unavailable()
     }
 
-    pub fn stop_dictation_session(&self) -> Result<(), CoreError> { unavailable() }
+    pub fn stop_dictation_session(&self) -> Result<(), CoreError> {
+        unavailable()
+    }
 
     pub fn cancel_dictation_session(&self) {}
 

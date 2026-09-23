@@ -87,15 +87,21 @@ impl InkblotModels {
     ) -> Result<String, CoreError> {
         let status = self
             .runtime
-            .block_on(self.synonyms.download(&|progress| {
-                emit_json(&sink, "synonym://download", &progress)
-            }))
+            .block_on(
+                self.synonyms
+                    .download(&|progress| emit_json(&sink, "synonym://download", &progress)),
+            )
             .map_err(failed)?;
         json(&status)
     }
 
     pub fn synonyms_json(&self, text: String, target_word: String) -> Result<String, CoreError> {
-        json(&self.synonyms.synonyms(&text, &target_word).map_err(failed)?)
+        json(
+            &self
+                .synonyms
+                .synonyms(&text, &target_word)
+                .map_err(failed)?,
+        )
     }
 
     /* ---------------- rhymes ---------------- */
@@ -110,9 +116,10 @@ impl InkblotModels {
     ) -> Result<String, CoreError> {
         let status = self
             .runtime
-            .block_on(self.rhymes.download(&|progress| {
-                emit_json(&sink, "rhyme://download", &progress)
-            }))
+            .block_on(
+                self.rhymes
+                    .download(&|progress| emit_json(&sink, "rhyme://download", &progress)),
+            )
             .map_err(failed)?;
         json(&status)
     }
@@ -151,7 +158,12 @@ impl InkblotModels {
         voice: String,
         speed: Option<f32>,
     ) -> Result<String, CoreError> {
-        json(&self.kokoro.generate(tokens, &voice, speed).map_err(failed)?)
+        json(
+            &self
+                .kokoro
+                .generate(tokens, &voice, speed)
+                .map_err(failed)?,
+        )
     }
 
     pub fn prewarm_kokoro_speech(&self, voice: String) -> Result<(), CoreError> {
@@ -160,7 +172,10 @@ impl InkblotModels {
 
     /* ---------------- dictation ---------------- */
 
-    pub fn load_dictation_model_json(&self, model_path: Option<String>) -> Result<String, CoreError> {
+    pub fn load_dictation_model_json(
+        &self,
+        model_path: Option<String>,
+    ) -> Result<String, CoreError> {
         json(&self.dictation.load_model(model_path).map_err(failed)?)
     }
 
@@ -240,7 +255,10 @@ mod tests {
         let root = std::env::temp_dir().join(format!(
             "inkblot-ffi-models-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let models = InkblotModels::new(
             root.to_string_lossy().into_owned(),
@@ -253,9 +271,13 @@ mod tests {
     #[test]
     fn an_uninstalled_model_answers_with_the_page_s_sentinel() {
         let (models, root) = models();
-        let error = models.synonyms_json("a word".into(), "word".into()).unwrap_err();
+        let error = models
+            .synonyms_json("a word".into(), "word".into())
+            .unwrap_err();
         assert_eq!(error.to_string(), inkblot_models::MODEL_NOT_INSTALLED);
-        let error = models.generate_kokoro_speech_json(vec![0, 1, 0], "af_heart".into(), None).unwrap_err();
+        let error = models
+            .generate_kokoro_speech_json(vec![0, 1, 0], "af_heart".into(), None)
+            .unwrap_err();
         assert_eq!(error.to_string(), inkblot_models::MODEL_NOT_INSTALLED);
 
         let status: serde_json::Value =
@@ -263,7 +285,8 @@ mod tests {
         assert_eq!(status["installed"], false);
         // The page reads these by their camelCase names, exactly as from Tauri.
         let status: serde_json::Value =
-            serde_json::from_str(&models.kokoro_model_status_json("af_heart".into()).unwrap()).unwrap();
+            serde_json::from_str(&models.kokoro_model_status_json("af_heart".into()).unwrap())
+                .unwrap();
         assert!(status["missing"].as_array().unwrap().len() == 3);
         let _ = std::fs::remove_dir_all(root);
     }
@@ -278,11 +301,17 @@ mod tests {
                     .into(),
             )
             .unwrap();
-        let report = models.pinterest_await_scrape_json("r1".into(), 50).unwrap().unwrap();
+        let report = models
+            .pinterest_await_scrape_json("r1".into(), 50)
+            .unwrap()
+            .unwrap();
         assert!(report.contains(r#""reason":"stable""#));
 
         models.pinterest_begin_scrape("r2".into());
-        assert!(models.pinterest_await_scrape_json("r2".into(), 10).unwrap().is_none());
+        assert!(models
+            .pinterest_await_scrape_json("r2".into(), 10)
+            .unwrap()
+            .is_none());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -291,7 +320,9 @@ mod tests {
         let (models, root) = models();
         // No model is loaded, so starting fails — but on the model, not on the options.
         let sink: Arc<dyn ModelEventSink> = Arc::new(Collect(Mutex::new(Vec::new())));
-        let error = models.start_dictation_session(Some("null".into()), sink).unwrap_err();
+        let error = models
+            .start_dictation_session(Some("null".into()), sink)
+            .unwrap_err();
         assert!(!error.to_string().contains("expected"), "{error}");
         let status: serde_json::Value =
             serde_json::from_str(&models.dictation_status_json().unwrap()).unwrap();
