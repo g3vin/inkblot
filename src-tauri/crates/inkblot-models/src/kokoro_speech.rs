@@ -77,7 +77,9 @@ pub struct KokoroEngine {
 pub fn valid_voice(voice: &str) -> Result<&str, String> {
     let ok = !voice.is_empty()
         && voice.len() <= 40
-        && voice.bytes().all(|b| b.is_ascii_lowercase() || b == b'_' || b.is_ascii_digit());
+        && voice
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b == b'_' || b.is_ascii_digit());
     if ok {
         Ok(voice)
     } else {
@@ -88,7 +90,10 @@ pub fn valid_voice(voice: &str) -> Result<&str, String> {
 impl KokoroEngine {
     /// `dir` is `<AppData>/models/kokoro`.
     pub fn new(dir: impl Into<PathBuf>) -> Self {
-        Self { dir: dir.into(), session: Arc::new(Mutex::new(None)) }
+        Self {
+            dir: dir.into(),
+            session: Arc::new(Mutex::new(None)),
+        }
     }
 
     fn dir(&self) -> Result<PathBuf, String> {
@@ -106,7 +111,10 @@ impl KokoroEngine {
     }
 
     fn voice_path(&self, voice: &str) -> Result<PathBuf, String> {
-        Ok(self.dir()?.join("voices").join(format!("{}.bin", valid_voice(voice)?)))
+        Ok(self
+            .dir()?
+            .join("voices")
+            .join(format!("{}.bin", valid_voice(voice)?)))
     }
 
     fn missing_assets(&self, voice: &str) -> Result<Vec<String>, String> {
@@ -148,7 +156,10 @@ impl KokoroEngine {
 
     pub fn status(&self, voice: &str) -> Result<KokoroModelStatus, String> {
         let missing = self.missing_assets(voice)?;
-        Ok(KokoroModelStatus { installed: missing.is_empty(), missing })
+        Ok(KokoroModelStatus {
+            installed: missing.is_empty(),
+            missing,
+        })
     }
 
     /// Fetch whatever is missing for `voice`, reporting progress as it goes.
@@ -163,14 +174,22 @@ impl KokoroEngine {
         for asset in self.missing_assets(&voice)? {
             let (url, destination) = match asset.as_str() {
                 "model.onnx" => (format!("{MODEL_BASE_URL}/{MODEL_FILE}"), self.model_path()?),
-                "tokenizer.json" => {
-                    (format!("{MODEL_BASE_URL}/tokenizer.json"), self.tokenizer_path()?)
-                }
-                _ => (format!("{MODEL_BASE_URL}/voices/{voice}.bin"), self.voice_path(&voice)?),
+                "tokenizer.json" => (
+                    format!("{MODEL_BASE_URL}/tokenizer.json"),
+                    self.tokenizer_path()?,
+                ),
+                _ => (
+                    format!("{MODEL_BASE_URL}/voices/{voice}.bin"),
+                    self.voice_path(&voice)?,
+                ),
             };
 
             download::fetch_to(&client, &url, &destination, &asset, &|received, total| {
-                progress(KokoroDownloadProgress { asset: asset.clone(), received, total })
+                progress(KokoroDownloadProgress {
+                    asset: asset.clone(),
+                    received,
+                    total,
+                })
             })
             .await?;
         }
@@ -178,7 +197,10 @@ impl KokoroEngine {
         self.status(&voice)
     }
 
-    fn with_session<T>(&self, f: impl FnOnce(&mut Session) -> Result<T, String>) -> Result<T, String> {
+    fn with_session<T>(
+        &self,
+        f: impl FnOnce(&mut Session) -> Result<T, String>,
+    ) -> Result<T, String> {
         let model_path = self.model_path()?;
         let mut guard = self.session.lock();
         if guard.is_none() {
@@ -226,9 +248,15 @@ impl KokoroEngine {
 
             // Erased to DynValue because the three inputs are not the same element type
             // — ids are i64, style and speed are f32 — and `run` takes one slice.
-            let input_tensor = Tensor::from_array(input_ids).map_err(|e| e.to_string())?.into_dyn();
-            let style_tensor = Tensor::from_array(style_array).map_err(|e| e.to_string())?.into_dyn();
-            let speed_tensor = Tensor::from_array(speed_array).map_err(|e| e.to_string())?.into_dyn();
+            let input_tensor = Tensor::from_array(input_ids)
+                .map_err(|e| e.to_string())?
+                .into_dyn();
+            let style_tensor = Tensor::from_array(style_array)
+                .map_err(|e| e.to_string())?
+                .into_dyn();
+            let speed_tensor = Tensor::from_array(speed_array)
+                .map_err(|e| e.to_string())?
+                .into_dyn();
 
             let outputs = session
                 .run(vec![
@@ -283,7 +311,12 @@ mod tests {
     fn nothing_installed_is_the_sentinel() {
         let dir = std::env::temp_dir().join(format!("inkblot-kokoro-{}", std::process::id()));
         let engine = KokoroEngine::new(&dir);
-        assert_eq!(engine.generate(vec![0, 1, 0], "af_heart", None).unwrap_err(), MODEL_NOT_INSTALLED);
+        assert_eq!(
+            engine
+                .generate(vec![0, 1, 0], "af_heart", None)
+                .unwrap_err(),
+            MODEL_NOT_INSTALLED
+        );
         assert_eq!(engine.vocab().unwrap_err(), MODEL_NOT_INSTALLED);
         assert_eq!(engine.status("af_heart").unwrap().missing.len(), 3);
         assert!(engine.status("../x").is_err());

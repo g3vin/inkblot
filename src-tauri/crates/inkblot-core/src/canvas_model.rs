@@ -42,12 +42,36 @@ pub struct CanvasColorPreset {
 }
 
 pub const CANVAS_COLOR_PRESETS: [CanvasColorPreset; 6] = [
-    CanvasColorPreset { id: "1", label: "Red", value: "#e5534b" },
-    CanvasColorPreset { id: "2", label: "Orange", value: "#e8873c" },
-    CanvasColorPreset { id: "3", label: "Yellow", value: "#e0b341" },
-    CanvasColorPreset { id: "4", label: "Green", value: "#4fb477" },
-    CanvasColorPreset { id: "5", label: "Cyan", value: "#3fa9c4" },
-    CanvasColorPreset { id: "6", label: "Purple", value: "#a07cd4" },
+    CanvasColorPreset {
+        id: "1",
+        label: "Red",
+        value: "#e5534b",
+    },
+    CanvasColorPreset {
+        id: "2",
+        label: "Orange",
+        value: "#e8873c",
+    },
+    CanvasColorPreset {
+        id: "3",
+        label: "Yellow",
+        value: "#e0b341",
+    },
+    CanvasColorPreset {
+        id: "4",
+        label: "Green",
+        value: "#4fb477",
+    },
+    CanvasColorPreset {
+        id: "5",
+        label: "Cyan",
+        value: "#3fa9c4",
+    },
+    CanvasColorPreset {
+        id: "6",
+        label: "Purple",
+        value: "#a07cd4",
+    },
 ];
 
 /// Resolve a spec color ('1'–'6' or '#rrggbb') to a CSS color.
@@ -75,10 +99,20 @@ pub struct NodeSize {
 }
 
 /// The size given to a node stored without dimensions.
-pub const DEFAULT_TEXT_NODE_SIZE: NodeSize = NodeSize { width: 260.0, height: 140.0 };
-pub const MIN_NODE_SIZE: NodeSize = NodeSize { width: 100.0, height: 60.0 };
+pub const DEFAULT_TEXT_NODE_SIZE: NodeSize = NodeSize {
+    width: 260.0,
+    height: 140.0,
+};
+pub const MIN_NODE_SIZE: NodeSize = NodeSize {
+    width: 100.0,
+    height: 60.0,
+};
 
-pub const DEFAULT_VIEWPORT: Viewport = Viewport { x: 0.0, y: 0.0, zoom: 1.0 };
+pub const DEFAULT_VIEWPORT: Viewport = Viewport {
+    x: 0.0,
+    y: 0.0,
+    zoom: 1.0,
+};
 
 /* ---------- reading raw JSON ---------- */
 
@@ -86,7 +120,10 @@ pub const DEFAULT_VIEWPORT: Viewport = Viewport { x: 0.0, y: 0.0, zoom: 1.0 };
 /// not the global `isFinite` — a numeric *string* does not qualify.
 fn finite_or(value: &Value, fallback: f64) -> f64 {
     match value {
-        Value::Number(number) => number.as_f64().filter(|float| float.is_finite()).unwrap_or(fallback),
+        Value::Number(number) => number
+            .as_f64()
+            .filter(|float| float.is_finite())
+            .unwrap_or(fallback),
         _ => fallback,
     }
 }
@@ -141,10 +178,18 @@ fn extras(object: &Map<String, Value>, taken: &[&str]) -> JsonMap {
 /// are preserved so a round-trip through Inkblot does not strip another app's data.
 pub fn normalize_canvas_with(raw: &Value, mut next_id: impl FnMut() -> String) -> CanvasState {
     let mut state = CanvasState::default();
-    let Some(raw) = raw.as_object() else { return state };
+    let Some(raw) = raw.as_object() else {
+        return state;
+    };
 
-    for node in raw.get("nodes").and_then(Value::as_array).unwrap_or(&Vec::new()) {
-        let Some(node) = node.as_object() else { continue };
+    for node in raw
+        .get("nodes")
+        .and_then(Value::as_array)
+        .unwrap_or(&Vec::new())
+    {
+        let Some(node) = node.as_object() else {
+            continue;
+        };
 
         let id = match node.get("id").and_then(Value::as_str) {
             Some(id) if !id.is_empty() => id.to_string(),
@@ -208,8 +253,14 @@ pub fn normalize_canvas_with(raw: &Value, mut next_id: impl FnMut() -> String) -
         u8::from(nodes.get(id).map(|node| node.node_type) != Some(CanvasNodeType::Group))
     });
 
-    for edge in raw.get("edges").and_then(Value::as_array).unwrap_or(&Vec::new()) {
-        let Some(edge) = edge.as_object() else { continue };
+    for edge in raw
+        .get("edges")
+        .and_then(Value::as_array)
+        .unwrap_or(&Vec::new())
+    {
+        let Some(edge) = edge.as_object() else {
+            continue;
+        };
 
         let id = match edge.get("id").and_then(Value::as_str) {
             Some(id) if !id.is_empty() => id.to_string(),
@@ -220,8 +271,14 @@ pub fn normalize_canvas_with(raw: &Value, mut next_id: impl FnMut() -> String) -
         }
 
         // An edge to a node that isn't here is unrenderable; drop it.
-        let from_node = edge.get("fromNode").and_then(Value::as_str).unwrap_or_default();
-        let to_node = edge.get("toNode").and_then(Value::as_str).unwrap_or_default();
+        let from_node = edge
+            .get("fromNode")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let to_node = edge
+            .get("toNode")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         if !state.nodes.contains_key(from_node) || !state.nodes.contains_key(to_node) {
             continue;
         }
@@ -285,14 +342,34 @@ pub fn serialize_canvas(state: &CanvasState, viewport: Viewport) -> CanvasFile {
     CanvasFile {
         // Interop and debugging marker only — never routed on (see `doc_kind`).
         file_type: "canvas".to_string(),
-        nodes: state.node_order.iter().filter_map(|id| state.nodes.get(id).cloned()).collect(),
-        edges: state.edge_order.iter().filter_map(|id| state.edges.get(id).cloned()).collect(),
+        nodes: state
+            .node_order
+            .iter()
+            .filter_map(|id| state.nodes.get(id).cloned())
+            .collect(),
+        edges: state
+            .edge_order
+            .iter()
+            .filter_map(|id| state.edges.get(id).cloned())
+            .collect(),
         inkblot: Some(CanvasFileMeta {
             version: CANVAS_FORMAT_VERSION,
             viewport: Viewport {
-                x: if viewport.x.is_finite() { viewport.x } else { DEFAULT_VIEWPORT.x },
-                y: if viewport.y.is_finite() { viewport.y } else { DEFAULT_VIEWPORT.y },
-                zoom: if viewport.zoom.is_finite() { viewport.zoom } else { DEFAULT_VIEWPORT.zoom },
+                x: if viewport.x.is_finite() {
+                    viewport.x
+                } else {
+                    DEFAULT_VIEWPORT.x
+                },
+                y: if viewport.y.is_finite() {
+                    viewport.y
+                } else {
+                    DEFAULT_VIEWPORT.y
+                },
+                zoom: if viewport.zoom.is_finite() {
+                    viewport.zoom
+                } else {
+                    DEFAULT_VIEWPORT.zoom
+                },
             },
         }),
     }
@@ -308,7 +385,9 @@ pub fn serialize_canvas(state: &CanvasState, viewport: Viewport) -> CanvasFile {
 /// spec-clean — a group is just a rect with a label, so a canvas grouped here still
 /// opens correctly anywhere else.
 pub fn group_member_ids(state: &CanvasState, group_id: &str) -> Vec<String> {
-    let Some(group) = state.nodes.get(group_id) else { return Vec::new() };
+    let Some(group) = state.nodes.get(group_id) else {
+        return Vec::new();
+    };
     if group.node_type != CanvasNodeType::Group {
         return Vec::new();
     }
@@ -318,7 +397,10 @@ pub fn group_member_ids(state: &CanvasState, group_id: &str) -> Vec<String> {
         .iter()
         .filter(|id| id.as_str() != group_id)
         .filter(|id| {
-            state.nodes.get(*id).is_some_and(|node| rect_contains(node_rect(group), node_rect(node)))
+            state
+                .nodes
+                .get(*id)
+                .is_some_and(|node| rect_contains(node_rect(group), node_rect(node)))
         })
         .cloned()
         .collect()
@@ -330,8 +412,11 @@ pub fn group_fit_rect(
     member_ids: &[String],
     padding: f64,
 ) -> Option<Rect> {
-    let members: Vec<Rect> =
-        member_ids.iter().filter_map(|id| nodes.get(id)).map(node_rect).collect();
+    let members: Vec<Rect> = member_ids
+        .iter()
+        .filter_map(|id| nodes.get(id))
+        .map(node_rect)
+        .collect();
     nodes_bounds(&members).map(|bounds| pad_rect(bounds, padding))
 }
 
@@ -350,7 +435,8 @@ pub fn groups_to_refit(state: &CanvasState, moving_ids: &[String]) -> Vec<(Strin
     let mut fits = Vec::new();
 
     for id in &state.node_order {
-        let is_group = state.nodes.get(id).map(|node| node.node_type) == Some(CanvasNodeType::Group);
+        let is_group =
+            state.nodes.get(id).map(|node| node.node_type) == Some(CanvasNodeType::Group);
         if !is_group || moving.contains(id) {
             continue;
         }
@@ -383,7 +469,8 @@ pub fn expand_group_selection(state: &CanvasState, ids: &[String]) -> Vec<String
         }
         seen.push(id.clone());
 
-        let is_group = state.nodes.get(&id).map(|node| node.node_type) == Some(CanvasNodeType::Group);
+        let is_group =
+            state.nodes.get(&id).map(|node| node.node_type) == Some(CanvasNodeType::Group);
         if is_group {
             for member_id in group_member_ids(state, &id) {
                 if !in_seen.contains(&member_id) {
@@ -403,10 +490,9 @@ pub fn incident_edge_ids(state: &CanvasState, node_ids: &[String]) -> Vec<String
         .edge_order
         .iter()
         .filter(|id| {
-            state
-                .edges
-                .get(*id)
-                .is_some_and(|edge| targets.contains(&edge.from_node) || targets.contains(&edge.to_node))
+            state.edges.get(*id).is_some_and(|edge| {
+                targets.contains(&edge.from_node) || targets.contains(&edge.to_node)
+            })
         })
         .cloned()
         .collect()
@@ -457,9 +543,7 @@ mod tests {
 
     #[test]
     fn two_groups_containing_each_other_terminate() {
-        let square = |id: &str| {
-            json!({ "id": id, "type": "group", "x": 0, "y": 0, "width": 500, "height": 500 })
-        };
+        let square = |id: &str| json!({ "id": id, "type": "group", "x": 0, "y": 0, "width": 500, "height": 500 });
         let state = normalize(json!({ "nodes": [square("g"), square("h")] }));
         let expanded = expand_group_selection(&state, &["g".to_string()]);
         assert_eq!(expanded.len(), 2);
@@ -468,6 +552,9 @@ mod tests {
     #[test]
     fn a_corrupt_file_opens_blank_rather_than_failing() {
         assert_eq!(normalize(json!("not a canvas")), CanvasState::default());
-        assert_eq!(normalize(json!({ "nodes": "nope" })), CanvasState::default());
+        assert_eq!(
+            normalize(json!({ "nodes": "nope" })),
+            CanvasState::default()
+        );
     }
 }

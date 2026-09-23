@@ -32,7 +32,10 @@ where
 /// The `type` tag of an adjacently-tagged value, as it appears on the wire.
 fn tag_of<T: serde::Serialize>(value: &T) -> String {
     let wire = serde_json::to_value(value).expect("serialize");
-    wire["type"].as_str().expect("a string `type` tag").to_string()
+    wire["type"]
+        .as_str()
+        .expect("a string `type` tag")
+        .to_string()
 }
 
 /* ---------------- the literal wire shape ---------------- */
@@ -179,7 +182,10 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::ReplaceRanges(ReplaceRangesCommand {
             target: EditorTarget::Primary,
-            edits: vec![RangeEdit { anchor: anchor(), text: "she paused".into() }],
+            edits: vec![RangeEdit {
+                anchor: anchor(),
+                text: "she paused".into(),
+            }],
         }),
         NativeCommand::SetCaretAtDocPos(SetCaretAtDocPosCommand {
             target: EditorTarget::Primary,
@@ -248,22 +254,40 @@ fn every_command() -> Vec<NativeCommand> {
             path: "Part One/Chapter 1".into(),
             is_folder: false,
         }),
-        NativeCommand::DuplicateEntry(DuplicateEntryCommand { path: "Part One/Chapter 1".into() }),
+        NativeCommand::DuplicateEntry(DuplicateEntryCommand {
+            path: "Part One/Chapter 1".into(),
+        }),
         NativeCommand::UpdateNote(UpdateNoteCommand {
             doc_path: "one".into(),
             note_id: "n1".into(),
-            patch: NotePatch { pinned: Some(true), ..Default::default() },
+            patch: NotePatch {
+                pinned: Some(true),
+                ..Default::default()
+            },
         }),
-        NativeCommand::RemoveNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
-        NativeCommand::JumpToNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
-        NativeCommand::ClipboardDrop(ClipboardDropCommand { text: "moved".into() }),
+        NativeCommand::RemoveNote(NoteRef {
+            doc_path: "one".into(),
+            note_id: "n1".into(),
+        }),
+        NativeCommand::JumpToNote(NoteRef {
+            doc_path: "one".into(),
+            note_id: "n1".into(),
+        }),
+        NativeCommand::ClipboardDrop(ClipboardDropCommand {
+            text: "moved".into(),
+        }),
         NativeCommand::RemoveClipboardEntries(RemoveClipboardEntriesCommand { ids: None }),
         NativeCommand::InsertClipboardEntry(InsertClipboardEntryCommand {
             id: "c1".into(),
             target: EditorTarget::Primary,
         }),
-        NativeCommand::RemoveTiles(RemoveTilesCommand { ids: Some(vec!["t1".into()]) }),
-        NativeCommand::ReplaceTileWord(ReplaceTileWordCommand { id: "t1".into(), word: "paused".into() }),
+        NativeCommand::RemoveTiles(RemoveTilesCommand {
+            ids: Some(vec!["t1".into()]),
+        }),
+        NativeCommand::ReplaceTileWord(ReplaceTileWordCommand {
+            id: "t1".into(),
+            word: "paused".into(),
+        }),
         NativeCommand::SelectTileWord(TileRef { id: "t1".into() }),
         NativeCommand::VersionAction(VersionActionCommand {
             doc_path: "one".into(),
@@ -281,8 +305,14 @@ fn every_command() -> Vec<NativeCommand> {
             node_id: None,
             note_id: None,
         }),
-        NativeCommand::AddReply(AddReplyCommand { doc_path: "one".into(), parent_note_id: "n1".into() }),
-        NativeCommand::SetTitlebarInset(SetTitlebarInsetCommand { leading: 78.0, trailing: 52.0 }),
+        NativeCommand::AddReply(AddReplyCommand {
+            doc_path: "one".into(),
+            parent_note_id: "n1".into(),
+        }),
+        NativeCommand::SetTitlebarInset(SetTitlebarInsetCommand {
+            leading: 78.0,
+            trailing: 52.0,
+        }),
     ]
 }
 
@@ -377,7 +407,10 @@ fn every_event() -> Vec<WebviewEvent> {
             project_name: Some("Novel".into()),
             project_root: Some("/Users/me/Novel".into()),
         }),
-        WebviewEvent::NotesChanged(NotesChanged { doc_path: "one".into(), notes: Vec::new() }),
+        WebviewEvent::NotesChanged(NotesChanged {
+            doc_path: "one".into(),
+            notes: Vec::new(),
+        }),
         WebviewEvent::ClipboardChanged(ClipboardChanged {
             entries: vec![ClipboardEntry {
                 id: "c1".into(),
@@ -394,8 +427,12 @@ fn every_event() -> Vec<WebviewEvent> {
                 doc: Some("one".into()),
             }],
         }),
-        WebviewEvent::VersionsChanged(VersionsChanged { doc_path: "one".into() }),
-        WebviewEvent::ShowSidebarTab(ShowSidebarTab { tab: SidebarTab::History }),
+        WebviewEvent::VersionsChanged(VersionsChanged {
+            doc_path: "one".into(),
+        }),
+        WebviewEvent::ShowSidebarTab(ShowSidebarTab {
+            tab: SidebarTab::History,
+        }),
         WebviewEvent::NoteMarkerMoved(NoteMarkerEvent {
             note_id: "n1".into(),
             doc_path: "chapters/one.md".into(),
@@ -405,7 +442,9 @@ fn every_event() -> Vec<WebviewEvent> {
             anchor_bottom: 4.0,
             note: None,
         }),
-        WebviewEvent::NotePreviewDismissed(NotePreviewDismissed { note_id: "n1".into() }),
+        WebviewEvent::NotePreviewDismissed(NotePreviewDismissed {
+            note_id: "n1".into(),
+        }),
     ]
 }
 
@@ -515,7 +554,9 @@ fn every_event_survives_a_round_trip() {
 fn every_request_and_reply_survives_a_round_trip() {
     let requests = vec![
         BridgeRequest::GetSelectionContext(EditorQuery::default()),
-        BridgeRequest::GetToolbarState(EditorQuery { target: Some(EditorTarget::Secondary) }),
+        BridgeRequest::GetToolbarState(EditorQuery {
+            target: Some(EditorTarget::Secondary),
+        }),
         BridgeRequest::GetReadAloudPayload(ReadAloudQuery {
             target: None,
             selection_only: true,
@@ -525,7 +566,12 @@ fn every_request_and_reply_survives_a_round_trip() {
     let names: Vec<String> = requests.iter().map(tag_of).collect();
     assert_eq!(
         names,
-        vec!["getSelectionContext", "getToolbarState", "getReadAloudPayload", "getDocumentText"]
+        vec![
+            "getSelectionContext",
+            "getToolbarState",
+            "getReadAloudPayload",
+            "getDocumentText"
+        ]
     );
     for request in &requests {
         round_trip(request);

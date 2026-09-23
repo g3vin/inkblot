@@ -46,7 +46,11 @@ pub fn strip_canvas_suffix(name: &str) -> String {
 
 /// Last path segment with the `.canvas` suffix stripped — what the UI shows.
 pub fn get_doc_display_name(path: &str) -> String {
-    let last = path.split('/').filter(|segment| !segment.is_empty()).next_back().unwrap_or("");
+    let last = path
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .next_back()
+        .unwrap_or("");
     strip_canvas_suffix(last)
 }
 

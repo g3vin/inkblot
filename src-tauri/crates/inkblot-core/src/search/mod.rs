@@ -36,10 +36,18 @@ pub fn search_scopes() -> Vec<SearchScopeInfo> {
     };
     vec![
         scope(SearchScope::Panel, "This panel", "Filter what is on screen"),
-        scope(SearchScope::Document, "Document", "Find and replace in the open document"),
+        scope(
+            SearchScope::Document,
+            "Document",
+            "Find and replace in the open document",
+        ),
         scope(SearchScope::Notes, "Notes", "Every note in the project"),
         scope(SearchScope::Files, "Files", "File and folder names"),
-        scope(SearchScope::Project, "All documents", "Full text of every document"),
+        scope(
+            SearchScope::Project,
+            "All documents",
+            "Full text of every document",
+        ),
     ]
 }
 
@@ -80,7 +88,10 @@ fn json_node_size(node: &Value, is_root: bool) -> usize {
     }
 
     let children = node["content"].as_array().map(Vec::as_slice).unwrap_or(&[]);
-    let child_size: usize = children.iter().map(|child| json_node_size(child, false)).sum();
+    let child_size: usize = children
+        .iter()
+        .map(|child| json_node_size(child, false))
+        .sum();
 
     if children.is_empty() {
         return 1;
@@ -92,7 +103,12 @@ fn json_node_size(node: &Value, is_root: bool) -> usize {
     }
 }
 
-fn walk_json_text_nodes(node: &Value, pos: usize, is_root: bool, visit: &mut impl FnMut(&str, usize)) {
+fn walk_json_text_nodes(
+    node: &Value,
+    pos: usize,
+    is_root: bool,
+    visit: &mut impl FnMut(&str, usize),
+) {
     if node.is_null() {
         return;
     }
@@ -163,7 +179,10 @@ pub fn collect_matches_from_doc_json(
 
 /// First line of a card, which is what identifies it in a list of results.
 fn title_of(text: &str, fallback: &str) -> String {
-    let first_line = text.split('\n').map(str::trim).find(|line| !line.is_empty());
+    let first_line = text
+        .split('\n')
+        .map(str::trim)
+        .find(|line| !line.is_empty());
     match first_line {
         None => fallback.to_string(),
         Some(line) if utf16_len(line) > 60 => format!("{}…", utf16_slice(line, 0, 60)),
@@ -219,12 +238,18 @@ pub fn collect_canvas_matches(
         if matches.len() >= limit {
             break;
         }
-        let Some(id) = node["id"].as_str().filter(|id| !id.is_empty()) else { continue };
+        let Some(id) = node["id"].as_str().filter(|id| !id.is_empty()) else {
+            continue;
+        };
         let node_type = node["type"].as_str().unwrap_or("");
 
         if node_type == "group" {
             let label = node["label"].as_str().unwrap_or("");
-            let title = if label.is_empty() { "Group".to_string() } else { label.to_string() };
+            let title = if label.is_empty() {
+                "Group".to_string()
+            } else {
+                label.to_string()
+            };
             scan(label, id, title, &mut matches);
             continue;
         }
@@ -233,7 +258,11 @@ pub fn collect_canvas_matches(
             // The path is the only text a file card has of its own; its document's
             // contents are searched under that document's own entry in the file list.
             let file = node["file"].as_str().unwrap_or("");
-            let title = if file.is_empty() { "File".to_string() } else { file.to_string() };
+            let title = if file.is_empty() {
+                "File".to_string()
+            } else {
+                file.to_string()
+            };
             scan(file, id, title, &mut matches);
             continue;
         }
@@ -253,7 +282,11 @@ pub fn collect_canvas_matches(
         // An edge label is revealed by centering the node it leaves from — an edge has
         // no position of its own, and its endpoints are the only thing selectable.
         let label = edge["label"].as_str().unwrap_or("");
-        let title = if label.is_empty() { "Arrow".to_string() } else { label.to_string() };
+        let title = if label.is_empty() {
+            "Arrow".to_string()
+        } else {
+            label.to_string()
+        };
         let from_node = edge["fromNode"].as_str().unwrap_or("").to_string();
         scan(label, &from_node, title, &mut matches);
     }
@@ -278,7 +311,10 @@ pub fn flatten_project_files(node: &crate::types::TreeNode) -> Vec<ProjectFile> 
 
 fn collect_files(node: &crate::types::TreeNode, files: &mut Vec<ProjectFile>) {
     if node.node_type == crate::types::TreeNodeType::File {
-        files.push(ProjectFile { path: node.path.clone(), name: node.name.clone() });
+        files.push(ProjectFile {
+            path: node.path.clone(),
+            name: node.name.clone(),
+        });
         return;
     }
     for child in node.children.iter().flatten() {
@@ -287,18 +323,19 @@ fn collect_files(node: &crate::types::TreeNode, files: &mut Vec<ProjectFile>) {
 }
 
 fn build_note_preview(note: &Value, matcher: &Matcher) -> String {
-    let parts: Vec<&str> = [note["anchor"].as_str().unwrap_or(""), note["content"].as_str().unwrap_or("")]
-        .into_iter()
-        .filter(|part| !part.is_empty())
-        .collect();
+    let parts: Vec<&str> = [
+        note["anchor"].as_str().unwrap_or(""),
+        note["content"].as_str().unwrap_or(""),
+    ]
+    .into_iter()
+    .filter(|part| !part.is_empty())
+    .collect();
     let combined = parts.join(" — ");
 
     match matcher.find_all(&combined, 1).first() {
         None if combined.is_empty() => "Untitled note".to_string(),
         None => combined,
-        Some(hit) => {
-            build_preview(&combined, hit.index, hit.index + hit.length, PREVIEW_RADIUS)
-        }
+        Some(hit) => build_preview(&combined, hit.index, hit.index + hit.length, PREVIEW_RADIUS),
     }
 }
 
@@ -362,7 +399,9 @@ pub fn search_project(
             if scope == SearchScope::Notes {
                 continue;
             }
-            let Some(canvas) = store.load_document(project_name, &entry.path)? else { continue };
+            let Some(canvas) = store.load_document(project_name, &entry.path)? else {
+                continue;
+            };
             if is_cancelled() {
                 return Ok(Vec::new());
             }
@@ -392,7 +431,10 @@ pub fn search_project(
                 if !matcher.test(anchor) && !matcher.test(content) {
                     continue;
                 }
-                let note_id = note["id"].as_str().map(str::to_string).unwrap_or(index.to_string());
+                let note_id = note["id"]
+                    .as_str()
+                    .map(str::to_string)
+                    .unwrap_or(index.to_string());
                 results.push(SearchResult {
                     id: format!("note-{}-{note_id}", entry.path),
                     result_type: SearchResultType::NoteMatch,
@@ -412,7 +454,11 @@ pub fn search_project(
                 });
             }
         } else {
-            results.extend(collect_matches_from_doc_json(&document["content"], matcher, &entry.path));
+            results.extend(collect_matches_from_doc_json(
+                &document["content"],
+                matcher,
+                &entry.path,
+            ));
         }
     }
 
@@ -452,9 +498,12 @@ pub fn get_recommended_scopes(tab: &str) -> Vec<SearchScopeInfo> {
     if tab == "notes" {
         order.push(SearchScope::Notes);
     }
-    for scope in
-        [SearchScope::Document, SearchScope::Project, SearchScope::Notes, SearchScope::Files]
-    {
+    for scope in [
+        SearchScope::Document,
+        SearchScope::Project,
+        SearchScope::Notes,
+        SearchScope::Files,
+    ] {
         if !order.contains(&scope) {
             order.push(scope);
         }
@@ -515,7 +564,10 @@ mod tests {
             .save_document(
                 "Novel",
                 "Chapter One",
-                &DocumentBody { content: doc("the quick brown fox"), notes: json!([]) },
+                &DocumentBody {
+                    content: doc("the quick brown fox"),
+                    notes: json!([]),
+                },
                 None,
             )
             .unwrap();
@@ -582,7 +634,9 @@ mod tests {
         assert_eq!(results[0].result_type, SearchResultType::NoteMatch);
         assert_eq!(results[0].title, "the quick");
         // A canvas has no notes, and must not be coerced into an empty document.
-        assert!(!results.iter().any(|result| result.path.ends_with(".canvas")));
+        assert!(!results
+            .iter()
+            .any(|result| result.path.ends_with(".canvas")));
     }
 
     #[test]
@@ -606,16 +660,28 @@ mod tests {
         let live = |path: &str| {
             (path == "Chapter One").then(|| json!({ "content": doc("a rewritten sentence") }))
         };
-        let results =
-            search_project(&store, "Novel", SearchScope::Project, &matcher("rewritten"), live, || false)
-                .unwrap();
+        let results = search_project(
+            &store,
+            "Novel",
+            SearchScope::Project,
+            &matcher("rewritten"),
+            live,
+            || false,
+        )
+        .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].path, "Chapter One");
 
         // And the saved text is no longer found, because it is not what is on screen.
-        let results =
-            search_project(&store, "Novel", SearchScope::Project, &matcher("brown"), live, || false)
-                .unwrap();
+        let results = search_project(
+            &store,
+            "Novel",
+            SearchScope::Project,
+            &matcher("brown"),
+            live,
+            || false,
+        )
+        .unwrap();
         assert!(results.is_empty());
     }
 
@@ -623,9 +689,15 @@ mod tests {
     fn a_cancelled_search_returns_nothing_rather_than_a_partial_answer() {
         let app_data = TempDir::new();
         let store = populated(&app_data);
-        let results =
-            search_project(&store, "Novel", SearchScope::Project, &matcher("quick"), |_| None, || true)
-                .unwrap();
+        let results = search_project(
+            &store,
+            "Novel",
+            SearchScope::Project,
+            &matcher("quick"),
+            |_| None,
+            || true,
+        )
+        .unwrap();
         assert!(results.is_empty());
     }
 
@@ -635,9 +707,22 @@ mod tests {
         let store = populated(&app_data);
         assert!(search(&store, SearchScope::Project, "").is_empty());
 
-        let broken = Matcher::new("foo(", MatcherOptions { use_regex: true, ..Default::default() });
-        assert!(search_project(&store, "Novel", SearchScope::Project, &broken, |_| None, || false)
-            .unwrap()
-            .is_empty());
+        let broken = Matcher::new(
+            "foo(",
+            MatcherOptions {
+                use_regex: true,
+                ..Default::default()
+            },
+        );
+        assert!(search_project(
+            &store,
+            "Novel",
+            SearchScope::Project,
+            &broken,
+            |_| None,
+            || false
+        )
+        .unwrap()
+        .is_empty());
     }
 }

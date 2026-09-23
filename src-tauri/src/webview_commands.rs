@@ -6,7 +6,11 @@ use tauri::{AppHandle, Manager};
 use url::Url;
 
 #[tauri::command]
-pub async fn navigate_webview(app_handle: AppHandle, label: String, url: String) -> Result<(), String> {
+pub async fn navigate_webview(
+    app_handle: AppHandle,
+    label: String,
+    url: String,
+) -> Result<(), String> {
     let webview = app_handle
         .get_webview_window(&label)
         .ok_or_else(|| format!("Webview '{label}' not found"))?;
@@ -32,7 +36,11 @@ pub async fn get_webview_url(app_handle: AppHandle, label: String) -> Result<Str
 }
 
 #[tauri::command]
-pub async fn eval_webview(app_handle: AppHandle, label: String, script: String) -> Result<(), String> {
+pub async fn eval_webview(
+    app_handle: AppHandle,
+    label: String,
+    script: String,
+) -> Result<(), String> {
     let webview = app_handle
         .get_webview_window(&label)
         .ok_or_else(|| format!("Webview '{label}' not found"))?;

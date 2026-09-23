@@ -33,7 +33,8 @@ fn perform_haptic_pattern(pattern: isize) {
     use objc2::{class, msg_send};
 
     unsafe {
-        let performer: *mut AnyObject = msg_send![class!(NSHapticFeedbackManager), defaultPerformer];
+        let performer: *mut AnyObject =
+            msg_send![class!(NSHapticFeedbackManager), defaultPerformer];
         if performer.is_null() {
             return;
         }

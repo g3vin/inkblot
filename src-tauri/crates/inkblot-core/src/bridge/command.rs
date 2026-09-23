@@ -10,14 +10,15 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use super::common::{Alignment, EditorTarget, MarkKind, Pane, RangeEdit, TextAnchor};
-use crate::types::json::JsonValue;
 use super::sidebar::{
-    AddReplyCommand, ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
-    RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
-    TileRef, UpdateNoteCommand, VersionActionCommand,
+    AddReplyCommand, ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef,
+    RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
+    ReplaceTileWordCommand, RevealSearchResultCommand, TileRef, UpdateNoteCommand,
+    VersionActionCommand,
 };
-use crate::types::note::Note;
 use super::workspace::{CreateFromDraftCommand, NewTabCommand, OpenDocInTabCommand, TabRef};
+use crate::types::json::JsonValue;
+use crate::types::note::Note;
 
 /// A command aimed at an editor with nothing else to say.
 #[typeshare]

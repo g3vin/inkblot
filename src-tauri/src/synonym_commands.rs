@@ -17,13 +17,14 @@ impl SynonymState {
         if let Some(engine) = self.engine.get() {
             return Ok(engine);
         }
-        let models = crate::app_data_dir(app)?
-            .join("models");
+        let models = crate::app_data_dir(app)?.join("models");
         let tokenizer = app
             .path()
             .resolve("resources/minilm-tokenizer.json", BaseDirectory::Resource)
             .map_err(|e| format!("tokenizer resource missing: {e}"))?;
-        Ok(self.engine.get_or_init(|| SynonymEngine::new(models, tokenizer)))
+        Ok(self
+            .engine
+            .get_or_init(|| SynonymEngine::new(models, tokenizer)))
     }
 }
 

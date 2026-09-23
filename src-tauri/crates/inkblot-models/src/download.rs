@@ -45,10 +45,13 @@ pub async fn fetch_to(
 
     let mut received: u64 = 0;
     let mut last_emit: u64 = 0;
-    while let Some(chunk) =
-        response.chunk().await.map_err(|e| format!("reading {label}: {e}"))?
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|e| format!("reading {label}: {e}"))?
     {
-        file.write_all(&chunk).map_err(|e| format!("writing {label}: {e}"))?;
+        file.write_all(&chunk)
+            .map_err(|e| format!("writing {label}: {e}"))?;
         received += chunk.len() as u64;
 
         if received - last_emit >= PROGRESS_EVERY || received == total {
@@ -59,8 +62,7 @@ pub async fn fetch_to(
 
     file.flush().map_err(|e| format!("flushing {label}: {e}"))?;
     drop(file);
-    std::fs::rename(&partial, destination)
-        .map_err(|e| format!("installing {destination:?}: {e}"))
+    std::fs::rename(&partial, destination).map_err(|e| format!("installing {destination:?}: {e}"))
 }
 
 #[cfg(test)]
@@ -72,6 +74,9 @@ mod tests {
             "{}.partial",
             path.extension().unwrap().to_string_lossy()
         ));
-        assert_eq!(partial, std::path::Path::new("/m/synonym.onnx.data.partial"));
+        assert_eq!(
+            partial,
+            std::path::Path::new("/m/synonym.onnx.data.partial")
+        );
     }
 }
