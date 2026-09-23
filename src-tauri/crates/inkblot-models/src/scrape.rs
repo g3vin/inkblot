@@ -1,19 +1,19 @@
 //! The Pinterest scrape's return channel.
 //!
-//! ## What this replaces
-//!
 //! `eval_webview` throws its result away — `WebviewWindow::eval` returns
-//! `Result<(), String>` — so the injected script had no way to answer. It smuggled its
-//! payload out through `location.hash`, and the app polled `get_webview_url` every
-//! 220ms until the hash changed. That cost a poll ten times a second for the length of
-//! every scrape, put the whole payload through a URL, and made every failure look like
-//! a timeout.
+//! `Result<(), String>` — so the script injected into the Pinterest page answers by
+//! calling `pinterest_report_scrape` itself, and the app receives a typed
+//! `ScrapeReport`.
 //!
-//! The script now calls a real command. Tauri injects `__TAURI_INTERNALS__` into the
-//! main frame of every webview it creates, including one showing pinterest.com, and
-//! app commands are not ACL-gated unless the app ships its own permission manifest —
-//! which this one does not. So the page can reach Rust directly, and Rust hands the
-//! webview a typed `ScrapeReport` rather than a URL fragment to parse.
+//! ## Why a remote page can make that call
+//!
+//! Tauri injects `__TAURI_INTERNALS__` into the main frame of every webview it creates,
+//! including one showing pinterest.com, and app commands are not ACL-gated unless the
+//! app ships its own permission manifest — which this one does not
+//! (`gen/schemas/acl-manifests.json` has no `__app__` key). **If a `permissions/`
+//! directory is ever added to `src-tauri`, this stops working** and the command must be
+//! granted to that webview explicitly. The Swift app injects `scrape-bridge.js` into
+//! the Pinterest page instead, which exposes this one call and nothing else.
 //!
 //! ## Why it is two commands and not one
 //!
@@ -138,8 +138,7 @@ mod tests {
     async fn a_report_that_arrives_before_the_wait_is_not_lost() {
         let channels = ScrapeChannels::default();
         channels.begin("r1".into());
-        // The page can answer faster than the caller gets round to waiting, which is
-        // exactly the race the hash-polling version could not have.
+        // The page can answer faster than the caller gets round to waiting.
         channels.report(report("r1", "session_api", false));
 
         let waited = channels.await_report("r1", 50).await.unwrap().unwrap();

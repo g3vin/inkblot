@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use inkblot_models::dictation::{
     DictationEngine, DictationSink, DictationStatus, LiveDictationOptions, ModelInfo,
 };
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Default)]
 pub struct AppDictationState {
@@ -18,7 +18,7 @@ impl AppDictationState {
         if let Some(engine) = self.engine.get() {
             return Ok(engine);
         }
-        let data = app.path().app_data_dir().map_err(|e| format!("no app data dir: {e}"))?;
+        let data = crate::app_data_dir(app)?;
         Ok(self.engine.get_or_init(|| DictationEngine::new(data)))
     }
 }

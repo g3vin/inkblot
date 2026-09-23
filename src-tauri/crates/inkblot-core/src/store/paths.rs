@@ -5,11 +5,12 @@
 //! `filePathFor` is what appends `.json`, which is why a canvas keeps its `.canvas`
 //! suffix all the way through save, load, rename, move and delete.
 //!
-//! Mirrors `src/lib/projectPaths.js`; `npm run parity` asserts the two agree.
+//! Mirrors `src/lib/projectPaths.ts`; `npm run parity` asserts the two agree.
 
 use crate::doc_kind::CANVAS_SUFFIX;
 
-/// The file tree's stored sort order. Reserved in the JS and never yet written.
+/// The file tree's stored sort order. Reserved, and never written: the order is
+/// machine-local, kept in the preference store (see `store::preferences`).
 pub const ORDER_FILE: &str = ".inkblot-order.json";
 
 pub const CANVAS_SUFFIX_LENGTH: usize = CANVAS_SUFFIX.len();
@@ -49,7 +50,7 @@ pub fn parent_of(abs_path: &str) -> String {
 /// Normalize a tree path: callers pass them loosely.
 ///
 /// **This collapses only the FIRST run of slashes**, because the JS regex has no `g`
-/// flag (`projectPaths.js:43`). `a//b//c` normalizes to `a/b//c`. That is almost
+/// flag (`projectPaths.ts`). `a//b//c` normalizes to `a/b//c`. That is almost
 /// certainly not what was intended, but it decides file names on disk — a document
 /// saved under the doubled path is only findable under the doubled path — so it is
 /// reproduced rather than fixed. Changing it is a migration, not a cleanup.

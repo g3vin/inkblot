@@ -10,10 +10,10 @@
 //!
 //! Mirrors `src/lib/versionHistory.js`; `npm run parity` asserts the two agree.
 //!
-//! **Three things stay in JS**, because they are the webview's to do:
+//! **Three things live only in the webview**, because they need it:
 //!   - `htmlToBlocks`, which needs a real `DOMParser`. [`diff_block_lists`] takes the
 //!     blocks it produces, so the alignment — the part with the algorithm in it —
-//!     still lives here.
+//!     is here.
 //!   - the `toLocaleString` formatters, which are locale-dependent by design.
 //!   - `groupVersions`, which is built out of those formatters.
 
@@ -453,8 +453,7 @@ pub fn canvas_node_text(node: &CanvasNode) -> String {
 ///
 /// A repeated id takes the later node's content at the earlier one's position, which
 /// is what `Map.set` does. The map is what makes this linear: a canvas can hold
-/// hundreds of cards, and this module was moved to Rust for the diff's cost, so
-/// scanning a Vec per lookup would give back exactly what the move bought.
+/// hundreds of cards, and scanning a Vec per lookup would make the diff quadratic.
 fn canvas_nodes_by_id(canvas: &CanvasFile) -> (Vec<&str>, HashMap<&str, &CanvasNode>) {
     let mut order: Vec<&str> = Vec::new();
     let mut by_id: HashMap<&str, &CanvasNode> = HashMap::new();

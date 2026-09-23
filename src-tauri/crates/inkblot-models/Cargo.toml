@@ -3,19 +3,13 @@ name = "inkblot-models"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.77.2"
-description = "Inkblot's on-device models — synonyms, Kokoro speech, whisper dictation — without a shell"
+description = "Inkblot's on-device models (synonyms, rhymes, Kokoro speech, whisper dictation), independent of any shell"
 publish = false
-
-# Everything here used to live in the Tauri app crate (`src-tauri/src/*_commands.rs`),
-# where the Swift shell could not link it. What made it Tauri's was only ever the
-# glue — `AppHandle` for a directory, `emit` for progress, `State` for a cache — so
-# that glue is now a path, a callback and a struct the caller owns, and both shells
-# wrap the same code.
 
 [features]
 default = ["dictation"]
-# whisper.cpp, built by cmake. Its own feature so a target it does not build for yet
-# (an iOS slice, Phase 6) can leave it out without losing the other models.
+# whisper.cpp, built by cmake. Its own feature so a target it does not build for
+# (iOS) can leave it out without losing the other models.
 dictation = ["dep:inkblot-dictation", "dep:cpal"]
 metal = ["inkblot-dictation?/metal"]
 

@@ -17,11 +17,24 @@
 //! Tauri app links the core as an rlib and has no use for UniFFI's scaffolding; keeping
 //! the macros out of it keeps the core exactly what `lib.rs` says it is — domain logic
 //! that knows nothing about any shell.
+//!
+//! ## Adding an export
+//!
+//! 1. Add a method to `InkblotCore` (or a free function) with `#[uniffi::export]`:
+//!    owned arguments, structured results as a JSON string of a typeshare type, errors
+//!    as `CoreError`. Model calls go on `InkblotModels` in `models.rs` *and* its
+//!    stand-in `models_unavailable.rs`.
+//! 2. `./scripts/build-xcframework.sh` rebuilds every slice and regenerates
+//!    `native/…/Generated/inkblot_ffi.swift`. The bindings must come from the same
+//!    build as the library: UniFFI checks each function's checksum at first call, and
+//!    the checksums include some doc comments, so a stale binding builds and then fails
+//!    at runtime.
+//! 3. Call it from Swift (`CoreService` holds the one `InkblotCore`).
 
 use std::sync::Arc;
 
 use inkblot_core::store::preferences::{PreferenceScope, PreferenceStore};
-use inkblot_core::store::{DocumentBody, ProjectStore, StoreError};
+use inkblot_core::store::{ProjectStore, StoreError};
 
 uniffi::setup_scaffolding!();
 
@@ -33,10 +46,11 @@ pub trait ModelEventSink: Send + Sync {
     fn emit(&self, event: String, payload_json: String);
 }
 
-// The models, or — where they do not build yet (iOS: `ort` ships no iOS library and
-// whisper.cpp's cmake is untested there) — a stand-in with exactly the same interface.
-// Same interface is the point: the Swift bindings are generated once for every slice of
-// the XCFramework, and UniFFI checks each function's checksum at first call.
+// The models, or — where they do not build (iOS: `ort` ships no iOS library and
+// whisper.cpp's cmake has not been run for the iOS SDKs) — a stand-in with exactly the
+// same interface. Same interface is the point: the Swift bindings are generated once for
+// every slice of the XCFramework, and UniFFI checks each function's checksum at first
+// call.
 #[cfg(feature = "models")]
 mod models;
 #[cfg(not(feature = "models"))]
@@ -105,20 +119,12 @@ impl InkblotCore {
         })
     }
 
-    pub fn app_data_root(&self) -> String {
-        self.projects.app_data_root().to_string()
-    }
-
     /* ---------------- preferences ---------------- */
 
     /// Every scope at once, as `{ scope: { key: value } }` — the same shape
     /// `preferences_load` hands the webview.
     pub fn preferences_load_json(&self) -> Result<String, CoreError> {
         Ok(serde_json::to_string(&self.preferences.load_all())?)
-    }
-
-    pub fn preferences_get(&self, scope: String, key: String) -> Result<Option<String>, CoreError> {
-        Ok(self.preferences.get(scope_of(&scope)?, &key))
     }
 
     pub fn preferences_set(&self, scope: String, key: String, value: String) -> Result<(), CoreError> {
@@ -140,11 +146,6 @@ impl InkblotCore {
 
     /* ---------------- projects ---------------- */
 
-    /// Unsorted, as the core returns it; presentation is the picker's decision.
-    pub fn list_projects(&self) -> Vec<String> {
-        self.projects.list_projects()
-    }
-
     pub fn project_root(&self, project_name: String) -> String {
         self.projects.project_root(&project_name)
     }
@@ -152,40 +153,6 @@ impl InkblotCore {
     /// A project's tree as a `TreeNode`, JSON-encoded — see the module note.
     pub fn project_tree_json(&self, project_name: String) -> Result<String, CoreError> {
         Ok(serde_json::to_string(&self.projects.list_project_tree(&project_name))?)
-    }
-
-    pub fn create_project(
-        &self,
-        project_name: String,
-        target_parent_dir: Option<String>,
-    ) -> Result<bool, CoreError> {
-        Ok(self.projects.create_project(&project_name, target_parent_dir.as_deref())?)
-    }
-
-    pub fn create_folder(&self, project_name: String, folder_path: String) -> Result<(), CoreError> {
-        Ok(self.projects.create_folder(&project_name, &folder_path)?)
-    }
-
-    pub fn document_exists(&self, project_name: String, doc_name: String) -> bool {
-        self.projects.document_exists(&project_name, &doc_name)
-    }
-
-    /// A new, empty text document — `{ content: [], notes: [], versions: [] }`, which is
-    /// what the web tree's "New Document" writes through `saveDocument`. Through the
-    /// core's `save_document` rather than a raw write, so the key whitelist is the one
-    /// both shells share.
-    ///
-    /// Refuses an existing document rather than emptying it: the caller picked a name,
-    /// and a name that is taken is a question for the user, not a reason to lose a file.
-    pub fn create_document(&self, project_name: String, doc_name: String) -> Result<(), CoreError> {
-        if self.projects.document_exists(&project_name, &doc_name) {
-            return Err(CoreError::Failed(format!("{doc_name} already exists")));
-        }
-        let body = DocumentBody {
-            content: serde_json::json!([]),
-            notes: serde_json::json!([]),
-        };
-        Ok(self.projects.save_document(&project_name, &doc_name, &body, None)?)
     }
 }
 
@@ -310,15 +277,6 @@ impl InkblotCore {
     }
 }
 
-/// The hue for an editing session, as `hsl(…)` — or empty for no session.
-#[uniffi::export]
-pub fn session_color(session_id: String) -> String {
-    if session_id.is_empty() {
-        return String::new();
-    }
-    inkblot_core::version_history::session_color(&session_id)
-}
-
 /* ---------------- free functions ---------------- */
 
 /// Installed font families, sorted and without Apple's private dot-faces.
@@ -361,7 +319,7 @@ mod tests {
             serde_json::from_str(&core.preferences_load_json().unwrap()).unwrap();
         assert_eq!(loaded["app"]["theme"], "\"dark\"");
         assert_eq!(
-            core.preferences_get("app".into(), "theme".into()).unwrap().as_deref(),
+            core.preferences.get(PreferenceScope::App, "theme").as_deref(),
             Some("\"dark\"")
         );
     }
@@ -375,22 +333,22 @@ mod tests {
     #[test]
     fn a_project_tree_crosses_as_the_typeshare_shape() {
         let core = InkblotCore::new(scratch_root("tree"), "s".into());
-        assert!(core.create_project("Novel".into(), None).unwrap());
-        core.create_folder("Novel".into(), "Part One".into()).unwrap();
+        assert!(core.projects.create_project("Novel", None).unwrap());
+        core.projects.create_folder("Novel", "Part One").unwrap();
 
         let tree: serde_json::Value =
             serde_json::from_str(&core.project_tree_json("Novel".into()).unwrap()).unwrap();
         assert_eq!(tree["type"], "folder");
         assert_eq!(tree["name"], "Novel");
         assert_eq!(tree["children"][0]["name"], "Part One");
-        assert_eq!(core.list_projects(), vec!["Novel".to_string()]);
+        assert_eq!(core.projects.list_projects(), vec!["Novel".to_string()]);
     }
 
     #[test]
     fn a_history_is_read_once_and_described_row_by_row() {
         let root = scratch_root("history");
         let core = InkblotCore::new(root.clone(), "s".into());
-        core.create_project("Novel".into(), None).unwrap();
+        core.projects.create_project("Novel", None).unwrap();
         std::fs::write(
             format!("{root}/Novel/one.json"),
             serde_json::json!({
@@ -419,7 +377,7 @@ mod tests {
     fn search_reads_the_saved_project() {
         let root = scratch_root("search");
         let core = InkblotCore::new(root.clone(), "s".into());
-        core.create_project("Novel".into(), None).unwrap();
+        core.projects.create_project("Novel", None).unwrap();
         std::fs::write(
             format!("{root}/Novel/one.json"),
             serde_json::json!({
@@ -447,22 +405,5 @@ mod tests {
 
         let regex = SearchOptions { use_regex: true, ..options() };
         assert!(core.search_project_json("Novel".into(), "project".into(), "(".into(), regex).is_err());
-    }
-
-    #[test]
-    fn a_new_document_is_the_shape_the_web_tree_writes_and_never_overwrites() {
-        let root = scratch_root("create");
-        let core = InkblotCore::new(root.clone(), "s".into());
-        core.create_project("Novel".into(), None).unwrap();
-        core.create_document("Novel".into(), "Part One/Chapter 1".into()).unwrap();
-
-        let written: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(format!("{root}/Novel/Part One/Chapter 1.json")).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(written, serde_json::json!({ "content": [], "notes": [], "versions": [] }));
-
-        assert!(core.create_document("Novel".into(), "Part One/Chapter 1".into()).is_err());
-        assert!(core.create_document("Novel".into(), "board.canvas".into()).is_err());
     }
 }

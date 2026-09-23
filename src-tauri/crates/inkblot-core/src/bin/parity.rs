@@ -4,7 +4,7 @@
 //! `{"results":[{"id":N,"ok":<json>}|{"id":N,"err":"..."}]}` on stdout. The Node half
 //! (`scripts/parity/run.mjs`) runs the same corpus through the JS implementation and
 //! compares. Nothing here is part of the library's API; it exists so that "the Rust
-//! port behaves identically" is a thing a gate can prove rather than a claim.
+//! implementation behaves identically" is a thing a gate can prove rather than a claim.
 //!
 //! **Why a subprocess rather than a Rust test with a checked-in corpus:** a corpus
 //! two halves each maintain is a corpus that drifts. Piping one corpus through both

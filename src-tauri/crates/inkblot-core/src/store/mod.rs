@@ -5,8 +5,8 @@
 //!   <projectRoot>/<path/to/doc>.json    { content, notes, versions? }
 //!   <projectRoot>/.versions/…           canvas version sidecars (a canvas file is
 //!                                       spec-shaped JSON Canvas, so its history
-//!                                       cannot ride inside it); also read as the
-//!                                       legacy fallback for old text documents
+//!                                       cannot ride inside it); also read for text
+//!                                       documents with no embedded history
 //! ```
 //!
 //! A project's root defaults to `<AppData>/<project>`, but the user may store a project
@@ -14,16 +14,16 @@
 //! resolves a project name to its absolute root before touching the filesystem, so both
 //! default and relocated projects go through the same code paths.
 //!
-//! Mirrors `src/lib/FileSystem.js`, `projectPaths.js`, `docLock.js`, `versionStore.js`
+//! Mirrors `src/lib/FileSystem.js`, `projectPaths.ts`, `docLock.ts`, `versionStore.js`
 //! and `projectLocations.js`.
 //!
-//! ## What is different, and why
+//! ## How it differs from the JS, and why
 //!
-//! - **The AppData root is injected.** `appDataDir()` is the shell's to know. A Tauri
-//!   app passes what the plugin reports; a Swift shell passes its container.
+//! - **The AppData root is injected.** `appDataDir()` is the shell's to know. The Tauri
+//!   app passes what its path resolver reports; the Swift app passes the same folder.
 //! - **`versions:changed` is a callback, not a DOM event.** [`ProjectStore::on_versions_changed`]
-//!   takes a listener; the Tauri shell wires it to `app.emit`, and a Swift shell to
-//!   whatever it uses. Nothing here knows what a `window` is.
+//!   takes a listener, which a shell wires to
+//!   whatever it notifies with. Nothing here knows what a `window` is.
 //! - **Failures are `Result`s.** The JS logs to the console and returns `false`/`null`,
 //!   which makes "the save failed" and "there was nothing to save" the same value.
 //!   Each function's doc comment says which JS return value it corresponds to.
@@ -118,8 +118,8 @@ pub struct VersionRequest {
 }
 
 /// The fields `updateVersionEntry` is ever asked to change. The JS takes an arbitrary
-/// patch object; the only caller renames or un-names an entry
-/// (`HistoryPanel.jsx:290`), and a typed patch cannot corrupt an entry by merging a
+/// patch object; the only caller (the history panel) renames or
+/// un-names an entry, and a typed patch cannot corrupt an entry by merging a
 /// stray key into it.
 #[derive(Default)]
 pub struct VersionPatch {
@@ -161,7 +161,7 @@ impl ProjectStore {
     }
 
     /// Called after a document's version list changes, with the project and document
-    /// names. This replaces the `versions:changed` DOM CustomEvent.
+    /// names.
     pub fn on_versions_changed(&self, listener: impl Fn(&str, &str) + Send + Sync + 'static) {
         let mut slot = self.listener.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         *slot = Some(Box::new(listener));
@@ -379,8 +379,8 @@ impl ProjectStore {
     ///
     /// Text documents embed their versions in the document file; canvases keep theirs
     /// in a `.versions/` sidecar, because the canvas file is spec-shaped JSON Canvas and
-    /// must stay that way. The sidecar is also the legacy fallback for text documents
-    /// written by older versions of the app.
+    /// must stay that way. The sidecar is also read for text documents that have no
+    /// embedded history.
     pub fn get_versions(&self, project_name: &str, doc_name: &str) -> Vec<VersionEntry> {
         let root = self.project_root(project_name);
 
@@ -939,7 +939,7 @@ fn read_directory(root: &str, relative_path: &str) -> Vec<TreeNode> {
     let Ok(entries) = std::fs::read_dir(&dir_path) else { return Vec::new() };
 
     // Sorted, because `std::fs::read_dir` yields in directory order and the tree is
-    // compared in tests. The UI applies its own order on top (fileTreeOrder.js).
+    // compared in tests. The UI applies its own order on top (fileTreeOrder.ts).
     let mut sorted: BTreeMap<String, std::fs::DirEntry> = BTreeMap::new();
     for entry in entries.flatten() {
         sorted.insert(entry.file_name().to_string_lossy().to_string(), entry);

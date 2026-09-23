@@ -1,9 +1,9 @@
 //! Everything the app remembers between launches that is not a document.
 //!
-//! All of this lived in `localStorage`, which a native shell cannot see: a `WKWebView`
-//! in a Swift app gets its own store, per origin, that no native code can read. So the
-//! same state moves to disk under AppData, where both shells can reach it, and the
-//! webview keeps a synchronous facade over a cache it hydrates once at launch.
+//! Not `localStorage`: a `WKWebView` in a Swift app gets its own store, per origin,
+//! that no native code can read. On disk under AppData, both shells reach the same
+//! state; the webview keeps a synchronous facade (`src/lib/preferences.ts`) over a
+//! cache it hydrates once at launch.
 //!
 //! ## Three files, not one
 //!
@@ -16,20 +16,19 @@
 //! Splitting them keeps a corrupt or enormous pin cache from taking the theme with it,
 //! and means the file that is read on every launch stays small.
 //!
-//! ## What deliberately did NOT move
+//! ## What is deliberately not here
 //!
-//! - **`sessionStorage`.** `inkblot:project-open-id` and the per-project Pinterest
+//! - **Per-launch session values.** `inkblot:project-open-id` and the per-project Pinterest
 //!   refresh flag are scoped to one app launch by design. On disk they would outlive
 //!   the thing they describe, so they stay in memory in the webview facade.
 //! - **The file tree's order and expansion stay machine-local.** They are here in
 //!   AppData rather than in the project directory, because `fileTreeState.js` says
-//!   plainly that they are kept out of the project so they do not travel with it. The
-//!   `.inkblot-order.json` name is still reserved in the store and still unwritten;
+//!   plainly that they are kept out of the project so they do not travel with it.  The
+//!   `.inkblot-order.json` name is reserved in the store and never written;
 //!   using it would put one machine's collapsed folders into another's checkout.
 //!
-//! Values are opaque strings. Every call site was already storing JSON it parsed
-//! itself, and keeping them strings makes the webview facade a drop-in for the
-//! `localStorage` it replaces.
+//! Values are opaque strings; callers that store structured data serialize it
+//! themselves.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;

@@ -17,10 +17,7 @@ impl SynonymState {
         if let Some(engine) = self.engine.get() {
             return Ok(engine);
         }
-        let models = app
-            .path()
-            .app_data_dir()
-            .map_err(|e| format!("no app data dir: {e}"))?
+        let models = crate::app_data_dir(app)?
             .join("models");
         let tokenizer = app
             .path()

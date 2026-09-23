@@ -1,174 +1,69 @@
-//! The Tauri shell: command registration and app setup.
+//! The Tauri app: command registration and setup.
 //!
-//! The builder lives here rather than in `main.rs` so that every target can share it.
-//! `main.rs` is the desktop binary and does nothing but call `run()`; the mobile entry
-//! point calls the same function, and the `staticlib`/`cdylib` outputs are what a
-//! native Swift shell would link against.
+//! Every command the page `invoke`s is registered here. The logic behind each lives
+//! in `inkblot-core` (domain, persistence) or `inkblot-models` (on-device models);
+//! the `*_commands.rs` modules only adapt it to Tauri — resolving AppData, holding
+//! engines as managed state, and turning progress callbacks into `emit`s.
 //!
-//! This file used to hold a second, parallel `tauri::Builder` that registered no
-//! commands and was never called by anything.
+//! ## Adding a command
+//!
+//! 1. Put the logic in `inkblot-core` or `inkblot-models`, not here, so the Swift app
+//!    can reach it through `inkblot-ffi` too.
+//! 2. Add a `#[tauri::command]` wrapper to the fitting `*_commands.rs` (or a new one),
+//!    and register it in `generate_handler!` below. Stateful engines go in a
+//!    `*State` struct registered with `.manage`.
+//! 3. Answer the same command name in the Swift app, in `TauriHost.swift` (or
+//!    `ModelService.swift` for a model), since the page calls both shells the same way.
+
+use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager};
-use url::Url;
 
-
+mod core_commands;
 mod dictation_commands;
+mod haptics_commands;
 mod kokoro_commands;
 mod pinterest_commands;
 mod preferences_commands;
 mod rhyme_commands;
 mod synonym_commands;
+mod webview_commands;
 
+use core_commands::{list_system_fonts, scrape_pinterest_html};
 use dictation_commands::{
     cancel_dictation_session, dictation_status, load_dictation_model, start_dictation_session,
     stop_dictation_session, AppDictationState,
 };
+use haptics_commands::perform_haptic;
+use inkblot_models::scrape::ScrapeChannels;
 use kokoro_commands::{
     download_kokoro_model, generate_kokoro_speech, kokoro_model_status, kokoro_vocab,
     prewarm_kokoro_speech, KokoroSpeechState,
 };
-use inkblot_models::scrape::ScrapeChannels;
 use pinterest_commands::{pinterest_await_scrape, pinterest_begin_scrape, pinterest_report_scrape};
 use preferences_commands::{
     preferences_load, preferences_remove, preferences_rename_prefix, preferences_set,
 };
 use rhyme_commands::{download_rhyme_dictionary, get_rhymes, rhyme_dictionary_status, RhymeState};
-use synonym_commands::{
-    download_synonym_model, get_synonyms, synonym_model_status, SynonymState,
-};
+use synonym_commands::{download_synonym_model, get_synonyms, synonym_model_status, SynonymState};
+use webview_commands::{eval_webview, get_webview_url, navigate_webview};
 
-/* ============================================================
-   WEBVIEW COMMANDS
-============================================================ */
-
-#[tauri::command]
-async fn navigate_webview(app_handle: AppHandle, label: String, url: String) -> Result<(), String> {
-    if let Some(webview) = app_handle.get_webview_window(&label) {
-        let parsed_url = Url::parse(&url).map_err(|e| format!("Invalid URL: {}", e))?;
-
-        let webview_clone = webview.clone();
-
-        webview
-            .run_on_main_thread(move || {
-                let _ = webview_clone.navigate(parsed_url);
-            })
-            .map_err(|e| format!("run_on_main_thread failed: {}", e))?;
-
-        Ok(())
-    } else {
-        Err(format!("Webview '{}' not found", label))
-    }
+/// `~/Library/Application Support/com.inkblot.app` on macOS. The Swift app reads and
+/// writes the same folder, so both shells see the same preferences and models.
+pub(crate) fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path().app_data_dir().map_err(|e| format!("no app data dir: {e}"))
 }
 
-#[tauri::command]
-async fn get_webview_url(app_handle: AppHandle, label: String) -> Result<String, String> {
-    if let Some(webview) = app_handle.get_webview_window(&label) {
-        webview
-            .url()
-            .map(|u| u.to_string())
-            .map_err(|e| format!("Failed to get URL: {e}"))
-    } else {
-        Err(format!("Webview '{}' not found", label))
-    }
-}
-
-#[tauri::command]
-async fn eval_webview(app_handle: AppHandle, label: String, script: String) -> Result<(), String> {
-    if let Some(webview) = app_handle.get_webview_window(&label) {
-        webview
-            .eval(script)
-            .map_err(|e| format!("Failed to evaluate script: {e}"))
-    } else {
-        Err(format!("Webview '{}' not found", label))
-    }
-}
-
-/* ============================================================
-   HAPTICS
-============================================================ */
-
-/// Tap the trackpad.
-///
-/// `NSHapticFeedbackPattern`: Generic = 0, Alignment = 1, LevelChange = 2.
-/// Alignment is the light tick AppKit uses when a dragged object snaps to a
-/// guide; LevelChange is the heavier one. Both are no-ops on hardware without a
-/// Force Touch trackpad, and on a user who has turned feedback off in System
-/// Settings — the OS decides, which is why nothing here tries to.
-#[cfg(target_os = "macos")]
-fn perform_haptic_pattern(pattern: isize) {
-    use objc2::runtime::AnyObject;
-    use objc2::{class, msg_send};
-
-    unsafe {
-        let performer: *mut AnyObject = msg_send![class!(NSHapticFeedbackManager), defaultPerformer];
-        if performer.is_null() {
-            return;
-        }
-
-        // performanceTime: NSHapticFeedbackPerformanceTimeNow = 1.
-        let _: () = msg_send![performer, performFeedbackPattern: pattern, performanceTime: 1isize];
-    }
-}
-
-#[tauri::command]
-fn perform_haptic(app_handle: AppHandle, pattern: String) -> Result<(), String> {
-    let _ = &pattern;
-
-    #[cfg(target_os = "macos")]
-    {
-        let raw: isize = match pattern.as_str() {
-            "alignment" => 1,
-            "level" => 2,
-            _ => 0,
-        };
-
-        // AppKit's feedback manager is main-thread only; commands are not.
-        app_handle
-            .run_on_main_thread(move || perform_haptic_pattern(raw))
-            .map_err(|e| format!("Failed to perform haptic: {e}"))?;
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    let _ = app_handle;
-
-    Ok(())
-}
-
-/* ============================================================
-   CORE DELEGATES
-
-   Thin #[tauri::command] shims over inkblot-core. The logic lives in the core
-   crate so a native shell can call it without going through Tauri.
-============================================================ */
-
-#[tauri::command]
-async fn list_system_fonts() -> Result<Vec<String>, String> {
-    inkblot_core::fonts::list_system_fonts()
-}
-
-#[tauri::command]
-async fn scrape_pinterest_html(
-    url: String,
-    max_pins: Option<usize>,
-) -> Result<inkblot_core::pinterest::ScrapeResult, String> {
-    inkblot_core::pinterest::scrape_pinterest_html(url, max_pins).await
-}
-
-/* ============================================================
-   MAIN
-============================================================ */
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppDictationState::default())
         .manage(KokoroSpeechState::default())
         .manage(SynonymState::default())
         .manage(RhymeState::default())
         .manage(ScrapeChannels::default())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             navigate_webview,
             get_webview_url,

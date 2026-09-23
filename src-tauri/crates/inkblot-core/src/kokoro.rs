@@ -1,25 +1,15 @@
 //! The parts of Kokoro speech synthesis that are arithmetic rather than inference.
 //!
-//! ## Why this exists
-//!
-//! Read Aloud's native path used to be a **long-lived Python child process**, with the
-//! Rust side probing anaconda, homebrew and system Python for one that had
-//! `pip install 'kokoro>=0.9.4' soundfile misaki[en]` done to it. Two consequences:
-//! it worked on the machine it was built on and silently fell back to WASM everywhere
-//! else, and — the one that matters for the migration — **subprocesses are impossible
-//! on iOS and iPadOS**, so it blocked two of the three new targets.
-//!
-//! What replaced it runs the same model through `ort`, which this crate's shell already
-//! depends on. The pipeline splits across the seam like this:
+//! Read Aloud's native speech runs the Kokoro model through `ort`
+//! (`inkblot-models::kokoro_speech`). The pipeline splits across the process boundary:
 //!
 //! ```text
-//!   webview:  text -> normalize -> phonemize -> token ids
+//!   webview:  text -> normalize -> phonemize -> token ids   (src/lib/readAloudVoice.ts)
 //!   native:   token ids + voice style + speed -> ONNX -> f32 samples at 24kHz
 //! ```
 //!
-//! Phonemization stays in the webview because a correct English grapheme-to-phoneme
-//! pass is a lexicon and several thousand rules, and there is a working one there
-//! already. Nothing about that is a subprocess, so nothing about it blocks iOS.
+//! Phonemization lives in the webview because a correct English grapheme-to-phoneme
+//! pass is a lexicon and several thousand rules, and `phonemizer` provides one there.
 //!
 //! This module holds the pieces of the native half that are decidable without a model:
 //! which slice of a voice file to use, and how the samples are handed back.
