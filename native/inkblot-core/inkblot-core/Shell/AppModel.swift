@@ -16,6 +16,7 @@ final class AppModel {
     let tree: ProjectTree
     let sidebar: SidebarModel
     let notePreviews: NotePreviewModel
+    let workspace: WorkspaceModel
     let memoRecorder = AudioMemoRecorder()
     let memoPlayer = AudioMemoPlayer()
     let language = LanguageServices()
@@ -28,6 +29,7 @@ final class AppModel {
         tree = ProjectTree(core: core)
         sidebar = SidebarModel(bridge: bridge, core: core)
         notePreviews = NotePreviewModel(bridge: bridge)
+        workspace = WorkspaceModel(bridge: bridge)
 
         bridge.addListener { [weak self] event in
             guard let self else { return }

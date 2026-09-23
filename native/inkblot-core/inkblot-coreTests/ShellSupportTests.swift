@@ -134,3 +134,24 @@ struct ModelServiceTests {
         #expect(report?["reason"] as? String == "stable")
     }
 }
+
+/// The tab dock's per-tab decisions, which `TabDock.jsx` made per dot.
+@MainActor
+struct WorkspaceModelTests {
+    @Test func aDocumentTabShowsWhereItIs() throws {
+        let event = #"{"type":"tabsChanged","payload":{"tabs":[{"id":"1","docPath":"ch/one"},{"id":"2","docPath":"board.canvas"},{"id":"3"}],"activeTabId":"1","currentDoc":"ch/one","secondaryDoc":"board.canvas","split":true}}"#
+        let decoded = try JSONDecoder().decode(WebviewEvent.self, from: Data(event.utf8))
+        guard case .tabsChanged(let changed) = decoded else { Issue.record("wrong case"); return }
+        let one = WorkspaceModel.presentation(of: changed.tabs[0], in: changed)
+        #expect(one.isActive && one.isOpen && !one.inSecondary && one.label == "one")
+        let board = WorkspaceModel.presentation(of: changed.tabs[1], in: changed)
+        #expect(board.inSecondary && board.isOpen && !board.isActive && board.label == "board")
+        let draft = WorkspaceModel.presentation(of: changed.tabs[2], in: changed)
+        #expect(draft.isDraft && !draft.isOpen && draft.label == "New Tab")
+    }
+
+    @Test func aDisplayNameDropsTheFolderAndTheCanvasSuffix() {
+        #expect(WorkspaceModel.displayName("Act 1/Scene.canvas") == "Scene")
+        #expect(WorkspaceModel.displayName("notes") == "notes")
+    }
+}

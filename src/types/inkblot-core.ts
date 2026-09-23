@@ -389,7 +389,13 @@ export type NativeCommand =
 	| { type: "renameVersion", payload: RenameVersionCommand }
 	| { type: "revealSearchResult", payload: RevealSearchResultCommand }
 	| { type: "addReply", payload: AddReplyCommand }
-	| { type: "setTitlebarInset", payload: SetTitlebarInsetCommand };
+	| { type: "setTitlebarInset", payload: SetTitlebarInsetCommand }
+	/** The tab dock and the new-tab chooser, drawn by the shell (see `workspace.rs`). */
+	| { type: "selectTab", payload: TabRef }
+	| { type: "closeTab", payload: TabRef }
+	| { type: "newTab", payload: NewTabCommand }
+	| { type: "openDocInTab", payload: OpenDocInTabCommand }
+	| { type: "createFromDraft", payload: CreateFromDraftCommand };
 
 /**
  * A command, with its place in the stream.
@@ -426,6 +432,21 @@ export interface CreateEntryCommand {
 	/** The bare name. For a canvas the page adds the `.canvas` suffix. */
 	name: string;
 	kind: EntryKind;
+}
+
+export enum DraftKind {
+	Doc = "doc",
+	Canvas = "canvas",
+}
+
+/**
+ * Make the draft into a document. The page checks the name and makes the file; the
+ * answer is the next `DraftPaneChanged` — gone if it worked, with a status if not.
+ */
+export interface CreateFromDraftCommand {
+	tabId: string;
+	name: string;
+	kind: DraftKind;
 }
 
 /** Delete a file or folder. The shell has already asked the user. */
@@ -547,10 +568,40 @@ export interface DocChanged {
 	charCount: number;
 }
 
+/** One open tab: a document, or a draft that has not decided what it is yet. */
+export interface DocTab {
+	id: string;
+	/** `None` for a draft. */
+	docPath?: string;
+	/** Opened by a single click and replaced by the next one, until it is edited. */
+	ephemeral?: boolean;
+}
+
 /** The plain text of a document, with the positions it was read from. */
 export interface DocumentText {
 	docPath: string;
 	text: string;
+}
+
+export interface Rect {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+/**
+ * Where the chooser goes, or that it is gone. The page keeps the pane itself (a draft
+ * holds the pane open, and a split stays up around it) and reports its rectangle, in
+ * the web view's coordinates, for the shell to draw into.
+ */
+export interface DraftPaneChanged {
+	/** The draft being shown; `None` when no draft is. */
+	tabId?: string;
+	rect?: Rect;
+	/** Why the last attempt was refused ("A document with that name already exists."). */
+	status?: string;
+	creating?: boolean;
 }
 
 /**
@@ -699,7 +750,11 @@ export type WebviewEvent =
 	 * superseded by the next.
 	 */
 	| { type: "noteMarkerMoved", payload: NoteMarkerEvent }
-	| { type: "notePreviewDismissed", payload: NotePreviewDismissed };
+	| { type: "notePreviewDismissed", payload: NotePreviewDismissed }
+	/** The tab dock, the new-tab chooser and the sentence bubble (see `workspace.rs`). */
+	| { type: "tabsChanged", payload: TabsChanged }
+	| { type: "draftPaneChanged", payload: DraftPaneChanged }
+	| { type: "sentenceStructure", payload: SentenceStructure };
 
 export interface EventEnvelope {
 	seq: number;
@@ -780,6 +835,13 @@ export interface MoveEntryCommand {
 	isFolder: boolean;
 	/** Tree path; empty for the project root. */
 	targetFolder: string;
+}
+
+/**
+ * Open a draft tab, as the dock's `+` does. Nothing to say, but adjacent tagging
+ * wants a payload, so it is an empty object.
+ */
+export interface NewTabCommand {
 }
 
 export enum NoteType {
@@ -923,6 +985,11 @@ export interface NotesRemapped {
 	droppedNoteIds: string[];
 }
 
+/** Open a document in a tab of its own — a document dropped on the dock. */
+export interface OpenDocInTabCommand {
+	docPath: string;
+}
+
 export interface OpenDocumentCommand {
 	/**
 	 * A project-relative tree path. A `.canvas` suffix makes it a canvas — routing is
@@ -930,6 +997,15 @@ export interface OpenDocumentCommand {
 	 */
 	path: string;
 	pane: Pane;
+}
+
+/**
+ * A node of a parse: a phrase with children, or a leaf (a part-of-speech tag, or a
+ * word) with none.
+ */
+export interface ParseNode {
+	label: string;
+	children?: ParseNode[];
 }
 
 /**
@@ -1013,13 +1089,6 @@ export interface ReadAloudQuery {
 	target?: EditorTarget;
 	/** Read only the selection rather than the whole document. */
 	selectionOnly: boolean;
-}
-
-export interface Rect {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
 }
 
 /** Remove entries from the history. `None` clears it. */
@@ -1220,6 +1289,26 @@ export interface SelectionContext {
 	isCanvas: boolean;
 }
 
+/**
+ * One way the sentence parses, and the grammar's score for it — higher is likelier.
+ * Not a probability: the parser mixes products and log-sums, and the web bubble
+ * printed it as "Probability" anyway, so it is only good for ordering.
+ */
+export interface SentenceParse {
+	score: number;
+	tree: ParseNode;
+}
+
+/**
+ * "Open Analytic Bubble" was chosen: the sentence, its best parses, and where the
+ * right-click was, in the web view's coordinates.
+ */
+export interface SentenceStructure {
+	sentence: string;
+	parses: SentenceParse[];
+	anchor?: Rect;
+}
+
 /** Text alignment, as the toolbar offers it. */
 export enum Alignment {
 	Left = "left",
@@ -1373,6 +1462,23 @@ export interface StoryFolderAncestor {
 export interface SyncNotesCommand {
 	docPath: string;
 	notes: Note[];
+}
+
+export interface TabRef {
+	tabId: string;
+}
+
+/** Everything the dock draws. Sent whole whenever any of it changes. */
+export interface TabsChanged {
+	tabs: DocTab[];
+	activeTabId?: string;
+	/**
+	 * The documents in the two panes — a tab showing one of these keeps its name
+	 * visible in the collapsed dock.
+	 */
+	currentDoc?: string;
+	secondaryDoc?: string;
+	split: boolean;
 }
 
 /** A command aimed at an editor with nothing else to say. */

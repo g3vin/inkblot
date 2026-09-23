@@ -17,6 +17,7 @@ use super::sidebar::{
     TileRef, UpdateNoteCommand, VersionActionCommand,
 };
 use crate::types::note::Note;
+use super::workspace::{CreateFromDraftCommand, NewTabCommand, OpenDocInTabCommand, TabRef};
 
 /// A command aimed at an editor with nothing else to say.
 #[typeshare]
@@ -455,4 +456,10 @@ pub enum NativeCommand {
     RevealSearchResult(RevealSearchResultCommand),
     AddReply(AddReplyCommand),
     SetTitlebarInset(SetTitlebarInsetCommand),
+    /// The tab dock and the new-tab chooser, drawn by the shell (see `workspace.rs`).
+    SelectTab(TabRef),
+    CloseTab(TabRef),
+    NewTab(NewTabCommand),
+    OpenDocInTab(OpenDocInTabCommand),
+    CreateFromDraft(CreateFromDraftCommand),
 }

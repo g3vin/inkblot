@@ -34,6 +34,7 @@ pub mod common;
 pub mod envelope;
 pub mod event;
 pub mod sidebar;
+pub mod workspace;
 
 pub use command::{
     ApplyMarkCommand, CanvasCommandRequest, CanvasDropDocCommand, CanvasDropNoteCommand,
@@ -50,6 +51,10 @@ pub use sidebar::{
     ReplaceTileWordCommand, RevealSearchResultCommand, ShowSidebarTab, SidebarTab, TileKind, TileRef,
     TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,
     WorkbenchTile,
+};
+pub use workspace::{
+    CreateFromDraftCommand, DocTab, DraftKind, DraftPaneChanged, NewTabCommand,
+    OpenDocInTabCommand, ParseNode, SentenceParse, SentenceStructure, TabRef, TabsChanged,
 };
 pub use common::{Alignment, EditorTarget, MarkKind, Pane, RangeEdit, TextAnchor};
 pub use envelope::{
