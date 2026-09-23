@@ -47,11 +47,8 @@
 
 /* ---------- one version row ---------- */
 
-.history-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+/* `.history-tile` and `.history-tile-header` themselves are in
+   components/Editor.historyPanel.css — see the note there on why there. */
 
 .history-tile.is-named {
   border-color: var(--accent-border);
@@ -59,13 +56,6 @@
 
 .history-tile.in-group {
   background: var(--surface-3);
-}
-
-.history-tile-header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 0;
 }
 
 .history-tile-header .history-timestamp {
