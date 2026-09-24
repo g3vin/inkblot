@@ -6,17 +6,14 @@ use typeshare::typeshare;
 
 /// Which editor a message concerns.
 ///
-/// This is sharp edge #5 made explicit. Today the active editor is elected by mouse
-/// movement over a pane, and the winner is a live TipTap object passed around by
-/// reference — `EditorLayout` reads `__inkblotCanvasCard` off it to tell the third
-/// state apart. An object reference cannot cross a process boundary, so the election
-/// result has to be a *name*, and the three names are these.
+/// The active editor is elected by mouse movement over a pane. An object reference
+/// cannot cross a process boundary, so the election result is a *name*, and the
+/// webview's `editorRegistry` turns a name back into a live editor.
 ///
 /// `CanvasCard` is the third state: a canvas card opened for editing holds the only
 /// live editor on that pane, and the pane's own two TipTap instances sit idle holding
 /// no document. A toolbar pointed at `Primary` while a card is being edited would be
-/// driving an empty editor, which is exactly the bug the `__inkblotCanvasCard` gate
-/// exists to prevent.
+/// driving an empty editor.
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,7 +39,6 @@ pub enum Pane {
 
 /// A place in a document, as the protocol carries it.
 ///
-/// **This is the one type sharp edge #3 is about, so it is worth reading the reason.**
 /// A ProseMirror position is an index into a document that every edit invalidates.
 /// In one process that is survivable: the holder maps its positions through each
 /// transaction's mapping and is never more than a tick out of date. Across a process
@@ -52,9 +48,8 @@ pub enum Pane {
 ///
 /// So nothing in this protocol carries a bare position. Everything carries the text
 /// the position was resolved from as well, and the webview re-resolves by that text
-/// when the positions no longer cover it. Two places in the React shell already do
-/// exactly this dance by hand (`EditorLayout.jsx:291-304`, `Workbench.jsx:40-64`);
-/// this type is that dance promoted to the protocol.
+/// when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
+/// or reports it gone when the text is.
 ///
 /// `from` and `to` are **UTF-16 code units**, like every other offset in this
 /// codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
@@ -72,12 +67,20 @@ pub struct TextAnchor {
 
 impl TextAnchor {
     pub fn new(from: u32, to: u32, text: impl Into<String>) -> Self {
-        Self { from, to, text: text.into() }
+        Self {
+            from,
+            to,
+            text: text.into(),
+        }
     }
 
     /// A caret rather than a range.
     pub fn caret(pos: u32) -> Self {
-        Self { from: pos, to: pos, text: String::new() }
+        Self {
+            from: pos,
+            to: pos,
+            text: String::new(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -87,9 +90,8 @@ impl TextAnchor {
 
 /// The marks the toolbar can toggle.
 ///
-/// A closed set rather than a string because the toolbar is going native: a Swift
-/// button sending `"bolb"` should not compile, and an enum is what makes that true in
-/// all three languages at once.
+/// A closed set rather than a string: a Swift menu item sending `"bolb"` should not
+/// compile, and an enum is what makes that true in all three languages at once.
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

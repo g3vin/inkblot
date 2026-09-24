@@ -97,8 +97,7 @@ const cacheKey = (url) => {
   return normalized ? `${CACHE_PREFIX}${normalized}` : null
 }
 
-// Was `window.__inkblotProjectOpenId`; see lib/projectContext for why it is still
-// ambient and why it is no longer a window property.
+// See lib/projectContext for why this is ambient rather than passed in.
 const projectOpenId = () => getProjectOpenId()
 
 const refreshKey = (url) => {

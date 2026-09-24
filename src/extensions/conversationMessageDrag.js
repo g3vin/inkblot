@@ -5,10 +5,9 @@
  * because the rows live inside a ProseMirror node view where HTML5 drag would
  * fight the editor's own drag handling.
  *
- * The five pieces of drag state used to be `let`s in the node view's closure,
- * reassigned from here. They are owned by this controller now, which is where they
- * belong — that is also why this is a factory rather than a set of functions:
- * reassigning a destructured parameter would not have propagated back.
+ * The controller owns the drag state, which is why this is a factory rather than a
+ * set of functions: the state is reassigned throughout a drag, and reassigning a
+ * destructured parameter would not propagate back to the node view.
  *
  * `getAttrs` is an accessor, not a value: the node view replaces its attribute
  * object on every commit, so a snapshot taken at construction would go stale.

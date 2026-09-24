@@ -5,7 +5,7 @@
  * view), lays the panes out, and hosts the split-view divider, the drop caret, the
  * draft pane, the canvas pane, the version-compare pane and the Focus Mode overlay.
  *
- * What a pane *does* with a document lives in five hooks beside this file, each one
+ * What a pane *does* with a document lives in six hooks in src/hooks, each one
  * a path where a bug is silent rather than loud:
  *
  *   useEditorDocCache    what each pane is holding, and whether it is mid-swap
@@ -31,13 +31,15 @@ import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
 import CanvasPane from '../canvas/CanvasPane'
 import MapPane from '../map/MapPane'
-import { useEditorAutosave } from './useEditorAutosave'
-import { useEditorDnd } from './useEditorDnd'
-import { useEditorDocCache } from './useEditorDocCache'
-import { useEditorDocLoader } from './useEditorDocLoader'
-import { useEditorNotes } from './useEditorNotes'
-import { formatWordStats, useEditorWordCount } from './useEditorWordCount'
+import { useEditorAutosave } from '../hooks/useEditorAutosave'
+import { useEditorDnd } from '../hooks/useEditorDnd'
+import { useEditorDocCache } from '../hooks/useEditorDocCache'
+import { useEditorDocLoader } from '../hooks/useEditorDocLoader'
+import { useEditorNotes } from '../hooks/useEditorNotes'
+import { formatWordStats, useEditorWordCount } from '../hooks/useEditorWordCount'
 import DraftTabPane from './DraftTabPane'
+import NativeDraftPane from './NativeDraftPane'
+import { nativeOwns } from '../lib/host'
 import FocusModeOverlay from './FocusModeOverlay'
 import VersionComparePane from './VersionComparePane'
 import SFIcon from './SFIcon'
@@ -70,6 +72,7 @@ export default function EditorCanvas({
   focusModeOpen = false,
   onExitFocusMode,
   draftTabActive = false,
+  activeTabId = null,
   onDraftCreated,
   refreshFiles,
   compare = null,
@@ -400,7 +403,7 @@ export default function EditorCanvas({
   /* ---------------- The bridge ---------------- */
 
   // Follows the election and publishes toolbar state and selection context for
-  // whichever editor is active. This is the loop Toolbar.jsx used to run on itself.
+  // whichever editor is active.
   useSurfacePublisher()
 
   /* ---------------- Expose Editor, to the bridge ---------------- */
@@ -593,6 +596,7 @@ export default function EditorCanvas({
       : ''
   }`
   const showDraftPane = draftTabActive && !currentDoc
+  const nativeDraftPane = nativeOwns('draftPane')
   const primaryPaneOwnsFocus = primaryIsStructured || showDraftPane
 
   // The divider is a track in the split grid, so the two panes are sized by the
@@ -670,11 +674,20 @@ export default function EditorCanvas({
             />
           ) : null}
           {showDraftPane ? (
-            <DraftTabPane
-              projectName={projectName}
-              onCreated={onDraftCreated}
-              refreshFiles={refreshFiles}
-            />
+            nativeDraftPane ? (
+              <NativeDraftPane
+                tabId={activeTabId}
+                projectName={projectName}
+                onCreated={onDraftCreated}
+                refreshFiles={refreshFiles}
+              />
+            ) : (
+              <DraftTabPane
+                projectName={projectName}
+                onCreated={onDraftCreated}
+                refreshFiles={refreshFiles}
+              />
+            )
           ) : primaryIsCanvas ? (
             <CanvasPane
               projectName={projectName}

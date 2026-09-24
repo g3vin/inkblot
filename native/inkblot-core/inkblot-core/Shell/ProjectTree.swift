@@ -1,10 +1,12 @@
+#if os(macOS)
 import CoreServices
+#endif
 import Foundation
 import Observation
 
 /// The open project's tree, kept current.
 ///
-/// The page still writes the tree — every autosave, every canvas card dropped into a
+/// The page writes the tree — every autosave, every canvas card dropped into a
 /// folder, everything the page's own code creates — and it does not say so over the
 /// bridge. So the tree is re-read from disk whenever the disk changes, which also
 /// catches a project moved in the Finder or synced down from iCloud. The core reads
@@ -160,6 +162,46 @@ final class ProjectTree {
     }
 }
 
+extension Notification.Name {
+    /// A path under the app's control changed on disk: `TauriHost` posts it after each
+    /// write, rename, removal or copy it performs for the page, with the path as the
+    /// object. On iOS it is how the tree hears about changes at all (no FSEvents).
+    static let inkblotFileChanged = Notification.Name("inkblotFileChanged")
+}
+
+#if !os(macOS)
+/// The iOS watcher. There are no FSEvents, and in the sandbox nothing but this app
+/// changes a project — and everything this app changes goes through `TauriHost`. So
+/// its announcements are the change feed, coalesced the same way FSEvents' are.
+@MainActor
+final class DirectoryWatcher {
+    private var observer: NSObjectProtocol?
+    private var pending: Task<Void, Never>?
+
+    init?(path: String, latency: CFTimeInterval = 0.3, onChange: @escaping () -> Void) {
+        let root = URL(fileURLWithPath: path).standardizedFileURL.path
+        observer = NotificationCenter.default.addObserver(
+            forName: .inkblotFileChanged, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let changed = note.object as? String,
+                  URL(fileURLWithPath: changed).standardizedFileURL.path.hasPrefix(root)
+            else { return }
+            MainActor.assumeIsolated {
+                self?.pending?.cancel()
+                self?.pending = Task {
+                    try? await Task.sleep(for: .seconds(latency))
+                    if !Task.isCancelled { onChange() }
+                }
+            }
+        }
+    }
+
+    isolated deinit {
+        pending?.cancel()
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+    }
+}
+#else
 /// FSEvents on one directory tree, coalesced to one callback per burst.
 ///
 /// An autosave is a temp-file write and a rename, and a canvas save touches its
@@ -203,3 +245,4 @@ final class DirectoryWatcher {
         FSEventStreamRelease(stream)
     }
 }
+#endif

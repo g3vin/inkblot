@@ -1,9 +1,9 @@
 /**
  * Canvas search.
  *
- * The bug this suite exists to prevent is a silent one: before M8, SearchPanel
- * coerced a canvas to an empty ProseMirror document and it matched NOTHING, with no
- * error anywhere. So the first thing asserted is simply that a canvas yields hits.
+ * The failure this suite guards against is silent: a canvas coerced to an empty
+ * ProseMirror document matches NOTHING, with no error anywhere. So the first thing
+ * asserted is simply that a canvas yields hits.
  */
 const C = '../../src'
 const { collectCanvasMatches } = await import(`${C}/lib/canvasSearch.js`)
@@ -16,7 +16,7 @@ const { createMatcher } = await import(`${C}/lib/sidebarSearch.js`)
 // switches. Passing a bare string makes it return [] silently, which is the exact
 // failure this suite exists to catch.
 const m = (query, options) => createMatcher(query, options)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const state = createEmptyCanvas()
 const add = (node) => { state.nodes[node.id] = node; state.nodeOrder.push(node.id); return node }

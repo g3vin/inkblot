@@ -1,18 +1,16 @@
 /**
  * dictationSource.ts — the speech engine's side of the dictation protocol.
  *
- * **This file is a stand-in for Swift.** In Phase 5 the shell owns the microphone and
- * whisper, and sends `dictationPartial` / `dictationFinal` / `dictationLevel` /
- * `dictationCancel` over the bridge. Today the shell is the web layer, so this
- * subscribes to the Tauri `dictation://*` events and sends exactly those commands —
- * same messages, same order, over the same client. When the Swift shell takes over,
- * this file is deleted and nothing downstream of it changes.
+ * The speech engine emits `dictation://*` events (the Tauri app's commands, or the
+ * Swift shell's `ModelService`, which emits the same events through the shim). This
+ * turns them into the protocol's `dictationPartial` / `dictationFinal` /
+ * `dictationLevel` / `dictationCancel` commands — the same messages a shell that owned
+ * the microphone itself would send — so `DictationControl` only ever sees the protocol.
  *
- * That is worth more than it looks. Sharp edge #2 says the draft state machine must
- * stay in the webview, because `replaceInlineDraft` is a read-modify-write at speaking
- * rate and a round trip inside that loop loses the race with whisper. The only way to
- * know the split is drawn in the right place is to run the real state machine against
- * the real protocol, which is what this makes possible before any Swift exists.
+ * **The draft state machine stays in the webview, on purpose.** `replaceInlineDraft`
+ * is a read-modify-write on the document at speaking rate; a process round trip inside
+ * that loop would lose the race with the next partial. The engine sends text; the
+ * document decides what to do with it.
  */
 import { shellBridge } from './appBridge'
 import { setupDictationListeners } from '../lib/dictation'

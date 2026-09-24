@@ -4,8 +4,6 @@
  * The hazard: a pane that lets go of a document flushes its pending autosave to the
  * path it had. Rename the file first and that flush recreates it under the old name —
  * a ghost copy of the document, and, if it was deleted, a deletion that did not stick.
- * That was the React tree's behaviour for as long as it has existed; the native tree's
- * rename/delete commands are what made it urgent.
  *
  * So this mounts the real EditorCanvas (whose teardown flush is the thing that
  * writes), types without waiting out the 800ms debounce, and then performs the entry
@@ -27,13 +25,13 @@ const React = (await import('react')).default
 const { act, useCallback, useRef, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const EditorCanvas = (await import('../../src/components/EditorCanvas.jsx')).default
-const { useEntryOperations } = await import('../../src/components/useEntryOperations.js')
+const { useEntryOperations } = await import('../../src/hooks/useEntryOperations.js')
 const entryOps = await import('../../src/lib/entryOperations.ts')
 const { saveDocument, loadDocument } = await import('../../src/lib/FileSystem.js')
 const { files, dirs } = await import('./stub-fs.mjs')
 const { shellBridge } = await import('../../src/bridge/index.ts')
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const settle = (ms = 50) => act(async () => { await new Promise((r) => setTimeout(r, ms)) })
 
 const P = 'Entries'

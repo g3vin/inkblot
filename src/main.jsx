@@ -1,11 +1,10 @@
 /**
  * main.jsx — React entry point; mounts <App /> into #root.
  *
- * Preferences are read from disk BEFORE the first render. They used to live in
- * `localStorage`, which is synchronous, and every call site reads them during render —
- * a `useState` initializer, a node view's constructor. Reading them from disk is not
- * synchronous, so the whole store is hydrated once here and answered from memory
- * afterwards (see lib/preferences.ts).
+ * Preferences are read from disk BEFORE the first render. Every call site reads them
+ * synchronously during render — a `useState` initializer, a node view's constructor —
+ * but reading from disk is not synchronous, so the whole store is hydrated once here
+ * and answered from memory afterwards (see lib/preferences.ts).
  *
  * Mounting first and hydrating after would mean a frame of the wrong theme, an editor
  * that opens with no tabs and then replaces them, and a file tree that expands

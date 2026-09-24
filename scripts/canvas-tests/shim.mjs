@@ -1,7 +1,7 @@
 /**
  * The Tauri shim the Swift shell injects (native/…/Web/tauri-shim.js).
  *
- * Under the Swift shell the web bundle is unmodified and still calls Tauri — for every
+ * Under the Swift shell the web bundle is unmodified and calls Tauri — for every
  * document save, every delete confirmation, every context menu. The shim is what
  * answers, and nothing in the build can see it: it is a string Swift injects into a
  * page. If it gets a wire format wrong, the symptom is a menu item that does nothing,
@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs'
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const SHIM = new URL('../../native/inkblot-core/inkblot-core/Web/tauri-shim.js', import.meta.url)
 const HOST = new URL('../../native/inkblot-core/inkblot-core/Web/native-host.js', import.meta.url)
@@ -31,6 +31,7 @@ const win = dom.window
 const received = []
 const files = new Map()
 let nextPopupChoice = null
+const openWindows = new Set()
 
 const reply = (value) => JSON.stringify({ ok: true, value })
 const fail = (error) => JSON.stringify({ ok: false, error })
@@ -57,6 +58,14 @@ win.webkit = {
           case 'menu.popup':
             return reply(nextPopupChoice)
           case 'menu.setApp':
+            return reply(null)
+          case 'window.create':
+            if (openWindows.has(args.options.label)) return fail(`a window with label \`${args.options.label}\` already exists`)
+            openWindows.add(args.options.label)
+            return reply(null)
+          case 'window.list':
+            return reply(['main', ...openWindows])
+          case 'window.op':
             return reply(null)
           default:
             return fail(`${cmd} is not available`)
@@ -127,6 +136,50 @@ ok('the shim installs __TAURI_INTERNALS__', typeof win.__TAURI_INTERNALS__?.invo
     heard.length === 2 && heard[0].payload.text === 'hello' && heard[0].event === 'dictation://partial')
   ok('an unlisten sticks', !heard.some((event) => event.payload.text === 'after'))
   ok('and none of it crossed to Swift', received.length === before)
+}
+
+/* ---------------- other windows: docWindow.js and the Pinterest windows ---------------- */
+{
+  const { WebviewWindow } = await import(new URL('webviewWindow.js', API).href)
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  const created = []
+  const board = new WebviewWindow('pinterest', { url: 'https://www.pinterest.com/', width: 600, visible: false })
+  board.once('tauri://created', () => created.push('pinterest'))
+  await settle()
+  const create = received.findLast((request) => request.cmd === 'window.create')
+  ok('new WebviewWindow asks Swift to create it, with its label and options',
+    create?.args.options.label === 'pinterest' && create.args.options.url === 'https://www.pinterest.com/'
+      && create.args.options.visible === false)
+  ok('and hears that it was created', created.length === 1)
+
+  let refused = null
+  const again = new WebviewWindow('pinterest', { url: 'https://www.pinterest.com/' })
+  again.once('tauri://error', (event) => { refused = event.payload })
+  await settle()
+  ok('a label already in use is refused, as Tauri refuses it', String(refused).includes('already exists'))
+
+  ok('getByLabel finds it through Swift', (await WebviewWindow.getByLabel('pinterest'))?.label === 'pinterest')
+  ok('and not a window that is not open', (await WebviewWindow.getByLabel('nope')) === null)
+
+  await board.hide()
+  await board.setAlwaysOnTop(true)
+  const ops = received.filter((request) => request.cmd === 'window.op').slice(-2)
+  ok('window verbs cross by label', ops[0]?.args.label === 'pinterest' && ops[0].args.op === 'hide')
+  ok('with their value', ops[1]?.args.op === 'set_always_on_top' && ops[1].args.value === true)
+
+  // Two windows' `destroyed` handlers: only the one that closed may hear it.
+  const detached = new WebviewWindow('doc-Novel-one', { url: 'index.html?project=Novel&doc=one' })
+  await settle()
+  const destroyed = []
+  await board.once('tauri://destroyed', () => destroyed.push('pinterest'))
+  await detached.once('tauri://destroyed', () => destroyed.push('doc'))
+  const anyWindow = []
+  await listen('tauri://destroyed', () => anyWindow.push(true))
+  win.__inkblotTauri.emit('tauri://destroyed', null, 'pinterest')
+  ok('an event about one window reaches that window\'s listener only',
+    destroyed.length === 1 && destroyed[0] === 'pinterest')
+  ok('and the listeners for any window', anyWindow.length === 1)
 }
 
 /* ---------------- a context menu, the way the bundle builds one ---------------- */

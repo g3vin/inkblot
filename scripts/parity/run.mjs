@@ -7,9 +7,18 @@
  * comes from calling the REAL JS function in src/lib/. This runner sends the same
  * `{ fn, args }` rows to the Rust `parity` binary and asserts the two agree.
  *
- * Why it exists: Phase 2 ports domain logic to Rust while the JS stays in place and
- * the app keeps shipping. Two implementations of the same function is a drift risk,
- * and "I read both and they look the same" is not a check. This is.
+ * Why it exists: domain logic is implemented twice, in src/lib/ (what the webview
+ * runs) and in `inkblot-core` (what the Swift app and the Tauri commands call). Two
+ * implementations of the same function is a drift risk, and "I read both and they
+ * look the same" is not a check. This is.
+ *
+ * A green run means something only if the harness can fail: after adding a case
+ * module, break the Rust side on purpose and watch it fail before trusting it.
+ *
+ * Adding a function: a case module in cases/ (or rows in an existing one), an arm in
+ * `src-tauri/crates/inkblot-core/src/bin/parity.rs`, and an import below. A module
+ * may export `canon(value, case)` to normalize both sides the same way (canvasModel
+ * uses it to rewrite generated ids).
  *
  * Both sides are compared after a JSON round-trip, so neither is credited with
  * distinctions JSON cannot carry (`undefined` keys, NaN, ±Infinity all collapse the

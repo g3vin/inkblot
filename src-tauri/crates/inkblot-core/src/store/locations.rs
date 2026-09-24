@@ -8,7 +8,7 @@
 //! A value is the absolute path to the project directory **itself**, not its parent.
 //! Projects in the default location have no entry.
 //!
-//! Mirrors `src/lib/projectLocations.js`.
+//! Reads and writes the same registry file as `src/lib/projectLocations.js`.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -34,7 +34,10 @@ impl ProjectLocations {
     }
 
     fn load(&self) -> LocationMap {
-        let mut cache = self.cache.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut cache = self
+            .cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(map) = cache.as_ref() {
             return map.clone();
         }
@@ -52,7 +55,10 @@ impl ProjectLocations {
 
     fn persist(&self, map: LocationMap) -> Result<(), StoreError> {
         {
-            let mut cache = self.cache.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut cache = self
+                .cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             *cache = Some(map.clone());
         }
 

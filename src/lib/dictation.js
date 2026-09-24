@@ -10,10 +10,7 @@ import { listen } from '@tauri-apps/api/event'
 /**
  * Loads a whisper model. Pass nothing and Rust resolves it — $INKBLOT_DICTATION_MODEL,
  * then `<AppData>/models/ggml-small.en.bin`, then `~/inkblot-dictation/models/`.
- *
- * This used to be a hardcoded absolute path into one developer's home directory, which
- * meant dictation could not load for anyone else. Rust owns the decision now so the
- * native shells do not each need their own copy of it.
+ * Rust owns that search order so both shells resolve the same model.
  */
 export async function loadDictationModel(modelPath = null) {
   return invoke('load_dictation_model', {

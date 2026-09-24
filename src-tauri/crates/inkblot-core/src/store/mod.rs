@@ -5,8 +5,8 @@
 //!   <projectRoot>/<path/to/doc>.json    { content, notes, versions? }
 //!   <projectRoot>/.versions/…           canvas version sidecars (a canvas file is
 //!                                       spec-shaped JSON Canvas, so its history
-//!                                       cannot ride inside it); also read as the
-//!                                       legacy fallback for old text documents
+//!                                       cannot ride inside it); also read for text
+//!                                       documents with no embedded history
 //! ```
 //!
 //! A project's root defaults to `<AppData>/<project>`, but the user may store a project
@@ -14,16 +14,16 @@
 //! resolves a project name to its absolute root before touching the filesystem, so both
 //! default and relocated projects go through the same code paths.
 //!
-//! Mirrors `src/lib/FileSystem.js`, `projectPaths.js`, `docLock.js`, `versionStore.js`
+//! Mirrors `src/lib/FileSystem.js`, `projectPaths.ts`, `docLock.ts`, `versionStore.js`
 //! and `projectLocations.js`.
 //!
-//! ## What is different, and why
+//! ## How it differs from the JS, and why
 //!
-//! - **The AppData root is injected.** `appDataDir()` is the shell's to know. A Tauri
-//!   app passes what the plugin reports; a Swift shell passes its container.
+//! - **The AppData root is injected.** `appDataDir()` is the shell's to know. The Tauri
+//!   app passes what its path resolver reports; the Swift app passes the same folder.
 //! - **`versions:changed` is a callback, not a DOM event.** [`ProjectStore::on_versions_changed`]
-//!   takes a listener; the Tauri shell wires it to `app.emit`, and a Swift shell to
-//!   whatever it uses. Nothing here knows what a `window` is.
+//!   takes a listener, which a shell wires to
+//!   whatever it notifies with. Nothing here knows what a `window` is.
 //! - **Failures are `Result`s.** The JS logs to the console and returns `false`/`null`,
 //!   which makes "the save failed" and "there was nothing to save" the same value.
 //!   Each function's doc comment says which JS return value it corresponds to.
@@ -119,8 +119,8 @@ pub struct VersionRequest {
 }
 
 /// The fields `updateVersionEntry` is ever asked to change. The JS takes an arbitrary
-/// patch object; the only caller renames or un-names an entry
-/// (`HistoryPanel.jsx:290`), and a typed patch cannot corrupt an entry by merging a
+/// patch object; the only caller (the history panel) renames or
+/// un-names an entry, and a typed patch cannot corrupt an entry by merging a
 /// stray key into it.
 #[derive(Default)]
 pub struct VersionPatch {
@@ -162,14 +162,20 @@ impl ProjectStore {
     }
 
     /// Called after a document's version list changes, with the project and document
-    /// names. This replaces the `versions:changed` DOM CustomEvent.
+    /// names.
     pub fn on_versions_changed(&self, listener: impl Fn(&str, &str) + Send + Sync + 'static) {
-        let mut slot = self.listener.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut slot = self
+            .listener
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         *slot = Some(Box::new(listener));
     }
 
     fn emit_versions_changed(&self, project_name: &str, doc_name: &str) {
-        let slot = self.listener.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let slot = self
+            .listener
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(listener) = slot.as_ref() {
             listener(project_name, doc_name);
         }
@@ -194,8 +200,16 @@ impl ProjectStore {
     /// [`Self::save_document`] only ever emits `{ content, notes, versions }`, which is
     /// right for text documents and destructive for anything else. Document kinds with
     /// their own shape — canvases — persist through here instead.
-    pub fn write_document_raw(&self, project_name: &str, doc_name: &str, data: &Value) -> Result<()> {
-        let file_path = join_path(&[&self.project_root(project_name), &format!("{doc_name}.json")]);
+    pub fn write_document_raw(
+        &self,
+        project_name: &str,
+        doc_name: &str,
+        data: &Value,
+    ) -> Result<()> {
+        let file_path = join_path(&[
+            &self.project_root(project_name),
+            &format!("{doc_name}.json"),
+        ]);
         std::fs::create_dir_all(parent_of(&file_path))?;
         std::fs::write(&file_path, serde_json::to_string(data)?)?;
         Ok(())
@@ -321,7 +335,11 @@ impl ProjectStore {
             if let Some(fields) = existing.as_object_mut() {
                 fields.insert(
                     "notes".to_string(),
-                    if notes.is_array() { notes.clone() } else { json!([]) },
+                    if notes.is_array() {
+                        notes.clone()
+                    } else {
+                        json!([])
+                    },
                 );
             }
             self.write_document_raw(project_name, doc_name, &existing)?;
@@ -331,20 +349,26 @@ impl ProjectStore {
 
     /// The document's JSON, or `None` when there is no such file.
     pub fn load_document(&self, project_name: &str, doc_name: &str) -> Result<Option<Value>> {
-        let file_path =
-            join_path(&[&self.project_root(project_name), &format!("{doc_name}.json")]);
+        let file_path = join_path(&[
+            &self.project_root(project_name),
+            &format!("{doc_name}.json"),
+        ]);
         if !exists(&file_path) {
             return Ok(None);
         }
-        Ok(Some(serde_json::from_str(&std::fs::read_to_string(&file_path)?)?))
+        Ok(Some(serde_json::from_str(&std::fs::read_to_string(
+            &file_path,
+        )?)?))
     }
 
     pub fn document_exists(&self, project_name: &str, doc_name: &str) -> bool {
         if project_name.is_empty() || doc_name.is_empty() {
             return false;
         }
-        let file_path =
-            join_path(&[&self.project_root(project_name), &format!("{doc_name}.json")]);
+        let file_path = join_path(&[
+            &self.project_root(project_name),
+            &format!("{doc_name}.json"),
+        ]);
         exists(&file_path)
     }
 
@@ -413,8 +437,8 @@ impl ProjectStore {
     ///
     /// Text documents embed their versions in the document file; canvases keep theirs
     /// in a `.versions/` sidecar, because the canvas file is spec-shaped JSON Canvas and
-    /// must stay that way. The sidecar is also the legacy fallback for text documents
-    /// written by older versions of the app.
+    /// must stay that way. The sidecar is also read for text documents that have no
+    /// embedded history.
     pub fn get_versions(&self, project_name: &str, doc_name: &str) -> Vec<VersionEntry> {
         let root = self.project_root(project_name);
 
@@ -509,8 +533,10 @@ impl ProjectStore {
             };
 
             let before = existing.len();
-            let versions: Vec<VersionEntry> =
-                existing.into_iter().filter(|entry| entry.id != version_id).collect();
+            let versions: Vec<VersionEntry> = existing
+                .into_iter()
+                .filter(|entry| entry.id != version_id)
+                .collect();
             if versions.len() == before {
                 return Ok(false);
             }
@@ -610,7 +636,11 @@ impl ProjectStore {
 
     /// Create a project. With `target_parent_dir`, the directory is created inside it
     /// and the custom location recorded; otherwise it goes in the AppData default.
-    pub fn create_project(&self, project_name: &str, target_parent_dir: Option<&str>) -> Result<bool> {
+    pub fn create_project(
+        &self,
+        project_name: &str,
+        target_parent_dir: Option<&str>,
+    ) -> Result<bool> {
         let name = project_name.trim();
         if name.is_empty() {
             return Ok(false);
@@ -649,7 +679,11 @@ impl ProjectStore {
             return Ok(Err(LinkRefusal::SourceMissing));
         }
 
-        let name = dir.split(['/', '\\']).filter(|part| !part.is_empty()).next_back().unwrap_or("");
+        let name = dir
+            .split(['/', '\\'])
+            .filter(|part| !part.is_empty())
+            .next_back()
+            .unwrap_or("");
         // A dotted directory is skipped by list_projects, so linking one would
         // "succeed" into a project that never appears.
         if name.is_empty() || name.starts_with('.') {
@@ -784,7 +818,12 @@ impl ProjectStore {
         }
     }
 
-    pub fn delete_entry(&self, project_name: &str, entry_path: &str, is_folder: bool) -> Result<()> {
+    pub fn delete_entry(
+        &self,
+        project_name: &str,
+        entry_path: &str,
+        is_folder: bool,
+    ) -> Result<()> {
         let root = self.project_root(project_name);
         let rel = normalize_path(entry_path);
         let target = self.entry_file_path(project_name, entry_path, is_folder);
@@ -834,8 +873,11 @@ impl ProjectStore {
         let rel = normalize_path(entry_path);
         let segments: Vec<&str> = rel.split('/').filter(|part| !part.is_empty()).collect();
         let parent = segments[..segments.len().saturating_sub(1)].join("/");
-        let next_path =
-            if parent.is_empty() { new_name.to_string() } else { format!("{parent}/{new_name}") };
+        let next_path = if parent.is_empty() {
+            new_name.to_string()
+        } else {
+            format!("{parent}/{new_name}")
+        };
 
         self.relocate_entry(project_name, &rel, &next_path, is_folder)
     }
@@ -850,7 +892,11 @@ impl ProjectStore {
     ) -> Result<Option<String>> {
         let rel = normalize_path(entry_path);
         let target_folder = normalize_path(target_folder_path);
-        let base_name = rel.split('/').filter(|part| !part.is_empty()).next_back().unwrap_or("");
+        let base_name = rel
+            .split('/')
+            .filter(|part| !part.is_empty())
+            .next_back()
+            .unwrap_or("");
         let next_path = if target_folder.is_empty() {
             base_name.to_string()
         } else {
@@ -870,7 +916,10 @@ impl ProjectStore {
     ) -> Result<Option<String>> {
         let root = self.project_root(project_name);
         let (old_path, new_path) = if is_folder {
-            (folder_path_for(&root, rel), folder_path_for(&root, next_path))
+            (
+                folder_path_for(&root, rel),
+                folder_path_for(&root, next_path),
+            )
         } else {
             (file_path_for(&root, rel), file_path_for(&root, next_path))
         };
@@ -967,13 +1016,18 @@ fn copy_dir_recursive(source_dir: &str, dest_dir: &str) -> Result<()> {
 }
 
 fn read_directory(root: &str, relative_path: &str) -> Vec<TreeNode> {
-    let dir_path =
-        if relative_path.is_empty() { root.to_string() } else { join_path(&[root, relative_path]) };
+    let dir_path = if relative_path.is_empty() {
+        root.to_string()
+    } else {
+        join_path(&[root, relative_path])
+    };
 
-    let Ok(entries) = std::fs::read_dir(&dir_path) else { return Vec::new() };
+    let Ok(entries) = std::fs::read_dir(&dir_path) else {
+        return Vec::new();
+    };
 
     // Sorted, because `std::fs::read_dir` yields in directory order and the tree is
-    // compared in tests. The UI applies its own order on top (fileTreeOrder.js).
+    // compared in tests. The UI applies its own order on top (fileTreeOrder.ts).
     let mut sorted: BTreeMap<String, std::fs::DirEntry> = BTreeMap::new();
     for entry in entries.flatten() {
         sorted.insert(entry.file_name().to_string_lossy().to_string(), entry);
@@ -984,7 +1038,9 @@ fn read_directory(root: &str, relative_path: &str) -> Vec<TreeNode> {
         if name.is_empty() || name.starts_with('.') || name == ORDER_FILE {
             continue;
         }
-        let Ok(kind) = entry.file_type() else { continue };
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
 
         if kind.is_dir() {
             let folder_path = if relative_path.is_empty() {
@@ -999,7 +1055,9 @@ fn read_directory(root: &str, relative_path: &str) -> Vec<TreeNode> {
                 path: folder_path,
             });
         } else if kind.is_file() {
-            let Some(base_name) = name.strip_suffix(".json") else { continue };
+            let Some(base_name) = name.strip_suffix(".json") else {
+                continue;
+            };
             let file_path = if relative_path.is_empty() {
                 base_name.to_string()
             } else {

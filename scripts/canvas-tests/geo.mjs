@@ -1,5 +1,9 @@
+/**
+ * Viewport math: screen/world round trips, zooming about the cursor, zoom-to-fit, and
+ * rectangle hit tests.
+ */
 import { screenToWorld, worldToScreen, zoomAt, fitViewport, nodesBounds, panBy, clampZoom, rectFromPoints, rectsIntersect } from '../../src/lib/canvasGeometry.js'
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps
 
 // round-trip

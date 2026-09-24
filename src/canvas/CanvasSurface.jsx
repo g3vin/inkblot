@@ -242,6 +242,19 @@ export default function CanvasSurface({
     clear()
   }, [clear, dispatch, selectionRef])
 
+  /* ---------------- stacking ---------------- */
+
+  // Front and back only: the order is the z-order, and one step at a time is a
+  // distinction a board of loosely overlapping cards rarely needs.
+  const reorderSelection = useCallback(
+    (to) => {
+      const ids = [...selectionRef.current.nodes]
+      if (!ids.length) return
+      dispatch({ type: 'nodes/reorder', ids, to })
+    },
+    [dispatch, selectionRef]
+  )
+
   /* ---------------- colors ---------------- */
 
   // One action for the whole selection, so recoloring six cards is one undo step.
@@ -417,6 +430,7 @@ export default function CanvasSurface({
     groupSelection,
     locked,
     redo,
+    reorderSelection,
     selectAll,
     selectionRef,
     stateRef,
@@ -501,6 +515,7 @@ export default function CanvasSurface({
     onActivate,
     redo,
     resetZoom,
+    reorderSelection,
     screenToWorldAt,
     selectNode,
     stateRef,

@@ -1,33 +1,50 @@
 //! The bridge protocol: what a shell and the document surface say to each other.
 //!
-//! Inkblot's document surface is ProseMirror, and ProseMirror runs in a web view. That
-//! is true in the Tauri app today and it stays true under a Swift shell — the editor is
-//! the one part that does not go native. Everything else does, and this module is the
-//! contract between the two halves.
+//! Inkblot's document surface is ProseMirror, and ProseMirror runs in a web view under
+//! every shell. The chrome around it is either React (the Tauri app) or partly native
+//! (the Swift app), and this module is the contract between chrome and surface.
 //!
-//! **Why this is defined here, in Rust, rather than in either shell.** The same reason
-//! `types/` is: three languages, one definition, generated outwards. A protocol that
-//! lives in the TypeScript client is a protocol Swift can get wrong at runtime.
-//! `npm run types:check` is what makes that a build failure instead.
-//!
-//! **Why the React shell is refactored onto it before the Swift shell exists.** The
-//! protocol is a guess until something runs on it. Moving the existing React shell onto
-//! the bridge while both halves are still in one process turns every wrong guess into a
-//! failing test today, rather than into a puzzling silence in an Xcode debugger later —
-//! and it leaves the app shippable the whole way. The in-process transport in
-//! `src/bridge/` is the reference implementation the Swift side is written against.
+//! **Why it is defined here, in Rust, rather than in either shell.** Three languages,
+//! one definition, generated outwards (see the crate docs). A protocol that lived in
+//! the TypeScript client would be one Swift could get wrong at runtime;
+//! `npm run types:check` makes that a build failure instead. The React chrome runs on
+//! this protocol too, through the in-process transport in `src/bridge/`, so the test
+//! suites exercise every message the Swift app depends on.
 //!
 //! The layout:
 //!
 //! ```text
-//! common    EditorTarget, Pane, TextAnchor, MarkKind, Alignment, RangeEdit
-//!   -> command   NativeCommand    (shell -> webview)
-//!   -> event     WebviewEvent     (webview -> shell)
-//!   -> envelope  what goes on the wire, plus the request/reply pair
+//! common      EditorTarget, Pane, TextAnchor, MarkKind, Alignment, RangeEdit
+//!   -> command    NativeCommand    (shell -> webview)
+//!   -> event      WebviewEvent     (webview -> shell)
+//!   -> sidebar    the inspector's notes, clipboard, tiles and versions
+//!   -> workspace  tabs, the new-tab chooser, the sentence bubble
+//!   -> envelope   what goes on the wire, plus the request/reply pair
 //! ```
 //!
-//! **The one rule worth carrying out of here:** no message carries a bare ProseMirror
-//! position. See `TextAnchor`.
+//! **The one rule:** no message carries a bare ProseMirror position. See `TextAnchor`.
+//! `tests::only_set_caret_addresses_a_document_by_bare_position` enforces it.
+//!
+//! ## Adding a command or an event
+//!
+//! 1. Define a named payload struct (see `command.rs` for why it must be named), with
+//!    `#[typeshare]` and `#[serde(rename_all = "camelCase")]`, in the file for its
+//!    area, and add the variant to `NativeCommand` or `WebviewEvent`. An empty
+//!    payload still needs a struct (`NewTabCommand`): adjacent tagging sends one for
+//!    every variant.
+//! 2. Re-export it below, and add an instance to `every_command` / `every_event` and
+//!    its wire name to the matching test in `tests.rs`.
+//! 3. `npm run types` to regenerate the TypeScript and Swift.
+//! 4. Handle it on the webview side: a command in `src/bridge/surface.ts` (or a
+//!    delegate the app registers, for anything that changes what the app is showing);
+//!    an event is published through a `documentSurface.publish…` method.
+//! 5. Handle it in Swift (`native/…/Bridge/ShellBridge.swift` and whichever model owns
+//!    that state). The generated decoder uses `try?` per case, so a payload that
+//!    fails to decode drops the whole message; `ShellBridge` logs the raw JSON.
+//!
+//! A request (the shell asking and waiting for an answer) goes in `envelope.rs` as a
+//! `BridgeRequest`/`BridgeReply` pair. The surface always replies, with an error if it
+//! must: a shell waiting on an answer that never comes is a hang with no symptom.
 
 pub mod archive;
 pub mod bubble;
@@ -38,6 +55,7 @@ pub mod event;
 pub mod references;
 pub mod print;
 pub mod sidebar;
+pub mod workspace;
 
 pub use archive::{ArchiveAction, ArchiveActionCommand, ArchiveChanged, ArchivedItem, ArchivedKind};
 pub use bubble::{BubbleAside, BubbleChipRect, BubbleChipsChanged, BubbleForm, BubbleMode, BubbleSession, BubbleSessionOpened, BubbleWord, CloseBubbleSessionCommand};
@@ -82,6 +100,10 @@ pub use event::{
     ActiveEditorChanged, ActiveMarks, CanvasToolbarChanged, CanvasToolbarState, DocChanged, DragEnded, DragMoved, DragPayloadKind,
     DragStarted, FocusModeView, NoteMarkerEvent, NoteMarkerRect, NoteMarkersChanged, NotesRemapped, ProjectChanged, ReadAloudPayloadEvent,
     SearchMatches, SelectionContext, ToolbarState, ViewOptions, WebviewEvent, WordCountBadge, WordCountsChanged,
+};
+pub use workspace::{
+    CreateFromDraftCommand, DocTab, DraftKind, DraftPaneChanged, NewTabCommand,
+    OpenDocInTabCommand, ParseNode, SentenceParse, SentenceStructure, TabRef, TabsChanged,
 };
 
 #[cfg(test)]

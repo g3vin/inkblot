@@ -34,7 +34,9 @@ pub fn story_folder_presets() -> Vec<StoryFolderPreset> {
 }
 
 pub fn get_story_folder_preset_by_key(key: &str) -> Option<StoryFolderPreset> {
-    story_folder_presets().into_iter().find(|preset| preset.key == key)
+    story_folder_presets()
+        .into_iter()
+        .find(|preset| preset.key == key)
 }
 
 /// A preset matched by its own name or by one of its aliases.
@@ -45,7 +47,10 @@ pub fn get_story_folder_preset_by_name(name: &str) -> Option<StoryFolderPreset> 
 }
 
 fn segments(entry_path: &str) -> Vec<&str> {
-    entry_path.split('/').filter(|segment| !segment.is_empty()).collect()
+    entry_path
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect()
 }
 
 /// The preset for a tree entry: folders match by their own name, files by the nearest
@@ -90,7 +95,10 @@ pub fn get_story_folder_ancestor(entry_path: &str) -> Option<StoryFolderAncestor
 
     for index in (0..segments.len() - 1).rev() {
         if let Some(preset) = get_story_folder_preset_by_name(segments[index]) {
-            return Some(StoryFolderAncestor { preset, path: segments[..=index].join("/") });
+            return Some(StoryFolderAncestor {
+                preset,
+                path: segments[..=index].join("/"),
+            });
         }
     }
 
@@ -103,8 +111,14 @@ mod tests {
 
     #[test]
     fn an_alias_resolves_to_its_preset() {
-        assert_eq!(get_story_folder_preset_by_name("Book").unwrap().key, "novel");
-        assert_eq!(get_story_folder_preset_by_name("Novel").unwrap().key, "novel");
+        assert_eq!(
+            get_story_folder_preset_by_name("Book").unwrap().key,
+            "novel"
+        );
+        assert_eq!(
+            get_story_folder_preset_by_name("Novel").unwrap().key,
+            "novel"
+        );
         assert!(get_story_folder_preset_by_name("book").is_none());
     }
 
@@ -113,7 +127,12 @@ mod tests {
         let nearest = get_story_folder_preset_for_entry("Novel/Characters/Ada", "file").unwrap();
         assert_eq!(nearest.key, "characters");
         // A folder matches on its own name, not on its ancestors'.
-        assert_eq!(get_story_folder_preset_for_entry("Novel/Characters", "folder").unwrap().key, "characters");
+        assert_eq!(
+            get_story_folder_preset_for_entry("Novel/Characters", "folder")
+                .unwrap()
+                .key,
+            "characters"
+        );
         // A file named after a preset is still matched by where it lives.
         assert!(get_story_folder_preset_for_entry("Characters", "file").is_none());
     }

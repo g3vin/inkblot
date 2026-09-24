@@ -1,28 +1,22 @@
 /**
- * dragHandoff.ts — one owner for the drag that four components used to share through
- * `window`.
+ * dragHandoff.ts — the one owner of an in-app drag between components.
  *
- * **What this replaces.** A drag in Inkblot is started by one component and finished by
- * another, and the DOM's own drag events cannot carry the payload between them: a drag
- * from the clipboard panel into an editor has to survive a `dragstart` in one React
- * tree and a `drop` in a different one, and `dataTransfer` is unreadable during
- * `dragover` — which is exactly when the editor needs it to decide whether to show a
- * drop caret. So the state was parked on `window`, in four mutable variables that
- * `useEditorDnd`, `ClipboardPanel`, `EditorCanvas` and `Editor` all read and wrote.
+ * A drag in Inkblot is often started by one component and finished by another, and
+ * the DOM's own drag events cannot carry the payload between them: a drag from the
+ * clipboard panel into an editor has to survive a `dragstart` in one React tree and a
+ * `drop` in another, and `dataTransfer` is unreadable during `dragover` — exactly when
+ * the editor needs it to decide whether to show a drop caret. `useEditorDnd`,
+ * `ClipboardPanel`, `EditorCanvas` and `Editor` all share the session held here.
  *
- * That works precisely as long as everyone is in the same `window`. Under a Swift
- * shell the clipboard panel is an `NSView` and the editor is in a `WKWebView`, so
- * there is no shared global to park anything on — the hand-off has to be messages.
- * This module is the webview's half of that: one session at a time, a claim protocol
- * instead of a boolean, and every transition reported on the bridge.
+ * In the Swift shell the other end of a drag can be native (the clipboard panel is a
+ * SwiftUI view), so there is no shared object to park anything on and the hand-off has
+ * to be messages. This module is the webview's half: one session at a time, a claim
+ * protocol, and every transition reported on the bridge.
  *
- * **`claim()` is the part worth reading.** `window.__inkblot_dropHandled` was a flag
- * that each drop target set after handling a drop and every other target then checked,
- * which is a race dressed as a variable: two targets can see the same drop (an editor
- * and the clipboard panel underneath it), and correctness depended on them running in
- * an order nobody wrote down. `claim()` is test-and-set — the first caller gets `true`
- * and everyone after it gets `false` — so the arbitration is in one place and has an
- * answer even when the order changes.
+ * **`claim()` is test-and-set.** Two drop targets can see the same drop (an editor
+ * and the clipboard panel underneath it). The first caller gets `true` and everyone
+ * after it gets `false`, so which target handles the drop does not depend on the order
+ * their listeners happen to run in.
  */
 import { DragPayloadKind } from '../types'
 import type { DragEnded, DragMoved, DragStarted, TextAnchor } from '../types'

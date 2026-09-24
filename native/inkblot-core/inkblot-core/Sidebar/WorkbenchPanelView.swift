@@ -81,7 +81,7 @@ private struct TileCard: View {
 /* ---------------- parts of speech ---------------- */
 
 /// Tagged with the system's own tagger rather than a bundled NLP library — and mapped
-/// onto the same ten categories and colours the page's tile used.
+/// onto the same ten categories and colours as the page's tile.
 struct PartsOfSpeechView: View {
     let sentence: String
 
@@ -142,7 +142,7 @@ struct PartsOfSpeechView: View {
 
 /* ---------------- definition ---------------- */
 
-/// The first sense from the same free dictionary API the page's tile used, so the two
+/// The first sense from the same free dictionary API as the page's tile, so the two
 /// shells define a word the same way.
 struct DefinitionView: View {
     let word: String
@@ -198,14 +198,26 @@ struct SynonymsView: View {
     @State private var state: WordListState = .loading
 
     var body: some View {
-        WordListView(tile: tile, state: state, emptyText: "No synonyms found.")
-            .task(id: tile.text) {
-                do {
-                    state = .words(try await model.language.synonyms(for: tile.text))
-                } catch {
-                    state = .failed(error.localizedDescription)
-                }
+        WordListView(tile: tile, state: state, emptyText: "No synonyms found.") {
+            state = .loading
+            do {
+                try await model.language.downloadSynonymModel()
+                await load()
+            } catch {
+                state = .failed(error.localizedDescription)
             }
+        }
+        .task(id: tile.text) { await load() }
+    }
+
+    private func load() async {
+        do {
+            state = .words(try await model.language.synonyms(for: tile.text))
+        } catch let missing as LanguageServices.NotInstalled {
+            state = .needsDownload(missing.localizedDescription)
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
     }
 }
 
@@ -230,6 +242,8 @@ enum WordListState {
     case loading
     case words([String])
     case failed(String)
+    /// The model is not installed; the message says what the download is.
+    case needsDownload(String)
 }
 
 /// Words that can replace the tile's word: a click replaces it in the document (the
@@ -239,6 +253,8 @@ private struct WordListView: View {
     let tile: WorkbenchTile
     let state: WordListState
     let emptyText: String
+    /// What the Download button does, for a tile whose model can be fetched.
+    var download: (() async -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -253,6 +269,12 @@ private struct WordListView: View {
                 ProgressView().controlSize(.small)
             case .failed(let message):
                 Text(message).font(.callout).foregroundStyle(.secondary)
+            case .needsDownload(let message):
+                Text(message).font(.callout).foregroundStyle(.secondary)
+                if let download {
+                    Button("Download") { Task { await download() } }
+                        .controlSize(.small)
+                }
             case .words(let words) where words.isEmpty:
                 Text(emptyText).font(.callout).foregroundStyle(.secondary)
             case .words(let words):

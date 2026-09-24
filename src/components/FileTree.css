@@ -449,8 +449,7 @@
 }
 
 /* Columns follow the actual tab count (set by SidebarTabs) rather than a fixed
-   number — hardcoding it left a phantom empty column when Search stopped being
-   a tab, and the strip no longer spread across the sidebar. */
+   number, so the strip always spans the sidebar. */
 .sidebar-tabs {
   position: relative;
   display: grid;

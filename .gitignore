@@ -1,40 +1,25 @@
-# NLP model artifacts.
-#
-# The synonym model is no longer fetched into public/ at build time — Rust downloads
-# it on first use into the app data directory (see src-tauri/src/synonym_commands.rs),
-# so nothing model-shaped should appear in the repo at all.
+# Models download at runtime into the app data directory; none belong in the repo.
 *.onnx
 *.onnx.data
 *.onnx.tmp
 
-# Node / Vite / editor files (keep common defaults)
+# Node / Vite
 node_modules/
 dist/
+dist-ssr/
 /.cache
-.DS_Store
+*.local
+
 # Logs
 logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
+# Editors and OS
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
 *.sw?
 
 # Claude Code local settings and agent worktrees

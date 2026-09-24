@@ -1,3 +1,5 @@
+#if os(macOS)
+import AppKit
 import SwiftUI
 
 /// The window: the native file tree, the document surface under a native toolbar, and
@@ -56,6 +58,7 @@ struct ContentView: View {
         } detail: {
             EditorWebView(controller: model.web, onLiveResizeEnd: publishPanelInsets)
                 .overlay {
+                    WorkspaceOverlay()
                     WordCountBadges()
                     PrintLayoutControls()
                     NotePreviewOverlay()
@@ -232,3 +235,4 @@ private final class PanelInsetsBox {
     /// What SwiftUI last reported, which during a window resize the page is not sent.
     var measured = EdgeInsets()
 }
+#endif

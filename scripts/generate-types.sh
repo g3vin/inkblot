@@ -32,12 +32,13 @@ generate() {
   typeshare "$crate/src" --lang=swift --config-file="$crate/typeshare.toml" --output-file="$swift"
 }
 
-# Typecheck the Swift. `npm run typecheck` covers the TypeScript; nothing else looks
-# at the Swift until the Phase 5 Xcode target exists, which is much too late to find
-# out that a Rust type generates something Swift will not accept.
+# Typecheck the Swift on its own, so a Rust type that generates something Swift will
+# not accept fails here rather than in the next Xcode build. `npm run typecheck`
+# covers the TypeScript.
 #
-# AnyCodable is stubbed because the real one comes from a package the Xcode target
-# will add. Skipped where swiftc is absent, so this still runs on Linux.
+# AnyCodable is stubbed so this needs neither Xcode nor the app target (the app
+# defines the real one in Support/AnyCodable.swift). Skipped where swiftc is absent,
+# so this still runs on Linux.
 check_swift() {
   local swift="$1"
   if ! command -v swiftc >/dev/null 2>&1; then

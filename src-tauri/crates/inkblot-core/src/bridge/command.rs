@@ -23,6 +23,7 @@ use super::sidebar::{
     RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
     TileRef, UpdateNoteCommand, VersionActionCommand,
 };
+use super::workspace::{CreateFromDraftCommand, NewTabCommand, OpenDocInTabCommand, TabRef};
 use crate::types::note::Note;
 use super::print::{
     ExportDocumentCommand, GoToPageCommand, InsertBreakCommand, PrintDocumentCommand,
@@ -57,11 +58,10 @@ pub struct SetColorCommand {
 
 /// Set the highlight color, and say what the remembered color becomes.
 ///
-/// This is sharp edge #1's second half. `Toolbar.jsx:240` writes the chosen color to
-/// `editor.storage.lastHighlightColor` and `contextMenu/editorMenu.js:78` reads it
-/// back — shared mutable state on a live editor object, reachable from both sides of
-/// a seam that does not exist yet. The value is part of the protocol instead: the
-/// command says what to remember, and `ToolbarState` reports it back.
+/// The remembered highlight color is protocol state rather than state on a live
+/// editor object, because both the toolbar and the context menu need it and either
+/// may be native: the command says what to remember, and `ToolbarState` reports it
+/// back.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -194,7 +194,7 @@ pub struct SetCaretAtDocPosCommand {
 
 /// One transcript from the speech engine.
 ///
-/// Sharp edge #2 is why this is so thin. `DictationControl.replaceInlineDraft` is a
+/// Deliberately thin. `DictationControl.replaceInlineDraft` is a
 /// read-modify-write at speaking rate: it reads the text the draft range currently
 /// covers, diffs the common prefix and suffix against the new transcript, and
 /// dispatches the changed slice plus its decoration in a single transaction. Asking
@@ -243,11 +243,10 @@ pub struct SyncNotesCommand {
 
 /// Run a command on the canvas the user aimed at.
 ///
-/// `surface_id` is how a command finds one canvas when split view is showing two. In
-/// the React shell the aiming is done by hit-testing the DOM for a `.canvas-surface`
-/// and dispatching on that element (`canvasEvents.js`); native cannot hit-test the
-/// webview's DOM, so the id is assigned by the webview when a surface mounts and
-/// reported with `activeEditorChanged`.
+/// `surface_id` is how a command finds one canvas when split view is showing two. The
+/// page aims by hit-testing the DOM for a `.canvas-surface` (`canvasEvents.js`); a
+/// native shell cannot hit-test the webview's DOM, so the id is assigned by the
+/// webview when a surface mounts and reported with `activeEditorChanged`.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -257,7 +256,7 @@ pub struct CanvasCommandRequest {
     pub command: String,
     /// Command-specific arguments. Untyped because this is the one place the vocabulary
     /// is still open — the canvas menu grows items faster than the protocol should
-    /// churn. Everything a native shell sends today is a name and at most a node id.
+    /// churn. What the native shell sends is a name and at most a node id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<JsonValue>,
 }
@@ -313,8 +312,7 @@ pub struct CanvasRestoreCommand {
 ///
 /// This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
 /// webview: `WKWebView` cannot read the clipboard without a user gesture inside the
-/// page, and the menu item is not one. It replaces `__inkblot_forcePlainPaste`, a flag
-/// that was read and never set.
+/// page, and the menu item is not one.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -582,4 +580,10 @@ pub enum NativeCommand {
     PrintDocument(PrintDocumentCommand),
     ExportDocument(ExportDocumentCommand),
     PrintFinished(PrintFinishedCommand),
+    /// The tab dock and the new-tab chooser, drawn by the shell (see `workspace.rs`).
+    SelectTab(TabRef),
+    CloseTab(TabRef),
+    NewTab(NewTabCommand),
+    OpenDocInTab(OpenDocInTabCommand),
+    CreateFromDraft(CreateFromDraftCommand),
 }

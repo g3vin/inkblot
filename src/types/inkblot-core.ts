@@ -5,17 +5,14 @@
 /**
  * Which editor a message concerns.
  * 
- * This is sharp edge #5 made explicit. Today the active editor is elected by mouse
- * movement over a pane, and the winner is a live TipTap object passed around by
- * reference — `EditorLayout` reads `__inkblotCanvasCard` off it to tell the third
- * state apart. An object reference cannot cross a process boundary, so the election
- * result has to be a *name*, and the three names are these.
+ * The active editor is elected by mouse movement over a pane. An object reference
+ * cannot cross a process boundary, so the election result is a *name*, and the
+ * webview's `editorRegistry` turns a name back into a live editor.
  * 
  * `CanvasCard` is the third state: a canvas card opened for editing holds the only
  * live editor on that pane, and the pane's own two TipTap instances sit idle holding
  * no document. A toolbar pointed at `Primary` while a card is being edited would be
- * driving an empty editor, which is exactly the bug the `__inkblotCanvasCard` gate
- * exists to prevent.
+ * driving an empty editor.
  */
 export enum EditorTarget {
 	Primary = "primary",
@@ -27,7 +24,7 @@ export enum EditorTarget {
 /**
  * The active editor election changed.
  * 
- * **Sharp edge #5.** The election is driven by mouse movement over a pane, which is a
+ * The election is driven by mouse movement over a pane, which is a
  * webview-side fact, so the webview stays the returning officer and reports the
  * result. `surface_id` is set when the winner is a canvas card, and it is what lets a
  * native canvas command find the right surface when split view shows two.
@@ -84,9 +81,8 @@ export interface AddReplyCommand {
 /**
  * The marks the toolbar can toggle.
  * 
- * A closed set rather than a string because the toolbar is going native: a Swift
- * button sending `"bolb"` should not compile, and an enum is what makes that true in
- * all three languages at once.
+ * A closed set rather than a string: a Swift menu item sending `"bolb"` should not
+ * compile, and an enum is what makes that true in all three languages at once.
  */
 export enum MarkKind {
 	Bold = "bold",
@@ -466,11 +462,10 @@ export interface BubbleSessionOpened {
 /**
  * Run a command on the canvas the user aimed at.
  * 
- * `surface_id` is how a command finds one canvas when split view is showing two. In
- * the React shell the aiming is done by hit-testing the DOM for a `.canvas-surface`
- * and dispatching on that element (`canvasEvents.js`); native cannot hit-test the
- * webview's DOM, so the id is assigned by the webview when a surface mounts and
- * reported with `activeEditorChanged`.
+ * `surface_id` is how a command finds one canvas when split view is showing two. The
+ * page aims by hit-testing the DOM for a `.canvas-surface` (`canvasEvents.js`); a
+ * native shell cannot hit-test the webview's DOM, so the id is assigned by the
+ * webview when a surface mounts and reported with `activeEditorChanged`.
  */
 export interface CanvasCommandRequest {
 	surfaceId: string;
@@ -479,7 +474,7 @@ export interface CanvasCommandRequest {
 	/**
 	 * Command-specific arguments. Untyped because this is the one place the vocabulary
 	 * is still open — the canvas menu grows items faster than the protocol should
-	 * churn. Everything a native shell sends today is a name and at most a node id.
+	 * churn. What the native shell sends is a name and at most a node id.
 	 */
 	detail?: unknown;
 }
@@ -720,8 +715,7 @@ export interface ClipboardChanged {
  * Text dropped on the shell's clipboard panel.
  * 
  * If it is the selection the user is dragging out of an editor, the page removes it
- * from the document — dropping a selection on the clipboard is a move, as it always
- * was. The page decides that, because only the page knows what is being dragged.
+ * from the document — dropping a selection on the clipboard is a move. The page decides that, because only the page knows what is being dragged.
  */
 export interface ClipboardDropCommand {
 	text: string;
@@ -825,7 +819,13 @@ export type NativeCommand =
 	| { type: "goToPage", payload: GoToPageCommand }
 	| { type: "printDocument", payload: PrintDocumentCommand }
 	| { type: "exportDocument", payload: ExportDocumentCommand }
-	| { type: "printFinished", payload: PrintFinishedCommand };
+	| { type: "printFinished", payload: PrintFinishedCommand }
+	/** The tab dock and the new-tab chooser, drawn by the shell (see `workspace.rs`). */
+	| { type: "selectTab", payload: TabRef }
+	| { type: "closeTab", payload: TabRef }
+	| { type: "newTab", payload: NewTabCommand }
+	| { type: "openDocInTab", payload: OpenDocInTabCommand }
+	| { type: "createFromDraft", payload: CreateFromDraftCommand };
 
 /**
  * A command, with its place in the stream.
@@ -878,6 +878,21 @@ export interface CreateEntryCommand {
 	kind: EntryKind;
 }
 
+export enum DraftKind {
+	Doc = "doc",
+	Canvas = "canvas",
+}
+
+/**
+ * Make the draft into a document. The page checks the name and makes the file; the
+ * answer is the next `DraftPaneChanged` — gone if it worked, with a status if not.
+ */
+export interface CreateFromDraftCommand {
+	tabId: string;
+	name: string;
+	kind: DraftKind;
+}
+
 /** A new, empty source of a kind, for entering by hand. */
 export interface CreateReferenceCommand {
 	id: string;
@@ -907,7 +922,7 @@ export interface DictationLevelCommand {
 /**
  * One transcript from the speech engine.
  * 
- * Sharp edge #2 is why this is so thin. `DictationControl.replaceInlineDraft` is a
+ * Deliberately thin. `DictationControl.replaceInlineDraft` is a
  * read-modify-write at speaking rate: it reads the text the draft range currently
  * covers, diffs the common prefix and suffix against the new transcript, and
  * dispatches the changed slice plus its decoration in a single transaction. Asking
@@ -1004,6 +1019,15 @@ export interface DocChanged {
 	charCount: number;
 }
 
+/** One open tab: a document, or a draft that has not decided what it is yet. */
+export interface DocTab {
+	id: string;
+	/** `None` for a draft. */
+	docPath?: string;
+	/** Opened by a single click and replaced by the next one, until it is edited. */
+	ephemeral?: boolean;
+}
+
 /**
  * A document's part of the references. The sources, and which documents each is
  * attached to, are the project's (`.inkblot-references.json`).
@@ -1020,15 +1044,34 @@ export interface DocumentText {
 	text: string;
 }
 
+export interface Rect {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+/**
+ * Where the chooser goes, or that it is gone. The page keeps the pane itself (a draft
+ * holds the pane open, and a split stays up around it) and reports its rectangle, in
+ * the web view's coordinates, for the shell to draw into.
+ */
+export interface DraftPaneChanged {
+	/** The draft being shown; `None` when no draft is. */
+	tabId?: string;
+	rect?: Rect;
+	/** Why the last attempt was refused ("A document with that name already exists."). */
+	status?: string;
+	creating?: boolean;
+}
+
 /**
  * The drag ended — however it ended.
  * 
- * `handled` is the one that used to be `__inkblot_dropHandled`, and it is a
- * *report*, not a negotiation: whichever drop target accepted the payload says so
- * when it does, and this event carries the final answer so the source knows whether
- * to remove what it was dragging. Two targets can see the same drop (an editor and
- * the clipboard panel underneath it); the first to claim it wins, which is what the
- * flag arbitrated before.
+ * `handled` is a *report*, not a negotiation: whichever drop target accepted the
+ * payload says so when it does, and this event carries the final answer so the source
+ * knows whether to remove what it was dragging. Two targets can see the same drop (an
+ * editor and the clipboard panel underneath it); the first to claim it wins.
  */
 export interface DragEnded {
 	dragId: string;
@@ -1041,7 +1084,7 @@ export interface DragEnded {
  * The pointer moved during a drag.
  * 
  * Carried explicitly because the DOM's own drag events do not reliably give a
- * position — which is why `__inkblot_dragPoint` existed. Coalesced to one per frame
+ * position. Coalesced to one per frame
  * by the sender, like `notesRemapped`, and for the same reason: only the last one
  * means anything.
  */
@@ -1054,13 +1097,11 @@ export interface DragMoved {
 /**
  * What is being dragged.
  * 
- * This is what replaces the `window.__inkblot_*` globals. They are six mutable
- * variables on `window` that four unrelated components read and write to coordinate
- * one drag — the clipboard panel writes what it picked up, the editor reads it on
- * drop and writes back whether it handled it, and the last pointer position is parked
- * there because the HTML5 drag events do not carry a usable one. None of that
- * survives a process boundary: `window` is the webview's, and a native drag source is
- * not in it.
+ * A drag in Inkblot often starts in one component and ends in another — the
+ * clipboard panel, an editor pane, a canvas — and in the Swift app one end can be
+ * native. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
+ * hand-off, so nothing about a drag depends on shared state in the webview's
+ * `window`. The webview side is `src/bridge/dragHandoff.ts`.
  */
 export enum DragPayloadKind {
 	/** A selection dragged out of an editor. */
@@ -1076,7 +1117,6 @@ export enum DragPayloadKind {
 /**
  * A place in a document, as the protocol carries it.
  * 
- * **This is the one type sharp edge #3 is about, so it is worth reading the reason.**
  * A ProseMirror position is an index into a document that every edit invalidates.
  * In one process that is survivable: the holder maps its positions through each
  * transaction's mapping and is never more than a tick out of date. Across a process
@@ -1086,9 +1126,8 @@ export enum DragPayloadKind {
  * 
  * So nothing in this protocol carries a bare position. Everything carries the text
  * the position was resolved from as well, and the webview re-resolves by that text
- * when the positions no longer cover it. Two places in the React shell already do
- * exactly this dance by hand (`EditorLayout.jsx:291-304`, `Workbench.jsx:40-64`);
- * this type is that dance promoted to the protocol.
+ * when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
+ * or reports it gone when the text is.
  * 
  * `from` and `to` are **UTF-16 code units**, like every other offset in this
  * codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
@@ -1203,7 +1242,11 @@ export type WebviewEvent =
 	 */
 	| { type: "wordCountsChanged", payload: WordCountsChanged }
 	| { type: "pageLayoutState", payload: PageLayoutState }
-	| { type: "printRequest", payload: PrintRequest };
+	| { type: "printRequest", payload: PrintRequest }
+	/** The tab dock, the new-tab chooser and the sentence bubble (see `workspace.rs`). */
+	| { type: "tabsChanged", payload: TabsChanged }
+	| { type: "draftPaneChanged", payload: DraftPaneChanged }
+	| { type: "sentenceStructure", payload: SentenceStructure };
 
 export interface EventEnvelope {
 	seq: number;
@@ -1238,11 +1281,10 @@ export interface ExportDocumentCommand {
 /**
  * What focus mode is showing.
  * 
- * `FocusModeOverlay` re-derives this from the full document on every transaction, and
- * the handoff flags that as the cost to watch: at a keystroke's rate this is the
- * largest payload on the bridge. It stays in the webview in Phase 5 for exactly that
- * reason, and this event exists so a native shell can mirror the *state* — which
- * paragraph, how far through — without receiving the text.
+ * `FocusModeOverlay` re-derives its view from the full document on every
+ * transaction; sent at a keystroke's rate, the text would be the largest payload on
+ * the bridge. So the overlay stays in the webview, and this event lets a native shell
+ * mirror the *state* — which paragraph, how far through — without receiving the text.
  */
 export interface FocusModeView {
 	active: boolean;
@@ -1293,8 +1335,8 @@ export interface InsertCitationCommand {
 }
 
 /**
- * Insert an entry at the caret of an editor, and take it off the history — what
- * dragging a tile into the editor did.
+ * Insert an entry at the caret of an editor, and take it off the history, as dragging a
+ * tile into the editor does.
  */
 export interface InsertClipboardEntryCommand {
 	id: string;
@@ -1307,8 +1349,7 @@ export interface InsertClipboardEntryCommand {
  * 
  * This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
  * webview: `WKWebView` cannot read the clipboard without a user gesture inside the
- * page, and the menu item is not one. It replaces `__inkblot_forcePlainPaste`, a flag
- * that was read and never set.
+ * page, and the menu item is not one.
  */
 export interface InsertPlainTextCommand {
 	target: EditorTarget;
@@ -1642,6 +1683,13 @@ export interface MoveEntryCommand {
 	targetFolder: string;
 }
 
+/**
+ * Open a draft tab, as the dock's `+` does. Nothing to say, but adjacent tagging
+ * wants a payload, so it is an empty object.
+ */
+export interface NewTabCommand {
+}
+
 export enum NoteType {
 	/** Anchored to a text range in the document. */
 	Quote = "quote",
@@ -1706,9 +1754,8 @@ export interface Note {
  * The pointer entered, left, or clicked a note marker in the document.
  * 
  * `anchor_rect` is in client coordinates *inside the webview*, so a native shell must
- * offset it by the web view's frame. This is the event that `NoteAnnotation.js:155`
- * currently ships a live `EditorView` object in — an object, over an event, to a
- * listener in the same process. That field is gone: nothing here is a reference.
+ * offset it by the web view's frame. Nothing here is an object reference: every
+ * field survives serialization.
  */
 export interface NoteMarkerEvent {
 	noteId: string;
@@ -1784,8 +1831,8 @@ export interface NotesChanged {
 /**
  * Note anchors after a remap.
  * 
- * **Sharp edge #4.** `useEditorNotes` remaps on every transaction — every keystroke
- * in a document with quote notes — and native is holding those positions. Two things
+ * `useEditorNotes` remaps on every transaction — every keystroke in a document with
+ * quote notes — and the shell holds those positions. Two things
  * keep that off the bridge's back:
  * 
  * 1. The event is coalesced to one per frame by the sender. Sending per transaction
@@ -1804,6 +1851,11 @@ export interface NotesRemapped {
 	 * can tell "deleted" from "never sent".
 	 */
 	droppedNoteIds: string[];
+}
+
+/** Open a document in a tab of its own — a document dropped on the dock. */
+export interface OpenDocInTabCommand {
+	docPath: string;
 }
 
 export interface OpenDocumentCommand {
@@ -1868,6 +1920,15 @@ export interface PageLayoutState {
 	signatureAdvice: SignatureAdvice[];
 }
 
+/**
+ * A node of a parse: a phrase with children, or a leaf (a part-of-speech tag, or a
+ * word) with none.
+ */
+export interface ParseNode {
+	label: string;
+	children?: ParseNode[];
+}
+
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
 export interface PrintDocumentCommand {
 	scope: PrintScope;
@@ -1896,7 +1957,7 @@ export interface PrintRequest {
 /**
  * The project the webview has open changed.
  * 
- * The project picker and its session restore are still in the webview, and the
+ * The project picker and its session restore are in the webview, and the
  * native sidebar has to show the tree of whatever project that is. `None` is the
  * landing screen: no project is open.
  */
@@ -1974,13 +2035,6 @@ export interface ReadAloudQuery {
 	target?: EditorTarget;
 	/** Read only the selection rather than the whole document. */
 	selectionOnly: boolean;
-}
-
-export interface Rect {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
 }
 
 export enum ReferenceStatus {
@@ -2298,8 +2352,7 @@ export interface SearchMatches {
 /** The scopes, in the order they appear in the bar. */
 export enum SearchScope {
 	/**
-	 * The default, and what the bar did before it could search: filter whatever panel
-	 * is showing. Every other scope searches content and shows its own results, so the
+	 * The default: filter whatever panel is showing. Every other scope searches content and shows its own results, so the
 	 * panel underneath is left unfiltered.
 	 */
 	Panel = "panel",
@@ -2318,7 +2371,7 @@ export interface SearchScopeInfo {
 /**
  * Everything a context menu needs to build itself, resolved in one read.
  * 
- * Phase 5 needs this as a *request*, not a push: the menu is built when the user
+ * A native context menu needs this as a *request*, not a push: the menu is built when the user
  * right-clicks, and it must be built from the selection as it is at that moment. It
  * is also pushed on selection change, because a native shell wants to enable and
  * disable menu bar items without asking.
@@ -2342,6 +2395,26 @@ export interface SelectionContext {
 	touchesHighlight: boolean;
 	/** True when the pane is showing a canvas. The editor items do not apply. */
 	isCanvas: boolean;
+}
+
+/**
+ * One way the sentence parses, and the grammar's score for it — higher is likelier.
+ * Not a probability: the parser mixes products and log-sums, so it is only good for
+ * ordering.
+ */
+export interface SentenceParse {
+	score: number;
+	tree: ParseNode;
+}
+
+/**
+ * "Open Analytic Bubble" was chosen: the sentence, its best parses, and where the
+ * right-click was, in the web view's coordinates.
+ */
+export interface SentenceStructure {
+	sentence: string;
+	parses: SentenceParse[];
+	anchor?: Rect;
 }
 
 /** Text alignment, as the toolbar offers it. */
@@ -2472,11 +2545,10 @@ export interface SetFontSizeCommand {
 /**
  * Set the highlight color, and say what the remembered color becomes.
  * 
- * This is sharp edge #1's second half. `Toolbar.jsx:240` writes the chosen color to
- * `editor.storage.lastHighlightColor` and `contextMenu/editorMenu.js:78` reads it
- * back — shared mutable state on a live editor object, reachable from both sides of
- * a seam that does not exist yet. The value is part of the protocol instead: the
- * command says what to remember, and `ToolbarState` reports it back.
+ * The remembered highlight color is protocol state rather than state on a live
+ * editor object, because both the toolbar and the context menu need it and either
+ * may be native: the command says what to remember, and `ToolbarState` reports it
+ * back.
  */
 export interface SetHighlightCommand {
 	target: EditorTarget;
@@ -2575,7 +2647,7 @@ export enum SidebarTab {
 
 /**
  * The page wants a sidebar tab shown — "Add note", "Open Version History", a new
- * workbench tile. The shell owns the sidebar now, so the page asks rather than opens.
+ * workbench tile. When the shell draws the sidebar, the page asks rather than opens.
  */
 export interface ShowSidebarTab {
 	tab: SidebarTab;
@@ -2611,6 +2683,23 @@ export interface SyncNotesCommand {
 	notes: Note[];
 }
 
+export interface TabRef {
+	tabId: string;
+}
+
+/** Everything the dock draws. Sent whole whenever any of it changes. */
+export interface TabsChanged {
+	tabs: DocTab[];
+	activeTabId?: string;
+	/**
+	 * The documents in the two panes — a tab showing one of these keeps its name
+	 * visible in the collapsed dock.
+	 */
+	currentDoc?: string;
+	secondaryDoc?: string;
+	split: boolean;
+}
+
 /** A command aimed at an editor with nothing else to say. */
 export interface TargetOnly {
 	target: EditorTarget;
@@ -2631,7 +2720,7 @@ export enum VersionKind {
  * The two kinds also live in different places. A text document embeds its
  * `versions` array in its own file; a canvas keeps history in a `.versions/`
  * sidecar, because a canvas file must stay spec-shaped JSON Canvas so it round-trips
- * with Obsidian. The sidecar is also the legacy fallback for old text documents.
+ * with Obsidian. The sidecar is also read for text documents that have no embedded history.
  */
 export interface VersionEntry {
 	id: string;
@@ -2727,14 +2816,11 @@ export interface ToggleListCommand {
 /**
  * The formatting at the selection, pushed.
  * 
- * **Sharp edge #1.** `Toolbar.jsx:102-145` pulls this today: on every
- * `selectionUpdate` it reaches into the live editor and reads about ten facts —
- * text-style attributes, four mark states resolved against the adjacent text node
- * when the selection is collapsed, the alignment of whichever of three node kinds is
- * selected. All of it is synchronous, and none of it survives a process boundary.
- * 
- * So the direction inverts: the webview does the reading, once per animation frame,
- * and sends the answer. A native toolbar renders this struct and never asks a
+ * Reading it takes about ten synchronous facts off the live editor — text-style
+ * attributes, four mark states resolved against the adjacent text node when the
+ * selection is collapsed, the alignment of whichever of three node kinds is selected
+ * — so the webview does the reading (`src/bridge/readState.ts`), once per animation
+ * frame, and sends the answer. A toolbar renders this struct and never asks a
  * question. The frame coalescing is not an optimization — `selectionUpdate` fires on
  * every cursor move, including every keystroke.
  */

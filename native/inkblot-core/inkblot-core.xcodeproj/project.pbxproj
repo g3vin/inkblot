@@ -18,20 +18,12 @@
 			remoteGlobalIDString = 86C99E9D3062ED9D00A74B69;
 			remoteInfo = "inkblot-core";
 		};
-		86C99EB63062ED9E00A74B69 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 86C99E963062ED9D00A74B69 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 86C99E9D3062ED9D00A74B69;
-			remoteInfo = "inkblot-core";
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		1F0A5C0000000000000000A2 /* InkblotFFI.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = InkblotFFI.xcframework; path = ../build/InkblotFFI.xcframework; sourceTree = SOURCE_ROOT; };
 		86C99E9E3062ED9D00A74B69 /* inkblot-core.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "inkblot-core.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		86C99EAB3062ED9E00A74B69 /* inkblot-coreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "inkblot-coreTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		86C99EB53062ED9E00A74B69 /* inkblot-coreUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "inkblot-coreUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -43,11 +35,6 @@
 		86C99EAE3062ED9E00A74B69 /* inkblot-coreTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "inkblot-coreTests";
-			sourceTree = "<group>";
-		};
-		86C99EB83062ED9E00A74B69 /* inkblot-coreUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "inkblot-coreUITests";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -68,13 +55,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		86C99EB23062ED9E00A74B69 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -83,7 +63,6 @@
 			children = (
 				86C99EA03062ED9D00A74B69 /* inkblot-core */,
 				86C99EAE3062ED9E00A74B69 /* inkblot-coreTests */,
-				86C99EB83062ED9E00A74B69 /* inkblot-coreUITests */,
 				1F0A5C0000000000000000A2 /* InkblotFFI.xcframework */,
 				86C99E9F3062ED9D00A74B69 /* Products */,
 			);
@@ -94,7 +73,6 @@
 			children = (
 				86C99E9E3062ED9D00A74B69 /* inkblot-core.app */,
 				86C99EAB3062ED9E00A74B69 /* inkblot-coreTests.xctest */,
-				86C99EB53062ED9E00A74B69 /* inkblot-coreUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -148,29 +126,6 @@
 			productReference = 86C99EAB3062ED9E00A74B69 /* inkblot-coreTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		86C99EB43062ED9E00A74B69 /* inkblot-coreUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 86C99EC53062ED9E00A74B69 /* Build configuration list for PBXNativeTarget "inkblot-coreUITests" */;
-			buildPhases = (
-				86C99EB13062ED9E00A74B69 /* Sources */,
-				86C99EB23062ED9E00A74B69 /* Frameworks */,
-				86C99EB33062ED9E00A74B69 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				86C99EB73062ED9E00A74B69 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				86C99EB83062ED9E00A74B69 /* inkblot-coreUITests */,
-			);
-			name = "inkblot-coreUITests";
-			packageProductDependencies = (
-			);
-			productName = "inkblot-coreUITests";
-			productReference = 86C99EB53062ED9E00A74B69 /* inkblot-coreUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -185,10 +140,6 @@
 						CreatedOnToolsVersion = 26.4.1;
 					};
 					86C99EAA3062ED9E00A74B69 = {
-						CreatedOnToolsVersion = 26.4.1;
-						TestTargetID = 86C99E9D3062ED9D00A74B69;
-					};
-					86C99EB43062ED9E00A74B69 = {
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = 86C99E9D3062ED9D00A74B69;
 					};
@@ -210,7 +161,6 @@
 			targets = (
 				86C99E9D3062ED9D00A74B69 /* inkblot-core */,
 				86C99EAA3062ED9E00A74B69 /* inkblot-coreTests */,
-				86C99EB43062ED9E00A74B69 /* inkblot-coreUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -224,13 +174,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		86C99EA93062ED9E00A74B69 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		86C99EB33062ED9E00A74B69 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -277,13 +220,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		86C99EB13062ED9E00A74B69 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -291,11 +227,6 @@
 			isa = PBXTargetDependency;
 			target = 86C99E9D3062ED9D00A74B69 /* inkblot-core */;
 			targetProxy = 86C99EAC3062ED9E00A74B69 /* PBXContainerItemProxy */;
-		};
-		86C99EB73062ED9E00A74B69 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 86C99E9D3062ED9D00A74B69 /* inkblot-core */;
-			targetProxy = 86C99EB63062ED9E00A74B69 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -421,13 +352,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Inkblot.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Inkblot.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5CGUJN26DB;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Inkblot;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -453,20 +385,30 @@
 					"-framework",
 					CoreGraphics,
 					"-liconv",
+					"-lc++",
+					"-framework",
+					Accelerate,
+					"-framework",
+					Metal,
+					"-framework",
+					MetalKit,
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "soupyorangecat.inkblot-core";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
-				SDKROOT = macosx;
+				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.4;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -475,13 +417,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Inkblot.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Inkblot.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5CGUJN26DB;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Inkblot;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -507,20 +450,30 @@
 					"-framework",
 					CoreGraphics,
 					"-liconv",
+					"-lc++",
+					"-framework",
+					Accelerate,
+					"-framework",
+					Metal,
+					"-framework",
+					MetalKit,
+					"-framework",
+					AudioToolbox,
+					"-framework",
+					CoreAudio,
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "soupyorangecat.inkblot-core";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
-				SDKROOT = macosx;
+				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.4;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -539,14 +492,13 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/inkblot-core.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/inkblot-core";
-				XROS_DEPLOYMENT_TARGET = 26.4;
 			};
 			name = Debug;
 		};
@@ -565,64 +517,13 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/inkblot-core.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/inkblot-core";
-				XROS_DEPLOYMENT_TARGET = 26.4;
-			};
-			name = Release;
-		};
-		86C99EC63062ED9E00A74B69 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5CGUJN26DB;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
-				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "soupyorangecat.inkblot-coreUITests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = "inkblot-core";
-				XROS_DEPLOYMENT_TARGET = 26.4;
-			};
-			name = Debug;
-		};
-		86C99EC73062ED9E00A74B69 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5CGUJN26DB;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
-				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "soupyorangecat.inkblot-coreUITests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = "inkblot-core";
-				XROS_DEPLOYMENT_TARGET = 26.4;
 			};
 			name = Release;
 		};
@@ -652,15 +553,6 @@
 			buildConfigurations = (
 				86C99EC33062ED9E00A74B69 /* Debug */,
 				86C99EC43062ED9E00A74B69 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		86C99EC53062ED9E00A74B69 /* Build configuration list for PBXNativeTarget "inkblot-coreUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				86C99EC63062ED9E00A74B69 /* Debug */,
-				86C99EC73062ED9E00A74B69 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

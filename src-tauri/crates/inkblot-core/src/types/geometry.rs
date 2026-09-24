@@ -19,7 +19,11 @@ pub struct Viewport {
 impl Default for Viewport {
     /// `DEFAULT_VIEWPORT` in canvasModel.js.
     fn default() -> Self {
-        Self { x: 0.0, y: 0.0, zoom: 1.0 }
+        Self {
+            x: 0.0,
+            y: 0.0,
+            zoom: 1.0,
+        }
     }
 }
 
@@ -64,5 +68,10 @@ pub struct BezierPath {
 
 impl EdgeSide {
     /// The order `EDGE_SIDES` declares in canvasGeometry.js.
-    pub const ALL: [EdgeSide; 4] = [EdgeSide::Top, EdgeSide::Right, EdgeSide::Bottom, EdgeSide::Left];
+    pub const ALL: [EdgeSide; 4] = [
+        EdgeSide::Top,
+        EdgeSide::Right,
+        EdgeSide::Bottom,
+        EdgeSide::Left,
+    ];
 }

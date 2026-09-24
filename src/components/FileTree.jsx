@@ -19,7 +19,7 @@ import {
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import SFIcon from './SFIcon'
-import { useFileTreeDrag } from './useFileTreeDrag'
+import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import {
   STORY_FOLDER_PRESETS,

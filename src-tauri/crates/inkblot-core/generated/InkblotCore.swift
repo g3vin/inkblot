@@ -6,17 +6,14 @@ import Foundation
 
 /// Which editor a message concerns.
 /// 
-/// This is sharp edge #5 made explicit. Today the active editor is elected by mouse
-/// movement over a pane, and the winner is a live TipTap object passed around by
-/// reference — `EditorLayout` reads `__inkblotCanvasCard` off it to tell the third
-/// state apart. An object reference cannot cross a process boundary, so the election
-/// result has to be a *name*, and the three names are these.
+/// The active editor is elected by mouse movement over a pane. An object reference
+/// cannot cross a process boundary, so the election result is a *name*, and the
+/// webview's `editorRegistry` turns a name back into a live editor.
 /// 
 /// `CanvasCard` is the third state: a canvas card opened for editing holds the only
 /// live editor on that pane, and the pane's own two TipTap instances sit idle holding
 /// no document. A toolbar pointed at `Primary` while a card is being edited would be
-/// driving an empty editor, which is exactly the bug the `__inkblotCanvasCard` gate
-/// exists to prevent.
+/// driving an empty editor.
 public enum EditorTarget: String, Codable, Equatable {
 	case primary
 	case secondary
@@ -26,7 +23,7 @@ public enum EditorTarget: String, Codable, Equatable {
 
 /// The active editor election changed.
 /// 
-/// **Sharp edge #5.** The election is driven by mouse movement over a pane, which is a
+/// The election is driven by mouse movement over a pane, which is a
 /// webview-side fact, so the webview stays the returning officer and reports the
 /// result. `surface_id` is set when the winner is a canvas card, and it is what lets a
 /// native canvas command find the right surface when split view shows two.
@@ -101,9 +98,8 @@ public struct AddReplyCommand: Codable, Equatable {
 
 /// The marks the toolbar can toggle.
 /// 
-/// A closed set rather than a string because the toolbar is going native: a Swift
-/// button sending `"bolb"` should not compile, and an enum is what makes that true in
-/// all three languages at once.
+/// A closed set rather than a string: a Swift menu item sending `"bolb"` should not
+/// compile, and an enum is what makes that true in all three languages at once.
 public enum MarkKind: String, Codable, Equatable {
 	case bold
 	case italic
@@ -594,18 +590,17 @@ public struct BubbleSessionOpened: Codable, Equatable {
 
 /// Run a command on the canvas the user aimed at.
 /// 
-/// `surface_id` is how a command finds one canvas when split view is showing two. In
-/// the React shell the aiming is done by hit-testing the DOM for a `.canvas-surface`
-/// and dispatching on that element (`canvasEvents.js`); native cannot hit-test the
-/// webview's DOM, so the id is assigned by the webview when a surface mounts and
-/// reported with `activeEditorChanged`.
+/// `surface_id` is how a command finds one canvas when split view is showing two. The
+/// page aims by hit-testing the DOM for a `.canvas-surface` (`canvasEvents.js`); a
+/// native shell cannot hit-test the webview's DOM, so the id is assigned by the
+/// webview when a surface mounts and reported with `activeEditorChanged`.
 public struct CanvasCommandRequest: Codable, Equatable {
 	public let surfaceId: String
 	/// The command name, as `CanvasSurface`'s handler spells it.
 	public let command: String
 	/// Command-specific arguments. Untyped because this is the one place the vocabulary
 	/// is still open — the canvas menu grows items faster than the protocol should
-	/// churn. Everything a native shell sends today is a name and at most a node id.
+	/// churn. What the native shell sends is a name and at most a node id.
 	public let detail: AnyCodable?
 
 	public init(surfaceId: String, command: String, detail: AnyCodable?) {
@@ -966,8 +961,7 @@ public struct ClipboardChanged: Codable, Equatable {
 /// Text dropped on the shell's clipboard panel.
 /// 
 /// If it is the selection the user is dragging out of an editor, the page removes it
-/// from the document — dropping a selection on the clipboard is a move, as it always
-/// was. The page decides that, because only the page knows what is being dragged.
+/// from the document — dropping a selection on the clipboard is a move. The page decides that, because only the page knows what is being dragged.
 public struct ClipboardDropCommand: Codable, Equatable {
 	public let text: String
 
@@ -1076,6 +1070,12 @@ public enum NativeCommand: Codable, Equatable {
 	case printDocument(PrintDocumentCommand)
 	case exportDocument(ExportDocumentCommand)
 	case printFinished(PrintFinishedCommand)
+	/// The tab dock and the new-tab chooser, drawn by the shell (see `workspace.rs`).
+	case selectTab(TabRef)
+	case closeTab(TabRef)
+	case newTab(NewTabCommand)
+	case openDocInTab(OpenDocInTabCommand)
+	case createFromDraft(CreateFromDraftCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1152,7 +1152,12 @@ public enum NativeCommand: Codable, Equatable {
 			goToPage,
 			printDocument,
 			exportDocument,
-			printFinished
+			printFinished,
+			selectTab,
+			closeTab,
+			newTab,
+			openDocInTab,
+			createFromDraft
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1538,6 +1543,31 @@ public enum NativeCommand: Codable, Equatable {
 					self = .printFinished(content)
 					return
 				}
+			case .selectTab:
+				if let content = try? container.decode(TabRef.self, forKey: .payload) {
+					self = .selectTab(content)
+					return
+				}
+			case .closeTab:
+				if let content = try? container.decode(TabRef.self, forKey: .payload) {
+					self = .closeTab(content)
+					return
+				}
+			case .newTab:
+				if let content = try? container.decode(NewTabCommand.self, forKey: .payload) {
+					self = .newTab(content)
+					return
+				}
+			case .openDocInTab:
+				if let content = try? container.decode(OpenDocInTabCommand.self, forKey: .payload) {
+					self = .openDocInTab(content)
+					return
+				}
+			case .createFromDraft:
+				if let content = try? container.decode(CreateFromDraftCommand.self, forKey: .payload) {
+					self = .createFromDraft(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -1771,6 +1801,21 @@ public enum NativeCommand: Codable, Equatable {
 		case .printFinished(let content):
 			try container.encode(CodingKeys.printFinished, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .selectTab(let content):
+			try container.encode(CodingKeys.selectTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .closeTab(let content):
+			try container.encode(CodingKeys.closeTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .newTab(let content):
+			try container.encode(CodingKeys.newTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .openDocInTab(let content):
+			try container.encode(CodingKeys.openDocInTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .createFromDraft(let content):
+			try container.encode(CodingKeys.createFromDraft, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -1845,6 +1890,25 @@ public struct CreateEntryCommand: Codable, Equatable {
 	}
 }
 
+public enum DraftKind: String, Codable, Equatable {
+	case doc
+	case canvas
+}
+
+/// Make the draft into a document. The page checks the name and makes the file; the
+/// answer is the next `DraftPaneChanged` — gone if it worked, with a status if not.
+public struct CreateFromDraftCommand: Codable, Equatable {
+	public let tabId: String
+	public let name: String
+	public let kind: DraftKind
+
+	public init(tabId: String, name: String, kind: DraftKind) {
+		self.tabId = tabId
+		self.name = name
+		self.kind = kind
+	}
+}
+
 /// A new, empty source of a kind, for entering by hand.
 public struct CreateReferenceCommand: Codable, Equatable {
 	public let id: String
@@ -1890,7 +1954,7 @@ public struct DictationLevelCommand: Codable, Equatable {
 
 /// One transcript from the speech engine.
 /// 
-/// Sharp edge #2 is why this is so thin. `DictationControl.replaceInlineDraft` is a
+/// Deliberately thin. `DictationControl.replaceInlineDraft` is a
 /// read-modify-write at speaking rate: it reads the text the draft range currently
 /// covers, diffs the common prefix and suffix against the new transcript, and
 /// dispatches the changed slice plus its decoration in a single transaction. Asking
@@ -2004,6 +2068,21 @@ public struct DocChanged: Codable, Equatable {
 	}
 }
 
+/// One open tab: a document, or a draft that has not decided what it is yet.
+public struct DocTab: Codable, Equatable {
+	public let id: String
+	/// `None` for a draft.
+	public let docPath: String?
+	/// Opened by a single click and replaced by the next one, until it is edited.
+	public let ephemeral: Bool?
+
+	public init(id: String, docPath: String?, ephemeral: Bool?) {
+		self.id = id
+		self.docPath = docPath
+		self.ephemeral = ephemeral
+	}
+}
+
 /// A document's part of the references. The sources, and which documents each is
 /// attached to, are the project's (`.inkblot-references.json`).
 public struct DocumentCitations: Codable, Equatable {
@@ -2028,14 +2107,45 @@ public struct DocumentText: Codable, Equatable {
 	}
 }
 
+public struct Rect: Codable, Equatable {
+	public let x: Double
+	public let y: Double
+	public let width: Double
+	public let height: Double
+
+	public init(x: Double, y: Double, width: Double, height: Double) {
+		self.x = x
+		self.y = y
+		self.width = width
+		self.height = height
+	}
+}
+
+/// Where the chooser goes, or that it is gone. The page keeps the pane itself (a draft
+/// holds the pane open, and a split stays up around it) and reports its rectangle, in
+/// the web view's coordinates, for the shell to draw into.
+public struct DraftPaneChanged: Codable, Equatable {
+	/// The draft being shown; `None` when no draft is.
+	public let tabId: String?
+	public let rect: Rect?
+	/// Why the last attempt was refused ("A document with that name already exists.").
+	public let status: String?
+	public let creating: Bool?
+
+	public init(tabId: String?, rect: Rect?, status: String?, creating: Bool?) {
+		self.tabId = tabId
+		self.rect = rect
+		self.status = status
+		self.creating = creating
+	}
+}
+
 /// The drag ended — however it ended.
 /// 
-/// `handled` is the one that used to be `__inkblot_dropHandled`, and it is a
-/// *report*, not a negotiation: whichever drop target accepted the payload says so
-/// when it does, and this event carries the final answer so the source knows whether
-/// to remove what it was dragging. Two targets can see the same drop (an editor and
-/// the clipboard panel underneath it); the first to claim it wins, which is what the
-/// flag arbitrated before.
+/// `handled` is a *report*, not a negotiation: whichever drop target accepted the
+/// payload says so when it does, and this event carries the final answer so the source
+/// knows whether to remove what it was dragging. Two targets can see the same drop (an
+/// editor and the clipboard panel underneath it); the first to claim it wins.
 public struct DragEnded: Codable, Equatable {
 	public let dragId: String
 	public let handled: Bool
@@ -2053,7 +2163,7 @@ public struct DragEnded: Codable, Equatable {
 /// The pointer moved during a drag.
 /// 
 /// Carried explicitly because the DOM's own drag events do not reliably give a
-/// position — which is why `__inkblot_dragPoint` existed. Coalesced to one per frame
+/// position. Coalesced to one per frame
 /// by the sender, like `notesRemapped`, and for the same reason: only the last one
 /// means anything.
 public struct DragMoved: Codable, Equatable {
@@ -2070,13 +2180,11 @@ public struct DragMoved: Codable, Equatable {
 
 /// What is being dragged.
 /// 
-/// This is what replaces the `window.__inkblot_*` globals. They are six mutable
-/// variables on `window` that four unrelated components read and write to coordinate
-/// one drag — the clipboard panel writes what it picked up, the editor reads it on
-/// drop and writes back whether it handled it, and the last pointer position is parked
-/// there because the HTML5 drag events do not carry a usable one. None of that
-/// survives a process boundary: `window` is the webview's, and a native drag source is
-/// not in it.
+/// A drag in Inkblot often starts in one component and ends in another — the
+/// clipboard panel, an editor pane, a canvas — and in the Swift app one end can be
+/// native. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
+/// hand-off, so nothing about a drag depends on shared state in the webview's
+/// `window`. The webview side is `src/bridge/dragHandoff.ts`.
 public enum DragPayloadKind: String, Codable, Equatable {
 	/// A selection dragged out of an editor.
 	case editorSelection
@@ -2090,7 +2198,6 @@ public enum DragPayloadKind: String, Codable, Equatable {
 
 /// A place in a document, as the protocol carries it.
 /// 
-/// **This is the one type sharp edge #3 is about, so it is worth reading the reason.**
 /// A ProseMirror position is an index into a document that every edit invalidates.
 /// In one process that is survivable: the holder maps its positions through each
 /// transaction's mapping and is never more than a tick out of date. Across a process
@@ -2100,9 +2207,8 @@ public enum DragPayloadKind: String, Codable, Equatable {
 /// 
 /// So nothing in this protocol carries a bare position. Everything carries the text
 /// the position was resolved from as well, and the webview re-resolves by that text
-/// when the positions no longer cover it. Two places in the React shell already do
-/// exactly this dance by hand (`EditorLayout.jsx:291-304`, `Workbench.jsx:40-64`);
-/// this type is that dance promoted to the protocol.
+/// when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
+/// or reports it gone when the text is.
 /// 
 /// `from` and `to` are **UTF-16 code units**, like every other offset in this
 /// codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
@@ -2232,6 +2338,10 @@ public enum WebviewEvent: Codable, Equatable {
 	case wordCountsChanged(WordCountsChanged)
 	case pageLayoutState(PageLayoutState)
 	case printRequest(PrintRequest)
+	/// The tab dock, the new-tab chooser and the sentence bubble (see `workspace.rs`).
+	case tabsChanged(TabsChanged)
+	case draftPaneChanged(DraftPaneChanged)
+	case sentenceStructure(SentenceStructure)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case toolbarState,
@@ -2267,7 +2377,10 @@ public enum WebviewEvent: Codable, Equatable {
 			revealReference,
 			wordCountsChanged,
 			pageLayoutState,
-			printRequest
+			printRequest,
+			tabsChanged,
+			draftPaneChanged,
+			sentenceStructure
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -2448,6 +2561,21 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .printRequest(content)
 					return
 				}
+			case .tabsChanged:
+				if let content = try? container.decode(TabsChanged.self, forKey: .payload) {
+					self = .tabsChanged(content)
+					return
+				}
+			case .draftPaneChanged:
+				if let content = try? container.decode(DraftPaneChanged.self, forKey: .payload) {
+					self = .draftPaneChanged(content)
+					return
+				}
+			case .sentenceStructure:
+				if let content = try? container.decode(SentenceStructure.self, forKey: .payload) {
+					self = .sentenceStructure(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
@@ -2558,6 +2686,15 @@ public enum WebviewEvent: Codable, Equatable {
 		case .printRequest(let content):
 			try container.encode(CodingKeys.printRequest, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .tabsChanged(let content):
+			try container.encode(CodingKeys.tabsChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .draftPaneChanged(let content):
+			try container.encode(CodingKeys.draftPaneChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .sentenceStructure(let content):
+			try container.encode(CodingKeys.sentenceStructure, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -2605,11 +2742,10 @@ public struct ExportDocumentCommand: Codable, Equatable {
 
 /// What focus mode is showing.
 /// 
-/// `FocusModeOverlay` re-derives this from the full document on every transaction, and
-/// the handoff flags that as the cost to watch: at a keystroke's rate this is the
-/// largest payload on the bridge. It stays in the webview in Phase 5 for exactly that
-/// reason, and this event exists so a native shell can mirror the *state* — which
-/// paragraph, how far through — without receiving the text.
+/// `FocusModeOverlay` re-derives its view from the full document on every
+/// transaction; sent at a keystroke's rate, the text would be the largest payload on
+/// the bridge. So the overlay stays in the webview, and this event lets a native shell
+/// mirror the *state* — which paragraph, how far through — without receiving the text.
 public struct FocusModeView: Codable, Equatable {
 	public let active: Bool
 	public let docPath: String
@@ -2687,8 +2823,8 @@ public struct InsertCitationCommand: Codable, Equatable {
 	}
 }
 
-/// Insert an entry at the caret of an editor, and take it off the history — what
-/// dragging a tile into the editor did.
+/// Insert an entry at the caret of an editor, and take it off the history, as dragging a
+/// tile into the editor does.
 public struct InsertClipboardEntryCommand: Codable, Equatable {
 	public let id: String
 	public let target: EditorTarget
@@ -2704,8 +2840,7 @@ public struct InsertClipboardEntryCommand: Codable, Equatable {
 /// 
 /// This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
 /// webview: `WKWebView` cannot read the clipboard without a user gesture inside the
-/// page, and the menu item is not one. It replaces `__inkblot_forcePlainPaste`, a flag
-/// that was read and never set.
+/// page, and the menu item is not one.
 public struct InsertPlainTextCommand: Codable, Equatable {
 	public let target: EditorTarget
 	public let text: String
@@ -3260,6 +3395,12 @@ public struct MoveEntryCommand: Codable, Equatable {
 	}
 }
 
+/// Open a draft tab, as the dock's `+` does. Nothing to say, but adjacent tagging
+/// wants a payload, so it is an empty object.
+public struct NewTabCommand: Codable, Equatable {
+	public init() {}
+}
+
 public enum NoteType: String, Codable, Equatable {
 	/// Anchored to a text range in the document.
 	case quote
@@ -3353,9 +3494,8 @@ public struct Note: Codable, Equatable {
 /// The pointer entered, left, or clicked a note marker in the document.
 /// 
 /// `anchor_rect` is in client coordinates *inside the webview*, so a native shell must
-/// offset it by the web view's frame. This is the event that `NoteAnnotation.js:155`
-/// currently ships a live `EditorView` object in — an object, over an event, to a
-/// listener in the same process. That field is gone: nothing here is a reference.
+/// offset it by the web view's frame. Nothing here is an object reference: every
+/// field survives serialization.
 public struct NoteMarkerEvent: Codable, Equatable {
 	public let noteId: String
 	public let docPath: String
@@ -3469,8 +3609,8 @@ public struct NotesChanged: Codable, Equatable {
 
 /// Note anchors after a remap.
 /// 
-/// **Sharp edge #4.** `useEditorNotes` remaps on every transaction — every keystroke
-/// in a document with quote notes — and native is holding those positions. Two things
+/// `useEditorNotes` remaps on every transaction — every keystroke in a document with
+/// quote notes — and the shell holds those positions. Two things
 /// keep that off the bridge's back:
 /// 
 /// 1. The event is coalesced to one per frame by the sender. Sending per transaction
@@ -3491,6 +3631,15 @@ public struct NotesRemapped: Codable, Equatable {
 		self.docPath = docPath
 		self.notes = notes
 		self.droppedNoteIds = droppedNoteIds
+	}
+}
+
+/// Open a document in a tab of its own — a document dropped on the dock.
+public struct OpenDocInTabCommand: Codable, Equatable {
+	public let docPath: String
+
+	public init(docPath: String) {
+		self.docPath = docPath
 	}
 }
 
@@ -3587,6 +3736,18 @@ public struct PageLayoutState: Codable, Equatable {
 	}
 }
 
+/// A node of a parse: a phrase with children, or a leaf (a part-of-speech tag, or a
+/// word) with none.
+public struct ParseNode: Codable, Equatable {
+	public let label: String
+	public let children: [ParseNode]?
+
+	public init(label: String, children: [ParseNode]?) {
+		self.label = label
+		self.children = children
+	}
+}
+
 /// Print. `bound` imposes the pages for binding, with the book's binding settings.
 public struct PrintDocumentCommand: Codable, Equatable {
 	public let scope: PrintScope
@@ -3630,7 +3791,7 @@ public struct PrintRequest: Codable, Equatable {
 
 /// The project the webview has open changed.
 /// 
-/// The project picker and its session restore are still in the webview, and the
+/// The project picker and its session restore are in the webview, and the
 /// native sidebar has to show the tree of whatever project that is. `None` is the
 /// landing screen: no project is open.
 public struct ProjectChanged: Codable, Equatable {
@@ -3734,20 +3895,6 @@ public struct ReadAloudQuery: Codable, Equatable {
 	public init(target: EditorTarget?, selectionOnly: Bool) {
 		self.target = target
 		self.selectionOnly = selectionOnly
-	}
-}
-
-public struct Rect: Codable, Equatable {
-	public let x: Double
-	public let y: Double
-	public let width: Double
-	public let height: Double
-
-	public init(x: Double, y: Double, width: Double, height: Double) {
-		self.x = x
-		self.y = y
-		self.width = width
-		self.height = height
 	}
 }
 
@@ -4323,8 +4470,7 @@ public struct SearchMatches: Codable, Equatable {
 
 /// The scopes, in the order they appear in the bar.
 public enum SearchScope: String, Codable, Equatable {
-	/// The default, and what the bar did before it could search: filter whatever panel
-	/// is showing. Every other scope searches content and shows its own results, so the
+	/// The default: filter whatever panel is showing. Every other scope searches content and shows its own results, so the
 	/// panel underneath is left unfiltered.
 	case panel
 	case document
@@ -4347,7 +4493,7 @@ public struct SearchScopeInfo: Codable, Equatable {
 
 /// Everything a context menu needs to build itself, resolved in one read.
 /// 
-/// Phase 5 needs this as a *request*, not a push: the menu is built when the user
+/// A native context menu needs this as a *request*, not a push: the menu is built when the user
 /// right-clicks, and it must be built from the selection as it is at that moment. It
 /// is also pushed on selection change, because a native shell wants to enable and
 /// disable menu bar items without asking.
@@ -4374,6 +4520,33 @@ public struct SelectionContext: Codable, Equatable {
 		self.empty = empty
 		self.touchesHighlight = touchesHighlight
 		self.isCanvas = isCanvas
+	}
+}
+
+/// One way the sentence parses, and the grammar's score for it — higher is likelier.
+/// Not a probability: the parser mixes products and log-sums, so it is only good for
+/// ordering.
+public struct SentenceParse: Codable, Equatable {
+	public let score: Double
+	public let tree: ParseNode
+
+	public init(score: Double, tree: ParseNode) {
+		self.score = score
+		self.tree = tree
+	}
+}
+
+/// "Open Analytic Bubble" was chosen: the sentence, its best parses, and where the
+/// right-click was, in the web view's coordinates.
+public struct SentenceStructure: Codable, Equatable {
+	public let sentence: String
+	public let parses: [SentenceParse]
+	public let anchor: Rect?
+
+	public init(sentence: String, parses: [SentenceParse], anchor: Rect?) {
+		self.sentence = sentence
+		self.parses = parses
+		self.anchor = anchor
 	}
 }
 
@@ -4546,11 +4719,10 @@ public struct SetFontSizeCommand: Codable, Equatable {
 
 /// Set the highlight color, and say what the remembered color becomes.
 /// 
-/// This is sharp edge #1's second half. `Toolbar.jsx:240` writes the chosen color to
-/// `editor.storage.lastHighlightColor` and `contextMenu/editorMenu.js:78` reads it
-/// back — shared mutable state on a live editor object, reachable from both sides of
-/// a seam that does not exist yet. The value is part of the protocol instead: the
-/// command says what to remember, and `ToolbarState` reports it back.
+/// The remembered highlight color is protocol state rather than state on a live
+/// editor object, because both the toolbar and the context menu need it and either
+/// may be native: the command says what to remember, and `ToolbarState` reports it
+/// back.
 public struct SetHighlightCommand: Codable, Equatable {
 	public let target: EditorTarget
 	public let color: String
@@ -4684,7 +4856,7 @@ public enum SidebarTab: String, Codable, Equatable {
 }
 
 /// The page wants a sidebar tab shown — "Add note", "Open Version History", a new
-/// workbench tile. The shell owns the sidebar now, so the page asks rather than opens.
+/// workbench tile. When the shell draws the sidebar, the page asks rather than opens.
 public struct ShowSidebarTab: Codable, Equatable {
 	public let tab: SidebarTab
 
@@ -4739,6 +4911,33 @@ public struct SyncNotesCommand: Codable, Equatable {
 	}
 }
 
+public struct TabRef: Codable, Equatable {
+	public let tabId: String
+
+	public init(tabId: String) {
+		self.tabId = tabId
+	}
+}
+
+/// Everything the dock draws. Sent whole whenever any of it changes.
+public struct TabsChanged: Codable, Equatable {
+	public let tabs: [DocTab]
+	public let activeTabId: String?
+	/// The documents in the two panes — a tab showing one of these keeps its name
+	/// visible in the collapsed dock.
+	public let currentDoc: String?
+	public let secondaryDoc: String?
+	public let split: Bool
+
+	public init(tabs: [DocTab], activeTabId: String?, currentDoc: String?, secondaryDoc: String?, split: Bool) {
+		self.tabs = tabs
+		self.activeTabId = activeTabId
+		self.currentDoc = currentDoc
+		self.secondaryDoc = secondaryDoc
+		self.split = split
+	}
+}
+
 /// A command aimed at an editor with nothing else to say.
 public struct TargetOnly: Codable, Equatable {
 	public let target: EditorTarget
@@ -4762,7 +4961,7 @@ public enum VersionKind: String, Codable, Equatable {
 /// The two kinds also live in different places. A text document embeds its
 /// `versions` array in its own file; a canvas keeps history in a `.versions/`
 /// sidecar, because a canvas file must stay spec-shaped JSON Canvas so it round-trips
-/// with Obsidian. The sidecar is also the legacy fallback for old text documents.
+/// with Obsidian. The sidecar is also read for text documents that have no embedded history.
 public struct VersionEntry: Codable, Equatable {
 	public let id: String
 	public let timestamp: String
@@ -4886,14 +5085,11 @@ public struct ToggleListCommand: Codable, Equatable {
 
 /// The formatting at the selection, pushed.
 /// 
-/// **Sharp edge #1.** `Toolbar.jsx:102-145` pulls this today: on every
-/// `selectionUpdate` it reaches into the live editor and reads about ten facts —
-/// text-style attributes, four mark states resolved against the adjacent text node
-/// when the selection is collapsed, the alignment of whichever of three node kinds is
-/// selected. All of it is synchronous, and none of it survives a process boundary.
-/// 
-/// So the direction inverts: the webview does the reading, once per animation frame,
-/// and sends the answer. A native toolbar renders this struct and never asks a
+/// Reading it takes about ten synchronous facts off the live editor — text-style
+/// attributes, four mark states resolved against the adjacent text node when the
+/// selection is collapsed, the alignment of whichever of three node kinds is selected
+/// — so the webview does the reading (`src/bridge/readState.ts`), once per animation
+/// frame, and sends the answer. A toolbar renders this struct and never asks a
 /// question. The frame coalescing is not an optimization — `selectionUpdate` fires on
 /// every cursor move, including every keystroke.
 public struct ToolbarState: Codable, Equatable {

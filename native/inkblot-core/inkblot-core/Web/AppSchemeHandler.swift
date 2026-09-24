@@ -11,8 +11,8 @@ import WebKit
 ///    reason only in the Web Inspector.
 ///  - `asset://localhost/<percent-encoded absolute path>` is any file on disk: canvas
 ///    images and voice memos in a project's `.assets/`. It is the URL the shim's
-///    `convertFileSrc` makes, which is the URL Tauri makes, so nothing in the bundle
-///    had to change to reach it.
+///    `convertFileSrc` makes, which is the URL Tauri makes, so the bundle's URLs
+///    work unchanged.
 ///
 /// Byte ranges are honoured because `<audio>` asks for them, and a voice memo served
 /// whole to a range request plays once and then refuses to seek.

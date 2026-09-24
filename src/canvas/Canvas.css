@@ -269,8 +269,8 @@
   min-height: 0;
   padding: 12px 14px;
   overflow: hidden;
-  /* Keep content inside the card's rounded corners now that the card itself
-     no longer clips (see .canvas-node-text). */
+  /* Keep content inside the card's rounded corners; the card itself does not
+     clip (see .canvas-node-text). */
   border-radius: inherit;
   font-size: 14px;
   line-height: 1.5;
@@ -796,8 +796,7 @@
 
 /*
  * Invisible strips lying along the card's border — you resize by grabbing the edge,
- * as you would in any other app, so there is nothing to draw. (These replace the
- * little squares that used to pop up on selection.)
+ * as you would in any other app, so there is nothing to draw.
  *
  * Sizes are divided by --canvas-zoom rather than transform-scaled: a transform would
  * scale a strip about its centre and leave it off the border. Dividing keeps the grab
