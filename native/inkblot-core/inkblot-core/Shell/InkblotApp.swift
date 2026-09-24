@@ -124,6 +124,15 @@ struct InkblotCommands: Commands {
             alignmentToggle("Align Right", .right)
         }
 
+        // View ▸ beside Customize Toolbar…: the inspector's two layouts.
+        CommandGroup(after: .toolbar) {
+            Button("Switch to \(model.sidebar.layout.other.title) Layout") {
+                model.sidebar.isPresented = true
+                model.sidebar.switchLayout()
+            }
+            Button("Customize Inspector Layout…") { model.sidebar.isCustomizingLayout = true }
+        }
+
         // The page's own View items — theme, accent color, word count. Still the page's
         // to run (it owns those settings); drawn here because the menu bar is ours.
         CommandGroup(after: .sidebar) {

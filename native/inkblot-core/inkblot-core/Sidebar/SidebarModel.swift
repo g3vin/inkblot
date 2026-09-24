@@ -41,7 +41,79 @@ final class SidebarModel {
     }
 
     var isPresented = true
-    var tab: Tab = .workbench
+
+    /* ---------------- layouts ---------------- */
+
+    /// Which of the two sets of panels the selector bar offers.
+    private(set) var layout: InspectorLayout
+    /// What each layout holds, as Customize Layout… left it.
+    private(set) var layouts: InspectorLayouts
+    /// The tab each layout last showed, so swapping back returns to it.
+    private var chosen: [InspectorLayout: Tab]
+    /// Which way the last swipe went (+1 toward the end of the bar), for the panel to
+    /// slide in from that side.
+    private(set) var lastStep = 1
+    /// Customize Layout… is showing.
+    var isCustomizingLayout = false
+
+    /// The selector bar's tabs.
+    var tabs: [Tab] { layouts[layout] }
+
+    /// The panel showing. Setting one the layout does not hold switches to the layout
+    /// that does; if neither does it shows anyway, with nothing lit in the bar — File ▸
+    /// Page Setup… still opens Page after Page is taken out of both.
+    var tab: Tab {
+        get { chosen[layout] ?? tabs.first ?? .workbench }
+        set {
+            if !tabs.contains(newValue), layouts[layout.other].contains(newValue) {
+                layout = layout.other
+            }
+            chosen[layout] = newValue
+            saveSelection()
+        }
+    }
+
+    func switchLayout() {
+        showLayout(layout.other)
+    }
+
+    func showLayout(_ next: InspectorLayout) {
+        layout = next
+        if !tabs.contains(tab) { chosen[layout] = tabs.first }
+        saveSelection()
+    }
+
+    /// The next tab along the bar (`step` +1) or the previous one (-1). Stops at the
+    /// ends rather than wrapping: a swipe past the last tab does nothing, as it does
+    /// past the last page of anything else.
+    func step(by step: Int) {
+        let index = tabs.firstIndex(of: tab).map { $0 + step } ?? 0
+        guard tabs.indices.contains(index) else { return }
+        lastStep = step
+        tab = tabs[index]
+    }
+
+    func editLayouts(_ change: (inout InspectorLayouts) -> Void) {
+        var edited = layouts
+        change(&edited)
+        guard edited != layouts else { return }
+        layouts = edited
+        layouts.save()
+        for layout in InspectorLayout.allCases where !layouts[layout].contains(chosen[layout] ?? tab) {
+            chosen[layout] = layouts[layout].first
+        }
+        saveSelection()
+    }
+
+    private static let layoutKey = "inkblot.inspector.layout"
+    private static let chosenKey = "inkblot.inspector.tabs"
+
+    private func saveSelection() {
+        UserDefaults.standard.set(layout.rawValue, forKey: Self.layoutKey)
+        UserDefaults.standard.set(
+            Dictionary(uniqueKeysWithValues: chosen.map { ($0.key.rawValue, $0.value.rawValue) }),
+            forKey: Self.chosenKey)
+    }
 
     /* ---------------- search ---------------- */
 
@@ -92,6 +164,14 @@ final class SidebarModel {
     init(bridge: ShellBridge, core: CoreService) {
         self.bridge = bridge
         self.core = core
+        let defaults = UserDefaults.standard
+        layouts = InspectorLayouts.load(from: defaults)
+        layout = defaults.string(forKey: Self.layoutKey).flatMap(InspectorLayout.init(rawValue:)) ?? .drafting
+        var chosen: [InspectorLayout: Tab] = [.drafting: .workbench]
+        for (key, value) in defaults.dictionary(forKey: Self.chosenKey) as? [String: String] ?? [:] {
+            if let layout = InspectorLayout(rawValue: key), let tab = Tab(rawValue: value) { chosen[layout] = tab }
+        }
+        self.chosen = chosen
         bridge.addListener { [weak self] event in self?.handle(event) }
     }
 
