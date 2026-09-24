@@ -100,6 +100,11 @@ struct ContentView: View {
         // turns Customize Toolbar… off. The inspector toggle is a titlebar accessory
         // instead, in the window's top-right corner.
         .background { InspectorTitlebarToggle(sidebar: model.sidebar) }
+        .background { ToolbarContextMenu(sidebar: model.sidebar) }
+        // Customize Layout…, from the selector bar, the toolbar or the View menu.
+        .sheet(isPresented: $sidebar.isCustomizingLayout) {
+            InspectorLayoutEditor().environment(model)
+        }
         .toolbar(removing: .title)
         // Clear: the buttons are glass over the page, not over a bar of window colour.
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
