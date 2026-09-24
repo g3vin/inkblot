@@ -251,6 +251,32 @@ export const preparePrint = async ({
   }
 }
 
+/**
+ * Print one figure on one page — a map, drawn as SVG — through the same print root
+ * and shell request as a document, so Print… and Export PDF work in both shells.
+ * `markup` is the page's content; the page is `widthPx` × `heightPx`.
+ */
+export const printFigure = async ({ markup, widthPx, heightPx, jobName, pdfPath }) => {
+  if (currentJob) return currentJob
+  currentJob = (async () => {
+    try {
+      const sheet = document.createElement('div')
+      sheet.className = 'print-sheet print-figure'
+      Object.assign(sheet.style, { width: `${widthPx}px`, height: `${heightPx}px`, overflow: 'hidden' })
+      sheet.innerHTML = markup
+      mountPrintRoot([sheet], widthPx, heightPx)
+      await waitForImages(sheet)
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      const completed = await requestHostPrint({ jobName, widthPx, heightPx, pdfPath })
+      if (isNativeShell()) clearPrintRoot()
+      return completed
+    } finally {
+      currentJob = null
+    }
+  })()
+  return currentJob
+}
+
 /** Print (or save as PDF, with `pdfPath`). Resolves once the shell has the job. */
 export const runPrintJob = async (options) => {
   if (currentJob) return currentJob

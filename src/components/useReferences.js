@@ -20,7 +20,7 @@ import { documentSurface } from '../bridge'
 import { nativeOwns } from '../lib/host'
 import { collectCitations, setCitationContext } from '../extensions/Citation'
 import { CITATION_REVEAL_EVENT } from '../extensions/citationPopover'
-import { isCanvasDoc } from '../lib/docKind'
+import { isTextDoc } from '../lib/docKind'
 import { formatLibrary } from '../lib/references/format'
 import { fetchText } from '../lib/references/fetchText'
 import { resolveInput } from '../lib/references/resolve'
@@ -96,8 +96,8 @@ export function useReferences({ projectName, activeDoc, panes }) {
   const panesRef = useRef(panes)
   useEffect(() => { panesRef.current = panes })
 
-  const docPath = activeDoc && !isCanvasDoc(activeDoc) ? activeDoc : null
-  const openDocs = [...new Set((panes || []).map((pane) => pane.path).filter((path) => path && !isCanvasDoc(path)))]
+  const docPath = activeDoc && isTextDoc(activeDoc) ? activeDoc : null
+  const openDocs = [...new Set((panes || []).map((pane) => pane.path).filter((path) => path && isTextDoc(path)))]
   const openKey = openDocs.join('\u0000')
 
   /* ---------------- reading ---------------- */
@@ -147,7 +147,7 @@ export function useReferences({ projectName, activeDoc, panes }) {
     const references = new Map(library.references.map((ref) => [ref.id, ref]))
     for (const pane of panes || []) {
       const editor = live(pane.editor)
-      if (!editor || !pane.path || isCanvasDoc(pane.path)) continue
+      if (!editor || !pane.path || !isTextDoc(pane.path)) continue
       const settings = settingsByDoc[pane.path]
       if (!settings) continue
       setCitationContext(editor, {
@@ -165,7 +165,7 @@ export function useReferences({ projectName, activeDoc, panes }) {
   /* What each open document cites, and attaching what it newly cites. */
   useEffect(() => {
     const editors = (panes || []).map((pane) => ({ editor: live(pane.editor), path: pane.path }))
-      .filter(({ editor, path }) => editor && path && !isCanvasDoc(path))
+      .filter(({ editor, path }) => editor && path && isTextDoc(path))
     const cleanups = editors.map(({ editor, path }) => {
       const read = () => {
         const { citedIds, bibliography } = collectCitations(editor.state.doc)

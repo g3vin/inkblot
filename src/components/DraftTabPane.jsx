@@ -9,15 +9,9 @@
  */
 import { useState } from 'react'
 import SFIcon from './SFIcon'
-import { documentExists, saveDocument } from '../lib/FileSystem'
-import { saveCanvasDocument } from '../lib/canvasFileSystem'
-import { createEmptyCanvas } from '../lib/canvasModel'
-import { stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
-
-const KINDS = [
-  { id: 'doc', label: 'Document', icon: 'doc.text', hint: 'A page for writing' },
-  { id: 'canvas', label: 'Canvas', icon: 'canvas', hint: 'An open board for cards' },
-]
+import { documentExists } from '../lib/FileSystem'
+import { DOCUMENT_KINDS as KINDS, createDocumentOfKind, nameForKind } from '../lib/createDocument'
+import { stripDocSuffix } from '../lib/docKind'
 
 export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
   const [kind, setKind] = useState('doc')
@@ -29,9 +23,9 @@ export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
     event?.preventDefault?.()
     if (creating || !projectName) return
 
-    // The `.canvas` suffix is what routes a document to the canvas editor, so it
+    // The `.canvas` or `.map` suffix is what routes a document to its editor, so it
     // follows the kind being created — never whatever the user typed.
-    const bare = stripCanvasSuffix(name.trim())
+    const bare = stripDocSuffix(name.trim())
     if (!bare) {
       setStatus('Give it a name first.')
       return
@@ -41,7 +35,7 @@ export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
       return
     }
 
-    const path = kind === 'canvas' ? withCanvasSuffix(bare) : bare
+    const path = nameForKind(bare, kind)
 
     setCreating(true)
     try {
@@ -52,11 +46,7 @@ export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
         return
       }
 
-      if (kind === 'canvas') {
-        await saveCanvasDocument(projectName, path, createEmptyCanvas())
-      } else {
-        await saveDocument(projectName, path, { content: [] })
-      }
+      await createDocumentOfKind(projectName, path, kind)
       await refreshFiles?.()
       onCreated?.(path)
     } catch (error) {

@@ -27,7 +27,7 @@ fn preset(
 pub fn story_folder_presets() -> Vec<StoryFolderPreset> {
     vec![
         preset("characters", "Characters", "Character Folder", "Character", "characters", &[]),
-        preset("settings", "Settings", "Setting Folder", "Setting", "settings", &[]),
+        preset("settings", "Settings", "Setting Folder", "Setting", "settings", &["Locations", "Places"]),
         preset("outline", "Outline", "Outline Folder", "Outline Entry", "outline", &[]),
         preset("novel", "Novel", "Novel Folder", "Chapter", "novel", &["Book"]),
     ]
@@ -67,6 +67,17 @@ pub fn get_story_folder_preset_for_entry(
         .iter()
         .rev()
         .find_map(|segment| get_story_folder_preset_by_name(segment))
+}
+
+/// A doc filed under a Settings folder (or one called Locations or Places) — what a
+/// map pin links to by default.
+pub fn is_location_doc(doc_path: &str) -> bool {
+    get_story_folder_preset_for_entry(doc_path, "file").is_some_and(|preset| preset.key == "settings")
+}
+
+/// A doc filed under a Characters folder — what travels a map's routes.
+pub fn is_character_doc(doc_path: &str) -> bool {
+    get_story_folder_preset_for_entry(doc_path, "file").is_some_and(|preset| preset.key == "characters")
 }
 
 /// The nearest preset folder a file lives in, with the path to create siblings in.

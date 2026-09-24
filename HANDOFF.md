@@ -15,20 +15,20 @@ Run all seven after every change, and the Swift tests below once you touch `nati
 They are fast and they have each caught something the others missed.
 
 ```bash
-npm test            # 598 assertions, 21 suites
+npm test            # 1,112 assertions, 28 suites
 npm run lint        # 0 errors AND 0 warnings is the current bar
 npm run typecheck   # tsc --noEmit
 npm run build       # the only thing that resolves dynamic imports and named exports
-npm run parity      # 15,915 cases through BOTH the JS and the Rust implementation
+npm run parity      # 17,264 cases through BOTH the JS and the Rust implementation
 npm run types:check # fails if the generated TS/Swift is stale, and typechecks the Swift
-(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 125 tests
+(cd src-tauri && cargo build --workspace && cargo test --workspace)   # 141 tests
 ```
 
 And for the Swift shell (Phase 5), after `./scripts/build-xcframework.sh` and `npm run build`:
 
 ```bash
 xcodebuild test -project native/inkblot-core/inkblot-core.xcodeproj -scheme inkblot-core \
-  -destination 'platform=macOS' -only-testing:inkblot-coreTests      # 29 tests
+  -destination 'platform=macOS' -only-testing:inkblot-coreTests      # 73 tests
 ```
 
 `parity` and `types:check` arrived with Phase 2 and need `cargo` and
@@ -1007,6 +1007,86 @@ logic, and every export format) and the `editor` suite mounts a pane as pages.
 real PDF from both shells; the Swift Page tab in use; the Tauri Page Setup sheet; a
 folded 16-page signature; an EPUB in Apple Books or `epubcheck`; a Pinterest board's
 embed iframe in print (a cloned iframe reloads, and may print blank).
+
+## Maps — branch `maps`
+
+A third document kind beside text and canvas: `Name.map`, stored as `Name.map.json`.
+A map holds places (pins, optionally linked to project documents), routes, regions
+with terrain, labels, and characters' journeys on a story timeline. It starts from one
+of four kinds: a blank sheet at a chosen scale, a picture (which can be traced to
+vectors), the Earth (Natural Earth, bundled — no network), or a star system with Kepler
+orbits. Travel times come from the scale, a transport (walking to a fraction of c) and
+the terrain crossed.
+
+**Where it lives.** The pure logic is `src/lib/map/`: model, geometry, units, geodesy,
+spaces, transports, travel, calendar, timeline, orbits, stars and the tracer. The UI is
+`src/map/`: `MapPane` → `MapSurface`, with `MapLayers` as the one renderer that the
+surface, thumbnails and export all share. `npm test` covers it in three suites:
+`maplib` (the libraries), `maptrace` (the tracer, on synthetic images) and `mapdom`
+(the real pane in jsdom under StrictMode).
+
+**The rules it follows, and why:**
+
+- **Kind comes from the suffix only.** `docKind.js` and `doc_kind.rs` (`DocKind::Map`,
+  and `is_map_doc` over FFI for the Swift tree) decide it. Every `isCanvasDoc` site was
+  checked: most now ask `!isTextDoc`, because what they meant was "not a text document".
+  A map that reaches `saveDocument` is wiped. `mapdom` checks that an edit lands on
+  disk as a map.
+- **A `.map` that is not a map is never written over.** People named text documents
+  `Treasure.map` before maps existed. `loadMapDocument` returns `foreign`, the pane says
+  so, and `saveMapDocument` writes through `writeDocumentRawIf(…, isMapPayload)`. The
+  Rust store's `save_map_document` makes the same check.
+- **Links survive renames.** After a rename or move, `mapLinks.followMovedDoc` rewrites
+  every map on disk. It also fires `map:doc-moved`, so an open map makes the same change
+  in memory; otherwise its next autosave would write the old path back. A deleted
+  document leaves its pin in place, marked missing.
+- **Viewport and timeline day are saved but not undone.** They live in refs and are
+  folded in at save time. `useMapDocument`'s debounced savers take the map, day and
+  viewport as arguments, so no ref is read while they are built (`react-hooks/refs`).
+- **The story calendar is per project** (`.story/calendar.json`), not per map. Every
+  map reads journey dates off it, and `story-calendar:changed` tells open maps to
+  re-read it.
+- **Marks keep their size at every zoom.** Pins and handles are scaled by
+  `--map-inv-zoom`, and strokes use `vector-effect: non-scaling-stroke`. The world
+  transform sits on one `<g>`, so vectors stay sharp at 256×.
+- **Heavy things are lazy.** d3-geo, topojson-client and world-atlas load only when an
+  Earth map opens; the 110m and 50m atlases are separate chunks. The tracer runs in a
+  module worker (`trace.worker.js`) and falls back to the main thread if the worker
+  will not start under the `inkblot://` scheme.
+
+**Rust scope — narrower than the plan, on purpose.** Rust twins what Rust itself uses,
+and parity checks it:
+
+- the document kind
+- the Settings aliases (Locations, Places)
+- normalizing and creating maps, word counts, document refs and the viewport
+- map search matches
+- version entries
+
+The maths modules (geometry, units, geodesy, travel, calendar, timeline, orbits, stars)
+are **JS only**. Nothing in Rust or Swift calls them, and a twin with no caller is a
+second copy to keep in step for no gain. If the Swift shell ever computes travel or
+positions natively, port the module it needs then, with parity cases and the
+12-significant-digit `canon` step the plan describes for trigonometry.
+
+**Where it differs from the plan:**
+
+- **The tool bar floats inside the map** instead of going through the titlebar with a
+  `mapToolbarChanged` bridge pair. It works the same in both shells and in either half
+  of a split, and there is no protocol to keep in step.
+- **Embedding in a chapter is "Copy image"** (a PNG on the clipboard, from the
+  export panel), not a live TipTap `mapEmbed` node. Canvases do show a live
+  `MapThumbnail` for a map file card. PDF export goes through `src/print`'s figure job.
+- **The Swift shell gets:**
+  - New Map in the + menu and the context menu
+  - a Maps filter
+  - the `map` symbol in the outline
+
+**Not yet verified by hand:**
+- the manual checks listed in the plan, in either shell
+- the worker loading under `inkblot://` in the Swift shell
+- the Earth chunks' first-open latency in WebKit
+- the SVG filter cost of the fantasy themes at high zoom
 
 ## Things that will bite you
 

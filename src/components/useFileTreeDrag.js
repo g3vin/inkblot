@@ -9,6 +9,7 @@
 import { useCallback, useEffect } from 'react'
 import { moveEntry } from '../lib/entryOperations'
 import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
+import { dispatchMapDropDoc, mapSurfaceAt } from '../map/mapEvents'
 import { getParentPath, remapOrderForFolder } from '../lib/fileTreeOrder'
 
 export function useFileTreeDrag({
@@ -240,6 +241,13 @@ export function useFileTreeDrag({
             clientX: point.x,
             clientY: point.y,
           })
+          return
+        }
+        // Onto an open map: a pin for a place, a traveler for a character. Same rule —
+        // it must not fall through to performMove.
+        const mapSurface = mapSurfaceAt(point.x, point.y)
+        if (mapSurface) {
+          dispatchMapDropDoc(mapSurface, { path: drag.path, clientX: point.x, clientY: point.y })
           return
         }
       }

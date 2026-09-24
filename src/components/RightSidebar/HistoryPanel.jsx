@@ -19,7 +19,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getVersions } from '../../lib/FileSystem'
-import { isCanvasDoc } from '../../lib/docKind'
+import { isCanvasDoc, isMapDoc, isTextDoc } from '../../lib/docKind'
+import { summarizeMapChange } from '../../lib/map/mapModel'
 import {
   describeCanvasDiff,
   diffCanvases,
@@ -103,6 +104,9 @@ export default function HistoryPanel({
   onOpenCompare,
 }) {
   const isCanvas = isCanvasDoc(docName)
+  const isMap = isMapDoc(docName)
+  // A canvas or map: no editor to snapshot from, no archive, word counts from names.
+  const isStructured = !isTextDoc(docName)
   const [localVersions, setLocalVersions] = useState(Array.isArray(versions) ? versions : [])
   const [namedOnly, setNamedOnly] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState(() => new Set())
@@ -250,6 +254,10 @@ export default function HistoryPanel({
   const renderPreview = (entry) => {
     const prev = previousOf.get(String(entry.id))
 
+    if (isMap) {
+      return <span className="history-preview-text">{summarizeMapChange(prev?.map, entry.map)}</span>
+    }
+
     if (isCanvas) {
       const cards = entry.canvas?.nodes?.length ?? 0
       if (!prev?.canvas) {
@@ -268,7 +276,7 @@ export default function HistoryPanel({
 
   const entryDelta = (entry) => {
     const prev = previousOf.get(String(entry.id))
-    if (isCanvas) {
+    if (isStructured) {
       const diff = versionWords(entry) - (prev ? versionWords(prev) : 0)
       return { added: Math.max(diff, 0), removed: Math.max(-diff, 0) }
     }
@@ -305,16 +313,19 @@ export default function HistoryPanel({
             >
               <SFIcon name="clock" size={13} />
             </button>
-            <button
-              className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
-              title="Compare / merge"
-              onClick={(event) => {
-                event.stopPropagation()
-                onOpenCompare?.(docName, id, 'current')
-              }}
-            >
-              <SFIcon name="git.pullrequest" size={13} />
-            </button>
+            {/* Compare/merge knows prose and cards; a map restores or copies whole. */}
+            {isMap ? null : (
+              <button
+                className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
+                title="Compare / merge"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onOpenCompare?.(docName, id, 'current')
+                }}
+              >
+                <SFIcon name="git.pullrequest" size={13} />
+              </button>
+            )}
             <button
               className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
               title="Make a copy as a new document"
@@ -378,7 +389,7 @@ export default function HistoryPanel({
     const newest = group.entries[0]
     const oldest = group.entries[group.entries.length - 1]
     const prevBeforeGroup = previousOf.get(String(oldest.id))
-    const groupDelta = isCanvas
+    const groupDelta = isStructured
       ? (() => {
           const diff = versionWords(newest) - (prevBeforeGroup ? versionWords(prevBeforeGroup) : 0)
           return { added: Math.max(diff, 0), removed: Math.max(-diff, 0) }
@@ -427,10 +438,12 @@ export default function HistoryPanel({
   const emptyMessage = displayedVersions.length === 0
     ? (isCanvas
         ? 'No versions yet. Checkpoints appear as you work on the canvas.'
-        : 'No versions yet. Checkpoints appear as you write.')
+        : isMap
+          ? 'No versions yet. Checkpoints appear as you work on the map.'
+          : 'No versions yet. Checkpoints appear as you write.')
     : (namedOnly ? 'No named versions yet — name one from its row.' : 'No matching versions.')
 
-  if (showArchive && !isCanvas) {
+  if (showArchive && !isStructured) {
     return (
       <div className="sidebar-panel history-panel">
         <ArchivePanel
@@ -449,7 +462,7 @@ export default function HistoryPanel({
         <button
           className="panel-action-btn panel-action-btn-small history-snapshot-btn"
           onClick={() => void snapshotNow()}
-          disabled={busy || (!isCanvas && !editor)}
+          disabled={busy || (!isStructured && !editor)}
           title="Save the current state as a version you can name"
         >
           <SFIcon name="plus" size={12} />
@@ -463,7 +476,7 @@ export default function HistoryPanel({
         >
           <SFIcon name="line.3.horizontal.decrease.circle" size={14} />
         </button>
-        {isCanvas ? null : (
+        {isStructured ? null : (
           <button
             className="panel-action-btn panel-action-btn-small panel-icon-btn"
             onClick={() => setShowArchive(true)}

@@ -105,7 +105,7 @@ struct FileTreeSidebar: View {
                     .fixedSize()
                     .padding(8)
                     .glassEffect(.regular.interactive(), in: .circle)
-                    .help("New Document, Canvas or Folder")
+                    .help("New Document, Canvas, Map or Folder")
 
                     FilterBar(filter: $filter) { expansion = .init() }
                 }
@@ -123,6 +123,7 @@ struct FileTreeSidebar: View {
     private func newItems(in folder: String) -> some View {
         Button("New Document", systemImage: "doc.text") { ask(.create(.document, in: folder)) }
         Button("New Canvas", systemImage: "rectangle.on.rectangle") { ask(.create(.canvas, in: folder)) }
+        Button("New Map", systemImage: "map") { ask(.create(.map, in: folder)) }
         Button("New Folder", systemImage: "folder") { ask(.create(.folder, in: folder)) }
     }
 
@@ -132,6 +133,7 @@ struct FileTreeSidebar: View {
         var items: [NSMenuItem] = [
             ClosureMenuItem("New Document", systemImage: "doc.text") { ask(.create(.document, in: folder)) },
             ClosureMenuItem("New Canvas", systemImage: "rectangle.on.rectangle") { ask(.create(.canvas, in: folder)) },
+            ClosureMenuItem("New Map", systemImage: "map") { ask(.create(.map, in: folder)) },
             ClosureMenuItem("New Folder", systemImage: "folder") { ask(.create(.folder, in: folder)) },
         ]
         guard let entry else { return items }
@@ -336,6 +338,7 @@ struct NamePrompt: Identifiable {
         switch action {
         case .create(.document, _): "New Document"
         case .create(.canvas, _): "New Canvas"
+        case .create(.map, _): "New Map"
         case .create(.folder, _): "New Folder"
         case .rename(let entry): "Rename “\(entry.displayName)”"
         }

@@ -332,6 +332,11 @@ pub fn is_canvas_doc(path: String) -> bool {
     inkblot_core::doc_kind::is_canvas_doc(&path)
 }
 
+#[uniffi::export]
+pub fn is_map_doc(path: String) -> bool {
+    inkblot_core::doc_kind::is_map_doc(&path)
+}
+
 /// What a document is called in the UI: its last path segment, without `.canvas`.
 #[uniffi::export]
 pub fn doc_display_name(path: String) -> String {

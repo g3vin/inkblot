@@ -1,0 +1,348 @@
+/**
+ * maplib — the map document's pure libraries: the model, geometry, spaces, the Earth,
+ * travel, the calendar, the timeline and orbits.
+ *
+ * Every assertion here is a fact a writer would notice if it were false: a pin that
+ * loses its link on rename, a forest that does not slow a horse, a character who
+ * arrives before they leave, London–New York the wrong length, a year that does not
+ * bring the Earth back round.
+ */
+import {
+  normalizeMap, createEmptyMap, serializeMap, isMapPayload, rewriteMapDocRefs, countMapWords,
+  summarizeMapChange, mapDocRefs,
+} from '../../src/lib/map/mapModel.js'
+import {
+  cumulativeLengths, pointAtDistance, catmullRomSample, ringArea, regionArea, pointInRegion,
+  segmentRingCrossings, nearestOnPolyline, simplifyDP, chaikin, polylineLength,
+} from '../../src/lib/map/mapGeometry.js'
+import { createSpace, measuredLine, pointAtKm, calibrationKmPerUnit, routeCoords } from '../../src/lib/map/mapSpace.js'
+import { haversineKm, densifyGreatCircle, interpolateGreatCircle, initialBearing } from '../../src/lib/map/geodesy.js'
+import { toKm, fromKm, formatDistance, formatDuration } from '../../src/lib/map/mapUnits.js'
+import { resolveTransport, lorentzGamma, properTimeDays, effectiveKmh } from '../../src/lib/map/transports.js'
+import { travelProfile, legTravel, kmAfter, distanceMatrix, terrainAt } from '../../src/lib/map/travel.js'
+import { normalizeCalendar, toParts, fromParts, formatDay, daysFromCivil, civilFromDays } from '../../src/lib/map/calendar.js'
+import { buildSchedule, travelerPositionAt, mapConflicts, crossScheduleConflicts } from '../../src/lib/map/timeline.js'
+import { systemPositionsAt, solveKepler, periodDays, orbitPeriod, interceptDays, bodyMass } from '../../src/lib/map/orbits.js'
+import { massToLuminosity, temperatureToColor, habitableZoneAU } from '../../src/lib/map/stars.js'
+import { zoomMapAt, screenToWorld, worldToScreen, fitMapBounds, clampMapZoom } from '../../src/lib/map/mapViewport.js'
+import { createProjector, systemToWorld, worldToSystem } from '../../src/lib/map/mapProjection.js'
+
+const ok = (label, condition) => {
+  console.log(`${condition ? 'PASS' : 'FAIL'}  ${label}`)
+  if (!condition) process.exitCode = 1
+}
+const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps
+const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
+
+/* ---------------- model ---------------- */
+
+{
+  const map = normalizeMap({
+    mapKind: 'image',
+    futureKey: 1,
+    pins: [{ id: 'a', at: [0, 0], doc: 'Settings/Port', aura: 'gold' }, { id: 'b', at: [10, 0] }],
+    routes: [{ id: 'r', nodes: [{ pin: 'a' }, { pin: 'b' }] }],
+    travelers: [{ id: 't', doc: 'Characters/Anna', legs: [{ id: 'l', from: 'a', to: 'b' }] }],
+  })
+  ok('unknown keys survive normalize at the top and on items', map.futureKey === 1 && map.pins[0].aura === 'gold')
+  const round = normalizeMap(JSON.parse(JSON.stringify(serializeMap(map, { x: 5, y: 6, zoom: 2 }))))
+  ok('serialize → normalize round-trips, viewport included', round.pins.length === 2 && round.viewport.zoom === 2 && round.futureKey === 1)
+
+  const renamed = rewriteMapDocRefs(map, 'Settings/Port', 'Settings/Harbour', 'file')
+  ok('renaming a linked doc rewrites the pin', renamed.changed && renamed.map.pins[0].doc === 'Settings/Harbour')
+  const movedFolder = rewriteMapDocRefs(map, 'Characters', 'People', 'folder')
+  ok('moving a folder rewrites travelers under it', movedFolder.map.travelers[0].doc === 'People/Anna')
+  const untouched = rewriteMapDocRefs(map, 'Settings/Portly', 'x', 'file')
+  ok('an unrelated rename leaves the map object as it was', !untouched.changed && untouched.map === map)
+  const deleted = rewriteMapDocRefs(map, 'Settings/Port', null, 'file')
+  ok('a delete keeps the link (the pin shows as missing)', !deleted.changed && deleted.map.pins[0].doc === 'Settings/Port')
+  ok('doc refs are listed once each', JSON.stringify(mapDocRefs(map)) === JSON.stringify(['Settings/Port', 'Characters/Anna']))
+
+  ok('a text document is not a map payload', !isMapPayload({ content: [], notes: [] }) && isMapPayload(null) && isMapPayload({ type: 'map' }))
+  const empty = createEmptyMap('blank', { setupPending: true })
+  ok('a new blank map is a sheet and remembers it wants setting up', empty.background.width === 4000 && empty.setupPending === true)
+  ok('words are counted from names and labels', countMapWords({ pins: [{ name: 'Old Quay' }], labels: [{ text: 'Grey Sea' }] }) === 4)
+  ok('history rows summarise counts', summarizeMapChange(null, map) === 'Snapshot · 2 places, 1 route, 1 traveler')
+  ok('history rows summarise changes', summarizeMapChange(map, { ...map, pins: [map.pins[0]], routes: [] }) === '−1 place, −1 route')
+}
+
+/* ---------------- geometry ---------------- */
+
+{
+  const line = [[0, 0], [3, 4], [3, 10]]
+  ok('cumulative lengths', JSON.stringify(cumulativeLengths(line)) === '[0,5,11]')
+  const mid = pointAtDistance(line, 8)
+  ok('point at distance lands on the second segment', near(mid.point[0], 3) && near(mid.point[1], 7) && mid.index === 1)
+  const smooth = catmullRomSample([[0, 0], [10, 5], [20, 0], [30, 8]], 8)
+  const controlsHit = [[0, 0], [10, 5], [20, 0], [30, 8]].every((control) => smooth.some((p) => near(p[0], control[0]) && near(p[1], control[1])))
+  ok('a Catmull–Rom curve passes through every control point', controlsHit)
+  ok('the curve is longer than the polyline it smooths', polylineLength(smooth) >= polylineLength([[0, 0], [10, 5], [20, 0], [30, 8]]) - 1e-9)
+  const square = [[0, 0], [10, 0], [10, 10], [0, 10]]
+  const hole = [[4, 4], [6, 4], [6, 6], [4, 6]]
+  ok('shoelace area', ringArea(square) === 100)
+  ok('a hole is subtracted', regionArea([square, hole]) === 96)
+  ok('a point in the hole is outside the region', !pointInRegion([5, 5], [square, hole]) && pointInRegion([2, 2], [square, hole]))
+  const cuts = segmentRingCrossings([-5, 5], [15, 5], square)
+  ok('a segment through a square crosses it twice, in order', cuts.length === 2 && near(cuts[0], 0.25) && near(cuts[1], 0.75))
+  const nearest = nearestOnPolyline(line, [0, 7])
+  ok('nearest point on a polyline', near(nearest.point[0], 3) && near(nearest.point[1], 7) && nearest.index === 1)
+  const noisy = [[0, 0], [1, 0.01], [2, -0.01], [3, 0], [3, 5]]
+  ok('Douglas–Peucker drops points within epsilon', simplifyDP(noisy, 0.1).length === 3)
+  ok('Chaikin keeps an open line’s ends', JSON.stringify(chaikin([[0, 0], [10, 0], [10, 10]], 2).at(-1)) === '[10,10]')
+}
+
+/* ---------------- units, spaces, calibration ---------------- */
+
+{
+  ok('fifty miles is 80.4672 km', near(toKm(50, 'mi'), 80.4672))
+  ok('km back to miles', near(fromKm(80.4672, 'mi'), 50))
+  ok('a custom unit is honoured', near(toKm(2, 'league', { scale: { customUnits: [{ id: 'league', km: 5 }] } }), 10))
+  ok('calibration: 100 px is 50 mi → 0.804672 km/px', near(calibrationKmPerUnit([0, 0], [100, 0], toKm(50, 'mi')), 0.804672))
+  const plane = createSpace({ mapKind: 'image', scale: { kmPerUnit: 2 } })
+  ok('a plane space scales by km per unit', plane.distanceKm([0, 0], [3, 4]) === 10)
+  ok('distances format with units', formatDistance(80.4672, 'mi') === '50 mi')
+  ok('durations read like a writer would say them', formatDuration(3.5) === '3 days 12 hours' && formatDuration(0.25) === '6 hours')
+}
+
+/* ---------------- the Earth ---------------- */
+
+{
+  const london = [-0.1278, 51.5074]
+  const newYork = [-74.006, 40.7128]
+  const km = haversineKm(london, newYork)
+  ok(`London–New York ≈ 5570 km (got ${km.toFixed(0)})`, within(km, 5570, 0.005))
+  const dense = densifyGreatCircle(london, newYork, 50)
+  const steps = dense.slice(1).map((point, index) => haversineKm(dense[index], point))
+  ok('a densified great circle has even steps under the limit', steps.every((step) => step <= 50.0001 && near(step, steps[0], 1e-6)))
+  const across = densifyGreatCircle([179, 0], [-179, 0], 50)
+  const earth = createSpace({ mapKind: 'earth' })
+  ok('a route across the antimeridian is short, not the long way round', within(measuredLine(earth, [[179, 0], [-179, 0]]).totalKm, haversineKm([179, 0], [-179, 0]), 1e-9) && across.length < 10)
+  const half = interpolateGreatCircle([0, 0], [90, 0], 0.5)
+  ok('halfway along the equator', near(half[0], 45, 1e-9) && near(half[1], 0, 1e-9))
+  ok('due east is 90°', near(initialBearing([0, 0], [10, 0]), 90, 1e-9))
+
+  for (const projection of ['equalEarth', 'equirectangular', 'mercator', 'naturalEarth', 'orthographic']) {
+    const projector = createProjector({ mapKind: 'earth', earth: { projection, rotate: [0, 0] } })
+    const world = projector.toWorld([12.5, 41.9])
+    const back = projector.fromWorld(world)
+    ok(`${projection}: project → invert round-trips Rome`, back && near(back[0], 12.5, 1e-6) && near(back[1], 41.9, 1e-6))
+  }
+  const globe = createProjector({ mapKind: 'earth', earth: { projection: 'orthographic', rotate: [0, 0] } })
+  ok('the far side of the globe is not drawn', globe.toWorld([180, 0]) === null)
+}
+
+/* ---------------- travel ---------------- */
+
+{
+  const map = normalizeMap({
+    mapKind: 'image',
+    scale: { kmPerUnit: 1 },
+    pins: [{ id: 'a', at: [0, 50] }, { id: 'b', at: [100, 50] }],
+    terrains: [{ id: 'forest', multipliers: { horse: 0.5 } }, { id: 'road', multipliers: { '*land': 2 } }, { id: 'lake', multipliers: { '*land': 0 } }],
+    regions: [
+      { id: 'woods', terrain: 'forest', rings: [[[25, 0], [75, 0], [75, 100], [25, 100]]] },
+    ],
+  })
+  const space = createSpace(map)
+  const horse = resolveTransport(map, 'horse')
+  const line = measuredLine(space, [[0, 50], [100, 50]])
+  const profile = travelProfile(map, space, line, horse)
+  ok('a line through a forest is cut exactly at its edges', profile.pieces.length === 3 && near(profile.pieces[0].toKm, 25) && near(profile.pieces[1].toKm, 75))
+  // 50 km at 8 km/h + 50 km at 4 km/h = 6.25 + 12.5 = 18.75 h → at 8 h a day, 2.34 days.
+  ok('the forest halves a horse’s speed', near(profile.hours, 18.75) && near(profile.days, 18.75 / 8))
+  const walk = travelProfile(map, space, line, resolveTransport(map, 'walk'))
+  ok('terrain only slows the transports it names', near(walk.hours, 20))
+  ok('the topmost region wins where regions overlap', (() => {
+    const layered = { ...map, regions: [...map.regions, { id: 'r2', terrain: 'road', rings: [[[40, 0], [60, 0], [60, 100], [40, 100]]] }] }
+    return terrainAt(layered, space, [50, 50])?.id === 'road' && terrainAt(layered, space, [30, 50])?.id === 'forest'
+  })())
+  const blocked = { ...map, regions: [{ id: 'l', terrain: 'lake', rings: [[[40, 0], [60, 0], [60, 100], [40, 100]]] }] }
+  const crossing = travelProfile(blocked, space, line, horse)
+  ok('impassable terrain is flagged but still takes finite time', crossing.impassable && Number.isFinite(crossing.days))
+  // A quarter of the 18.75 h is 4.6875 h: 3.125 h across the open first 25 km, then
+  // 1.5625 h into the forest at 4 km/h — 6.25 km, not the 12.5 an even pace would give.
+  ok('a traveller slows in the forest rather than moving at an average pace', near(kmAfter(profile, profile.days / 4), 31.25))
+  const custom = normalizeMap({ ...map, transports: [{ id: 'horse', name: 'Warhorse', kmh: 12, hoursPerDay: 10 }] })
+  ok('a map’s own transport overrides the built-in', resolveTransport(custom, 'horse').kmh === 12)
+  ok('γ at 0.9c is 2.294', near(lorentzGamma(0.9), 2.294157338705618, 1e-12))
+  ok('a traveller at 0.9c ages less', near(properTimeDays(10, 0.9), 10 / 2.294157338705618, 1e-12))
+  ok('light fractions become km/h', near(effectiveKmh(resolveTransport(map, 'light50')), 0.5 * 1079252848.8))
+  const matrix = distanceMatrix(map, space, ['a', 'b'], 'walk')
+  ok('the distance matrix is symmetric with a zero diagonal', matrix[0][0].km === 0 && near(matrix[0][1].km, matrix[1][0].km) && near(matrix[0][1].km, 100))
+  const leg = legTravel(map, space, { from: 'b', to: 'a', route: null, transport: 'horse' }, 0)
+  ok('a leg with no route goes straight', near(leg.line.totalKm, 100))
+}
+
+/* ---------------- routes ---------------- */
+
+{
+  const map = normalizeMap({
+    pins: [{ id: 'a', at: [0, 0] }, { id: 'b', at: [30, 40] }],
+    routes: [{ id: 'r', nodes: [{ pin: 'a' }, { at: [0, 40] }, { pin: 'b' }] }],
+  })
+  const space = createSpace(map)
+  ok('a route through a pin follows the pin', JSON.stringify(routeCoords(map, space, map.routes[0])) === '[[0,0],[0,40],[30,40]]')
+  const leg = legTravel(map, space, { from: 'b', to: 'a', route: 'r', transport: 'walk' }, 0)
+  ok('a route travelled backwards is reversed, not jumped', near(leg.line.totalKm, 70) && JSON.stringify(leg.line.points[0]) === '[30,40]')
+  const at = pointAtKm(space, measuredLine(space, [[0, 0], [0, 40], [30, 40]]), 55)
+  ok('the point 55 km along', near(at.point[0], 15) && near(at.point[1], 40))
+}
+
+/* ---------------- calendar ---------------- */
+
+{
+  ok('the Unix epoch is day 0', daysFromCivil(1970, 1, 1) === 0)
+  ok('2000-03-01 is day 11017', daysFromCivil(2000, 3, 1) === 11017)
+  let roundTrips = true
+  for (let z = -100000; z <= 100000; z += 997) {
+    const { year, month, day } = civilFromDays(z)
+    if (daysFromCivil(year, month, day) !== z) roundTrips = false
+  }
+  ok('civil dates round-trip over ±10⁵ days', roundTrips)
+  const gregorian = normalizeCalendar({ mode: 'gregorian', gregorianEpoch: '1850-03-01' })
+  ok('day 0 of an 1850 story is 1 March 1850', formatDay(gregorian, 0) === '1 March 1850')
+  ok('and day 365 is 1 March 1851', formatDay(gregorian, 365) === '1 March 1851')
+  ok('1 March 1850 was a Friday', toParts(gregorian, 0).weekday === 'Friday')
+  ok('a time of day is shown when asked', formatDay(gregorian, 0.5, { withTime: true }) === '1 March 1850, 12:00')
+  const custom = normalizeCalendar({
+    mode: 'custom',
+    custom: { months: [{ name: 'Ice', days: 10 }, { name: 'Sun', days: 20 }], yearZero: 100, era: 'AR', leap: { every: 4, days: 1, month: 1 } },
+  })
+  let customRoundTrips = true
+  for (let day = -3000; day <= 3000; day += 7) {
+    if (fromParts(custom, toParts(custom, day)) !== day) customRoundTrips = false
+  }
+  ok('a custom calendar with leap days round-trips', customRoundTrips)
+  ok('a custom calendar writes its own dates', formatDay(custom, 0) === '1 Ice, Year 100 AR')
+  ok('year 0 of a 4-year leap cycle has the leap day', formatDay(custom, 10) === '11 Ice, Year 100 AR' && formatDay(custom, 11) === '1 Sun, Year 100 AR')
+  ok('day mode counts from Day 1', formatDay(normalizeCalendar(null), 0) === 'Day 1')
+}
+
+/* ---------------- timeline ---------------- */
+
+{
+  const map = normalizeMap({
+    scale: { kmPerUnit: 1 },
+    pins: [{ id: 'a', at: [0, 0], doc: 'Settings/A' }, { id: 'b', at: [40, 0], doc: 'Settings/B' }, { id: 'c', at: [80, 0] }],
+    travelers: [
+      {
+        id: 'anna', doc: 'Characters/Anna', startPin: 'a', startDay: 2,
+        legs: [
+          { id: 'l1', from: 'a', to: 'b', transport: 'walk' },
+          { id: 'l2', from: 'b', to: 'c', transport: 'walk', restDays: 1 },
+        ],
+      },
+    ],
+  })
+  const space = createSpace(map)
+  const schedule = buildSchedule(map, space, map.travelers[0])
+  // 40 km at 5 km/h, 8 h a day = 1 day per leg.
+  ok('arrival is departure plus travel time', near(schedule.intervals[0].to, 3))
+  ok('rest days sit between legs', near(schedule.intervals[1].from, 3) && near(schedule.intervals[1].to, 4) && schedule.intervals[1].kind === 'stay')
+  ok('the traveller stays where they end up', schedule.intervals.at(-1).to === Infinity && schedule.intervals.at(-1).pin === 'c')
+  ok('before the start, nowhere', travelerPositionAt(map, space, schedule, 1) === null)
+  const halfway = travelerPositionAt(map, space, schedule, 2.5)
+  ok('halfway through a leg, halfway along it', near(halfway.point[0], 20) && near(halfway.point[1], 0))
+  ok('resting at the second place', JSON.stringify(travelerPositionAt(map, space, schedule, 3.5).point) === '[40,0]')
+  ok('no conflicts in a sound itinerary', mapConflicts(map, space).length === 0)
+
+  const broken = normalizeMap({
+    ...map,
+    travelers: [{
+      id: 'anna', doc: 'Characters/Anna', startPin: 'a', startDay: 2,
+      legs: [
+        { id: 'l1', from: 'a', to: 'b', transport: 'walk' },
+        { id: 'l2', from: 'c', to: 'a', transport: 'walk', departDay: 2.5 },
+      ],
+    }],
+  })
+  const kinds = mapConflicts(broken, space).map((conflict) => conflict.kind).sort()
+  ok('an early departure and a teleport are both caught', JSON.stringify(kinds) === '["discontinuity","overlap"]')
+
+  const twice = normalizeMap({
+    ...map,
+    travelers: [
+      { id: 't1', doc: 'Characters/Anna', startPin: 'a', startDay: 0, legs: [] },
+      { id: 't2', doc: 'Characters/Anna', startPin: 'c', startDay: 5, legs: [] },
+    ],
+  })
+  const two = mapConflicts(twice, space).filter((conflict) => conflict.kind === 'twoPlaces')
+  ok('one character in two places at once', two.length === 1 && two[0].from === 5)
+
+  // Across maps: the same place on two maps is the same place.
+  const scheduleA = buildSchedule(twice, space, { id: 'x', doc: 'Characters/Bo', startPin: 'a', startDay: 0, legs: [] })
+  const scheduleB = buildSchedule(twice, space, { id: 'y', doc: 'Characters/Bo', startPin: 'a', startDay: 0, legs: [] })
+  const sharedPlace = crossScheduleConflicts([
+    { mapPath: 'One.map', schedule: scheduleA, pinDocs: new Map([['a', 'Settings/A']]) },
+    { mapPath: 'Two.map', schedule: scheduleB, pinDocs: new Map([['a', 'Settings/A']]) },
+  ])
+  ok('the same location doc on two maps is not a conflict', sharedPlace.length === 0)
+}
+
+/* ---------------- orbits and stars ---------------- */
+
+{
+  ok(`the Earth's year is 365.25 days (${periodDays(1, 1).toFixed(3)})`, near(periodDays(1, 1), 365.256363, 1e-9))
+  let worst = 0
+  for (const e of [0, 0.1, 0.5, 0.9, 0.95]) {
+    for (let M = 0; M < Math.PI * 2; M += 0.37) {
+      const E = solveKepler(M, e)
+      worst = Math.max(worst, Math.abs(E - e * Math.sin(E) - M))
+    }
+  }
+  ok(`Kepler's equation is solved to 1e-12 (worst ${worst.toExponential(1)})`, worst < 1e-12)
+  const system = normalizeMap({
+    mapKind: 'system',
+    system: {
+      bodies: [
+        { id: 'sun', kind: 'star', massSun: 1 },
+        { id: 'earth', parent: 'sun', kind: 'planet', orbit: { aAU: 1, e: 0 } },
+        { id: 'moon', parent: 'earth', kind: 'moon', orbit: { aAU: 0.00257, e: 0 } },
+      ],
+    },
+  }).system
+  const start = systemPositionsAt(system, 0).get('earth')
+  const period = orbitPeriod(system.bodies[1], new Map(system.bodies.map((body) => [body.id, body])))
+  const later = systemPositionsAt(system, period).get('earth')
+  ok('a year later the Earth is back where it started', near(start[0], later[0], 1e-9) && near(start[1], later[1], 1e-9))
+  const quarter = systemPositionsAt(system, period / 4).get('earth')
+  ok('a circular orbit keeps its radius, and runs counter-clockwise', near(Math.hypot(...quarter), 1, 1e-9) && quarter[1] > 0.99)
+  const moon = systemPositionsAt(system, 10).get('moon')
+  const earthAt10 = systemPositionsAt(system, 10).get('earth')
+  ok('the Moon rides along with the Earth', near(Math.hypot(moon[0] - earthAt10[0], moon[1] - earthAt10[1]), 0.00257, 1e-12))
+  const fast = interceptDays((id, day) => systemPositionsAt(system, day).get(id), 'earth', 'moon', 0, 0.1 * 1079252848.8, 149597870.7)
+  ok('an intercept at 0.1c settles', !fast.approximate && fast.days < 1)
+  // A target whipping round at 1 AU a day, chased at walking pace from outside its orbit.
+  const slow = interceptDays((id, day) => (id === 'a' ? [2, 0] : [Math.cos(day), Math.sin(day)]), 'a', 'b', 0, 1, 149597870.7)
+  ok('a hopeless intercept says it is approximate', slow.approximate)
+  ok('a barycenter weighs its stars', bodyMass({ id: 'bc', kind: 'barycenter' }, new Map([['s1', { id: 's1', kind: 'star', massSun: 1, parent: 'bc' }], ['s2', { id: 's2', kind: 'star', massSun: 0.5, parent: 'bc' }]])) === 1.5)
+  let continuous = true
+  for (const edge of [0.43, 2, 55]) {
+    const below = massToLuminosity(edge - 1e-9)
+    const above = massToLuminosity(edge + 1e-9)
+    if (Math.abs(above - below) / above > 0.2) continuous = false
+  }
+  ok('the mass–luminosity law has no wild jumps at its breakpoints', continuous)
+  ok('the Sun is yellow-white', temperatureToColor(5772).startsWith('#ff'))
+  const zone = habitableZoneAU(1)
+  ok('the Sun’s habitable zone contains the Earth', zone[0] < 1 && zone[1] > 1)
+  const display = { radial: 'log', pxPerAU: 100 }
+  const drawn = systemToWorld([3, 4], display)
+  const back = worldToSystem(drawn, display)
+  ok('the log-radial display scale inverts', near(back[0], 3, 1e-9) && near(back[1], 4, 1e-9))
+  ok('1 AU is drawn at pxPerAU on either scale', near(systemToWorld([1, 0], display)[0], 100, 1e-9) && near(systemToWorld([1, 0], { radial: 'linear', pxPerAU: 100 })[0], 100))
+}
+
+/* ---------------- viewport ---------------- */
+
+{
+  const before = { x: 20, y: -80, zoom: 3 }
+  const anchor = screenToWorld(400, 300, before)
+  const after = zoomMapAt(before, 400, 300, 2.5)
+  const screen = worldToScreen(anchor.x, anchor.y, after)
+  ok('zooming keeps the point under the cursor', near(screen.x, 400) && near(screen.y, 300))
+  ok('the map zooms far past the canvas limits', clampMapZoom(200) === 200 && clampMapZoom(0.03) === 0.03)
+  const fit = fitMapBounds({ x: 0, y: 0, width: 4000, height: 3000 }, 800, 600, 0)
+  const center = worldToScreen(2000, 1500, fit)
+  ok('fit centers the sheet', near(center.x, 400) && near(center.y, 300))
+}

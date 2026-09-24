@@ -22,7 +22,7 @@ import { useEffect } from 'react'
 
 import { loadDocument, getVersions } from '../lib/FileSystem'
 import { isEditorReady } from '../lib/editorUtils'
-import { isCanvasDoc } from '../lib/docKind'
+import { isTextDoc } from '../lib/docKind'
 
 export function useEditorDocLoader({
   currentDoc,
@@ -50,7 +50,7 @@ export function useEditorDocLoader({
     if (!isEditorReady(editor) || !currentDoc) return
     // A canvas has no TipTap content — feeding its JSON to createDocument() would
     // throw. CanvasPane loads and saves it instead; this editor stays idle.
-    if (isCanvasDoc(currentDoc)) return
+    if (!isTextDoc(currentDoc)) return
     let cancelled = false
 
     const load = async () => {
@@ -108,7 +108,7 @@ export function useEditorDocLoader({
 
   useEffect(() => {
     if (!isEditorReady(secondaryEditor) || splitView !== 'editor' || !secondaryDoc) return
-    if (isCanvasDoc(secondaryDoc)) return
+    if (!isTextDoc(secondaryDoc)) return
     let cancelled = false
 
     const load = async () => {

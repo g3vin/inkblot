@@ -14,7 +14,8 @@
  */
 import { useState } from 'react'
 import { isAudioPath, isImagePath } from '../lib/assets'
-import { isCanvasDoc } from '../lib/docKind'
+import { getDocDisplayName, isCanvasDoc, isMapDoc } from '../lib/docKind'
+import MapThumbnail from '../map/MapThumbnail'
 import { useAssetUrl } from './useAssetUrl'
 import { useDocPreview, filePathToDocPath } from './useDocPreview'
 import { useCanvasPreview } from './useCanvasPreview'
@@ -146,6 +147,22 @@ export default function CanvasFileNode({ node, projectName }) {
   // A canvas is a document too, but it has no prose to preview — it gets a minimap.
   if (isCanvasDoc(filePathToDocPath(node.file))) {
     return <CanvasCanvasNode node={node} projectName={projectName} />
+  }
+
+  // A map is drawn as itself, small.
+  if (isMapDoc(filePathToDocPath(node.file))) {
+    const docPath = filePathToDocPath(node.file)
+    return (
+      <div className="canvas-doc">
+        <div className="canvas-doc-header">
+          <span className="canvas-doc-title">{getDocDisplayName(docPath)}</span>
+          <span className="canvas-doc-kind">map</span>
+        </div>
+        <div className="canvas-doc-body" style={{ padding: 0, overflow: 'hidden', flex: 1 }}>
+          <MapThumbnail projectName={projectName} docPath={docPath} />
+        </div>
+      </div>
+    )
   }
 
   return <CanvasDocNode node={node} projectName={projectName} />
