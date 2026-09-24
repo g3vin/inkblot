@@ -1,8 +1,8 @@
 /**
  * generateHTML — how every card that is NOT being edited renders.
  *
- * This was the single biggest untested path in the canvas: prosemirror-model reaches
- * for `window.document`, so it throws under bare Node, and every static card
+ * prosemirror-model reaches for `window.document`, so it throws under bare Node (this
+ * suite installs jsdom first), and every static card
  * (CanvasTextNode) plus every document preview (useDocPreview) goes through it. A
  * throw here blanks a card, and the only fallback is its plain text — so a silently
  * broken extension looks like "my formatting disappeared", not like an error.
@@ -23,7 +23,7 @@ const C = '../../src'
 const { generateHTML } = await import('@tiptap/core')
 const { getCardExtensions, getCardSchema, getDocPreviewExtensions } =
   await import(`${C}/lib/editorExtensions.js`)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const render = (content) => generateHTML(content, getCardExtensions())
 const renderPreview = (content) => generateHTML(content, getDocPreviewExtensions())

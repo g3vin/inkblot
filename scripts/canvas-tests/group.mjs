@@ -18,7 +18,7 @@ const {
   groupsToRefit,
   DEFAULT_GROUP_PADDING,
 } = await import(`${C}/lib/canvasModel.js`)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 let h = createHistory(createEmptyCanvas())
 const run = (a) => { h = historyReducer(h, a) }

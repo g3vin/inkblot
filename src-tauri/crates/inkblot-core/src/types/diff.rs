@@ -76,7 +76,12 @@ pub struct DiffChunk {
 
 impl DiffChunk {
     pub fn equal(blocks: Vec<HtmlBlock>) -> Self {
-        Self { chunk_type: DiffChunkType::Equal, blocks: Some(blocks), left: None, right: None }
+        Self {
+            chunk_type: DiffChunkType::Equal,
+            blocks: Some(blocks),
+            left: None,
+            right: None,
+        }
     }
 
     pub fn changed(left: Vec<HtmlBlock>, right: Vec<HtmlBlock>) -> Self {

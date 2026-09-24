@@ -7,10 +7,12 @@
  * collects pin images/links, and takes the result back over Tauri's IPC.
  * PinterestBoard.js consumes this via dynamic import.
  *
- * The script used to smuggle its payload out through `location.hash` while this file
- * polled `get_webview_url` every 220ms, because `eval_webview` throws its result away.
- * It now calls `pinterest_report_scrape` directly and Rust hands back a typed report —
- * see src-tauri/src/pinterest_commands.rs for why that works from a remote page.
+ * `eval_webview` throws the script's result away, so the injected script reports by
+ * calling `pinterest_report_scrape` itself, and `waitForScrapeReport` receives it. The
+ * slot is opened (`pinterest_begin_scrape`) before the script is injected, so a report
+ * can never arrive before anything is listening. See
+ * `src-tauri/crates/inkblot-models/src/scrape.rs` for why a remote page can make that
+ * call at all.
  */
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
@@ -309,11 +311,7 @@ export async function scrapePinterestPins(
     const elapsedSoFar = Date.now() - parseInt(requestId.split('-')[0], 10)
     const scriptTimeout = Math.max(3000, reqTimeoutMs - elapsedSoFar)
 
-    // One script for both strategies. The 'auto' path used to inject a separate
-    // DOM-only scraper, but that script was never valid JavaScript — backslashes
-    // in its regexes were eaten by the template literal it was written in, so it
-    // failed to parse in the page. Nothing ever requested 'auto' for the webview
-    // step (every caller passes 'session-only'), so it had no working users.
+    // One script for both strategies.
     const script = buildPinterestSessionScrapeScript({
       requestId,
       maxPins: reqMaxPins,

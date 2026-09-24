@@ -15,8 +15,7 @@
  *
  * .ts is erased rather than checked — esbuild does not typecheck, and nothing here
  * should. `npm run typecheck` is what looks at the types; this only has to make a
- * converted module runnable, so a Phase 3 conversion does not quietly drop a module
- * out of the suites that cover it.
+ * .ts module runnable, so converting a module to TypeScript keeps it under test.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -85,8 +84,8 @@ export async function load(url, context, next) {
 
   /**
    * `import.meta.glob` is a Vite build-time transform, not a runtime function, so a
-   * module using it throws on import under Node before any of its exports exist —
-   * which is what kept readAloud.js, and its chunker, unreachable from here.
+   * module using it (readAloud.js) throws on import under Node before any of its
+   * exports exist.
    *
    * It is rewritten to a call returning an empty map. Anything that actually needs the
    * globbed assets (the bundled Kokoro voice files) cannot work outside the app

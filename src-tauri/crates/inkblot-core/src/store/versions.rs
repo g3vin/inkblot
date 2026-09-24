@@ -32,7 +32,10 @@ pub fn build_text_version_entry(new_version: NewTextVersion) -> VersionEntry {
         name: new_version.name.filter(|name| !name.is_empty()),
         auto: new_version.auto,
         session_id: Some(new_version.session_id),
-        words: Some(count_words(new_version.content_html.as_deref().unwrap_or(""), true)),
+        words: Some(count_words(
+            new_version.content_html.as_deref().unwrap_or(""),
+            true,
+        )),
         content_html: new_version.content_html,
         content_json: new_version.content_json,
         canvas: None,
@@ -108,11 +111,16 @@ pub fn same_version_content(a: &VersionEntry, b: &VersionEntry) -> bool {
     }
     if a.canvas.is_some() || b.canvas.is_some() {
         let parts = |entry: &VersionEntry| {
-            entry.canvas.as_ref().map(|canvas| (canvas.nodes.clone(), canvas.edges.clone()))
+            entry
+                .canvas
+                .as_ref()
+                .map(|canvas| (canvas.nodes.clone(), canvas.edges.clone()))
         };
         return parts(a) == parts(b);
     }
-    a.content_html.as_deref().is_some_and(|html| !html.is_empty())
+    a.content_html
+        .as_deref()
+        .is_some_and(|html| !html.is_empty())
         && a.content_html == b.content_html
 }
 
@@ -192,13 +200,22 @@ mod tests {
     fn the_cap_never_evicts_a_named_version() {
         let mut versions: Vec<VersionEntry> = Vec::new();
         for index in 0..(VERSION_CAP + 50) {
-            let name = if index == 3 { Some("Final Submission") } else { None };
-            versions = push_version_entry(&versions, text_entry(&index.to_string(), &format!("<p>{index}</p>"), name));
+            let name = if index == 3 {
+                Some("Final Submission")
+            } else {
+                None
+            };
+            versions = push_version_entry(
+                &versions,
+                text_entry(&index.to_string(), &format!("<p>{index}</p>"), name),
+            );
         }
 
         let unnamed = versions.iter().filter(|entry| !is_named(entry)).count();
         assert_eq!(unnamed, VERSION_CAP);
-        assert!(versions.iter().any(|entry| entry.name.as_deref() == Some("Final Submission")));
+        assert!(versions
+            .iter()
+            .any(|entry| entry.name.as_deref() == Some("Final Submission")));
         // Eviction is oldest-first, so the newest entry is still at the front.
         assert_eq!(versions[0].id, (VERSION_CAP + 49).to_string());
     }

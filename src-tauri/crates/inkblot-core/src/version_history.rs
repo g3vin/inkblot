@@ -10,10 +10,10 @@
 //!
 //! Mirrors `src/lib/versionHistory.js`; `npm run parity` asserts the two agree.
 //!
-//! **Three things stay in JS**, because they are the webview's to do:
+//! **Three things live only in the webview**, because they need it:
 //!   - `htmlToBlocks`, which needs a real `DOMParser`. [`diff_block_lists`] takes the
 //!     blocks it produces, so the alignment — the part with the algorithm in it —
-//!     still lives here.
+//!     is here.
 //!   - the `toLocaleString` formatters, which are locale-dependent by design.
 //!   - `groupVersions`, which is built out of those formatters.
 
@@ -29,8 +29,8 @@ use crate::types::{
 };
 
 /* ============================================================
-   Editing sessions
-   ============================================================ */
+Editing sessions
+============================================================ */
 
 /// Stable session → hue. Same session, same color, across reloads of the panel.
 ///
@@ -54,8 +54,8 @@ pub fn session_color(session_id: &str) -> String {
 }
 
 /* ============================================================
-   Text extraction and word counts
-   ============================================================ */
+Text extraction and word counts
+============================================================ */
 
 static BLOCK_TAG_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)</(p|h[1-6]|li|blockquote|pre|div|tr)>|<br\s*/?>").unwrap());
@@ -114,7 +114,11 @@ pub fn text_words(text: &str) -> Vec<String> {
 }
 
 pub fn count_words(html_or_text: &str, is_html: bool) -> u32 {
-    let text = if is_html { html_to_text(html_or_text) } else { html_or_text.to_string() };
+    let text = if is_html {
+        html_to_text(html_or_text)
+    } else {
+        html_or_text.to_string()
+    };
     text_words(&text).len() as u32
 }
 
@@ -122,11 +126,20 @@ pub fn count_words(html_or_text: &str, is_html: bool) -> u32 {
 pub fn count_canvas_words(canvas: &CanvasFile) -> u32 {
     let mut total = 0;
     for node in &canvas.nodes {
-        total += node.text.as_deref().map_or(0, |text| text_words(text).len());
-        total += node.label.as_deref().map_or(0, |label| text_words(label).len());
+        total += node
+            .text
+            .as_deref()
+            .map_or(0, |text| text_words(text).len());
+        total += node
+            .label
+            .as_deref()
+            .map_or(0, |label| text_words(label).len());
     }
     for edge in &canvas.edges {
-        total += edge.label.as_deref().map_or(0, |label| text_words(label).len());
+        total += edge
+            .label
+            .as_deref()
+            .map_or(0, |label| text_words(label).len());
     }
     total as u32
 }
@@ -146,25 +159,36 @@ pub fn version_words(entry: &VersionEntry) -> u32 {
 }
 
 /* ============================================================
-   Timeline rows
-   ============================================================ */
+Timeline rows
+============================================================ */
 
 fn entry_text(entry: Option<&VersionEntry>) -> String {
-    entry.map(|e| html_to_text(e.content_html.as_deref().unwrap_or(""))).unwrap_or_default()
+    entry
+        .map(|e| html_to_text(e.content_html.as_deref().unwrap_or("")))
+        .unwrap_or_default()
 }
 
 fn canvas_delta(newer: &VersionEntry, older: Option<&VersionEntry>) -> WordDelta {
     let diff = version_words(newer) as i64 - older.map(version_words).unwrap_or(0) as i64;
-    WordDelta { added: diff.max(0) as u32, removed: (-diff).max(0) as u32 }
+    WordDelta {
+        added: diff.max(0) as u32,
+        removed: (-diff).max(0) as u32,
+    }
 }
 
 /// A word diff trimmed to what `ChangeSnippet` in `HistoryPanel.jsx` shows: three words
 /// of context, then up to 24 words of change, stopping at the first long unchanged run.
 /// With no change at all, the first twelve words.
 pub fn change_snippet(ops: &[DiffOp]) -> Vec<DiffOp> {
-    let op = |op_type, tokens: &[String]| DiffOp { op_type, tokens: tokens.to_vec() };
+    let op = |op_type, tokens: &[String]| DiffOp {
+        op_type,
+        tokens: tokens.to_vec(),
+    };
     let Some(first_change) = ops.iter().position(|o| o.op_type != DiffOpType::Equal) else {
-        let tokens = ops.first().map(|o| &o.tokens[..o.tokens.len().min(12)]).unwrap_or(&[]);
+        let tokens = ops
+            .first()
+            .map(|o| &o.tokens[..o.tokens.len().min(12)])
+            .unwrap_or(&[]);
         return vec![op(DiffOpType::Equal, tokens)];
     };
 
@@ -172,7 +196,10 @@ pub fn change_snippet(ops: &[DiffOp]) -> Vec<DiffOp> {
     let mut budget = 24usize;
     if first_change > 0 {
         let context = &ops[first_change - 1].tokens;
-        parts.push(op(DiffOpType::Equal, &context[context.len().saturating_sub(3)..]));
+        parts.push(op(
+            DiffOpType::Equal,
+            &context[context.len().saturating_sub(3)..],
+        ));
     }
     for current in &ops[first_change..] {
         if budget == 0 {
@@ -200,14 +227,21 @@ pub fn version_rows(versions: &[VersionEntry]) -> Vec<VersionRow> {
                     Some(before) => describe_canvas_diff(&diff_canvases(before, canvas)),
                     None => {
                         let cards = canvas.nodes.len();
-                        format!("Snapshot · {cards} card{}", if cards == 1 { "" } else { "s" })
+                        format!(
+                            "Snapshot · {cards} card{}",
+                            if cards == 1 { "" } else { "s" }
+                        )
                     }
                 };
                 (canvas_delta(entry, previous), Vec::new(), Some(summary))
             } else {
                 let before = entry_text(previous);
                 let after = entry_text(Some(entry));
-                (word_delta(&before, &after), change_snippet(&diff_words(&before, &after)), None)
+                (
+                    word_delta(&before, &after),
+                    change_snippet(&diff_words(&before, &after)),
+                    None,
+                )
             };
             VersionRow {
                 id: entry.id.clone(),
@@ -227,7 +261,9 @@ pub fn version_rows(versions: &[VersionEntry]) -> Vec<VersionRow> {
 /// The change across a burst of edits: from the entry before `oldest` to `newest`,
 /// both given as indices into the newest-first list.
 pub fn span_delta(versions: &[VersionEntry], newest: usize, oldest: usize) -> WordDelta {
-    let Some(newer) = versions.get(newest) else { return WordDelta::default() };
+    let Some(newer) = versions.get(newest) else {
+        return WordDelta::default();
+    };
     let before = versions.get(oldest + 1);
     if newer.canvas.is_some() {
         return canvas_delta(newer, before);
@@ -236,8 +272,8 @@ pub fn span_delta(versions: &[VersionEntry], newest: usize, oldest: usize) -> Wo
 }
 
 /* ============================================================
-   Token diff (word level)
-   ============================================================ */
+Token diff (word level)
+============================================================ */
 
 /// Above this many DP cells the middle is treated as a plain replace: edits in prose
 /// are local, so the prefix/suffix trim almost always keeps us under it.
@@ -271,7 +307,10 @@ pub fn diff_tokens(a: &[String], b: &[String]) -> Vec<DiffOp> {
         }
         match ops.last_mut() {
             Some(last) if last.op_type == op_type => last.tokens.extend_from_slice(tokens),
-            _ => ops.push(DiffOp { op_type, tokens: tokens.to_vec() }),
+            _ => ops.push(DiffOp {
+                op_type,
+                tokens: tokens.to_vec(),
+            }),
         }
     };
 
@@ -304,9 +343,7 @@ pub fn diff_tokens(a: &[String], b: &[String]) -> Vec<DiffOp> {
                 reversed.push((DiffOpType::Equal, &mid_a[i - 1]));
                 i -= 1;
                 j -= 1;
-            } else if j > 0
-                && (i == 0 || table[i * cols + (j - 1)] >= table[(i - 1) * cols + j])
-            {
+            } else if j > 0 && (i == 0 || table[i * cols + (j - 1)] >= table[(i - 1) * cols + j]) {
                 reversed.push((DiffOpType::Added, &mid_b[j - 1]));
                 j -= 1;
             } else {
@@ -319,7 +356,10 @@ pub fn diff_tokens(a: &[String], b: &[String]) -> Vec<DiffOp> {
         }
     }
 
-    push(DiffOpType::Equal, if end > 0 { &a[a.len() - end..] } else { &[] });
+    push(
+        DiffOpType::Equal,
+        if end > 0 { &a[a.len() - end..] } else { &[] },
+    );
     ops
 }
 
@@ -342,8 +382,8 @@ pub fn word_delta(a_text: &str, b_text: &str) -> WordDelta {
 }
 
 /* ============================================================
-   Block diff (paragraph level, for side-by-side compare/merge)
-   ============================================================ */
+Block diff (paragraph level, for side-by-side compare/merge)
+============================================================ */
 
 /// Diff two block lists into aligned chunks for a two-column view.
 ///
@@ -427,8 +467,8 @@ pub fn merge_chunks_to_html(chunks: &[DiffChunk], choices: &HashMap<usize, Merge
 }
 
 /* ============================================================
-   Canvas diff (card level)
-   ============================================================ */
+Canvas diff (card level)
+============================================================ */
 
 /// What a card says, for previews and text diffs.
 pub fn canvas_node_text(node: &CanvasNode) -> String {
@@ -447,7 +487,11 @@ pub fn canvas_node_text(node: &CanvasNode) -> String {
     if let Some(file) = non_empty(&node.file) {
         // `split('/').pop() || file` — a trailing slash falls back to the whole path.
         let last = file.split('/').next_back().unwrap_or("");
-        return if last.is_empty() { file } else { last.to_string() };
+        return if last.is_empty() {
+            file
+        } else {
+            last.to_string()
+        };
     }
     String::new()
 }
@@ -456,8 +500,7 @@ pub fn canvas_node_text(node: &CanvasNode) -> String {
 ///
 /// A repeated id takes the later node's content at the earlier one's position, which
 /// is what `Map.set` does. The map is what makes this linear: a canvas can hold
-/// hundreds of cards, and this module was moved to Rust for the diff's cost, so
-/// scanning a Vec per lookup would give back exactly what the move bought.
+/// hundreds of cards, and scanning a Vec per lookup would make the diff quadratic.
 fn canvas_nodes_by_id(canvas: &CanvasFile) -> (Vec<&str>, HashMap<&str, &CanvasNode>) {
     let mut order: Vec<&str> = Vec::new();
     let mut by_id: HashMap<&str, &CanvasNode> = HashMap::new();
@@ -506,11 +549,15 @@ pub fn diff_canvases(left: &CanvasFile, right: &CanvasFile) -> CanvasDiff {
         match left_nodes.get(id) {
             None => diff.added.push(node.clone()),
             Some(before) if node_content_changed(before, node) => {
-                diff.edited.push(CanvasNodeChange { before: (*before).clone(), after: node.clone() })
+                diff.edited.push(CanvasNodeChange {
+                    before: (*before).clone(),
+                    after: node.clone(),
+                })
             }
-            Some(before) if node_moved(before, node) => {
-                diff.moved.push(CanvasNodeChange { before: (*before).clone(), after: node.clone() })
-            }
+            Some(before) if node_moved(before, node) => diff.moved.push(CanvasNodeChange {
+                before: (*before).clone(),
+                after: node.clone(),
+            }),
             Some(_) => {}
         }
     }
@@ -521,7 +568,12 @@ pub fn diff_canvases(left: &CanvasFile, right: &CanvasFile) -> CanvasDiff {
     }
 
     fn edge_ids(canvas: &CanvasFile) -> HashSet<&str> {
-        canvas.edges.iter().map(|edge| edge.id.as_str()).filter(|id| !id.is_empty()).collect()
+        canvas
+            .edges
+            .iter()
+            .map(|edge| edge.id.as_str())
+            .filter(|id| !id.is_empty())
+            .collect()
     }
     let left_edge_ids = edge_ids(left);
     let right_edge_ids = edge_ids(right);
@@ -553,11 +605,19 @@ pub fn describe_canvas_diff(diff: &CanvasDiff) -> String {
     let mut parts: Vec<String> = Vec::new();
 
     if !diff.added.is_empty() {
-        parts.push(format!("+{} card{}", diff.added.len(), plural(diff.added.len())));
+        parts.push(format!(
+            "+{} card{}",
+            diff.added.len(),
+            plural(diff.added.len())
+        ));
     }
     if !diff.removed.is_empty() {
         // U+2212 MINUS SIGN, to line up with the + above it.
-        parts.push(format!("\u{2212}{} card{}", diff.removed.len(), plural(diff.removed.len())));
+        parts.push(format!(
+            "\u{2212}{} card{}",
+            diff.removed.len(),
+            plural(diff.removed.len())
+        ));
     }
     if !diff.edited.is_empty() {
         parts.push(format!("{} edited", diff.edited.len()));
@@ -599,10 +659,16 @@ pub fn merge_canvases(
     let mut nodes: Vec<CanvasNode> = Vec::new();
 
     let added_ids: HashSet<&str> = diff.added.iter().map(|node| node.id.as_str()).collect();
-    let edited_by_id: HashMap<&str, &CanvasNodeChange> =
-        diff.edited.iter().map(|edit| (edit.after.id.as_str(), edit)).collect();
-    let moved_by_id: HashMap<&str, &CanvasNodeChange> =
-        diff.moved.iter().map(|moved| (moved.after.id.as_str(), moved)).collect();
+    let edited_by_id: HashMap<&str, &CanvasNodeChange> = diff
+        .edited
+        .iter()
+        .map(|edit| (edit.after.id.as_str(), edit))
+        .collect();
+    let moved_by_id: HashMap<&str, &CanvasNodeChange> = diff
+        .moved
+        .iter()
+        .map(|moved| (moved.after.id.as_str(), moved))
+        .collect();
 
     for node in &right.nodes {
         if added_ids.contains(node.id.as_str()) && take(&format!("added:{}", node.id)) {
@@ -639,7 +705,8 @@ pub fn merge_canvases(
         if edge.id.is_empty() || seen.contains(&edge.id) {
             return;
         }
-        if !node_ids.contains(&edge.from_node.as_str()) || !node_ids.contains(&edge.to_node.as_str())
+        if !node_ids.contains(&edge.from_node.as_str())
+            || !node_ids.contains(&edge.to_node.as_str())
         {
             return;
         }
@@ -661,7 +728,11 @@ pub fn merge_canvases(
         }
     }
 
-    CanvasFile { nodes, edges, ..right.clone() }
+    CanvasFile {
+        nodes,
+        edges,
+        ..right.clone()
+    }
 }
 
 #[cfg(test)]
@@ -697,9 +768,19 @@ mod tests {
             text_version("v1", "<p>she stood</p>", "s1"),
         ];
         let rows = version_rows(&versions);
-        assert_eq!(rows[0].delta, WordDelta { added: 1, removed: 0 });
         assert_eq!(
-            rows[0].snippet.iter().map(|op| (op.op_type, op.tokens.join(" "))).collect::<Vec<_>>(),
+            rows[0].delta,
+            WordDelta {
+                added: 1,
+                removed: 0
+            }
+        );
+        assert_eq!(
+            rows[0]
+                .snippet
+                .iter()
+                .map(|op| (op.op_type, op.tokens.join(" ")))
+                .collect::<Vec<_>>(),
             vec![
                 (DiffOpType::Equal, "hesitated at the".to_string()),
                 (DiffOpType::Added, "red".to_string()),
@@ -707,7 +788,13 @@ mod tests {
             ]
         );
         // The oldest has nothing before it, so all of it is new.
-        assert_eq!(rows[2].delta, WordDelta { added: 2, removed: 0 });
+        assert_eq!(
+            rows[2].delta,
+            WordDelta {
+                added: 2,
+                removed: 0
+            }
+        );
         assert_eq!(rows[0].session_color, session_color("s2"));
         assert!(rows[0].summary.is_none());
     }
@@ -720,7 +807,13 @@ mod tests {
             text_version("v1", "<p>one</p>", "s"),
         ];
         // The burst v3..v2 is measured against v1.
-        assert_eq!(span_delta(&versions, 0, 1), WordDelta { added: 3, removed: 0 });
+        assert_eq!(
+            span_delta(&versions, 0, 1),
+            WordDelta {
+                added: 3,
+                removed: 0
+            }
+        );
         assert_eq!(span_delta(&versions, 9, 9), WordDelta::default());
     }
 
@@ -738,7 +831,10 @@ mod tests {
         // U+FEFF is whitespace to JS and not to Unicode, so `regex`'s \s would call
         // this one word.
         assert_eq!(words("one\u{feff}two"), ["one", "two"]);
-        assert_eq!(words("  leading and trailing  "), ["leading", "and", "trailing"]);
+        assert_eq!(
+            words("  leading and trailing  "),
+            ["leading", "and", "trailing"]
+        );
         assert_eq!(words("\u{a0}\u{2009}nbsp\u{3000}"), ["nbsp"]);
         assert!(words("   ").is_empty());
     }
@@ -786,6 +882,12 @@ mod tests {
     #[test]
     fn word_delta_counts_both_directions() {
         let delta = word_delta("one two three", "one four five six");
-        assert_eq!(delta, WordDelta { added: 3, removed: 2 });
+        assert_eq!(
+            delta,
+            WordDelta {
+                added: 3,
+                removed: 2
+            }
+        );
     }
 }

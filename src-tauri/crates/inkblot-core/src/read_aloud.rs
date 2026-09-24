@@ -14,8 +14,8 @@
 //! to map audio time back to document positions.
 //!
 //! Mirrors `splitReadAloudText` and `buildReadAloudChunks` in `src/lib/readAloud.js`
-//! (`:426-627`); `npm run parity` asserts the two agree. Everything else in that file
-//! — model loading, the WASM fallback, the highlight scheduler — stays in the webview.
+//! ; `npm run parity` asserts the two agree. Everything else in that file
+//! — model loading, the WASM fallback, the highlight scheduler — lives in the webview.
 //!
 //! **Offsets are UTF-16 code units**, as everywhere that touches a ProseMirror
 //! position. See [`crate::js_string`].
@@ -26,12 +26,9 @@ use regex::Regex;
 use crate::js_string::{js_trim, utf16_len, utf16_slice, JS_WHITESPACE_CLASS};
 use crate::types::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
 
-pub const MAX_READ_ALOUD_CHUNK_LENGTH: usize = 220;
-
 /// A word that ends a sentence: terminal punctuation, then any closing quotes or
 /// brackets that trail it.
-static SENTENCE_END: Lazy<Regex> =
-    Lazy::new(|| Regex::new("[.!?]+[\"')\\]}»”’]*$").unwrap());
+static SENTENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new("[.!?]+[\"')\\]}»”’]*$").unwrap());
 
 /// A word that ends a clause.
 static CLAUSE_END: Lazy<Regex> = Lazy::new(|| Regex::new("[,;:][\"')\\]}»”’]*$").unwrap());
@@ -42,8 +39,12 @@ static HORIZONTAL_SPACE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(&format!("[{without_newline}]+")).unwrap()
 });
 
-static NEWLINE_RUN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(&format!("[{JS_WHITESPACE_CLASS}]*\n+[{JS_WHITESPACE_CLASS}]*")).unwrap());
+static NEWLINE_RUN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(&format!(
+        "[{JS_WHITESPACE_CLASS}]*\n+[{JS_WHITESPACE_CLASS}]*"
+    ))
+    .unwrap()
+});
 
 static SPACE_BEFORE_PUNCTUATION: Lazy<Regex> =
     Lazy::new(|| Regex::new(&format!("[{JS_WHITESPACE_CLASS}]+([,.;:!?])")).unwrap());
@@ -87,13 +88,22 @@ pub fn split_read_aloud_text(text: &str, max_length: usize) -> Vec<String> {
         })
         .collect();
 
-    let payload = ReadAloudPayload { text: normalized, words };
-    build_read_aloud_chunks(&payload, max_length).into_iter().map(|chunk| chunk.text).collect()
+    let payload = ReadAloudPayload {
+        text: normalized,
+        words,
+    };
+    build_read_aloud_chunks(&payload, max_length)
+        .into_iter()
+        .map(|chunk| chunk.text)
+        .collect()
 }
 
 /// The full entry point: text plus the words the editor resolved, each carrying the
 /// document positions the highlight scheduler will need.
-pub fn build_read_aloud_chunks(payload: &ReadAloudPayload, max_length: usize) -> Vec<ReadAloudChunk> {
+pub fn build_read_aloud_chunks(
+    payload: &ReadAloudPayload,
+    max_length: usize,
+) -> Vec<ReadAloudChunk> {
     if payload.text.is_empty() || payload.words.is_empty() {
         return Vec::new();
     }
@@ -123,7 +133,9 @@ fn words_with_text_offsets(text: &str, words: &[ReadAloudWord]) -> Vec<ReadAloud
         }
 
         let haystack = utf16_slice(text, cursor, utf16_len(text));
-        let Some(byte_offset) = haystack.find(&word.text) else { continue };
+        let Some(byte_offset) = haystack.find(&word.text) else {
+            continue;
+        };
         let start_offset = cursor + crate::js_string::byte_to_utf16(haystack, byte_offset);
         let end_offset = start_offset + utf16_len(&word.text);
         cursor = end_offset;
@@ -138,7 +150,10 @@ fn words_with_text_offsets(text: &str, words: &[ReadAloudWord]) -> Vec<ReadAloud
 }
 
 fn offsets(word: &ReadAloudWord) -> (usize, usize) {
-    (word.start_offset.unwrap_or(0) as usize, word.end_offset.unwrap_or(0) as usize)
+    (
+        word.start_offset.unwrap_or(0) as usize,
+        word.end_offset.unwrap_or(0) as usize,
+    )
 }
 
 /// Never speak across a paragraph break: any gap between two words containing a
@@ -251,11 +266,7 @@ fn split_long_sentence(
 
 /// The index to cut at: one past the last clause-ending word whose prefix still fits.
 /// Never the first or last word — a cut there is not a clause break, it is a hyphen.
-fn last_clause_boundary(
-    text: &str,
-    words: &[ReadAloudWord],
-    max_length: usize,
-) -> Option<usize> {
+fn last_clause_boundary(text: &str, words: &[ReadAloudWord], max_length: usize) -> Option<usize> {
     if words.len() < 3 {
         return None;
     }
@@ -287,7 +298,10 @@ fn push_chunk(text: &str, words: Vec<ReadAloudWord>, chunks: &mut Vec<ReadAloudC
     let last = offsets(words.last().expect("non-empty")).1;
     let chunk_text = normalize_speech_chunk_text(utf16_slice(text, first, last));
     if !chunk_text.is_empty() {
-        chunks.push(ReadAloudChunk { text: chunk_text, words });
+        chunks.push(ReadAloudChunk {
+            text: chunk_text,
+            words,
+        });
     }
 }
 

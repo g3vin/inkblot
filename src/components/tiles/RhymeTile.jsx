@@ -1,103 +1,76 @@
 /**
  * RhymeTile.jsx — "Find Rhymes" workbench tile.
  *
- * Scores rhyme candidates with a local ONNX model (public/rhyme_model.onnx +
- * public/vocab.json) running in onnxruntime-web. Candidates are pre-filtered
- * by shared word suffix, then ranked by model score; clicking a rhyme
- * replaces the source word in the document.
+ * Asks Rust's `get_rhymes` for perfect rhymes, read out of the CMU Pronouncing
+ * Dictionary (see `inkblot-models/src/rhymes.rs`); clicking a rhyme replaces the source
+ * word in the document.
+ *
+ * The dictionary is 3.6 MB, so when Rust reports `MODEL_NOT_INSTALLED` the tile
+ * fetches it without asking, the way it would load any other small resource.
  */
 import React, { useEffect, useMemo, useState } from 'react'
-import * as ort from 'onnxruntime-web/ort-wasm'
 
-// Model session and vocabulary are module-level singletons shared by all tiles.
-let session
-let vocab = []
-let word2idx = {}
+/** Tauri's API, imported lazily so the tile still renders in a plain browser. */
+const tauri =
+  typeof window !== 'undefined' && window.__TAURI__
+    ? import('@tauri-apps/api/core')
+        .then((core) => ({ invoke: core.invoke }))
+        .catch(() => null)
+    : Promise.resolve(null)
 
-async function initRhymeModel() {
-  if (!session) {
-    ort.env.wasm.numThreads = 1
-    ort.env.wasm.simd = false
-    session = await ort.InferenceSession.create('/rhyme_model.onnx', {
-      executionProviders: ['wasm'],
-    })
-  }
+/** One download for every tile, however many are open when it is needed. */
+let dictionaryDownload = null
 
-  if (!vocab.length) {
-    vocab = await fetch('/vocab.json').then((r) => r.json())
-    word2idx = Object.fromEntries(vocab.map((w, i) => [w, i]))
-  }
-
-  return { session, vocab, word2idx }
+const ensureDictionary = (api) => {
+  dictionaryDownload ??= api.invoke('download_rhyme_dictionary').catch((error) => {
+    dictionaryDownload = null
+    throw error
+  })
+  return dictionaryDownload
 }
 
 export default function RhymeTile({ word, onReplace, onRemove, onSelect }) {
   const [rhymes, setRhymes] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
 
-  const normalizedWord = useMemo(() => word?.toLowerCase() || '', [word])
+  const normalizedWord = useMemo(() => word?.trim().toLowerCase() || '', [word])
 
   useEffect(() => {
     if (!normalizedWord) {
       setRhymes([])
       setError('')
-      return
+      return undefined
     }
 
     let cancelled = false
 
-    const scoreCandidate = async (candidate, modelSession, map) => {
-      const a = map[normalizedWord]
-      const b = map[candidate]
-      if (a === undefined || b === undefined) return null
-
-      const inputA = new ort.Tensor('int64', BigInt64Array.from([BigInt(a)]), [1])
-      const inputB = new ort.Tensor('int64', BigInt64Array.from([BigInt(b)]), [1])
-
-      const outputs = await modelSession.run({ word_a: inputA, word_b: inputB })
-      return outputs.rhyme_score.data[0]
-    }
-
     const fetchRhymes = async () => {
-      setLoading(true)
+      setStatus('loading')
       setError('')
       try {
-        const { session: modelSession, vocab: modelVocab, word2idx: map } = await initRhymeModel()
-        if (cancelled) return
+        const api = await tauri
+        if (!api) throw new Error('Rhymes need the desktop app.')
 
-        const suffix3 = normalizedWord.slice(-3)
-        const suffix2 = normalizedWord.slice(-2)
-        const candidates = modelVocab
-          .filter((candidate) => candidate !== normalizedWord)
-          .filter((candidate) => {
-            if (normalizedWord.length <= 2) return candidate.endsWith(suffix2)
-            return candidate.endsWith(suffix3) || candidate.endsWith(suffix2)
-          })
-
-        const limitedCandidates = candidates.length > 300
-          ? candidates.slice(0, 300)
-          : candidates
-
-        const scored = []
-        for (const candidate of limitedCandidates) {
-          if (cancelled) return
-          const score = await scoreCandidate(candidate, modelSession, map)
-          if (score !== null && Number.isFinite(score)) {
-            scored.push({ word: candidate, score })
-          }
+        let response
+        try {
+          response = await api.invoke('get_rhymes', { word: normalizedWord })
+        } catch (err) {
+          if (!String(err?.message || err).includes('MODEL_NOT_INSTALLED')) throw err
+          if (!cancelled) setStatus('downloading')
+          await ensureDictionary(api)
+          response = await api.invoke('get_rhymes', { word: normalizedWord })
         }
 
-        scored.sort((a, b) => b.score - a.score)
-        const top = scored.slice(0, 15).map(item => item.word)
-        setRhymes(top)
+        if (cancelled) return
+        setRhymes(response?.rhymes || [])
+        setStatus('ready')
       } catch (err) {
         if (cancelled) return
-        console.error('Error scoring rhymes:', err)
-        setError('Failed to score rhymes.')
+        console.error('Finding rhymes failed:', err)
+        setError(String(err?.message || err || 'Finding rhymes failed.'))
         setRhymes([])
-      } finally {
-        if (!cancelled) setLoading(false)
+        setStatus('ready')
       }
     }
 
@@ -129,14 +102,16 @@ export default function RhymeTile({ word, onReplace, onRemove, onSelect }) {
       <h4 className="sidebar-card-title">{normalizedWord}</h4>
 
       <div className="sidebar-chip-list">
-        {loading ? (
+        {status === 'downloading' ? (
+          <span className="sidebar-muted">Getting the rhyming dictionary…</span>
+        ) : status === 'loading' ? (
           <span className="sidebar-muted">Finding rhymes...</span>
         ) : error ? (
           <span className="sidebar-error">{error}</span>
         ) : rhymes.length > 0 ? (
-          rhymes.map((rhyme, i) => (
+          rhymes.map((rhyme) => (
             <button
-              key={i}
+              key={rhyme}
               onClick={(e) => {
                 e.stopPropagation()
                 onReplace(rhyme)

@@ -1,10 +1,9 @@
 /**
  * The file tree's per-row decisions.
  *
- * FileTree.jsx had no coverage at all, and the part worth covering was buried: the
- * twenty-odd constants renderNode derives before it emits any markup. They are now
- * deriveFileNodeState(), which is pure, so this suite can ask it directly what a row
- * should look like instead of mounting a tree and reading class names back out.
+ * The part of FileTree.jsx worth covering is the twenty-odd values renderNode derives
+ * before it emits any markup. They are deriveFileNodeState(), which is
+ * pure, so this suite can ask it directly what a row should look like instead of mounting a tree and reading class names back out.
  *
  * The cases here are the ones where the rule is not obvious from the call site:
  * four highlight states that overlap, an icon that fills only for documents, and
@@ -14,7 +13,7 @@
  */
 const { deriveFileNodeState } = await import('../../src/lib/fileTreeNodeState.js')
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const file = (name, path) => ({ type: 'file', name, path: path ?? name })
 const folder = (name, path, children = []) => ({ type: 'folder', name, path: path ?? name, children })

@@ -29,7 +29,7 @@ const CanvasSurface = (await import('../../src/canvas/CanvasSurface.jsx')).defau
 const { CanvasToolbarSlotContext } = await import('../../src/canvas/canvasToolbarSlot.js')
 const { createEmptyCanvas, makeTextNode } = await import('../../src/lib/canvasModel.js')
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 40)) })
 
 const state = createEmptyCanvas()
@@ -173,5 +173,121 @@ await settle()
 
 ok('unlocking restores the resize zones', document.querySelectorAll('.canvas-resize-handle').length === 8)
 ok('unlocking restores Add card', !!button('Add card'))
+
+/* Touch. A finger on the empty canvas pans; the Pencil does what the mouse
+   does; a second finger ends the first one's pan, because two fingers are a pinch. */
+{
+  const world = () => document.querySelector('.canvas-world')
+  const pointer = (target, type, { id, kind, x, y }) => {
+    const event = new dom.window.MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y })
+    Object.defineProperty(event, 'pointerType', { value: kind })
+    Object.defineProperty(event, 'pointerId', { value: id })
+    target.dispatchEvent(event)
+  }
+
+  const before = world().style.transform
+  await act(async () => {
+    pointer(surface(), 'pointerdown', { id: 1, kind: 'touch', x: 100, y: 100 })
+    pointer(dom.window, 'pointermove', { id: 1, kind: 'touch', x: 160, y: 130 })
+  })
+  await settle()
+  const panned = world().style.transform
+  ok('a finger on the empty canvas pans it', panned && panned !== before)
+  ok('and draws no selection box', !document.querySelector('.canvas-marquee'))
+
+  // A second finger lands: the pan ends, and the first finger no longer moves anything.
+  await act(async () => {
+    pointer(surface(), 'pointerdown', { id: 2, kind: 'touch', x: 300, y: 100 })
+    pointer(dom.window, 'pointermove', { id: 1, kind: 'touch', x: 400, y: 400 })
+  })
+  await settle()
+  ok('a second finger ends the pan — two fingers are a pinch', world().style.transform === panned)
+  await act(async () => {
+    pointer(dom.window, 'pointerup', { id: 1, kind: 'touch', x: 400, y: 400 })
+    pointer(dom.window, 'pointerup', { id: 2, kind: 'touch', x: 300, y: 100 })
+  })
+
+  await act(async () => {
+    pointer(surface(), 'pointerdown', { id: 3, kind: 'pen', x: 100, y: 100 })
+    pointer(dom.window, 'pointermove', { id: 3, kind: 'pen', x: 200, y: 200 })
+  })
+  await settle()
+  ok('the Pencil does not pan', world().style.transform === panned)
+  await act(async () => { pointer(dom.window, 'pointerup', { id: 3, kind: 'pen', x: 200, y: 200 }) })
+  await settle()
+}
+
+/* Stacking: Bring to Front / Send to Back, through the same command event the context menu and the bridge use. */
+{
+  const { dispatchCanvasCommand } = await import('../../src/canvas/canvasEvents.js')
+  const order = () => [...document.querySelectorAll('.canvas-node[data-node-id]')]
+    .map((element) => element.getAttribute('data-node-id'))
+
+  // A new card is selected and on top.
+  await act(async () => { dispatchCanvasCommand(surface(), 'add-card', {}) })
+  await settle()
+  const added = order().find((id) => id !== card.id)
+  ok('a new card lands on top', order().at(-1) === added)
+
+  await act(async () => { dispatchCanvasCommand(surface(), 'send-to-back', {}) })
+  await settle()
+  ok('Send to Back puts the selection under everything', order()[0] === added)
+
+  await act(async () => { dispatchCanvasCommand(surface(), 'bring-to-front', {}) })
+  await settle()
+  ok('Bring to Front puts it back on top', order().at(-1) === added && order()[0] === card.id)
+}
+
+/* A file dropped from Finder in WKWebView: an HTML5 drop carrying a File, which Tauri
+   never delivers (it swallows the drop and sends paths). */
+{
+  // jsdom loads no images, so measuring one would wait forever; fail it at once, which
+  // is the path a broken image takes and still lands a node.
+  globalThis.Image = class { set src(_url) { setTimeout(() => this.onerror?.()) } }
+  const before = document.querySelectorAll('.canvas-node').length
+
+  const drop = (type, files, types = ['Files']) => {
+    const event = new dom.window.Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', { value: { types, files, dropEffect: 'none' } })
+    Object.assign(event, { clientX: 10, clientY: 10 })
+    surface().dispatchEvent(event)
+    return event
+  }
+
+  const over = drop('dragover', [])
+  ok('a drag carrying files is accepted, so WebKit does not navigate to the file', over.defaultPrevented)
+  ok('a drag carrying anything else is left alone', !drop('dragover', [], ['text/plain']).defaultPrevented)
+
+  const png = new File([new Uint8Array([137, 80, 78, 71])], 'photo.png', { type: 'image/png' })
+  const text = new File(['hi'], 'notes.txt', { type: 'text/plain' })
+  await act(async () => { drop('drop', [png, text]) })
+  await settle()
+  ok('a dropped image becomes a node, and a dropped text file does not',
+    document.querySelectorAll('.canvas-node').length === before + 1)
+
+  // A note dragged from the native Notes panel carries its URL.
+  const { noteDragURL } = await import('../../src/canvas/canvasEvents.js')
+  ok('a note URL names its document and note',
+    JSON.stringify(noteDragURL('inkblot-note://note?doc=ch%2Fone&id=n1')) === '{"docPath":"ch/one","noteId":"n1"}')
+  ok('and anything else is not a note', noteDragURL('https://example.com\nfile:///x.png') === null)
+
+  const urlDrop = (uriList) => {
+    const event = new dom.window.Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { types: ['text/uri-list'], files: [], getData: (type) => (type === 'text/uri-list' ? uriList : '') },
+    })
+    Object.assign(event, { clientX: 20, clientY: 20 })
+    surface().dispatchEvent(event)
+    return event
+  }
+  const withNote = document.querySelectorAll('.canvas-node').length
+  let event
+  await act(async () => { event = urlDrop('inkblot-note://note?doc=ch%2Fone&id=n1') })
+  await settle()
+  ok('dropping a native note makes a note card',
+    event.defaultPrevented && document.querySelectorAll('.canvas-node').length === withNote + 1)
+  await act(async () => { event = urlDrop('https://example.com') })
+  ok('a plain link dropped on the canvas is left for someone else', !event.defaultPrevented)
+}
 
 await act(async () => { root.unmount() })

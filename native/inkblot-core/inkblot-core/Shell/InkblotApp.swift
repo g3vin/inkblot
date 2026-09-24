@@ -1,10 +1,33 @@
 import SwiftUI
 
+/// The Swift app: a SwiftUI shell around the editor bundle (`dist/`), which runs
+/// unmodified in a `WKWebView` (`EditorWebView`). The shell draws the file tree, the
+/// inspector, the tab dock and the menu bar natively, and talks to the page over the
+/// bridge protocol (`ShellBridge`) and the Tauri API shim (`TauriHost`). Domain logic
+/// and models come from Rust through `inkblot-ffi` (`CoreService`, `ModelService`).
 @main
 struct InkblotApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {
+        #if os(macOS)
+        mac
+        #else
+        // iOS and iPadOS have no single-window scene. One scene is still the rule (see
+        // `AppModel`); the Info.plist does not enable multiple scenes, so this is one.
+        WindowGroup {
+            ContentView()
+                .environment(model)
+        }
+        .commands {
+            InkblotCommands(model: model)
+        }
+        #endif
+    }
+
+    #if os(macOS)
+    @SceneBuilder
+    private var mac: some Scene {
         // What Inkblot opens with: the project picker. The editor window opens once a
         // project is chosen (`ProjectPickerView.open`).
         Window("Welcome to Inkblot", id: ProjectPickerView.windowID) {
@@ -18,7 +41,6 @@ struct InkblotApp: App {
         .defaultLaunchBehavior(.presented)
         .restorationBehavior(.disabled)
         .keyboardShortcut("1", modifiers: [.command, .shift])
-
         // `Window`, not `WindowGroup` — see `AppModel` on why there is one page.
         Window("Inkblot", id: "main") {
             ContentView()
@@ -42,6 +64,7 @@ struct InkblotApp: App {
             InkblotCommands(model: model)
         }
     }
+    #endif
 }
 
 /// The menu bar.

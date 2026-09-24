@@ -1,18 +1,17 @@
 /*
  * Editor.css — the editor workspace stylesheet, as an ordered manifest.
  *
- * This file was 5,620 lines. It is now one file per section banner, imported
- * below IN CASCADE ORDER.
+ * One file per section, imported below IN CASCADE ORDER.
  *
  * That order is load-bearing and must not be rearranged: several selectors are
  * declared in more than one place (`.toolbar-group` in Toolbar/Canvas/
- * VersionComparePane, `.ProseMirror` and `.pane` in Editor and Canvas,
- * `.history-tile` here and in RightSidebar/HistoryPanel.css), so which
- * declaration wins depends on which arrives last.
+ * VersionComparePane, `.ProseMirror` and `.pane` in Editor and Canvas), so which
+ * declaration wins depends on which arrives last. For the same reason, do not move
+ * a section's import into its component: that changes where its rules land.
  *
  * The imports are all at the top because CSS requires it — @import may not
- * follow a rule. That is why every section, including the small ones that stayed
- * behind, is its own file rather than some being left inline here.
+ * follow a rule. That is why every section, including the small ones, is its own
+ * file rather than some being left inline here.
  */
 
 @import './Editor.base.css';

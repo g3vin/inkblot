@@ -87,7 +87,12 @@ impl Matcher {
         // `js_trim`, not `str::trim`: a query of nothing but a byte order mark is an
         // empty query to JS and a one-character search to Rust.
         if js_trim(query).is_empty() {
-            return Self { regex: None, is_empty: true, valid: true, error: String::new() };
+            return Self {
+                regex: None,
+                is_empty: true,
+                valid: true,
+                error: String::new(),
+            };
         }
 
         let mut source = if options.use_regex {
@@ -103,18 +108,26 @@ impl Matcher {
         }
 
         match Regex::new(&source) {
-            Ok(regex) => {
-                Self { regex: Some(regex), is_empty: false, valid: true, error: String::new() }
-            }
-            Err(error) => {
-                Self { regex: None, is_empty: false, valid: false, error: error.to_string() }
-            }
+            Ok(regex) => Self {
+                regex: Some(regex),
+                is_empty: false,
+                valid: true,
+                error: String::new(),
+            },
+            Err(error) => Self {
+                regex: None,
+                is_empty: false,
+                valid: false,
+                error: error.to_string(),
+            },
         }
     }
 
     /// Every match in `value`, up to `limit`.
     pub fn find_all(&self, value: &str, limit: usize) -> Vec<Hit> {
-        let Some(regex) = &self.regex else { return Vec::new() };
+        let Some(regex) = &self.regex else {
+            return Vec::new();
+        };
         if value.is_empty() || limit == 0 {
             return Vec::new();
         }
@@ -123,14 +136,19 @@ impl Matcher {
         let mut cursor = 0;
 
         while cursor <= value.len() && found.len() < limit {
-            let Ok(Some(matched)) = regex.find_from_pos(value, cursor) else { break };
+            let Ok(Some(matched)) = regex.find_from_pos(value, cursor) else {
+                break;
+            };
 
             if matched.start() == matched.end() {
                 // A pattern that can match nothing (`a*`, `^`) would never advance on
                 // its own and would spin here forever. JS steps one UTF-16 unit; this
                 // steps one character, the same step except beside an astral character,
                 // where JS would land between its two halves.
-                let step = value[matched.start()..].chars().next().map_or(1, char::len_utf8);
+                let step = value[matched.start()..]
+                    .chars()
+                    .next()
+                    .map_or(1, char::len_utf8);
                 cursor = matched.start() + step;
                 continue;
             }
@@ -240,7 +258,13 @@ mod tests {
 
     #[test]
     fn a_half_written_pattern_is_reported_not_thrown() {
-        let matcher = Matcher::new("foo(", MatcherOptions { use_regex: true, ..Default::default() });
+        let matcher = Matcher::new(
+            "foo(",
+            MatcherOptions {
+                use_regex: true,
+                ..Default::default()
+            },
+        );
         assert!(!matcher.valid);
         assert!(!matcher.error.is_empty());
         assert!(!matcher.test("foo("));
@@ -265,7 +289,10 @@ mod tests {
     fn whole_word_uses_ascii_boundaries_like_javascript() {
         // JS: `\bcafé\b` never matches, because é is not a word character and the
         // trailing boundary cannot be satisfied.
-        let options = MatcherOptions { whole_word: true, ..Default::default() };
+        let options = MatcherOptions {
+            whole_word: true,
+            ..Default::default()
+        };
         assert!(hits("café", options, "a café here").is_empty());
         assert_eq!(hits("cafe", options, "a cafe here").len(), 1);
         assert!(hits("cafe", options, "a cafeteria here").is_empty());
@@ -273,14 +300,20 @@ mod tests {
 
     #[test]
     fn lookaround_and_backreferences_compile() {
-        let options = MatcherOptions { use_regex: true, ..Default::default() };
+        let options = MatcherOptions {
+            use_regex: true,
+            ..Default::default()
+        };
         assert_eq!(hits(r"foo(?=bar)", options, "foobar foobaz").len(), 1);
         assert_eq!(hits(r"(\w)\1", options, "letter").len(), 1);
     }
 
     #[test]
     fn class_escapes_follow_javascript_rather_than_unicode() {
-        let options = MatcherOptions { use_regex: true, ..Default::default() };
+        let options = MatcherOptions {
+            use_regex: true,
+            ..Default::default()
+        };
         // Arabic-Indic five is a digit to Rust and not to JS.
         assert!(hits(r"\d", options, "٥").is_empty());
         assert_eq!(hits(r"\d", options, "5").len(), 1);
@@ -295,16 +328,36 @@ mod tests {
         // Pinned, not fixed: JS matches UTF-16 units and finds the two surrogate
         // halves separately. The offsets agree — the emoji occupies units 0 and 1 —
         // but the hit count and the matched text cannot.
-        let options = MatcherOptions { use_regex: true, ..Default::default() };
+        let options = MatcherOptions {
+            use_regex: true,
+            ..Default::default()
+        };
         let found = hits(r"\W", options, "🎨 art");
         assert_eq!(found.len(), 2);
-        assert_eq!(found[0], Hit { index: 0, length: 2, text: "🎨".to_string() });
-        assert_eq!(found[1], Hit { index: 2, length: 1, text: " ".to_string() });
+        assert_eq!(
+            found[0],
+            Hit {
+                index: 0,
+                length: 2,
+                text: "🎨".to_string()
+            }
+        );
+        assert_eq!(
+            found[1],
+            Hit {
+                index: 2,
+                length: 1,
+                text: " ".to_string()
+            }
+        );
     }
 
     #[test]
     fn an_empty_match_advances_instead_of_spinning() {
-        let options = MatcherOptions { use_regex: true, ..Default::default() };
+        let options = MatcherOptions {
+            use_regex: true,
+            ..Default::default()
+        };
         assert!(hits("a*", options, "bbb").is_empty());
         assert_eq!(hits("b*", options, "bbb").len(), 1);
     }

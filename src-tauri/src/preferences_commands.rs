@@ -2,16 +2,16 @@
 //!
 //! The store itself is `inkblot_core::store::preferences`; this is the Tauri shim over
 //! it, plus the one thing the core cannot know — where AppData is. Tauri's path
-//! resolver answers that, and a Swift shell would answer it from its own container.
+//! resolver answers that, and the Swift app points its own store at the same folder.
 //!
 //! `preferences_load` returns everything at once, because the webview's facade is
 //! synchronous: it hydrates the whole cache before React mounts, then answers
-//! `getItem` from memory the way `localStorage` did.
+//! reads from memory.
 
 use std::sync::OnceLock;
 
 use inkblot_core::store::preferences::{PreferenceMap, PreferenceScope, PreferenceStore};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 static STORE: OnceLock<PreferenceStore> = OnceLock::new();
 
@@ -20,10 +20,7 @@ fn store(app_handle: &AppHandle) -> Result<&'static PreferenceStore, String> {
         return Ok(store);
     }
 
-    let app_data = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("No AppData directory: {error}"))?;
+    let app_data = crate::app_data_dir(app_handle)?;
     let root = app_data.to_str().ok_or("AppData path is not valid UTF-8")?;
 
     // A second caller racing us just gets the store the first one built; both were
@@ -60,7 +57,9 @@ pub async fn preferences_remove(
     scope: String,
     key: String,
 ) -> Result<(), String> {
-    store(&app_handle)?.remove(scope_of(&scope)?, &key).map_err(|error| error.to_string())
+    store(&app_handle)?
+        .remove(scope_of(&scope)?, &key)
+        .map_err(|error| error.to_string())
 }
 
 /// Move every key under one prefix to another — what a project rename does to the file

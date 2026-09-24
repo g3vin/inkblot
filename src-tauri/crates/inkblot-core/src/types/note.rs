@@ -19,8 +19,9 @@ use super::json::JsonMap;
 pub const DEFAULT_NOTE_COLOR: &str = "#ffd54f";
 
 /// `NOTE_COLOR_OPTIONS` in noteUtils.js.
-pub const NOTE_COLOR_OPTIONS: [&str; 6] =
-    ["#ffd54f", "#ff9aa2", "#9ad0f5", "#9ee493", "#c7a8ff", "#ffb86b"];
+pub const NOTE_COLOR_OPTIONS: [&str; 6] = [
+    "#ffd54f", "#ff9aa2", "#9ad0f5", "#9ee493", "#c7a8ff", "#ffb86b",
+];
 
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -75,7 +76,10 @@ pub struct NotePreviewSize {
 
 impl Default for NotePreviewSize {
     fn default() -> Self {
-        Self { width: 260.0, height: 88.0 }
+        Self {
+            width: 260.0,
+            height: 88.0,
+        }
     }
 }
 
@@ -112,7 +116,7 @@ pub struct Note {
     /// locale-dependent, so nothing may read it back as data — recompute it instead.
     pub timestamp: String,
     /// **Unknown keys are preserved, not dropped.** `normalizeNote` spreads the
-    /// original note before overriding the fields above (noteUtils.js:107), so a key
+    /// original note before overriding the fields above (`src/lib/noteUtils.js`), so a key
     /// written by a newer build survives a round-trip through an older one. This
     /// field is what keeps that true here.
     #[typeshare(skip)]

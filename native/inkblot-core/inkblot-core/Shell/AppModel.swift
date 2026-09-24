@@ -1,12 +1,16 @@
+#if os(macOS)
 import AppKit
+#endif
+import Foundation
 import Observation
 
 /// Everything one window is made of, created once.
 ///
-/// One window for now. The page holds per-window state (the open project, its panes
+/// One main window. The page holds per-window state (the open project, its panes
 /// and tabs) and a second `WindowGroup` instance would be a second page over the same
 /// files with no coordination between them — two autosaves racing on one document.
-/// `InkblotApp` uses a single `Window` scene for exactly that reason.
+/// `InkblotApp` uses a single scene for exactly that reason (detached documents are
+/// separate windows with their own page; see `AuxiliaryWindows`).
 @MainActor
 @Observable
 final class AppModel {
@@ -19,6 +23,7 @@ final class AppModel {
     let notePreviews: NotePreviewModel
     let bubble: BubbleModel
     let pageLayout: PageLayoutModel
+    let workspace: WorkspaceModel
     let memoRecorder = AudioMemoRecorder()
     let memoPlayer = AudioMemoPlayer()
     let language = LanguageServices()
@@ -37,6 +42,7 @@ final class AppModel {
         notePreviews = NotePreviewModel(bridge: bridge)
         bubble = BubbleModel(bridge: bridge)
         pageLayout = PageLayoutModel(bridge: bridge)
+        workspace = WorkspaceModel(bridge: bridge)
 
         bridge.addListener { [weak self] event in
             guard let self else { return }
@@ -93,7 +99,9 @@ final class AppModel {
     /// Give the keyboard back to the document — after a citation is inserted from the
     /// References panel, the writer carries on typing where it went.
     func focusDocument() {
+        #if os(macOS)
         web.webView.window?.makeFirstResponder(web.webView)
+        #endif
     }
 
     /* ---------------- what the menu bar does ---------------- */
@@ -123,8 +131,8 @@ final class AppModel {
     /// Edit ▸ Paste and Match Style. The pasteboard is read here, not in the page —
     /// see `InsertPlainTextCommand` for why it has to be.
     func pasteAndMatchStyle() {
-        guard let target, let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
-            NSSound.beep()
+        guard let target, let text = Platform.pastedText, !text.isEmpty else {
+            Platform.beep()
             return
         }
         bridge.send(.insertPlainText(InsertPlainTextCommand(target: target, text: text)))

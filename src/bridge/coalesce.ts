@@ -1,21 +1,20 @@
 /**
  * coalesce.ts — sending the latest answer once, instead of every answer immediately.
  *
- * **Sharp edge #4 lives here.** `useEditorNotes` remaps note anchors on every
- * transaction — every keystroke in a document that has quote notes — and native is
- * holding those positions. `Toolbar` has the same shape: `selectionUpdate` fires on
- * every cursor move. Neither can be sent per occurrence without saturating the bridge
- * with messages that are obsolete before they arrive.
+ * `useEditorNotes` remaps note anchors on every transaction — every keystroke in a
+ * document that has quote notes — and the shell holds those positions. Toolbar state
+ * has the same shape: `selectionUpdate` fires on every cursor move. Neither can be
+ * sent per occurrence without saturating the bridge with messages that are obsolete
+ * before they arrive, so both go out at most once per frame, per key.
  *
- * **Why coalescing is safe here and would not be in general.** Every event this is used
- * for carries its *whole* current state rather than a delta. Dropping an intermediate
- * value therefore loses nothing: the next one is complete. A delta stream coalesced the
- * same way would silently corrupt, and that is the property to check before reaching
- * for this — see the note on `NotesRemapped`.
+ * **Only coalesce whole-state events.** Every event this is used for carries its
+ * *whole* current state rather than a delta, so dropping an intermediate value loses
+ * nothing: the next one is complete. A delta stream coalesced the same way would
+ * corrupt silently. Check that property before reaching for this — see the note on
+ * `NotesRemapped`.
  *
- * `Toolbar.jsx` already does exactly this with a bare `requestAnimationFrame` and a
- * ref. This is that, made reusable and made cancellable, because a pending frame that
- * fires after the editor is gone is the teardown bug the suites exist to catch.
+ * Pending sends are cancellable, because a frame that fires after its editor is gone
+ * would publish state for something that no longer exists.
  */
 
 export type Scheduler = (callback: () => void) => () => void

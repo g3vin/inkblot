@@ -88,3 +88,59 @@ struct WebMenusTests {
         #expect(menus.viewMenuItems[2].checked)
     }
 }
+
+/// `inkblot-models` through `inkblot-ffi`. These run against the real library, so a
+/// stale `inkblot_ffi.swift` (a checksum mismatch) fails here rather than at the first
+/// click on a synonym tile. They only read status: the models live in the user's real
+/// data folder, and nothing here downloads.
+@MainActor
+struct ModelServiceTests {
+    @Test func theTokenizerIsBundled() {
+        #expect(Bundle.main.url(forResource: "minilm-tokenizer", withExtension: "json") != nil)
+    }
+
+    @Test func statusAnswersWithTheTauriCommandsShape() async throws {
+        let status = try await ModelService.shared.invoke("synonym_model_status", args: [:]) as? [String: Any]
+        #expect(status?["installed"] is Bool)
+        #expect(status?["missing"] is [Any])
+        let kokoro = try await ModelService.shared.invoke("kokoro_model_status", args: ["voice": "af_heart"]) as? [String: Any]
+        #expect(kokoro?["installed"] is Bool)
+    }
+
+    @Test func aVoiceThatIsAPathIsRefused() async {
+        await #expect(throws: (any Error).self) {
+            try await ModelService.shared.invoke("kokoro_model_status", args: ["voice": "../../etc"])
+        }
+    }
+
+    @Test func theScrapeChannelRoundTrips() async throws {
+        let id = UUID().uuidString
+        _ = try await ModelService.shared.invoke("pinterest_begin_scrape", args: ["requestId": id])
+        _ = try await ModelService.shared.invoke("pinterest_report_scrape", args: [
+            "report": ["requestId": id, "url": "https://pinterest.com/b", "pins": [], "reason": "stable", "stage": "", "progress": false],
+        ])
+        let report = try await ModelService.shared.invoke("pinterest_await_scrape", args: ["requestId": id, "timeoutMs": 500]) as? [String: Any]
+        #expect(report?["reason"] as? String == "stable")
+    }
+}
+
+/// The tab dock's per-tab decisions, which `TabDock.jsx` makes per dot.
+@MainActor
+struct WorkspaceModelTests {
+    @Test func aDocumentTabShowsWhereItIs() throws {
+        let event = #"{"type":"tabsChanged","payload":{"tabs":[{"id":"1","docPath":"ch/one"},{"id":"2","docPath":"board.canvas"},{"id":"3"}],"activeTabId":"1","currentDoc":"ch/one","secondaryDoc":"board.canvas","split":true}}"#
+        let decoded = try JSONDecoder().decode(WebviewEvent.self, from: Data(event.utf8))
+        guard case .tabsChanged(let changed) = decoded else { Issue.record("wrong case"); return }
+        let one = WorkspaceModel.presentation(of: changed.tabs[0], in: changed)
+        #expect(one.isActive && one.isOpen && !one.inSecondary && one.label == "one")
+        let board = WorkspaceModel.presentation(of: changed.tabs[1], in: changed)
+        #expect(board.inSecondary && board.isOpen && !board.isActive && board.label == "board")
+        let draft = WorkspaceModel.presentation(of: changed.tabs[2], in: changed)
+        #expect(draft.isDraft && !draft.isOpen && draft.label == "New Tab")
+    }
+
+    @Test func aDisplayNameDropsTheFolderAndTheCanvasSuffix() {
+        #expect(WorkspaceModel.displayName("Act 1/Scene.canvas") == "Scene")
+        #expect(WorkspaceModel.displayName("notes") == "notes")
+    }
+}
