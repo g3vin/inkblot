@@ -21,10 +21,10 @@ import { flushSync } from 'react-dom'
 
 import { documentSurface } from '../bridge'
 import { withDocLock } from '../lib/docLock'
-import { createFolder, saveDocument } from '../lib/FileSystem'
-import { saveCanvasDocument } from '../lib/canvasFileSystem'
-import { createEmptyCanvas } from '../lib/canvasModel'
-import { isCanvasDoc, stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
+import { createFolder } from '../lib/FileSystem'
+import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
+import { getDocKind, stripDocSuffix } from '../lib/docKind'
+import { followMovedDoc } from '../lib/map/mapLinks'
 import {
   deleteEntry,
   duplicateEntry,
@@ -124,14 +124,20 @@ export function useEntryOperations({
       return failed ? null : nextPath
     }
 
-    const operations = {
-      renameEntry: (projectNameArg, entryPath, newName, type = 'file') =>
-        relocate(projectNameArg, entryPath, type,
-          () => disk.renameEntry(projectNameArg, entryPath, newName, type)),
+    // Maps link to documents by path; a rename or move takes the links with it.
+    const followed = async (projectNameArg, entryPath, type, nextPath) => {
+      if (nextPath) await followMovedDoc(projectNameArg, entryPath, nextPath, type)
+      return nextPath
+    }
 
-      moveEntry: (projectNameArg, entryPath, targetFolder, type = 'file') =>
-        relocate(projectNameArg, entryPath, type,
-          () => disk.moveEntry(projectNameArg, entryPath, targetFolder, type)),
+    const operations = {
+      renameEntry: async (projectNameArg, entryPath, newName, type = 'file') =>
+        followed(projectNameArg, entryPath, type, await relocate(projectNameArg, entryPath, type,
+          () => disk.renameEntry(projectNameArg, entryPath, newName, type))),
+
+      moveEntry: async (projectNameArg, entryPath, targetFolder, type = 'file') =>
+        followed(projectNameArg, entryPath, type, await relocate(projectNameArg, entryPath, type,
+          () => disk.moveEntry(projectNameArg, entryPath, targetFolder, type))),
 
       deleteEntry: async (projectNameArg, entryPath, type = 'file') => {
         await relocate(projectNameArg, entryPath, type, async () => {
@@ -160,27 +166,28 @@ export function useEntryOperations({
     const offs = [
       documentSurface.onCommand('createEntry', async ({ parentFolder, name, kind }) => {
         const projectNameArg = project()
-        const bare = stripCanvasSuffix(String(name || '').trim())
-        if (!projectNameArg || !bare) return
+        if (!projectNameArg || !String(name || '').trim()) return
         if (kind === 'folder') {
-          await createFolder(projectNameArg, joinTreePath(parentFolder, bare))
+          await createFolder(projectNameArg, joinTreePath(parentFolder, String(name).trim()))
           await refreshFilesRef.current?.()
           return
         }
         // The suffix follows the kind, never the typed name — the same rule the page's
         // own tree applies, so "plan.canvas" as a document does not become a canvas.
-        const path = joinTreePath(parentFolder, kind === 'canvas' ? withCanvasSuffix(bare) : bare)
-        if (kind === 'canvas') await saveCanvasDocument(projectNameArg, path, createEmptyCanvas())
-        else await saveDocument(projectNameArg, path, { content: [] })
+        const tree = nameForKind(name, kind)
+        if (!stripDocSuffix(tree)) return
+        const path = joinTreePath(parentFolder, tree)
+        await createDocumentOfKind(projectNameArg, path, kind)
         await refreshFilesRef.current?.()
         open(path)
       }),
 
       documentSurface.onCommand('renameEntry', ({ path, isFolder, newName }) => {
         const projectNameArg = project()
-        const bare = stripCanvasSuffix(String(newName || '').trim())
-        if (!projectNameArg || !bare) return
-        const name = !isFolder && isCanvasDoc(path) ? withCanvasSuffix(bare) : bare
+        const typed = String(newName || '').trim()
+        // A file keeps its kind through a rename; a folder takes the name as typed.
+        const name = isFolder ? typed : nameForKind(typed, getDocKind(path))
+        if (!projectNameArg || !stripDocSuffix(name)) return
         void renameEntry(projectNameArg, path, name, isFolder ? 'folder' : 'file')
       }),
 

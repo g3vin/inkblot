@@ -17,7 +17,7 @@
  *
  * Pure: no React, no DOM, no I/O.
  */
-import { getDocDisplayName, isCanvasDoc } from './docKind'
+import { getDocDisplayName, getDocKind } from './docKind'
 import { getParentPath } from './fileTreeOrder'
 import { getStoryFolderPresetForEntry } from './storyStructure'
 
@@ -56,10 +56,11 @@ export function deriveFileNodeState(node, context = {}) {
   const isSecondary = splitView === 'editor' && secondaryDoc === node.path
 
   const storyPreset = getStoryFolderPresetForEntry(node.path, node.type)
-  const isCanvas = !isFolder && isCanvasDoc(node.path)
+  const kind = isFolder ? null : getDocKind(node.path)
+  const isCanvas = kind === 'canvas'
   const iconName = isFolder
     ? (storyPreset?.folderIcon || (isExpanded ? 'folder.fill' : 'folder'))
-    : (isCanvas ? 'canvas' : null)
+    : (isCanvas ? 'canvas' : kind === 'map' ? 'map' : null)
   const hasEntryIcon = Boolean(iconName)
   // Only a document's icon fills in — a folder's is already solid when open.
   const iconFilled = !isFolder && isActive && hasEntryIcon

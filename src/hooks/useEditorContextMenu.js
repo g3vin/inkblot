@@ -14,6 +14,7 @@ import { useCallback } from 'react'
 import { createMenuContext } from './contextMenu/menuContext'
 import { fileTreeMenu } from './contextMenu/fileTreeMenu'
 import { canvasMenu } from './contextMenu/canvasMenu'
+import { mapMenu } from './contextMenu/mapMenu'
 import { editorMenu } from './contextMenu/editorMenu'
 import { commonMenu } from './contextMenu/commonMenu'
 
@@ -41,6 +42,7 @@ export function useEditorContextMenu(props) {
       // Each of these pops its own menu and returns true when it owns the click.
       if (await fileTreeMenu(ctx)) return
       if (await canvasMenu(ctx)) return
+      if (await mapMenu(ctx)) return
 
       await editorMenu(ctx)
       await commonMenu(ctx)

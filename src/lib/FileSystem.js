@@ -30,11 +30,10 @@ import {
   rename,
   remove,
 } from '@tauri-apps/plugin-fs'
-import { CANVAS_SUFFIX, isCanvasDoc } from './docKind'
+import { getDocKind, isTextDoc, stripDocSuffix, withDocSuffix } from './docKind'
 import { EDIT_SESSION_ID } from './versionHistory'
 import {
   ORDER_FILE,
-  CANVAS_SUFFIX_LENGTH,
   appDataRoot,
   getProjectRoot,
   joinPath,
@@ -58,6 +57,7 @@ export { getProjectRoot } from './projectPaths'
 export {
   buildTextVersionEntry,
   buildCanvasVersionEntry,
+  buildMapVersionEntry,
   getVersions,
   appendVersionEntry,
   appendCanvasVersion,
@@ -84,6 +84,21 @@ export async function writeDocumentRaw(projectName, docName, data) {
   // Under the document's lock like every other write to it, so something that needs
   // the last write to have landed — a rename, see entryOperations.ts — can wait for it.
   return withDocLock(projectName, docName, () => writeDocumentUnlocked(projectName, docName, data))
+}
+
+/**
+ * writeDocumentRaw, but only when `accepts(existing)` says the file there now may be
+ * replaced — checked under the same lock as the write, so nothing lands in between.
+ * `existing` is the parsed file, or null when there is none. Resolves to whether it
+ * wrote.
+ */
+export async function writeDocumentRawIf(projectName, docName, data, accepts) {
+  return withDocLock(projectName, docName, async () => {
+    const existing = await loadDocument(projectName, docName)
+    if (!accepts(existing)) return false
+    await writeDocumentUnlocked(projectName, docName, data)
+    return true
+  })
 }
 
 // For callers already holding the document's lock. The lock is a queue, not a
@@ -115,8 +130,8 @@ async function writeDocumentUnlocked(projectName, docName, data) {
  * below); this reads the file first and puts back everything it didn't come to change.
  */
 export async function saveDocumentNotes(projectName, docName, notes) {
-  if (isCanvasDoc(docName)) {
-    console.error('[saveDocumentNotes] refused: %s is a canvas and has no notes.', docName)
+  if (!isTextDoc(docName)) {
+    console.error('[saveDocumentNotes] refused: %s is not a text document and has no notes.', docName)
     return false
   }
 
@@ -140,10 +155,11 @@ export async function saveDocumentNotes(projectName, docName, notes) {
 }
 
 export async function saveDocument(projectName, docName, docData) {
-  if (isCanvasDoc(docName)) {
+  if (!isTextDoc(docName)) {
     console.error(
-      '[saveDocument] refused: %s is a canvas. Use saveCanvasDocument() — this path would erase it.',
-      docName
+      '[saveDocument] refused: %s is a %s. Use its own saver (saveCanvasDocument, saveMapDocument) — this path would erase it.',
+      docName,
+      getDocKind(docName)
     )
     return
   }
@@ -209,10 +225,10 @@ export async function createDocumentFromVersion(projectName, docName, version, l
   try {
     const root = await getProjectRoot(projectName)
     const rel = normalizePath(docName)
-    const isCanvas = isCanvasDoc(rel)
-    const base = isCanvas ? rel.slice(0, -CANVAS_SUFFIX_LENGTH) : rel
+    const kind = getDocKind(rel)
+    const base = stripDocSuffix(rel)
     const suffix = String(label || 'copy').replace(/[/\\]/g, '-')
-    const withSuffix = (name) => (isCanvas ? `${name}${CANVAS_SUFFIX}` : name)
+    const withSuffix = (name) => withDocSuffix(name, kind)
 
     let candidate = withSuffix(`${base} (${suffix})`)
     let counter = 2
@@ -221,9 +237,7 @@ export async function createDocumentFromVersion(projectName, docName, version, l
       counter += 1
     }
 
-    const data = version.canvas
-      ? version.canvas
-      : { content: version.contentJson || [], notes: [] }
+    const data = version.map || version.canvas || { content: version.contentJson || [], notes: [] }
 
     await writeDocumentRaw(projectName, candidate, data)
     return candidate
@@ -552,10 +566,10 @@ export async function duplicateEntry(projectName, entryPath) {
     const source = filePathFor(root, rel)
     if (!(await exists(source))) return null
 
-    // The `.canvas` suffix carries the document's kind, so the copy keeps it.
-    const isCanvas = isCanvasDoc(rel)
-    const base = isCanvas ? rel.slice(0, -CANVAS_SUFFIX_LENGTH) : rel
-    const withSuffix = (name) => (isCanvas ? `${name}${CANVAS_SUFFIX}` : name)
+    // The `.canvas` or `.map` suffix carries the document's kind, so the copy keeps it.
+    const kind = getDocKind(rel)
+    const base = stripDocSuffix(rel)
+    const withSuffix = (name) => withDocSuffix(name, kind)
 
     let candidate = withSuffix(`${base} copy`)
     let counter = 2

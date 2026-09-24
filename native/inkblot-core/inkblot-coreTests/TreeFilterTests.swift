@@ -18,7 +18,7 @@ struct TreeFilterTests {
 
     private var tree: TreeNode {
         folder("", [
-            folder("essays", [file("essays/Draft"), file("essays/Board.canvas")]),
+            folder("essays", [file("essays/Draft"), file("essays/Board.canvas"), file("essays/Shire.map")]),
             folder("empty", []),
             file("Notes"),
         ])
@@ -35,12 +35,15 @@ struct TreeFilterTests {
 
     @Test func aMatchingFolderKeepsItsContents() {
         let shown = TreeFilter(text: "ess").apply(to: tree, recent: [])
-        #expect(paths(shown) == ["essays", "essays/Draft", "essays/Board.canvas"])
+        #expect(paths(shown) == ["essays", "essays/Draft", "essays/Board.canvas", "essays/Shire.map"])
     }
 
     @Test func kindAndRecentNarrowFiles() {
         #expect(paths(TreeFilter(kind: .canvases).apply(to: tree, recent: []))
                 == ["essays", "essays/Board.canvas"])
+        #expect(paths(TreeFilter(kind: .maps).apply(to: tree, recent: [])) == ["essays", "essays/Shire.map"])
+        #expect(paths(TreeFilter(kind: .documents).apply(to: tree, recent: []))
+                == ["essays", "essays/Draft", "Notes"])
         #expect(paths(TreeFilter(recentOnly: true).apply(to: tree, recent: ["Notes"])) == ["Notes"])
     }
 }

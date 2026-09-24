@@ -42,6 +42,9 @@ pub enum SearchResultType {
     NoteMatch,
     /// A hit on a canvas, addressed by node id — a canvas has no positions.
     CanvasMatch,
+    /// A hit on a map, addressed by the id of the pin, route, region, label or
+    /// traveler that carries the text (in `node_id`).
+    MapMatch,
 }
 
 /// One row of results.

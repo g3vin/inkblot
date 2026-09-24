@@ -172,7 +172,9 @@ struct ProjectOutline: NSViewRepresentable {
             let id = NSUserInterfaceItemIdentifier("row")
             let cell = outlineView.makeView(withIdentifier: id, owner: nil) as? NSTableCellView ?? Self.makeCell(id)
             cell.textField?.stringValue = item.isFolder ? item.node.name : docDisplayName(path: item.path)
-            let symbol = item.isFolder ? "folder" : isCanvasDoc(path: item.path) ? "rectangle.on.rectangle" : "doc.text"
+            let symbol = item.isFolder ? "folder"
+                : isCanvasDoc(path: item.path) ? "rectangle.on.rectangle"
+                : isMapDoc(path: item.path) ? "map" : "doc.text"
             cell.imageView?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
             return cell
         }
