@@ -40,6 +40,35 @@ struct InkblotCommands: Commands {
                 .disabled(model.target == nil)
         }
 
+        // File ▸ Page Setup, Print and Export. ⌘P and ⌥⌘P are the page's too (it handles
+        // them as keystrokes, like the Format keys above), so these carry none.
+        CommandGroup(replacing: .printItem) {
+            Button("Page Setup…") { model.showPageSetup() }
+            Button("Print…  ⌘P") { model.pageLayout.print(.document) }
+                .disabled(!model.pageLayout.hasDocument)
+            Button("Print Book…") { model.pageLayout.print(.folder) }
+                .disabled(!model.pageLayout.hasDocument)
+            Button("Print Book for Binding…") { model.pageLayout.print(.folder, bound: true) }
+                .disabled(!model.pageLayout.hasDocument)
+        }
+        CommandGroup(after: .importExport) {
+            Menu("Export") {
+                exportItems(.document)
+            }
+            .disabled(!model.pageLayout.hasDocument)
+            Menu("Export Book") {
+                exportItems(.folder)
+                Button("PDF for Binding…") { model.pageLayout.export(.pdf, scope: .folder, bound: true) }
+            }
+            .disabled(!model.pageLayout.hasDocument)
+        }
+
+        CommandMenu("Insert") {
+            Button("Page Break  ⌘↩") { model.pageLayout.insertBreak(.page, target: model.target) }
+            Button("Column Break  ⇧⌘↩") { model.pageLayout.insertBreak(.column, target: model.target) }
+            Button("Break to Next Right-Hand Page") { model.pageLayout.insertBreak(.recto, target: model.target) }
+        }
+
         CommandMenu("Format") {
             markToggle("Bold", .bold, \.bold)
             markToggle("Italic", .italic, \.italic)
@@ -54,11 +83,32 @@ struct InkblotCommands: Commands {
         // The page's own View items — theme, accent color, word count. Still the page's
         // to run (it owns those settings); drawn here because the menu bar is ours.
         CommandGroup(after: .sidebar) {
+            Divider()
+            Toggle("Print Layout  ⌥⌘P", isOn: Binding(
+                get: { model.pageLayout.isEnabled },
+                set: { model.pageLayout.setPrintLayout($0) }))
+                .disabled(!model.pageLayout.hasDocument)
+            Menu("Page Zoom") {
+                Button("Fit Width") { model.pageLayout.fit(.width) }
+                Button("Fit Page") { model.pageLayout.fit(.page) }
+                Button("Actual Size") { model.pageLayout.fit(.actual) }
+                Divider()
+                Button("100%") { model.pageLayout.zoom(1) }
+            }
+            .disabled(!model.pageLayout.isEnabled)
             if !model.menus.viewMenuItems.isEmpty {
                 Divider()
                 WebMenuItems(items: model.menus.viewMenuItems) { rid in model.menus.activate?(rid) }
             }
         }
+    }
+
+    @ViewBuilder
+    private func exportItems(_ scope: PrintScope) -> some View {
+        Button("PDF…") { model.pageLayout.export(.pdf, scope: scope) }
+        Button("EPUB…") { model.pageLayout.export(.epub, scope: scope) }
+        Button("Markdown…") { model.pageLayout.export(.markdown, scope: scope) }
+        Button("HTML…") { model.pageLayout.export(.html, scope: scope) }
     }
 
     private func markToggle(_ title: String, _ mark: MarkKind, _ isOn: KeyPath<ActiveMarks, Bool>) -> some View {

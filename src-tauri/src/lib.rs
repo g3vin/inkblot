@@ -16,6 +16,7 @@ mod dictation_commands;
 mod kokoro_commands;
 mod pinterest_commands;
 mod preferences_commands;
+mod print_commands;
 mod synonym_commands;
 
 use dictation_commands::{
@@ -194,6 +195,7 @@ pub fn run() {
             pinterest_begin_scrape,
             pinterest_report_scrape,
             pinterest_await_scrape,
+            print_commands::print_webview,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

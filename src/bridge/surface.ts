@@ -33,6 +33,8 @@ import type {
   NotePreviewDismissed,
   NotesRemapped,
   OpenDocumentCommand,
+  PageLayoutState,
+  PrintRequest,
   ClipboardChanged,
   NotesChanged,
   ProjectChanged,
@@ -128,6 +130,10 @@ export interface DocumentSurface {
   /** An open preview's marker moved. Coalesced — each carries the whole rect. */
   publishNoteMarkerMoved(payload: NoteMarkerEvent): void
   publishNotePreviewDismissed(payload: NotePreviewDismissed): void
+  /** Print Layout's state, for the inspector's Page tab. Coalesced — each carries it all. */
+  publishPageLayoutState(payload: PageLayoutState): void
+  /** Ask the shell to print the web view at a paper size. Not coalesced: each is a job. */
+  publishPrintRequest(payload: PrintRequest): void
 
   /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
   publishDragStarted(): void
@@ -191,6 +197,10 @@ export function createDocumentSurface({
   )
   const markerMoves = createCoalescer<NoteMarkerEvent>(
     (payload) => bridge.emit('noteMarkerMoved', payload),
+    scheduler
+  )
+  const pageLayoutChanges = createCoalescer<PageLayoutState>(
+    (payload) => bridge.emit('pageLayoutState', payload),
     scheduler
   )
   const dragMoves = createCoalescer<{ dragId: string; clientX: number; clientY: number }>(
@@ -382,10 +392,13 @@ export function createDocumentSurface({
     publishVersionsChanged(payload) { bridge.emit('versionsChanged', payload) },
     publishShowSidebarTab(payload) { bridge.emit('showSidebarTab', payload) },
     publishNoteMarkerMoved(payload) { markerMoves.push(payload) },
+    publishPageLayoutState(payload) { pageLayoutChanges.push(payload) },
+    publishPrintRequest(payload) { bridge.emit('printRequest', payload) },
     publishNotePreviewDismissed(payload) {
       // A move queued for a preview that is closing would reopen nothing, but it would
       // arrive after the dismissal and be one message the shell has to reason about.
       markerMoves.cancel()
+      pageLayoutChanges.cancel()
       bridge.emit('notePreviewDismissed', payload)
     },
 
@@ -416,6 +429,7 @@ export function createDocumentSurface({
       clipboardChanges.flush()
       tileChanges.flush()
       markerMoves.flush()
+      pageLayoutChanges.flush()
       for (const coalescer of notesByDoc.values()) coalescer.flush()
       for (const coalescer of notesChangedByDoc.values()) coalescer.flush()
     },
@@ -427,6 +441,7 @@ export function createDocumentSurface({
       clipboardChanges.cancel()
       tileChanges.cancel()
       markerMoves.cancel()
+      pageLayoutChanges.cancel()
       for (const coalescer of notesByDoc.values()) coalescer.cancel()
       for (const coalescer of notesChangedByDoc.values()) coalescer.cancel()
       notesByDoc.clear()

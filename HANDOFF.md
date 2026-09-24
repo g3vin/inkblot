@@ -832,6 +832,65 @@ on the canvas, and a native keyboard accessory replacing the toolbar.
 
 ---
 
+## Print Layout, printing, binding and export — branch `print-layout`
+
+The editor shown as physical pages (View ▸ Print Layout, ⌥⌘P), printed exactly as
+shown, imposed for self-binding, and exported to PDF, EPUB, Markdown and HTML — for one
+document, or for its folder compiled as a book. All of it lives in `src/print/`.
+
+**Gates.** Beside the seven above: `npm run test:layout`, which runs the real editor in
+WebKit (17 checks; needs `playwright-core` + its WebKit, not a project dependency — see
+the header of `scripts/print-tests/run.mjs`). `npm test` has a `print` suite (the pure
+logic, and every export format) and the `editor` suite mounts a pane as pages.
+
+**How it works — the parts that took finding out:**
+
+- **One live editor, pushed, not split.** Pagination never moves content between
+  containers. `PaginationExtension.ts` measures the laid-out document (`measure.ts`),
+  decides the breaks (`paginate.ts`, pure) and draws them as decorations that push
+  content to the next page: a `::before` inside a textblock, an inline-block widget
+  as wide as the line at a mid-paragraph break, an empty `<tr>` before a table row, a
+  block widget before an atom. Every node view keeps working because it is the same
+  editor. Nothing it adds is saved, undone, copied or exported.
+- **Measure natural geometry, or it oscillates.** The measurer subtracts the pushes it
+  finds (a push at position p moves everything at or after p), so applying the result
+  cannot change the input. One pass settles; `MAX_PASSES` bounds pathological cases.
+- **Line geometry is cached by node identity** (ProseMirror nodes are immutable) and a
+  line's position is only resolved where a page breaks. That is the difference between
+  a 20 s pass and a 36 ms one on 300 pages.
+- **Never `posAtCoords` for off-screen lines** — it hit-tests, so it fails off screen —
+  and **never `coordsAtPos` for a line start**: at a soft wrap WebKit answers with the
+  end of the previous line, which put breaks one letter into the word. `charTopAt`
+  measures the character's own box.
+- **WebKit will not move the caret ↑/↓ over a push.** Vertical moves in Print Layout
+  are made by the plugin (`handleVerticalArrow`), stepping past the line with
+  `posAtCoords` at the goal x.
+- **Zoom is a `transform`, not CSS `zoom`**, so line breaks are identical at every zoom
+  (tested). 100% is CSS real size; "Actual Size" uses the display density the Swift
+  shell sends (`setDisplayDensity`).
+- **Top-level blocks are `display: flow-root` in Print Layout.** Printing clones each
+  block into a page window with absolute positioning — a formatting context of its own —
+  so a child margin that collapsed through its block on screen could not on paper. Found
+  by `test:layout` (a line 3 px over the foot of printed page 6).
+- **Printing is the layout cut up, not re-typeset** (`printRender.js`): each page is a
+  window onto the paginated flow holding clones of the blocks that overlap it. The
+  document open in Print Layout prints from its live editor; anything else is laid out
+  in a hidden editor first. Both shells then run `WKWebView.printOperation` at the exact
+  paper size with zero margins — Swift in `Web/WebPrinting.swift` (on the `printRequest`
+  event), Tauri in `src-tauri/src/print_commands.rs` (`print_webview`, objc2). PDF is
+  the same operation with the save disposition.
+- **The page setup is an attribute of the `doc` node** (`DocPageSetup.js`), so it rides
+  in autosave and every version with no storage change. `setContent` does not carry doc
+  attributes — restores and merges go through `setContentKeepingPageSetup`.
+- **Columns:** the live editor is a single running column ("galley") at the column
+  width; print, PDF and binding set the columns side by side. Live multi-column editing
+  in one contenteditable was judged not reliable in WebKit.
+
+**Not yet verified by hand** (nothing here can click through a GUI): a real print and a
+real PDF from both shells; the Swift Page tab in use; the Tauri Page Setup sheet; a
+folded 16-page signature; an EPUB in Apple Books or `epubcheck`; a Pinterest board's
+embed iframe in print (a cloned iframe reloads, and may print blank).
+
 ## Things that will bite you
 
 ### Refactoring technique

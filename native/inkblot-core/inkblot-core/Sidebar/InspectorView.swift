@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The right sidebar: a selector bar and one search bar over four panels.
+/// The right sidebar: a selector bar and one search bar over five panels.
 ///
 /// With the scope on "This Panel" the bar filters the panel beneath it. Any other scope
 /// turns it into a search, and the results replace the panel until the scope goes back
@@ -36,6 +36,7 @@ struct InspectorView: View {
                     case .workbench: WorkbenchPanelView()
                     case .notes: NotesPanelView()
                     case .history: HistoryPanelView()
+                    case .page: PagePanelView()
                     }
                 }
             }

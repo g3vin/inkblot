@@ -33,6 +33,7 @@ pub mod command;
 pub mod common;
 pub mod envelope;
 pub mod event;
+pub mod print;
 pub mod sidebar;
 
 pub use command::{
@@ -43,6 +44,12 @@ pub use command::{
     OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand,
     SetColorCommand, SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand,
     SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,
+};
+pub use print::{
+    ExportDocumentCommand, ExportFormat, GoToPageCommand, InsertBreakCommand, PageBreakKind,
+    PageLayoutState, PageSizeOption, PrintDocumentCommand, PrintFinishedCommand, PrintRequest,
+    PrintScope, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
+    SetPrintLayoutCommand, SetPrintZoomCommand, SignatureAdvice, ZoomFit,
 };
 pub use sidebar::{
     AddReplyCommand, NotePreviewDismissed, ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,

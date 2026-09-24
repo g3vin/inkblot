@@ -17,6 +17,11 @@ use super::sidebar::{
     TileRef, UpdateNoteCommand, VersionActionCommand,
 };
 use crate::types::note::Note;
+use super::print::{
+    ExportDocumentCommand, GoToPageCommand, InsertBreakCommand, PrintDocumentCommand,
+    PrintFinishedCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
+    SetPrintLayoutCommand, SetPrintZoomCommand,
+};
 
 /// A command aimed at an editor with nothing else to say.
 #[typeshare]
@@ -455,4 +460,14 @@ pub enum NativeCommand {
     RevealSearchResult(RevealSearchResultCommand),
     AddReply(AddReplyCommand),
     SetTitlebarInset(SetTitlebarInsetCommand),
+    SetPrintLayout(SetPrintLayoutCommand),
+    SetPageSetup(SetPageSetupCommand),
+    SetBookSettings(SetBookSettingsCommand),
+    SetPrintZoom(SetPrintZoomCommand),
+    SetDisplayDensity(SetDisplayDensityCommand),
+    InsertBreak(InsertBreakCommand),
+    GoToPage(GoToPageCommand),
+    PrintDocument(PrintDocumentCommand),
+    ExportDocument(ExportDocumentCommand),
+    PrintFinished(PrintFinishedCommand),
 }
