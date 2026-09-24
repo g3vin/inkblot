@@ -1,6 +1,11 @@
 import SwiftUI
 
-/// The right sidebar: a selector bar and one search bar over five panels.
+/// The right sidebar: a selector bar and one search bar over its panels.
+///
+/// The bar offers one of two layouts' panels (`InspectorLayout`) — drafting's or
+/// finishing's — swapped by the round button beside it; right-clicking either offers
+/// Customize Layout…, where the user decides what each holds and in what order. Two
+/// fingers swiping sideways over the inspector move along the bar (`InspectorSwipeCatcher`).
 ///
 /// With the scope on "This Panel" the bar filters the panel beneath it. Any other scope
 /// turns it into a search, and the results replace the panel until the scope goes back
@@ -15,13 +20,28 @@ struct InspectorView: View {
         VStack(spacing: 10) {
             // Xcode's arrangement: the toggle in the toolbar above, the selector bar
             // beneath it, then the panel.
-            SidebarTabPicker(
-                tabs: SidebarModel.Tab.allCases,
-                selection: $sidebar.tab,
-                symbol: \.symbol,
-                title: \.title)
-                .disabled(sidebar.isSearching)
-                .opacity(sidebar.isSearching ? 0.5 : 1)
+            HStack(spacing: 8) {
+                SidebarTabPicker(
+                    tabs: sidebar.tabs,
+                    selection: $sidebar.tab,
+                    symbol: \.symbol,
+                    title: \.title,
+                    menu: layoutMenu)
+                LayoutSwitchButton(layout: sidebar.layout) {
+                    withAnimation(.smooth(duration: 0.25)) { sidebar.switchLayout() }
+                }
+                .contextMenu {
+                    ForEach(layoutMenu.indices, id: \.self) { index in
+                        switch layoutMenu[index] {
+                        case .separator: Divider()
+                        case .item(let title, let isChecked, let action):
+                            Toggle(title, isOn: Binding(get: { isChecked }, set: { _ in action() }))
+                        }
+                    }
+                }
+            }
+            .disabled(sidebar.isSearching)
+            .opacity(sidebar.isSearching ? 0.5 : 1)
 
             searchBar
 
@@ -29,21 +49,48 @@ struct InspectorView: View {
                 if sidebar.isSearching {
                     SearchResultsView(replacement: $replacement)
                 } else {
-                    switch sidebar.tab {
-                    case .clipboard: ClipboardPanelView()
-                    case .workbench: WorkbenchPanelView()
-                    case .notes: NotesPanelView()
-                    case .references: ReferencesPanelView()
-                    case .history: HistoryPanelView()
-                    case .page: PagePanelView()
-                    }
+                    panel(sidebar.tab)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .id(sidebar.tab)
+                        // Only a swipe animates, and the panel comes in from the side the
+                        // fingers were heading from.
+                        .transition(.push(from: sidebar.lastStep > 0 ? .trailing : .leading))
                 }
             }
             .padding(.horizontal, -12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .clipped()
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
+        .background {
+            InspectorSwipeCatcher(isEnabled: model.bubble.open == nil && !sidebar.isSearching) { step in
+                withAnimation(.smooth(duration: 0.25)) { sidebar.step(by: step) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func panel(_ tab: SidebarModel.Tab) -> some View {
+        switch tab {
+        case .clipboard: ClipboardPanelView()
+        case .workbench: WorkbenchPanelView()
+        case .notes: NotesPanelView()
+        case .references: ReferencesPanelView()
+        case .history: HistoryPanelView()
+        case .page: PagePanelView()
+        }
+    }
+
+    /// Right-clicking the selector bar or the layout button: which layout, and
+    /// Customize Layout….
+    private var layoutMenu: [SidebarTabPicker<SidebarModel.Tab>.MenuEntry] {
+        let sidebar = model.sidebar
+        return InspectorLayout.allCases.map { layout in
+            .item("\(layout.title) Layout", isChecked: sidebar.layout == layout) {
+                withAnimation(.smooth(duration: 0.25)) { sidebar.showLayout(layout) }
+            }
+        } + [.separator, .item("Customize Layout…") { sidebar.isCustomizingLayout = true }]
     }
 
     private var searchBar: some View {
@@ -159,5 +206,28 @@ struct SearchResultsView: View {
                 .listStyle(.inset)
             }
         }
+    }
+}
+
+/// The small round button beside the selector bar that swaps the inspector's layout. It
+/// shows the layout in use; clicking it brings the other.
+private struct LayoutSwitchButton: View {
+    let layout: InspectorLayout
+    let action: () -> Void
+
+    private static let diameter: CGFloat = 28
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: layout.symbol)
+                .font(.system(size: 12, weight: .medium))
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: Self.diameter, height: Self.diameter)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .circle)
+        .help("\(layout.title) panels — click for \(layout.other.title)")
+        .accessibilityLabel("Switch to the \(layout.other.title) layout")
     }
 }

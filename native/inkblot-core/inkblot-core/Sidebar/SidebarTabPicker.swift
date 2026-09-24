@@ -14,6 +14,13 @@ struct SidebarTabPicker<Tab: Hashable>: NSViewRepresentable {
     @Binding var selection: Tab
     let symbol: (Tab) -> String
     let title: (Tab) -> String
+    /// What right-clicking the bar offers; empty for nothing.
+    var menu: [MenuEntry] = []
+
+    enum MenuEntry {
+        case item(String, isChecked: Bool = false, action: () -> Void)
+        case separator
+    }
 
     func makeNSView(context: Context) -> NSSegmentedControl {
         let control = NSSegmentedControl()
@@ -42,6 +49,7 @@ struct SidebarTabPicker<Tab: Hashable>: NSViewRepresentable {
             control.setToolTip(title(tab), forSegment: index)
         }
         control.isEnabled = context.environment.isEnabled
+        control.menu = menu.isEmpty ? nil : context.coordinator.makeMenu(menu)
         control.selectedSegment = tabs.firstIndex(of: selection) ?? -1
     }
 
@@ -55,6 +63,27 @@ struct SidebarTabPicker<Tab: Hashable>: NSViewRepresentable {
         @objc func changed(_ control: NSSegmentedControl) {
             guard parent.tabs.indices.contains(control.selectedSegment) else { return }
             parent.selection = parent.tabs[control.selectedSegment]
+        }
+
+        func makeMenu(_ entries: [MenuEntry]) -> NSMenu {
+            let menu = NSMenu()
+            for entry in entries {
+                switch entry {
+                case .separator:
+                    menu.addItem(.separator())
+                case .item(let title, let isChecked, let action):
+                    let item = NSMenuItem(title: title, action: #selector(run(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.state = isChecked ? .on : .off
+                    item.representedObject = action
+                    menu.addItem(item)
+                }
+            }
+            return menu
+        }
+
+        @objc private func run(_ item: NSMenuItem) {
+            (item.representedObject as? () -> Void)?()
         }
     }
 }
