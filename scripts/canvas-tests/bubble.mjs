@@ -304,10 +304,42 @@ ok('with the set-aside words in it', same(found.session.aside, bubble.aside))
 ok('the chip marks it in the editor',
   editor.view.dom.querySelectorAll(`.bubble-session-chip[data-bubble-session-id="${bubble.id}"]`).length === 1)
 ok('the caret is after the sentence', editor.state.selection.from === found.to)
+// Hung in the margin (lib/marginHang.js), so a full line never pushes it onto its own.
+const hang = editor.view.dom.querySelector('.bubble-session-chip').parentElement
+ok('the chip hangs, taking the width of the space after the sentence',
+  hang.classList.contains('margin-hang') && hang.classList.contains('is-before-space')
+  && hang.lastElementChild.classList.contains('margin-hang-space'))
+ok('…which is made droppable at the end of a line',
+  [...editor.view.dom.querySelectorAll('.margin-hang-after')].map((el) => el.textContent).join('|') === ' ')
 
 // Typing right after it is not typing into it.
 editor.chain().insertContent('!').run()
 ok('the mark does not grow at its end', findBubbleSession(editor.state.doc, bubble.id).to === found.to)
+ok('and with no space after it now, its chip has none to stand in for',
+  !editor.view.dom.querySelector('.bubble-session-chip').parentElement.classList.contains('is-before-space')
+  && !editor.view.dom.querySelector('.margin-hang-after'))
+
+// A note's dot hangs the same way.
+{
+  const { NoteAnnotation, syncEditorNotes } = await import(`${S}/extensions/NoteAnnotation.js`)
+  const noted = new Editor({
+    element: document.getElementById('root').appendChild(document.createElement('div')),
+    extensions: [StarterKit, NoteAnnotation],
+    content: '<p>One word here.</p>',
+  })
+  syncEditorNotes(noted, [{ id: 'n1', type: 'quote', from: 1, to: 9 }], 'doc') // "One word"
+  const dotHang = () => noted.view.dom.querySelector('.note-marker')?.parentElement
+  ok('a note\'s dot hangs, standing in for the space after it',
+    dotHang()?.classList.contains('is-before-space') && noted.view.dom.querySelectorAll('.margin-hang-after').length === 1)
+  noted.commands.setContent('<p>One word, here.</p>')
+  syncEditorNotes(noted, [{ id: 'n2', type: 'quote', from: 1, to: 9 }], 'doc')
+  ok('a dot before a comma has no space to stand in for',
+    dotHang() && !dotHang().classList.contains('is-before-space'))
+  noted.commands.insertContentAt(9, 'y')
+  ok('…nor, typed at its place, does it get one: the text goes before it',
+    noted.state.doc.textContent === 'One wordy, here.' && dotHang() && !dotHang().classList.contains('is-before-space'))
+  noted.destroy()
+}
 
 // What version history stores, and restores.
 const json = editor.getJSON()
@@ -624,24 +656,13 @@ await act(async () => {
 })
 ok('and the shell closing it writes the paragraph', native.state.doc.textContent === 'Gamma delta. Alpha beta.')
 
-const nativeChip = native.view.dom.querySelector('.bubble-session-chip')
-nativeChip.getBoundingClientRect = () => ({ left: 100, top: 200, right: 122, bottom: 216, width: 22, height: 16 })
-// jsdom computes no overflow, which would make every pane around the chip clip it away.
-const realComputedStyle = globalThis.getComputedStyle
-globalThis.getComputedStyle = () => ({ overflowX: 'visible', overflowY: 'visible' })
-await act(async () => { window.dispatchEvent(new dom.window.Event('resize')) })
-// One frame to measure, one for the surface's coalescer to send.
+// The chips stay the page's: drawn over from reported positions, they trailed the text
+// through every scroll.
 await frame()
 await frame()
-const reported = heard.bubbleChipsChanged.at(-1)?.chips ?? []
-ok('the chips are reported to the shell, which draws them as glass',
-  same(reported, [{ sessionId: openedNatively.session.id, left: 100, top: 200, right: 122, bottom: 216, formPage: 0, formPages: 0 }]))
-globalThis.getComputedStyle = realComputedStyle
-ok('and the page\'s own chips are hidden', document.documentElement.classList.contains('native-bubble-chips'))
+ok('the page draws its own chips, reporting none to the shell',
+  !!native.view.dom.querySelector('.bubble-session-chip') && heard.bubbleChipsChanged.length === 0)
 
 await act(async () => { nativeRoot.unmount() })
-await frame()
-ok('unmounting clears them', heard.bubbleChipsChanged.at(-1)?.chips.length === 0
-  && !document.documentElement.classList.contains('native-bubble-chips'))
 delete window.__inkblotNative
 native.destroy()

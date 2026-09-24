@@ -56,7 +56,6 @@ struct ContentView: View {
         } detail: {
             EditorWebView(controller: model.web)
                 .overlay {
-                    BubbleChips()
                     WordCountBadges()
                     NotePreviewOverlay()
                 }

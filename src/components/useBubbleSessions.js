@@ -30,7 +30,6 @@ import { writeBubbleSession } from '../lib/bubbleWrite'
 import { BubbleMode } from '../types'
 import { BUBBLE_OPEN_EVENT, bubbleSessionAt, findBubbleSession } from '../extensions/BubbleSession'
 import { archiveItem } from '../lib/archiveStore'
-import { visibleRect } from './useNativeNotePreviews'
 
 /** The selection with surrounding whitespace left out, or null if it is not one sentence's worth. */
 export const selectionForBubble = (editor) => {
@@ -213,56 +212,6 @@ export function useBubbleSessions({ docPath, projectName }) {
     window.addEventListener(BUBBLE_OPEN_EVENT, onOpen)
     return () => window.removeEventListener(BUBBLE_OPEN_EVENT, onOpen)
   }, [openSession])
-
-  // Under the Swift shell the chips are drawn natively, as Liquid Glass. The page's stay
-  // where they are, invisible (`.native-bubble-chips`), and go on taking the click; this
-  // says where they are — measured at most once a frame, whatever moved them, and sent
-  // only when something did.
-  useEffect(() => {
-    if (!nativeBubble) return undefined
-    document.documentElement.classList.add('native-bubble-chips')
-    let last = ''
-    let frame = 0
-    const publish = () => {
-      if (frame) return
-      frame = window.requestAnimationFrame(() => {
-        frame = 0
-        const clips = new Map()
-        const chips = []
-        for (const chip of document.querySelectorAll('.bubble-session-chip')) {
-          const rect = visibleRect(chip, clips)
-          if (!rect) continue
-          chips.push({
-            sessionId: String(chip.dataset.bubbleSessionId || ''),
-            left: rect.left,
-            top: rect.top,
-            right: rect.right,
-            bottom: rect.bottom,
-            formPage: Number(chip.dataset.formPage) || 0,
-            formPages: Number(chip.dataset.formPages) || 0,
-          })
-        }
-        const key = JSON.stringify(chips)
-        if (key === last) return
-        last = key
-        documentSurface.publishBubbleChipsChanged({ chips })
-      })
-    }
-    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(publish)
-    mutations?.observe(document.body, { childList: true, subtree: true, characterData: true })
-    // Capture: a document scrolls inside its pane, and scroll does not bubble.
-    window.addEventListener('scroll', publish, true)
-    window.addEventListener('resize', publish)
-    publish()
-    return () => {
-      mutations?.disconnect()
-      window.removeEventListener('scroll', publish, true)
-      window.removeEventListener('resize', publish)
-      if (frame) window.cancelAnimationFrame(frame)
-      document.documentElement.classList.remove('native-bubble-chips')
-      documentSurface.publishBubbleChipsChanged({ chips: [] })
-    }
-  }, [nativeBubble])
 
   useEffect(() => {
     if (!nativeBubble) return undefined
