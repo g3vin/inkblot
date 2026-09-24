@@ -25,7 +25,7 @@ import {
   pageMetrics,
   runningTextFor,
 } from './pageSetup'
-import { clampZoom, fitPageZoom, fitWidthZoom, ZOOM_STEPS } from './zoom'
+import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, ZOOM_STEPS } from './zoom'
 import { PAGE_GAP } from './printLayoutConstants'
 import { nativeOwns } from '../lib/host'
 import './PrintLayout.css'
@@ -70,7 +70,8 @@ export default function PrintLayoutView({
   const zoomRef = useRef(zoom)
   const galley = setup.columns > 1
 
-  useEffect(() => {
+  // Before the zoom's own layout effect below, which reads it.
+  useLayoutEffect(() => {
     zoomRef.current = zoom
   }, [zoom])
 
@@ -163,51 +164,235 @@ export default function PrintLayoutView({
     return () => scrollEl.removeEventListener('scroll', onScroll)
   }, [galley, scrollEl, setup.columns, slotStride, stripCount])
 
-  // Keep what is under the cursor under the cursor across a zoom.
-  const applyZoom = useCallback((next, anchor) => {
-    const target = clampZoom(next)
-    const prev = zoomRef.current || 1
-    if (!scrollEl || target === prev) {
-      onZoomChange?.(target)
+  /*
+   * Zoom, as smooth as the display allows.
+   *
+   * Laying the pages out again at every step of a pinch is what made the text shimmy:
+   * each step re-rasterised every glyph at a new scale, and the scroll that held the
+   * anchor still landed a step behind. So a zoom in progress lays nothing out. It
+   * scales the sizer as one composited layer — a transform the compositor applies on
+   * its own — holding the point under the cursor (or the pane's centre) still. Only
+   * when it ends is the zoom committed: the store's zoom changes, the stage is laid
+   * out once at the new size, and in the same frame (`settle`) the scroll is set so
+   * every page lands exactly where the transform last drew it.
+   */
+  const sizerRef = useRef(null)
+  // { base: the committed zoom it started from, s, tx, ty: the transform, ax, ay: its anchor }
+  const liveRef = useRef(null)
+  // What `settle` needs once the committed zoom has been laid out.
+  const pendingRef = useRef(null)
+  const commitTimerRef = useRef(0)
+  const animationRef = useRef({ frame: 0, target: null })
+  const pinchingRef = useRef(false)
+
+  const liveZoom = () => (liveRef.current ? liveRef.current.base * liveRef.current.s : zoomRef.current || 1)
+
+  /** Draws the pages at `next`, keeping the screen point (ax, ay) where it is. */
+  const zoomVisual = useCallback((next, ax, ay) => {
+    const sizer = sizerRef.current
+    if (!sizer) return
+    let live = liveRef.current
+    if (!live) {
+      live = { base: zoomRef.current || 1, s: 1, tx: 0, ty: 0, ax, ay }
+      // Picked up mid-settle: from wherever the settling transition has got to.
+      if (sizer.classList.contains('is-settling')) {
+        const m = new DOMMatrixReadOnly(getComputedStyle(sizer).transform)
+        live.tx = m.e
+        live.ty = m.f
+        sizer.classList.remove('is-settling')
+      }
+      liveRef.current = live
+      sizer.classList.add('is-zooming')
+    }
+    // Unrounded while it moves (clampZoom's rounding would step); rounded at the end.
+    const target = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next))
+    const current = live.base * live.s
+    live.ax = ax
+    live.ay = ay
+    if (target !== current) {
+      // screen = o + t + s·q for a point q of the sizer, o its untransformed origin;
+      // scaling by f about a moves t to f·t + (1 − f)(a − o).
+      const f = target / current
+      const rect = sizer.getBoundingClientRect()
+      live.tx = f * live.tx + (1 - f) * (ax - (rect.left - live.tx))
+      live.ty = f * live.ty + (1 - f) * (ay - (rect.top - live.ty))
+      live.s = target / live.base
+    }
+    sizer.style.transform = `translate(${live.tx}px, ${live.ty}px) scale(${live.s})`
+  }, [])
+
+  /** Scrolls the laid-out pages to where the transform last drew them, and drops it. */
+  const settle = useCallback((pending) => {
+    const sizer = sizerRef.current
+    if (!sizer || !scrollEl) return
+    sizer.classList.remove('is-zooming', 'is-settling')
+    sizer.style.transform = ''
+    const wantTop = pending.scrollTop + (sizer.offsetTop - pending.offsetTop) - pending.ty
+    const wantLeft = pending.scrollLeft + (sizer.offsetLeft - pending.offsetLeft) - pending.tx
+    scrollEl.scrollTop = wantTop
+    scrollEl.scrollLeft = wantLeft
+    // The scroll range could not take it all — the document's top, or pages that now
+    // fit across and centre. Ease the rest in rather than jump.
+    const dx = scrollEl.scrollLeft - wantLeft
+    const dy = scrollEl.scrollTop - wantTop
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
+    sizer.style.transform = `translate(${dx}px, ${dy}px)`
+    void sizer.offsetWidth
+    sizer.classList.add('is-settling')
+    sizer.style.transform = ''
+    const done = (event) => {
+      if (event.target !== sizer) return
+      sizer.removeEventListener('transitionend', done)
+      if (!liveRef.current) sizer.classList.remove('is-settling')
+    }
+    sizer.addEventListener('transitionend', done)
+  }, [scrollEl])
+
+  /** Ends the zoom in progress: one layout at the new zoom, then `settle`. */
+  const commitZoom = useCallback(() => {
+    window.clearTimeout(commitTimerRef.current)
+    commitTimerRef.current = 0
+    const live = liveRef.current
+    const sizer = sizerRef.current
+    if (!live || !sizer || !scrollEl) return
+    const target = clampZoom(live.base * live.s)
+    zoomVisual(target, live.ax, live.ay)
+    liveRef.current = null
+    const pending = {
+      zoom: target,
+      tx: live.tx,
+      ty: live.ty,
+      scrollTop: scrollEl.scrollTop,
+      scrollLeft: scrollEl.scrollLeft,
+      offsetTop: sizer.offsetTop,
+      offsetLeft: sizer.offsetLeft,
+    }
+    if (target === zoomRef.current) {
+      settle(pending)
       return
     }
-    const rect = scrollEl.getBoundingClientRect()
-    const ax = anchor ? anchor.x - rect.left : scrollEl.clientWidth / 2
-    const ay = anchor ? anchor.y - rect.top : scrollEl.clientHeight / 2
-    const docY = (scrollEl.scrollTop + ay) / prev
-    const docX = (scrollEl.scrollLeft + ax) / prev
+    // The store re-renders synchronously, before the next paint; the layout effect
+    // below settles it there.
+    pendingRef.current = pending
     onZoomChange?.(target)
-    requestAnimationFrame(() => {
-      scrollEl.scrollTop = docY * target - ay
-      scrollEl.scrollLeft = docX * target - ax
-    })
-  }, [onZoomChange, scrollEl])
+  }, [onZoomChange, scrollEl, settle, zoomVisual])
 
-  // Pinch and ⌘/ctrl-wheel zoom the pages, not the webview.
+  useLayoutEffect(() => {
+    const pending = pendingRef.current
+    if (!pending || pending.zoom !== zoom) return
+    pendingRef.current = null
+    settle(pending)
+  }, [settle, zoom])
+
+  const stopAnimation = () => {
+    if (animationRef.current.frame) cancelAnimationFrame(animationRef.current.frame)
+    animationRef.current = { frame: 0, target: null }
+  }
+
+  /** A zoom to a set level — a step, a fit, a menu choice — eased over a few frames. */
+  const applyZoom = useCallback((next, anchor) => {
+    if (!scrollEl) {
+      onZoomChange?.(clampZoom(next))
+      return
+    }
+    stopAnimation()
+    window.clearTimeout(commitTimerRef.current)
+    const rect = scrollEl.getBoundingClientRect()
+    const ax = anchor ? anchor.x : rect.left + scrollEl.clientWidth / 2
+    const ay = anchor ? anchor.y : rect.top + scrollEl.clientHeight / 2
+    const from = liveZoom()
+    const to = clampZoom(next)
+    if (to === from) {
+      commitZoom()
+      return
+    }
+    const start = performance.now()
+    const duration = 220
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration)
+      const eased = 1 - (1 - t) ** 3
+      // Geometric, so every frame of the ease is the same proportion of zoom.
+      zoomVisual(from * (to / from) ** eased, ax, ay)
+      if (t < 1) {
+        animationRef.current.frame = requestAnimationFrame(step)
+      } else {
+        animationRef.current = { frame: 0, target: null }
+        commitZoom()
+      }
+    }
+    animationRef.current = { frame: requestAnimationFrame(step), target: to }
+  }, [commitZoom, onZoomChange, scrollEl, zoomVisual])
+
+  /** The level a step in or out goes to — from where a running step is headed, so
+   *  pressing ⌘+ three times goes three steps. */
+  const stepZoom = useCallback((direction) => {
+    const z = animationRef.current.target ?? liveZoom()
+    const next = direction > 0
+      ? ZOOM_STEPS.find((s) => s > z + 0.001) ?? z
+      : [...ZOOM_STEPS].reverse().find((s) => s < z - 0.001) ?? z
+    applyZoom(next)
+  }, [applyZoom])
+
+  useEffect(() => () => {
+    window.clearTimeout(commitTimerRef.current)
+    if (animationRef.current.frame) cancelAnimationFrame(animationRef.current.frame)
+  }, [])
+
+  // Pinch and ⌘/ctrl-wheel zoom the pages, not the webview. WebKit sends a trackpad
+  // pinch as gesture events (which, unhandled, magnify the whole page); a mouse's
+  // ⌘-wheel, and other engines' pinch, as ctrl-wheel.
   useEffect(() => {
     if (!scrollEl) return undefined
     const onWheel = (event) => {
       if (!event.ctrlKey && !event.metaKey) return
       event.preventDefault()
-      const factor = Math.exp(-event.deltaY * 0.01)
-      applyZoom((zoomRef.current || 1) * factor, { x: event.clientX, y: event.clientY })
+      if (pinchingRef.current) return
+      stopAnimation()
+      const factor = Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.05 : 0.01))
+      zoomVisual(liveZoom() * factor, event.clientX, event.clientY)
+      window.clearTimeout(commitTimerRef.current)
+      commitTimerRef.current = window.setTimeout(commitZoom, 160)
+    }
+    let pinchFrom = 1
+    const onGestureStart = (event) => {
+      event.preventDefault()
+      stopAnimation()
+      window.clearTimeout(commitTimerRef.current)
+      pinchingRef.current = true
+      pinchFrom = liveZoom()
+    }
+    const onGestureChange = (event) => {
+      event.preventDefault()
+      zoomVisual(pinchFrom * event.scale, event.clientX, event.clientY)
+    }
+    const onGestureEnd = (event) => {
+      event.preventDefault()
+      pinchingRef.current = false
+      commitZoom()
     }
     scrollEl.addEventListener('wheel', onWheel, { passive: false })
-    return () => scrollEl.removeEventListener('wheel', onWheel)
-  }, [applyZoom, scrollEl])
+    scrollEl.addEventListener('gesturestart', onGestureStart, { passive: false })
+    scrollEl.addEventListener('gesturechange', onGestureChange, { passive: false })
+    scrollEl.addEventListener('gestureend', onGestureEnd, { passive: false })
+    return () => {
+      scrollEl.removeEventListener('wheel', onWheel)
+      scrollEl.removeEventListener('gesturestart', onGestureStart)
+      scrollEl.removeEventListener('gesturechange', onGestureChange)
+      scrollEl.removeEventListener('gestureend', onGestureEnd)
+    }
+  }, [commitZoom, scrollEl, zoomVisual])
 
   // ⌘+ / ⌘− / ⌘0 while the pane has focus.
   useEffect(() => {
     if (!scrollEl) return undefined
     const onKey = (event) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return
-      const z = zoomRef.current || 1
       if (event.key === '=' || event.key === '+') {
         event.preventDefault()
-        applyZoom(ZOOM_STEPS.find((s) => s > z + 0.001) ?? z)
+        stepZoom(1)
       } else if (event.key === '-') {
         event.preventDefault()
-        applyZoom([...ZOOM_STEPS].reverse().find((s) => s < z - 0.001) ?? z)
+        stepZoom(-1)
       } else if (event.key === '0') {
         event.preventDefault()
         applyZoom(1)
@@ -215,7 +400,7 @@ export default function PrintLayoutView({
     }
     scrollEl.addEventListener('keydown', onKey)
     return () => scrollEl.removeEventListener('keydown', onKey)
-  }, [applyZoom, scrollEl])
+  }, [applyZoom, scrollEl, stepZoom])
 
   const fit = useCallback((mode) => {
     if (!scrollEl) return
@@ -230,10 +415,11 @@ export default function PrintLayoutView({
   // Bring a page to the top of the view.
   const goToPage = useCallback((page) => {
     if (!scrollEl) return
+    commitZoom()
     const strip = galley ? (page - 1) * setup.columns : page - 1
     const stageTop = scrollEl.querySelector('.pl-sizer')?.offsetTop || 0
     scrollEl.scrollTo({ top: stageTop + strip * slotStride * (zoomRef.current || 1) - 16, behavior: 'smooth' })
-  }, [galley, scrollEl, setup.columns, slotStride])
+  }, [commitZoom, galley, scrollEl, setup.columns, slotStride])
 
   useLayoutEffect(() => {
     if (!editor || editor.isDestroyed) return undefined
@@ -241,11 +427,13 @@ export default function PrintLayoutView({
     if (!storage) return undefined
     storage.goToPage = goToPage
     storage.fit = fit
+    storage.zoomTo = applyZoom
     return () => {
       if (storage.goToPage === goToPage) storage.goToPage = null
       if (storage.fit === fit) storage.fit = null
+      if (storage.zoomTo === applyZoom) storage.zoomTo = null
     }
-  }, [editor, fit, goToPage])
+  }, [applyZoom, editor, fit, goToPage])
 
   const stageStyle = {
     width: `${stageWidth}px`,
@@ -262,12 +450,17 @@ export default function PrintLayoutView({
   }
 
   const pageCount = Math.max(result.pageCount, 1)
-  const status = (
-    <div className="pl-status" role="toolbar" aria-label="Print Layout">
-      <span className="pl-page-count">
-        Page {Math.min(currentPage, pageCount)} of {pageCount}
-      </span>
-      <button type="button" onClick={() => applyZoom([...ZOOM_STEPS].reverse().find((s) => s < zoom - 0.001) ?? zoom)} aria-label="Zoom out" title="Zoom out (⌘−)">−</button>
+  // Beside the word count, in the pane's status row; drawn as glass under the Swift
+  // shell, which measures it with the word count (it is a `.word-count` too).
+  const pageCountBadge = (
+    <div className="word-count pl-page-count-badge">
+      Page {Math.min(currentPage, pageCount)} of {pageCount}
+    </div>
+  )
+  // Under the Swift shell the zoom control is native (PrintLayoutControls.swift).
+  const zoomBar = nativeOwns('printControls') ? null : (
+    <div className="pl-status" role="toolbar" aria-label="Zoom">
+      <button type="button" onClick={() => stepZoom(-1)} aria-label="Zoom out" title="Zoom out (⌘−)">−</button>
       <select
         value=""
         onChange={(event) => {
@@ -283,16 +476,17 @@ export default function PrintLayoutView({
         <option value="page">Fit page</option>
         {ZOOM_STEPS.map((s) => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}
       </select>
-      <button type="button" onClick={() => applyZoom(ZOOM_STEPS.find((s) => s > zoom + 0.001) ?? zoom)} aria-label="Zoom in" title="Zoom in (⌘+)">+</button>
+      <button type="button" onClick={() => stepZoom(1)} aria-label="Zoom in" title="Zoom in (⌘+)">+</button>
       {nativeOwns('pageSetup') ? null : (
         <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} title="Page Setup">Page Setup…</button>
       )}
     </div>
   )
+  const pageCountHost = statusHost?.querySelector(':scope > .pane-status') || null
 
   return (
     <div className="print-layout">
-      <div className="pl-sizer" style={{ width: `${stageWidth * zoom}px`, height: `${stageHeight * zoom}px` }}>
+      <div ref={sizerRef} className="pl-sizer" style={{ width: `${stageWidth * zoom}px`, height: `${stageHeight * zoom}px` }}>
         <div className="pl-stage" style={stageStyle}>
           <div className="pl-pages" aria-hidden="true">
             {pages.map((page) => (
@@ -342,7 +536,8 @@ export default function PrintLayoutView({
           </div>
         </div>
       </div>
-      {statusHost ? createPortal(status, statusHost) : status}
+      {pageCountHost ? createPortal(pageCountBadge, pageCountHost) : null}
+      {zoomBar && statusHost ? createPortal(zoomBar, statusHost) : zoomBar}
     </div>
   )
 }

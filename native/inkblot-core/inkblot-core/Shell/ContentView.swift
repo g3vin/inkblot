@@ -57,6 +57,7 @@ struct ContentView: View {
             EditorWebView(controller: model.web)
                 .overlay {
                     WordCountBadges()
+                    PrintLayoutControls()
                     NotePreviewOverlay()
                 }
                 // Under the sidebars and the toolbar, so the page shows through their

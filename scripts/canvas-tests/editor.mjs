@@ -317,7 +317,8 @@ await settle()
 ok('Print Layout mounts the pane as pages', !!document.querySelector('.primary-pane .print-layout .pl-stage .pl-page'))
 ok('…with the live editor inside the page stage', !!document.querySelector('.primary-pane .pl-flow .editor .ProseMirror'))
 ok('…the same editor instance, with the same text', control.editor === editorBefore && paneText() === textBefore)
-ok('…and a page count in the zoom bar', /Page 1 of \d+/.test(document.querySelector('.primary-pane .pl-status')?.textContent || ''))
+ok('…a page count beside the word count', /Page 1 of \d+/.test(document.querySelector('.primary-pane .pane-status .pl-page-count-badge')?.textContent || ''))
+ok('…and a zoom bar', !!document.querySelector('.primary-pane .pl-status'))
 
 await act(async () => {
   control.editor.commands.setPageSetup(bookPageSetup('trade-6x9'))
