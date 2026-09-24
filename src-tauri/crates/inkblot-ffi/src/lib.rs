@@ -143,6 +143,25 @@ impl InkblotCore {
         Ok(self.projects.create_project(&project_name, target_parent_dir.as_deref())?)
     }
 
+    /// Adopt a project folder that already exists on disk, under the folder's own name —
+    /// the picker's "Open…". Returns the name it is known by; a refusal is a message
+    /// fit to show, the same ones the web picker shows.
+    pub fn link_project(&self, project_dir: String) -> Result<String, CoreError> {
+        use inkblot_core::store::LinkRefusal;
+        match self.projects.link_project(&project_dir)? {
+            Ok((name, _already_linked)) => Ok(name),
+            Err(refusal) => Err(CoreError::Failed(
+                match refusal {
+                    LinkRefusal::NameExists => "A different project already has that folder’s name. Rename one of the folders, then open it again.",
+                    LinkRefusal::InvalidName => "That folder’s name can’t be used for a project.",
+                    LinkRefusal::SourceMissing => "That folder no longer exists.",
+                    LinkRefusal::InvalidArguments | LinkRefusal::TargetExists => "Could not open that folder.",
+                }
+                .to_string(),
+            )),
+        }
+    }
+
     pub fn create_folder(&self, project_name: String, folder_path: String) -> Result<(), CoreError> {
         Ok(self.projects.create_folder(&project_name, &folder_path)?)
     }

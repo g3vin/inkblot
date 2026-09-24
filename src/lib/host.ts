@@ -17,19 +17,36 @@ import { detectNativeHost } from '../bridge/transport'
  * The pieces the shell can take over.
  *
  *  - `fileTree`     the left sidebar — the shell draws the project's tree natively
- *  - `windowChrome` traffic-light spacing and fullscreen tracking. The shell draws no
- *                   titlebar row, so the page's toolbar is the top of the window and
- *                   still the place to drag it by; the shell says how much room the
- *                   traffic lights need (`setTitlebarInset`) and does the drag itself.
+ *  - `windowChrome` the titlebar and fullscreen tracking. The window has a real toolbar,
+ *                   which places the traffic lights and drags the window; the shell says
+ *                   how much of the page its glass sidebars cover (`setPanelInsets`).
  *  - `rightSidebar` search, clipboard, workbench, notes and history — drawn by the shell
  *                   from what `useNativeSidebar` publishes
  *  - `notePreviews` the cards that open over a note's marker — drawn by the shell as
  *                   Liquid Glass, placed from what `useNativeNotePreviews` publishes
+ *  - `toolbar`      the formatting toolbar — a real window toolbar, driven by the pushed
+ *                   `ToolbarState`. The page then draws its toolbar row only for a canvas's
+ *                   own toolbar or a comparison's, below the window's.
+ *  - `bubble`       the bubble editor — each word a Liquid Glass bubble, drawn by the
+ *                   shell from what `useBubbleSessions` publishes
+ *  - `wordCount`    the per-pane word-count badge — drawn by the shell as Liquid Glass,
+ *                   placed from what `useEditorWordCount` publishes
+ *  - `projectPicker` the landing page — the shell picks a project in a window of its own
+ *                   and sends `openProject`; with no project open the page draws nothing
  *  - `pageSetup`    Print Layout's page setup, book and binding settings — the
  *                   inspector's Page tab, drawn from what `usePrintLayoutController`
  *                   publishes. Without it the page shows its own Page Setup sheet.
  */
-export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar' | 'notePreviews' | 'pageSetup'
+export type NativeChrome =
+  | 'fileTree'
+  | 'windowChrome'
+  | 'rightSidebar'
+  | 'notePreviews'
+  | 'bubble'
+  | 'toolbar'
+  | 'wordCount'
+  | 'projectPicker'
+  | 'pageSetup'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null

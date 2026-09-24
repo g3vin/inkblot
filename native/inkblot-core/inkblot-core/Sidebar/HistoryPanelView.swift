@@ -10,16 +10,27 @@ import SwiftUI
 ///
 /// Every action is a command, performed by the page under the lock its autosave writes
 /// the history with; the page then announces `versionsChanged` and this re-reads.
+///
+/// The archive button opens the document's archive (`ArchiveListView`) in its place.
 struct HistoryPanelView: View {
     @Environment(AppModel.self) private var model
     @State private var namedOnly = false
     @State private var expanded: Set<String> = []
     @State private var renaming: VersionRow?
     @State private var pendingDelete: VersionRow?
+    @State private var showingArchive = false
 
     var body: some View {
+        if showingArchive {
+            ArchiveListView { showingArchive = false }
+        } else {
+            versions
+        }
+    }
+
+    private var versions: some View {
         let sidebar = model.sidebar
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             HStack {
                 Button("Snapshot Now", systemImage: "plus") { sidebar.versionAction(.snapshot) }
                     .disabled(sidebar.historyDocPath == nil)
@@ -28,15 +39,22 @@ struct HistoryPanelView: View {
                 Toggle(isOn: $namedOnly) { Image(systemName: "tag") }
                     .toggleStyle(.button)
                     .help(namedOnly ? "Show all versions" : "Show only named versions")
+                Button("Archive", systemImage: "archivebox") { showingArchive = true }
+                    .labelStyle(.iconOnly)
+                    .disabled(sidebar.historyDocPath == nil)
+                    .help("View the archive: things put away out of this document")
             }
             .padding(12)
 
             if sections.isEmpty {
-                ContentUnavailableView(
-                    emptyTitle, systemImage: "clock",
-                    description: Text(sidebar.historyDocPath == nil
-                                      ? "Open a document to see its history."
-                                      : "Checkpoints appear as you write."))
+                ContentUnavailableView {
+                    Text(emptyTitle)
+                } description: {
+                    Text(sidebar.historyDocPath == nil
+                        ? "Open a document to see its history."
+                        : "Checkpoints appear as you write.")
+                }
+                .frame(maxHeight: .infinity)
             } else {
                 List {
                     ForEach(sections) { section in

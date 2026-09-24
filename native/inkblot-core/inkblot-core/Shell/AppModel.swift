@@ -14,12 +14,17 @@ final class AppModel {
     let bridge: ShellBridge
     let menus: WebMenus
     let tree: ProjectTree
+    let picker: ProjectPicker
     let sidebar: SidebarModel
     let notePreviews: NotePreviewModel
+    let bubble: BubbleModel
     let pageLayout: PageLayoutModel
     let memoRecorder = AudioMemoRecorder()
     let memoPlayer = AudioMemoPlayer()
     let language = LanguageServices()
+    /// The vertical centre of the file tree's bottom bar (the + and the filter), in
+    /// window coordinates — so the word-count badges can sit level with it.
+    var sidebarBarMidY: CGFloat?
     @ObservationIgnored private(set) lazy var web = EditorWebController(bridge: bridge, menus: menus, core: core)
 
     init() {
@@ -27,8 +32,10 @@ final class AppModel {
         bridge = ShellBridge()
         menus = WebMenus()
         tree = ProjectTree(core: core)
+        picker = ProjectPicker(core: core)
         sidebar = SidebarModel(bridge: bridge, core: core)
         notePreviews = NotePreviewModel(bridge: bridge)
+        bubble = BubbleModel(bridge: bridge)
         pageLayout = PageLayoutModel(bridge: bridge)
 
         bridge.addListener { [weak self] event in
@@ -36,6 +43,9 @@ final class AppModel {
             switch event {
             case .projectChanged(let project):
                 tree.follow(project)
+                deliverPendingProject(after: project)
+            case .activeEditorChanged(let changed):
+                if let docPath = changed.docPath { tree.noteOpened(docPath) }
             case .printRequest(let request):
                 // The page has laid the sheets out; print the web view at their size,
                 // and tell it when it can take them down.
@@ -50,6 +60,40 @@ final class AppModel {
                 break
             }
         }
+    }
+
+    /* ---------------- opening a project ---------------- */
+
+    /// A project the picker chose that the page has not yet said it opened.
+    @ObservationIgnored private var pendingProject: String?
+
+    /// Open a project in the page.
+    ///
+    /// The page does not queue commands it has no handler for yet, and the picker runs
+    /// before the page exists: the editor window, and so the page, only open once a
+    /// project is chosen, and a page that is still loading drops the command. So it is
+    /// kept until the page reports the project open, and sent again when a page reports
+    /// that it has started with nothing open — its first `projectChanged` comes from the
+    /// same commit that subscribes to `openProject`.
+    func openProject(_ name: String) {
+        guard bridge.project.projectName != name else { return }
+        pendingProject = name
+        bridge.send(.openProject(OpenProjectCommand(projectName: name)))
+    }
+
+    private func deliverPendingProject(after project: ProjectChanged) {
+        guard let pendingProject else { return }
+        if project.projectName == pendingProject {
+            self.pendingProject = nil
+        } else if project.projectName == nil {
+            bridge.send(.openProject(OpenProjectCommand(projectName: pendingProject)))
+        }
+    }
+
+    /// Give the keyboard back to the document — after a citation is inserted from the
+    /// References panel, the writer carries on typing where it went.
+    func focusDocument() {
+        web.webView.window?.makeFirstResponder(web.webView)
     }
 
     /* ---------------- what the menu bar does ---------------- */

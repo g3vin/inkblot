@@ -40,6 +40,13 @@
  *          final autosave must not recreate the old path
  *   sidebar the right sidebar drawn by the shell: what the page publishes, and each
  *          edit applied the way the React panel applied it
+ *   bubble a sentence taken apart into bubbles: the word and clause rules, where a drop
+ *          lands, and a session written back into a real editor — kept, reopened,
+ *          round-tripped through JSON and HTML, resolved behind a checkpoint
+ *   references citations: what a paste is, what a page says about itself, citeproc in the
+ *          bundled styles, lookups against canned answers, and the library file
+ *   citations citations and the bibliography in a real editor: the renderer, style changes,
+ *          round trips, and the bibliography added on paper, a book numbered through
  *   print  Print Layout's pure logic: page sizes and geometry, where pages break,
  *          and signature imposition for binding
  *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
@@ -57,7 +64,7 @@
  * Still not covered: anything involving layout, pointer events, or the asset://
  * protocol. Those need the real webview.
  */
-const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'print']
+const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'references', 'citations']
 
 const failures = []
 

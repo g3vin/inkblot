@@ -13,11 +13,9 @@ struct InspectorView: View {
         @Bindable var sidebar = model.sidebar
 
         VStack(spacing: 10) {
-            // Xcode's arrangement: the toggle (the window's, see ContentView) on the
-            // traffic lights' line above, the selector bar beneath it, then the panel.
-            Color.clear.frame(height: WindowChrome.toggleSize)
-
-            GlassTabBar(
+            // Xcode's arrangement: the toggle in the toolbar above, the selector bar
+            // beneath it, then the panel.
+            SidebarTabPicker(
                 tabs: SidebarModel.Tab.allCases,
                 selection: $sidebar.tab,
                 symbol: \.symbol,
@@ -35,6 +33,7 @@ struct InspectorView: View {
                     case .clipboard: ClipboardPanelView()
                     case .workbench: WorkbenchPanelView()
                     case .notes: NotesPanelView()
+                    case .references: ReferencesPanelView()
                     case .history: HistoryPanelView()
                     case .page: PagePanelView()
                     }
@@ -44,10 +43,7 @@ struct InspectorView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, 12)
-        .padding(.top, WindowChrome.toggleInset)
-        // The toggle belongs on the traffic lights' line, not below the safe area the
-        // hidden titlebar still reserves.
-        .ignoresSafeArea(.container, edges: .top)
+        .padding(.top, 8)
     }
 
     private var searchBar: some View {
@@ -137,12 +133,17 @@ struct SearchResultsView: View {
             }
 
             if let error = sidebar.searchError {
-                ContentUnavailableView("Invalid Search", systemImage: "exclamationmark.magnifyingglass",
-                                       description: Text(error))
+                ContentUnavailableView {
+                    Text("Invalid Search")
+                } description: {
+                    Text(error)
+                }
+                .frame(maxHeight: .infinity)
             } else if sidebar.results.isEmpty {
-                ContentUnavailableView(
-                    sidebar.query.isEmpty ? "Type to Search" : "No Results",
-                    systemImage: "magnifyingglass")
+                ContentUnavailableView {
+                    Text(sidebar.query.isEmpty ? "Type to Search" : "No Results")
+                }
+                .frame(maxHeight: .infinity)
             } else {
                 List(sidebar.results, id: \.id) { result in
                     Button { sidebar.reveal(result) } label: {

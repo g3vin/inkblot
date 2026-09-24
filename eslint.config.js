@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'public/ort', 'src-tauri/target']),
+  // .claude/worktrees holds other checkouts of this repo; each lints itself.
+  globalIgnores(['dist', 'public/ort', 'src-tauri/target', '.claude']),
   {
     files: ['**/*.{js,jsx,mjs,ts,tsx}'],
     extends: [

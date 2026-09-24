@@ -98,6 +98,27 @@ fn an_autosave_carries_the_version_history_forward() {
 }
 
 #[test]
+fn an_autosave_carries_the_archive_and_the_citations_forward() {
+    let app_data = TempDir::new();
+    let store = store(&app_data);
+    store.create_project("Novel", None).unwrap();
+
+    let citations = json!({ "style": "mla", "bibliography": { "include": "cited", "annotated": false, "inPrint": true } });
+    let archive = json!([{ "id": "x1", "archivedAt": "", "kind": "bubble", "title": "t" }]);
+    store
+        .write_document_raw("Novel", "Chapter One", &json!({ "content": [], "notes": [], "archive": archive, "citations": citations }))
+        .unwrap();
+    store.save_document("Novel", "Chapter One", &body(json!([2]), json!([])), None).unwrap();
+
+    let document = store.load_document("Novel", "Chapter One").unwrap().unwrap();
+    assert_eq!(document["content"], json!([2]));
+    assert_eq!(document["archive"], archive);
+    assert_eq!(document["citations"], citations);
+    let typed: crate::types::TextDocument = serde_json::from_value(document).unwrap();
+    assert_eq!(typed.citations.unwrap().style.as_deref(), Some("mla"));
+}
+
+#[test]
 fn saving_a_canvas_as_a_text_document_is_refused() {
     let app_data = TempDir::new();
     let store = store(&app_data);

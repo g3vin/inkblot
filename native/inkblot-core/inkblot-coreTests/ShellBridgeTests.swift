@@ -25,8 +25,10 @@ struct ShellBridgeTests {
 
     private let toolbar = #"""
     {"target":"primary","color":"#000000","highlight":"#ffff00","font":"Georgia","fontSize":"18px",
-     "alignment":"center","activeMarks":{"bold":true,"italic":false,"underline":false,"strike":false,"table":false},
-     "lastHighlightColor":"#ffff00"}
+     "alignment":"center","blockType":"paragraph",
+     "activeMarks":{"bold":true,"italic":false,"underline":false,"strike":false,"table":false,
+                    "bulletList":false,"orderedList":false},
+     "canUndo":true,"canRedo":false,"lastHighlightColor":"#ffff00"}
     """#
 
     @Test func aPushedToolbarStateIsWhatTheMenuReads() {
@@ -44,6 +46,17 @@ struct ShellBridgeTests {
         // `{}` — no project — is the landing screen, and must decode, not fail.
         bridge.receive(json: event(1, "projectChanged", "{}"))
         #expect(bridge.project.projectName == nil)
+        #expect(bridge.droppedEventCount == 0)
+    }
+
+    @Test func theWordCountBadgesAreWhatThePageLastReported() {
+        let (bridge, _) = attached()
+        bridge.receive(json: event(0, "wordCountsChanged",
+            #"{"badges":[{"text":"12 words","left":600,"top":700,"right":660,"bottom":722}]}"#))
+        #expect(bridge.wordCounts.map(\.text) == ["12 words"])
+        #expect(bridge.wordCounts.first?.right == 660)
+        bridge.receive(json: event(1, "wordCountsChanged", #"{"badges":[]}"#))
+        #expect(bridge.wordCounts.isEmpty)
         #expect(bridge.droppedEventCount == 0)
     }
 

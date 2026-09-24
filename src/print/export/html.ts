@@ -55,6 +55,13 @@ mark { background: #fff59d; }
 hr { border: 0; border-top: 1px solid #ccc; margin: 2em 0; }
 .page-break { break-after: page; page-break-after: always; height: 0; }
 .page-break-recto { break-after: right; page-break-after: right; }
+.sc { font-variant: small-caps; }
+.bibliography { margin-top: 2.5em; }
+.bibliography-title { text-align: center; font-size: 1.25em; }
+.bibliography-notes { padding-left: 2em; }
+.bibliography-entries.is-hanging .bibliography-entry { padding-left: 2em; text-indent: -2em; }
+.bibliography-annotation { margin: -0.4em 0 1em 2em; font-size: 0.95em; }
+.bibliography-empty { display: none; }
 `
 
 export const buildHtmlDocument = ({

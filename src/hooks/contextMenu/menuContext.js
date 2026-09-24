@@ -114,7 +114,6 @@ export async function createMenuContext(e, props) {
     return Submenu.new({ text: 'Move File to…', items: moveItems })
   }
 
-  const tabDot = e.target.closest('.tab-dot')
   const fileTree = e.target.closest('.file-tree')
   const leftSidebar = e.target.closest('.left-sidebar')
   const fileTreeEl = fileTree || leftSidebar?.querySelector('.file-tree')
@@ -137,7 +136,6 @@ export async function createMenuContext(e, props) {
     beginRename,
     buildCopyPathSubmenu,
     buildMoveToSubmenu,
-    tabDot,
     fileTree,
     leftSidebar,
     fileTreeEl,

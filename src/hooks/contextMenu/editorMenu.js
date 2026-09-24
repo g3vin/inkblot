@@ -5,6 +5,8 @@
  * and split-view actions land underneath it.
  */
 import { createQuoteNote } from '../../lib/noteUtils'
+import { bubbleSessionAt, sessionForms, showSessionForm } from '../../extensions/BubbleSession'
+import { paragraphForBubble, selectionForBubble } from '../../components/useBubbleSessions'
 
 /* ------------------------------------------------------------
    Helper: Remove highlight only within selection (native behavior)
@@ -45,7 +47,7 @@ export async function editorMenu(ctx) {
     items,
     onEnterFocusMode,
     openRightSidebarTab,
-    setBubbleSentence,
+    bubbles,
     setNotes,
     setTiles,
   } = ctx
@@ -81,6 +83,50 @@ export async function editorMenu(ctx) {
 
     const { from, to } = editor.state.selection
     const text = editor.state.doc.textBetween(from, to, ' ')
+
+    // A bubble session left open on the sentence under the caret.
+    const session = bubbleSessionAt(editor.state.doc, from, to)
+    if (session && bubbles) {
+      items.push(
+        await MenuItem.new({
+          text: 'Open Bubble',
+          action: () => bubbles.openSession(editor, session.id),
+        }),
+        await MenuItem.new({
+          text: 'Archive Bubble',
+          action: () => bubbles.archiveSession(editor, session.id),
+        }),
+      )
+      // Its saved forms, turned to where the sentence is, without opening the editor.
+      const { page, pages } = sessionForms(editor.state.doc, session)
+      if (pages > 1) {
+        items.push(
+          await MenuItem.new({
+            text: 'Previous Form',
+            enabled: page > 0,
+            action: () => showSessionForm(editor, session.id, page - 1),
+          }),
+          await MenuItem.new({
+            text: 'Next Form',
+            enabled: page < pages - 1,
+            action: () => showSessionForm(editor, session.id, page + 1),
+          }),
+        )
+      }
+      items.push(await PredefinedMenuItem.new({ item: 'Separator' }))
+    }
+
+    // Nothing selected: the paragraph around the caret, to reorder its sentences.
+    if (!text.trim() && !session && bubbles && paragraphForBubble(editor)) {
+      items.push(
+        await MenuItem.new({
+          text: 'Bubble Paragraph',
+          action: () => bubbles.openParagraph(editor),
+        }),
+        await PredefinedMenuItem.new({ item: 'Separator' })
+      )
+    }
+
     if (text.trim()) {
       const touchesHighlight = selectionTouchesHighlight(editor)
 
@@ -114,19 +160,16 @@ export async function editorMenu(ctx) {
 
       items.push(await PredefinedMenuItem.new({ item: 'Separator' }))
 
-      // Open Analytic Bubble (modal)
-      items.push(
-        await MenuItem.new({
-          text: 'Open Analytic Bubble',
-          action: () => {
-            try {
-              setBubbleSentence?.(text)
-            } catch (err) {
-              console.warn('Failed to open analytic bubble:', err)
-            }
-          },
-        })
-      )
+      // Take the sentence apart into bubbles. Within one paragraph only: writing it
+      // back across blocks would merge them.
+      if (!session && bubbles && selectionForBubble(editor)) {
+        items.push(
+          await MenuItem.new({
+            text: 'Bubble',
+            action: () => bubbles.openFromSelection(editor),
+          })
+        )
+      }
 
       const addWorkbenchTile = (type) => {
         setTiles((p) => [

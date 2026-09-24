@@ -88,6 +88,16 @@ pub struct NoteRef {
     pub note_id: String,
 }
 
+/// Which note's hover cards the shell is showing, so the page can highlight the text
+/// the note is about — the cards no longer quote it. `None` clears the highlight.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HighlightNoteCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note_id: Option<String>,
+}
+
 /// A document's notes changed — the whole list, so it is safe to coalesce.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -295,6 +305,7 @@ pub enum SidebarTab {
     Workbench,
     Notes,
     History,
+    References,
 }
 
 /// The page wants a sidebar tab shown — "Add note", "Open Version History", a new

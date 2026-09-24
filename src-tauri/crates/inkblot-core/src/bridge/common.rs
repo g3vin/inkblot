@@ -100,6 +100,37 @@ pub enum MarkKind {
     Strike,
 }
 
+/// A text block's kind, as the toolbar's Paragraph Style menu offers it. Anything
+/// else the caret can be in — a list item's paragraph, a table cell — reads as
+/// `paragraph`, which is what the menu would turn it back into.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BlockType {
+    Paragraph,
+    Heading1,
+    Heading2,
+    Heading3,
+}
+
+/// The list kinds the toolbar can toggle.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ListKind {
+    Bullet,
+    Ordered,
+}
+
+/// A step through the editor's own undo history.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HistoryAction {
+    Undo,
+    Redo,
+}
+
 /// Text alignment, as the toolbar offers it.
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

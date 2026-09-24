@@ -20,8 +20,6 @@ import {
 import { saveCanvasDocument } from '../lib/canvasFileSystem'
 import { createEmptyCanvas } from '../lib/canvasModel'
 import { isCanvasDoc, stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
-import {
-} from '../lib/tabDockEvents'
 import SFIcon from './SFIcon'
 import { useFileTreeDrag } from './useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'

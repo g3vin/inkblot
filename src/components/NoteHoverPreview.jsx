@@ -19,12 +19,10 @@ import { readClipboardImages } from '../lib/noteImageUtils'
 import { collectNoteBranchIds, createFreeNote, touchNote } from '../lib/noteUtils'
 import { RESIZE_ICON_PATHS } from '../lib/resizeIcon'
 import {
-  clearEditorActiveNote,
+  NOTE_HIGHLIGHT_EVENT,
   NOTE_PREVIEW_ENTER_EVENT,
   NOTE_PREVIEW_LEAVE_EVENT,
   NOTE_PREVIEW_PIN_EVENT,
-  setEditorActiveNote,
-  setEditorHoveredNote,
 } from '../extensions/NoteAnnotation'
 
 import {
@@ -149,26 +147,14 @@ export default function NoteHoverPreview({
     return noteById.get(preview.note.id) || preview.note
   }, [noteById, preview])
 
-  // Mirror hover/pin state back into the editor so the anchored text highlights.
+  // Mirror the open card back into the editor so the text it is about highlights.
   useEffect(() => {
     const previous = previousPreviewRef.current
-
-    if (previous && !isSamePreviewIdentity(previous, preview)) {
-      if (previous.locked) {
-        clearEditorActiveNote(previous.editorView)
-      } else {
-        setEditorHoveredNote(previous.editorView, null)
-      }
+    if (!isSamePreviewIdentity(previous, preview)) {
+      window.dispatchEvent(new CustomEvent(NOTE_HIGHLIGHT_EVENT, {
+        detail: { noteId: preview?.note?.id ?? null },
+      }))
     }
-
-    if (preview && !isSamePreviewIdentity(previous, preview)) {
-      if (preview.locked) {
-        setEditorActiveNote(preview.editorView, preview.note.id)
-      } else {
-        setEditorHoveredNote(preview.editorView, preview.note.id)
-      }
-    }
-
     previousPreviewRef.current = preview
   }, [preview])
 

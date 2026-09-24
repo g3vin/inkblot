@@ -27,12 +27,19 @@ final class ShellBridge {
 
     /// The last toolbar state the page published. `nil` until it has.
     private(set) var toolbar: ToolbarState?
+    /// The active canvas's own toolbar, while it should be up: `nil` when no canvas is
+    /// active or a card is being edited — the formatting toolbar's turn.
+    private(set) var canvasToolbar: CanvasToolbarState?
     /// Which editor the page elected, and which document it is showing.
     private(set) var activeEditor: ActiveEditorChanged?
     /// The open project. `nil` name is the landing screen.
     private(set) var project = ProjectChanged(projectName: nil, projectRoot: nil)
     /// The last `docChanged` — what made the file tree stale, among other things.
     private(set) var lastDocChanged: DocChanged?
+    /// Every word-count badge the page can see. The shell draws them, as glass.
+    private(set) var wordCounts: [WordCountBadge] = []
+    /// The page's focus mode and word-count badge, for the toolbar items that toggle them.
+    private(set) var viewOptions = ViewOptions(focusMode: false, wordCountVisible: true)
 
     /* ---------------- the wire ---------------- */
 
@@ -200,8 +207,11 @@ final class ShellBridge {
         switch event {
         case .toolbarState(let state): toolbar = state
         case .activeEditorChanged(let info): activeEditor = info
+        case .canvasToolbarChanged(let changed): canvasToolbar = changed.state
         case .projectChanged(let changed): project = changed
         case .docChanged(let changed): lastDocChanged = changed
+        case .viewOptions(let options): viewOptions = options
+        case .wordCountsChanged(let changed): wordCounts = changed.badges
         default: break
         }
     }

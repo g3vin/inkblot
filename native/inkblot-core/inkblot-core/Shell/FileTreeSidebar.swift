@@ -15,6 +15,8 @@ struct FileTreeSidebar: View {
     @State private var selection: String?
     @State private var prompt: NamePrompt?
     @State private var pendingDelete: TreeEntry?
+    @State private var filter = TreeFilter()
+    @State private var expansion: ProjectOutline.ExpansionRequest?
 
     var body: some View {
         Group {
@@ -70,60 +72,49 @@ struct FileTreeSidebar: View {
     /* ---------------- the list ---------------- */
 
     private var list: some View {
-        List(selection: $selection) {
-            if let children = model.tree.root?.children {
-                OutlineGroup(children, id: \.path, children: \.outlineChildren) { node in
-                    row(node)
-                }
+        let shown = filter.apply(to: model.tree.root, recent: Set(model.tree.recent))
+        return ProjectOutline(
+            root: shown,
+            isFiltered: filter.isActive,
+            expansion: expansion,
+            selection: $selection,
+            // A filtered tree hides siblings, so a drop's index among the rows shown is
+            // not its index in the folder.
+            canDrop: { paths, folder, index in
+                !filter.isActive && paths.contains { accepts($0, into: folder, at: index) }
+            },
+            drop: { paths, folder, index in drop(paths, into: folder, at: index) },
+            menu: { path in contextMenu(for: path.map(entry(at:))) })
+        .overlay {
+            if filter.isActive && (shown?.children ?? []).isEmpty {
+                Text(filter.recentOnly && model.tree.recent.isEmpty ? "No Recent Files" : "No Matching Files")
+                    .foregroundStyle(.secondary)
             }
         }
-        .listStyle(.sidebar)
-        .contextMenu(forSelectionType: String.self) { paths in
-            contextMenu(for: paths.first.map(entry(at:)))
-        }
-        // Dropping on the empty part of the list moves to the project root.
-        .dropDestination(for: String.self) { paths, _ in move(paths, to: "") }
-        .safeAreaInset(edge: .bottom) {
-            HStack {
-                Menu {
-                    newItems(in: "")
-                } label: {
-                    Image(systemName: "plus")
+        .overlay(alignment: .bottom) {
+            GlassEffectContainer {
+                HStack(spacing: 8) {
+                    Menu {
+                        newItems(in: "")
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .padding(8)
+                    .glassEffect(.regular.interactive(), in: .circle)
+                    .help("New Document, Canvas or Folder")
+
+                    FilterBar(filter: $filter) { expansion = .init() }
                 }
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .padding(8)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .help("New Document, Canvas or Folder")
-                Spacer()
+                .onGeometryChange(for: CGFloat.self, of: { $0.frame(in: .global).midY }) { midY in
+                    if model.sidebarBarMidY != midY { model.sidebarBarMidY = midY }
+                }
             }
             .padding(10)
         }
-    }
-
-    @ViewBuilder
-    private func row(_ node: TreeNode) -> some View {
-        let label = Label {
-            Text(node.type == .folder ? node.name : docDisplayName(path: node.path))
-                .lineLimit(1)
-        } icon: {
-            Image(systemName: icon(for: node))
-        }
-        .tag(node.path)
-        .draggable(node.path)
-
-        if node.type == .folder {
-            label.dropDestination(for: String.self) { paths, _ in move(paths, to: node.path) }
-        } else {
-            label
-        }
-    }
-
-    private func icon(for node: TreeNode) -> String {
-        if node.type == .folder { return "folder" }
-        return isCanvasDoc(path: node.path) ? "rectangle.on.rectangle" : "doc.text"
     }
 
     /* ---------------- menus ---------------- */
@@ -135,29 +126,37 @@ struct FileTreeSidebar: View {
         Button("New Folder", systemImage: "folder") { ask(.create(.folder, in: folder)) }
     }
 
-    @ViewBuilder
-    private func contextMenu(for entry: TreeEntry?) -> some View {
-        newItems(in: entry?.containingFolder ?? "")
-        if let entry {
-            Divider()
-            Button("Rename…") { ask(.rename(entry)) }
-            if !entry.isFolder {
-                Button("Duplicate") {
-                    model.bridge.send(.duplicateEntry(DuplicateEntryCommand(path: entry.path)))
-                }
-            }
-            Menu("Move To") {
-                ForEach(moveTargets(for: entry), id: \.self) { folder in
-                    Button(folder.isEmpty ? (model.tree.projectName ?? "Project") : folder) {
-                        _ = move([entry.path], to: folder)
-                    }
-                }
-            }
-            Divider()
-            Button("Reveal in Finder") { reveal(entry) }
-            Divider()
-            Button("Delete…", role: .destructive) { pendingDelete = entry }
+    /// AppKit items, because the outline view asks for its menu per click.
+    private func contextMenu(for entry: TreeEntry?) -> [NSMenuItem] {
+        let folder = entry?.containingFolder ?? ""
+        var items: [NSMenuItem] = [
+            ClosureMenuItem("New Document", systemImage: "doc.text") { ask(.create(.document, in: folder)) },
+            ClosureMenuItem("New Canvas", systemImage: "rectangle.on.rectangle") { ask(.create(.canvas, in: folder)) },
+            ClosureMenuItem("New Folder", systemImage: "folder") { ask(.create(.folder, in: folder)) },
+        ]
+        guard let entry else { return items }
+        items.append(.separator())
+        items.append(ClosureMenuItem("Rename…") { ask(.rename(entry)) })
+        if !entry.isFolder {
+            items.append(ClosureMenuItem("Duplicate") {
+                model.bridge.send(.duplicateEntry(DuplicateEntryCommand(path: entry.path)))
+            })
         }
+        let moveTo = NSMenuItem(title: "Move To", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        for target in moveTargets(for: entry) {
+            submenu.addItem(ClosureMenuItem(target.isEmpty ? (model.tree.projectName ?? "Project") : target) {
+                drop([entry.path], into: target, at: nil)
+            })
+        }
+        moveTo.submenu = submenu
+        moveTo.isEnabled = !submenu.items.isEmpty
+        items.append(moveTo)
+        items.append(.separator())
+        items.append(ClosureMenuItem("Reveal in Finder") { reveal(entry) })
+        items.append(.separator())
+        items.append(ClosureMenuItem("Delete…") { pendingDelete = entry })
+        return items
     }
 
     /* ---------------- entries ---------------- */
@@ -183,16 +182,51 @@ struct FileTreeSidebar: View {
         }
     }
 
+    /// Move entries into `folder` at `index` among its children, as the drop showed it;
+    /// `nil` — a drop onto the folder itself, or Move To — puts them last. A drop in
+    /// the folder an entry is already in only reorders it: the order is the shell's,
+    /// and the disk does not change. Anything else is a move, which the page performs.
     @discardableResult
-    private func move(_ paths: [String], to folder: String) -> Bool {
-        var moved = false
-        for path in paths {
+    private func drop(_ paths: [String], into folder: String, at index: Int?) -> Bool {
+        var index = index
+        var dropped = false
+        for path in paths where accepts(path, into: folder, at: index) {
             let source = entry(at: path)
-            guard moveTargets(for: source).contains(folder) else { continue }
-            model.bridge.send(.moveEntry(MoveEntryCommand(path: path, isFolder: source.isFolder, targetFolder: folder)))
-            moved = true
+            let newPath = folder.isEmpty ? source.name : "\(folder)/\(source.name)"
+            if source.containingParent != folder {
+                model.bridge.send(.moveEntry(MoveEntryCommand(path: path, isFolder: source.isFolder, targetFolder: folder)))
+            }
+            let placed = model.tree.place(path: path, isFolder: source.isFolder, newPath: newPath, in: folder, at: index)
+            index = index.map { _ in placed + 1 }
+            dropped = true
         }
-        return moved
+        return dropped
+    }
+
+    /// Whether dropping `path` there does anything: a reorder needs a place to go, and a
+    /// move needs a folder it may enter with its name free. The move is a rename on
+    /// disk, and a rename onto a name that is taken replaces what had it.
+    private func accepts(_ path: String, into folder: String, at index: Int?) -> Bool {
+        let source = entry(at: path)
+        if source.containingParent == folder { return index != nil }
+        let intoItself = source.isFolder && (folder == path || folder.hasPrefix(path + "/"))
+        return !intoItself && !isTaken(source.name, isFolder: source.isFolder, in: folder)
+    }
+
+    private func isTaken(_ name: String, isFolder: Bool, in folder: String) -> Bool {
+        let children = folder.isEmpty ? model.tree.root?.children : node(at: folder)?.children
+        return (children ?? []).contains { $0.name == name && ($0.type == .folder) == isFolder }
+    }
+
+    private func node(at path: String) -> TreeNode? {
+        func find(_ nodes: [TreeNode]) -> TreeNode? {
+            for node in nodes {
+                if node.path == path { return node }
+                if path.hasPrefix(node.path + "/"), let found = find(node.children ?? []) { return found }
+            }
+            return nil
+        }
+        return find(model.tree.root?.children ?? [])
     }
 
     private func ask(_ action: NamePrompt.Action) {
@@ -215,6 +249,63 @@ struct FileTreeSidebar: View {
     }
 }
 
+/// The field beside the "+", as Xcode's navigator has under its lists: a menu of what
+/// to show, the text to match, and buttons for recent files and expanding everything.
+private struct FilterBar: View {
+    @Binding var filter: TreeFilter
+    let toggleExpansion: () -> Void
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Menu {
+                Picker("Show", selection: $filter.kind) {
+                    ForEach(TreeFilter.Kind.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                HStack(spacing: 1) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                    Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold))
+                }
+                .foregroundStyle(filter.kind == .all ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
+            }
+            .menuStyle(.button)
+            .buttonStyle(.borderless)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Filter Options")
+
+            TextField("Filter", text: $filter.text)
+                .textFieldStyle(.plain)
+                .focused($focused)
+                .onExitCommand { filter.text = "" }
+
+            if !filter.text.isEmpty {
+                button("xmark.circle.fill", help: "Clear Filter") { filter.text = "" }
+            }
+            button("clock", help: "Show Only Recent Files", on: filter.recentOnly) {
+                filter.recentOnly.toggle()
+            }
+            button("plusminus.circle", help: "Expand or Collapse All Folders", action: toggleExpansion)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .contentShape(.capsule)
+        .onTapGesture { focused = true }
+    }
+
+    private func button(_ symbol: String, help: String, on: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(on ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+        .help(help)
+    }
+}
+
 /// One row of the tree, as the menus and commands need it.
 struct TreeEntry: Hashable, Identifiable {
     let path: String
@@ -223,6 +314,8 @@ struct TreeEntry: Hashable, Identifiable {
     var id: String { path }
     var name: String { String(path.split(separator: "/").last ?? "") }
     var displayName: String { isFolder ? name : docDisplayName(path: path) }
+    /// The folder the entry is in.
+    var containingParent: String { TreeOrder.parent(of: path) }
     /// Where a new entry made "here" goes: inside a folder, or beside a file.
     var containingFolder: String {
         isFolder ? path : path.split(separator: "/").dropLast().joined(separator: "/")

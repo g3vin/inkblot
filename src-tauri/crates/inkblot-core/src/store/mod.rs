@@ -206,7 +206,8 @@ impl ProjectStore {
     /// re-write it. An autosave that rebuilt the file from `{ content, notes }` alone
     /// would erase the history — including named snapshots — on the next keystroke.
     ///
-    /// Only `content`, `notes` and `versions` survive; everything else is dropped. That
+    /// Only `content`, `notes`, `versions`, `archive` and `citations` survive; everything
+    /// else is dropped. That
     /// makes this unsafe for any other document kind, so a canvas is **refused** rather
     /// than silently overwritten with an empty text document.
     pub fn save_document(
@@ -248,11 +249,22 @@ impl ProjectStore {
                 versions = push_version_entry(&versions, entry);
             }
 
-            let document = json!({
+            let mut document = json!({
                 "content": body.content,
                 "notes": body.notes,
                 "versions": versions,
             });
+            // The archive and the citation settings live in this file too, owned by
+            // their own stores (`archiveStore.js`, `referenceStore.js`), and are carried
+            // forward the way the JS save does.
+            if let (Some(existing), Some(fields)) = (existing.as_ref(), document.as_object_mut()) {
+                if let Some(archive) = existing.get("archive").filter(|a| a.as_array().is_some_and(|a| !a.is_empty())) {
+                    fields.insert("archive".to_string(), archive.clone());
+                }
+                if let Some(citations) = existing.get("citations").filter(|c| c.is_object()) {
+                    fields.insert("citations".to_string(), citations.clone());
+                }
+            }
             std::fs::write(&file_path, serde_json::to_string(&document)?)?;
 
             if appended {

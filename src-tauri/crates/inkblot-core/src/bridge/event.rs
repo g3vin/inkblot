@@ -9,7 +9,10 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::common::{Alignment, EditorTarget, Pane, TextAnchor};
+use super::archive::ArchiveChanged;
+use super::bubble::{BubbleChipsChanged, BubbleSessionOpened};
+use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
+use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor};
 use crate::types::json::JsonValue;
 use super::sidebar::{
     ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged, VersionsChanged,
@@ -31,6 +34,10 @@ pub struct ActiveMarks {
     /// Not a mark — whether the caret is inside a table. It rides along because the
     /// toolbar's table button is lit by the same read.
     pub table: bool,
+    /// Not marks either — whether the caret is in a bulleted or numbered list, for the
+    /// toolbar's list toggles.
+    pub bullet_list: bool,
+    pub ordered_list: bool,
 }
 
 /// The formatting at the selection, pushed.
@@ -60,7 +67,13 @@ pub struct ToolbarState {
     pub font: String,
     pub font_size: String,
     pub alignment: Alignment,
+    /// What the Paragraph Style menu shows as current.
+    pub block_type: BlockType,
     pub active_marks: ActiveMarks,
+    /// Whether the editor's own history has a step to undo or redo — the document's
+    /// Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.
+    pub can_undo: bool,
+    pub can_redo: bool,
     /// The color the context menu's "Highlight" item would apply — what used to live
     /// on `editor.storage.lastHighlightColor`. See `SetHighlightCommand`.
     pub last_highlight_color: String,
@@ -156,6 +169,31 @@ pub struct NoteMarkerEvent {
     pub note: Option<Note>,
 }
 
+/// Where one note marker is, for a shell that draws the markers itself. Client
+/// coordinates inside the webview, as `NoteMarkerEvent`'s.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteMarkerRect {
+    pub note_id: String,
+    pub color: String,
+    pub left: f64,
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+}
+
+/// Every note marker the user can see, and where — the whole list, so it is safe to
+/// coalesce. Sent when any of them appears, goes, or moves (a scroll, a reflow). The
+/// page still owns the markers' hover and click; the shell draws the dots, as Liquid
+/// Glass, over the page's invisible ones.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteMarkersChanged {
+    pub markers: Vec<NoteMarkerRect>,
+}
+
 /// The active editor election changed.
 ///
 /// **Sharp edge #5.** The election is driven by mouse movement over a pane, which is a
@@ -175,6 +213,47 @@ pub struct ActiveEditorChanged {
     pub surface_id: Option<String>,
 }
 
+/// The canvas's own controls, pushed.
+///
+/// A canvas has two toolbars that take turns: its own, and the formatting one while a
+/// card's text is being edited. The page decides which — it is the one that knows a
+/// card editor is live — and says so with `state`: present, the canvas toolbar is up;
+/// absent, it is not (no canvas is active, or a card is being edited). A native
+/// toolbar renders this and sends `canvasCommand`s back to `state.surface_id`.
+///
+/// Rare but not per keystroke: it changes with zoom, selection, undo depth and the
+/// memo recorder's clock, and the sender coalesces it to one per frame.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasToolbarChanged {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<CanvasToolbarState>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasToolbarState {
+    /// The surface the commands go back to.
+    pub surface_id: String,
+    /// 1 is 100%.
+    pub zoom: f64,
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub has_selection: bool,
+    pub can_group: bool,
+    pub can_ungroup: bool,
+    /// Read mode: the editing tools are hidden, not merely disabled.
+    pub locked: bool,
+    pub alignment_guides: bool,
+    pub snap_to_grid: bool,
+    pub can_record: bool,
+    pub is_recording: bool,
+    /// How long the memo has been recording, in milliseconds. Zero when not recording.
+    pub record_elapsed_ms: f64,
+}
+
 /// Search results from inside the open document.
 ///
 /// Project-wide search is `inkblot-core`'s job and does not come through here; this is
@@ -190,6 +269,40 @@ pub struct SearchMatches {
     /// Which result is current, as an index into `results`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_index: Option<u32>,
+}
+
+/// The page's own view settings that a shell offers as toolbar toggles, pushed whole
+/// whenever either changes and once at startup. The page still owns both: the shell
+/// asks with `setFocusMode` / `setWordCountVisible` and lights its buttons from this.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewOptions {
+    pub focus_mode: bool,
+    pub word_count_visible: bool,
+}
+
+/// Where one pane's word-count badge is, and what it says, for a shell that draws the
+/// badges itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WordCountBadge {
+    pub text: String,
+    pub left: f64,
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+}
+
+/// Every word-count badge the user can see — the whole list, so it is safe to coalesce.
+/// The page's badges stay where they are, invisible, to be measured; the shell draws
+/// them as Liquid Glass, which only a view above the page can be.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WordCountsChanged {
+    pub badges: Vec<WordCountBadge>,
 }
 
 /// What focus mode is showing.
@@ -336,6 +449,7 @@ pub enum WebviewEvent {
     NoteMarkerLeave(NoteMarkerEvent),
     NoteMarkerPin(NoteMarkerEvent),
     ActiveEditorChanged(ActiveEditorChanged),
+    CanvasToolbarChanged(CanvasToolbarChanged),
     SearchMatches(SearchMatches),
     FocusModeView(FocusModeView),
     ReadAloudPayload(ReadAloudPayloadEvent),
@@ -353,6 +467,23 @@ pub enum WebviewEvent {
     /// superseded by the next.
     NoteMarkerMoved(NoteMarkerEvent),
     NotePreviewDismissed(NotePreviewDismissed),
+    NoteMarkersChanged(NoteMarkersChanged),
+    /// Open the bubble editor. Sent only to a shell that draws it (`bubble` chrome).
+    BubbleSessionOpened(BubbleSessionOpened),
+    /// Where the chips of sessions left open are, for a shell that draws them.
+    BubbleChipsChanged(BubbleChipsChanged),
+    ViewOptions(ViewOptions),
+    /// A document's archive, whole (`archive.rs`).
+    ArchiveChanged(ArchiveChanged),
+    /// The project's sources, whole, for the document in view (`references.rs`).
+    ReferencesChanged(ReferencesChanged),
+    /// The kinds of source and the styles, sent once when the page mounts.
+    ReferenceSchema(ReferenceSchema),
+    /// Show a source in the panel.
+    RevealReference(RevealReference),
+    /// Where the word-count badges are, for a shell that draws them (`wordCount`
+    /// chrome). Coalesced per frame; the total is itself debounced by the page.
+    WordCountsChanged(WordCountsChanged),
     PageLayoutState(PageLayoutState),
     PrintRequest(PrintRequest),
 }

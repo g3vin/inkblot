@@ -26,6 +26,14 @@ import { isCanvasDoc } from '../lib/docKind'
 const AUTOSAVE_DEBOUNCE_MS = 800
 const HISTORY_CHECKPOINT_DEBOUNCE_MS = 15000
 
+/**
+ * `detail: { editor, name }` — save a named checkpoint of that editor's document now,
+ * before whatever the sender is about to do to it. The content is read synchronously
+ * on receipt, so an edit dispatched right after the event is not in it. Resolving a
+ * bubble session sends it: history is the only way back to a resolved session.
+ */
+export const VERSION_CHECKPOINT_EVENT = 'inkblot:version-checkpoint'
+
 export function useEditorAutosave({
   activeDoc,
   activeDocNotes,
@@ -61,7 +69,7 @@ export function useEditorAutosave({
     }
   }, [])
 
-  const saveVersionCheckpoint = useCallback(async (targetEditor, docName, paneId) => {
+  const saveVersionCheckpoint = useCallback(async (targetEditor, docName, paneId, name = null) => {
     if (!isEditorReady(targetEditor) || !docName) return
     // Canvas checkpoints are written by useCanvasDocument, not this TipTap path.
     if (isCanvasDoc(docName)) return
@@ -78,6 +86,7 @@ export function useEditorAutosave({
       _version: {
         contentHtml,
         contentJson,
+        ...(name ? { name, auto: false } : {}),
       },
     })
 
@@ -118,11 +127,18 @@ export function useEditorAutosave({
       checkpointHandler()
     }
 
+    const handleCheckpointRequest = (event) => {
+      if (event?.detail?.editor !== editor) return
+      void saveVersionCheckpoint(editor, currentDoc, 'primary', event.detail.name || null)
+    }
+
     primaryAutosaveRef.current = handler
     primaryVersionCheckpointRef.current = checkpointHandler
     editor.on('update', handleUpdate)
+    window.addEventListener(VERSION_CHECKPOINT_EVENT, handleCheckpointRequest)
 
     return () => {
+      window.removeEventListener(VERSION_CHECKPOINT_EVENT, handleCheckpointRequest)
       if (!editor.isDestroyed) editor.off('update', handleUpdate)
       handler.flush()
       handler.cancel()

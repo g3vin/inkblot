@@ -20,9 +20,17 @@
 .pane-scroll {
   --editor-bottom-breathing-room: 96px;
   height: 100%;
+  /* The titlebar clearance (SidebarTiles.css) goes inside the 100%, not on top of it. */
+  box-sizing: border-box;
   overflow-y: auto;
   display: block;
   scroll-padding-bottom: var(--editor-bottom-breathing-room);
+}
+
+/* The editor fills the pane less the ::after spacer, so a short document fits
+   exactly and the pane only scrolls once the text outgrows it. */
+.pane-scroll > .editor {
+  min-height: calc(100% - var(--editor-bottom-breathing-room));
 }
 
 .pane-scroll::after {

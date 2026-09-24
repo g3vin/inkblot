@@ -16,10 +16,12 @@ struct NotesPanelView: View {
             sidebar.matchesFilter(note.anchor, note.content)
         }
         if branches.isEmpty {
-            ContentUnavailableView(
-                sidebar.notes.isEmpty ? "No Notes Yet" : "No Matching Notes",
-                systemImage: "note.text",
-                description: Text(sidebar.notes.isEmpty ? "Select text in the document and choose Add Note." : ""))
+            ContentUnavailableView {
+                Text(sidebar.notes.isEmpty ? "No Notes Yet" : "No Matching Notes")
+            } description: {
+                Text(sidebar.notes.isEmpty ? "Select text in the document and choose Add Note." : "")
+            }
+            .frame(maxHeight: .infinity)
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
@@ -90,7 +92,6 @@ struct NoteCardView: View {
     var glass = false
 
     @State private var draft = ""
-    @State private var confirmDelete = false
     @FocusState private var editing: Bool
     @State private var commitTask: Task<Void, Never>?
 
@@ -101,27 +102,38 @@ struct NoteCardView: View {
         let accent = Color(hex: note.color) ?? .accentColor
 
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                if note.type == .quote {
-                    Button { sidebar.jump(to: note) } label: {
-                        Text("“\(note.anchor)”")
-                            .font(.callout.italic())
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
+            // A hover card has neither half of this row: it sits over its quote, which
+            // the page highlights, and its actions are in its own top row
+            // (`NotePreviewOverlay`). Only the Notes tab, away from the text, needs them here.
+            if !glass {
+                HStack(spacing: 6) {
+                    if note.type == .quote {
+                        Button { sidebar.jump(to: note) } label: {
+                            Text("“\(note.anchor)”")
+                                .font(.callout.italic())
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Show in the document")
                     }
-                    .buttonStyle(.plain)
-                    .help("Show in the document")
+                    Spacer(minLength: 4)
+                    NoteActions(note: note, hasChildren: hasChildren)
                 }
-                Spacer(minLength: 4)
-                actions
             }
 
             TextField("Type your note here…", text: $draft, axis: .vertical)
                 .textFieldStyle(.plain)
-                .lineLimit(editing ? 3...20 : 1...6)
+                // A hover card is only as tall as its text, editing or not: it grows a line
+                // at a time as the text needs, and never jumps when clicked into.
+                .lineLimit(glass ? 1...20 : editing ? 3...20 : 1...6)
                 .focused($editing)
                 .onChange(of: draft) { _, text in scheduleCommit(text) }
                 .onChange(of: editing) { _, isEditing in if !isEditing { commit(draft) } }
+
+            // On a hover card the attachments and the time sit on the card's bottom edge,
+            // however tall it has been made.
+            if glass { Spacer(minLength: 0) }
 
             if !note.images.isEmpty { images }
             if !note.audio.isEmpty { memos }
@@ -150,49 +162,6 @@ struct NoteCardView: View {
             if !editing { draft = content }
         }
         .dropDestination(for: URL.self) { urls, _ in attachImages(urls) }
-        .confirmationDialog("Delete note?", isPresented: $confirmDelete) {
-            Button("Delete", role: .destructive) { sidebar.removeNote(note) }
-        } message: {
-            if hasChildren { Text("Its replies will be deleted too.") }
-        }
-    }
-
-    private var actions: some View {
-        let sidebar = model.sidebar
-        return HStack(spacing: 2) {
-            if hasChildren {
-                Button {
-                    sidebar.updateNote(note, .with(collapsedChildren: !note.collapsedChildren))
-                } label: {
-                    Image(systemName: note.collapsedChildren ? "chevron.right" : "chevron.down")
-                }
-                .help(note.collapsedChildren ? "Expand branch" : "Collapse branch")
-            }
-            Menu {
-                ForEach(Self.colors, id: \.self) { hex in
-                    Button { sidebar.updateNote(note, .with(color: hex)) } label: {
-                        Label(hex, systemImage: note.color == hex ? "checkmark.circle.fill" : "circle.fill")
-                    }
-                    .tint(Color(hex: hex))
-                }
-            } label: {
-                Circle().fill(Color(hex: note.color) ?? .accentColor).frame(width: 10, height: 10)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Note color")
-            Button {
-                sidebar.updateNote(note, .with(pinned: !note.pinned))
-            } label: {
-                Image(systemName: note.pinned ? "pin.fill" : "pin")
-            }
-            .help(note.pinned ? "Unpin note" : "Pin note")
-            Button { confirmDelete = true } label: { Image(systemName: "xmark") }
-                .help("Delete note")
-        }
-        .buttonStyle(.borderless)
-        .font(.caption)
     }
 
     private var images: some View {
@@ -231,7 +200,7 @@ struct NoteCardView: View {
                     Spacer()
                     Button {
                         model.sidebar.updateNote(note, .with(audio: note.audio.filter { $0.id != clip.id }))
-                    } label: { Image(systemName: "xmark") }
+                    } label: { Image(systemName: "trash") }
                     .help("Delete voice memo")
                 }
                 .buttonStyle(.borderless)
@@ -342,5 +311,92 @@ extension Color {
         self.init(red: Double((rgb >> 16) & 0xff) / 255,
                   green: Double((rgb >> 8) & 0xff) / 255,
                   blue: Double(rgb & 0xff) / 255)
+    }
+}
+
+/// A note's own buttons — collapse, colour, pin, delete. The Notes tab puts them beside
+/// the quote; a hover card, in its top row with its other buttons.
+/// Folds a note's replies away, or brings them back.
+struct NoteCollapseButton: View {
+    @Environment(AppModel.self) private var model
+    let note: Note
+    /// As `NoteActions.docPath`.
+    var docPath: String? = nil
+
+    var body: some View {
+        Button {
+            let patch = NotePatch.with(collapsedChildren: !note.collapsedChildren)
+            if let docPath {
+                model.sidebar.updateNote(note, in: docPath, patch)
+            } else {
+                model.sidebar.updateNote(note, patch)
+            }
+        } label: {
+            Image(systemName: note.collapsedChildren ? "chevron.right" : "chevron.down")
+        }
+        .help(note.collapsedChildren ? "Expand branch" : "Collapse branch")
+    }
+}
+
+struct NoteActions: View {
+    @Environment(AppModel.self) private var model
+    let note: Note
+    var hasChildren = false
+    /// Which document the note is in, for a hover card — it may not be the one the Notes
+    /// tab is showing. `nil` means the Notes tab's.
+    var docPath: String? = nil
+    /// The gap between the buttons; a hover card's header sets it to match its own.
+    var spacing: CGFloat = 2
+    /// A hover card puts the collapse chevron in its own corner instead.
+    var showsCollapse = true
+
+    @State private var confirmDelete = false
+
+    var body: some View {
+        let sidebar = model.sidebar
+        HStack(spacing: spacing) {
+            if hasChildren && showsCollapse {
+                NoteCollapseButton(note: note, docPath: docPath)
+            }
+            Menu {
+                ForEach(NoteCardView.colors, id: \.self) { hex in
+                    Button { update(.with(color: hex)) } label: {
+                        Label(hex, systemImage: note.color == hex ? "checkmark.circle.fill" : "circle.fill")
+                    }
+                    .tint(Color(hex: hex))
+                }
+            } label: {
+                Circle().fill(Color(hex: note.color) ?? .accentColor).frame(width: 10, height: 10)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Note color")
+            Button {
+                update(.with(pinned: !note.pinned))
+            } label: {
+                Image(systemName: note.pinned ? "pin.fill" : "pin")
+            }
+            .help(note.pinned ? "Unpin note" : "Pin note")
+            Button { confirmDelete = true } label: { Image(systemName: "trash") }
+                .help("Delete note")
+        }
+        .buttonStyle(.borderless)
+        .font(.caption)
+        .confirmationDialog("Delete note?", isPresented: $confirmDelete) {
+            Button("Delete", role: .destructive) {
+                if let docPath { sidebar.removeNote(note, in: docPath) } else { sidebar.removeNote(note) }
+            }
+        } message: {
+            if hasChildren { Text("Its replies will be deleted too.") }
+        }
+    }
+
+    private func update(_ patch: NotePatch) {
+        if let docPath {
+            model.sidebar.updateNote(note, in: docPath, patch)
+        } else {
+            model.sidebar.updateNote(note, patch)
+        }
     }
 }
