@@ -16,6 +16,7 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { marginHangDecorations } from '../lib/marginHang'
 
 const NOTE_ANNOTATION_PLUGIN_KEY = new PluginKey('noteAnnotation')
 const pendingSyncByEditor = new WeakMap()
@@ -197,7 +198,8 @@ const buildNoteDecorations = (doc, notes = [], docName = null, activeNoteId = nu
     }
 
     decorations.push(
-      Decoration.widget(
+      ...marginHangDecorations(
+        doc,
         note.to,
         (view) => {
           const marker = document.createElement('span')

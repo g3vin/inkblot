@@ -35,6 +35,7 @@ const STRIP_SELECTORS = [
   '.column-resize-handle',
   '.note-marker',
   '.note-dot',
+  '.margin-hang', // a bubble chip or note dot and its spacer (lib/marginHang.js)
   '.ProseMirror-gapcursor',
   '.drag-drop-caret',
 ].join(',')
