@@ -18,9 +18,14 @@
 import { EditorTarget } from '../types'
 import type {
   ActiveEditorChanged,
+  ArchiveChanged,
+  BubbleChipsChanged,
+  WordCountsChanged,
+  BubbleSessionOpened,
   CanvasCommandRequest,
   CanvasDropDocCommand,
   CanvasDropNoteCommand,
+  CanvasToolbarChanged,
   CanvasRestoreCommand,
   CanvasRevealCommand,
   DictationCancelCommand,
@@ -30,10 +35,14 @@ import type {
   FocusModeView,
   Note,
   NoteMarkerEvent,
+  NoteMarkersChanged,
   NotePreviewDismissed,
   NotesRemapped,
   OpenDocumentCommand,
   PageLayoutState,
+  ReferenceSchema,
+  ReferencesChanged,
+  RevealReference,
   PrintRequest,
   ClipboardChanged,
   NotesChanged,
@@ -47,6 +56,7 @@ import type {
   SetContentCommand,
   SyncNotesCommand,
   ToolbarState,
+  ViewOptions,
 } from '../types'
 import type { CommandPayload, CommandType, SurfaceBridge, Unsubscribe } from './client'
 import type { EditorRegistry, ResolvedEditor } from './editorRegistry'
@@ -105,6 +115,8 @@ export interface DocumentSurface {
   publishToolbarState(): void
   /** Read the active editor and push a `selectionContext`. Coalesced. */
   publishSelectionContext(options?: { docPath?: string | null; isCanvas?: boolean }): void
+  /** The canvas's own controls, or none while they are not up. Coalesced per frame. */
+  publishCanvasToolbar(payload: CanvasToolbarChanged): void
   /** Push the election result. Not coalesced — it is rare and ordering matters. */
   publishActiveEditor(info?: Partial<ActiveEditorChanged>): void
   publishDocChanged(payload: DocChanged): void
@@ -113,6 +125,12 @@ export interface DocumentSurface {
   publishNoteMarker(kind: 'hover' | 'leave' | 'pin', payload: NoteMarkerEvent): void
   publishSearchMatches(payload: SearchMatches): void
   publishFocusModeView(payload: FocusModeView): void
+  /**
+   * The page's view settings a native toolbar offers as toggles. Each is owned by a
+   * different component — focus mode by `EditorLayout`, the word count by `App` — so
+   * each publishes only its own; the surface keeps the rest and sends the whole.
+   */
+  publishViewOptions(patch: Partial<ViewOptions>): void
   publishReadAloudPayload(payload: ReadAloudPayloadEvent): void
   /** Which project is open. Not coalesced — it changes when the user picks one. */
   publishProjectChanged(payload: ProjectChanged): void
@@ -130,10 +148,26 @@ export interface DocumentSurface {
   /** An open preview's marker moved. Coalesced — each carries the whole rect. */
   publishNoteMarkerMoved(payload: NoteMarkerEvent): void
   publishNotePreviewDismissed(payload: NotePreviewDismissed): void
+  /** Every visible note marker, for a shell that draws the dots. Coalesced per frame. */
+  publishNoteMarkersChanged(payload: NoteMarkersChanged): void
+  /** Open the bubble editor, for a shell that draws it. Not coalesced — one per open. */
+  publishBubbleSessionOpened(payload: BubbleSessionOpened): void
+  /** Every visible session chip, for a shell that draws them. Coalesced per frame. */
+  publishBubbleChipsChanged(payload: BubbleChipsChanged): void
+  /** A document's archive, whole. */
+  publishArchiveChanged(payload: ArchiveChanged): void
+  /** Every visible word-count badge, for a shell that draws them. Coalesced per frame. */
+  publishWordCountsChanged(payload: WordCountsChanged): void
   /** Print Layout's state, for the inspector's Page tab. Coalesced — each carries it all. */
   publishPageLayoutState(payload: PageLayoutState): void
   /** Ask the shell to print the web view at a paper size. Not coalesced: each is a job. */
   publishPrintRequest(payload: PrintRequest): void
+  /** The project's sources for the document in view. Coalesced — each carries them all. */
+  publishReferencesChanged(payload: ReferencesChanged): void
+  /** The kinds of source and the styles, once. */
+  publishReferenceSchema(payload: ReferenceSchema): void
+  /** Show a source in the References panel. */
+  publishRevealReference(payload: RevealReference): void
 
   /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
   publishDragStarted(): void
@@ -154,12 +188,17 @@ export function createDocumentSurface({
 }: DocumentSurfaceOptions): DocumentSurface {
   let delegates = initialDelegates
   let lastHighlightColor: string = TOOLBAR_DEFAULTS.highlight
+  let viewOptions: ViewOptions = { focusMode: false, wordCountVisible: true }
   const subscriptions: Unsubscribe[] = []
 
   /* ---------------- coalesced publishers ---------------- */
 
   const toolbar = createCoalescer<ToolbarState>(
     (state) => bridge.emit('toolbarState', state),
+    scheduler
+  )
+  const canvasToolbar = createCoalescer<CanvasToolbarChanged>(
+    (payload) => bridge.emit('canvasToolbarChanged', payload),
     scheduler
   )
   const selection = createCoalescer<SelectionContext>(
@@ -199,8 +238,24 @@ export function createDocumentSurface({
     (payload) => bridge.emit('noteMarkerMoved', payload),
     scheduler
   )
+  const markerLists = createCoalescer<NoteMarkersChanged>(
+    (payload) => bridge.emit('noteMarkersChanged', payload),
+    scheduler
+  )
+  const chipLists = createCoalescer<BubbleChipsChanged>(
+    (payload) => bridge.emit('bubbleChipsChanged', payload),
+    scheduler
+  )
+  const wordCountLists = createCoalescer<WordCountsChanged>(
+    (payload) => bridge.emit('wordCountsChanged', payload),
+    scheduler
+  )
   const pageLayoutChanges = createCoalescer<PageLayoutState>(
     (payload) => bridge.emit('pageLayoutState', payload),
+    scheduler
+  )
+  const referenceLists = createCoalescer<ReferencesChanged>(
+    (payload) => bridge.emit('referencesChanged', payload),
     scheduler
   )
   const dragMoves = createCoalescer<{ dragId: string; clientX: number; clientY: number }>(
@@ -260,8 +315,23 @@ export function createDocumentSurface({
   handle('insertTable', (payload) => {
     withEditor(payload, (editor) => { commands.insertTable(editor, payload) })
   })
+  handle('setBlockType', (payload) => {
+    withEditor(payload, (editor) => { commands.setBlockType(editor, payload) })
+  })
+  handle('toggleList', (payload) => {
+    withEditor(payload, (editor) => { commands.toggleList(editor, payload) })
+  })
+  handle('editorHistory', (payload) => {
+    withEditor(payload, (editor) => { commands.editorHistory(editor, payload) })
+  })
   handle('insertConversationTile', (payload) => {
     withEditor(payload, (editor) => { commands.insertConversationTile(editor) })
+  })
+  handle('insertCitation', (payload) => {
+    withEditor(payload, (editor) => { commands.insertCitation(editor, payload) })
+  })
+  handle('insertBibliography', (payload) => {
+    withEditor(payload, (editor) => { commands.insertBibliography(editor) })
   })
   handle('setSelection', (payload) => {
     withEditor(payload, (editor) => { commands.setSelection(editor, payload) })
@@ -371,6 +441,8 @@ export function createDocumentSurface({
       publishToolbarState()
     },
 
+    publishCanvasToolbar(payload) { canvasToolbar.push(payload) },
+
     publishDocChanged(payload) { bridge.emit('docChanged', payload) },
 
     publishNotesRemapped(payload) { notesCoalescer(payload.docPath).push(payload) },
@@ -384,6 +456,10 @@ export function createDocumentSurface({
 
     publishSearchMatches(payload) { bridge.emit('searchMatches', payload) },
     publishFocusModeView(payload) { bridge.emit('focusModeView', payload) },
+    publishViewOptions(patch) {
+      viewOptions = { ...viewOptions, ...patch }
+      bridge.emit('viewOptions', viewOptions)
+    },
     publishReadAloudPayload(payload) { bridge.emit('readAloudPayload', payload) },
     publishProjectChanged(payload) { bridge.emit('projectChanged', payload) },
     publishNotesChanged(payload) { notesChangedFor(payload.docPath).push(payload) },
@@ -392,13 +468,22 @@ export function createDocumentSurface({
     publishVersionsChanged(payload) { bridge.emit('versionsChanged', payload) },
     publishShowSidebarTab(payload) { bridge.emit('showSidebarTab', payload) },
     publishNoteMarkerMoved(payload) { markerMoves.push(payload) },
+    publishNoteMarkersChanged(payload) { markerLists.push(payload) },
+    publishBubbleSessionOpened(payload) { bridge.emit('bubbleSessionOpened', payload) },
+    publishBubbleChipsChanged(payload) { chipLists.push(payload) },
+    publishArchiveChanged(payload) { bridge.emit('archiveChanged', payload) },
+    publishWordCountsChanged(payload) { wordCountLists.push(payload) },
     publishPageLayoutState(payload) { pageLayoutChanges.push(payload) },
     publishPrintRequest(payload) { bridge.emit('printRequest', payload) },
+    publishReferencesChanged(payload) { referenceLists.push(payload) },
+    publishReferenceSchema(payload) { bridge.emit('referenceSchema', payload) },
+    publishRevealReference(payload) { bridge.emit('revealReference', payload) },
     publishNotePreviewDismissed(payload) {
       // A move queued for a preview that is closing would reopen nothing, but it would
       // arrive after the dismissal and be one message the shell has to reason about.
       markerMoves.cancel()
       pageLayoutChanges.cancel()
+      referenceLists.cancel()
       bridge.emit('notePreviewDismissed', payload)
     },
 
@@ -424,23 +509,32 @@ export function createDocumentSurface({
 
     flush() {
       toolbar.flush()
+      canvasToolbar.flush()
       selection.flush()
       dragMoves.flush()
       clipboardChanges.flush()
       tileChanges.flush()
       markerMoves.flush()
+      markerLists.flush()
+      chipLists.flush()
+      wordCountLists.flush()
       pageLayoutChanges.flush()
+      referenceLists.flush()
       for (const coalescer of notesByDoc.values()) coalescer.flush()
       for (const coalescer of notesChangedByDoc.values()) coalescer.flush()
     },
 
     dispose() {
       toolbar.cancel()
+      canvasToolbar.cancel()
       selection.cancel()
       dragMoves.cancel()
       clipboardChanges.cancel()
       tileChanges.cancel()
       markerMoves.cancel()
+      markerLists.cancel()
+      chipLists.cancel()
+      wordCountLists.cancel()
       pageLayoutChanges.cancel()
       for (const coalescer of notesByDoc.values()) coalescer.cancel()
       for (const coalescer of notesChangedByDoc.values()) coalescer.cancel()

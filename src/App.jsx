@@ -10,11 +10,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import './App.css'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
-import { isNativeShell } from './lib/host'
+import { documentSurface } from './bridge'
+import { isNativeShell, nativeOwns } from './lib/host'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -30,6 +32,22 @@ const ACCENT_PRESETS = [
 ]
 
 const DEFAULT_ACCENT = ACCENT_PRESETS[0].value
+
+/**
+ * The OS accent color (System Settings → Appearance on macOS) as `#rrggbb`, or null
+ * where the host has none to give. Asked of the host because WebKit's
+ * `-apple-system-control-accent` keyword reports stock blue to page content whatever
+ * the user picked. Where there is one, the accent is the system's — like every native
+ * control beside the page — and the picker is not offered.
+ */
+const readSystemAccent = async () => {
+  try {
+    const hex = await invoke('system_accent_color')
+    return typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : null
+  } catch {
+    return null
+  }
+}
 
 /** Coerce any stored/user value to a valid 6-digit hex color, falling back to the default accent. */
 const normalizeAccentColor = (value) => {
@@ -170,6 +188,13 @@ export default function App() {
     setAccentColor(normalized)
   }, [])
 
+  // The system's accent is not a preference: it is shown, never stored, so the user's
+  // own pick is still there wherever the host has no system accent to give.
+  const followSystemAccent = useCallback((hex) => {
+    document.documentElement.style.setProperty('--accent-color', hex)
+    setAccentColor(hex)
+  }, [])
+
   const applyWordCountBadgeVisibility = useCallback((visible) => {
     const nextVisible = Boolean(visible)
     showWordCountBadgeRef.current = nextVisible
@@ -177,6 +202,16 @@ export default function App() {
     setShowWordCountBadge(nextVisible)
     menuRefs.current.wordCountItem?.setChecked(nextVisible)
   }, [])
+
+  // The native toolbar's Word Count item: the shell asks, and this stays the setting's
+  // owner — the same path the View menu's checkbox takes.
+  useEffect(() => {
+    if (!nativeOwns('toolbar')) return undefined
+    return documentSurface.onCommand('setWordCountVisible', ({ visible }) => applyWordCountBadgeVisibility(visible))
+  }, [applyWordCountBadgeVisibility])
+  useEffect(() => {
+    if (nativeOwns('toolbar')) documentSurface.publishViewOptions({ wordCountVisible: showWordCountBadge })
+  }, [showWordCountBadge])
 
   // Backend-initiated Pinterest searches (e.g. from a native menu) open the scraper window.
   useEffect(() => {
@@ -203,6 +238,9 @@ export default function App() {
     applyAccentColor(storedAccent)
     applyTheme(stored)
     applyWordCountBadgeVisibility(showStoredWordCountBadge)
+
+    const systemAccent = readSystemAccent()
+    systemAccent.then((hex) => hex && followSystemAccent(hex))
 
     const setupMenu = async () => {
       const { Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem } = await import('@tauri-apps/api/menu')
@@ -237,12 +275,6 @@ export default function App() {
         text: 'System',
         checked: currentThemeRef.current === 'system',
         action: () => applyTheme('system'),
-      })
-
-      const accentItem = await MenuItem.new({
-        id: 'accent-color-picker',
-        text: 'Accent Color…',
-        action: () => setIsAccentPickerOpen(true),
       })
 
       const wordCountItem = await CheckMenuItem.new({
@@ -291,7 +323,16 @@ export default function App() {
       }
 
       const themeItems = [toggleItem, systemItem]
-      const accentItems = [await PredefinedMenuItem.new({ item: 'Separator' }), accentItem]
+      const accentItems = (await systemAccent)
+        ? []
+        : [
+            await PredefinedMenuItem.new({ item: 'Separator' }),
+            await MenuItem.new({
+              id: 'accent-color-picker',
+              text: 'Accent Color…',
+              action: () => setIsAccentPickerOpen(true),
+            }),
+          ]
       const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [printLayoutItem])]
 
       if (viewSubmenu) {
@@ -309,7 +350,18 @@ export default function App() {
     }
 
     setupMenu()
-  }, [applyAccentColor, applyTheme, applyWordCountBadgeVisibility, getResolvedTheme, updateMenu])
+  }, [applyAccentColor, applyTheme, applyWordCountBadgeVisibility, followSystemAccent, getResolvedTheme, updateMenu])
+
+  // The accent is changed in System Settings, so coming back to the window is when it
+  // may have moved.
+  useEffect(() => {
+    const onFocus = async () => {
+      const systemAccent = await readSystemAccent()
+      if (systemAccent) followSystemAccent(systemAccent)
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [followSystemAccent])
 
   // Refresh menu labels when the OS theme flips while in 'system' mode.
   useEffect(() => {

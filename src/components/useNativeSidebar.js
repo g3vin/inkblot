@@ -18,7 +18,6 @@ import { useEffect, useRef } from 'react'
 import { documentSurface, editorRegistry } from '../bridge'
 import { claimEndedSelectionDrag } from '../bridge/recentSelectionDrag'
 import { collectNoteBranchIds, createFreeNote, touchNote } from '../lib/noteUtils'
-import { getDefaultChildOffset } from '../lib/notePreviewGeometry'
 import {
   copyVersionAsDocument,
   deleteVersion,
@@ -153,10 +152,11 @@ export function useNativeSidebar({
         state().setNotesForDoc?.(docPath, (notes) => {
           const parent = notes.find((note) => note.id === parentNoteId)
           if (!parent) return notes
-          const siblings = notes.filter((note) => note.parentNoteId === parentNoteId).length
+          // A zero layout means "not placed yet": the shell hangs the reply below its
+          // parent, clear of the card as drawn — which only the shell knows the size of.
           const reply = touchNote(createFreeNote(parent.color), {
             parentNoteId,
-            previewLayout: getDefaultChildOffset(siblings, siblings + 1),
+            previewLayout: { offsetX: 0, offsetY: 0 },
             collapsedChildren: false,
           })
           return [...notes, reply]

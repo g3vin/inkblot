@@ -21,6 +21,7 @@ import { StarterKit } from '@tiptap/starter-kit'
 import { documentSurface } from '../bridge'
 import { isNativeShell } from '../lib/host'
 import { buildEditorExtensions } from '../lib/editorExtensions'
+import { withPrintBibliography } from '../lib/references/printBibliography'
 import { loadChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
 import { foldingGuide, printSequence } from './imposition'
@@ -209,7 +210,12 @@ export const preparePrint = async ({
   book,
 }) => {
   const liveByPath = new Map(liveEditors.filter((e) => e?.path && e.editor && !e.editor.isDestroyed).map((e) => [e.path, e.editor]))
-  const chapters = await loadChapters(projectName, docPath, scope, (path) => liveByPath.get(path)?.getJSON() || null)
+  // A document whose bibliography appears only on paper gets it here (and so is laid
+  // out afresh below, not taken from its live pages).
+  const chapters = await withPrintBibliography(
+    projectName,
+    await loadChapters(projectName, docPath, scope, (path) => liveByPath.get(path)?.getJSON() || null)
+  )
   if (!chapters.length) return null
 
   const firstOwn = chapters[0].content?.attrs?.pageSetup || readDocPageSetup(liveByPath.get(chapters[0].path)?.state.doc)
@@ -218,7 +224,7 @@ export const preparePrint = async ({
   const sources = []
   try {
     for (const chapter of chapters) {
-      const live = liveSource(liveByPath.get(chapter.path), setup)
+      const live = chapter.printBibliography ? null : liveSource(liveByPath.get(chapter.path), setup)
       const laid = live || await layoutOffscreen(chapter.content, setup)
       sources.push({
         ...laid,

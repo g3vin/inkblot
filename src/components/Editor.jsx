@@ -253,6 +253,11 @@ export default function Editor({
     return () => { cancelled = true }
   }, [projectName])
 
+  // The shell's project picker names a project; opening it is still ours to do.
+  useEffect(() => documentSurface.onCommand('openProject', ({ projectName: nextProjectName }) => {
+    openProject(nextProjectName)
+  }), [openProject])
+
   const docRef = useRef(currentDoc)
   useEffect(() => { docRef.current = currentDoc }, [currentDoc])
 
@@ -643,6 +648,8 @@ export default function Editor({
   }, [activeEditor, editor, secondaryEditor])
 
   if (!projectName) {
+    // Under the Swift shell the picker is a window of its own (`ProjectPicker.swift`).
+    if (nativeOwns('projectPicker')) return null
     return (
       <ProjectLanding
         projectSessions={projectSessions}

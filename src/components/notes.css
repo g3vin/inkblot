@@ -213,6 +213,15 @@
   background: color-mix(in srgb, var(--note-color, var(--accent-color)) 26%, transparent);
 }
 
+/* Under the Swift shell the dots are drawn above the page as Liquid Glass
+   (useNativeNotePreviews); the page's stay, invisible, to take the hover and click. */
+.native-note-dots .note-dot,
+.native-note-dots .note-marker:hover .note-dot {
+  opacity: 0;
+  transform: none;
+  box-shadow: none;
+}
+
 .note-branch {
   display: block;
 }

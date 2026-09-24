@@ -3,7 +3,7 @@
  *
  * Storage layout:
  *   <projectRoot>/                      one directory per project
- *   <projectRoot>/<path/to/doc>.json    { content, notes, versions? }
+ *   <projectRoot>/<path/to/doc>.json    { content, notes, versions?, archive? }
  *   <projectRoot>/.versions/…           canvas version sidecars (a canvas file is
  *                                       spec-shaped JSON Canvas, so its history
  *                                       cannot ride inside it); also read as the
@@ -43,6 +43,7 @@ import {
   stripTrailingSlash,
 } from './projectPaths'
 import { withDocLock } from './docLock'
+import { relocateAttachments } from './references/referenceStore'
 import {
   buildTextVersionEntry,
   emitVersionsChanged,
@@ -184,6 +185,11 @@ export async function saveDocument(projectName, docName, docData) {
           content: docData.content || [],
           notes: docData.notes || [],
           versions,
+          // Archived items live here too (`archiveStore.js`), and are carried forward
+          // the same way.
+          ...(Array.isArray(existing?.archive) && existing.archive.length ? { archive: existing.archive } : {}),
+          // So is the document's part of the references (`referenceStore.js`).
+          ...(existing?.citations && typeof existing.citations === 'object' ? { citations: existing.citations } : {}),
         })
       )
 
@@ -519,6 +525,7 @@ export async function deleteEntry(projectName, entryPath, type = 'file') {
 
     await remove(targetPath, { recursive: true })
     if (type === 'file') await relocateSidecar(root, rel, null)
+    await relocateAttachments(root, rel, null, { folder: type === 'folder' })
   } catch (e) {
     console.error('Delete entry failed:', e)
   }
@@ -558,6 +565,7 @@ export async function duplicateEntry(projectName, entryPath) {
     }
 
     await copyFile(source, filePathFor(root, candidate))
+    await relocateAttachments(root, rel, candidate, { copy: true })
     return candidate
   } catch (e) {
     console.error('Duplicate entry failed:', e)
@@ -591,6 +599,7 @@ export async function renameEntry(projectName, entryPath, newName, type = 'file'
 
     await rename(oldPath, newPath)
     if (type === 'file') await relocateSidecar(root, rel, nextPath)
+    await relocateAttachments(root, rel, nextPath, { folder: type === 'folder' })
     return nextPath
   } catch (e) {
     console.error('Rename entry failed:', e)
@@ -627,6 +636,7 @@ export async function moveEntry(projectName, entryPath, targetFolderPath, type =
 
     await rename(oldPath, newPath)
     if (type === 'file') await relocateSidecar(root, rel, nextPath)
+    await relocateAttachments(root, rel, nextPath, { folder: type === 'folder' })
     return nextPath
   } catch (e) {
     console.error('Move entry failed:', e)

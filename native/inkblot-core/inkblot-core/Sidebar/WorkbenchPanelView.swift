@@ -21,12 +21,14 @@ struct WorkbenchPanelView: View {
                 .padding(.vertical, 8)
             }
             if tiles.isEmpty {
-                ContentUnavailableView(
-                    sidebar.tiles.isEmpty ? "Workbench Is Empty" : "No Matching Tiles",
-                    systemImage: "hammer",
-                    description: Text(sidebar.tiles.isEmpty
-                                      ? "Select text in the document and choose a language tool from its menu."
-                                      : ""))
+                ContentUnavailableView {
+                    Text(sidebar.tiles.isEmpty ? "Workbench Is Empty" : "No Matching Tiles")
+                } description: {
+                    Text(sidebar.tiles.isEmpty
+                        ? "Select text in the document and choose a language tool from its menu."
+                        : "")
+                }
+                .frame(maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -50,7 +52,7 @@ private struct TileCard: View {
             HStack {
                 Text(eyebrow).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Spacer()
-                Button { model.sidebar.removeTiles([tile.id]) } label: { Image(systemName: "xmark") }
+                Button { model.sidebar.removeTiles([tile.id]) } label: { Image(systemName: "trash") }
                     .buttonStyle(.borderless)
                     .help("Remove tile")
             }

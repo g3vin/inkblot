@@ -18,6 +18,8 @@ import { getDocDisplayName } from '../lib/docKind'
 import { useCanvasNotes } from './useCanvasNotes'
 import { filePathToDocPath } from './useDocPreview'
 import AudioNotes from '../components/AudioNotes'
+import NoteImageGallery from '../components/NoteImageGallery'
+import { readClipboardImages } from '../lib/noteImageUtils'
 
 /** The note plus everything nested under it, depth-first. */
 function buildThread(notes, rootId) {
@@ -41,7 +43,7 @@ function buildThread(notes, rootId) {
   return out
 }
 
-function NoteBody({ note, depth, projectName, onChange, onChangeAudio, onAddReply, onDelete }) {
+function NoteBody({ note, depth, projectName, onChange, onChangeAudio, onChangeImages, onAddReply, onDelete }) {
   const [draft, setDraft] = useState(note.content || '')
   const dirtyRef = useRef(false)
 
@@ -75,10 +77,23 @@ function NoteBody({ note, depth, projectName, onChange, onChangeAudio, onAddRepl
           setDraft(event.target.value)
         }}
         onBlur={commit}
+        // A pasted picture attaches to the note, as it does in the notes panel.
+        onPaste={async (event) => {
+          const images = await readClipboardImages(event.clipboardData)
+          if (!images.length) return
+          event.preventDefault()
+          onChangeImages(note.id, [...(note.images || []), ...images])
+        }}
         // The surface would otherwise read a press here as "start a marquee" and a
         // drag as "move the card", while the user is selecting text.
         onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => event.stopPropagation()}
+      />
+
+      <NoteImageGallery
+        images={note.images}
+        onRemoveImage={(imageId) =>
+          onChangeImages(note.id, (note.images || []).filter((image) => image.id !== imageId))}
       />
 
       {/* Voice memos live on the note itself, so one recorded here shows up in the
@@ -149,6 +164,12 @@ export default function CanvasNoteNode({ node }) {
     [apply]
   )
 
+  const changeImages = useCallback(
+    (id, images) =>
+      apply((current) => current.map((note) => (note.id === id ? touchNote(note, { images }) : note))),
+    [apply]
+  )
+
   const addReply = useCallback(
     (parentId) =>
       apply((current) => {
@@ -201,6 +222,7 @@ export default function CanvasNoteNode({ node }) {
             projectName={notesApi?.projectName}
             onChange={changeNote}
             onChangeAudio={changeAudio}
+            onChangeImages={changeImages}
             onAddReply={addReply}
             onDelete={deleteNote}
           />

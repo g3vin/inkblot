@@ -727,13 +727,102 @@ gitignored because it must come from the same build as the library (see
 
 | Piece | State |
 |---|---|
-| Window chrome | No title and no titlebar row: the page's toolbar is the top of the window. The traffic lights float over the file tree; with the tree hidden (or with the right sidebar closed, for its reopen button) the shell sends `setTitlebarInset` and the page leaves room. The page's top strip drags the window again — the shim's `start_dragging` becomes `performDrag` with the mouse-down recorded on the way in. The sidebars toggle from View ▸ Show/Hide Sidebar and Inspector. |
-| File tree | Native. Browse, open, New Document / Canvas / Folder, Rename, Move (menu and drag), Duplicate, Delete, Reveal. **Every change is a command the page performs** (`createEntry`, `renameEntry`, …) through `useEntryOperations` — see below. |
-| Right sidebar | Native inspector: a glass selector bar under its own toggle (Xcode-style; the selection bubble can be grabbed and slid), a search bar with scopes and match options, and the Clipboard, Workbench, Notes and History panels. State stays the page's; `useNativeSidebar` publishes it and applies the shell's edits. Version rows and search come from the core through `inkblot-ffi`. |
+| Window chrome and toolbar | Standard macOS 26 chrome: a regular-height unified toolbar (`.unified(showsTitle: false)`; the compact one was too narrow), NavigationSplitView's sidebar toggle, an inspector toggle pinned to the top-right corner (a titlebar accessory, never in the » overflow); AppKit places the traffic lights and drags the window. The **formatting toolbar is native** (`Shell/Toolbar/DocumentToolbar.swift`): font (pinned/recent/installed, same preference keys as the page), size, marks, text and highlight colour, alignment, insert table and conversation — rendering the pushed `ToolbarState` and sending commands. A canvas's own toolbar is native too (`Shell/Toolbar/CanvasToolbar.swift`): the page publishes `canvasToolbarChanged` with the active canvas's state while no card is being edited, and nothing while one is, so the window toolbar shows the canvas controls and swaps to the formatting ones when you start typing in a card; its buttons go back as `canvasCommand`s (`undo`, `zoom-in`, `toggle-grid`, `apply-color`, …). **Both toolbars are customizable** (right-click ▸ Customize Toolbar…, or View ▸ Customize Toolbar…), each with its own saved layout — see "The toolbar is customizable" below. The page draws its own toolbar row only for a comparison (`nativeOwns('toolbar')`). **Dictation and Read Aloud have no native buttons yet** — their engines are still Tauri-only. The page runs full width *under* both sidebars (the detail column ignores their safe area), so a canvas shows blurred through the glass; the shell sends `setPanelInsets` with how much of each side they cover, and a canvas's toolbar and a document's text column keep to the uncovered part. | |
+| Project picker | Native (`Shell/ProjectPicker.swift`), modelled on Xcode's welcome window: a 480×630 title-less window (`Window` id `picker`, ⇧⌘1) that Inkblot opens with instead of the editor. Lists `list_projects` newest first by the page's `inkblot-session` `updatedAt`; **Open…** links an existing folder (`link_project`, newly exposed over UniFFI), **New Project** creates one (the chevron offers a folder). Picking one sends `openProject` and opens the editor window; closing the editor brings the picker back. The page draws nothing with no project open (`nativeOwns('projectPicker')`), and does not queue commands, so `AppModel.openProject` resends until the page reports the project open. **Not ported from the web landing page:** Move Folder Location (no `move_project` over UniFFI yet). |
+| File tree | Native. Browse, open, New Document / Canvas / Folder, Rename, Move (menu and drag), drag to reorder, Duplicate, Delete, Reveal. The tree is an `NSOutlineView` (`ProjectOutline`), not a SwiftUI `List`: the `List` could not take insert-between-rows drops in nested folders. The manual order is the page's own `inkblot-order:<project>` preference, read and written through the core (`TreeOrder`, a port of `fileTreeOrder.ts`) — the page does not mount its tree here, so nothing else writes it. A move onto a name already taken in the target folder is refused: the move is a rename, and would replace it. **Every change is a command the page performs** (`createEntry`, `renameEntry`, …) through `useEntryOperations` — see below. |
+| Right sidebar | Native inspector: the system segmented control in its tabs role under its own toggle (`SidebarTabPicker`, Xcode-style), a search bar with scopes and match options, and the Clipboard, Workbench, Notes and History panels. State stays the page's; `useNativeSidebar` publishes it and applies the shell's edits. Version rows and search come from the core through `inkblot-ffi`. |
+| Bubble | Native Liquid Glass over the whole window (`Bubble/`). The page opens a session (`bubbleSessionOpened`, from its context menu or the chip on a sentence) and writes the sentence back on `closeBubbleSession`; the shell holds no positions. `BubbleText`/`BubbleDrop`/`BubbleForms` are ports of `lib/bubbleText.ts`/`lib/bubbleDrop.js`/`lib/bubbleForms.ts` — change them together. Saved forms (`BubbleForm`) travel in the session's `forms`; which one is showing is never stored, only worked out by equality. A sentence can be switched between its forms in the document (chip dots, ⌥⌘[ ⌥⌘], a sideways swipe over it — `extensions/BubbleSession.js`). Archive (formerly Resolve) moves a session into the document file's `archive` (`bridge/archive.rs`, `lib/archiveStore.js`); the page publishes it (`archiveChanged`) and the History panel's archive view restores or deletes (`archiveAction`). A session left open lives on its sentence as a `bubbleSession` mark whose attributes are the whole session, so version history restores a resolved one. |
 | Note hover cards | Native Liquid Glass over the web view (`Notes/`), placed from marker events the page publishes (`useNativeNotePreviews`): hover, leave, pin, the anchor following a scroll, dismissal. Draggable, resizable, replies on strings, layout stored on the note. |
 | Voice memos | AVFoundation, content-addressed into `.assets/` exactly as `assets.js` does, so either shell plays the other's. Needs the audio-input entitlement (`Inkblot.entitlements`) under the hardened runtime. |
 | Menu bar | Format (checkmarks follow `ToolbarState`), Edit ▸ Paste and Match Style (`insertPlainText`), and the page's View items. |
 | Context menus, dialogs, preferences, fonts, haptics | As before: through the shim and `TauriHost`. |
+
+### The toolbar is customizable — adding an item
+
+The window toolbar is AppKit's own customizable toolbar, reached through SwiftUI's
+`.toolbar(id:)` and `ToolbarItem(id:)`. Right-click it (or View ▸ Customize
+Toolbar…) and the system palette drops down under it: drag items in, drag them out,
+reorder, add Space and Flexible Space, or drag the default set back to reset. None of
+that is our code, and it should stay that way — it is the same sheet Xcode and Finder
+use, and a hand-built one would only ever be a near miss.
+
+**Two toolbars, two layouts.** A document gets `ToolbarID.document` (`DocumentToolbar`)
+and a canvas with no card being edited gets `ToolbarID.canvas` (`CanvasToolbar`), so
+each keeps its own arrangement. AppKit saves a changed layout in UserDefaults under the
+toolbar's id (NSToolbar autosave), *not* in the core's preference store. It is one
+`.toolbar(id:)` on the page (`ContentView`) whose id and contents switch together;
+the `if` is inside the toolbar builder, never around `EditorWebView`, whose identity
+changing would reload the page.
+
+**The files**, all in `native/inkblot-core/inkblot-core/Shell/Toolbar/`:
+
+| File | Holds |
+|---|---|
+| `ToolbarItemID.swift` | Every item's id and the two toolbar ids. Its header is the short form of this section. |
+| `DocumentToolbar.swift` | A document's items, plus the font/size/colour/alignment/paragraph-style/list controls they use. |
+| `CanvasToolbar.swift` | A canvas's items. |
+| `SharedToolbarItems.swift` | Items both offer (Snapshot Now, the four inspector panels). |
+| `InspectorTitlebarToggle.swift` | The inspector's show/hide — not a toolbar item, see below. |
+
+`inkblot-coreTests/ToolbarRegistryTests.swift` pins every id.
+
+**Adding a button:**
+
+1. **An id.** A new `ToolbarItemID` case whose raw value is `inkblot.<area>.<name>`.
+   Ids are storage keys in people's saved layouts: never rename or reuse one. An item
+   that goes away keeps its case, marked deprecated.
+2. **The item.** A `ToolbarItem(id: ToolbarItemID.x.id) { … }` in `DocumentToolbar`,
+   `CanvasToolbar`, or `SharedToolbarItems` for one that belongs in both. Where it goes
+   in the builder is where it sits in the default set, and its position in the palette.
+3. **Default or palette.** Add `.defaultCustomization(.hidden)` unless it belongs in
+   what every new user sees. Most new items belong in the palette. Items that belong
+   together (B/I/U/S, undo/redo, zoom) are one item holding a `ControlGroup`, as
+   Xcode's Run/Stop is.
+4. **A `Label` with a title and an SF Symbol**, even for an icon-only button: the
+   palette shows both, and the title is the item's name in text-only mode. Add
+   `.help(…)`.
+5. **Disable, never omit.** No `if` around an item: a missing item pulls the rest of
+   the user's layout along. A canvas's creation tools are disabled while it is locked
+   for this reason, where the page removes them.
+6. **No `.toolbar {}` of your own anywhere in the window.** One plain toolbar, or a
+   second `.toolbar(id:)` even with the same id, and AppKit silently turns Customize
+   Toolbar… off for the whole window. Something that must always be there but may move
+   goes in the toolbars with `.customizationBehavior(.disabled)`. Something pinned to a
+   corner that must never overflow into » is a titlebar accessory, as the inspector
+   toggle is (`InspectorTitlebarToggle`).
+7. **If it needs the page**, follow the bridge recipe:
+   - a payload struct and a `NativeCommand` variant in `bridge/command.rs` (enums in
+     `bridge/common.rs`), re-exported in `bridge/mod.rs`;
+   - the variant in `every_command()` and its wire name in the name list in
+     `bridge/tests.rs`;
+   - `npm run types`, which rewrites the TS and both Swift copies;
+   - a handler. One that only needs an editor goes in `src/bridge/surface.ts`, with the
+     editor work in `src/bridge/commands.ts`. One that needs app state is registered by
+     the component that owns that state with `documentSurface.onCommand(...)`.
+     `setFocusMode` (`EditorLayout.jsx`) and `setWordCountVisible` (`App.jsx`) are the
+     models.
+8. **If it has on/off state**, the page has to push it; the toolbar never asks.
+   - Editor facts go in `ToolbarState`/`ActiveMarks`, read in `src/bridge/readState.ts`.
+   - Canvas facts go in `CanvasToolbarState`.
+   - App-level view settings go in `ViewOptions`. Each owner calls
+     `documentSurface.publishViewOptions({ itsField })` and the surface sends the merged
+     whole. `ShellBridge.viewOptions` mirrors it.
+9. **Its id in `ToolbarRegistryTests.expected`.**
+
+**Candidates not built yet**, from the audit that produced the current set:
+
+- **Dictation and Read Aloud.** Their engines are Tauri-only (Still owed, 2–3).
+- **New Document / Canvas / Folder.** `FileTreeSidebar`'s naming sheet (`ask(.create)`)
+  would have to be lifted out, since it is view-local state.
+- **Bubble / Resolve Bubble.**
+- **Workbench lookups** (Define, Synonyms, Rhymes). These need a selection.
+- **Highlight / Remove Highlight.**
+- **Split Right/Down, New Tab.** The bridge only has `openDocument{pane}`.
+- **Theme (Switch to Dark/Light).** It is only reachable through the page-built View
+  menu's `rid`s.
+- **Focus the inspector's search field.**
+- **Print Layout.** Being built on its own branch; its page controls will want items
+  here.
 
 ### Rename, move and delete — a bug the Tauri app had too
 
@@ -752,10 +841,13 @@ and deletes the open document; a control case shows the ghost file without the f
 
 ### Protocol additions this phase
 
-`insertPlainText`, `projectChanged`, the entry commands (`createEntry`, `renameEntry`,
+`bubbleSessionOpened` / `closeBubbleSession` (`bridge/bubble.rs`), `insertPlainText`, `projectChanged`, the entry commands (`createEntry`, `renameEntry`,
 `moveEntry`, `deleteEntry`, `duplicateEntry`), the sidebar's (`bridge/sidebar.rs`:
 notes by patch, clipboard, tiles, version actions, `revealSearchResult`, `addReply`),
 the preview events (`noteMarkerMoved`, `notePreviewDismissed`) and `setTitlebarInset`.
+The customizable toolbar added `setBlockType`, `toggleList`, `editorHistory`,
+`setFocusMode`, `setWordCountVisible`, the `viewOptions` event, `ToolbarState.blockType`/
+`canUndo`/`canRedo` and `ActiveMarks.bulletList`/`orderedList`.
 Two rules held that are worth keeping:
 
 - **Notes are edited by `NotePatch`, never sent whole.** `Note` flattens unknown keys
@@ -776,14 +868,14 @@ Two rules held that are worth keeping:
    workbench's synonym and rhyme tiles say "not available in the native app yet" through
    `LanguageServices` — the one file that changes when they move into a crate
    `inkblot-ffi` can link. Rhymes never worked in either shell (see Known broken).
-3. **The formatting toolbar** is still the page's, and at the top of the window now,
-   which is where the user asked for it. Porting it natively would move it into a
-   titlebar row that was just removed at their request — decide with them before doing it.
+3. **Dictation and Read Aloud buttons** in the native toolbar, once their engines can
+   be linked (item 2). The page's `DictationControl`/`ReadAloudControl` are not shown
+   under the shell.
 4. **Detached document windows and the Pinterest webviews** (`WebviewWindow`, answered
    with nothing by the shim).
 5. **Finder drag-and-drop onto a canvas** (Tauri's `drag-drop` event with paths; in
    `WKWebView` it is an HTML5 drop with `File` objects).
-6. `TabDock`, `DraftTabPane`, `Bubble`, `useResizableSidebar`. The momentum hack in
+6. `TabDock`, `DraftTabPane`, `useResizableSidebar`. The momentum hack in
    `RightSidebar.jsx` can be deleted only when the Tauri app stops shipping that sidebar.
 7. **Dragging a note from the native Notes panel onto a canvas** — the page's version
    hit-tests the canvas with a pointer drag, which a native drag cannot reach.
@@ -808,12 +900,37 @@ Two rules held that are worth keeping:
   to `.with(content:` everywhere also rewrote the call inside `.with`, which then
   recursed; it compiled, and every native note edit would have overflowed the stack.
   `NotePreviewTests.aPatchNamesOnlyWhatChanged` is the guard.
-- **A real window toolbar would swallow the page's clicks.** AppKit keeps a toolbar's
-  whole band (its empty space drags the window), and the page's toolbar lives in that
-  band. So the window uses a hidden titlebar, which passes clicks through, and
-  `WindowChrome` moves the traffic lights to where a toolbar window has them — AppKit
-  resets them on every titlebar layout, so it re-places them on resize and full screen.
-  The toggles are drawn at toolbar-button size on the same line.
+- **A hidden titlebar with hand-placed traffic lights does not hold.** An earlier
+  version kept the page's toolbar in the toolbar band (where a real toolbar would have
+  swallowed its clicks) and moved the traffic lights itself, down to swizzling the
+  titlebar container's frame setters; AppKit resets them on every titlebar layout,
+  including collapsing a split view column. The fix was to make the formatting toolbar
+  native and use a real toolbar — regular unified height (compact was tried and read as too narrow).
+- **Any non-customizable toolbar content turns toolbar customization off.** The
+  inspector toggle used to be a plain `.toolbar {}` in the inspector column. With it
+  there, View ▸ Customize Toolbar… was disabled and the right-click menu had no
+  Customize item. A `.toolbar(id:)` with the same id in the inspector did the same.
+  As a fixed item inside the customizable toolbar it worked, but it sat at the detail
+  column's edge and fell into » in a narrow window. It is now an
+  `NSTitlebarAccessoryViewController` (`.trailing`): always in the top-right corner and
+  outside the toolbar entirely. Its `NSHostingView` has `sceneBridgingOptions = []` so
+  that it cannot claim the window's toolbar.
+- **SwiftUI's inspector crashes the app once the page column is narrower than it.**
+  The split view re-lays the columns out on every constraint pass until AppKit throws
+  ("more Update Constraints in Window passes than there are views"). Narrowing the
+  window got there (at about 845pt with the default panes), and so did dragging the
+  inspector's divider wider or showing and hiding it in a narrow window. It happens with
+  no toolbar and empty panels, so it is the split view itself. `PaneLimits` in
+  `ContentView` keeps the layout out of that state: the inspector's maximum width
+  follows the window, and the window's minimum leaves room for the inspector's minimum.
+  **Neither limit may read the inspector's own width.** That width changes on every
+  frame of the show/hide animation, and a minimum that moved mid-animation crashed in
+  the same way. The width watchers also have to sit *inside* `inspectorColumnWidth` /
+  `navigationSplitViewColumnWidth`, since those must be the column's outermost modifier
+  or the ideal width is ignored.
+- **Reading a menu item's `enabled` through Accessibility is stale.** AppKit validates
+  items when the menu opens; to check whether Customize Toolbar… works, click it and
+  look for the palette window.
 - **A `GlassEffectContainer` draws its glass over plain content inside it.** Apply
   `.glassEffect` to the content view (glass goes behind it), or keep the content outside
   the container — the selector bar's icons were frosted over until they moved out.

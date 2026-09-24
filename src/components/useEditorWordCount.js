@@ -10,11 +10,18 @@
  * selectionUpdate fires on every arrow key, and a total recount usually produces the
  * same number it did last time; without the check each one re-renders the pane, and
  * the pane holds the editor.
+ *
+ * Under the Swift shell the badges are drawn natively, as Liquid Glass. The page's stay
+ * where they are, invisible (`.native-word-count`), to be measured; the shell is told
+ * where each one is and what it says.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { debounce } from 'lodash'
 
+import { documentSurface } from '../bridge'
 import { isEditorReady } from '../lib/editorUtils'
+import { nativeOwns } from '../lib/host'
+import { visibleRect } from './useNativeNotePreviews'
 
 const WORD_COUNT_DEBOUNCE_MS = 300
 
@@ -130,5 +137,61 @@ export function useEditorWordCount({ editor, secondaryEditor, showWordCountBadge
     }
   }, [secondaryEditor, showWordCountBadge, splitView])
 
+  useNativeWordCounts()
+
   return { primaryWordStats, secondaryWordStats, syncWordStats }
+}
+
+/**
+ * Says where the page's badges are, for a shell that draws them — measured at most once
+ * a frame, whatever moved or changed them, and sent only when something did. The panes
+ * are watched for size too: dragging the split divider moves a badge without a scroll
+ * or a window resize.
+ */
+function useNativeWordCounts() {
+  const nativeWordCount = nativeOwns('wordCount')
+
+  useEffect(() => {
+    if (!nativeWordCount) return undefined
+    document.documentElement.classList.add('native-word-count')
+    let last = ''
+    let frame = 0
+    const publish = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => {
+        frame = 0
+        const clips = new Map()
+        const badges = []
+        for (const badge of document.querySelectorAll('.word-count')) {
+          if (badge.parentElement) resizes?.observe(badge.parentElement)
+          const rect = visibleRect(badge, clips)
+          if (!rect) continue
+          badges.push({
+            text: badge.textContent || '',
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+          })
+        }
+        const key = JSON.stringify(badges)
+        if (key === last) return
+        last = key
+        documentSurface.publishWordCountsChanged({ badges })
+      })
+    }
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(publish)
+    mutations?.observe(document.body, { childList: true, subtree: true, characterData: true })
+    const resizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publish)
+    window.addEventListener('resize', publish)
+    publish()
+    return () => {
+      mutations?.disconnect()
+      resizes?.disconnect()
+      window.removeEventListener('resize', publish)
+      if (frame) window.cancelAnimationFrame(frame)
+      document.documentElement.classList.remove('native-word-count')
+      documentSurface.publishWordCountsChanged({ badges: [] })
+    }
+  }, [nativeWordCount])
 }

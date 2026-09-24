@@ -10,6 +10,7 @@
  *     Make a copy (materialize the version as a new document), Compare (opens
  *     the side-by-side diff/merge view in the editor area), Rename, Delete
  *   - Snapshot now, for deliberately pinning the current state between autosaves
+ *   - the document's Archive (`ArchivePanel`): things put away out of it, to restore
  *
  * Storage and the diff engine live in lib/FileSystem.js and lib/versionHistory.js;
  * this file is only the timeline UI. Compare is VersionComparePane, which lives in
@@ -39,6 +40,7 @@ import {
   snapshotVersion,
 } from '../../lib/versionActions'
 import SFIcon from '../SFIcon'
+import ArchivePanel, { ArchiveIcon } from './ArchivePanel'
 import './HistoryPanel.css'
 
 /** ±word-count badge. Hidden when the change was a wash. */
@@ -108,6 +110,7 @@ export default function HistoryPanel({
   const [renameValue, setRenameValue] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [showArchive, setShowArchive] = useState(false)
   const renameInputRef = useRef(null)
 
   const displayedVersions = useMemo(
@@ -427,6 +430,19 @@ export default function HistoryPanel({
         : 'No versions yet. Checkpoints appear as you write.')
     : (namedOnly ? 'No named versions yet — name one from its row.' : 'No matching versions.')
 
+  if (showArchive && !isCanvas) {
+    return (
+      <div className="sidebar-panel history-panel">
+        <ArchivePanel
+          projectName={projectName}
+          docName={docName}
+          editor={editor}
+          onBack={() => setShowArchive(false)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="sidebar-panel history-panel">
       <div className="history-toolbar">
@@ -447,6 +463,16 @@ export default function HistoryPanel({
         >
           <SFIcon name="line.3.horizontal.decrease.circle" size={14} />
         </button>
+        {isCanvas ? null : (
+          <button
+            className="panel-action-btn panel-action-btn-small panel-icon-btn"
+            onClick={() => setShowArchive(true)}
+            title="View the archive: things put away out of this document"
+            aria-label="Archive"
+          >
+            <ArchiveIcon />
+          </button>
+        )}
       </div>
 
       {sections.length === 0 ? (

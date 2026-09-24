@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { listProjects, createProject, linkProject, listProjectTree, moveProject, getProjectRoot } from '../lib/FileSystem'
 import SFIcon from './SFIcon'
+import { nativeOwns } from '../lib/host'
 import appIconUrl from '../../src-tauri/icons/icon.png'
 
 const LANDING_WINDOW_DRAG_HEIGHT = 52
@@ -90,6 +91,8 @@ export default function ProjectLanding({
 
   // The landing page has no native titlebar, so dragging near the top edge moves the window.
   const handleLandingMouseDown = useCallback((event) => {
+    // Under the Swift shell the window has a real toolbar to drag it by.
+    if (nativeOwns('toolbar')) return
     if (event.button !== 0) return
     if (event.clientY > LANDING_WINDOW_DRAG_HEIGHT) return
     if (event.target instanceof Element && event.target.closest(LANDING_WINDOW_DRAG_BLOCKER_SELECTOR)) {

@@ -54,8 +54,43 @@ const wrapMarks = (value: string, marks: PMJSON['marks'] = []): string => {
   return `${lead}${core}${trail}`
 }
 
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' }
+
+/**
+ * A formatted citation or bibliography entry (`format.js` `tidy`: only i, b, sup, sub
+ * and small caps) as Markdown. Superscripts stay as <sup>, which Markdown passes through.
+ */
+export const citationMarkdown = (html: string): string => String(html || '')
+  .replace(/<\/?(i|em)>/g, '*')
+  .replace(/<\/?(b|strong)>/g, '**')
+  .replace(/<(\/?)(sup|sub)>/g, '<$1$2>')
+  .replace(/<(?!\/?su[pb]>)[^>]+>/g, '')
+  .replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (whole, code: string) => {
+    if (code[0] === '#') {
+      const n = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10)
+      return Number.isFinite(n) ? String.fromCodePoint(n) : whole
+    }
+    return ENTITIES[code.toLowerCase()] ?? whole
+  })
+
+const bibliographyMarkdown = (attrs: Record<string, unknown> = {}): string => {
+  const notes = Array.isArray(attrs.notes) ? (attrs.notes as string[]) : []
+  const entries = Array.isArray(attrs.entries) ? (attrs.entries as Array<{ html?: string; annotation?: string }>) : []
+  const out = [`## ${String(attrs.title || 'References')}`]
+  if (notes.length) {
+    if (entries.length) out.push('### Notes')
+    out.push(notes.map((note, i) => `${i + 1}. ${citationMarkdown(note)}`).join('\n'))
+  }
+  for (const entry of entries) {
+    out.push(citationMarkdown(entry.html || ''))
+    if (entry.annotation) out.push(`> ${entry.annotation.replace(/\n/g, '\n> ')}`)
+  }
+  return out.join('\n\n')
+}
+
 const inline = (nodes: PMJSON[] = [], options: MarkdownOptions): string => nodes.map((node) => {
   if (node.type === 'text') return wrapMarks(node.text || '', node.marks)
+  if (node.type === 'citation') return citationMarkdown(String(node.attrs?.rendered || ''))
   if (node.type === 'hardBreak') return '  \n'
   if (node.type === 'image') {
     const src = String(node.attrs?.src || '')
@@ -115,6 +150,8 @@ const block = (node: PMJSON, options: MarkdownOptions): string => {
       return table(node, options)
     case 'pageBreak':
       return '<div style="break-after: page"></div>'
+    case 'bibliography':
+      return bibliographyMarkdown(node.attrs)
     default:
       return node.content ? blocks(node.content, options) : ''
   }

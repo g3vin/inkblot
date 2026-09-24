@@ -7,6 +7,7 @@
  *   3. transpile .jsx and .ts, so a suite can mount a real component or import a
  *      converted module
  *   4. neutralize `import.meta.glob`, which is Vite's and has no Node equivalent
+ *   5. serve a `?raw` import as the file's text, the way Vite does (the citation styles)
  *
  * (3) is what lets the `dom` suite render CanvasSurface itself. esbuild comes with
  * Vite, so this adds no dependency. The automatic JSX runtime is used, matching the
@@ -33,6 +34,10 @@ const MAP = {
 
 export async function resolve(specifier, context, next) {
   if (MAP[specifier]) return { url: MAP[specifier], shortCircuit: true }
+
+  if (specifier.endsWith('?raw') && context.parentURL) {
+    return { url: new URL(specifier, context.parentURL).href, shortCircuit: true }
+  }
 
   if (specifier.startsWith('.') && context.parentURL) {
     const base = fileURLToPath(new URL(specifier, context.parentURL))
@@ -61,6 +66,11 @@ export async function resolve(specifier, context, next) {
 const LOADERS = { '.jsx': 'jsx', '.ts': 'ts' }
 
 export async function load(url, context, next) {
+  if (url.endsWith('?raw')) {
+    const text = readFileSync(fileURLToPath(url.slice(0, -'?raw'.length)), 'utf8')
+    return { format: 'module', source: `export default ${JSON.stringify(text)}`, shortCircuit: true }
+  }
+
   // CSS is imported for its side effect only (CanvasPane imports Canvas.css).
   if (url.endsWith('.css')) {
     return { format: 'module', source: 'export default {}', shortCircuit: true }
