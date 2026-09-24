@@ -697,8 +697,10 @@ export default function EditorCanvas({
               ) : null}
             />
           )}
-          {showWordCountBadge && !primaryIsCanvas && !showDraftPane ? (
-            <div className="word-count">{formatWordStats(primaryWordStats)}</div>
+          {!primaryIsCanvas && !showDraftPane ? (
+            <div className="pane-status">
+              {showWordCountBadge ? <div className="word-count">{formatWordStats(primaryWordStats)}</div> : null}
+            </div>
           ) : null}
         </div>
 
@@ -764,8 +766,10 @@ export default function EditorCanvas({
                 )}
               />
             )}
-            {showWordCountBadge && !secondaryIsCanvas ? (
-              <div className="word-count">{formatWordStats(secondaryWordStats)}</div>
+            {!secondaryIsCanvas ? (
+              <div className="pane-status">
+                {showWordCountBadge ? <div className="word-count">{formatWordStats(secondaryWordStats)}</div> : null}
+              </div>
             ) : null}
           </div>
         )}

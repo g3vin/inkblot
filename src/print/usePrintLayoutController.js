@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef } from 'react'
 
 import { documentSurface } from '../bridge'
 import { isCanvasDoc } from '../lib/docKind'
+import { nativeOwns } from '../lib/host'
 import { bookFolderFor, listBookChapters } from './compile'
 import { effectivePageSetup, readDocPageSetup } from './DocPageSetup'
 import { SIGNATURE_GUIDANCE } from './imposition'
@@ -89,8 +90,12 @@ export default function usePrintLayoutController({
         })
         .catch(() => {})
     }
+    const enabled = Boolean(doc) && isPrintLayoutEnabled(project, doc)
+    // The shell's zoom control holds the bottom-right corner while it shows; a status
+    // row there moves over for it (WordCountBadge.css).
+    document.documentElement.classList.toggle('print-layout-active', enabled)
     documentSurface.publishPageLayoutState({
-      enabled: Boolean(doc) && isPrintLayoutEnabled(project, doc),
+      enabled,
       docPath: doc || undefined,
       setup: ed ? effectivePageSetup(ed.state.doc) : effectivePageSetup(null),
       hasOwnSetup: Boolean(ed && readDocPageSetup(ed.state.doc)),
@@ -105,6 +110,13 @@ export default function usePrintLayoutController({
     })
   }, [])
 
+  // The shell draws the Print Layout button and zoom control; the page leaves room.
+  useEffect(() => {
+    if (!nativeOwns('printControls')) return undefined
+    document.documentElement.classList.add('native-print-controls')
+    return () => document.documentElement.classList.remove('native-print-controls', 'print-layout-active')
+  }, [])
+
   // Publish on every change to what the Page tab shows.
   useEffect(() => {
     publish()
@@ -117,18 +129,21 @@ export default function usePrintLayoutController({
     }
   }, [activeEditor, activeTextDoc, projectName, publish])
 
+  // Through the view when it is showing, which eases to the new zoom about the pane's
+  // centre; straight to the store when it is not.
   const zoomTo = useCallback(({ zoom, fit }) => {
-    const ed = stateRef.current.activeEditor
+    const pagination = stateRef.current.activeEditor?.storage?.pagination
+    const setZoom = (z) => (pagination?.zoomTo ? pagination.zoomTo(z) : setPrintZoom(z))
     if (fit === 'actual') {
       const z = actualSizeZoom(getDisplayPointsPerInch())
-      if (z) setPrintZoom(z)
+      if (z) setZoom(z)
       return
     }
     if (fit === 'width' || fit === 'page') {
-      ed?.storage?.pagination?.fit?.(fit)
+      pagination?.fit?.(fit)
       return
     }
-    if (typeof zoom === 'number') setPrintZoom(zoom)
+    if (typeof zoom === 'number') setZoom(zoom)
   }, [])
 
   useEffect(() => {

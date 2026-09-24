@@ -144,7 +144,8 @@ export function useEditorWordCount({ editor, secondaryEditor, showWordCountBadge
 
 /**
  * Says where the page's badges are, for a shell that draws them — measured at most once
- * a frame, whatever moved or changed them, and sent only when something did. The panes
+ * a frame, whatever moved or changed them, and sent only when something did. Print
+ * Layout's page count is one of them (`.word-count` too), drawn the same way beside it. The panes
  * are watched for size too: dragging the split divider moves a badge without a scroll
  * or a window resize.
  */
@@ -163,7 +164,8 @@ function useNativeWordCounts() {
         const clips = new Map()
         const badges = []
         for (const badge of document.querySelectorAll('.word-count')) {
-          if (badge.parentElement) resizes?.observe(badge.parentElement)
+          const pane = badge.closest('.pane') || badge.parentElement
+          if (pane) resizes?.observe(pane)
           const rect = visibleRect(badge, clips)
           if (!rect) continue
           badges.push({

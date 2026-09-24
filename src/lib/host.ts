@@ -36,6 +36,9 @@ import { detectNativeHost } from '../bridge/transport'
  *  - `pageSetup`    Print Layout's page setup, book and binding settings — the
  *                   inspector's Page tab, drawn from what `usePrintLayoutController`
  *                   publishes. Without it the page shows its own Page Setup sheet.
+ *  - `printControls` the Print Layout button (bottom-left of the editor) and its zoom
+ *                   control (bottom-right) — drawn by the shell as Liquid Glass from
+ *                   `pageLayoutState`. The page leaves them room and draws no zoom bar.
  */
 export type NativeChrome =
   | 'fileTree'
@@ -47,6 +50,7 @@ export type NativeChrome =
   | 'wordCount'
   | 'projectPicker'
   | 'pageSetup'
+  | 'printControls'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null
