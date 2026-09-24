@@ -63,3 +63,37 @@ export type StoredCanvasState = Omit<CanvasState, 'nodes' | 'edges'> & {
  * does not compile.
  */
 export type Loose<T> = { [K in keyof T]?: unknown }
+
+import type {
+  MapFile, MapLabel, MapPin, MapRegion, MapRoute, MapTerrain, MapTransport, MapTraveler,
+} from './inkblot-core'
+
+/** A map item as it exists on disk: modeled fields plus keys we do not model. */
+export type StoredMapPin = MapPin & UnknownKeys
+export type StoredMapRoute = MapRoute & UnknownKeys
+export type StoredMapRegion = MapRegion & UnknownKeys
+export type StoredMapLabel = MapLabel & UnknownKeys
+export type StoredMapTerrain = MapTerrain & UnknownKeys
+export type StoredMapTransport = MapTransport & UnknownKeys
+export type StoredMapTraveler = MapTraveler & UnknownKeys
+
+/**
+ * A whole map between a load and the save that follows it — what the map reducer
+ * holds. Unlike a canvas there is no separate runtime shape: `normalizeMap` returns
+ * this, and `serializeMap` writes it back with the live viewport.
+ */
+export type StoredMap = Omit<
+  MapFile,
+  'pins' | 'routes' | 'regions' | 'labels' | 'terrains' | 'transports' | 'travelers'
+> & UnknownKeys & {
+  pins: StoredMapPin[]
+  routes: StoredMapRoute[]
+  regions: StoredMapRegion[]
+  labels: StoredMapLabel[]
+  terrains: StoredMapTerrain[]
+  transports: StoredMapTransport[]
+  travelers: StoredMapTraveler[]
+}
+
+/** The arrays of id-carrying items a map holds, in paint order. */
+export type MapCollection = 'pins' | 'routes' | 'regions' | 'labels' | 'terrains' | 'transports' | 'travelers'

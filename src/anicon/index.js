@@ -54,3 +54,4 @@ export { IconUngroup } from './icon-ungroup.jsx';
 export { IconUserRound } from './icon-user-round.jsx';
 export { IconUsers } from './icon-users.jsx';
 export { IconX } from './icon-x.jsx';
+export { IconCompass, IconCursor, IconRoute, IconRegion, IconType, IconRuler, IconArea, IconCrosshair, IconGlobe, IconOrbit, IconSun, IconDownload, IconCalendar, IconScan, IconMaximize, IconUndo, IconRedo, IconAlert, IconGauge, IconFootprints } from './icon-map-tools.jsx';

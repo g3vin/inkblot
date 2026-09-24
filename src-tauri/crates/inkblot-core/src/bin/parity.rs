@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use serde_json::{json, Map, Value};
 
 use inkblot_core::types::{
-    CanvasEdge, CanvasFile, CanvasNode, CanvasNodeType, DiffChunk, EdgeSide, HtmlBlock, MergeChoice,
+    CanvasEdge, CanvasFile, DocKind, CanvasNode, CanvasNodeType, DiffChunk, EdgeSide, HtmlBlock, MergeChoice,
     Note, Point, ReadAloudPayload, Rect, SearchScope, VersionEntry, Viewport,
 };
 use inkblot_core::search::matcher::{Matcher, MatcherOptions};
@@ -27,7 +27,7 @@ use inkblot_core::read_aloud;
 use inkblot_core::store::{paths, versions};
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
-    story_structure as story, version_history as history,
+    map::model as map_model, story_structure as story, version_history as history,
 };
 
 /// `String(x || '')`, the coercion the JS entry points open with.
@@ -276,6 +276,18 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         "withCanvasSuffix" => json!(doc_kind::with_canvas_suffix(&text()?)),
         "stripCanvasSuffix" => json!(doc_kind::strip_canvas_suffix(&text()?)),
         "getDocDisplayName" => json!(doc_kind::get_doc_display_name(&text()?)),
+        "isMapDoc" => json!(doc_kind::is_map_doc(&text()?)),
+        "isTextDoc" => json!(doc_kind::is_text_doc(&text()?)),
+        "stripDocSuffix" => json!(doc_kind::strip_doc_suffix(&text()?)),
+        "withDocSuffix" => {
+            let kind = match args.get(1).and_then(Value::as_str) {
+                Some("canvas") => Some(DocKind::Canvas),
+                Some("map") => Some(DocKind::Map),
+                _ => None,
+            };
+            let name = text()?;
+            json!(kind.map_or(name.clone(), |kind| doc_kind::with_doc_suffix(&name, kind)))
+        }
 
         /* ---- canvas_geometry ---- */
         "clamp" => json!(geo::clamp(f64_arg(args, 0)?, f64_arg(args, 1)?, f64_arg(args, 2)?)),
@@ -387,6 +399,32 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         )),
         "getStoryFolderAncestor" => {
             json!(story::get_story_folder_ancestor(args[0].as_str().unwrap_or_default()))
+        }
+        "isLocationDoc" => json!(story::is_location_doc(args[0].as_str().unwrap_or_default())),
+        "isCharacterDoc" => json!(story::is_character_doc(args[0].as_str().unwrap_or_default())),
+
+        /* ---- map::model ---- */
+        "normalizeMap" => {
+            let mut next = 0;
+            json!(map_model::normalize_map_with(&args[0], || {
+                let id = format!("gen{next}");
+                next += 1;
+                id
+            }))
+        }
+        "createEmptyMap" => json!(map_model::create_empty_map(args[0].as_str().unwrap_or_default())),
+        "isMapPayload" => json!(map_model::is_map_payload(args.first())),
+        "readMapViewport" => json!(map_model::read_map_viewport(&args[0])),
+        "countMapWords" => json!(map_model::count_map_words(&args[0])),
+        "mapDocRefs" => json!(map_model::map_doc_refs(&args[0])),
+        "collectMapMatches" => {
+            let matcher = Matcher::new(args[1].as_str().unwrap_or_default(), matcher_options(&args[2]));
+            json!(search::collect_map_matches(
+                &args[0],
+                &matcher,
+                args[3].as_str().unwrap_or_default(),
+                args[4].as_u64().unwrap_or(u64::MAX) as usize
+            ))
         }
 
         /* ---- version_history ---- */

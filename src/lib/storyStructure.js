@@ -23,7 +23,7 @@ export const STORY_FOLDER_PRESETS = [
     entryLabel: 'Setting',
     folderIcon: 'folder.settings',
     fileIcon: 'doc.settings',
-    aliases: [],
+    aliases: ['Locations', 'Places'],
   },
   {
     key: 'outline',
@@ -92,3 +92,14 @@ export const getStoryFolderAncestor = (entryPath = '') => {
 
   return null
 }
+
+/**
+ * A doc filed under a Settings folder (or one called Locations or Places) — what a
+ * map pin links to by default.
+ */
+export const isLocationDoc = (docPath = '') =>
+  getStoryFolderPresetForEntry(docPath, 'file')?.key === 'settings'
+
+/** A doc filed under a Characters folder — what travels a map's routes. */
+export const isCharacterDoc = (docPath = '') =>
+  getStoryFolderPresetForEntry(docPath, 'file')?.key === 'characters'

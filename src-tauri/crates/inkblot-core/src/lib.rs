@@ -22,6 +22,7 @@ pub mod fonts;
 pub mod js_number;
 pub mod kokoro;
 pub mod js_string;
+pub mod map;
 pub mod notes;
 pub mod pinterest;
 pub mod read_aloud;
