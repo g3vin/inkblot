@@ -21,7 +21,7 @@ import { debounce } from 'lodash'
 
 import { saveDocument, getVersions } from '../lib/FileSystem'
 import { isEditorReady } from '../lib/editorUtils'
-import { isCanvasDoc } from '../lib/docKind'
+import { isTextDoc } from '../lib/docKind'
 
 const AUTOSAVE_DEBOUNCE_MS = 800
 const HISTORY_CHECKPOINT_DEBOUNCE_MS = 15000
@@ -72,7 +72,7 @@ export function useEditorAutosave({
   const saveVersionCheckpoint = useCallback(async (targetEditor, docName, paneId, name = null) => {
     if (!isEditorReady(targetEditor) || !docName) return
     // Canvas checkpoints are written by useCanvasDocument, not this TipTap path.
-    if (isCanvasDoc(docName)) return
+    if (!isTextDoc(docName)) return
     if (!isDocLoaded(docName, paneId)) return
     if (isPaneLoading(paneId)) return
 
@@ -102,7 +102,7 @@ export function useEditorAutosave({
 
   useEffect(() => {
     if (!isEditorReady(editor) || !currentDoc) return
-    if (isCanvasDoc(currentDoc)) return
+    if (!isTextDoc(currentDoc)) return
 
     const handler = debounce(async () => {
       if (!isEditorReady(editor)) return
@@ -160,7 +160,7 @@ export function useEditorAutosave({
   // autosave below covers for both panes.
   useEffect(() => {
     if (!isEditorReady(secondaryEditor) || splitView !== 'editor' || !secondaryDoc) return
-    if (isCanvasDoc(secondaryDoc)) return
+    if (!isTextDoc(secondaryDoc)) return
 
     const handler = debounce(async () => {
       if (!isEditorReady(secondaryEditor)) return

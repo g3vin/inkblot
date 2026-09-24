@@ -20,7 +20,7 @@
  * reserved name), and each is followed by a `references:changed` window event.
  */
 import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import { isCanvasDoc } from '../docKind'
+import { isTextDoc } from '../docKind'
 import { getProjectRoot, joinPath } from '../projectPaths'
 import { withDocLock } from '../docLock'
 import { DEFAULT_STYLE } from './styles'
@@ -164,7 +164,7 @@ const withAttachment = (attachments, docPath, ids, attached) => {
 export const addReference = (projectName, record, docPath = null) => updateLibrary(projectName, (library) => ({
   ...library,
   references: [normalizeReference(record), ...library.references.filter((ref) => ref.id !== record.id)],
-  attachments: docPath && !isCanvasDoc(docPath) ? withAttachment(library.attachments, docPath, [record.id], true) : library.attachments,
+  attachments: docPath && isTextDoc(docPath) ? withAttachment(library.attachments, docPath, [record.id], true) : library.attachments,
 }), { docName: docPath })
 
 /** Replace a source by id, through `change(ref) → ref`. */
@@ -193,7 +193,7 @@ export const removeReference = (projectName, id) => updateLibrary(projectName, (
 })
 
 export const setAttached = (projectName, docPath, ids, attached) => (
-  !docPath || isCanvasDoc(docPath)
+  !docPath || !isTextDoc(docPath)
     ? Promise.resolve(false)
     : updateLibrary(projectName, (library) => {
       const known = ids.filter((id) => library.references.some((ref) => ref.id === id))
@@ -241,7 +241,7 @@ const normalizeCitations = (raw) => ({
 
 /** `{ style?, bibliography }` for a text document; defaults when it has none. */
 export async function getDocCitations(projectName, docName) {
-  if (!projectName || !docName || isCanvasDoc(docName)) return normalizeCitations(null)
+  if (!projectName || !docName || !isTextDoc(docName)) return normalizeCitations(null)
   try {
     const doc = JSON.parse((await readTextFile(await documentPath(projectName, docName))) || '{}')
     return normalizeCitations(doc.citations)
@@ -252,7 +252,7 @@ export async function getDocCitations(projectName, docName) {
 
 /** Change a document's settings under its lock, the way the archive is changed. */
 export async function updateDocCitations(projectName, docName, change) {
-  if (!projectName || !docName || isCanvasDoc(docName)) return false
+  if (!projectName || !docName || !isTextDoc(docName)) return false
   const changed = await withDocLock(projectName, docName, async () => {
     const path = await documentPath(projectName, docName)
     let doc

@@ -72,6 +72,7 @@ fn entry(id: &str, html: &str) -> VersionEntry {
         content_html: Some(html.to_string()),
         content_json: None,
         canvas: None,
+        map: None,
     }
 }
 
@@ -131,6 +132,42 @@ fn saving_a_canvas_as_a_text_document_is_refused() {
     assert!(matches!(refused, Err(StoreError::Refused(_))));
     // And the canvas is still there, whole.
     assert_eq!(store.load_document("Novel", "Board.canvas").unwrap().unwrap(), canvas);
+}
+
+#[test]
+fn a_map_is_neither_saved_as_text_nor_written_over_text() {
+    let app_data = TempDir::new();
+    let store = store(&app_data);
+    store.create_project("Novel", None).unwrap();
+
+    let map = crate::map::model::create_empty_map("image");
+    store.save_map_document("Novel", "World.map", &map).unwrap();
+    let refused = store.save_document("Novel", "World.map", &body(json!([]), json!([])), None);
+    assert!(matches!(refused, Err(StoreError::Refused(_))));
+    assert_eq!(store.load_document("Novel", "World.map").unwrap().unwrap(), map);
+
+    // A text document from before maps existed, whose name happens to end in `.map`.
+    let writing = json!({ "content": { "type": "doc", "content": [] }, "notes": [] });
+    store.write_document_raw("Novel", "Treasure.map", &writing).unwrap();
+    let refused = store.save_map_document("Novel", "Treasure.map", &map);
+    assert!(matches!(refused, Err(StoreError::Refused(_))));
+    assert_eq!(store.load_document("Novel", "Treasure.map").unwrap().unwrap(), writing);
+
+    // And only a `.map` path takes a map at all.
+    assert!(matches!(store.save_map_document("Novel", "Chapter", &map), Err(StoreError::Refused(_))));
+}
+
+#[test]
+fn a_map_versions_into_the_sidecar_and_its_copy_stays_a_map() {
+    let app_data = TempDir::new();
+    let store = store(&app_data);
+    store.create_project("Novel", None).unwrap();
+    store.save_map_document("Novel", "World.map", &crate::map::model::create_empty_map("blank")).unwrap();
+
+    store.append_version_entry("Novel", "World.map", entry("m1", "<p>a</p>")).unwrap();
+    let root = store.project_root("Novel");
+    assert!(PathBuf::from(paths::versions_sidecar_path(&root, "World.map")).exists());
+    assert_eq!(store.duplicate_entry("Novel", "World.map").unwrap().as_deref(), Some("World copy.map"));
 }
 
 #[test]

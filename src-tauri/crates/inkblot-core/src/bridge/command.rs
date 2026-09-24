@@ -330,11 +330,12 @@ pub struct InsertPlainTextCommand {
 pub enum EntryKind {
     Document,
     Canvas,
+    Map,
     Folder,
 }
 
-/// Create a document, canvas or folder in the open project, and open it if it is a
-/// document.
+/// Create a document, canvas, map or folder in the open project, and open it if it is
+/// not a folder.
 ///
 /// The page does the writing, not the shell, for the same reason as every command
 /// below: a new document gets a tab and a place in the tree's stored order, and those
@@ -346,7 +347,7 @@ pub enum EntryKind {
 pub struct CreateEntryCommand {
     /// Tree path of the folder to create in; empty for the project root.
     pub parent_folder: String,
-    /// The bare name. For a canvas the page adds the `.canvas` suffix.
+    /// The bare name. For a canvas or map the page adds the `.canvas` or `.map` suffix.
     pub name: String,
     pub kind: EntryKind,
 }

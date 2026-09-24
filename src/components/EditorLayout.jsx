@@ -29,8 +29,9 @@ import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useEditorContextMenu } from '../hooks/useEditorContextMenu'
-import { isCanvasDoc } from '../lib/docKind'
+import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
+import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
 import BubbleEditor from './BubbleEditor'
@@ -90,6 +91,7 @@ const WINDOW_DRAG_BLOCKER_SELECTOR = [
   // Owns its own drag gestures (panning, moving nodes) in the band the strip
   // overhangs below the toolbar.
   '.canvas-surface',
+  '.map-surface',
 ].join(',')
 
 export default function EditorLayout(props) {
@@ -185,6 +187,8 @@ export default function EditorLayout(props) {
   // controls inside the Toolbar genuinely need the instance.
   const activeEditorInfo = useBridgeState('activeEditorChanged', EMPTY_ACTIVE_EDITOR)
   const activeIsCanvas = isCanvasDoc(activeDoc || currentDoc)
+  // A canvas or a map pans instead of scrolling, and runs on under the sidebars.
+  const activeUnderlays = !isTextDoc(activeDoc || currentDoc)
   // The titlebar element the active canvas portals its toolbar into. A ref
   // callback rather than a ref object, so mounting/unmounting the slot re-renders
   // the consumers that are waiting for it.
@@ -428,6 +432,18 @@ export default function EditorLayout(props) {
       return
     }
 
+    // A map hit names an item (pin, route, label…) the same way.
+    if (isMapDoc(docName)) {
+      if (docName !== activeDoc && docName !== currentDoc) {
+        setActiveDoc(docName)
+        setCurrentDoc(docName)
+      }
+      if (normalizedTarget.nodeId) {
+        requestMapReveal(docName, normalizedTarget.nodeId)
+      }
+      return
+    }
+
     if (docName === activeDoc || docName === currentDoc) {
       if (normalizedTarget.skipJump) return
       jumpToText(
@@ -640,7 +656,7 @@ export default function EditorLayout(props) {
       </div> : null}
 
       <div
-        className={`main-layout${activeIsCanvas ? ' is-canvas-underlay' : ''}${nativeToolbar ? ' is-under-native-toolbar' : ''}`}
+        className={`main-layout${activeUnderlays ? ' is-canvas-underlay' : ''}${nativeToolbar ? ' is-under-native-toolbar' : ''}`}
         style={{
           '--panel-inset-left': `${nativePanelInsets.leading}px`,
           '--panel-inset-right': `${nativePanelInsets.trailing}px`,

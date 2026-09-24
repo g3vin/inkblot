@@ -857,12 +857,13 @@ export interface ContributorRoleSpec {
 export enum EntryKind {
 	Document = "document",
 	Canvas = "canvas",
+	Map = "map",
 	Folder = "folder",
 }
 
 /**
- * Create a document, canvas or folder in the open project, and open it if it is a
- * document.
+ * Create a document, canvas, map or folder in the open project, and open it if it is
+ * not a folder.
  * 
  * The page does the writing, not the shell, for the same reason as every command
  * below: a new document gets a tab and a place in the tree's stored order, and those
@@ -872,7 +873,7 @@ export enum EntryKind {
 export interface CreateEntryCommand {
 	/** Tree path of the folder to create in; empty for the project root. */
 	parentFolder: string;
-	/** The bare name. For a canvas the page adds the `.canvas` suffix. */
+	/** The bare name. For a canvas or map the page adds the `.canvas` or `.map` suffix. */
 	name: string;
 	kind: EntryKind;
 }
@@ -1339,6 +1340,298 @@ export interface JumpToAnchorCommand {
 	 * on disk.
 	 */
 	preferPositions: boolean;
+}
+
+export interface MapBackground {
+	/** A project asset path (`.assets/<hash>.<ext>`). */
+	image?: string | null;
+	width?: number | null;
+	height?: number | null;
+	opacity: number;
+	/** The traced vector outline, an SVG asset. */
+	trace?: string | null;
+	showImage: boolean;
+}
+
+export enum BodyKind {
+	Star = "star",
+	Planet = "planet",
+	Dwarf = "dwarf",
+	Moon = "moon",
+	Belt = "belt",
+	Station = "station",
+	Barycenter = "barycenter",
+}
+
+export interface MapOrbit {
+	/** Semi-major axis, in AU. */
+	aAU: number;
+	/** Eccentricity, 0 to 0.99. */
+	e: number;
+	periapsisDeg: number;
+	/** Mean anomaly at day 0. */
+	meanAnomalyDeg: number;
+	/** Overrides the period Kepler's third law gives. */
+	periodDays?: number | null;
+	retrograde: boolean;
+}
+
+export interface MapBody {
+	id: string;
+	name: string;
+	kind: BodyKind;
+	parent?: string | null;
+	massSun?: number | null;
+	radiusKm?: number | null;
+	color?: string | null;
+	orbit?: MapOrbit | null;
+}
+
+export interface MapCalibration {
+	a: number[];
+	b: number[];
+	/** The distance between `a` and `b`, in `unit`. */
+	distance: number;
+	unit: string;
+}
+
+export interface MapCartouche {
+	show: boolean;
+	at: number[];
+	title?: string | null;
+	subtitle?: string | null;
+}
+
+export interface MapCompass {
+	show: boolean;
+	at: number[];
+	size: number;
+	style: string;
+}
+
+export interface MapCustomUnit {
+	id: string;
+	name: string;
+	km: number;
+}
+
+export enum EarthProjection {
+	EqualEarth = "equalEarth",
+	Equirectangular = "equirectangular",
+	Mercator = "mercator",
+	NaturalEarth = "naturalEarth",
+	Orthographic = "orthographic",
+}
+
+export interface MapEarth {
+	projection: EarthProjection;
+	/** `[λ, φ]` rotation in degrees; what an orthographic globe is turned to. */
+	rotate: number[];
+	graticule: boolean;
+	borders: boolean;
+	/** `auto`, `110m` or `50m`. */
+	detail: string;
+}
+
+export enum MapKind {
+	Blank = "blank",
+	Image = "image",
+	Earth = "earth",
+	System = "system",
+}
+
+export interface MapScale {
+	/**
+	 * Kilometres per map unit on a plane map. Earth and system maps carry their own
+	 * intrinsic scale and ignore it.
+	 */
+	kmPerUnit: number;
+	displayUnit: string;
+	calibration?: MapCalibration | null;
+	customUnits: MapCustomUnit[];
+}
+
+export interface MapSystemDisplay {
+	/** `linear` or `log`. */
+	radial: string;
+	pxPerAU: number;
+}
+
+export interface MapSystem {
+	bodies: MapBody[];
+	display: MapSystemDisplay;
+}
+
+export interface MapPin {
+	id: string;
+	/** Overrides the linked doc's name. */
+	name?: string | null;
+	/** Tree path of the linked doc — a location, usually. */
+	doc?: string | null;
+	at?: number[] | null;
+	/** On a star system, the body the pin rides on instead of a fixed point. */
+	body?: string | null;
+	icon: string;
+	color?: string | null;
+}
+
+/**
+ * One stop on a route: a pin (which the route then follows when it moves) or a
+ * free point. Exactly one of the two is set.
+ */
+export interface MapRouteNode {
+	pin?: string;
+	at?: number[];
+}
+
+export interface MapLineStyle {
+	stroke?: string | null;
+	width: number;
+	/** `solid`, `dashed`, `dotted`, `inked` or `rough`. */
+	dash: string;
+	arrow: boolean;
+}
+
+export interface MapRoute {
+	id: string;
+	name?: string | null;
+	nodes: MapRouteNode[];
+	/** `linear` or `catmullRom`. */
+	smooth: string;
+	style: MapLineStyle;
+}
+
+export interface MapRegion {
+	id: string;
+	name?: string | null;
+	/** The outer ring first; any further ring is a hole. */
+	rings: number[][][];
+	/** A terrain id; travel across the region takes its multipliers. */
+	terrain?: string | null;
+	fill?: string | null;
+	hatch: string;
+	stroke?: string | null;
+}
+
+export interface MapTerrain {
+	id: string;
+	name: string;
+	/**
+	 * Speed multipliers keyed by transport id, or `*land`/`*water`/… for a whole
+	 * medium. 0 is impassable; a transport that is not listed moves at full speed.
+	 */
+	multipliers: Record<string, number>;
+}
+
+export interface MapLabel {
+	id: string;
+	text: string;
+	at?: number[] | null;
+	/** A route the text runs along. */
+	route?: string | null;
+	/** A free path the text runs along. */
+	path?: number[][] | null;
+	startOffset: number;
+	size: number;
+	rotation: number;
+	font: string;
+	minZoom: number;
+	maxZoom?: number | null;
+}
+
+export enum TransportMedium {
+	Land = "land",
+	Water = "water",
+	Air = "air",
+	Space = "space",
+}
+
+export interface MapTransport {
+	id: string;
+	name: string;
+	kmh: number;
+	/** Hours actually spent moving in a day. */
+	hoursPerDay: number;
+	medium: TransportMedium;
+	/**
+	 * Set on relativistic transports: the speed as a fraction of c (then `kmh` is
+	 * derived from it).
+	 */
+	fractionC?: number | null;
+}
+
+export interface MapLeg {
+	id: string;
+	/** The route to follow; straight (or great-circle) from `from` to `to` without one. */
+	route?: string | null;
+	from?: string | null;
+	to?: string | null;
+	transport: string;
+	/** A fixed departure day; null leaves when the previous leg arrives (plus rest). */
+	departDay?: number | null;
+	restDays: number;
+}
+
+export interface MapTraveler {
+	id: string;
+	/** Tree path of the character doc. */
+	doc?: string | null;
+	name?: string | null;
+	color?: string | null;
+	startPin?: string | null;
+	startDay: number;
+	legs: MapLeg[];
+}
+
+export interface MapTimeline {
+	/** The story day the map shows, a float; day 0 is the story's epoch. */
+	day: number;
+}
+
+/** A screen-anchored ornament; `at` is a fraction of the view on each axis. */
+export interface MapOrnament {
+	show: boolean;
+	at: number[];
+}
+
+export interface MapStyle {
+	/** `clean`, `parchment`, `ink` or `night`. */
+	theme: string;
+	compass: MapCompass;
+	scaleBar: MapOrnament;
+	cartouche: MapCartouche;
+}
+
+export interface MapViewport {
+	x: number;
+	y: number;
+	zoom: number;
+}
+
+/** The object written to `<name>.map.json`. */
+export interface MapFile {
+	/**
+	 * Always `"map"`. Never routed on (the kind is the path's), but the store checks
+	 * it before overwriting a file, so a text document named `x.map` survives.
+	 */
+	type: string;
+	formatVersion: number;
+	mapKind: MapKind;
+	scale: MapScale;
+	background: MapBackground;
+	earth: MapEarth;
+	system: MapSystem;
+	pins: MapPin[];
+	routes: MapRoute[];
+	regions: MapRegion[];
+	terrains: MapTerrain[];
+	labels: MapLabel[];
+	/** Custom transports; one sharing a built-in's id replaces it on this map. */
+	transports: MapTransport[];
+	travelers: MapTraveler[];
+	timeline: MapTimeline;
+	style: MapStyle;
+	viewport: MapViewport;
 }
 
 /** Move a file or folder into another folder. See `RenameEntryCommand`. */
@@ -1956,6 +2249,11 @@ export enum SearchResultType {
 	NoteMatch = "note-match",
 	/** A hit on a canvas, addressed by node id — a canvas has no positions. */
 	CanvasMatch = "canvas-match",
+	/**
+	 * A hit on a map, addressed by the id of the pin, route, region, label or
+	 * traveler that carries the text (in `node_id`).
+	 */
+	MapMatch = "map-match",
 }
 
 /**
@@ -2321,6 +2619,7 @@ export interface TargetOnly {
 export enum VersionKind {
 	Text = "text",
 	Canvas = "canvas",
+	Map = "map",
 }
 
 /**
@@ -2352,6 +2651,11 @@ export interface VersionEntry {
 	contentHtml?: string;
 	contentJson?: unknown;
 	canvas?: CanvasFile;
+	/**
+	 * A map entry's whole serialized map. Held as JSON rather than `MapFile` so the
+	 * unknown keys a map carries survive a restore (see `map::model`).
+	 */
+	map?: unknown;
 }
 
 /**
@@ -2591,6 +2895,7 @@ export interface WordCountsChanged {
  */
 export enum DocKind {
 	Canvas = "canvas",
+	Map = "map",
 	Text = "text",
 }
 

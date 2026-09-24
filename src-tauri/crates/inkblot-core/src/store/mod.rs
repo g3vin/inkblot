@@ -45,13 +45,14 @@ use std::sync::Mutex;
 
 use serde_json::{json, Value};
 
-use crate::doc_kind::{is_canvas_doc, CANVAS_SUFFIX};
+use crate::doc_kind::{doc_kind_name, get_doc_kind, is_map_doc, is_text_doc, strip_doc_suffix, with_doc_suffix};
+use crate::map::model::is_map_payload;
 use crate::types::{JsonValue, TreeNode, TreeNodeType, VersionEntry};
 use doc_lock::DocLocks;
 use locations::ProjectLocations;
 use paths::{
     file_path_for, folder_path_for, join_path, normalize_path, parent_of, strip_trailing_slash,
-    versions_sidecar_path, CANVAS_SUFFIX_LENGTH, ORDER_FILE,
+    versions_sidecar_path, ORDER_FILE,
 };
 use versions::{push_version_entry, NewTextVersion};
 
@@ -200,6 +201,26 @@ impl ProjectStore {
         Ok(())
     }
 
+    /// Write a map, refusing to overwrite a file that is not one.
+    ///
+    /// A text document named `Something.map` was an ordinary document before maps
+    /// existed, and routing is by suffix alone — so without this check the first
+    /// autosave of the map view would replace the writing with an empty map.
+    pub fn save_map_document(&self, project_name: &str, doc_name: &str, map: &Value) -> Result<()> {
+        if !is_map_doc(doc_name) {
+            return Err(StoreError::Refused(format!("{doc_name} is not a map")));
+        }
+        self.locks.with_doc_lock(project_name, doc_name, || {
+            let existing = self.load_document(project_name, doc_name)?;
+            if !is_map_payload(existing.as_ref()) {
+                return Err(StoreError::Refused(format!(
+                    "{doc_name} holds something other than a map; it was not overwritten"
+                )));
+            }
+            self.write_document_raw(project_name, doc_name, map)
+        })
+    }
+
     /// Save a text document, carrying its version history forward.
     ///
     /// Version history lives in this same file, so every write has to re-read and
@@ -217,9 +238,10 @@ impl ProjectStore {
         body: &DocumentBody,
         append_version: Option<VersionRequest>,
     ) -> Result<()> {
-        if is_canvas_doc(doc_name) {
+        if !is_text_doc(doc_name) {
             return Err(StoreError::Refused(format!(
-                "{doc_name} is a canvas; saving it as a text document would erase it"
+                "{doc_name} is a {}; saving it as a text document would erase it",
+                doc_kind_name(get_doc_kind(doc_name))
             )));
         }
 
@@ -288,8 +310,8 @@ impl ProjectStore {
         doc_name: &str,
         notes: &Value,
     ) -> Result<bool> {
-        if is_canvas_doc(doc_name) {
-            return Err(StoreError::Refused(format!("{doc_name} is a canvas and has no notes")));
+        if !is_text_doc(doc_name) {
+            return Err(StoreError::Refused(format!("{doc_name} is not a text document and has no notes")));
         }
 
         self.locks.with_doc_lock(project_name, doc_name, || {
@@ -371,10 +393,10 @@ impl ProjectStore {
         name_for: impl Fn(&str, Option<u32>) -> String,
     ) -> Result<String> {
         let rel = normalize_path(doc_name);
-        let is_canvas = is_canvas_doc(&rel);
-        let base = if is_canvas { &rel[..rel.len() - CANVAS_SUFFIX_LENGTH] } else { &rel };
-        let with_suffix =
-            |name: String| if is_canvas { format!("{name}{CANVAS_SUFFIX}") } else { name };
+        let kind = get_doc_kind(&rel);
+        let base = strip_doc_suffix(&rel);
+        let base = base.as_str();
+        let with_suffix = |name: String| with_doc_suffix(&name, kind);
 
         let mut candidate = with_suffix(name_for(base, None));
         let mut counter = 2;
@@ -396,7 +418,7 @@ impl ProjectStore {
     pub fn get_versions(&self, project_name: &str, doc_name: &str) -> Vec<VersionEntry> {
         let root = self.project_root(project_name);
 
-        if !is_canvas_doc(doc_name) {
+        if is_text_doc(doc_name) {
             let embedded = read_json(&join_path(&[&root, &format!("{doc_name}.json")]))
                 .and_then(|doc| doc.get("versions").cloned())
                 .and_then(|value| serde_json::from_value::<Vec<VersionEntry>>(value).ok())
@@ -507,7 +529,7 @@ impl ProjectStore {
     ) -> Result<Option<(VersionStore, Vec<VersionEntry>)>> {
         let root = self.project_root(project_name);
 
-        if is_canvas_doc(doc_name) {
+        if !is_text_doc(doc_name) {
             let versions = read_sidecar_versions(&root, doc_name);
             return Ok(Some((VersionStore::Sidecar { root }, versions)));
         }

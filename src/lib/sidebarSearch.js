@@ -10,8 +10,9 @@
  * Kept free of React and of the filesystem (callers inject `listProjectTree` /
  * `loadDocument`) so the matching rules can be tested directly.
  */
-import { isCanvasDoc } from './docKind'
+import { isCanvasDoc, isMapDoc } from './docKind'
 import { collectCanvasMatches } from './canvasSearch'
+import { collectMapMatches } from './map/mapSearch'
 import { getPreference, setPreference, removePreference } from './preferences'
 
 export const MAX_RESULTS_PER_DOCUMENT = 24
@@ -286,6 +287,22 @@ export const searchProject = async ({
       if (!canvasData) continue
 
       results.push(...collectCanvasMatches(canvasData, matcher, entry.path, {
+        limit: MAX_RESULTS_PER_DOCUMENT,
+      }))
+
+      if (results.length >= MAX_PROJECT_RESULTS) break
+      continue
+    }
+
+    // A map is the same: no notes, and its text is addressed by item id.
+    if (isMapDoc(entry.path)) {
+      if (scope === 'notes') continue
+
+      const mapData = await loadDocument(projectName, entry.path)
+      if (isCancelled()) return []
+      if (!mapData) continue
+
+      results.push(...collectMapMatches(mapData, matcher, entry.path, {
         limit: MAX_RESULTS_PER_DOCUMENT,
       }))
 

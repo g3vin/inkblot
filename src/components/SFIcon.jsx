@@ -40,6 +40,26 @@ import {
   IconLockOpen,
   IconMap,
   IconMapPin,
+  IconCompass,
+  IconCursor,
+  IconRoute,
+  IconRegion,
+  IconType,
+  IconRuler,
+  IconArea,
+  IconCrosshair,
+  IconGlobe,
+  IconOrbit,
+  IconSun,
+  IconDownload,
+  IconCalendar,
+  IconScan,
+  IconMaximize,
+  IconUndo,
+  IconRedo,
+  IconAlert,
+  IconGauge,
+  IconFootprints,
   IconMenuDots,
   IconMic,
   IconFrame,
@@ -112,6 +132,48 @@ const renderIcon = (name, filled, props) => {
       return <IconFile {...props} />
     case 'canvas':
       return <IconCanvas {...props} />
+    case 'map':
+      return <IconCompass {...props} />
+    case 'mappin':
+      return <IconMapPin {...props} />
+    case 'cursorarrow':
+      return <IconCursor {...props} />
+    case 'map.route':
+      return <IconRoute {...props} />
+    case 'map.region':
+      return <IconRegion {...props} />
+    case 'map.label':
+      return <IconType {...props} />
+    case 'map.ruler':
+      return <IconRuler {...props} />
+    case 'map.area':
+      return <IconArea {...props} />
+    case 'map.calibrate':
+      return <IconCrosshair {...props} />
+    case 'globe':
+      return <IconGlobe {...props} />
+    case 'map.system':
+      return <IconOrbit {...props} />
+    case 'sun.max':
+      return <IconSun {...props} />
+    case 'square.and.arrow.down':
+      return <IconDownload {...props} />
+    case 'calendar':
+      return <IconCalendar {...props} />
+    case 'map.trace':
+      return <IconScan {...props} />
+    case 'map.fit':
+      return <IconMaximize {...props} />
+    case 'arrow.uturn.backward':
+      return <IconUndo {...props} />
+    case 'arrow.uturn.forward':
+      return <IconRedo {...props} />
+    case 'exclamationmark.triangle':
+      return <IconAlert {...props} />
+    case 'gauge':
+      return <IconGauge {...props} />
+    case 'figure.walk':
+      return <IconFootprints {...props} />
     case 'rectangle.on.rectangle':
       return <IconGroup {...props} />
     case 'rectangle.dashed':
