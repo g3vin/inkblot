@@ -21,7 +21,9 @@ struct PagePanelView: View {
         Group {
             if let state = layout.state, state.docPath != nil {
                 Form {
-                    viewSection(state)
+                    // Print Layout itself is switched on and off from the editor's
+                    // bottom-left corner (`PrintLayoutControls`).
+                    if state.enabled { viewSection(state) }
                     if setup != nil { pageSections(state) }
                     if book != nil { bookSections(state) }
                     printSection(state)
@@ -82,32 +84,29 @@ struct PagePanelView: View {
     private func viewSection(_ state: PageLayoutState) -> some View {
         let layout = model.pageLayout
         Section {
-            Toggle("Print Layout", isOn: Binding(get: { state.enabled }, set: { layout.setPrintLayout($0) }))
-            if state.enabled {
-                LabeledContent("Pages", value: "\(state.pageCount)")
-                HStack {
-                    Text("Zoom")
-                    Spacer()
-                    Menu("\(Int((state.zoom * 100).rounded()))%") {
-                        Button("Fit Width") { layout.fit(.width) }
-                        Button("Fit Page") { layout.fit(.page) }
-                        Button("Actual Size") { layout.fit(.actual) }
-                        Divider()
-                        ForEach([0.5, 0.75, 1, 1.25, 1.5, 2, 3], id: \.self) { z in
-                            Button("\(Int(z * 100))%") { layout.zoom(z) }
-                        }
+            LabeledContent("Pages", value: "\(state.pageCount)")
+            HStack {
+                Text("Zoom")
+                Spacer()
+                Menu("\(Int((state.zoom * 100).rounded()))%") {
+                    Button("Fit Width") { layout.fit(.width) }
+                    Button("Fit Page") { layout.fit(.page) }
+                    Button("Actual Size") { layout.fit(.actual) }
+                    Divider()
+                    ForEach([0.5, 0.75, 1, 1.25, 1.5, 2, 3], id: \.self) { z in
+                        Button("\(Int(z * 100))%") { layout.zoom(z) }
                     }
-                    .fixedSize()
                 }
-                HStack {
-                    Text("Go to Page")
-                    Spacer()
-                    TextField("", value: $goTo, format: .number)
-                        .frame(width: 56)
-                        .multilineTextAlignment(.trailing)
-                        .onSubmit { layout.goToPage(goTo) }
-                    Button("Go") { layout.goToPage(goTo) }
-                }
+                .fixedSize()
+            }
+            HStack {
+                Text("Go to Page")
+                Spacer()
+                TextField("", value: $goTo, format: .number)
+                    .frame(width: 56)
+                    .multilineTextAlignment(.trailing)
+                    .onSubmit { layout.goToPage(goTo) }
+                Button("Go") { layout.goToPage(goTo) }
             }
         } footer: {
             Text("100% is the page at its printed size in CSS inches. Actual Size matches a ruler held to this display.")

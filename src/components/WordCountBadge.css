@@ -3,11 +3,19 @@
    ============================================================ */
 
 /* Bottom-left, level with the file tree's + and filter bar and the same height (32px),
-   so the two read as one row along the bottom of the window. */
-.word-count {
+   so the two read as one row along the bottom of the window. The word count leads; in
+   Print Layout the page count follows it. */
+.pane-status {
   position: absolute;
   bottom: 18px;
   left: 10px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.word-count {
   margin: 0;
   display: flex;
   align-items: center;
@@ -25,9 +33,23 @@
 /* Side by side, the secondary pane's badge would sit against the divider — which is
    the middle of the window, which is where the tab dock floats. Send it to the
    outer edge so the two never overlap. */
-.split-active:not(.split-rows) .secondary-pane .word-count {
+.split-active:not(.split-rows) .secondary-pane .pane-status {
   left: auto;
   right: 10px;
+  flex-direction: row-reverse;
+}
+
+/* Under the Swift shell the Print Layout button holds the bottom-left corner of the
+   editor (PrintLayoutControls.swift): 32px from 10px in, then the row's gap. */
+.native-print-controls .editor-container:not(.split-rows) .primary-pane .pane-status,
+.native-print-controls .split-rows .secondary-pane .pane-status {
+  left: 50px;
+}
+
+/* …and while the active document is in Print Layout, its zoom control holds the
+   bottom-right corner — which, side by side, is where the right pane's status sits. */
+.native-print-controls.print-layout-active .split-active:not(.split-rows) .secondary-pane .pane-status {
+  right: 170px;
 }
 
 .pane-header-centered {

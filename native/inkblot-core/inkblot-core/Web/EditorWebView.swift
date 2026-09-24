@@ -19,7 +19,7 @@ import os
 final class EditorWebController: NSObject {
     /// The parts of the chrome this shell draws itself; the page stops drawing them.
     /// See `src/lib/host.ts`.
-    static let nativeChrome = ["fileTree", "windowChrome", "rightSidebar", "notePreviews", "bubble", "toolbar", "wordCount", "projectPicker", "pageSetup"]
+    static let nativeChrome = ["fileTree", "windowChrome", "rightSidebar", "notePreviews", "bubble", "toolbar", "wordCount", "projectPicker", "pageSetup", "printControls"]
 
     let webView: WKWebView
     private let bridge: ShellBridge
