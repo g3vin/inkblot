@@ -4,15 +4,19 @@
  * Owns app-wide chrome and preferences that live above the editor:
  * theme (light/dark/system), accent color, and the word-count badge
  * toggle. Wires those preferences into the native Tauri "View" menu
- * and persists them to localStorage. Renders the Editor plus the
+ * and persists them through lib/preferences.ts. Renders the Editor plus the
  * accent-color picker dialog.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import './App.css'
+import { getPreference, setPreference, removePreference } from './lib/preferences'
+import { documentSurface } from './bridge'
+import { isNativeShell, nativeOwns } from './lib/host'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -28,6 +32,22 @@ const ACCENT_PRESETS = [
 ]
 
 const DEFAULT_ACCENT = ACCENT_PRESETS[0].value
+
+/**
+ * The OS accent color (System Settings → Appearance on macOS) as `#rrggbb`, or null
+ * where the host has none to give. Asked of the host because WebKit's
+ * `-apple-system-control-accent` keyword reports stock blue to page content whatever
+ * the user picked. Where there is one, the accent is the system's — like every native
+ * control beside the page — and the picker is not offered.
+ */
+const readSystemAccent = async () => {
+  try {
+    const hex = await invoke('system_accent_color')
+    return typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : null
+  } catch {
+    return null
+  }
+}
 
 /** Coerce any stored/user value to a valid 6-digit hex color, falling back to the default accent. */
 const normalizeAccentColor = (value) => {
@@ -150,31 +170,48 @@ export default function App() {
     if (theme === 'system') {
       root.removeAttribute('data-theme')
       root.style.colorScheme = 'light dark'
-      localStorage.removeItem(THEME_STORAGE_KEY)
+      removePreference(THEME_STORAGE_KEY)
       updateMenu(theme)
       return
     }
 
     root.setAttribute('data-theme', theme)
     root.style.colorScheme = theme
-    localStorage.setItem(THEME_STORAGE_KEY, theme)
+    setPreference(THEME_STORAGE_KEY, theme)
     updateMenu(theme)
   }, [updateMenu])
 
   const applyAccentColor = useCallback((nextAccent) => {
     const normalized = normalizeAccentColor(nextAccent)
     document.documentElement.style.setProperty('--accent-color', normalized)
-    localStorage.setItem(ACCENT_STORAGE_KEY, normalized)
+    setPreference(ACCENT_STORAGE_KEY, normalized)
     setAccentColor(normalized)
+  }, [])
+
+  // The system's accent is not a preference: it is shown, never stored, so the user's
+  // own pick is still there wherever the host has no system accent to give.
+  const followSystemAccent = useCallback((hex) => {
+    document.documentElement.style.setProperty('--accent-color', hex)
+    setAccentColor(hex)
   }, [])
 
   const applyWordCountBadgeVisibility = useCallback((visible) => {
     const nextVisible = Boolean(visible)
     showWordCountBadgeRef.current = nextVisible
-    localStorage.setItem(WORD_COUNT_BADGE_STORAGE_KEY, nextVisible ? 'true' : 'false')
+    setPreference(WORD_COUNT_BADGE_STORAGE_KEY, nextVisible ? 'true' : 'false')
     setShowWordCountBadge(nextVisible)
     menuRefs.current.wordCountItem?.setChecked(nextVisible)
   }, [])
+
+  // The native toolbar's Word Count item: the shell asks, and this stays the setting's
+  // owner — the same path the View menu's checkbox takes.
+  useEffect(() => {
+    if (!nativeOwns('toolbar')) return undefined
+    return documentSurface.onCommand('setWordCountVisible', ({ visible }) => applyWordCountBadgeVisibility(visible))
+  }, [applyWordCountBadgeVisibility])
+  useEffect(() => {
+    if (nativeOwns('toolbar')) documentSurface.publishViewOptions({ wordCountVisible: showWordCountBadge })
+  }, [showWordCountBadge])
 
   // Backend-initiated Pinterest searches (e.g. from a native menu) open the scraper window.
   useEffect(() => {
@@ -194,13 +231,16 @@ export default function App() {
 
   // On startup: restore persisted preferences, then build the native View menu entries.
   useEffect(() => {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY) || 'system'
-    const storedAccent = normalizeAccentColor(localStorage.getItem(ACCENT_STORAGE_KEY))
-    const storedWordCountBadge = localStorage.getItem(WORD_COUNT_BADGE_STORAGE_KEY)
+    const stored = getPreference(THEME_STORAGE_KEY) || 'system'
+    const storedAccent = normalizeAccentColor(getPreference(ACCENT_STORAGE_KEY))
+    const storedWordCountBadge = getPreference(WORD_COUNT_BADGE_STORAGE_KEY)
     const showStoredWordCountBadge = storedWordCountBadge !== 'false'
     applyAccentColor(storedAccent)
     applyTheme(stored)
     applyWordCountBadgeVisibility(showStoredWordCountBadge)
+
+    const systemAccent = readSystemAccent()
+    systemAccent.then((hex) => hex && followSystemAccent(hex))
 
     const setupMenu = async () => {
       const { Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem } = await import('@tauri-apps/api/menu')
@@ -209,11 +249,14 @@ export default function App() {
       const items = await menu.items()
 
       let viewSubmenu = null
+      let fileSubmenu = null
       for (const item of items) {
         if (item instanceof Submenu) {
           const text = await item.text()
           if (text === 'View') {
             viewSubmenu = item
+          } else if (text === 'File') {
+            fileSubmenu = item
           }
         }
       }
@@ -234,12 +277,6 @@ export default function App() {
         action: () => applyTheme('system'),
       })
 
-      const accentItem = await MenuItem.new({
-        id: 'accent-color-picker',
-        text: 'Accent Color…',
-        action: () => setIsAccentPickerOpen(true),
-      })
-
       const wordCountItem = await CheckMenuItem.new({
         id: 'word-count-badge-toggle',
         text: 'Show Word Count',
@@ -251,9 +288,52 @@ export default function App() {
       menuRefs.current.systemItem = systemItem
       menuRefs.current.wordCountItem = wordCountItem
 
+      // Print Layout, printing and export act on the active document; the pane that
+      // owns it listens for these (usePrintLayoutController).
+      const printEvent = (type, detail) => () => window.dispatchEvent(new CustomEvent(type, { detail }))
+      const printLayoutItem = await MenuItem.new({
+        id: 'print-layout-toggle',
+        text: 'Print Layout  ⌥⌘P',
+        action: printEvent('inkblot:print-layout-toggle'),
+      })
+      const exportItems = (scope, labelSuffix = '') => Promise.all([
+        MenuItem.new({ id: `export-pdf-${scope}`, text: `PDF${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'pdf', scope }) }),
+        ...(scope === 'folder'
+          ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for Binding…', action: printEvent('inkblot:export', { format: 'pdf', scope, bound: true }) })]
+          : []),
+        MenuItem.new({ id: `export-epub-${scope}`, text: `EPUB${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'epub', scope }) }),
+        MenuItem.new({ id: `export-md-${scope}`, text: `Markdown${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'markdown', scope }) }),
+        MenuItem.new({ id: `export-html-${scope}`, text: `HTML${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'html', scope }) }),
+      ])
+      const fileItems = [
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        await MenuItem.new({ id: 'page-setup', text: 'Page Setup…', action: printEvent('inkblot:page-setup') }),
+        await MenuItem.new({ id: 'print-document', text: 'Print…  ⌘P', action: printEvent('inkblot:print', { scope: 'document' }) }),
+        await MenuItem.new({ id: 'print-book', text: 'Print Book…', action: printEvent('inkblot:print', { scope: 'folder' }) }),
+        await MenuItem.new({ id: 'print-book-bound', text: 'Print Book for Binding…', action: printEvent('inkblot:print', { scope: 'folder', bound: true }) }),
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        await Submenu.new({ text: 'Export', items: await exportItems('document') }),
+        await Submenu.new({ text: 'Export Book', items: await exportItems('folder') }),
+      ]
+      // The Swift shell draws File ▸ Print and Export, and View ▸ Print Layout, itself.
+      const native = isNativeShell()
+      if (!native) {
+        if (fileSubmenu) await fileSubmenu.append(fileItems)
+        else await menu.append(await Submenu.new({ text: 'File', items: fileItems.slice(1) }))
+      }
+
       const themeItems = [toggleItem, systemItem]
-      const accentItems = [await PredefinedMenuItem.new({ item: 'Separator' }), accentItem]
-      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem]
+      const accentItems = (await systemAccent)
+        ? []
+        : [
+            await PredefinedMenuItem.new({ item: 'Separator' }),
+            await MenuItem.new({
+              id: 'accent-color-picker',
+              text: 'Accent Color…',
+              action: () => setIsAccentPickerOpen(true),
+            }),
+          ]
+      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [printLayoutItem])]
 
       if (viewSubmenu) {
         await viewSubmenu.append([...themeItems, ...accentItems, ...displayItems])
@@ -270,7 +350,18 @@ export default function App() {
     }
 
     setupMenu()
-  }, [applyAccentColor, applyTheme, applyWordCountBadgeVisibility, getResolvedTheme, updateMenu])
+  }, [applyAccentColor, applyTheme, applyWordCountBadgeVisibility, followSystemAccent, getResolvedTheme, updateMenu])
+
+  // The accent is changed in System Settings, so coming back to the window is when it
+  // may have moved.
+  useEffect(() => {
+    const onFocus = async () => {
+      const systemAccent = await readSystemAccent()
+      if (systemAccent) followSystemAccent(systemAccent)
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [followSystemAccent])
 
   // Refresh menu labels when the OS theme flips while in 'system' mode.
   useEffect(() => {

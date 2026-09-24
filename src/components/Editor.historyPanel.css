@@ -1,0 +1,55 @@
+/* ============================================================
+   History panel
+   ============================================================ */
+
+.history-panel {
+  min-height: 0;
+}
+
+.history-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-tile-header {
+  margin-bottom: 0;
+}
+
+.history-timestamp {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-preview {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-preview-context {
+  color: var(--text-subtle);
+}
+
+.history-preview-added {
+  color: color-mix(in srgb, var(--status-success) 72%, var(--text-primary));
+}
+
+.history-preview-removed {
+  color: var(--status-error-soft);
+}
+
+.history-preview-text {
+  color: var(--text-secondary);
+}

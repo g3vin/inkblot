@@ -10,6 +10,7 @@
  *     Make a copy (materialize the version as a new document), Compare (opens
  *     the side-by-side diff/merge view in the editor area), Rename, Delete
  *   - Snapshot now, for deliberately pinning the current state between autosaves
+ *   - the document's Archive (`ArchivePanel`): things put away out of it, to restore
  *
  * Storage and the diff engine live in lib/FileSystem.js and lib/versionHistory.js;
  * this file is only the timeline UI. Compare is VersionComparePane, which lives in
@@ -17,17 +18,9 @@
  * beside it so you can swap versions while reading one.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  appendVersionEntry,
-  buildCanvasVersionEntry,
-  buildTextVersionEntry,
-  createDocumentFromVersion,
-  deleteVersionEntry,
-  getVersions,
-  loadDocument,
-  updateVersionEntry,
-} from '../../lib/FileSystem'
-import { isCanvasDoc } from '../../lib/docKind'
+import { getVersions } from '../../lib/FileSystem'
+import { isCanvasDoc, isMapDoc, isTextDoc } from '../../lib/docKind'
+import { summarizeMapChange } from '../../lib/map/mapModel'
 import {
   describeCanvasDiff,
   diffCanvases,
@@ -40,8 +33,15 @@ import {
   versionWords,
   wordDelta,
 } from '../../lib/versionHistory'
-import { dispatchCanvasRestore } from '../../canvas/canvasEvents'
+import {
+  copyVersionAsDocument,
+  deleteVersion,
+  renameVersion,
+  restoreVersion,
+  snapshotVersion,
+} from '../../lib/versionActions'
 import SFIcon from '../SFIcon'
+import ArchivePanel, { ArchiveIcon } from './ArchivePanel'
 import './HistoryPanel.css'
 
 /** ±word-count badge. Hidden when the change was a wash. */
@@ -104,6 +104,9 @@ export default function HistoryPanel({
   onOpenCompare,
 }) {
   const isCanvas = isCanvasDoc(docName)
+  const isMap = isMapDoc(docName)
+  // A canvas or map: no editor to snapshot from, no archive, word counts from names.
+  const isStructured = !isTextDoc(docName)
   const [localVersions, setLocalVersions] = useState(Array.isArray(versions) ? versions : [])
   const [namedOnly, setNamedOnly] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState(() => new Set())
@@ -111,6 +114,7 @@ export default function HistoryPanel({
   const [renameValue, setRenameValue] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [showArchive, setShowArchive] = useState(false)
   const renameInputRef = useRef(null)
 
   const displayedVersions = useMemo(
@@ -189,25 +193,7 @@ export default function HistoryPanel({
     if (busy || !projectName || !docName) return
     setBusy(true)
     try {
-      let stored = null
-      if (isCanvas) {
-        const raw = await loadDocument(projectName, docName)
-        if (raw) {
-          stored = await appendVersionEntry(
-            projectName, docName,
-            buildCanvasVersionEntry({ canvas: raw, auto: false })
-          )
-        }
-      } else if (editor) {
-        stored = await appendVersionEntry(
-          projectName, docName,
-          buildTextVersionEntry({
-            contentHtml: editor.getHTML(),
-            contentJson: editor.getJSON(),
-            auto: false,
-          })
-        )
-      }
+      const stored = await snapshotVersion({ projectName, docName, editor })
       await refresh()
       // A deliberate snapshot is usually about to be named — drop straight into
       // the rename field rather than making the user hunt for the row.
@@ -218,61 +204,24 @@ export default function HistoryPanel({
     } finally {
       setBusy(false)
     }
-  }, [busy, docName, editor, isCanvas, projectName, refresh])
+  }, [busy, docName, editor, projectName, refresh])
 
   const handleRestore = useCallback(async (version) => {
     if (busy || !projectName || !docName) return
     setBusy(true)
     try {
-      const restoredName = `Restored from ${formatFullTimestamp(version.timestamp)}`
-
-      if (isCanvas) {
-        // Safety checkpoint of what's on disk now (autosave keeps it ≤1s stale),
-        // then swap the live canvas — one undoable doc/replace.
-        const current = await loadDocument(projectName, docName)
-        if (current) {
-          await appendVersionEntry(
-            projectName, docName,
-            buildCanvasVersionEntry({ canvas: current, auto: true })
-          )
-        }
-        dispatchCanvasRestore(docName, version.canvas)
-        await appendVersionEntry(
-          projectName, docName,
-          buildCanvasVersionEntry({ canvas: version.canvas, name: restoredName, auto: false })
-        )
-      } else if (editor) {
-        await appendVersionEntry(
-          projectName, docName,
-          buildTextVersionEntry({
-            contentHtml: editor.getHTML(),
-            contentJson: editor.getJSON(),
-            auto: true,
-          })
-        )
-        editor.commands.setContent(version.contentJson || version.contentHtml || '<p></p>')
-        await appendVersionEntry(
-          projectName, docName,
-          buildTextVersionEntry({
-            contentHtml: version.contentHtml,
-            contentJson: version.contentJson,
-            name: restoredName,
-            auto: false,
-          })
-        )
-      }
+      await restoreVersion({ projectName, docName, editor, version })
       await refresh()
     } finally {
       setBusy(false)
     }
-  }, [busy, docName, editor, isCanvas, projectName, refresh])
+  }, [busy, docName, editor, projectName, refresh])
 
   const handleMakeCopy = useCallback(async (version) => {
     if (busy || !projectName || !docName) return
     setBusy(true)
     try {
-      const label = version.name || formatFullTimestamp(version.timestamp)
-      const newPath = await createDocumentFromVersion(projectName, docName, version, label)
+      const newPath = await copyVersionAsDocument({ projectName, docName, version })
       if (newPath) {
         await refreshFiles?.()
         onOpenDocInTab?.(newPath)
@@ -286,8 +235,7 @@ export default function HistoryPanel({
     const id = renamingId
     setRenamingId(null)
     if (!id) return
-    const name = renameValue.trim()
-    await updateVersionEntry(projectName, docName, id, { name: name || null, auto: !name })
+    await renameVersion({ projectName, docName, versionId: id, name: renameValue })
     await refresh()
   }, [docName, projectName, refresh, renameValue, renamingId])
 
@@ -297,7 +245,7 @@ export default function HistoryPanel({
       return
     }
     setConfirmDeleteId(null)
-    await deleteVersionEntry(projectName, docName, version.id)
+    await deleteVersion({ projectName, docName, versionId: version.id })
     await refresh()
   }, [confirmDeleteId, docName, projectName, refresh])
 
@@ -305,6 +253,10 @@ export default function HistoryPanel({
 
   const renderPreview = (entry) => {
     const prev = previousOf.get(String(entry.id))
+
+    if (isMap) {
+      return <span className="history-preview-text">{summarizeMapChange(prev?.map, entry.map)}</span>
+    }
 
     if (isCanvas) {
       const cards = entry.canvas?.nodes?.length ?? 0
@@ -324,7 +276,7 @@ export default function HistoryPanel({
 
   const entryDelta = (entry) => {
     const prev = previousOf.get(String(entry.id))
-    if (isCanvas) {
+    if (isStructured) {
       const diff = versionWords(entry) - (prev ? versionWords(prev) : 0)
       return { added: Math.max(diff, 0), removed: Math.max(-diff, 0) }
     }
@@ -361,16 +313,19 @@ export default function HistoryPanel({
             >
               <SFIcon name="clock" size={13} />
             </button>
-            <button
-              className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
-              title="Compare / merge"
-              onClick={(event) => {
-                event.stopPropagation()
-                onOpenCompare?.(docName, id, 'current')
-              }}
-            >
-              <SFIcon name="git.pullrequest" size={13} />
-            </button>
+            {/* Compare/merge knows prose and cards; a map restores or copies whole. */}
+            {isMap ? null : (
+              <button
+                className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
+                title="Compare / merge"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onOpenCompare?.(docName, id, 'current')
+                }}
+              >
+                <SFIcon name="git.pullrequest" size={13} />
+              </button>
+            )}
             <button
               className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
               title="Make a copy as a new document"
@@ -434,7 +389,7 @@ export default function HistoryPanel({
     const newest = group.entries[0]
     const oldest = group.entries[group.entries.length - 1]
     const prevBeforeGroup = previousOf.get(String(oldest.id))
-    const groupDelta = isCanvas
+    const groupDelta = isStructured
       ? (() => {
           const diff = versionWords(newest) - (prevBeforeGroup ? versionWords(prevBeforeGroup) : 0)
           return { added: Math.max(diff, 0), removed: Math.max(-diff, 0) }
@@ -483,8 +438,23 @@ export default function HistoryPanel({
   const emptyMessage = displayedVersions.length === 0
     ? (isCanvas
         ? 'No versions yet. Checkpoints appear as you work on the canvas.'
-        : 'No versions yet. Checkpoints appear as you write.')
+        : isMap
+          ? 'No versions yet. Checkpoints appear as you work on the map.'
+          : 'No versions yet. Checkpoints appear as you write.')
     : (namedOnly ? 'No named versions yet — name one from its row.' : 'No matching versions.')
+
+  if (showArchive && !isStructured) {
+    return (
+      <div className="sidebar-panel history-panel">
+        <ArchivePanel
+          projectName={projectName}
+          docName={docName}
+          editor={editor}
+          onBack={() => setShowArchive(false)}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="sidebar-panel history-panel">
@@ -492,7 +462,7 @@ export default function HistoryPanel({
         <button
           className="panel-action-btn panel-action-btn-small history-snapshot-btn"
           onClick={() => void snapshotNow()}
-          disabled={busy || (!isCanvas && !editor)}
+          disabled={busy || (!isStructured && !editor)}
           title="Save the current state as a version you can name"
         >
           <SFIcon name="plus" size={12} />
@@ -506,6 +476,16 @@ export default function HistoryPanel({
         >
           <SFIcon name="line.3.horizontal.decrease.circle" size={14} />
         </button>
+        {isStructured ? null : (
+          <button
+            className="panel-action-btn panel-action-btn-small panel-icon-btn"
+            onClick={() => setShowArchive(true)}
+            title="View the archive: things put away out of this document"
+            aria-label="Archive"
+          >
+            <ArchiveIcon />
+          </button>
+        )}
       </div>
 
       {sections.length === 0 ? (

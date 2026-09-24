@@ -22,6 +22,45 @@ export const CANVAS_RESTORE_EVENT = 'canvas:restore-version'
 export const canvasSurfaceAt = (clientX, clientY) =>
   document.elementFromPoint(clientX, clientY)?.closest('.canvas-surface') || null
 
+/* ------------------------------------------------------------------
+   Surface ids.
+
+   Hit-testing the DOM is how the app aims a command at one of two open
+   canvases, and it works because the app and the DOM are the same process.
+   A native shell has neither — it cannot call `elementFromPoint` inside a
+   web view — so the bridge protocol addresses a canvas by id instead
+   (`CanvasCommandRequest.surface_id`), and this is where an id is turned
+   back into the element the existing CustomEvents are dispatched on.
+
+   The id lives on the element as a data attribute as well as in the map, so
+   anything already holding an element — a card editor looking for the canvas
+   it is inside — can name it without a second lookup.
+------------------------------------------------------------------ */
+
+const surfacesById = new Map()
+let nextSurfaceId = 0
+
+/** Claim an id for a mounted surface. Returns a function that releases it. */
+export function registerCanvasSurface(element) {
+  if (!element) return () => {}
+  const id = `canvas-surface-${nextSurfaceId++}`
+  element.dataset.surfaceId = id
+  surfacesById.set(id, element)
+  return () => {
+    // Only release the entry if it is still ours: StrictMode runs setup twice, and a
+    // cleanup that deletes unconditionally would unregister the live surface.
+    if (surfacesById.get(id) === element) surfacesById.delete(id)
+  }
+}
+
+/** The surface element with this id, or null. */
+export const canvasSurfaceById = (surfaceId) =>
+  (surfaceId ? surfacesById.get(surfaceId) || null : null)
+
+/** The id of the surface containing `element`, or null. */
+export const canvasSurfaceIdOf = (element) =>
+  element?.closest?.('.canvas-surface')?.dataset?.surfaceId || null
+
 /** Run a canvas command (see CanvasSurface's handler for the vocabulary). */
 export function dispatchCanvasCommand(surface, command, detail = {}) {
   if (!surface) return false

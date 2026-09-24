@@ -7,9 +7,15 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
-export const DEFAULT_DICTATION_MODEL_PATH = '/Users/gavin/inkblot-dictation/models/ggml-small.en.bin'
-
-export async function loadDictationModel(modelPath = DEFAULT_DICTATION_MODEL_PATH) {
+/**
+ * Loads a whisper model. Pass nothing and Rust resolves it — $INKBLOT_DICTATION_MODEL,
+ * then `<AppData>/models/ggml-small.en.bin`, then `~/inkblot-dictation/models/`.
+ *
+ * This used to be a hardcoded absolute path into one developer's home directory, which
+ * meant dictation could not load for anyone else. Rust owns the decision now so the
+ * native shells do not each need their own copy of it.
+ */
+export async function loadDictationModel(modelPath = null) {
   return invoke('load_dictation_model', {
     modelPath,
   })

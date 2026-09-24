@@ -30,6 +30,7 @@ import {
   loadDocument,
 } from '../lib/FileSystem'
 import { getDocPreviewExtensions } from '../lib/editorExtensions'
+import { readDocPageSetup, setContentKeepingPageSetup, withPageSetup } from '../print/DocPageSetup'
 import { isCanvasDoc } from '../lib/docKind'
 import {
   canvasNodeText,
@@ -297,7 +298,7 @@ export default function VersionComparePane({
         contentJson: editor.getJSON(),
         auto: true,
       }))
-      editor.commands.setContent(merged)
+      setContentKeepingPageSetup(editor, merged)
       await appendVersionEntry(projectName, docName, buildTextVersionEntry({
         contentHtml: editor.getHTML(),
         contentJson: editor.getJSON(),
@@ -348,7 +349,12 @@ export default function VersionComparePane({
       } else {
         if (!chunks) return
         const merged = mergeChunksToHtml(chunks, choices)
-        const contentJson = generateJSON(merged, getDocPreviewExtensions())
+        // Built from HTML, so it has no doc attributes: carry the live document's
+        // page setup onto the copy, or the copy opens on the default page.
+        const contentJson = withPageSetup(
+          generateJSON(merged, getDocPreviewExtensions()),
+          editor ? readDocPageSetup(editor.state.doc) : null
+        )
         newPath = await createDocumentFromVersion(projectName, docName, { contentJson }, 'merged')
       }
       if (newPath) {
@@ -359,7 +365,7 @@ export default function VersionComparePane({
     } finally {
       setBusy(false)
     }
-  }, [canvasDiff, chunks, choices, docName, isCanvas, left.canvas, onClose, onOpenDocInTab, projectName, refreshFiles, right.canvas])
+  }, [canvasDiff, chunks, choices, docName, editor, isCanvas, left.canvas, onClose, onOpenDocInTab, projectName, refreshFiles, right.canvas])
 
   /* ---------------- divider ---------------- */
 

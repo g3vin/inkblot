@@ -1,0 +1,244 @@
+/* ============================================================
+   Sidebars: shared shell, tabs, resizers
+   ============================================================ */
+
+.sidebar {
+  --sidebar-floating-offset: 8px;
+  /* Drops the header row below the macOS traffic lights, which sit in the left
+     sidebar's top-left corner (trafficLightPosition in tauri.conf.json). Both
+     sidebars clear by the same amount so their header rows stay level. */
+  --sidebar-header-offset: 32px;
+  --sidebar-top-fade-height: 28px;
+  position: relative;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: calc(100% - (var(--sidebar-floating-offset) * 2));
+  min-width: 100px;
+  max-width: 500px;
+  transition:
+    width 280ms ease,
+    margin 220ms ease,
+    border-color 160ms ease,
+    border-radius 160ms ease;
+
+  border: 1px solid var(--sidebar-shell-border);
+  padding: 8px;
+  margin-top: var(--sidebar-floating-offset);
+  margin-bottom: var(--sidebar-floating-offset);
+
+  box-shadow: var(--sidebar-shell-shadow);
+  border-radius: 16px;
+
+  /* Solid window background: on a canvas (which runs under the floating
+     sidebars) the panel fully occludes the dots rather than letting them
+     show through. */
+  background: var(--app-bg);
+}
+
+.sidebar.is-resizing {
+  transition: none;
+}
+
+.sidebar.collapsed {
+  width: 0 !important;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.sidebar-content,
+.sidebar-tabs,
+.sidebar-resizer,
+.sidebar-topbar,
+.resizer {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 200ms ease, visibility 200ms ease;
+}
+
+.sidebar.collapsed .sidebar-content,
+.sidebar.collapsed .sidebar-tabs,
+.sidebar.collapsed .resizer,
+.sidebar.collapsed .sidebar-topbar {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sidebar-topbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 6px;
+  margin-top: var(--sidebar-header-offset);
+}
+
+.left-sidebar .sidebar-topbar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.right-sidebar .sidebar-topbar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.left-sidebar-project-title {
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-pin {
+  background: transparent;
+  border: none;
+  color: var(--text-subtle);
+  font-size: 10px;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.sidebar-pin:hover {
+  background: var(--accent-surface);
+  color: var(--accent-foreground);
+}
+
+.sidebar-pin.active {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+
+.left-sidebar {
+  margin-left: var(--sidebar-floating-offset);
+}
+
+.right-sidebar {
+  margin-right: var(--sidebar-floating-offset);
+  padding: 10px;
+  /* Its shell padding is 2px deeper than the left one's, which already eats
+     2px of the clearance — keeps both header rows on the same line. */
+  --sidebar-header-offset: 30px;
+}
+
+.left-sidebar.is-peeked::before,
+.right-sidebar.is-peeked::before,
+.sidebar.is-peeked::after {
+  content: '';
+  position: absolute;
+  pointer-events: auto;
+}
+
+.left-sidebar.is-peeked::before {
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 8px;
+}
+
+.right-sidebar.is-peeked::before {
+  top: 0;
+  right: -8px;
+  bottom: 0;
+  width: 8px;
+}
+
+.sidebar.is-peeked::after {
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 8px;
+}
+
+
+
+.sidebar-content {
+  padding: 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* The right sidebar's content is inset only by its 10px shell padding (its header
+   is a direct child of the shell). The left's sits inside .sidebar-content, so its
+   own padding is trimmed to 2px to land on that same 10px — otherwise the two
+   sidebars' header boxes visibly disagree. */
+.left-sidebar .sidebar-content {
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 2px;
+  padding-right: 2px;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.right-sidebar .sidebar-content {
+  margin-inline: -10px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.right-sidebar-global-header {
+  position: relative;
+  z-index: 14;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 12px;
+}
+
+.right-sidebar-global-title {
+  --right-sidebar-title-width: 112px;
+  flex: 0 0 var(--right-sidebar-title-width);
+  width: var(--right-sidebar-title-width);
+  min-height: 24px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.right-sidebar-global-title-track {
+  display: flex;
+  align-items: center;
+  transform: translateX(calc(var(--right-sidebar-title-progress, 0) * var(--right-sidebar-title-width) * -1));
+  will-change: transform;
+}
+
+.right-sidebar-global-title-label {
+  flex: 0 0 var(--right-sidebar-title-width);
+  width: var(--right-sidebar-title-width);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.right-sidebar-global-header .sidebar-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  max-width: 100%;
+  width: 100%;
+}
+
+/* visibility, not display: the bar keeps its space (and stays unfocusable) while
+   the centered overlay is standing in for it, so nothing below shifts. */
+.right-sidebar-global-header.is-search-detached .sidebar-search {
+  visibility: hidden;
+}
+

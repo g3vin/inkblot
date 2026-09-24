@@ -22,7 +22,7 @@ for (const n of ['heading', 'paragraph', 'tableCell', 'tableHeader'])
 ok('color/fontFamily ride on textStyle', !!schema.marks.textStyle?.spec?.attrs?.color)
 
 // The doc-scoped extensions must NOT leak into a card.
-for (const n of ['conversationTile', 'pinterestBoard'])
+for (const n of ['conversationTile', 'pinterestBoard', 'citation', 'bibliography'])
   ok(`document-only node "${n}" excluded from cards`, !nodes.includes(n))
 ok('document-only mark "noteAnnotation" excluded', !marks.includes('noteAnnotation'))
 

@@ -5,6 +5,7 @@
  * rhymes) created from the editor context menu. Tiles remember the text
  * range they were created from so replacements land back in the document.
  */
+import { editorForTile, replaceTileWord, selectTileWord as selectWord } from '../../lib/workbenchActions'
 import POSTile from '../tiles/POSTile.jsx'
 import SynonymTile from '../tiles/SynonymTile.jsx'
 import DefinitionTile from '../tiles/DefinitionTile.jsx'
@@ -28,75 +29,17 @@ export default function Workbench({
       ))
     : tiles
 
-  // Tiles created from the secondary pane target that pane's editor; everything
-  // else goes to the primary editor.
-  const getEditorForTile = (tile) => {
-    if (tile?.doc && tile.doc === secondaryDoc) return secondaryEditor || editor
-    return editor
-  }
-
-  // Locate the tile's source text: trust its stored from/to range if that text
-  // still exists, otherwise search the document for the anchor string.
-  const findAnchorRange = (targetEditor, tile) => {
-    if (!targetEditor || !tile) return null
-
-    if (typeof tile.from === 'number' && typeof tile.to === 'number') {
-      const currentText = targetEditor.state.doc.textBetween(tile.from, tile.to, ' ')
-      if (currentText) {
-        return { from: tile.from, to: tile.to }
-      }
-    }
-
-    const needle = tile.anchor || tile.text
-    if (!needle) return null
-
-    let found = null
-    targetEditor.state.doc.descendants((node, pos) => {
-      if (!node.isText) return
-      const idx = node.text.indexOf(needle)
-      if (idx !== -1) {
-        found = { from: pos + idx, to: pos + idx + needle.length }
-        return false
-      }
-    })
-
-    return found
-  }
+  const panes = { editor, secondaryEditor, secondaryDoc }
 
   const selectTileWord = (tile) => {
-    const targetEditor = getEditorForTile(tile)
-    if (!targetEditor) return
-    const range = findAnchorRange(targetEditor, tile)
-    if (!range) return
-    targetEditor
-      .chain()
-      .focus()
-      .setTextSelection(range)
-      .scrollIntoView()
-      .run()
+    selectWord(editorForTile(tile, panes), tile)
   }
 
   // Replace the tile's word in the document and retarget the tile to the new text.
   const replaceWord = (tile, newWord) => {
-    const targetEditor = getEditorForTile(tile)
-    if (!targetEditor) return
-    const range = findAnchorRange(targetEditor, tile)
-    if (!range) return
-    targetEditor
-      .chain()
-      .focus()
-      .setTextSelection(range)
-      .insertContent(newWord)
-      .run()
-
-    const newRange = { from: range.from, to: range.from + newWord.length }
-    setTiles(prev =>
-      prev.map(t =>
-        t.id === tile.id
-          ? { ...t, text: newWord, anchor: newWord, from: newRange.from, to: newRange.to }
-          : t
-      )
-    )
+    const updated = replaceTileWord(editorForTile(tile, panes), tile, newWord)
+    if (!updated) return
+    setTiles(prev => prev.map(t => (t.id === tile.id ? updated : t)))
   }
 
   return (

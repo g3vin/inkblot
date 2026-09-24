@@ -302,6 +302,22 @@
   color: var(--status-warning);
 }
 
+/* The mic is closed but whisper is still transcribing the tail of the take. */
+.dictation-mic-btn.finishing {
+  color: var(--status-warning);
+  animation: dictation-finishing-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes dictation-finishing-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .dictation-button-wave {
   display: inline-flex;
   align-items: center;

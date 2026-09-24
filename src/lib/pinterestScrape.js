@@ -4,11 +4,17 @@
  * Used for boards the public widget API can't serve (private boards and
  * board sections). Opens a hidden webview that shares the logged-in
  * Pinterest session, injects a scraping script that scrolls the board and
- * collects pin images/links, and relays results back over Tauri events.
+ * collects pin images/links, and takes the result back over Tauri's IPC.
  * PinterestBoard.js consumes this via dynamic import.
+ *
+ * The script used to smuggle its payload out through `location.hash` while this file
+ * polled `get_webview_url` every 220ms, because `eval_webview` throws its result away.
+ * It now calls `pinterest_report_scrape` directly and Rust hands back a typed report —
+ * see src-tauri/src/pinterest_commands.rs for why that works from a remote page.
  */
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
+import sessionScrapeBody from './pinterestScripts/sessionScrape.js?raw'
 
 let scrapeWindow = null
 
@@ -56,30 +62,26 @@ const evalWithRetry = async (label, script, { attempts = 35, delayMs = 200 } = {
   const d = Math.max(50, Math.min(1000, Number(delayMs) || 200))
   const requestIdMatch = script.match(/const requestId = "([^"]+)"/)
   const wrappedRequestId = requestIdMatch ? requestIdMatch[1] : ''
+  // A script that throws while running reports the throw itself, so the caller gets a
+  // reason instead of a timeout. A script that fails to PARSE cannot — which is what
+  // the syntax pre-check below is for.
   const wrappedScript = `(() => {
     try {
       ${script}
     } catch (error) {
       try {
-        const message = String(error && error.message ? error.message : error);
-        const stack = String(error && error.stack ? error.stack : '');
         const requestId = ${JSON.stringify(wrappedRequestId)};
         if (requestId) {
-          const payload = {
-            requestId,
-            url: location.href,
-            pins: [],
-            reason: 'wrapper_eval_error',
-            stage: 'wrapper-eval-error',
-            progress: false,
-            debug: {
-              wrapperError: message,
-              wrapperStack: stack.slice(0, 1200),
-              locationHref: location.href,
-              pathname: location.pathname,
+          window.__TAURI_INTERNALS__.invoke('pinterest_report_scrape', {
+            report: {
+              requestId,
+              url: location.href,
+              pins: [],
+              reason: 'wrapper_eval_error',
+              stage: String(error && error.message ? error.message : error).slice(0, 200),
+              progress: false,
             },
-          };
-          location.hash = 'inkblot-scrape-' + requestId + '=' + encodeURIComponent(JSON.stringify(payload));
+          });
         }
       } catch (_) {
         // ignore secondary failures
@@ -109,54 +111,23 @@ const evalWithRetry = async (label, script, { attempts = 35, delayMs = 200 } = {
   return { ok: false, error: lastErr, exhausted: true }
 }
 
-const readScrapePayloadFromUrl = (url, requestId) => {
-  if (!url) return null
-  let parsed
+/**
+ * Open a slot for this run, then wait for the page to fill it.
+ *
+ * `begin` has to happen before the script is injected — that ordering is the whole
+ * reason the report cannot arrive before anything is listening for it.
+ */
+const openScrapeSlot = (requestId) => invoke('pinterest_begin_scrape', { requestId })
+
+const waitForScrapeReport = async (requestId, timeoutMs) => {
   try {
-    parsed = new URL(url)
+    return await invoke('pinterest_await_scrape', {
+      requestId,
+      timeoutMs: Math.max(1000, Number(timeoutMs) || 15000),
+    })
   } catch {
     return null
   }
-
-  const hash = String(parsed.hash || '').replace(/^#/, '')
-  const prefix = `inkblot-scrape-${requestId}=`
-  if (!hash.startsWith(prefix)) return null
-
-  const encoded = hash.slice(prefix.length)
-  if (!encoded) return null
-
-  try {
-    const payload = JSON.parse(decodeURIComponent(encoded))
-    if (!payload || typeof payload !== 'object') return null
-    return payload
-  } catch {
-    return null
-  }
-}
-
-const waitForScrapePayload = async (label, requestId, timeoutMs) => {
-  const started = Date.now()
-  const deadline = started + Math.max(1000, Number(timeoutMs) || 15000)
-
-  while (Date.now() < deadline) {
-    try {
-      const currentUrl = await invoke('get_webview_url', { label })
-      const payload = readScrapePayloadFromUrl(currentUrl, requestId)
-      if (payload) {
-        if (payload?.progress) {
-          await sleep(220)
-          continue
-        }
-        return payload
-      }
-    } catch {
-      // ignore and retry
-    }
-
-    await sleep(220)
-  }
-
-  return null
 }
 
 const ensureScrapeWindow = async (url) => {
@@ -308,8 +279,11 @@ export async function scrapePinterestPins(
     // The probe script will confirm execution works before we proceed.
     await sleep(scrapeStrategy === 'session-only' ? 250 : 150)
 
-    // Probe whether injected JS actually executes in this remote page.
+    // Probe whether injected JS actually executes in this remote page AND can reach
+    // Rust. Both are the same question now, and answering it up front turns "the
+    // channel is broken" from a fifteen-second timeout into an immediate reason.
     const probeRequestId = `${requestId}-probe`
+    await openScrapeSlot(probeRequestId)
     const probeScript = buildPinterestProbeScript({ requestId: probeRequestId })
     const probeEval = await evalWithRetry(activeLabel, probeScript, { attempts: 20, delayMs: 150 })
     if (!probeEval.ok) {
@@ -321,7 +295,7 @@ export async function scrapePinterestPins(
       }
     }
 
-    const probePayload = await waitForScrapePayload(activeLabel, probeRequestId, scrapeStrategy === 'session-only' ? 2500 : 1500)
+    const probePayload = await waitForScrapeReport(probeRequestId, scrapeStrategy === 'session-only' ? 2500 : 1500)
     if (!probePayload) {
       return {
         pins: [],
@@ -335,20 +309,18 @@ export async function scrapePinterestPins(
     const elapsedSoFar = Date.now() - parseInt(requestId.split('-')[0], 10)
     const scriptTimeout = Math.max(3000, reqTimeoutMs - elapsedSoFar)
 
-    const script = scrapeStrategy === 'session-only'
-      ? buildPinterestSessionScrapeScript({
-        requestId,
-        maxPins: reqMaxPins,
-        timeoutMs: scriptTimeout,
-        targetUrl,
-      })
-      : buildPinterestScrapeScript({
-        requestId,
-        maxPins: reqMaxPins,
-        timeoutMs: scriptTimeout,
-        targetUrl,
-      })
-    if (scrapeStrategy === 'session-only') {
+    // One script for both strategies. The 'auto' path used to inject a separate
+    // DOM-only scraper, but that script was never valid JavaScript — backslashes
+    // in its regexes were eaten by the template literal it was written in, so it
+    // failed to parse in the page. Nothing ever requested 'auto' for the webview
+    // step (every caller passes 'session-only'), so it had no working users.
+    const script = buildPinterestSessionScrapeScript({
+      requestId,
+      maxPins: reqMaxPins,
+      timeoutMs: scriptTimeout,
+      targetUrl,
+    })
+    {
       try {
         // Validate generated script syntax in our own app context before
         // sending it into the Pinterest page, where parse failures are opaque.
@@ -362,6 +334,7 @@ export async function scrapePinterestPins(
         }
       }
     }
+    await openScrapeSlot(requestId)
     const evalResult = await evalWithRetry(activeLabel, script, { attempts: 35, delayMs: 200 })
     if (!evalResult.ok) {
       return {
@@ -371,7 +344,7 @@ export async function scrapePinterestPins(
         error: String(evalResult?.error?.message || evalResult?.error || ''),
       }
     }
-    const payload = await waitForScrapePayload(activeLabel, requestId, scriptTimeout + payloadWaitBufferMs)
+    const payload = await waitForScrapeReport(requestId, scriptTimeout + payloadWaitBufferMs)
     if (!payload) {
       return {
         pins: [],
@@ -400,18 +373,24 @@ export async function scrapePinterestPins(
   }
 }
 
-/* eslint-disable no-useless-escape */
 
 /**
- * Lightweight probe script – sets the URL hash to prove JS execution works
- * inside the Pinterest webview before we inject the heavier scrape script.
+ * Lightweight probe script — proves that injected JS runs inside the Pinterest webview
+ * AND that it can reach Rust, before the heavier scrape script is sent after it.
  */
 const buildPinterestProbeScript = ({ requestId }) => {
   return `(() => {
   try {
-    var payload = { requestId: ${JSON.stringify(String(requestId))}, reason: 'probe', url: location.href, pins: [], debug: { locationHref: location.href, pathname: location.pathname } };
-    var encoded = encodeURIComponent(JSON.stringify(payload));
-    location.hash = 'inkblot-scrape-' + ${JSON.stringify(String(requestId))} + '=' + encoded;
+    window.__TAURI_INTERNALS__.invoke('pinterest_report_scrape', {
+      report: {
+        requestId: ${JSON.stringify(String(requestId))},
+        reason: 'probe',
+        url: location.href,
+        pins: [],
+        stage: 'probe',
+        progress: false,
+      },
+    });
   } catch (e) {
     // ignore
   }
@@ -424,665 +403,5 @@ const buildPinterestSessionScrapeScript = ({ requestId, maxPins, timeoutMs, targ
   const maxPins = ${Number(maxPins) || 50};
   const timeoutMs = ${Number(timeoutMs) || 15000};
   const requestedUrl = ${JSON.stringify(String(targetUrl || ''))};
-  const debugState = {
-    requestedUrl,
-    initialLocationHref: location.href,
-    initialPathname: location.pathname,
-    cookieNames: [],
-    csrfCookiePresent: false,
-    parsedPath: null,
-    sectionResource: null,
-    pinsResource: null,
-    boardResource: null,
-    sessionApiError: '',
-  };
-
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-  const getRequestedUrl = () => {
-    try {
-      return requestedUrl ? new URL(requestedUrl) : new URL(location.href);
-    } catch {
-      try {
-        return new URL(location.href);
-      } catch {
-        return null;
-      }
-    }
-  };
-
-  const emit = (pins, reason, extra = {}) => {
-    try {
-      const payload = {
-        requestId,
-        url: location.href,
-        pins,
-        reason,
-        stage: extra.stage || '',
-        progress: Boolean(extra.progress),
-        debug: {
-          ...debugState,
-          finalLocationHref: location.href,
-          finalPathname: location.pathname,
-          ...(extra.debug || {}),
-        },
-      };
-      location.hash = 'inkblot-scrape-' + requestId + '=' + encodeURIComponent(JSON.stringify(payload));
-    } catch {
-      // ignore
-    }
-  };
-
-  const emitProgress = (stage, debug) => {
-    emit([], 'progress', { progress: true, stage, debug: debug || {} });
-  };
-
-  const readCookie = (name) => {
-    try {
-      const parts = String(document.cookie || '').split(';');
-      debugState.cookieNames = parts
-        .map((part) => {
-          const trimmed = part.trim();
-          const eq = trimmed.indexOf('=');
-          return eq === -1 ? trimmed : trimmed.slice(0, eq);
-        })
-        .filter(Boolean)
-        .slice(0, 20);
-      for (const part of parts) {
-        const trimmed = part.trim();
-        if (!trimmed) continue;
-        const eq = trimmed.indexOf('=');
-        const key = eq === -1 ? trimmed : trimmed.slice(0, eq);
-        if (key === name) {
-          return eq === -1 ? '' : decodeURIComponent(trimmed.slice(eq + 1));
-        }
-      }
-    } catch {}
-    return '';
-  };
-
-  const parsePinterestPath = () => {
-    const requested = getRequestedUrl();
-    const pathname = requested ? requested.pathname : location.pathname;
-    const segments = String(pathname || '')
-      .split('/')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    if (segments.length === 2) {
-      const parsed = { user: segments[0], board: segments[1], section: '' };
-      debugState.parsedPath = parsed;
-      return parsed;
-    }
-    if (segments.length >= 3) {
-      const parsed = { user: segments[0], board: segments[1], section: segments[2] };
-      debugState.parsedPath = parsed;
-      return parsed;
-    }
-    return null;
-  };
-
-  const normalizePins = (items) => {
-    const out = [];
-    const seen = new Set();
-    for (const pin of Array.isArray(items) ? items : []) {
-      if (out.length >= maxPins) break;
-      const pinId = String(pin && pin.id ? pin.id : '').trim();
-      if (!pinId) continue;
-      const imageUrl =
-        (((pin || {}).images || {})['736x'] || {}).url ||
-        (((pin || {}).images || {})['564x'] || {}).url ||
-        (((pin || {}).images || {})['474x'] || {}).url ||
-        (((pin || {}).images || {})['236x'] || {}).url ||
-        (((pin || {}).images || {})['orig'] || {}).url ||
-        String(pin && pin.image_large_url ? pin.image_large_url : '');
-      if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) continue;
-      const pinHref = 'https://www.pinterest.com/pin/' + pinId + '/';
-      const key = pinHref + '::' + imageUrl;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ pinHref, imageUrl });
-    }
-    return out;
-  };
-
-  const postPinterestResource = async (endpoint, options) => {
-    const csrf = readCookie('csrftoken');
-    debugState.csrfCookiePresent = Boolean(csrf);
-    const requested = getRequestedUrl();
-    const params = new URLSearchParams();
-    params.set('source_url', (requested && requested.pathname) || location.pathname || '/');
-    params.set('data', JSON.stringify({ options, context: {} }));
-
-    const res = await fetch('https://www.pinterest.com/resource/' + endpoint + '/get/', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-Pinterest-AppState': 'active',
-        'X-APP-VERSION': 'unknown',
-        ...(csrf ? { 'X-CSRFToken': csrf } : {}),
-      },
-      body: params.toString(),
-    });
-
-    const text = await res.text();
-    let json = null;
-    try {
-      json = text ? JSON.parse(text) : null;
-    } catch {}
-
-    const summary = {
-      ok: res.ok,
-      status: res.status,
-      statusText: res.statusText,
-      bodyPreview: String(text || '').slice(0, 300),
-      topLevelKeys: Object.keys(json || {}).slice(0, 10),
-      resourceResponseKeys: Object.keys((((json || {}).resource_response) || {})).slice(0, 10),
-    };
-
-    if (endpoint === 'BoardSectionResource') {
-      debugState.sectionResource = summary;
-    } else if (endpoint === 'BoardSectionPinsResource') {
-      debugState.pinsResource = summary;
-    } else if (endpoint === 'BoardFeedResource') {
-      debugState.boardResource = summary;
-    }
-
-    if (!res.ok) {
-      throw new Error(endpoint + ' failed: ' + res.status + ' ' + res.statusText);
-    }
-
-    return json || {};
-  };
-
-  const fetchPinsViaSessionApi = async () => {
-    const parts = parsePinterestPath();
-    if (!parts) return [];
-
-    if (parts.section) {
-      const sectionJson = await postPinterestResource('BoardSectionResource', {
-        board_slug: parts.board,
-        section_slug: parts.section,
-        username: parts.user,
-      });
-      const sectionId = ((((sectionJson || {}).resource_response || {}).data || {}).id) || '';
-      debugState.sectionResource = {
-        ...(debugState.sectionResource || {}),
-        sectionId,
-      };
-      if (!sectionId) {
-        throw new Error('BoardSectionResource returned no section id');
-      }
-
-      const pinsJson = await postPinterestResource('BoardSectionPinsResource', {
-        section_id: sectionId,
-        page_size: Math.min(maxPins, 50),
-        bookmark: '',
-      });
-      return normalizePins(((((pinsJson || {}).resource_response || {}).data) || []));
-    }
-
-    const boardJson = await postPinterestResource('BoardFeedResource', {
-      board_slug: parts.board,
-      username: parts.user,
-      page_size: Math.min(maxPins, 50),
-    });
-    return normalizePins(((((boardJson || {}).resource_response || {}).data) || []));
-  };
-
-  const pickFromSrcset = (srcset) => {
-    if (!srcset) return '';
-    const parts = String(srcset).split(',').map(s => s.trim()).filter(Boolean);
-    let bestUrl = '';
-    let bestScale = 0;
-    for (const part of parts) {
-      const m = part.match(/^(\\S+)\\s+(\\d+(?:\\.\\d+)?)x$/);
-      if (m) {
-        const url = m[1] || '';
-        const scale = Number(m[2] || 0);
-        if (url && scale >= bestScale) {
-          bestScale = scale;
-          bestUrl = url;
-        }
-        continue;
-      }
-      const urlOnly = part.split(' ')[0] || '';
-      if (urlOnly && !bestUrl) bestUrl = urlOnly;
-    }
-    return bestUrl;
-  };
-
-  const normalizePinHref = (href) => {
-    if (!href) return '';
-    try {
-      const u = new URL(href, location.origin);
-      const m = u.pathname.match(/^\\/pin\\/(\\d+)(?:\\/)?$/);
-      if (m) return 'https://www.pinterest.com/pin/' + m[1] + '/';
-      return u.toString();
-    } catch {
-      return '';
-    }
-  };
-
-  const collectDomPins = () => {
-    const out = [];
-    const seen = new Set();
-    const anchors = Array.from(document.querySelectorAll('a[href*="/pin/"]'));
-    for (const a of anchors) {
-      if (out.length >= maxPins) break;
-      const pinHref = normalizePinHref(a.getAttribute('href'));
-      if (!pinHref) continue;
-
-      const img = a.querySelector('img');
-      let imageUrl = '';
-      if (img) {
-        imageUrl = pickFromSrcset(img.getAttribute('srcset')) || img.currentSrc || img.src || '';
-      }
-
-      if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) {
-        const bgEl = a.querySelector('[style*="background-image"]') || a.querySelector('div') || a;
-        const bg = (bgEl.style && bgEl.style.backgroundImage) || getComputedStyle(bgEl).backgroundImage;
-        if (bg && bg !== 'none') {
-          const match = bg.match(/url\\((['"]?)(.*?)\\1\\)/i);
-          const bgUrl = match && match[2];
-          if (bgUrl && bgUrl.indexOf('i.pinimg.com') !== -1) imageUrl = bgUrl;
-        }
-      }
-
-      if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) continue;
-      const key = pinHref + '::' + imageUrl;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ pinHref, imageUrl });
-    }
-
-    if (out.length < Math.min(6, maxPins)) {
-      const imgs = Array.from(document.querySelectorAll('img[srcset*="i.pinimg.com"], img[src*="i.pinimg.com"]'));
-      for (const img of imgs) {
-        if (out.length >= maxPins) break;
-        const imageUrl = pickFromSrcset(img.getAttribute('srcset')) || img.currentSrc || img.src || '';
-        if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) continue;
-        const w = Number(img.naturalWidth || img.width || 0);
-        const h = Number(img.naturalHeight || img.height || 0);
-        if ((w && w < 110) || (h && h < 110)) continue;
-        const pinHref = normalizePinHref(img.closest('a[href*="/pin/"]')?.getAttribute?.('href')) || location.href;
-        const key = pinHref + '::' + imageUrl;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ pinHref, imageUrl });
-      }
-    }
-
-    return out;
-  };
-
-  (async () => {
-    try {
-      emitProgress('script-start');
-      try {
-        emitProgress('session-api-start');
-        const apiPins = await fetchPinsViaSessionApi();
-        if (apiPins.length) {
-          emit(apiPins, 'session_api', { stage: 'session-api-success' });
-          return;
-        }
-        emitProgress('session-api-empty');
-      } catch (err) {
-        debugState.sessionApiError = String(err && err.message ? err.message : err);
-        emitProgress('session-api-error', { sessionApiError: debugState.sessionApiError });
-      }
-
-      emitProgress('dom-fallback-start');
-      const start = Date.now();
-      let best = [];
-      let lastCount = 0;
-      let stableFor = 0;
-
-      while (Date.now() - start < timeoutMs) {
-        const pins = collectDomPins();
-        if (pins.length > best.length) best = pins;
-        if (pins.length >= maxPins) {
-          emit(pins, 'max', { stage: 'session-dom-max' });
-          return;
-        }
-        if (pins.length === lastCount && pins.length > 0) {
-          stableFor += 350;
-          if (stableFor >= 1200) {
-            emit(pins, 'stable', { stage: 'session-dom-stable' });
-            return;
-          }
-        } else {
-          stableFor = 0;
-          lastCount = pins.length;
-        }
-        try {
-          window.scrollBy(0, Math.max(600, window.innerHeight * 0.9));
-        } catch {}
-        await sleep(350);
-      }
-
-      emit(best, best.length ? 'timeout' : (debugState.sessionApiError ? 'session_api_error' : 'empty'), { stage: 'session-dom-timeout' });
-    } catch (err) {
-      emit([], 'script_error', {
-        stage: 'script-error',
-        debug: { thrownError: String(err && err.message ? err.message : err) },
-      });
-    }
-  })();
-})();`
+${sessionScrapeBody}})();`
 }
-
-const buildPinterestScrapeScript = ({ requestId, maxPins, timeoutMs, targetUrl }) => {
-  // IMPORTANT: This string is evaluated inside the Pinterest page.
-  // Avoid template-literals inside this script.
-  return `(() => {
-  const requestId = ${JSON.stringify(String(requestId))};
-  const maxPins = ${Number(maxPins) || 50};
-  const timeoutMs = ${Number(timeoutMs) || 15000};
-  const debugState = {
-    requestedUrl: ${JSON.stringify(String(targetUrl || ''))},
-    initialLocationHref: location.href,
-    initialPathname: location.pathname,
-  };
-
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-  const pickFromSrcset = (srcset) => {
-    if (!srcset) return '';
-    const parts = String(srcset).split(',').map(s => s.trim()).filter(Boolean);
-    let bestUrl = '';
-    let bestScale = 0;
-
-    for (const part of parts) {
-      const m = part.match(/^(\S+)\s+(\d+(?:\.\d+)?)x$/);
-      if (m) {
-        const url = m[1] || '';
-        const scale = Number(m[2] || 0);
-        if (url && scale >= bestScale) {
-          bestScale = scale;
-          bestUrl = url;
-        }
-        continue;
-      }
-
-      // Fallback when descriptor is missing.
-      const urlOnly = part.split(' ')[0] || '';
-      if (urlOnly && !bestUrl) bestUrl = urlOnly;
-    }
-
-    return bestUrl;
-  };
-
-  const normalizePinHref = (href) => {
-    if (!href) return '';
-    try {
-      const u = new URL(href, location.origin);
-      const m = u.pathname.match(/^\\/pin\\/(\\d+)(?:\\/)?$/);
-      if (m) return 'https://www.pinterest.com/pin/' + m[1] + '/';
-      return u.toString();
-    } catch {
-      return '';
-    }
-  };
-
-  const decodeEscapedUrl = (value) => {
-    if (!value) return '';
-    return String(value)
-      .replace(/\\u002F/g, '/')
-      .replace(/\\\//g, '/')
-      .replace(/\\"/g, '"');
-  };
-
-  const pinHrefFromElement = (el) => {
-    if (!el) return '';
-
-    try {
-      const a = el.closest('a[href*="/pin/"]') || el.querySelector?.('a[href*="/pin/"]');
-      const fromHref = normalizePinHref(a?.getAttribute?.('href'));
-      if (fromHref) return fromHref;
-    } catch {}
-
-    const candidates = [
-      el.getAttribute?.('data-pin-id'),
-      el.getAttribute?.('data-id'),
-      el.dataset?.pinId,
-      el.dataset?.id,
-      el.parentElement?.getAttribute?.('data-pin-id'),
-      el.parentElement?.dataset?.pinId,
-    ];
-
-    for (const c of candidates) {
-      const s = String(c || '').trim();
-      if (/^\d{6,}$/.test(s)) return 'https://www.pinterest.com/pin/' + s + '/';
-    }
-
-    return '';
-  };
-
-  const extractFromPwsData = () => {
-    const out = [];
-    const seen = new Set();
-    try {
-      const script = document.querySelector('script#__PWS_DATA__');
-      const raw = script?.textContent || '';
-      if (!raw) return out;
-
-      // Pair pin URL and nearby image URL from the same serialized object chunk.
-      const pairRegex = /"url"\s*:\s*"(?:\\\/|\/)pin(?:\\\/|\/)\s*(\d+)\s*(?:\\\/|\/)"[\s\S]{0,1800}?"url"\s*:\s*"(https:(?:\\\\\/\\\\\/|\\\/\\\/|\\\/|\/\/)?i\.pinimg\.com[^"\n]+)"/g;
-      let match;
-      while ((match = pairRegex.exec(raw)) && out.length < maxPins) {
-        const id = String(match[1] || '').trim();
-        const imageUrl = decodeEscapedUrl(match[2]);
-        if (!/^\d+$/.test(id)) continue;
-        if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) continue;
-
-        const pinHref = 'https://www.pinterest.com/pin/' + id + '/';
-        const key = pinHref + '::' + imageUrl;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ pinHref, imageUrl });
-      }
-    } catch {}
-
-    return out;
-  };
-
-  const collect = () => {
-    const out = [];
-    const seen = new Set();
-
-    const anchors = Array.from(document.querySelectorAll('a[href*="/pin/"]'));
-    for (const a of anchors) {
-      const pinHref = normalizePinHref(a.getAttribute('href'));
-      if (!pinHref) continue;
-
-      const img = a.querySelector('img');
-      let imageUrl = '';
-      if (img) {
-        imageUrl =
-          pickFromSrcset(img.getAttribute('srcset')) ||
-          img.currentSrc ||
-          img.src ||
-          '';
-      }
-
-      // Pinterest sometimes uses background-image tiles instead of <img>.
-      if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) {
-        const bgEl =
-          a.querySelector('[style*="background-image"]') ||
-          a.querySelector('div') ||
-          a;
-        const bg = (bgEl.style && bgEl.style.backgroundImage) || getComputedStyle(bgEl).backgroundImage;
-        if (bg && bg !== 'none') {
-          const match = bg.match(/url\\((['"]?)(.*?)\\1\\)/i);
-          const bgUrl = match && match[2];
-          if (bgUrl && bgUrl.indexOf('i.pinimg.com') !== -1) imageUrl = bgUrl;
-        }
-      }
-
-      if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) continue;
-
-      const key = pinHref + '::' + imageUrl;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ pinHref, imageUrl });
-      if (out.length >= maxPins) break;
-    }
-
-    // Fallback: collect Pinterest CDN images even if links are not direct /pin/ anchors.
-    if (out.length < Math.min(6, maxPins)) {
-      const imgs = Array.from(document.querySelectorAll('img[srcset*="i.pinimg.com"], img[src*="i.pinimg.com"]'));
-      for (const img of imgs) {
-        const imageUrl =
-          pickFromSrcset(img.getAttribute('srcset')) ||
-          img.currentSrc ||
-          img.src ||
-          '';
-        if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) continue;
-
-        // Ignore tiny assets (icons/avatars).
-        const w = Number(img.naturalWidth || img.width || 0);
-        const h = Number(img.naturalHeight || img.height || 0);
-        if ((w && w < 110) || (h && h < 110)) continue;
-
-        let pinHref = pinHrefFromElement(img);
-        if (!pinHref) pinHref = location.href;
-
-        const key = pinHref + '::' + imageUrl;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ pinHref, imageUrl });
-        if (out.length >= maxPins) break;
-      }
-    }
-
-    if (out.length < Math.min(6, maxPins)) {
-      const spans = Array.from(document.querySelectorAll('span[data-pin-href]'));
-      for (const el of spans) {
-        const pinHref = normalizePinHref(el.getAttribute('data-pin-href'));
-        if (!pinHref) continue;
-
-        const bg = (el.style && el.style.backgroundImage) || getComputedStyle(el).backgroundImage;
-        if (!bg || bg === 'none') continue;
-        const match = bg.match(/url\\((['"]?)(.*?)\\1\\)/i);
-        const imageUrl = match && match[2];
-        if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) continue;
-
-        const key = pinHref + '::' + imageUrl;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ pinHref, imageUrl });
-        if (out.length >= maxPins) break;
-      }
-    }
-
-    // Final fallback: parse serialized Pinterest data blob for pin/image pairs.
-    if (out.length < Math.min(6, maxPins)) {
-      const pwsPins = extractFromPwsData();
-      for (const item of pwsPins) {
-        const key = item.pinHref + '::' + item.imageUrl;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push(item);
-        if (out.length >= maxPins) break;
-      }
-    }
-
-    return out;
-  };
-
-  const emit = (pins, reason, extra = {}) => {
-    try {
-      const payload = {
-        requestId,
-        url: location.href,
-        pins,
-        reason,
-        stage: extra.stage || '',
-        progress: Boolean(extra.progress),
-        debug: {
-          ...debugState,
-          finalLocationHref: location.href,
-          finalPathname: location.pathname,
-          ...(extra.debug || {}),
-        },
-      };
-      const encoded = encodeURIComponent(JSON.stringify(payload));
-      location.hash = 'inkblot-scrape-' + requestId + '=' + encoded;
-    } catch {
-      // ignore
-    }
-  };
-
-  const emitProgress = (stage, debug) => {
-    emit([], 'progress', {
-      progress: true,
-      stage,
-      debug: debug || {},
-    });
-  };
-
-  (async () => {
-    try {
-      emitProgress('script-start');
-      emitProgress('dom-fallback-start');
-      const start = Date.now();
-      let best = [];
-      let lastCount = 0;
-      let stableFor = 0;
-      let iterations = 0;
-
-      const scrollStep = async () => {
-        try {
-          window.scrollBy(0, Math.max(600, window.innerHeight * 0.9));
-        } catch {}
-        await sleep(350);
-      };
-
-      while (Date.now() - start < timeoutMs) {
-        iterations += 1;
-        const pins = collect();
-        if (pins.length > best.length) best = pins;
-
-        if (iterations <= 2 || iterations % 5 === 0) {
-          emitProgress('dom-loop', {
-            iterations,
-            loopPins: pins.length,
-            bestPins: best.length,
-            elapsedMs: Date.now() - start,
-          });
-        }
-
-        if (pins.length >= maxPins) {
-          emit(pins, 'max', { stage: 'dom-max' });
-          return;
-        }
-
-        if (pins.length === lastCount && pins.length > 0) {
-          stableFor += 350;
-          if (stableFor >= 1200) {
-            emit(pins, 'stable', { stage: 'dom-stable' });
-            return;
-          }
-        } else {
-          stableFor = 0;
-          lastCount = pins.length;
-        }
-
-        await scrollStep();
-      }
-
-      emit(best, best.length ? 'timeout' : 'empty', { stage: 'dom-timeout' });
-    } catch (err) {
-      emit([], 'script_error', {
-        stage: 'script-error',
-        debug: { thrownError: String(err && err.message ? err.message : err) },
-      });
-    }
-  })();
-})();`
-}
-/* eslint-enable no-useless-escape */

@@ -1,0 +1,206 @@
+/* ============================================================
+   Page Setup sheet — the Tauri app's page setup (the Swift shell uses its inspector)
+   ============================================================ */
+
+.pss-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 56px 16px 16px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.pss-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 100%);
+  max-height: 100%;
+  border-radius: 14px;
+  background: var(--surface-1, #242424);
+  color: var(--text-primary, #eee);
+  box-shadow: var(--shadow-popover, 0 12px 40px rgba(0, 0, 0, 0.35));
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+}
+
+.pss-sheet header,
+.pss-sheet footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.pss-sheet footer {
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-bottom: 0;
+}
+
+.pss-sheet h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+}
+
+.pss-body {
+  overflow: auto;
+  padding: 4px 14px 14px;
+}
+
+.pss-body section {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+.pss-body h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.pss-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.pss-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  margin-bottom: 6px;
+}
+
+.pss-field.wide {
+  width: 100%;
+}
+
+.pss-field > span {
+  min-width: 64px;
+  opacity: 0.75;
+}
+
+.pss-field em {
+  font-style: normal;
+  opacity: 0.55;
+}
+
+.pss-sheet input,
+.pss-sheet select,
+.pss-sheet button {
+  font: inherit;
+  color: inherit;
+}
+
+.pss-sheet input[type="number"],
+.pss-sheet input:not([type]),
+.pss-sheet select {
+  min-width: 0;
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+  border-radius: 6px;
+  background: var(--app-bg, rgba(0, 0, 0, 0.2));
+}
+
+.pss-sheet input[type="number"] {
+  max-width: 80px;
+  text-align: right;
+}
+
+.pss-sheet button {
+  padding: 5px 10px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pss-sheet button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary, #eee) 10%, transparent);
+}
+
+.pss-sheet button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pss-sheet .pss-link {
+  padding: 0;
+  border: 0;
+  color: var(--accent-color, #54a5ff);
+}
+
+.pss-segmented {
+  display: inline-flex;
+  margin: 2px 0 8px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.pss-segmented button {
+  border: 0;
+  border-radius: 0;
+}
+
+.pss-segmented button.is-on {
+  background: var(--accent-color, #54a5ff);
+  color: #fff;
+}
+
+.pss-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.pss-running {
+  display: grid;
+  grid-template-columns: 90px 1fr 1fr 1fr;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.pss-running span {
+  opacity: 0.75;
+}
+
+.pss-note,
+.pss-warn {
+  margin: 4px 0 0;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.pss-warn {
+  color: #e8a33d;
+  opacity: 1;
+}
+
+.pss-advice {
+  margin: 0 0 8px;
+  padding-left: 16px;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.pss-advice li.is-on {
+  opacity: 1;
+  font-weight: 600;
+}
+
+.pss-spacer {
+  flex: 1;
+}

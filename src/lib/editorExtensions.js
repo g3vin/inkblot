@@ -17,6 +17,9 @@ import { TableHeader } from '@tiptap/extension-table-header'
 import { TableRow } from '@tiptap/extension-table-row'
 import { getSchema } from '@tiptap/core'
 
+import { Bibliography } from '../extensions/Bibliography'
+import { BubbleSession } from '../extensions/BubbleSession'
+import { Citation } from '../extensions/Citation'
 import { CustomTextStyle } from '../extensions/CustomTextStyle'
 import ConversationTile from '../extensions/ConversationTile'
 import { DictationInline } from '../extensions/DictationInline'
@@ -25,6 +28,9 @@ import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import ResizableImage from '../extensions/ResizableImage'
 import TabIndent from '../extensions/TabIndent'
+import { DocPageSetup } from '../print/DocPageSetup'
+import { PageBreak } from '../print/PageBreak'
+import { Pagination } from '../print/PaginationExtension'
 
 /**
  * Everything both panes and cards understand.
@@ -36,6 +42,7 @@ import TabIndent from '../extensions/TabIndent'
  */
 const sharedExtensions = () => [
   CustomTextStyle,
+  BubbleSession,
   Color,
   FontFamily,
   ReadAloudHighlight,
@@ -68,15 +75,21 @@ export const buildEditorExtensions = (starterKit) => [
   NoteAnnotation,
   ConversationTile,
   PinterestBoard,
+  Citation,
+  Bibliography,
+  DocPageSetup,
+  PageBreak,
+  Pagination,
   ...sharedExtensions(),
 ]
 
 /**
  * The extension set for a canvas card.
  *
- * Drops three document-scoped extensions that have no meaning inside a card:
+ * Drops the document-scoped extensions that have no meaning inside a card:
  * NoteAnnotation (its anchors are positions in a document's notes list),
- * ConversationTile, and PinterestBoard. Everything the Toolbar can invoke stays,
+ * ConversationTile, PinterestBoard, and citations and the bibliography (their sources
+ * are attached to a document). Everything the Toolbar can invoke stays,
  * so a card's editor answers the same commands a pane's editor does.
  *
  * Returns a fresh array each call — TipTap extension instances are stateful and

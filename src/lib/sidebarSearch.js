@@ -10,8 +10,10 @@
  * Kept free of React and of the filesystem (callers inject `listProjectTree` /
  * `loadDocument`) so the matching rules can be tested directly.
  */
-import { isCanvasDoc } from './docKind'
+import { isCanvasDoc, isMapDoc } from './docKind'
 import { collectCanvasMatches } from './canvasSearch'
+import { collectMapMatches } from './map/mapSearch'
+import { getPreference, setPreference, removePreference } from './preferences'
 
 export const MAX_RESULTS_PER_DOCUMENT = 24
 export const MAX_PROJECT_RESULTS = 120
@@ -292,6 +294,22 @@ export const searchProject = async ({
       continue
     }
 
+    // A map is the same: no notes, and its text is addressed by item id.
+    if (isMapDoc(entry.path)) {
+      if (scope === 'notes') continue
+
+      const mapData = await loadDocument(projectName, entry.path)
+      if (isCancelled()) return []
+      if (!mapData) continue
+
+      results.push(...collectMapMatches(mapData, matcher, entry.path, {
+        limit: MAX_RESULTS_PER_DOCUMENT,
+      }))
+
+      if (results.length >= MAX_PROJECT_RESULTS) break
+      continue
+    }
+
     const docData = getLiveDoc(entry.path) || await loadDocument(projectName, entry.path)
     if (isCancelled()) return []
     if (!docData) continue
@@ -362,7 +380,7 @@ const RECENT_STORAGE_KEY = 'inkblot.search.recent'
 
 export const loadRecentSearches = () => {
   try {
-    const parsed = JSON.parse(localStorage.getItem(RECENT_STORAGE_KEY) || '[]')
+    const parsed = JSON.parse(getPreference(RECENT_STORAGE_KEY) || '[]')
     if (!Array.isArray(parsed)) return []
     return parsed.filter((entry) => typeof entry === 'string' && entry.trim()).slice(0, MAX_RECENT_SEARCHES)
   } catch {
@@ -379,9 +397,9 @@ export const rememberRecentSearch = (query) => {
     .slice(0, MAX_RECENT_SEARCHES)
 
   try {
-    localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next))
+    setPreference(RECENT_STORAGE_KEY, JSON.stringify(next))
   } catch {
-    // A full or unavailable localStorage must not take the search bar down.
+    // A failed write must not take the search bar down.
   }
 
   return next
@@ -389,7 +407,7 @@ export const rememberRecentSearch = (query) => {
 
 export const clearRecentSearches = () => {
   try {
-    localStorage.removeItem(RECENT_STORAGE_KEY)
+    removePreference(RECENT_STORAGE_KEY)
   } catch {
     // Nothing to do — the list is best-effort.
   }

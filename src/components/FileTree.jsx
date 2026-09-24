@@ -5,7 +5,7 @@
  * creating/renaming files, folders, story-preset folders, and projects;
  * custom (mouse-driven) drag & drop for reordering and re-parenting entries;
  * and per-project persistence of manual ordering and folder expansion in
- * localStorage. Other parts of the app talk to it through `filetree:*`
+ * the preference store. Other parts of the app talk to it through `filetree:*`
  * window events (new-entry, refresh-projects, folders-visibility, …).
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -14,238 +14,42 @@ import {
   listProjects,
   createProject,
   listProjectTree,
-  saveDocument,
   createFolder,
-  moveEntry,
 } from '../lib/FileSystem'
-import { saveCanvasDocument } from '../lib/canvasFileSystem'
-import { createEmptyCanvas } from '../lib/canvasModel'
-import { getDocDisplayName, isCanvasDoc, stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
-import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
-import {
-  announceTreeDragEnd,
-  announceTreeDragStart,
-  dispatchTabDockDropDoc,
-  tabDockAt,
-} from '../lib/tabDockEvents'
+import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
+import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import SFIcon from './SFIcon'
+import { useFileTreeDrag } from './useFileTreeDrag'
+import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import {
   STORY_FOLDER_PRESETS,
   getStoryFolderAncestor,
   getStoryFolderPresetByKey,
-  getStoryFolderPresetForEntry,
 } from '../lib/storyStructure'
 
 const MotionDiv = motion.div
 
-const ORDER_PREFIX = 'inkblot-order:'
-const EXPANDED_PREFIX = 'inkblot-expanded:'
 const DRAG_SLOT_HEIGHT = 22
 const TREE_ROOT_INDENT = 8
 const TREE_DEPTH_INDENT = 10
 const FOLDER_STICKY_STEP = 22
 
-const itemRevealVariants = {
-  collapsed: {
-    opacity: 0,
-    y: -8,
-  },
-  expanded: (index = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.2,
-      ease: 'easeOut',
-      delay: Math.min(index, 8) * 0.024,
-    },
-  }),
-}
+import { itemRevealVariants, folderChildrenVariants } from './fileTreeVariants'
+import {
+  applyOrderToTree,
+  collectFolderPaths,
+  getParentPath,
+  remapExpandedForFolder,
+  remapOrderForEntry,
+} from '../lib/fileTreeOrder'
+import {
+  loadExpanded,
+  loadOrder,
+  migrateProjectTreeState,
+  saveExpanded,
+  saveOrder,
+} from '../lib/fileTreeState'
 
-const folderChildrenVariants = {
-  collapsed: {
-    height: 0,
-    opacity: 0,
-    transition: {
-      duration: 0.18,
-      ease: 'easeInOut',
-      when: 'afterChildren',
-      staggerChildren: 0.018,
-      staggerDirection: -1,
-    },
-  },
-  expanded: {
-    height: 'auto',
-    opacity: 1,
-    transition: {
-      duration: 0.24,
-      ease: 'easeOut',
-      when: 'beforeChildren',
-      staggerChildren: 0.03,
-      delayChildren: 0.02,
-    },
-  },
-}
-
-/* ---------- localStorage persistence for manual order & expanded folders ---------- */
-
-const loadOrder = (projectName) => {
-  try {
-    return JSON.parse(localStorage.getItem(`${ORDER_PREFIX}${projectName}`) || '{}')
-  } catch {
-    return {}
-  }
-}
-
-const saveOrder = (projectName, order) => {
-  localStorage.setItem(`${ORDER_PREFIX}${projectName}`, JSON.stringify(order))
-}
-
-const loadExpanded = (projectName) => {
-  try {
-    const raw = localStorage.getItem(`${EXPANDED_PREFIX}${projectName}`)
-    if (!raw) return ['']
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : ['']
-  } catch {
-    return ['']
-  }
-}
-
-const saveExpanded = (projectName, expandedList) => {
-  localStorage.setItem(`${EXPANDED_PREFIX}${projectName}`, JSON.stringify(expandedList))
-}
-
-/** Carry a project's order/expanded localStorage keys across a project rename. */
-const migrateProjectTreeState = (fromProjectName, toProjectName) => {
-  if (!fromProjectName || !toProjectName || fromProjectName === toProjectName) return
-
-  const pairs = [
-    [`${ORDER_PREFIX}${fromProjectName}`, `${ORDER_PREFIX}${toProjectName}`],
-    [`${EXPANDED_PREFIX}${fromProjectName}`, `${EXPANDED_PREFIX}${toProjectName}`],
-  ]
-
-  pairs.forEach(([fromKey, toKey]) => {
-    const value = localStorage.getItem(fromKey)
-    if (value == null) return
-    localStorage.setItem(toKey, value)
-    localStorage.removeItem(fromKey)
-  })
-}
-
-const getParentPath = (path = '') => path.split('/').slice(0, -1).join('/')
-
-/* ----------------------------------------------------------------------------
-   Manual ordering. Each folder maps to an ordered list of "type:path" ids;
-   entries missing from the stored order are appended, stale ids are dropped.
----------------------------------------------------------------------------- */
-
-const ensureOrder = (order, folderPath, children) => {
-  const folderKey = folderPath || ''
-  const ids = children.map(child => `${child.type}:${child.path}`)
-  const existing = order[folderKey] || []
-  const filtered = existing.filter(id => ids.includes(id))
-  const missing = ids.filter(id => !filtered.includes(id))
-  const next = [...filtered, ...missing]
-  const changed = existing.length !== next.length || existing.some((id, idx) => id !== next[idx])
-  return { next, changed }
-}
-
-/** Recursively sort a tree's children by the stored manual order (unknown items last, A→Z). */
-const applyOrderToTree = (node, order) => {
-  if (!node || node.type !== 'folder') return node
-
-  const children = node.children || []
-  const { next, changed } = ensureOrder(order, node.path, children)
-  if (changed) {
-    order[node.path || ''] = next
-  }
-
-  const indexMap = new Map(next.map((id, index) => [id, index]))
-  const sorted = [...children].sort((a, b) => {
-    const aId = `${a.type}:${a.path}`
-    const bId = `${b.type}:${b.path}`
-    const aIndex = indexMap.get(aId)
-    const bIndex = indexMap.get(bId)
-
-    if (aIndex == null && bIndex == null) return a.name.localeCompare(b.name)
-    if (aIndex == null) return 1
-    if (bIndex == null) return -1
-    return aIndex - bIndex
-  })
-
-  return {
-    ...node,
-    children: sorted.map(child => applyOrderToTree(child, order)),
-  }
-}
-
-/** Rewrite order keys/ids after a folder moves or is renamed (fromPath → toPath). */
-const remapOrderForFolder = (orderState, fromPath, toPath) => {
-  const next = {}
-  Object.entries(orderState).forEach(([key, list]) => {
-    const newKey = key === fromPath || key.startsWith(`${fromPath}/`)
-      ? key.replace(fromPath, toPath)
-      : key
-
-    const newList = list.map(id => {
-      if (id.startsWith(`file:${fromPath}/`) || id === `file:${fromPath}`) {
-        return id.replace(`file:${fromPath}`, `file:${toPath}`)
-      }
-      if (id.startsWith(`folder:${fromPath}/`) || id === `folder:${fromPath}`) {
-        return id.replace(`folder:${fromPath}`, `folder:${toPath}`)
-      }
-      return id
-    })
-
-    next[newKey] = newList
-  })
-  return next
-}
-
-/** Rewrite order ids after any entry rename (delegates to the folder variant for folders). */
-const remapOrderForEntry = (orderState, type, fromPath, toPath) => {
-  if (type === 'folder') {
-    return remapOrderForFolder(orderState, fromPath, toPath)
-  }
-
-  const fromId = `${type}:${fromPath}`
-  const toId = `${type}:${toPath}`
-  const next = {}
-
-  Object.entries(orderState).forEach(([key, list]) => {
-    next[key] = list.map(id => (id === fromId ? toId : id))
-  })
-
-  return next
-}
-
-/** Rewrite expanded-folder paths after a folder moves or is renamed. */
-const remapExpandedForFolder = (expandedSet, fromPath, toPath) => {
-  const next = new Set()
-
-  expandedSet.forEach(path => {
-    if (path === fromPath || path.startsWith(`${fromPath}/`)) {
-      next.add(path.replace(fromPath, toPath))
-    } else {
-      next.add(path)
-    }
-  })
-
-  return next
-}
-
-const collectFolderPaths = (node) => {
-  const paths = []
-
-  const visit = (entry) => {
-    if (!entry || entry.type !== 'folder') return
-    if (entry.path) paths.push(entry.path)
-    ;(entry.children || []).forEach(visit)
-  }
-
-  visit(node)
-  return paths
-}
 
 export default function FileTree({
   projectName,
@@ -440,10 +244,10 @@ export default function FileTree({
         setRenamingEntry({
           path: detail.path || detail.name,
           type: detail.type,
-          oldName: stripCanvasSuffix(detail.name),
+          oldName: stripDocSuffix(detail.name),
           parent: detail.parent || '',
         })
-        setRenameValue(stripCanvasSuffix(detail.name))
+        setRenameValue(stripDocSuffix(detail.name))
         setIsAddingEntry(false)
         setIsAddingProject(false)
         setIsCreateMenuOpen(false)
@@ -472,23 +276,20 @@ export default function FileTree({
 
   const confirmNewEntry = async () => {
     if (!newEntryName.trim()) return
-    // The `.canvas` suffix is what routes a document to the canvas editor, so it
+    // The `.canvas` or `.map` suffix is what routes a document to its editor, so it
     // follows the kind being created — never whatever the user typed. Without
     // this, a text file named "plan.canvas" would collide with a real canvas.
-    const bare = stripCanvasSuffix(newEntryName.trim())
-    if (!bare) return
-    const name = newEntryType === 'canvas' ? withCanvasSuffix(bare) : bare
+    const name = nameForKind(newEntryName, newEntryType)
+    if (!stripDocSuffix(name)) return
     const path = newEntryParent ? `${newEntryParent}/${name}` : name
 
     if (newEntryType === 'folder') {
       await createFolder(projectName, path)
-    } else if (newEntryType === 'canvas') {
-      await saveCanvasDocument(projectName, path, createEmptyCanvas())
     } else {
-      await saveDocument(projectName, path, { content: [] })
+      await createDocumentOfKind(projectName, path, newEntryType)
     }
 
-    // Folders and files are the only entry kinds the tree orders; a canvas is a file.
+    // Folders and files are the only entry kinds the tree orders; a canvas or map is a file.
     const orderType = newEntryType === 'folder' ? 'folder' : 'file'
     ensureOrderItem(newEntryParent || '', `${orderType}:${path}`)
 
@@ -545,246 +346,26 @@ export default function FileTree({
     }
   }
 
-  const moveOrderItem = useCallback((itemId, fromFolder, toFolder, targetIndex) => {
-    updateOrder(orderState => {
-      const fromKey = fromFolder || ''
-      const toKey = toFolder || ''
+  const { handleDrop, updateManualDrag } = useFileTreeDrag({
+    dragInsert,
+    dragInsertRef,
+    dragOverFolder,
+    dragOverFolderRef,
+    dragPointRef,
+    manualDragActiveRef,
+    manualDragRef,
+    order,
+    projectName,
+    refreshTree,
+    setDragInsert,
+    setDragOverFolder,
+    setDragOverPath,
+    setDragPreview,
+    setDragSourceId,
+    setIsDragging,
+    updateOrder,
+  })
 
-      const fromList = [...(orderState[fromKey] || [])]
-      const fromIndex = fromList.indexOf(itemId)
-      const filtered = fromList.filter(id => id !== itemId)
-      orderState[fromKey] = filtered
-
-      const toList = [...(orderState[toKey] || [])].filter(id => id !== itemId)
-      let requestedIndex = typeof targetIndex === 'number'
-        ? targetIndex
-        : toList.length
-
-      if (fromKey === toKey && typeof targetIndex === 'number' && fromIndex !== -1 && fromIndex < targetIndex) {
-        requestedIndex -= 1
-      }
-
-      const insertIndex = Math.max(0, Math.min(requestedIndex, toList.length))
-
-      toList.splice(insertIndex, 0, itemId)
-      orderState[toKey] = toList
-
-      return orderState
-    })
-  }, [updateOrder])
-
-  // Move an entry to a target folder/index: same-folder moves only touch the
-  // stored order; cross-folder moves also move the entry on disk.
-  const performMove = useCallback(async ({ path, type }, targetFolder, targetIndex) => {
-    const fromParent = getParentPath(path)
-
-    if (type === 'folder' && targetFolder.startsWith(`${path}/`)) return
-
-    let nextPath = path
-
-    // Moving to a different folder - need filesystem operation
-    if (fromParent !== targetFolder) {
-      const moved = await moveEntry(projectName, path, targetFolder, type)
-      if (!moved) {
-        await refreshTree()
-        return
-      }
-      nextPath = moved
-      if (type === 'folder') {
-        updateOrder(orderState => remapOrderForFolder(orderState, path, nextPath))
-      }
-      moveOrderItem(`${type}:${nextPath}`, fromParent, targetFolder, targetIndex)
-      await refreshTree()
-    } else {
-      // Same folder reorder - just update the order, no filesystem operation needed
-      moveOrderItem(`${type}:${nextPath}`, fromParent, targetFolder, targetIndex)
-    }
-  }, [projectName, refreshTree, moveOrderItem, updateOrder])
-
-  const handleDrop = async (event, targetNode, targetParent) => {
-    event.preventDefault()
-    setDragOverPath(null)
-    setDragInsert(null)
-    setDragOverFolder(null)
-
-    let data
-    try {
-      const raw = event.dataTransfer.getData('application/json') || event.dataTransfer.getData('text/plain')
-      data = JSON.parse(raw)
-    } catch {
-      return
-    }
-
-    if (!data?.path || !data?.type) return
-    if (data.path === targetNode?.path) return
-
-    const useInsert = dragInsert && dragInsert.parentPath === (targetParent || '')
-    const targetFolder = useInsert
-      ? dragInsert.parentPath
-      : (dragOverFolder && targetNode?.type === 'folder')
-        ? targetNode.path
-        : (targetNode?.type === 'folder' ? targetNode.path : (targetParent || ''))
-
-    const targetIndex = useInsert
-      ? dragInsert.index
-      : (targetNode && targetNode.type !== 'folder'
-        ? (order[targetParent || ''] || []).indexOf(`${targetNode.type}:${targetNode.path}`)
-        : undefined)
-
-    await performMove(data, targetFolder, targetIndex)
-  }
-
-  // Hit-test the pointer during a manual drag: hovering a folder's middle
-  // third targets "drop into folder", the outer thirds target an insert slot
-  // before/after the hovered item.
-  const updateManualDrag = useCallback((clientX, clientY) => {
-    const el = document.elementFromPoint(clientX, clientY)
-    if (!el) return
-
-    const item = el.closest('.file-item')
-    if (item) {
-      const entryType = item.getAttribute('data-entry-type')
-      const entryPath = item.getAttribute('data-entry-path')
-      const parentPath = item.getAttribute('data-entry-parent') || ''
-      const indexAttr = item.getAttribute('data-entry-index')
-      const rect = item.getBoundingClientRect()
-      const offsetY = clientY - rect.top
-      const beforeZone = rect.height * 0.33
-      const afterZone = rect.height * 0.66
-      const index = Number.isNaN(Number(indexAttr))
-        ? (order[parentPath] || []).indexOf(`${entryType}:${entryPath}`)
-        : Number(indexAttr)
-
-      if (entryType === 'folder' && offsetY > beforeZone && offsetY < afterZone) {
-        setDragOverFolder(entryPath)
-        dragOverFolderRef.current = entryPath
-        setDragInsert(null)
-        dragInsertRef.current = null
-        setDragOverPath(entryPath)
-        return
-      }
-
-      const insertIndex = offsetY >= afterZone
-        ? index + 1
-        : index
-
-      setDragOverFolder(null)
-      dragOverFolderRef.current = null
-      setDragOverPath(null)
-      setDragInsert({ parentPath, index: insertIndex })
-      dragInsertRef.current = { parentPath, index: insertIndex }
-      return
-    }
-
-    const childrenContainer = el.closest('.file-children')
-    if (childrenContainer) {
-      // Keep the current drag insert position rather than jumping to end
-      return
-    }
-
-    const list = el.closest('.file-list')
-    if (list) {
-      // Keep the current drag insert position rather than jumping to end
-      return
-    }
-  }, [order])
-
-  // Mouse-driven drag & drop (not HTML5 DnD): a drag arms on item mousedown
-  // and activates after ~4px of movement, showing a ghost preview; mouseup
-  // commits the move.
-  useEffect(() => {
-    const onMove = (event) => {
-      const drag = manualDragRef.current
-      if (!drag) return
-      dragPointRef.current = { x: event.clientX, y: event.clientY }
-      const dx = Math.abs(event.clientX - drag.startX)
-      const dy = Math.abs(event.clientY - drag.startY)
-      if (!manualDragActiveRef.current) {
-        if (dx + dy < 4) return
-        manualDragActiveRef.current = true
-        setIsDragging(true)
-        setDragSourceId(`${drag.type}:${drag.path}`)
-        setDragPreview({
-          x: event.clientX,
-          y: event.clientY,
-          name: drag.name,
-          iconName: drag.iconName,
-          iconFilled: drag.iconFilled,
-        })
-        // The tab dock opens while a document is in flight, so there is something
-        // to aim at before the pointer gets there.
-        announceTreeDragStart({ path: drag.path, type: drag.type })
-      }
-      setDragPreview((current) => current ? {
-        ...current,
-        x: event.clientX,
-        y: event.clientY,
-      } : current)
-      updateManualDrag(event.clientX, event.clientY)
-    }
-
-    const onUp = async () => {
-      const drag = manualDragRef.current
-      if (!drag) return
-      const didDrag = manualDragActiveRef.current
-      const insert = dragInsertRef.current
-      const folder = dragOverFolderRef.current
-      const point = dragPointRef.current
-
-      manualDragRef.current = null
-      manualDragActiveRef.current = false
-      dragPointRef.current = null
-      setIsDragging(false)
-      setDragPreview(null)
-      setDragSourceId(null)
-      setDragOverPath(null)
-      setDragInsert(null)
-      setDragOverFolder(null)
-      if (didDrag) announceTreeDragEnd()
-
-      if (!didDrag) return
-
-      // Like the canvas drop below, a drop onto the tab dock MUST NOT fall through
-      // to performMove — the tree still believes it is reordering, and would
-      // silently move the document into whatever folder it was dragged over.
-      if (point && drag.type === 'file') {
-        const dock = tabDockAt(point.x, point.y)
-        if (dock) {
-          dispatchTabDockDropDoc(dock, { path: drag.path })
-          return
-        }
-      }
-
-      // A drop onto an open canvas adds a card there, and MUST NOT fall through to
-      // performMove — the pointer never left the tree's own drag state, so the tree
-      // still believes it is reordering, and would silently move the document.
-      //
-      // Canvases are droppable too (they render as a minimap and open on
-      // double-click); the surface itself refuses a canvas dropped onto ITSELF.
-      if (point && drag.type === 'file') {
-        const surface = canvasSurfaceAt(point.x, point.y)
-        if (surface) {
-          dispatchCanvasDropDoc(surface, {
-            path: drag.path,
-            clientX: point.x,
-            clientY: point.y,
-          })
-          return
-        }
-      }
-
-      const targetFolder = folder || (insert ? insert.parentPath : getParentPath(drag.path))
-      const targetIndex = insert ? insert.index : undefined
-      await performMove({ path: drag.path, type: drag.type }, targetFolder, targetIndex)
-    }
-
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [dragInsert, dragOverFolder, performMove, updateManualDrag])
 
   // Handle rename confirm
   const handleRenameConfirm = useCallback(async () => {
@@ -812,17 +393,16 @@ export default function FileTree({
       return
     }
 
-    // Renaming must not change a document's kind: re-apply the `.canvas` suffix
-    // to a canvas (the edit box shows the bare name) and strip it from anything else.
-    const bare = stripCanvasSuffix(trimmed)
-    if (!bare) {
+    // Renaming must not change a document's kind: re-apply its `.canvas` or `.map`
+    // suffix (the edit box shows the bare name) and strip any from anything else.
+    const nextName = nameForKind(trimmed, type === 'file' ? getDocKind(path) : 'folder')
+    if (!stripDocSuffix(nextName)) {
       setRenamingEntry(null)
       setRenameValue('')
       return
     }
-    const nextName = type === 'file' && isCanvasDoc(path) ? withCanvasSuffix(bare) : bare
 
-    const { renameEntry } = await import('../lib/FileSystem')
+    const { renameEntry } = await import('../lib/entryOperations')
     const nextPath = await renameEntry(projectName, path, nextName, type)
     if (nextPath) {
       updateOrder(orderState => remapOrderForEntry(orderState, type, path, nextPath))
@@ -870,7 +450,9 @@ export default function FileTree({
             ? 'Folder name...'
             : newEntryType === 'canvas'
               ? 'Canvas name...'
-              : 'File name...'
+              : newEntryType === 'map'
+                ? 'Map name...'
+                : 'File name...'
         }
       />
     </div>
@@ -899,30 +481,43 @@ export default function FileTree({
   // Render one tree node (file or folder) plus its drop slots and children.
   const renderNode = (node, depth = 0, siblings = []) => {
     if (!node) return null
-    const isFolder = node.type === 'folder'
-    const isExpanded = expanded.has(node.path)
-    const isPrimary = currentDoc === node.path
-    const isActive = activeDoc ? activeDoc === node.path : isPrimary
-    const isSecondary = splitView === 'editor' && secondaryDoc === node.path
-    const storyPreset = getStoryFolderPresetForEntry(node.path, node.type)
-    const parentPath = getParentPath(node.path)
-    const nodeId = `${node.type}:${node.path}`
-    const isCanvas = !isFolder && isCanvasDoc(node.path)
-    const iconName = isFolder
-      ? (storyPreset?.folderIcon || (isExpanded ? 'folder.fill' : 'folder'))
-      : (isCanvas ? 'canvas' : null)
-    const hasEntryIcon = Boolean(iconName)
-    const iconFilled = !isFolder && isActive && hasEntryIcon
-    const showInlineInput =
-      isAddingEntry && newEntryParent === node.path && (isFolder || newEntryParent)
-    const siblingIndex = siblings.findIndex(child => child.path === node.path && child.type === node.type)
-    const showInsertSlot = dragInsert && dragInsert.parentPath === parentPath && dragInsert.index === siblingIndex
-    const showInsertAfterLast =
-      dragInsert && dragInsert.parentPath === parentPath && dragInsert.index === siblings.length && siblingIndex === siblings.length - 1
+    // Every decision this row makes lives in fileTreeNodeState.js; what is left
+    // below is markup and handlers.
+    const {
+      dragName,
+      hasEntryIcon,
+      iconFilled,
+      iconName,
+      isDragOver,
+      isDragSource,
+      isExpanded,
+      isFolder,
+      isPrimary,
+      isRenaming,
+      isSecondary,
+      label,
+      nodeId,
+      parentPath,
+      showFolderDivider,
+      showInlineInput,
+      showInsertAfterLast,
+      showInsertSlot,
+      siblingIndex,
+    } = deriveFileNodeState(node, {
+      activeDoc,
+      currentDoc,
+      dragInsert,
+      dragOverPath,
+      dragSourceId,
+      expanded,
+      isAddingEntry,
+      newEntryParent,
+      renamingEntry,
+      secondaryDoc,
+      siblings,
+      splitView,
+    })
 
-    const isRenaming = renamingEntry && renamingEntry.path === node.path && renamingEntry.type === node.type
-    const isDragSource = dragSourceId === nodeId
-    const showFolderDivider = isFolder && isExpanded
     return (
       <MotionDiv
         key={nodeId}
@@ -939,7 +534,7 @@ export default function FileTree({
 
         <MotionDiv
           layout="position"
-          className={`file-item${isFolder ? ' folder' : ''}${isPrimary ? ' active' : ''}${isSecondary ? ' secondary' : ''}${dragOverPath === node.path ? ' drag-over' : ''}${isDragSource ? ' is-drag-source' : ''}`}
+          className={`file-item${isFolder ? ' folder' : ''}${isPrimary ? ' active' : ''}${isSecondary ? ' secondary' : ''}${isDragOver ? ' drag-over' : ''}${isDragSource ? ' is-drag-source' : ''}`}
           data-entry-type={node.type}
           data-entry-path={node.path}
           data-entry-parent={parentPath}
@@ -955,7 +550,7 @@ export default function FileTree({
             manualDragRef.current = {
               path: node.path,
               type: node.type,
-              name: getDocDisplayName(node.name),
+              name: dragName,
               iconName,
               iconFilled,
               startX: e.clientX,
@@ -997,7 +592,7 @@ export default function FileTree({
           {isRenaming ? (
             renderRenameInput({ marginLeft: hasEntryIcon ? 4 : 0, minWidth: 80 })
           ) : (
-            <span className="file-item-label">{isFolder ? node.name : getDocDisplayName(node.name)}</span>
+            <span className="file-item-label">{label}</span>
           )}
 
           <AnimatePresence initial={false}>
@@ -1107,6 +702,14 @@ export default function FileTree({
               aria-label="New canvas"
             >
               <SFIcon name="canvas" />
+            </button>
+            <button
+              className="file-tree-action"
+              onClick={() => beginNewEntry('map', '')}
+              title="New map"
+              aria-label="New map"
+            >
+              <SFIcon name="map" />
             </button>
             <button
               className="file-tree-action"

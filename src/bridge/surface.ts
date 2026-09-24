@@ -1,0 +1,549 @@
+/**
+ * surface.ts — the webview's half of the bridge, assembled.
+ *
+ * `createDocumentSurface` takes a `SurfaceBridge` and an `EditorRegistry` and installs
+ * every command and request handler the protocol defines. What comes back is the object
+ * the React shell publishes *through*: `publishToolbarState()`, `publishNotesRemapped()`
+ * and friends, each coalesced, each typed.
+ *
+ * **The split between handlers and delegates is the interesting line.** A command that
+ * only needs a live editor — every formatting command, the selection commands — is
+ * handled here, completely, and needs nothing from the app. A command that changes what
+ * the app is *showing* — open a document, replace a pane's content, run a canvas
+ * command — cannot be: it needs React state that only the app owns. Those are delegated
+ * out, and the delegate list is therefore an exact statement of what a native shell
+ * cannot do without the app's cooperation. It is short, and keeping it short is what
+ * keeps the seam thin.
+ */
+import { EditorTarget } from '../types'
+import type {
+  ActiveEditorChanged,
+  ArchiveChanged,
+  BubbleChipsChanged,
+  WordCountsChanged,
+  BubbleSessionOpened,
+  CanvasCommandRequest,
+  CanvasDropDocCommand,
+  CanvasDropNoteCommand,
+  CanvasToolbarChanged,
+  CanvasRestoreCommand,
+  CanvasRevealCommand,
+  DictationCancelCommand,
+  DictationLevelCommand,
+  DictationTranscript,
+  DocChanged,
+  FocusModeView,
+  Note,
+  NoteMarkerEvent,
+  NoteMarkersChanged,
+  NotePreviewDismissed,
+  NotesRemapped,
+  OpenDocumentCommand,
+  PageLayoutState,
+  ReferenceSchema,
+  ReferencesChanged,
+  RevealReference,
+  PrintRequest,
+  ClipboardChanged,
+  NotesChanged,
+  ProjectChanged,
+  ShowSidebarTab,
+  TilesChanged,
+  VersionsChanged,
+  ReadAloudPayloadEvent,
+  SearchMatches,
+  SelectionContext,
+  SetContentCommand,
+  SyncNotesCommand,
+  ToolbarState,
+  ViewOptions,
+} from '../types'
+import type { CommandPayload, CommandType, SurfaceBridge, Unsubscribe } from './client'
+import type { EditorRegistry, ResolvedEditor } from './editorRegistry'
+import { createCoalescer, frameScheduler, type Scheduler } from './coalesce'
+import { TOOLBAR_DEFAULTS, readSelectionContext, readToolbarState } from './readState'
+import * as commands from './commands'
+import { dragHandoff, type DragHandoff } from './dragHandoff'
+
+/** What the surface cannot do alone. Every one of these needs app state. */
+export interface SurfaceDelegates {
+  openDocument?(command: OpenDocumentCommand): void
+  setContent?(command: SetContentCommand): void
+  syncNotes?(command: SyncNotesCommand): void
+  dictationPartial?(command: DictationTranscript): void
+  dictationFinal?(command: DictationTranscript): void
+  dictationLevel?(command: DictationLevelCommand): void
+  dictationCancel?(command: DictationCancelCommand): void
+  canvasCommand?(command: CanvasCommandRequest): void
+  canvasDropDoc?(command: CanvasDropDocCommand): void
+  canvasDropNote?(command: CanvasDropNoteCommand): void
+  canvasReveal?(command: CanvasRevealCommand): void
+  canvasRestore?(command: CanvasRestoreCommand): void
+}
+
+export interface DocumentSurfaceOptions {
+  bridge: SurfaceBridge
+  registry: EditorRegistry
+  delegates?: SurfaceDelegates
+  /** Injected so a test can run without a frame loop. */
+  scheduler?: Scheduler
+  drag?: DragHandoff
+}
+
+export interface DocumentSurface {
+  /** Replace the delegates — React's callbacks change identity on every render. */
+  setDelegates(delegates: SurfaceDelegates): void
+
+  /**
+   * Handle a command directly, alongside the delegates.
+   *
+   * For the components that own a command outright rather than on the app's behalf:
+   * `DictationControl` is the whole reason this exists. The delegate table is set in
+   * one place by one component, which is right for commands the app routes, and wrong
+   * for a command whose only possible handler is a control that may not be mounted.
+   * Several handlers may register for the same command; all of them are called.
+   */
+  onCommand<T extends CommandType>(
+    type: T,
+    handler: (payload: CommandPayload<T>) => void
+  ): Unsubscribe
+
+  /** The remembered highlight color, which is now protocol state rather than editor storage. */
+  lastHighlightColor(): string
+
+  /** Read the active editor and push a `toolbarState`. Coalesced to one per frame. */
+  publishToolbarState(): void
+  /** Read the active editor and push a `selectionContext`. Coalesced. */
+  publishSelectionContext(options?: { docPath?: string | null; isCanvas?: boolean }): void
+  /** The canvas's own controls, or none while they are not up. Coalesced per frame. */
+  publishCanvasToolbar(payload: CanvasToolbarChanged): void
+  /** Push the election result. Not coalesced — it is rare and ordering matters. */
+  publishActiveEditor(info?: Partial<ActiveEditorChanged>): void
+  publishDocChanged(payload: DocChanged): void
+  /** Push a whole remapped note set. Coalesced per document. */
+  publishNotesRemapped(payload: NotesRemapped): void
+  publishNoteMarker(kind: 'hover' | 'leave' | 'pin', payload: NoteMarkerEvent): void
+  publishSearchMatches(payload: SearchMatches): void
+  publishFocusModeView(payload: FocusModeView): void
+  /**
+   * The page's view settings a native toolbar offers as toggles. Each is owned by a
+   * different component — focus mode by `EditorLayout`, the word count by `App` — so
+   * each publishes only its own; the surface keeps the rest and sends the whole.
+   */
+  publishViewOptions(patch: Partial<ViewOptions>): void
+  publishReadAloudPayload(payload: ReadAloudPayloadEvent): void
+  /** Which project is open. Not coalesced — it changes when the user picks one. */
+  publishProjectChanged(payload: ProjectChanged): void
+  /**
+   * The right sidebar's state, for a shell that draws the sidebar itself. Notes, the
+   * clipboard and tiles each carry the whole list, which is what makes coalescing
+   * them to one per frame safe (sharp edge #4) — a keystroke in a note would otherwise
+   * be a message per keystroke.
+   */
+  publishNotesChanged(payload: NotesChanged): void
+  publishClipboardChanged(payload: ClipboardChanged): void
+  publishTilesChanged(payload: TilesChanged): void
+  publishVersionsChanged(payload: VersionsChanged): void
+  publishShowSidebarTab(payload: ShowSidebarTab): void
+  /** An open preview's marker moved. Coalesced — each carries the whole rect. */
+  publishNoteMarkerMoved(payload: NoteMarkerEvent): void
+  publishNotePreviewDismissed(payload: NotePreviewDismissed): void
+  /** Every visible note marker, for a shell that draws the dots. Coalesced per frame. */
+  publishNoteMarkersChanged(payload: NoteMarkersChanged): void
+  /** Open the bubble editor, for a shell that draws it. Not coalesced — one per open. */
+  publishBubbleSessionOpened(payload: BubbleSessionOpened): void
+  /** Every visible session chip, for a shell that draws them. Coalesced per frame. */
+  publishBubbleChipsChanged(payload: BubbleChipsChanged): void
+  /** A document's archive, whole. */
+  publishArchiveChanged(payload: ArchiveChanged): void
+  /** Every visible word-count badge, for a shell that draws them. Coalesced per frame. */
+  publishWordCountsChanged(payload: WordCountsChanged): void
+  /** Print Layout's state, for the inspector's Page tab. Coalesced — each carries it all. */
+  publishPageLayoutState(payload: PageLayoutState): void
+  /** Ask the shell to print the web view at a paper size. Not coalesced: each is a job. */
+  publishPrintRequest(payload: PrintRequest): void
+  /** The project's sources for the document in view. Coalesced — each carries them all. */
+  publishReferencesChanged(payload: ReferencesChanged): void
+  /** The kinds of source and the styles, once. */
+  publishReferenceSchema(payload: ReferenceSchema): void
+  /** Show a source in the References panel. */
+  publishRevealReference(payload: RevealReference): void
+
+  /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
+  publishDragStarted(): void
+  publishDragMoved(x: number, y: number): void
+  publishDragEnded(at?: { x?: number; y?: number }): void
+
+  /** Send anything still pending. Called when a pane tears down. */
+  flush(): void
+  dispose(): void
+}
+
+export function createDocumentSurface({
+  bridge,
+  registry,
+  delegates: initialDelegates = {},
+  scheduler = frameScheduler,
+  drag = dragHandoff,
+}: DocumentSurfaceOptions): DocumentSurface {
+  let delegates = initialDelegates
+  let lastHighlightColor: string = TOOLBAR_DEFAULTS.highlight
+  let viewOptions: ViewOptions = { focusMode: false, wordCountVisible: true }
+  const subscriptions: Unsubscribe[] = []
+
+  /* ---------------- coalesced publishers ---------------- */
+
+  const toolbar = createCoalescer<ToolbarState>(
+    (state) => bridge.emit('toolbarState', state),
+    scheduler
+  )
+  const canvasToolbar = createCoalescer<CanvasToolbarChanged>(
+    (payload) => bridge.emit('canvasToolbarChanged', payload),
+    scheduler
+  )
+  const selection = createCoalescer<SelectionContext>(
+    (context) => bridge.emit('selectionContext', context),
+    scheduler
+  )
+  // Keyed by document: two panes remap independently, and coalescing them into one slot
+  // would drop one pane's notes every time both changed in the same frame.
+  const notesByDoc = new Map<string, ReturnType<typeof createCoalescer<NotesRemapped>>>()
+  const notesCoalescer = (docPath: string) => {
+    const existing = notesByDoc.get(docPath)
+    if (existing) return existing
+    const created = createCoalescer<NotesRemapped>(
+      (payload) => bridge.emit('notesRemapped', payload),
+      scheduler
+    )
+    notesByDoc.set(docPath, created)
+    return created
+  }
+  const notesChangedByDoc = new Map<string, ReturnType<typeof createCoalescer<NotesChanged>>>()
+  const notesChangedFor = (docPath: string) => {
+    const existing = notesChangedByDoc.get(docPath)
+    if (existing) return existing
+    const created = createCoalescer<NotesChanged>((payload) => bridge.emit('notesChanged', payload), scheduler)
+    notesChangedByDoc.set(docPath, created)
+    return created
+  }
+  const clipboardChanges = createCoalescer<ClipboardChanged>(
+    (payload) => bridge.emit('clipboardChanged', payload),
+    scheduler
+  )
+  const tileChanges = createCoalescer<TilesChanged>(
+    (payload) => bridge.emit('tilesChanged', payload),
+    scheduler
+  )
+  const markerMoves = createCoalescer<NoteMarkerEvent>(
+    (payload) => bridge.emit('noteMarkerMoved', payload),
+    scheduler
+  )
+  const markerLists = createCoalescer<NoteMarkersChanged>(
+    (payload) => bridge.emit('noteMarkersChanged', payload),
+    scheduler
+  )
+  const chipLists = createCoalescer<BubbleChipsChanged>(
+    (payload) => bridge.emit('bubbleChipsChanged', payload),
+    scheduler
+  )
+  const wordCountLists = createCoalescer<WordCountsChanged>(
+    (payload) => bridge.emit('wordCountsChanged', payload),
+    scheduler
+  )
+  const pageLayoutChanges = createCoalescer<PageLayoutState>(
+    (payload) => bridge.emit('pageLayoutState', payload),
+    scheduler
+  )
+  const referenceLists = createCoalescer<ReferencesChanged>(
+    (payload) => bridge.emit('referencesChanged', payload),
+    scheduler
+  )
+  const dragMoves = createCoalescer<{ dragId: string; clientX: number; clientY: number }>(
+    (moved) => bridge.emit('dragMoved', moved),
+    scheduler
+  )
+
+  /* ---------------- resolving a target ---------------- */
+
+  /** `undefined` on a command means "whichever editor is active" — see `EditorQuery`. */
+  const resolve = (target?: EditorTarget | null): ResolvedEditor | null =>
+    (target ? registry.resolve(target) : registry.active())
+
+  /** Run a command against its target, silently doing nothing if it is gone. */
+  const withEditor = <T extends { target?: EditorTarget }>(
+    payload: T,
+    body: (editor: unknown, resolved: ResolvedEditor) => void
+  ) => {
+    const resolved = resolve(payload.target)
+    // Not an error. A command aimed at a pane the user just closed is ordinary, and a
+    // shell cannot avoid the race — it decided to send before it could know.
+    if (!resolved) return
+    body(resolved.editor, resolved)
+  }
+
+  /* ---------------- command handlers ---------------- */
+
+  const handle = <T extends CommandType>(
+    type: T,
+    handler: (payload: CommandPayload<T>) => void
+  ) => {
+    subscriptions.push(bridge.onCommand(type, handler))
+  }
+
+  handle('applyMark', (payload) => {
+    withEditor(payload, (editor) => { commands.applyMark(editor, payload) })
+  })
+  handle('setColor', (payload) => {
+    withEditor(payload, (editor) => { commands.setColor(editor, payload) })
+  })
+  handle('setHighlight', (payload) => {
+    // The remembered color is updated whether or not an editor took the command: the
+    // user chose it, and the context menu should offer it next time regardless.
+    if (payload.remember) lastHighlightColor = payload.color
+    withEditor(payload, (editor) => { commands.setHighlight(editor, payload) })
+    publishToolbarState()
+  })
+  handle('setFontFamily', (payload) => {
+    withEditor(payload, (editor) => { commands.setFontFamily(editor, payload) })
+  })
+  handle('setFontSize', (payload) => {
+    withEditor(payload, (editor) => { commands.setFontSize(editor, payload) })
+  })
+  handle('setAlignment', (payload) => {
+    withEditor(payload, (editor) => { commands.setAlignment(editor, payload) })
+  })
+  handle('insertTable', (payload) => {
+    withEditor(payload, (editor) => { commands.insertTable(editor, payload) })
+  })
+  handle('setBlockType', (payload) => {
+    withEditor(payload, (editor) => { commands.setBlockType(editor, payload) })
+  })
+  handle('toggleList', (payload) => {
+    withEditor(payload, (editor) => { commands.toggleList(editor, payload) })
+  })
+  handle('editorHistory', (payload) => {
+    withEditor(payload, (editor) => { commands.editorHistory(editor, payload) })
+  })
+  handle('insertConversationTile', (payload) => {
+    withEditor(payload, (editor) => { commands.insertConversationTile(editor) })
+  })
+  handle('insertCitation', (payload) => {
+    withEditor(payload, (editor) => { commands.insertCitation(editor, payload) })
+  })
+  handle('insertBibliography', (payload) => {
+    withEditor(payload, (editor) => { commands.insertBibliography(editor) })
+  })
+  handle('setSelection', (payload) => {
+    withEditor(payload, (editor) => { commands.setSelection(editor, payload) })
+  })
+  handle('jumpToAnchor', (payload) => {
+    withEditor(payload, (editor) => { commands.jumpToAnchor(editor, payload) })
+  })
+  handle('replaceRanges', (payload) => {
+    withEditor(payload, (editor) => { commands.replaceRanges(editor, payload) })
+  })
+  handle('setCaretAtDocPos', (payload) => {
+    withEditor(payload, (editor) => { commands.setCaretAtDocPos(editor, payload) })
+  })
+  handle('insertPlainText', (payload) => {
+    withEditor(payload, (editor) => { commands.insertPlainText(editor, payload) })
+  })
+
+  /* Delegated: these change what the app is showing, which the surface does not own. */
+  handle('openDocument', (payload) => delegates.openDocument?.(payload))
+  handle('setContent', (payload) => delegates.setContent?.(payload))
+  handle('syncNotes', (payload) => delegates.syncNotes?.(payload))
+  handle('dictationPartial', (payload) => delegates.dictationPartial?.(payload))
+  handle('dictationFinal', (payload) => delegates.dictationFinal?.(payload))
+  handle('dictationLevel', (payload) => delegates.dictationLevel?.(payload))
+  handle('dictationCancel', (payload) => delegates.dictationCancel?.(payload))
+  handle('canvasCommand', (payload) => delegates.canvasCommand?.(payload))
+  handle('canvasDropDoc', (payload) => delegates.canvasDropDoc?.(payload))
+  handle('canvasDropNote', (payload) => delegates.canvasDropNote?.(payload))
+  handle('canvasReveal', (payload) => delegates.canvasReveal?.(payload))
+  handle('canvasRestore', (payload) => delegates.canvasRestore?.(payload))
+
+  /* ---------------- request handlers ---------------- */
+
+  subscriptions.push(bridge.onRequest('getToolbarState', ({ target }) => {
+    const resolved = resolve(target)
+    return readToolbarState(resolved?.editor, {
+      target: resolved?.target ?? null,
+      lastHighlightColor,
+    })
+  }))
+
+  subscriptions.push(bridge.onRequest('getSelectionContext', ({ target }) => {
+    const resolved = resolve(target)
+    if (!resolved) return null
+    return readSelectionContext(resolved.editor, {
+      target: resolved.target,
+      docPath: resolved.docPath,
+      isCanvas: resolved.target === EditorTarget.CanvasCard,
+    })
+  }))
+
+  subscriptions.push(bridge.onRequest('getDocumentText', ({ target }) => {
+    const resolved = resolve(target)
+    if (!resolved) return null
+    const doc = (resolved.editor as { state: { doc: {
+      content: { size: number }
+      textBetween(from: number, to: number, sep?: string, leaf?: string): string
+    } } }).state.doc
+    return {
+      docPath: resolved.docPath ?? '',
+      text: doc.textBetween(0, doc.content.size, '\n', '\n'),
+    }
+  }))
+
+  /* `getReadAloudPayload` has no handler here on purpose. Building it needs the read
+     aloud chunker and the document's block structure, which `ReadAloudControl` owns;
+     it registers its own handler while it is mounted. An unanswered request replies
+     with an error rather than hanging — see `createSurfaceBridge`. */
+
+  /* ---------------- publishers ---------------- */
+
+  function publishToolbarState() {
+    const resolved = registry.active()
+    toolbar.push(readToolbarState(resolved?.editor, {
+      target: resolved?.target ?? null,
+      lastHighlightColor,
+    }))
+  }
+
+  function publishSelectionContext(options: { docPath?: string | null; isCanvas?: boolean } = {}) {
+    const resolved = registry.active()
+    if (!resolved) return
+    const context = readSelectionContext(resolved.editor, {
+      target: resolved.target,
+      docPath: options.docPath ?? resolved.docPath,
+      isCanvas: options.isCanvas ?? resolved.target === EditorTarget.CanvasCard,
+    })
+    if (context) selection.push(context)
+  }
+
+  return {
+    setDelegates(next) { delegates = next },
+    onCommand: (type, handler) => bridge.onCommand(type, handler),
+    lastHighlightColor: () => lastHighlightColor,
+
+    publishToolbarState,
+    publishSelectionContext,
+
+    publishActiveEditor(info = {}) {
+      const resolved = registry.active()
+      bridge.emit('activeEditorChanged', {
+        target: info.target ?? resolved?.target ?? undefined,
+        docPath: info.docPath ?? resolved?.docPath ?? undefined,
+        surfaceId: info.surfaceId ?? resolved?.surfaceId ?? undefined,
+      })
+      // The toolbar is about the active editor, so a new winner means a new answer.
+      publishToolbarState()
+    },
+
+    publishCanvasToolbar(payload) { canvasToolbar.push(payload) },
+
+    publishDocChanged(payload) { bridge.emit('docChanged', payload) },
+
+    publishNotesRemapped(payload) { notesCoalescer(payload.docPath).push(payload) },
+
+    publishNoteMarker(kind, payload) {
+      const type = kind === 'hover'
+        ? 'noteMarkerHover'
+        : kind === 'leave' ? 'noteMarkerLeave' : 'noteMarkerPin'
+      bridge.emit(type, payload)
+    },
+
+    publishSearchMatches(payload) { bridge.emit('searchMatches', payload) },
+    publishFocusModeView(payload) { bridge.emit('focusModeView', payload) },
+    publishViewOptions(patch) {
+      viewOptions = { ...viewOptions, ...patch }
+      bridge.emit('viewOptions', viewOptions)
+    },
+    publishReadAloudPayload(payload) { bridge.emit('readAloudPayload', payload) },
+    publishProjectChanged(payload) { bridge.emit('projectChanged', payload) },
+    publishNotesChanged(payload) { notesChangedFor(payload.docPath).push(payload) },
+    publishClipboardChanged(payload) { clipboardChanges.push(payload) },
+    publishTilesChanged(payload) { tileChanges.push(payload) },
+    publishVersionsChanged(payload) { bridge.emit('versionsChanged', payload) },
+    publishShowSidebarTab(payload) { bridge.emit('showSidebarTab', payload) },
+    publishNoteMarkerMoved(payload) { markerMoves.push(payload) },
+    publishNoteMarkersChanged(payload) { markerLists.push(payload) },
+    publishBubbleSessionOpened(payload) { bridge.emit('bubbleSessionOpened', payload) },
+    publishBubbleChipsChanged(payload) { chipLists.push(payload) },
+    publishArchiveChanged(payload) { bridge.emit('archiveChanged', payload) },
+    publishWordCountsChanged(payload) { wordCountLists.push(payload) },
+    publishPageLayoutState(payload) { pageLayoutChanges.push(payload) },
+    publishPrintRequest(payload) { bridge.emit('printRequest', payload) },
+    publishReferencesChanged(payload) { referenceLists.push(payload) },
+    publishReferenceSchema(payload) { bridge.emit('referenceSchema', payload) },
+    publishRevealReference(payload) { bridge.emit('revealReference', payload) },
+    publishNotePreviewDismissed(payload) {
+      // A move queued for a preview that is closing would reopen nothing, but it would
+      // arrive after the dismissal and be one message the shell has to reason about.
+      markerMoves.cancel()
+      pageLayoutChanges.cancel()
+      referenceLists.cancel()
+      bridge.emit('notePreviewDismissed', payload)
+    },
+
+    publishDragStarted() {
+      const session = drag.current()
+      if (!session) return
+      const { claimed: _claimed, ...started } = session
+      bridge.emit('dragStarted', started)
+    },
+
+    publishDragMoved(x, y) {
+      const moved = drag.moveTo(x, y)
+      if (moved) dragMoves.push(moved)
+    },
+
+    publishDragEnded(at) {
+      // A pending move describes a drag that is over; sending it after the end would
+      // put the two out of order for no benefit.
+      dragMoves.cancel()
+      const ended = drag.end(at)
+      if (ended) bridge.emit('dragEnded', ended)
+    },
+
+    flush() {
+      toolbar.flush()
+      canvasToolbar.flush()
+      selection.flush()
+      dragMoves.flush()
+      clipboardChanges.flush()
+      tileChanges.flush()
+      markerMoves.flush()
+      markerLists.flush()
+      chipLists.flush()
+      wordCountLists.flush()
+      pageLayoutChanges.flush()
+      referenceLists.flush()
+      for (const coalescer of notesByDoc.values()) coalescer.flush()
+      for (const coalescer of notesChangedByDoc.values()) coalescer.flush()
+    },
+
+    dispose() {
+      toolbar.cancel()
+      canvasToolbar.cancel()
+      selection.cancel()
+      dragMoves.cancel()
+      clipboardChanges.cancel()
+      tileChanges.cancel()
+      markerMoves.cancel()
+      markerLists.cancel()
+      chipLists.cancel()
+      wordCountLists.cancel()
+      pageLayoutChanges.cancel()
+      for (const coalescer of notesByDoc.values()) coalescer.cancel()
+      for (const coalescer of notesChangedByDoc.values()) coalescer.cancel()
+      notesByDoc.clear()
+      notesChangedByDoc.clear()
+      for (const unsubscribe of subscriptions) unsubscribe()
+      subscriptions.length = 0
+    },
+  }
+}
+
+export type { Note }

@@ -12,23 +12,17 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { debounce } from 'lodash'
-import { CanvasToolbarSlotContext } from './canvasToolbarSlot'
+import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from './canvasToolbarSlot'
+import { documentSurface } from '../bridge'
 import { saveCanvasDocument } from '../lib/canvasFileSystem'
 import {
   expandGroupSelection,
   groupsToRefit,
-  normalizeCanvas,
   makeFileNode,
-  makeLinkNode,
-  makeNoteNode,
   makeTextNode,
   DEFAULT_TEXT_NODE_SIZE,
-  DEFAULT_FILE_NODE_SIZE,
-  DEFAULT_LINK_NODE_SIZE,
-  DEFAULT_NOTE_NODE_SIZE,
   DEFAULT_AUDIO_NODE_SIZE,
 } from '../lib/canvasModel'
-import { normalizePinterestBoardUrl } from '../lib/pinterestBoard'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 import { useCanvasViewport } from './useCanvasViewport'
 import { useCanvasDocument } from './useCanvasDocument'
@@ -36,15 +30,10 @@ import { useCanvasSelection } from './useCanvasSelection'
 import { loadSnapPrefs, saveSnapPrefs, useCanvasDrag } from './useCanvasDrag'
 import { useCanvasConnect } from './useCanvasConnect'
 import { useCanvasImageImport } from './useCanvasImageImport'
-import { docPathToFilePath, filePathToDocPath } from './useDocPreview'
-import {
-  CANVAS_COMMAND_EVENT,
-  CANVAS_DROP_DOC_EVENT,
-  CANVAS_DROP_NOTE_EVENT,
-  CANVAS_RESTORE_EVENT,
-  CANVAS_REVEAL_EVENT,
-  takePendingCanvasReveal,
-} from './canvasEvents'
+import { useCanvasKeyboard } from './useCanvasKeyboard'
+import { useCanvasExternalEvents } from './useCanvasExternalEvents'
+import { registerCanvasSurface } from './canvasEvents'
+import { filePathToDocPath } from './useDocPreview'
 import CanvasNode from './CanvasNode'
 import CanvasEdges from './CanvasEdges'
 import CanvasEdgeLabels from './CanvasEdgeLabels'
@@ -422,70 +411,7 @@ export default function CanvasSurface({
     clear()
   }, [clear, dispatch, selectionRef])
 
-  /* ---------------- keyboard ---------------- */
-
-  useEffect(() => {
-    const surface = surfaceRef.current
-    if (!surface) return
-
-    const onKeyDown = (event) => {
-      // Never steal keys from a card that is being edited — ⌘Z there belongs to
-      // that editor's own history.
-      const target = event.target
-      if (target instanceof HTMLElement && target.closest('input, textarea, [contenteditable="true"]')) {
-        return
-      }
-
-      const mod = event.metaKey || event.ctrlKey
-      const key = event.key.toLowerCase()
-
-      // L locks and unlocks — read mode. No modifier: it is a mode switch you reach
-      // for constantly while browsing a board, not a rare command.
-      if (!mod && key === 'l') {
-        event.preventDefault()
-        toggleLocked()
-        return
-      }
-
-      // Everything below edits. In read mode there is nothing to edit.
-      if (locked) return
-
-      if (mod && key === 'z') {
-        event.preventDefault()
-        if (event.shiftKey) redo()
-        else undo()
-        return
-      }
-
-      if (mod && key === 'a') {
-        event.preventDefault()
-        selectAll(stateRef.current)
-        return
-      }
-
-      if (mod && key === 'g') {
-        event.preventDefault()
-        if (event.shiftKey) ungroupSelection()
-        else groupSelection()
-        return
-      }
-
-      if (event.key === 'Backspace' || event.key === 'Delete') {
-        const current = selectionRef.current
-        if (!current.nodes.size && !current.edges.size) return
-        event.preventDefault()
-        deleteSelection()
-        return
-      }
-
-      if (event.key === 'Escape') {
-        clear()
-      }
-    }
-
-    surface.addEventListener('keydown', onKeyDown)
-    return () => surface.removeEventListener('keydown', onKeyDown)
-  }, [
+  useCanvasKeyboard({
     clear,
     deleteSelection,
     groupSelection,
@@ -493,11 +419,12 @@ export default function CanvasSurface({
     redo,
     selectAll,
     selectionRef,
+    stateRef,
     surfaceRef,
     toggleLocked,
     undo,
     ungroupSelection,
-  ])
+  })
 
   /* ---------------- toolbar ---------------- */
 
@@ -559,225 +486,90 @@ export default function CanvasSurface({
     selectNode(node.id)
   }, [dispatch, recorder, selectNode, viewCenter])
 
-  /* ---------------- links and Pinterest boards ---------------- */
-
-  const addLinkNodeAt = useCallback(
-    (url, worldPoint) => {
-      const node = makeLinkNode({
-        url,
-        x: worldPoint.x - DEFAULT_LINK_NODE_SIZE.width / 2,
-        y: worldPoint.y - DEFAULT_LINK_NODE_SIZE.height / 2,
-      })
-      dispatch({ type: 'nodes/add', nodes: [node] })
-      selectNode(node.id)
-      return node
-    },
-    [dispatch, selectNode]
-  )
-
-  /**
-   * Pasting a URL drops a link card — and a Pinterest board url becomes the board.
-   * This mirrors what EditorCanvas's paste handler already does inside a document, so
-   * the same copied link behaves the same way wherever you put it.
-   *
-   * Image pastes are handled in useCanvasImageImport and consume the event first;
-   * this listener only ever sees a paste that carried no image.
-   */
-  useEffect(() => {
-    const surface = surfaceRef.current
-    if (!surface) return
-
-    const onPaste = (event) => {
-      if (event.defaultPrevented) return
-
-      const target = event.target
-      if (target instanceof HTMLElement && target.closest('[contenteditable="true"], input, textarea')) {
-        return
-      }
-
-      const text = event.clipboardData?.getData('text/plain')?.trim()
-      if (!text || !/^https?:\/\//i.test(text)) return
-
-      event.preventDefault()
-      onActivate?.()
-      addLinkNodeAt(normalizePinterestBoardUrl(text) || text, viewCenter())
-    }
-
-    surface.addEventListener('paste', onPaste)
-    return () => surface.removeEventListener('paste', onPaste)
-  }, [addLinkNodeAt, onActivate, surfaceRef, viewCenter])
-
-  /* ---------------- documents dropped from the file tree ---------------- */
-
-  const addDocNodeAt = useCallback(
-    (docTreePath, worldPoint) => {
-      const node = makeFileNode({
-        // The node stores the REAL file path, per the spec — the tree path plus
-        // `.json`. filePathToDocPath goes back the other way when opening it.
-        file: docPathToFilePath(docTreePath),
-        x: worldPoint.x - DEFAULT_FILE_NODE_SIZE.width / 2,
-        y: worldPoint.y - DEFAULT_FILE_NODE_SIZE.height / 2,
-      })
-      dispatch({ type: 'nodes/add', nodes: [node] })
-      selectNode(node.id)
-      return node
-    },
-    [dispatch, selectNode]
-  )
-
-  useEffect(() => {
-    const surface = surfaceRef.current
-    if (!surface) return
-
-    const onDropDoc = (event) => {
-      const { path, clientX, clientY } = event.detail || {}
-      if (!path) return
-      // A canvas can reference another canvas, but not itself — that card would
-      // preview the very document it lives in, and its minimap could never settle.
-      if (path === docPath) return
-      onActivate?.()
-      addDocNodeAt(path, screenToWorldAt(clientX, clientY))
-    }
-
-    surface.addEventListener(CANVAS_DROP_DOC_EVENT, onDropDoc)
-    return () => surface.removeEventListener(CANVAS_DROP_DOC_EVENT, onDropDoc)
-  }, [addDocNodeAt, docPath, onActivate, screenToWorldAt, surfaceRef])
-
-  /* ---------------- notes dropped from the notes panel ---------------- */
-
-  useEffect(() => {
-    const surface = surfaceRef.current
-    if (!surface) return
-
-    const onDropNote = (event) => {
-      const { docPath: sourceDoc, noteId, clientX, clientY } = event.detail || {}
-      if (!sourceDoc || !noteId) return
-
-      onActivate?.()
-      const point = screenToWorldAt(clientX, clientY)
-      const node = makeNoteNode({
-        // The note stays in its document; the card only points at it.
-        file: docPathToFilePath(sourceDoc),
-        noteId,
-        x: point.x - DEFAULT_NOTE_NODE_SIZE.width / 2,
-        y: point.y - DEFAULT_NOTE_NODE_SIZE.height / 2,
-      })
-      dispatch({ type: 'nodes/add', nodes: [node] })
-      selectNode(node.id)
-    }
-
-    surface.addEventListener(CANVAS_DROP_NOTE_EVENT, onDropNote)
-    return () => surface.removeEventListener(CANVAS_DROP_NOTE_EVENT, onDropNote)
-  }, [dispatch, onActivate, screenToWorldAt, selectNode, surfaceRef])
-
-  /* ---------------- commands from the native context menu ---------------- */
-
-  useEffect(() => {
-    const surface = surfaceRef.current
-    if (!surface) return
-
-    const onCommand = (event) => {
-      const { command, clientX, clientY } = event.detail || {}
-      const at = () =>
-        Number.isFinite(clientX) ? screenToWorldAt(clientX, clientY) : viewCenter()
-
-      switch (command) {
-        case 'add-card':
-          addTextNodeAt(at(), { edit: true })
-          break
-        case 'add-image':
-          void importImageAt(at())
-          break
-        case 'record-memo':
-          void handleToggleRecording()
-          break
-        case 'toggle-lock':
-          toggleLocked()
-          break
-        case 'group':
-          groupSelection()
-          break
-        case 'ungroup':
-          ungroupSelection()
-          break
-        case 'delete':
-          deleteSelection()
-          break
-        case 'zoom-to-fit':
-          handleZoomToFit()
-          break
-        default:
-          break
-      }
-    }
-
-    surface.addEventListener(CANVAS_COMMAND_EVENT, onCommand)
-    return () => surface.removeEventListener(CANVAS_COMMAND_EVENT, onCommand)
-  }, [
+  useCanvasExternalEvents({
     addTextNodeAt,
+    applyColor,
+    centerOn,
+    clear,
     deleteSelection,
+    dispatch,
+    docPath,
     groupSelection,
     handleToggleRecording,
     handleZoomToFit,
     importImageAt,
+    onActivate,
+    redo,
+    resetZoom,
     screenToWorldAt,
+    selectNode,
+    stateRef,
     surfaceRef,
     toggleLocked,
+    toggleSnapPref,
+    undo,
     ungroupSelection,
     viewCenter,
-  ])
+    zoomIn,
+    zoomOut,
+  })
 
-  /* ---------------- restore a version (from the history panel) ---------------- */
 
-  useEffect(() => {
-    // Restoring goes through the reducer as one doc/replace, so it is a single
-    // undo step — stepping back from a restore is ⌘Z, same as any other edit.
-    const onRestore = (event) => {
-      const { docPath: target, canvas } = event.detail || {}
-      if (target !== docPath || !canvas) return
-      dispatch({ type: 'doc/replace', doc: normalizeCanvas(canvas) })
-      clear()
-    }
-
-    window.addEventListener(CANVAS_RESTORE_EVENT, onRestore)
-    return () => window.removeEventListener(CANVAS_RESTORE_EVENT, onRestore)
-  }, [clear, dispatch, docPath])
-
-  /* ---------------- reveal a node (from search) ---------------- */
-
-  const revealNode = useCallback(
-    (nodeId) => {
-      const node = stateRef.current.nodes[nodeId]
-      if (!node) return
-      selectNode(nodeId)
-      centerOn(node)
-    },
-    [centerOn, selectNode]
-  )
-
-  useEffect(() => {
-    // A search hit in a canvas that was not open asks for the reveal before this
-    // surface exists; the request waits in canvasEvents and is claimed on mount.
-    const pending = takePendingCanvasReveal(docPath)
-    if (pending) revealNode(pending)
-
-    // And a hit in the canvas already on screen arrives as an event, because
-    // nothing remounts.
-    const onReveal = (event) => {
-      const { docPath: target, nodeId } = event.detail || {}
-      if (target !== docPath) return
-      takePendingCanvasReveal(docPath)
-      revealNode(nodeId)
-    }
-
-    window.addEventListener(CANVAS_REVEAL_EVENT, onReveal)
-    return () => window.removeEventListener(CANVAS_REVEAL_EVENT, onReveal)
-  }, [docPath, revealNode])
+  // Claim an id for this surface, so the bridge can address it without hit-testing
+  // the DOM — which a native shell cannot do. See canvasEvents' surface-id section.
+  useEffect(() => registerCanvasSurface(surfaceRef.current), [surfaceRef])
 
   const isEmpty = state.nodeOrder.length === 0
   const hasSelection = selection.nodes.size > 0 || selection.edges.size > 0
   const canGroup = [...selection.nodes].some((id) => state.nodes[id]?.type !== 'group')
   const canUngroup = [...selection.nodes].some((id) => state.nodes[id]?.type === 'group')
+
+  /*
+   * Under a shell that draws the canvas toolbar itself, this canvas reports the
+   * toolbar's state instead of rendering it, and the shell sends the buttons back as
+   * canvas commands. The cleanup says "no canvas toolbar", so a canvas that stops being
+   * the active one — or starts having a card edited — takes its toolbar down; when the
+   * state merely changed, the next state lands in the same frame and supersedes it.
+   */
+  const nativeToolbar = isActive && toolbarSlot === NATIVE_CANVAS_TOOLBAR
+  useEffect(() => {
+    if (!nativeToolbar) return undefined
+    const surfaceId = surfaceRef.current?.dataset.surfaceId
+    if (!surfaceId) return undefined
+    documentSurface.publishCanvasToolbar({
+      state: {
+        surfaceId,
+        zoom: viewport.zoom,
+        canUndo,
+        canRedo,
+        hasSelection,
+        canGroup,
+        canUngroup,
+        locked,
+        alignmentGuides: !!snapPrefs.guides,
+        snapToGrid: !!snapPrefs.grid,
+        canRecord: !!recorder.supported,
+        isRecording: !!recorder.recording,
+        recordElapsedMs: recorder.recording ? recorder.elapsed : 0,
+      },
+    })
+    return () => documentSurface.publishCanvasToolbar({})
+  }, [
+    canGroup,
+    canRedo,
+    canUndo,
+    canUngroup,
+    hasSelection,
+    locked,
+    nativeToolbar,
+    recorder.elapsed,
+    recorder.recording,
+    recorder.supported,
+    snapPrefs.grid,
+    snapPrefs.guides,
+    surfaceRef,
+    viewport.zoom,
+  ])
 
   return (
     <div
@@ -869,7 +661,7 @@ export default function CanvasSurface({
       {/* The toolbar renders in the titlebar, not over the canvas. The slot is
           null unless this is the active pane's canvas and no card is being
           edited — when one is, the text Toolbar takes the titlebar instead. */}
-      {isActive && toolbarSlot ? createPortal(
+      {isActive && toolbarSlot && !nativeToolbar ? createPortal(
         <CanvasToolbar
           zoom={viewport.zoom}
           canUndo={canUndo}
