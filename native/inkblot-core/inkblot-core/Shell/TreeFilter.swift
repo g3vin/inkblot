@@ -4,13 +4,14 @@ import Foundation
 /// the rows that match, with the folders they are in.
 struct TreeFilter: Equatable {
     enum Kind: String, CaseIterable, Identifiable {
-        case all, documents, canvases
+        case all, documents, canvases, maps
         var id: Self { self }
         var title: String {
             switch self {
             case .all: "All Files"
             case .documents: "Documents"
             case .canvases: "Canvases"
+            case .maps: "Maps"
             }
         }
     }
@@ -45,8 +46,9 @@ struct TreeFilter: Equatable {
             if recentOnly && !recent.contains(node.path) { return nil }
             switch kind {
             case .all: return node
-            case .documents: return isCanvasDoc(path: node.path) ? nil : node
+            case .documents: return isCanvasDoc(path: node.path) || isMapDoc(path: node.path) ? nil : node
             case .canvases: return isCanvasDoc(path: node.path) ? node : nil
+            case .maps: return isMapDoc(path: node.path) ? node : nil
             }
         }
     }

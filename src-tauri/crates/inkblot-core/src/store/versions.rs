@@ -36,6 +36,7 @@ pub fn build_text_version_entry(new_version: NewTextVersion) -> VersionEntry {
         content_html: new_version.content_html,
         content_json: new_version.content_json,
         canvas: None,
+        map: None,
     }
 }
 
@@ -59,7 +60,41 @@ pub fn build_canvas_version_entry(
         content_html: None,
         content_json: None,
         canvas: Some(canvas),
+        map: None,
     }
+}
+
+/// A version entry holding a full serialized map.
+pub fn build_map_version_entry(
+    id: String,
+    timestamp: String,
+    session_id: String,
+    map: crate::types::JsonValue,
+    name: Option<String>,
+    auto: bool,
+) -> VersionEntry {
+    VersionEntry {
+        id,
+        timestamp,
+        kind: VersionKind::Map,
+        name: name.filter(|name| !name.is_empty()),
+        auto,
+        session_id: Some(session_id),
+        words: Some(crate::map::model::count_map_words(&map)),
+        content_html: None,
+        content_json: None,
+        canvas: None,
+        map: Some(map),
+    }
+}
+
+/// A map with the parts that are where you looked, not what you made, taken out.
+fn map_content(entry: &VersionEntry) -> Option<crate::types::JsonValue> {
+    let mut map = entry.map.clone()?;
+    if let Some(object) = map.as_object_mut() {
+        object.remove("viewport");
+    }
+    Some(map)
 }
 
 /// Two entries hold the same document state (viewport and metadata aside).
@@ -68,6 +103,9 @@ pub fn build_canvas_version_entry(
 /// values, so two canvases differing only in the key order of an unknown key are the
 /// same state here and different states there. Same trade as `diff_canvases`.
 pub fn same_version_content(a: &VersionEntry, b: &VersionEntry) -> bool {
+    if a.map.is_some() || b.map.is_some() {
+        return map_content(a) == map_content(b);
+    }
     if a.canvas.is_some() || b.canvas.is_some() {
         let parts = |entry: &VersionEntry| {
             entry.canvas.as_ref().map(|canvas| (canvas.nodes.clone(), canvas.edges.clone()))

@@ -11,6 +11,10 @@ import {
   withCanvasSuffix,
   stripCanvasSuffix,
   getDocDisplayName,
+  isMapDoc,
+  isTextDoc,
+  withDocSuffix,
+  stripDocSuffix,
 } from '../../../src/lib/docKind.js'
 
 const PATHS = [
@@ -41,6 +45,14 @@ const PATHS = [
   true,
   7,
   'multi\nline.canvas',
+  'World/Aria.map',
+  '.map',
+  'map',
+  'a.map.canvas',
+  'x.canvas.map',
+  'Treasure.Map',
+  'atlas.map.backup',
+  'Lands 🗺️.map',
 ]
 
 const FUNCTIONS = {
@@ -49,6 +61,9 @@ const FUNCTIONS = {
   withCanvasSuffix,
   stripCanvasSuffix,
   getDocDisplayName,
+  isMapDoc,
+  isTextDoc,
+  stripDocSuffix,
 }
 
 export default {
@@ -57,6 +72,11 @@ export default {
     for (const [name, fn] of Object.entries(FUNCTIONS)) {
       for (const path of PATHS) {
         yield { fn: name, args: [path], expected: fn(path) }
+      }
+    }
+    for (const path of PATHS) {
+      for (const kind of ['canvas', 'map', 'text', 'folder', undefined]) {
+        yield { fn: 'withDocSuffix', args: [path, kind ?? null], expected: withDocSuffix(path, kind) }
       }
     }
   },

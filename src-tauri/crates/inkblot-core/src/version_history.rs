@@ -139,6 +139,9 @@ pub fn version_words(entry: &VersionEntry) -> u32 {
     if let Some(canvas) = &entry.canvas {
         return count_canvas_words(canvas);
     }
+    if let Some(map) = &entry.map {
+        return crate::map::model::count_map_words(map);
+    }
     count_words(entry.content_html.as_deref().unwrap_or(""), true)
 }
 
@@ -681,6 +684,7 @@ mod tests {
             content_html: Some(html.into()),
             content_json: None,
             canvas: None,
+            map: None,
         }
     }
 

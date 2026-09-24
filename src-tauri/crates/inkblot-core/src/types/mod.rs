@@ -16,6 +16,7 @@ pub mod diff;
 pub mod document;
 pub mod geometry;
 pub mod json;
+pub mod map;
 pub mod note;
 pub mod page_setup;
 pub mod read_aloud;
@@ -31,6 +32,13 @@ pub use canvas::{
 pub use document::{DocKind, DocumentCitations, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind, VERSION_CAP};
 pub use geometry::{BezierPath, EdgeSide, Point, Rect, Viewport};
 pub use json::{JsonMap, JsonValue};
+pub use map::{
+    BodyKind, EarthProjection, MapBackground, MapBody, MapCalibration, MapCartouche, MapCompass,
+    MapCustomUnit, MapEarth, MapFile, MapKind, MapLabel, MapLeg, MapLineStyle, MapOrbit,
+    MapOrnament, MapPin, MapRegion, MapRoute, MapRouteNode, MapScale, MapStyle, MapSystem,
+    MapSystemDisplay, MapTerrain, MapTimeline, MapTransport, MapTraveler, MapViewport,
+    TransportMedium,
+};
 pub use page_setup::{
     BindingSettings, BindingType, BookSettings, DuplexMode, PageMargins, PageNumberFormat,
     PageOrientation, PageSetup, RunningText, SheetFit,

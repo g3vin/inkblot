@@ -18,6 +18,7 @@ pub const VERSION_CAP: usize = 200;
 #[serde(rename_all = "lowercase")]
 pub enum DocKind {
     Canvas,
+    Map,
     Text,
 }
 
@@ -27,6 +28,7 @@ pub enum DocKind {
 pub enum VersionKind {
     Text,
     Canvas,
+    Map,
 }
 
 /// One point in a document's history.
@@ -63,6 +65,10 @@ pub struct VersionEntry {
     pub content_json: Option<JsonValue>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas: Option<CanvasFile>,
+    /// A map entry's whole serialized map. Held as JSON rather than `MapFile` so the
+    /// unknown keys a map carries survive a restore (see `map::model`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map: Option<JsonValue>,
 }
 
 #[typeshare]

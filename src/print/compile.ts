@@ -6,7 +6,7 @@
  * tree — the same order the tree shows, from the same saved order map — and loading
  * each one's content. Canvases are not chapters and are skipped.
  */
-import { isCanvasDoc } from '../lib/docKind'
+import { isTextDoc } from '../lib/docKind'
 import { listProjectTree, loadDocument } from '../lib/FileSystem'
 import { applyOrderToTree, getParentPath } from '../lib/fileTreeOrder'
 import { loadOrder } from '../lib/fileTreeState'
@@ -42,7 +42,7 @@ const collectFiles = (node: TreeNode | null | undefined, out: string[] = []): st
   if (!node) return out
   for (const child of node.children || []) {
     if (child.type === 'file') {
-      if (!isCanvasDoc(child.path)) out.push(child.path)
+      if (isTextDoc(child.path)) out.push(child.path)
     } else {
       collectFiles(child, out)
     }

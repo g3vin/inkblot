@@ -1820,11 +1820,12 @@ public struct ContributorRoleSpec: Codable, Equatable {
 public enum EntryKind: String, Codable, Equatable {
 	case document
 	case canvas
+	case map
 	case folder
 }
 
-/// Create a document, canvas or folder in the open project, and open it if it is a
-/// document.
+/// Create a document, canvas, map or folder in the open project, and open it if it is
+/// not a folder.
 /// 
 /// The page does the writing, not the shell, for the same reason as every command
 /// below: a new document gets a tab and a place in the tree's stored order, and those
@@ -1833,7 +1834,7 @@ public enum EntryKind: String, Codable, Equatable {
 public struct CreateEntryCommand: Codable, Equatable {
 	/// Tree path of the folder to create in; empty for the project root.
 	public let parentFolder: String
-	/// The bare name. For a canvas the page adds the `.canvas` suffix.
+	/// The bare name. For a canvas or map the page adds the `.canvas` or `.map` suffix.
 	public let name: String
 	public let kind: EntryKind
 
@@ -2748,6 +2749,500 @@ public struct JumpToAnchorCommand: Codable, Equatable {
 		self.target = target
 		self.anchor = anchor
 		self.preferPositions = preferPositions
+	}
+}
+
+public struct MapBackground: Codable, Equatable {
+	/// A project asset path (`.assets/<hash>.<ext>`).
+	public let image: String?
+	public let width: Double?
+	public let height: Double?
+	public let opacity: Double
+	/// The traced vector outline, an SVG asset.
+	public let trace: String?
+	public let showImage: Bool
+
+	public init(image: String?, width: Double?, height: Double?, opacity: Double, trace: String?, showImage: Bool) {
+		self.image = image
+		self.width = width
+		self.height = height
+		self.opacity = opacity
+		self.trace = trace
+		self.showImage = showImage
+	}
+}
+
+public enum BodyKind: String, Codable, Equatable {
+	case star
+	case planet
+	case dwarf
+	case moon
+	case belt
+	case station
+	case barycenter
+}
+
+public struct MapOrbit: Codable, Equatable {
+	/// Semi-major axis, in AU.
+	public let aAU: Double
+	/// Eccentricity, 0 to 0.99.
+	public let e: Double
+	public let periapsisDeg: Double
+	/// Mean anomaly at day 0.
+	public let meanAnomalyDeg: Double
+	/// Overrides the period Kepler's third law gives.
+	public let periodDays: Double?
+	public let retrograde: Bool
+
+	public init(aAU: Double, e: Double, periapsisDeg: Double, meanAnomalyDeg: Double, periodDays: Double?, retrograde: Bool) {
+		self.aAU = aAU
+		self.e = e
+		self.periapsisDeg = periapsisDeg
+		self.meanAnomalyDeg = meanAnomalyDeg
+		self.periodDays = periodDays
+		self.retrograde = retrograde
+	}
+}
+
+public struct MapBody: Codable, Equatable {
+	public let id: String
+	public let name: String
+	public let kind: BodyKind
+	public let parent: String?
+	public let massSun: Double?
+	public let radiusKm: Double?
+	public let color: String?
+	public let orbit: MapOrbit?
+
+	public init(id: String, name: String, kind: BodyKind, parent: String?, massSun: Double?, radiusKm: Double?, color: String?, orbit: MapOrbit?) {
+		self.id = id
+		self.name = name
+		self.kind = kind
+		self.parent = parent
+		self.massSun = massSun
+		self.radiusKm = radiusKm
+		self.color = color
+		self.orbit = orbit
+	}
+}
+
+public struct MapCalibration: Codable, Equatable {
+	public let a: [Double]
+	public let b: [Double]
+	/// The distance between `a` and `b`, in `unit`.
+	public let distance: Double
+	public let unit: String
+
+	public init(a: [Double], b: [Double], distance: Double, unit: String) {
+		self.a = a
+		self.b = b
+		self.distance = distance
+		self.unit = unit
+	}
+}
+
+public struct MapCartouche: Codable, Equatable {
+	public let show: Bool
+	public let at: [Double]
+	public let title: String?
+	public let subtitle: String?
+
+	public init(show: Bool, at: [Double], title: String?, subtitle: String?) {
+		self.show = show
+		self.at = at
+		self.title = title
+		self.subtitle = subtitle
+	}
+}
+
+public struct MapCompass: Codable, Equatable {
+	public let show: Bool
+	public let at: [Double]
+	public let size: Double
+	public let style: String
+
+	public init(show: Bool, at: [Double], size: Double, style: String) {
+		self.show = show
+		self.at = at
+		self.size = size
+		self.style = style
+	}
+}
+
+public struct MapCustomUnit: Codable, Equatable {
+	public let id: String
+	public let name: String
+	public let km: Double
+
+	public init(id: String, name: String, km: Double) {
+		self.id = id
+		self.name = name
+		self.km = km
+	}
+}
+
+public enum EarthProjection: String, Codable, Equatable {
+	case equalEarth
+	case equirectangular
+	case mercator
+	case naturalEarth
+	case orthographic
+}
+
+public struct MapEarth: Codable, Equatable {
+	public let projection: EarthProjection
+	/// `[λ, φ]` rotation in degrees; what an orthographic globe is turned to.
+	public let rotate: [Double]
+	public let graticule: Bool
+	public let borders: Bool
+	/// `auto`, `110m` or `50m`.
+	public let detail: String
+
+	public init(projection: EarthProjection, rotate: [Double], graticule: Bool, borders: Bool, detail: String) {
+		self.projection = projection
+		self.rotate = rotate
+		self.graticule = graticule
+		self.borders = borders
+		self.detail = detail
+	}
+}
+
+public enum MapKind: String, Codable, Equatable {
+	case blank
+	case image
+	case earth
+	case system
+}
+
+public struct MapScale: Codable, Equatable {
+	/// Kilometres per map unit on a plane map. Earth and system maps carry their own
+	/// intrinsic scale and ignore it.
+	public let kmPerUnit: Double
+	public let displayUnit: String
+	public let calibration: MapCalibration?
+	public let customUnits: [MapCustomUnit]
+
+	public init(kmPerUnit: Double, displayUnit: String, calibration: MapCalibration?, customUnits: [MapCustomUnit]) {
+		self.kmPerUnit = kmPerUnit
+		self.displayUnit = displayUnit
+		self.calibration = calibration
+		self.customUnits = customUnits
+	}
+}
+
+public struct MapSystemDisplay: Codable, Equatable {
+	/// `linear` or `log`.
+	public let radial: String
+	public let pxPerAU: Double
+
+	public init(radial: String, pxPerAU: Double) {
+		self.radial = radial
+		self.pxPerAU = pxPerAU
+	}
+}
+
+public struct MapSystem: Codable, Equatable {
+	public let bodies: [MapBody]
+	public let display: MapSystemDisplay
+
+	public init(bodies: [MapBody], display: MapSystemDisplay) {
+		self.bodies = bodies
+		self.display = display
+	}
+}
+
+public struct MapPin: Codable, Equatable {
+	public let id: String
+	/// Overrides the linked doc's name.
+	public let name: String?
+	/// Tree path of the linked doc — a location, usually.
+	public let doc: String?
+	public let at: [Double]?
+	/// On a star system, the body the pin rides on instead of a fixed point.
+	public let body: String?
+	public let icon: String
+	public let color: String?
+
+	public init(id: String, name: String?, doc: String?, at: [Double]?, body: String?, icon: String, color: String?) {
+		self.id = id
+		self.name = name
+		self.doc = doc
+		self.at = at
+		self.body = body
+		self.icon = icon
+		self.color = color
+	}
+}
+
+/// One stop on a route: a pin (which the route then follows when it moves) or a
+/// free point. Exactly one of the two is set.
+public struct MapRouteNode: Codable, Equatable {
+	public let pin: String?
+	public let at: [Double]?
+
+	public init(pin: String?, at: [Double]?) {
+		self.pin = pin
+		self.at = at
+	}
+}
+
+public struct MapLineStyle: Codable, Equatable {
+	public let stroke: String?
+	public let width: Double
+	/// `solid`, `dashed`, `dotted`, `inked` or `rough`.
+	public let dash: String
+	public let arrow: Bool
+
+	public init(stroke: String?, width: Double, dash: String, arrow: Bool) {
+		self.stroke = stroke
+		self.width = width
+		self.dash = dash
+		self.arrow = arrow
+	}
+}
+
+public struct MapRoute: Codable, Equatable {
+	public let id: String
+	public let name: String?
+	public let nodes: [MapRouteNode]
+	/// `linear` or `catmullRom`.
+	public let smooth: String
+	public let style: MapLineStyle
+
+	public init(id: String, name: String?, nodes: [MapRouteNode], smooth: String, style: MapLineStyle) {
+		self.id = id
+		self.name = name
+		self.nodes = nodes
+		self.smooth = smooth
+		self.style = style
+	}
+}
+
+public struct MapRegion: Codable, Equatable {
+	public let id: String
+	public let name: String?
+	/// The outer ring first; any further ring is a hole.
+	public let rings: [[[Double]]]
+	/// A terrain id; travel across the region takes its multipliers.
+	public let terrain: String?
+	public let fill: String?
+	public let hatch: String
+	public let stroke: String?
+
+	public init(id: String, name: String?, rings: [[[Double]]], terrain: String?, fill: String?, hatch: String, stroke: String?) {
+		self.id = id
+		self.name = name
+		self.rings = rings
+		self.terrain = terrain
+		self.fill = fill
+		self.hatch = hatch
+		self.stroke = stroke
+	}
+}
+
+public struct MapTerrain: Codable, Equatable {
+	public let id: String
+	public let name: String
+	/// Speed multipliers keyed by transport id, or `*land`/`*water`/… for a whole
+	/// medium. 0 is impassable; a transport that is not listed moves at full speed.
+	public let multipliers: [String: Double]
+
+	public init(id: String, name: String, multipliers: [String: Double]) {
+		self.id = id
+		self.name = name
+		self.multipliers = multipliers
+	}
+}
+
+public struct MapLabel: Codable, Equatable {
+	public let id: String
+	public let text: String
+	public let at: [Double]?
+	/// A route the text runs along.
+	public let route: String?
+	/// A free path the text runs along.
+	public let path: [[Double]]?
+	public let startOffset: Double
+	public let size: Double
+	public let rotation: Double
+	public let font: String
+	public let minZoom: Double
+	public let maxZoom: Double?
+
+	public init(id: String, text: String, at: [Double]?, route: String?, path: [[Double]]?, startOffset: Double, size: Double, rotation: Double, font: String, minZoom: Double, maxZoom: Double?) {
+		self.id = id
+		self.text = text
+		self.at = at
+		self.route = route
+		self.path = path
+		self.startOffset = startOffset
+		self.size = size
+		self.rotation = rotation
+		self.font = font
+		self.minZoom = minZoom
+		self.maxZoom = maxZoom
+	}
+}
+
+public enum TransportMedium: String, Codable, Equatable {
+	case land
+	case water
+	case air
+	case space
+}
+
+public struct MapTransport: Codable, Equatable {
+	public let id: String
+	public let name: String
+	public let kmh: Double
+	/// Hours actually spent moving in a day.
+	public let hoursPerDay: Double
+	public let medium: TransportMedium
+	/// Set on relativistic transports: the speed as a fraction of c (then `kmh` is
+	/// derived from it).
+	public let fractionC: Double?
+
+	public init(id: String, name: String, kmh: Double, hoursPerDay: Double, medium: TransportMedium, fractionC: Double?) {
+		self.id = id
+		self.name = name
+		self.kmh = kmh
+		self.hoursPerDay = hoursPerDay
+		self.medium = medium
+		self.fractionC = fractionC
+	}
+}
+
+public struct MapLeg: Codable, Equatable {
+	public let id: String
+	/// The route to follow; straight (or great-circle) from `from` to `to` without one.
+	public let route: String?
+	public let from: String?
+	public let to: String?
+	public let transport: String
+	/// A fixed departure day; null leaves when the previous leg arrives (plus rest).
+	public let departDay: Double?
+	public let restDays: Double
+
+	public init(id: String, route: String?, from: String?, to: String?, transport: String, departDay: Double?, restDays: Double) {
+		self.id = id
+		self.route = route
+		self.from = from
+		self.to = to
+		self.transport = transport
+		self.departDay = departDay
+		self.restDays = restDays
+	}
+}
+
+public struct MapTraveler: Codable, Equatable {
+	public let id: String
+	/// Tree path of the character doc.
+	public let doc: String?
+	public let name: String?
+	public let color: String?
+	public let startPin: String?
+	public let startDay: Double
+	public let legs: [MapLeg]
+
+	public init(id: String, doc: String?, name: String?, color: String?, startPin: String?, startDay: Double, legs: [MapLeg]) {
+		self.id = id
+		self.doc = doc
+		self.name = name
+		self.color = color
+		self.startPin = startPin
+		self.startDay = startDay
+		self.legs = legs
+	}
+}
+
+public struct MapTimeline: Codable, Equatable {
+	/// The story day the map shows, a float; day 0 is the story's epoch.
+	public let day: Double
+
+	public init(day: Double) {
+		self.day = day
+	}
+}
+
+/// A screen-anchored ornament; `at` is a fraction of the view on each axis.
+public struct MapOrnament: Codable, Equatable {
+	public let show: Bool
+	public let at: [Double]
+
+	public init(show: Bool, at: [Double]) {
+		self.show = show
+		self.at = at
+	}
+}
+
+public struct MapStyle: Codable, Equatable {
+	/// `clean`, `parchment`, `ink` or `night`.
+	public let theme: String
+	public let compass: MapCompass
+	public let scaleBar: MapOrnament
+	public let cartouche: MapCartouche
+
+	public init(theme: String, compass: MapCompass, scaleBar: MapOrnament, cartouche: MapCartouche) {
+		self.theme = theme
+		self.compass = compass
+		self.scaleBar = scaleBar
+		self.cartouche = cartouche
+	}
+}
+
+public struct MapViewport: Codable, Equatable {
+	public let x: Double
+	public let y: Double
+	public let zoom: Double
+
+	public init(x: Double, y: Double, zoom: Double) {
+		self.x = x
+		self.y = y
+		self.zoom = zoom
+	}
+}
+
+/// The object written to `<name>.map.json`.
+public struct MapFile: Codable, Equatable {
+	/// Always `"map"`. Never routed on (the kind is the path's), but the store checks
+	/// it before overwriting a file, so a text document named `x.map` survives.
+	public let type: String
+	public let formatVersion: UInt32
+	public let mapKind: MapKind
+	public let scale: MapScale
+	public let background: MapBackground
+	public let earth: MapEarth
+	public let system: MapSystem
+	public let pins: [MapPin]
+	public let routes: [MapRoute]
+	public let regions: [MapRegion]
+	public let terrains: [MapTerrain]
+	public let labels: [MapLabel]
+	/// Custom transports; one sharing a built-in's id replaces it on this map.
+	public let transports: [MapTransport]
+	public let travelers: [MapTraveler]
+	public let timeline: MapTimeline
+	public let style: MapStyle
+	public let viewport: MapViewport
+
+	public init(type: String, formatVersion: UInt32, mapKind: MapKind, scale: MapScale, background: MapBackground, earth: MapEarth, system: MapSystem, pins: [MapPin], routes: [MapRoute], regions: [MapRegion], terrains: [MapTerrain], labels: [MapLabel], transports: [MapTransport], travelers: [MapTraveler], timeline: MapTimeline, style: MapStyle, viewport: MapViewport) {
+		self.type = type
+		self.formatVersion = formatVersion
+		self.mapKind = mapKind
+		self.scale = scale
+		self.background = background
+		self.earth = earth
+		self.system = system
+		self.pins = pins
+		self.routes = routes
+		self.regions = regions
+		self.terrains = terrains
+		self.labels = labels
+		self.transports = transports
+		self.travelers = travelers
+		self.timeline = timeline
+		self.style = style
+		self.viewport = viewport
 	}
 }
 
@@ -3765,6 +4260,9 @@ public enum SearchResultType: String, Codable, Equatable {
 	case noteMatch = "note-match"
 	/// A hit on a canvas, addressed by node id — a canvas has no positions.
 	case canvasMatch = "canvas-match"
+	/// A hit on a map, addressed by the id of the pin, route, region, label or
+	/// traveler that carries the text (in `node_id`).
+	case mapMatch = "map-match"
 }
 
 /// One row of results.
@@ -4253,6 +4751,7 @@ public struct TargetOnly: Codable, Equatable {
 public enum VersionKind: String, Codable, Equatable {
 	case text
 	case canvas
+	case map
 }
 
 /// One point in a document's history.
@@ -4280,8 +4779,11 @@ public struct VersionEntry: Codable, Equatable {
 	public let contentHtml: String?
 	public let contentJson: AnyCodable?
 	public let canvas: CanvasFile?
+	/// A map entry's whole serialized map. Held as JSON rather than `MapFile` so the
+	/// unknown keys a map carries survive a restore (see `map::model`).
+	public let map: AnyCodable?
 
-	public init(id: String, timestamp: String, kind: VersionKind, name: String?, auto: Bool, sessionId: String?, words: UInt32?, contentHtml: String?, contentJson: AnyCodable?, canvas: CanvasFile?) {
+	public init(id: String, timestamp: String, kind: VersionKind, name: String?, auto: Bool, sessionId: String?, words: UInt32?, contentHtml: String?, contentJson: AnyCodable?, canvas: CanvasFile?, map: AnyCodable?) {
 		self.id = id
 		self.timestamp = timestamp
 		self.kind = kind
@@ -4292,6 +4794,7 @@ public struct VersionEntry: Codable, Equatable {
 		self.contentHtml = contentHtml
 		self.contentJson = contentJson
 		self.canvas = canvas
+		self.map = map
 	}
 }
 
@@ -4602,6 +5105,7 @@ public struct WordCountsChanged: Codable, Equatable {
 /// `doc_kind` for why it is never read from a field inside the file.
 public enum DocKind: String, Codable, Equatable {
 	case canvas
+	case map
 	case text
 }
 
