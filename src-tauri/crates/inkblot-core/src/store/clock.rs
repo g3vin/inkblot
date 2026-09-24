@@ -37,7 +37,11 @@ pub fn iso8601_from_millis(millis: i64) -> String {
     let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
     let shifted_month = (5 * day_of_year + 2) / 153;
     let day = day_of_year - (153 * shifted_month + 2) / 5 + 1;
-    let month = if shifted_month < 10 { shifted_month + 3 } else { shifted_month - 9 };
+    let month = if shifted_month < 10 {
+        shifted_month + 3
+    } else {
+        shifted_month - 9
+    };
     let year = if month <= 2 { year + 1 } else { year };
 
     let (hour, minute, second, milli) = (
@@ -82,10 +86,19 @@ mod tests {
         assert_eq!(iso8601_from_millis(0), "1970-01-01T00:00:00.000Z");
         assert_eq!(iso8601_from_millis(1), "1970-01-01T00:00:00.001Z");
         // Node: new Date(1772668800000).toISOString()
-        assert_eq!(iso8601_from_millis(1_772_668_800_000), "2026-03-05T00:00:00.000Z");
+        assert_eq!(
+            iso8601_from_millis(1_772_668_800_000),
+            "2026-03-05T00:00:00.000Z"
+        );
         // A leap day, and the last millisecond of a year.
-        assert_eq!(iso8601_from_millis(1_709_164_800_000), "2024-02-29T00:00:00.000Z");
-        assert_eq!(iso8601_from_millis(1_767_225_599_999), "2025-12-31T23:59:59.999Z");
+        assert_eq!(
+            iso8601_from_millis(1_709_164_800_000),
+            "2024-02-29T00:00:00.000Z"
+        );
+        assert_eq!(
+            iso8601_from_millis(1_767_225_599_999),
+            "2025-12-31T23:59:59.999Z"
+        );
         // Before the epoch, where truncating division would give the wrong day.
         assert_eq!(iso8601_from_millis(-1), "1969-12-31T23:59:59.999Z");
     }

@@ -1,35 +1,41 @@
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 import Foundation
 import os
 import UniformTypeIdentifiers
 import WebKit
 
-/// The Swift side of `Web/tauri-shim.js`: the Tauri commands the bundle still makes,
+/// The Swift side of `Web/tauri-shim.js`: the Tauri commands the bundle makes,
 /// answered natively.
 ///
 /// Only what needs the machine arrives here — callbacks, events and the menu tree are
-/// kept in the page (see the shim's header). What is left is a short list, and each
-/// case below says which package in the bundle makes the call, so that when that
-/// caller moves onto the bridge protocol the case can be deleted with confidence.
+/// kept in the page (see the shim's header). Each case below says which package in the
+/// bundle makes the call. A new Tauri command added to `src-tauri/src/lib.rs` needs a
+/// case here too (or in `ModelService`), or the Swift app answers it with an error.
 ///
-/// **Not answered yet**, and rejected by name so the bundle's own fallbacks run: the
-/// synonym model, Kokoro speech, whisper dictation and the Pinterest scrape. Each is
-/// a Rust module in the Tauri app crate (`src-tauri/src/*_commands.rs`) rather than in
-/// `inkblot-core`, so there is nothing for `inkblot-ffi` to expose until they move.
-/// HANDOFF.md tracks them.
+/// The synonym model, rhymes, Kokoro speech, whisper dictation and the Pinterest
+/// scrape channel are `ModelService`'s — `inkblot-models` through `inkblot-ffi`, the
+/// same engines the Tauri app's `*_commands.rs` wrap.
 @MainActor
 final class TauriHost {
     private let core: CoreService
     private let menus: WebMenus
+    private let models = ModelService.shared
     private let log = Logger(subsystem: "inkblot", category: "tauri")
-    weak var window: NSWindow?
+    weak var window: PlatformWindow?
+    /// Which window's page this answers: `main`, or a detached document's label.
+    let label: String
 
     /// `@tauri-apps/api/path`'s `BaseDirectory.AppData`.
     private static let appDataBaseDirectory = 14
 
-    init(core: CoreService, menus: WebMenus) {
+    init(core: CoreService, menus: WebMenus, label: String = AuxiliaryWindows.mainLabel) {
         self.core = core
         self.menus = menus
+        self.label = label
     }
 
     struct Failure: LocalizedError {
@@ -61,7 +67,9 @@ final class TauriHost {
         let bytes = (request["bytes"] as? String).flatMap { Data(base64Encoded: $0) }
 
         do {
-            switch try await dispatch(cmd, args: args, headers: headers, bytes: bytes) {
+            let reply = try await dispatch(cmd, args: args, headers: headers, bytes: bytes)
+            announceChange(cmd, args: args, headers: headers)
+            switch reply {
             case .value(let value):
                 return Self.encode(["ok": true, "value": value ?? NSNull()])
             case .bytes(let data):
@@ -187,16 +195,18 @@ final class TauriHost {
 
         case "plugin:opener|open_url":
             guard let string = args["url"] as? String, let url = URL(string: string) else { throw Failure("Not a URL") }
-            NSWorkspace.shared.open(url)
+            Platform.open(url)
             return .value(nil)
 
         case "plugin:opener|open_path":
-            NSWorkspace.shared.open(try path(args["path"], options: nil))
+            Platform.open(try path(args["path"], options: nil))
             return .value(nil)
 
         case "plugin:opener|reveal_item_in_dir":
+            #if os(macOS)
             let paths = (args["paths"] as? [String]) ?? (args["path"] as? String).map { [$0] } ?? []
             NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) })
+            #endif
             return .value(nil)
 
         /* ---------------- the shim's own: menus and the window ---------------- */
@@ -206,16 +216,74 @@ final class TauriHost {
             return .value(menus.popup(tree, in: window))
 
         case "menu.setApp":
+            // The menu bar is the main window's page's: its items activate there, so a
+            // detached window's menu would install items nothing could answer.
+            guard label == AuxiliaryWindows.mainLabel else { return .value(nil) }
             guard let tree = args["menu"] as? [String: Any] else { throw Failure("No menu to install") }
             menus.setAppMenu(tree)
             return .value(nil)
 
+        case "window.startDrag":
+            #if os(macOS)
+            // The page asks after its mousedown has already been delivered, so the
+            // event that started the drag is the one recorded on the way in — and the
+            // drag only starts if that button is still down.
+            guard let window, let mouseDown = MouseDownRecorder.shared.last,
+                  NSEvent.pressedMouseButtons & 1 == 1
+            else { return .value(nil) }
+            window.performDrag(with: mouseDown)
+            #endif
+            return .value(nil)
+
         case "window.isFullscreen":
+            #if os(macOS)
             return .value(window?.styleMask.contains(.fullScreen) ?? false)
+            #else
+            return .value(false)
+            #endif
 
         case "window.setTitle":
+            // On iPadOS the scene's title is what the app switcher shows.
+            #if os(macOS)
             window?.title = args["title"] as? String ?? ""
+            #else
+            window?.windowScene?.title = args["title"] as? String ?? ""
+            #endif
             return .value(nil)
+
+        /* ---------------- other windows: docWindow.js, openPinterest.js, pinterestScrape.js ---------------- */
+
+        case "window.list":
+            return .value(AuxiliaryWindows.shared.labels)
+
+        case "window.create":
+            try AuxiliaryWindows.shared.create(args["options"] as? [String: Any] ?? [:], core: core, menus: menus)
+            return .value(nil)
+
+        case "window.op":
+            let target = args["label"] as? String ?? label
+            let op = try string(args, "op")
+            if target == label {
+                return .value(window.flatMap { WindowOps.perform(op, value: args["value"], on: $0) })
+            }
+            if target == AuxiliaryWindows.mainLabel {
+                let main = AuxiliaryWindows.shared.mainWindow
+                return .value(main.flatMap { WindowOps.perform(op, value: args["value"], on: $0) })
+            }
+            return .value(AuxiliaryWindows.shared.window(target)?.perform(op, value: args["value"]))
+
+        case "navigate_webview":
+            let aux = try auxiliary(args)
+            guard let url = URL(string: try string(args, "url")) else { throw Failure("Invalid URL") }
+            aux.navigate(to: url)
+            return .value(nil)
+
+        case "eval_webview":
+            try auxiliary(args).evaluate(try string(args, "script"))
+            return .value(nil)
+
+        case "get_webview_url":
+            return .value(try auxiliary(args).currentURL)
 
         /* ---------------- the app's own commands (src-tauri/src/lib.rs and friends) ---------------- */
 
@@ -243,12 +311,7 @@ final class TauriHost {
             return .value(try listSystemFonts())
 
         case "perform_haptic":
-            let pattern: NSHapticFeedbackManager.FeedbackPattern = switch args["pattern"] as? String {
-            case "alignment": .alignment
-            case "levelChange", "level_change": .levelChange
-            default: .generic
-            }
-            NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
+            Platform.haptic(args["pattern"] as? String)
             return .value(nil)
 
         /* ---------------- references/fetchText.js: looking a source up ---------------- */
@@ -262,14 +325,45 @@ final class TauriHost {
         // content whatever the user picked, so the page asks for the real one.
         case "system_accent_color":
             return .value(Self.hex(NSColor.controlAccentColor))
+        /* ---------------- inkblot-models: SynonymTile, RhymeTile, readAloud.js, dictation.js, pinterestScrape.js ---------------- */
+
+        case _ where ModelService.commands.contains(cmd):
+            return .value(try await models.invoke(cmd, args: args))
 
         default:
             log.info("Unanswered Tauri command: \(cmd, privacy: .public)")
-            throw Failure("not available in the native shell yet")
+            throw Failure("not available in the native shell")
         }
     }
 
+    /// Say which path a filesystem command just changed (`.inkblotFileChanged`) — the
+    /// project tree's change feed on iOS, where there are no FSEvents.
+    private func announceChange(_ cmd: String, args: [String: Any], headers: [String: String]) {
+        let raw: Any? = switch cmd {
+        case "plugin:fs|write_text_file", "plugin:fs|write_file": headers["path"]?.removingPercentEncoding
+        case "plugin:fs|mkdir", "plugin:fs|remove": args["path"]
+        case "plugin:fs|rename": args["newPath"]
+        case "plugin:fs|copy_file": args["toPath"]
+        default: nil
+        }
+        guard let raw else { return }
+        let options: Any? = cmd.hasPrefix("plugin:fs|write")
+            ? headers["options"].flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) }
+            : args["options"]
+        guard let changed = try? path(raw, options: options) else { return }
+        NotificationCenter.default.post(name: .inkblotFileChanged, object: changed.path)
+    }
+
     /* ---------------- arguments ---------------- */
+
+    /// The window a `*_webview` command names, refused as Tauri refuses it.
+    private func auxiliary(_ args: [String: Any]) throws -> AuxiliaryWindow {
+        let target = try string(args, "label")
+        guard let window = AuxiliaryWindows.shared.window(target) else {
+            throw Failure("Webview '\(target)' not found")
+        }
+        return window
+    }
 
     private func string(_ args: [String: Any], _ key: String) throws -> String {
         guard let value = args[key] as? String else { throw Failure("Missing \(key)") }
@@ -304,6 +398,7 @@ final class TauriHost {
 
     /* ---------------- panels ---------------- */
 
+    #if os(macOS)
     private func openPanel(_ options: [String: Any]) async -> Any? {
         let panel = NSOpenPanel()
         let directory = options["directory"] as? Bool ?? false
@@ -375,5 +470,104 @@ final class TauriHost {
         }
         return response == .alertFirstButtonReturn
     }
+    #else
+    /// The page asks for files by path; the document picker answers with URLs lent for
+    /// the duration of a security scope, which nothing here can hold open while the page
+    /// reads through plugin-fs. So files are picked `asCopy` — the picker copies them
+    /// into the app's container, and those paths are what the page gets. A folder cannot
+    /// be copied, so a folder pick is still a lent URL: choosing a project folder
+    /// outside the app's container does not work on iOS.
+    private func openPanel(_ options: [String: Any]) async -> Any? {
+        let directory = options["directory"] as? Bool ?? false
+        let multiple = options["multiple"] as? Bool ?? false
+        let extensions = (options["filters"] as? [[String: Any]] ?? [])
+            .flatMap { $0["extensions"] as? [String] ?? [] }
+        let types: [UTType] = directory ? [.folder]
+            : (extensions.isEmpty || extensions.contains("*")) ? [.item]
+            : extensions.compactMap { UTType(filenameExtension: $0) }
+
+        guard let presenter = Self.presenter(for: window) else { return nil }
+        let urls: [URL] = await withCheckedContinuation { continuation in
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: !directory)
+            picker.allowsMultipleSelection = multiple
+            let delegate = DocumentPickerDelegate { continuation.resume(returning: $0) }
+            picker.delegate = delegate
+            objc_setAssociatedObject(picker, &DocumentPickerDelegate.key, delegate, .OBJC_ASSOCIATION_RETAIN)
+            presenter.present(picker, animated: true)
+        }
+        guard !urls.isEmpty else { return nil }
+        let paths = urls.map(\.path)
+        return multiple ? paths : paths.first
+    }
+
+    /// Unsupported on iOS: a save panel there exports a file that already exists, and
+    /// the page asks where to write before it writes. Answering as a cancelled panel is
+    /// a case the page already handles.
+    private func savePanel(_ options: [String: Any]) async -> Any? { nil }
+
+    private func alert(message: String, title: String?, kind: String?, ok: String, cancel: String?) async -> Bool {
+        guard let presenter = Self.presenter(for: window) else { return false }
+        return await withCheckedContinuation { continuation in
+            let alert = UIAlertController(title: title ?? message, message: title == nil ? nil : message,
+                                          preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: ok, style: kind == "warning" ? .destructive : .default) { _ in
+                continuation.resume(returning: true)
+            })
+            if let cancel {
+                alert.addAction(UIAlertAction(title: cancel, style: .cancel) { _ in
+                    continuation.resume(returning: false)
+                })
+            }
+            presenter.present(alert, animated: true)
+        }
+    }
+
+    /// The view controller at the top of the window, to present from.
+    static func presenter(for window: UIWindow?) -> UIViewController? {
+        let window = window ?? UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first
+        var top = window?.rootViewController
+        while let presented = top?.presentedViewController { top = presented }
+        return top
+    }
+    #endif
 }
 
+#if !os(macOS)
+/// `UIDocumentPickerViewController`'s delegate, answering once — picked or cancelled.
+private final class DocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
+    nonisolated(unsafe) static var key: UInt8 = 0
+    private var answer: (([URL]) -> Void)?
+
+    init(_ answer: @escaping ([URL]) -> Void) { self.answer = answer }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        answer?(urls)
+        answer = nil
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        answer?([])
+        answer = nil
+    }
+}
+#endif
+
+#if os(macOS)
+/// The last left mouse-down in the app, for a window drag the page asks for after the
+/// event has gone by. `performDrag(with:)` needs the event that began the gesture.
+@MainActor
+final class MouseDownRecorder {
+    static let shared = MouseDownRecorder()
+    private(set) var last: NSEvent?
+    private var monitor: Any?
+
+    private init() {
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            self?.last = event
+            return event
+        }
+    }
+}
+#endif

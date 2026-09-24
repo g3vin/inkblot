@@ -1,6 +1,6 @@
 //! `WebviewEvent` — what the document surface tells the shell.
 //!
-//! The asymmetry with `NativeCommand` is the point of the phase. Commands are
+//! The asymmetry with `NativeCommand` matters. Commands are
 //! imperative and rare; events are observations and some of them fire on every
 //! transaction. Each event below that can fire at that rate says so, and says what it
 //! costs, because "batch it or it saturates the bridge" is only actionable if you know
@@ -15,8 +15,10 @@ use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
 use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor};
 use crate::types::json::JsonValue;
 use super::sidebar::{
-    ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged, VersionsChanged,
+    ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged,
+    VersionsChanged,
 };
+use super::workspace::{DraftPaneChanged, SentenceStructure, TabsChanged};
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
@@ -42,14 +44,11 @@ pub struct ActiveMarks {
 
 /// The formatting at the selection, pushed.
 ///
-/// **Sharp edge #1.** `Toolbar.jsx:102-145` pulls this today: on every
-/// `selectionUpdate` it reaches into the live editor and reads about ten facts —
-/// text-style attributes, four mark states resolved against the adjacent text node
-/// when the selection is collapsed, the alignment of whichever of three node kinds is
-/// selected. All of it is synchronous, and none of it survives a process boundary.
-///
-/// So the direction inverts: the webview does the reading, once per animation frame,
-/// and sends the answer. A native toolbar renders this struct and never asks a
+/// Reading it takes about ten synchronous facts off the live editor — text-style
+/// attributes, four mark states resolved against the adjacent text node when the
+/// selection is collapsed, the alignment of whichever of three node kinds is selected
+/// — so the webview does the reading (`src/bridge/readState.ts`), once per animation
+/// frame, and sends the answer. A toolbar renders this struct and never asks a
 /// question. The frame coalescing is not an optimization — `selectionUpdate` fires on
 /// every cursor move, including every keystroke.
 #[typeshare]
@@ -81,7 +80,7 @@ pub struct ToolbarState {
 
 /// Everything a context menu needs to build itself, resolved in one read.
 ///
-/// Phase 5 needs this as a *request*, not a push: the menu is built when the user
+/// A native context menu needs this as a *request*, not a push: the menu is built when the user
 /// right-clicks, and it must be built from the selection as it is at that moment. It
 /// is also pushed on selection change, because a native shell wants to enable and
 /// disable menu bar items without asking.
@@ -127,8 +126,8 @@ pub struct DocChanged {
 
 /// Note anchors after a remap.
 ///
-/// **Sharp edge #4.** `useEditorNotes` remaps on every transaction — every keystroke
-/// in a document with quote notes — and native is holding those positions. Two things
+/// `useEditorNotes` remaps on every transaction — every keystroke in a document with
+/// quote notes — and the shell holds those positions. Two things
 /// keep that off the bridge's back:
 ///
 /// 1. The event is coalesced to one per frame by the sender. Sending per transaction
@@ -152,9 +151,8 @@ pub struct NotesRemapped {
 /// The pointer entered, left, or clicked a note marker in the document.
 ///
 /// `anchor_rect` is in client coordinates *inside the webview*, so a native shell must
-/// offset it by the web view's frame. This is the event that `NoteAnnotation.js:155`
-/// currently ships a live `EditorView` object in — an object, over an event, to a
-/// listener in the same process. That field is gone: nothing here is a reference.
+/// offset it by the web view's frame. Nothing here is an object reference: every
+/// field survives serialization.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -196,7 +194,7 @@ pub struct NoteMarkersChanged {
 
 /// The active editor election changed.
 ///
-/// **Sharp edge #5.** The election is driven by mouse movement over a pane, which is a
+/// The election is driven by mouse movement over a pane, which is a
 /// webview-side fact, so the webview stays the returning officer and reports the
 /// result. `surface_id` is set when the winner is a canvas card, and it is what lets a
 /// native canvas command find the right surface when split view shows two.
@@ -307,11 +305,10 @@ pub struct WordCountsChanged {
 
 /// What focus mode is showing.
 ///
-/// `FocusModeOverlay` re-derives this from the full document on every transaction, and
-/// the handoff flags that as the cost to watch: at a keystroke's rate this is the
-/// largest payload on the bridge. It stays in the webview in Phase 5 for exactly that
-/// reason, and this event exists so a native shell can mirror the *state* — which
-/// paragraph, how far through — without receiving the text.
+/// `FocusModeOverlay` re-derives its view from the full document on every
+/// transaction; sent at a keystroke's rate, the text would be the largest payload on
+/// the bridge. So the overlay stays in the webview, and this event lets a native shell
+/// mirror the *state* — which paragraph, how far through — without receiving the text.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -340,13 +337,11 @@ pub struct ReadAloudPayloadEvent {
 
 /// What is being dragged.
 ///
-/// This is what replaces the `window.__inkblot_*` globals. They are six mutable
-/// variables on `window` that four unrelated components read and write to coordinate
-/// one drag — the clipboard panel writes what it picked up, the editor reads it on
-/// drop and writes back whether it handled it, and the last pointer position is parked
-/// there because the HTML5 drag events do not carry a usable one. None of that
-/// survives a process boundary: `window` is the webview's, and a native drag source is
-/// not in it.
+/// A drag in Inkblot often starts in one component and ends in another — the
+/// clipboard panel, an editor pane, a canvas — and in the Swift app one end can be
+/// native. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
+/// hand-off, so nothing about a drag depends on shared state in the webview's
+/// `window`. The webview side is `src/bridge/dragHandoff.ts`.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -387,7 +382,7 @@ pub struct DragStarted {
 /// The pointer moved during a drag.
 ///
 /// Carried explicitly because the DOM's own drag events do not reliably give a
-/// position — which is why `__inkblot_dragPoint` existed. Coalesced to one per frame
+/// position. Coalesced to one per frame
 /// by the sender, like `notesRemapped`, and for the same reason: only the last one
 /// means anything.
 #[typeshare]
@@ -401,12 +396,10 @@ pub struct DragMoved {
 
 /// The drag ended — however it ended.
 ///
-/// `handled` is the one that used to be `__inkblot_dropHandled`, and it is a
-/// *report*, not a negotiation: whichever drop target accepted the payload says so
-/// when it does, and this event carries the final answer so the source knows whether
-/// to remove what it was dragging. Two targets can see the same drop (an editor and
-/// the clipboard panel underneath it); the first to claim it wins, which is what the
-/// flag arbitrated before.
+/// `handled` is a *report*, not a negotiation: whichever drop target accepted the
+/// payload says so when it does, and this event carries the final answer so the source
+/// knows whether to remove what it was dragging. Two targets can see the same drop (an
+/// editor and the clipboard panel underneath it); the first to claim it wins.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -421,7 +414,7 @@ pub struct DragEnded {
 
 /// The project the webview has open changed.
 ///
-/// The project picker and its session restore are still in the webview, and the
+/// The project picker and its session restore are in the webview, and the
 /// native sidebar has to show the tree of whatever project that is. `None` is the
 /// landing screen: no project is open.
 #[typeshare]
@@ -486,4 +479,8 @@ pub enum WebviewEvent {
     WordCountsChanged(WordCountsChanged),
     PageLayoutState(PageLayoutState),
     PrintRequest(PrintRequest),
+    /// The tab dock, the new-tab chooser and the sentence bubble (see `workspace.rs`).
+    TabsChanged(TabsChanged),
+    DraftPaneChanged(DraftPaneChanged),
+    SentenceStructure(SentenceStructure),
 }

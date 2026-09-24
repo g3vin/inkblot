@@ -1,7 +1,11 @@
+/**
+ * The canvas reducer and its undo history: one undo step per gesture, and deleting a
+ * node takes its edges with it.
+ */
 const C = '../../src'
 const { historyReducer, createHistory, canUndo, canRedo } = await import(`${C}/canvas/canvasReducer.ts`)
 const { createEmptyCanvas, makeTextNode, makeEdge } = await import(`${C}/lib/canvasModel.js`)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 let h = createHistory(createEmptyCanvas())
 const run = (a) => { h = historyReducer(h, a) }

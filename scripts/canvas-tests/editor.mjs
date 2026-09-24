@@ -1,8 +1,7 @@
 /**
  * EditorCanvas — the writing surface, mounted for real.
  *
- * This is the suite the migration handoff asked for before EditorCanvas could be
- * split: nothing else in the harness mounts it, and the things it owns — autosave,
+ * Nothing else in the harness mounts it, and the things it owns — autosave,
  * version checkpoints, the per-doc editor-state cache, note anchor remapping — fail
  * *silently* and lose the user's writing, possibly days later.
  *
@@ -10,10 +9,8 @@
  * setup/teardown is part of every assertion below. The real FileSystem.js runs
  * against the in-memory stub, so "it saved" means bytes actually landed.
  *
- * It paid for itself on the first run: `useEditorDnd({ editor, ... })` was passing
- * the `editor` binding roughly forty lines before its own `const editor = useEditor()`
- * — a temporal dead zone read that threw on every single mount. Lint, tsc and the
- * production build all passed. Nothing else could have caught it.
+ * Mounting is what catches a render-time throw — a hook argument read in its temporal
+ * dead zone, say — which lint, tsc and the production build all miss.
  *
  * Flushing: autosave debounces at 800ms and the history checkpoint at 15s, so the
  * suite does not wait them out. Switching documents tears down both effects, and
@@ -44,7 +41,7 @@ const printStore = await import('../../src/print/printLayoutStore.js')
 const { readDocPageSetup } = await import('../../src/print/DocPageSetup.js')
 const { bookPageSetup } = await import('../../src/print/pageSetup.ts')
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 50)) })
 
 const P = 'Novel'
@@ -127,6 +124,9 @@ function Harness() {
   })
 }
 
+const docChanges = []
+shellBridge.on('docChanged', (payload) => docChanges.push(payload))
+
 const root = createRoot(document.getElementById('root'))
 await act(async () => {
   root.render(React.createElement(StrictMode, null, React.createElement(Harness)))
@@ -138,12 +138,32 @@ const wordCount = () => document.querySelector('.primary-pane .word-count')?.tex
 
 /* ---------------- It mounts at all ---------------- */
 
-// The regression that motivated this file. If EditorCanvas throws during render,
-// every assertion below is unreachable — so this one is the canary.
+// The canary. If EditorCanvas throws during render,
+// every assertion below is unreachable.
 ok('EditorCanvas mounts under StrictMode', !!document.querySelector('.middle-section'))
 ok('the primary pane is present', !!document.querySelector('.primary-pane'))
 ok('the loaded document renders', paneText().includes('the first chapter'))
 ok('the word-count badge counts the loaded text', wordCount() === '3 words')
+
+/* ---------------- docChanged ---------------- */
+
+// A load is announced as not the user's edit, so a shell does not autosave it back.
+const loaded = docChanges.find((change) => change.docPath === 'one')
+ok('loading a document publishes docChanged', !!loaded)
+ok('and marks it as not a user edit', loaded?.userEdit === false)
+ok('with the counts the badge shows', loaded?.wordCount === 3 && loaded?.charCount > 0)
+
+await act(async () => {
+  control.editor.commands.insertContentAt(control.editor.state.doc.content.size - 1, ' today')
+})
+await act(async () => { await new Promise((r) => setTimeout(r, 350)) })
+const edited = docChanges.at(-1)
+ok('typing publishes docChanged as a user edit', edited?.userEdit === true && edited.docPath === 'one')
+ok('with the new count', edited?.wordCount === 4)
+// Put it back and let the autosave (800ms) land, so the next section starts with
+// nothing pending — it asserts on the debounce holding a write back.
+await act(async () => { control.editor.commands.undo() })
+await act(async () => { await new Promise((r) => setTimeout(r, 1000)) })
 
 /* ---------------- Autosave ---------------- */
 
@@ -223,7 +243,7 @@ await settle()
 // remap runs on each transaction; if it stops, notes drift onto the wrong words
 // with no error anywhere.
 //
-// Since Phase 4 the shell is holding those positions too, so each remap is also
+// The shell holds those positions too, so each remap is also
 // published on the bridge. Listening here rather than in bridge.mjs is the point:
 // that suite proves the protocol works, this one proves the app is actually wired to
 // it — a publish call deleted from useEditorNotes would pass every test there.

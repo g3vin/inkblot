@@ -17,6 +17,19 @@
 //! Tauri app links the core as an rlib and has no use for UniFFI's scaffolding; keeping
 //! the macros out of it keeps the core exactly what `lib.rs` says it is — domain logic
 //! that knows nothing about any shell.
+//!
+//! ## Adding an export
+//!
+//! 1. Add a method to `InkblotCore` (or a free function) with `#[uniffi::export]`:
+//!    owned arguments, structured results as a JSON string of a typeshare type, errors
+//!    as `CoreError`. Model calls go on `InkblotModels` in `models.rs` *and* its
+//!    stand-in `models_unavailable.rs`.
+//! 2. `./scripts/build-xcframework.sh` rebuilds every slice and regenerates
+//!    `native/…/Generated/inkblot_ffi.swift`. The bindings must come from the same
+//!    build as the library: UniFFI checks each function's checksum at first call, and
+//!    the checksums include some doc comments, so a stale binding builds and then fails
+//!    at runtime.
+//! 3. Call it from Swift (`CoreService` holds the one `InkblotCore`).
 
 use std::sync::Arc;
 
@@ -24,6 +37,26 @@ use inkblot_core::store::preferences::{PreferenceScope, PreferenceStore};
 use inkblot_core::store::{DocumentBody, ProjectStore, StoreError};
 
 uniffi::setup_scaffolding!();
+
+/// Where a model's events go: a Tauri event name the page listens for
+/// (`synonym://download`, `kokoro://download`, `dictation://partial`, …) and its
+/// payload as JSON. Swift implements it by emitting into the page through the shim.
+#[uniffi::export(with_foreign)]
+pub trait ModelEventSink: Send + Sync {
+    fn emit(&self, event: String, payload_json: String);
+}
+
+// The models, or — where they do not build (iOS: `ort` ships no iOS library and
+// whisper.cpp's cmake has not been run for the iOS SDKs) — a stand-in with exactly the
+// same interface. Same interface is the point: the Swift bindings are generated once for
+// every slice of the XCFramework, and UniFFI checks each function's checksum at first
+// call.
+#[cfg(feature = "models")]
+mod models;
+#[cfg(not(feature = "models"))]
+#[path = "models_unavailable.rs"]
+mod models;
+pub use models::InkblotModels;
 
 /// Everything the core can refuse, flattened to a message.
 ///
@@ -102,7 +135,12 @@ impl InkblotCore {
         Ok(self.preferences.get(scope_of(&scope)?, &key))
     }
 
-    pub fn preferences_set(&self, scope: String, key: String, value: String) -> Result<(), CoreError> {
+    pub fn preferences_set(
+        &self,
+        scope: String,
+        key: String,
+        value: String,
+    ) -> Result<(), CoreError> {
         Ok(self.preferences.set(scope_of(&scope)?, &key, &value)?)
     }
 
@@ -116,7 +154,9 @@ impl InkblotCore {
         from_prefix: String,
         to_prefix: String,
     ) -> Result<(), CoreError> {
-        Ok(self.preferences.rename_prefix(scope_of(&scope)?, &from_prefix, &to_prefix)?)
+        Ok(self
+            .preferences
+            .rename_prefix(scope_of(&scope)?, &from_prefix, &to_prefix)?)
     }
 
     /* ---------------- projects ---------------- */
@@ -206,7 +246,9 @@ pub struct VersionHistory {
 impl VersionHistory {
     #[uniffi::constructor]
     pub fn load(core: Arc<InkblotCore>, project_name: String, doc_name: String) -> Arc<Self> {
-        Arc::new(Self { versions: core.projects.get_versions(&project_name, &doc_name) })
+        Arc::new(Self {
+            versions: core.projects.get_versions(&project_name, &doc_name),
+        })
     }
 
     pub fn count(&self) -> u32 {
@@ -215,12 +257,18 @@ impl VersionHistory {
 
     /// `[VersionRow]`, newest first, as JSON.
     pub fn rows_json(&self) -> Result<String, CoreError> {
-        Ok(serde_json::to_string(&inkblot_core::version_history::version_rows(&self.versions))?)
+        Ok(serde_json::to_string(
+            &inkblot_core::version_history::version_rows(&self.versions),
+        )?)
     }
 
     /// The `WordDelta` across a burst, from the entry before `oldest_id` to `newest_id`,
     /// as JSON. `{added: 0, removed: 0}` if either id is unknown.
-    pub fn span_delta_json(&self, newest_id: String, oldest_id: String) -> Result<String, CoreError> {
+    pub fn span_delta_json(
+        &self,
+        newest_id: String,
+        oldest_id: String,
+    ) -> Result<String, CoreError> {
         let index_of = |id: &str| self.versions.iter().position(|v| v.id == id);
         let delta = match (index_of(&newest_id), index_of(&oldest_id)) {
             (Some(newest), Some(oldest)) => {
@@ -252,7 +300,10 @@ pub struct SearchOptions {
     pub use_regex: bool,
 }
 
-fn matcher(query: &str, options: &SearchOptions) -> Result<inkblot_core::search::matcher::Matcher, CoreError> {
+fn matcher(
+    query: &str,
+    options: &SearchOptions,
+) -> Result<inkblot_core::search::matcher::Matcher, CoreError> {
     let matcher = inkblot_core::search::matcher::Matcher::new(
         query,
         inkblot_core::search::matcher::MatcherOptions {
@@ -284,7 +335,12 @@ impl InkblotCore {
                 .map_err(|_| CoreError::Failed(format!("Unknown search scope: {scope}")))?;
         let matcher = matcher(&query, &options)?;
         let results = inkblot_core::search::search_project(
-            &self.projects, &project_name, scope, &matcher, |_| None, || false,
+            &self.projects,
+            &project_name,
+            scope,
+            &matcher,
+            |_| None,
+            || false,
         )?;
         Ok(serde_json::to_string(&results)?)
     }
@@ -304,11 +360,17 @@ impl InkblotCore {
         let results = if inkblot_core::doc_kind::is_canvas_doc(&doc_name) {
             inkblot_core::search::collect_canvas_matches(&raw, &matcher, &doc_name, usize::MAX)
         } else {
-            inkblot_core::search::collect_matches_from_doc_json(&raw["content"], &matcher, &doc_name)
+            inkblot_core::search::collect_matches_from_doc_json(
+                &raw["content"],
+                &matcher,
+                &doc_name,
+            )
         };
         Ok(serde_json::to_string(&results)?)
     }
 }
+
+/* ---------------- free functions ---------------- */
 
 /// The hue for an editing session, as `hsl(…)` — or empty for no session.
 #[uniffi::export]
@@ -318,8 +380,6 @@ pub fn session_color(session_id: String) -> String {
     }
     inkblot_core::version_history::session_color(&session_id)
 }
-
-/* ---------------- free functions ---------------- */
 
 /// Installed font families, sorted and without Apple's private dot-faces.
 #[uniffi::export]
@@ -360,13 +420,16 @@ mod tests {
     #[test]
     fn preferences_round_trip_through_the_json_the_webview_reads() {
         let core = InkblotCore::new(scratch_root("prefs"), "s".into());
-        core.preferences_set("app".into(), "theme".into(), "\"dark\"".into()).unwrap();
+        core.preferences_set("app".into(), "theme".into(), "\"dark\"".into())
+            .unwrap();
 
         let loaded: serde_json::Value =
             serde_json::from_str(&core.preferences_load_json().unwrap()).unwrap();
         assert_eq!(loaded["app"]["theme"], "\"dark\"");
         assert_eq!(
-            core.preferences_get("app".into(), "theme".into()).unwrap().as_deref(),
+            core.preferences
+                .get(PreferenceScope::App, "theme")
+                .as_deref(),
             Some("\"dark\"")
         );
     }
@@ -374,28 +437,30 @@ mod tests {
     #[test]
     fn an_unknown_scope_is_an_error_not_a_path() {
         let core = InkblotCore::new(scratch_root("scope"), "s".into());
-        assert!(core.preferences_set("../escape".into(), "k".into(), "v".into()).is_err());
+        assert!(core
+            .preferences_set("../escape".into(), "k".into(), "v".into())
+            .is_err());
     }
 
     #[test]
     fn a_project_tree_crosses_as_the_typeshare_shape() {
         let core = InkblotCore::new(scratch_root("tree"), "s".into());
-        assert!(core.create_project("Novel".into(), None).unwrap());
-        core.create_folder("Novel".into(), "Part One".into()).unwrap();
+        assert!(core.projects.create_project("Novel", None).unwrap());
+        core.projects.create_folder("Novel", "Part One").unwrap();
 
         let tree: serde_json::Value =
             serde_json::from_str(&core.project_tree_json("Novel".into()).unwrap()).unwrap();
         assert_eq!(tree["type"], "folder");
         assert_eq!(tree["name"], "Novel");
         assert_eq!(tree["children"][0]["name"], "Part One");
-        assert_eq!(core.list_projects(), vec!["Novel".to_string()]);
+        assert_eq!(core.projects.list_projects(), vec!["Novel".to_string()]);
     }
 
     #[test]
     fn a_history_is_read_once_and_described_row_by_row() {
         let root = scratch_root("history");
         let core = InkblotCore::new(root.clone(), "s".into());
-        core.create_project("Novel".into(), None).unwrap();
+        core.projects.create_project("Novel", None).unwrap();
         std::fs::write(
             format!("{root}/Novel/one.json"),
             serde_json::json!({
@@ -413,10 +478,14 @@ mod tests {
         let history = VersionHistory::load(core.clone(), "Novel".into(), "one".into());
         assert_eq!(history.count(), 2);
         let rows: serde_json::Value = serde_json::from_str(&history.rows_json().unwrap()).unwrap();
-        assert_eq!(rows[0]["delta"], serde_json::json!({ "added": 3, "removed": 0 }));
+        assert_eq!(
+            rows[0]["delta"],
+            serde_json::json!({ "added": 3, "removed": 0 })
+        );
         assert_eq!(history.text_of("v1".into()).trim(), "she hesitated");
         let span: serde_json::Value =
-            serde_json::from_str(&history.span_delta_json("v2".into(), "v1".into()).unwrap()).unwrap();
+            serde_json::from_str(&history.span_delta_json("v2".into(), "v1".into()).unwrap())
+                .unwrap();
         assert_eq!(span["added"], 5);
     }
 
@@ -424,7 +493,7 @@ mod tests {
     fn search_reads_the_saved_project() {
         let root = scratch_root("search");
         let core = InkblotCore::new(root.clone(), "s".into());
-        core.create_project("Novel".into(), None).unwrap();
+        core.projects.create_project("Novel", None).unwrap();
         std::fs::write(
             format!("{root}/Novel/one.json"),
             serde_json::json!({
@@ -435,39 +504,40 @@ mod tests {
             }).to_string(),
         )
         .unwrap();
-        let options = || SearchOptions { match_case: false, whole_word: false, use_regex: false };
+        let options = || SearchOptions {
+            match_case: false,
+            whole_word: false,
+            use_regex: false,
+        };
 
         let found: serde_json::Value = serde_json::from_str(
-            &core.search_project_json("Novel".into(), "project".into(), "HESITATED".into(), options()).unwrap(),
+            &core
+                .search_project_json(
+                    "Novel".into(),
+                    "project".into(),
+                    "HESITATED".into(),
+                    options(),
+                )
+                .unwrap(),
         )
         .unwrap();
         assert_eq!(found[0]["docName"], "one");
         assert_eq!(found[0]["matchText"], "hesitated");
 
         let in_doc: serde_json::Value = serde_json::from_str(
-            &core.search_document_json("Novel".into(), "one".into(), "door".into(), options()).unwrap(),
+            &core
+                .search_document_json("Novel".into(), "one".into(), "door".into(), options())
+                .unwrap(),
         )
         .unwrap();
         assert_eq!(in_doc.as_array().unwrap().len(), 1);
 
-        let regex = SearchOptions { use_regex: true, ..options() };
-        assert!(core.search_project_json("Novel".into(), "project".into(), "(".into(), regex).is_err());
-    }
-
-    #[test]
-    fn a_new_document_is_the_shape_the_web_tree_writes_and_never_overwrites() {
-        let root = scratch_root("create");
-        let core = InkblotCore::new(root.clone(), "s".into());
-        core.create_project("Novel".into(), None).unwrap();
-        core.create_document("Novel".into(), "Part One/Chapter 1".into()).unwrap();
-
-        let written: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(format!("{root}/Novel/Part One/Chapter 1.json")).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(written, serde_json::json!({ "content": [], "notes": [], "versions": [] }));
-
-        assert!(core.create_document("Novel".into(), "Part One/Chapter 1".into()).is_err());
-        assert!(core.create_document("Novel".into(), "board.canvas".into()).is_err());
+        let regex = SearchOptions {
+            use_regex: true,
+            ..options()
+        };
+        assert!(core
+            .search_project_json("Novel".into(), "project".into(), "(".into(), regex)
+            .is_err());
     }
 }

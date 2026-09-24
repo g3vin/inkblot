@@ -1,8 +1,8 @@
 /**
  * The preference store's webview half.
  *
- * Everything the app remembers between launches moved out of `localStorage`, which a
- * native shell cannot see, into a file under AppData that both shells can. The Rust
+ * Everything the app remembers between launches lives in files under AppData that both
+ * shells can read — not `localStorage`, which a native shell cannot see. The Rust
  * half has its own tests; what is checked here is the part that only exists in the
  * webview, and where a mistake is silent:
  *
@@ -11,11 +11,11 @@
  *     to save and is simply gone at the next launch.
  *   - **that reads are synchronous after hydration**, because every call site reads
  *     during render and none of them can await.
- *   - **that a failed write does not throw**, since `localStorage` never did.
+ *   - **that a failed write does not throw**: losing a setting must not crash the app.
  */
 import { setInvokeHandler } from './stub-core.mjs'
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const calls = []
 let failWrites = false

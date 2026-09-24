@@ -19,9 +19,9 @@ import SFIcon from './SFIcon'
 import './Editor.css'
 
 import ProjectLanding from './ProjectLanding'
-import { useTabs } from './useTabs'
-import { useEntryOperations } from './useEntryOperations'
-import { useClipboardHistory } from './useClipboardHistory'
+import { useTabs } from '../hooks/useTabs'
+import { useEntryOperations } from '../hooks/useEntryOperations'
+import { useClipboardHistory } from '../hooks/useClipboardHistory'
 import {
   CLIPBOARD_PERSIST_KEY,
   MAX_CLIPBOARD_ENTRIES,
@@ -111,18 +111,17 @@ export default function Editor({
       setTiles([])
       setNotesByDoc({})
       setVersionsState({})
-      // Nothing is open, so nothing should still answer for "the current project" —
-      // the window property this replaces was never cleared here, and a Pinterest
-      // board mounting on the landing screen kept the last project's cache key.
+      // Nothing is open, so nothing should still answer for "the current project";
+      // otherwise a Pinterest board mounting on the landing screen would keep the
+      // last project's cache key.
       clearOpenProject()
       return
     }
 
     const projectOpenId = `${nextProjectName}:${Date.now()}:${Math.random().toString(16).slice(2)}`
     try {
-      // Was two `window.__inkblot*` properties. The Pinterest node views that read it
-      // have no React path to reach, so it is still ambient — but owned, typed, and
-      // backed by the same session value it already fell through to.
+      // Ambient rather than React state: the Pinterest node views that read it have
+      // no React path to reach. See lib/projectContext.
       setOpenProject({ projectName: nextProjectName, projectOpenId })
       setSessionValue('inkblot:project-open-id', projectOpenId)
       setSessionValue('inkblot:project-name', nextProjectName)

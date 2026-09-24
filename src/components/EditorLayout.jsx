@@ -16,8 +16,8 @@ import { EditorTarget } from '../types'
 const EMPTY_ACTIVE_EDITOR = {}
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
 import { nativeOwns } from '../lib/host'
-import { useNativeSidebar } from './useNativeSidebar'
-import { useNativeNotePreviews } from './useNativeNotePreviews'
+import { useNativeSidebar } from '../hooks/useNativeSidebar'
+import { useNativeNotePreviews } from '../hooks/useNativeNotePreviews'
 import EditorCanvas from './EditorCanvas'
 import usePrintLayoutController from '../print/usePrintLayoutController'
 import PageSetupSheet from '../print/PageSetupSheet'
@@ -179,12 +179,10 @@ export default function EditorLayout(props) {
   // Falling back to the pane's TipTap editors would point the Toolbar at an idle
   // instance holding no document.
   //
-  // Which one that is used to be read off the editor object as `__inkblotCanvasCard`
-  // — a property set by the card and read here, across what becomes a process
-  // boundary in Phase 5. The election result arrives as a protocol event now, and
-  // `canvasCard` is one of the three names it can carry (sharp edge #5). The live
-  // editor below is still resolved locally, because the dictation and read-aloud
-  // controls inside the Toolbar genuinely need the instance.
+  // The election result arrives as the `activeEditorChanged` event, whose target is
+  // `canvasCard` when a card's editor is active. The live editor is still resolved
+  // locally, because the dictation and read-aloud controls inside the Toolbar need
+  // the instance.
   const activeEditorInfo = useBridgeState('activeEditorChanged', EMPTY_ACTIVE_EDITOR)
   const activeIsCanvas = isCanvasDoc(activeDoc || currentDoc)
   // A canvas or a map pans instead of scrolling, and runs on under the sidebars.
@@ -366,14 +364,8 @@ export default function EditorLayout(props) {
   }, [openLeftSidebar])
 
   // Select and scroll to a note's text in the active editor. Accepts a note object
-  // (which carries stored from/to) or a plain anchor string.
-  //
-  // This used to do the anchor-fallback dance by hand, and one of the two places the
-  // handoff points at for sharp edge #3. It now goes through `resolveAnchor`, which
-  // is the same dance with one difference that matters: it *verifies* that the stored
-  // positions still cover the anchor text before trusting them, where this trusted any
-  // pair of finite numbers. A note whose positions went stale used to put the caret on
-  // whatever had moved into that range.
+  // (which carries stored from/to) or a plain anchor string. `resolveAnchor` only
+  // trusts the stored positions if they still cover the anchor text.
   const jumpToText = useCallback((noteOrAnchor) => {
     const currentEditor = activeEditor || editor
     if (!currentEditor) return

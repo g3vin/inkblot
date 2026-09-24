@@ -133,8 +133,7 @@ pub struct ClipboardChanged {
 /// Text dropped on the shell's clipboard panel.
 ///
 /// If it is the selection the user is dragging out of an editor, the page removes it
-/// from the document — dropping a selection on the clipboard is a move, as it always
-/// was. The page decides that, because only the page knows what is being dragged.
+/// from the document — dropping a selection on the clipboard is a move. The page decides that, because only the page knows what is being dragged.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -151,8 +150,8 @@ pub struct RemoveClipboardEntriesCommand {
     pub ids: Option<Vec<String>>,
 }
 
-/// Insert an entry at the caret of an editor, and take it off the history — what
-/// dragging a tile into the editor did.
+/// Insert an entry at the caret of an editor, and take it off the history, as dragging a
+/// tile into the editor does.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -309,7 +308,7 @@ pub enum SidebarTab {
 }
 
 /// The page wants a sidebar tab shown — "Add note", "Open Version History", a new
-/// workbench tile. The shell owns the sidebar now, so the page asks rather than opens.
+/// workbench tile. When the shell draws the sidebar, the page asks rather than opens.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -25,6 +25,8 @@ import {
   CANVAS_DROP_NOTE_EVENT,
   CANVAS_RESTORE_EVENT,
   CANVAS_REVEAL_EVENT,
+  dispatchCanvasDropNote,
+  noteDragURL,
   takePendingCanvasReveal,
 } from './canvasEvents'
 
@@ -43,6 +45,7 @@ export function useCanvasExternalEvents({
   onActivate,
   redo,
   resetZoom,
+  reorderSelection,
   screenToWorldAt,
   selectNode,
   stateRef,
@@ -162,8 +165,30 @@ export function useCanvasExternalEvents({
       selectNode(node.id)
     }
 
+    // The same note, dragged natively from the Swift shell's Notes panel: an HTML5
+    // drop carrying its URL, turned into the event above at the drop point.
+    const carriesURL = (event) => [...(event.dataTransfer?.types || [])].includes('text/uri-list')
+    const onDragOver = (event) => {
+      if (!carriesURL(event)) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'copy'
+    }
+    const onDrop = (event) => {
+      if (!carriesURL(event)) return
+      const note = noteDragURL(event.dataTransfer.getData('text/uri-list'))
+      if (!note) return
+      event.preventDefault()
+      dispatchCanvasDropNote(surface, { ...note, clientX: event.clientX, clientY: event.clientY })
+    }
+
     surface.addEventListener(CANVAS_DROP_NOTE_EVENT, onDropNote)
-    return () => surface.removeEventListener(CANVAS_DROP_NOTE_EVENT, onDropNote)
+    surface.addEventListener('dragover', onDragOver)
+    surface.addEventListener('drop', onDrop)
+    return () => {
+      surface.removeEventListener(CANVAS_DROP_NOTE_EVENT, onDropNote)
+      surface.removeEventListener('dragover', onDragOver)
+      surface.removeEventListener('drop', onDrop)
+    }
   }, [dispatch, onActivate, screenToWorldAt, selectNode, surfaceRef])
 
   /* ---------------- commands from the native context menu ---------------- */
@@ -198,6 +223,12 @@ export function useCanvasExternalEvents({
           break
         case 'delete':
           deleteSelection()
+          break
+        case 'bring-to-front':
+          reorderSelection('front')
+          break
+        case 'send-to-back':
+          reorderSelection('back')
           break
         case 'zoom-to-fit':
           handleZoomToFit()
@@ -245,6 +276,7 @@ export function useCanvasExternalEvents({
     importImageAt,
     redo,
     resetZoom,
+    reorderSelection,
     screenToWorldAt,
     surfaceRef,
     toggleLocked,

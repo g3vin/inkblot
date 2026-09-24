@@ -6,7 +6,7 @@
  * message crosses the JSON-copying transport — a payload the shell could not receive,
  * or a command the page would silently ignore, fails here. The state is the page's own
  * (notes, clipboard, tiles, versions on disk through the stubbed filesystem), and each
- * edit is checked against what the React panel would have done with it.
+ * edit is checked against what the React panel does with it.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -21,15 +21,15 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const React = (await import('react')).default
 const { act, useState, useCallback } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { useNativeSidebar } = await import('../../src/components/useNativeSidebar.js')
-const { useNativeNotePreviews } = await import('../../src/components/useNativeNotePreviews.js')
+const { useNativeSidebar } = await import('../../src/hooks/useNativeSidebar.js')
+const { useNativeNotePreviews } = await import('../../src/hooks/useNativeNotePreviews.js')
 const { NOTE_PREVIEW_ENTER_EVENT, NOTE_PREVIEW_PIN_EVENT } = await import('../../src/extensions/NoteAnnotation.js')
 const { shellBridge } = await import('../../src/bridge/index.ts')
 const drag = await import('../../src/bridge/recentSelectionDrag.ts')
 const { saveDocument, getVersions } = await import('../../src/lib/FileSystem.js')
 const { appendVersionEntry, buildTextVersionEntry } = await import('../../src/lib/FileSystem.js')
 
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const frame = () => act(async () => {
   await new Promise((resolve) => dom.window.requestAnimationFrame(() => resolve()))
   await new Promise((resolve) => setTimeout(resolve, 10))

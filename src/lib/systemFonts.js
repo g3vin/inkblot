@@ -67,7 +67,7 @@ const isSafeUnquotedFamily = (name) => /^[A-Za-z][A-Za-z0-9-]*( [A-Za-z][A-Za-z0
 
 /**
  * Family name as it should be written into the `fontFamily` mark. Plain names
- * are left bare, which keeps documents written before this change byte-identical.
+ * are left bare, so existing documents' font marks round-trip byte-identical.
  */
 export const toCssFontFamily = (name) => (
   isSafeUnquotedFamily(name) ? name : `"${name.replace(/"/g, '\\"')}"`

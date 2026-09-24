@@ -1,6 +1,10 @@
+/**
+ * The canvas card's TipTap schema: every mark and node the Toolbar can apply must exist
+ * in it, and stored content must parse against it.
+ */
 const S = '../../src'
 const { getCardSchema, getCardExtensions, buildCardExtensions } = await import(`${S}/lib/editorExtensions.js`)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 
 const schema = getCardSchema()
 const marks = Object.keys(schema.marks)
@@ -30,8 +34,7 @@ ok('document-only mark "noteAnnotation" excluded', !marks.includes('noteAnnotati
 // JSON against the schema proves that without a DOM.
 //
 // The other half — generateHTML() serializing it back out, which is how every
-// non-editing card renders — cannot be checked here: prosemirror-model reaches
-// for `window.document`. That path is only exercisable in the app.
+// non-editing card renders — is the `html` suite's.
 const doc = {
   type: 'doc',
   content: [

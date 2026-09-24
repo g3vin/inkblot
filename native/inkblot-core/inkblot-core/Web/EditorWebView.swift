@@ -1,4 +1,8 @@
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 import SwiftUI
 import WebKit
 import os
@@ -8,7 +12,7 @@ import os
 ///
 ///  - `inkblotBridge` carries the protocol — `OutboundMessage` JSON from the page to
 ///    `ShellBridge`, and `InboundMessage` JSON back through `evaluateJavaScript`.
-///  - `tauri` carries the compatibility calls the bundle still makes, answered by
+///  - `tauri` carries the Tauri API calls the bundle makes, answered by
 ///    `TauriHost` (see `Web/tauri-shim.js`). It is a reply handler, so each call is a
 ///    promise on the page side.
 ///
@@ -64,18 +68,40 @@ final class EditorWebController: NSObject {
         // The page paints its own background; letting the window's show through during
         // the first frame avoids a white flash in dark mode.
         webView.underPageBackgroundColor = .clear
+        #if os(macOS)
         webView.setValue(false, forKey: "drawsBackground")
+        #else
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        // The page scrolls its own panes; the web view bouncing as a whole would move
+        // the toolbar with it.
+        webView.scrollView.bounces = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        #endif
 
         menus.activate = { [weak self] rid in
             self?.webView.evaluateJavaScript("window.__inkblotTauri.activateMenuItem(\(rid))")
         }
 
+        // Model progress and dictation, as the Tauri events the page already listens for.
+        // The main window's page only: a detached window starting dictation too would
+        // have its words typed into both.
+        ModelService.shared.emit = { [weak self] event, payloadJSON in
+            self?.emitTauriEvent(event, payloadJSON: payloadJSON)
+        }
+        // Detached and Pinterest windows opening, loading and closing.
+        AuxiliaryWindows.shared.register(self)
+
+        #if os(macOS)
+        _ = MouseDownRecorder.shared
+        #endif
         webView.load(URLRequest(url: Self.startURL))
     }
 
     /// Where the window's chrome lives, for sheets and fullscreen checks.
-    func attach(to window: NSWindow?) {
+    func attach(to window: PlatformWindow?) {
         host.window = window
+        AuxiliaryWindows.shared.mainWindow = window
     }
 
     func reload() {
@@ -84,7 +110,7 @@ final class EditorWebController: NSObject {
 
     /* ---------------- where the page comes from ---------------- */
 
-    private static var webRoot: URL {
+    static var webRoot: URL {
         Bundle.main.resourceURL!.appendingPathComponent("web", isDirectory: true)
     }
 
@@ -92,14 +118,14 @@ final class EditorWebController: NSObject {
     /// scheme's environment (e.g. `http://localhost:5173`), Vite's dev server, so a web
     /// edit shows up without rebuilding the app. Everything else is the same either way:
     /// the scripts are injected by WebKit, not served.
-    private static var startURL: URL {
+    static var startURL: URL {
         if let dev = ProcessInfo.processInfo.environment["INKBLOT_DEV_URL"], let url = URL(string: dev) {
             return url
         }
         return AppSchemeHandler.appURL
     }
 
-    private static func resource(_ name: String) -> String {
+    static func resource(_ name: String) -> String {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js"),
               let source = try? String(contentsOf: url, encoding: .utf8)
         else {
@@ -108,7 +134,7 @@ final class EditorWebController: NSObject {
         return source
     }
 
-    private static func script(_ source: String) -> WKUserScript {
+    static func script(_ source: String) -> WKUserScript {
         WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)
     }
 
@@ -129,6 +155,14 @@ final class EditorWebController: NSObject {
         let literal = String(decoding: data, as: UTF8.self)
         webView.evaluateJavaScript("window.__inkblotNative.deliver(\(literal))") { [log] _, error in
             if let error { log.error("Delivering to the page failed: \(error.localizedDescription, privacy: .public)") }
+        }
+    }
+
+    /// Raise a Tauri event in the page, through the shim's listener table — aimed at
+    /// one window's listeners when `label` names one.
+    func emitTauriEvent(_ event: String, payloadJSON: String, label: String? = nil) {
+        webView.evaluateJavaScript(TauriEvents.script(event, payloadJSON: payloadJSON, label: label)) { [log] _, error in
+            if let error { log.error("Emitting \(event, privacy: .public) failed: \(error.localizedDescription, privacy: .public)") }
         }
     }
 
@@ -155,6 +189,8 @@ final class EditorWebController: NSObject {
 }
 
 /* ---------------- navigation ---------------- */
+
+extension EditorWebController: TauriEventTarget {}
 
 extension EditorWebController: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
@@ -192,7 +228,7 @@ extension EditorWebController: WKNavigationDelegate, WKUIDelegate {
         if isApp {
             decisionHandler(.allow)
         } else {
-            NSWorkspace.shared.open(url)
+            Platform.open(url)
             decisionHandler(.cancel)
         }
     }
@@ -204,10 +240,11 @@ extension EditorWebController: WKNavigationDelegate, WKUIDelegate {
         for action: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        if let url = action.request.url { NSWorkspace.shared.open(url) }
+        if let url = action.request.url { Platform.open(url) }
         return nil
     }
 
+    #if os(macOS)
     func webView(
         _ webView: WKWebView,
         runJavaScriptAlertPanelWithMessage message: String,
@@ -234,6 +271,34 @@ extension EditorWebController: WKNavigationDelegate, WKUIDelegate {
         }
         return response == .alertFirstButtonReturn
     }
+    #else
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptAlertPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo
+    ) async {
+        guard let presenter = TauriHost.presenter(for: webView.window) else { return }
+        await withCheckedContinuation { continuation in
+            let alert = UIAlertController(title: message, message: nil, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in continuation.resume() })
+            presenter.present(alert, animated: true)
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo
+    ) async -> Bool {
+        guard let presenter = TauriHost.presenter(for: webView.window) else { return false }
+        return await withCheckedContinuation { continuation in
+            let alert = UIAlertController(title: message, message: nil, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in continuation.resume(returning: true) })
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in continuation.resume(returning: false) })
+            presenter.present(alert, animated: true)
+        }
+    }
+    #endif
 }
 
 /* ---------------- message handlers ----------------
@@ -271,6 +336,7 @@ private final class WeakReplyHandler: NSObject, WKScriptMessageHandlerWithReply 
 
 /// Hands the controller's web view to SwiftUI, tells the controller which window it
 /// ended up in, and says when a drag resizing that window ends.
+#if os(macOS)
 struct EditorWebView: NSViewRepresentable {
     let controller: EditorWebController
     var onLiveResizeEnd: () -> Void = {}
@@ -340,3 +406,37 @@ struct EditorWebView: NSViewRepresentable {
         }
     }
 }
+#else
+struct EditorWebView: UIViewRepresentable {
+    let controller: EditorWebController
+
+    func makeUIView(context: Context) -> WindowReportingContainer {
+        let container = WindowReportingContainer()
+        container.onWindow = { [weak controller] window in controller?.attach(to: window) }
+        container.embed(controller.webView)
+        return container
+    }
+
+    func updateUIView(_ view: WindowReportingContainer, context: Context) {}
+
+    final class WindowReportingContainer: UIView {
+        var onWindow: ((UIWindow?) -> Void)?
+
+        func embed(_ child: UIView) {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(child)
+            NSLayoutConstraint.activate([
+                child.leadingAnchor.constraint(equalTo: leadingAnchor),
+                child.trailingAnchor.constraint(equalTo: trailingAnchor),
+                child.topAnchor.constraint(equalTo: topAnchor),
+                child.bottomAnchor.constraint(equalTo: bottomAnchor),
+            ])
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            onWindow?(window)
+        }
+    }
+}
+#endif

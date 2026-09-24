@@ -1,16 +1,13 @@
 /**
  * tauri-shim.js — the Tauri IPC surface, answered by the Swift shell.
  *
- * Injected at document start, before any of the web bundle runs. The bundle was
- * written against Tauri and still is: `@tauri-apps/plugin-fs` persists every
- * document, `plugin-dialog` asks before every delete, `api/menu` builds every context
- * menu. All of those call `window.__TAURI_INTERNALS__`, and nothing else — so
- * implementing that one object is what lets the same `dist/` run under both shells
- * with no build flag and no fork.
- *
- * This is a compatibility layer, not the destination. Each piece of chrome that moves
- * to Swift stops calling through here; when the last one has, what is left is the
- * filesystem, and that belongs on the bridge protocol, not on Tauri's.
+ * Injected at document start, before any of the web bundle runs. The bundle is
+ * written against Tauri: `@tauri-apps/plugin-fs` persists every document,
+ * `plugin-dialog` asks before every delete, `api/menu` builds every context menu. All
+ * of those call `window.__TAURI_INTERNALS__`, and nothing else — so implementing that
+ * one object is what lets the same `dist/` run under both shells with no build flag
+ * and no fork. (Chrome state — tabs, notes, the toolbar — goes over the bridge
+ * protocol instead; this is only Tauri's API.)
  *
  * **What is answered here and what crosses.** Callbacks, channels, event listeners
  * and the menu resource tree are pure bookkeeping, and they live here, because a
@@ -119,14 +116,21 @@
 
   /* ---------------- events ---------------- */
 
-  const listeners = new Map() // event -> Map<eventId, callbackId>
+  // event -> Map<eventId, { callbackId, label }>. `label` is the window a listener was
+  // aimed at (`win.once('tauri://destroyed', …)` targets that window), or null for any.
+  const listeners = new Map()
   let nextEventId = 1
 
+  const targetLabel = (target) =>
+    target && typeof target === 'object' && target.kind !== 'Any' && typeof target.label === 'string'
+      ? target.label
+      : null
+
   const events = {
-    listen({ event, handler: callbackId }) {
+    listen({ event, target, handler: callbackId }) {
       const eventId = nextEventId++
       if (!listeners.has(event)) listeners.set(event, new Map())
-      listeners.get(event).set(eventId, callbackId)
+      listeners.get(event).set(eventId, { callbackId, label: targetLabel(target) })
       return eventId
     },
     unlisten({ event, eventId }) {
@@ -135,13 +139,22 @@
     emit({ event, payload }) {
       dispatchEvent(event, payload)
     },
+    emit_to({ target, event, payload }) {
+      dispatchEvent(event, payload, targetLabel(target))
+    },
   }
 
-  const dispatchEvent = (event, payload) => {
+  /**
+   * Deliver to every listener, or — for an event about one window — to the listeners
+   * for any window and the ones aimed at that window. Two Pinterest windows' `destroyed`
+   * handlers must not both fire when one of them closes.
+   */
+  const dispatchEvent = (event, payload, label = null) => {
     const registered = listeners.get(event)
     if (!registered) return
-    for (const [eventId, callbackId] of [...registered]) {
-      runCallback(callbackId, { event, id: eventId, payload })
+    for (const [eventId, listener] of [...registered]) {
+      if (label != null && listener.label != null && listener.label !== label) continue
+      runCallback(listener.callbackId, { event, id: eventId, payload })
     }
   }
 
@@ -322,16 +335,34 @@
 
   /* ---------------- windows ---------------- */
 
-  const WINDOW_LABEL = 'main'
+  // A detached document window is told its label before this runs; the main window is
+  // `main`, as it is under Tauri.
+  const WINDOW_LABEL = window.__inkblotWindowLabel || 'main'
+
+  const isOwn = (args) => args == null || args.label == null || args.label === WINDOW_LABEL
 
   const windows = {
     // The window's own toolbar is what drags it. The page's drag strips are off under
     // the shell (`nativeOwns('toolbar')`); this answers any stray call rather than
     // rejecting it, because the bundle logs a warning per rejected drag.
     start_dragging() {},
-    get_all_windows() { return [WINDOW_LABEL] },
+    // Detached document windows are the shell's (`AuxiliaryWindows`).
+    get_all_windows() { return native('window.list') },
     is_fullscreen() { return native('window.isFullscreen') },
-    set_title({ value }) { return native('window.setTitle', { title: value }) },
+    set_title(args) {
+      return isOwn(args)
+        ? native('window.setTitle', { title: args.value })
+        : native('window.op', { label: args.label, op: 'set_title', value: args.value })
+    },
+  }
+
+  /** Any other window verb — `show`, `hide`, `set_focus`, `destroy` — on any window, by label. */
+  const windowOp = (name) => (args) =>
+    native('window.op', { label: args?.label ?? WINDOW_LABEL, op: name, value: args?.value ?? null })
+
+  const webviews = {
+    // `new WebviewWindow(label, options)`: a detached document, or a Pinterest page.
+    create_webview_window({ options }) { return native('window.create', { options }) },
   }
 
   /* ---------------- dispatch ---------------- */
@@ -340,8 +371,8 @@
     const [plugin, name] = cmd.startsWith('plugin:') ? cmd.slice(7).split('|') : [null, cmd]
     if (plugin === 'event') return events[name]
     if (plugin === 'menu') return menus[name]
-    if (plugin === 'window') return windows[name] || (() => null)
-    if (plugin === 'webview') return () => null
+    if (plugin === 'window') return windows[name] || windowOp(name)
+    if (plugin === 'webview') return webviews[name] || (() => null)
     if (plugin === 'resources' && name === 'close') return () => null
     return null
   }

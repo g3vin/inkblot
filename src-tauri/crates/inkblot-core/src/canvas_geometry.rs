@@ -89,11 +89,17 @@ pub fn clamp_zoom(zoom: f64) -> f64 {
 }
 
 pub fn world_to_screen(wx: f64, wy: f64, v: Viewport) -> Point {
-    Point { x: (wx - v.x) * v.zoom, y: (wy - v.y) * v.zoom }
+    Point {
+        x: (wx - v.x) * v.zoom,
+        y: (wy - v.y) * v.zoom,
+    }
 }
 
 pub fn screen_to_world(sx: f64, sy: f64, v: Viewport) -> Point {
-    Point { x: sx / v.zoom + v.x, y: sy / v.zoom + v.y }
+    Point {
+        x: sx / v.zoom + v.x,
+        y: sy / v.zoom + v.y,
+    }
 }
 
 /// The CSS transform for the world layer.
@@ -114,7 +120,11 @@ pub fn zoom_at(v: Viewport, factor: f64, sx: f64, sy: f64) -> Viewport {
         return v;
     }
     let anchor = screen_to_world(sx, sy, v);
-    Viewport { zoom, x: anchor.x - sx / zoom, y: anchor.y - sy / zoom }
+    Viewport {
+        zoom,
+        x: anchor.x - sx / zoom,
+        y: anchor.y - sy / zoom,
+    }
 }
 
 /// Scale to an exact zoom level, pinning the center of the container.
@@ -123,12 +133,21 @@ pub fn zoom_to(v: Viewport, zoom: f64, width: f64, height: f64) -> Viewport {
 }
 
 pub fn pan_by(v: Viewport, dx_screen: f64, dy_screen: f64) -> Viewport {
-    Viewport { x: v.x + dx_screen / v.zoom, y: v.y + dy_screen / v.zoom, zoom: v.zoom }
+    Viewport {
+        x: v.x + dx_screen / v.zoom,
+        y: v.y + dy_screen / v.zoom,
+        zoom: v.zoom,
+    }
 }
 
 /// The rect a node occupies in world space.
 pub fn node_rect(node: &CanvasNode) -> Rect {
-    Rect { x: node.x, y: node.y, width: node.width, height: node.height }
+    Rect {
+        x: node.x,
+        y: node.y,
+        width: node.width,
+        height: node.height,
+    }
 }
 
 /// Bounding box of a list of rects in world space, or `None` if there are none.
@@ -148,7 +167,12 @@ pub fn nodes_bounds(nodes: &[Rect]) -> Option<Rect> {
     if !min_x.is_finite() {
         return None;
     }
-    Some(Rect { x: min_x, y: min_y, width: max_x - min_x, height: max_y - min_y })
+    Some(Rect {
+        x: min_x,
+        y: min_y,
+        width: max_x - min_x,
+        height: max_y - min_y,
+    })
 }
 
 /// The options `fitViewport` takes, with the defaults its destructuring supplies.
@@ -160,16 +184,26 @@ pub struct FitOptions {
 
 impl Default for FitOptions {
     fn default() -> Self {
-        Self { padding: 64.0, max_zoom: 1.0 }
+        Self {
+            padding: 64.0,
+            max_zoom: 1.0,
+        }
     }
 }
 
 /// Viewport that centers `bounds` in a container of the given size with `padding`
 /// screen pixels of breathing room. An empty canvas resets to the origin.
-pub fn fit_viewport(bounds: Option<Rect>, width: f64, height: f64, options: FitOptions) -> Viewport {
+pub fn fit_viewport(
+    bounds: Option<Rect>,
+    width: f64,
+    height: f64,
+    options: FitOptions,
+) -> Viewport {
     // `!width` in JS is true for 0 and for NaN, and false for a negative width.
     let falsy = |value: f64| value == 0.0 || value.is_nan();
-    let Some(bounds) = bounds else { return Viewport::default() };
+    let Some(bounds) = bounds else {
+        return Viewport::default();
+    };
     if falsy(width) || falsy(height) {
         return Viewport::default();
     }
@@ -188,14 +222,15 @@ pub fn fit_viewport(bounds: Option<Rect>, width: f64, height: f64, options: FitO
     let center_x = bounds.x + bounds.width / 2.0;
     let center_y = bounds.y + bounds.height / 2.0;
 
-    Viewport { zoom, x: center_x - width / (2.0 * zoom), y: center_y - height / (2.0 * zoom) }
+    Viewport {
+        zoom,
+        x: center_x - width / (2.0 * zoom),
+        y: center_y - height / (2.0 * zoom),
+    }
 }
 
 pub fn rects_intersect(a: Rect, b: Rect) -> bool {
-    a.x < b.x + b.width
-        && a.x + a.width > b.x
-        && a.y < b.y + b.height
-        && a.y + a.height > b.y
+    a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
 /// True when `inner` sits entirely within `outer` — how a group claims its members.
@@ -231,10 +266,22 @@ pub fn rect_from_points(a: Point, b: Point) -> Rect {
 /// Where an edge attaches on a node's side (world coords).
 pub fn side_anchor(node: Rect, side: EdgeSide) -> Point {
     match side {
-        EdgeSide::Top => Point { x: node.x + node.width / 2.0, y: node.y },
-        EdgeSide::Bottom => Point { x: node.x + node.width / 2.0, y: node.y + node.height },
-        EdgeSide::Left => Point { x: node.x, y: node.y + node.height / 2.0 },
-        EdgeSide::Right => Point { x: node.x + node.width, y: node.y + node.height / 2.0 },
+        EdgeSide::Top => Point {
+            x: node.x + node.width / 2.0,
+            y: node.y,
+        },
+        EdgeSide::Bottom => Point {
+            x: node.x + node.width / 2.0,
+            y: node.y + node.height,
+        },
+        EdgeSide::Left => Point {
+            x: node.x,
+            y: node.y + node.height / 2.0,
+        },
+        EdgeSide::Right => Point {
+            x: node.x + node.width,
+            y: node.y + node.height / 2.0,
+        },
     }
 }
 
@@ -289,8 +336,14 @@ pub fn bezier_path(from: Point, from_side: EdgeSide, to: Point, to_side: EdgeSid
     let reach0 = control_reach(distance, away_from);
     let reach1 = control_reach(distance, away_to);
 
-    let c0 = Point { x: from.x + n0.x * reach0, y: from.y + n0.y * reach0 };
-    let c1 = Point { x: to.x + n1.x * reach1, y: to.y + n1.y * reach1 };
+    let c0 = Point {
+        x: from.x + n0.x * reach0,
+        y: from.y + n0.y * reach0,
+    };
+    let c1 = Point {
+        x: to.x + n1.x * reach1,
+        y: to.y + n1.y * reach1,
+    };
 
     BezierPath {
         d: format!(
@@ -314,20 +367,35 @@ pub fn bezier_path(from: Point, from_side: EdgeSide, to: Point, to_side: EdgeSid
 /// An anchor pushed `gap` out along its side's normal, clear of the card.
 pub fn offset_anchor(anchor: Point, side: EdgeSide, gap: f64) -> Point {
     let n = side_normal(side);
-    Point { x: anchor.x + n.x * gap, y: anchor.y + n.y * gap }
+    Point {
+        x: anchor.x + n.x * gap,
+        y: anchor.y + n.y * gap,
+    }
 }
 
 /// The path (and label point) for an edge between two nodes.
 ///
 /// An unset side — or, in a foreign file, one spelled in a way we do not recognise —
 /// falls back to the same defaults JS reaches through `sideAnchor`'s `default:` branch.
-pub fn edge_geometry(edge: &CanvasEdge, from_node: &CanvasNode, to_node: &CanvasNode) -> BezierPath {
+pub fn edge_geometry(
+    edge: &CanvasEdge,
+    from_node: &CanvasNode,
+    to_node: &CanvasNode,
+) -> BezierPath {
     let from_side = edge.from_side.unwrap_or(EdgeSide::Right);
     let to_side = edge.to_side.unwrap_or(EdgeSide::Left);
     bezier_path(
-        offset_anchor(side_anchor(node_rect(from_node), from_side), from_side, EDGE_ENDPOINT_GAP),
+        offset_anchor(
+            side_anchor(node_rect(from_node), from_side),
+            from_side,
+            EDGE_ENDPOINT_GAP,
+        ),
         from_side,
-        offset_anchor(side_anchor(node_rect(to_node), to_side), to_side, EDGE_ENDPOINT_GAP),
+        offset_anchor(
+            side_anchor(node_rect(to_node), to_side),
+            to_side,
+            EDGE_ENDPOINT_GAP,
+        ),
         to_side,
     )
 }
@@ -339,7 +407,11 @@ pub fn infer_side(node: Rect, point: Point) -> EdgeSide {
     let dx = point.x - (node.x + node.width / 2.0);
     let dy = point.y - (node.y + node.height / 2.0);
     if dx.abs() > dy.abs() {
-        return if dx > 0.0 { EdgeSide::Right } else { EdgeSide::Left };
+        return if dx > 0.0 {
+            EdgeSide::Right
+        } else {
+            EdgeSide::Left
+        };
     }
     if dy > 0.0 {
         EdgeSide::Bottom
@@ -358,7 +430,13 @@ mod tests {
         assert!(js_min(1.0, f64::NAN).is_nan());
         assert!(js_max(1.0, f64::NAN).is_nan());
         // A list containing NaN has no bounds at all, rather than bounds that skip it.
-        assert!(nodes_bounds(&[Rect { x: f64::NAN, y: 0.0, width: 10.0, height: 10.0 }]).is_none());
+        assert!(nodes_bounds(&[Rect {
+            x: f64::NAN,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0
+        }])
+        .is_none());
     }
 
     #[test]
@@ -376,7 +454,10 @@ mod tests {
         // difference survives into the SVG path string.
         let v8 = js_hypot(-202.0, -50.0);
         assert_eq!(crate::js_number::format_js_number(v8), "208.09613163151306");
-        assert_eq!(crate::js_number::format_js_number((-202.0f64).hypot(-50.0)), "208.09613163151303");
+        assert_eq!(
+            crate::js_number::format_js_number((-202.0f64).hypot(-50.0)),
+            "208.09613163151303"
+        );
         assert!(js_hypot(f64::INFINITY, f64::NAN).is_infinite());
         assert!(js_hypot(f64::NAN, 1.0).is_nan());
         assert_eq!(js_hypot(0.0, 0.0), 0.0);

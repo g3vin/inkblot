@@ -4,8 +4,7 @@
 
 /*
  * A board is a card like any other in the app: same radius, same surface, same
- * shadow language as a note or a canvas card. It used to sit in a flat translucent
- * box with square-ish corners that matched nothing around it.
+ * shadow language as a note or a canvas card.
  */
 .pinterest-board-node {
   display: block;

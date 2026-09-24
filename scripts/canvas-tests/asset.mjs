@@ -1,7 +1,11 @@
+/**
+ * The content-addressed asset store (`.assets/<sha256[0..20]>.<ext>`): writing, importing
+ * and resolving canvas images.
+ */
 import { files } from './stub-fs.mjs'
 const L = '../../src/lib'
 const { writeAsset, writeAssetFromFile, importAssetFromPath, assetUrl, isImagePath, isAssetPath, extensionOf } = await import(`${L}/assets.js`)
-const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
+import { ok } from './assert.mjs'
 const P = 'Novel'
 
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4, 5])
@@ -44,7 +48,7 @@ ok('assetUrl uses the asset protocol', url.startsWith('asset://'))
 ok('assetUrl points at the absolute file', decodeURIComponent(url).includes(`/appdata/Novel/${a}`))
 ok('assetUrl is cached (stable across calls)', (await assetUrl(P, a)) === url)
 
-// extension sniffing used to decide what to import
+// extension sniffing decides what to import
 ok('isImagePath: png', isImagePath('a/b.PNG'))
 ok('isImagePath: rejects non-images', !isImagePath('notes.txt') && !isImagePath('doc.json'))
 ok('extensionOf lowercases', extensionOf('X.JPG') === 'jpg')

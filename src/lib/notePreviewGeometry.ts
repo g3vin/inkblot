@@ -35,11 +35,6 @@ export interface AnchorRect {
   height: number
 }
 
-/**
- * What the hover preview is showing. `editorView` is a live ProseMirror `EditorView`
- * and is only ever compared by identity here — this module does not touch it, which
- * is what keeps it pure.
- */
 export interface PreviewIdentity {
   note?: { id?: string } | null
   locked?: boolean

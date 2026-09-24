@@ -1,9 +1,10 @@
 /**
  * menuContext.js — the shared state one right-click needs.
  *
- * The handler used to be a single 904-line callback. Everything the branches read
- * in common is assembled here once: the Tauri menu classes, the accumulating item
- * list, the document helpers, and the DOM targets under the pointer.
+ * The right-click handler is split into one module per menu branch (canvas, editor,
+ * file tree, tab, common). Everything the branches read in common is assembled here
+ * once: the Tauri menu classes, the accumulating item list, the document helpers, and
+ * the DOM targets under the pointer.
  *
  * The targets are resolved here rather than inside the file-tree branch because
  * `fileItem` reaches beyond it — the canvas and editor branches both key off it.

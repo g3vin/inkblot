@@ -1,4 +1,4 @@
-//! What a search returns. The sidebar goes native in Phase 5, so these cross the seam.
+//! What a search returns, to the page's search bar and the Swift app's inspector alike.
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
@@ -10,8 +10,7 @@ use super::json::JsonValue;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SearchScope {
-    /// The default, and what the bar did before it could search: filter whatever panel
-    /// is showing. Every other scope searches content and shows its own results, so the
+    /// The default: filter whatever panel is showing. Every other scope searches content and shows its own results, so the
     /// panel underneath is left unfiltered.
     Panel,
     Document,

@@ -2,16 +2,12 @@
  * canvasDelegates.ts — the canvas half of the protocol, implemented over what the
  * canvas already listens to.
  *
- * `canvasEvents.js` is how the rest of the app talks to a mounted canvas today: a
+ * `canvasEvents.js` is how the rest of the app talks to a mounted canvas: a
  * CustomEvent dispatched on the surface element, because split view can show two
- * canvases and the element is what says which one the user aimed at. That mechanism
- * is fine — it is the *aiming* that does not survive a process boundary, since a
- * native shell cannot hit-test the web view's DOM.
- *
- * So the protocol aims by id and this file does the translation: id to element, then
- * the existing dispatch. Nothing about how a canvas receives a command changes, which
- * is deliberate — a phase that rewrote the canvas's event handling at the same time as
- * introducing the bridge would have no way to tell which half broke it.
+ * canvases and the element is what says which one the user aimed at. A native shell
+ * cannot hit-test the web view's DOM, so the protocol aims by surface id instead, and
+ * this file translates: id to element, then the same dispatch. A canvas receives a
+ * bridge command exactly as it receives one from the page.
  */
 import {
   canvasSurfaceById,

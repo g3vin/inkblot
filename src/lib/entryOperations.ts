@@ -5,8 +5,12 @@
  * the page may be *holding* the path it is about to change — the open document, the
  * split pane, a tab, notes and versions keyed by path — and when a pane lets go of a
  * document its autosave flushes to the path it had. Rename the file first and that
- * flush lands on the old name and quietly recreates it. That was true of the React
- * tree for as long as it has existed; the native tree only made it impossible to miss.
+ * flush lands on the old name and quietly recreates it.
+ *
+ * `useEntryOperations` therefore closes whatever an entry touches (with `flushSync`,
+ * so the flushes run now), waits for those writes on the document locks, performs the
+ * disk operation, and reopens at the new paths with tabs, notes and versions carried
+ * across. The `entries` suite covers renaming and deleting the open document.
  *
  * So there is one implementation that knows about the page's state
  * (`useEntryOperations`, registered by Editor.jsx), and every caller goes through the

@@ -38,9 +38,14 @@ pub fn format_js_number(value: f64) -> String {
     // is `m × 10^exp` with `1 <= |m| < 10`. ECMA works in terms of `0.d1d2… × 10^n`,
     // so `n = exp + 1` and `digits` is the mantissa with its point removed.
     let scientific = format!("{:e}", value.abs());
-    let (mantissa, exponent) = scientific.split_once('e').expect("{:e} always emits an exponent");
+    let (mantissa, exponent) = scientific
+        .split_once('e')
+        .expect("{:e} always emits an exponent");
     let mut digits: String = mantissa.chars().filter(|c| *c != '.').collect();
-    let mut n = exponent.parse::<i32>().expect("{:e} emits a decimal exponent") + 1;
+    let mut n = exponent
+        .parse::<i32>()
+        .expect("{:e} emits a decimal exponent")
+        + 1;
 
     if let Some((tied_digits, tied_n)) = round_half_to_even(value.abs(), &digits, n) {
         digits = tied_digits;
@@ -106,7 +111,11 @@ fn round_half_to_even(magnitude: f64, digits: &str, n: i32) -> Option<(String, i
 
     // The two candidates: the first k digits, and that value plus one.
     let low = &rounded[..k];
-    let picked = if low.as_bytes()[k - 1] % 2 == 0 { low.to_string() } else { increment_digits(low) };
+    let picked = if low.as_bytes()[k - 1] % 2 == 0 {
+        low.to_string()
+    } else {
+        increment_digits(low)
+    };
 
     // A carry lengthens the digit string and shifts the exponent; trailing zeros are
     // not significant, and JS would never print them.

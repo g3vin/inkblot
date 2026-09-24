@@ -5,12 +5,10 @@
  * pane moves the text into the document, and dropping editor selections or
  * external text onto this panel adds a clipboard entry.
  *
- * This panel and the editor are the two ends of one drag, and they used to meet on
- * `window.__inkblot_*`. They meet on `bridge/dragHandoff` now — same shape, one owner,
- * and a drop that is *claimed* rather than flagged, so which of the two handles a drop
- * both of them can see no longer depends on the order their listeners happen to run
- * in. This panel is going native in Phase 5, so it is one of the two ends that will
- * genuinely be in a different process.
+ * This panel and the editor are the two ends of one drag, and they meet on
+ * `bridge/dragHandoff`. A drop both of them can see is *claimed*, so which one handles
+ * it does not depend on the order their listeners run in. The Swift shell draws its
+ * own clipboard panel and reaches the same session over the bridge.
  */
 import { useEffect, useRef, useState } from 'react'
 import { dragHandoff, DragPayloadKind } from '../../bridge'

@@ -1,9 +1,9 @@
 //! Everything the app remembers between launches that is not a document.
 //!
-//! All of this lived in `localStorage`, which a native shell cannot see: a `WKWebView`
-//! in a Swift app gets its own store, per origin, that no native code can read. So the
-//! same state moves to disk under AppData, where both shells can reach it, and the
-//! webview keeps a synchronous facade over a cache it hydrates once at launch.
+//! Not `localStorage`: a `WKWebView` in a Swift app gets its own store, per origin,
+//! that no native code can read. On disk under AppData, both shells reach the same
+//! state; the webview keeps a synchronous facade (`src/lib/preferences.ts`) over a
+//! cache it hydrates once at launch.
 //!
 //! ## Three files, not one
 //!
@@ -16,20 +16,19 @@
 //! Splitting them keeps a corrupt or enormous pin cache from taking the theme with it,
 //! and means the file that is read on every launch stays small.
 //!
-//! ## What deliberately did NOT move
+//! ## What is deliberately not here
 //!
-//! - **`sessionStorage`.** `inkblot:project-open-id` and the per-project Pinterest
+//! - **Per-launch session values.** `inkblot:project-open-id` and the per-project Pinterest
 //!   refresh flag are scoped to one app launch by design. On disk they would outlive
 //!   the thing they describe, so they stay in memory in the webview facade.
 //! - **The file tree's order and expansion stay machine-local.** They are here in
 //!   AppData rather than in the project directory, because `fileTreeState.js` says
-//!   plainly that they are kept out of the project so they do not travel with it. The
-//!   `.inkblot-order.json` name is still reserved in the store and still unwritten;
+//!   plainly that they are kept out of the project so they do not travel with it.  The
+//!   `.inkblot-order.json` name is reserved in the store and never written;
 //!   using it would put one machine's collapsed folders into another's checkout.
 //!
-//! Values are opaque strings. Every call site was already storing JSON it parsed
-//! itself, and keeping them strings makes the webview facade a drop-in for the
-//! `localStorage` it replaces.
+//! Values are opaque strings; callers that store structured data serialize it
+//! themselves.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -45,8 +44,11 @@ pub enum PreferenceScope {
 }
 
 impl PreferenceScope {
-    pub const ALL: [PreferenceScope; 3] =
-        [PreferenceScope::App, PreferenceScope::FileTree, PreferenceScope::PinterestCache];
+    pub const ALL: [PreferenceScope; 3] = [
+        PreferenceScope::App,
+        PreferenceScope::FileTree,
+        PreferenceScope::PinterestCache,
+    ];
 
     /// The wire name, which is also the stem of the file. Parsed rather than
     /// interpolated, so a caller cannot name a path.
@@ -96,7 +98,10 @@ impl PreferenceStore {
     /// preference is not worth refusing to launch over, and every caller already
     /// defaults when a key is absent.
     fn load(&self, scope: PreferenceScope) -> PreferenceMap {
-        let mut scopes = self.scopes.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut scopes = self
+            .scopes
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(map) = scopes.get(&scope) {
             return map.clone();
         }
@@ -112,7 +117,10 @@ impl PreferenceStore {
 
     fn persist(&self, scope: PreferenceScope, map: PreferenceMap) -> Result<(), StoreError> {
         {
-            let mut scopes = self.scopes.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut scopes = self
+                .scopes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             scopes.insert(scope, map.clone());
         }
         std::fs::create_dir_all(&self.app_data_root)?;
@@ -123,7 +131,10 @@ impl PreferenceStore {
     /// Every scope at once — what the webview asks for at launch so that its facade
     /// can answer synchronously afterwards.
     pub fn load_all(&self) -> BTreeMap<&'static str, PreferenceMap> {
-        PreferenceScope::ALL.into_iter().map(|scope| (scope.as_str(), self.load(scope))).collect()
+        PreferenceScope::ALL
+            .into_iter()
+            .map(|scope| (scope.as_str(), self.load(scope)))
+            .collect()
     }
 
     pub fn get(&self, scope: PreferenceScope, key: &str) -> Option<String> {
@@ -216,42 +227,90 @@ mod tests {
 
         // A second store is a second launch: nothing is shared but the files.
         let relaunched = PreferenceStore::new(app_data.as_str());
-        assert_eq!(relaunched.get(PreferenceScope::App, "inkblot-theme").as_deref(), Some("dark"));
+        assert_eq!(
+            relaunched
+                .get(PreferenceScope::App, "inkblot-theme")
+                .as_deref(),
+            Some("dark")
+        );
     }
 
     #[test]
     fn the_scopes_are_separate_files() {
         let app_data = TempDir::new();
         let store = PreferenceStore::new(app_data.as_str());
-        store.set(PreferenceScope::App, "inkblot-theme", "dark").unwrap();
-        store.set(PreferenceScope::PinterestCache, "board", "[]").unwrap();
+        store
+            .set(PreferenceScope::App, "inkblot-theme", "dark")
+            .unwrap();
+        store
+            .set(PreferenceScope::PinterestCache, "board", "[]")
+            .unwrap();
 
         assert!(PathBuf::from(format!("{}/preferences.json", app_data.as_str())).exists());
         assert!(PathBuf::from(format!("{}/pinterest-cache.json", app_data.as_str())).exists());
         // And a corrupt cache cannot take the theme with it.
-        std::fs::write(format!("{}/pinterest-cache.json", app_data.as_str()), "{{{{").unwrap();
+        std::fs::write(
+            format!("{}/pinterest-cache.json", app_data.as_str()),
+            "{{{{",
+        )
+        .unwrap();
         let relaunched = PreferenceStore::new(app_data.as_str());
-        assert_eq!(relaunched.get(PreferenceScope::App, "inkblot-theme").as_deref(), Some("dark"));
-        assert!(relaunched.get(PreferenceScope::PinterestCache, "board").is_none());
+        assert_eq!(
+            relaunched
+                .get(PreferenceScope::App, "inkblot-theme")
+                .as_deref(),
+            Some("dark")
+        );
+        assert!(relaunched
+            .get(PreferenceScope::PinterestCache, "board")
+            .is_none());
     }
 
     #[test]
     fn a_project_rename_carries_its_file_tree_state() {
         let app_data = TempDir::new();
         let store = PreferenceStore::new(app_data.as_str());
-        store.set(PreferenceScope::FileTree, "inkblot-order:Novel", "{}").unwrap();
-        store.set(PreferenceScope::FileTree, "inkblot-expanded:Novel", "[]").unwrap();
-        store.set(PreferenceScope::FileTree, "inkblot-order:Other", "{}").unwrap();
-
-        store.rename_prefix(PreferenceScope::FileTree, "inkblot-order:Novel", "inkblot-order:Book").unwrap();
         store
-            .rename_prefix(PreferenceScope::FileTree, "inkblot-expanded:Novel", "inkblot-expanded:Book")
+            .set(PreferenceScope::FileTree, "inkblot-order:Novel", "{}")
+            .unwrap();
+        store
+            .set(PreferenceScope::FileTree, "inkblot-expanded:Novel", "[]")
+            .unwrap();
+        store
+            .set(PreferenceScope::FileTree, "inkblot-order:Other", "{}")
             .unwrap();
 
-        assert!(store.get(PreferenceScope::FileTree, "inkblot-order:Novel").is_none());
-        assert_eq!(store.get(PreferenceScope::FileTree, "inkblot-order:Book").as_deref(), Some("{}"));
+        store
+            .rename_prefix(
+                PreferenceScope::FileTree,
+                "inkblot-order:Novel",
+                "inkblot-order:Book",
+            )
+            .unwrap();
+        store
+            .rename_prefix(
+                PreferenceScope::FileTree,
+                "inkblot-expanded:Novel",
+                "inkblot-expanded:Book",
+            )
+            .unwrap();
+
+        assert!(store
+            .get(PreferenceScope::FileTree, "inkblot-order:Novel")
+            .is_none());
+        assert_eq!(
+            store
+                .get(PreferenceScope::FileTree, "inkblot-order:Book")
+                .as_deref(),
+            Some("{}")
+        );
         // Another project's state is untouched.
-        assert_eq!(store.get(PreferenceScope::FileTree, "inkblot-order:Other").as_deref(), Some("{}"));
+        assert_eq!(
+            store
+                .get(PreferenceScope::FileTree, "inkblot-order:Other")
+                .as_deref(),
+            Some("{}")
+        );
     }
 
     #[test]

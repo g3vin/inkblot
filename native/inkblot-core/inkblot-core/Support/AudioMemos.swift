@@ -113,7 +113,7 @@ final class AudioMemoRecorder {
     }
 }
 
-/// Plays one memo at a time, as the page's `<audio>` elements effectively did.
+/// Plays one memo at a time, as the page's `<audio>` elements effectively do.
 @MainActor
 @Observable
 final class AudioMemoPlayer: NSObject, AVAudioPlayerDelegate {
