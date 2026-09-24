@@ -17,6 +17,7 @@ pub mod document;
 pub mod geometry;
 pub mod json;
 pub mod note;
+pub mod page_setup;
 pub mod read_aloud;
 pub mod search;
 pub mod story;
@@ -30,6 +31,10 @@ pub use canvas::{
 pub use document::{DocKind, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind, VERSION_CAP};
 pub use geometry::{BezierPath, EdgeSide, Point, Rect, Viewport};
 pub use json::{JsonMap, JsonValue};
+pub use page_setup::{
+    BindingSettings, BindingType, BookSettings, DuplexMode, PageMargins, PageNumberFormat,
+    PageOrientation, PageSetup, RunningText, SheetFit,
+};
 pub use read_aloud::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
 pub use search::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
 pub use story::{StoryFolderAncestor, StoryFolderPreset};

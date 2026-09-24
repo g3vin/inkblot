@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "test": "node --experimental-loader ./scripts/canvas-tests/loader.mjs scripts/canvas-tests/run.mjs",
+    "test:layout": "node scripts/print-tests/run.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "parity": "node --experimental-loader ./scripts/canvas-tests/loader.mjs scripts/parity/run.mjs",

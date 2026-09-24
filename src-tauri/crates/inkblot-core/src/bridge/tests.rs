@@ -14,6 +14,54 @@ use super::*;
 use crate::types::note::Note;
 use serde_json::{json, Value};
 
+fn page_setup() -> crate::types::PageSetup {
+    use crate::types::{PageMargins, PageNumberFormat, PageOrientation, PageSetup, RunningText};
+    let blank = RunningText { left: String::new(), center: String::new(), right: String::new() };
+    PageSetup {
+        preset_id: "trade-6x9".into(),
+        width_mm: 152.4,
+        height_mm: 228.6,
+        orientation: PageOrientation::Portrait,
+        margins: PageMargins { top_mm: 19.05, bottom_mm: 19.05, inside_mm: 15.875, outside_mm: 15.875, gutter_mm: 3.175 },
+        mirror_margins: true,
+        columns: 1,
+        column_gap_mm: 6.35,
+        header: RunningText { left: String::new(), center: "{chapter}".into(), right: String::new() },
+        footer: RunningText { left: String::new(), center: "{page}".into(), right: String::new() },
+        verso_header: Some(RunningText { center: "{title}".into(), ..blank.clone() }),
+        verso_footer: None,
+        header_distance_mm: 9.525,
+        footer_distance_mm: 9.525,
+        different_first_page: true,
+        page_number_start: 1,
+        page_number_format: PageNumberFormat::Arabic,
+        widow_orphan_lines: 2,
+        chapter_starts_on_recto: true,
+    }
+}
+
+fn book() -> crate::types::BookSettings {
+    use crate::types::{BindingSettings, BindingType, BookSettings, DuplexMode, SheetFit};
+    BookSettings {
+        folder: "Manuscript".into(),
+        title: "The Book".into(),
+        author: "A. Writer".into(),
+        language: "en-US".into(),
+        cover_image: None,
+        page_setup: Some(page_setup()),
+        binding: BindingSettings {
+            binding: BindingType::Signatures,
+            sheets_per_signature: 4,
+            sheet_preset_id: "letter".into(),
+            sheet_fit: SheetFit::ActualSize,
+            duplex: DuplexMode::Automatic,
+            paper_thickness_mm: 0.1,
+            crop_marks: true,
+            include_guide: true,
+        },
+    }
+}
+
 fn anchor() -> TextAnchor {
     TextAnchor::new(4, 17, "she hesitated")
 }
@@ -283,6 +331,16 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::AddReply(AddReplyCommand { doc_path: "one".into(), parent_note_id: "n1".into() }),
         NativeCommand::SetTitlebarInset(SetTitlebarInsetCommand { leading: 78.0, trailing: 52.0 }),
+        NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true }),
+        NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup() }),
+        NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
+        NativeCommand::SetPrintZoom(SetPrintZoomCommand { zoom: Some(1.25), fit: None }),
+        NativeCommand::SetDisplayDensity(SetDisplayDensityCommand { points_per_inch: 127.0 }),
+        NativeCommand::InsertBreak(InsertBreakCommand { target: EditorTarget::Primary, kind: PageBreakKind::Recto }),
+        NativeCommand::GoToPage(GoToPageCommand { page: 12 }),
+        NativeCommand::PrintDocument(PrintDocumentCommand { scope: PrintScope::Folder, bound: true }),
+        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false }),
+        NativeCommand::PrintFinished(PrintFinishedCommand { job_id: "p1".into(), completed: true }),
     ]
 }
 
@@ -406,6 +464,27 @@ fn every_event() -> Vec<WebviewEvent> {
             note: None,
         }),
         WebviewEvent::NotePreviewDismissed(NotePreviewDismissed { note_id: "n1".into() }),
+        WebviewEvent::PageLayoutState(PageLayoutState {
+            enabled: true,
+            doc_path: Some("Manuscript/one".into()),
+            setup: page_setup(),
+            has_own_setup: true,
+            page_count: 212,
+            current_page: 3,
+            zoom: 1.0,
+            book: book(),
+            book_chapters: vec!["Manuscript/one".into(), "Manuscript/two".into()],
+            suggested_inside_margin_mm: 12.7,
+            presets: vec![PageSizeOption { id: "a4".into(), label: "A4".into(), group: "ISO A".into(), width_mm: 210.0, height_mm: 297.0 }],
+            signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
+        }),
+        WebviewEvent::PrintRequest(PrintRequest {
+            job_id: "p1".into(),
+            job_name: "The Book".into(),
+            paper_width_pt: 612.0,
+            paper_height_pt: 792.0,
+            pdf_path: None,
+        }),
     ]
 }
 
@@ -460,6 +539,16 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
             "revealSearchResult",
             "addReply",
             "setTitlebarInset",
+            "setPrintLayout",
+            "setPageSetup",
+            "setBookSettings",
+            "setPrintZoom",
+            "setDisplayDensity",
+            "insertBreak",
+            "goToPage",
+            "printDocument",
+            "exportDocument",
+            "printFinished",
         ]
     );
 }
@@ -493,6 +582,8 @@ fn every_event_has_the_wire_name_the_handoff_promised() {
             "showSidebarTab",
             "noteMarkerMoved",
             "notePreviewDismissed",
+            "pageLayoutState",
+            "printRequest",
         ]
     );
 }
@@ -614,4 +705,27 @@ fn envelope_sequence_numbers_survive_the_wire() {
         panic!("an event envelope came back as something else");
     };
     assert_eq!(envelope.seq, 41);
+}
+
+#[test]
+fn a_page_setup_crosses_the_wire_in_millimetres_and_camel_case() {
+    let command = NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup() });
+    let wire = serde_json::to_value(&command).unwrap();
+    assert_eq!(wire["type"], "setPageSetup");
+    let setup = &wire["payload"]["setup"];
+    assert_eq!(setup["presetId"], "trade-6x9");
+    assert_eq!(setup["widthMm"], 152.4);
+    assert_eq!(setup["margins"]["gutterMm"], 3.175);
+    assert_eq!(setup["pageNumberFormat"], "arabic");
+    assert_eq!(setup["versoHeader"]["center"], "{title}");
+    // An absent override is absent, not null: the page tests `setup.versoFooter`.
+    assert!(setup.get("versoFooter").is_none());
+}
+
+#[test]
+fn a_page_setup_without_verso_overrides_still_reads() {
+    let mut wire = serde_json::to_value(page_setup()).unwrap();
+    wire.as_object_mut().unwrap().remove("versoHeader");
+    let setup: crate::types::PageSetup = serde_json::from_value(wire).unwrap();
+    assert!(setup.verso_header.is_none());
 }

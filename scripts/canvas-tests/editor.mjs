@@ -40,6 +40,9 @@ const { saveCanvasDocument, loadCanvasDocument } = await import('../../src/lib/c
 const { createEmptyCanvas, makeTextNode } = await import('../../src/lib/canvasModel.js')
 const { files } = await import('./stub-fs.mjs')
 const { shellBridge } = await import('../../src/bridge/index.ts')
+const printStore = await import('../../src/print/printLayoutStore.js')
+const { readDocPageSetup } = await import('../../src/print/DocPageSetup.js')
+const { bookPageSetup } = await import('../../src/print/pageSetup.ts')
 
 const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 50)) })
@@ -301,6 +304,42 @@ await settle()
 const secondaryOnDisk = await loadDocument(P, 'two')
 ok('closing the split flushes the secondary pane\'s autosave',
   JSON.stringify(secondaryOnDisk.content).includes('revised'))
+
+/* ---------------- Print Layout ---------------- */
+
+// jsdom has no layout, so this cannot see where pages break (scripts/print-tests does,
+// in WebKit). What it can see is that the real pane mounts as pages, keeps the SAME
+// editor — switching views must not recreate it — and that the setup is saved.
+const editorBefore = control.editor
+const textBefore = paneText()
+await act(async () => { printStore.setPrintLayoutEnabled(P, 'one', true) })
+await settle()
+ok('Print Layout mounts the pane as pages', !!document.querySelector('.primary-pane .print-layout .pl-stage .pl-page'))
+ok('…with the live editor inside the page stage', !!document.querySelector('.primary-pane .pl-flow .editor .ProseMirror'))
+ok('…the same editor instance, with the same text', control.editor === editorBefore && paneText() === textBefore)
+ok('…and a page count in the zoom bar', /Page 1 of \d+/.test(document.querySelector('.primary-pane .pl-status')?.textContent || ''))
+
+await act(async () => {
+  control.editor.commands.setPageSetup(bookPageSetup('trade-6x9'))
+  control.editor.commands.setTextSelection(3)
+  control.editor.commands.insertPageBreak('recto')
+})
+await settle()
+ok('a page break is a node in the document', control.editor.getJSON().content.some((n) => n.type === 'pageBreak' && n.attrs.kind === 'recto'))
+
+await act(async () => { printStore.setPrintLayoutEnabled(P, 'one', false) })
+await settle()
+ok('turning Print Layout off returns the continuous editor', !document.querySelector('.primary-pane .print-layout') && !!document.querySelector('.primary-pane .editor .ProseMirror'))
+ok('…still the same editor', control.editor === editorBefore)
+
+// Switching documents flushes the autosave; the setup must be in what was written.
+await act(async () => { control.setCurrentDoc('two') })
+await settle()
+const withSetup = await loadDocument(P, 'one')
+ok('the page setup is saved with the document', withSetup?.content?.attrs?.pageSetup?.presetId === 'trade-6x9')
+await act(async () => { control.setCurrentDoc('one') })
+await settle()
+ok('…and is back when the document is reopened', readDocPageSetup(control.editor.state.doc)?.mirrorMargins === true)
 
 /* ---------------- Unmount ---------------- */
 

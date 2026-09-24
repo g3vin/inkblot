@@ -22,6 +22,7 @@ import {
 import { isCanvasDoc } from './docKind'
 import { formatFullTimestamp } from './versionHistory'
 import { dispatchCanvasRestore } from '../canvas/canvasEvents'
+import { setContentKeepingPageSetup } from '../print/DocPageSetup'
 
 /** Save the current state as a version. Resolves to the stored entry, or null. */
 export async function snapshotVersion({ projectName, docName, editor }) {
@@ -67,7 +68,7 @@ export async function restoreVersion({ projectName, docName, editor, version }) 
     contentJson: editor.getJSON(),
     auto: true,
   }))
-  editor.commands.setContent(version.contentJson || version.contentHtml || '<p></p>')
+  setContentKeepingPageSetup(editor, version.contentJson || version.contentHtml || '<p></p>')
   await appendVersionEntry(projectName, docName, buildTextVersionEntry({
     contentHtml: version.contentHtml,
     contentJson: version.contentJson,
