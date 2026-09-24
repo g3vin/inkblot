@@ -30,6 +30,7 @@ import {
 
 export function useCanvasExternalEvents({
   addTextNodeAt,
+  applyColor,
   centerOn,
   clear,
   deleteSelection,
@@ -40,13 +41,19 @@ export function useCanvasExternalEvents({
   handleZoomToFit,
   importImageAt,
   onActivate,
+  redo,
+  resetZoom,
   screenToWorldAt,
   selectNode,
   stateRef,
   surfaceRef,
   toggleLocked,
+  toggleSnapPref,
+  undo,
   ungroupSelection,
   viewCenter,
+  zoomIn,
+  zoomOut,
 }) {
   /* ---------------- links and Pinterest boards ---------------- */
 
@@ -166,7 +173,7 @@ export function useCanvasExternalEvents({
     if (!surface) return
 
     const onCommand = (event) => {
-      const { command, clientX, clientY } = event.detail || {}
+      const { command, clientX, clientY, color } = event.detail || {}
       const at = () =>
         Number.isFinite(clientX) ? screenToWorldAt(clientX, clientY) : viewCenter()
 
@@ -195,6 +202,32 @@ export function useCanvasExternalEvents({
         case 'zoom-to-fit':
           handleZoomToFit()
           break
+        // The rest are the canvas toolbar's, for a shell that draws it natively.
+        case 'undo':
+          undo()
+          break
+        case 'redo':
+          redo()
+          break
+        case 'zoom-in':
+          zoomIn()
+          break
+        case 'zoom-out':
+          zoomOut()
+          break
+        case 'reset-zoom':
+          resetZoom()
+          break
+        case 'toggle-guides':
+          toggleSnapPref('guides')
+          break
+        case 'toggle-grid':
+          toggleSnapPref('grid')
+          break
+        // `color` is a preset id ('1'–'6'), or absent for the default.
+        case 'apply-color':
+          applyColor(color || null)
+          break
         default:
           break
       }
@@ -204,16 +237,23 @@ export function useCanvasExternalEvents({
     return () => surface.removeEventListener(CANVAS_COMMAND_EVENT, onCommand)
   }, [
     addTextNodeAt,
+    applyColor,
     deleteSelection,
     groupSelection,
     handleToggleRecording,
     handleZoomToFit,
     importImageAt,
+    redo,
+    resetZoom,
     screenToWorldAt,
     surfaceRef,
     toggleLocked,
+    toggleSnapPref,
+    undo,
     ungroupSelection,
     viewCenter,
+    zoomIn,
+    zoomOut,
   ])
 
   /* ---------------- restore a version (from the history panel) ---------------- */

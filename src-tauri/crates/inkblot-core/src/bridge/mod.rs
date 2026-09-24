@@ -29,21 +29,35 @@
 //! **The one rule worth carrying out of here:** no message carries a bare ProseMirror
 //! position. See `TextAnchor`.
 
+pub mod archive;
+pub mod bubble;
 pub mod command;
 pub mod common;
 pub mod envelope;
 pub mod event;
+pub mod references;
 pub mod print;
 pub mod sidebar;
 
+pub use archive::{ArchiveAction, ArchiveActionCommand, ArchiveChanged, ArchivedItem, ArchivedKind};
+pub use bubble::{BubbleAside, BubbleChipRect, BubbleChipsChanged, BubbleForm, BubbleMode, BubbleSession, BubbleSessionOpened, BubbleWord, CloseBubbleSessionCommand};
 pub use command::{
     ApplyMarkCommand, CanvasCommandRequest, CanvasDropDocCommand, CanvasDropNoteCommand,
     CanvasRestoreCommand, CanvasRevealCommand, DictationCancelCommand, DictationLevelCommand,
     CreateEntryCommand, DeleteEntryCommand, DictationTranscript, DuplicateEntryCommand, EntryKind,
-    InsertPlainTextCommand, MoveEntryCommand, RenameEntryCommand, SetTitlebarInsetCommand, InsertTableCommand, JumpToAnchorCommand, NativeCommand,
+    InsertPlainTextCommand, MoveEntryCommand, RenameEntryCommand, SetTitlebarInsetCommand, SetPanelInsetsCommand, InsertTableCommand, OpenProjectCommand, JumpToAnchorCommand, NativeCommand,
     OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand,
     SetColorCommand, SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand,
     SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,
+    SetBlockTypeCommand, ToggleListCommand, EditorHistoryCommand, SetFocusModeCommand, SetWordCountVisibleCommand,
+};
+pub use references::{
+    AddReferenceCommand, BibliographyInclude, BibliographyOptions, ChooseReferenceCandidateCommand,
+    CitationStyleSpec, Contributor, ContributorRoleSpec, CreateReferenceCommand, InsertBibliographyCommand,
+    InsertCitationCommand, Reference, ReferenceCandidate, ReferenceFieldInput, ReferenceFieldSpec,
+    ReferenceKindSpec, ReferenceOrigin, ReferencePatch, ReferenceRef, ReferenceSchema, ReferenceStatus,
+    ReferenceView, ReferencesChanged, RevealReference, SetBibliographyOptionsCommand,
+    SetCitationStyleCommand, SetReferenceAttachedCommand, UpdateReferenceCommand,
 };
 pub use print::{
     ExportDocumentCommand, ExportFormat, GoToPageCommand, InsertBreakCommand, PageBreakKind,
@@ -52,22 +66,22 @@ pub use print::{
     SetPrintLayoutCommand, SetPrintZoomCommand, SignatureAdvice, ZoomFit,
 };
 pub use sidebar::{
-    AddReplyCommand, NotePreviewDismissed, ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,
+    AddReplyCommand, HighlightNoteCommand, NotePreviewDismissed, ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,
     NoteRef, NotesChanged, RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
     ReplaceTileWordCommand, RevealSearchResultCommand, ShowSidebarTab, SidebarTab, TileKind, TileRef,
     TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,
     WorkbenchTile,
 };
-pub use common::{Alignment, EditorTarget, MarkKind, Pane, RangeEdit, TextAnchor};
+pub use common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor};
 pub use envelope::{
     BridgeError, BridgeErrorCode, BridgeReply, BridgeRequest, CommandEnvelope, DocumentText,
     EditorQuery, EventEnvelope, InboundMessage, OutboundMessage, ReadAloudQuery, ReplyEnvelope,
     RequestEnvelope,
 };
 pub use event::{
-    ActiveEditorChanged, ActiveMarks, DocChanged, DragEnded, DragMoved, DragPayloadKind,
-    DragStarted, FocusModeView, NoteMarkerEvent, NotesRemapped, ProjectChanged, ReadAloudPayloadEvent,
-    SearchMatches, SelectionContext, ToolbarState, WebviewEvent,
+    ActiveEditorChanged, ActiveMarks, CanvasToolbarChanged, CanvasToolbarState, DocChanged, DragEnded, DragMoved, DragPayloadKind,
+    DragStarted, FocusModeView, NoteMarkerEvent, NoteMarkerRect, NoteMarkersChanged, NotesRemapped, ProjectChanged, ReadAloudPayloadEvent,
+    SearchMatches, SelectionContext, ToolbarState, ViewOptions, WebviewEvent, WordCountBadge, WordCountsChanged,
 };
 
 #[cfg(test)]

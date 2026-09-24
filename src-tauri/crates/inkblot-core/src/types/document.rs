@@ -106,4 +106,24 @@ pub struct TextDocument {
     /// Absent on documents whose history still lives in the `.versions/` sidecar.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub versions: Option<Vec<VersionEntry>>,
+    /// Things archived out of the document (`bridge::archive`), newest first. Absent
+    /// until something is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archive: Option<Vec<crate::bridge::ArchivedItem>>,
+    /// The document's citation style and how its bibliography is built
+    /// (`bridge::references`). Absent until either is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub citations: Option<DocumentCitations>,
+}
+
+/// A document's part of the references. The sources, and which documents each is
+/// attached to, are the project's (`.inkblot-references.json`).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentCitations {
+    /// A citation style id; absent means the project's default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+    pub bibliography: crate::bridge::BibliographyOptions,
 }

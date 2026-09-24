@@ -10,9 +10,13 @@
  * Each function takes the resolved editor, because resolving a target is the registry's
  * job and doing it twice is how the two disagree.
  */
-import { Alignment, MarkKind } from '../types'
+import { Alignment, BlockType, HistoryAction, ListKind, MarkKind } from '../types'
 import type {
   ApplyMarkCommand,
+  EditorHistoryCommand,
+  SetBlockTypeCommand,
+  ToggleListCommand,
+  InsertCitationCommand,
   InsertPlainTextCommand,
   InsertTableCommand,
   JumpToAnchorCommand,
@@ -45,9 +49,17 @@ interface Chain {
   updateAttributes(name: string, attrs: Record<string, unknown>): Chain
   insertTable(attrs: { rows: number; cols: number; withHeaderRow: boolean }): Chain
   insertConversationTile(): Chain
+  insertCitation(options: { refIds: string[]; locator?: string }): Chain
+  insertBibliography(): Chain
   setTextSelection(range: { from: number; to: number } | number): Chain
   insertContent(content: string): Chain
   scrollIntoView(): Chain
+  setParagraph(): Chain
+  setHeading(attrs: { level: 1 | 2 | 3 }): Chain
+  toggleBulletList(): Chain
+  toggleOrderedList(): Chain
+  undo(): Chain
+  redo(): Chain
 }
 
 interface CommandEditor {
@@ -146,8 +158,48 @@ export function insertTable(
   })
 }
 
+/** The Paragraph Style menu. A native toolbar's; the page has only markdown input rules. */
+export function setBlockType(editor: unknown, { block }: SetBlockTypeCommand): boolean {
+  return run(editor, (chain) => {
+    switch (block) {
+      case BlockType.Paragraph: chain.focus().setParagraph().run(); break
+      case BlockType.Heading1: chain.focus().setHeading({ level: 1 }).run(); break
+      case BlockType.Heading2: chain.focus().setHeading({ level: 2 }).run(); break
+      case BlockType.Heading3: chain.focus().setHeading({ level: 3 }).run(); break
+    }
+  })
+}
+
+export function toggleList(editor: unknown, { list }: ToggleListCommand): boolean {
+  return run(editor, (chain) => {
+    switch (list) {
+      case ListKind.Bullet: chain.focus().toggleBulletList().run(); break
+      case ListKind.Ordered: chain.focus().toggleOrderedList().run(); break
+    }
+  })
+}
+
+/** A document's undo and redo — the editor's own history, not the canvas's. */
+export function editorHistory(editor: unknown, { action }: EditorHistoryCommand): boolean {
+  return run(editor, (chain) => {
+    if (action === HistoryAction.Undo) chain.focus().undo().run()
+    else chain.focus().redo().run()
+  })
+}
+
 export function insertConversationTile(editor: unknown): boolean {
   return run(editor, (chain) => { chain.focus().insertConversationTile().run() })
+}
+
+/** Cite sources at the caret (`extensions/Citation.js`). */
+export function insertCitation(editor: unknown, { refIds, locator }: InsertCitationCommand): boolean {
+  if (!refIds.length) return false
+  return run(editor, (chain) => { chain.focus().insertCitation({ refIds, locator: locator || '' }).run() })
+}
+
+/** Put the bibliography at the end of the document, or move it there. */
+export function insertBibliography(editor: unknown): boolean {
+  return run(editor, (chain) => { chain.focus().insertBibliography().run() })
 }
 
 export function setSelection(

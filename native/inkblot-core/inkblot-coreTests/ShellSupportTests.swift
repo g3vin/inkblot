@@ -88,14 +88,3 @@ struct WebMenusTests {
         #expect(menus.viewMenuItems[2].checked)
     }
 }
-
-struct GlassTabBarTests {
-    /// Where a released bubble lands: the slot its centre is over, clamped to the bar.
-    @Test func theBubbleLandsOnTheSlotItsCentreIsOver() {
-        #expect(GlassTabBar<Int>.index(at: 10, slot: 50, count: 4) == 0)
-        #expect(GlassTabBar<Int>.index(at: 149, slot: 50, count: 4) == 2)
-        #expect(GlassTabBar<Int>.index(at: 999, slot: 50, count: 4) == 3)
-        #expect(GlassTabBar<Int>.index(at: -20, slot: 50, count: 4) == 0)
-        #expect(GlassTabBar<Int>.index(at: 10, slot: 0, count: 4) == 0)
-    }
-}

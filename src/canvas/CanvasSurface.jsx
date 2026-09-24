@@ -12,7 +12,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { debounce } from 'lodash'
-import { CanvasToolbarSlotContext } from './canvasToolbarSlot'
+import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from './canvasToolbarSlot'
+import { documentSurface } from '../bridge'
 import { saveCanvasDocument } from '../lib/canvasFileSystem'
 import {
   expandGroupSelection,
@@ -487,6 +488,7 @@ export default function CanvasSurface({
 
   useCanvasExternalEvents({
     addTextNodeAt,
+    applyColor,
     centerOn,
     clear,
     deleteSelection,
@@ -497,13 +499,19 @@ export default function CanvasSurface({
     handleZoomToFit,
     importImageAt,
     onActivate,
+    redo,
+    resetZoom,
     screenToWorldAt,
     selectNode,
     stateRef,
     surfaceRef,
     toggleLocked,
+    toggleSnapPref,
+    undo,
     ungroupSelection,
     viewCenter,
+    zoomIn,
+    zoomOut,
   })
 
 
@@ -515,6 +523,53 @@ export default function CanvasSurface({
   const hasSelection = selection.nodes.size > 0 || selection.edges.size > 0
   const canGroup = [...selection.nodes].some((id) => state.nodes[id]?.type !== 'group')
   const canUngroup = [...selection.nodes].some((id) => state.nodes[id]?.type === 'group')
+
+  /*
+   * Under a shell that draws the canvas toolbar itself, this canvas reports the
+   * toolbar's state instead of rendering it, and the shell sends the buttons back as
+   * canvas commands. The cleanup says "no canvas toolbar", so a canvas that stops being
+   * the active one — or starts having a card edited — takes its toolbar down; when the
+   * state merely changed, the next state lands in the same frame and supersedes it.
+   */
+  const nativeToolbar = isActive && toolbarSlot === NATIVE_CANVAS_TOOLBAR
+  useEffect(() => {
+    if (!nativeToolbar) return undefined
+    const surfaceId = surfaceRef.current?.dataset.surfaceId
+    if (!surfaceId) return undefined
+    documentSurface.publishCanvasToolbar({
+      state: {
+        surfaceId,
+        zoom: viewport.zoom,
+        canUndo,
+        canRedo,
+        hasSelection,
+        canGroup,
+        canUngroup,
+        locked,
+        alignmentGuides: !!snapPrefs.guides,
+        snapToGrid: !!snapPrefs.grid,
+        canRecord: !!recorder.supported,
+        isRecording: !!recorder.recording,
+        recordElapsedMs: recorder.recording ? recorder.elapsed : 0,
+      },
+    })
+    return () => documentSurface.publishCanvasToolbar({})
+  }, [
+    canGroup,
+    canRedo,
+    canUndo,
+    canUngroup,
+    hasSelection,
+    locked,
+    nativeToolbar,
+    recorder.elapsed,
+    recorder.recording,
+    recorder.supported,
+    snapPrefs.grid,
+    snapPrefs.guides,
+    surfaceRef,
+    viewport.zoom,
+  ])
 
   return (
     <div
@@ -606,7 +661,7 @@ export default function CanvasSurface({
       {/* The toolbar renders in the titlebar, not over the canvas. The slot is
           null unless this is the active pane's canvas and no card is being
           edited — when one is, the text Toolbar takes the titlebar instead. */}
-      {isActive && toolbarSlot ? createPortal(
+      {isActive && toolbarSlot && !nativeToolbar ? createPortal(
         <CanvasToolbar
           zoom={viewport.zoom}
           canUndo={canUndo}

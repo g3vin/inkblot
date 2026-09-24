@@ -16,6 +16,9 @@
     var(--titlebar-right-width, 0px);
   align-items: stretch;
   height: var(--app-titlebar-height);
+  /* Under a native window toolbar the row sits below the toolbar's band. */
+  box-sizing: border-box;
+  padding-top: var(--native-toolbar-inset, 0px);
   flex: none;
   min-height: var(--app-titlebar-height);
   background: transparent;
@@ -117,6 +120,24 @@
 
 .main-layout.is-canvas-underlay > .right-sidebar {
   right: 0;
+}
+
+/*
+ * Under a native window toolbar a canvas runs up under its glass too: it pans, so
+ * nothing is lost there, and the toolbar's buttons float over the board.
+ */
+.main-layout.is-canvas-underlay.is-under-native-toolbar > .middle-section {
+  padding-top: 0;
+}
+
+/*
+ * Under the Swift shell the sidebars are native, translucent, and float over this page
+ * (--panel-inset-* is how much of each side they cover). A canvas runs on underneath
+ * them; a document keeps its column in the part they leave uncovered.
+ */
+.main-layout:not(.is-canvas-underlay) > .middle-section {
+  padding-left: var(--panel-inset-left, 0px);
+  padding-right: var(--panel-inset-right, 0px);
 }
 
 .editor-page-wrapper.is-focus-mode .app-titlebar,

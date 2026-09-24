@@ -10,6 +10,7 @@
 import { save } from '@tauri-apps/plugin-dialog'
 import { mkdir, writeFile, writeTextFile } from '@tauri-apps/plugin-fs'
 
+import { withPrintBibliography } from '../../lib/references/printBibliography'
 import { loadChapters } from '../compile'
 import { readDocPageSetup } from '../DocPageSetup'
 import { runPrintJob } from '../printJob'
@@ -72,7 +73,10 @@ export async function runExport({
     return path
   }
 
-  const chapters = await loadChapters(projectName, docPath, scope, (p) => liveByPath.get(p)?.getJSON() || null)
+  const chapters = await withPrintBibliography(
+    projectName,
+    await loadChapters(projectName, docPath, scope, (p) => liveByPath.get(p)?.getJSON() || null)
+  )
   const setup = compiled
     ? (book?.pageSetup || chapters[0]?.content?.attrs?.pageSetup || null)
     : (readDocPageSetup(liveByPath.get(docPath)?.state.doc) || chapters[0]?.content?.attrs?.pageSetup || null)

@@ -9,10 +9,17 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::common::{Alignment, EditorTarget, MarkKind, Pane, RangeEdit, TextAnchor};
+use super::archive::ArchiveActionCommand;
+use super::bubble::CloseBubbleSessionCommand;
+use super::references::{
+    AddReferenceCommand, ChooseReferenceCandidateCommand, CreateReferenceCommand, InsertBibliographyCommand,
+    InsertCitationCommand, ReferenceRef, SetBibliographyOptionsCommand, SetCitationStyleCommand,
+    SetReferenceAttachedCommand, UpdateReferenceCommand,
+};
+use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor};
 use crate::types::json::JsonValue;
 use super::sidebar::{
-    AddReplyCommand, ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
+    AddReplyCommand, ClipboardDropCommand, HighlightNoteCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
     RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
     TileRef, UpdateNoteCommand, VersionActionCommand,
 };
@@ -406,6 +413,85 @@ pub struct SetTitlebarInsetCommand {
     pub trailing: f64,
 }
 
+/// Open a project, as picking it on the web landing page would.
+///
+/// The shell's project picker is its own window; the page still owns everything that
+/// opening a project restores (its tabs, panes and sidebar state), so the picker only
+/// names the project.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenProjectCommand {
+    pub project_name: String,
+}
+
+/// How much of each side of the page the shell's chrome covers.
+///
+/// The shell's sidebars and window toolbar are translucent and float over the page
+/// rather than beside it: the page runs the whole window, so a canvas carries on
+/// underneath them and a document scrolls up under the toolbar's glass. What must stay
+/// readable — a document's text column, its first line — keeps to the part of the page
+/// they leave uncovered.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPanelInsetsCommand {
+    pub leading: f64,
+    pub trailing: f64,
+    /// The window toolbar's band. Absent from an older shell, which kept the page
+    /// below its toolbar, so it defaults to nothing covered.
+    #[serde(default)]
+    pub top: f64,
+}
+
+/// Turn the selection's blocks into paragraphs or headings — the toolbar's Paragraph
+/// Style menu.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetBlockTypeCommand {
+    pub target: EditorTarget,
+    pub block: BlockType,
+}
+
+/// Toggle a list around the selection's blocks, as the page's input rules do for `- `
+/// and `1. `.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToggleListCommand {
+    pub target: EditorTarget,
+    pub list: ListKind,
+}
+
+/// Undo or redo in one editor. A canvas has its own history and its own command
+/// (`canvasCommand` `undo`/`redo`); this is a document's.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorHistoryCommand {
+    pub target: EditorTarget,
+    pub action: HistoryAction,
+}
+
+/// Open or leave focus mode — the page's, which stays in the page (see
+/// `FocusModeView`). The page answers with `viewOptions`.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetFocusModeCommand {
+    pub open: bool,
+}
+
+/// Show or hide the per-pane word-count badge — the page's own preference, which it
+/// stores and then answers with `viewOptions`.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetWordCountVisibleCommand {
+    pub visible: bool,
+}
+
 /// Everything the shell can ask the document surface to do.
 ///
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
@@ -449,6 +535,8 @@ pub enum NativeCommand {
     UpdateNote(UpdateNoteCommand),
     RemoveNote(NoteRef),
     JumpToNote(NoteRef),
+    /// Highlight the text a note is about while its hover cards are open.
+    HighlightNote(HighlightNoteCommand),
     ClipboardDrop(ClipboardDropCommand),
     RemoveClipboardEntries(RemoveClipboardEntriesCommand),
     InsertClipboardEntry(InsertClipboardEntryCommand),
@@ -460,6 +548,29 @@ pub enum NativeCommand {
     RevealSearchResult(RevealSearchResultCommand),
     AddReply(AddReplyCommand),
     SetTitlebarInset(SetTitlebarInsetCommand),
+    SetPanelInsets(SetPanelInsetsCommand),
+    OpenProject(OpenProjectCommand),
+    /// Leave the bubble editor and write its sentence back into the document.
+    CloseBubbleSession(CloseBubbleSessionCommand),
+    SetBlockType(SetBlockTypeCommand),
+    ToggleList(ToggleListCommand),
+    EditorHistory(EditorHistoryCommand),
+    SetFocusMode(SetFocusModeCommand),
+    SetWordCountVisible(SetWordCountVisibleCommand),
+    /// Restore or delete something in a document's archive (`archive.rs`).
+    ArchiveAction(ArchiveActionCommand),
+    /* References (`references.rs`). */
+    AddReference(AddReferenceCommand),
+    CreateReference(CreateReferenceCommand),
+    UpdateReference(UpdateReferenceCommand),
+    DeleteReference(ReferenceRef),
+    RetryReferenceLookup(ReferenceRef),
+    ChooseReferenceCandidate(ChooseReferenceCandidateCommand),
+    SetReferenceAttached(SetReferenceAttachedCommand),
+    InsertCitation(InsertCitationCommand),
+    InsertBibliography(InsertBibliographyCommand),
+    SetCitationStyle(SetCitationStyleCommand),
+    SetBibliographyOptions(SetBibliographyOptionsCommand),
     SetPrintLayout(SetPrintLayoutCommand),
     SetPageSetup(SetPageSetupCommand),
     SetBookSettings(SetBookSettingsCommand),

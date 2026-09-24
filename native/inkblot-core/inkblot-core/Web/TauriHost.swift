@@ -210,16 +210,6 @@ final class TauriHost {
             menus.setAppMenu(tree)
             return .value(nil)
 
-        case "window.startDrag":
-            // The page asks after its mousedown has already been delivered, so the
-            // event that started the drag is the one recorded on the way in — and the
-            // drag only starts if that button is still down.
-            guard let window, let mouseDown = MouseDownRecorder.shared.last,
-                  NSEvent.pressedMouseButtons & 1 == 1
-            else { return .value(nil) }
-            window.performDrag(with: mouseDown)
-            return .value(nil)
-
         case "window.isFullscreen":
             return .value(window?.styleMask.contains(.fullScreen) ?? false)
 
@@ -261,6 +251,18 @@ final class TauriHost {
             NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
             return .value(nil)
 
+        /* ---------------- references/fetchText.js: looking a source up ---------------- */
+
+        case "fetch_text":
+            return .value(try await RemoteFetch.text(url: try string(args, "url"), accept: args["accept"] as? String))
+
+        /* ---------------- App.jsx ---------------- */
+
+        // WebKit's `-apple-system-control-accent` keyword reports stock blue to page
+        // content whatever the user picked, so the page asks for the real one.
+        case "system_accent_color":
+            return .value(Self.hex(NSColor.controlAccentColor))
+
         default:
             log.info("Unanswered Tauri command: \(cmd, privacy: .public)")
             throw Failure("not available in the native shell yet")
@@ -290,6 +292,14 @@ final class TauriHost {
     private static func isDirectory(_ url: URL) -> Bool {
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
+    /// `#rrggbb` in sRGB — the form `App.jsx` keeps its accent in.
+    private static func hex(_ color: NSColor) -> String? {
+        guard let srgb = color.usingColorSpace(.sRGB) else { return nil }
+        let channel = { (value: CGFloat) in Int((min(max(value, 0), 1) * 255).rounded()) }
+        return String(format: "#%02x%02x%02x",
+                      channel(srgb.redComponent), channel(srgb.greenComponent), channel(srgb.blueComponent))
     }
 
     /* ---------------- panels ---------------- */
@@ -367,18 +377,3 @@ final class TauriHost {
     }
 }
 
-/// The last left mouse-down in the app, for a window drag the page asks for after the
-/// event has gone by. `performDrag(with:)` needs the event that began the gesture.
-@MainActor
-final class MouseDownRecorder {
-    static let shared = MouseDownRecorder()
-    private(set) var last: NSEvent?
-    private var monitor: Any?
-
-    private init() {
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-            self?.last = event
-            return event
-        }
-    }
-}

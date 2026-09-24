@@ -50,6 +50,26 @@ export interface ActiveMarks {
 	 * toolbar's table button is lit by the same read.
 	 */
 	table: boolean;
+	/**
+	 * Not marks either — whether the caret is in a bulleted or numbered list, for the
+	 * toolbar's list toggles.
+	 */
+	bulletList: boolean;
+	orderedList: boolean;
+}
+
+/**
+ * Quick add: a URL, DOI, ISBN, arXiv id or PMID is looked up; anything else is
+ * searched for as a title. The source exists at once, `resolving`, attached to the
+ * document — the writer does not wait on the network.
+ */
+export interface AddReferenceCommand {
+	/** Chosen by the shell, so it can select the source it just asked for. */
+	id: string;
+	docPath?: string;
+	input: string;
+	/** Also cite it at the caret, in whichever editor is active. */
+	cite: boolean;
 }
 
 /**
@@ -80,6 +100,125 @@ export interface ApplyMarkCommand {
 	mark: MarkKind;
 }
 
+export enum ArchiveAction {
+	/**
+	 * Put it back. A bubble goes back on its sentence, if the sentence is still in the
+	 * document as it was archived; otherwise it stays in the archive.
+	 */
+	Restore = "restore",
+	/**
+	 * Delete it for good. Version history still has the document from before it was
+	 * archived.
+	 */
+	Delete = "delete",
+}
+
+export interface ArchiveActionCommand {
+	docPath: string;
+	itemId: string;
+	action: ArchiveAction;
+}
+
+/** What an archived item is. */
+export enum ArchivedKind {
+	/**
+	 * A bubble session, taken off its sentence. The sentence stays in the document as
+	 * it was written; the session, forms and set-aside words and all, is in `bubble`.
+	 */
+	Bubble = "bubble",
+}
+
+/** One bubble in the sentence: a word, or several joined into one. */
+export interface BubbleWord {
+	id: string;
+	/** What the bubble says. Joined words are separated by a single space. */
+	text: string;
+}
+
+/**
+ * A bubble thrown to the side, out of the sentence.
+ * 
+ * Where it rests is a fraction of the editor's area rather than points, so it is
+ * still on its edge when the session is reopened in a window of another size.
+ */
+export interface BubbleAside {
+	id: string;
+	text: string;
+	/** The bubble's centre, 0 at the left edge and 1 at the right. */
+	x: number;
+	/** The bubble's centre, 0 at the top edge and 1 at the bottom. */
+	y: number;
+}
+
+/**
+ * What the bubbles are: one per word (and punctuation mark), per clause, or per
+ * sentence — the last is for reordering a paragraph.
+ */
+export enum BubbleMode {
+	Words = "words",
+	Clauses = "clauses",
+	Sentences = "sentences",
+}
+
+/**
+ * A saved version of the arrangement — a "form" the writer can come back to.
+ * 
+ * A session keeps as many as the writer saves. Showing one puts its bubbles back
+ * exactly as they were, ids included, so the shell can tell which form (if any) the
+ * bubbles on screen are: the one they equal.
+ */
+export interface BubbleForm {
+	id: string;
+	words: BubbleWord[];
+	aside?: BubbleAside[];
+	/** How its bubbles were grouped. Absent means words. */
+	mode?: BubbleMode;
+}
+
+/** Everything a bubble session is. */
+export interface BubbleSession {
+	id: string;
+	/** The sentence, in order. The text written back is these joined by spaces. */
+	words: BubbleWord[];
+	aside?: BubbleAside[];
+	/** The sentence as it was when the session began, shown for reference. */
+	original: string;
+	/** How the bubbles were last grouped. Absent means words. */
+	mode?: BubbleMode;
+	/**
+	 * The saved forms, in the order they were saved. The arrangement above is what is
+	 * written into the document; it may equal one of these, or none.
+	 */
+	forms?: BubbleForm[];
+	/**
+	 * The unsaved arrangement, kept while one of the forms is showing in its place — in
+	 * the bubble editor, or in the document, where a sentence can be switched between
+	 * its forms without opening the editor. Its id means nothing.
+	 */
+	unsaved?: BubbleForm;
+}
+
+/** One thing in a document's archive. */
+export interface ArchivedItem {
+	id: string;
+	/** When it was archived, as an ISO 8601 timestamp. */
+	archivedAt: string;
+	kind: ArchivedKind;
+	/** What to call it in a list: for a bubble, its sentence. */
+	title: string;
+	/** The session, for a `Bubble`. */
+	bubble?: BubbleSession;
+}
+
+/**
+ * A document's archive, newest first — the whole list, sent when the document the
+ * writer is in changes and whenever its archive does.
+ */
+export interface ArchiveChanged {
+	docPath: string;
+	items: ArchivedItem[];
+}
+
 /** A voice memo attached to a note. */
 export interface AudioClip {
 	id: string;
@@ -104,6 +243,27 @@ export interface BezierPath {
 	d: string;
 	/** t = 0.5 on the curve. */
 	mid: Point;
+}
+
+export enum BibliographyInclude {
+	/** Only sources cited in the text — what every style asks for. */
+	Cited = "cited",
+	/** Every source attached to the document, cited or not ("works consulted"). */
+	Attached = "attached",
+}
+
+export interface BibliographyOptions {
+	include: BibliographyInclude;
+	/** Print each source's annotation under its entry. */
+	annotated: boolean;
+	/**
+	 * Add the bibliography to printouts and exports when the document has none of
+	 * its own in the text. A book printed or exported whole gets one, at its end, for
+	 * every chapter that asks for it.
+	 */
+	inPrint: boolean;
+	/** Overrides the style's heading. Absent means the style's. */
+	title?: string;
 }
 
 /**
@@ -267,6 +427,40 @@ export enum BridgeErrorCode {
 export interface BridgeError {
 	code: BridgeErrorCode;
 	message: string;
+}
+
+/**
+ * Where one open session's chip is in the document, for a shell that draws the chips
+ * itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
+ */
+export interface BubbleChipRect {
+	sessionId: string;
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+	/**
+	 * Which of the session's pages is showing — its forms, then the unsaved arrangement
+	 * if there is one — and how many there are. Zero pages: it has no forms.
+	 */
+	formPage?: number;
+	formPages?: number;
+}
+
+/**
+ * Every session chip the user can see, and where — the whole list, so it is safe to
+ * coalesce. The page's chips stay where they are, invisible, and go on taking the click
+ * that reopens a session; the shell draws them as Liquid Glass, which only a view above
+ * the page can be.
+ */
+export interface BubbleChipsChanged {
+	chips: BubbleChipRect[];
+}
+
+/** Open the bubble editor on a session — new, or reopened from its mark. */
+export interface BubbleSessionOpened {
+	docPath: string;
+	session: BubbleSession;
 }
 
 /**
@@ -455,6 +649,60 @@ export interface CanvasState {
 	edgeOrder: string[];
 }
 
+export interface CanvasToolbarState {
+	/** The surface the commands go back to. */
+	surfaceId: string;
+	/** 1 is 100%. */
+	zoom: number;
+	canUndo: boolean;
+	canRedo: boolean;
+	hasSelection: boolean;
+	canGroup: boolean;
+	canUngroup: boolean;
+	/** Read mode: the editing tools are hidden, not merely disabled. */
+	locked: boolean;
+	alignmentGuides: boolean;
+	snapToGrid: boolean;
+	canRecord: boolean;
+	isRecording: boolean;
+	/** How long the memo has been recording, in milliseconds. Zero when not recording. */
+	recordElapsedMs: number;
+}
+
+/**
+ * The canvas's own controls, pushed.
+ * 
+ * A canvas has two toolbars that take turns: its own, and the formatting one while a
+ * card's text is being edited. The page decides which — it is the one that knows a
+ * card editor is live — and says so with `state`: present, the canvas toolbar is up;
+ * absent, it is not (no canvas is active, or a card is being edited). A native
+ * toolbar renders this and sends `canvasCommand`s back to `state.surface_id`.
+ * 
+ * Rare but not per keystroke: it changes with zoom, selection, undo depth and the
+ * memo recorder's clock, and the sender coalesces it to one per frame.
+ */
+export interface CanvasToolbarChanged {
+	state?: CanvasToolbarState;
+}
+
+export interface ChooseReferenceCandidateCommand {
+	id: string;
+	index: number;
+}
+
+/** A citation style the page can format in. */
+export interface CitationStyleSpec {
+	id: string;
+	/** "APA 7th edition". */
+	label: string;
+	/** "APA", for a compact picker. */
+	short: string;
+	/** What the style calls its bibliography: References, Works Cited, Bibliography. */
+	heading: string;
+	/** Citations are numbered notes rather than (Author, Year) in the text. */
+	noteStyle: boolean;
+}
+
 export interface ClipboardEntry {
 	id: string;
 	text: string;
@@ -477,6 +725,18 @@ export interface ClipboardChanged {
  */
 export interface ClipboardDropCommand {
 	text: string;
+}
+
+/**
+ * The writer left the bubble editor: write the sentence back.
+ * 
+ * `archive` decides what stays behind. False keeps the session on the sentence, so it
+ * can be reopened; true takes it off and puts it in the document's archive
+ * (`archive.rs`), from where it can be restored.
+ */
+export interface CloseBubbleSessionCommand {
+	session: BubbleSession;
+	archive: boolean;
 }
 
 /**
@@ -521,6 +781,8 @@ export type NativeCommand =
 	| { type: "updateNote", payload: UpdateNoteCommand }
 	| { type: "removeNote", payload: NoteRef }
 	| { type: "jumpToNote", payload: NoteRef }
+	/** Highlight the text a note is about while its hover cards are open. */
+	| { type: "highlightNote", payload: HighlightNoteCommand }
 	| { type: "clipboardDrop", payload: ClipboardDropCommand }
 	| { type: "removeClipboardEntries", payload: RemoveClipboardEntriesCommand }
 	| { type: "insertClipboardEntry", payload: InsertClipboardEntryCommand }
@@ -532,6 +794,28 @@ export type NativeCommand =
 	| { type: "revealSearchResult", payload: RevealSearchResultCommand }
 	| { type: "addReply", payload: AddReplyCommand }
 	| { type: "setTitlebarInset", payload: SetTitlebarInsetCommand }
+	| { type: "setPanelInsets", payload: SetPanelInsetsCommand }
+	| { type: "openProject", payload: OpenProjectCommand }
+	/** Leave the bubble editor and write its sentence back into the document. */
+	| { type: "closeBubbleSession", payload: CloseBubbleSessionCommand }
+	| { type: "setBlockType", payload: SetBlockTypeCommand }
+	| { type: "toggleList", payload: ToggleListCommand }
+	| { type: "editorHistory", payload: EditorHistoryCommand }
+	| { type: "setFocusMode", payload: SetFocusModeCommand }
+	| { type: "setWordCountVisible", payload: SetWordCountVisibleCommand }
+	/** Restore or delete something in a document's archive (`archive.rs`). */
+	| { type: "archiveAction", payload: ArchiveActionCommand }
+	| { type: "addReference", payload: AddReferenceCommand }
+	| { type: "createReference", payload: CreateReferenceCommand }
+	| { type: "updateReference", payload: UpdateReferenceCommand }
+	| { type: "deleteReference", payload: ReferenceRef }
+	| { type: "retryReferenceLookup", payload: ReferenceRef }
+	| { type: "chooseReferenceCandidate", payload: ChooseReferenceCandidateCommand }
+	| { type: "setReferenceAttached", payload: SetReferenceAttachedCommand }
+	| { type: "insertCitation", payload: InsertCitationCommand }
+	| { type: "insertBibliography", payload: InsertBibliographyCommand }
+	| { type: "setCitationStyle", payload: SetCitationStyleCommand }
+	| { type: "setBibliographyOptions", payload: SetBibliographyOptionsCommand }
 	| { type: "setPrintLayout", payload: SetPrintLayoutCommand }
 	| { type: "setPageSetup", payload: SetPageSetupCommand }
 	| { type: "setBookSettings", payload: SetBookSettingsCommand }
@@ -556,6 +840,19 @@ export interface CommandEnvelope {
 	command: NativeCommand;
 }
 
+/** A person or an organisation. An organisation has `literal` and no names. */
+export interface Contributor {
+	role: string;
+	family?: string;
+	given?: string;
+	literal?: string;
+}
+
+export interface ContributorRoleSpec {
+	id: string;
+	label: string;
+}
+
 /** What kind of entry `createEntry` makes. */
 export enum EntryKind {
 	Document = "document",
@@ -578,6 +875,13 @@ export interface CreateEntryCommand {
 	/** The bare name. For a canvas the page adds the `.canvas` suffix. */
 	name: string;
 	kind: EntryKind;
+}
+
+/** A new, empty source of a kind, for entering by hand. */
+export interface CreateReferenceCommand {
+	id: string;
+	docPath?: string;
+	kind: string;
 }
 
 /** Delete a file or folder. The shell has already asked the user. */
@@ -699,6 +1003,16 @@ export interface DocChanged {
 	charCount: number;
 }
 
+/**
+ * A document's part of the references. The sources, and which documents each is
+ * attached to, are the project's (`.inkblot-references.json`).
+ */
+export interface DocumentCitations {
+	/** A citation style id; absent means the project's default. */
+	style?: string;
+	bibliography: BibliographyOptions;
+}
+
 /** The plain text of a document, with the positions it was read from. */
 export interface DocumentText {
 	docPath: string;
@@ -814,6 +1128,21 @@ export interface DuplicateEntryCommand {
 	path: string;
 }
 
+/** A step through the editor's own undo history. */
+export enum HistoryAction {
+	Undo = "undo",
+	Redo = "redo",
+}
+
+/**
+ * Undo or redo in one editor. A canvas has its own history and its own command
+ * (`canvasCommand` `undo`/`redo`); this is a document's.
+ */
+export interface EditorHistoryCommand {
+	target: EditorTarget;
+	action: HistoryAction;
+}
+
 /** A question aimed at a particular editor, or at whichever one is active. */
 export interface EditorQuery {
 	/**
@@ -833,6 +1162,7 @@ export type WebviewEvent =
 	| { type: "noteMarkerLeave", payload: NoteMarkerEvent }
 	| { type: "noteMarkerPin", payload: NoteMarkerEvent }
 	| { type: "activeEditorChanged", payload: ActiveEditorChanged }
+	| { type: "canvasToolbarChanged", payload: CanvasToolbarChanged }
 	| { type: "searchMatches", payload: SearchMatches }
 	| { type: "focusModeView", payload: FocusModeView }
 	| { type: "readAloudPayload", payload: ReadAloudPayloadEvent }
@@ -852,6 +1182,25 @@ export type WebviewEvent =
 	 */
 	| { type: "noteMarkerMoved", payload: NoteMarkerEvent }
 	| { type: "notePreviewDismissed", payload: NotePreviewDismissed }
+	| { type: "noteMarkersChanged", payload: NoteMarkersChanged }
+	/** Open the bubble editor. Sent only to a shell that draws it (`bubble` chrome). */
+	| { type: "bubbleSessionOpened", payload: BubbleSessionOpened }
+	/** Where the chips of sessions left open are, for a shell that draws them. */
+	| { type: "bubbleChipsChanged", payload: BubbleChipsChanged }
+	| { type: "viewOptions", payload: ViewOptions }
+	/** A document's archive, whole (`archive.rs`). */
+	| { type: "archiveChanged", payload: ArchiveChanged }
+	/** The project's sources, whole, for the document in view (`references.rs`). */
+	| { type: "referencesChanged", payload: ReferencesChanged }
+	/** The kinds of source and the styles, sent once when the page mounts. */
+	| { type: "referenceSchema", payload: ReferenceSchema }
+	/** Show a source in the panel. */
+	| { type: "revealReference", payload: RevealReference }
+	/**
+	 * Where the word-count badges are, for a shell that draws them (`wordCount`
+	 * chrome). Coalesced per frame; the total is itself debounced by the page.
+	 */
+	| { type: "wordCountsChanged", payload: WordCountsChanged }
 	| { type: "pageLayoutState", payload: PageLayoutState }
 	| { type: "printRequest", payload: PrintRequest };
 
@@ -908,6 +1257,19 @@ export interface GoToPageCommand {
 	page: number;
 }
 
+/**
+ * Which note's hover cards the shell is showing, so the page can highlight the text
+ * the note is about — the cards no longer quote it. `None` clears the highlight.
+ */
+export interface HighlightNoteCommand {
+	noteId?: string;
+}
+
+/** Put the bibliography at the end of the document, or move it there. */
+export interface InsertBibliographyCommand {
+	target?: EditorTarget;
+}
+
 export enum PageBreakKind {
 	Page = "page",
 	Column = "column",
@@ -918,6 +1280,15 @@ export enum PageBreakKind {
 export interface InsertBreakCommand {
 	target: EditorTarget;
 	kind: PageBreakKind;
+}
+
+/** Cite sources at the caret. Several ids make one citation: (Smith, 2020; Lee, 2021). */
+export interface InsertCitationCommand {
+	/** Absent means whichever editor is active. */
+	target?: EditorTarget;
+	refIds: string[];
+	/** A page or other locator, for a single source: "42", "12–14". */
+	locator?: string;
 }
 
 /**
@@ -1056,6 +1427,29 @@ export interface NoteMarkerEvent {
 	note?: Note;
 }
 
+/**
+ * Where one note marker is, for a shell that draws the markers itself. Client
+ * coordinates inside the webview, as `NoteMarkerEvent`'s.
+ */
+export interface NoteMarkerRect {
+	noteId: string;
+	color: string;
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+}
+
+/**
+ * Every note marker the user can see, and where — the whole list, so it is safe to
+ * coalesce. Sent when any of them appears, goes, or moves (a scroll, a reflow). The
+ * page still owns the markers' hover and click; the shell draws the dots, as Liquid
+ * Glass, over the page's invisible ones.
+ */
+export interface NoteMarkersChanged {
+	markers: NoteMarkerRect[];
+}
+
 /** The fields of a note the shell can change. `None` leaves a field alone. */
 export interface NotePatch {
 	content?: string;
@@ -1126,6 +1520,17 @@ export interface OpenDocumentCommand {
 	 */
 	path: string;
 	pane: Pane;
+}
+
+/**
+ * Open a project, as picking it on the web landing page would.
+ * 
+ * The shell's project picker is its own window; the page still owns everything that
+ * opening a project restores (its tabs, panes and sidebar state), so the picker only
+ * names the project.
+ */
+export interface OpenProjectCommand {
+	projectName: string;
 }
 
 /** A page size the inspector can offer. */
@@ -1285,6 +1690,159 @@ export interface Rect {
 	height: number;
 }
 
+export enum ReferenceStatus {
+	/** Being looked up. */
+	Resolving = "resolving",
+	Complete = "complete",
+	/** Found, or entered, but a field most styles want is empty. */
+	Incomplete = "incomplete",
+	/** The lookup found nothing; the writer fills it in. */
+	Failed = "failed",
+}
+
+/**
+ * Where a source came from: what was pasted, and what the page took it to be
+ * (`url`, `doi`, `isbn`, `arxiv`, `pmid`, `search`, `manual`).
+ */
+export interface ReferenceOrigin {
+	kind: string;
+	input: string;
+}
+
+/** A possible match for a title typed into quick add. */
+export interface ReferenceCandidate {
+	title: string;
+	/** Authors · year · publisher, for telling matches apart. */
+	detail: string;
+	kind: string;
+	contributors: Contributor[];
+	fields: Record<string, string>;
+}
+
+export interface Reference {
+	id: string;
+	/** A `ReferenceKindSpec` id. */
+	kind: string;
+	contributors: Contributor[];
+	/**
+	 * Every other detail, by CSL variable name — `title`, `container-title`, `DOI`,
+	 * `issued` (an ISO date)… Empty fields are absent.
+	 */
+	fields: Record<string, string>;
+	/** Printed under the entry in an annotated bibliography. */
+	annotation: string;
+	/** The writer's own; never printed. */
+	note: string;
+	tags: string[];
+	status: ReferenceStatus;
+	origin?: ReferenceOrigin;
+	/** Matches to choose from, after a title search. */
+	candidates: ReferenceCandidate[];
+	/** Why the lookup failed, in words for the writer. */
+	error?: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/** How a field is edited. */
+export enum ReferenceFieldInput {
+	Text = "text",
+	/** Several lines — an abstract, a description. */
+	Multiline = "multiline",
+	/** An ISO date, as much of it as is known: `2021`, `2021-03`, `2021-03-04`. */
+	Date = "date",
+	Url = "url",
+}
+
+/** One field a kind of source has. `key` is the CSL variable it fills. */
+export interface ReferenceFieldSpec {
+	key: string;
+	label: string;
+	placeholder: string;
+	input: ReferenceFieldInput;
+	/** Wanted by most styles; an empty one marks the source incomplete. */
+	required: boolean;
+}
+
+/** A kind of source — a book, a journal article, a YouTube video. */
+export interface ReferenceKindSpec {
+	id: string;
+	label: string;
+	/** Which part of the "new source" menu it is listed in. */
+	group: string;
+	/** An SF Symbol. */
+	symbol: string;
+	fields: ReferenceFieldSpec[];
+	/** The contributor roles it offers, first one the default (`author`, `editor`…). */
+	roles: string[];
+}
+
+/**
+ * A change to a source. Only what is present changes; `fields` merges, and an empty
+ * value removes the field.
+ */
+export interface ReferencePatch {
+	kind?: string;
+	contributors?: Contributor[];
+	fields?: Record<string, string>;
+	annotation?: string;
+	note?: string;
+	tags?: string[];
+}
+
+export interface ReferenceRef {
+	id: string;
+}
+
+/**
+ * What the panel needs to build its forms and pickers. Sent once, when the page
+ * mounts; the page is the one place kinds and styles are defined.
+ */
+export interface ReferenceSchema {
+	kinds: ReferenceKindSpec[];
+	roles: ContributorRoleSpec[];
+	styles: CitationStyleSpec[];
+}
+
+/** A source as the panel shows it: formatted in the style of the document in view. */
+export interface ReferenceView {
+	reference: Reference;
+	/**
+	 * The bibliography entry, as HTML with only `i`, `b`, `sup`, `sub` and
+	 * `span.sc` (small caps) in it.
+	 */
+	entryHtml: string;
+	/** The entry as plain text, for copying and filtering. */
+	entryText: string;
+	/** How it is cited in the text, "(Smith, 2021)". */
+	inText: string;
+	/** Keys of required fields that are empty. */
+	missingFields: string[];
+	/** The documents it is attached to. */
+	usedIn: string[];
+	/** Attached to the document in view. */
+	attached: boolean;
+	/** Cited in the document in view. */
+	cited: boolean;
+}
+
+/**
+ * The project's sources, as they stand for the document in view — the whole list,
+ * sent when the library changes, the document changes or its style does.
+ */
+export interface ReferencesChanged {
+	/** Absent when no text document is open; sources still list, unattached. */
+	docPath?: string;
+	/** The document's style, or the project's when it has none of its own. */
+	style: string;
+	projectStyle: string;
+	bibliography: BibliographyOptions;
+	/** The document has a bibliography block in it. */
+	hasBibliography: boolean;
+	/** Every source in the project, newest first. */
+	references: ReferenceView[];
+}
+
 /** Remove entries from the history. `None` clears it. */
 export interface RemoveClipboardEntriesCommand {
 	ids?: string[];
@@ -1362,6 +1920,11 @@ export interface RequestEnvelope {
 	/** Correlates the reply. Opaque to the webview, which echoes it back. */
 	id: string;
 	request: BridgeRequest;
+}
+
+/** Show a source in the panel — the writer ⌥-clicked its citation. */
+export interface RevealReference {
+	id: string;
 }
 
 /**
@@ -1503,6 +2066,32 @@ export interface SetAlignmentCommand {
 	alignment: Alignment;
 }
 
+export interface SetBibliographyOptionsCommand {
+	docPath: string;
+	options: BibliographyOptions;
+}
+
+/**
+ * A text block's kind, as the toolbar's Paragraph Style menu offers it. Anything
+ * else the caret can be in — a list item's paragraph, a table cell — reads as
+ * `paragraph`, which is what the menu would turn it back into.
+ */
+export enum BlockType {
+	Paragraph = "paragraph",
+	Heading1 = "heading1",
+	Heading2 = "heading2",
+	Heading3 = "heading3",
+}
+
+/**
+ * Turn the selection's blocks into paragraphs or headings — the toolbar's Paragraph
+ * Style menu.
+ */
+export interface SetBlockTypeCommand {
+	target: EditorTarget;
+	block: BlockType;
+}
+
 /** Replace the settings of the book the active document belongs to. */
 export interface SetBookSettingsCommand {
 	settings: BookSettings;
@@ -1512,6 +2101,14 @@ export interface SetCaretAtDocPosCommand {
 	target: EditorTarget;
 	/** A ProseMirror position in UTF-16 code units. Clamped to the document. */
 	pos: number;
+}
+
+export interface SetCitationStyleCommand {
+	/** Absent sets only the project's default. */
+	docPath?: string;
+	style: string;
+	/** Also make it the style of documents that have none of their own. */
+	makeProjectDefault: boolean;
 }
 
 export interface SetColorCommand {
@@ -1545,6 +2142,14 @@ export interface SetContentCommand {
  */
 export interface SetDisplayDensityCommand {
 	pointsPerInch: number;
+}
+
+/**
+ * Open or leave focus mode — the page's, which stays in the page (see
+ * `FocusModeView`). The page answers with `viewOptions`.
+ */
+export interface SetFocusModeCommand {
+	open: boolean;
 }
 
 export interface SetFontFamilyCommand {
@@ -1590,6 +2195,25 @@ export interface SetPageSetupCommand {
 	setup: PageSetup;
 }
 
+/**
+ * How much of each side of the page the shell's chrome covers.
+ * 
+ * The shell's sidebars and window toolbar are translucent and float over the page
+ * rather than beside it: the page runs the whole window, so a canvas carries on
+ * underneath them and a document scrolls up under the toolbar's glass. What must stay
+ * readable — a document's text column, its first line — keeps to the part of the page
+ * they leave uncovered.
+ */
+export interface SetPanelInsetsCommand {
+	leading: number;
+	trailing: number;
+	/**
+	 * The window toolbar's band. Absent from an older shell, which kept the page
+	 * below its toolbar, so it defaults to nothing covered.
+	 */
+	top?: number;
+}
+
 /** Show the active pane as pages, or as the continuous editor. */
 export interface SetPrintLayoutCommand {
 	enabled: boolean;
@@ -1606,6 +2230,12 @@ export enum ZoomFit {
 export interface SetPrintZoomCommand {
 	zoom?: number;
 	fit?: ZoomFit;
+}
+
+export interface SetReferenceAttachedCommand {
+	docPath: string;
+	id: string;
+	attached: boolean;
 }
 
 export interface SetSelectionCommand {
@@ -1629,11 +2259,20 @@ export interface SetTitlebarInsetCommand {
 	trailing?: number;
 }
 
+/**
+ * Show or hide the per-pane word-count badge — the page's own preference, which it
+ * stores and then answers with `viewOptions`.
+ */
+export interface SetWordCountVisibleCommand {
+	visible: boolean;
+}
+
 export enum SidebarTab {
 	Clipboard = "clipboard",
 	Workbench = "workbench",
 	Notes = "notes",
 	History = "history",
+	References = "references",
 }
 
 /**
@@ -1728,6 +2367,16 @@ export interface TextDocument {
 	notes: Note[];
 	/** Absent on documents whose history still lives in the `.versions/` sidecar. */
 	versions?: VersionEntry[];
+	/**
+	 * Things archived out of the document (`bridge::archive`), newest first. Absent
+	 * until something is.
+	 */
+	archive?: ArchivedItem[];
+	/**
+	 * The document's citation style and how its bibliography is built
+	 * (`bridge::references`). Absent until either is set.
+	 */
+	citations?: DocumentCitations;
 }
 
 export interface TileRef {
@@ -1754,6 +2403,21 @@ export interface WorkbenchTile {
 
 export interface TilesChanged {
 	tiles: WorkbenchTile[];
+}
+
+/** The list kinds the toolbar can toggle. */
+export enum ListKind {
+	Bullet = "bullet",
+	Ordered = "ordered",
+}
+
+/**
+ * Toggle a list around the selection's blocks, as the page's input rules do for `- `
+ * and `1. `.
+ */
+export interface ToggleListCommand {
+	target: EditorTarget;
+	list: ListKind;
 }
 
 /**
@@ -1785,7 +2449,15 @@ export interface ToolbarState {
 	font: string;
 	fontSize: string;
 	alignment: Alignment;
+	/** What the Paragraph Style menu shows as current. */
+	blockType: BlockType;
 	activeMarks: ActiveMarks;
+	/**
+	 * Whether the editor's own history has a step to undo or redo — the document's
+	 * Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.
+	 */
+	canUndo: boolean;
+	canRedo: boolean;
 	/**
 	 * The color the context menu's "Highlight" item would apply — what used to live
 	 * on `editor.storage.lastHighlightColor`. See `SetHighlightCommand`.
@@ -1817,6 +2489,11 @@ export interface UpdateNoteCommand {
 	docPath: string;
 	noteId: string;
 	patch: NotePatch;
+}
+
+export interface UpdateReferenceCommand {
+	id: string;
+	patch: ReferencePatch;
 }
 
 export enum VersionAction {
@@ -1875,6 +2552,37 @@ export interface VersionRow {
 /** A document's history changed on disk. The shell re-reads it through the core. */
 export interface VersionsChanged {
 	docPath: string;
+}
+
+/**
+ * The page's own view settings that a shell offers as toolbar toggles, pushed whole
+ * whenever either changes and once at startup. The page still owns both: the shell
+ * asks with `setFocusMode` / `setWordCountVisible` and lights its buttons from this.
+ */
+export interface ViewOptions {
+	focusMode: boolean;
+	wordCountVisible: boolean;
+}
+
+/**
+ * Where one pane's word-count badge is, and what it says, for a shell that draws the
+ * badges itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
+ */
+export interface WordCountBadge {
+	text: string;
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+}
+
+/**
+ * Every word-count badge the user can see — the whole list, so it is safe to coalesce.
+ * The page's badges stay where they are, invisible, to be measured; the shell draws
+ * them as Liquid Glass, which only a view above the page can be.
+ */
+export interface WordCountsChanged {
+	badges: WordCountBadge[];
 }
 
 /**

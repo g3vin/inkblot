@@ -2,19 +2,13 @@
  * useFileTreeDrag — reordering and reparenting entries by dragging.
  *
  * Hand-rolled rather than HTML5 drag-and-drop: the tree drops onto targets that
- * are not its own DOM (the canvas surface, the tab dock), and Tauri swallows the
+ * are not its own DOM (the canvas surface), and Tauri swallows the
  * native drop event, so the drag is tracked with pointer events and hit-tested
  * with document.elementFromPoint.
  */
 import { useCallback, useEffect } from 'react'
 import { moveEntry } from '../lib/entryOperations'
 import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
-import {
-  announceTreeDragEnd,
-  announceTreeDragStart,
-  dispatchTabDockDropDoc,
-  tabDockAt,
-} from '../lib/tabDockEvents'
 import { getParentPath, remapOrderForFolder } from '../lib/fileTreeOrder'
 
 export function useFileTreeDrag({
@@ -203,9 +197,6 @@ export function useFileTreeDrag({
           iconName: drag.iconName,
           iconFilled: drag.iconFilled,
         })
-        // The tab dock opens while a document is in flight, so there is something
-        // to aim at before the pointer gets there.
-        announceTreeDragStart({ path: drag.path, type: drag.type })
       }
       setDragPreview((current) => current ? {
         ...current,
@@ -232,20 +223,8 @@ export function useFileTreeDrag({
       setDragOverPath(null)
       setDragInsert(null)
       setDragOverFolder(null)
-      if (didDrag) announceTreeDragEnd()
 
       if (!didDrag) return
-
-      // Like the canvas drop below, a drop onto the tab dock MUST NOT fall through
-      // to performMove — the tree still believes it is reordering, and would
-      // silently move the document into whatever folder it was dragged over.
-      if (point && drag.type === 'file') {
-        const dock = tabDockAt(point.x, point.y)
-        if (dock) {
-          dispatchTabDockDropDoc(dock, { path: drag.path })
-          return
-        }
-      }
 
       // A drop onto an open canvas adds a card there, and MUST NOT fall through to
       // performMove — the pointer never left the tree's own drag state, so the tree

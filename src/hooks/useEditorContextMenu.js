@@ -12,7 +12,6 @@
  */
 import { useCallback } from 'react'
 import { createMenuContext } from './contextMenu/menuContext'
-import { tabMenu } from './contextMenu/tabMenu'
 import { fileTreeMenu } from './contextMenu/fileTreeMenu'
 import { canvasMenu } from './contextMenu/canvasMenu'
 import { editorMenu } from './contextMenu/editorMenu'
@@ -22,7 +21,7 @@ export function useEditorContextMenu(props) {
   const {
     editor, setTiles, setNotes, openRightSidebarTab, setSplitView, setSecondaryDoc,
     setCurrentDoc, splitView, currentDoc, secondaryDoc, activeDoc, projectName,
-    refreshFiles, setBubbleSentence, onEnterFocusMode, onOpenDocInTab,
+    refreshFiles, bubbles, onEnterFocusMode, onOpenDocInTab,
     onOpenDocInSplit, onCloseTab, onCloseOtherTabs, onCloseTabsToTheRight,
     onCloseAllTabs, onCloseSplit, onKeepTab, onSelectTab,
   } = props
@@ -34,13 +33,12 @@ export function useEditorContextMenu(props) {
       const ctx = await createMenuContext(e, {
         editor, setTiles, setNotes, openRightSidebarTab, setSplitView, setSecondaryDoc,
         setCurrentDoc, splitView, currentDoc, secondaryDoc, activeDoc, projectName,
-        refreshFiles, setBubbleSentence, onEnterFocusMode, onOpenDocInTab,
+        refreshFiles, bubbles, onEnterFocusMode, onOpenDocInTab,
         onOpenDocInSplit, onCloseTab, onCloseOtherTabs, onCloseTabsToTheRight,
         onCloseAllTabs, onCloseSplit, onKeepTab, onSelectTab,
       })
 
       // Each of these pops its own menu and returns true when it owns the click.
-      if (await tabMenu(ctx)) return
       if (await fileTreeMenu(ctx)) return
       if (await canvasMenu(ctx)) return
 
@@ -53,7 +51,7 @@ export function useEditorContextMenu(props) {
     [
       editor, setTiles, setNotes, openRightSidebarTab, setSplitView, setSecondaryDoc,
       setCurrentDoc, splitView, currentDoc, secondaryDoc, activeDoc, projectName,
-      refreshFiles, setBubbleSentence, onEnterFocusMode, onOpenDocInTab,
+      refreshFiles, bubbles, onEnterFocusMode, onOpenDocInTab,
       onOpenDocInSplit, onCloseTab, onCloseOtherTabs, onCloseTabsToTheRight,
       onCloseAllTabs, onCloseSplit, onKeepTab, onSelectTab,
     ]

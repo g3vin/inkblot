@@ -5,6 +5,20 @@ struct InkblotApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {
+        // What Inkblot opens with: the project picker. The editor window opens once a
+        // project is chosen (`ProjectPickerView.open`).
+        Window("Welcome to Inkblot", id: ProjectPickerView.windowID) {
+            ProjectPickerView()
+                .environment(model)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(ProjectPickerView.size)
+        .windowResizability(.contentMinSize)
+        .defaultPosition(.center)
+        .defaultLaunchBehavior(.presented)
+        .restorationBehavior(.disabled)
+        .keyboardShortcut("1", modifiers: [.command, .shift])
+
         // `Window`, not `WindowGroup` — see `AppModel` on why there is one page.
         Window("Inkblot", id: "main") {
             ContentView()
@@ -12,13 +26,19 @@ struct InkblotApp: App {
                 .frame(minWidth: 760, minHeight: 480)
         }
         .defaultSize(width: 1200, height: 800)
-        // No title and no toolbar row — see WindowChrome for why not a real toolbar, and
-        // for how the traffic lights still get a toolbar window's placement.
-        .windowStyle(.hiddenTitleBar)
+        // Never on its own: at launch the picker comes first, and a restored editor
+        // window would be a page with no project in it.
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
+        // A real toolbar at the regular unified height, without the title: a band of
+        // glass holding the formatting controls and the sidebar toggles — see ContentView.
+        .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
-            // View ▸ Show/Hide Sidebar and Show/Hide Inspector, beside the toolbar toggles.
+            // View ▸ Show/Hide Sidebar and Show/Hide Inspector, beside the toolbar toggles,
+            // and View ▸ Customize Toolbar….
             SidebarCommands()
             InspectorCommands()
+            ToolbarCommands()
             InkblotCommands(model: model)
         }
     }
@@ -67,6 +87,30 @@ struct InkblotCommands: Commands {
             Button("Page Break  ⌘↩") { model.pageLayout.insertBreak(.page, target: model.target) }
             Button("Column Break  ⇧⌘↩") { model.pageLayout.insertBreak(.column, target: model.target) }
             Button("Break to Next Right-Hand Page") { model.pageLayout.insertBreak(.recto, target: model.target) }
+            Divider()
+            // References. The page's editor has no use for these chords (⌥⌘C is its code
+            // block, ⇧⌘R its align-right), so they reach the menu.
+            Button("Add Reference…") { model.sidebar.beginQuickAdd(cite: false) }
+                .keyboardShortcut("r", modifiers: [.command, .option])
+                .disabled(model.sidebar.projectName == nil)
+            Button("Insert Citation…") { model.sidebar.beginQuickAdd(cite: true) }
+                .keyboardShortcut("k", modifiers: [.command, .option])
+                .disabled(model.target == nil)
+            Button("Insert Bibliography") { model.sidebar.insertBibliography() }
+                .disabled(model.target == nil)
+            Menu("Citation Style") {
+                ForEach(model.sidebar.referenceSchema?.styles ?? [], id: \.id) { style in
+                    Toggle(style.label, isOn: Binding(
+                        get: { model.sidebar.references?.style == style.id },
+                        set: { if $0 { model.sidebar.setCitationStyle(style.id) } }))
+                }
+                Divider()
+                Button("Next Style") { model.sidebar.cycleCitationStyle(by: 1) }
+                    .keyboardShortcut("]", modifiers: [.command, .control])
+                Button("Previous Style") { model.sidebar.cycleCitationStyle(by: -1) }
+                    .keyboardShortcut("[", modifiers: [.command, .control])
+            }
+            .disabled(model.sidebar.references == nil)
         }
 
         CommandMenu("Format") {

@@ -12,7 +12,7 @@
  * menu asks for `SelectionContext` at the moment of the right-click, and the same
  * function has already been answering the pushed one on every selection change.
  */
-import { Alignment } from '../types'
+import { Alignment, BlockType } from '../types'
 import type { ActiveMarks, SelectionContext, ToolbarState, EditorTarget } from '../types'
 import { isEditorReady } from '../lib/editorUtils'
 import { fromCssFontFamily } from '../lib/systemFonts'
@@ -59,7 +59,8 @@ interface PmEditor {
     }
   }
   getAttributes(name: string): Record<string, unknown>
-  isActive(name: string): boolean
+  isActive(name: string, attrs?: Record<string, unknown>): boolean
+  can?(): { undo?(): boolean; redo?(): boolean }
 }
 
 const asEditor = (editor: unknown) => editor as PmEditor
@@ -98,7 +99,10 @@ const isMarkActive = (editor: PmEditor, markName: string): boolean => {
 
 export function readActiveMarks(editor: unknown): ActiveMarks {
   if (!isEditorReady(editor)) {
-    return { bold: false, italic: false, underline: false, strike: false, table: false }
+    return {
+      bold: false, italic: false, underline: false, strike: false, table: false,
+      bulletList: false, orderedList: false,
+    }
   }
   const live = asEditor(editor)
 
@@ -108,7 +112,25 @@ export function readActiveMarks(editor: unknown): ActiveMarks {
     underline: isMarkActive(live, 'underline'),
     strike: isMarkActive(live, 'strike'),
     table: live.isActive('table'),
+    bulletList: live.isActive('bulletList'),
+    orderedList: live.isActive('orderedList'),
   }
+}
+
+/** The Paragraph Style menu's current entry. Headings past 3 read as the nearest it has. */
+export function readBlockType(editor: unknown): BlockType {
+  if (!isEditorReady(editor)) return BlockType.Paragraph
+  const live = asEditor(editor)
+  if (live.isActive('heading', { level: 1 })) return BlockType.Heading1
+  if (live.isActive('heading', { level: 2 })) return BlockType.Heading2
+  if (live.isActive('heading')) return BlockType.Heading3
+  return BlockType.Paragraph
+}
+
+/** Whether the editor's own history can step back or forward. */
+const readHistory = (live: PmEditor) => {
+  const can = live.can?.()
+  return { canUndo: !!can?.undo?.(), canRedo: !!can?.redo?.() }
 }
 
 export interface ReadToolbarOptions {
@@ -142,7 +164,10 @@ export function readToolbarState(
       font: TOOLBAR_DEFAULTS.font,
       fontSize: TOOLBAR_DEFAULTS.fontSize,
       alignment: Alignment.Left,
+      blockType: BlockType.Paragraph,
       activeMarks: readActiveMarks(null),
+      canUndo: false,
+      canRedo: false,
       lastHighlightColor: remembered,
     }
   }
@@ -167,7 +192,9 @@ export function readToolbarState(
     alignment: toAlignment(
       nodeAlignment ?? live.getAttributes('paragraph').textAlign ?? Alignment.Left
     ),
+    blockType: readBlockType(editor),
     activeMarks: readActiveMarks(editor),
+    ...readHistory(live),
     lastHighlightColor: remembered,
   }
 }

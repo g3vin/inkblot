@@ -52,13 +52,38 @@ public struct ActiveMarks: Codable, Equatable {
 	/// Not a mark — whether the caret is inside a table. It rides along because the
 	/// toolbar's table button is lit by the same read.
 	public let table: Bool
+	/// Not marks either — whether the caret is in a bulleted or numbered list, for the
+	/// toolbar's list toggles.
+	public let bulletList: Bool
+	public let orderedList: Bool
 
-	public init(bold: Bool, italic: Bool, underline: Bool, strike: Bool, table: Bool) {
+	public init(bold: Bool, italic: Bool, underline: Bool, strike: Bool, table: Bool, bulletList: Bool, orderedList: Bool) {
 		self.bold = bold
 		self.italic = italic
 		self.underline = underline
 		self.strike = strike
 		self.table = table
+		self.bulletList = bulletList
+		self.orderedList = orderedList
+	}
+}
+
+/// Quick add: a URL, DOI, ISBN, arXiv id or PMID is looked up; anything else is
+/// searched for as a title. The source exists at once, `resolving`, attached to the
+/// document — the writer does not wait on the network.
+public struct AddReferenceCommand: Codable, Equatable {
+	/// Chosen by the shell, so it can select the source it just asked for.
+	public let id: String
+	public let docPath: String?
+	public let input: String
+	/// Also cite it at the caret, in whichever editor is active.
+	public let cite: Bool
+
+	public init(id: String, docPath: String?, input: String, cite: Bool) {
+		self.id = id
+		self.docPath = docPath
+		self.input = input
+		self.cite = cite
 	}
 }
 
@@ -93,6 +118,155 @@ public struct ApplyMarkCommand: Codable, Equatable {
 	public init(target: EditorTarget, mark: MarkKind) {
 		self.target = target
 		self.mark = mark
+	}
+}
+
+public enum ArchiveAction: String, Codable, Equatable {
+	/// Put it back. A bubble goes back on its sentence, if the sentence is still in the
+	/// document as it was archived; otherwise it stays in the archive.
+	case restore
+	/// Delete it for good. Version history still has the document from before it was
+	/// archived.
+	case delete
+}
+
+public struct ArchiveActionCommand: Codable, Equatable {
+	public let docPath: String
+	public let itemId: String
+	public let action: ArchiveAction
+
+	public init(docPath: String, itemId: String, action: ArchiveAction) {
+		self.docPath = docPath
+		self.itemId = itemId
+		self.action = action
+	}
+}
+
+/// What an archived item is.
+public enum ArchivedKind: String, Codable, Equatable {
+	/// A bubble session, taken off its sentence. The sentence stays in the document as
+	/// it was written; the session, forms and set-aside words and all, is in `bubble`.
+	case bubble
+}
+
+/// One bubble in the sentence: a word, or several joined into one.
+public struct BubbleWord: Codable, Equatable {
+	public let id: String
+	/// What the bubble says. Joined words are separated by a single space.
+	public let text: String
+
+	public init(id: String, text: String) {
+		self.id = id
+		self.text = text
+	}
+}
+
+/// A bubble thrown to the side, out of the sentence.
+/// 
+/// Where it rests is a fraction of the editor's area rather than points, so it is
+/// still on its edge when the session is reopened in a window of another size.
+public struct BubbleAside: Codable, Equatable {
+	public let id: String
+	public let text: String
+	/// The bubble's centre, 0 at the left edge and 1 at the right.
+	public let x: Double
+	/// The bubble's centre, 0 at the top edge and 1 at the bottom.
+	public let y: Double
+
+	public init(id: String, text: String, x: Double, y: Double) {
+		self.id = id
+		self.text = text
+		self.x = x
+		self.y = y
+	}
+}
+
+/// What the bubbles are: one per word (and punctuation mark), per clause, or per
+/// sentence — the last is for reordering a paragraph.
+public enum BubbleMode: String, Codable, Equatable {
+	case words
+	case clauses
+	case sentences
+}
+
+/// A saved version of the arrangement — a "form" the writer can come back to.
+/// 
+/// A session keeps as many as the writer saves. Showing one puts its bubbles back
+/// exactly as they were, ids included, so the shell can tell which form (if any) the
+/// bubbles on screen are: the one they equal.
+public struct BubbleForm: Codable, Equatable {
+	public let id: String
+	public let words: [BubbleWord]
+	public let aside: [BubbleAside]?
+	/// How its bubbles were grouped. Absent means words.
+	public let mode: BubbleMode?
+
+	public init(id: String, words: [BubbleWord], aside: [BubbleAside]?, mode: BubbleMode?) {
+		self.id = id
+		self.words = words
+		self.aside = aside
+		self.mode = mode
+	}
+}
+
+/// Everything a bubble session is.
+public struct BubbleSession: Codable, Equatable {
+	public let id: String
+	/// The sentence, in order. The text written back is these joined by spaces.
+	public let words: [BubbleWord]
+	public let aside: [BubbleAside]?
+	/// The sentence as it was when the session began, shown for reference.
+	public let original: String
+	/// How the bubbles were last grouped. Absent means words.
+	public let mode: BubbleMode?
+	/// The saved forms, in the order they were saved. The arrangement above is what is
+	/// written into the document; it may equal one of these, or none.
+	public let forms: [BubbleForm]?
+	/// The unsaved arrangement, kept while one of the forms is showing in its place — in
+	/// the bubble editor, or in the document, where a sentence can be switched between
+	/// its forms without opening the editor. Its id means nothing.
+	public let unsaved: BubbleForm?
+
+	public init(id: String, words: [BubbleWord], aside: [BubbleAside]?, original: String, mode: BubbleMode?, forms: [BubbleForm]?, unsaved: BubbleForm?) {
+		self.id = id
+		self.words = words
+		self.aside = aside
+		self.original = original
+		self.mode = mode
+		self.forms = forms
+		self.unsaved = unsaved
+	}
+}
+
+/// One thing in a document's archive.
+public struct ArchivedItem: Codable, Equatable {
+	public let id: String
+	/// When it was archived, as an ISO 8601 timestamp.
+	public let archivedAt: String
+	public let kind: ArchivedKind
+	/// What to call it in a list: for a bubble, its sentence.
+	public let title: String
+	/// The session, for a `Bubble`.
+	public let bubble: BubbleSession?
+
+	public init(id: String, archivedAt: String, kind: ArchivedKind, title: String, bubble: BubbleSession?) {
+		self.id = id
+		self.archivedAt = archivedAt
+		self.kind = kind
+		self.title = title
+		self.bubble = bubble
+	}
+}
+
+/// A document's archive, newest first — the whole list, sent when the document the
+/// writer is in changes and whenever its archive does.
+public struct ArchiveChanged: Codable, Equatable {
+	public let docPath: String
+	public let items: [ArchivedItem]
+
+	public init(docPath: String, items: [ArchivedItem]) {
+		self.docPath = docPath
+		self.items = items
 	}
 }
 
@@ -135,6 +309,32 @@ public struct BezierPath: Codable, Equatable {
 	public init(d: String, mid: Point) {
 		self.d = d
 		self.mid = mid
+	}
+}
+
+public enum BibliographyInclude: String, Codable, Equatable {
+	/// Only sources cited in the text — what every style asks for.
+	case cited
+	/// Every source attached to the document, cited or not ("works consulted").
+	case attached
+}
+
+public struct BibliographyOptions: Codable, Equatable {
+	public let include: BibliographyInclude
+	/// Print each source's annotation under its entry.
+	public let annotated: Bool
+	/// Add the bibliography to printouts and exports when the document has none of
+	/// its own in the text. A book printed or exported whole gets one, at its end, for
+	/// every chapter that asks for it.
+	public let inPrint: Bool
+	/// Overrides the style's heading. Absent means the style's.
+	public let title: String?
+
+	public init(include: BibliographyInclude, annotated: Bool, inPrint: Bool, title: String?) {
+		self.include = include
+		self.annotated = annotated
+		self.inPrint = inPrint
+		self.title = title
 	}
 }
 
@@ -342,6 +542,53 @@ public struct BridgeError: Codable, Equatable {
 	public init(code: BridgeErrorCode, message: String) {
 		self.code = code
 		self.message = message
+	}
+}
+
+/// Where one open session's chip is in the document, for a shell that draws the chips
+/// itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
+public struct BubbleChipRect: Codable, Equatable {
+	public let sessionId: String
+	public let left: Double
+	public let top: Double
+	public let right: Double
+	public let bottom: Double
+	/// Which of the session's pages is showing — its forms, then the unsaved arrangement
+	/// if there is one — and how many there are. Zero pages: it has no forms.
+	public let formPage: UInt32?
+	public let formPages: UInt32?
+
+	public init(sessionId: String, left: Double, top: Double, right: Double, bottom: Double, formPage: UInt32?, formPages: UInt32?) {
+		self.sessionId = sessionId
+		self.left = left
+		self.top = top
+		self.right = right
+		self.bottom = bottom
+		self.formPage = formPage
+		self.formPages = formPages
+	}
+}
+
+/// Every session chip the user can see, and where — the whole list, so it is safe to
+/// coalesce. The page's chips stay where they are, invisible, and go on taking the click
+/// that reopens a session; the shell draws them as Liquid Glass, which only a view above
+/// the page can be.
+public struct BubbleChipsChanged: Codable, Equatable {
+	public let chips: [BubbleChipRect]
+
+	public init(chips: [BubbleChipRect]) {
+		self.chips = chips
+	}
+}
+
+/// Open the bubble editor on a session — new, or reopened from its mark.
+public struct BubbleSessionOpened: Codable, Equatable {
+	public let docPath: String
+	public let session: BubbleSession
+
+	public init(docPath: String, session: BubbleSession) {
+		self.docPath = docPath
+		self.session = session
 	}
 }
 
@@ -607,6 +854,91 @@ public struct CanvasState: Codable, Equatable {
 	}
 }
 
+public struct CanvasToolbarState: Codable, Equatable {
+	/// The surface the commands go back to.
+	public let surfaceId: String
+	/// 1 is 100%.
+	public let zoom: Double
+	public let canUndo: Bool
+	public let canRedo: Bool
+	public let hasSelection: Bool
+	public let canGroup: Bool
+	public let canUngroup: Bool
+	/// Read mode: the editing tools are hidden, not merely disabled.
+	public let locked: Bool
+	public let alignmentGuides: Bool
+	public let snapToGrid: Bool
+	public let canRecord: Bool
+	public let isRecording: Bool
+	/// How long the memo has been recording, in milliseconds. Zero when not recording.
+	public let recordElapsedMs: Double
+
+	public init(surfaceId: String, zoom: Double, canUndo: Bool, canRedo: Bool, hasSelection: Bool, canGroup: Bool, canUngroup: Bool, locked: Bool, alignmentGuides: Bool, snapToGrid: Bool, canRecord: Bool, isRecording: Bool, recordElapsedMs: Double) {
+		self.surfaceId = surfaceId
+		self.zoom = zoom
+		self.canUndo = canUndo
+		self.canRedo = canRedo
+		self.hasSelection = hasSelection
+		self.canGroup = canGroup
+		self.canUngroup = canUngroup
+		self.locked = locked
+		self.alignmentGuides = alignmentGuides
+		self.snapToGrid = snapToGrid
+		self.canRecord = canRecord
+		self.isRecording = isRecording
+		self.recordElapsedMs = recordElapsedMs
+	}
+}
+
+/// The canvas's own controls, pushed.
+/// 
+/// A canvas has two toolbars that take turns: its own, and the formatting one while a
+/// card's text is being edited. The page decides which — it is the one that knows a
+/// card editor is live — and says so with `state`: present, the canvas toolbar is up;
+/// absent, it is not (no canvas is active, or a card is being edited). A native
+/// toolbar renders this and sends `canvasCommand`s back to `state.surface_id`.
+/// 
+/// Rare but not per keystroke: it changes with zoom, selection, undo depth and the
+/// memo recorder's clock, and the sender coalesces it to one per frame.
+public struct CanvasToolbarChanged: Codable, Equatable {
+	public let state: CanvasToolbarState?
+
+	public init(state: CanvasToolbarState?) {
+		self.state = state
+	}
+}
+
+public struct ChooseReferenceCandidateCommand: Codable, Equatable {
+	public let id: String
+	public let index: UInt32
+
+	public init(id: String, index: UInt32) {
+		self.id = id
+		self.index = index
+	}
+}
+
+/// A citation style the page can format in.
+public struct CitationStyleSpec: Codable, Equatable {
+	public let id: String
+	/// "APA 7th edition".
+	public let label: String
+	/// "APA", for a compact picker.
+	public let short: String
+	/// What the style calls its bibliography: References, Works Cited, Bibliography.
+	public let heading: String
+	/// Citations are numbered notes rather than (Author, Year) in the text.
+	public let noteStyle: Bool
+
+	public init(id: String, label: String, short: String, heading: String, noteStyle: Bool) {
+		self.id = id
+		self.label = label
+		self.short = short
+		self.heading = heading
+		self.noteStyle = noteStyle
+	}
+}
+
 public struct ClipboardEntry: Codable, Equatable {
 	public let id: String
 	public let text: String
@@ -641,6 +973,21 @@ public struct ClipboardDropCommand: Codable, Equatable {
 
 	public init(text: String) {
 		self.text = text
+	}
+}
+
+/// The writer left the bubble editor: write the sentence back.
+/// 
+/// `archive` decides what stays behind. False keeps the session on the sentence, so it
+/// can be reopened; true takes it off and puts it in the document's archive
+/// (`archive.rs`), from where it can be restored.
+public struct CloseBubbleSessionCommand: Codable, Equatable {
+	public let session: BubbleSession
+	public let archive: Bool
+
+	public init(session: BubbleSession, archive: Bool) {
+		self.session = session
+		self.archive = archive
 	}
 }
 
@@ -684,6 +1031,8 @@ public enum NativeCommand: Codable, Equatable {
 	case updateNote(UpdateNoteCommand)
 	case removeNote(NoteRef)
 	case jumpToNote(NoteRef)
+	/// Highlight the text a note is about while its hover cards are open.
+	case highlightNote(HighlightNoteCommand)
 	case clipboardDrop(ClipboardDropCommand)
 	case removeClipboardEntries(RemoveClipboardEntriesCommand)
 	case insertClipboardEntry(InsertClipboardEntryCommand)
@@ -695,6 +1044,28 @@ public enum NativeCommand: Codable, Equatable {
 	case revealSearchResult(RevealSearchResultCommand)
 	case addReply(AddReplyCommand)
 	case setTitlebarInset(SetTitlebarInsetCommand)
+	case setPanelInsets(SetPanelInsetsCommand)
+	case openProject(OpenProjectCommand)
+	/// Leave the bubble editor and write its sentence back into the document.
+	case closeBubbleSession(CloseBubbleSessionCommand)
+	case setBlockType(SetBlockTypeCommand)
+	case toggleList(ToggleListCommand)
+	case editorHistory(EditorHistoryCommand)
+	case setFocusMode(SetFocusModeCommand)
+	case setWordCountVisible(SetWordCountVisibleCommand)
+	/// Restore or delete something in a document's archive (`archive.rs`).
+	case archiveAction(ArchiveActionCommand)
+	case addReference(AddReferenceCommand)
+	case createReference(CreateReferenceCommand)
+	case updateReference(UpdateReferenceCommand)
+	case deleteReference(ReferenceRef)
+	case retryReferenceLookup(ReferenceRef)
+	case chooseReferenceCandidate(ChooseReferenceCandidateCommand)
+	case setReferenceAttached(SetReferenceAttachedCommand)
+	case insertCitation(InsertCitationCommand)
+	case insertBibliography(InsertBibliographyCommand)
+	case setCitationStyle(SetCitationStyleCommand)
+	case setBibliographyOptions(SetBibliographyOptionsCommand)
 	case setPrintLayout(SetPrintLayoutCommand)
 	case setPageSetup(SetPageSetupCommand)
 	case setBookSettings(SetBookSettingsCommand)
@@ -740,6 +1111,7 @@ public enum NativeCommand: Codable, Equatable {
 			updateNote,
 			removeNote,
 			jumpToNote,
+			highlightNote,
 			clipboardDrop,
 			removeClipboardEntries,
 			insertClipboardEntry,
@@ -751,6 +1123,26 @@ public enum NativeCommand: Codable, Equatable {
 			revealSearchResult,
 			addReply,
 			setTitlebarInset,
+			setPanelInsets,
+			openProject,
+			closeBubbleSession,
+			setBlockType,
+			toggleList,
+			editorHistory,
+			setFocusMode,
+			setWordCountVisible,
+			archiveAction,
+			addReference,
+			createReference,
+			updateReference,
+			deleteReference,
+			retryReferenceLookup,
+			chooseReferenceCandidate,
+			setReferenceAttached,
+			insertCitation,
+			insertBibliography,
+			setCitationStyle,
+			setBibliographyOptions,
 			setPrintLayout,
 			setPageSetup,
 			setBookSettings,
@@ -936,6 +1328,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .jumpToNote(content)
 					return
 				}
+			case .highlightNote:
+				if let content = try? container.decode(HighlightNoteCommand.self, forKey: .payload) {
+					self = .highlightNote(content)
+					return
+				}
 			case .clipboardDrop:
 				if let content = try? container.decode(ClipboardDropCommand.self, forKey: .payload) {
 					self = .clipboardDrop(content)
@@ -989,6 +1386,106 @@ public enum NativeCommand: Codable, Equatable {
 			case .setTitlebarInset:
 				if let content = try? container.decode(SetTitlebarInsetCommand.self, forKey: .payload) {
 					self = .setTitlebarInset(content)
+					return
+				}
+			case .setPanelInsets:
+				if let content = try? container.decode(SetPanelInsetsCommand.self, forKey: .payload) {
+					self = .setPanelInsets(content)
+					return
+				}
+			case .openProject:
+				if let content = try? container.decode(OpenProjectCommand.self, forKey: .payload) {
+					self = .openProject(content)
+					return
+				}
+			case .closeBubbleSession:
+				if let content = try? container.decode(CloseBubbleSessionCommand.self, forKey: .payload) {
+					self = .closeBubbleSession(content)
+					return
+				}
+			case .setBlockType:
+				if let content = try? container.decode(SetBlockTypeCommand.self, forKey: .payload) {
+					self = .setBlockType(content)
+					return
+				}
+			case .toggleList:
+				if let content = try? container.decode(ToggleListCommand.self, forKey: .payload) {
+					self = .toggleList(content)
+					return
+				}
+			case .editorHistory:
+				if let content = try? container.decode(EditorHistoryCommand.self, forKey: .payload) {
+					self = .editorHistory(content)
+					return
+				}
+			case .setFocusMode:
+				if let content = try? container.decode(SetFocusModeCommand.self, forKey: .payload) {
+					self = .setFocusMode(content)
+					return
+				}
+			case .setWordCountVisible:
+				if let content = try? container.decode(SetWordCountVisibleCommand.self, forKey: .payload) {
+					self = .setWordCountVisible(content)
+					return
+				}
+			case .archiveAction:
+				if let content = try? container.decode(ArchiveActionCommand.self, forKey: .payload) {
+					self = .archiveAction(content)
+					return
+				}
+			case .addReference:
+				if let content = try? container.decode(AddReferenceCommand.self, forKey: .payload) {
+					self = .addReference(content)
+					return
+				}
+			case .createReference:
+				if let content = try? container.decode(CreateReferenceCommand.self, forKey: .payload) {
+					self = .createReference(content)
+					return
+				}
+			case .updateReference:
+				if let content = try? container.decode(UpdateReferenceCommand.self, forKey: .payload) {
+					self = .updateReference(content)
+					return
+				}
+			case .deleteReference:
+				if let content = try? container.decode(ReferenceRef.self, forKey: .payload) {
+					self = .deleteReference(content)
+					return
+				}
+			case .retryReferenceLookup:
+				if let content = try? container.decode(ReferenceRef.self, forKey: .payload) {
+					self = .retryReferenceLookup(content)
+					return
+				}
+			case .chooseReferenceCandidate:
+				if let content = try? container.decode(ChooseReferenceCandidateCommand.self, forKey: .payload) {
+					self = .chooseReferenceCandidate(content)
+					return
+				}
+			case .setReferenceAttached:
+				if let content = try? container.decode(SetReferenceAttachedCommand.self, forKey: .payload) {
+					self = .setReferenceAttached(content)
+					return
+				}
+			case .insertCitation:
+				if let content = try? container.decode(InsertCitationCommand.self, forKey: .payload) {
+					self = .insertCitation(content)
+					return
+				}
+			case .insertBibliography:
+				if let content = try? container.decode(InsertBibliographyCommand.self, forKey: .payload) {
+					self = .insertBibliography(content)
+					return
+				}
+			case .setCitationStyle:
+				if let content = try? container.decode(SetCitationStyleCommand.self, forKey: .payload) {
+					self = .setCitationStyle(content)
+					return
+				}
+			case .setBibliographyOptions:
+				if let content = try? container.decode(SetBibliographyOptionsCommand.self, forKey: .payload) {
+					self = .setBibliographyOptions(content)
 					return
 				}
 			case .setPrintLayout:
@@ -1148,6 +1645,9 @@ public enum NativeCommand: Codable, Equatable {
 		case .jumpToNote(let content):
 			try container.encode(CodingKeys.jumpToNote, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .highlightNote(let content):
+			try container.encode(CodingKeys.highlightNote, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		case .clipboardDrop(let content):
 			try container.encode(CodingKeys.clipboardDrop, forKey: .type)
 			try container.encode(content, forKey: .payload)
@@ -1180,6 +1680,66 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setTitlebarInset(let content):
 			try container.encode(CodingKeys.setTitlebarInset, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setPanelInsets(let content):
+			try container.encode(CodingKeys.setPanelInsets, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .openProject(let content):
+			try container.encode(CodingKeys.openProject, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .closeBubbleSession(let content):
+			try container.encode(CodingKeys.closeBubbleSession, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setBlockType(let content):
+			try container.encode(CodingKeys.setBlockType, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .toggleList(let content):
+			try container.encode(CodingKeys.toggleList, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .editorHistory(let content):
+			try container.encode(CodingKeys.editorHistory, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setFocusMode(let content):
+			try container.encode(CodingKeys.setFocusMode, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setWordCountVisible(let content):
+			try container.encode(CodingKeys.setWordCountVisible, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .archiveAction(let content):
+			try container.encode(CodingKeys.archiveAction, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .addReference(let content):
+			try container.encode(CodingKeys.addReference, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .createReference(let content):
+			try container.encode(CodingKeys.createReference, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .updateReference(let content):
+			try container.encode(CodingKeys.updateReference, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .deleteReference(let content):
+			try container.encode(CodingKeys.deleteReference, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .retryReferenceLookup(let content):
+			try container.encode(CodingKeys.retryReferenceLookup, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .chooseReferenceCandidate(let content):
+			try container.encode(CodingKeys.chooseReferenceCandidate, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setReferenceAttached(let content):
+			try container.encode(CodingKeys.setReferenceAttached, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .insertCitation(let content):
+			try container.encode(CodingKeys.insertCitation, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .insertBibliography(let content):
+			try container.encode(CodingKeys.insertBibliography, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setCitationStyle(let content):
+			try container.encode(CodingKeys.setCitationStyle, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setBibliographyOptions(let content):
+			try container.encode(CodingKeys.setBibliographyOptions, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setPrintLayout(let content):
 			try container.encode(CodingKeys.setPrintLayout, forKey: .type)
@@ -1231,6 +1791,31 @@ public struct CommandEnvelope: Codable, Equatable {
 	}
 }
 
+/// A person or an organisation. An organisation has `literal` and no names.
+public struct Contributor: Codable, Equatable {
+	public let role: String
+	public let family: String?
+	public let given: String?
+	public let literal: String?
+
+	public init(role: String, family: String?, given: String?, literal: String?) {
+		self.role = role
+		self.family = family
+		self.given = given
+		self.literal = literal
+	}
+}
+
+public struct ContributorRoleSpec: Codable, Equatable {
+	public let id: String
+	public let label: String
+
+	public init(id: String, label: String) {
+		self.id = id
+		self.label = label
+	}
+}
+
 /// What kind of entry `createEntry` makes.
 public enum EntryKind: String, Codable, Equatable {
 	case document
@@ -1255,6 +1840,19 @@ public struct CreateEntryCommand: Codable, Equatable {
 	public init(parentFolder: String, name: String, kind: EntryKind) {
 		self.parentFolder = parentFolder
 		self.name = name
+		self.kind = kind
+	}
+}
+
+/// A new, empty source of a kind, for entering by hand.
+public struct CreateReferenceCommand: Codable, Equatable {
+	public let id: String
+	public let docPath: String?
+	public let kind: String
+
+	public init(id: String, docPath: String?, kind: String) {
+		self.id = id
+		self.docPath = docPath
 		self.kind = kind
 	}
 }
@@ -1405,6 +2003,19 @@ public struct DocChanged: Codable, Equatable {
 	}
 }
 
+/// A document's part of the references. The sources, and which documents each is
+/// attached to, are the project's (`.inkblot-references.json`).
+public struct DocumentCitations: Codable, Equatable {
+	/// A citation style id; absent means the project's default.
+	public let style: String?
+	public let bibliography: BibliographyOptions
+
+	public init(style: String?, bibliography: BibliographyOptions) {
+		self.style = style
+		self.bibliography = bibliography
+	}
+}
+
 /// The plain text of a document, with the positions it was read from.
 public struct DocumentText: Codable, Equatable {
 	public let docPath: String
@@ -1544,6 +2155,24 @@ public struct DuplicateEntryCommand: Codable, Equatable {
 	}
 }
 
+/// A step through the editor's own undo history.
+public enum HistoryAction: String, Codable, Equatable {
+	case undo
+	case redo
+}
+
+/// Undo or redo in one editor. A canvas has its own history and its own command
+/// (`canvasCommand` `undo`/`redo`); this is a document's.
+public struct EditorHistoryCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let action: HistoryAction
+
+	public init(target: EditorTarget, action: HistoryAction) {
+		self.target = target
+		self.action = action
+	}
+}
+
 /// A question aimed at a particular editor, or at whichever one is active.
 public struct EditorQuery: Codable, Equatable {
 	/// Absent means "whichever editor is active" — which is what a context menu wants,
@@ -1565,6 +2194,7 @@ public enum WebviewEvent: Codable, Equatable {
 	case noteMarkerLeave(NoteMarkerEvent)
 	case noteMarkerPin(NoteMarkerEvent)
 	case activeEditorChanged(ActiveEditorChanged)
+	case canvasToolbarChanged(CanvasToolbarChanged)
 	case searchMatches(SearchMatches)
 	case focusModeView(FocusModeView)
 	case readAloudPayload(ReadAloudPayloadEvent)
@@ -1582,6 +2212,23 @@ public enum WebviewEvent: Codable, Equatable {
 	/// superseded by the next.
 	case noteMarkerMoved(NoteMarkerEvent)
 	case notePreviewDismissed(NotePreviewDismissed)
+	case noteMarkersChanged(NoteMarkersChanged)
+	/// Open the bubble editor. Sent only to a shell that draws it (`bubble` chrome).
+	case bubbleSessionOpened(BubbleSessionOpened)
+	/// Where the chips of sessions left open are, for a shell that draws them.
+	case bubbleChipsChanged(BubbleChipsChanged)
+	case viewOptions(ViewOptions)
+	/// A document's archive, whole (`archive.rs`).
+	case archiveChanged(ArchiveChanged)
+	/// The project's sources, whole, for the document in view (`references.rs`).
+	case referencesChanged(ReferencesChanged)
+	/// The kinds of source and the styles, sent once when the page mounts.
+	case referenceSchema(ReferenceSchema)
+	/// Show a source in the panel.
+	case revealReference(RevealReference)
+	/// Where the word-count badges are, for a shell that draws them (`wordCount`
+	/// chrome). Coalesced per frame; the total is itself debounced by the page.
+	case wordCountsChanged(WordCountsChanged)
 	case pageLayoutState(PageLayoutState)
 	case printRequest(PrintRequest)
 
@@ -1594,6 +2241,7 @@ public enum WebviewEvent: Codable, Equatable {
 			noteMarkerLeave,
 			noteMarkerPin,
 			activeEditorChanged,
+			canvasToolbarChanged,
 			searchMatches,
 			focusModeView,
 			readAloudPayload,
@@ -1608,6 +2256,15 @@ public enum WebviewEvent: Codable, Equatable {
 			showSidebarTab,
 			noteMarkerMoved,
 			notePreviewDismissed,
+			noteMarkersChanged,
+			bubbleSessionOpened,
+			bubbleChipsChanged,
+			viewOptions,
+			archiveChanged,
+			referencesChanged,
+			referenceSchema,
+			revealReference,
+			wordCountsChanged,
 			pageLayoutState,
 			printRequest
 	}
@@ -1658,6 +2315,11 @@ public enum WebviewEvent: Codable, Equatable {
 			case .activeEditorChanged:
 				if let content = try? container.decode(ActiveEditorChanged.self, forKey: .payload) {
 					self = .activeEditorChanged(content)
+					return
+				}
+			case .canvasToolbarChanged:
+				if let content = try? container.decode(CanvasToolbarChanged.self, forKey: .payload) {
+					self = .canvasToolbarChanged(content)
 					return
 				}
 			case .searchMatches:
@@ -1730,6 +2392,51 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .notePreviewDismissed(content)
 					return
 				}
+			case .noteMarkersChanged:
+				if let content = try? container.decode(NoteMarkersChanged.self, forKey: .payload) {
+					self = .noteMarkersChanged(content)
+					return
+				}
+			case .bubbleSessionOpened:
+				if let content = try? container.decode(BubbleSessionOpened.self, forKey: .payload) {
+					self = .bubbleSessionOpened(content)
+					return
+				}
+			case .bubbleChipsChanged:
+				if let content = try? container.decode(BubbleChipsChanged.self, forKey: .payload) {
+					self = .bubbleChipsChanged(content)
+					return
+				}
+			case .viewOptions:
+				if let content = try? container.decode(ViewOptions.self, forKey: .payload) {
+					self = .viewOptions(content)
+					return
+				}
+			case .archiveChanged:
+				if let content = try? container.decode(ArchiveChanged.self, forKey: .payload) {
+					self = .archiveChanged(content)
+					return
+				}
+			case .referencesChanged:
+				if let content = try? container.decode(ReferencesChanged.self, forKey: .payload) {
+					self = .referencesChanged(content)
+					return
+				}
+			case .referenceSchema:
+				if let content = try? container.decode(ReferenceSchema.self, forKey: .payload) {
+					self = .referenceSchema(content)
+					return
+				}
+			case .revealReference:
+				if let content = try? container.decode(RevealReference.self, forKey: .payload) {
+					self = .revealReference(content)
+					return
+				}
+			case .wordCountsChanged:
+				if let content = try? container.decode(WordCountsChanged.self, forKey: .payload) {
+					self = .wordCountsChanged(content)
+					return
+				}
 			case .pageLayoutState:
 				if let content = try? container.decode(PageLayoutState.self, forKey: .payload) {
 					self = .pageLayoutState(content)
@@ -1772,6 +2479,9 @@ public enum WebviewEvent: Codable, Equatable {
 		case .activeEditorChanged(let content):
 			try container.encode(CodingKeys.activeEditorChanged, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .canvasToolbarChanged(let content):
+			try container.encode(CodingKeys.canvasToolbarChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		case .searchMatches(let content):
 			try container.encode(CodingKeys.searchMatches, forKey: .type)
 			try container.encode(content, forKey: .payload)
@@ -1813,6 +2523,33 @@ public enum WebviewEvent: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .notePreviewDismissed(let content):
 			try container.encode(CodingKeys.notePreviewDismissed, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .noteMarkersChanged(let content):
+			try container.encode(CodingKeys.noteMarkersChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .bubbleSessionOpened(let content):
+			try container.encode(CodingKeys.bubbleSessionOpened, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .bubbleChipsChanged(let content):
+			try container.encode(CodingKeys.bubbleChipsChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .viewOptions(let content):
+			try container.encode(CodingKeys.viewOptions, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .archiveChanged(let content):
+			try container.encode(CodingKeys.archiveChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .referencesChanged(let content):
+			try container.encode(CodingKeys.referencesChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .referenceSchema(let content):
+			try container.encode(CodingKeys.referenceSchema, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .revealReference(let content):
+			try container.encode(CodingKeys.revealReference, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .wordCountsChanged(let content):
+			try container.encode(CodingKeys.wordCountsChanged, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .pageLayoutState(let content):
 			try container.encode(CodingKeys.pageLayoutState, forKey: .type)
@@ -1898,6 +2635,25 @@ public struct GoToPageCommand: Codable, Equatable {
 	}
 }
 
+/// Which note's hover cards the shell is showing, so the page can highlight the text
+/// the note is about — the cards no longer quote it. `None` clears the highlight.
+public struct HighlightNoteCommand: Codable, Equatable {
+	public let noteId: String?
+
+	public init(noteId: String?) {
+		self.noteId = noteId
+	}
+}
+
+/// Put the bibliography at the end of the document, or move it there.
+public struct InsertBibliographyCommand: Codable, Equatable {
+	public let target: EditorTarget?
+
+	public init(target: EditorTarget?) {
+		self.target = target
+	}
+}
+
 public enum PageBreakKind: String, Codable, Equatable {
 	case page
 	case column
@@ -1912,6 +2668,21 @@ public struct InsertBreakCommand: Codable, Equatable {
 	public init(target: EditorTarget, kind: PageBreakKind) {
 		self.target = target
 		self.kind = kind
+	}
+}
+
+/// Cite sources at the caret. Several ids make one citation: (Smith, 2020; Lee, 2021).
+public struct InsertCitationCommand: Codable, Equatable {
+	/// Absent means whichever editor is active.
+	public let target: EditorTarget?
+	public let refIds: [String]
+	/// A page or other locator, for a single source: "42", "12–14".
+	public let locator: String?
+
+	public init(target: EditorTarget?, refIds: [String], locator: String?) {
+		self.target = target
+		self.refIds = refIds
+		self.locator = locator
 	}
 }
 
@@ -2110,6 +2881,38 @@ public struct NoteMarkerEvent: Codable, Equatable {
 	}
 }
 
+/// Where one note marker is, for a shell that draws the markers itself. Client
+/// coordinates inside the webview, as `NoteMarkerEvent`'s.
+public struct NoteMarkerRect: Codable, Equatable {
+	public let noteId: String
+	public let color: String
+	public let left: Double
+	public let top: Double
+	public let right: Double
+	public let bottom: Double
+
+	public init(noteId: String, color: String, left: Double, top: Double, right: Double, bottom: Double) {
+		self.noteId = noteId
+		self.color = color
+		self.left = left
+		self.top = top
+		self.right = right
+		self.bottom = bottom
+	}
+}
+
+/// Every note marker the user can see, and where — the whole list, so it is safe to
+/// coalesce. Sent when any of them appears, goes, or moves (a scroll, a reflow). The
+/// page still owns the markers' hover and click; the shell draws the dots, as Liquid
+/// Glass, over the page's invisible ones.
+public struct NoteMarkersChanged: Codable, Equatable {
+	public let markers: [NoteMarkerRect]
+
+	public init(markers: [NoteMarkerRect]) {
+		self.markers = markers
+	}
+}
+
 /// The fields of a note the shell can change. `None` leaves a field alone.
 public struct NotePatch: Codable, Equatable {
 	public let content: String?
@@ -2205,6 +3008,19 @@ public struct OpenDocumentCommand: Codable, Equatable {
 	public init(path: String, pane: Pane) {
 		self.path = path
 		self.pane = pane
+	}
+}
+
+/// Open a project, as picking it on the web landing page would.
+/// 
+/// The shell's project picker is its own window; the page still owns everything that
+/// opening a project restores (its tabs, panes and sidebar state), so the picker only
+/// names the project.
+public struct OpenProjectCommand: Codable, Equatable {
+	public let projectName: String
+
+	public init(projectName: String) {
+		self.projectName = projectName
 	}
 }
 
@@ -2437,6 +3253,232 @@ public struct Rect: Codable, Equatable {
 		self.y = y
 		self.width = width
 		self.height = height
+	}
+}
+
+public enum ReferenceStatus: String, Codable, Equatable {
+	/// Being looked up.
+	case resolving
+	case complete
+	/// Found, or entered, but a field most styles want is empty.
+	case incomplete
+	/// The lookup found nothing; the writer fills it in.
+	case failed
+}
+
+/// Where a source came from: what was pasted, and what the page took it to be
+/// (`url`, `doi`, `isbn`, `arxiv`, `pmid`, `search`, `manual`).
+public struct ReferenceOrigin: Codable, Equatable {
+	public let kind: String
+	public let input: String
+
+	public init(kind: String, input: String) {
+		self.kind = kind
+		self.input = input
+	}
+}
+
+/// A possible match for a title typed into quick add.
+public struct ReferenceCandidate: Codable, Equatable {
+	public let title: String
+	/// Authors · year · publisher, for telling matches apart.
+	public let detail: String
+	public let kind: String
+	public let contributors: [Contributor]
+	public let fields: [String: String]
+
+	public init(title: String, detail: String, kind: String, contributors: [Contributor], fields: [String: String]) {
+		self.title = title
+		self.detail = detail
+		self.kind = kind
+		self.contributors = contributors
+		self.fields = fields
+	}
+}
+
+public struct Reference: Codable, Equatable {
+	public let id: String
+	/// A `ReferenceKindSpec` id.
+	public let kind: String
+	public let contributors: [Contributor]
+	/// Every other detail, by CSL variable name — `title`, `container-title`, `DOI`,
+	/// `issued` (an ISO date)… Empty fields are absent.
+	public let fields: [String: String]
+	/// Printed under the entry in an annotated bibliography.
+	public let annotation: String
+	/// The writer's own; never printed.
+	public let note: String
+	public let tags: [String]
+	public let status: ReferenceStatus
+	public let origin: ReferenceOrigin?
+	/// Matches to choose from, after a title search.
+	public let candidates: [ReferenceCandidate]
+	/// Why the lookup failed, in words for the writer.
+	public let error: String?
+	public let createdAt: String
+	public let updatedAt: String
+
+	public init(id: String, kind: String, contributors: [Contributor], fields: [String: String], annotation: String, note: String, tags: [String], status: ReferenceStatus, origin: ReferenceOrigin?, candidates: [ReferenceCandidate], error: String?, createdAt: String, updatedAt: String) {
+		self.id = id
+		self.kind = kind
+		self.contributors = contributors
+		self.fields = fields
+		self.annotation = annotation
+		self.note = note
+		self.tags = tags
+		self.status = status
+		self.origin = origin
+		self.candidates = candidates
+		self.error = error
+		self.createdAt = createdAt
+		self.updatedAt = updatedAt
+	}
+}
+
+/// How a field is edited.
+public enum ReferenceFieldInput: String, Codable, Equatable {
+	case text
+	/// Several lines — an abstract, a description.
+	case multiline
+	/// An ISO date, as much of it as is known: `2021`, `2021-03`, `2021-03-04`.
+	case date
+	case url
+}
+
+/// One field a kind of source has. `key` is the CSL variable it fills.
+public struct ReferenceFieldSpec: Codable, Equatable {
+	public let key: String
+	public let label: String
+	public let placeholder: String
+	public let input: ReferenceFieldInput
+	/// Wanted by most styles; an empty one marks the source incomplete.
+	public let required: Bool
+
+	public init(key: String, label: String, placeholder: String, input: ReferenceFieldInput, required: Bool) {
+		self.key = key
+		self.label = label
+		self.placeholder = placeholder
+		self.input = input
+		self.required = required
+	}
+}
+
+/// A kind of source — a book, a journal article, a YouTube video.
+public struct ReferenceKindSpec: Codable, Equatable {
+	public let id: String
+	public let label: String
+	/// Which part of the "new source" menu it is listed in.
+	public let group: String
+	/// An SF Symbol.
+	public let symbol: String
+	public let fields: [ReferenceFieldSpec]
+	/// The contributor roles it offers, first one the default (`author`, `editor`…).
+	public let roles: [String]
+
+	public init(id: String, label: String, group: String, symbol: String, fields: [ReferenceFieldSpec], roles: [String]) {
+		self.id = id
+		self.label = label
+		self.group = group
+		self.symbol = symbol
+		self.fields = fields
+		self.roles = roles
+	}
+}
+
+/// A change to a source. Only what is present changes; `fields` merges, and an empty
+/// value removes the field.
+public struct ReferencePatch: Codable, Equatable {
+	public let kind: String?
+	public let contributors: [Contributor]?
+	public let fields: [String: String]?
+	public let annotation: String?
+	public let note: String?
+	public let tags: [String]?
+
+	public init(kind: String?, contributors: [Contributor]?, fields: [String: String]?, annotation: String?, note: String?, tags: [String]?) {
+		self.kind = kind
+		self.contributors = contributors
+		self.fields = fields
+		self.annotation = annotation
+		self.note = note
+		self.tags = tags
+	}
+}
+
+public struct ReferenceRef: Codable, Equatable {
+	public let id: String
+
+	public init(id: String) {
+		self.id = id
+	}
+}
+
+/// What the panel needs to build its forms and pickers. Sent once, when the page
+/// mounts; the page is the one place kinds and styles are defined.
+public struct ReferenceSchema: Codable, Equatable {
+	public let kinds: [ReferenceKindSpec]
+	public let roles: [ContributorRoleSpec]
+	public let styles: [CitationStyleSpec]
+
+	public init(kinds: [ReferenceKindSpec], roles: [ContributorRoleSpec], styles: [CitationStyleSpec]) {
+		self.kinds = kinds
+		self.roles = roles
+		self.styles = styles
+	}
+}
+
+/// A source as the panel shows it: formatted in the style of the document in view.
+public struct ReferenceView: Codable, Equatable {
+	public let reference: Reference
+	/// The bibliography entry, as HTML with only `i`, `b`, `sup`, `sub` and
+	/// `span.sc` (small caps) in it.
+	public let entryHtml: String
+	/// The entry as plain text, for copying and filtering.
+	public let entryText: String
+	/// How it is cited in the text, "(Smith, 2021)".
+	public let inText: String
+	/// Keys of required fields that are empty.
+	public let missingFields: [String]
+	/// The documents it is attached to.
+	public let usedIn: [String]
+	/// Attached to the document in view.
+	public let attached: Bool
+	/// Cited in the document in view.
+	public let cited: Bool
+
+	public init(reference: Reference, entryHtml: String, entryText: String, inText: String, missingFields: [String], usedIn: [String], attached: Bool, cited: Bool) {
+		self.reference = reference
+		self.entryHtml = entryHtml
+		self.entryText = entryText
+		self.inText = inText
+		self.missingFields = missingFields
+		self.usedIn = usedIn
+		self.attached = attached
+		self.cited = cited
+	}
+}
+
+/// The project's sources, as they stand for the document in view — the whole list,
+/// sent when the library changes, the document changes or its style does.
+public struct ReferencesChanged: Codable, Equatable {
+	/// Absent when no text document is open; sources still list, unattached.
+	public let docPath: String?
+	/// The document's style, or the project's when it has none of its own.
+	public let style: String
+	public let projectStyle: String
+	public let bibliography: BibliographyOptions
+	/// The document has a bibliography block in it.
+	public let hasBibliography: Bool
+	/// Every source in the project, newest first.
+	public let references: [ReferenceView]
+
+	public init(docPath: String?, style: String, projectStyle: String, bibliography: BibliographyOptions, hasBibliography: Bool, references: [ReferenceView]) {
+		self.docPath = docPath
+		self.style = style
+		self.projectStyle = projectStyle
+		self.bibliography = bibliography
+		self.hasBibliography = hasBibliography
+		self.references = references
 	}
 }
 
@@ -2680,6 +3722,15 @@ public struct RequestEnvelope: Codable, Equatable {
 	}
 }
 
+/// Show a source in the panel — the writer ⌥-clicked its citation.
+public struct RevealReference: Codable, Equatable {
+	public let id: String
+
+	public init(id: String) {
+		self.id = id
+	}
+}
+
 /// Open a search result: switch to its document if needed, then select the match (or
 /// reveal the canvas node, or jump to the note).
 /// 
@@ -2851,6 +3902,38 @@ public struct SetAlignmentCommand: Codable, Equatable {
 	}
 }
 
+public struct SetBibliographyOptionsCommand: Codable, Equatable {
+	public let docPath: String
+	public let options: BibliographyOptions
+
+	public init(docPath: String, options: BibliographyOptions) {
+		self.docPath = docPath
+		self.options = options
+	}
+}
+
+/// A text block's kind, as the toolbar's Paragraph Style menu offers it. Anything
+/// else the caret can be in — a list item's paragraph, a table cell — reads as
+/// `paragraph`, which is what the menu would turn it back into.
+public enum BlockType: String, Codable, Equatable {
+	case paragraph
+	case heading1
+	case heading2
+	case heading3
+}
+
+/// Turn the selection's blocks into paragraphs or headings — the toolbar's Paragraph
+/// Style menu.
+public struct SetBlockTypeCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let block: BlockType
+
+	public init(target: EditorTarget, block: BlockType) {
+		self.target = target
+		self.block = block
+	}
+}
+
 /// Replace the settings of the book the active document belongs to.
 public struct SetBookSettingsCommand: Codable, Equatable {
 	public let settings: BookSettings
@@ -2868,6 +3951,20 @@ public struct SetCaretAtDocPosCommand: Codable, Equatable {
 	public init(target: EditorTarget, pos: UInt32) {
 		self.target = target
 		self.pos = pos
+	}
+}
+
+public struct SetCitationStyleCommand: Codable, Equatable {
+	/// Absent sets only the project's default.
+	public let docPath: String?
+	public let style: String
+	/// Also make it the style of documents that have none of their own.
+	public let makeProjectDefault: Bool
+
+	public init(docPath: String?, style: String, makeProjectDefault: Bool) {
+		self.docPath = docPath
+		self.style = style
+		self.makeProjectDefault = makeProjectDefault
 	}
 }
 
@@ -2911,6 +4008,16 @@ public struct SetDisplayDensityCommand: Codable, Equatable {
 
 	public init(pointsPerInch: Double) {
 		self.pointsPerInch = pointsPerInch
+	}
+}
+
+/// Open or leave focus mode — the page's, which stays in the page (see
+/// `FocusModeView`). The page answers with `viewOptions`.
+public struct SetFocusModeCommand: Codable, Equatable {
+	public let open: Bool
+
+	public init(open: Bool) {
+		self.open = open
 	}
 }
 
@@ -2969,6 +4076,27 @@ public struct SetPageSetupCommand: Codable, Equatable {
 	}
 }
 
+/// How much of each side of the page the shell's chrome covers.
+/// 
+/// The shell's sidebars and window toolbar are translucent and float over the page
+/// rather than beside it: the page runs the whole window, so a canvas carries on
+/// underneath them and a document scrolls up under the toolbar's glass. What must stay
+/// readable — a document's text column, its first line — keeps to the part of the page
+/// they leave uncovered.
+public struct SetPanelInsetsCommand: Codable, Equatable {
+	public let leading: Double
+	public let trailing: Double
+	/// The window toolbar's band. Absent from an older shell, which kept the page
+	/// below its toolbar, so it defaults to nothing covered.
+	public let top: Double?
+
+	public init(leading: Double, trailing: Double, top: Double?) {
+		self.leading = leading
+		self.trailing = trailing
+		self.top = top
+	}
+}
+
 /// Show the active pane as pages, or as the continuous editor.
 public struct SetPrintLayoutCommand: Codable, Equatable {
 	public let enabled: Bool
@@ -2993,6 +4121,18 @@ public struct SetPrintZoomCommand: Codable, Equatable {
 	public init(zoom: Double?, fit: ZoomFit?) {
 		self.zoom = zoom
 		self.fit = fit
+	}
+}
+
+public struct SetReferenceAttachedCommand: Codable, Equatable {
+	public let docPath: String
+	public let id: String
+	public let attached: Bool
+
+	public init(docPath: String, id: String, attached: Bool) {
+		self.docPath = docPath
+		self.id = id
+		self.attached = attached
 	}
 }
 
@@ -3027,11 +4167,22 @@ public struct SetTitlebarInsetCommand: Codable, Equatable {
 	}
 }
 
+/// Show or hide the per-pane word-count badge — the page's own preference, which it
+/// stores and then answers with `viewOptions`.
+public struct SetWordCountVisibleCommand: Codable, Equatable {
+	public let visible: Bool
+
+	public init(visible: Bool) {
+		self.visible = visible
+	}
+}
+
 public enum SidebarTab: String, Codable, Equatable {
 	case clipboard
 	case workbench
 	case notes
 	case history
+	case references
 }
 
 /// The page wants a sidebar tab shown — "Add note", "Open Version History", a new
@@ -3155,11 +4306,19 @@ public struct TextDocument: Codable, Equatable {
 	public let notes: [Note]
 	/// Absent on documents whose history still lives in the `.versions/` sidecar.
 	public let versions: [VersionEntry]?
+	/// Things archived out of the document (`bridge::archive`), newest first. Absent
+	/// until something is.
+	public let archive: [ArchivedItem]?
+	/// The document's citation style and how its bibliography is built
+	/// (`bridge::references`). Absent until either is set.
+	public let citations: DocumentCitations?
 
-	public init(content: AnyCodable, notes: [Note], versions: [VersionEntry]?) {
+	public init(content: AnyCodable, notes: [Note], versions: [VersionEntry]?, archive: [ArchivedItem]?, citations: DocumentCitations?) {
 		self.content = content
 		self.notes = notes
 		self.versions = versions
+		self.archive = archive
+		self.citations = citations
 	}
 }
 
@@ -3204,6 +4363,24 @@ public struct TilesChanged: Codable, Equatable {
 	}
 }
 
+/// The list kinds the toolbar can toggle.
+public enum ListKind: String, Codable, Equatable {
+	case bullet
+	case ordered
+}
+
+/// Toggle a list around the selection's blocks, as the page's input rules do for `- `
+/// and `1. `.
+public struct ToggleListCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let list: ListKind
+
+	public init(target: EditorTarget, list: ListKind) {
+		self.target = target
+		self.list = list
+	}
+}
+
 /// The formatting at the selection, pushed.
 /// 
 /// **Sharp edge #1.** `Toolbar.jsx:102-145` pulls this today: on every
@@ -3227,19 +4404,28 @@ public struct ToolbarState: Codable, Equatable {
 	public let font: String
 	public let fontSize: String
 	public let alignment: Alignment
+	/// What the Paragraph Style menu shows as current.
+	public let blockType: BlockType
 	public let activeMarks: ActiveMarks
+	/// Whether the editor's own history has a step to undo or redo — the document's
+	/// Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.
+	public let canUndo: Bool
+	public let canRedo: Bool
 	/// The color the context menu's "Highlight" item would apply — what used to live
 	/// on `editor.storage.lastHighlightColor`. See `SetHighlightCommand`.
 	public let lastHighlightColor: String
 
-	public init(target: EditorTarget?, color: String, highlight: String, font: String, fontSize: String, alignment: Alignment, activeMarks: ActiveMarks, lastHighlightColor: String) {
+	public init(target: EditorTarget?, color: String, highlight: String, font: String, fontSize: String, alignment: Alignment, blockType: BlockType, activeMarks: ActiveMarks, canUndo: Bool, canRedo: Bool, lastHighlightColor: String) {
 		self.target = target
 		self.color = color
 		self.highlight = highlight
 		self.font = font
 		self.fontSize = fontSize
 		self.alignment = alignment
+		self.blockType = blockType
 		self.activeMarks = activeMarks
+		self.canUndo = canUndo
+		self.canRedo = canRedo
 		self.lastHighlightColor = lastHighlightColor
 	}
 }
@@ -3277,6 +4463,16 @@ public struct UpdateNoteCommand: Codable, Equatable {
 	public init(docPath: String, noteId: String, patch: NotePatch) {
 		self.docPath = docPath
 		self.noteId = noteId
+		self.patch = patch
+	}
+}
+
+public struct UpdateReferenceCommand: Codable, Equatable {
+	public let id: String
+	public let patch: ReferencePatch
+
+	public init(id: String, patch: ReferencePatch) {
+		self.id = id
 		self.patch = patch
 	}
 }
@@ -3357,6 +4553,48 @@ public struct VersionsChanged: Codable, Equatable {
 
 	public init(docPath: String) {
 		self.docPath = docPath
+	}
+}
+
+/// The page's own view settings that a shell offers as toolbar toggles, pushed whole
+/// whenever either changes and once at startup. The page still owns both: the shell
+/// asks with `setFocusMode` / `setWordCountVisible` and lights its buttons from this.
+public struct ViewOptions: Codable, Equatable {
+	public let focusMode: Bool
+	public let wordCountVisible: Bool
+
+	public init(focusMode: Bool, wordCountVisible: Bool) {
+		self.focusMode = focusMode
+		self.wordCountVisible = wordCountVisible
+	}
+}
+
+/// Where one pane's word-count badge is, and what it says, for a shell that draws the
+/// badges itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
+public struct WordCountBadge: Codable, Equatable {
+	public let text: String
+	public let left: Double
+	public let top: Double
+	public let right: Double
+	public let bottom: Double
+
+	public init(text: String, left: Double, top: Double, right: Double, bottom: Double) {
+		self.text = text
+		self.left = left
+		self.top = top
+		self.right = right
+		self.bottom = bottom
+	}
+}
+
+/// Every word-count badge the user can see — the whole list, so it is safe to coalesce.
+/// The page's badges stay where they are, invisible, to be measured; the shell draws
+/// them as Liquid Glass, which only a view above the page can be.
+public struct WordCountsChanged: Codable, Equatable {
+	public let badges: [WordCountBadge]
+
+	public init(badges: [WordCountBadge]) {
+		self.badges = badges
 	}
 }
 

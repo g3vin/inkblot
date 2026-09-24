@@ -32,10 +32,12 @@ struct ClipboardPanelView: View {
 
             Group {
                 if entries.isEmpty {
-                    ContentUnavailableView(
-                        sidebar.clipboard.isEmpty ? "Nothing Copied Yet" : "No Matching Entries",
-                        systemImage: "doc.on.clipboard",
-                        description: Text(sidebar.clipboard.isEmpty ? "Copy text, or drag a selection here." : ""))
+                    ContentUnavailableView {
+                        Text(sidebar.clipboard.isEmpty ? "Nothing Copied Yet" : "No Matching Entries")
+                    } description: {
+                        Text(sidebar.clipboard.isEmpty ? "Copy text, or drag a selection here." : "")
+                    }
+                    .frame(maxHeight: .infinity)
                 } else {
                     List(entries, id: \.id) { entry in
                         row(entry)

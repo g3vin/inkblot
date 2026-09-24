@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import Testing
+import SwiftUI
 @testable import inkblot_core
 
 /// Note patches, and the glass hover cards' layout and open/close rules.
@@ -51,23 +52,41 @@ struct NotePreviewTests {
             anchor: CGRect(x: 100, y: 300, width: 8, height: 16),
             viewport: CGSize(width: 1000, height: 800), dragOffsets: [:], sizeOverrides: [:])
         let frame = layout.cards[0].frame
-        #expect(frame.maxX <= 1000 - 20)
-        #expect(frame.minY >= 20)
+        let gap = NotePreviewLayoutEngine.padding
+        #expect(frame.maxX <= 1000 - gap)
+        #expect(frame.minY >= gap)
+    }
+
+    @Test func norGoesUnderASidebar() {
+        let insets = EdgeInsets(top: 0, leading: 240, bottom: 0, trailing: 310)
+        let gap = NotePreviewLayoutEngine.padding
+        let right = NotePreviewLayoutEngine(
+            root: note("n1", layout: (5000, 0)), notes: [note("n1", layout: (5000, 0))],
+            anchor: CGRect(x: 400, y: 300, width: 8, height: 16),
+            viewport: CGSize(width: 1400, height: 800), panelInsets: insets, dragOffsets: [:], sizeOverrides: [:])
+        #expect(abs(right.cards[0].frame.maxX - (1400 - 310 - gap)) < 0.001)
+        let left = NotePreviewLayoutEngine(
+            root: note("n1", layout: (-5000, 0)), notes: [note("n1", layout: (-5000, 0))],
+            anchor: CGRect(x: 400, y: 300, width: 8, height: 16),
+            viewport: CGSize(width: 1400, height: 800), panelInsets: insets, dragOffsets: [:], sizeOverrides: [:])
+        #expect(abs(left.cards[0].frame.minX - (240 + gap)) < 0.001)
     }
 
     @Test func repliesHangBelowTheirParentAndMoveWithIt() {
         let notes = [note("n1"), note("r1", parent: "n1"), note("r2", parent: "n1")]
         let still = NotePreviewLayoutEngine(
-            root: notes[0], notes: notes, anchor: CGRect(x: 100, y: 100, width: 8, height: 16),
+            root: notes[0], notes: notes, anchor: CGRect(x: 500, y: 100, width: 8, height: 16),
             viewport: CGSize(width: 1400, height: 1200), dragOffsets: [:], sizeOverrides: [:])
         let root = still.cards[0].frame
         let replies = still.cards.filter { $0.parentId == "n1" }
         #expect(replies.count == 2)
-        #expect(replies.allSatisfy { $0.frame.minY == root.minY + NotePreviewLayoutEngine.childOffsetY })
-        #expect(replies[0].frame.minX < replies[1].frame.minX)
+        #expect(replies.allSatisfy { $0.frame.minY == root.maxY + NotePreviewLayoutEngine.childGap })
+        #expect(replies[0].frame.maxX < replies[1].frame.minX)
+        // Centred on the parent between them.
+        #expect(abs((replies[0].frame.minX + replies[1].frame.maxX) / 2 - root.midX) < 0.001)
 
         let dragged = NotePreviewLayoutEngine(
-            root: notes[0], notes: notes, anchor: CGRect(x: 100, y: 100, width: 8, height: 16),
+            root: notes[0], notes: notes, anchor: CGRect(x: 500, y: 100, width: 8, height: 16),
             viewport: CGSize(width: 1400, height: 1200), dragOffsets: ["n1": CGSize(width: 50, height: 0)],
             sizeOverrides: [:])
         #expect(dragged.cards[1].frame.minX == still.cards[1].frame.minX + 50)
@@ -136,5 +155,31 @@ struct NotePreviewTests {
 
         wire.send(#"{"kind":"event","message":{"seq":SEQ,"event":{"type":"notePreviewDismissed","payload":{"noteId":"n1"}}}}"#)
         #expect(previews.preview == nil)
+    }
+}
+
+struct HoverIntentTests {
+    /// Closing on the card is heading for it; opening the gap is leaving; a jitter is neither.
+    @Test func headingIsJudgedOnTheGapToTheCard() {
+        #expect(NotePreviewModel.heading(from: 40, to: 36) == .toward)
+        #expect(NotePreviewModel.heading(from: 40, to: 44) == .away)
+        #expect(NotePreviewModel.heading(from: 40, to: 40.3) == .unclear)
+    }
+
+    /// The gap is to the card's nearest edge, and nothing once inside it.
+    @Test func theGapIsToTheNearestEdge() {
+        let card = CGRect(x: 100, y: 100, width: 200, height: 100)
+        #expect(NotePreviewModel.distance(from: CGPoint(x: 90, y: 150), to: card) == 10)
+        #expect(NotePreviewModel.distance(from: CGPoint(x: 97, y: 96), to: card) == 5)
+        #expect(NotePreviewModel.distance(from: CGPoint(x: 150, y: 150), to: card) == 0)
+    }
+}
+
+struct ReplyPlacementTests {
+    /// A lone reply hangs straight below its parent, centred on it.
+    @Test func aLoneReplyIsCentredBelowItsParent() {
+        let offset = NotePreviewLayoutEngine.defaultChildOffset(
+            parent: CGSize(width: 300, height: 120), child: CGSize(width: 220, height: 80), index: 0, count: 1)
+        #expect(offset == CGSize(width: 40, height: 120 + NotePreviewLayoutEngine.childGap))
     }
 }

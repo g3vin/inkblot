@@ -226,8 +226,10 @@ ok('dragging a hover card stores its layout without touching the note\'s timesta
 
 await act(async () => { shellBridge.send('addReply', { docPath: 'one', parentNoteId: 'n3' }) })
 const reply = control.notesByDoc.one.find((note) => note.parentNoteId === 'n3')
-ok('addReply makes an empty free note under the parent, placed below it',
-  reply && reply.type === 'free' && reply.content === '' && reply.previewLayout.offsetY > 0)
+// Unplaced: a zero layout, which the shell hangs below the parent as it draws it.
+ok('addReply makes an empty free note under the parent, left for the shell to place',
+  reply && reply.type === 'free' && reply.content === ''
+    && reply.previewLayout.offsetX === 0 && reply.previewLayout.offsetY === 0)
 
 // A marker in the page, where NoteAnnotation would have put one.
 const marker = document.createElement('span')

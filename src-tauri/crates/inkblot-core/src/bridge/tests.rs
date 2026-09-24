@@ -304,6 +304,7 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::RemoveNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
         NativeCommand::JumpToNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
+        NativeCommand::HighlightNote(HighlightNoteCommand { note_id: Some("n1".into()) }),
         NativeCommand::ClipboardDrop(ClipboardDropCommand { text: "moved".into() }),
         NativeCommand::RemoveClipboardEntries(RemoveClipboardEntriesCommand { ids: None }),
         NativeCommand::InsertClipboardEntry(InsertClipboardEntryCommand {
@@ -331,6 +332,52 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::AddReply(AddReplyCommand { doc_path: "one".into(), parent_note_id: "n1".into() }),
         NativeCommand::SetTitlebarInset(SetTitlebarInsetCommand { leading: 78.0, trailing: 52.0 }),
+        NativeCommand::SetPanelInsets(SetPanelInsetsCommand { leading: 240.0, trailing: 310.0, top: 52.0 }),
+        NativeCommand::OpenProject(OpenProjectCommand { project_name: "Novel".into() }),
+        NativeCommand::CloseBubbleSession(CloseBubbleSessionCommand {
+            session: bubble_session(),
+            archive: false,
+        }),
+        NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::Heading1 }),
+        NativeCommand::ToggleList(ToggleListCommand { target: EditorTarget::Primary, list: ListKind::Ordered }),
+        NativeCommand::EditorHistory(EditorHistoryCommand { target: EditorTarget::Primary, action: HistoryAction::Undo }),
+        NativeCommand::SetFocusMode(SetFocusModeCommand { open: true }),
+        NativeCommand::SetWordCountVisible(SetWordCountVisibleCommand { visible: false }),
+        NativeCommand::ArchiveAction(ArchiveActionCommand {
+            doc_path: "a.md".into(),
+            item_id: "x1".into(),
+            action: ArchiveAction::Restore,
+        }),
+        NativeCommand::AddReference(AddReferenceCommand {
+            id: "r1".into(),
+            doc_path: Some("a".into()),
+            input: "10.1038/nature14539".into(),
+            cite: false,
+        }),
+        NativeCommand::CreateReference(CreateReferenceCommand { id: "r2".into(), doc_path: None, kind: "book".into() }),
+        NativeCommand::UpdateReference(UpdateReferenceCommand {
+            id: "r1".into(),
+            patch: ReferencePatch { note: Some("check p. 4".into()), ..Default::default() },
+        }),
+        NativeCommand::DeleteReference(ReferenceRef { id: "r1".into() }),
+        NativeCommand::RetryReferenceLookup(ReferenceRef { id: "r1".into() }),
+        NativeCommand::ChooseReferenceCandidate(ChooseReferenceCandidateCommand { id: "r1".into(), index: 2 }),
+        NativeCommand::SetReferenceAttached(SetReferenceAttachedCommand { doc_path: "a".into(), id: "r1".into(), attached: true }),
+        NativeCommand::InsertCitation(InsertCitationCommand {
+            target: None,
+            ref_ids: vec!["r1".into()],
+            locator: Some("42".into()),
+        }),
+        NativeCommand::InsertBibliography(InsertBibliographyCommand { target: Some(EditorTarget::Primary) }),
+        NativeCommand::SetCitationStyle(SetCitationStyleCommand {
+            doc_path: Some("a".into()),
+            style: "mla".into(),
+            make_project_default: false,
+        }),
+        NativeCommand::SetBibliographyOptions(SetBibliographyOptionsCommand {
+            doc_path: "a".into(),
+            options: bibliography_options(),
+        }),
         NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true }),
         NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup() }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
@@ -342,6 +389,86 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false }),
         NativeCommand::PrintFinished(PrintFinishedCommand { job_id: "p1".into(), completed: true }),
     ]
+}
+
+fn bibliography_options() -> BibliographyOptions {
+    BibliographyOptions { include: BibliographyInclude::Cited, annotated: true, in_print: true, title: None }
+}
+
+fn a_reference() -> Reference {
+    Reference {
+        id: "r1".into(),
+        kind: "journalArticle".into(),
+        contributors: vec![
+            Contributor { role: "author".into(), family: Some("LeCun".into()), given: Some("Yann".into()), literal: None },
+            Contributor { role: "author".into(), family: None, given: None, literal: Some("NASA".into()) },
+        ],
+        fields: [("title".to_string(), "Deep learning".to_string()), ("issued".to_string(), "2015-05-28".to_string())]
+            .into_iter()
+            .collect(),
+        annotation: "".into(),
+        note: "".into(),
+        tags: vec![],
+        status: ReferenceStatus::Complete,
+        origin: Some(ReferenceOrigin { kind: "doi".into(), input: "10.1038/nature14539".into() }),
+        candidates: vec![],
+        error: None,
+        created_at: "2026-09-23T12:00:00.000Z".into(),
+        updated_at: "2026-09-23T12:00:00.000Z".into(),
+    }
+}
+
+#[test]
+fn a_reference_is_camel_case_and_keeps_csl_field_names() {
+    let value = serde_json::to_value(a_reference()).unwrap();
+    assert_eq!(value["createdAt"], json!("2026-09-23T12:00:00.000Z"));
+    assert_eq!(value["status"], json!("complete"));
+    assert_eq!(value["fields"]["title"], json!("Deep learning"));
+    assert_eq!(value["contributors"][1], json!({ "role": "author", "literal": "NASA" }));
+    let patch = serde_json::to_value(ReferencePatch { annotation: Some("x".into()), ..Default::default() }).unwrap();
+    assert_eq!(patch, json!({ "annotation": "x" }));
+}
+
+fn bubble_session() -> BubbleSession {
+    BubbleSession {
+        id: "b1".into(),
+        words: vec![
+            BubbleWord { id: "w1".into(), text: "She".into() },
+            BubbleWord { id: "w2".into(), text: "hesitated at the door".into() },
+        ],
+        aside: vec![BubbleAside { id: "w3".into(), text: "quietly".into(), x: 0.02, y: 0.5 }],
+        original: "She quietly hesitated at the door".into(),
+        mode: Some(BubbleMode::Clauses),
+        forms: vec![BubbleForm {
+            id: "f1".into(),
+            words: vec![BubbleWord { id: "w2".into(), text: "hesitated at the door".into() }],
+            aside: vec![],
+            mode: None,
+        }],
+        unsaved: None,
+    }
+}
+
+fn archived_bubble() -> ArchivedItem {
+    ArchivedItem {
+        id: "x1".into(),
+        archived_at: "2026-09-23T12:00:00.000Z".into(),
+        kind: ArchivedKind::Bubble,
+        title: "She hesitated at the door".into(),
+        bubble: Some(bubble_session()),
+    }
+}
+
+#[test]
+fn an_archived_item_is_camel_case_and_names_its_kind() {
+    let value = serde_json::to_value(archived_bubble()).unwrap();
+    assert_eq!(value["archivedAt"], json!("2026-09-23T12:00:00.000Z"));
+    assert_eq!(value["kind"], json!("bubble"));
+    assert_eq!(value["bubble"]["id"], json!("b1"));
+    let bare: ArchivedItem = serde_json::from_value(
+        json!({ "id": "x2", "archivedAt": "", "kind": "bubble", "title": "" }),
+    ).unwrap();
+    assert_eq!(bare.bubble, None);
 }
 
 fn every_event() -> Vec<WebviewEvent> {
@@ -363,7 +490,10 @@ fn every_event() -> Vec<WebviewEvent> {
             font: "Georgia".into(),
             font_size: "18px".into(),
             alignment: Alignment::Left,
+            block_type: BlockType::Heading2,
             active_marks: ActiveMarks::default(),
+            can_undo: true,
+            can_redo: false,
             last_highlight_color: "#ffff00".into(),
         }),
         WebviewEvent::SelectionContext(SelectionContext {
@@ -393,6 +523,23 @@ fn every_event() -> Vec<WebviewEvent> {
             target: Some(EditorTarget::Primary),
             doc_path: None,
             surface_id: None,
+        }),
+        WebviewEvent::CanvasToolbarChanged(CanvasToolbarChanged {
+            state: Some(CanvasToolbarState {
+                surface_id: "canvas-surface-0".into(),
+                zoom: 1.25,
+                can_undo: true,
+                can_redo: false,
+                has_selection: true,
+                can_group: true,
+                can_ungroup: false,
+                locked: false,
+                alignment_guides: true,
+                snap_to_grid: false,
+                can_record: true,
+                is_recording: false,
+                record_elapsed_ms: 0.0,
+            }),
         }),
         WebviewEvent::SearchMatches(SearchMatches {
             query: "hesitated".into(),
@@ -464,6 +611,77 @@ fn every_event() -> Vec<WebviewEvent> {
             note: None,
         }),
         WebviewEvent::NotePreviewDismissed(NotePreviewDismissed { note_id: "n1".into() }),
+        WebviewEvent::NoteMarkersChanged(NoteMarkersChanged {
+            markers: vec![NoteMarkerRect {
+                note_id: "n1".into(),
+                color: "#ffd54f".into(),
+                left: 10.0,
+                top: 20.0,
+                right: 18.0,
+                bottom: 28.0,
+            }],
+        }),
+        WebviewEvent::BubbleSessionOpened(BubbleSessionOpened {
+            doc_path: "chapters/one.md".into(),
+            session: bubble_session(),
+        }),
+        WebviewEvent::BubbleChipsChanged(BubbleChipsChanged {
+            chips: vec![BubbleChipRect {
+                session_id: "b1".into(), left: 1.0, top: 2.0, right: 23.0, bottom: 18.0, form_page: 1, form_pages: 3,
+            }],
+        }),
+        WebviewEvent::ViewOptions(ViewOptions { focus_mode: false, word_count_visible: true }),
+        WebviewEvent::WordCountsChanged(WordCountsChanged {
+            badges: vec![WordCountBadge {
+                text: "12 words".into(), left: 600.0, top: 700.0, right: 660.0, bottom: 722.0,
+            }],
+        }),
+        WebviewEvent::ArchiveChanged(ArchiveChanged {
+            doc_path: "a.md".into(),
+            items: vec![archived_bubble()],
+        }),
+        WebviewEvent::ReferencesChanged(ReferencesChanged {
+            doc_path: Some("a".into()),
+            style: "apa".into(),
+            project_style: "apa".into(),
+            bibliography: bibliography_options(),
+            has_bibliography: true,
+            references: vec![ReferenceView {
+                reference: a_reference(),
+                entry_html: "LeCun, Y. (2015). Deep learning. <i>Nature</i>.".into(),
+                entry_text: "LeCun, Y. (2015). Deep learning. Nature.".into(),
+                in_text: "(LeCun, 2015)".into(),
+                missing_fields: vec![],
+                used_in: vec!["a".into()],
+                attached: true,
+                cited: true,
+            }],
+        }),
+        WebviewEvent::ReferenceSchema(ReferenceSchema {
+            kinds: vec![ReferenceKindSpec {
+                id: "book".into(),
+                label: "Book".into(),
+                group: "Books".into(),
+                symbol: "book.closed".into(),
+                fields: vec![ReferenceFieldSpec {
+                    key: "title".into(),
+                    label: "Title".into(),
+                    placeholder: "".into(),
+                    input: ReferenceFieldInput::Text,
+                    required: true,
+                }],
+                roles: vec!["author".into()],
+            }],
+            roles: vec![ContributorRoleSpec { id: "author".into(), label: "Author".into() }],
+            styles: vec![CitationStyleSpec {
+                id: "apa".into(),
+                label: "APA 7th edition".into(),
+                short: "APA".into(),
+                heading: "References".into(),
+                note_style: false,
+            }],
+        }),
+        WebviewEvent::RevealReference(RevealReference { id: "r1".into() }),
         WebviewEvent::PageLayoutState(PageLayoutState {
             enabled: true,
             doc_path: Some("Manuscript/one".into()),
@@ -528,6 +746,7 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
             "updateNote",
             "removeNote",
             "jumpToNote",
+            "highlightNote",
             "clipboardDrop",
             "removeClipboardEntries",
             "insertClipboardEntry",
@@ -539,6 +758,26 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
             "revealSearchResult",
             "addReply",
             "setTitlebarInset",
+            "setPanelInsets",
+            "openProject",
+            "closeBubbleSession",
+            "setBlockType",
+            "toggleList",
+            "editorHistory",
+            "setFocusMode",
+            "setWordCountVisible",
+            "archiveAction",
+            "addReference",
+            "createReference",
+            "updateReference",
+            "deleteReference",
+            "retryReferenceLookup",
+            "chooseReferenceCandidate",
+            "setReferenceAttached",
+            "insertCitation",
+            "insertBibliography",
+            "setCitationStyle",
+            "setBibliographyOptions",
             "setPrintLayout",
             "setPageSetup",
             "setBookSettings",
@@ -568,6 +807,7 @@ fn every_event_has_the_wire_name_the_handoff_promised() {
             "noteMarkerLeave",
             "noteMarkerPin",
             "activeEditorChanged",
+            "canvasToolbarChanged",
             "searchMatches",
             "focusModeView",
             "readAloudPayload",
@@ -582,6 +822,15 @@ fn every_event_has_the_wire_name_the_handoff_promised() {
             "showSidebarTab",
             "noteMarkerMoved",
             "notePreviewDismissed",
+            "noteMarkersChanged",
+            "bubbleSessionOpened",
+            "bubbleChipsChanged",
+            "viewOptions",
+            "wordCountsChanged",
+            "archiveChanged",
+            "referencesChanged",
+            "referenceSchema",
+            "revealReference",
             "pageLayoutState",
             "printRequest",
         ]
@@ -705,6 +954,41 @@ fn envelope_sequence_numbers_survive_the_wire() {
         panic!("an event envelope came back as something else");
     };
     assert_eq!(envelope.seq, 41);
+}
+
+#[test]
+fn a_bubble_session_is_camel_case_and_an_empty_aside_may_be_omitted() {
+    let session = bubble_session();
+    let value = serde_json::to_value(&session).unwrap();
+    assert_eq!(value["words"][1], json!({ "id": "w2", "text": "hesitated at the door" }));
+    assert_eq!(value["aside"][0], json!({ "id": "w3", "text": "quietly", "x": 0.02, "y": 0.5 }));
+    assert_eq!(value["mode"], json!("clauses"));
+    assert_eq!(value["forms"][0], json!({
+        "id": "f1", "words": [{ "id": "w2", "text": "hesitated at the door" }], "aside": [],
+    }));
+
+    // A session written before anything was set aside, or any form saved, still reads.
+    let bare: BubbleSession =
+        serde_json::from_value(json!({ "id": "b2", "words": [], "original": "" })).unwrap();
+    assert!(bare.aside.is_empty());
+    assert_eq!(bare.mode, None);
+    assert!(bare.forms.is_empty());
+    assert!(serde_json::to_value(&bare).unwrap().get("forms").is_none());
+    assert_eq!(bare.unsaved, None);
+}
+
+#[test]
+fn the_toolbar_items_speak_camel_case() {
+    let command = NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::Heading2 });
+    assert_eq!(
+        serde_json::to_value(&command).unwrap(),
+        json!({ "type": "setBlockType", "payload": { "target": "primary", "block": "heading2" } })
+    );
+    let event = WebviewEvent::ViewOptions(ViewOptions { focus_mode: true, word_count_visible: false });
+    assert_eq!(
+        serde_json::to_value(&event).unwrap(),
+        json!({ "type": "viewOptions", "payload": { "focusMode": true, "wordCountVisible": false } })
+    );
 }
 
 #[test]
