@@ -37,9 +37,17 @@ struct WordCountBadges: View {
     /// Where the page puts it — except along the bottom of the window, where it sits
     /// level with the file tree's bottom bar. (A stacked split's upper badge is
     /// mid-window, and stays where the page puts it.)
+    ///
+    /// Along the bottom is any badge with no other under it, not one near the bottom:
+    /// while the window is dragged taller the page's positions trail its height, and a
+    /// badge judged by distance fell short of the bottom for a frame and jumped up to
+    /// where the page last had it.
     private func y(of badge: WordCountBadge) -> CGFloat {
         let pageY = (badge.top + badge.bottom) / 2
-        guard let barY = model.sidebarBarMidY, frame.height - badge.bottom < 60 else { return pageY }
+        let isAbove = model.bridge.wordCounts.contains {
+            $0.top >= badge.bottom && $0.left < badge.right && $0.right > badge.left
+        }
+        guard let barY = model.sidebarBarMidY, !isAbove else { return pageY }
         return barY - frame.minY
     }
 }

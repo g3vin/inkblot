@@ -269,37 +269,74 @@ private final class WeakReplyHandler: NSObject, WKScriptMessageHandlerWithReply 
 
 /* ---------------- SwiftUI ---------------- */
 
-/// Hands the controller's web view to SwiftUI, and tells the controller which window
-/// it ended up in.
+/// Hands the controller's web view to SwiftUI, tells the controller which window it
+/// ended up in, and says when a drag resizing that window ends.
 struct EditorWebView: NSViewRepresentable {
     let controller: EditorWebController
+    var onLiveResizeEnd: () -> Void = {}
 
     func makeNSView(context: Context) -> WindowReportingContainer {
         let container = WindowReportingContainer()
         container.onWindow = { [weak controller] window in controller?.attach(to: window) }
+        container.onLiveResizeEnd = onLiveResizeEnd
         container.embed(controller.webView)
         return container
     }
 
-    func updateNSView(_ view: WindowReportingContainer, context: Context) {}
+    func updateNSView(_ view: WindowReportingContainer, context: Context) {
+        view.onLiveResizeEnd = onLiveResizeEnd
+    }
 
+    /// Also keeps the sizes a window resize passes through on its way from reaching the
+    /// page.
+    ///
+    /// On every step of a resize drag, the inspector's split view lays the whole
+    /// NavigationSplitView out at a trial size (about 850×170, the page 52 tall) before
+    /// the real one, all in one layout pass. AppKit never draws the trial, but a web view
+    /// hands every size to its web process as it gets it, and the page laid itself out,
+    /// painted and published at 52 tall: the text flashed, and the word count — placed
+    /// from what the page publishes — jumped to the top. So mid-drag the page is sized
+    /// once the pass is over, to whatever the container ended up.
     final class WindowReportingContainer: NSView {
         var onWindow: ((NSWindow?) -> Void)?
+        var onLiveResizeEnd: (() -> Void)?
+        private weak var child: NSView?
+        private var childResizePending = false
+
+        /// Top-down, so the page hangs from the top while it waits: its size is a turn
+        /// behind mid-drag, and from the bottom its text rode up and down with the
+        /// window's bottom edge.
+        override var isFlipped: Bool { true }
 
         func embed(_ child: NSView) {
-            child.translatesAutoresizingMaskIntoConstraints = false
+            child.frame = bounds
             addSubview(child)
-            NSLayoutConstraint.activate([
-                child.leadingAnchor.constraint(equalTo: leadingAnchor),
-                child.trailingAnchor.constraint(equalTo: trailingAnchor),
-                child.topAnchor.constraint(equalTo: topAnchor),
-                child.bottomAnchor.constraint(equalTo: bottomAnchor),
-            ])
+            self.child = child
+        }
+
+        override func resizeSubviews(withOldSize oldSize: NSSize) {
+            guard inLiveResize else {
+                child?.frame = bounds
+                return
+            }
+            guard !childResizePending else { return }
+            childResizePending = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                childResizePending = false
+                child?.frame = bounds
+            }
         }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             onWindow?(window)
+        }
+
+        override func viewDidEndLiveResize() {
+            super.viewDidEndLiveResize()
+            child?.frame = bounds
+            onLiveResizeEnd?()
         }
     }
 }

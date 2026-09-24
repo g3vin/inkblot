@@ -54,7 +54,7 @@ struct ContentView: View {
                 }
                 .navigationSplitViewColumnWidth(min: PaneLimits.sidebarMin, ideal: 240, max: 340)
         } detail: {
-            EditorWebView(controller: model.web)
+            EditorWebView(controller: model.web, onLiveResizeEnd: publishPanelInsets)
                 .overlay {
                     WordCountBadges()
                     PrintLayoutControls()
@@ -66,9 +66,15 @@ struct ContentView: View {
                 // Measured on the view that ignores the safe area, so these are how far
                 // the sidebars and the toolbar reach over it.
                 .onGeometryChange(for: EdgeInsets.self, of: \.safeAreaInsets) { insets in
-                    guard insets != panelInsets.value else { return }
-                    panelInsets.value = insets
-                    sendPanelInsets()
+                    panelInsets.measured = insets
+                    // While the window is being resized, SwiftUI lays the column out
+                    // again on every other pass as if the toolbar and the inspector were
+                    // not there — top and trailing 0, or partway — and reports those
+                    // passes here as well. Passed on, they jerked the text up a toolbar's
+                    // height for a frame. A window resize moves none of the chrome, so
+                    // the page keeps what it has until the drag ends.
+                    guard !model.web.webView.inLiveResize else { return }
+                    publishPanelInsets()
                 }
                 // On a canvas its own controls take the document toolbar's place until a
                 // card's text is being edited — the page says which (`canvasToolbar`).
@@ -140,6 +146,13 @@ struct ContentView: View {
     /// Whether a project or a document is open yet.
     private var hasContent: Bool {
         model.bridge.project.projectName != nil || model.bridge.activeEditor?.docPath != nil
+    }
+
+    /// The last measurement, if the page does not have it yet.
+    private func publishPanelInsets() {
+        guard panelInsets.measured != panelInsets.value else { return }
+        panelInsets.value = panelInsets.measured
+        sendPanelInsets()
     }
 
     private func sendPanelInsets() {
@@ -214,5 +227,8 @@ nonisolated struct PaneLimits: Equatable, Sendable {
 
 /// A value SwiftUI does not watch.
 private final class PanelInsetsBox {
+    /// What the page was last sent.
     var value = EdgeInsets()
+    /// What SwiftUI last reported, which during a window resize the page is not sent.
+    var measured = EdgeInsets()
 }
