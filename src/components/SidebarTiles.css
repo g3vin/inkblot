@@ -149,3 +149,8 @@
   padding-top: var(--app-titlebar-height);
 }
 
+
+.main-layout:not(.is-canvas-underlay) .map-pane {
+  box-sizing: border-box;
+  padding-top: var(--app-titlebar-height);
+}

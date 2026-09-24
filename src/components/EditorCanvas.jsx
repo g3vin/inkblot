@@ -28,8 +28,9 @@ import { canvasDelegates } from '../bridge/canvasDelegates'
 import { useSurfacePublisher } from '../bridge/useSurfacePublisher'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { isEditorReady } from '../lib/editorUtils'
-import { isCanvasDoc } from '../lib/docKind'
+import { getDocKind, isTextDoc } from '../lib/docKind'
 import CanvasPane from '../canvas/CanvasPane'
+import MapPane from '../map/MapPane'
 import { useEditorAutosave } from './useEditorAutosave'
 import { useEditorDnd } from './useEditorDnd'
 import { useEditorDocCache } from './useEditorDocCache'
@@ -540,11 +541,15 @@ export default function EditorCanvas({
   const liveActiveEditor = isEditorReady(activeEditor) ? activeEditor : null
   const focusModeEditor = liveActiveEditor || liveEditor || liveSecondaryEditor
 
-  // A canvas pane renders CanvasPane instead of an EditorContent. The two TipTap
-  // editors above still exist (hooks can't be conditional) — they just sit idle,
-  // holding no document, and must never be handed to the canvas pane.
-  const primaryIsCanvas = isCanvasDoc(currentDoc)
-  const secondaryIsCanvas = isCanvasDoc(secondaryDoc)
+  // A canvas or map pane renders its own surface instead of an EditorContent. The two
+  // TipTap editors above still exist (hooks can't be conditional) — they just sit
+  // idle, holding no document, and must never be handed to such a pane.
+  const primaryKind = getDocKind(currentDoc)
+  const secondaryKind = getDocKind(secondaryDoc)
+  const primaryIsCanvas = primaryKind === 'canvas'
+  const secondaryIsCanvas = secondaryKind === 'canvas'
+  const primaryIsStructured = primaryKind !== 'text'
+  const secondaryIsStructured = secondaryKind !== 'text'
 
   if (!hasActiveDoc) {
     return (
@@ -588,7 +593,7 @@ export default function EditorCanvas({
       : ''
   }`
   const showDraftPane = draftTabActive && !currentDoc
-  const primaryPaneOwnsFocus = primaryIsCanvas || showDraftPane
+  const primaryPaneOwnsFocus = primaryIsStructured || showDraftPane
 
   // The divider is a track in the split grid, so the two panes are sized by the
   // ratio and the gutter never has to be accounted for twice.
@@ -684,6 +689,17 @@ export default function EditorCanvas({
               onClose={closePrimary}
               isActive={activeDoc === currentDoc}
             />
+          ) : primaryKind === 'map' ? (
+            <MapPane
+              projectName={projectName}
+              docPath={currentDoc}
+              setActiveEditor={setActiveEditor}
+              onActivate={() => activatePane(currentDoc, null)}
+              onOpenDoc={(docPath) => openDocFromCanvas('primary', docPath)}
+              showHeader={splitView === 'editor'}
+              onClose={closePrimary}
+              isActive={activeDoc === currentDoc}
+            />
           ) : (
             <PaneEditorSurface
               editor={liveEditor}
@@ -697,7 +713,7 @@ export default function EditorCanvas({
               ) : null}
             />
           )}
-          {!primaryIsCanvas && !showDraftPane ? (
+          {!primaryIsStructured && !showDraftPane ? (
             <div className="pane-status">
               {showWordCountBadge ? <div className="word-count">{formatWordStats(primaryWordStats)}</div> : null}
             </div>
@@ -722,12 +738,12 @@ export default function EditorCanvas({
           <div
             ref={secondaryPaneRef}
             className="pane secondary-pane"
-            onFocus={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
-            onMouseEnter={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
-            onWheel={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
-            onMouseDown={secondaryIsCanvas ? undefined : () => focusEditor(liveSecondaryEditor)}
-            onClick={secondaryIsCanvas ? undefined : () => focusEditor(liveSecondaryEditor)}
-            onMouseMove={secondaryIsCanvas ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
+            onFocus={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
+            onMouseEnter={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
+            onWheel={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
+            onMouseDown={secondaryIsStructured ? undefined : () => focusEditor(liveSecondaryEditor)}
+            onClick={secondaryIsStructured ? undefined : () => focusEditor(liveSecondaryEditor)}
+            onMouseMove={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
           >
             {dragCaret?.pane === 'secondary' ? (
               <div
@@ -753,6 +769,17 @@ export default function EditorCanvas({
                 onClose={closeSecondary}
                 isActive={activeDoc === secondaryDoc}
               />
+            ) : secondaryKind === 'map' ? (
+              <MapPane
+                projectName={projectName}
+                docPath={secondaryDoc}
+                setActiveEditor={setActiveEditor}
+                onActivate={() => activatePane(secondaryDoc, null)}
+                onOpenDoc={(docPath) => openDocFromCanvas('secondary', docPath)}
+                showHeader
+                onClose={closeSecondary}
+                isActive={activeDoc === secondaryDoc}
+              />
             ) : (
               <PaneEditorSurface
                 editor={liveSecondaryEditor}
@@ -766,7 +793,7 @@ export default function EditorCanvas({
                 )}
               />
             )}
-            {!secondaryIsCanvas ? (
+            {!secondaryIsStructured ? (
               <div className="pane-status">
                 {showWordCountBadge ? <div className="word-count">{formatWordStats(secondaryWordStats)}</div> : null}
               </div>
@@ -787,8 +814,8 @@ export default function EditorCanvas({
           />
         ) : null}
 
-        {/* Focus Mode is a prose surface — it has nothing to show for a canvas or a draft. */}
-        {focusModeOpen && !showDraftPane && !isCanvasDoc(activeDoc || currentDoc) ? (
+        {/* Focus Mode is a prose surface — it has nothing to show for a canvas, a map or a draft. */}
+        {focusModeOpen && !showDraftPane && isTextDoc(activeDoc || currentDoc) ? (
           <FocusModeOverlay
             editor={focusModeEditor}
             onExit={onExitFocusMode}

@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import { documentSurface } from '../bridge'
-import { isCanvasDoc } from '../lib/docKind'
+import { isTextDoc } from '../lib/docKind'
 import { nativeOwns } from '../lib/host'
 import { bookFolderFor, listBookChapters } from './compile'
 import { effectivePageSetup, readDocPageSetup } from './DocPageSetup'
@@ -57,7 +57,7 @@ export default function usePrintLayoutController({
   onExport,
 }) {
   // The editor that holds the active document: the pane it is open in.
-  const activeTextDoc = activeDoc && !isCanvasDoc(activeDoc) ? activeDoc : null
+  const activeTextDoc = activeDoc && isTextDoc(activeDoc) ? activeDoc : null
   const activeEditor = activeTextDoc
     ? usable(activeTextDoc === secondaryDoc && activeTextDoc !== currentDoc ? secondaryEditor : editor)
     : null

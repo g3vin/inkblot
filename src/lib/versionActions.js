@@ -12,6 +12,7 @@
 import {
   appendVersionEntry,
   buildCanvasVersionEntry,
+  buildMapVersionEntry,
   buildTextVersionEntry,
   createDocumentFromVersion,
   deleteVersionEntry,
@@ -19,14 +20,20 @@ import {
   loadDocument,
   updateVersionEntry,
 } from './FileSystem'
-import { isCanvasDoc } from './docKind'
+import { isCanvasDoc, isMapDoc } from './docKind'
 import { formatFullTimestamp } from './versionHistory'
 import { dispatchCanvasRestore } from '../canvas/canvasEvents'
+import { dispatchMapRestore } from '../map/mapEvents'
 import { setContentKeepingPageSetup } from '../print/DocPageSetup'
 
 /** Save the current state as a version. Resolves to the stored entry, or null. */
 export async function snapshotVersion({ projectName, docName, editor }) {
   if (!projectName || !docName) return null
+  if (isMapDoc(docName)) {
+    const raw = await loadDocument(projectName, docName)
+    if (!raw) return null
+    return appendVersionEntry(projectName, docName, buildMapVersionEntry({ map: raw, auto: false }))
+  }
   if (isCanvasDoc(docName)) {
     const raw = await loadDocument(projectName, docName)
     if (!raw) return null
@@ -47,6 +54,19 @@ export async function snapshotVersion({ projectName, docName, editor }) {
 export async function restoreVersion({ projectName, docName, editor, version }) {
   if (!projectName || !docName || !version) return
   const restoredName = `Restored from ${formatFullTimestamp(version.timestamp)}`
+
+  if (isMapDoc(docName)) {
+    if (!version.map) return
+    const current = await loadDocument(projectName, docName)
+    if (current) {
+      await appendVersionEntry(projectName, docName, buildMapVersionEntry({ map: current, auto: true }))
+    }
+    dispatchMapRestore(docName, version.map)
+    await appendVersionEntry(projectName, docName, buildMapVersionEntry({
+      map: version.map, name: restoredName, auto: false,
+    }))
+    return
+  }
 
   if (isCanvasDoc(docName)) {
     // What's on disk now (autosave keeps it ≤1s stale), then swap the live canvas —

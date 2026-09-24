@@ -14,12 +14,10 @@ import {
   listProjects,
   createProject,
   listProjectTree,
-  saveDocument,
   createFolder,
 } from '../lib/FileSystem'
-import { saveCanvasDocument } from '../lib/canvasFileSystem'
-import { createEmptyCanvas } from '../lib/canvasModel'
-import { isCanvasDoc, stripCanvasSuffix, withCanvasSuffix } from '../lib/docKind'
+import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
+import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import SFIcon from './SFIcon'
 import { useFileTreeDrag } from './useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
@@ -246,10 +244,10 @@ export default function FileTree({
         setRenamingEntry({
           path: detail.path || detail.name,
           type: detail.type,
-          oldName: stripCanvasSuffix(detail.name),
+          oldName: stripDocSuffix(detail.name),
           parent: detail.parent || '',
         })
-        setRenameValue(stripCanvasSuffix(detail.name))
+        setRenameValue(stripDocSuffix(detail.name))
         setIsAddingEntry(false)
         setIsAddingProject(false)
         setIsCreateMenuOpen(false)
@@ -278,23 +276,20 @@ export default function FileTree({
 
   const confirmNewEntry = async () => {
     if (!newEntryName.trim()) return
-    // The `.canvas` suffix is what routes a document to the canvas editor, so it
+    // The `.canvas` or `.map` suffix is what routes a document to its editor, so it
     // follows the kind being created — never whatever the user typed. Without
     // this, a text file named "plan.canvas" would collide with a real canvas.
-    const bare = stripCanvasSuffix(newEntryName.trim())
-    if (!bare) return
-    const name = newEntryType === 'canvas' ? withCanvasSuffix(bare) : bare
+    const name = nameForKind(newEntryName, newEntryType)
+    if (!stripDocSuffix(name)) return
     const path = newEntryParent ? `${newEntryParent}/${name}` : name
 
     if (newEntryType === 'folder') {
       await createFolder(projectName, path)
-    } else if (newEntryType === 'canvas') {
-      await saveCanvasDocument(projectName, path, createEmptyCanvas())
     } else {
-      await saveDocument(projectName, path, { content: [] })
+      await createDocumentOfKind(projectName, path, newEntryType)
     }
 
-    // Folders and files are the only entry kinds the tree orders; a canvas is a file.
+    // Folders and files are the only entry kinds the tree orders; a canvas or map is a file.
     const orderType = newEntryType === 'folder' ? 'folder' : 'file'
     ensureOrderItem(newEntryParent || '', `${orderType}:${path}`)
 
@@ -398,15 +393,14 @@ export default function FileTree({
       return
     }
 
-    // Renaming must not change a document's kind: re-apply the `.canvas` suffix
-    // to a canvas (the edit box shows the bare name) and strip it from anything else.
-    const bare = stripCanvasSuffix(trimmed)
-    if (!bare) {
+    // Renaming must not change a document's kind: re-apply its `.canvas` or `.map`
+    // suffix (the edit box shows the bare name) and strip any from anything else.
+    const nextName = nameForKind(trimmed, type === 'file' ? getDocKind(path) : 'folder')
+    if (!stripDocSuffix(nextName)) {
       setRenamingEntry(null)
       setRenameValue('')
       return
     }
-    const nextName = type === 'file' && isCanvasDoc(path) ? withCanvasSuffix(bare) : bare
 
     const { renameEntry } = await import('../lib/entryOperations')
     const nextPath = await renameEntry(projectName, path, nextName, type)
@@ -456,7 +450,9 @@ export default function FileTree({
             ? 'Folder name...'
             : newEntryType === 'canvas'
               ? 'Canvas name...'
-              : 'File name...'
+              : newEntryType === 'map'
+                ? 'Map name...'
+                : 'File name...'
         }
       />
     </div>
@@ -706,6 +702,14 @@ export default function FileTree({
               aria-label="New canvas"
             >
               <SFIcon name="canvas" />
+            </button>
+            <button
+              className="file-tree-action"
+              onClick={() => beginNewEntry('map', '')}
+              title="New map"
+              aria-label="New map"
+            >
+              <SFIcon name="map" />
             </button>
             <button
               className="file-tree-action"

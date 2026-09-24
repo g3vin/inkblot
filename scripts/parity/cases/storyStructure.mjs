@@ -11,10 +11,12 @@ import {
   getStoryFolderPresetByName,
   getStoryFolderPresetForEntry,
   getStoryFolderAncestor,
+  isLocationDoc,
+  isCharacterDoc,
 } from '../../../src/lib/storyStructure.js'
 
 const KEYS = ['characters', 'settings', 'outline', 'novel', 'Characters', 'book', '', 'missing']
-const NAMES = ['Characters', 'Settings', 'Outline', 'Novel', 'Book', 'book', 'novel', '', 'Chapters']
+const NAMES = ['Characters', 'Settings', 'Locations', 'Places', 'locations', 'Outline', 'Novel', 'Book', 'book', 'novel', '', 'Chapters']
 
 const PATHS = [
   '',
@@ -34,6 +36,10 @@ const PATHS = [
   'novel/chapter',
   'Settings/The Fens.canvas',
   'Outline/Beats/Midpoint',
+  'Locations/Rivertown',
+  'World/Places/Harbour/Old Quay',
+  'Characters/Locations/Ada',
+  'Locations/Characters/Ada',
 ]
 
 export default {
@@ -49,6 +55,8 @@ export default {
     }
     for (const path of PATHS) {
       yield { fn: 'getStoryFolderAncestor', args: [path], expected: getStoryFolderAncestor(path) }
+      yield { fn: 'isLocationDoc', args: [path], expected: isLocationDoc(path) }
+      yield { fn: 'isCharacterDoc', args: [path], expected: isCharacterDoc(path) }
       for (const type of ['file', 'folder']) {
         yield {
           fn: 'getStoryFolderPresetForEntry',

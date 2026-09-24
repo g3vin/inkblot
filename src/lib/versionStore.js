@@ -9,8 +9,9 @@
  * Split out of FileSystem.js, which was 956 lines; this was 44% of it.
  */
 import { writeTextFile, readTextFile, mkdir } from '@tauri-apps/plugin-fs'
-import { isCanvasDoc } from './docKind'
+import { isTextDoc } from './docKind'
 import { EDIT_SESSION_ID, countWords, countCanvasWords } from './versionHistory'
+import { countMapWords } from './map/mapModel'
 import { getProjectRoot, joinPath, normalizePath, parentOf } from './projectPaths'
 import { withDocLock } from './docLock'
 
@@ -57,9 +58,35 @@ export const buildCanvasVersionEntry = ({ canvas, name = null, auto = true }) =>
   canvas,
 })
 
+/** A version entry holding a full serialized map. */
+export const buildMapVersionEntry = ({ map, name = null, auto = true }) => ({
+  id: newVersionId(),
+  timestamp: new Date().toISOString(),
+  kind: 'map',
+  name: name || null,
+  auto,
+  sessionId: EDIT_SESSION_ID,
+  words: countMapWords(map),
+  map,
+})
+
+/** A map as written, minus where the view was looking. */
+const mapContent = (entry) => {
+  if (!entry?.map) return null
+  const { viewport: _viewport, ...content } = entry.map
+  return content
+}
+
 /** Two entries hold the same document state (viewport and metadata aside). */
 const sameVersionContent = (a, b) => {
   if (!a || !b) return false
+  if (a.map || b.map) {
+    try {
+      return JSON.stringify(mapContent(a)) === JSON.stringify(mapContent(b))
+    } catch {
+      return false
+    }
+  }
   if (a.canvas || b.canvas) {
     try {
       return JSON.stringify({ n: a.canvas?.nodes, e: a.canvas?.edges }) ===
@@ -134,7 +161,7 @@ export async function getVersions(projectName, docName) {
   try {
     const root = await getProjectRoot(projectName)
 
-    if (!isCanvasDoc(docName)) {
+    if (isTextDoc(docName)) {
       try {
         const raw = await readTextFile(joinPath(root, `${docName}.json`))
         const parsed = JSON.parse(raw || '{}')
@@ -159,7 +186,7 @@ export async function getVersions(projectName, docName) {
 async function readVersionStore(projectName, docName) {
   const root = await getProjectRoot(projectName)
 
-  if (isCanvasDoc(docName)) {
+  if (!isTextDoc(docName)) {
     return { root, store: 'sidecar', doc: null, versions: await readSidecarVersions(root, docName) }
   }
 

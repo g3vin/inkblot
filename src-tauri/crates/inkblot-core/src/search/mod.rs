@@ -19,7 +19,7 @@ pub mod matcher;
 
 use serde_json::Value;
 
-use crate::doc_kind::is_canvas_doc;
+use crate::doc_kind::{is_canvas_doc, is_map_doc};
 use crate::js_string::{js_trim, utf16_len, utf16_slice};
 use crate::store::{ProjectStore, StoreError};
 use crate::types::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
@@ -265,6 +265,64 @@ pub fn collect_canvas_matches(
     matches
 }
 
+/* ---- maps ------------------------------------------------------------------ */
+
+/// What each searchable collection on a map is called, which key holds its text, the
+/// key to fall back to when that is empty, and the title a nameless one gets.
+const MAP_SEARCH_FIELDS: [(&str, &str, Option<&str>, &str); 5] = [
+    ("pins", "name", Some("doc"), "Place"),
+    ("routes", "name", None, "Route"),
+    ("regions", "name", None, "Region"),
+    ("labels", "text", None, "Label"),
+    ("travelers", "name", Some("doc"), "Traveler"),
+];
+
+/// Every match in a map's raw (on-disk) JSON, addressed by the id of the item that
+/// carries the text. A pin or traveler with no name of its own is searched by the
+/// path of the doc it links to — that is the name it shows.
+pub fn collect_map_matches(raw: &Value, matcher: &Matcher, doc_path: &str, limit: usize) -> Vec<SearchResult> {
+    if raw.is_null() || matcher.is_empty || !matcher.valid {
+        return Vec::new();
+    }
+    let mut matches: Vec<SearchResult> = Vec::new();
+
+    for (collection, key, fallback, nameless) in MAP_SEARCH_FIELDS {
+        for item in raw[collection].as_array().map(Vec::as_slice).unwrap_or(&[]) {
+            if matches.len() >= limit {
+                return matches;
+            }
+            let Some(id) = item["id"].as_str().filter(|id| !id.is_empty()) else { continue };
+            let own = item[key].as_str().unwrap_or("");
+            let text = match fallback {
+                Some(fallback) if own.is_empty() => item[fallback].as_str().unwrap_or(""),
+                _ => own,
+            };
+            if text.is_empty() {
+                continue;
+            }
+            let title = title_of(text, nameless);
+            let remaining = limit - matches.len();
+            for hit in matcher.find_all(text, remaining) {
+                matches.push(SearchResult {
+                    id: format!("{doc_path}-{id}-{}", hit.index),
+                    result_type: SearchResultType::MapMatch,
+                    doc_name: doc_path.to_string(),
+                    path: doc_path.to_string(),
+                    node_id: Some(id.to_string()),
+                    title: title.clone(),
+                    preview: build_preview(text, hit.index, hit.index + hit.length, PREVIEW_RADIUS),
+                    match_text: Some(hit.text),
+                    from: None,
+                    to: None,
+                    note: None,
+                });
+            }
+        }
+    }
+
+    matches
+}
+
 /* ---- the project scopes ---------------------------------------------------- */
 
 /// A file entry in the project tree: its tree path and its display name.
@@ -376,6 +434,19 @@ pub fn search_project(
                 &entry.path,
                 MAX_RESULTS_PER_DOCUMENT,
             ));
+            continue;
+        }
+
+        // A map is the same: no notes, and its text is addressed by item id.
+        if is_map_doc(&entry.path) {
+            if scope == SearchScope::Notes {
+                continue;
+            }
+            let Some(map) = store.load_document(project_name, &entry.path)? else { continue };
+            if is_cancelled() {
+                return Ok(Vec::new());
+            }
+            results.extend(collect_map_matches(&map, matcher, &entry.path, MAX_RESULTS_PER_DOCUMENT));
             continue;
         }
 

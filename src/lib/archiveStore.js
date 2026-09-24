@@ -11,7 +11,7 @@
  * follows each change.
  */
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import { isCanvasDoc } from './docKind'
+import { isTextDoc } from './docKind'
 import { getProjectRoot, joinPath } from './projectPaths'
 import { withDocLock } from './docLock'
 
@@ -39,14 +39,14 @@ const readDocument = async (path) => {
 
 /** A document's archived items, newest first. Canvases have none yet. */
 export async function getArchive(projectName, docName) {
-  if (!projectName || !docName || isCanvasDoc(docName)) return []
+  if (!projectName || !docName || !isTextDoc(docName)) return []
   const doc = await readDocument(await documentPath(projectName, docName))
   return Array.isArray(doc?.archive) ? doc.archive : []
 }
 
 /** Change a document's archive, under its lock. `change` maps the list to the next. */
 async function updateArchive(projectName, docName, change) {
-  if (!projectName || !docName || isCanvasDoc(docName)) return false
+  if (!projectName || !docName || !isTextDoc(docName)) return false
   const changed = await withDocLock(projectName, docName, async () => {
     const path = await documentPath(projectName, docName)
     const doc = await readDocument(path)
