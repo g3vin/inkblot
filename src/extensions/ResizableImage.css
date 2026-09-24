@@ -1,0 +1,297 @@
+/* ============================================================
+   Images (ResizableImage node view)
+   ============================================================ */
+
+.image-node {
+  display: inline-block;
+  position: relative;
+  max-width: 100%;
+  vertical-align: text-bottom;
+  line-height: 0;
+}
+
+.image-node.image-layout-block,
+.image-node.image-align-center,
+.image-node.image-align-right {
+  display: block;
+}
+
+.image-node.image-layout-block,
+.image-node.image-align-left {
+  margin: 0.75em 0;
+}
+
+.image-node.image-align-center {
+  margin: 0.75em auto;
+}
+
+.image-node.image-align-right {
+  margin: 0.75em 0 0.75em auto;
+}
+
+.image-node.image-layout-wrap-left {
+  float: left;
+  margin: 0.35em 1em 0.75em 0;
+}
+
+.image-node.image-layout-wrap-right {
+  float: right;
+  margin: 0.35em 0 0.75em 1em;
+}
+
+.image-viewport {
+  display: block;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-height: 40px;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.image-viewport img {
+  position: absolute;
+  display: block;
+  max-width: none;
+  height: auto;
+  transform-origin: center;
+  user-select: none;
+}
+
+.image-node.is-cropping .image-viewport img {
+  transform: none !important;
+}
+
+.image-node.is-selected {
+  outline: 2px solid color-mix(in srgb, var(--accent-color) 68%, transparent);
+  outline-offset: 2px;
+}
+
+.image-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 35;
+  align-items: center;
+  gap: 4px;
+  max-width: min(680px, calc(100vw - 28px));
+  padding: 5px;
+  border: 1px solid var(--floating-note-border);
+  border-radius: var(--floating-note-radius);
+  background: var(--floating-note-bg);
+  color: var(--text-primary);
+  box-shadow: var(--floating-note-shadow);
+  line-height: 1;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.image-toolbar.is-cropping {
+  border-color: var(--accent-border);
+}
+
+.image-tool-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.image-tool-button-icon-only {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+}
+
+.image-tool-icon {
+  display: block;
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.image-tool-icon path,
+.image-tool-icon line {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.image-tool-button:hover .image-tool-icon-frame line:nth-child(-n + 2) {
+  opacity: 0.72;
+  transform: scaleX(0.78);
+  transform-origin: center;
+}
+
+.image-tool-button:hover .image-tool-icon-frame line:nth-child(n + 3) {
+  opacity: 0.72;
+  transform: scaleY(0.78);
+  transform-origin: center;
+}
+
+.image-tool-button:hover .image-tool-icon-flip-horizontal path:nth-child(-n + 2) {
+  transform: translateX(2px);
+}
+
+.image-tool-button:hover .image-tool-icon-flip-horizontal path:nth-child(n + 3) {
+  transform: translateX(-2px);
+}
+
+.image-tool-button:hover .image-tool-icon-flip-vertical path:nth-child(-n + 2) {
+  transform: translateY(2px);
+}
+
+.image-tool-button:hover .image-tool-icon-flip-vertical path:nth-child(n + 3) {
+  transform: translateY(-2px);
+}
+
+.image-tool-button:hover,
+.image-tool-button.active {
+  border-color: var(--accent-border);
+  background: var(--accent-surface);
+  color: var(--accent-foreground);
+}
+
+.image-tool-select {
+  height: 26px;
+  max-width: 86px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  outline: none;
+  cursor: pointer;
+}
+
+.image-tool-select:hover,
+.image-tool-select:focus {
+  border-color: var(--accent-border);
+  background: var(--accent-surface);
+  color: var(--accent-foreground);
+}
+
+.image-crop-action {
+  color: var(--accent-foreground);
+}
+
+.image-toolbar-separator {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--border-color);
+}
+
+.image-crop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.34);
+  cursor: crosshair;
+}
+
+.image-crop-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.28);
+  cursor: move;
+}
+
+.image-crop-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.image-crop-handle-nw {
+  left: -5px;
+  top: -5px;
+  cursor: nwse-resize;
+}
+
+.image-crop-handle-n {
+  left: 50%;
+  top: -5px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.image-crop-handle-ne {
+  right: -5px;
+  top: -5px;
+  cursor: nesw-resize;
+}
+
+.image-crop-handle-e {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.image-crop-handle-se {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+
+.image-crop-handle-s {
+  left: 50%;
+  bottom: -5px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.image-crop-handle-sw {
+  left: -5px;
+  bottom: -5px;
+  cursor: nesw-resize;
+}
+
+.image-crop-handle-w {
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.image-resize-handle {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  right: -7px;
+  bottom: -7px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-surface);
+  color: var(--accent-foreground);
+  box-shadow: var(--shadow-soft);
+  cursor: nwse-resize;
+  z-index: 3;
+}
+
+.resize-corner-icon {
+  display: block;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+

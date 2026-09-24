@@ -1,0 +1,100 @@
+/* ============================================================
+   Word-count badge
+   ============================================================ */
+
+/* Bottom-left, level with the file tree's + and filter bar and the same height (32px),
+   so the two read as one row along the bottom of the window. The word count leads; in
+   Print Layout the page count follows it. */
+.pane-status {
+  position: absolute;
+  bottom: 18px;
+  left: 10px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.word-count {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  font-size: 13px;
+  border-radius: 16px;
+  background: var(--app-bg);
+  color: var(--text-primary);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+/* Side by side, the secondary pane's badge would sit against the divider — which is
+   the middle of the window, which is where the tab dock floats. Send it to the
+   outer edge so the two never overlap. */
+.split-active:not(.split-rows) .secondary-pane .pane-status {
+  left: auto;
+  right: 10px;
+  flex-direction: row-reverse;
+}
+
+/* Under the Swift shell the Print Layout button holds the bottom-left corner of the
+   editor (PrintLayoutControls.swift): 32px from 10px in, then the row's gap. */
+.native-print-controls .editor-container:not(.split-rows) .primary-pane .pane-status,
+.native-print-controls .split-rows .secondary-pane .pane-status {
+  left: 50px;
+}
+
+/* …and while the active document is in Print Layout, its zoom control holds the
+   bottom-right corner — which, side by side, is where the right pane's status sits. */
+.native-print-controls.print-layout-active .split-active:not(.split-rows) .secondary-pane .pane-status {
+  right: 170px;
+}
+
+.pane-header-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  margin-top: 60px;
+  margin-bottom: 4px;
+}
+
+.pane-header-centered button {
+  position: static;
+  font-size: 12px;
+  padding: 0 6px;
+  line-height: 1.2;
+}
+
+/* Stacked, the lower pane's header has no titlebar to clear. */
+.split-rows .secondary-pane .pane-header-centered {
+  margin-top: 14px;
+}
+
+/* The seam between the panes is the draggable divider, not a pane border. */
+.secondary-pane {
+  position: relative;
+}
+
+.split-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #999;
+  padding: 5px;
+  background: #f9f9f9;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+}
+
+.editor {
+  min-height: 100%;
+}
+
+/* Under the Swift shell the badge is drawn natively, as Liquid Glass, over this one —
+   which stays, invisible, to be measured (useEditorWordCount). */
+.native-word-count .word-count {
+  opacity: 0;
+}

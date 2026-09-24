@@ -14,6 +14,7 @@ import { edgeGeometry, nodesBounds } from '../lib/canvasGeometry'
 import { groupFitRect, MIN_NODE_SIZE } from '../lib/canvasModel'
 import { computeSnap, paintGuides, snapCandidates, SNAP_THRESHOLD_PX } from './useCanvasSnapping'
 import { GRID_SIZE } from './useCanvasViewport'
+import { getPreference, setPreference } from '../lib/preferences'
 
 const DRAG_MIN_DELTA = 3
 
@@ -41,7 +42,7 @@ const SNAP_PREFS_STORAGE_KEY = 'inkblot.canvas.snap'
 /** Both snapping behaviours are on for a new user; each is remembered once changed. */
 export const loadSnapPrefs = () => {
   try {
-    const parsed = JSON.parse(localStorage.getItem(SNAP_PREFS_STORAGE_KEY) || '{}')
+    const parsed = JSON.parse(getPreference(SNAP_PREFS_STORAGE_KEY) || '{}')
     return {
       guides: parsed.guides !== false,
       grid: parsed.grid !== false,
@@ -53,7 +54,7 @@ export const loadSnapPrefs = () => {
 
 export const saveSnapPrefs = (prefs) => {
   try {
-    localStorage.setItem(SNAP_PREFS_STORAGE_KEY, JSON.stringify(prefs))
+    setPreference(SNAP_PREFS_STORAGE_KEY, JSON.stringify(prefs))
   } catch {
     // A preference that fails to persist is not worth breaking a drag over.
   }

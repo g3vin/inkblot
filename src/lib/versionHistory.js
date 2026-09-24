@@ -12,6 +12,7 @@
  *
  * All pure (DOMParser aside) — nothing here touches the filesystem or React.
  */
+import { countMapWords } from './map/mapModel'
 
 /* ============================================================
    Editing sessions
@@ -86,6 +87,7 @@ export const versionWords = (entry) => {
   if (!entry) return 0
   if (Number.isFinite(entry.words)) return entry.words
   if (entry.canvas) return countCanvasWords(entry.canvas)
+  if (entry.map) return countMapWords(entry.map)
   return countWords(entry.contentHtml || '')
 }
 

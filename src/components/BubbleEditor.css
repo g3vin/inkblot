@@ -1,0 +1,692 @@
+/**
+ * BubbleEditor.css — the page's bubble editor, and the chip that marks an open session.
+ *
+ * The bubbles are glass as far as CSS can take it: a blurred, saturated sample of what
+ * is behind, a bright rim on top and a soft one below. Under the Swift shell the real
+ * Liquid Glass is drawn natively instead and none of the editor styles here apply.
+ */
+
+.bubble-editor {
+  --bubble-fill-top: rgba(255, 255, 255, 0.2);
+  --bubble-fill-bottom: rgba(255, 255, 255, 0.06);
+  --bubble-rim: rgba(255, 255, 255, 0.3);
+  --bubble-highlight: rgba(255, 255, 255, 0.5);
+  --bubble-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  --bubble-text: var(--text-primary);
+  --bubble-scrim: rgba(6, 8, 12, 0.42);
+  --bubble-edge-glow: color-mix(in srgb, var(--accent-color) 36%, transparent);
+  --bubble-danger: var(--status-error);
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-primary);
+  background: var(--bubble-scrim);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  outline: none;
+  animation: bubble-editor-in 180ms ease-out;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+:root[data-theme='light'] .bubble-editor {
+  --bubble-fill-top: rgba(255, 255, 255, 0.78);
+  --bubble-fill-bottom: rgba(255, 255, 255, 0.42);
+  --bubble-rim: rgba(255, 255, 255, 0.9);
+  --bubble-highlight: rgba(255, 255, 255, 1);
+  --bubble-shadow: 0 10px 26px rgba(17, 24, 39, 0.14), 0 0 0 0.5px rgba(17, 24, 39, 0.08);
+  --bubble-scrim: rgba(236, 240, 245, 0.5);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .bubble-editor {
+    --bubble-fill-top: rgba(255, 255, 255, 0.78);
+    --bubble-fill-bottom: rgba(255, 255, 255, 0.42);
+    --bubble-rim: rgba(255, 255, 255, 0.9);
+    --bubble-highlight: rgba(255, 255, 255, 1);
+    --bubble-shadow: 0 10px 26px rgba(17, 24, 39, 0.14), 0 0 0 0.5px rgba(17, 24, 39, 0.08);
+    --bubble-scrim: rgba(236, 240, 245, 0.5);
+  }
+}
+
+@keyframes bubble-editor-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---------------- the bar ---------------- */
+
+/* The bar and, beside it in its own circle, Done. */
+.bubble-editor-top {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bubble-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--bubble-fill-top), var(--bubble-fill-bottom));
+  border: 1px solid var(--bubble-rim);
+  box-shadow: inset 0 1px 0 var(--bubble-highlight), var(--bubble-shadow);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  white-space: nowrap;
+}
+
+.bubble-editor-done {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(180deg, #3ddc6f, #1fb450);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), var(--bubble-shadow);
+  cursor: pointer;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.bubble-editor-done:hover {
+  transform: scale(1.06);
+  filter: brightness(1.06);
+}
+
+.bubble-editor-done:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.bubble-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.bubble-segmented button,
+.bubble-editor-button {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bubble-segmented button.is-active {
+  color: var(--text-primary);
+  background: var(--surface-active);
+  box-shadow: inset 0 1px 0 var(--bubble-highlight);
+}
+
+.bubble-editor-button:hover {
+  background: var(--surface-hover);
+}
+
+.bubble-editor-button:focus-visible,
+.bubble-segmented button:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 1px;
+}
+
+/* ---------------- the sentence ---------------- */
+
+.bubble-stage {
+  position: relative;
+  z-index: 1;
+  width: min(880px, calc(100% - 240px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.bubble-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  width: 100%;
+}
+
+.bubble-row-empty {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.bubble-preview {
+  margin: 0;
+  max-width: 100%;
+  text-align: center;
+  font-family: var(--editor-font-family, Georgia, 'Times New Roman', serif);
+  font-size: 19px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.bubble-preview.is-empty {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.bubble-original {
+  margin: -12px 0 0;
+  max-width: 100%;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------------- a bubble ---------------- */
+
+.bubble {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  box-sizing: border-box;
+  font-family: var(--editor-font-family, Georgia, 'Times New Roman', serif);
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--bubble-text);
+  background: linear-gradient(180deg, var(--bubble-fill-top), var(--bubble-fill-bottom));
+  border: 1px solid var(--bubble-rim);
+  box-shadow:
+    inset 0 1px 0 var(--bubble-highlight),
+    inset 0 -8px 16px -12px rgba(255, 255, 255, 0.35),
+    var(--bubble-shadow);
+  backdrop-filter: blur(16px) saturate(190%);
+  -webkit-backdrop-filter: blur(16px) saturate(190%);
+  cursor: grab;
+  touch-action: none;
+  transition:
+    box-shadow 160ms ease,
+    opacity 160ms ease,
+    border-color 160ms ease,
+    background 200ms ease,
+    scale 260ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.bubble:hover {
+  border-color: color-mix(in srgb, var(--bubble-rim) 60%, var(--accent-color));
+}
+
+.bubble.is-selected {
+  border-color: var(--accent-color);
+  box-shadow:
+    inset 0 1px 0 var(--bubble-highlight),
+    0 0 0 4px var(--accent-ring),
+    var(--bubble-shadow);
+}
+
+.bubble.is-lifted {
+  opacity: 0.28;
+}
+
+/* A join tints both halves of it: the bubble being dragged and the one it touches. */
+.bubble.is-join-target,
+.bubble.is-floating.is-joining {
+  background:
+    linear-gradient(var(--accent-surface-strong), var(--accent-surface-strong)),
+    linear-gradient(180deg, var(--bubble-fill-top), var(--bubble-fill-bottom));
+  border-color: var(--accent-color);
+}
+
+.bubble.is-join-target {
+  box-shadow:
+    inset 0 1px 0 var(--bubble-highlight),
+    0 0 0 6px var(--accent-ring),
+    var(--bubble-shadow);
+  /* `scale`, not `transform`: framer-motion owns the transform for its layout animation,
+     and the transition above only animates what it can see change. */
+  scale: 1.06;
+}
+
+.bubble.is-join-target.joins-before { box-shadow: inset 6px 0 0 -2px var(--accent-color), 0 0 0 6px var(--accent-ring), var(--bubble-shadow); }
+.bubble.is-join-target.joins-after { box-shadow: inset -6px 0 0 -2px var(--accent-color), 0 0 0 6px var(--accent-ring), var(--bubble-shadow); }
+
+.bubble.is-dropped {
+  animation: bubble-pop 260ms cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+
+@keyframes bubble-pop {
+  from { transform: scale(0.82); }
+  to { transform: scale(1); }
+}
+
+.bubble.is-aside {
+  position: absolute;
+  translate: -50% -50%;
+  font-size: 16px;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+/* Punctuation is a round bubble, sized to the word bubbles' height. */
+.bubble.is-punctuation {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: 600;
+}
+
+.bubble.is-aside.is-punctuation {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+.bubble.is-floating {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  cursor: grabbing;
+  transform: scale(1.06) rotate(-1.5deg);
+  box-shadow:
+    inset 0 1px 0 var(--bubble-highlight),
+    0 22px 40px rgba(0, 0, 0, 0.32);
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.bubble.is-floating.is-trashing {
+  transform: scale(0.8);
+  opacity: 0.6;
+  border-color: var(--bubble-danger);
+}
+
+.bubble.is-editing {
+  cursor: text;
+  padding: 0 10px;
+}
+
+.bubble.is-draft {
+  border-style: dashed;
+}
+
+.bubble-input {
+  width: auto;
+  min-width: 2ch;
+  border: 0;
+  outline: none;
+  padding: 0 4px;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  background: transparent;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.bubble-actions {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  translate: -50% 0;
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--popover-bg);
+  border: 1px solid var(--popover-border);
+  box-shadow: var(--shadow-popover);
+  font-family: system-ui, -apple-system, sans-serif;
+  white-space: nowrap;
+}
+
+.bubble-actions button {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bubble-actions button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.bubble-actions button.is-destructive:hover {
+  color: var(--bubble-danger);
+}
+
+/* ---------------- drop targets ---------------- */
+
+.bubble-aside-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.bubble-aside-layer .bubble {
+  pointer-events: auto;
+}
+
+/* ---------------- forms ---------------- */
+
+.bubble-forms {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  z-index: 3;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--bubble-fill-top), var(--bubble-fill-bottom));
+  border: 1px solid var(--bubble-rim);
+  box-shadow: inset 0 1px 0 var(--bubble-highlight), var(--bubble-shadow);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  white-space: nowrap;
+  animation: bubble-editor-in 160ms ease-out;
+}
+
+.bubble-forms:not(:has(.bubble-forms-dots)) {
+  padding-left: 6px;
+}
+
+.bubble-forms-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bubble-forms-dot {
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text-tertiary, var(--text-secondary));
+  opacity: 0.55;
+  cursor: pointer;
+  transition: width 180ms ease, opacity 180ms ease, background 180ms ease;
+}
+
+.bubble-forms-dot.is-unsaved {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--text-secondary);
+}
+
+.bubble-forms-dot.is-current {
+  width: 20px;
+  opacity: 1;
+  background: var(--accent-color);
+  box-shadow: none;
+}
+
+.bubble-forms-dot:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.bubble-forms-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.bubble-forms-icon {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bubble-forms-icon:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.bubble-forms-icon.is-destructive:hover {
+  color: var(--bubble-danger);
+}
+
+.bubble-forms-icon:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 1px;
+}
+
+/* The edges light up while a drop there would set the bubble aside. */
+.bubble-editor-edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: inset 0 0 0 2px var(--bubble-edge-glow), inset 0 0 64px var(--bubble-edge-glow);
+  transition: opacity 160ms ease;
+}
+
+.bubble-editor.is-dragging .bubble-editor-edges { opacity: 0.35; }
+.bubble-editor.is-aside-armed .bubble-editor-edges { opacity: 1; }
+
+.bubble-caret {
+  position: absolute;
+  z-index: 4;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--accent-color);
+  box-shadow: 0 0 10px var(--accent-glow);
+  pointer-events: none;
+}
+
+.bubble-trash {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  translate: -50% 0;
+  color: var(--text-secondary);
+  background: linear-gradient(180deg, var(--bubble-fill-top), var(--bubble-fill-bottom));
+  border: 1px solid var(--bubble-rim);
+  box-shadow: inset 0 1px 0 var(--bubble-highlight), var(--bubble-shadow);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1), color 120ms ease;
+}
+
+.bubble-trash.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.bubble-trash.is-armed {
+  color: #fff;
+  background: var(--bubble-danger);
+  border-color: transparent;
+  transform: scale(1.14);
+}
+
+@media (max-width: 640px) {
+  .bubble-stage { width: calc(100% - 32px); }
+}
+
+/* ---------------- in the document ---------------- */
+
+.ProseMirror .bubble-session {
+  text-decoration: underline dotted color-mix(in srgb, var(--accent-color) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+.bubble-session-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+  /* Centred on the text of its line — the font's height, ascender to descender, which
+     the chip plugin measures (`--bubble-text-extent`, in ems) — not on the line box,
+     whose gap above the text would pull it up. Its top sits at the text's top, then
+     comes down half of what is left. `em` here is the line's font size, inherited. */
+  font-size: inherit;
+  margin: calc((var(--bubble-text-extent, 1.15) * 1em - 16px) / 2) 2px 0 4px;
+  padding: 0 5px;
+  vertical-align: text-top;
+  border-radius: 999px;
+  /* Glass tinted with the accent. Drawn here rather than by the shell: it rides the
+     page's own scroll, which a native overlay placed from reported positions trails. */
+  border: 0.5px solid color-mix(in srgb, var(--accent-color) 30%, rgba(255, 255, 255, 0.55));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 60%),
+    color-mix(in srgb, var(--accent-color) 30%, transparent);
+  -webkit-backdrop-filter: blur(6px) saturate(1.6);
+  backdrop-filter: blur(6px) saturate(1.6);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.6),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+/* The 2px it keeps after itself, hung in the margin (lib/marginHang.js). */
+.margin-hang:has(> .bubble-session-chip) {
+  --hang-gap: 2px;
+}
+
+.bubble-session-chip:hover {
+  transform: scale(1.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 60%),
+    color-mix(in srgb, var(--accent-color) 42%, transparent);
+}
+
+.bubble-session-chip-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-foreground);
+}
+
+.bubble-session-chip-dot:nth-child(2) { width: 5px; height: 5px; }
+
+/* With forms: a dot per form, the one showing drawn long, the unsaved one as a ring. */
+.bubble-session-chip.has-forms .bubble-session-chip-dot {
+  width: 4px;
+  height: 4px;
+  opacity: 0.55;
+  transition: width 180ms ease, opacity 180ms ease;
+}
+
+.bubble-session-chip.has-forms .bubble-session-chip-dot.is-unsaved {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--accent-foreground);
+}
+
+.bubble-session-chip.has-forms .bubble-session-chip-dot.is-current {
+  width: 9px;
+  border-radius: 999px;
+  opacity: 1;
+}
+
+.bubble-session-chip.has-forms .bubble-session-chip-dot.is-current.is-unsaved {
+  background: var(--accent-foreground);
+  box-shadow: none;
+}
+
+.bubble-session-chip-count {
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A sentence being swiped to another form lights up as the swipe goes on. */
+.bubble-session.is-form-swiping {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent-color) calc(var(--bubble-swipe, 0) * 26%), transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) calc(var(--bubble-swipe, 0) * 26%), transparent);
+}
+
+/* And once it has turned, the new form flashes and fades. */
+.bubble-session.is-form-changed {
+  border-radius: 4px;
+  animation: bubble-form-changed 700ms ease-out;
+}
+
+@keyframes bubble-form-changed {
+  from {
+    background: color-mix(in srgb, var(--accent-color) 30%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, transparent);
+  }
+  to {
+    background: transparent;
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble-session.is-form-changed { animation: none; }
+}
+
+/* An icon alone, in a circle as tall as the mode buttons beside it. */
+.bubble-editor-button.is-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}

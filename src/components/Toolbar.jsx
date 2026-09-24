@@ -2,14 +2,28 @@
  * Toolbar.jsx — formatting toolbar rendered in the titlebar.
  *
  * Mirrors the active editor's formatting at the current selection (marks,
- * colors, font, size, alignment) and applies changes back through TipTap
- * commands. Also hosts the table/conversation-tile inserters and the
- * dictation and read-aloud controls.
+ * colors, font, size, alignment) and applies changes back through the bridge.
+ * Also hosts the table/conversation-tile inserters and the dictation and
+ * read-aloud controls.
  *
- * Controls are batched into segmented groups that share one background
- * (marks, colors, insert) to keep the titlebar compact. Alignment collapses
- * to the active option and reveals the rest in a hover menu, which is
- * portaled out because the titlebar clips overflow.
+ * **This component used to hold the editor, and no longer does.** It read about
+ * ten facts out of a live TipTap instance on every `selectionUpdate` and called
+ * `editor.chain()` on every click. Both directions now go through the bridge
+ * protocol: it renders a pushed `ToolbarState` and sends `NativeCommand`s. That is
+ * sharp edge #1 of Phase 4, and the point of it is that this file is now written
+ * the way an `NSToolbar` will have to be written — it cannot ask the document a
+ * question, because in Phase 5 it will not be able to.
+ *
+ * The reading did not disappear, it moved: `bridge/readState.ts` does it, and
+ * `bridge/useSurfacePublisher.ts` decides when. The frame coalescing that used to
+ * live here as a `requestAnimationFrame` ref is `bridge/coalesce.ts`.
+ *
+ * What is still local is what is genuinely about this control and not about the
+ * document: which fonts are pinned or recent, whether the alignment menu is open,
+ * and the highlight picker's in-progress value. Controls are batched into segmented
+ * groups that share one background (marks, colors, insert) to keep the titlebar
+ * compact. Alignment collapses to the active option and reveals the rest in a hover
+ * menu, which is portaled out because the titlebar clips overflow.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -18,9 +32,10 @@ import SFIcon from './SFIcon'
 import DictationControl from './DictationControl'
 import ReadAloudControl from './ReadAloudControl'
 import { isEditorReady } from '../lib/editorUtils'
+import { shellBridge, useBridgeState } from '../bridge'
+import { Alignment, MarkKind } from '../types'
 import {
   buildFontSections,
-  fromCssFontFamily,
   loadPinnedFonts,
   loadRecentFonts,
   loadSystemFonts,
@@ -29,12 +44,20 @@ import {
   togglePinnedFont,
 } from '../lib/systemFonts'
 
+/**
+ * What the toolbar shows before the first state arrives.
+ *
+ * `target: undefined` is the protocol's way of saying "no live editor", so this is
+ * also what it shows when there is nothing to format — which is the same thing, and
+ * used to be two different code paths.
+ */
 const DEFAULT_TOOLBAR_STATE = {
+  target: undefined,
   color: '#000000',
   highlight: '#ffff00',
   font: 'Georgia',
   fontSize: '18px',
-  alignment: 'left',
+  alignment: Alignment.Left,
   activeMarks: {
     bold: false,
     italic: false,
@@ -42,50 +65,34 @@ const DEFAULT_TOOLBAR_STATE = {
     strike: false,
     table: false,
   },
+  lastHighlightColor: '#ffff00',
 }
 
 const ALIGNMENTS = [
-  { value: 'left', icon: 'text.alignleft', label: 'Align left' },
-  { value: 'center', icon: 'text.aligncenter', label: 'Align center' },
-  { value: 'right', icon: 'text.alignright', label: 'Align right' },
+  { value: Alignment.Left, icon: 'text.alignleft', label: 'Align left' },
+  { value: Alignment.Center, icon: 'text.aligncenter', label: 'Align center' },
+  { value: Alignment.Right, icon: 'text.alignright', label: 'Align right' },
 ]
 
 // Grace period so the pointer can travel from the trigger to the menu without
 // the menu closing underneath it.
 const ALIGN_MENU_CLOSE_DELAY_MS = 160
 
-const areActiveMarksEqual = (left, right) => (
-  left.bold === right.bold &&
-  left.italic === right.italic &&
-  left.underline === right.underline &&
-  left.strike === right.strike &&
-  left.table === right.table
-)
-
-const areToolbarStatesEqual = (left, right) => (
-  left.color === right.color &&
-  left.highlight === right.highlight &&
-  left.font === right.font &&
-  left.fontSize === right.fontSize &&
-  left.alignment === right.alignment &&
-  areActiveMarksEqual(left.activeMarks, right.activeMarks)
-)
-
 export default function Toolbar({ editor }) {
-  const [userSelectingHighlight, setUserSelectingHighlight] = useState(false)
-  const [toolbarState, setToolbarState] = useState(DEFAULT_TOOLBAR_STATE)
+  const toolbarState = useBridgeState('toolbarState', DEFAULT_TOOLBAR_STATE)
+
+  // The highlight picker's value while the user is dragging inside it. A pushed
+  // state arriving mid-drag would yank the swatch back to the document's colour and
+  // fight the picker, which is the same reason the old `userSelectingHighlight`
+  // guard existed — it is only expressed as an override now instead of by
+  // suppressing part of an incoming update.
+  const [highlightDraft, setHighlightDraft] = useState(null)
   const [alignMenuAnchor, setAlignMenuAnchor] = useState(null)
   const [systemFonts, setSystemFonts] = useState([])
   const [pinnedFonts, setPinnedFonts] = useState(loadPinnedFonts)
   const [recentFonts, setRecentFonts] = useState(loadRecentFonts)
-  const frameRef = useRef(null)
-  const userSelectingHighlightRef = useRef(false)
   const alignTriggerRef = useRef(null)
   const alignCloseTimerRef = useRef(null)
-
-  useEffect(() => {
-    userSelectingHighlightRef.current = userSelectingHighlight
-  }, [userSelectingHighlight])
 
   useEffect(() => {
     let cancelled = false
@@ -97,89 +104,40 @@ export default function Toolbar({ editor }) {
     return () => { cancelled = true }
   }, [])
 
-  // Snapshot the formatting at the current selection into toolbar state.
-  // For collapsed selections, mark state comes from the adjacent text node.
-  const readToolbarState = useCallback(() => {
-    if (!isEditorReady(editor)) return null
+  /* ---------------- sending ---------------- */
 
-    const attrs = editor.getAttributes('textStyle') || {}
-    const { state } = editor
-    const { from, to, empty, $from } = state.selection
-    const selectedNode = state.selection.node
-    const selectedConversationAlign = selectedNode?.type?.name === 'conversationTile'
-      ? selectedNode.attrs.align || 'left'
-      : null
-    const selectedImageAlign = selectedNode?.type?.name === 'image'
-      ? selectedNode.attrs.align || 'left'
-      : null
-    const getMarkActive = (markName) => {
-      const markType = state.schema.marks[markName]
-      if (!markType) return false
-      if (!empty) {
-        return state.doc.rangeHasMark(from, to, markType)
-      }
+  // Every command names the editor the state came from rather than "the active one",
+  // so a state rendered a frame ago cannot apply itself to an editor elected since.
+  const target = toolbarState.target
+  const send = useCallback((type, payload) => {
+    if (!target) return
+    shellBridge.send(type, { target, ...payload })
+  }, [target])
 
-      const parent = $from.parent
-      const offset = $from.parentOffset
-      const afterNode = parent.childAfter(offset).node
-      const beforeNode = parent.childBefore(offset).node
-      const pickNode = (afterNode?.isText && afterNode) || (beforeNode?.isText && beforeNode)
-      const marks = pickNode?.marks || []
-      return marks.some(mark => mark.type === markType)
-    }
+  const applyMark = (mark) => send('applyMark', { mark })
+  const applyColor = (color) => send('setColor', { color })
 
-    return {
-      color: attrs.color || '#000000',
-      highlight: editor.getAttributes('highlight').color || toolbarState.highlight,
-      font: fromCssFontFamily(attrs.fontFamily) || 'Georgia',
-      fontSize: attrs.fontSize || '18px',
-      alignment: selectedConversationAlign || selectedImageAlign || editor.getAttributes('paragraph').textAlign || 'left',
-      activeMarks: {
-        bold: getMarkActive('bold'),
-        italic: getMarkActive('italic'),
-        underline: getMarkActive('underline'),
-        strike: getMarkActive('strike'),
-        table: editor.isActive('table'),
-      },
-    }
-  }, [editor, toolbarState.highlight])
+  const applyHighlight = (color) => {
+    setHighlightDraft(color)
+    send('setHighlight', { color, remember: true })
+  }
 
-  // Refresh toolbar state at most once per animation frame. While the user is
-  // interacting with the highlight color input, its value is left alone so the
-  // picker doesn't fight the selection.
-  const updateToolbar = useCallback(() => {
-    if (frameRef.current) return
+  const applyFont = (font) => {
+    setRecentFonts(rememberRecentFont(font))
+    send('setFontFamily', { family: font })
+  }
 
-    frameRef.current = requestAnimationFrame(() => {
-      frameRef.current = null
-      const next = readToolbarState()
-      if (!next) return
+  const applyFontSize = (size) => send('setFontSize', { size })
+  const applyAlignment = (alignment) => send('setAlignment', { alignment })
 
-      setToolbarState((current) => {
-        const normalizedNext = userSelectingHighlightRef.current
-          ? { ...next, highlight: current.highlight }
-          : next
-        return areToolbarStatesEqual(current, normalizedNext) ? current : normalizedNext
-      })
-    })
-  }, [readToolbarState])
+  const insertTable = () => send('insertTable', { rows: 3, cols: 3, withHeaderRow: true })
+  const insertConversationTile = () => send('insertConversationTile', {})
 
-  useEffect(() => {
-    if (!isEditorReady(editor)) return undefined
+  const toggleCurrentFontPin = () => {
+    setPinnedFonts(togglePinnedFont(toolbarState.font))
+  }
 
-    editor.on('selectionUpdate', updateToolbar)
-    updateToolbar()
-
-    return () => {
-      if (frameRef.current) {
-        cancelAnimationFrame(frameRef.current)
-        frameRef.current = null
-      }
-      if (!editor.isDestroyed) {
-        editor.off('selectionUpdate', updateToolbar)
-      }
-    }
-  }, [editor, updateToolbar])
+  /* ---------------- the alignment menu ---------------- */
 
   const cancelAlignMenuClose = useCallback(() => {
     if (!alignCloseTimerRef.current) return
@@ -222,97 +180,19 @@ export default function Toolbar({ editor }) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [alignMenuAnchor, closeAlignMenu])
 
+  // The voice controls keep the editor: the dictation draft state machine is a
+  // read-modify-write at speaking rate and stays on this side of the seam
+  // (sharp edge #2), and Read Aloud's highlight scheduler maps audio time to
+  // ProseMirror positions, which cannot cross it at all.
   if (!isEditorReady(editor)) return null
 
-  const runEditorCommand = (command) => {
-    if (!isEditorReady(editor)) return
-    command(editor)
-    updateToolbar()
-  }
-
-  const applyColor = (c) => {
-    setToolbarState(current => ({ ...current, color: c }))
-    runEditorCommand(currentEditor => currentEditor.chain().focus().setColor(c).run())
-  }
-
-  const applyHighlight = (c) => {
-    setToolbarState(current => ({ ...current, highlight: c }))
-    if (editor.storage) Reflect.set(editor.storage, 'lastHighlightColor', c)
-    runEditorCommand(currentEditor => currentEditor.chain().focus().setHighlight({ color: c }).run())
-  }
-
-  const applyFont = (f) => {
-    setToolbarState(current => ({ ...current, font: f }))
-    setRecentFonts(rememberRecentFont(f))
-    runEditorCommand(currentEditor => currentEditor.chain().focus().setFontFamily(toCssFontFamily(f)).run())
-  }
-
-  const toggleCurrentFontPin = () => {
-    setPinnedFonts(togglePinnedFont(toolbarState.font))
-  }
-
-  const applyFontSize = (size) => {
-    setToolbarState(current => ({ ...current, fontSize: size }))
-    runEditorCommand(currentEditor => currentEditor.chain().focus().setMark('textStyle', { fontSize: size }).run())
-  }
-
-  // Alignment applies to the selected conversation tile or image node when one
-  // is selected; otherwise it sets text alignment on the current block.
-  const applyAlignment = (align) => {
-    setToolbarState(current => ({ ...current, alignment: align }))
-    runEditorCommand(currentEditor => {
-      if (currentEditor.state.selection.node?.type?.name === 'conversationTile') {
-        currentEditor.chain().focus().updateAttributes('conversationTile', { align }).run()
-        return
-      }
-
-      if (currentEditor.state.selection.node?.type?.name === 'image') {
-        const layout = currentEditor.state.selection.node.attrs.layout || 'inline'
-        currentEditor
-          .chain()
-          .focus()
-          .updateAttributes('image', {
-            align,
-            layout: layout.startsWith('wrap-') ? 'block' : layout,
-          })
-          .run()
-        return
-      }
-
-      try {
-        currentEditor.chain().focus().setTextAlign(align).run()
-      } catch {
-        currentEditor.chain().focus().updateAttributes('paragraph', { textAlign: align }).run()
-      }
-    })
-  }
-
-  const selectAlignment = (align) => {
-    applyAlignment(align)
+  const selectAlignment = (alignment) => {
+    applyAlignment(alignment)
     closeAlignMenu()
   }
 
-  const insertTable = () => {
-    runEditorCommand(currentEditor => {
-      currentEditor
-        .chain()
-        .focus()
-        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-        .run()
-    })
-  }
-
-  const insertConversationTile = () => {
-    runEditorCommand(currentEditor => {
-      currentEditor
-        .chain()
-        .focus()
-        .insertConversationTile()
-        .run()
-    })
-  }
-
   const activeAlignment = ALIGNMENTS.find(option => option.value === toolbarState.alignment) || ALIGNMENTS[0]
+  const highlightValue = highlightDraft ?? toolbarState.highlight
 
   const { sections: fontSections, missingCurrentFont } = buildFontSections({
     systemFonts,
@@ -410,7 +290,7 @@ export default function Toolbar({ editor }) {
           <button
             type="button"
             className={toolbarState.activeMarks.bold ? 'active' : ''}
-            onClick={() => runEditorCommand(currentEditor => currentEditor.chain().focus().toggleBold().run())}
+            onClick={() => applyMark(MarkKind.Bold)}
             aria-label="Bold"
             aria-pressed={toolbarState.activeMarks.bold}
             title="Bold"
@@ -420,7 +300,7 @@ export default function Toolbar({ editor }) {
           <button
             type="button"
             className={toolbarState.activeMarks.italic ? 'active' : ''}
-            onClick={() => runEditorCommand(currentEditor => currentEditor.chain().focus().toggleItalic().run())}
+            onClick={() => applyMark(MarkKind.Italic)}
             aria-label="Italic"
             aria-pressed={toolbarState.activeMarks.italic}
             title="Italic"
@@ -430,7 +310,7 @@ export default function Toolbar({ editor }) {
           <button
             type="button"
             className={toolbarState.activeMarks.underline ? 'active' : ''}
-            onClick={() => runEditorCommand(currentEditor => currentEditor.chain().focus().toggleUnderline().run())}
+            onClick={() => applyMark(MarkKind.Underline)}
             aria-label="Underline"
             aria-pressed={toolbarState.activeMarks.underline}
             title="Underline"
@@ -440,7 +320,7 @@ export default function Toolbar({ editor }) {
           <button
             type="button"
             className={toolbarState.activeMarks.strike ? 'active' : ''}
-            onClick={() => runEditorCommand(currentEditor => currentEditor.chain().focus().toggleStrike().run())}
+            onClick={() => applyMark(MarkKind.Strike)}
             aria-label="Strikethrough"
             aria-pressed={toolbarState.activeMarks.strike}
             title="Strikethrough"
@@ -465,12 +345,11 @@ export default function Toolbar({ editor }) {
             <span className="toolbar-color-glyph" aria-hidden="true">
               <SFIcon name="paintpalette" />
             </span>
-            <span className="toolbar-color-bar" style={{ background: toolbarState.highlight }} aria-hidden="true" />
+            <span className="toolbar-color-bar" style={{ background: highlightValue }} aria-hidden="true" />
             <input
               type="color"
-              value={toolbarState.highlight}
-              onFocus={() => setUserSelectingHighlight(true)}
-              onBlur={() => setUserSelectingHighlight(false)}
+              value={highlightValue}
+              onBlur={() => setHighlightDraft(null)}
               onChange={(e) => applyHighlight(e.target.value)}
               aria-label="Highlight color"
             />

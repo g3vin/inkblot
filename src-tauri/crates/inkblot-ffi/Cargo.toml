@@ -1,0 +1,28 @@
+[package]
+name = "inkblot-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "inkblot-core, exposed to the Swift shell through UniFFI"
+publish = false
+
+[lib]
+# staticlib is what the XCFramework wraps and the app links. cdylib is only there so
+# `uniffi-bindgen --library` has something to read the interface metadata out of.
+crate-type = ["staticlib", "cdylib", "lib"]
+name = "inkblot_ffi"
+
+[[bin]]
+# The bindings generator, pinned to the same uniffi as the scaffolding. A globally
+# installed uniffi-bindgen of a different version generates Swift that does not match
+# the checksums compiled into the library, and the app fails at launch, not at build.
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+inkblot-core = { path = "../inkblot-core" }
+serde_json = { workspace = true }
+uniffi = "0.29"

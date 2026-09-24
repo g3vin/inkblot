@@ -1,0 +1,145 @@
+/* ============================================================
+   Draft tab pane (a tab that has no document yet)
+   ============================================================ */
+
+.draft-pane {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.draft-pane-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.draft-pane-kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.draft-pane-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.draft-pane-kind:hover {
+  background: var(--control-hover-bg);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.draft-pane-kind.is-active {
+  border-color: var(--accent-border);
+  background: var(--accent-surface);
+  color: var(--text-primary);
+}
+
+.draft-pane-kind-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.draft-pane-kind-hint {
+  font-size: 11.5px;
+  color: var(--text-subtle);
+}
+
+.draft-pane-name {
+  display: flex;
+  gap: 8px;
+}
+
+.draft-pane-name input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.draft-pane-name input:focus {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.draft-pane-create {
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-surface);
+  color: var(--accent-foreground);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.draft-pane-create:hover:not(:disabled) {
+  background: var(--accent-surface-strong);
+}
+
+.draft-pane-create:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.draft-pane-status {
+  font-size: 12px;
+  color: var(--status-error);
+}
+
+.draft-pane-tip {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-subtle);
+  text-align: center;
+}
+
+.editor-container {
+  flex: 1;
+  display: flex;
+  justify-content: stretch;
+  overflow: hidden;
+}
+
+.editor-wrapper {
+  width: 100%;
+  max-width: 800px;
+  padding: 40px;
+}
+
+.editor {
+  outline: none;
+  font-size: 18px;
+  line-height: 1.6;
+  max-width: none;
+  min-height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  flex: 1;
+  display: flex;
+}
+

@@ -3,25 +3,34 @@
  *
  * A ProseMirror decoration plugin places a widget dot at the end of every
  * quote note's anchored range. Hovering/clicking a dot emits the
- * NOTE_PREVIEW_* window events consumed by NoteHoverPreview. React pushes
+ * NOTE_PREVIEW_* window events: NoteHoverPreview opens the note's card on them,
+ * or useNativeNotePreviews reports them to the shell. React pushes
  * note lists into the plugin via syncEditorNotes (EditorCanvas calls it
  * whenever a doc's notes change); decorations are only rebuilt when the
  * note signature actually changes.
+ *
+ * While a note's card is open, the text it is about is highlighted in place (the
+ * `.note-range.is-active` decoration) — the card does not quote it. The card's owner
+ * says which note that is with NOTE_HIGHLIGHT_EVENT.
  */
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { marginHangDecorations } from '../lib/marginHang'
 
 const NOTE_ANNOTATION_PLUGIN_KEY = new PluginKey('noteAnnotation')
 const pendingSyncByEditor = new WeakMap()
 export const NOTE_PREVIEW_ENTER_EVENT = 'inkblot:note-preview-enter'
 export const NOTE_PREVIEW_LEAVE_EVENT = 'inkblot:note-preview-leave'
 export const NOTE_PREVIEW_PIN_EVENT = 'inkblot:note-preview-pin'
+/** `detail: { noteId }` — highlight that note's text; a null id clears it. */
+export const NOTE_HIGHLIGHT_EVENT = 'inkblot:note-highlight'
 
 const EMPTY_STATE = {
   docName: null,
   notes: [],
   signature: '',
+  activeNoteId: null,
   decorations: DecorationSet.empty,
 }
 
@@ -130,13 +139,6 @@ export const syncEditorNotes = (editor, notes, docName = null) => {
   }
 }
 
-// Intentional no-ops: NoteHoverPreview still calls these to signal hover/active
-// note state, but the in-editor text highlight they used to drive was removed.
-// Kept as stubs so the hook points survive if that highlight returns.
-export const setEditorHoveredNote = () => {}
-export const setEditorActiveNote = () => {}
-export const clearEditorActiveNote = () => {}
-
 const serializeRect = (rect) => ({
   left: rect.left,
   top: rect.top,
@@ -165,8 +167,8 @@ const dispatchPreviewEvent = (eventName, note, marker, view, docName) => {
 }
 
 /** Cheap change-detection key over the quote notes that affect decorations. */
-const getNoteSignature = (notes = [], docName = null, docSize = 0) => (
-  `${docName || ''}:${docSize}:${
+const getNoteSignature = (notes = [], docName = null, docSize = 0, activeNoteId = null) => (
+  `${docName || ''}:${docSize}:${activeNoteId || ''}:${
     (Array.isArray(notes) ? notes : [])
       .filter(note => note?.type === 'quote')
       .map(note => [
@@ -179,7 +181,7 @@ const getNoteSignature = (notes = [], docName = null, docSize = 0) => (
   }`
 )
 
-const buildNoteDecorations = (doc, notes = [], docName = null) => {
+const buildNoteDecorations = (doc, notes = [], docName = null, activeNoteId = null) => {
   const decorations = []
   const docSize = doc.content.size
 
@@ -188,8 +190,16 @@ const buildNoteDecorations = (doc, notes = [], docName = null) => {
     if (!Number.isFinite(note.from) || !Number.isFinite(note.to)) return
     if (note.from < 0 || note.to > docSize || note.from >= note.to) return
 
+    if (note.id === activeNoteId) {
+      decorations.push(Decoration.inline(note.from, note.to, {
+        class: 'note-range is-active',
+        style: `--note-color: ${note.color || '#007aff'}`,
+      }))
+    }
+
     decorations.push(
-      Decoration.widget(
+      ...marginHangDecorations(
+        doc,
         note.to,
         (view) => {
           const marker = document.createElement('span')
@@ -269,13 +279,16 @@ export const NoteAnnotation = Extension.create({
 
             const nextDocName = typeof meta.docName === 'string' ? meta.docName : pluginState.docName
             const nextNotes = Array.isArray(meta.notes) ? meta.notes : pluginState.notes
-            const nextSignature = getNoteSignature(nextNotes, nextDocName, transaction.doc.content.size)
+            const nextActive = 'activeNoteId' in meta ? meta.activeNoteId : pluginState.activeNoteId
+            const nextSignature = getNoteSignature(
+              nextNotes, nextDocName, transaction.doc.content.size, nextActive)
 
             if (pluginState.signature === nextSignature && pluginState.decorations) {
               return {
                 docName: nextDocName,
                 notes: nextNotes,
                 signature: nextSignature,
+                activeNoteId: nextActive,
                 decorations: pluginState.decorations,
               }
             }
@@ -284,9 +297,21 @@ export const NoteAnnotation = Extension.create({
               docName: nextDocName,
               notes: nextNotes,
               signature: nextSignature,
-              decorations: buildNoteDecorations(transaction.doc, nextNotes, nextDocName),
+              activeNoteId: nextActive,
+              decorations: buildNoteDecorations(transaction.doc, nextNotes, nextDocName, nextActive),
             }
           },
+        },
+        view(view) {
+          const onHighlight = (event) => {
+            const noteId = event?.detail?.noteId ?? null
+            if ((NOTE_ANNOTATION_PLUGIN_KEY.getState(view.state)?.activeNoteId ?? null) === noteId) return
+            view.dispatch(view.state.tr.setMeta(NOTE_ANNOTATION_PLUGIN_KEY, { activeNoteId: noteId }))
+          }
+          window.addEventListener(NOTE_HIGHLIGHT_EVENT, onHighlight)
+          return {
+            destroy() { window.removeEventListener(NOTE_HIGHLIGHT_EVENT, onHighlight) },
+          }
         },
         props: {
           decorations(state) {

@@ -12,82 +12,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import SFIcon from './SFIcon'
+import { useNoteCardDrag } from './useNoteCardDrag'
 import NoteImageGallery from './NoteImageGallery'
 import AudioNotes from './AudioNotes'
 import { readClipboardImages } from '../lib/noteImageUtils'
 import { collectNoteBranchIds, createFreeNote, touchNote } from '../lib/noteUtils'
 import { RESIZE_ICON_PATHS } from '../lib/resizeIcon'
 import {
-  clearEditorActiveNote,
+  NOTE_HIGHLIGHT_EVENT,
   NOTE_PREVIEW_ENTER_EVENT,
   NOTE_PREVIEW_LEAVE_EVENT,
   NOTE_PREVIEW_PIN_EVENT,
-  setEditorActiveNote,
-  setEditorHoveredNote,
 } from '../extensions/NoteAnnotation'
 
-const TILE_WIDTH = 260
-const TILE_MIN_HEIGHT = 88
-const TILE_MIN_RESIZE_WIDTH = 220
-const TILE_MIN_RESIZE_HEIGHT = 64
-const VIEWPORT_PADDING = 20
-const HIDE_DELAY_MS = 110
-const EDGE_GRAB_THRESHOLD = 18
-const DRAG_MIN_DELTA = 3
-const CHILD_OFFSET_X = 0
-const CHILD_OFFSET_Y = 184
-
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
-
-const clampPosition = (position, size = { width: TILE_WIDTH, height: TILE_MIN_HEIGHT }) => ({
-  x: clamp(position.x, VIEWPORT_PADDING, window.innerWidth - size.width - VIEWPORT_PADDING),
-  y: clamp(position.y, VIEWPORT_PADDING, window.innerHeight - size.height - VIEWPORT_PADDING),
-})
-
-/** Default root-card position beside the anchor: right of it when there's room, else left. */
-const getInitialTilePosition = (anchorRect, tileWidth = TILE_WIDTH, tileHeight = TILE_MIN_HEIGHT) => {
-  const prefersRight = anchorRect.right + tileWidth + 28 <= window.innerWidth - VIEWPORT_PADDING
-  const x = prefersRight
-    ? anchorRect.right + 22
-    : anchorRect.left - tileWidth - 22
-  const y = clamp(
-    anchorRect.top - tileHeight * 0.3,
-    VIEWPORT_PADDING,
-    window.innerHeight - tileHeight - VIEWPORT_PADDING
-  )
-
-  return {
-    x: clamp(x, VIEWPORT_PADDING, window.innerWidth - tileWidth - VIEWPORT_PADDING),
-    y,
-  }
-}
-
-const getDotPoint = (anchorRect) => ({
-  x: anchorRect.left + anchorRect.width / 2,
-  y: anchorRect.top + anchorRect.height / 2,
-})
-
-const getCardCenter = (position, size = { width: TILE_WIDTH, height: TILE_MIN_HEIGHT }) => ({
-  x: position.x + size.width / 2,
-  y: position.y + size.height / 2,
-})
-
-const getDefaultChildOffset = (index, total) => ({
-  offsetX: (index - (total - 1) / 2) * 48 + CHILD_OFFSET_X,
-  offsetY: CHILD_OFFSET_Y,
-})
-
-/** Quadratic bezier "string" between two points, bowing upward with distance. */
-const getCurvePath = (fromPoint, toPoint) => {
-  const distance = Math.hypot(toPoint.x - fromPoint.x, toPoint.y - fromPoint.y)
-  const sway = clamp(distance * 0.12, 18, 70)
-  const controlPoint = {
-    x: (fromPoint.x + toPoint.x) / 2,
-    y: (fromPoint.y + toPoint.y) / 2 - sway,
-  }
-
-  return `M ${fromPoint.x} ${fromPoint.y} Q ${controlPoint.x} ${controlPoint.y} ${toPoint.x} ${toPoint.y}`
-}
+import {
+  TILE_WIDTH,
+  TILE_MIN_HEIGHT,
+  TILE_MIN_RESIZE_WIDTH,
+  TILE_MIN_RESIZE_HEIGHT,
+  VIEWPORT_PADDING,
+  HIDE_DELAY_MS,
+  EDGE_GRAB_THRESHOLD,
+  DRAG_MIN_DELTA,
+  CHILD_OFFSET_X,
+  CHILD_OFFSET_Y,
+  clampPosition,
+  getInitialTilePosition,
+  getDotPoint,
+  getCardCenter,
+  getDefaultChildOffset,
+  getCurvePath,
+  isSamePreviewIdentity,
+  hasStoredChildOffset,
+  areRectsEqual,
+} from '../lib/notePreviewGeometry'
 
 /** Find the live bounding rect of a note's marker element in the editor DOM. */
 const queryAnchorRect = (noteId, editorView) => {
@@ -97,87 +55,6 @@ const queryAnchorRect = (noteId, editorView) => {
   return marker?.getBoundingClientRect?.() || null
 }
 
-const isSamePreviewIdentity = (left, right) => {
-  if (left === right) return true
-  if (!left || !right) return false
-
-  return (
-    left.note?.id === right.note?.id &&
-    left.locked === right.locked &&
-    left.editorView === right.editorView
-  )
-}
-
-const isDragEdge = (clientX, clientY, rect) => (
-  clientX - rect.left <= EDGE_GRAB_THRESHOLD ||
-  rect.right - clientX <= EDGE_GRAB_THRESHOLD ||
-  clientY - rect.top <= EDGE_GRAB_THRESHOLD ||
-  rect.bottom - clientY <= EDGE_GRAB_THRESHOLD
-)
-
-const setPointerCaptureSafely = (target, pointerId) => {
-  try {
-    target?.setPointerCapture?.(pointerId)
-  } catch {
-    // Pointer capture is a nice-to-have; window listeners still keep drag working.
-  }
-}
-
-const releasePointerCaptureSafely = (target, pointerId) => {
-  try {
-    target?.releasePointerCapture?.(pointerId)
-  } catch {
-    // Ignore stale pointer ids after the drag has ended.
-  }
-}
-
-const addPointerDragListeners = (target, handlePointerMove, handlePointerUp) => {
-  window.addEventListener('pointermove', handlePointerMove, true)
-  window.addEventListener('pointerup', handlePointerUp, true)
-  target?.addEventListener?.('pointermove', handlePointerMove, true)
-  target?.addEventListener?.('pointerup', handlePointerUp, true)
-
-  return () => {
-    window.removeEventListener('pointermove', handlePointerMove, true)
-    window.removeEventListener('pointerup', handlePointerUp, true)
-    target?.removeEventListener?.('pointermove', handlePointerMove, true)
-    target?.removeEventListener?.('pointerup', handlePointerUp, true)
-  }
-}
-
-const hasStoredChildOffset = (note) => (
-  Math.abs(note?.previewLayout?.offsetX || 0) > 1 ||
-  Math.abs(note?.previewLayout?.offsetY || 0) > 1
-)
-
-const collectDescendantIds = (childMap, rootId) => {
-  const ids = new Set()
-  const stack = [...(childMap.get(rootId) || [])]
-
-  while (stack.length > 0) {
-    const note = stack.pop()
-    if (!note || ids.has(note.id)) continue
-    ids.add(note.id)
-    const children = childMap.get(note.id) || []
-    children.forEach((child) => stack.push(child))
-  }
-
-  return ids
-}
-
-const areRectsEqual = (left, right) => {
-  if (left === right) return true
-  if (!left || !right) return false
-
-  return (
-    left.left === right.left &&
-    left.top === right.top &&
-    left.right === right.right &&
-    left.bottom === right.bottom &&
-    left.width === right.width &&
-    left.height === right.height
-  )
-}
 
 export default function NoteHoverPreview({
   notesByDoc = {},
@@ -270,26 +147,14 @@ export default function NoteHoverPreview({
     return noteById.get(preview.note.id) || preview.note
   }, [noteById, preview])
 
-  // Mirror hover/pin state back into the editor so the anchored text highlights.
+  // Mirror the open card back into the editor so the text it is about highlights.
   useEffect(() => {
     const previous = previousPreviewRef.current
-
-    if (previous && !isSamePreviewIdentity(previous, preview)) {
-      if (previous.locked) {
-        clearEditorActiveNote(previous.editorView)
-      } else {
-        setEditorHoveredNote(previous.editorView, null)
-      }
+    if (!isSamePreviewIdentity(previous, preview)) {
+      window.dispatchEvent(new CustomEvent(NOTE_HIGHLIGHT_EVENT, {
+        detail: { noteId: preview?.note?.id ?? null },
+      }))
     }
-
-    if (preview && !isSamePreviewIdentity(previous, preview)) {
-      if (preview.locked) {
-        setEditorActiveNote(preview.editorView, preview.note.id)
-      } else {
-        setEditorHoveredNote(preview.editorView, preview.note.id)
-      }
-    }
-
     previousPreviewRef.current = preview
   }, [preview])
 
@@ -660,197 +525,24 @@ export default function NoteHoverPreview({
 
   // A drag starts from the drag handle or by grabbing near a card edge —
   // never from the close button or interactive controls.
-  const shouldStartDrag = useCallback((event) => {
-    if (!(event.target instanceof HTMLElement)) return false
-    if (event.target.closest('.note-preview-close')) return false
-    if (event.target.closest('.note-preview-drag')) return true
-    if (event.target.closest('textarea, input, button, a, label')) return false
-
-    const card = event.currentTarget
-    if (!(card instanceof HTMLElement)) return false
-    const rect = card.getBoundingClientRect()
-    return isDragEdge(event.clientX, event.clientY, rect)
-  }, [])
-
-  const handleDragStart = useCallback((noteId, event) => {
-    if (!preview || !layout || !shouldStartDrag(event)) return
-
-    const position = layout.positions.get(noteId)
-    const note = noteById.get(noteId)
-    if (!position || !note) return
-
-    event.preventDefault()
-    event.stopPropagation()
-    const dragTarget = event.currentTarget
-    setPointerCaptureSafely(dragTarget, event.pointerId)
-    lockPreview()
-
-    const parentPosition = note.parentNoteId ? layout.positions.get(note.parentNoteId) || null : null
-    const rootBase = layout.rootBase
-    const descendantIds = collectDescendantIds(childMap, noteId)
-
-    if (descendantIds.size > 0) {
-      const nextElasticPositions = { ...elasticPositionsRef.current }
-      const nextElasticVelocity = { ...elasticVelocityRef.current }
-
-      descendantIds.forEach((id) => {
-        const currentPosition = layout.positions.get(id)
-        if (!currentPosition) return
-        nextElasticPositions[id] = elasticPositionsRef.current[id] || { ...currentPosition }
-        nextElasticVelocity[id] = elasticVelocityRef.current[id] || { x: 0, y: 0 }
-      })
-
-      elasticPositionsRef.current = nextElasticPositions
-      elasticVelocityRef.current = nextElasticVelocity
-      setElasticPositions(nextElasticPositions)
-    }
-
-    dragStateRef.current = {
-      mode: 'move',
-      noteId,
-      descendantIds,
-      parentPosition,
-      rootBase,
-      pointerOffsetX: event.clientX - position.x,
-      pointerOffsetY: event.clientY - position.y,
-      originX: event.clientX,
-      originY: event.clientY,
-      hasMoved: false,
-    }
-
-    const handlePointerMove = (moveEvent) => {
-      const dragState = dragStateRef.current
-      if (!dragState) return
-      moveEvent.preventDefault()
-
-      const size = cardSizesRef.current[dragState.noteId]
-        || noteById.get(dragState.noteId)?.previewSize
-        || { width: TILE_WIDTH, height: TILE_MIN_HEIGHT }
-      const hasMoved = dragState.hasMoved ||
-        Math.abs(moveEvent.clientX - dragState.originX) + Math.abs(moveEvent.clientY - dragState.originY) >= DRAG_MIN_DELTA
-      dragState.hasMoved = hasMoved
-      const nextPosition = clampPosition({
-        x: moveEvent.clientX - dragState.pointerOffsetX,
-        y: moveEvent.clientY - dragState.pointerOffsetY,
-      }, size)
-
-      const nextLayout = dragState.parentPosition
-        ? {
-            offsetX: nextPosition.x - dragState.parentPosition.x,
-            offsetY: nextPosition.y - dragState.parentPosition.y,
-          }
-        : {
-            offsetX: nextPosition.x - dragState.rootBase.x,
-            offsetY: nextPosition.y - dragState.rootBase.y,
-          }
-
-      if (hasMoved) {
-        dragLayoutsRef.current = {
-          ...dragLayoutsRef.current,
-          [dragState.noteId]: nextLayout,
-        }
-        setDragLayouts((current) => ({
-          ...current,
-          [dragState.noteId]: nextLayout,
-        }))
-      }
-
-      if (dragState.descendantIds?.size > 0) {
-        startElasticLoop()
-      }
-    }
-
-    const handlePointerUp = (upEvent) => {
-      const dragState = dragStateRef.current
-      removePointerListeners()
-      releasePointerCaptureSafely(dragTarget, event.pointerId)
-      upEvent?.preventDefault?.()
-
-      if (!dragState) return
-      const finalLayout = dragLayoutsRef.current[dragState.noteId]
-      if (finalLayout) {
-        commitLayout(dragState.noteId, finalLayout)
-      }
-
-      if (dragState.descendantIds?.size > 0) {
-        dragStateRef.current = {
-          mode: 'settle',
-          descendantIds: dragState.descendantIds,
-        }
-        startElasticLoop()
-        return
-      }
-
-      dragStateRef.current = null
-    }
-
-    const removePointerListeners = addPointerDragListeners(dragTarget, handlePointerMove, handlePointerUp)
-  }, [childMap, commitLayout, layout, lockPreview, noteById, preview, shouldStartDrag, startElasticLoop])
-
-  const handleResizeStart = useCallback((noteId, event) => {
-    const note = noteById.get(noteId)
-    const position = layout?.positions.get(noteId)
-    const currentSize = layout?.sizes.get(noteId)
-    if (!note || !position || !currentSize) return
-
-    event.preventDefault()
-    event.stopPropagation()
-    const dragTarget = event.currentTarget
-    setPointerCaptureSafely(dragTarget, event.pointerId)
-    lockPreview()
-
-    dragStateRef.current = {
-      mode: 'resize',
-      noteId,
-      originX: event.clientX,
-      originY: event.clientY,
-      initialWidth: currentSize.width,
-      initialHeight: currentSize.height,
-      position,
-    }
-
-    const handlePointerMove = (moveEvent) => {
-      const dragState = dragStateRef.current
-      if (!dragState || dragState.mode !== 'resize') return
-      moveEvent.preventDefault()
-
-      const nextWidth = Math.max(
-        TILE_MIN_RESIZE_WIDTH,
-        dragState.initialWidth + (moveEvent.clientX - dragState.originX)
-      )
-      const nextHeight = Math.max(
-        TILE_MIN_RESIZE_HEIGHT,
-        dragState.initialHeight + (moveEvent.clientY - dragState.originY)
-      )
-      const clampedSize = {
-        width: Math.min(nextWidth, window.innerWidth - dragState.position.x - VIEWPORT_PADDING),
-        height: Math.min(nextHeight, window.innerHeight - dragState.position.y - VIEWPORT_PADDING),
-      }
-
-      cardSizesRef.current = {
-        ...cardSizesRef.current,
-        [noteId]: clampedSize,
-      }
-      setCardSizes((current) => ({
-        ...current,
-        [noteId]: clampedSize,
-      }))
-    }
-
-    const handlePointerUp = (upEvent) => {
-      const dragState = dragStateRef.current
-      dragStateRef.current = null
-      removePointerListeners()
-      releasePointerCaptureSafely(dragTarget, event.pointerId)
-      upEvent?.preventDefault?.()
-
-      if (!dragState || dragState.mode !== 'resize') return
-      const finalSize = cardSizesRef.current[noteId] || currentSize
-      commitSize(noteId, finalSize)
-    }
-
-    const removePointerListeners = addPointerDragListeners(dragTarget, handlePointerMove, handlePointerUp)
-  }, [commitSize, layout, lockPreview, noteById])
+  const { handleDragStart, handleResizeStart } = useNoteCardDrag({
+    cardSizesRef,
+    childMap,
+    commitLayout,
+    commitSize,
+    dragLayoutsRef,
+    dragStateRef,
+    elasticPositionsRef,
+    elasticVelocityRef,
+    layout,
+    lockPreview,
+    noteById,
+    preview,
+    setCardSizes,
+    setDragLayouts,
+    setElasticPositions,
+    startElasticLoop,
+  })
 
   const handleDeleteNote = useCallback(async (noteId) => {
     if (!preview?.docName || !setNotesForDoc) return

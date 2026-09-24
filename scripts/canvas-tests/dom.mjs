@@ -12,21 +12,21 @@
  * frame). A non-StrictMode test passes happily, which is why this one exists.
  */
 import { JSDOM } from 'jsdom'
+import { installGlobals } from './install-globals.mjs'
 
 const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
   pretendToBeVisual: true,
 })
-for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node',
+installGlobals(dom.window, ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node',
   'DOMParser', 'requestAnimationFrame', 'cancelAnimationFrame', 'getComputedStyle',
-  'CustomEvent', 'Event', 'MouseEvent']) {
-  globalThis[key] = dom.window[key]
-}
+  'CustomEvent', 'Event', 'MouseEvent'])
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const React = (await import('react')).default
 const { act, StrictMode } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const CanvasSurface = (await import('../../src/canvas/CanvasSurface.jsx')).default
+const { CanvasToolbarSlotContext } = await import('../../src/canvas/canvasToolbarSlot.js')
 const { createEmptyCanvas, makeTextNode } = await import('../../src/lib/canvasModel.js')
 
 const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
@@ -39,19 +39,30 @@ state.nodeOrder.push(card.id)
 
 const root = createRoot(document.getElementById('root'))
 
+// The canvas toolbar renders in the titlebar, not over the canvas: CanvasSurface
+// portals it into the element published through CanvasToolbarSlotContext, and
+// renders no toolbar at all when that slot is null. So the slot has to exist here,
+// or every toolbar assertion below reads an absent button.
+const toolbarSlot = document.createElement('div')
+document.body.appendChild(toolbarSlot)
+
 await act(async () => {
   root.render(
     React.createElement(
       StrictMode,
       null,
-      React.createElement(CanvasSurface, {
-        projectName: 'P',
-        docPath: 'x.canvas',
-        initialState: state,
-        initialViewport: { x: 0, y: 0, zoom: 1 },
-        onActivate: () => {},
-        setActiveEditor: () => {},
-      })
+      React.createElement(
+        CanvasToolbarSlotContext.Provider,
+        { value: toolbarSlot },
+        React.createElement(CanvasSurface, {
+          projectName: 'P',
+          docPath: 'x.canvas',
+          initialState: state,
+          initialViewport: { x: 0, y: 0, zoom: 1 },
+          onActivate: () => {},
+          setActiveEditor: () => {},
+        })
+      )
     )
   )
 })
@@ -59,8 +70,10 @@ await settle()
 
 const surface = () => document.querySelector('.canvas-surface')
 const readout = () => document.querySelector('.canvas-toolbar-zoom')?.textContent
+// CanvasToolbar's controls are bare <button type="button"> elements — they carry an
+// aria-label and a title, but no shared class — so match on the label alone.
 const button = (label) =>
-  [...document.querySelectorAll('.canvas-toolbar-btn')].find(
+  [...document.querySelectorAll('button')].find(
     (b) => b.getAttribute('aria-label') === label
   )
 
@@ -124,11 +137,11 @@ ok('ports render after the resize zones (so they stay grabbable)', firstPort > l
 // Locked, the canvas stops being editable: nothing can be dragged, resized or
 // connected, so the chrome that advertises those gestures must not be there at all.
 const lockButton = () =>
-  [...document.querySelectorAll('.canvas-toolbar-btn')].find((b) =>
+  [...document.querySelectorAll('button')].find((b) =>
     (b.getAttribute('aria-label') || '').startsWith('Lock canvas')
   )
 const unlockButton = () =>
-  [...document.querySelectorAll('.canvas-toolbar-btn')].find((b) =>
+  [...document.querySelectorAll('button')].find((b) =>
     (b.getAttribute('aria-label') || '').startsWith('Unlock canvas')
   )
 

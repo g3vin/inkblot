@@ -3,7 +3,7 @@
  *
  * Extracted from the TipTap extension so a board can live in two places: inline in a
  * document (extensions/PinterestBoard.js) and as a card on a canvas
- * (canvas/CanvasPinterestNode.jsx). Both read the SAME localStorage cache, so a board
+ * (canvas/CanvasPinterestNode.jsx). Both read the SAME preference-store cache, so a board
  * scraped in a document renders instantly when you drop it on a canvas, and vice
  * versa — a board is one thing the app knows about, not two.
  *
@@ -11,6 +11,8 @@
  * cache is the primary source: render whatever is cached immediately, then refresh
  * once per project-open in the background.
  */
+import { getPreference, setPreference, getSessionValue, setSessionValue } from './preferences'
+import { getProjectOpenId } from './projectContext'
 
 const CACHE_PREFIX = 'inkblot:pinterest-preview:'
 const PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
@@ -95,14 +97,9 @@ const cacheKey = (url) => {
   return normalized ? `${CACHE_PREFIX}${normalized}` : null
 }
 
-const projectOpenId = () => {
-  if (typeof window === 'undefined') return 'default'
-  return String(
-    window.__inkblotProjectOpenId ||
-      window.sessionStorage?.getItem(PROJECT_OPEN_ID_KEY) ||
-      'default'
-  )
-}
+// Was `window.__inkblotProjectOpenId`; see lib/projectContext for why it is still
+// ambient and why it is no longer a window property.
+const projectOpenId = () => getProjectOpenId()
 
 const refreshKey = (url) => {
   const key = cacheKey(url)
@@ -114,22 +111,14 @@ export const hasRefreshedThisSession = (url) => {
   if (typeof window === 'undefined') return false
   const key = refreshKey(url)
   if (!key) return false
-  try {
-    return window.sessionStorage?.getItem(key) === 'true'
-  } catch {
-    return false
-  }
+  return getSessionValue(key) === 'true'
 }
 
 export const markRefreshedThisSession = (url) => {
   if (typeof window === 'undefined') return
   const key = refreshKey(url)
   if (!key) return
-  try {
-    window.sessionStorage?.setItem(key, 'true')
-  } catch {
-    // Session markers are best-effort.
-  }
+  setSessionValue(key, 'true')
 }
 
 /** Drop anything that isn't a real {pinHref, imageUrl} pair, and de-duplicate. */
@@ -160,7 +149,7 @@ export function readPinterestCache(url) {
   if (!key) return null
 
   try {
-    const raw = window.localStorage?.getItem(key)
+    const raw = getPreference(key)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (parsed?.version !== CACHE_VERSION) return null
@@ -181,14 +170,10 @@ export function writePinterestCache(url, pins) {
   const normalized = normalizePins(pins)
   if (!normalized.length) return
 
-  try {
-    window.localStorage?.setItem(
-      key,
-      JSON.stringify({ version: CACHE_VERSION, savedAt: Date.now(), pins: normalized })
-    )
-  } catch {
-    // Cache writes are best-effort.
-  }
+  setPreference(
+    key,
+    JSON.stringify({ version: CACHE_VERSION, savedAt: Date.now(), pins: normalized })
+  )
 }
 
 /* ---------------- fetching ---------------- */

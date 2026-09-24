@@ -1,3 +1,25 @@
+[workspace]
+members = ["crates/*"]
+
+# Shared by the app crate and inkblot-core, so a version bump lands in both at once.
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+# float_roundtrip: without it serde_json's float parser is off by up to 1 ULP, so a
+# canvas coordinate changes in its last bit every time a document is loaded — and the
+# parity harness reports it as a diff-engine mismatch. Caught by scripts/parity.
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
+url = "2.5.8"
+regex = "1.11"
+# fancy-regex, not regex, for the search matcher: `regex` rejects backreferences and
+# lookaround outright, so a user's `(?=...)` would come back as "Invalid pattern".
+fancy-regex = "0.14"
+once_cell = "1.19"
+font-kit = "0.14"
+# The #[typeshare] attribute itself is a no-op proc macro; the `typeshare` CLI reads
+# the annotations out of the source. See crates/inkblot-core/typeshare.toml.
+typeshare = "1.0"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "gzip", "brotli", "deflate"] }
+
 [package]
 name = "app"
 version = "0.1.0"
@@ -14,19 +36,28 @@ rust-version = "1.77.2"
 name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[dev-dependencies]
+# `rt` and `macros` are only needed by #[tokio::test]; the library itself runs on the
+# runtime Tauri already started.
+tokio = { version = "1", features = ["time", "sync", "rt", "macros"] }
+
 [build-dependencies]
 tauri-build = { version = "2.5.4", features = [] }
 
 [dependencies]
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
+serde_json = { workspace = true }
+serde = { workspace = true }
+inkblot-core = { path = "crates/inkblot-core" }
+url = { workspace = true }
 log = "0.4"
 ndarray = "0.17.2"
 ort = { version = "2.0.0-rc.11", features = ["ndarray"] }
-once_cell = "1.19"
-font-kit = "0.14"
+once_cell = { workspace = true }
 tokenizers = { version = "0.15", features = ["http"] }
 parking_lot = "0.12"
+# Tauri already runs on tokio; this is for the scrape channel's timeout and its
+# notify, so a waiting command parks instead of polling.
+tokio = { version = "1", features = ["time", "sync"] }
 cpal = "0.17.3"
 inkblot-dictation = { git = "https://github.com/g3vin/inkblot-dictation.git", branch = "main", features = ["metal"] }
 
@@ -36,8 +67,7 @@ tauri-plugin-log = "2"
 tauri-plugin-fs = "2.4.5"
 tauri-plugin-dialog = "2.6.0"
 
-url = "2.5.8"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "gzip", "brotli", "deflate"] }
+reqwest = { workspace = true }
 tauri-plugin-opener = "2"
 
 # NSHapticFeedbackManager. WKWebView exposes no haptics API, so the trackpad can

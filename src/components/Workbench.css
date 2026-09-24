@@ -1,0 +1,111 @@
+/* ============================================================
+   Workbench cards (POS / definition / synonym / rhyme tiles)
+   ============================================================ */
+
+.sidebar-card {
+  cursor: default;
+}
+
+.sidebar-card-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: 0;
+  color: var(--text-subtle);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+
+.sidebar-card-close:hover {
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.sidebar-card-eyebrow {
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-card-eyebrow--thesaurus {
+  color: #63a5ff;
+}
+
+.sidebar-card-eyebrow--dictionary {
+  color: #e7c35f;
+}
+
+.sidebar-card-eyebrow--rhyme {
+  color: #f0a45d;
+}
+
+.sidebar-card-eyebrow--pos {
+  color: #ef9353;
+}
+
+.sidebar-card-title {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.sidebar-card-copy {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sidebar-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.synonym-btn-antonym {
+  color: var(--status-error);
+  border-color: rgba(255, 143, 143, 0.55);
+  background: transparent;
+}
+
+.sidebar-muted {
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.sidebar-error {
+  color: var(--status-error);
+  font-size: 12px;
+}
+
+.sidebar-pos-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.sidebar-pos-token {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.sidebar-pos-badge {
+  font-size: 9px;
+  color: var(--color-white);
+  padding: 2px 5px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.sidebar-pos-word {
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+}
+

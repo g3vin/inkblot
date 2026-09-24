@@ -1,6 +1,7 @@
 /**
  * Headless checks for the canvas feature.
  *
+ *   npm test                                               (from the repo root)
  *   node --experimental-loader ./loader.mjs run.mjs        (from this directory)
  *
  * The app is a Tauri desktop app, so most of it can only be exercised in the
@@ -17,8 +18,39 @@
  *   group  group create/ungroup, and the geometric membership a drag resolves
  *   snap   the alignment math behind a drag
  *   search finding text in a canvas (which used to silently match nothing)
+ *   note   the note model, and note cards as file nodes
+ *   audio  voice memos: mime resolution, the asset store, dedupe
  *   html   generateHTML(): how every non-editing card and document preview renders
  *   dom    the real CanvasSurface mounted in jsdom, under StrictMode like the app
+ *   editor the real EditorCanvas mounted in jsdom: autosave, version checkpoints,
+ *          the per-doc editor-state cache, and note anchor remapping — the paths
+ *          where a bug loses the user's writing without saying anything
+ *   tree   the file tree's per-row decisions: highlight states, icons, and where a
+ *          drop indicator goes
+ *   prefs  the preference store's webview half: which file a key lands in, that reads
+ *          are synchronous after hydration, and that a failed write is survivable
+ *   voice  the Read Aloud text normalizer, against the one inside kokoro-js — a
+ *          transcription, so it is compared with its original rather than trusted
+ *   bridge the Phase 4 protocol client, both ends: that a command reaches the editor
+ *          it names, that a request is always answered rather than left hanging, that
+ *          coalescing drops intermediate values and never the last one, and that the
+ *          drag hand-off arbitrates instead of depending on running order; and that
+ *          the native shell can join the wire beside the React one (Phase 5)
+ *   entries renaming, moving and deleting the document being written in: the pane's
+ *          final autosave must not recreate the old path
+ *   sidebar the right sidebar drawn by the shell: what the page publishes, and each
+ *          edit applied the way the React panel applied it
+ *   bubble a sentence taken apart into bubbles: the word and clause rules, where a drop
+ *          lands, and a session written back into a real editor — kept, reopened,
+ *          round-tripped through JSON and HTML, resolved behind a checkpoint
+ *   references citations: what a paste is, what a page says about itself, citeproc in the
+ *          bundled styles, lookups against canned answers, and the library file
+ *   citations citations and the bibliography in a real editor: the renderer, style changes,
+ *          round trips, and the bibliography added on paper, a book numbered through
+ *   print  Print Layout's pure logic: page sizes and geometry, where pages break,
+ *          and signature imposition for binding
+ *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
+ *          through the real @tauri-apps/api modules
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -32,15 +64,32 @@
  * Still not covered: anything involving layout, pointer events, or the asset://
  * protocol. Those need the real webview.
  */
-const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom']
+const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'references', 'citations', 'maplib', 'maptrace', 'mapdom']
 
-let failed = false
+const failures = []
 
 for (const suite of SUITES) {
   console.log(`\n=== ${suite} ===`)
-  const before = process.exitCode
-  await import(`./${suite}.mjs`)
-  if (process.exitCode && process.exitCode !== before) failed = true
+
+  // Each suite reports by setting process.exitCode, so snapshot and clear it around
+  // every import — otherwise the first failure masks each one after it.
+  process.exitCode = 0
+  try {
+    await import(`./${suite}.mjs`)
+  } catch (error) {
+    // A suite that throws must not take the rest of the run down with it. That is
+    // how four suites sat silently unrun behind one stale assertion.
+    console.error(`ERROR  ${suite} threw and was abandoned:`)
+    console.error(error)
+    process.exitCode = 1
+  }
+  if (process.exitCode) failures.push(suite)
 }
 
-console.log(failed ? '\nFAILURES above.' : '\nAll suites passed.')
+if (failures.length) {
+  console.log(`\nFAILURES in: ${failures.join(', ')}`)
+  process.exitCode = 1
+} else {
+  process.exitCode = 0
+  console.log('\nAll suites passed.')
+}

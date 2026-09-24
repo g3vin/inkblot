@@ -1,19 +1,11 @@
-# Ignore downloaded NLP model files and related metadata
-# Prevent large ONNX files from being accidentally committed or pushed
-
-# Specific model files downloaded by scripts
-/public/synonym.onnx
-/public/synonym.onnx.data
-/public/.synonym_meta.json
-/public/vocab_kaggle.json
-/src-tauri/assets/pos_context_tagger.onnx
-
-# General patterns to catch any other model artifacts
+# NLP model artifacts.
+#
+# The synonym model is no longer fetched into public/ at build time — Rust downloads
+# it on first use into the app data directory (see src-tauri/src/synonym_commands.rs),
+# so nothing model-shaped should appear in the repo at all.
 *.onnx
 *.onnx.data
-
-# Ignore any local build artifacts for the model downloader
-/public/*.onnx.tmp
+*.onnx.tmp
 
 # Node / Vite / editor files (keep common defaults)
 node_modules/
@@ -44,3 +36,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code local settings and agent worktrees
+.claude/settings.local.json
+.claude/worktrees/
