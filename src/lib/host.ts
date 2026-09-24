@@ -25,8 +25,11 @@ import { detectNativeHost } from '../bridge/transport'
  *                   from what `useNativeSidebar` publishes
  *  - `notePreviews` the cards that open over a note's marker — drawn by the shell as
  *                   Liquid Glass, placed from what `useNativeNotePreviews` publishes
+ *  - `pageSetup`    Print Layout's page setup, book and binding settings — the
+ *                   inspector's Page tab, drawn from what `usePrintLayoutController`
+ *                   publishes. Without it the page shows its own Page Setup sheet.
  */
-export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar' | 'notePreviews'
+export type NativeChrome = 'fileTree' | 'windowChrome' | 'rightSidebar' | 'notePreviews' | 'pageSetup'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null

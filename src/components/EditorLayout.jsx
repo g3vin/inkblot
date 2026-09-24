@@ -19,6 +19,12 @@ import { nativeOwns } from '../lib/host'
 import { useNativeSidebar } from './useNativeSidebar'
 import { useNativeNotePreviews } from './useNativeNotePreviews'
 import EditorCanvas from './EditorCanvas'
+import usePrintLayoutController from '../print/usePrintLayoutController'
+import PageSetupSheet from '../print/PageSetupSheet'
+import { runPrintJob } from '../print/printJob'
+import { runExport } from '../print/export/runExport'
+import { bookFolderFor } from '../print/compile'
+import { getBookSettings } from '../print/printLayoutStore'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
@@ -407,6 +413,44 @@ export default function EditorLayout(props) {
 
   // The right sidebar's state and edits, for a shell that draws the sidebar itself.
   // Here, after openSearchTarget, because a hook argument is read during render.
+  // Print Layout, Print… and Export, for whichever document is active.
+  const printOptions = useCallback((scope) => {
+    const projectName = props.projectName
+    const docPath = activeDoc || currentDoc
+    return {
+      projectName,
+      docPath,
+      liveEditors: [
+        { path: currentDoc, editor },
+        { path: props.secondaryDoc, editor: props.secondaryEditor },
+      ],
+      book: getBookSettings(projectName, bookFolderFor(docPath, scope)),
+    }
+  }, [activeDoc, currentDoc, editor, props.projectName, props.secondaryDoc, props.secondaryEditor])
+  const printLayout = usePrintLayoutController({
+    projectName: props.projectName,
+    activeDoc: activeDoc || currentDoc,
+    currentDoc,
+    secondaryDoc: props.secondaryDoc,
+    editor,
+    secondaryEditor: props.secondaryEditor,
+    onPrint: ({ scope, bound }) => {
+      runPrintJob({ ...printOptions(scope), scope, bound }).catch((error) => console.error('[print] failed:', error))
+    },
+    onExport: ({ format, scope, bound }) => {
+      runExport({ ...printOptions(scope), format, scope, bound }).catch((error) => console.error('[export] failed:', error))
+    },
+  })
+
+  // The page's own Page Setup, for a shell that does not draw one (host.ts).
+  const [pageSetupOpen, setPageSetupOpen] = useState(false)
+  useEffect(() => {
+    if (nativeOwns('pageSetup')) return undefined
+    const open = () => setPageSetupOpen(true)
+    window.addEventListener('inkblot:page-setup', open)
+    return () => window.removeEventListener('inkblot:page-setup', open)
+  }, [])
+
   useNativeSidebar({
     enabled: nativeRightSidebar,
     projectName: props.projectName,
@@ -499,6 +543,15 @@ export default function EditorLayout(props) {
       className={`editor-page-wrapper${isFullscreenChrome ? ' is-fullscreen' : ''}${focusModeOpen ? ' is-focus-mode' : ''}${sidebarResizing ? ' is-sidebar-resizing' : ''}`}
       onContextMenu={handleContextMenu}
     >
+      {pageSetupOpen && printLayout.activeEditor ? (
+        <PageSetupSheet
+          editor={printLayout.activeEditor}
+          projectName={props.projectName}
+          docPath={printLayout.activeTextDoc}
+          pageCount={printLayout.pageCount}
+          onClose={() => setPageSetupOpen(false)}
+        />
+      ) : null}
       <div
         className="app-titlebar"
         style={{

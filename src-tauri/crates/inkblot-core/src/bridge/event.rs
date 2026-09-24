@@ -17,6 +17,7 @@ use super::sidebar::{
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
+use super::print::{PageLayoutState, PrintRequest};
 
 /// Which marks are on at the selection.
 #[typeshare]
@@ -352,4 +353,6 @@ pub enum WebviewEvent {
     /// superseded by the next.
     NoteMarkerMoved(NoteMarkerEvent),
     NotePreviewDismissed(NotePreviewDismissed),
+    PageLayoutState(PageLayoutState),
+    PrintRequest(PrintRequest),
 }

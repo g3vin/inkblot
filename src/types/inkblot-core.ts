@@ -106,6 +106,148 @@ export interface BezierPath {
 	mid: Point;
 }
 
+/**
+ * How a printed book is put together — which decides the order pages are laid on
+ * sheets (see `imposition.ts`).
+ */
+export enum BindingType {
+	/** No imposition: one page per sheet side, in order. */
+	None = "none",
+	/** Folded sheets nested into signatures and sewn: case, Coptic, long-stitch. */
+	Signatures = "signatures",
+	/** Every page in one signature, stapled through the fold: a booklet. */
+	Saddle = "saddle",
+	/** Leaves cut apart and glued at the spine; two per sheet, in reading order. */
+	Perfect = "perfect",
+}
+
+export enum SheetFit {
+	/** Pages keep their size and sit centred on the half-sheet, with crop marks. */
+	ActualSize = "actualSize",
+	/** Pages scale to fill the half-sheet. */
+	Fit = "fit",
+}
+
+export enum DuplexMode {
+	/** The printer prints both sides (flip on short edge). */
+	Automatic = "automatic",
+	/** Every front, then the stack is fed back for the backs in reverse. */
+	Manual = "manual",
+}
+
+export interface BindingSettings {
+	binding: BindingType;
+	/** Folios (folded sheets) per signature, 1–8; four (16 pages) is the hand-binding norm. */
+	sheetsPerSignature: number;
+	/** The paper the sheets are printed on: a `pageSizes.ts` preset id. */
+	sheetPresetId: string;
+	sheetFit: SheetFit;
+	duplex: DuplexMode;
+	/** For creep compensation; 0.1mm is ordinary 20lb / 75gsm paper. 0 turns it off. */
+	paperThicknessMm: number;
+	cropMarks: boolean;
+	/** Also print the folding guide as a last sheet. */
+	includeGuide: boolean;
+}
+
+export enum PageOrientation {
+	Portrait = "portrait",
+	Landscape = "landscape",
+}
+
+/**
+ * Page margins. `inside`/`outside` are left/right on a recto (odd) page, and swap
+ * on a verso when `PageSetup::mirror_margins` is set.
+ */
+export interface PageMargins {
+	topMm: number;
+	bottomMm: number;
+	insideMm: number;
+	outsideMm: number;
+	/** Extra binding allowance added to the inside margin. */
+	gutterMm: number;
+}
+
+/**
+ * One running header or footer: three slots, each a template of literal text and
+ * the tokens `{page}`, `{pages}`, `{title}`, `{chapter}` and `{author}`. On a verso
+ * page of a mirrored setup, left and right swap so "outside" stays outside.
+ */
+export interface RunningText {
+	left: string;
+	center: string;
+	right: string;
+}
+
+/** Page-number numerals. */
+export enum PageNumberFormat {
+	Arabic = "arabic",
+	UpperRoman = "upperRoman",
+	LowerRoman = "lowerRoman",
+}
+
+export interface PageSetup {
+	/** A `pageSizes.ts` preset id, or `"custom"`. */
+	presetId: string;
+	/** Portrait width and height; `orientation` decides which is horizontal. */
+	widthMm: number;
+	heightMm: number;
+	orientation: PageOrientation;
+	margins: PageMargins;
+	mirrorMargins: boolean;
+	/** Text columns per page, 1–3. */
+	columns: number;
+	columnGapMm: number;
+	/**
+	 * The running head and foot of every page — or of recto pages only, when a
+	 * verso override is set.
+	 */
+	header: RunningText;
+	footer: RunningText;
+	/**
+	 * A different head/foot for verso (even) pages, as a book sets the title on
+	 * the left page and the chapter on the right.
+	 */
+	versoHeader?: RunningText;
+	versoFooter?: RunningText;
+	/** Distance from the paper edge to the header's top / the footer's bottom. */
+	headerDistanceMm: number;
+	footerDistanceMm: number;
+	/** No header or footer on a chapter's first page. */
+	differentFirstPage: boolean;
+	pageNumberStart: number;
+	pageNumberFormat: PageNumberFormat;
+	/**
+	 * Minimum lines of a split paragraph left at a page's foot or carried to the
+	 * next page's head. 1 turns widow/orphan control off.
+	 */
+	widowOrphanLines: number;
+	/**
+	 * A manual "recto" break, and each chapter of a compiled book, starts on an
+	 * odd page, inserting a blank verso when needed.
+	 */
+	chapterStartsOnRecto: boolean;
+}
+
+/**
+ * A folder (or the whole project) compiled as one book: its chapters are the
+ * folder's documents in tree order. Kept per folder in preferences, not in any one
+ * document, because it belongs to all of them.
+ */
+export interface BookSettings {
+	/** The folder's tree path; empty for the project root. */
+	folder: string;
+	title: string;
+	author: string;
+	/** BCP 47, e.g. `en-US`. EPUB requires it. */
+	language: string;
+	/** A project-relative image path, or a data URI. */
+	coverImage?: string;
+	/** The book's own page setup; absent means each chapter's first document's. */
+	pageSetup?: PageSetup;
+	binding: BindingSettings;
+}
+
 export enum BridgeErrorCode {
 	/** No live editor to answer for — an empty pane, or a canvas with no card open. */
 	NoEditor = "noEditor",
@@ -389,7 +531,17 @@ export type NativeCommand =
 	| { type: "renameVersion", payload: RenameVersionCommand }
 	| { type: "revealSearchResult", payload: RevealSearchResultCommand }
 	| { type: "addReply", payload: AddReplyCommand }
-	| { type: "setTitlebarInset", payload: SetTitlebarInsetCommand };
+	| { type: "setTitlebarInset", payload: SetTitlebarInsetCommand }
+	| { type: "setPrintLayout", payload: SetPrintLayoutCommand }
+	| { type: "setPageSetup", payload: SetPageSetupCommand }
+	| { type: "setBookSettings", payload: SetBookSettingsCommand }
+	| { type: "setPrintZoom", payload: SetPrintZoomCommand }
+	| { type: "setDisplayDensity", payload: SetDisplayDensityCommand }
+	| { type: "insertBreak", payload: InsertBreakCommand }
+	| { type: "goToPage", payload: GoToPageCommand }
+	| { type: "printDocument", payload: PrintDocumentCommand }
+	| { type: "exportDocument", payload: ExportDocumentCommand }
+	| { type: "printFinished", payload: PrintFinishedCommand };
 
 /**
  * A command, with its place in the stream.
@@ -699,11 +851,38 @@ export type WebviewEvent =
 	 * superseded by the next.
 	 */
 	| { type: "noteMarkerMoved", payload: NoteMarkerEvent }
-	| { type: "notePreviewDismissed", payload: NotePreviewDismissed };
+	| { type: "notePreviewDismissed", payload: NotePreviewDismissed }
+	| { type: "pageLayoutState", payload: PageLayoutState }
+	| { type: "printRequest", payload: PrintRequest };
 
 export interface EventEnvelope {
 	seq: number;
 	event: WebviewEvent;
+}
+
+export enum ExportFormat {
+	Pdf = "pdf",
+	Epub = "epub",
+	Markdown = "markdown",
+	Html = "html",
+}
+
+/** What a print or export covers. */
+export enum PrintScope {
+	/** The active document. */
+	Document = "document",
+	/** The active document's folder, compiled as a book. */
+	Folder = "folder",
+	/** The whole project, compiled as a book. */
+	Project = "project",
+}
+
+/** Export to a file. The page asks where (a save panel) and writes it. */
+export interface ExportDocumentCommand {
+	format: ExportFormat;
+	scope: PrintScope;
+	/** PDF only: imposed for binding. */
+	bound?: boolean;
 }
 
 /**
@@ -722,6 +901,23 @@ export interface FocusModeView {
 	paragraphIndex: number;
 	paragraphCount: number;
 	wordCount: number;
+}
+
+/** Scroll a page (1-based, as numbered on screen) into view. */
+export interface GoToPageCommand {
+	page: number;
+}
+
+export enum PageBreakKind {
+	Page = "page",
+	Column = "column",
+	/** The next right-hand (odd) page, as a chapter opening. */
+	Recto = "recto",
+}
+
+export interface InsertBreakCommand {
+	target: EditorTarget;
+	kind: PageBreakKind;
 }
 
 /**
@@ -930,6 +1126,73 @@ export interface OpenDocumentCommand {
 	 */
 	path: string;
 	pane: Pane;
+}
+
+/** A page size the inspector can offer. */
+export interface PageSizeOption {
+	id: string;
+	label: string;
+	/** A heading to group the menu by ("ISO A", "Book trim sizes", …). */
+	group: string;
+	widthMm: number;
+	heightMm: number;
+}
+
+/** One line of advice beside the sheets-per-signature control. */
+export interface SignatureAdvice {
+	sheets: number;
+	label: string;
+}
+
+/**
+ * Everything the Page tab shows. Published when the active document, its setup,
+ * its page count or the zoom changes.
+ */
+export interface PageLayoutState {
+	/** Whether the active pane shows pages. */
+	enabled: boolean;
+	/** The active text document, or none (a canvas, or nothing open). */
+	docPath?: string;
+	/** The setup the document lays out in — its own, or the default. */
+	setup: PageSetup;
+	/** False while the document has never been given a setup of its own. */
+	hasOwnSetup: boolean;
+	pageCount: number;
+	currentPage: number;
+	zoom: number;
+	/** The book the active document belongs to. */
+	book: BookSettings;
+	/** The book's chapters, in order: document tree paths. */
+	bookChapters: string[];
+	/** A recommended inside margin for a book of this many pages, in mm. */
+	suggestedInsideMarginMm: number;
+	presets: PageSizeOption[];
+	signatureAdvice: SignatureAdvice[];
+}
+
+/** Print. `bound` imposes the pages for binding, with the book's binding settings. */
+export interface PrintDocumentCommand {
+	scope: PrintScope;
+	bound: boolean;
+}
+
+/** The shell finished (or abandoned) a `PrintRequest`. */
+export interface PrintFinishedCommand {
+	jobId: string;
+	completed: boolean;
+}
+
+/**
+ * Print the web view as it is now, on paper of this size, with no margins and no
+ * scaling: the page has laid out exactly what goes on each sheet.
+ */
+export interface PrintRequest {
+	jobId: string;
+	jobName: string;
+	paperWidthPt: number;
+	paperHeightPt: number;
+	/** Save as PDF here instead of printing. Absent shows the print panel. */
+	pdfPath?: string;
 }
 
 /**
@@ -1240,6 +1503,11 @@ export interface SetAlignmentCommand {
 	alignment: Alignment;
 }
 
+/** Replace the settings of the book the active document belongs to. */
+export interface SetBookSettingsCommand {
+	settings: BookSettings;
+}
+
 export interface SetCaretAtDocPosCommand {
 	target: EditorTarget;
 	/** A ProseMirror position in UTF-16 code units. Clamped to the document. */
@@ -1269,6 +1537,14 @@ export interface SetContentCommand {
 	 * (`useEditorNotes.js`).
 	 */
 	isLoad: boolean;
+}
+
+/**
+ * The display's logical density — its width in points over its width in inches —
+ * which is what "Actual size" zoom needs and only the shell can measure.
+ */
+export interface SetDisplayDensityCommand {
+	pointsPerInch: number;
 }
 
 export interface SetFontFamilyCommand {
@@ -1307,6 +1583,29 @@ export interface SetHighlightCommand {
 	 * False for a preview while the user is still dragging in the color picker.
 	 */
 	remember: boolean;
+}
+
+/** Replace the active document's page setup. One undo step in the document. */
+export interface SetPageSetupCommand {
+	setup: PageSetup;
+}
+
+/** Show the active pane as pages, or as the continuous editor. */
+export interface SetPrintLayoutCommand {
+	enabled: boolean;
+}
+
+export enum ZoomFit {
+	Width = "width",
+	Page = "page",
+	/** Physical size on this display; needs `SetDisplayDensity` first. */
+	Actual = "actual",
+}
+
+/** A zoom level (1 = 100%), or a fit. `fit` wins when both are present. */
+export interface SetPrintZoomCommand {
+	zoom?: number;
+	fit?: ZoomFit;
 }
 
 export interface SetSelectionCommand {

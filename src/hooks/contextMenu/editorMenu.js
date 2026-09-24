@@ -59,8 +59,24 @@ export async function editorMenu(ctx) {
             onEnterFocusMode?.()
           },
         }),
+        await MenuItem.new({
+          text: 'Print Layout',
+          action: () => window.dispatchEvent(new CustomEvent('inkblot:print-layout-toggle')),
+        }),
         await PredefinedMenuItem.new({ item: 'Separator' })
       )
+      // Manual breaks, where the caret is. ⌘↩ and ⇧⌘↩ do the same from the keyboard.
+      if (editor.can().insertPageBreak?.('page')) {
+        items.push(
+          await MenuItem.new({ text: 'Insert Page Break', action: () => editor.chain().focus().insertPageBreak('page').run() }),
+          await MenuItem.new({ text: 'Insert Column Break', action: () => editor.chain().focus().insertPageBreak('column').run() }),
+          await MenuItem.new({
+            text: 'Insert Break to Next Right-Hand Page',
+            action: () => editor.chain().focus().insertPageBreak('recto').run(),
+          }),
+          await PredefinedMenuItem.new({ item: 'Separator' })
+        )
+      }
     }
 
     const { from, to } = editor.state.selection

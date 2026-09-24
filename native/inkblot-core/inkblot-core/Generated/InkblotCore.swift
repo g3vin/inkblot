@@ -138,6 +138,189 @@ public struct BezierPath: Codable, Equatable {
 	}
 }
 
+/// How a printed book is put together — which decides the order pages are laid on
+/// sheets (see `imposition.ts`).
+public enum BindingType: String, Codable, Equatable {
+	/// No imposition: one page per sheet side, in order.
+	case none
+	/// Folded sheets nested into signatures and sewn: case, Coptic, long-stitch.
+	case signatures
+	/// Every page in one signature, stapled through the fold: a booklet.
+	case saddle
+	/// Leaves cut apart and glued at the spine; two per sheet, in reading order.
+	case perfect
+}
+
+public enum SheetFit: String, Codable, Equatable {
+	/// Pages keep their size and sit centred on the half-sheet, with crop marks.
+	case actualSize
+	/// Pages scale to fill the half-sheet.
+	case fit
+}
+
+public enum DuplexMode: String, Codable, Equatable {
+	/// The printer prints both sides (flip on short edge).
+	case automatic
+	/// Every front, then the stack is fed back for the backs in reverse.
+	case manual
+}
+
+public struct BindingSettings: Codable, Equatable {
+	public let binding: BindingType
+	/// Folios (folded sheets) per signature, 1–8; four (16 pages) is the hand-binding norm.
+	public let sheetsPerSignature: UInt32
+	/// The paper the sheets are printed on: a `pageSizes.ts` preset id.
+	public let sheetPresetId: String
+	public let sheetFit: SheetFit
+	public let duplex: DuplexMode
+	/// For creep compensation; 0.1mm is ordinary 20lb / 75gsm paper. 0 turns it off.
+	public let paperThicknessMm: Double
+	public let cropMarks: Bool
+	/// Also print the folding guide as a last sheet.
+	public let includeGuide: Bool
+
+	public init(binding: BindingType, sheetsPerSignature: UInt32, sheetPresetId: String, sheetFit: SheetFit, duplex: DuplexMode, paperThicknessMm: Double, cropMarks: Bool, includeGuide: Bool) {
+		self.binding = binding
+		self.sheetsPerSignature = sheetsPerSignature
+		self.sheetPresetId = sheetPresetId
+		self.sheetFit = sheetFit
+		self.duplex = duplex
+		self.paperThicknessMm = paperThicknessMm
+		self.cropMarks = cropMarks
+		self.includeGuide = includeGuide
+	}
+}
+
+public enum PageOrientation: String, Codable, Equatable {
+	case portrait
+	case landscape
+}
+
+/// Page margins. `inside`/`outside` are left/right on a recto (odd) page, and swap
+/// on a verso when `PageSetup::mirror_margins` is set.
+public struct PageMargins: Codable, Equatable {
+	public let topMm: Double
+	public let bottomMm: Double
+	public let insideMm: Double
+	public let outsideMm: Double
+	/// Extra binding allowance added to the inside margin.
+	public let gutterMm: Double
+
+	public init(topMm: Double, bottomMm: Double, insideMm: Double, outsideMm: Double, gutterMm: Double) {
+		self.topMm = topMm
+		self.bottomMm = bottomMm
+		self.insideMm = insideMm
+		self.outsideMm = outsideMm
+		self.gutterMm = gutterMm
+	}
+}
+
+/// One running header or footer: three slots, each a template of literal text and
+/// the tokens `{page}`, `{pages}`, `{title}`, `{chapter}` and `{author}`. On a verso
+/// page of a mirrored setup, left and right swap so "outside" stays outside.
+public struct RunningText: Codable, Equatable {
+	public let left: String
+	public let center: String
+	public let right: String
+
+	public init(left: String, center: String, right: String) {
+		self.left = left
+		self.center = center
+		self.right = right
+	}
+}
+
+/// Page-number numerals.
+public enum PageNumberFormat: String, Codable, Equatable {
+	case arabic
+	case upperRoman
+	case lowerRoman
+}
+
+public struct PageSetup: Codable, Equatable {
+	/// A `pageSizes.ts` preset id, or `"custom"`.
+	public let presetId: String
+	/// Portrait width and height; `orientation` decides which is horizontal.
+	public let widthMm: Double
+	public let heightMm: Double
+	public let orientation: PageOrientation
+	public let margins: PageMargins
+	public let mirrorMargins: Bool
+	/// Text columns per page, 1–3.
+	public let columns: UInt32
+	public let columnGapMm: Double
+	/// The running head and foot of every page — or of recto pages only, when a
+	/// verso override is set.
+	public let header: RunningText
+	public let footer: RunningText
+	/// A different head/foot for verso (even) pages, as a book sets the title on
+	/// the left page and the chapter on the right.
+	public let versoHeader: RunningText?
+	public let versoFooter: RunningText?
+	/// Distance from the paper edge to the header's top / the footer's bottom.
+	public let headerDistanceMm: Double
+	public let footerDistanceMm: Double
+	/// No header or footer on a chapter's first page.
+	public let differentFirstPage: Bool
+	public let pageNumberStart: UInt32
+	public let pageNumberFormat: PageNumberFormat
+	/// Minimum lines of a split paragraph left at a page's foot or carried to the
+	/// next page's head. 1 turns widow/orphan control off.
+	public let widowOrphanLines: UInt32
+	/// A manual "recto" break, and each chapter of a compiled book, starts on an
+	/// odd page, inserting a blank verso when needed.
+	public let chapterStartsOnRecto: Bool
+
+	public init(presetId: String, widthMm: Double, heightMm: Double, orientation: PageOrientation, margins: PageMargins, mirrorMargins: Bool, columns: UInt32, columnGapMm: Double, header: RunningText, footer: RunningText, versoHeader: RunningText?, versoFooter: RunningText?, headerDistanceMm: Double, footerDistanceMm: Double, differentFirstPage: Bool, pageNumberStart: UInt32, pageNumberFormat: PageNumberFormat, widowOrphanLines: UInt32, chapterStartsOnRecto: Bool) {
+		self.presetId = presetId
+		self.widthMm = widthMm
+		self.heightMm = heightMm
+		self.orientation = orientation
+		self.margins = margins
+		self.mirrorMargins = mirrorMargins
+		self.columns = columns
+		self.columnGapMm = columnGapMm
+		self.header = header
+		self.footer = footer
+		self.versoHeader = versoHeader
+		self.versoFooter = versoFooter
+		self.headerDistanceMm = headerDistanceMm
+		self.footerDistanceMm = footerDistanceMm
+		self.differentFirstPage = differentFirstPage
+		self.pageNumberStart = pageNumberStart
+		self.pageNumberFormat = pageNumberFormat
+		self.widowOrphanLines = widowOrphanLines
+		self.chapterStartsOnRecto = chapterStartsOnRecto
+	}
+}
+
+/// A folder (or the whole project) compiled as one book: its chapters are the
+/// folder's documents in tree order. Kept per folder in preferences, not in any one
+/// document, because it belongs to all of them.
+public struct BookSettings: Codable, Equatable {
+	/// The folder's tree path; empty for the project root.
+	public let folder: String
+	public let title: String
+	public let author: String
+	/// BCP 47, e.g. `en-US`. EPUB requires it.
+	public let language: String
+	/// A project-relative image path, or a data URI.
+	public let coverImage: String?
+	/// The book's own page setup; absent means each chapter's first document's.
+	public let pageSetup: PageSetup?
+	public let binding: BindingSettings
+
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings) {
+		self.folder = folder
+		self.title = title
+		self.author = author
+		self.language = language
+		self.coverImage = coverImage
+		self.pageSetup = pageSetup
+		self.binding = binding
+	}
+}
+
 public enum BridgeErrorCode: String, Codable, Equatable {
 	/// No live editor to answer for — an empty pane, or a canvas with no card open.
 	case noEditor
@@ -512,6 +695,16 @@ public enum NativeCommand: Codable, Equatable {
 	case revealSearchResult(RevealSearchResultCommand)
 	case addReply(AddReplyCommand)
 	case setTitlebarInset(SetTitlebarInsetCommand)
+	case setPrintLayout(SetPrintLayoutCommand)
+	case setPageSetup(SetPageSetupCommand)
+	case setBookSettings(SetBookSettingsCommand)
+	case setPrintZoom(SetPrintZoomCommand)
+	case setDisplayDensity(SetDisplayDensityCommand)
+	case insertBreak(InsertBreakCommand)
+	case goToPage(GoToPageCommand)
+	case printDocument(PrintDocumentCommand)
+	case exportDocument(ExportDocumentCommand)
+	case printFinished(PrintFinishedCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -557,7 +750,17 @@ public enum NativeCommand: Codable, Equatable {
 			renameVersion,
 			revealSearchResult,
 			addReply,
-			setTitlebarInset
+			setTitlebarInset,
+			setPrintLayout,
+			setPageSetup,
+			setBookSettings,
+			setPrintZoom,
+			setDisplayDensity,
+			insertBreak,
+			goToPage,
+			printDocument,
+			exportDocument,
+			printFinished
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -788,6 +991,56 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setTitlebarInset(content)
 					return
 				}
+			case .setPrintLayout:
+				if let content = try? container.decode(SetPrintLayoutCommand.self, forKey: .payload) {
+					self = .setPrintLayout(content)
+					return
+				}
+			case .setPageSetup:
+				if let content = try? container.decode(SetPageSetupCommand.self, forKey: .payload) {
+					self = .setPageSetup(content)
+					return
+				}
+			case .setBookSettings:
+				if let content = try? container.decode(SetBookSettingsCommand.self, forKey: .payload) {
+					self = .setBookSettings(content)
+					return
+				}
+			case .setPrintZoom:
+				if let content = try? container.decode(SetPrintZoomCommand.self, forKey: .payload) {
+					self = .setPrintZoom(content)
+					return
+				}
+			case .setDisplayDensity:
+				if let content = try? container.decode(SetDisplayDensityCommand.self, forKey: .payload) {
+					self = .setDisplayDensity(content)
+					return
+				}
+			case .insertBreak:
+				if let content = try? container.decode(InsertBreakCommand.self, forKey: .payload) {
+					self = .insertBreak(content)
+					return
+				}
+			case .goToPage:
+				if let content = try? container.decode(GoToPageCommand.self, forKey: .payload) {
+					self = .goToPage(content)
+					return
+				}
+			case .printDocument:
+				if let content = try? container.decode(PrintDocumentCommand.self, forKey: .payload) {
+					self = .printDocument(content)
+					return
+				}
+			case .exportDocument:
+				if let content = try? container.decode(ExportDocumentCommand.self, forKey: .payload) {
+					self = .exportDocument(content)
+					return
+				}
+			case .printFinished:
+				if let content = try? container.decode(PrintFinishedCommand.self, forKey: .payload) {
+					self = .printFinished(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -927,6 +1180,36 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setTitlebarInset(let content):
 			try container.encode(CodingKeys.setTitlebarInset, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setPrintLayout(let content):
+			try container.encode(CodingKeys.setPrintLayout, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setPageSetup(let content):
+			try container.encode(CodingKeys.setPageSetup, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setBookSettings(let content):
+			try container.encode(CodingKeys.setBookSettings, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setPrintZoom(let content):
+			try container.encode(CodingKeys.setPrintZoom, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setDisplayDensity(let content):
+			try container.encode(CodingKeys.setDisplayDensity, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .insertBreak(let content):
+			try container.encode(CodingKeys.insertBreak, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .goToPage(let content):
+			try container.encode(CodingKeys.goToPage, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .printDocument(let content):
+			try container.encode(CodingKeys.printDocument, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .exportDocument(let content):
+			try container.encode(CodingKeys.exportDocument, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .printFinished(let content):
+			try container.encode(CodingKeys.printFinished, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -1299,6 +1582,8 @@ public enum WebviewEvent: Codable, Equatable {
 	/// superseded by the next.
 	case noteMarkerMoved(NoteMarkerEvent)
 	case notePreviewDismissed(NotePreviewDismissed)
+	case pageLayoutState(PageLayoutState)
+	case printRequest(PrintRequest)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case toolbarState,
@@ -1322,7 +1607,9 @@ public enum WebviewEvent: Codable, Equatable {
 			versionsChanged,
 			showSidebarTab,
 			noteMarkerMoved,
-			notePreviewDismissed
+			notePreviewDismissed,
+			pageLayoutState,
+			printRequest
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1443,6 +1730,16 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .notePreviewDismissed(content)
 					return
 				}
+			case .pageLayoutState:
+				if let content = try? container.decode(PageLayoutState.self, forKey: .payload) {
+					self = .pageLayoutState(content)
+					return
+				}
+			case .printRequest:
+				if let content = try? container.decode(PrintRequest.self, forKey: .payload) {
+					self = .printRequest(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
@@ -1517,6 +1814,12 @@ public enum WebviewEvent: Codable, Equatable {
 		case .notePreviewDismissed(let content):
 			try container.encode(CodingKeys.notePreviewDismissed, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .pageLayoutState(let content):
+			try container.encode(CodingKeys.pageLayoutState, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .printRequest(let content):
+			try container.encode(CodingKeys.printRequest, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -1528,6 +1831,37 @@ public struct EventEnvelope: Codable, Equatable {
 	public init(seq: UInt32, event: WebviewEvent) {
 		self.seq = seq
 		self.event = event
+	}
+}
+
+public enum ExportFormat: String, Codable, Equatable {
+	case pdf
+	case epub
+	case markdown
+	case html
+}
+
+/// What a print or export covers.
+public enum PrintScope: String, Codable, Equatable {
+	/// The active document.
+	case document
+	/// The active document's folder, compiled as a book.
+	case folder
+	/// The whole project, compiled as a book.
+	case project
+}
+
+/// Export to a file. The page asks where (a save panel) and writes it.
+public struct ExportDocumentCommand: Codable, Equatable {
+	public let format: ExportFormat
+	public let scope: PrintScope
+	/// PDF only: imposed for binding.
+	public let bound: Bool?
+
+	public init(format: ExportFormat, scope: PrintScope, bound: Bool?) {
+		self.format = format
+		self.scope = scope
+		self.bound = bound
 	}
 }
 
@@ -1552,6 +1886,32 @@ public struct FocusModeView: Codable, Equatable {
 		self.paragraphIndex = paragraphIndex
 		self.paragraphCount = paragraphCount
 		self.wordCount = wordCount
+	}
+}
+
+/// Scroll a page (1-based, as numbered on screen) into view.
+public struct GoToPageCommand: Codable, Equatable {
+	public let page: UInt32
+
+	public init(page: UInt32) {
+		self.page = page
+	}
+}
+
+public enum PageBreakKind: String, Codable, Equatable {
+	case page
+	case column
+	/// The next right-hand (odd) page, as a chapter opening.
+	case recto
+}
+
+public struct InsertBreakCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let kind: PageBreakKind
+
+	public init(target: EditorTarget, kind: PageBreakKind) {
+		self.target = target
+		self.kind = kind
 	}
 }
 
@@ -1845,6 +2205,115 @@ public struct OpenDocumentCommand: Codable, Equatable {
 	public init(path: String, pane: Pane) {
 		self.path = path
 		self.pane = pane
+	}
+}
+
+/// A page size the inspector can offer.
+public struct PageSizeOption: Codable, Equatable {
+	public let id: String
+	public let label: String
+	/// A heading to group the menu by ("ISO A", "Book trim sizes", …).
+	public let group: String
+	public let widthMm: Double
+	public let heightMm: Double
+
+	public init(id: String, label: String, group: String, widthMm: Double, heightMm: Double) {
+		self.id = id
+		self.label = label
+		self.group = group
+		self.widthMm = widthMm
+		self.heightMm = heightMm
+	}
+}
+
+/// One line of advice beside the sheets-per-signature control.
+public struct SignatureAdvice: Codable, Equatable {
+	public let sheets: UInt32
+	public let label: String
+
+	public init(sheets: UInt32, label: String) {
+		self.sheets = sheets
+		self.label = label
+	}
+}
+
+/// Everything the Page tab shows. Published when the active document, its setup,
+/// its page count or the zoom changes.
+public struct PageLayoutState: Codable, Equatable {
+	/// Whether the active pane shows pages.
+	public let enabled: Bool
+	/// The active text document, or none (a canvas, or nothing open).
+	public let docPath: String?
+	/// The setup the document lays out in — its own, or the default.
+	public let setup: PageSetup
+	/// False while the document has never been given a setup of its own.
+	public let hasOwnSetup: Bool
+	public let pageCount: UInt32
+	public let currentPage: UInt32
+	public let zoom: Double
+	/// The book the active document belongs to.
+	public let book: BookSettings
+	/// The book's chapters, in order: document tree paths.
+	public let bookChapters: [String]
+	/// A recommended inside margin for a book of this many pages, in mm.
+	public let suggestedInsideMarginMm: Double
+	public let presets: [PageSizeOption]
+	public let signatureAdvice: [SignatureAdvice]
+
+	public init(enabled: Bool, docPath: String?, setup: PageSetup, hasOwnSetup: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, book: BookSettings, bookChapters: [String], suggestedInsideMarginMm: Double, presets: [PageSizeOption], signatureAdvice: [SignatureAdvice]) {
+		self.enabled = enabled
+		self.docPath = docPath
+		self.setup = setup
+		self.hasOwnSetup = hasOwnSetup
+		self.pageCount = pageCount
+		self.currentPage = currentPage
+		self.zoom = zoom
+		self.book = book
+		self.bookChapters = bookChapters
+		self.suggestedInsideMarginMm = suggestedInsideMarginMm
+		self.presets = presets
+		self.signatureAdvice = signatureAdvice
+	}
+}
+
+/// Print. `bound` imposes the pages for binding, with the book's binding settings.
+public struct PrintDocumentCommand: Codable, Equatable {
+	public let scope: PrintScope
+	public let bound: Bool
+
+	public init(scope: PrintScope, bound: Bool) {
+		self.scope = scope
+		self.bound = bound
+	}
+}
+
+/// The shell finished (or abandoned) a `PrintRequest`.
+public struct PrintFinishedCommand: Codable, Equatable {
+	public let jobId: String
+	public let completed: Bool
+
+	public init(jobId: String, completed: Bool) {
+		self.jobId = jobId
+		self.completed = completed
+	}
+}
+
+/// Print the web view as it is now, on paper of this size, with no margins and no
+/// scaling: the page has laid out exactly what goes on each sheet.
+public struct PrintRequest: Codable, Equatable {
+	public let jobId: String
+	public let jobName: String
+	public let paperWidthPt: Double
+	public let paperHeightPt: Double
+	/// Save as PDF here instead of printing. Absent shows the print panel.
+	public let pdfPath: String?
+
+	public init(jobId: String, jobName: String, paperWidthPt: Double, paperHeightPt: Double, pdfPath: String?) {
+		self.jobId = jobId
+		self.jobName = jobName
+		self.paperWidthPt = paperWidthPt
+		self.paperHeightPt = paperHeightPt
+		self.pdfPath = pdfPath
 	}
 }
 
@@ -2382,6 +2851,15 @@ public struct SetAlignmentCommand: Codable, Equatable {
 	}
 }
 
+/// Replace the settings of the book the active document belongs to.
+public struct SetBookSettingsCommand: Codable, Equatable {
+	public let settings: BookSettings
+
+	public init(settings: BookSettings) {
+		self.settings = settings
+	}
+}
+
 public struct SetCaretAtDocPosCommand: Codable, Equatable {
 	public let target: EditorTarget
 	/// A ProseMirror position in UTF-16 code units. Clamped to the document.
@@ -2423,6 +2901,16 @@ public struct SetContentCommand: Codable, Equatable {
 		self.docPath = docPath
 		self.content = content
 		self.isLoad = isLoad
+	}
+}
+
+/// The display's logical density — its width in points over its width in inches —
+/// which is what "Actual size" zoom needs and only the shell can measure.
+public struct SetDisplayDensityCommand: Codable, Equatable {
+	public let pointsPerInch: Double
+
+	public init(pointsPerInch: Double) {
+		self.pointsPerInch = pointsPerInch
 	}
 }
 
@@ -2469,6 +2957,42 @@ public struct SetHighlightCommand: Codable, Equatable {
 		self.target = target
 		self.color = color
 		self.remember = remember
+	}
+}
+
+/// Replace the active document's page setup. One undo step in the document.
+public struct SetPageSetupCommand: Codable, Equatable {
+	public let setup: PageSetup
+
+	public init(setup: PageSetup) {
+		self.setup = setup
+	}
+}
+
+/// Show the active pane as pages, or as the continuous editor.
+public struct SetPrintLayoutCommand: Codable, Equatable {
+	public let enabled: Bool
+
+	public init(enabled: Bool) {
+		self.enabled = enabled
+	}
+}
+
+public enum ZoomFit: String, Codable, Equatable {
+	case width
+	case page
+	/// Physical size on this display; needs `SetDisplayDensity` first.
+	case actual
+}
+
+/// A zoom level (1 = 100%), or a fit. `fit` wins when both are present.
+public struct SetPrintZoomCommand: Codable, Equatable {
+	public let zoom: Double?
+	public let fit: ZoomFit?
+
+	public init(zoom: Double?, fit: ZoomFit?) {
+		self.zoom = zoom
+		self.fit = fit
 	}
 }
 

@@ -18,7 +18,7 @@
  * scripts/canvas-tests/editor.mjs mounts this component and exercises all of them.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 
 import { EditorTarget } from '../types'
@@ -40,6 +40,7 @@ import DraftTabPane from './DraftTabPane'
 import FocusModeOverlay from './FocusModeOverlay'
 import VersionComparePane from './VersionComparePane'
 import SFIcon from './SFIcon'
+import PaneEditorSurface from '../print/PaneEditorSurface'
 
 const EMPTY_NOTES = []
 
@@ -684,15 +685,17 @@ export default function EditorCanvas({
               isActive={activeDoc === currentDoc}
             />
           ) : (
-            <div className="pane-scroll">
-              {splitView === 'editor' && (
+            <PaneEditorSurface
+              editor={liveEditor}
+              projectName={projectName}
+              docPath={currentDoc}
+              header={splitView === 'editor' ? (
                 <div className="pane-header pane-header-centered">
                   <span>{currentDoc}</span>
                   <button onClick={closePrimary}>×</button>
                 </div>
-              )}
-              {liveEditor ? <EditorContent editor={liveEditor} className="editor" /> : null}
-            </div>
+              ) : null}
+            />
           )}
           {showWordCountBadge && !primaryIsCanvas && !showDraftPane ? (
             <div className="word-count">{formatWordStats(primaryWordStats)}</div>
@@ -749,13 +752,17 @@ export default function EditorCanvas({
                 isActive={activeDoc === secondaryDoc}
               />
             ) : (
-              <div className="pane-scroll">
-                <div className="pane-header split-header pane-header-centered">
-                  <span>{secondaryDoc}</span>
-                  <button onClick={closeSecondary}>×</button>
-                </div>
-                {liveSecondaryEditor ? <EditorContent editor={liveSecondaryEditor} className="editor" /> : null}
-              </div>
+              <PaneEditorSurface
+                editor={liveSecondaryEditor}
+                projectName={projectName}
+                docPath={secondaryDoc}
+                header={(
+                  <div className="pane-header split-header pane-header-centered">
+                    <span>{secondaryDoc}</span>
+                    <button onClick={closeSecondary}>×</button>
+                  </div>
+                )}
+              />
             )}
             {showWordCountBadge && !secondaryIsCanvas ? (
               <div className="word-count">{formatWordStats(secondaryWordStats)}</div>

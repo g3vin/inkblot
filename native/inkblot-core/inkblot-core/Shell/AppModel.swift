@@ -16,6 +16,7 @@ final class AppModel {
     let tree: ProjectTree
     let sidebar: SidebarModel
     let notePreviews: NotePreviewModel
+    let pageLayout: PageLayoutModel
     let memoRecorder = AudioMemoRecorder()
     let memoPlayer = AudioMemoPlayer()
     let language = LanguageServices()
@@ -28,12 +29,19 @@ final class AppModel {
         tree = ProjectTree(core: core)
         sidebar = SidebarModel(bridge: bridge, core: core)
         notePreviews = NotePreviewModel(bridge: bridge)
+        pageLayout = PageLayoutModel(bridge: bridge)
 
         bridge.addListener { [weak self] event in
             guard let self else { return }
             switch event {
             case .projectChanged(let project):
                 tree.follow(project)
+            case .printRequest(let request):
+                // The page has laid the sheets out; print the web view at their size,
+                // and tell it when it can take them down.
+                web.print(request) { [weak self] completed in
+                    self?.bridge.send(.printFinished(PrintFinishedCommand(jobId: request.jobId, completed: completed)))
+                }
             case .docChanged(let changed) where !tree.filePaths.contains(changed.docPath):
                 // A document the tree has not seen — made by the page, most likely. The
                 // watcher will catch it too; this just does not wait for the latency.
@@ -60,6 +68,12 @@ final class AppModel {
     func align(_ alignment: Alignment) {
         guard let target else { return }
         bridge.send(.setAlignment(SetAlignmentCommand(target: target, alignment: alignment)))
+    }
+
+    /// File ▸ Page Setup…: the inspector's Page tab.
+    func showPageSetup() {
+        sidebar.isPresented = true
+        sidebar.tab = .page
     }
 
     /// Edit ▸ Paste and Match Style. The pasteboard is read here, not in the page —

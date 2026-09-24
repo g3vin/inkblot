@@ -25,6 +25,9 @@ import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import ResizableImage from '../extensions/ResizableImage'
 import TabIndent from '../extensions/TabIndent'
+import { DocPageSetup } from '../print/DocPageSetup'
+import { PageBreak } from '../print/PageBreak'
+import { Pagination } from '../print/PaginationExtension'
 
 /**
  * Everything both panes and cards understand.
@@ -68,6 +71,9 @@ export const buildEditorExtensions = (starterKit) => [
   NoteAnnotation,
   ConversationTile,
   PinterestBoard,
+  DocPageSetup,
+  PageBreak,
+  Pagination,
   ...sharedExtensions(),
 ]
 

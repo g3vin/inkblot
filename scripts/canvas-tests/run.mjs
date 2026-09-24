@@ -40,6 +40,8 @@
  *          final autosave must not recreate the old path
  *   sidebar the right sidebar drawn by the shell: what the page publishes, and each
  *          edit applied the way the React panel applied it
+ *   print  Print Layout's pure logic: page sizes and geometry, where pages break,
+ *          and signature imposition for binding
  *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
  *          through the real @tauri-apps/api modules
  *
@@ -55,7 +57,7 @@
  * Still not covered: anything involving layout, pointer events, or the asset://
  * protocol. Those need the real webview.
  */
-const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar']
+const SUITES = ['m0', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'print']
 
 const failures = []
 

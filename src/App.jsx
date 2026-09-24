@@ -14,6 +14,7 @@ import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import './App.css'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
+import { isNativeShell } from './lib/host'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -210,11 +211,14 @@ export default function App() {
       const items = await menu.items()
 
       let viewSubmenu = null
+      let fileSubmenu = null
       for (const item of items) {
         if (item instanceof Submenu) {
           const text = await item.text()
           if (text === 'View') {
             viewSubmenu = item
+          } else if (text === 'File') {
+            fileSubmenu = item
           }
         }
       }
@@ -252,9 +256,43 @@ export default function App() {
       menuRefs.current.systemItem = systemItem
       menuRefs.current.wordCountItem = wordCountItem
 
+      // Print Layout, printing and export act on the active document; the pane that
+      // owns it listens for these (usePrintLayoutController).
+      const printEvent = (type, detail) => () => window.dispatchEvent(new CustomEvent(type, { detail }))
+      const printLayoutItem = await MenuItem.new({
+        id: 'print-layout-toggle',
+        text: 'Print Layout  ⌥⌘P',
+        action: printEvent('inkblot:print-layout-toggle'),
+      })
+      const exportItems = (scope, labelSuffix = '') => Promise.all([
+        MenuItem.new({ id: `export-pdf-${scope}`, text: `PDF${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'pdf', scope }) }),
+        ...(scope === 'folder'
+          ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for Binding…', action: printEvent('inkblot:export', { format: 'pdf', scope, bound: true }) })]
+          : []),
+        MenuItem.new({ id: `export-epub-${scope}`, text: `EPUB${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'epub', scope }) }),
+        MenuItem.new({ id: `export-md-${scope}`, text: `Markdown${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'markdown', scope }) }),
+        MenuItem.new({ id: `export-html-${scope}`, text: `HTML${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'html', scope }) }),
+      ])
+      const fileItems = [
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        await MenuItem.new({ id: 'page-setup', text: 'Page Setup…', action: printEvent('inkblot:page-setup') }),
+        await MenuItem.new({ id: 'print-document', text: 'Print…  ⌘P', action: printEvent('inkblot:print', { scope: 'document' }) }),
+        await MenuItem.new({ id: 'print-book', text: 'Print Book…', action: printEvent('inkblot:print', { scope: 'folder' }) }),
+        await MenuItem.new({ id: 'print-book-bound', text: 'Print Book for Binding…', action: printEvent('inkblot:print', { scope: 'folder', bound: true }) }),
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        await Submenu.new({ text: 'Export', items: await exportItems('document') }),
+        await Submenu.new({ text: 'Export Book', items: await exportItems('folder') }),
+      ]
+      // The Swift shell draws File ▸ Print and Export, and View ▸ Print Layout, itself.
+      const native = isNativeShell()
+      if (!native) {
+        if (fileSubmenu) await fileSubmenu.append(fileItems)
+        else await menu.append(await Submenu.new({ text: 'File', items: fileItems.slice(1) }))
+      }
+
       const themeItems = [toggleItem, systemItem]
       const accentItems = [await PredefinedMenuItem.new({ item: 'Separator' }), accentItem]
-      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem]
+      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [printLayoutItem])]
 
       if (viewSubmenu) {
         await viewSubmenu.append([...themeItems, ...accentItems, ...displayItems])
