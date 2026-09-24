@@ -29,6 +29,7 @@ import { Fragment, Slice } from '@tiptap/pm/model'
 import { normalizeSession, reconcileSession, composeSentence } from '../lib/bubbleText'
 import { formPage, formPages, formsStateOf, showFormPage, withFormsState } from '../lib/bubbleForms'
 import { writeBubbleSession } from '../lib/bubbleWrite'
+import { marginHangDecorations } from '../lib/marginHang'
 
 /** `detail: { editor, sessionId }` — open the bubble editor on that session. */
 export const BUBBLE_OPEN_EVENT = 'inkblot:bubble-open'
@@ -162,6 +163,8 @@ const textExtent = (style) => {
  * Centre each chip on the text of its line: on the font's own height, ascender to
  * descender, not the line's, which adds the gap above. CSS has no unit for that height,
  * so it is measured once per font and handed to the chip's stylesheet.
+ *
+ * And tell its `.margin-hang` wrapper how wide it is, which depends on its dots or count.
  */
 const fitChips = (view) => {
   for (const chip of view.dom.querySelectorAll('.bubble-session-chip')) {
@@ -169,6 +172,8 @@ const fitChips = (view) => {
     if (!parent) continue
     const extent = textExtent(window.getComputedStyle(parent))
     if (extent) chip.style.setProperty('--bubble-text-extent', String(extent))
+    const width = chip.offsetWidth + parseFloat(window.getComputedStyle(chip).marginLeft)
+    if (width > 0) parent.style.setProperty('--hang-width', `${width}px`)
   }
 }
 
@@ -177,7 +182,7 @@ const buildChips = (doc, editor) => {
   for (const entry of findBubbleSessions(doc)) {
     const count = Array.isArray(entry.session?.aside) ? entry.session.aside.length : 0
     const { page, pages, state } = sessionForms(doc, entry)
-    decorations.push(Decoration.widget(entry.to, () => {
+    decorations.push(...marginHangDecorations(doc, entry.to, () => {
       const chip = document.createElement('button')
       chip.type = 'button'
       chip.className = 'bubble-session-chip'

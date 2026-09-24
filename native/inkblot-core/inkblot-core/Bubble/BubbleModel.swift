@@ -56,8 +56,6 @@ final class BubbleModel {
     /// — which grow, shrink and tint the bubbles — can change with a spring.
     private(set) var joinTargetId: String?
     private(set) var trashArmed = false
-    /// Every open session's chip the page can see. The shell draws them, as glass.
-    private(set) var chips: [BubbleChipRect] = []
 
     /// Where every bubble is, in the editor's coordinates, as last laid out. Read when a
     /// drag starts; not observed, since drawing does not depend on it.
@@ -86,7 +84,6 @@ final class BubbleModel {
         bridge.addListener { [weak self] event in
             switch event {
             case .bubbleSessionOpened(let opened): self?.show(opened)
-            case .bubbleChipsChanged(let changed): self?.chips = changed.chips
             default: break
             }
         }

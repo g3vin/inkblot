@@ -91,3 +91,24 @@
   user-select: none;
 }
 
+/* An indicator that runs into the margin rather than wrap alone (lib/marginHang.js). */
+.margin-hang > :first-child {
+  margin-right: calc(-1 * var(--hang-width, 0px));
+}
+
+/* Collapsible, unlike the editor's own spaces, so the end of a line drops it rather
+   than wrapping for it. As wide as the indicator, and `--hang-gap` for any room it keeps
+   after itself; a space's own width only when it stands in for the one after it. */
+.margin-hang-space {
+  white-space: normal;
+  font-size: 0;
+  word-spacing: calc(var(--hang-width, 0px) + var(--hang-gap, 0px));
+}
+
+.margin-hang.is-before-space .margin-hang-space {
+  font-size: inherit;
+}
+
+.margin-hang-after {
+  white-space: normal;
+}

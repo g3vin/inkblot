@@ -584,18 +584,33 @@
   padding: 0 5px;
   vertical-align: text-top;
   border-radius: 999px;
-  border: 1px solid var(--accent-border);
-  background: linear-gradient(180deg, var(--accent-surface-strong), var(--accent-surface));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  /* Glass tinted with the accent. Drawn here rather than by the shell: it rides the
+     page's own scroll, which a native overlay placed from reported positions trails. */
+  border: 0.5px solid color-mix(in srgb, var(--accent-color) 30%, rgba(255, 255, 255, 0.55));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 60%),
+    color-mix(in srgb, var(--accent-color) 30%, transparent);
+  -webkit-backdrop-filter: blur(6px) saturate(1.6);
+  backdrop-filter: blur(6px) saturate(1.6);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.6),
+    0 1px 3px rgba(0, 0, 0, 0.12);
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
   transition: transform 140ms ease, background 140ms ease;
 }
 
+/* The 2px it keeps after itself, hung in the margin (lib/marginHang.js). */
+.margin-hang:has(> .bubble-session-chip) {
+  --hang-gap: 2px;
+}
+
 .bubble-session-chip:hover {
   transform: scale(1.12);
-  background: var(--accent-surface-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 60%),
+    color-mix(in srgb, var(--accent-color) 42%, transparent);
 }
 
 .bubble-session-chip-dot {
@@ -665,14 +680,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bubble-session.is-form-changed { animation: none; }
-}
-
-/* Under the Swift shell the chip is drawn natively, as Liquid Glass, over this one —
-   which stays, invisible, to take the click. */
-.native-bubble-chips .bubble-session-chip,
-.native-bubble-chips .bubble-session-chip:hover {
-  opacity: 0;
-  transform: none;
 }
 
 /* An icon alone, in a circle as tall as the mode buttons beside it. */

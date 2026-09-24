@@ -11,6 +11,11 @@
   z-index: 2;
 }
 
+/* The dot and its left margin (lib/marginHang.js). */
+.margin-hang:has(> .note-marker) {
+  --hang-width: 10px;
+}
+
 .note-dot {
   display: inline-block;
   width: 8px;
