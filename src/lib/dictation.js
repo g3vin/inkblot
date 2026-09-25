@@ -36,14 +36,6 @@ export async function stopDictation() {
   return invoke('stop_dictation_session')
 }
 
-export async function cancelDictation() {
-  return invoke('cancel_dictation_session')
-}
-
-export async function dictationStatus() {
-  return invoke('dictation_status')
-}
-
 export async function setupDictationListeners({
   onStarted,
   onPartial,

@@ -34,7 +34,7 @@
 use std::sync::Arc;
 
 use inkblot_core::store::preferences::{PreferenceScope, PreferenceStore};
-use inkblot_core::store::{DocumentBody, ProjectStore, StoreError};
+use inkblot_core::store::{ProjectStore, StoreError};
 
 uniffi::setup_scaffolding!();
 
@@ -208,24 +208,6 @@ impl InkblotCore {
 
     pub fn document_exists(&self, project_name: String, doc_name: String) -> bool {
         self.projects.document_exists(&project_name, &doc_name)
-    }
-
-    /// A new, empty text document — `{ content: [], notes: [], versions: [] }`, which is
-    /// what the web tree's "New Document" writes through `saveDocument`. Through the
-    /// core's `save_document` rather than a raw write, so the key whitelist is the one
-    /// both shells share.
-    ///
-    /// Refuses an existing document rather than emptying it: the caller picked a name,
-    /// and a name that is taken is a question for the user, not a reason to lose a file.
-    pub fn create_document(&self, project_name: String, doc_name: String) -> Result<(), CoreError> {
-        if self.projects.document_exists(&project_name, &doc_name) {
-            return Err(CoreError::Failed(format!("{doc_name} already exists")));
-        }
-        let body = DocumentBody {
-            content: serde_json::json!([]),
-            notes: serde_json::json!([]),
-        };
-        Ok(self.projects.save_document(&project_name, &doc_name, &body, None)?)
     }
 }
 

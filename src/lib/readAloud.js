@@ -98,10 +98,6 @@ let kokoroVoiceFetchPatched = false
 let kokoroVoiceCachePatched = false
 let transformersConfigured = false
 
-export function getReadableEditorText(editor) {
-  return getReadableEditorPayload(editor).text
-}
-
 /**
  * Flatten the editor doc (or current selection) into plain text plus:
  * charToPos (text offset → doc position) and word ranges, used for

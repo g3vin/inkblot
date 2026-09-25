@@ -37,12 +37,6 @@ const waitForWindowCreated = (win, { timeoutMs = 5000 } = {}) => {
   })
 }
 
-const getPinterestConnectUrl = (targetUrl = '') => {
-  const next = String(targetUrl || '').trim()
-  if (!next) return 'https://www.pinterest.com/login/'
-  return `https://www.pinterest.com/login/?next=${encodeURIComponent(next)}`
-}
-
 export async function getPinterestWindow({ waitForCreate = false, timeoutMs = 5000 } = {}) {
   if (waitForCreate && pinterestWindowReady) {
     const readyWindow = await pinterestWindowReady
@@ -153,8 +147,4 @@ export async function openPinterest(query = '', options = {}) {
   })
 
   return options?.waitForCreate ? await getPinterestWindow({ waitForCreate: true }) : pinterestWindow
-}
-
-export async function connectPinterest(targetUrl = '') {
-  return openPinterest(getPinterestConnectUrl(targetUrl || PINTEREST_HOME_URL))
 }

@@ -360,10 +360,6 @@ export const regroupWords = (words: BubbleWord[]): BubbleWord[] =>
 export const regroupClauses = (words: BubbleWord[]): BubbleWord[] =>
   toWords(grouped(tokensOf(words), BubbleMode.Clauses))
 
-/** The paragraph regrouped into sentences. */
-export const regroupSentences = (words: BubbleWord[]): BubbleWord[] =>
-  toWords(grouped(tokensOf(words), BubbleMode.Sentences))
-
 /** The bubbles regrouped for a mode. */
 export const regroup = (words: BubbleWord[], mode: BubbleMode): BubbleWord[] => (
   mode === BubbleMode.Words ? regroupWords(words) : toWords(grouped(tokensOf(words), mode))
