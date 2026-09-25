@@ -243,6 +243,23 @@ export interface AudioClip {
 	createdAt: string;
 }
 
+/**
+ * Who wrote it, for title pages and running heads. One per app: it is the writer's,
+ * not any one project's.
+ */
+export interface AuthorProfile {
+	/** The name on the work — a pen name, if there is one. */
+	byline: string;
+	/** The name the contact details are under. */
+	legalName: string;
+	/** Street address, one line per line. */
+	address: string;
+	email: string;
+	phone: string;
+	/** An agent or agency, when the work goes out through one. */
+	agent: string;
+}
+
 export interface Point {
 	x: number;
 	y: number;
@@ -360,6 +377,77 @@ export enum PageNumberFormat {
 	LowerRoman = "lowerRoman",
 }
 
+export enum LineSpacing {
+	Single = "single",
+	OneAndAHalf = "oneAndAHalf",
+	Double = "double",
+	/** `line_value` times the font's size. */
+	Multiple = "multiple",
+	/** Exactly `line_value` points from baseline to baseline, as a script is set. */
+	Exact = "exact",
+}
+
+export enum PrintAlignment {
+	Left = "left",
+	Justify = "justify",
+}
+
+/** How a chapter's first paragraph opens. */
+export enum ChapterOpening {
+	Plain = "plain",
+	/** A large initial set into the first lines. */
+	DropCap = "dropCap",
+	/** The first line in small capitals. */
+	SmallCaps = "smallCaps",
+	DropCapAndSmallCaps = "dropCapAndSmallCaps",
+}
+
+/**
+ * Type for print: set on the page's text in Print Layout, on paper and in the PDF,
+ * and carried into a DOCX's styles — never on the continuous editor.
+ */
+export interface PrintTypography {
+	/** A CSS font family list: `"Courier Prime", Courier, monospace`. */
+	fontFamily: string;
+	fontSizePt: number;
+	lineSpacing: LineSpacing;
+	/** The multiple, or the exact leading in points; unused otherwise. */
+	lineValue: number;
+	firstLineIndentMm: number;
+	/** Space between paragraphs. */
+	paragraphSpacingPt: number;
+	alignment: PrintAlignment;
+	hyphenate: boolean;
+	/**
+	 * What a horizontal rule prints as — a scene break: `#`, `* * *`, `❧`. Empty
+	 * prints a blank line.
+	 */
+	sceneBreak: string;
+	chapterOpening: ChapterOpening;
+	/** How far down the page a chapter's title starts, below the top margin. */
+	chapterSinkMm: number;
+	/** A paragraph after a heading or a scene break starts flush, as books set it. */
+	noIndentAfterBreak: boolean;
+}
+
+export enum TitlePageStyle {
+	/**
+	 * Contact details top-left, word count top-right, title and byline centred: the
+	 * standard manuscript submission.
+	 */
+	Manuscript = "manuscript",
+	/** Title, author, and nothing else: a book's title page. */
+	Book = "book",
+	/** Title, "Written by", author centred; contact details bottom-left. */
+	Screenplay = "screenplay",
+}
+
+export interface TitlePageOptions {
+	style: TitlePageStyle;
+	showContact: boolean;
+	showWordCount: boolean;
+}
+
 export interface PageSetup {
 	/** A `pageSizes.ts` preset id, or `"custom"`. */
 	presetId: string;
@@ -406,6 +494,13 @@ export interface PageSetup {
 	 * changed so the inspector can say "Standard Manuscript (modified)".
 	 */
 	formatId?: string;
+	/**
+	 * How the text is set on the page. Absent prints in the editor's own font, as a
+	 * document always did before it could be set for print.
+	 */
+	typography?: PrintTypography;
+	/** A title page before the text, printed and exported but never numbered. */
+	titlePage?: TitlePageOptions;
 }
 
 /**
@@ -851,7 +946,8 @@ export type NativeCommand =
 	| { type: "useSetupForBook", payload: UseSetupForBookCommand }
 	| { type: "clearBookSetup", payload: ClearBookSetupCommand }
 	| { type: "refreshBookChapters", payload: RefreshBookChaptersCommand }
-	| { type: "setPrintScope", payload: SetPrintScopeCommand };
+	| { type: "setPrintScope", payload: SetPrintScopeCommand }
+	| { type: "setAuthorProfile", payload: SetAuthorProfileCommand };
 
 /**
  * A command, with its place in the stream.
@@ -1934,6 +2030,8 @@ export interface PageLayoutCatalog {
 	formats: FormatOption[];
 	signatureAdvice: SignatureAdvice[];
 	tokens: RunningToken[];
+	/** What "Set Type for Print" starts from. */
+	defaultTypography: PrintTypography;
 }
 
 /** Where the setup a document lays out in came from. */
@@ -1983,6 +2081,13 @@ export interface PageLayoutState {
 	bookChapters: string[];
 	/** A recommended inside margin for a book of this many pages, in mm. */
 	suggestedInsideMarginMm: number;
+	/** Who wrote it: the title page's byline and contact details. */
+	author?: AuthorProfile;
+	/**
+	 * Words in what Print covers — the document, or the book — as a title page
+	 * gives them.
+	 */
+	wordCount?: number;
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
@@ -2518,6 +2623,11 @@ export enum Alignment {
 export interface SetAlignmentCommand {
 	target: EditorTarget;
 	alignment: Alignment;
+}
+
+/** Replace the writer's profile — byline and contact details — for every project. */
+export interface SetAuthorProfileCommand {
+	profile: AuthorProfile;
 }
 
 export interface SetBibliographyOptionsCommand {

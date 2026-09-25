@@ -19,6 +19,7 @@ import { SIGNATURE_GUIDANCE } from './imposition'
 import { normalizePageSetup, resolvePageSetup, suggestedInsideMarginMm } from './pageSetup'
 import { fromMm, PAGE_SIZE_GROUP_LABELS, PAGE_SIZE_PRESETS, matchPageSizePreset, toMm } from './pageSizes'
 import { bookFolderForScope, getBookSettings, getPrintScope, setBookSettings, setPrintScope, usePrintLayoutStore } from './printLayoutStore'
+import { BOOK_TYPOGRAPHY } from './typography'
 import { useDocPageSetup } from './useDocPageSetup'
 import { usePrintJobStatus } from './usePrintJobStatus'
 import './PageSetupSheet.css'
@@ -275,6 +276,68 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
               {setup.columns > 1 ? <Length label="Gap" mm={setup.columnGapMm} unit={unit} onChange={(v) => apply({ columnGapMm: v })} /> : null}
             </div>
             {setup.columns > 1 ? <p className="pss-note">Pages are edited as a single running column; Print, PDF and binding set the columns side by side.</p> : null}
+          </section>
+
+          <section>
+            <h3>Typography</h3>
+            <label className="pss-check">
+              <input
+                type="checkbox"
+                checked={Boolean(setup.typography)}
+                onChange={(event) => apply({ typography: event.target.checked ? { ...BOOK_TYPOGRAPHY } : undefined })}
+              />
+              Set type for print
+            </label>
+            {setup.typography ? (() => {
+              const t = setup.typography
+              const applyType = (patch) => apply({ typography: { ...t, ...patch } })
+              return (
+                <>
+                  <label className="pss-field wide">
+                    <span>Font</span>
+                    <input key={`f:${t.fontFamily}`} defaultValue={t.fontFamily} onBlur={(event) => applyType({ fontFamily: event.target.value })} />
+                  </label>
+                  <div className="pss-row">
+                    <label className="pss-field">
+                      <span>Size</span>
+                      <input type="number" min="5" max="72" step="0.5" key={`s:${t.fontSizePt}`} defaultValue={t.fontSizePt} onBlur={(event) => applyType({ fontSizePt: Number(event.target.value) || t.fontSizePt })} />
+                      <em>pt</em>
+                    </label>
+                    <label className="pss-field">
+                      <span>Spacing</span>
+                      <select value={t.lineSpacing} onChange={(event) => applyType({ lineSpacing: event.target.value })}>
+                        <option value="single">Single</option>
+                        <option value="oneAndAHalf">1.5 lines</option>
+                        <option value="double">Double</option>
+                        <option value="multiple">Multiple</option>
+                        <option value="exact">Exactly</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="pss-row">
+                    <Length label="Indent" mm={t.firstLineIndentMm} unit={unit} onChange={(v) => applyType({ firstLineIndentMm: v })} />
+                    <label className="pss-field">
+                      <span>Scene break</span>
+                      <input key={`b:${t.sceneBreak}`} defaultValue={t.sceneBreak} onBlur={(event) => applyType({ sceneBreak: event.target.value })} />
+                    </label>
+                  </div>
+                  <div className="pss-segmented" role="radiogroup" aria-label="Alignment">
+                    {[['left', 'Ragged Right'], ['justify', 'Justified']].map(([value, label]) => (
+                      <button key={value} type="button" className={t.alignment === value ? 'is-on' : ''} onClick={() => applyType({ alignment: value })}>{label}</button>
+                    ))}
+                  </div>
+                  <p className="pss-note">Type for print shows in Print Layout and on paper; the editor keeps your writing font.</p>
+                </>
+              )
+            })() : null}
+            <label className="pss-check">
+              <input
+                type="checkbox"
+                checked={Boolean(setup.titlePage)}
+                onChange={(event) => apply({ titlePage: event.target.checked ? { style: 'book', showContact: false, showWordCount: false } : undefined })}
+              />
+              Add a title page when printing
+            </label>
           </section>
 
           <section>

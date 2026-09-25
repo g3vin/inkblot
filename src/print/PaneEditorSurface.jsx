@@ -14,7 +14,7 @@ import { EditorContent } from '@tiptap/react'
 
 import PrintLayoutView from './PrintLayoutView'
 import { useDocPageSetup } from './useDocPageSetup'
-import { getBookForDoc, getPrintZoom, isPrintLayoutEnabled, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
+import { bookAuthor, getBookForDoc, getPrintZoom, isPrintLayoutEnabled, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
 import { resolvePageSetup } from './pageSetup'
 
 /**
@@ -42,6 +42,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
   )
   const printLayout = Boolean(editor) && isPrintLayoutEnabled(projectName, docPath)
   const zoom = getPrintZoom()
+  const author = projectName && docPath ? bookAuthor(getBookForDoc(projectName, docPath)) : ''
 
   const setScroll = useCallback((el) => {
     setScrollEl(el)
@@ -62,6 +63,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           zoom={zoom}
           onZoomChange={setPrintZoom}
           docTitle={baseName(docPath)}
+          author={author}
           scrollEl={scrollEl}
           // The pane, not the scroller: the zoom bar stays put while the pages scroll.
           statusHost={scrollEl?.parentElement || null}

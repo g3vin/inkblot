@@ -98,6 +98,116 @@ pub struct PageSetup {
     /// changed so the inspector can say "Standard Manuscript (modified)".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format_id: Option<String>,
+    /// How the text is set on the page. Absent prints in the editor's own font, as a
+    /// document always did before it could be set for print.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub typography: Option<PrintTypography>,
+    /// A title page before the text, printed and exported but never numbered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_page: Option<TitlePageOptions>,
+}
+
+/* ---------------- typography ---------------- */
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LineSpacing {
+    Single,
+    OneAndAHalf,
+    Double,
+    /// `line_value` times the font's size.
+    Multiple,
+    /// Exactly `line_value` points from baseline to baseline, as a script is set.
+    Exact,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PrintAlignment {
+    Left,
+    Justify,
+}
+
+/// How a chapter's first paragraph opens.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChapterOpening {
+    Plain,
+    /// A large initial set into the first lines.
+    DropCap,
+    /// The first line in small capitals.
+    SmallCaps,
+    DropCapAndSmallCaps,
+}
+
+/// Type for print: set on the page's text in Print Layout, on paper and in the PDF,
+/// and carried into a DOCX's styles — never on the continuous editor.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrintTypography {
+    /// A CSS font family list: `"Courier Prime", Courier, monospace`.
+    pub font_family: String,
+    pub font_size_pt: f64,
+    pub line_spacing: LineSpacing,
+    /// The multiple, or the exact leading in points; unused otherwise.
+    pub line_value: f64,
+    pub first_line_indent_mm: f64,
+    /// Space between paragraphs.
+    pub paragraph_spacing_pt: f64,
+    pub alignment: PrintAlignment,
+    pub hyphenate: bool,
+    /// What a horizontal rule prints as — a scene break: `#`, `* * *`, `❧`. Empty
+    /// prints a blank line.
+    pub scene_break: String,
+    pub chapter_opening: ChapterOpening,
+    /// How far down the page a chapter's title starts, below the top margin.
+    pub chapter_sink_mm: f64,
+    /// A paragraph after a heading or a scene break starts flush, as books set it.
+    pub no_indent_after_break: bool,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TitlePageStyle {
+    /// Contact details top-left, word count top-right, title and byline centred: the
+    /// standard manuscript submission.
+    Manuscript,
+    /// Title, author, and nothing else: a book's title page.
+    Book,
+    /// Title, "Written by", author centred; contact details bottom-left.
+    Screenplay,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TitlePageOptions {
+    pub style: TitlePageStyle,
+    pub show_contact: bool,
+    pub show_word_count: bool,
+}
+
+/// Who wrote it, for title pages and running heads. One per app: it is the writer's,
+/// not any one project's.
+#[typeshare]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AuthorProfile {
+    /// The name on the work — a pen name, if there is one.
+    pub byline: String,
+    /// The name the contact details are under.
+    pub legal_name: String,
+    /// Street address, one line per line.
+    pub address: String,
+    pub email: String,
+    pub phone: String,
+    /// An agent or agency, when the work goes out through one.
+    pub agent: String,
 }
 
 /* ---------------- binding and books ---------------- */

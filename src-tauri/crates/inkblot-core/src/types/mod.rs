@@ -56,8 +56,9 @@ pub use note::{
     NOTE_COLOR_OPTIONS,
 };
 pub use page_setup::{
-    BindingSettings, BindingType, BookSettings, DuplexMode, PageMargins, PageNumberFormat,
-    PageOrientation, PageSetup, RunningText, SheetFit,
+    AuthorProfile, BindingSettings, BindingType, BookSettings, ChapterOpening, DuplexMode,
+    LineSpacing, PageMargins, PageNumberFormat, PageOrientation, PageSetup, PrintAlignment,
+    PrintTypography, RunningText, SheetFit, TitlePageOptions, TitlePageStyle,
 };
 pub use read_aloud::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
 pub use search::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};

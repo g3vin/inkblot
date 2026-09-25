@@ -13,6 +13,7 @@ import { getDocPreviewExtensions } from '../../lib/editorExtensions'
 import { normalizePageSetup } from '../pageSetup'
 import type { PageSetup } from '../pageSetup'
 import { PageOrientation } from '../../types'
+import { leadingPt } from '../typography'
 import { portableContent } from './portable'
 import type { PMJSON } from './portable'
 
@@ -99,6 +100,15 @@ ${setup.mirrorMargins ? `@page :left { margin-left: ${mm(m.outsideMm)}; margin-r
   h1, h2, h3 { break-after: avoid; }
   p { orphans: ${setup.widowOrphanLines}; widows: ${setup.widowOrphanLines}; }
 }`
+  const t = setup.typography
+  const typeCss = t ? `
+main { font-family: ${t.fontFamily}; font-size: ${t.fontSizePt}pt; line-height: ${Math.round(leadingPt(t) * 100) / 100}pt; text-align: ${t.alignment === 'justify' ? 'justify' : 'left'}; hyphens: ${t.hyphenate ? 'auto' : 'manual'}; }
+main p { margin: 0 0 ${t.paragraphSpacingPt}pt; text-indent: ${t.firstLineIndentMm}mm; }
+main :is(li, td, th, blockquote) p { text-indent: 0; }
+${t.noIndentAfterBreak ? 'main :is(h1, h2, h3, hr) + p, .chapter > p:first-child { text-indent: 0; }' : ''}
+main hr { border: 0; text-align: center; }
+main hr::after { content: ${JSON.stringify(t.sceneBreak)}; letter-spacing: 0.2em; }
+.chapter > h1:first-child { padding-top: ${t.chapterSinkMm}mm; text-align: center; }` : ''
   const body = chapters.map((chapter, i) => (
     `<section class="chapter" id="chapter-${i + 1}" aria-label="${escapeHtml(chapter.title)}">\n${chapterBodyHtml(chapter.content)}\n</section>`
   )).join('\n')
@@ -109,7 +119,7 @@ ${setup.mirrorMargins ? `@page :left { margin-left: ${mm(m.outsideMm)}; margin-r
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 ${author ? `<meta name="author" content="${escapeHtml(author)}">\n` : ''}<meta name="generator" content="Inkblot">
-<style>${PROSE_CSS}${pageCss}
+<style>${PROSE_CSS}${pageCss}${typeCss}
 </style>
 </head>
 <body>
