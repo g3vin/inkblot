@@ -510,6 +510,9 @@ fn every_event() -> Vec<WebviewEvent> {
             user_edit: true,
             word_count: 120,
             char_count: 640,
+            inserted: 3,
+            deleted: 1,
+            paste: false,
         }),
         WebviewEvent::NotesRemapped(NotesRemapped {
             doc_path: "chapters/one.md".into(),
@@ -947,6 +950,9 @@ fn envelope_sequence_numbers_survive_the_wire() {
             user_edit: true,
             word_count: 1,
             char_count: 2,
+            inserted: 0,
+            deleted: 0,
+            paste: true,
         }),
     });
 

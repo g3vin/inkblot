@@ -1852,6 +1852,32 @@ public struct CreateReferenceCommand: Codable, Equatable {
 	}
 }
 
+/// One local day, summed.
+public struct DayStat: Codable, Equatable {
+	/// `YYYY-MM-DD`, the writer's local date.
+	public let day: String
+	public let openSecs: UInt32
+	public let activeSecs: UInt32
+	public let wordsAdded: UInt32
+	public let wordsDeleted: UInt32
+	public let wordsPasted: UInt32
+	/// Sessions that began on this day.
+	public let sessions: UInt32
+	/// Active seconds in each of the day's 24 local hours.
+	public let hours: [UInt32]
+
+	public init(day: String, openSecs: UInt32, activeSecs: UInt32, wordsAdded: UInt32, wordsDeleted: UInt32, wordsPasted: UInt32, sessions: UInt32, hours: [UInt32]) {
+		self.day = day
+		self.openSecs = openSecs
+		self.activeSecs = activeSecs
+		self.wordsAdded = wordsAdded
+		self.wordsDeleted = wordsDeleted
+		self.wordsPasted = wordsPasted
+		self.sessions = sessions
+		self.hours = hours
+	}
+}
+
 /// Delete a file or folder. The shell has already asked the user.
 public struct DeleteEntryCommand: Codable, Equatable {
 	public let path: String
@@ -1988,13 +2014,42 @@ public struct DocChanged: Codable, Equatable {
 	public let userEdit: Bool
 	public let wordCount: UInt32
 	public let charCount: UInt32
+	/// Positions inserted and removed since the last `DocChanged` for this pane.
+	/// 
+	/// The page throttles this event, so these are sums over every transaction in the
+	/// window, not one keystroke. Positions rather than characters — a split paragraph
+	/// is two — which is close enough for "how much did the writer do", and exact for
+	/// plain typing.
+	public let inserted: UInt32?
+	public let deleted: UInt32?
+	/// The window was a paste or a drop. The page sends one on its own rather than
+	/// folding it into the typing around it, so a shell can tell written words from
+	/// pasted ones.
+	public let paste: Bool?
 
-	public init(pane: Pane, docPath: String, userEdit: Bool, wordCount: UInt32, charCount: UInt32) {
+	public init(pane: Pane, docPath: String, userEdit: Bool, wordCount: UInt32, charCount: UInt32, inserted: UInt32?, deleted: UInt32?, paste: Bool?) {
 		self.pane = pane
 		self.docPath = docPath
 		self.userEdit = userEdit
 		self.wordCount = wordCount
 		self.charCount = charCount
+		self.inserted = inserted
+		self.deleted = deleted
+		self.paste = paste
+	}
+}
+
+/// A saved document's length, read from disk.
+public struct DocWordCount: Codable, Equatable {
+	public let docPath: String
+	public let words: UInt32
+	/// UTF-16 code units of text, as the page's `textContent.length` counts them.
+	public let chars: UInt32
+
+	public init(docPath: String, words: UInt32, chars: UInt32) {
+		self.docPath = docPath
+		self.words = words
+		self.chars = chars
 	}
 }
 
@@ -4676,6 +4731,69 @@ public struct ShowSidebarTab: Codable, Equatable {
 	}
 }
 
+/// One minute of a session. `minute` counts from the session's start, so a session
+/// that runs past midnight lands its later minutes on the next day.
+public struct StatsMinute: Codable, Equatable {
+	public let minute: UInt32
+	/// Seconds in this minute the document was in front of the writer.
+	public let openSecs: UInt32?
+	/// Seconds in this minute the writer was typing — see `WritingSession::active_secs`.
+	public let activeSecs: UInt32?
+	public let wordsAdded: UInt32?
+	public let wordsDeleted: UInt32?
+	public let wordsPasted: UInt32?
+
+	public init(minute: UInt32, openSecs: UInt32?, activeSecs: UInt32?, wordsAdded: UInt32?, wordsDeleted: UInt32?, wordsPasted: UInt32?) {
+		self.minute = minute
+		self.openSecs = openSecs
+		self.activeSecs = activeSecs
+		self.wordsAdded = wordsAdded
+		self.wordsDeleted = wordsDeleted
+		self.wordsPasted = wordsPasted
+	}
+}
+
+/// Which sessions a query is about. No project is everything; a project with no
+/// document is the whole project.
+public struct StatsScope: Codable, Equatable {
+	public let project: String?
+	public let docPath: String?
+
+	public init(project: String?, docPath: String?) {
+		self.project = project
+		self.docPath = docPath
+	}
+}
+
+/// Everything in a scope, summed.
+public struct StatsTotals: Codable, Equatable {
+	public let sessions: UInt32
+	public let openSecs: UInt32
+	public let activeSecs: UInt32
+	public let wordsAdded: UInt32
+	public let wordsDeleted: UInt32
+	public let wordsPasted: UInt32
+	public let longestSessionSecs: UInt32
+	/// Local days with any words written.
+	public let daysWritten: UInt32
+	/// Unix milliseconds of the first and latest session, when there are any.
+	public let firstSession: Double?
+	public let lastSession: Double?
+
+	public init(sessions: UInt32, openSecs: UInt32, activeSecs: UInt32, wordsAdded: UInt32, wordsDeleted: UInt32, wordsPasted: UInt32, longestSessionSecs: UInt32, daysWritten: UInt32, firstSession: Double?, lastSession: Double?) {
+		self.sessions = sessions
+		self.openSecs = openSecs
+		self.activeSecs = activeSecs
+		self.wordsAdded = wordsAdded
+		self.wordsDeleted = wordsDeleted
+		self.wordsPasted = wordsPasted
+		self.longestSessionSecs = longestSessionSecs
+		self.daysWritten = daysWritten
+		self.firstSession = firstSession
+		self.lastSession = lastSession
+	}
+}
+
 public struct StoryFolderPreset: Codable, Equatable {
 	public let key: String
 	public let name: String
@@ -4846,6 +4964,43 @@ public struct TilesChanged: Codable, Equatable {
 
 	public init(tiles: [WorkbenchTile]) {
 		self.tiles = tiles
+	}
+}
+
+/// One run of the writing timer: a routine from its start to its end, or to where the
+/// writer stopped it. Recorded as it goes, like a session, and kept by `id`.
+public struct TimerRun: Codable, Equatable {
+	public let id: String
+	public let routineName: String
+	/// The project open when the run began.
+	public let project: String?
+	/// Unix milliseconds.
+	public let start: Double
+	public let end: Double
+	public let utcOffsetMinutes: Int32
+	/// Time in writing segments and in breaks, paused time excluded.
+	public let writeSecs: UInt32?
+	public let breakSecs: UInt32?
+	public let wordsWritten: UInt32?
+	/// Writing segments that ran to their end — a sprint finished, not skipped.
+	public let sprintsCompleted: UInt32?
+	public let sprintsSkipped: UInt32?
+	/// The routine ran to its last segment, rather than being stopped.
+	public let completed: Bool?
+
+	public init(id: String, routineName: String, project: String?, start: Double, end: Double, utcOffsetMinutes: Int32, writeSecs: UInt32?, breakSecs: UInt32?, wordsWritten: UInt32?, sprintsCompleted: UInt32?, sprintsSkipped: UInt32?, completed: Bool?) {
+		self.id = id
+		self.routineName = routineName
+		self.project = project
+		self.start = start
+		self.end = end
+		self.utcOffsetMinutes = utcOffsetMinutes
+		self.writeSecs = writeSecs
+		self.breakSecs = breakSecs
+		self.wordsWritten = wordsWritten
+		self.sprintsCompleted = sprintsCompleted
+		self.sprintsSkipped = sprintsSkipped
+		self.completed = completed
 	}
 }
 
@@ -5078,6 +5233,63 @@ public struct WordCountsChanged: Codable, Equatable {
 
 	public init(badges: [WordCountBadge]) {
 		self.badges = badges
+	}
+}
+
+/// One sitting at one document.
+/// 
+/// A session ends when the writer moves to another document or project, or has been
+/// away longer than the idle cutoff. A shell records the same session repeatedly as it
+/// goes — a checkpoint, so a crash loses a minute rather than an evening — and the
+/// store keeps the latest record for each `id`.
+public struct WritingSession: Codable, Equatable {
+	public let id: String
+	public let project: String
+	public let docPath: String
+	/// Unix milliseconds.
+	public let start: Double
+	public let end: Double
+	/// The writer's UTC offset when the session began, in minutes east of UTC. Days
+	/// and hours are the writer's local ones, and the offset travels with the record
+	/// rather than being looked up later, so a trip or a DST change does not move
+	/// last week's words onto a different day.
+	public let utcOffsetMinutes: Int32
+	/// Time the document was frontmost with the writer present.
+	public let openSecs: UInt32?
+	/// Time spent typing: the gaps between edits that were short enough to be one
+	/// run of writing, as the shell's "active gap" setting decides.
+	public let activeSecs: UInt32?
+	/// Words that appeared by typing. Pasted words are counted apart.
+	public let wordsAdded: UInt32?
+	public let wordsDeleted: UInt32?
+	public let wordsPasted: UInt32?
+	public let charsAdded: UInt32?
+	public let charsDeleted: UInt32?
+	/// The document's length when the session began and when it last changed.
+	public let startWords: UInt32?
+	public let endWords: UInt32?
+	public let minutes: [StatsMinute]?
+	/// The writing timer run this session was part of, if any.
+	public let timerRunId: String?
+
+	public init(id: String, project: String, docPath: String, start: Double, end: Double, utcOffsetMinutes: Int32, openSecs: UInt32?, activeSecs: UInt32?, wordsAdded: UInt32?, wordsDeleted: UInt32?, wordsPasted: UInt32?, charsAdded: UInt32?, charsDeleted: UInt32?, startWords: UInt32?, endWords: UInt32?, minutes: [StatsMinute]?, timerRunId: String?) {
+		self.id = id
+		self.project = project
+		self.docPath = docPath
+		self.start = start
+		self.end = end
+		self.utcOffsetMinutes = utcOffsetMinutes
+		self.openSecs = openSecs
+		self.activeSecs = activeSecs
+		self.wordsAdded = wordsAdded
+		self.wordsDeleted = wordsDeleted
+		self.wordsPasted = wordsPasted
+		self.charsAdded = charsAdded
+		self.charsDeleted = charsDeleted
+		self.startWords = startWords
+		self.endWords = endWords
+		self.minutes = minutes
+		self.timerRunId = timerRunId
 	}
 }
 

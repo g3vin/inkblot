@@ -79,6 +79,7 @@ struct InspectorView: View {
         case .references: ReferencesPanelView()
         case .history: HistoryPanelView()
         case .page: PagePanelView()
+        case .stats: StatsPanelView()
         }
     }
 

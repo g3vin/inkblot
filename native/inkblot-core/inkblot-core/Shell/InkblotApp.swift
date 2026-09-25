@@ -63,6 +63,29 @@ struct InkblotApp: App {
             ToolbarCommands()
             InkblotCommands(model: model)
         }
+
+        Settings {
+            InkblotSettingsView()
+                .environment(model)
+        }
+
+        // SwiftUI writes this binding back as it updates the scene, changed or not. The
+        // guard is what keeps that from being a loop: a write saves the config, the
+        // config is observed by this scene, and the scene updating writes it again.
+        MenuBarExtra(isInserted: Binding(
+            get: { model.stats.config.menuBarExtra },
+            set: { shown in
+                guard shown != model.stats.config.menuBarExtra else { return }
+                model.stats.config.menuBarExtra = shown
+                model.saveStatsConfig()
+            })
+        ) {
+            StatsMenuBarPanel()
+                .environment(model)
+        } label: {
+            StatsMenuBarLabel(model: model)
+        }
+        .menuBarExtraStyle(.window)
     }
     #endif
 }
@@ -134,6 +157,10 @@ struct InkblotCommands: Commands {
                     .keyboardShortcut("[", modifiers: [.command, .control])
             }
             .disabled(model.sidebar.references == nil)
+        }
+
+        CommandMenu("Timer") {
+            TimerMenuItems(model: model)
         }
 
         CommandMenu("Format") {

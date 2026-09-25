@@ -879,6 +879,21 @@ export interface CreateReferenceCommand {
 	kind: string;
 }
 
+/** One local day, summed. */
+export interface DayStat {
+	/** `YYYY-MM-DD`, the writer's local date. */
+	day: string;
+	openSecs: number;
+	activeSecs: number;
+	wordsAdded: number;
+	wordsDeleted: number;
+	wordsPasted: number;
+	/** Sessions that began on this day. */
+	sessions: number;
+	/** Active seconds in each of the day's 24 local hours. */
+	hours: number[];
+}
+
 /** Delete a file or folder. The shell has already asked the user. */
 export interface DeleteEntryCommand {
 	path: string;
@@ -996,6 +1011,30 @@ export interface DocChanged {
 	userEdit: boolean;
 	wordCount: number;
 	charCount: number;
+	/**
+	 * Positions inserted and removed since the last `DocChanged` for this pane.
+	 * 
+	 * The page throttles this event, so these are sums over every transaction in the
+	 * window, not one keystroke. Positions rather than characters — a split paragraph
+	 * is two — which is close enough for "how much did the writer do", and exact for
+	 * plain typing.
+	 */
+	inserted?: number;
+	deleted?: number;
+	/**
+	 * The window was a paste or a drop. The page sends one on its own rather than
+	 * folding it into the typing around it, so a shell can tell written words from
+	 * pasted ones.
+	 */
+	paste?: boolean;
+}
+
+/** A saved document's length, read from disk. */
+export interface DocWordCount {
+	docPath: string;
+	words: number;
+	/** UTF-16 code units of text, as the page's `textContent.length` counts them. */
+	chars: number;
 }
 
 /**
@@ -2564,6 +2603,46 @@ export interface ShowSidebarTab {
 	tab: SidebarTab;
 }
 
+/**
+ * One minute of a session. `minute` counts from the session's start, so a session
+ * that runs past midnight lands its later minutes on the next day.
+ */
+export interface StatsMinute {
+	minute: number;
+	/** Seconds in this minute the document was in front of the writer. */
+	openSecs?: number;
+	/** Seconds in this minute the writer was typing — see `WritingSession::active_secs`. */
+	activeSecs?: number;
+	wordsAdded?: number;
+	wordsDeleted?: number;
+	wordsPasted?: number;
+}
+
+/**
+ * Which sessions a query is about. No project is everything; a project with no
+ * document is the whole project.
+ */
+export interface StatsScope {
+	project?: string;
+	docPath?: string;
+}
+
+/** Everything in a scope, summed. */
+export interface StatsTotals {
+	sessions: number;
+	openSecs: number;
+	activeSecs: number;
+	wordsAdded: number;
+	wordsDeleted: number;
+	wordsPasted: number;
+	longestSessionSecs: number;
+	/** Local days with any words written. */
+	daysWritten: number;
+	/** Unix milliseconds of the first and latest session, when there are any. */
+	firstSession?: number;
+	lastSession?: number;
+}
+
 export interface StoryFolderPreset {
 	key: string;
 	name: string;
@@ -2690,6 +2769,30 @@ export interface WorkbenchTile {
 
 export interface TilesChanged {
 	tiles: WorkbenchTile[];
+}
+
+/**
+ * One run of the writing timer: a routine from its start to its end, or to where the
+ * writer stopped it. Recorded as it goes, like a session, and kept by `id`.
+ */
+export interface TimerRun {
+	id: string;
+	routineName: string;
+	/** The project open when the run began. */
+	project?: string;
+	/** Unix milliseconds. */
+	start: number;
+	end: number;
+	utcOffsetMinutes: number;
+	/** Time in writing segments and in breaks, paused time excluded. */
+	writeSecs?: number;
+	breakSecs?: number;
+	wordsWritten?: number;
+	/** Writing segments that ran to their end — a sprint finished, not skipped. */
+	sprintsCompleted?: number;
+	sprintsSkipped?: number;
+	/** The routine ran to its last segment, rather than being stopped. */
+	completed?: boolean;
 }
 
 /** The list kinds the toolbar can toggle. */
@@ -2867,6 +2970,49 @@ export interface WordCountBadge {
  */
 export interface WordCountsChanged {
 	badges: WordCountBadge[];
+}
+
+/**
+ * One sitting at one document.
+ * 
+ * A session ends when the writer moves to another document or project, or has been
+ * away longer than the idle cutoff. A shell records the same session repeatedly as it
+ * goes — a checkpoint, so a crash loses a minute rather than an evening — and the
+ * store keeps the latest record for each `id`.
+ */
+export interface WritingSession {
+	id: string;
+	project: string;
+	docPath: string;
+	/** Unix milliseconds. */
+	start: number;
+	end: number;
+	/**
+	 * The writer's UTC offset when the session began, in minutes east of UTC. Days
+	 * and hours are the writer's local ones, and the offset travels with the record
+	 * rather than being looked up later, so a trip or a DST change does not move
+	 * last week's words onto a different day.
+	 */
+	utcOffsetMinutes: number;
+	/** Time the document was frontmost with the writer present. */
+	openSecs?: number;
+	/**
+	 * Time spent typing: the gaps between edits that were short enough to be one
+	 * run of writing, as the shell's "active gap" setting decides.
+	 */
+	activeSecs?: number;
+	/** Words that appeared by typing. Pasted words are counted apart. */
+	wordsAdded?: number;
+	wordsDeleted?: number;
+	wordsPasted?: number;
+	charsAdded?: number;
+	charsDeleted?: number;
+	/** The document's length when the session began and when it last changed. */
+	startWords?: number;
+	endWords?: number;
+	minutes?: StatsMinute[];
+	/** The writing timer run this session was part of, if any. */
+	timerRunId?: string;
 }
 
 /**

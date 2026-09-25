@@ -72,6 +72,8 @@ enum ToolbarItemID: String, CaseIterable {
     case notesPanel = "inkblot.panel.notes"
     case historyPanel = "inkblot.panel.history"
     case referencesPanel = "inkblot.panel.references"
+    case statsPanel = "inkblot.panel.stats"
+    case writingTimer = "inkblot.timer"
     /// Retired: the toggle is a titlebar accessory (`InspectorTitlebarToggle`), not a
     /// toolbar item. Kept because saved layouts may still name it.
     case inspectorToggle = "inkblot.window.inspector-toggle"

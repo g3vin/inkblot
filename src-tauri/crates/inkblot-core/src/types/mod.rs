@@ -10,6 +10,7 @@
 //! | `document` | `VersionEntry`, `TreeNode`, `TextDocument` |
 //! | `diff` | The version diff engine's results: `DiffOp`, `HtmlBlock`, `DiffChunk`, `CanvasDiff` |
 //! | `read_aloud`, `search`, `story` | Read Aloud payloads, search results, story presets |
+//! | `stats` | Writing statistics: `WritingSession`, `DayStat`, `StatsTotals` |
 //! | `json` | `JsonValue`, the escape hatch for JSON we carry but never interpret |
 //!
 //! Three typeshare limits shape these definitions:
@@ -32,6 +33,7 @@ pub mod note;
 pub mod page_setup;
 pub mod read_aloud;
 pub mod search;
+pub mod stats;
 pub mod story;
 
 pub use canvas::{CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState};
@@ -59,4 +61,5 @@ pub use page_setup::{
 };
 pub use read_aloud::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
 pub use search::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
+pub use stats::{DayStat, DocWordCount, StatsMinute, StatsScope, StatsTotals, TimerRun, WritingSession};
 pub use story::{StoryFolderAncestor, StoryFolderPreset};

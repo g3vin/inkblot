@@ -42,10 +42,14 @@ struct ContentView: View {
     /// panes' current widths. State, unlike `panelInsets`, because layout reads it — and
     /// safe to be, because neither limit moves anything that feeds the measurement.
     @State private var paneLimits = PaneLimits()
+    /// The file tree's column, so sprint mode can put it away and bring it back as it was.
+    @State private var columns: NavigationSplitViewVisibility = .all
+    @State private var columnsBeforeSprint: NavigationSplitViewVisibility?
 
     var body: some View {
         @Bindable var sidebar = model.sidebar
-        NavigationSplitView {
+        @Bindable var timer = model.timer
+        NavigationSplitView(columnVisibility: $columns) {
             FileTreeSidebar()
                 // Inside the column width, which has to be the column's outermost
                 // modifier or SwiftUI ignores its ideal.
@@ -112,6 +116,21 @@ struct ContentView: View {
         // Customize Layout…, from the selector bar, the toolbar or the View menu.
         .sheet(isPresented: $sidebar.isCustomizingLayout) {
             InspectorLayoutEditor().environment(model)
+        }
+        // A routine run to its end.
+        .sheet(item: $timer.recap) { run in
+            TimerRecapView(run: run).environment(model)
+        }
+        .onChange(of: model.sprintHidesFileTree) { _, hidden in
+            withAnimation(.smooth(duration: 0.3)) {
+                if hidden {
+                    columnsBeforeSprint = columns
+                    columns = .detailOnly
+                } else {
+                    columns = columnsBeforeSprint ?? .all
+                    columnsBeforeSprint = nil
+                }
+            }
         }
         .toolbar(removing: .title)
         // Clear: the buttons are glass over the page, not over a bar of window colour.

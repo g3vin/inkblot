@@ -38,6 +38,7 @@ pub mod doc_lock;
 pub mod locations;
 pub mod paths;
 pub mod preferences;
+pub mod stats;
 pub mod versions;
 
 use std::collections::BTreeMap;

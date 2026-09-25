@@ -23,6 +23,7 @@ import { Citation } from '../extensions/Citation'
 import { CustomTextStyle } from '../extensions/CustomTextStyle'
 import ConversationTile from '../extensions/ConversationTile'
 import { DictationInline } from '../extensions/DictationInline'
+import { DocChangeReporter } from '../extensions/DocChangeReporter'
 import { NoteAnnotation } from '../extensions/NoteAnnotation'
 import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
@@ -42,6 +43,7 @@ import { Pagination } from '../print/PaginationExtension'
  */
 const sharedExtensions = () => [
   CustomTextStyle,
+  DocChangeReporter,
   BubbleSession,
   Color,
   FontFamily,

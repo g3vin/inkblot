@@ -121,6 +121,21 @@ pub struct DocChanged {
     pub user_edit: bool,
     pub word_count: u32,
     pub char_count: u32,
+    /// Positions inserted and removed since the last `DocChanged` for this pane.
+    ///
+    /// The page throttles this event, so these are sums over every transaction in the
+    /// window, not one keystroke. Positions rather than characters — a split paragraph
+    /// is two — which is close enough for "how much did the writer do", and exact for
+    /// plain typing.
+    #[serde(default)]
+    pub inserted: u32,
+    #[serde(default)]
+    pub deleted: u32,
+    /// The window was a paste or a drop. The page sends one on its own rather than
+    /// folding it into the typing around it, so a shell can tell written words from
+    /// pasted ones.
+    #[serde(default)]
+    pub paste: bool,
 }
 
 /// Note anchors after a remap.

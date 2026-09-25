@@ -23,6 +23,15 @@ final class AppModel {
     let notePreviews: NotePreviewModel
     let bubble: BubbleModel
     let pageLayout: PageLayoutModel
+    let statsService: StatsService
+    let stats: StatsTracker
+    let timer: WritingTimer
+    let timerAnnouncer = TimerAnnouncer()
+    let goals: GoalsModel
+    /// Sprint mode has the file tree hidden; `ContentView` follows.
+    var sprintHidesFileTree = false
+    /// What sprint mode changed, to put back when the writing segment ends.
+    @ObservationIgnored private var sprintRestore: (inspector: Bool, focusMode: Bool)?
     let memoRecorder = AudioMemoRecorder()
     let memoPlayer = AudioMemoPlayer()
     let language = LanguageServices()
@@ -41,29 +50,133 @@ final class AppModel {
         notePreviews = NotePreviewModel(bridge: bridge)
         bubble = BubbleModel(bridge: bridge)
         pageLayout = PageLayoutModel(bridge: bridge)
+        let statsService = StatsService(core: core.core)
+        self.statsService = statsService
+        let stats = StatsTracker(
+            config: statsService.loadConfig(),
+            environment: .live(record: statsService.record))
+        self.stats = stats
+        let bridge = bridge
+        let announcer = timerAnnouncer
+        let goals = GoalsModel(service: statsService, stats: stats, notifier: announcer)
+        self.goals = goals
+        timer = WritingTimer(environment: WritingTimer.Environment(
+            wordsWritten: { [weak stats] in stats?.wordsWritten ?? 0 },
+            project: { [weak bridge] in bridge?.project.projectName },
+            record: { [weak goals] run in
+                statsService.record(run)
+                goals?.refresh()
+            },
+            announce: { [weak stats, weak announcer] announcement in
+                guard let stats else { return }
+                announcer?.announce(announcement, notify: stats.config.timerNotifications, sound: stats.config.timerSounds)
+            },
+            track: { [weak stats] runID, paused in
+                stats?.timerRunId = runID
+                stats?.isPaused = paused
+            }))
+        stats.onRecord = { [weak goals] in goals?.refresh() }
+        stats.onTick = { [weak goals] in goals?.check() }
 
         bridge.addListener { [weak self] event in
             guard let self else { return }
             switch event {
             case .projectChanged(let project):
                 tree.follow(project)
+                stats.follow(project: project.projectName)
                 deliverPendingProject(after: project)
             case .activeEditorChanged(let changed):
                 if let docPath = changed.docPath { tree.noteOpened(docPath) }
+                stats.elect(docPath: changed.docPath)
             case .printRequest(let request):
                 // The page has laid the sheets out; print the web view at their size,
                 // and tell it when it can take them down.
                 web.print(request) { [weak self] completed in
                     self?.bridge.send(.printFinished(PrintFinishedCommand(jobId: request.jobId, completed: completed)))
                 }
-            case .docChanged(let changed) where !tree.filePaths.contains(changed.docPath):
+            case .docChanged(let changed):
+                stats.edit(changed)
                 // A document the tree has not seen — made by the page, most likely. The
                 // watcher will catch it too; this just does not wait for the latency.
-                tree.reload()
+                if !tree.filePaths.contains(changed.docPath) { tree.reload() }
             default:
                 break
             }
         }
+        stats.start()
+        timerAnnouncer.install()
+        timerAnnouncer.onProceed = { [weak self] in self?.timer.proceed() }
+        timer.onSegmentChanged = { [weak self] segment in self?.sprintSegmentChanged(segment) }
+        timerAnnouncer.onStartSprint = { [weak self] in
+            guard let self else { return }
+            startTimer(defaultRoutine)
+        }
+        goals.refresh()
+        timerAnnouncer.onOpen = { [weak self] in
+            #if os(macOS)
+            NSApp.activate()
+            #endif
+            self?.showStats()
+        }
+    }
+
+    /* ---------------- writing stats ---------------- */
+
+    /// A rename or a move the shell is asking the page for: the entry's writing history
+    /// goes with it. The session in progress is about the old path, so it ends first.
+    func statsFollowRename(of path: String, to name: String, isFolder: Bool) {
+        guard let project = bridge.project.projectName else { return }
+        stats.endSession()
+        statsService.renameEntry(project: project, path: path, newName: name, isFolder: isFolder)
+    }
+
+    func statsFollowMove(of path: String, into folder: String, isFolder: Bool) {
+        guard let project = bridge.project.projectName else { return }
+        stats.endSession()
+        statsService.moveEntry(project: project, path: path, into: folder, isFolder: isFolder)
+    }
+
+    /// Run a routine, and remember it as the one Start runs next time.
+    func startTimer(_ routine: WritingRoutine) {
+        if stats.config.timerNotifications { timerAnnouncer.requestPermission() }
+        stats.config.lastRoutineID = routine.id
+        saveStatsConfig()
+        timer.start(routine)
+    }
+
+    /// Keep the stats settings, and let what depends on them — goals, the streak,
+    /// reminders, deadlines — see the change.
+    func saveStatsConfig() {
+        statsService.save(stats.config)
+        goals.refresh()
+    }
+
+    /// Sprint mode: a writing segment clears the screen — the page's focus mode, the
+    /// file tree and the inspector away — and the end of it puts back what was there.
+    func sprintSegmentChanged(_ segment: TimerSegment?) {
+        let writing = segment?.kind == .write
+        if writing, stats.config.sprintFocus, sprintRestore == nil {
+            sprintRestore = (sidebar.isPresented, bridge.viewOptions.focusMode)
+            if !bridge.viewOptions.focusMode { bridge.send(.setFocusMode(SetFocusModeCommand(open: true))) }
+            sidebar.isPresented = false
+            sprintHidesFileTree = true
+        } else if !writing, let restore = sprintRestore {
+            sprintRestore = nil
+            if !restore.focusMode, bridge.viewOptions.focusMode { bridge.send(.setFocusMode(SetFocusModeCommand(open: false))) }
+            sidebar.isPresented = restore.inspector
+            sprintHidesFileTree = false
+        }
+    }
+
+    /// The routine Start runs: the last one run, or a sprint.
+    var defaultRoutine: WritingRoutine {
+        stats.config.routine(stats.config.lastRoutineID) ?? .sprint
+    }
+
+    /// The Stats tab, from a notification or the Timer menu.
+    func showStats() {
+        sidebar.isPresented = true
+        sidebar.tab = .stats
     }
 
     /* ---------------- opening a project ---------------- */

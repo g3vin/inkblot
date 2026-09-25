@@ -20,6 +20,12 @@ struct SharedToolbarItems: CustomizableToolbarContent {
         panelItem(.notes, id: .notesPanel)
         panelItem(.history, id: .historyPanel)
         panelItem(.references, id: .referencesPanel)
+        panelItem(.stats, id: .statsPanel)
+
+        ToolbarItem(id: ToolbarItemID.writingTimer.id) {
+            TimerToolbarControl()
+        }
+        .defaultCustomization(.hidden)
 
     }
 
