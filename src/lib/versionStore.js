@@ -3,10 +3,11 @@
  *
  * Text documents carry their history inside their own file; canvases keep theirs
  * in a `.versions/` sidecar, because a canvas file is spec-shaped JSON Canvas and
- * must stay that way. The sidecar is also the legacy fallback for text documents
- * written by older versions of the app.
+ * must stay that way (it round-trips with Obsidian). The sidecar is also read as a
+ * fallback for text documents that have no embedded history.
  *
- * Split out of FileSystem.js, which was 956 lines; this was 44% of it.
+ * Retention: at most 200 unnamed entries, evicted oldest first; named versions are
+ * never evicted.
  */
 import { writeTextFile, readTextFile, mkdir } from '@tauri-apps/plugin-fs'
 import { isTextDoc } from './docKind'

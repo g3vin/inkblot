@@ -8,9 +8,8 @@
  * Both are typed against the generated protocol, and the typing is the point of the
  * file. `onCommand('setColor', handler)` gives `handler` a `SetColorCommand` and
  * nothing else; `send('setColor', { ... })` will not compile with a
- * `SetFontSizeCommand`'s fields. That is the payoff Phase 3 deferred to here — the
- * bridge is the one place where a wrong shape is otherwise invisible until it reaches
- * a language that cannot see this file at all.
+ * `SetFontSizeCommand`'s fields. The bridge is the one place where a wrong shape would
+ * otherwise be invisible until it reached a language that cannot see this file.
  */
 import { BridgeErrorCode } from '../types'
 import type {

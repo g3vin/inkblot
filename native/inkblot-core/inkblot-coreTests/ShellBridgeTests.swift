@@ -7,7 +7,7 @@ import Testing
 /// The JSON here is written out by hand rather than produced by the Swift encoder:
 /// what has to be true is that Swift reads what `src/bridge/client.ts` writes, and a
 /// test that encodes with Swift and decodes with Swift proves only that Swift agrees
-/// with itself. The page-side half of the same contract is `scripts/canvas-tests/bridge.mjs`.
+/// with itself. The page-side half of the same contract is `tests/unit/bridge.mjs`.
 @MainActor
 struct ShellBridgeTests {
     /// A bridge attached to a page that records what it was sent.

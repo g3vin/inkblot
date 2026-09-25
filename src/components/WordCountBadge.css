@@ -30,9 +30,8 @@
   opacity: 0.9;
 }
 
-/* Side by side, the secondary pane's badge would sit against the divider — which is
-   the middle of the window, which is where the tab dock floats. Send it to the
-   outer edge so the two never overlap. */
+/* Side by side, the secondary pane's badge would sit against the divider, in the
+   middle of the window. Send it to the outer edge instead. */
 .split-active:not(.split-rows) .secondary-pane .pane-status {
   left: auto;
   right: 10px;
@@ -77,16 +76,6 @@
 /* The seam between the panes is the draggable divider, not a pane border. */
 .secondary-pane {
   position: relative;
-}
-
-.split-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  color: #999;
-  padding: 5px;
-  background: #f9f9f9;
-  text-align: center;
-  border-bottom: 1px solid #eee;
 }
 
 .editor {

@@ -14,11 +14,9 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 crate="$root/src-tauri/crates/inkblot-core"
 ts_out="$root/src/types/inkblot-core.ts"
-swift_out="$crate/generated/InkblotCore.swift"
-# The Xcode target compiles its own copy. A synchronized group cannot reach outside
-# its folder, and a symlink in one is a build that works on the machine that made it.
-# --check diffs this copy too, so it cannot drift from the one next to the crate.
-native_swift_out="$root/native/inkblot-core/inkblot-core/Generated/InkblotCore.swift"
+# The Xcode target compiles the Swift from inside its own folder: a synchronized group
+# cannot reach outside it.
+swift_out="$root/native/inkblot-core/inkblot-core/Generated/InkblotCore.swift"
 
 if ! command -v typeshare >/dev/null 2>&1; then
   echo "typeshare not found. Install it with:" >&2
@@ -32,12 +30,13 @@ generate() {
   typeshare "$crate/src" --lang=swift --config-file="$crate/typeshare.toml" --output-file="$swift"
 }
 
-# Typecheck the Swift. `npm run typecheck` covers the TypeScript; nothing else looks
-# at the Swift until the Phase 5 Xcode target exists, which is much too late to find
-# out that a Rust type generates something Swift will not accept.
+# Typecheck the Swift on its own, so a Rust type that generates something Swift will
+# not accept fails here rather than in the next Xcode build. `npm run typecheck`
+# covers the TypeScript.
 #
-# AnyCodable is stubbed because the real one comes from a package the Xcode target
-# will add. Skipped where swiftc is absent, so this still runs on Linux.
+# AnyCodable is stubbed so this needs neither Xcode nor the app target (the app
+# defines the real one in Support/AnyCodable.swift). Skipped where swiftc is absent,
+# so this still runs on Linux.
 check_swift() {
   local swift="$1"
   if ! command -v swiftc >/dev/null 2>&1; then
@@ -66,7 +65,6 @@ if [[ "${1:-}" == "--check" ]]; then
   status=0
   diff -u "$ts_out" "$tmp/inkblot-core.ts" || status=1
   diff -u "$swift_out" "$tmp/InkblotCore.swift" || status=1
-  diff -u "$native_swift_out" "$tmp/InkblotCore.swift" || status=1
   if [[ $status -ne 0 ]]; then
     echo "Generated types are stale. Run ./scripts/generate-types.sh and commit." >&2
     exit 1
@@ -77,9 +75,6 @@ if [[ "${1:-}" == "--check" ]]; then
 fi
 
 generate "$ts_out" "$swift_out"
-mkdir -p "$(dirname "$native_swift_out")"
-cp "$swift_out" "$native_swift_out"
 check_swift "$swift_out"
 echo "Wrote $ts_out"
 echo "Wrote $swift_out"
-echo "Wrote $native_swift_out"

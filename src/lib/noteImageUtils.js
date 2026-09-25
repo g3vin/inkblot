@@ -61,10 +61,7 @@ const toBase64 = (bytes) => {
 }
 
 /**
- * Pick images from disk and read them as note images.
- *
- * Pasting was previously the only way to attach one, which is fine when the image is
- * already on your clipboard and useless when it is a file.
+ * Pick images from disk and read them as note images (the alternative to pasting).
  */
 export const pickNoteImages = async () => {
   const [{ open }, { readFile }] = await Promise.all([

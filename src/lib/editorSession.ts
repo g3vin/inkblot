@@ -12,17 +12,17 @@
  * and leaves as the type the app may rely on.
  *
  * The `as` casts below are assertions about what the writer wrote, not checks: they
- * are erased, so a field holding something exotic comes out of here exactly as it did
- * before this file was TypeScript. Coercing instead would be a behaviour change, and
- * this is a port.
+ * are erased, so a field holding something exotic (a stored `5` for `currentDoc`)
+ * passes through unchanged. Coercing with `typeof` checks would be stricter, and a
+ * behaviour change for sessions already on disk.
  */
 import type { Loose } from '../types'
 import { getPreference } from './preferences'
 export const PERSIST_KEY = 'inkblot-session'
 export const CLIPBOARD_PERSIST_KEY = 'inkblot-clipboard-history'
 export const MAX_CLIPBOARD_ENTRIES = 80
-// No 'search': search is the sidebar's search bar, not a tab. A session saved
-// before that change restores to the default tab rather than a tab that is gone.
+// Search is the sidebar's search bar, not a tab, so a stored 'search' (or any
+// unknown id) restores to the default tab.
 export const RIGHT_SIDEBAR_TAB_IDS = new Set(['clipboard', 'workbench', 'notes', 'history'])
 
 /** Which panel the right sidebar is showing. */
@@ -33,12 +33,12 @@ export type SplitView = 'editor' | null
 
 export type SplitOrientation = 'columns' | 'rows'
 
-/** One tab in the dock. */
+/** One open tab. */
 export interface DocTab {
   id: string
   /** Null on a draft — a tab holding a filename being typed, with no document yet. */
   docPath: string | null
-  /** Opened by the dock on its own, not deliberately; closes with its document. */
+  /** Opened implicitly, not deliberately; closes with its document. */
   ephemeral: boolean
 }
 
@@ -71,7 +71,7 @@ export const createEmptySession = (fallbackProject?: string | null): EditorSessi
 /**
  * Drop malformed tabs from a restored session. A tab is a document, or a draft
  * (docPath null) that has not decided what document it is yet. An `ephemeral`
- * tab is one the dock created on its own for a document opened from the file
+ * tab is one created implicitly for a document opened from the file
  * tree — see ensureTabsForOpenDocs.
  */
 export const normalizeTabs = (tabs: unknown): DocTab[] => {
@@ -117,12 +117,12 @@ export const createTabId = (): string =>
   `tab-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
 
 /**
- * Every open document has a dot, whether or not it was opened deliberately.
+ * Every open document has a tab, whether or not it was opened deliberately.
  *
  * Opening a document *replaces the active tab*: clicking through the file tree,
  * a search result, or a canvas card reuses the tab you are standing on instead
- * of piling new ones up. Tabs are only ever added on purpose — the new-tab
- * button, "Open in New Tab", a drop on the dock, or a split — and each of those
+ * of piling new ones up. Tabs are only ever added on purpose — "Open in New
+ * Tab" or a split — and each of those
  * paths creates its tab itself, so by the time this runs the document already
  * has one and the active tab is left alone.
  *

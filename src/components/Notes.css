@@ -1,0 +1,809 @@
+/* ============================================================
+   Notes: markers, hover-preview cards, notes panel
+   ============================================================ */
+
+.note-marker {
+  --note-color: #007aff;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: super;
+  z-index: 2;
+}
+
+/* The dot and its left margin (lib/marginHang.js). */
+.margin-hang:has(> .note-marker) {
+  --hang-width: 10px;
+}
+
+.note-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: var(--note-color, #007aff);
+  border-radius: 50%;
+  margin-left: 2px;
+  cursor: pointer;
+  border: 0.1px solid #444;
+  box-shadow: none;
+  transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+}
+
+.note-marker:hover .note-dot {
+  transform: scale(1.5);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+
+.note-preview-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.note-preview-string {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.note-preview-string-shadow,
+.note-preview-string-path {
+  fill: none;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.note-preview-string-shadow {
+  display: none;
+}
+
+.note-preview-string-path {
+  stroke: var(--note-color, #7aaef7);
+  stroke-width: 2.2;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: note-string-draw 220ms ease-out forwards;
+  animation-delay: 40ms;
+}
+
+@keyframes note-string-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.note-preview-card {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  width: 260px;
+  min-height: 88px;
+  padding: 12px 14px 14px;
+  border-radius: 18px;
+  /*
+   * Same recipe as every other card (see --card-tint in index.css): the whole surface
+   * carries the note's colour softly, and the border carries it several shades
+   * stronger.
+   */
+  --card-color: var(--note-color, var(--accent-color));
+  --card-base: var(--popover-bg);
+  --card-edge-base: var(--popover-border);
+
+  border: 1px solid var(--card-edge);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card-tint) 96%, var(--app-bg)), var(--card-tint));
+  box-shadow: var(--shadow-popover);
+  pointer-events: auto;
+  cursor: default;
+  color: var(--text-primary);
+  user-select: auto;
+  touch-action: none;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.94);
+  animation: note-card-pop 220ms cubic-bezier(0.2, 0.8, 0.2, 1.18) forwards;
+  animation-delay: var(--note-reveal-delay, 0s);
+}
+
+@keyframes note-card-pop {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.note-preview-card.locked {
+  box-shadow:
+    var(--shadow-popover),
+    0 0 0 1px color-mix(in srgb, var(--note-color, #7aaef7) 18%, transparent);
+}
+
+.note-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.note-preview-drag,
+.note-preview-close {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.note-preview-drag {
+  cursor: grab;
+}
+
+.note-preview-drag:active {
+  cursor: grabbing;
+}
+
+.note-preview-drag:hover,
+.note-preview-close:hover {
+  background: var(--control-hover-bg);
+  color: var(--text-primary);
+}
+
+.note-preview-spacer {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.note-preview-textarea {
+  min-height: 22px;
+  padding-right: 4px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  flex: 1 1 auto;
+}
+
+.note-preview-textarea::placeholder {
+  color: var(--text-placeholder);
+}
+
+.note-preview-footer {
+  margin-top: auto;
+  justify-content: flex-end;
+}
+
+.note-preview-branch-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-preview-branch-btn {
+  width: 24px;
+  height: 24px;
+}
+
+.note-preview-resize {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--note-color, var(--accent-color)) 42%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--note-color, var(--accent-color)) 18%, transparent);
+  color: color-mix(in srgb, var(--note-color, var(--accent-color)) 74%, white);
+  box-shadow: var(--shadow-soft);
+  cursor: nwse-resize;
+}
+
+.note-preview-resize:hover {
+  background: color-mix(in srgb, var(--note-color, var(--accent-color)) 26%, transparent);
+}
+
+/* Under the Swift shell the dots are drawn above the page as Liquid Glass
+   (useNativeNotePreviews); the page's stay, invisible, to take the hover and click. */
+.native-note-dots .note-dot,
+.native-note-dots .note-marker:hover .note-dot {
+  opacity: 0;
+  transform: none;
+  box-shadow: none;
+}
+
+.note-branch {
+  display: block;
+}
+
+.note-children {
+  position: relative;
+}
+
+.note-marker.has-preview:hover .note-dot {
+  transform: scale(0.42);
+  opacity: 0;
+}
+
+.note-dot-preview {
+  display: block;
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  width: max-content;
+  min-width: 160px;
+  max-width: 220px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  background: var(--tile-color);
+  border: 1px solid var(--border-muted);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+  max-height: 120px;
+  overflow: auto;
+  box-shadow: var(--shadow-soft);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.22);
+  transform-origin: 12px center;
+  transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 180ms;
+}
+
+.note-marker.has-preview:hover .note-dot-preview {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+  transition-delay: 0s;
+}
+
+.note-range {
+  border-radius: 4px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.note-range.is-hovered {
+  background-color: color-mix(in srgb, var(--note-color, #007aff) 24%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--note-color, #007aff) 34%, transparent);
+}
+
+.note-range.is-active {
+  background-color: color-mix(in srgb, var(--note-color, #007aff) 32%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--note-color, #007aff) 44%, transparent),
+    0 6px 16px color-mix(in srgb, var(--note-color, #007aff) 16%, transparent);
+}
+
+.note-anchor {
+  border-bottom: 1px dashed var(--border-strong);
+}
+
+/*
+ * A note in the notes panel wears its colour the way every other card in the app
+ * does — the whole tile tinted, the border the same hue a few shades stronger. See
+ * --card-tint in index.css for the recipe and the reasoning.
+ */
+.note-tile {
+  --note-color: #007aff;
+  --card-color: var(--note-color);
+  --card-base: var(--tile-color);
+  --card-edge-base: var(--sidebar-card-border);
+
+  border: 1px solid var(--card-edge);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 0;
+  position: relative;
+  cursor: pointer;
+  background: var(--card-tint);
+  box-shadow: var(--sidebar-card-shadow);
+}
+
+.note-tile:hover {
+  /* Deepen the card's OWN colour rather than washing it out with a neutral grey —
+     otherwise hovering a red note briefly makes it look like a different note. */
+  background: color-mix(in srgb, var(--card-color) 16%, var(--card-base));
+  border-color: var(--card-edge-hover);
+}
+
+.note-tile.pinned {
+  box-shadow: var(--sidebar-card-shadow-pinned);
+}
+
+.note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.note-tool-btn,
+.note-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-subtle);
+  cursor: pointer;
+  border-radius: 999px;
+  line-height: 1;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.note-tool-btn svg,
+.note-delete svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.note-tool-btn:hover,
+.note-delete:hover {
+  color: var(--text-primary);
+  background: var(--control-hover-bg);
+}
+
+.note-tool-btn.active {
+  color: var(--note-color);
+  background: var(--surface-active);
+}
+
+.note-anchor-label {
+  font-size: 11px;
+  color: var(--note-color);
+  font-weight: bold;
+  margin-bottom: 6px;
+  border-left: 2px solid var(--note-color);
+  padding-left: 8px;
+}
+
+.note-textarea {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  padding: 0;
+  font-size: 13px;
+  outline: none;
+
+  resize: none;
+  overflow: hidden;
+
+  line-height: 1.4;
+  max-height: calc(1.4em * 10);
+}
+
+.note-textarea.expanded {
+  max-height: none;
+}
+
+.note-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.note-image-card {
+  position: relative;
+  margin: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-muted);
+  background: var(--control-bg);
+}
+
+.note-image {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+  object-fit: cover;
+  user-select: none;
+  pointer-events: none;
+}
+
+.note-image-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--popover-bg) 72%, transparent);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.note-image-remove:hover {
+  background: color-mix(in srgb, var(--popover-bg) 90%, transparent);
+  transform: scale(1.04);
+}
+
+
+.note-timestamp {
+  font-size: 10px;
+  color: var(--text-subtle);
+  text-align: right;
+}
+
+/* ---- voice memos on a note ---- */
+
+/*
+ * One set of styles for all three places a note appears (notes panel, in-line hover
+ * preview, canvas card) — the memo controls are the same control everywhere, because
+ * they act on the same note.
+ */
+.audio-notes,
+.audio-clips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.audio-notes.is-compact,
+.audio-notes.is-compact .audio-clips {
+  margin-top: 6px;
+  gap: 4px;
+}
+
+/* Inside the combined wrapper the clip row must not stack a second margin. */
+.audio-notes .audio-clips {
+  margin-top: 0;
+}
+
+.audio-clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 2px 2px;
+  border: 1px solid var(--card-edge, var(--border-muted));
+  border-radius: 999px;
+  background: var(--card-tint, var(--surface-3));
+}
+
+.audio-clip-play,
+.audio-clip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.audio-clip-play:hover:not(:disabled),
+.audio-clip-remove:hover {
+  background: var(--control-hover-bg);
+  color: var(--text-primary);
+}
+
+.audio-clip-remove {
+  /* Destructive, so it stays quiet until the clip is hovered. */
+  opacity: 0;
+}
+
+.audio-clip:hover .audio-clip-remove,
+.audio-clip:focus-within .audio-clip-remove {
+  opacity: 1;
+}
+
+.audio-clip-time {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+/* In the notes-panel footer the button sits beside the other per-note tools and has
+   to be the same size as them, so it collapses to a circle. */
+.audio-record.is-icon-only {
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+}
+
+/* Recording needs its timer, so it stops being a circle for as long as it runs. */
+.audio-record.is-icon-only.is-recording {
+  width: auto;
+  padding: 0 7px;
+}
+
+.audio-record:hover {
+  background: var(--control-hover-bg);
+  color: var(--text-primary);
+}
+
+/* Recording is a state you must not be able to miss — it is holding your microphone. */
+.audio-record.is-recording {
+  border-color: color-mix(in srgb, var(--status-error) 55%, transparent);
+  background: color-mix(in srgb, var(--status-error) 14%, transparent);
+  color: var(--status-error);
+}
+
+.audio-record-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-error);
+  animation: audio-record-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes audio-record-pulse {
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-record-dot { animation: none; }
+}
+
+.audio-notes-error {
+  color: var(--status-error-soft);
+  font-size: 11px;
+}
+
+/* ---- dragging a note out to a canvas ---- */
+
+.note-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  max-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--card-edge, var(--border-color));
+  border-radius: 10px;
+  background: var(--card-tint, var(--surface-1));
+  box-shadow: var(--shadow-popover);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+/* Says the drop will actually land — the difference between "dragging" and
+   "dragging somewhere useful". */
+.note-drag-ghost.is-over-canvas {
+  opacity: 1;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-ring), var(--shadow-popover);
+}
+
+.note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/*
+ * Attach controls (record a memo, add an image) sit BETWEEN the colour chip on the
+ * left and the timestamp on the right, and only appear while the note is being
+ * edited. margin: auto on both sides is what centres them in the row without
+ * disturbing the two things already anchored to its ends.
+ */
+.note-attach-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 auto;
+}
+
+.note-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border-muted);
+  border-radius: 50%;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.note-attach-btn:hover {
+  background: var(--control-hover-bg);
+  color: var(--text-primary);
+}
+
+.note-color-chip {
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--note-color);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.notes-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.notes-toolbar .sidebar-search-field {
+  flex: 1;
+}
+
+.notes-panel .panel-header {
+  gap: 8px;
+}
+
+.notes-panel .panel-header-title {
+  flex: 0 0 auto;
+}
+
+.notes-header-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 24px;
+  height: 24px;
+  padding: 0 7px 0 9px;
+  gap: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.notes-header-search .sidebar-search-input {
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+}
+
+.notes-header-search .sidebar-search-icon {
+  width: 12px;
+  height: 12px;
+  opacity: 0.68;
+}
+
+.notes-filter-btn.active {
+  color: var(--accent-color, #7aaef7);
+}
+
+.note-floating-menu {
+  position: fixed;
+  z-index: 60;
+  width: 188px;
+  padding: 10px;
+  border-radius: var(--floating-note-radius);
+  border: 1px solid var(--sidebar-floating-border);
+  background: var(--sidebar-floating-bg);
+  box-shadow: var(--sidebar-floating-shadow);
+  color: var(--text-primary);
+}
+
+.note-floating-title {
+  font-size: 11px;
+  color: var(--floating-note-title);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.note-color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.note-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: var(--swatch-color);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.note-color-custom {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.note-color-custom input {
+  width: 34px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.note-filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.note-filter-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-filter-option:hover,
+.note-filter-option.active {
+  background: var(--surface-active);
+}
+
+.note-filter-option svg {
+  width: 12px;
+  height: 12px;
+}
+

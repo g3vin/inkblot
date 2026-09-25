@@ -134,8 +134,8 @@
   padding-top: 0;
 }
 
-/* Non-scrolling pane contents still need the titlebar clearance the layout
-   used to give them. */
+/* Non-scrolling pane contents need the same titlebar clearance as a
+   scrolling pane. */
 .main-layout:not(.is-canvas-underlay) .draft-pane {
   padding-top: calc(32px + var(--app-titlebar-height));
 }

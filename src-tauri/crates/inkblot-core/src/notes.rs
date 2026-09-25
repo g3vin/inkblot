@@ -76,9 +76,8 @@ fn normalize_date(raw: &Value, key: &str, fallback: &str) -> String {
 /// `YYYY-MM-DDTHH:MM:SS.sssZ`, which is what `toISOString` emits and what the store
 /// writes.
 fn is_iso8601(text: &str) -> bool {
-    static ISO: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$").unwrap()
-    });
+    static ISO: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$").unwrap());
     ISO.is_match(text)
 }
 
@@ -103,8 +102,14 @@ fn normalize_optional_id(raw: &Value, key: &str) -> Option<String> {
 fn normalize_preview_layout(raw: &Value) -> NotePreviewLayout {
     let value = &raw["previewLayout"];
     NotePreviewLayout {
-        offset_x: value["offsetX"].as_f64().filter(|n| n.is_finite()).unwrap_or(0.0),
-        offset_y: value["offsetY"].as_f64().filter(|n| n.is_finite()).unwrap_or(0.0),
+        offset_x: value["offsetX"]
+            .as_f64()
+            .filter(|n| n.is_finite())
+            .unwrap_or(0.0),
+        offset_y: value["offsetY"]
+            .as_f64()
+            .filter(|n| n.is_finite())
+            .unwrap_or(0.0),
     }
 }
 
@@ -115,8 +120,14 @@ fn normalize_preview_size(raw: &Value) -> NotePreviewSize {
         return NotePreviewSize::default();
     }
     NotePreviewSize {
-        width: value["width"].as_f64().filter(|n| n.is_finite()).map_or(260.0, |n| n.max(220.0)),
-        height: value["height"].as_f64().filter(|n| n.is_finite()).map_or(88.0, |n| n.max(64.0)),
+        width: value["width"]
+            .as_f64()
+            .filter(|n| n.is_finite())
+            .map_or(260.0, |n| n.max(220.0)),
+        height: value["height"]
+            .as_f64()
+            .filter(|n| n.is_finite())
+            .map_or(88.0, |n| n.max(64.0)),
     }
 }
 
@@ -127,7 +138,9 @@ pub fn normalize_note_image(raw: &Value, new_id: &dyn Fn() -> String) -> Option<
         return None;
     }
     Some(NoteImage {
-        id: string_field(raw, "id").filter(|id| !id.trim().is_empty()).unwrap_or_else(new_id),
+        id: string_field(raw, "id")
+            .filter(|id| !id.trim().is_empty())
+            .unwrap_or_else(new_id),
         src: src.to_string(),
         mime_type: string_field(raw, "mimeType").unwrap_or_else(|| "image/png".to_string()),
     })
@@ -144,7 +157,9 @@ pub fn normalize_audio_clip(
         return None;
     }
     Some(AudioClip {
-        id: string_field(raw, "id").filter(|id| !id.trim().is_empty()).unwrap_or_else(new_id),
+        id: string_field(raw, "id")
+            .filter(|id| !id.trim().is_empty())
+            .unwrap_or_else(new_id),
         src: src.to_string(),
         mime_type: string_field(raw, "mimeType").unwrap_or_else(|| "audio/webm".to_string()),
         duration_ms: raw["durationMs"]
@@ -162,7 +177,10 @@ pub fn normalize_note_audio(
 ) -> Vec<AudioClip> {
     raw.as_array()
         .map(|clips| {
-            clips.iter().filter_map(|clip| normalize_audio_clip(clip, new_id, now_iso)).collect()
+            clips
+                .iter()
+                .filter_map(|clip| normalize_audio_clip(clip, new_id, now_iso))
+                .collect()
         })
         .unwrap_or_default()
 }
@@ -173,9 +191,23 @@ pub fn normalize_note_audio(
 /// before overriding the fields it owns — so a key written by a newer build survives a
 /// round-trip through an older one.
 const MODELED_KEYS: [&str; 17] = [
-    "id", "type", "content", "anchor", "from", "to", "color", "pinned", "parentNoteId",
-    "collapsedChildren", "previewLayout", "previewSize", "images", "audio", "createdAt",
-    "updatedAt", "timestamp",
+    "id",
+    "type",
+    "content",
+    "anchor",
+    "from",
+    "to",
+    "color",
+    "pinned",
+    "parentNoteId",
+    "collapsedChildren",
+    "previewLayout",
+    "previewSize",
+    "images",
+    "audio",
+    "createdAt",
+    "updatedAt",
+    "timestamp",
 ];
 
 /// Fill in defaults and coerce every field. Safe on untrusted or legacy data.
@@ -197,8 +229,14 @@ pub fn normalize_note(raw: &Value, defaults: &NoteDefaults) -> Note {
         .unwrap_or_default();
 
     Note {
-        id: string_field(raw, "id").filter(|id| !id.is_empty()).unwrap_or_else(defaults.new_id),
-        note_type: if raw["type"] == "quote" { NoteType::Quote } else { NoteType::Free },
+        id: string_field(raw, "id")
+            .filter(|id| !id.is_empty())
+            .unwrap_or_else(defaults.new_id),
+        note_type: if raw["type"] == "quote" {
+            NoteType::Quote
+        } else {
+            NoteType::Free
+        },
         content: string_field(raw, "content").unwrap_or_default(),
         anchor: string_field(raw, "anchor").unwrap_or_default(),
         from: normalize_range_value(raw, "from"),
@@ -212,7 +250,10 @@ pub fn normalize_note(raw: &Value, defaults: &NoteDefaults) -> Note {
         images: raw["images"]
             .as_array()
             .map(|images| {
-                images.iter().filter_map(|image| normalize_note_image(image, defaults.new_id)).collect()
+                images
+                    .iter()
+                    .filter_map(|image| normalize_note_image(image, defaults.new_id))
+                    .collect()
             })
             .unwrap_or_default(),
         audio: normalize_note_audio(&raw["audio"], defaults.new_id, defaults.now_iso),
@@ -225,7 +266,12 @@ pub fn normalize_note(raw: &Value, defaults: &NoteDefaults) -> Note {
 
 pub fn normalize_notes(raw: &Value, defaults: &NoteDefaults) -> Vec<Note> {
     raw.as_array()
-        .map(|notes| notes.iter().map(|note| normalize_note(note, defaults)).collect())
+        .map(|notes| {
+            notes
+                .iter()
+                .map(|note| normalize_note(note, defaults))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -292,13 +338,21 @@ pub fn compare_notes(a: &Note, b: &Note) -> std::cmp::Ordering {
     use std::cmp::Ordering;
 
     if a.pinned != b.pinned {
-        return if a.pinned { Ordering::Less } else { Ordering::Greater };
+        return if a.pinned {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        };
     }
 
     let a_is_free = a.note_type == NoteType::Free;
     let b_is_free = b.note_type == NoteType::Free;
     if a_is_free != b_is_free {
-        return if a_is_free { Ordering::Greater } else { Ordering::Less };
+        return if a_is_free {
+            Ordering::Greater
+        } else {
+            Ordering::Less
+        };
     }
 
     if !a_is_free && !b_is_free {
@@ -360,17 +414,31 @@ mod tests {
 
     #[test]
     fn javascript_truthiness_decides_the_flags() {
-        let note = normalize_note(&json!({ "pinned": "yes", "collapsedChildren": 1 }), &defaults());
+        let note = normalize_note(
+            &json!({ "pinned": "yes", "collapsedChildren": 1 }),
+            &defaults(),
+        );
         assert!(note.pinned && note.collapsed_children);
-        let note = normalize_note(&json!({ "pinned": "", "collapsedChildren": 0 }), &defaults());
+        let note = normalize_note(
+            &json!({ "pinned": "", "collapsedChildren": 0 }),
+            &defaults(),
+        );
         assert!(!note.pinned && !note.collapsed_children);
     }
 
     #[test]
     fn a_preview_cannot_be_smaller_than_it_can_show() {
-        let note =
-            normalize_note(&json!({ "previewSize": { "width": 10, "height": 10 } }), &defaults());
-        assert_eq!(note.preview_size, NotePreviewSize { width: 220.0, height: 64.0 });
+        let note = normalize_note(
+            &json!({ "previewSize": { "width": 10, "height": 10 } }),
+            &defaults(),
+        );
+        assert_eq!(
+            note.preview_size,
+            NotePreviewSize {
+                width: 220.0,
+                height: 64.0
+            }
+        );
     }
 
     #[test]

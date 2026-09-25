@@ -242,6 +242,19 @@ export default function CanvasSurface({
     clear()
   }, [clear, dispatch, selectionRef])
 
+  /* ---------------- stacking ---------------- */
+
+  // Front and back only: the order is the z-order, and one step at a time is a
+  // distinction a board of loosely overlapping cards rarely needs.
+  const reorderSelection = useCallback(
+    (to) => {
+      const ids = [...selectionRef.current.nodes]
+      if (!ids.length) return
+      dispatch({ type: 'nodes/reorder', ids, to })
+    },
+    [dispatch, selectionRef]
+  )
+
   /* ---------------- colors ---------------- */
 
   // One action for the whole selection, so recoloring six cards is one undo step.
@@ -417,6 +430,7 @@ export default function CanvasSurface({
     groupSelection,
     locked,
     redo,
+    reorderSelection,
     selectAll,
     selectionRef,
     stateRef,
@@ -454,10 +468,8 @@ export default function CanvasSurface({
   /**
    * Record straight onto the canvas: press to start, press again to stop, and the memo
    * lands as a card where you were looking.
-   *
-   * Until now the only way to get a memo onto a canvas was to attach it to a note in a
-   * document and drag that note over — which is no use when the thought you want to
-   * capture isn't attached to anything yet.
+   * This is for a thought that isn't attached to anything yet; a memo already on a
+   * note gets here by dragging the note over.
    */
   const recorder = useAudioRecorder(projectName)
 
@@ -501,6 +513,7 @@ export default function CanvasSurface({
     onActivate,
     redo,
     resetZoom,
+    reorderSelection,
     screenToWorldAt,
     selectNode,
     stateRef,

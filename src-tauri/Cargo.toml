@@ -1,12 +1,22 @@
 [workspace]
 members = ["crates/*"]
 
-# Shared by the app crate and inkblot-core, so a version bump lands in both at once.
+# Shared by every package in the workspace; each inherits with `field.workspace = true`.
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+authors = ["Gavin Bowden"]
+license = "LicenseRef-Proprietary"
+repository = "https://github.com/g3vin/inkblot"
+publish = false
+
+# Shared by the member crates, so a version bump lands in all of them at once.
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 # float_roundtrip: without it serde_json's float parser is off by up to 1 ULP, so a
 # canvas coordinate changes in its last bit every time a document is loaded — and the
-# parity harness reports it as a diff-engine mismatch. Caught by scripts/parity.
+# parity harness reports it as a diff-engine mismatch. Caught by tests/parity.
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 url = "2.5.8"
 regex = "1.11"
@@ -21,53 +31,36 @@ typeshare = "1.0"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "gzip", "brotli", "deflate"] }
 
 [package]
-name = "app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
-edition = "2021"
-rust-version = "1.77.2"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+name = "inkblot"
+description = "Inkblot, the Tauri app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
 
 [lib]
-name = "app_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
-[dev-dependencies]
-# `rt` and `macros` are only needed by #[tokio::test]; the library itself runs on the
-# runtime Tauri already started.
-tokio = { version = "1", features = ["time", "sync", "rt", "macros"] }
+name = "inkblot_lib"
 
 [build-dependencies]
 tauri-build = { version = "2.5.4", features = [] }
 
 [dependencies]
 serde_json = { workspace = true }
-serde = { workspace = true }
 inkblot-core = { path = "crates/inkblot-core" }
+# The synonym model, Kokoro, whisper dictation and the scrape channel. The
+# `*_commands.rs` modules are the Tauri glue over it; inkblot-ffi is the Swift glue.
+inkblot-models = { path = "crates/inkblot-models", features = ["metal"] }
 url = { workspace = true }
-log = "0.4"
-ndarray = "0.17.2"
-ort = { version = "2.0.0-rc.11", features = ["ndarray"] }
-once_cell = { workspace = true }
-tokenizers = { version = "0.15", features = ["http"] }
-parking_lot = "0.12"
-# Tauri already runs on tokio; this is for the scrape channel's timeout and its
-# notify, so a waiting command parks instead of polling.
-tokio = { version = "1", features = ["time", "sync"] }
-cpal = "0.17.3"
-inkblot-dictation = { git = "https://github.com/g3vin/inkblot-dictation.git", branch = "main", features = ["metal"] }
-
+# reference_commands.rs: fetching a source's page for the References panel.
+serde = { workspace = true }
+reqwest = { workspace = true }
 
 tauri = { version = "2.10.0", features = ["protocol-asset"] }
-tauri-plugin-log = "2"
 tauri-plugin-fs = "2.4.5"
 tauri-plugin-dialog = "2.6.0"
-
-reqwest = { workspace = true }
 tauri-plugin-opener = "2"
 
 # NSHapticFeedbackManager. WKWebView exposes no haptics API, so the trackpad can

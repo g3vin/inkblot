@@ -85,9 +85,9 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
    * pending"). StrictMode mounts, tears down, and re-mounts on the SAME refs, so if
    * this cleanup only cancelled the frame and left the id behind, the guard above
    * would see a stale non-zero id forever and never schedule again. React state —
-   * and so the zoom readout — would freeze at its initial value, while the canvas
+   * and so the zoom readout — would freeze at its initial value while the canvas
    * kept zooming, because the transform is written to the DOM directly a few lines
-   * up. That is exactly the "stuck at 100%" bug.
+   * up.
    */
   useEffect(
     () => () => {
@@ -218,6 +218,8 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
   /* ---------------- drag to pan: middle mouse, or space held ---------------- */
 
   const spaceHeldRef = useRef(false)
+  /** Ends the finger pan in progress, if there is one — see `startPan`. */
+  const touchPanRef = useRef(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
 
   useEffect(() => {
@@ -252,19 +254,33 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     }
   }, [])
 
-  /** Call from the surface's onPointerDown. Returns true if it started a pan. */
+  /**
+   * Call from the surface's onPointerDown. Returns true if it started a pan.
+   *
+   * On a touch screen a finger on the empty canvas pans, as it does in every canvas app
+   * on iPad, and the Pencil is the mouse: it draws the selection box. A second finger
+   * ends the first finger's pan rather than starting another, because two fingers are a
+   * pinch — which the gesture events above turn into a zoom.
+   */
   const startPan = useCallback((event) => {
     const isMiddleButton = event.button === 1
     const isSpaceDrag = event.button === 0 && spaceHeldRef.current
-    if (!isMiddleButton && !isSpaceDrag) return false
+    const isFinger = event.pointerType === 'touch'
+    if (!isMiddleButton && !isSpaceDrag && !isFinger) return false
 
     event.preventDefault()
+    if (isFinger && touchPanRef.current) {
+      touchPanRef.current()
+      return true
+    }
     setIsPanning(true)
 
     let lastX = event.clientX
     let lastY = event.clientY
+    const pointerId = event.pointerId
 
     const onMove = (moveEvent) => {
+      if (isFinger && moveEvent.pointerId !== pointerId) return
       // Dragging the surface right should pull the world right, i.e. move the
       // viewport left — hence the negated delta.
       applyViewport(
@@ -274,12 +290,16 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
       lastY = moveEvent.clientY
     }
 
-    const onUp = () => {
+    const onUp = (upEvent) => {
+      if (isFinger && upEvent && upEvent.pointerId !== pointerId) return
       window.removeEventListener('pointermove', onMove, true)
       window.removeEventListener('pointerup', onUp, true)
       window.removeEventListener('pointercancel', onUp, true)
+      if (touchPanRef.current === end) touchPanRef.current = null
       setIsPanning(false)
     }
+    const end = () => onUp()
+    if (isFinger) touchPanRef.current = end
 
     window.addEventListener('pointermove', onMove, true)
     window.addEventListener('pointerup', onUp, true)

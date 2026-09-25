@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
   // .claude/worktrees holds other checkouts of this repo; each lints itself.
-  globalIgnores(['dist', 'public/ort', 'src-tauri/target', '.claude']),
+  globalIgnores(['dist', 'src-tauri/target', '.claude']),
   {
     files: ['**/*.{js,jsx,mjs,ts,tsx}'],
     extends: [
@@ -16,7 +16,6 @@ export default defineConfig([
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
         ecmaVersion: 'latest',
@@ -36,7 +35,7 @@ export default defineConfig([
   },
   /* TypeScript files parse with the TS parser and use its unused-vars rule, which
      understands type-only references the base rule flags as unused. Not type-aware
-     yet (no `projectService`) — `npm run typecheck` is what checks types. */
+     (no `projectService`): `npm run typecheck` is what checks types. */
   {
     files: ['**/*.{ts,tsx}'],
     extends: [tseslint.configs.recommended],
@@ -47,6 +46,15 @@ export default defineConfig([
         argsIgnorePattern: '^_',
         caughtErrors: 'none',
       }],
+    },
+  },
+  /* typeshare's output. A command with nothing to say (`NewTabCommand`) is an empty
+     struct in Rust and an empty interface here, and it has to exist: adjacent tagging
+     sends a payload for every variant. */
+  {
+    files: ['src/types/inkblot-core.ts'],
+    rules: {
+      '@typescript-eslint/no-empty-object-type': 'off',
     },
   },
   /* Scripts injected into pinterest.com, read with Vite's ?raw. They are not
@@ -66,15 +74,15 @@ export default defineConfig([
     },
   },
   {
-    files: ['scripts/**/*.{js,mjs}', 'vite.config.js', 'eslint.config.js'],
+    files: ['scripts/**/*.{js,mjs}', 'tests/**/*.mjs', 'vite.config.js', 'eslint.config.js'],
     languageOptions: {
       globals: globals.node,
     },
   },
-  /* The canvas suites run under Node with a custom ESM loader, and mount components
+  /* The unit suites run under Node with a custom ESM loader, and mount components
      into jsdom — so they see both sets of globals. */
   {
-    files: ['scripts/canvas-tests/**/*.mjs'],
+    files: ['tests/unit/**/*.mjs'],
     languageOptions: {
       globals: { ...globals.node, ...globals.browser },
     },

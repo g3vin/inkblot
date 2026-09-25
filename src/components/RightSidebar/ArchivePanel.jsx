@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ARCHIVE_CHANGED_EVENT, getArchive, removeArchivedItem } from '../../lib/archiveStore'
 import { formatFullTimestamp } from '../../lib/versionHistory'
-import { restoreArchivedItem } from '../useDocumentArchive'
+import { restoreArchivedItem } from '../../hooks/useDocumentArchive'
 import SFIcon from '../SFIcon'
 
 const KIND_LABELS = { bubble: 'Bubble' }

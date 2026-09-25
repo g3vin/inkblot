@@ -1,5 +1,9 @@
+#if os(macOS)
 import AppKit
+#endif
+import Foundation
 import Observation
+import os
 
 /// Menus the page builds, drawn natively.
 ///
@@ -9,9 +13,9 @@ import Observation
 /// This turns the tree into an `NSMenu`, or into SwiftUI menu-bar content, and reports
 /// which item was chosen by the rid the page gave it.
 ///
-/// This is the compatibility path. A context menu built natively from
-/// `getSelectionContext` — the protocol request that exists for exactly this — is the
-/// destination, and it removes the page from the loop entirely.
+/// Context menus built this way need the page to handle `contextmenu`. A menu built
+/// natively from the protocol's `getSelectionContext` request would not, and would
+/// work on iOS as well.
 @MainActor
 @Observable
 final class WebMenus {
@@ -45,24 +49,32 @@ final class WebMenus {
     private(set) var viewMenuItems: [Item] = []
 
     /// Runs the chosen item in the page. Set by the web view controller.
+    @ObservationIgnored private let log = Logger(subsystem: "inkblot", category: "menus")
     @ObservationIgnored var activate: ((Int) -> Void)?
 
     /* ---------------- the menu bar ---------------- */
 
     /// `setAsAppMenu`. On macOS the menu bar belongs to the app, so the page's menu is
     /// not installed wholesale — SwiftUI owns the bar and rebuilds it at will. What the
-    /// page contributes is taken from it: today that is its View submenu (theme, accent
+    /// page contributes is taken from it: its View submenu (theme, accent
     /// color, word count). A top-level submenu under any other name is logged and
     /// dropped rather than guessed at.
     func setAppMenu(_ tree: [String: Any]) {
         guard let root = Item(tree) else { return }
         viewMenuItems = root.items.first { $0.text == "View" }?.items ?? []
         for other in root.items where other.text != "View" {
-            NSLog("[inkblot] The page added a \"%@\" menu; only View is merged into the menu bar.", other.text)
+            log.notice("The page added a \"\(other.text, privacy: .public)\" menu; only View is merged into the menu bar.")
         }
     }
 
     /* ---------------- context menus ---------------- */
+
+    #if !os(macOS)
+    /// Unsupported on iOS and iPadOS: a long press there is WebKit's own menu, and the
+    /// page's `contextmenu` handler never runs to ask for one. A dismissed menu is a
+    /// case the page already handles.
+    func popup(_ tree: [String: Any], in window: PlatformWindow?) -> Int? { nil }
+    #else
 
     /// Show a menu at the pointer and return the rid chosen, or `nil` if dismissed.
     ///
@@ -143,4 +155,5 @@ final class WebMenus {
         }
         return key.isEmpty ? nil : (key, modifiers)
     }
+    #endif
 }

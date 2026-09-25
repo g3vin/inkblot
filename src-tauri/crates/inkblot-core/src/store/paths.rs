@@ -5,11 +5,12 @@
 //! `filePathFor` is what appends `.json`, which is why a canvas keeps its `.canvas`
 //! suffix all the way through save, load, rename, move and delete.
 //!
-//! Mirrors `src/lib/projectPaths.js`; `npm run parity` asserts the two agree.
+//! Mirrors `src/lib/projectPaths.ts`; `npm run parity` asserts the two agree.
 
 use crate::doc_kind::CANVAS_SUFFIX;
 
-/// The file tree's stored sort order. Reserved in the JS and never yet written.
+/// The file tree's stored sort order. Reserved, and never written: the order is
+/// machine-local, kept in the preference store (see `store::preferences`).
 pub const ORDER_FILE: &str = ".inkblot-order.json";
 
 pub const CANVAS_SUFFIX_LENGTH: usize = CANVAS_SUFFIX.len();
@@ -49,19 +50,24 @@ pub fn parent_of(abs_path: &str) -> String {
 /// Normalize a tree path: callers pass them loosely.
 ///
 /// **This collapses only the FIRST run of slashes**, because the JS regex has no `g`
-/// flag (`projectPaths.js:43`). `a//b//c` normalizes to `a/b//c`. That is almost
+/// flag (`projectPaths.ts`). `a//b//c` normalizes to `a/b//c`. That is almost
 /// certainly not what was intended, but it decides file names on disk — a document
 /// saved under the doubled path is only findable under the doubled path — so it is
 /// reproduced rather than fixed. Changing it is a migration, not a cleanup.
 pub fn normalize_path(path: &str) -> String {
     let collapsed = match path.find('/') {
         Some(start) => {
-            let run_end = path[start..].find(|c| c != '/').map_or(path.len(), |o| start + o);
+            let run_end = path[start..]
+                .find(|c| c != '/')
+                .map_or(path.len(), |o| start + o);
             format!("{}/{}", &path[..start], &path[run_end..])
         }
         None => path.to_string(),
     };
-    collapsed.strip_prefix('/').unwrap_or(&collapsed).to_string()
+    collapsed
+        .strip_prefix('/')
+        .unwrap_or(&collapsed)
+        .to_string()
 }
 
 /// The document file for a tree path: `<root>/<path>.json`.
@@ -114,7 +120,10 @@ mod tests {
 
     #[test]
     fn a_canvas_keeps_its_suffix_through_the_path_mapping() {
-        assert_eq!(file_path_for("/p", "Notes/board.canvas"), "/p/Notes/board.canvas.json");
+        assert_eq!(
+            file_path_for("/p", "Notes/board.canvas"),
+            "/p/Notes/board.canvas.json"
+        );
         assert_eq!(folder_path_for("/p", "Notes"), "/p/Notes");
         assert_eq!(folder_path_for("/p", ""), "/p");
         assert_eq!(

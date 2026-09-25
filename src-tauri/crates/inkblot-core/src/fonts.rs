@@ -1,6 +1,5 @@
 //! System font enumeration. No Tauri, no UI — just font-kit.
 
-
 /// Every font family installed on the machine, so anything the user adds in
 /// Font Book shows up in the editor without a rebuild.
 ///

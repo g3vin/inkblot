@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -67,6 +66,7 @@ struct NoteTree: Identifiable {
 }
 
 private struct NoteBranchView: View {
+    @Environment(AppModel.self) private var model
     let branch: NoteTree
     let depth: Int
     let filtering: Bool
@@ -75,6 +75,15 @@ private struct NoteBranchView: View {
         VStack(alignment: .leading, spacing: 8) {
             NoteCardView(note: branch.note, hasChildren: !branch.children.isEmpty)
                 .padding(.leading, CGFloat(depth) * 16)
+                // Onto a canvas: the page reads this URL off an ordinary HTML5 drop
+                // (`noteDragURL` in canvasEvents.js). A native drag cannot hit-test the
+                // canvas the way the page's own pointer drag does, so it doesn't try.
+                .onDrag {
+                    guard let url = NoteDrag.url(docPath: model.sidebar.notesDocPath, noteId: branch.note.id) else {
+                        return NSItemProvider()
+                    }
+                    return NSItemProvider(object: url as NSURL)
+                }
             if !branch.note.collapsedChildren || filtering {
                 ForEach(branch.children) { child in
                     NoteBranchView(branch: child, depth: depth + 1, filtering: filtering)
@@ -94,6 +103,7 @@ struct NoteCardView: View {
     @State private var draft = ""
     @FocusState private var editing: Bool
     @State private var commitTask: Task<Void, Never>?
+    @State private var pickingImages = false
 
     static let colors = ["#ffd54f", "#ff9aa2", "#9ad0f5", "#9ee493", "#c7a8ff", "#ffb86b"]
 
@@ -168,8 +178,8 @@ struct NoteCardView: View {
         ScrollView(.horizontal) {
             HStack(spacing: 6) {
                 ForEach(note.images, id: \.id) { image in
-                    if let nsImage = NSImage.fromDataURI(image.src) {
-                        Image(nsImage: nsImage)
+                    if let picture = PlatformImage.fromDataURI(image.src) {
+                        Image(platformImage: picture)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 64, height: 64)
@@ -256,17 +266,19 @@ struct NoteCardView: View {
         model.sidebar.updateNote(note, .with(content: text))
     }
 
+    /// `fileImporter` rather than `NSOpenPanel`: the same picker on a Mac, the Files
+    /// sheet on an iPad or a phone.
     private func pickImages() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.image]
-        guard panel.runModal() == .OK else { return }
-        _ = attachImages(panel.urls)
+        pickingImages = true
     }
 
     /// Note images are inlined as data URIs — the page's format, see `NoteImage`.
+    @discardableResult
     private func attachImages(_ urls: [URL]) -> Bool {
         let added = urls.compactMap { url -> NoteImage? in
+            // A picked file outside the app's container is lent, not given (iOS).
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             guard let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .image),
                   let mime = type.preferredMIMEType,
                   let data = try? Data(contentsOf: url) else { return nil }
@@ -289,14 +301,6 @@ extension NotePatch {
                      previewSize: NotePreviewSize? = nil) -> NotePatch {
         NotePatch(content: content, color: color, pinned: pinned, collapsedChildren: collapsedChildren,
                   images: images, audio: audio, previewLayout: previewLayout, previewSize: previewSize)
-    }
-}
-
-extension NSImage {
-    static func fromDataURI(_ uri: String) -> NSImage? {
-        guard uri.hasPrefix("data:"), let comma = uri.firstIndex(of: ",") else { return nil }
-        guard let data = Data(base64Encoded: String(uri[uri.index(after: comma)...])) else { return nil }
-        return NSImage(data: data)
     }
 }
 

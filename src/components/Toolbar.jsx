@@ -6,19 +6,13 @@
  * Also hosts the table/conversation-tile inserters and the dictation and
  * read-aloud controls.
  *
- * **This component used to hold the editor, and no longer does.** It read about
- * ten facts out of a live TipTap instance on every `selectionUpdate` and called
- * `editor.chain()` on every click. Both directions now go through the bridge
- * protocol: it renders a pushed `ToolbarState` and sends `NativeCommand`s. That is
- * sharp edge #1 of Phase 4, and the point of it is that this file is now written
- * the way an `NSToolbar` will have to be written — it cannot ask the document a
- * question, because in Phase 5 it will not be able to.
+ * **The toolbar does not touch the editor for formatting.** It renders a pushed
+ * `ToolbarState` and sends `NativeCommand`s, exactly as native chrome has to, since
+ * native chrome cannot ask the document a question. The state is read by
+ * `bridge/readState.ts`, published by `bridge/useSurfacePublisher.ts`, and coalesced
+ * to one per frame by `bridge/coalesce.ts`.
  *
- * The reading did not disappear, it moved: `bridge/readState.ts` does it, and
- * `bridge/useSurfacePublisher.ts` decides when. The frame coalescing that used to
- * live here as a `requestAnimationFrame` ref is `bridge/coalesce.ts`.
- *
- * What is still local is what is genuinely about this control and not about the
+ * What is local is what is genuinely about this control and not about the
  * document: which fonts are pinned or recent, whether the alignment menu is open,
  * and the highlight picker's in-progress value. Controls are batched into segmented
  * groups that share one background (marks, colors, insert) to keep the titlebar
@@ -48,8 +42,7 @@ import {
  * What the toolbar shows before the first state arrives.
  *
  * `target: undefined` is the protocol's way of saying "no live editor", so this is
- * also what it shows when there is nothing to format — which is the same thing, and
- * used to be two different code paths.
+ * also what it shows when there is nothing to format.
  */
 const DEFAULT_TOOLBAR_STATE = {
   target: undefined,
@@ -83,9 +76,7 @@ export default function Toolbar({ editor }) {
 
   // The highlight picker's value while the user is dragging inside it. A pushed
   // state arriving mid-drag would yank the swatch back to the document's colour and
-  // fight the picker, which is the same reason the old `userSelectingHighlight`
-  // guard existed — it is only expressed as an override now instead of by
-  // suppressing part of an incoming update.
+  // fight the picker, so while this is set it overrides the pushed value.
   const [highlightDraft, setHighlightDraft] = useState(null)
   const [alignMenuAnchor, setAlignMenuAnchor] = useState(null)
   const [systemFonts, setSystemFonts] = useState([])
@@ -181,8 +172,8 @@ export default function Toolbar({ editor }) {
   }, [alignMenuAnchor, closeAlignMenu])
 
   // The voice controls keep the editor: the dictation draft state machine is a
-  // read-modify-write at speaking rate and stays on this side of the seam
-  // (sharp edge #2), and Read Aloud's highlight scheduler maps audio time to
+  // read-modify-write at speaking rate and stays next to the document (see
+  // bridge/dictationSource.ts), and Read Aloud's highlight scheduler maps audio time to
   // ProseMirror positions, which cannot cross it at all.
   if (!isEditorReady(editor)) return null
 

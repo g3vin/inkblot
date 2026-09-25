@@ -10,7 +10,6 @@ import { CANVAS_SUFFIX } from './docKind'
 import { getProjectLocation } from './projectLocations'
 
 export const ORDER_FILE = '.inkblot-order.json'
-export const CANVAS_SUFFIX_LENGTH = CANVAS_SUFFIX.length
 
 /**
  * A path as a caller hands it over. Absent and empty are both ordinary here —
