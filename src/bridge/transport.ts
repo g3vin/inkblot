@@ -192,8 +192,8 @@ const NATIVE_REQUEST_PREFIX = 'native:'
 /**
  * Two shells, one surface: the React chrome in this process, and the Swift shell.
  *
- * Some chrome is native in the Swift shell (file tree, inspector, tab dock) and some is
- * still the page's (the formatting toolbar), and both drive the same document. So this
+ * Some chrome is native in the Swift shell (file tree, inspector, toolbar) and some is
+ * still the page's (context menus, dialogs), and both drive the same document. So this
  * is not a replacement for the in-process pair but a third party on it:
  *
  *   - **Events go to both.** They are one stream from one surface, so both shells see

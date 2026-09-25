@@ -9,9 +9,6 @@ import { ok } from './assert.mjs'
 const schema = getCardSchema()
 const marks = Object.keys(schema.marks)
 const nodes = Object.keys(schema.nodes)
-console.log('marks:', marks.join(', '))
-console.log('nodes:', nodes.join(', '))
-console.log()
 
 // Every mark/node the titlebar Toolbar can invoke must exist in a card, or the
 // button throws the moment someone clicks it on a card.

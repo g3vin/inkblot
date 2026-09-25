@@ -135,8 +135,8 @@
   background: var(--surface-active);
 }
 
-/* Font names are arbitrary now that the list comes from the OS, so clip long
-   ones rather than letting the control stretch the titlebar. */
+/* Font names come from the OS and can be any length, so clip long ones rather
+   than letting the control stretch the titlebar. */
 .toolbar-select-font {
   width: 104px;
   text-overflow: ellipsis;

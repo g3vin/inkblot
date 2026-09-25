@@ -3,6 +3,7 @@ import AppKit
 #endif
 import Foundation
 import Observation
+import os
 
 /// Menus the page builds, drawn natively.
 ///
@@ -48,6 +49,7 @@ final class WebMenus {
     private(set) var viewMenuItems: [Item] = []
 
     /// Runs the chosen item in the page. Set by the web view controller.
+    @ObservationIgnored private let log = Logger(subsystem: "inkblot", category: "menus")
     @ObservationIgnored var activate: ((Int) -> Void)?
 
     /* ---------------- the menu bar ---------------- */
@@ -61,7 +63,7 @@ final class WebMenus {
         guard let root = Item(tree) else { return }
         viewMenuItems = root.items.first { $0.text == "View" }?.items ?? []
         for other in root.items where other.text != "View" {
-            NSLog("[inkblot] The page added a \"%@\" menu; only View is merged into the menu bar.", other.text)
+            log.notice("The page added a \"\(other.text, privacy: .public)\" menu; only View is merged into the menu bar.")
         }
     }
 

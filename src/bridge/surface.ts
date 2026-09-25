@@ -123,7 +123,7 @@ export interface DocumentSurface {
    */
   onRequest<T extends RequestType>(type: T, handler: RequestHandler<T>): Unsubscribe
 
-  /** The remembered highlight color, which is now protocol state rather than editor storage. */
+  /** The remembered highlight color. It is protocol state, not editor storage. */
   lastHighlightColor(): string
 
   /** Read the active editor and push a `toolbarState`. Coalesced to one per frame. */
