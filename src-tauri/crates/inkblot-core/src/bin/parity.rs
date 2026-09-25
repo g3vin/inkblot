@@ -2,7 +2,7 @@
 //!
 //! Reads `{"cases":[{"id":N,"fn":"name","args":[...]}]}` on stdin and writes
 //! `{"results":[{"id":N,"ok":<json>}|{"id":N,"err":"..."}]}` on stdout. The Node half
-//! (`scripts/parity/run.mjs`) runs the same corpus through the JS implementation and
+//! (`tests/parity/run.mjs`) runs the same corpus through the JS implementation and
 //! compares. Nothing here is part of the library's API; it exists so that "the Rust
 //! implementation behaves identically" is a thing a gate can prove rather than a claim.
 //!
@@ -61,7 +61,7 @@ fn js_string_or_empty(value: Option<&Value>) -> Result<String, String> {
 }
 
 /// A number out of the corpus. JSON has no NaN, Infinity or -0, so those arrive as
-/// the string spellings `scripts/parity/encode.mjs` writes.
+/// the string spellings `tests/parity/encode.mjs` writes.
 fn js_f64(value: &Value) -> f64 {
     match value {
         Value::Number(number) => number.as_f64().unwrap_or(f64::NAN),
@@ -168,7 +168,7 @@ fn canvas_edge(value: &Value) -> CanvasEdge {
 ///
 /// The real one is 16 random hex chars; this one counts, so a corpus case that leaves
 /// a node without an id produces something the harness can line up against the JS
-/// side. `scripts/parity/cases/canvasModel.mjs` rewrites every id that was not in the
+/// side. `tests/parity/cases/canvasModel.mjs` rewrites every id that was not in the
 /// input, on both sides, before comparing.
 fn counting_ids() -> impl FnMut() -> String {
     let mut counter: u64 = 0;

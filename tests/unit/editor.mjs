@@ -327,7 +327,7 @@ ok('closing the split flushes the secondary pane\'s autosave',
 
 /* ---------------- Print Layout ---------------- */
 
-// jsdom has no layout, so this cannot see where pages break (scripts/print-tests does,
+// jsdom has no layout, so this cannot see where pages break (tests/layout does,
 // in WebKit). What it can see is that the real pane mounts as pages, keeps the SAME
 // editor — switching views must not recreate it — and that the setup is saved.
 const editorBefore = control.editor

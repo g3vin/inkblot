@@ -134,7 +134,7 @@ The page and a shell talk through a protocol defined once in Rust
   - It keeps callbacks, events and menu trees in the page.
   - It forwards only what needs the machine to `TauriHost`.
   - Bytes cross as base64.
-  - `scripts/canvas-tests/shim.mjs` drives it through the real `@tauri-apps/api`
+  - `tests/unit/shim.mjs` drives it through the real `@tauri-apps/api`
     modules.
 - **Structured values cross UniFFI as JSON strings** of the typeshare types. This keeps
   one definition per type instead of a second, UniFFI-generated one.
@@ -193,7 +193,7 @@ document or a folder compiled as a book. All of it is in `src/print/`.
   them side by side. Live multi-column editing in WebKit was judged unreliable.
 
 `npm run test:layout` runs the real editor in WebKit (it needs `playwright-core` and
-its WebKit, which are not project dependencies; see `scripts/print-tests/run.mjs`).
+its WebKit, which are not project dependencies; see `tests/layout/run.mjs`).
 
 ## Maps
 
@@ -334,10 +334,10 @@ SwiftUI's `.toolbar(id:)`. A document and a canvas each have their own saved lay
    `CanvasToolbarState`, app settings in `ViewOptions`.
 7. Add its id to `ToolbarRegistryTests.expected`.
 
-**A test suite.** See the header of `scripts/canvas-tests/run.mjs`.
+**A test suite.** See the header of `tests/unit/run.mjs`.
 
 **Porting a JS function to Rust.** Write it against the pitfalls above. Add a case
-module in `scripts/parity/cases/` whose `expected` comes from calling the real JS
+module in `tests/parity/cases/` whose `expected` comes from calling the real JS
 function, and add an arm in `inkblot-core/src/bin/parity.rs`. Break the Rust side once
 to prove the case can fail.
 

@@ -15,7 +15,7 @@
  *   useEditorNotes       note storage, and remapping quote anchors across edits
  *   useEditorDnd         pasting, and dragging text between panes
  *
- * scripts/canvas-tests/editor.mjs mounts this component and exercises all of them.
+ * tests/unit/editor.mjs mounts this component and exercises all of them.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useEditor } from '@tiptap/react'

@@ -41,7 +41,7 @@ const { TextSelection } = await import('@tiptap/pm/state')
 const { BubbleSession, findBubbleSession, bubbleSessionAt, findBubbleSessions, showSessionForm, sessionForms } =
   await import(`${S}/extensions/BubbleSession.js`)
 const { writeBubbleSession, selectionForBubble, useBubbleSessions } =
-  await import(`${S}/components/useBubbleSessions.js`)
+  await import(`${S}/hooks/useBubbleSessions.js`)
 const { files } = await import('./stub-fs.mjs')
 const { getProjectRoot } = await import(`${S}/lib/projectPaths.ts`)
 const archiveStore = await import(`${S}/lib/archiveStore.js`)
@@ -481,7 +481,7 @@ await saveDocument('Archive Project', 'one.md', { content: { type: 'doc' }, note
 ok('an autosave carries the archive forward', JSON.parse(files.get(docFile)).archive?.length === 1)
 
 // Restoring puts it back on its sentence, where the sentence still is.
-const { restoreArchivedItem } = await import(`${S}/components/useDocumentArchive.js`)
+const { restoreArchivedItem } = await import(`${S}/hooks/useDocumentArchive.js`)
 ok('restoring puts the session back on its sentence', restoreArchivedItem(doc, archive[0])
   && findBubbleSession(doc.state.doc, opened.id)?.session.aside[0].text === 'three'
   && doc.state.doc.textBetween(findBubbleSession(doc.state.doc, opened.id).from, findBubbleSession(doc.state.doc, opened.id).to) === 'Four two.')

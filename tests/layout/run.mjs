@@ -4,7 +4,7 @@
  *   npm run test:layout
  *
  * jsdom does no layout, so `npm test` can only check pagination as a function
- * (canvas-tests/print.mjs). This drives the real editor, the real PrintLayoutView and
+ * (tests/unit/print.mjs). This drives the real editor, the real PrintLayoutView and
  * the app's own CSS in WebKit — the engine both shells run — and checks what can only
  * be seen in a laid-out page:
  *
