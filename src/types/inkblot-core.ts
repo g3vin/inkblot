@@ -260,6 +260,14 @@ export interface AuthorProfile {
 	agent: string;
 }
 
+/** The pages after the last chapter, each under its own heading. Empty text leaves it out. */
+export interface BackMatter {
+	acknowledgements: string;
+	aboutTheAuthor: string;
+	/** The author's other books, one per line. */
+	alsoBy: string;
+}
+
 export interface Point {
 	x: number;
 	y: number;
@@ -503,6 +511,41 @@ export interface PageSetup {
 	titlePage?: TitlePageOptions;
 }
 
+/** How a chapter's number is written in its heading. */
+export enum ChapterNumberStyle {
+	/** The chapters' own headings, as written. */
+	None = "none",
+	/** "Chapter One" */
+	Words = "words",
+	/** "Chapter 1" */
+	Numerals = "numerals",
+	/** "Chapter I" */
+	Roman = "roman",
+}
+
+/** Chapter headings a book adds as it compiles. */
+export interface ChapterNumbering {
+	style: ChapterNumberStyle;
+	/** The word before the number — "Chapter", "Part" — or empty for the number alone. */
+	prefix: string;
+	/** Keep the chapter's own title under its number. */
+	includeTitle: boolean;
+}
+
+/** The pages before the first chapter. Empty text leaves its page out. */
+export interface FrontMatter {
+	/** The title alone, on the first recto. */
+	halfTitle: boolean;
+	/** The copyright page, on the back of the title page. */
+	copyright: string;
+	dedication: string;
+	epigraph: string;
+	/** Who the epigraph is by. */
+	epigraphSource: string;
+	/** A table of contents with page numbers. */
+	contents: boolean;
+}
+
 /**
  * A folder (or the whole project) compiled as one book: its chapters are the
  * folder's documents in tree order. Kept per folder in preferences, not in any one
@@ -520,6 +563,14 @@ export interface BookSettings {
 	/** The book's own page setup; absent means each chapter's first document's. */
 	pageSetup?: PageSetup;
 	binding: BindingSettings;
+	/**
+	 * Chapters left out of the book, by tree path. The rest print in tree order; a
+	 * document added to the folder is in until it is left out.
+	 */
+	excluded?: string[];
+	chapterNumbering?: ChapterNumbering;
+	frontMatter?: FrontMatter;
+	backMatter?: BackMatter;
 }
 
 export enum BridgeErrorCode {
@@ -947,7 +998,8 @@ export type NativeCommand =
 	| { type: "clearBookSetup", payload: ClearBookSetupCommand }
 	| { type: "refreshBookChapters", payload: RefreshBookChaptersCommand }
 	| { type: "setPrintScope", payload: SetPrintScopeCommand }
-	| { type: "setAuthorProfile", payload: SetAuthorProfileCommand };
+	| { type: "setAuthorProfile", payload: SetAuthorProfileCommand }
+	| { type: "setBookCover", payload: SetBookCoverCommand };
 
 /**
  * A command, with its place in the stream.
@@ -2088,6 +2140,8 @@ export interface PageLayoutState {
 	 * gives them.
 	 */
 	wordCount?: number;
+	/** The book's cover as a file on disk, for the Book tab's thumbnail. */
+	coverFile?: string;
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
@@ -2654,6 +2708,14 @@ export enum BlockType {
 export interface SetBlockTypeCommand {
 	target: EditorTarget;
 	block: BlockType;
+}
+
+/**
+ * Give the book a cover: an image file the shell picked, which the page copies into
+ * the project's assets. No path takes the cover away.
+ */
+export interface SetBookCoverCommand {
+	path?: string;
 }
 
 /** Replace the settings of the book the active document belongs to. */

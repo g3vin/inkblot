@@ -290,3 +290,118 @@ ok('a book\'s title page is followed by a blank verso, so the text opens on a re
 ok('no title page asked for, none given', titles.buildTitlePages({ setup: normalizePageSetup(null), title: 'x' }).length === 0)
 ok('a document\'s text is counted across its blocks',
   titles.textOfContent({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one two' }] }, { type: 'paragraph', content: [{ type: 'text', text: 'three' }] }] }).trim().split(/\s+/).length === 3)
+
+/* ---------------- compiling a book ---------------- */
+
+const matter = await import('../../src/print/bookMatter.ts')
+const front = await import('../../src/print/frontMatter.js')
+const bookStore = await import('../../src/print/bookStore.js')
+const { files: fsFiles } = await import('./stub-fs.mjs')
+const { getProjectRoot } = await import('../../src/lib/projectPaths.ts')
+const { buildEpub } = await import('../../src/print/export/epub.ts')
+const { buildHtmlDocument } = await import('../../src/print/export/html.ts')
+
+ok('numbers are spelled as chapter headings spell them',
+  matter.numberToWords(1) === 'One' && matter.numberToWords(42) === 'Forty-Two' && matter.numberToWords(105) === 'One Hundred Five' &&
+  matter.numberToWords(2024) === 'Two Thousand Twenty-Four')
+ok('a label in words, numerals or roman, with or without a prefix',
+  matter.chapterLabel(7, { style: 'words', prefix: 'Chapter' }) === 'Chapter Seven' &&
+  matter.chapterLabel(7, { style: 'numerals', prefix: '' }) === '7' &&
+  matter.chapterLabel(4, { style: 'roman', prefix: 'Part' }) === 'Part IV' &&
+  matter.chapterLabel(4, { style: 'none', prefix: 'Chapter' }) === null)
+
+const para = (text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })
+const h1 = (text) => ({ type: 'heading', attrs: { level: 1, textAlign: 'center' }, content: [{ type: 'text', text }] })
+const titled = { type: 'doc', content: [h1('The Storm'), para('Rain.')] }
+const bare = { type: 'doc', content: [para('Rain.')] }
+const numbered = matter.headChapter(titled, 'doc', 3, { style: 'words', prefix: 'Chapter', includeTitle: true })
+ok('a numbered chapter\'s opening heading becomes its number over its title',
+  numbered.content.length === 2 && numbered.content[0].attrs.textAlign === 'center' &&
+  same(numbered.content[0].content.map((n) => n.text || n.type), ['Chapter Three', 'hardBreak', 'The Storm']))
+ok('without its title, the number alone',
+  same(matter.headChapter(titled, 'doc', 3, { style: 'numerals', prefix: 'Chapter', includeTitle: false }).content[0].content, [{ type: 'text', text: 'Chapter 3' }]))
+ok('a chapter with no heading is titled by its document',
+  matter.headChapter(bare, 'Rainfall', 1, { style: 'words', prefix: '', includeTitle: true }).content[0].content.at(-1).text === 'Rainfall')
+ok('numbering off leaves a chapter alone, unless an export wants it titled',
+  matter.headChapter(bare, 'Rainfall', 1, null) === bare &&
+  matter.headChapter(bare, 'Rainfall', 1, null, { insertTitle: true }).content[0].content[0].text === 'Rainfall' &&
+  matter.headChapter(titled, 'x', 1, null, { insertTitle: true }) === titled)
+ok('a numbered title reads with a colon in contents', matter.chapterTitleOf(numbered, 'x') === 'Chapter Three: The Storm')
+
+const compiledBook = matter.compileBook(
+  [{ path: 'B/one', name: 'one', content: titled }, { path: 'B/two', name: 'two', content: bare }],
+  { chapterNumbering: { style: 'numerals', prefix: 'Chapter', includeTitle: false }, backMatter: { aboutTheAuthor: 'Lives by the sea.\n\nWrites.', alsoBy: 'First Book\nSecond Book', acknowledgements: ' ' } },
+  { author: 'A. Writer' }
+)
+ok('a book compiles to its numbered chapters, then its back matter',
+  same(compiledBook.map((c) => c.name), ['one', 'two', 'About the Author', 'Also by A. Writer']) &&
+  compiledBook[1].content.content[0].content[0].text === 'Chapter 2' && compiledBook[2].matter === 'back')
+ok('back matter paragraphs split on blank lines; "also by" one title a line',
+  compiledBook[2].content.content.length === 3 && compiledBook[3].content.content.length === 3)
+
+const trade = formats.applyFormat('trade-6x9')
+const fullFront = { frontMatter: { halfTitle: true, copyright: 'Copyright © 2026', dedication: 'For M.', epigraph: 'All we have to decide…', epigraphSource: 'Gandalf', contents: true } }
+const titleOnly = titles.buildTitlePages({ setup: trade, title: 'The Book', author: 'A. Writer' })
+const contentsList = Array.from({ length: 3 }, (_, i) => ({ title: `Chapter ${i + 1}`, folio: String(1 + i * 20) }))
+const fm = front.buildFrontMatterPages({ setup: trade, book: fullFront, title: 'The Book', titlePages: titleOnly, contents: contentsList })
+const kinds = fm.map((p) => ['fm-half-title', 'print-title-page', 'fm-copyright', 'fm-dedication', 'fm-epigraph', 'fm-contents', 'is-blank'].find((c) => p.classList.contains(c)))
+ok('front matter runs half-title, title, copyright on its back, dedication, epigraph, contents — each opening on a recto',
+  same(kinds, ['fm-half-title', 'is-blank', 'print-title-page', 'fm-copyright', 'fm-dedication', 'is-blank', 'fm-epigraph', 'is-blank', 'fm-contents', 'is-blank']))
+ok('and runs to an even count, so the first chapter is a recto', fm.length % 2 === 0)
+ok('the contents list each chapter with its folio',
+  same(Array.from(fm[8].querySelectorAll('.fm-contents-row')).map((r) => r.lastChild.textContent), ['1', '21', '41']))
+const { first: rowsFirst, rest: rowsRest } = front.contentsRowsPerPage(trade)
+const longContents = Array.from({ length: rowsFirst + rowsRest + 1 }, (_, i) => ({ title: `C${i}`, folio: String(i) }))
+const longFm = front.buildFrontMatterPages({ setup: trade, book: { frontMatter: { contents: true } }, title: 'T', contents: longContents })
+ok('a long contents runs on over as many pages as it takes', longFm.filter((p) => p.classList.contains('fm-contents')).length === 3)
+const flatFm = front.buildFrontMatterPages({ setup: normalizePageSetup(null), book: { frontMatter: { dedication: 'For M.' } }, title: 'T', titlePages: [] })
+ok('without facing pages, no blanks are added', flatFm.length === 1)
+
+/* ---------------- the book file ---------------- */
+
+bookStore.resetBookStore()
+const bookRoot = await getProjectRoot('Shelf')
+fsFiles.set(`${bookRoot}/.inkblot-books.json`, JSON.stringify({ version: 1, books: { Novel: { title: 'Kept in the Project', excluded: ['Novel/Notes'] } } }))
+store.getBookSettings('Shelf', 'Novel')
+await bookStore.booksSettled('Shelf')
+const shelved = store.getBookSettings('Shelf', 'Novel')
+ok('a book is read from the project\'s file, with every default filled in',
+  shelved.title === 'Kept in the Project' && same(shelved.excluded, ['Novel/Notes']) &&
+  shelved.chapterNumbering.style === 'none' && shelved.frontMatter.contents === false && shelved.binding.binding === 'none')
+await store.setBookSettings('Shelf', 'Stories', { ...store.getBookSettings('Shelf', 'Stories'), title: 'Short Ones' })
+const onDisk = JSON.parse(fsFiles.get(`${bookRoot}/.inkblot-books.json`))
+ok('a change is written to the file, beside the books already there',
+  onDisk.books.Stories.title === 'Short Ones' && onDisk.books.Novel.title === 'Kept in the Project')
+await bookStore.relocateBooks('Shelf', 'Novel', 'Books/Novel', { folder: true })
+ok('a folder\'s book moves with it, and its left-out chapters with them',
+  store.getBookSettings('Shelf', 'Books/Novel').title === 'Kept in the Project' &&
+  same(store.getBookSettings('Shelf', 'Books/Novel').excluded, ['Books/Novel/Notes']) &&
+  !JSON.parse(fsFiles.get(`${bookRoot}/.inkblot-books.json`)).books.Novel)
+
+/* ---------------- exports carry the book ---------------- */
+
+const sections = matter.frontMatterSections(fullFront, { title: 'The Book', author: 'A. Writer', titlePage: true })
+ok('an export\'s front matter is the half-title, title page, copyright, dedication and epigraph',
+  same(sections.map((s) => s.kind), ['halfTitle', 'titlePage', 'copyright', 'dedication', 'epigraph']))
+const htmlBook = buildHtmlDocument({ title: 'The Book', chapters: [{ title: 'Chapter One', content: titled }], front: sections, contents: true })
+ok('the HTML carries the front matter and a linked contents',
+  htmlBook.includes('class="fm-dedication">For M.</p>') && htmlBook.includes('<a href="#chapter-1">Chapter One</a>') && htmlBook.includes('— Gandalf'))
+const { inflateRawSync } = await import('node:zlib')
+const { listZip } = await import('../../src/print/export/zip.ts')
+const readZipEntry = (bytes, name) => {
+  const e = listZip(bytes).find((entry) => entry.name === name)
+  if (!e) return ''
+  const view = new DataView(bytes.buffer, bytes.byteOffset)
+  const start = e.offset + 30 + view.getUint16(e.offset + 26, true) + e.extraLength
+  const size = view.getUint32(e.offset + 18, true)
+  const raw = bytes.subarray(start, start + size)
+  return (e.method === 8 ? inflateRawSync(raw) : Buffer.from(raw)).toString('utf8')
+}
+globalThis.XMLSerializer ??= dom.window.XMLSerializer
+globalThis.DOMParser ??= dom.window.DOMParser
+const epubBook = await buildEpub({ title: 'The Book', chapters: [{ title: 'Chapter One', content: titled }], resolveImage: async () => null, front: sections, contents: true, identifier: 'urn:x', modified: new Date(0) })
+const opfBook = readZipEntry(epubBook, 'OEBPS/content.opf')
+ok('the EPUB reads front matter, contents, then chapters',
+  opfBook.indexOf('idref="front-01"') > 0 &&
+  opfBook.indexOf('idref="front-01"') < opfBook.indexOf('idref="contents"') && opfBook.indexOf('idref="contents"') < opfBook.indexOf('idref="chapter-001"') &&
+  readZipEntry(epubBook, 'OEBPS/text/front-04.xhtml').includes('epub:type="dedication"'))

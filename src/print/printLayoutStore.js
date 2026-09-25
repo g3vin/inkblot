@@ -9,18 +9,19 @@
  * A store rather than React state because it is read and written from places that
  * do not share a parent: the panes, the View menu in App.jsx, and bridge commands
  * from the native inspector. Persisted through preferences, so a document reopens
- * the way it was left.
+ * the way it was left — except the books, which are the project's and are kept in a
+ * file in it (bookStore.js).
  */
 import { useSyncExternalStore } from 'react'
 
 import { getPreference, setPreference } from '../lib/preferences'
+import { onBooksChanged, storedBook, storeBook } from './bookStore'
 import { bookFolderFor } from './compile'
 import { clampZoom } from './zoom'
 import { DEFAULT_SHEETS_PER_SIGNATURE } from './imposition'
 
 const ENABLED_PREFIX = 'inkblot-print-layout:'
 const ZOOM_KEY = 'inkblot-print-zoom'
-const BOOK_PREFIX = 'inkblot-book:'
 const SCOPE_PREFIX = 'inkblot-print-scope:'
 const AUTHOR_KEY = 'inkblot-author-profile'
 
@@ -83,30 +84,48 @@ export const DEFAULT_BINDING = {
   includeGuide: true,
 }
 
-const bookKey = (projectName, folder) => `${BOOK_PREFIX}${projectName || ''}:${folder || ''}`
+export const DEFAULT_CHAPTER_NUMBERING = { style: 'none', prefix: 'Chapter', includeTitle: true }
+
+export const DEFAULT_FRONT_MATTER = {
+  halfTitle: false,
+  copyright: '',
+  dedication: '',
+  epigraph: '',
+  epigraphSource: '',
+  contents: false,
+}
+
+export const DEFAULT_BACK_MATTER = { acknowledgements: '', aboutTheAuthor: '', alsoBy: '' }
+
+const objectOr = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {})
+
+// The book file is read in the background; when it lands, everything showing a book
+// shows the one it holds.
+onBooksChanged(() => emit())
 
 /** A folder's book settings, with defaults filled in: the folder's name as the title. */
 export const getBookSettings = (projectName, folder) => {
-  let stored = null
-  try {
-    stored = JSON.parse(getPreference(bookKey(projectName, folder)) || 'null')
-  } catch {
-    stored = null
-  }
+  const stored = objectOr(storedBook(projectName, folder))
   const name = (folder || projectName || 'Untitled').split('/').filter(Boolean).pop() || 'Untitled'
   return {
     folder: folder || '',
     title: name,
     author: '',
     language: (typeof navigator !== 'undefined' && navigator.language) || 'en-US',
-    ...(stored && typeof stored === 'object' ? stored : {}),
-    binding: { ...DEFAULT_BINDING, ...(stored?.binding || {}) },
+    ...stored,
+    binding: { ...DEFAULT_BINDING, ...objectOr(stored.binding) },
+    excluded: Array.isArray(stored.excluded) ? stored.excluded.filter((p) => typeof p === 'string') : [],
+    chapterNumbering: { ...DEFAULT_CHAPTER_NUMBERING, ...objectOr(stored.chapterNumbering) },
+    frontMatter: { ...DEFAULT_FRONT_MATTER, ...objectOr(stored.frontMatter) },
+    backMatter: { ...DEFAULT_BACK_MATTER, ...objectOr(stored.backMatter) },
   }
 }
 
+/** Store a folder's book settings. Resolves when they are saved in the project. */
 export const setBookSettings = (projectName, folder, settings) => {
-  setPreference(bookKey(projectName, folder), JSON.stringify({ ...settings, folder: folder || '' }))
+  const saved = storeBook(projectName, folder, { ...settings, folder: folder || '' })
   emit()
+  return saved
 }
 
 /* ---------------- the writer ---------------- */

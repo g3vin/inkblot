@@ -235,4 +235,50 @@ struct FinishingTests {
         #expect(RunningPreviewContext.describeWordCount(4_449) == "about \(4_400.formatted()) words")
         #expect(RunningPreviewContext.describeWordCount(88_600) == "about \(89_000.formatted()) words")
     }
+
+    @Test func aChapterLeftOutIsSentWithEveryOtherBookSetting() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var book = try #require(layout.book)
+        #expect(book.excluded.isEmpty && book.numbering == .none && book.numberPrefix == "Chapter")
+        book.include("Novel/Two", false)
+        book.include("Novel/Two", false)
+        book.numbering = .words
+        book.dedication = "For M."
+        layout.apply(book)
+
+        let settings = try #require(wire.commands.last?.payload["settings"] as? [String: Any])
+        #expect(settings["excluded"] as? [String] == ["Novel/Two"])
+        #expect((settings["chapterNumbering"] as? [String: Any])?["style"] as? String == "words")
+        #expect((settings["frontMatter"] as? [String: Any])?["dedication"] as? String == "For M.")
+        // Sent even when empty, so the page never reads a missing field as a reset.
+        #expect((settings["backMatter"] as? [String: Any])?["alsoBy"] as? String == "")
+
+        book.include("Novel/Two", true)
+        #expect(book.excluded.isEmpty)
+    }
+
+    @Test func aChapterHeadingIsSpelledAsThePageSpellsIt() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var book = try #require(layout.book)
+        book.numbering = .words
+        #expect(BookPanelView.label(42, book) == "Chapter Forty-Two")
+        #expect(BookPanelView.label(105, book) == "Chapter One Hundred Five")
+        book.numbering = .roman
+        book.numberPrefix = ""
+        #expect(BookPanelView.label(4, book) == "IV")
+    }
+
+    @Test func aCoverIsPickedByPathAndRemovedWithNone() {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        layout.setCover(URL(fileURLWithPath: "/Users/a/cover.jpg"))
+        #expect(wire.commands.last?.type == "setBookCover")
+        #expect(wire.commands.last?.payload["path"] as? String == "/Users/a/cover.jpg")
+        layout.setCover(nil)
+        #expect(wire.commands.last?.payload["path"] == nil)
+    }
 }

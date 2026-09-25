@@ -136,6 +136,59 @@ struct CommitTextField: View {
     }
 }
 
+/// Paragraphs of text — a dedication, a copyright page — typed in a box that grows
+/// with them, and applied when the box lets go, as `CommitTextField` does. Return is a
+/// new line here, not a commit.
+struct CommitTextEditor: View {
+    let title: String
+    @Binding var text: String
+    var prompt = ""
+
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    init(_ title: String, text: Binding<String>, prompt: String = "") {
+        self.title = title
+        self._text = text
+        self.prompt = prompt
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+            TextEditor(text: $draft)
+                .focused($focused)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 54, maxHeight: 140)
+                .padding(4)
+                .background(.background, in: .rect(cornerRadius: 5))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 5)
+                        .strokeBorder(focused ? Color.accentColor.opacity(0.6) : Color.secondary.opacity(0.3))
+                }
+                .overlay(alignment: .topLeading) {
+                    if draft.isEmpty && !prompt.isEmpty {
+                        Text(prompt)
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .accessibilityLabel(title)
+        }
+        .onAppear { draft = text }
+        .onChange(of: text) { if !focused { draft = text } }
+        .onChange(of: focused) { if !focused { commit() } }
+        .onDisappear(perform: commit)
+    }
+
+    private func commit() {
+        if draft != text { text = draft }
+    }
+}
+
 /* ---------------- lengths and numbers ---------------- */
 
 /// A length in a form row: its label leading, the number and its unit trailing, at the

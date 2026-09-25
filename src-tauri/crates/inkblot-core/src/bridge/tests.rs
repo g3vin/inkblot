@@ -80,6 +80,14 @@ fn book() -> crate::types::BookSettings {
             crop_marks: true,
             include_guide: true,
         },
+        excluded: vec!["Manuscript/notes".into()],
+        chapter_numbering: crate::types::ChapterNumbering {
+            style: crate::types::ChapterNumberStyle::Words,
+            prefix: "Chapter".into(),
+            include_title: true,
+        },
+        front_matter: crate::types::FrontMatter { half_title: true, dedication: "For M.".into(), contents: true, ..Default::default() },
+        back_matter: crate::types::BackMatter { about_the_author: "A. Writer lives by the sea.".into(), ..Default::default() },
     }
 }
 
@@ -417,6 +425,7 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::SetAuthorProfile(SetAuthorProfileCommand {
             profile: crate::types::AuthorProfile { byline: "A. Writer".into(), email: "a@example.com".into(), ..Default::default() },
         }),
+        NativeCommand::SetBookCover(SetBookCoverCommand { path: Some("/Users/a/cover.jpg".into()) }),
     ]
 }
 
@@ -733,6 +742,7 @@ fn every_event() -> Vec<WebviewEvent> {
             suggested_inside_margin_mm: 12.7,
             author: crate::types::AuthorProfile { byline: "A. Writer".into(), ..Default::default() },
             word_count: 71_400,
+            cover_file: Some("/Users/a/Novel/.assets/ab12.jpg".into()),
         }),
         WebviewEvent::PrintRequest(PrintRequest {
             job_id: "p1".into(),
@@ -855,6 +865,7 @@ fn every_command_has_its_documented_wire_name() {
             "refreshBookChapters",
             "setPrintScope",
             "setAuthorProfile",
+            "setBookCover",
         ]
     );
 }

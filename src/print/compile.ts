@@ -69,16 +69,22 @@ const asDoc = (content: unknown): Chapter['content'] => {
   return { type: 'doc', content: Array.isArray(content) ? content : [] }
 }
 
-/** Load a scope's chapters. `live` supplies the open documents' current content. */
+/**
+ * Load a scope's chapters. `live` supplies the open documents' current content;
+ * `excluded` are the chapters the book leaves out.
+ */
 export const loadChapters = async (
   projectName: string,
   docPath: string,
   scope: CompileScope,
-  live: (path: string) => Chapter['content'] | null = () => null
+  live: (path: string) => Chapter['content'] | null = () => null,
+  { excluded = [] }: { excluded?: string[] } = {}
 ): Promise<Chapter[]> => {
+  // A chapter the book leaves out is still printed on its own.
+  const left = new Set(excluded)
   const paths = scope === 'document'
     ? [docPath]
-    : await listBookChapters(projectName, bookFolderFor(docPath, scope))
+    : (await listBookChapters(projectName, bookFolderFor(docPath, scope))).filter((path) => !left.has(path))
   const chapters: Chapter[] = []
   for (const path of paths) {
     const open = live(path)

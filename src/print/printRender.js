@@ -138,8 +138,10 @@ const renderWindow = (snapshot, from, to, bleed) => {
  * must open on a recto.
  *
  * source: { snapshot, result, setup, stride, title, chapterTitleAt(pos) }
+ * `onChapterStart(index, folio)` is told the folio each source's first page carries,
+ * for a table of contents.
  */
-export const renderPages = (sources, { bookTitle = '', author = '', surname, words = 0 } = {}) => {
+export const renderPages = (sources, { bookTitle = '', author = '', surname, words = 0, onChapterStart } = {}) => {
   const pages = []
   if (!sources.length) return pages
   const setup = normalizePageSetup(sources[0].setup)
@@ -225,6 +227,7 @@ export const renderPages = (sources, { bookTitle = '', author = '', surname, wor
         }))
       }
       page.dataset.folio = formatPageNumber(ctx.page, setup.pageNumberFormat)
+      if (p === 0) onChapterStart?.(chapterIndex, page.dataset.folio)
       pages.push(page)
     }
   })

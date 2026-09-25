@@ -56,7 +56,8 @@ pub use note::{
     NOTE_COLOR_OPTIONS,
 };
 pub use page_setup::{
-    AuthorProfile, BindingSettings, BindingType, BookSettings, ChapterOpening, DuplexMode,
+    AuthorProfile, BackMatter, BindingSettings, BindingType, BookSettings, ChapterNumberStyle,
+    ChapterNumbering, ChapterOpening, DuplexMode, FrontMatter,
     LineSpacing, PageMargins, PageNumberFormat, PageOrientation, PageSetup, PrintAlignment,
     PrintTypography, RunningText, SheetFit, TitlePageOptions, TitlePageStyle,
 };

@@ -22,9 +22,11 @@ import { documentSurface } from '../bridge'
 import { isNativeShell } from '../lib/host'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { withPrintBibliography } from '../lib/references/printBibliography'
+import { compileBook } from './bookMatter'
 import { loadChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
 import { describeError, newJobId, reportJob } from './printJobStatus'
+import { buildFrontMatterPages } from './frontMatter'
 import { foldingGuide, printSequence } from './imposition'
 import { paginationKey, settlePagination } from './PaginationExtension'
 import { pageMetrics, resolvePageSetup, setupUsesToken, surnameOf } from './pageSetup'
@@ -39,11 +41,19 @@ import { countWords } from '../lib/wordCount'
 const PRINT_ROOT_ID = 'print-root'
 const PAGE_STYLE_ID = 'print-page-style'
 
+/**
+ * The text of a heading, with a line break read as a colon: a numbered chapter's
+ * "Chapter One" over "The Storm" is "Chapter One: The Storm" in a running head.
+ */
+const headingText = (node) => node.textBetween(0, node.content.size, '', (leaf) => (leaf.type.name === 'hardBreak' ? ': ' : '')).trim()
+
 /** Top-level H1s of a document, as { pos, text }: what a chapter's running head shows. */
 export const chapterHeadings = (doc) => {
   const out = []
   doc.forEach((node, pos) => {
-    if (node.type.name === 'heading' && node.attrs.level === 1 && node.textContent) out.push({ pos, text: node.textContent })
+    if (node.type.name !== 'heading' || node.attrs.level !== 1) return
+    const text = headingText(node)
+    if (text) out.push({ pos, text })
   })
   return out
 }
@@ -233,11 +243,15 @@ export const preparePrint = async ({
   const liveByPath = new Map(liveEditors.filter((e) => e?.path && e.editor && !e.editor.isDestroyed).map((e) => [e.path, e.editor]))
   // A document whose bibliography appears only on paper gets it here (and so is laid
   // out afresh below, not taken from its live pages).
-  const chapters = await withPrintBibliography(
+  const compiled = scope !== 'document'
+  const author = bookAuthor(book)
+  const loaded = await withPrintBibliography(
     projectName,
-    await loadChapters(projectName, docPath, scope, (path) => liveByPath.get(path)?.getJSON() || null)
+    await loadChapters(projectName, docPath, scope, (path) => liveByPath.get(path)?.getJSON() || null, { excluded: compiled ? book?.excluded : [] })
   )
-  if (!chapters.length) return null
+  if (!loaded.length) return null
+  // A book's chapters get their numbers and its back matter; a document is as it is.
+  const chapters = compiled ? compileBook(loaded, book, { author }) : loaded
 
   // A book with a setup of its own prints every chapter in it; otherwise the first
   // chapter's decides, as it always has. A document alone prints in its own, or in
@@ -249,7 +263,9 @@ export const preparePrint = async ({
   try {
     for (const [index, chapter] of chapters.entries()) {
       onProgress({ done: index, total: chapters.length })
-      const live = chapter.printBibliography ? null : liveSource(liveByPath.get(chapter.path), setup)
+      // A chapter the book numbered is not what its editor shows: lay it out afresh.
+      const changed = chapter.printBibliography || chapter.content !== loaded[index]?.content
+      const live = changed ? null : liveSource(liveByPath.get(chapter.path), setup)
       const laid = live || await layoutOffscreen(chapter.content, setup)
       sources.push({
         ...laid,
@@ -260,14 +276,30 @@ export const preparePrint = async ({
     }
     const bookTitle = scope === 'document' ? chapters[0].name : (book?.title || chapters[0].name)
     const profile = getAuthorProfile()
-    const author = bookAuthor(book)
     // Words only when something shows them: counting a whole book is not free.
     const needsWords = setup.titlePage?.showWordCount || setupUsesToken(setup, 'words')
-    const words = needsWords ? chapters.reduce((n, c) => n + countWords(textOfContent(c.content)), 0) : 0
-    const pages = [
-      ...buildTitlePages({ setup, title: bookTitle, profile, author, words }),
-      ...renderPages(sources, { bookTitle, author, surname: surnameOf(author), words }),
-    ]
+    const words = needsWords ? loaded.reduce((n, c) => n + countWords(textOfContent(c.content)), 0) : 0
+    const folios = []
+    const body = renderPages(sources, {
+      bookTitle,
+      author,
+      surname: surnameOf(author),
+      words,
+      onChapterStart: (index, folio) => { folios[index] = folio },
+    })
+    const titlePages = buildTitlePages({ setup, title: bookTitle, profile, author, words })
+    const front = compiled
+      ? buildFrontMatterPages({
+        setup,
+        book,
+        title: bookTitle,
+        titlePages,
+        contents: book?.frontMatter?.contents
+          ? sources.map((source, i) => ({ title: source.headings[0]?.text || source.title, folio: folios[i] || '' }))
+          : null,
+      })
+      : titlePages
+    const pages = [...front, ...body]
     const m = pageMetrics(setup)
 
     if (bound && book?.binding && book.binding.binding !== 'none') {

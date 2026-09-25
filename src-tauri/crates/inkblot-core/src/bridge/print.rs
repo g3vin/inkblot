@@ -129,6 +129,16 @@ pub struct SetAuthorProfileCommand {
     pub profile: AuthorProfile,
 }
 
+/// Give the book a cover: an image file the shell picked, which the page copies into
+/// the project's assets. No path takes the cover away.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetBookCoverCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
 /// What Print and Export cover, and which book the Book tab shows: the active
 /// document's folder, or the whole project. `Document` shows the folder's book.
 #[typeshare]
@@ -341,6 +351,9 @@ pub struct PageLayoutState {
     /// gives them.
     #[serde(default)]
     pub word_count: u32,
+    /// The book's cover as a file on disk, for the Book tab's thumbnail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_file: Option<String>,
 }
 
 /// What a print or export job is.
