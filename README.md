@@ -1,9 +1,20 @@
 # Inkblot
 
-Inkblot is a local-first writing app: prose documents and infinite canvases side by
-side, with notes anchored to the text, version history, a workbench of language tools
-(synonyms, rhymes, definitions, parts of speech), dictation, and Read Aloud. Documents
-live as JSON on your disk; nothing is synced anywhere. See [PRIVACY.md](PRIVACY.md).
+Inkblot is a local-first writing app for long-form work. Documents live as files on
+your disk; nothing is synced anywhere (see [PRIVACY.md](PRIVACY.md)).
+
+- **Three kinds of document:** prose, infinite canvases (JSON Canvas, compatible with
+  Obsidian) and maps with places, routes and journeys on a story timeline. Any two can
+  sit side by side in a split.
+- **Notes anchored to the text,** with images and voice memos, and a Bubble editor for
+  reworking a sentence word by word.
+- **Version history** with named versions, side-by-side comparison and restore.
+- **A workbench of on-device language tools:** synonyms, rhymes, definitions and parts
+  of speech, plus dictation and Read Aloud that run on your machine.
+- **References and citations** in APA, MLA, Chicago and more, with sources shared
+  across a project.
+- **Print Layout:** the document as real pages, printed as shown, imposed for binding,
+  and exported to PDF, EPUB, Markdown or HTML, for one document or a whole book.
 
 There are two apps, and they share one editor:
 
@@ -21,7 +32,7 @@ boundary.
 
 - Node 20+ and npm
 - Rust (stable) with `cargo`
-- `typeshare-cli` for the generated types: `cargo install typeshare-cli --locked`
+- `typeshare-cli` 1.13.4 for the generated types: `cargo install typeshare-cli --version 1.13.4 --locked`
 - For the Swift app: Xcode 26 with the macOS 26.4 SDK. For iOS slices:
   `rustup target add aarch64-apple-ios aarch64-apple-ios-sim`
 
@@ -61,11 +72,13 @@ open native/inkblot-core/inkblot-core.xcodeproj   # then ⌘R
 ## Checks
 
 Run these before every commit, and the Swift ones as well when you touch `native/` or
-`src-tauri/crates/`. Each catches failures the others can't.
+`src-tauri/crates/`. Each catches failures the others can't. CI
+(`.github/workflows/ci.yml`) runs all of them except the Swift ones and
+`npm run test:layout`.
 
 | Command | What it checks | What only it catches |
 |---|---|---|
-| `npm test` | 29 suites under `tests/unit/`, in jsdom, mounting real components | A component that throws on every render: lint, tsc and the build all pass on it |
+| `npm test` | 28 suites under `tests/unit/`, in jsdom, mounting real components | A component that throws on every render: lint, tsc and the build all pass on it |
 | `npm run lint` | ESLint, including the React Compiler rules. The bar is 0 errors and 0 warnings | A ref written during render |
 | `npm run typecheck` | `tsc --noEmit` over the TypeScript | |
 | `npm run build` | The Vite production build | Bad dynamic imports, and named imports a module does not export |
@@ -96,4 +109,18 @@ dictionary: `INKBLOT_CMUDICT=/path/to/cmudict.dict cargo test -p inkblot-models 
 | `src-tauri/crates/inkblot-models/` | On-device models: synonyms, rhymes, Kokoro speech, dictation |
 | `src-tauri/crates/inkblot-ffi/` | `inkblot-core` and `inkblot-models` exposed to Swift through UniFFI |
 | `native/inkblot-core/` | The Swift app (the Xcode project, target and module are all named `inkblot-core`) |
-| `scripts/` | Type generation, the XCFramework build, the test suites, the parity harness |
+| `tests/unit/` | The jsdom suites (`npm test`) |
+| `tests/parity/` | The JS/Rust differential harness (`npm run parity`) |
+| `tests/layout/` | Print Layout in real WebKit (`npm run test:layout`) |
+| `scripts/` | Type generation and the XCFramework build |
+
+## Contributing
+
+Branch naming, commit messages and the pull request flow are in
+[CONTRIBUTING.md](CONTRIBUTING.md). Notable changes are recorded in
+[CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+Copyright (c) 2026 Gavin Bowden. All rights reserved. Inkblot is proprietary software;
+see [LICENSE](LICENSE).
