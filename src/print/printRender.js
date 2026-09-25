@@ -227,6 +227,11 @@ export const renderPages = (sources, { bookTitle = '', author = '', surname, wor
         }))
       }
       page.dataset.folio = formatPageNumber(ctx.page, setup.pageNumberFormat)
+      // For narrowing a print afterwards: the printed number, and where in its
+      // chapter the page starts.
+      page.dataset.page = String(ctx.page)
+      page.dataset.chapter = String(chapterIndex)
+      page.dataset.pos = String(startPos)
       if (p === 0) onChapterStart?.(chapterIndex, page.dataset.folio)
       pages.push(page)
     }

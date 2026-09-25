@@ -228,6 +228,58 @@ const guideSheet = (imposition, widthPx, heightPx, title) => {
 }
 
 /**
+ * Printed page numbers typed as `3-7, 10`: a set of them, or null for every page.
+ * A range written backwards is read forwards; anything unreadable is ignored.
+ */
+export const parsePageRanges = (text) => {
+  const wanted = new Set()
+  for (const part of String(text || '').split(/[,;\s]+/)) {
+    const m = /^(\d+)(?:\s*[-–]\s*(\d+))?$/.exec(part.trim())
+    if (!m) continue
+    const a = Number(m[1])
+    const b = m[2] ? Number(m[2]) : a
+    for (let n = Math.min(a, b); n <= Math.max(a, b) && wanted.size < 100_000; n += 1) wanted.add(n)
+  }
+  return wanted.size ? wanted : null
+}
+
+/** The selected text of an editor, as a chapter to lay out alone. */
+const selectionChapter = (editor, docPath) => {
+  const { from, to } = editor.state.selection
+  const cut = editor.state.doc.cut(from, to).toJSON()
+  return { path: docPath, name: docPath.split('/').pop() || docPath, content: cut, selection: true }
+}
+
+/**
+ * The pages of the chapter the cursor is in: from the Heading 1 before it to the next,
+ * by where each page starts. A document without headings is one chapter.
+ */
+const pagesOfChapterAt = (pages, editor) => {
+  if (!editor) return pages
+  const at = editor.state.selection.from
+  const headings = chapterHeadings(editor.state.doc)
+  const start = headings.filter((h) => h.pos <= at).pop()?.pos ?? 0
+  const end = headings.find((h) => h.pos > at)?.pos ?? Infinity
+  return pages.filter((page) => {
+    if (page.dataset.pos == null) return false
+    const pos = Number(page.dataset.pos)
+    return pos >= start && pos < end
+  })
+}
+
+/** Text set faintly across a page, corner to corner. */
+const watermark = (text, pageWidth) => {
+  const mark = document.createElement('div')
+  mark.className = 'print-watermark'
+  const span = document.createElement('span')
+  span.textContent = text
+  // Sized to run most of the way across the diagonal, whatever its length.
+  span.style.fontSize = `${Math.min(96, Math.max(18, (pageWidth * 1.25) / Math.max(4, text.length)))}px`
+  mark.appendChild(span)
+  return mark
+}
+
+/**
  * Build the printable pages (or sheets) for a job and mount them in #print-root.
  * Exposed apart from printing so Print Preview and tests can use the same pages.
  */
@@ -238,33 +290,51 @@ export const preparePrint = async ({
   bound = false,
   liveEditors = [],
   book,
+  options = {},
   onProgress = () => {},
 }) => {
   const liveByPath = new Map(liveEditors.filter((e) => e?.path && e.editor && !e.editor.isDestroyed).map((e) => [e.path, e.editor]))
-  // A document whose bibliography appears only on paper gets it here (and so is laid
-  // out afresh below, not taken from its live pages).
+  const range = options.range || 'all'
+  const activeEditor = liveByPath.get(docPath)
+  // The selection prints alone, as a document of its own.
+  if (range === 'selection') {
+    const selection = activeEditor?.state.selection
+    if (!selection || selection.empty) throw new Error('Select some text to print it on its own.')
+    scope = 'document'
+  }
   const compiled = scope !== 'document'
   const author = bookAuthor(book)
-  const loaded = await withPrintBibliography(
-    projectName,
-    await loadChapters(projectName, docPath, scope, (path) => liveByPath.get(path)?.getJSON() || null, { excluded: compiled ? book?.excluded : [] })
-  )
+  // A document whose bibliography appears only on paper gets it here (and so is laid
+  // out afresh below, not taken from its live pages).
+  const loaded = range === 'selection'
+    ? [selectionChapter(activeEditor, docPath)]
+    : await withPrintBibliography(
+      projectName,
+      await loadChapters(projectName, docPath, scope, (path) => liveByPath.get(path)?.getJSON() || null, { excluded: compiled ? book?.excluded : [] })
+    )
   if (!loaded.length) return null
   // A book's chapters get their numbers and its back matter; a document is as it is.
-  const chapters = compiled ? compileBook(loaded, book, { author }) : loaded
+  let chapters = compiled ? compileBook(loaded, book, { author }) : loaded
 
   // A book with a setup of its own prints every chapter in it; otherwise the first
   // chapter's decides, as it always has. A document alone prints in its own, or in
   // its book's when it has none — which is what Print Layout showed it in.
   const firstOwn = chapters[0].content?.attrs?.pageSetup || readDocPageSetup(liveByPath.get(chapters[0].path)?.state.doc)
   const { setup } = resolvePageSetup({ docSetup: firstOwn, bookSetup: book?.pageSetup, scope })
+  // The current chapter of a book is the document being written in, numbered as it
+  // would be in the whole book.
+  const chapterOnly = range === 'currentChapter' && compiled
+  if (chapterOnly) {
+    chapters = chapters.filter((chapter) => chapter.path === docPath)
+    if (!chapters.length) throw new Error('This document is left out of the book.')
+  }
 
   const sources = []
   try {
     for (const [index, chapter] of chapters.entries()) {
       onProgress({ done: index, total: chapters.length })
       // A chapter the book numbered is not what its editor shows: lay it out afresh.
-      const changed = chapter.printBibliography || chapter.content !== loaded[index]?.content
+      const changed = chapter.printBibliography || chapter.selection || chapter.content !== loaded[index]?.content || chapterOnly
       const live = changed ? null : liveSource(liveByPath.get(chapter.path), setup)
       const laid = live || await layoutOffscreen(chapter.content, setup)
       sources.push({
@@ -287,6 +357,7 @@ export const preparePrint = async ({
       words,
       onChapterStart: (index, folio) => { folios[index] = folio },
     })
+    const m0 = pageMetrics(setup)
     const titlePages = buildTitlePages({ setup, title: bookTitle, profile, author, words })
     const front = compiled
       ? buildFrontMatterPages({
@@ -299,7 +370,15 @@ export const preparePrint = async ({
           : null,
       })
       : titlePages
-    const pages = [...front, ...body]
+    let pages = chapterOnly ? body : [...front, ...body]
+    if (range === 'currentChapter' && !compiled) pages = pagesOfChapterAt(pages, activeEditor)
+    const wanted = parsePageRanges(options.pages)
+    if (wanted) pages = pages.filter((page) => page.dataset.page && wanted.has(Number(page.dataset.page)))
+    if (!pages.length) throw new Error(wanted ? 'None of those pages are in what is being printed.' : 'There was nothing to print.')
+    if (options.watermark?.trim()) {
+      const text = options.watermark.trim().replace(/\{recipient\}/g, options.recipient || '')
+      for (const page of pages) page.appendChild(watermark(text, m0.width))
+    }
     const m = pageMetrics(setup)
 
     if (bound && book?.binding && book.binding.binding !== 'none') {
@@ -376,10 +455,28 @@ const runJob = ({ jobId = newJobId(), kind, format, pdfPath, prepare }) => enque
  * Print (or save as PDF, with `pdfPath`). Resolves once the shell is done with the job.
  * `jobId`, when given, is the id its statuses carry — an export passes its own.
  */
-export const runPrintJob = (options) => runJob({
-  jobId: options.jobId,
-  kind: options.pdfPath ? 'export' : 'print',
-  format: options.pdfPath ? 'pdf' : undefined,
-  pdfPath: options.pdfPath,
-  prepare: (onProgress) => preparePrint({ ...options, onProgress }),
-})
+export const runPrintJob = (options) => {
+  const recipients = (options.options?.recipients || []).map((r) => r.trim()).filter(Boolean)
+  // A watermarked copy for each recipient: one job each, the name in the watermark.
+  if (recipients.length && options.options?.watermark?.trim()) {
+    return recipients.reduce((previous, recipient) => previous.then(() => runJob({
+      kind: options.pdfPath ? 'export' : 'print',
+      format: options.pdfPath ? 'pdf' : undefined,
+      pdfPath: options.pdfPath ? recipientPath(options.pdfPath, recipient) : undefined,
+      prepare: (onProgress) => preparePrint({ ...options, options: { ...options.options, recipient }, onProgress }),
+    })), Promise.resolve(true))
+  }
+  return runJob({
+    jobId: options.jobId,
+    kind: options.pdfPath ? 'export' : 'print',
+    format: options.pdfPath ? 'pdf' : undefined,
+    pdfPath: options.pdfPath,
+    prepare: (onProgress) => preparePrint({ ...options, onProgress }),
+  })
+}
+
+/** `Book.pdf` for Sam Reader → `Book – Sam Reader.pdf`, beside it. */
+export const recipientPath = (path, recipient) => {
+  const safe = recipient.replace(/[/\\:*?"<>|]+/g, '-')
+  return /\.pdf$/i.test(path) ? path.replace(/\.pdf$/i, ` – ${safe}.pdf`) : `${path} – ${safe}`
+}

@@ -474,11 +474,11 @@ export default function EditorLayout(props) {
     secondaryDoc: props.secondaryDoc,
     editor,
     secondaryEditor: props.secondaryEditor,
-    onPrint: ({ scope, bound }) => {
-      runPrintJob({ ...printOptions(scope), scope, bound }).catch((error) => console.error('[print] failed:', error))
+    onPrint: ({ scope, bound, options }) => {
+      runPrintJob({ ...printOptions(scope), scope, bound, options }).catch((error) => console.error('[print] failed:', error))
     },
-    onExport: ({ format, scope, bound }) => {
-      runExport({ ...printOptions(scope), format, scope, bound }).catch((error) => console.error('[export] failed:', error))
+    onExport: ({ format, scope, bound, options, path }) => {
+      runExport({ ...printOptions(scope), format, scope, bound, options, path }).catch((error) => console.error('[export] failed:', error))
     },
   })
 

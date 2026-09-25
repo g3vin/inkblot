@@ -1,5 +1,5 @@
 /**
- * runExport.js — File ▸ Export: PDF, EPUB, Markdown and HTML, for a document or a
+ * runExport.js — File ▸ Export: PDF, EPUB, Word, Markdown, HTML and plain text, for a document or a
  * book (a folder or the project, compiled in tree order).
  *
  * Asks where to save with the system save panel, then writes the file through the
@@ -15,13 +15,17 @@ import { chapterTitleOf, compileBook, frontMatterSections, paragraphsOf } from '
 import { loadChapters } from '../compile'
 import { readDocPageSetup } from '../DocPageSetup'
 import { resolvePageSetup } from '../pageSetup'
-import { bookAuthor } from '../printLayoutStore'
+import { bookAuthor, getAuthorProfile, setLastExport } from '../printLayoutStore'
+import { textOfContent } from '../titlePage'
+import { countWords } from '../../lib/wordCount'
 import { runPrintJob } from '../printJob'
 import { describeError, newJobId, reportJob } from '../printJobStatus'
+import { buildDocx } from './docx'
 import { buildEpub } from './epub'
 import { buildHtmlDocument } from './html'
 import { decodeDataUri, resolveImage, toDataUri } from './images'
 import { toMarkdown } from './markdown'
+import { buildPlainText } from './text'
 import { mapImageSources, portableContent } from './portable'
 
 const FORMATS = {
@@ -29,6 +33,8 @@ const FORMATS = {
   epub: { ext: 'epub', label: 'EPUB' },
   markdown: { ext: 'md', label: 'Markdown' },
   html: { ext: 'html', label: 'HTML' },
+  docx: { ext: 'docx', label: 'Word' },
+  plainText: { ext: 'txt', label: 'Plain Text' },
 }
 
 const safeFileName = (name) => (name || 'Untitled').replace(/[/\\:*?"<>|]+/g, '-').trim() || 'Untitled'
@@ -49,6 +55,8 @@ export async function runExport({
   docPath,
   liveEditors = [],
   book,
+  options = {},
+  path: knownPath = null,
 }) {
   const spec = FORMATS[format]
   if (!spec || !projectName || !docPath) return null
@@ -58,9 +66,10 @@ export async function runExport({
   const title = compiled ? (book?.title || 'Book') : (docPath.split('/').pop() || 'Untitled')
 
   const jobId = newJobId()
-  let path
+  // Export Again writes where the last one did, without asking.
+  let path = knownPath
   try {
-    path = await save({
+    if (!path) path = await save({
       title: `Export ${spec.label}`,
       defaultPath: `${safeFileName(title)}.${spec.ext}`,
       filters: [{ name: spec.label, extensions: [spec.ext] }],
@@ -71,8 +80,10 @@ export async function runExport({
   }
   if (!path) return null
 
+  const remember = () => setLastExport(projectName, { format, scope, path, bound: Boolean(bound), options })
   if (format === 'pdf') {
-    const saved = await runPrintJob({ jobId, projectName, docPath, scope, bound, liveEditors, book, pdfPath: path })
+    const saved = await runPrintJob({ jobId, projectName, docPath, scope, bound, liveEditors, book, options, pdfPath: path })
+    if (saved) remember()
     return saved ? path : null
   }
 
@@ -85,6 +96,7 @@ export async function runExport({
     throw error
   }
   report('done', { path })
+  remember()
   return path
 }
 
@@ -170,6 +182,45 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
       if (image) await writeFile(`${dirOf(path)}/${item.rel}`, image.bytes)
     }
     await writeTextFile(path, md)
+    return path
+  }
+
+  if (format === 'docx') {
+    // A document alone still gets its title page; a book's is among its front matter.
+    const sections = compiled ? front : (setup.titlePage ? [{ kind: 'titlePage', title, author }] : [])
+    const words = setup.titlePage?.showWordCount
+      ? chapters.reduce((n, c) => n + countWords(textOfContent(c.content)), 0)
+      : 0
+    const bytes = await buildDocx({
+      title,
+      author,
+      language: book?.language || 'en-US',
+      chapters: exportChapters,
+      setup,
+      front: sections,
+      contents,
+      profile: getAuthorProfile(),
+      words,
+      resolveImage: (src) => resolveImage(projectName, src),
+    })
+    await writeFile(path, bytes)
+    return path
+  }
+
+  if (format === 'plainText') {
+    const frontDocs = front
+      .filter((section) => section.text || section.kind === 'titlePage')
+      .map((section) => ({
+        type: 'doc',
+        content: section.kind === 'titlePage'
+          ? paragraphsOf([title, author && `by ${author}`].filter(Boolean).join('\n'))
+          : paragraphsOf(section.source ? `${section.text}\n\n— ${section.source}` : section.text),
+      }))
+    const text = buildPlainText(
+      [...frontDocs, ...exportChapters.map((chapter) => chapter.content)],
+      { wrap: 0, sceneBreak: setup.typography?.sceneBreak || '* * *' }
+    )
+    await writeTextFile(path, text)
     return path
   }
 

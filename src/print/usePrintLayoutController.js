@@ -35,6 +35,7 @@ import {
   getBookSettings,
   getCurrentPrintPage,
   getDisplayPointsPerInch,
+  getLastExport,
   getPrintScope,
   getPrintZoom,
   isPrintLayoutEnabled,
@@ -81,6 +82,9 @@ const TYPING_DEBOUNCE_MS = 120
 
 const usable = (editor) => (editor && !editor.isDestroyed && editor.view && !editor.view.isDestroyed ? editor : null)
 
+/** What the shell is told of the last export: enough to say "Export Again: Book.pdf". */
+const lastExportState = (last) => (last ? { format: last.format, scope: last.scope, path: last.path } : undefined)
+
 /**
  * The state the Finishing tabs draw, for one document. Pure but for the store reads,
  * so the tests can check it without a bridge.
@@ -113,6 +117,8 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     author: getAuthorProfile(),
     // The document's words; a book's would mean reading every chapter on each publish.
     wordCount: editor && scope === 'document' ? countWords(editor.state.doc.textContent) : 0,
+    lastExport: lastExportState(getLastExport(projectName)),
+    hasSelection: Boolean(editor && !editor.state.selection.empty),
     // The cover on disk, for the Book tab's thumbnail: a project asset, once the root is known.
     coverFile: projectRoot && book.coverImage && !book.coverImage.startsWith('data:')
       ? joinPath(projectRoot, book.coverImage)
@@ -329,11 +335,15 @@ export default function usePrintLayoutController({
       documentSurface.onCommand('goToPage', ({ page }) => {
         stateRef.current.activeEditor?.storage?.pagination?.goToPage?.(page)
       }),
-      documentSurface.onCommand('printDocument', ({ scope, bound }) => {
-        stateRef.current.onPrint?.({ scope, bound })
+      documentSurface.onCommand('printDocument', ({ scope, bound, options }) => {
+        stateRef.current.onPrint?.({ scope, bound, options })
       }),
-      documentSurface.onCommand('exportDocument', ({ format, scope, bound }) => {
-        stateRef.current.onExport?.({ format, scope, bound })
+      documentSurface.onCommand('exportDocument', ({ format, scope, bound, options }) => {
+        stateRef.current.onExport?.({ format, scope, bound, options })
+      }),
+      documentSurface.onCommand('exportAgain', () => {
+        const last = getLastExport(stateRef.current.projectName)
+        if (last) stateRef.current.onExport?.(last)
       }),
     ]
     return () => subscriptions.forEach((unsubscribe) => unsubscribe())

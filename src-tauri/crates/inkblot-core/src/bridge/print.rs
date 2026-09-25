@@ -60,6 +60,39 @@ pub enum ExportFormat {
     Epub,
     Markdown,
     Html,
+    /// Word, for an editor or an agent: styles, sections, headers and footers.
+    Docx,
+    /// Plain text, for a submission form or an email.
+    PlainText,
+}
+
+/// Which part of what the scope covers is printed.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PrintRange {
+    #[default]
+    All,
+    /// The chapter the cursor is in: the active document in a book, or the Heading 1
+    /// section around the cursor in a document.
+    CurrentChapter,
+    /// The selected text, laid out alone.
+    Selection,
+}
+
+/// How a print or a PDF is narrowed and marked. Every field is optional on the wire:
+/// no options is the whole thing, unmarked.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PrintOptions {
+    pub range: PrintRange,
+    /// Printed page numbers, as typed: `3-7, 10`. Empty prints every page.
+    pub pages: String,
+    /// Text set faintly across every page — "DRAFT", or "Read copy for {recipient}".
+    pub watermark: String,
+    /// Who a watermarked copy is for, one PDF each; filled into `{recipient}`.
+    pub recipients: Vec<String>,
 }
 
 /* ---------------- commands ---------------- */
@@ -199,6 +232,8 @@ pub struct GoToPageCommand {
 pub struct PrintDocumentCommand {
     pub scope: PrintScope,
     pub bound: bool,
+    #[serde(default)]
+    pub options: PrintOptions,
 }
 
 /// Export to a file. The page asks where (a save panel) and writes it.
@@ -211,6 +246,25 @@ pub struct ExportDocumentCommand {
     /// PDF only: imposed for binding.
     #[serde(default)]
     pub bound: bool,
+    /// PDF only: a range, a watermark.
+    #[serde(default)]
+    pub options: PrintOptions,
+}
+
+/// Export the last export again — same format, scope and file — without asking where.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportAgainCommand {}
+
+/// The export Export Again repeats.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LastExport {
+    pub format: ExportFormat,
+    pub scope: PrintScope,
+    pub path: String,
 }
 
 /// The shell finished (or abandoned) a `PrintRequest`.
@@ -354,6 +408,12 @@ pub struct PageLayoutState {
     /// The book's cover as a file on disk, for the Book tab's thumbnail.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover_file: Option<String>,
+    /// The project's last export, for Export Again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_export: Option<LastExport>,
+    /// Text is selected in the active document, so Print can print just that.
+    #[serde(default)]
+    pub has_selection: bool,
 }
 
 /// What a print or export job is.

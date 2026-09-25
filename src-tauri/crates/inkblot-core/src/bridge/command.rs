@@ -25,7 +25,7 @@ use super::sidebar::{
 };
 use crate::types::note::Note;
 use super::print::{
-    ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand, GoToPageCommand,
+    ApplyFormatCommand, ClearBookSetupCommand, ExportAgainCommand, ExportDocumentCommand, GoToPageCommand,
     InsertBreakCommand, PrintDocumentCommand, PrintFinishedCommand, RefreshBookChaptersCommand,
     SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand, SetPrintLayoutCommand,
     SetAuthorProfileCommand, SetBookCoverCommand, SetPrintScopeCommand, SetPrintZoomCommand, UseSetupForBookCommand,
@@ -587,4 +587,5 @@ pub enum NativeCommand {
     SetPrintScope(SetPrintScopeCommand),
     SetAuthorProfile(SetAuthorProfileCommand),
     SetBookCover(SetBookCoverCommand),
+    ExportAgain(ExportAgainCommand),
 }

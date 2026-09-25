@@ -405,3 +405,91 @@ ok('the EPUB reads front matter, contents, then chapters',
   opfBook.indexOf('idref="front-01"') > 0 &&
   opfBook.indexOf('idref="front-01"') < opfBook.indexOf('idref="contents"') && opfBook.indexOf('idref="contents"') < opfBook.indexOf('idref="chapter-001"') &&
   readZipEntry(epubBook, 'OEBPS/text/front-04.xhtml').includes('epub:type="dedication"'))
+
+/* ---------------- Word ---------------- */
+
+const { buildDocx, twips, hexColor } = await import('../../src/print/export/docx.ts')
+const { toPlainText, wrapText } = await import('../../src/print/export/text.ts')
+const { parsePageRanges, recipientPath } = await import('../../src/print/printJob.js')
+
+// A 1×1 PNG, the smallest picture there is.
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
+const { decodeDataUri, imageSize } = await import('../../src/print/export/images.ts')
+ok('an image\'s size is read from its header', same(imageSize(decodeDataUri(PNG)), { width: 1, height: 1 }))
+
+const richChapter = {
+  type: 'doc',
+  content: [
+    h1('The Storm'),
+    { type: 'paragraph', attrs: { textAlign: 'justify' }, content: [
+      { type: 'text', text: 'Bold & ', marks: [{ type: 'bold' }] },
+      { type: 'text', text: 'red', marks: [{ type: 'textStyle', attrs: { color: 'rgb(255, 0, 0)', fontSize: '18px' } }] },
+      { type: 'text', text: ' link', marks: [{ type: 'link', attrs: { href: 'https://example.com/?a=1&b=2' } }] },
+    ] },
+    { type: 'horizontalRule' },
+    { type: 'orderedList', attrs: { start: 3 }, content: [{ type: 'listItem', content: [para('three'), { type: 'bulletList', content: [{ type: 'listItem', content: [para('inner')] }] }] }] },
+    { type: 'table', content: [
+      { type: 'tableRow', content: [{ type: 'tableHeader', attrs: { colspan: 1, rowspan: 2 }, content: [para('A')] }, { type: 'tableHeader', content: [para('B')] }] },
+      { type: 'tableRow', content: [{ type: 'tableCell', content: [para('b2')] }] },
+    ] },
+    { type: 'image', attrs: { src: PNG, width: 5000 } },
+    { type: 'pageBreak', attrs: { kind: 'recto' } },
+    para('After the break.'),
+  ],
+}
+const wordSetup = { ...formats.applyFormat('manuscript'), differentFirstPage: true, versoHeader: { left: '{page}', center: '', right: '' } }
+const docx = await buildDocx({
+  title: 'The Book', author: 'Ann Writer', setup: wordSetup, chapters: [{ title: 'One', content: richChapter }, { title: 'Two', content: bare }],
+  front: [{ kind: 'titlePage', title: 'The Book', author: 'Ann Writer' }, { kind: 'dedication', text: 'For M.' }], contents: true,
+  profile, words: 71_449, resolveImage: async (src) => decodeDataUri(src), modified: new Date(0),
+})
+const wordNames = listZip(docx).map((e) => e.name)
+ok('a Word file has its parts, headers, footers and the picture',
+  ['[Content_Types].xml', '_rels/.rels', 'word/document.xml', 'word/styles.xml', 'word/settings.xml', 'word/numbering.xml',
+    'word/_rels/document.xml.rels', 'docProps/core.xml', 'word/header1.xml', 'word/footer1.xml', 'word/media/image1.png'].every((n) => wordNames.includes(n)))
+const xmlOk = (name) => {
+  const text = readZipEntry(docx, name)
+  return text && !new dom.window.DOMParser().parseFromString(text, 'application/xml').querySelector('parsererror')
+}
+ok('every part is well-formed XML', wordNames.filter((n) => /\.(xml|rels)$/.test(n)).every(xmlOk))
+const wordDoc = readZipEntry(docx, 'word/document.xml')
+const wordRels = readZipEntry(docx, 'word/_rels/document.xml.rels')
+ok('the page is Letter in twips, one-inch margins', wordDoc.includes('<w:pgSz w:w="12240" w:h="15840"/>') && wordDoc.includes('w:top="1440"') && twips(25.4) === 1440)
+ok('front matter, then a section per chapter, the break to a right-hand page starting one of its own',
+  (wordDoc.match(/<w:sectPr>/g) || []).length === 4 && (wordDoc.match(/w:val="oddPage"/g) || []).length === 1)
+ok('numbering starts with the first chapter, which has no running head on its first page',
+  (wordDoc.match(/w:start="1"/g) || []).length === 1 && wordDoc.includes('<w:titlePg/>'))
+ok('the manuscript title page carries the contact block and the rounded word count', wordDoc.includes('Alice Writer') && wordDoc.includes('about 71,000 words'))
+ok('the contents are a Word TOC field, updated on opening',
+  wordDoc.includes('TOC \\o &quot;1-1&quot;') && readZipEntry(docx, 'word/settings.xml').includes('<w:updateFields w:val="true"/>'))
+ok('text is escaped, and the link is a relationship with its ampersand escaped',
+  wordDoc.includes('Bold &amp; ') && wordRels.includes('Target="https://example.com/?a=1&amp;b=2" TargetMode="External"'))
+ok('a colour and a size become run properties', wordDoc.includes('<w:color w:val="FF0000"/><w:sz w:val="27"/>') && hexColor('#abc') === 'AABBCC')
+ok('a scene break is the manuscript\'s glyph, centred', wordDoc.includes('<w:pStyle w:val="SceneBreak"/></w:pPr><w:r><w:t xml:space="preserve">#</w:t>'))
+ok('an ordered list restarts at its own start; a nested list is a level deeper',
+  readZipEntry(docx, 'word/numbering.xml').includes('<w:startOverride w:val="3"/>') && wordDoc.includes('<w:ilvl w:val="1"/>'))
+ok('a row-spanning cell continues into the row below', wordDoc.includes('<w:vMerge w:val="restart"/>') && wordDoc.includes('<w:vMerge/>'))
+ok('a picture is capped at the text\'s width', (() => {
+  const cx = Number(/<wp:extent cx="(\d+)"/.exec(wordDoc)?.[1])
+  return cx > 0 && cx <= Math.round((215.9 - 50.8) * (96 / 25.4) * 9525) + 1
+})())
+const wordHeader = readZipEntry(docx, 'word/header1.xml')
+ok('the running head is surname / title / page, the page a live field',
+  wordHeader.replace(/<[^>]+>/g, '').trim() === 'Writer / The Book / 1' && wordHeader.includes('w:instr=" PAGE "'))
+ok('left-hand heads differ, so the settings say so', readZipEntry(docx, 'word/settings.xml').includes('<w:evenAndOddHeaders/>'))
+ok('the manuscript\'s type is the Normal style: Courier, 12 pt, double, half-inch indent',
+  readZipEntry(docx, 'word/styles.xml').includes('w:ascii="Courier Prime"') && readZipEntry(docx, 'word/styles.xml').includes('<w:sz w:val="24"/>') &&
+  readZipEntry(docx, 'word/styles.xml').includes('w:line="480"') && readZipEntry(docx, 'word/styles.xml').includes('<w:ind w:firstLine="720"/>'))
+
+/* ---------------- plain text ---------------- */
+
+ok('plain text: headings, lists, a scene break, and no trailing space',
+  toPlainText(richChapter, { sceneBreak: '#' }).startsWith('The Storm\n\nBold & red link\n\n') &&
+  toPlainText(richChapter, { sceneBreak: '#' }).includes('3. three\n\n   - inner') && !/ \n/.test(toPlainText(richChapter)))
+ok('wrapping at 72 breaks between words and indents what follows a marker',
+  wrapText('word '.repeat(30).trim(), 20, '- ').split('\n').every((l) => l.length <= 20) && wrapText('a b', 20, '- ') === '- a b')
+
+/* ---------------- print options ---------------- */
+
+ok('page ranges read as typed', same([...parsePageRanges('3-5, 9; 7–6')].sort((a, b) => a - b), [3, 4, 5, 6, 7, 9]) && parsePageRanges('  ') === null && parsePageRanges('abc') === null)
+ok('a copy for each reader is a file of its own', recipientPath('/Users/a/Book.pdf', 'Sam: Reader') === '/Users/a/Book – Sam- Reader.pdf')
