@@ -1,9 +1,13 @@
 [package]
 name = "inkblot-ffi"
-version = "0.1.0"
-edition = "2021"
 description = "inkblot-core, exposed to the Swift shell through UniFFI"
-publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
 
 [lib]
 # staticlib is what the XCFramework wraps and the app links. cdylib is only there so

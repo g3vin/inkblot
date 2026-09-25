@@ -1,7 +1,17 @@
 {
   "name": "inkblot",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "A local-first writing app: prose documents, canvases and maps, with notes, version history and on-device language tools.",
+  "author": "Gavin Bowden",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/g3vin/inkblot.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
