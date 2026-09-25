@@ -40,6 +40,8 @@ import type { LayoutFrame, LayoutResult, Push } from './paginate'
 export interface PaginationFrame extends LayoutFrame {
   /** Bumped by the caller whenever something outside the document changed layout. */
   revision?: number
+  /** The print typography the text is set in (`typographyKey`): a change re-measures every line. */
+  typeKey?: string
 }
 
 export interface PaginationState {
@@ -316,7 +318,7 @@ export const computePushes = (view: EditorView, state: PaginationState): { pushe
   const rect = dom.getBoundingClientRect()
   const scale = rect.width / dom.offsetWidth || 1
   const originOffset = parseFloat(getComputedStyle(dom).paddingTop) || 0
-  const layoutKey = `${dom.offsetWidth}|${frame.slotHeight}`
+  const layoutKey = `${dom.offsetWidth}|${frame.slotHeight}|${frame.typeKey || ''}|${frame.revision || 0}`
   const units = measureUnits({ view, scale, applied: state.pushes, originOffset, layoutKey })
   const result = paginate(units, frame)
   return { pushes: result.pushes, result }

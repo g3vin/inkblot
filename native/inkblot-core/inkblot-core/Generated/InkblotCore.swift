@@ -303,6 +303,30 @@ public struct AudioClip: Codable, Equatable {
 	}
 }
 
+/// Who wrote it, for title pages and running heads. One per app: it is the writer's,
+/// not any one project's.
+public struct AuthorProfile: Codable, Equatable {
+	/// The name on the work — a pen name, if there is one.
+	public let byline: String
+	/// The name the contact details are under.
+	public let legalName: String
+	/// Street address, one line per line.
+	public let address: String
+	public let email: String
+	public let phone: String
+	/// An agent or agency, when the work goes out through one.
+	public let agent: String
+
+	public init(byline: String, legalName: String, address: String, email: String, phone: String, agent: String) {
+		self.byline = byline
+		self.legalName = legalName
+		self.address = address
+		self.email = email
+		self.phone = phone
+		self.agent = agent
+	}
+}
+
 public struct Point: Codable, Equatable {
 	public let x: Double
 	public let y: Double
@@ -452,6 +476,92 @@ public enum PageNumberFormat: String, Codable, Equatable {
 	case lowerRoman
 }
 
+public enum LineSpacing: String, Codable, Equatable {
+	case single
+	case oneAndAHalf
+	case double
+	/// `line_value` times the font's size.
+	case multiple
+	/// Exactly `line_value` points from baseline to baseline, as a script is set.
+	case exact
+}
+
+public enum PrintAlignment: String, Codable, Equatable {
+	case left
+	case justify
+}
+
+/// How a chapter's first paragraph opens.
+public enum ChapterOpening: String, Codable, Equatable {
+	case plain
+	/// A large initial set into the first lines.
+	case dropCap
+	/// The first line in small capitals.
+	case smallCaps
+	case dropCapAndSmallCaps
+}
+
+/// Type for print: set on the page's text in Print Layout, on paper and in the PDF,
+/// and carried into a DOCX's styles — never on the continuous editor.
+public struct PrintTypography: Codable, Equatable {
+	/// A CSS font family list: `"Courier Prime", Courier, monospace`.
+	public let fontFamily: String
+	public let fontSizePt: Double
+	public let lineSpacing: LineSpacing
+	/// The multiple, or the exact leading in points; unused otherwise.
+	public let lineValue: Double
+	public let firstLineIndentMm: Double
+	/// Space between paragraphs.
+	public let paragraphSpacingPt: Double
+	public let alignment: PrintAlignment
+	public let hyphenate: Bool
+	/// What a horizontal rule prints as — a scene break: `#`, `* * *`, `❧`. Empty
+	/// prints a blank line.
+	public let sceneBreak: String
+	public let chapterOpening: ChapterOpening
+	/// How far down the page a chapter's title starts, below the top margin.
+	public let chapterSinkMm: Double
+	/// A paragraph after a heading or a scene break starts flush, as books set it.
+	public let noIndentAfterBreak: Bool
+
+	public init(fontFamily: String, fontSizePt: Double, lineSpacing: LineSpacing, lineValue: Double, firstLineIndentMm: Double, paragraphSpacingPt: Double, alignment: PrintAlignment, hyphenate: Bool, sceneBreak: String, chapterOpening: ChapterOpening, chapterSinkMm: Double, noIndentAfterBreak: Bool) {
+		self.fontFamily = fontFamily
+		self.fontSizePt = fontSizePt
+		self.lineSpacing = lineSpacing
+		self.lineValue = lineValue
+		self.firstLineIndentMm = firstLineIndentMm
+		self.paragraphSpacingPt = paragraphSpacingPt
+		self.alignment = alignment
+		self.hyphenate = hyphenate
+		self.sceneBreak = sceneBreak
+		self.chapterOpening = chapterOpening
+		self.chapterSinkMm = chapterSinkMm
+		self.noIndentAfterBreak = noIndentAfterBreak
+	}
+}
+
+public enum TitlePageStyle: String, Codable, Equatable {
+	/// Contact details top-left, word count top-right, title and byline centred: the
+	/// standard manuscript submission.
+	case manuscript
+	/// Title, author, and nothing else: a book's title page.
+	case book
+	/// Title, "Written by", author centred; contact details bottom-left.
+	case screenplay
+}
+
+public struct TitlePageOptions: Codable, Equatable {
+	public let style: TitlePageStyle
+	public let showContact: Bool
+	public let showWordCount: Bool
+
+	public init(style: TitlePageStyle, showContact: Bool, showWordCount: Bool) {
+		self.style = style
+		self.showContact = showContact
+		self.showWordCount = showWordCount
+	}
+}
+
 public struct PageSetup: Codable, Equatable {
 	/// A `pageSizes.ts` preset id, or `"custom"`.
 	public let presetId: String
@@ -488,8 +598,13 @@ public struct PageSetup: Codable, Equatable {
 	/// The catalog format (`formats.ts`) this setup was made from, kept after it is
 	/// changed so the inspector can say "Standard Manuscript (modified)".
 	public let formatId: String?
+	/// How the text is set on the page. Absent prints in the editor's own font, as a
+	/// document always did before it could be set for print.
+	public let typography: PrintTypography?
+	/// A title page before the text, printed and exported but never numbered.
+	public let titlePage: TitlePageOptions?
 
-	public init(presetId: String, widthMm: Double, heightMm: Double, orientation: PageOrientation, margins: PageMargins, mirrorMargins: Bool, columns: UInt32, columnGapMm: Double, header: RunningText, footer: RunningText, versoHeader: RunningText?, versoFooter: RunningText?, headerDistanceMm: Double, footerDistanceMm: Double, differentFirstPage: Bool, pageNumberStart: UInt32, pageNumberFormat: PageNumberFormat, widowOrphanLines: UInt32, chapterStartsOnRecto: Bool, formatId: String?) {
+	public init(presetId: String, widthMm: Double, heightMm: Double, orientation: PageOrientation, margins: PageMargins, mirrorMargins: Bool, columns: UInt32, columnGapMm: Double, header: RunningText, footer: RunningText, versoHeader: RunningText?, versoFooter: RunningText?, headerDistanceMm: Double, footerDistanceMm: Double, differentFirstPage: Bool, pageNumberStart: UInt32, pageNumberFormat: PageNumberFormat, widowOrphanLines: UInt32, chapterStartsOnRecto: Bool, formatId: String?, typography: PrintTypography?, titlePage: TitlePageOptions?) {
 		self.presetId = presetId
 		self.widthMm = widthMm
 		self.heightMm = heightMm
@@ -510,6 +625,8 @@ public struct PageSetup: Codable, Equatable {
 		self.widowOrphanLines = widowOrphanLines
 		self.chapterStartsOnRecto = chapterStartsOnRecto
 		self.formatId = formatId
+		self.typography = typography
+		self.titlePage = titlePage
 	}
 }
 
@@ -1103,6 +1220,7 @@ public enum NativeCommand: Codable, Equatable {
 	case clearBookSetup(ClearBookSetupCommand)
 	case refreshBookChapters(RefreshBookChaptersCommand)
 	case setPrintScope(SetPrintScopeCommand)
+	case setAuthorProfile(SetAuthorProfileCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1184,7 +1302,8 @@ public enum NativeCommand: Codable, Equatable {
 			useSetupForBook,
 			clearBookSetup,
 			refreshBookChapters,
-			setPrintScope
+			setPrintScope,
+			setAuthorProfile
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1595,6 +1714,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setPrintScope(content)
 					return
 				}
+			case .setAuthorProfile:
+				if let content = try? container.decode(SetAuthorProfileCommand.self, forKey: .payload) {
+					self = .setAuthorProfile(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -1842,6 +1966,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setPrintScope(let content):
 			try container.encode(CodingKeys.setPrintScope, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setAuthorProfile(let content):
+			try container.encode(CodingKeys.setAuthorProfile, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -3731,12 +3858,15 @@ public struct PageLayoutCatalog: Codable, Equatable {
 	public let formats: [FormatOption]
 	public let signatureAdvice: [SignatureAdvice]
 	public let tokens: [RunningToken]
+	/// What "Set Type for Print" starts from.
+	public let defaultTypography: PrintTypography
 
-	public init(presets: [PageSizeOption], formats: [FormatOption], signatureAdvice: [SignatureAdvice], tokens: [RunningToken]) {
+	public init(presets: [PageSizeOption], formats: [FormatOption], signatureAdvice: [SignatureAdvice], tokens: [RunningToken], defaultTypography: PrintTypography) {
 		self.presets = presets
 		self.formats = formats
 		self.signatureAdvice = signatureAdvice
 		self.tokens = tokens
+		self.defaultTypography = defaultTypography
 	}
 }
 
@@ -3783,8 +3913,13 @@ public struct PageLayoutState: Codable, Equatable {
 	public let bookChapters: [String]
 	/// A recommended inside margin for a book of this many pages, in mm.
 	public let suggestedInsideMarginMm: Double
+	/// Who wrote it: the title page's byline and contact details.
+	public let author: AuthorProfile?
+	/// Words in what Print covers — the document, or the book — as a title page
+	/// gives them.
+	public let wordCount: UInt32?
 
-	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double) {
+	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?) {
 		self.enabled = enabled
 		self.docPath = docPath
 		self.ready = ready
@@ -3801,6 +3936,8 @@ public struct PageLayoutState: Codable, Equatable {
 		self.bookSetupActive = bookSetupActive
 		self.bookChapters = bookChapters
 		self.suggestedInsideMarginMm = suggestedInsideMarginMm
+		self.author = author
+		self.wordCount = wordCount
 	}
 }
 
@@ -4663,6 +4800,15 @@ public struct SetAlignmentCommand: Codable, Equatable {
 	public init(target: EditorTarget, alignment: Alignment) {
 		self.target = target
 		self.alignment = alignment
+	}
+}
+
+/// Replace the writer's profile — byline and contact details — for every project.
+public struct SetAuthorProfileCommand: Codable, Equatable {
+	public let profile: AuthorProfile
+
+	public init(profile: AuthorProfile) {
+		self.profile = profile
 	}
 }
 

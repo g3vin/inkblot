@@ -12,6 +12,7 @@ struct FinishingActionHeader: View {
     @AppStorage(LengthUnit.storageKey) private var unitsRaw = LengthUnit.defaultForLocale.rawValue
     @State private var goingToPage = false
     @State private var goTo = 1
+    @State private var editingAuthor = false
 
     var body: some View {
         let layout = model.pageLayout
@@ -25,6 +26,9 @@ struct FinishingActionHeader: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.bar)
         .overlay(alignment: .bottom) { Divider() }
+        .sheet(isPresented: $editingAuthor) {
+            AuthorProfileSheet(profile: layout.state?.author ?? AuthorProfile.empty) { layout.setAuthor($0) }
+        }
     }
 
     /* ---------------- what ---------------- */
@@ -53,6 +57,7 @@ struct FinishingActionHeader: View {
             }
             Toggle("Show Pages", isOn: Binding(get: { layout.isEnabled }, set: { layout.setPrintLayout($0) }))
                 .disabled(!layout.hasDocument)
+            Button("Author Details…") { editingAuthor = true }
             Divider()
             Button("Expand All Sections") { layout.setExpanded(true, FinishingSectionID.all) }
             Button("Collapse All Sections") { layout.setExpanded(false, FinishingSectionID.all) }
@@ -243,12 +248,14 @@ enum FinishingSectionID {
     static let pageSize = "page.size"
     static let headerFooter = "page.headerFooter"
     static let textFlow = "page.textFlow"
+    static let typography = "page.typography"
+    static let titlePage = "page.titlePage"
     static let bookInfo = "book.info"
     static let chapters = "book.chapters"
     static let bookSetup = "book.setup"
     static let binding = "publish.binding"
 
-    static let all = [pageSize, headerFooter, textFlow, bookInfo, chapters, bookSetup, binding]
+    static let all = [pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, bookSetup, binding]
 }
 
 /// A Finishing tab: the action header pinned at the top, the tab's settings scrolling

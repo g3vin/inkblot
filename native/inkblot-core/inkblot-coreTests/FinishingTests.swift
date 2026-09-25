@@ -117,11 +117,15 @@ struct FinishingTests {
         {"presets":[{"id":"a4","label":"A4","group":"ISO A","widthMm":210,"heightMm":297}],
          "formats":[{"id":"a4","label":"A4","group":"Everyday","summary":"A plain page.","kind":"prose"}],
          "signatureAdvice":[{"sheets":4,"label":"Standard"}],
-         "tokens":[{"token":"{page}","label":"Page Number"}]}
+         "tokens":[{"token":"{page}","label":"Page Number"}],
+         "defaultTypography":{"fontFamily":"Palatino, serif","fontSizePt":11,"lineSpacing":"multiple","lineValue":1.2,
+           "firstLineIndentMm":7.62,"paragraphSpacingPt":0,"alignment":"justify","hyphenate":true,"sceneBreak":"* * *",
+           "chapterOpening":"dropCapAndSmallCaps","chapterSinkMm":38.1,"noIndentAfterBreak":true}}
         """#)
         #expect(wire.bridge.droppedEventCount == 0)
         #expect(layout.format("a4")?.summary == "A plain page.")
         #expect(layout.catalog?.tokens.first?.token == "{page}")
+        #expect(layout.catalog?.defaultTypography.chapterOpening == .dropCapAndSmallCaps)
     }
 
     @Test func aJobIsShownWhileItRunsAndAFailureStays() async throws {
@@ -182,5 +186,53 @@ struct FinishingTests {
         #expect(layout.expansion(FinishingSectionID.binding).wrappedValue == false)
         layout.setExpanded(true, ids)
         #expect(layout.expansion(FinishingSectionID.binding).wrappedValue == true)
+    }
+
+    @Test func typographyAndTheTitlePageRoundTripThroughTheDraft() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var draft = try #require(layout.setup)
+        #expect(draft.typography == nil)
+        draft.typography = TypographyDraft(PrintTypography(
+            fontFamily: TypographyDraft.cssFamily("Courier Prime"), fontSizePt: 200, lineSpacing: .double, lineValue: 2,
+            firstLineIndentMm: -3, paragraphSpacingPt: 0, alignment: .left, hyphenate: false,
+            sceneBreak: "#", chapterOpening: .plain, chapterSinkMm: 63.5, noIndentAfterBreak: false))
+        draft.titlePage = TitlePageDraft(style: .manuscript)
+        layout.apply(draft)
+
+        let sent = try #require(wire.commands.last?.payload["setup"] as? [String: Any])
+        let type = try #require(sent["typography"] as? [String: Any])
+        #expect(type["fontFamily"] as? String == #""Courier Prime", Courier, monospace"#)
+        #expect(type["fontSizePt"] as? Double == 72)
+        #expect(type["firstLineIndentMm"] as? Double == 0)
+        #expect(type["lineSpacing"] as? String == "double")
+        let title = try #require(sent["titlePage"] as? [String: Any])
+        #expect(title["style"] as? String == "manuscript")
+        #expect(title["showContact"] as? Bool == true)
+        #expect(title["showWordCount"] as? Bool == true)
+        #expect(layout.setup?.typography?.primaryFamily == "Courier Prime")
+        #expect(TypographyDraft.cssFamily("Palatino") == #""Palatino", Georgia, serif"#)
+    }
+
+    @Test func aBookTitlePageLeavesOutTheContactBlock() {
+        let page = TitlePageDraft(style: .book)
+        #expect(!page.showContact && !page.showWordCount)
+        #expect(TitlePageDraft(style: .screenplay).showContact)
+    }
+
+    @Test func theAuthorIsSentAsAWhole() {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        layout.setAuthor(AuthorProfile(byline: "A. Writer", legalName: "Ann Writer", address: "1 Road\nTown", email: "a@b.c", phone: "", agent: ""))
+        #expect(wire.commands.last?.type == "setAuthorProfile")
+        let profile = wire.commands.last?.payload["profile"] as? [String: Any]
+        #expect(profile?["legalName"] as? String == "Ann Writer")
+    }
+
+    @Test func aWordCountIsRoundedAsAManuscriptGivesIt() {
+        #expect(RunningPreviewContext.describeWordCount(44) == "about 40 words")
+        #expect(RunningPreviewContext.describeWordCount(4_449) == "about \(4_400.formatted()) words")
+        #expect(RunningPreviewContext.describeWordCount(88_600) == "about \(89_000.formatted()) words")
     }
 }

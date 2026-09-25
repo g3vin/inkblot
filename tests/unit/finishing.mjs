@@ -29,6 +29,9 @@ const { bookPageSetup, normalizePageSetup, resolvePageSetup, DEFAULT_PAGE_SETUP 
 const store = await import('../../src/print/printLayoutStore.js')
 const { default: usePrintLayoutController, buildPageLayoutState } = await import('../../src/print/usePrintLayoutController.js')
 const { printFigure } = await import('../../src/print/printJob.js')
+const typo = await import('../../src/print/typography.ts')
+const setupFns = await import('../../src/print/pageSetup.ts')
+const titles = await import('../../src/print/titlePage.js')
 const { describeJob } = await import('../../src/print/usePrintJobStatus.js')
 
 import { ok } from './assert.mjs'
@@ -49,8 +52,9 @@ ok('every format reads back as itself, unmodified',
     const { formatId, modified } = formats.formatOf(formats.applyFormat(f.id))
     return formatId === f.id && !modified
   }))
-ok('Trade Paperback 6 × 9 is the book setup the tests have always used',
-  same({ ...formats.applyFormat('trade-6x9'), formatId: undefined }, normalizePageSetup(bookPageSetup('trade-6x9'))))
+ok('Trade Paperback 6 × 9 is the book setup the tests have always used, set as a book',
+  same({ ...formats.applyFormat('trade-6x9'), formatId: undefined, typography: undefined, titlePage: undefined }, normalizePageSetup(bookPageSetup('trade-6x9'))) &&
+  formats.applyFormat('trade-6x9').typography?.alignment === 'justify')
 const applied = formats.applyFormat('trade-6x9')
 ok('an applied format remembers where it came from', applied.formatId === 'trade-6x9')
 const changed = { ...applied, margins: { ...applied.margins, topMm: 30 } }
@@ -234,3 +238,55 @@ ok('an export in progress says so, by chapter',
 ok('a saved export names the file', describeJob({ kind: 'export', format: 'epub', phase: 'done', path: '/Users/me/Book.epub' }) === 'Saved Book.epub')
 ok('a failure says what went wrong', describeJob({ kind: 'print', phase: 'failed', message: 'No printer.' }) === 'Could not print: No printer.')
 ok('a cancelled job says nothing', describeJob({ kind: 'print', phase: 'cancelled' }) === '')
+
+/* ---------------- typography ---------------- */
+
+const manuscript = formats.applyFormat('manuscript')
+ok('the manuscript is Courier 12, double-spaced, ragged right, one-inch margins',
+  manuscript.typography.fontFamily.includes('Courier') && manuscript.typography.fontSizePt === 12 &&
+  manuscript.typography.lineSpacing === 'double' && manuscript.typography.alignment === 'left' &&
+  manuscript.margins.topMm === 25.4 && manuscript.margins.insideMm === 25.4)
+ok('double-spaced 12 pt leads 27.6 pt, about 23 lines to a Letter page',
+  Math.abs(typo.leadingPt(manuscript.typography) - 27.6) < 1e-9 && Math.floor(9 * 72 / typo.leadingPt(manuscript.typography)) === 23)
+ok('exact leading is taken as given', typo.leadingPt({ ...manuscript.typography, lineSpacing: 'exact', lineValue: 12 }) === 12)
+ok('the manuscript\'s head is surname / title / page', manuscript.header.right === '{surname} / {title} / {page}')
+ok('and it has a manuscript title page with contact details and word count',
+  manuscript.titlePage.style === 'manuscript' && manuscript.titlePage.showContact && manuscript.titlePage.showWordCount)
+ok('a plain page prints in the editor\'s font', formats.applyFormat('letter').typography === undefined)
+
+const junk = typo.normalizeTypography({ fontFamily: '', fontSizePt: 900, lineSpacing: 'triple', sceneBreak: 'a\nb' })
+ok('junk typography normalizes to type that sets',
+  junk.fontFamily === typo.BOOK_TYPOGRAPHY.fontFamily && junk.fontSizePt === 72 && junk.lineSpacing === typo.BOOK_TYPOGRAPHY.lineSpacing && junk.sceneBreak === 'a b')
+ok('no typography stays none', typo.normalizeTypography(null) === undefined && normalizePageSetup({}).typography === undefined)
+const vars = typo.typographyVars(manuscript.typography)
+ok('the variables carry the size, leading and a quoted scene break',
+  vars['--pt-size'] === '12pt' && vars['--pt-leading'] === '27.6pt' && vars['--pt-break'] === '"#"')
+ok('a quote in a scene break is escaped for CSS', typo.typographyVars({ ...manuscript.typography, sceneBreak: 'say "hi"' })['--pt-break'] === '"say \\"hi\\""')
+ok('the book\'s classes switch on drop caps, small caps and flush openings',
+  same(typo.typographyClasses(typo.BOOK_TYPOGRAPHY), ['has-print-type', 'pt-drop-cap', 'pt-small-caps', 'pt-flush-after-break']))
+ok('the editor\'s font has no classes', typo.typographyClasses(undefined).length === 0)
+ok('the primary family is unquoted', typo.primaryFamily('"Courier Prime", Courier') === 'Courier Prime')
+
+/* ---------------- tokens and word counts ---------------- */
+
+const ctx = { page: 7, pages: 212, title: 'The Book', chapter: 'One', author: 'Ursula Le Guin', words: 'about 71,000 words', date: '1 May 2026' }
+ok('{surname} is the last word of the author', setupFns.resolveRunningTemplate('{surname} / {title} / {page}', ctx, 'arabic') === 'Guin / The Book / 7')
+ok('{words} and {date} resolve', setupFns.resolveRunningTemplate('{words}, {date}', ctx, 'arabic') === 'about 71,000 words, 1 May 2026')
+ok('word counts round as a title page gives them',
+  setupFns.roundWordCount(4_372) === 4_400 && setupFns.roundWordCount(71_449) === 71_000 && setupFns.roundWordCount(17_600) === 18_000 && setupFns.roundWordCount(47) === 50)
+ok('a setup knows whether it shows a token', setupFns.setupUsesToken(manuscript, 'surname') && !setupFns.setupUsesToken(manuscript, 'words'))
+
+/* ---------------- the title page ---------------- */
+
+const profile = { byline: 'A. Writer', legalName: 'Alice Writer', address: '1 Main St\nSpringfield', email: 'a@example.com', phone: '', agent: 'Big Agency' }
+const [titlePage, ...afterTitle] = titles.buildTitlePages({ setup: manuscript, title: 'The Book', profile, author: 'A. Writer', words: 71_449 })
+ok('a manuscript\'s title page gives the contact block, one line each', titlePage.querySelector('.tp-contact').textContent === 'Alice Writer\n1 Main St\nSpringfield\na@example.com\nRepresented by Big Agency')
+ok('the rounded word count', titlePage.querySelector('.tp-words').textContent === 'about 71,000 words')
+ok('the title and the byline', titlePage.querySelector('.tp-title').textContent === 'The Book' && titlePage.querySelector('.tp-byline').textContent === 'by A. Writer')
+ok('the page is set in the manuscript\'s type', titlePage.classList.contains('has-print-type') && titlePage.style.getPropertyValue('--pt-size') === '12pt')
+ok('an unmirrored setup adds no blank page after it', afterTitle.length === 0)
+const bookTitle = titles.buildTitlePages({ setup: formats.applyFormat('trade-6x9'), title: 'The Book', profile, author: 'A. Writer' })
+ok('a book\'s title page is followed by a blank verso, so the text opens on a recto', bookTitle.length === 2 && bookTitle[1].classList.contains('is-blank'))
+ok('no title page asked for, none given', titles.buildTitlePages({ setup: normalizePageSetup(null), title: 'x' }).length === 0)
+ok('a document\'s text is counted across its blocks',
+  titles.textOfContent({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one two' }] }, { type: 'paragraph', content: [{ type: 'text', text: 'three' }] }] }).trim().split(/\s+/).length === 3)

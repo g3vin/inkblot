@@ -28,7 +28,7 @@ use super::print::{
     ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand, GoToPageCommand,
     InsertBreakCommand, PrintDocumentCommand, PrintFinishedCommand, RefreshBookChaptersCommand,
     SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand, SetPrintLayoutCommand,
-    SetPrintScopeCommand, SetPrintZoomCommand, UseSetupForBookCommand,
+    SetAuthorProfileCommand, SetPrintScopeCommand, SetPrintZoomCommand, UseSetupForBookCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -585,4 +585,5 @@ pub enum NativeCommand {
     ClearBookSetup(ClearBookSetupCommand),
     RefreshBookChapters(RefreshBookChaptersCommand),
     SetPrintScope(SetPrintScopeCommand),
+    SetAuthorProfile(SetAuthorProfileCommand),
 }

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use super::common::EditorTarget;
-use crate::types::page_setup::{BookSettings, PageSetup};
+use crate::types::page_setup::{AuthorProfile, BookSettings, PageSetup, PrintTypography};
 
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -120,6 +120,14 @@ pub struct ClearBookSetupCommand {}
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RefreshBookChaptersCommand {}
+
+/// Replace the writer's profile — byline and contact details — for every project.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetAuthorProfileCommand {
+    pub profile: AuthorProfile,
+}
 
 /// What Print and Export cover, and which book the Book tab shows: the active
 /// document's folder, or the whole project. `Document` shows the folder's book.
@@ -284,6 +292,8 @@ pub struct PageLayoutCatalog {
     pub formats: Vec<FormatOption>,
     pub signature_advice: Vec<SignatureAdvice>,
     pub tokens: Vec<RunningToken>,
+    /// What "Set Type for Print" starts from.
+    pub default_typography: PrintTypography,
 }
 
 /// Everything the Finishing tabs show that changes. Published when the active
@@ -324,6 +334,13 @@ pub struct PageLayoutState {
     pub book_chapters: Vec<String>,
     /// A recommended inside margin for a book of this many pages, in mm.
     pub suggested_inside_margin_mm: f64,
+    /// Who wrote it: the title page's byline and contact details.
+    #[serde(default)]
+    pub author: AuthorProfile,
+    /// Words in what Print covers — the document, or the book — as a title page
+    /// gives them.
+    #[serde(default)]
+    pub word_count: u32,
 }
 
 /// What a print or export job is.

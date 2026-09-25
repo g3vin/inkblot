@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { documentSurface } from '../bridge'
 import { isTextDoc } from '../lib/docKind'
 import { nativeOwns } from '../lib/host'
+import { countWords } from '../lib/wordCount'
 import { listBookChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
 import { applyFormat, FORMAT_OPTIONS, formatOf } from './formats'
@@ -28,12 +29,14 @@ import { PAGE_SIZE_GROUP_LABELS, PAGE_SIZE_PRESETS } from './pageSizes'
 import { normalizePageSetup, resolvePageSetup, suggestedInsideMarginMm } from './pageSetup'
 import {
   bookFolderForScope,
+  getAuthorProfile,
   getBookSettings,
   getCurrentPrintPage,
   getDisplayPointsPerInch,
   getPrintScope,
   getPrintZoom,
   isPrintLayoutEnabled,
+  setAuthorProfile,
   setBookSettings,
   setDisplayPointsPerInch,
   setPrintLayoutEnabled,
@@ -42,6 +45,7 @@ import {
   subscribeCurrentPrintPage,
   subscribePrintLayoutStore,
 } from './printLayoutStore'
+import { BOOK_TYPOGRAPHY } from './typography'
 import { actualSizeZoom } from './zoom'
 
 /** The tokens a running head or foot can hold, for the inspector's token menu. */
@@ -51,6 +55,9 @@ export const RUNNING_TOKENS = [
   { token: '{title}', label: 'Title' },
   { token: '{chapter}', label: 'Chapter' },
   { token: '{author}', label: 'Author' },
+  { token: '{surname}', label: 'Author’s Surname' },
+  { token: '{words}', label: 'Word Count' },
+  { token: '{date}', label: 'Today’s Date' },
 ]
 
 export const PAGE_LAYOUT_CATALOG = {
@@ -64,6 +71,7 @@ export const PAGE_LAYOUT_CATALOG = {
   formats: FORMAT_OPTIONS,
   signatureAdvice: SIGNATURE_GUIDANCE.map((g) => ({ sheets: g.sheets, label: g.label })),
   tokens: RUNNING_TOKENS,
+  defaultTypography: BOOK_TYPOGRAPHY,
 }
 
 /** How long typing waits before the page count it changed is published. */
@@ -100,6 +108,9 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     bookSetupActive: Boolean(book.pageSetup),
     bookChapters: chapters,
     suggestedInsideMarginMm: suggestedInsideMarginMm(Math.max(pageCount, 1)),
+    author: getAuthorProfile(),
+    // The document's words; a book's would mean reading every chapter on each publish.
+    wordCount: editor && scope === 'document' ? countWords(editor.state.doc.textContent) : 0,
   }
 }
 
@@ -267,6 +278,7 @@ export default function usePrintLayoutController({
         chaptersRevision.current += 1
         publish()
       }),
+      documentSurface.onCommand('setAuthorProfile', ({ profile }) => setAuthorProfile(profile)),
       documentSurface.onCommand('setPrintScope', ({ scope }) => {
         setPrintScope(stateRef.current.projectName, scope)
       }),

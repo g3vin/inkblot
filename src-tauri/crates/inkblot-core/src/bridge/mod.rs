@@ -80,7 +80,7 @@ pub use print::{
     FormatOption, GoToPageCommand, InsertBreakCommand, PageBreakKind, PageLayoutCatalog,
     PageLayoutState, PageSetupTarget, PageSizeOption, PrintDocumentCommand, PrintFinishedCommand,
     PrintJobKind, PrintJobPhase, PrintJobStatus, PrintRequest, PrintScope, RefreshBookChaptersCommand,
-    RunningToken, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
+    RunningToken, SetAuthorProfileCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
     SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
     UseSetupForBookCommand, ZoomFit,
 };

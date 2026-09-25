@@ -18,18 +18,24 @@ import { createPortal } from 'react-dom'
 
 import { paginationKey } from './PaginationExtension'
 import {
+  describeWordCount,
   formatPageNumber,
   isRecto,
   normalizePageSetup,
   pageLeftMargin,
   pageMetrics,
   runningTextFor,
+  setupUsesToken,
+  surnameOf,
 } from './pageSetup'
+import { loadTypographyFont, typographyClasses, typographyKey, typographyVars } from './typography'
+import { countWords } from '../lib/wordCount'
 import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, ZOOM_STEPS } from './zoom'
 import { PAGE_GAP } from './printLayoutConstants'
 import { setCurrentPrintPage } from './printLayoutStore'
 import { nativeOwns } from '../lib/host'
 import './PrintLayout.css'
+import './PrintTypography.css'
 
 const EMPTY_RESULT = { pageCount: 1, slotCount: 1, slotStarts: [0], chapterStartSlots: [0], pushes: [] }
 
@@ -79,12 +85,24 @@ export default function PrintLayoutView({
 
   // In a galley each column is its own strip, a page's height apart.
   const slotStride = metrics.height + PAGE_GAP
+  // The print type: its key re-measures every line, and so does its font arriving —
+  // measured in a fallback, the lines would break in the wrong places until then.
+  const typeKey = typographyKey(setup.typography)
+  const [fontsLoaded, setFontsLoaded] = useState(0)
+  useEffect(() => {
+    let live = true
+    loadTypographyFont(setup.typography).then(() => { if (live) setFontsLoaded((n) => n + 1) })
+    return () => { live = false }
+  }, [typeKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const frame = useMemo(() => ({
     slotHeight: metrics.contentHeight,
     stride: slotStride,
     columns: setup.columns,
     minLines: setup.widowOrphanLines,
-  }), [metrics.contentHeight, slotStride, setup.columns, setup.widowOrphanLines])
+    typeKey,
+    revision: fontsLoaded,
+  }), [metrics.contentHeight, slotStride, setup.columns, setup.widowOrphanLines, typeKey, fontsLoaded])
 
   // Hand the plugin its frame; take it back when the view goes.
   useEffect(() => {
@@ -119,6 +137,13 @@ export default function PrintLayoutView({
   const stripCount = galley ? slots : Math.max(result.pageCount, 1)
   const stageHeight = stripCount * slotStride - PAGE_GAP
 
+  // Words only when a running head shows them.
+  const wordsText = useMemo(() => (
+    setupUsesToken(setup, 'words') && editor && !editor.isDestroyed
+      ? describeWordCount(countWords(editor.state.doc.textContent))
+      : ''
+  ), [editor, result, setup]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const pages = useMemo(() => {
     const out = []
     const chapterStarts = new Set(result.chapterStartSlots)
@@ -135,6 +160,8 @@ export default function PrintLayoutView({
         title: docTitle,
         chapter: chapterAt(headings, startPos, docTitle),
         author,
+        surname: surnameOf(author),
+        words: wordsText,
       }
       const flags = { chapterFirstPage: chapterStarts.has(firstSlot), blank }
       out.push({
@@ -150,7 +177,7 @@ export default function PrintLayoutView({
       })
     }
     return out
-  }, [author, docTitle, flowX, galley, headings, result, setup, slotStride, stripCount])
+  }, [author, docTitle, flowX, galley, headings, result, setup, slotStride, stripCount, wordsText])
 
   // Which page is in view, for "Page X of Y".
   useEffect(() => {
@@ -443,6 +470,7 @@ export default function PrintLayoutView({
   }, [applyZoom, editor, fit, goToPage])
 
   const stageStyle = {
+    ...typographyVars(setup.typography),
     width: `${stageWidth}px`,
     height: `${stageHeight}px`,
     transform: `scale(${zoom})`,
@@ -494,7 +522,7 @@ export default function PrintLayoutView({
   return (
     <div className="print-layout">
       <div ref={sizerRef} className="pl-sizer" style={{ width: `${stageWidth * zoom}px`, height: `${stageHeight * zoom}px` }}>
-        <div className="pl-stage" style={stageStyle}>
+        <div className={['pl-stage', ...typographyClasses(setup.typography)].join(' ')} style={stageStyle}>
           <div className="pl-pages" aria-hidden="true">
             {pages.map((page) => (
               <div

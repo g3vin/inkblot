@@ -38,6 +38,26 @@ fn page_setup() -> crate::types::PageSetup {
         widow_orphan_lines: 2,
         chapter_starts_on_recto: true,
         format_id: Some("trade-6x9".into()),
+        typography: None,
+        title_page: None,
+    }
+}
+
+fn typography() -> crate::types::PrintTypography {
+    use crate::types::{ChapterOpening, LineSpacing, PrintAlignment, PrintTypography};
+    PrintTypography {
+        font_family: "Georgia, serif".into(),
+        font_size_pt: 11.0,
+        line_spacing: LineSpacing::Multiple,
+        line_value: 1.2,
+        first_line_indent_mm: 7.62,
+        paragraph_spacing_pt: 0.0,
+        alignment: PrintAlignment::Justify,
+        hyphenate: true,
+        scene_break: "* * *".into(),
+        chapter_opening: ChapterOpening::DropCap,
+        chapter_sink_mm: 25.4,
+        no_indent_after_break: true,
     }
 }
 
@@ -394,6 +414,9 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::ClearBookSetup(ClearBookSetupCommand {}),
         NativeCommand::RefreshBookChapters(RefreshBookChaptersCommand {}),
         NativeCommand::SetPrintScope(SetPrintScopeCommand { scope: PrintScope::Project }),
+        NativeCommand::SetAuthorProfile(SetAuthorProfileCommand {
+            profile: crate::types::AuthorProfile { byline: "A. Writer".into(), email: "a@example.com".into(), ..Default::default() },
+        }),
     ]
 }
 
@@ -708,6 +731,8 @@ fn every_event() -> Vec<WebviewEvent> {
             book_setup_active: true,
             book_chapters: vec!["Manuscript/one".into(), "Manuscript/two".into()],
             suggested_inside_margin_mm: 12.7,
+            author: crate::types::AuthorProfile { byline: "A. Writer".into(), ..Default::default() },
+            word_count: 71_400,
         }),
         WebviewEvent::PrintRequest(PrintRequest {
             job_id: "p1".into(),
@@ -727,6 +752,7 @@ fn every_event() -> Vec<WebviewEvent> {
             }],
             signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
             tokens: vec![RunningToken { token: "{page}".into(), label: "Page Number".into() }],
+            default_typography: typography(),
         }),
         WebviewEvent::PrintJobStatus(PrintJobStatus {
             job_id: "p1".into(),
@@ -828,6 +854,7 @@ fn every_command_has_its_documented_wire_name() {
             "clearBookSetup",
             "refreshBookChapters",
             "setPrintScope",
+            "setAuthorProfile",
         ]
     );
 }

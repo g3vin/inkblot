@@ -13,6 +13,8 @@ struct PagePanelView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(LengthUnit.storageKey) private var unitsRaw = LengthUnit.defaultForLocale.rawValue
 
+    @State private var editingAuthor = false
+
     private var units: LengthUnit { LengthUnit(rawValue: unitsRaw) ?? .inches }
 
     var body: some View {
@@ -21,8 +23,16 @@ struct PagePanelView: View {
                 formatSection(state, setup)
                 pageSection(state, setup)
                 headerFooterSection(state, setup)
+                TypographySection(
+                    setup: setup, unit: units,
+                    defaultTypography: model.pageLayout.catalog?.defaultTypography,
+                    apply: model.pageLayout.apply)
+                TitlePageSection(setup: setup, apply: model.pageLayout.apply) { editingAuthor = true }
                 textFlowSection(setup)
             }
+        }
+        .sheet(isPresented: $editingAuthor) {
+            AuthorProfileSheet(profile: model.pageLayout.state?.author ?? AuthorProfile.empty) { model.pageLayout.setAuthor($0) }
         }
     }
 
@@ -200,7 +210,7 @@ struct PagePanelView: View {
             }
             NumberField("First Page Number", value: binding(\.pageNumberStart), in: PageSetupDraft.pageNumberRange)
         } footer: {
-            FinishingNote("Insert page numbers, the title, the chapter or the author with the ＋ menu. The chapter is the most recent Heading 1. Header and footer stay within their margins.")
+            FinishingNote("Insert page numbers, the title, the chapter, the author, the word count or the date with the ＋ menu. The chapter is the most recent Heading 1. Header and footer stay within their margins.")
         }
     }
 
@@ -239,7 +249,7 @@ private enum DefaultSetup {
         footer: RunningText(left: "", center: "{page}", right: ""),
         versoHeader: nil, versoFooter: nil, headerDistanceMm: 12.7, footerDistanceMm: 12.7,
         differentFirstPage: false, pageNumberStart: 1, pageNumberFormat: .arabic,
-        widowOrphanLines: 2, chapterStartsOnRecto: false, formatId: nil)
+        widowOrphanLines: 2, chapterStartsOnRecto: false, formatId: nil, typography: nil, titlePage: nil)
 }
 
 /* ---------------- margins ---------------- */
@@ -323,11 +333,12 @@ private struct MarginDiagram: View {
 /* ---------------- running text ---------------- */
 
 /// What a running head's tokens stand for in the preview under its fields.
-private struct RunningPreviewContext {
+struct RunningPreviewContext {
     var page: Int
     var pages: Int
     var title: String
     var author: String
+    var words: String
     var format: PageNumberFormat
 
     init(state: PageLayoutState, setup: PageSetupDraft) {
@@ -336,7 +347,9 @@ private struct RunningPreviewContext {
         pages = max(Int(state.pageCount), 1) - 1 + first
         let docName = state.docPath?.split(separator: "/").last.map(String.init) ?? "Title"
         title = state.scope == .document ? docName : (state.book.title.isEmpty ? docName : state.book.title)
-        author = state.book.author.isEmpty ? "Author" : state.book.author
+        let name = state.scope != .document && !state.book.author.isEmpty ? state.book.author : state.author?.byline ?? ""
+        author = name.isEmpty ? "Author" : name
+        words = Self.describeWordCount(Int(state.wordCount ?? 0))
         format = setup.pageNumberFormat
     }
 
@@ -354,6 +367,17 @@ private struct RunningPreviewContext {
             .replacingOccurrences(of: "{title}", with: title)
             .replacingOccurrences(of: "{chapter}", with: "Chapter")
             .replacingOccurrences(of: "{author}", with: author)
+            .replacingOccurrences(of: "{surname}", with: author.split(separator: " ").last.map(String.init) ?? author)
+            .replacingOccurrences(of: "{words}", with: words)
+            .replacingOccurrences(of: "{date}", with: Date.now.formatted(date: .long, time: .omitted))
+    }
+
+    /// As a manuscript gives it (`roundWordCount` in pageSetup.ts): to the nearest ten,
+    /// hundred or thousand by length.
+    static func describeWordCount(_ words: Int) -> String {
+        let step = words < 100 ? 10 : words < 17_500 ? 100 : 1000
+        let rounded = Int((Double(max(0, words)) / Double(step)).rounded()) * step
+        return "about \(rounded.formatted()) words"
     }
 
     private func number(_ n: Int) -> String {

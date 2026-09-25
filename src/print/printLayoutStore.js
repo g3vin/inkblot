@@ -22,6 +22,7 @@ const ENABLED_PREFIX = 'inkblot-print-layout:'
 const ZOOM_KEY = 'inkblot-print-zoom'
 const BOOK_PREFIX = 'inkblot-book:'
 const SCOPE_PREFIX = 'inkblot-print-scope:'
+const AUTHOR_KEY = 'inkblot-author-profile'
 
 const listeners = new Set()
 let version = 0
@@ -107,6 +108,30 @@ export const setBookSettings = (projectName, folder, settings) => {
   setPreference(bookKey(projectName, folder), JSON.stringify({ ...settings, folder: folder || '' }))
   emit()
 }
+
+/* ---------------- the writer ---------------- */
+
+const PROFILE_FIELDS = ['byline', 'legalName', 'address', 'email', 'phone', 'agent']
+
+/** The writer's byline and contact details, for every project: title pages, heads. */
+export const getAuthorProfile = () => {
+  let stored = null
+  try {
+    stored = JSON.parse(getPreference(AUTHOR_KEY) || 'null')
+  } catch {
+    stored = null
+  }
+  return Object.fromEntries(PROFILE_FIELDS.map((key) => [key, typeof stored?.[key] === 'string' ? stored[key] : '']))
+}
+
+export const setAuthorProfile = (profile) => {
+  const clean = Object.fromEntries(PROFILE_FIELDS.map((key) => [key, typeof profile?.[key] === 'string' ? profile[key] : '']))
+  setPreference(AUTHOR_KEY, JSON.stringify(clean))
+  emit()
+}
+
+/** The name a book is by: its own author, or the writer's byline. */
+export const bookAuthor = (book) => book?.author || getAuthorProfile().byline
 
 /* ---------------- scope ---------------- */
 

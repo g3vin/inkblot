@@ -133,6 +133,10 @@ final class PageLayoutModel {
         bridge.send(.clearBookSetup(ClearBookSetupCommand()))
     }
 
+    func setAuthor(_ profile: AuthorProfile) {
+        bridge.send(.setAuthorProfile(SetAuthorProfileCommand(profile: profile)))
+    }
+
     func refreshChapters() {
         bridge.send(.refreshBookChapters(RefreshBookChaptersCommand()))
     }
@@ -256,6 +260,9 @@ struct PageSetupDraft: Equatable {
     var widowOrphanLines: Int
     var chapterStartsOnRecto: Bool
     var formatId: String?
+    /// Type for print; nil prints in the editor's font.
+    var typography: TypographyDraft?
+    var titlePage: TitlePageDraft?
 
     /// The page's limit (`normalizePageSetup`), so the field and the page agree.
     static let pageNumberRange = 0...99_999
@@ -286,6 +293,8 @@ struct PageSetupDraft: Equatable {
         widowOrphanLines = Int(s.widowOrphanLines)
         chapterStartsOnRecto = s.chapterStartsOnRecto
         formatId = s.formatId
+        typography = s.typography.map(TypographyDraft.init)
+        titlePage = s.titlePage.map(TitlePageDraft.init)
     }
 
     var setup: PageSetup {
@@ -311,7 +320,9 @@ struct PageSetupDraft: Equatable {
             pageNumberFormat: pageNumberFormat,
             widowOrphanLines: UInt32(max(1, min(5, widowOrphanLines))),
             chapterStartsOnRecto: chapterStartsOnRecto,
-            formatId: formatId)
+            formatId: formatId,
+            typography: typography?.typography,
+            titlePage: titlePage?.options)
     }
 
     /// Pick a size preset, keeping the orientation.
@@ -320,6 +331,77 @@ struct PageSetupDraft: Equatable {
         widthMm = preset.widthMm
         heightMm = preset.heightMm
     }
+}
+
+struct TypographyDraft: Equatable {
+    var fontFamily: String
+    var fontSizePt: Double
+    var lineSpacing: LineSpacing
+    var lineValue: Double
+    var firstLineIndentMm: Double
+    var paragraphSpacingPt: Double
+    var alignment: PrintAlignment
+    var hyphenate: Bool
+    var sceneBreak: String
+    var chapterOpening: ChapterOpening
+    var chapterSinkMm: Double
+    var noIndentAfterBreak: Bool
+
+    init(_ t: PrintTypography) {
+        fontFamily = t.fontFamily
+        fontSizePt = t.fontSizePt
+        lineSpacing = t.lineSpacing
+        lineValue = t.lineValue
+        firstLineIndentMm = t.firstLineIndentMm
+        paragraphSpacingPt = t.paragraphSpacingPt
+        alignment = t.alignment
+        hyphenate = t.hyphenate
+        sceneBreak = t.sceneBreak
+        chapterOpening = t.chapterOpening
+        chapterSinkMm = t.chapterSinkMm
+        noIndentAfterBreak = t.noIndentAfterBreak
+    }
+
+    var typography: PrintTypography {
+        PrintTypography(
+            fontFamily: fontFamily, fontSizePt: min(72, max(5, fontSizePt)), lineSpacing: lineSpacing,
+            lineValue: lineValue, firstLineIndentMm: max(0, firstLineIndentMm),
+            paragraphSpacingPt: max(0, paragraphSpacingPt), alignment: alignment, hyphenate: hyphenate,
+            sceneBreak: sceneBreak, chapterOpening: chapterOpening, chapterSinkMm: max(0, chapterSinkMm),
+            noIndentAfterBreak: noIndentAfterBreak)
+    }
+
+    /// The family a CSS list starts with, unquoted: what the font menu shows.
+    var primaryFamily: String {
+        let first = fontFamily.split(separator: ",").first.map(String.init) ?? fontFamily
+        return first.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+    }
+
+    /// A family chosen from the font menu, as a CSS list with a fallback of its kind.
+    static func cssFamily(_ name: String) -> String {
+        let monospaced = ["courier", "mono", "typewriter", "menlo", "consol"].contains { name.lowercased().contains($0) }
+        return "\"\(name)\", \(monospaced ? "Courier, monospace" : "Georgia, serif")"
+    }
+}
+
+struct TitlePageDraft: Equatable {
+    var style: TitlePageStyle
+    var showContact: Bool
+    var showWordCount: Bool
+
+    init(_ o: TitlePageOptions) {
+        style = o.style
+        showContact = o.showContact
+        showWordCount = o.showWordCount
+    }
+
+    init(style: TitlePageStyle) {
+        self.style = style
+        showContact = style != .book
+        showWordCount = style == .manuscript
+    }
+
+    var options: TitlePageOptions { TitlePageOptions(style: style, showContact: showContact, showWordCount: showWordCount) }
 }
 
 struct BookDraft: Equatable {
@@ -373,6 +455,10 @@ struct BookDraft: Equatable {
                 cropMarks: cropMarks,
                 includeGuide: includeGuide))
     }
+}
+
+extension AuthorProfile {
+    static let empty = AuthorProfile(byline: "", legalName: "", address: "", email: "", phone: "", agent: "")
 }
 
 extension ClosedRange where Bound: Comparable {

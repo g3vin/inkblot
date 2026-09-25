@@ -27,10 +27,14 @@ import { readDocPageSetup } from './DocPageSetup'
 import { describeError, newJobId, reportJob } from './printJobStatus'
 import { foldingGuide, printSequence } from './imposition'
 import { paginationKey, settlePagination } from './PaginationExtension'
-import { pageMetrics, resolvePageSetup } from './pageSetup'
+import { pageMetrics, resolvePageSetup, setupUsesToken, surnameOf } from './pageSetup'
 import { pxToPt } from './pageSizes'
 import { PAGE_GAP } from './printLayoutConstants'
 import { imposeSheets, renderPages, snapshotBlocks } from './printRender'
+import { bookAuthor, getAuthorProfile } from './printLayoutStore'
+import { buildTitlePages, textOfContent } from './titlePage'
+import { applyTypography, loadTypographyFont, typographyKey } from './typography'
+import { countWords } from '../lib/wordCount'
 
 const PRINT_ROOT_ID = 'print-root'
 const PAGE_STYLE_ID = 'print-page-style'
@@ -70,6 +74,7 @@ const layoutOffscreen = async (content, setup) => {
   host.setAttribute('aria-hidden', 'true')
   const stage = document.createElement('div')
   stage.className = 'pl-stage'
+  applyTypography(stage, setup.typography)
   stage.style.setProperty('--pl-flow-w', `${setup.columns > 1 ? m.columnWidth : m.contentWidth}px`)
   stage.style.setProperty('--pl-content-top', `${m.contentTop}px`)
   stage.style.setProperty('--pl-content-h', `${m.contentHeight}px`)
@@ -92,11 +97,13 @@ const layoutOffscreen = async (content, setup) => {
     content,
   })
   const stride = m.height + PAGE_GAP
+  await loadTypographyFont(setup.typography)
   editor.commands.setPaginationFrame({
     slotHeight: m.contentHeight,
     stride,
     columns: setup.columns,
     minLines: setup.widowOrphanLines,
+    typeKey: typographyKey(setup.typography),
   })
   await waitForImages(mount)
   const result = settlePagination(editor.view)
@@ -119,6 +126,8 @@ const liveSource = (editor, setup) => {
   if (!state?.frame || !state.result) return null
   const m = pageMetrics(setup)
   if (Math.abs(state.frame.slotHeight - m.contentHeight) > 0.5) return null
+  // Set in other type, its lines break elsewhere: lay it out afresh.
+  if ((state.frame.typeKey || '') !== typographyKey(setup.typography)) return null
   return {
     snapshot: snapshotBlocks(editor.view.dom),
     result: state.result,
@@ -250,7 +259,15 @@ export const preparePrint = async ({
       })
     }
     const bookTitle = scope === 'document' ? chapters[0].name : (book?.title || chapters[0].name)
-    const pages = renderPages(sources, { bookTitle, author: book?.author || '' })
+    const profile = getAuthorProfile()
+    const author = bookAuthor(book)
+    // Words only when something shows them: counting a whole book is not free.
+    const needsWords = setup.titlePage?.showWordCount || setupUsesToken(setup, 'words')
+    const words = needsWords ? chapters.reduce((n, c) => n + countWords(textOfContent(c.content)), 0) : 0
+    const pages = [
+      ...buildTitlePages({ setup, title: bookTitle, profile, author, words }),
+      ...renderPages(sources, { bookTitle, author, surname: surnameOf(author), words }),
+    ]
     const m = pageMetrics(setup)
 
     if (bound && book?.binding && book.binding.binding !== 'none') {

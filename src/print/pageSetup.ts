@@ -12,8 +12,9 @@
  * a recto and a verso — top, bottom and the content height never do — so where the
  * text breaks is independent of which side of the spread a page falls on.
  */
-import { PageNumberFormat, PageOrientation, SetupSource } from '../types'
-import type { PageMargins, PageSetup, RunningText } from '../types'
+import { PageNumberFormat, PageOrientation, SetupSource, TitlePageStyle } from '../types'
+import type { PageMargins, PageSetup, RunningText, TitlePageOptions } from '../types'
+import { normalizeTypography } from './typography'
 import { getPageSizePreset, mmToPx } from './pageSizes'
 
 export type { PageSetup }
@@ -41,6 +42,8 @@ export const DEFAULT_PAGE_SETUP: PageSetup = {
   widowOrphanLines: 2,
   chapterStartsOnRecto: false,
   formatId: undefined,
+  typography: undefined,
+  titlePage: undefined,
 }
 
 /**
@@ -157,6 +160,20 @@ export const normalizePageSetup = (raw: unknown): PageSetup => {
     widowOrphanLines: Math.round(finite(r.widowOrphanLines, d.widowOrphanLines, 1, 5)),
     chapterStartsOnRecto: Boolean(r.chapterStartsOnRecto),
     formatId: typeof r.formatId === 'string' && r.formatId ? r.formatId : undefined,
+    typography: normalizeTypography(r.typography),
+    titlePage: normalizeTitlePage(r.titlePage),
+  }
+}
+
+/** Anything → title page options, or undefined for none. */
+export const normalizeTitlePage = (raw: unknown): TitlePageOptions | undefined => {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const styles = Object.values(TitlePageStyle)
+  return {
+    style: styles.includes(r.style as TitlePageStyle) ? (r.style as TitlePageStyle) : TitlePageStyle.Book,
+    showContact: Boolean(r.showContact),
+    showWordCount: Boolean(r.showWordCount),
   }
 }
 
@@ -299,17 +316,49 @@ export interface RunningTextContext {
   title: string
   chapter: string
   author: string
+  /** The author's surname, as a manuscript's running head gives it. */
+  surname?: string
+  /** Words in what is printed, rounded as a title page gives them. */
+  words?: string
+  /** Today, written out. */
+  date?: string
 }
+
+/** The last word of a name — "Le Guin" is a known exception writers type by hand. */
+export const surnameOf = (name: string): string => name.trim().split(/\s+/).pop() || ''
+
+/**
+ * A word count the way a manuscript's title page gives it: to the nearest hundred
+ * for short work, the nearest thousand from a novella up. Exact is not wanted — it
+ * reads as unprofessional, and it is out of date with the next edit.
+ */
+export const roundWordCount = (words: number): number => {
+  if (words < 100) return Math.max(0, Math.round(words / 10) * 10)
+  if (words < 17_500) return Math.round(words / 100) * 100
+  return Math.round(words / 1000) * 1000
+}
+
+export const describeWordCount = (words: number): string => `about ${roundWordCount(words).toLocaleString('en-US')} words`
+
+const TOKEN_PATTERN = /\{(page|pages|title|chapter|author|surname|words|date)\}/g
 
 export const resolveRunningTemplate = (
   template: string,
   ctx: RunningTextContext,
   format: PageNumberFormat
-): string => template.replace(/\{(page|pages|title|chapter|author)\}/g, (_, token: string) => {
+): string => template.replace(TOKEN_PATTERN, (_, token: string) => {
   if (token === 'page') return formatPageNumber(ctx.page, format)
   if (token === 'pages') return formatPageNumber(ctx.pages, format)
-  return ctx[token as 'title' | 'chapter' | 'author'] || ''
+  if (token === 'surname') return ctx.surname ?? surnameOf(ctx.author)
+  if (token === 'date') return ctx.date ?? new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+  return ctx[token as 'title' | 'chapter' | 'author' | 'words'] || ''
 })
+
+/** Whether any of a setup's running heads or feet uses a token. */
+export const setupUsesToken = (setup: PageSetup, token: string): boolean => (
+  [setup.header, setup.footer, setup.versoHeader, setup.versoFooter]
+    .some((t) => t && [t.left, t.center, t.right].some((slot) => slot.includes(`{${token}}`)))
+)
 
 /**
  * The header or footer of one physical page, resolved to text. A verso uses its
