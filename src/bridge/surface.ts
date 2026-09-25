@@ -15,7 +15,8 @@
  * cannot do without the app's cooperation. It is short, and keeping it short is what
  * keeps the seam thin.
  */
-import { EditorTarget } from '../types'
+import { EditorTarget, Pane } from '../types'
+import { countWords } from '../lib/wordCount'
 import type {
   ActiveEditorChanged,
   ArchiveChanged,
@@ -94,7 +95,21 @@ export interface DocumentSurfaceOptions {
   delegates?: SurfaceDelegates
   /** Injected so a test can run without a frame loop. */
   scheduler?: Scheduler
+  /**
+   * When a window of edits is sent as one `docChanged`. Slower than a frame: each one
+   * recounts the whole document, and the shell only needs it often enough to see
+   * typing as typing. Injected for the same reason `scheduler` is.
+   */
+  docChangeScheduler?: Scheduler
   drag?: DragHandoff
+}
+
+/** How long `docChanged` gathers edits before it sends them. */
+export const DOC_CHANGE_WINDOW_MS = 250
+
+const docChangeTimer: Scheduler = (callback) => {
+  const handle = setTimeout(callback, DOC_CHANGE_WINDOW_MS)
+  return () => clearTimeout(handle)
 }
 
 export interface DocumentSurface {
@@ -135,6 +150,12 @@ export interface DocumentSurface {
   /** Push the election result. Not coalesced — it is rare and ordering matters. */
   publishActiveEditor(info?: Partial<ActiveEditorChanged>): void
   publishDocChanged(payload: DocChanged): void
+  /**
+   * An editor's transaction changed its document. Called by `DocChangeReporter` for
+   * every editor; one that is not registered is ignored. Edits are summed per editor
+   * and sent as one `docChanged` per window, except a paste, which is sent on its own.
+   */
+  noteDocTransaction(editor: unknown, transaction: unknown): void
   /** Push a whole remapped note set. Coalesced per document. */
   publishNotesRemapped(payload: NotesRemapped): void
   publishNoteMarker(kind: 'hover' | 'leave' | 'pin', payload: NoteMarkerEvent): void
@@ -199,12 +220,111 @@ export function createDocumentSurface({
   registry,
   delegates: initialDelegates = {},
   scheduler = frameScheduler,
+  docChangeScheduler = docChangeTimer,
   drag = dragHandoff,
 }: DocumentSurfaceOptions): DocumentSurface {
   let delegates = initialDelegates
   let lastHighlightColor: string = TOOLBAR_DEFAULTS.highlight
   let viewOptions: ViewOptions = { focusMode: false, wordCountVisible: true }
   const subscriptions: Unsubscribe[] = []
+
+  /* ---------------- docChanged ---------------- */
+
+  // Not a coalescer: `inserted`/`deleted` are deltas, and a coalescer keeps only the
+  // last value (see `coalesce.ts`). This sums instead, per editor — two panes edited in
+  // one window are two documents.
+  interface PendingDocChange {
+    editor: unknown
+    pane: Pane
+    docPath: string
+    inserted: number
+    deleted: number
+    paste: boolean
+    userEdit: boolean
+    cancel: (() => void) | null
+  }
+  const pendingDocChanges = new Map<EditorTarget, PendingDocChange>()
+
+  const sendDocChange = (target: EditorTarget) => {
+    const pending = pendingDocChanges.get(target)
+    if (!pending) return
+    pendingDocChanges.delete(target)
+    pending.cancel?.()
+    const editor = pending.editor as { isDestroyed?: boolean; getText(): string; state: { doc: { textContent: string } } }
+    if (editor.isDestroyed) return
+    bridge.emit('docChanged', {
+      pane: pending.pane,
+      docPath: pending.docPath,
+      userEdit: pending.userEdit,
+      wordCount: countWords(editor.getText()),
+      charCount: editor.state.doc.textContent.length,
+      inserted: pending.inserted,
+      deleted: pending.deleted,
+      paste: pending.paste,
+    })
+  }
+
+  const targetOf = (editor: unknown) => {
+    for (const target of [EditorTarget.Primary, EditorTarget.Secondary, EditorTarget.CanvasCard]) {
+      const resolved = registry.resolve(target)
+      if (resolved?.editor === editor) return resolved
+    }
+    return null
+  }
+
+  const noteDocTransaction = (editor: unknown, transaction: unknown) => {
+    const resolved = targetOf(editor)
+    if (!resolved?.docPath) return
+    const tr = transaction as {
+      getMeta(key: string): unknown
+      mapping: { maps: { forEach(f: (oldStart: number, oldEnd: number, newStart: number, newEnd: number) => void): void }[] }
+    }
+    let inserted = 0
+    let deleted = 0
+    for (const map of tr.mapping.maps) {
+      map.forEach((oldStart, oldEnd, newStart, newEnd) => {
+        deleted += oldEnd - oldStart
+        inserted += newEnd - newStart
+      })
+    }
+    const uiEvent = tr.getMeta('uiEvent')
+    const paste = tr.getMeta('paste') === true || uiEvent === 'paste' || uiEvent === 'drop'
+    // A plugin's own bookkeeping (ids, normalisation) opts out of history; it is the
+    // document changing, but it is not the writer.
+    const userEdit = tr.getMeta('addToHistory') !== false
+
+    const target = resolved.target
+    const existing = pendingDocChanges.get(target)
+    // A different document in the same editor, or a paste: whatever was gathering is
+    // about something else, so it goes first.
+    if (existing && (existing.docPath !== resolved.docPath || existing.editor !== editor || paste)) {
+      sendDocChange(target)
+    }
+
+    // A canvas card has no pane of its own; its document is the canvas.
+    const pane = target === EditorTarget.Secondary ? Pane.Secondary : Pane.Primary
+    const pending = pendingDocChanges.get(target) ?? {
+      editor, pane, docPath: resolved.docPath, inserted: 0, deleted: 0,
+      paste: false, userEdit: false, cancel: null,
+    }
+    pending.inserted += inserted
+    pending.deleted += deleted
+    pending.userEdit ||= userEdit
+    pendingDocChanges.set(target, pending)
+
+    if (paste) {
+      pending.paste = true
+      sendDocChange(target)
+      return
+    }
+    if (!pending.cancel) {
+      let ran = false
+      const cancel = docChangeScheduler(() => { ran = true; sendDocChange(target) })
+      // A synchronous scheduler has sent it already; see `createCoalescer` for why the
+      // canceller must not be kept then.
+      if (!ran) pending.cancel = cancel
+    }
+  }
 
   /* ---------------- coalesced publishers ---------------- */
 
@@ -464,6 +584,7 @@ export function createDocumentSurface({
     publishCanvasToolbar(payload) { canvasToolbar.push(payload) },
 
     publishDocChanged(payload) { bridge.emit('docChanged', payload) },
+    noteDocTransaction,
 
     publishNotesRemapped(payload) { notesCoalescer(payload.docPath).push(payload) },
 
@@ -528,6 +649,7 @@ export function createDocumentSurface({
     },
 
     flush() {
+      for (const target of [...pendingDocChanges.keys()]) sendDocChange(target)
       toolbar.flush()
       canvasToolbar.flush()
       selection.flush()
@@ -545,6 +667,8 @@ export function createDocumentSurface({
     },
 
     dispose() {
+      for (const pending of pendingDocChanges.values()) pending.cancel?.()
+      pendingDocChanges.clear()
       toolbar.cancel()
       canvasToolbar.cancel()
       selection.cancel()

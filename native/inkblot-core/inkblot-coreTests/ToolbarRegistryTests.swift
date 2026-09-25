@@ -40,6 +40,8 @@ struct ToolbarRegistryTests {
         "inkblot.panel.notes",
         "inkblot.panel.history",
         "inkblot.panel.references",
+        "inkblot.panel.stats",
+        "inkblot.timer",
         "inkblot.window.inspector-toggle",
     ]
 

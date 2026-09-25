@@ -20,18 +20,12 @@ import { debounce } from 'lodash'
 
 import { documentSurface, editorRegistry } from '../bridge'
 import { isEditorReady } from '../lib/editorUtils'
+import { countWords } from '../lib/wordCount'
 import { nativeOwns } from '../lib/host'
 import { EditorTarget, Pane } from '../types'
 import { visibleRect } from './useNativeNotePreviews'
 
 const WORD_COUNT_DEBOUNCE_MS = 300
-
-/** Whitespace-delimited word count. */
-const countWords = (text = '') => {
-  const trimmed = text.trim()
-  if (!trimmed) return 0
-  return trimmed.split(/\s+/).length
-}
 
 const emptyWordStats = {
   total: 0,
@@ -58,13 +52,16 @@ const getWordStats = (targetEditor, previousTotal = 0, includeTotal = true) => {
 }
 
 /**
- * Tell the shell a pane's document changed, with its counts.
+ * Tell the shell a pane has a document in it, with its counts.
  *
- * `userEdit` is false for a load — the protocol's way of saying "do not treat this as
- * the user's edit". The document path comes from the registry, whose accessors read the
- * pane's current document, rather than being threaded through as a prop.
+ * Only for a load, which no editor event announces; `userEdit` false is the protocol's
+ * way of saying "do not treat this as the user's edit". Edits are reported by the
+ * surface itself (`noteDocTransaction`), which sums them per window rather than
+ * waiting for the writer to pause. The document path comes from the registry, whose
+ * accessors read the pane's current document, rather than being threaded through as
+ * a prop.
  */
-const publishDocChanged = (paneId, targetEditor, userEdit) => {
+const publishLoaded = (paneId, targetEditor) => {
   if (!isEditorReady(targetEditor)) return
   const pane = paneId === 'secondary' ? Pane.Secondary : Pane.Primary
   const target = paneId === 'secondary' ? EditorTarget.Secondary : EditorTarget.Primary
@@ -74,28 +71,10 @@ const publishDocChanged = (paneId, targetEditor, userEdit) => {
   documentSurface.publishDocChanged({
     pane,
     docPath,
-    userEdit,
+    userEdit: false,
     wordCount: countWords(text),
-    charCount: text.length,
+    charCount: targetEditor.state.doc.textContent.length,
   })
-}
-
-/**
- * Publish `docChanged` for one pane on every edit, debounced like the total count.
- *
- * Independent of the badge: the badge is a preference, and a shell listening for
- * changes should not go deaf because the user hid a label.
- */
-const useDocChangedPublisher = (paneId, targetEditor, enabled) => {
-  useEffect(() => {
-    if (!enabled || !isEditorReady(targetEditor)) return undefined
-    const publish = debounce(() => publishDocChanged(paneId, targetEditor, true), WORD_COUNT_DEBOUNCE_MS)
-    targetEditor.on('update', publish)
-    return () => {
-      if (!targetEditor.isDestroyed) targetEditor.off('update', publish)
-      publish.flush()
-    }
-  }, [enabled, paneId, targetEditor])
 }
 
 export const formatWordStats = ({ total, selected }) => {
@@ -113,11 +92,8 @@ export function useEditorWordCount({ editor, secondaryEditor, showWordCountBadge
   const syncWordStats = useCallback((paneId, targetEditor) => {
     const setStats = paneId === 'secondary' ? setSecondaryWordStats : setPrimaryWordStats
     setStats(getWordStats(targetEditor))
-    publishDocChanged(paneId, targetEditor, false)
+    publishLoaded(paneId, targetEditor)
   }, [])
-
-  useDocChangedPublisher('primary', editor, true)
-  useDocChangedPublisher('secondary', secondaryEditor, splitView === 'editor')
 
   useEffect(() => {
     if (!showWordCountBadge || !isEditorReady(editor)) return

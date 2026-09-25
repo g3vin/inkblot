@@ -34,6 +34,8 @@
 use std::sync::Arc;
 
 use inkblot_core::store::preferences::{PreferenceScope, PreferenceStore};
+use inkblot_core::store::stats::StatsStore;
+use inkblot_core::types::{StatsScope, WritingSession};
 use inkblot_core::store::{ProjectStore, StoreError};
 
 uniffi::setup_scaffolding!();
@@ -104,6 +106,7 @@ fn scope_of(name: &str) -> Result<PreferenceScope, CoreError> {
 pub struct InkblotCore {
     projects: ProjectStore,
     preferences: PreferenceStore,
+    stats: StatsStore,
 }
 
 #[uniffi::export]
@@ -116,6 +119,7 @@ impl InkblotCore {
         Arc::new(Self {
             projects: ProjectStore::new(&app_data_root, &session_id),
             preferences: PreferenceStore::new(&app_data_root),
+            stats: StatsStore::new(&app_data_root),
         })
     }
 
@@ -208,6 +212,139 @@ impl InkblotCore {
 
     pub fn document_exists(&self, project_name: String, doc_name: String) -> bool {
         self.projects.document_exists(&project_name, &doc_name)
+    }
+}
+
+/* ---------------- writing stats ---------------- */
+
+fn stats_scope(project: Option<String>, doc_path: Option<String>) -> StatsScope {
+    // A document without its project names nothing: paths repeat across projects.
+    let doc_path = if project.is_some() { doc_path } else { None };
+    StatsScope { project, doc_path }
+}
+
+#[uniffi::export]
+impl InkblotCore {
+    /// Record a `WritingSession` (JSON), new or a later checkpoint of one.
+    pub fn stats_record_session(&self, session_json: String) -> Result<(), CoreError> {
+        let session: WritingSession = serde_json::from_str(&session_json)?;
+        Ok(self.stats.record_session(&session)?)
+    }
+
+    /// `[WritingSession]` that began in the range (local `YYYY-MM-DD`, inclusive).
+    pub fn stats_sessions_json(
+        &self,
+        project: Option<String>,
+        doc_path: Option<String>,
+        from_day: Option<String>,
+        to_day: Option<String>,
+    ) -> Result<String, CoreError> {
+        let sessions = self.stats.sessions(
+            &stats_scope(project, doc_path),
+            from_day.as_deref(),
+            to_day.as_deref(),
+        );
+        Ok(serde_json::to_string(&sessions)?)
+    }
+
+    /// `[DayStat]` for the days in the range that have anything, oldest first.
+    pub fn stats_daily_json(
+        &self,
+        project: Option<String>,
+        doc_path: Option<String>,
+        from_day: String,
+        to_day: String,
+    ) -> Result<String, CoreError> {
+        let days = self.stats.daily(&stats_scope(project, doc_path), &from_day, &to_day);
+        Ok(serde_json::to_string(&days)?)
+    }
+
+    /// `StatsTotals` over all time.
+    pub fn stats_totals_json(&self, project: Option<String>, doc_path: Option<String>) -> Result<String, CoreError> {
+        Ok(serde_json::to_string(&self.stats.totals(&stats_scope(project, doc_path)))?)
+    }
+
+    /// Re-key an entry's history for the `renameEntry` command the shell is sending: the
+    /// page's rule for the new path, applied here so the two cannot disagree — a file
+    /// keeps its kind's suffix whatever was typed, a folder takes the name as typed.
+    pub fn stats_rename_entry(
+        &self,
+        project: String,
+        path: String,
+        new_name: String,
+        is_folder: bool,
+    ) -> Result<(), CoreError> {
+        use inkblot_core::doc_kind::{get_doc_kind, strip_doc_suffix, with_doc_suffix};
+        let typed = new_name.trim();
+        let name = if is_folder {
+            typed.to_string()
+        } else {
+            with_doc_suffix(&strip_doc_suffix(typed), get_doc_kind(&path))
+        };
+        let parent = path.trim_matches('/').rsplit_once('/').map(|(parent, _)| parent);
+        let new_path = parent.map_or(name.clone(), |parent| format!("{parent}/{name}"));
+        Ok(self.stats.rename_entry(&project, &path, &new_path, is_folder)?)
+    }
+
+    /// Re-key an entry's history for a `moveEntry` command: the same name, in `target_folder`.
+    pub fn stats_move_entry(
+        &self,
+        project: String,
+        path: String,
+        target_folder: String,
+        is_folder: bool,
+    ) -> Result<(), CoreError> {
+        let name = path.trim_matches('/').rsplit('/').next().unwrap_or("").to_string();
+        let folder = target_folder.trim_matches('/');
+        let new_path = if folder.is_empty() { name } else { format!("{folder}/{name}") };
+        Ok(self.stats.rename_entry(&project, &path, &new_path, is_folder)?)
+    }
+
+    pub fn stats_rename_project(&self, old_name: String, new_name: String) -> Result<(), CoreError> {
+        Ok(self.stats.rename_project(&old_name, &new_name)?)
+    }
+
+    /// Forget the history in scope — all of it when `project` is `None`.
+    pub fn stats_reset(&self, project: Option<String>, doc_path: Option<String>) -> Result<(), CoreError> {
+        Ok(self.stats.reset(&stats_scope(project, doc_path))?)
+    }
+
+    /// Record a `TimerRun` (JSON), new or a later record of one in progress.
+    pub fn stats_record_timer_run(&self, run_json: String) -> Result<(), CoreError> {
+        let run: inkblot_core::types::TimerRun = serde_json::from_str(&run_json)?;
+        Ok(self.stats.record_timer_run(&run)?)
+    }
+
+    /// `[TimerRun]` that began in the range, for one project or all.
+    pub fn stats_timer_runs_json(
+        &self,
+        project: Option<String>,
+        from_day: Option<String>,
+        to_day: Option<String>,
+    ) -> Result<String, CoreError> {
+        let runs = self.stats.timer_runs(project.as_deref(), from_day.as_deref(), to_day.as_deref());
+        Ok(serde_json::to_string(&runs)?)
+    }
+
+    pub fn stats_config(&self) -> Option<String> {
+        self.stats.config()
+    }
+
+    pub fn stats_set_config(&self, json: String) -> Result<(), CoreError> {
+        Ok(self.stats.set_config(&json)?)
+    }
+
+    /// `[DocWordCount]` for every document in the project, read from disk — so a
+    /// project's length includes the chapters nobody has opened this week.
+    pub fn project_word_counts_json(&self, project_name: String) -> Result<String, CoreError> {
+        let tree = self.projects.list_project_tree(&project_name);
+        let mut counts = Vec::new();
+        for file in inkblot_core::search::flatten_project_files(&tree) {
+            if let Some(raw) = self.projects.load_document(&project_name, &file.path)? {
+                counts.push(inkblot_core::store::stats::count_document(&file.path, &raw));
+            }
+        }
+        Ok(serde_json::to_string(&counts)?)
     }
 }
 
@@ -436,6 +573,39 @@ mod tests {
         assert_eq!(tree["name"], "Novel");
         assert_eq!(tree["children"][0]["name"], "Part One");
         assert_eq!(core.projects.list_projects(), vec!["Novel".to_string()]);
+    }
+
+    #[test]
+    fn a_session_crosses_as_json_and_comes_back_rolled_up() {
+        let core = InkblotCore::new(scratch_root("stats"), "s".into());
+        // 2026-03-14T12:00:00Z, two minutes, the camelCase the Swift encoder writes.
+        let session = r#"{"id":"s1","project":"Novel","docPath":"one","start":1773489600000,
+            "end":1773489720000,"utcOffsetMinutes":0,"openSecs":120,"activeSecs":80,
+            "wordsAdded":42,"minutes":[{"minute":0,"activeSecs":50,"wordsAdded":30},
+            {"minute":1,"activeSecs":30,"wordsAdded":12}]}"#;
+        core.stats_record_session(session.into()).unwrap();
+
+        let days: serde_json::Value = serde_json::from_str(
+            &core.stats_daily_json(Some("Novel".into()), None, "2026-03-01".into(), "2026-03-31".into()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(days[0]["day"], "2026-03-14");
+        assert_eq!(days[0]["wordsAdded"], 42);
+        assert_eq!(days[0]["hours"][12], 80);
+
+        // A document path without its project is not a scope.
+        let totals: serde_json::Value =
+            serde_json::from_str(&core.stats_totals_json(None, Some("elsewhere".into())).unwrap()).unwrap();
+        assert_eq!(totals["sessions"], 1);
+
+        // A rename keeps the kind the page would keep; a move keeps the name.
+        core.stats_rename_entry("Novel".into(), "one".into(), " Prologue.canvas ".into(), false).unwrap();
+        core.stats_move_entry("Novel".into(), "Prologue".into(), "Part One".into(), false).unwrap();
+        let sessions: serde_json::Value = serde_json::from_str(
+            &core.stats_sessions_json(Some("Novel".into()), None, None, None).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(sessions[0]["docPath"], "Part One/Prologue");
     }
 
     #[test]

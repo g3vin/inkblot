@@ -200,6 +200,7 @@ struct FileTreeSidebar: View {
             let newPath = folder.isEmpty ? source.name : "\(folder)/\(source.name)"
             if source.containingParent != folder {
                 model.bridge.send(.moveEntry(MoveEntryCommand(path: path, isFolder: source.isFolder, targetFolder: folder)))
+                model.statsFollowMove(of: path, into: folder, isFolder: source.isFolder)
             }
             let placed = model.tree.place(path: path, isFolder: source.isFolder, newPath: newPath, in: folder, at: index)
             index = index.map { _ in placed + 1 }
@@ -244,6 +245,7 @@ struct FileTreeSidebar: View {
             model.bridge.send(.createEntry(CreateEntryCommand(parentFolder: folder, name: name, kind: kind)))
         case .rename(let entry):
             model.bridge.send(.renameEntry(RenameEntryCommand(path: entry.path, isFolder: entry.isFolder, newName: name)))
+            model.statsFollowRename(of: entry.path, to: name, isFolder: entry.isFolder)
         }
     }
 
