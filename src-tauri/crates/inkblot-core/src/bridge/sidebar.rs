@@ -89,7 +89,7 @@ pub struct NoteRef {
 }
 
 /// Which note's hover cards the shell is showing, so the page can highlight the text
-/// the note is about — the cards no longer quote it. `None` clears the highlight.
+/// the note is about, since the cards do not quote it. `None` clears the highlight.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

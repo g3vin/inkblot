@@ -85,9 +85,9 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
    * pending"). StrictMode mounts, tears down, and re-mounts on the SAME refs, so if
    * this cleanup only cancelled the frame and left the id behind, the guard above
    * would see a stale non-zero id forever and never schedule again. React state —
-   * and so the zoom readout — would freeze at its initial value, while the canvas
+   * and so the zoom readout — would freeze at its initial value while the canvas
    * kept zooming, because the transform is written to the DOM directly a few lines
-   * up. That is exactly the "stuck at 100%" bug.
+   * up.
    */
   useEffect(
     () => () => {

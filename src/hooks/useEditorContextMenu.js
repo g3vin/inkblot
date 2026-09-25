@@ -2,10 +2,10 @@
  * useEditorContextMenu.js — builds the native (Tauri) right-click menu.
  *
  * One handler serves the whole workspace; the items offered depend on where the
- * click landed. This file is now only the dispatch: each surface lives in its own
+ * click landed. This file is only the dispatch: each surface lives in its own
  * module under ./contextMenu.
  *
- * Order is behaviour, not style. The tab dock, file rows and canvas each pop their
+ * Order is behaviour, not style. File rows, canvases and maps each pop their
  * own menu and stop; everything else accumulates into one shared item list that is
  * popped at the end, so the editor actions and the common copy/paste land in the
  * same menu.

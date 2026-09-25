@@ -1,5 +1,5 @@
 /**
- * useTabs — the tab dock's state machine, and the split view it can open into.
+ * useTabs — the open tabs' state machine, and the split view it can open into.
  *
  * Tabs are derived state: every open document must have one, and closing the last
  * tab has to decide what the editor shows next. That bookkeeping is why this is a
@@ -50,7 +50,7 @@ export function useTabs({
     ))
   }, [])
 
-  /** Open a document as a tab in the primary pane (right-click → new tab, or dropped on the dock). */
+  /** Open a document as a tab in the primary pane (right-click → Open in New Tab). */
   const openDocInTab = useCallback((docPath) => {
     if (!docPath) return
     setTabs(prev => withTabForDoc(prev, docPath))

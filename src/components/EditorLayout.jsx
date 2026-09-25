@@ -349,7 +349,7 @@ export default function EditorLayout(props) {
 
   // Renaming and creating happen in the tree's own inline text box, which is no
   // use if the sidebar is collapsed — and these actions are reachable from the
-  // dock and the editor, where it usually is.
+  // editor, where it usually is.
   const openLeftSidebar = left.open
   useEffect(() => {
     const reveal = () => openLeftSidebar?.()
