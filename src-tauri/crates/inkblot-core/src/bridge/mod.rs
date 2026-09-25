@@ -65,7 +65,7 @@ pub use command::{
     OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand,
     SetColorCommand, SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand,
     SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,
-    SetBlockTypeCommand, ToggleListCommand, EditorHistoryCommand, SetFocusModeCommand, SetWordCountVisibleCommand,
+    SetBlockTypeCommand, SetWritingFormatCommand, ToggleListCommand, EditorHistoryCommand, SetFocusModeCommand, SetWordCountVisibleCommand,
 };
 pub use references::{
     AddReferenceCommand, BibliographyInclude, BibliographyOptions, ChooseReferenceCandidateCommand,
@@ -93,7 +93,7 @@ pub use sidebar::{
     TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,
     WorkbenchTile,
 };
-pub use common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor};
+pub use common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 pub use envelope::{
     BridgeError, BridgeErrorCode, BridgeReply, BridgeRequest, CommandEnvelope, DocumentText,
     EditorQuery, EventEnvelope, InboundMessage, OutboundMessage, ReadAloudQuery, ReplyEnvelope,

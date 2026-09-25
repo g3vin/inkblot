@@ -192,6 +192,19 @@ struct InkblotCommands: Commands {
             alignmentToggle("Align Left", .left)
             alignmentToggle("Center", .center)
             alignmentToggle("Align Right", .right)
+            Divider()
+            // Prose, or a script: its lines become scene headings, action, dialogue…
+            Picker("Write As", selection: Binding(
+                get: { model.bridge.toolbar?.writingFormat ?? .prose },
+                set: { format in
+                    guard let target = model.bridge.toolbar?.target else { return }
+                    model.bridge.send(.setWritingFormat(SetWritingFormatCommand(target: target, format: format)))
+                })) {
+                Text("Prose").tag(WritingFormat.prose)
+                Text("Screenplay").tag(WritingFormat.screenplay)
+                Text("Stage Play").tag(WritingFormat.stageplay)
+            }
+            .disabled(model.bridge.toolbar?.target == nil)
         }
 
         // View ▸ beside Customize Toolbar…: the inspector's two layouts.

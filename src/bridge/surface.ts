@@ -459,6 +459,9 @@ export function createDocumentSurface({
   handle('setBlockType', (payload) => {
     withEditor(payload, (editor) => { commands.setBlockType(editor, payload) })
   })
+  handle('setWritingFormat', (payload) => {
+    withEditor(payload, (editor) => { commands.setWritingFormat(editor, payload) })
+  })
   handle('toggleList', (payload) => {
     withEditor(payload, (editor) => { commands.toggleList(editor, payload) })
   })

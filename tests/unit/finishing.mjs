@@ -520,3 +520,66 @@ const edgeIssue = pre.preflight({ setup: { ...tradeBook, margins: { ...tradeBook
 ok('an outside margin under a quarter inch is widened to it', edgeIssue && edgeIssue.fixedSetup.margins.outsideMm === 6.35)
 ok('a picture printed at 150 dpi is flagged', pre.preflight({ setup: tradeBook, target: { service: 'kdp', paper: 'cream' }, pageCount: 0, images: [{ pixelsWide: 600, printedInches: 4 }] }).some((i) => i.id === 'dpi'))
 ok('no service, no checks', pre.preflight({ setup: formats.applyFormat('letter'), target: { service: 'none', paper: 'cream' }, pageCount: 3 }).length === 0)
+
+/* ---------------- scripts ---------------- */
+
+const scriptEls = await import('../../src/script/elements.ts')
+const { readBlockType, readWritingFormat } = await import('../../src/bridge/readState.ts')
+const { suggestionFor } = await import('../../src/script/ScriptElement.ts')
+
+ok('Enter after a character is dialogue; after dialogue, action; on an empty action line, the next speaker',
+  scriptEls.nextOnEnter('character', 'MARY').next === 'dialogue' && scriptEls.nextOnEnter('dialogue', 'Hi.').next === 'action' &&
+  scriptEls.nextOnEnter('action', '').change === 'character')
+ok('Tab runs action, character, transition, action; dialogue and parenthetical swap',
+  scriptEls.nextOnTab('action') === 'character' && scriptEls.nextOnTab('character') === 'transition' &&
+  scriptEls.nextOnTab('transition') === 'action' && scriptEls.nextOnTab('dialogue') === 'parenthetical' && scriptEls.nextOnTab('parenthetical') === 'dialogue')
+ok('a character\'s extension is not part of their name', scriptEls.characterName('Mary (V.O.)') === 'MARY')
+ok('a scene heading\'s location', scriptEls.sceneLocation('INT. KITCHEN - NIGHT') === 'KITCHEN')
+
+globalThis.KeyboardEvent ??= dom.window.KeyboardEvent
+const scriptEditor = (content) => new Editor({ element: document.createElement('div'), extensions: buildEditorExtensions(StarterKit.configure({})), content })
+const line = (element, text = '') => ({ type: 'scriptElement', attrs: { element }, content: text ? [{ type: 'text', text }] : [] })
+const elementsOf = (ed) => { const out = []; ed.state.doc.forEach((n) => out.push(n.type.name === 'scriptElement' ? n.attrs.element : n.type.name)); return out }
+const textsOf = (ed) => { const out = []; ed.state.doc.forEach((n) => out.push(n.textContent)); return out }
+const endOf = (ed, index) => { let pos = 0; ed.state.doc.forEach((n, p, i) => { if (i === index) pos = p + n.nodeSize - 1 }); return pos }
+
+const prose = scriptEditor({ type: 'doc', content: [h1('Kitchen'), para('She waits.')] })
+prose.commands.setWritingFormat('screenplay')
+ok('written as a screenplay, a heading is a scene heading and a paragraph is action',
+  readWritingFormat(prose) === 'screenplay' && same(elementsOf(prose), ['sceneHeading', 'action']) && prose.view.dom.classList.contains('is-screenplay'))
+prose.commands.setWritingFormat('stageplay')
+ok('as a play, the action becomes stage directions', same(elementsOf(prose), ['sceneHeading', 'stageDirection']))
+prose.commands.setWritingFormat('prose')
+ok('and back to prose, nothing lost', same(elementsOf(prose), ['heading', 'paragraph']) && same(textsOf(prose), ['Kitchen', 'She waits.']) && !prose.view.dom.classList.contains('is-script'))
+prose.destroy()
+
+const script = scriptEditor({ type: 'doc', attrs: { writingFormat: 'screenplay' }, content: [line('character', 'MARGARET'), line('dialogue', 'Hello.'), line('action', 'She sits.')] })
+script.commands.setTextSelection(endOf(script, 0))
+script.commands.keyboardShortcut('Enter')
+ok('Enter at the end of a character makes a dialogue line', same(elementsOf(script), ['character', 'dialogue', 'dialogue', 'action']))
+ok('which the menu reads as dialogue', readBlockType(script) === 'dialogue')
+script.commands.keyboardShortcut('Enter')
+ok('Enter on the empty dialogue line makes it action instead', same(elementsOf(script), ['character', 'action', 'dialogue', 'action']))
+script.commands.keyboardShortcut('Enter')
+ok('and Enter again makes it the next speaker', elementsOf(script)[1] === 'character')
+script.commands.insertContent('MA')
+ok('a name used before is offered', suggestionFor(script.state.doc, 'character', 'MA') === 'MARGARET')
+script.commands.keyboardShortcut('Tab')
+ok('and Tab takes it', textsOf(script)[1] === 'MARGARET')
+script.commands.keyboardShortcut('Enter')
+script.commands.insertContent('(')
+ok('"(" opening a speech makes a parenthetical, closed', elementsOf(script)[2] === 'parenthetical' && textsOf(script)[2] === '()')
+script.destroy()
+
+const typing = scriptEditor({ type: 'doc', attrs: { writingFormat: 'screenplay' }, content: [line('action')] })
+typing.commands.setTextSelection(1)
+typing.commands.insertContent('INT. ')
+ok('"INT. " typed into action makes a scene heading', elementsOf(typing)[0] === 'sceneHeading')
+typing.commands.keyboardShortcut('Enter')
+typing.commands.insertContent('CUT TO:')
+typing.commands.keyboardShortcut('Enter')
+ok('a capitalised line ending "TO:" is a transition, and a scene heading follows', same(elementsOf(typing), ['sceneHeading', 'transition', 'sceneHeading']))
+// ⌥⌘1–8 choose by the menu's order; which key "Mod" is depends on the platform.
+typing.commands.setScriptElement(scriptEls.elementsFor('screenplay')[1].id)
+ok('⌥⌘2 is action', elementsOf(typing)[2] === 'action')
+typing.destroy()

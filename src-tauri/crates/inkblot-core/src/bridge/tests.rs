@@ -369,6 +369,8 @@ fn every_command() -> Vec<NativeCommand> {
             archive: false,
         }),
         NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::Heading1 }),
+        NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::SceneHeading }),
+        NativeCommand::SetWritingFormat(SetWritingFormatCommand { target: EditorTarget::Primary, format: WritingFormat::Screenplay }),
         NativeCommand::ToggleList(ToggleListCommand { target: EditorTarget::Primary, list: ListKind::Ordered }),
         NativeCommand::EditorHistory(EditorHistoryCommand { target: EditorTarget::Primary, action: HistoryAction::Undo }),
         NativeCommand::SetFocusMode(SetFocusModeCommand { open: true }),
@@ -537,6 +539,7 @@ fn every_event() -> Vec<WebviewEvent> {
             font_size: "18px".into(),
             alignment: Alignment::Left,
             block_type: BlockType::Heading2,
+            writing_format: WritingFormat::Prose,
             active_marks: ActiveMarks::default(),
             can_undo: true,
             can_redo: false,
@@ -858,6 +861,8 @@ fn every_command_has_its_documented_wire_name() {
             "openProject",
             "closeBubbleSession",
             "setBlockType",
+            "setBlockType",
+            "setWritingFormat",
             "toggleList",
             "editorHistory",
             "setFocusMode",
@@ -1151,4 +1156,77 @@ fn a_job_status_leaves_out_what_it_does_not_have() {
         serde_json::to_value(&event).unwrap(),
         json!({ "type": "printJobStatus", "payload": { "jobId": "p1", "kind": "print", "phase": "done" } })
     );
+}
+
+#[test]
+fn a_page_setup_carries_its_typography_in_camel_case() {
+    use crate::types::{ChapterOpening, LineSpacing, PrintAlignment, PrintTypography, TitlePageOptions, TitlePageStyle};
+    let mut setup = page_setup();
+    setup.typography = Some(PrintTypography {
+        font_family: "\"Courier Prime\", Courier, monospace".into(),
+        font_size_pt: 12.0,
+        line_spacing: LineSpacing::Double,
+        line_value: 2.0,
+        first_line_indent_mm: 12.7,
+        paragraph_spacing_pt: 0.0,
+        alignment: PrintAlignment::Left,
+        hyphenate: false,
+        scene_break: "#".into(),
+        chapter_opening: ChapterOpening::DropCapAndSmallCaps,
+        chapter_sink_mm: 76.2,
+        no_indent_after_break: true,
+    });
+    setup.title_page = Some(TitlePageOptions { style: TitlePageStyle::Manuscript, show_contact: true, show_word_count: true });
+    let wire = serde_json::to_value(&setup).unwrap();
+    assert_eq!(wire["typography"]["lineSpacing"], "double");
+    assert_eq!(wire["typography"]["chapterOpening"], "dropCapAndSmallCaps");
+    assert_eq!(wire["titlePage"]["style"], "manuscript");
+    round_trip(&setup);
+}
+
+#[test]
+fn an_author_profile_missing_fields_reads_as_blank() {
+    let profile: crate::types::AuthorProfile = serde_json::from_value(json!({ "byline": "A. Writer" })).unwrap();
+    assert_eq!(profile.byline, "A. Writer");
+    assert!(profile.email.is_empty());
+}
+
+#[test]
+fn a_book_saved_before_compiling_reads_with_everything_in() {
+    let mut old = serde_json::to_value(book()).unwrap();
+    for key in ["excluded", "chapterNumbering", "frontMatter", "backMatter"] {
+        old.as_object_mut().unwrap().remove(key);
+    }
+    let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
+    assert!(read.excluded.is_empty());
+    assert_eq!(read.chapter_numbering.style, crate::types::ChapterNumberStyle::None);
+    assert!(!read.front_matter.contents);
+    let wire = serde_json::to_value(book()).unwrap();
+    assert_eq!(wire["chapterNumbering"]["style"], "words");
+    assert_eq!(wire["frontMatter"]["halfTitle"], true);
+    assert_eq!(wire["backMatter"]["aboutTheAuthor"], "A. Writer lives by the sea.");
+}
+
+#[test]
+fn a_print_from_an_older_shell_has_no_options() {
+    let old: PrintDocumentCommand = serde_json::from_value(json!({ "scope": "document", "bound": false })).unwrap();
+    assert_eq!(old.options, PrintOptions::default());
+    let wire = serde_json::to_value(ExportFormat::PlainText).unwrap();
+    assert_eq!(wire, "plainText");
+    let partial: PrintOptions = serde_json::from_value(json!({ "watermark": "DRAFT" })).unwrap();
+    assert_eq!(partial.range, PrintRange::All);
+    assert!(partial.pages.is_empty());
+}
+
+#[test]
+fn a_script_element_is_a_block_type_and_an_old_toolbar_is_prose() {
+    assert_eq!(serde_json::to_value(BlockType::StageDirection).unwrap(), "stageDirection");
+    assert_eq!(serde_json::to_value(WritingFormat::Stageplay).unwrap(), "stageplay");
+    let mut toolbar = serde_json::to_value(every_event().into_iter().find_map(|e| match e {
+        WebviewEvent::ToolbarState(state) => Some(state),
+        _ => None,
+    }).unwrap()).unwrap();
+    toolbar.as_object_mut().unwrap().remove("writingFormat");
+    let read: ToolbarState = serde_json::from_value(toolbar).unwrap();
+    assert_eq!(read.writing_format, WritingFormat::Prose);
 }

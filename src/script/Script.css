@@ -1,0 +1,134 @@
+/* ============================================================
+   A script on the page (ScriptElement.ts)
+
+   Screenplay measures are in `ch` of Courier, which is a tenth of an inch at 12 pt,
+   so the indents are the industry's own, measured from the left margin (1½ in from
+   the paper's edge):
+
+     scene heading, action, shot   0      to 60ch (6 in)
+     character                     22ch   (3.7 in from the edge)
+     parenthetical                 16ch   to 41ch
+     dialogue                      10ch   to 45ch (2.5 in to 6 in)
+     transition                    flush right
+
+   A blank line comes before a heading, action, a character and a transition; none
+   before dialogue or a parenthetical, which hang from their speaker. Capitals are
+   set here, for display: what was typed is kept as typed.
+   ============================================================ */
+
+.ProseMirror.is-script {
+  --script-line: 1em;
+  font-family: "Courier Prime", "Courier New", Courier, monospace;
+  font-size: 12pt;
+  line-height: 1;
+}
+
+.ProseMirror.is-script .script-el {
+  margin: 0;
+  min-height: 1em;
+  max-width: 60ch;
+  text-indent: 0;
+  text-align: left;
+  -webkit-hyphens: manual;
+  hyphens: manual;
+}
+
+.ProseMirror.is-script .script-el:first-child {
+  margin-top: 0;
+}
+
+.ProseMirror.is-script .script-sceneHeading,
+.ProseMirror.is-script .script-shot,
+.ProseMirror.is-script .script-action,
+.ProseMirror.is-script .script-character,
+.ProseMirror.is-script .script-transition,
+.ProseMirror.is-script .script-centered {
+  margin-top: var(--script-line);
+}
+
+.ProseMirror.is-script .script-sceneHeading,
+.ProseMirror.is-script .script-shot,
+.ProseMirror.is-script .script-character,
+.ProseMirror.is-script .script-transition,
+.ProseMirror.is-script .script-actHeading,
+.ProseMirror.is-script .script-sceneTitle,
+.ProseMirror.is-script .script-stageCharacter {
+  text-transform: uppercase;
+}
+
+.ProseMirror.is-script .script-sceneHeading {
+  font-weight: 700;
+}
+
+.ProseMirror.is-script .script-character {
+  margin-left: 22ch;
+  max-width: 38ch;
+}
+
+.ProseMirror.is-script .script-parenthetical {
+  margin-left: 16ch;
+  max-width: 25ch;
+}
+
+.ProseMirror.is-script .script-dialogue {
+  margin-left: 10ch;
+  max-width: 35ch;
+}
+
+.ProseMirror.is-script .script-transition {
+  text-align: right;
+}
+
+.ProseMirror.is-script .script-centered {
+  text-align: center;
+}
+
+/* ---- a stage play ---- */
+
+.ProseMirror.is-stageplay .script-actHeading {
+  margin-top: calc(var(--script-line) * 2);
+  text-align: center;
+  text-decoration: underline;
+}
+
+.ProseMirror.is-stageplay .script-sceneTitle {
+  margin-top: var(--script-line);
+  text-align: center;
+}
+
+.ProseMirror.is-stageplay .script-stageCharacter {
+  margin-top: var(--script-line);
+  text-align: center;
+}
+
+.ProseMirror.is-stageplay .script-stageDialogue {
+  margin-left: 0;
+}
+
+.ProseMirror.is-stageplay .script-stageDirection {
+  margin-top: var(--script-line);
+  margin-left: 25ch;
+  max-width: 35ch;
+  font-style: italic;
+}
+
+.ProseMirror.is-stageplay .script-parenthetical {
+  margin-left: 20ch;
+  max-width: 30ch;
+  font-style: italic;
+}
+
+/* The empty line the cursor is on says what it is (ScriptElement.ts sets the label). */
+.ProseMirror.is-script .script-el[data-placeholder]::before {
+  content: attr(data-placeholder);
+  color: var(--text-tertiary, #9a9a9a);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* SmartType's offer: the rest of a name or a heading, in grey, until it is taken. */
+.script-ghost {
+  color: var(--text-tertiary, #9a9a9a);
+  pointer-events: none;
+}
