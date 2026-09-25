@@ -990,6 +990,7 @@ export type NativeCommand =
 	/** Leave the bubble editor and write its sentence back into the document. */
 	| { type: "closeBubbleSession", payload: CloseBubbleSessionCommand }
 	| { type: "setBlockType", payload: SetBlockTypeCommand }
+	| { type: "setWritingFormat", payload: SetWritingFormatCommand }
 	| { type: "toggleList", payload: ToggleListCommand }
 	| { type: "editorHistory", payload: EditorHistoryCommand }
 	| { type: "setFocusMode", payload: SetFocusModeCommand }
@@ -2817,6 +2818,19 @@ export enum BlockType {
 	Heading1 = "heading1",
 	Heading2 = "heading2",
 	Heading3 = "heading3",
+	SceneHeading = "sceneHeading",
+	Action = "action",
+	Character = "character",
+	Parenthetical = "parenthetical",
+	Dialogue = "dialogue",
+	Transition = "transition",
+	Shot = "shot",
+	Centered = "centered",
+	ActHeading = "actHeading",
+	SceneTitle = "sceneTitle",
+	StageDirection = "stageDirection",
+	StageCharacter = "stageCharacter",
+	StageDialogue = "stageDialogue",
 }
 
 /**
@@ -3021,6 +3035,22 @@ export interface SetTitlebarInsetCommand {
  */
 export interface SetWordCountVisibleCommand {
 	visible: boolean;
+}
+
+/**
+ * What a document is written as. A script's lines are script elements, set on the
+ * page as a screenplay or a play is (`DocWritingFormat.js`).
+ */
+export enum WritingFormat {
+	Prose = "prose",
+	Screenplay = "screenplay",
+	Stageplay = "stageplay",
+}
+
+/** Write the document as prose, a screenplay or a stage play, converting its lines. */
+export interface SetWritingFormatCommand {
+	target: EditorTarget;
+	format: WritingFormat;
 }
 
 export enum SidebarTab {
@@ -3274,6 +3304,8 @@ export interface ToolbarState {
 	alignment: Alignment;
 	/** What the Paragraph Style menu shows as current. */
 	blockType: BlockType;
+	/** What the document is written as, which decides what the menu offers. */
+	writingFormat?: WritingFormat;
 	activeMarks: ActiveMarks;
 	/**
 	 * Whether the editor's own history has a step to undo or redo — the document's

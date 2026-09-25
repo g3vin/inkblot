@@ -113,6 +113,34 @@ pub enum BlockType {
     Heading1,
     Heading2,
     Heading3,
+    // A screenplay's lines (`ScriptElement.ts`). The menu offers these, not the
+    // headings, in a document written as a script.
+    SceneHeading,
+    Action,
+    Character,
+    Parenthetical,
+    Dialogue,
+    Transition,
+    Shot,
+    Centered,
+    // A stage play's.
+    ActHeading,
+    SceneTitle,
+    StageDirection,
+    StageCharacter,
+    StageDialogue,
+}
+
+/// What a document is written as. A script's lines are script elements, set on the
+/// page as a screenplay or a play is (`DocWritingFormat.js`).
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WritingFormat {
+    #[default]
+    Prose,
+    Screenplay,
+    Stageplay,
 }
 
 /// The list kinds the toolbar can toggle.

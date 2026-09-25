@@ -12,7 +12,7 @@ use typeshare::typeshare;
 use super::archive::ArchiveChanged;
 use super::bubble::{BubbleChipsChanged, BubbleSessionOpened};
 use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
-use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor};
+use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor, WritingFormat};
 use crate::types::json::JsonValue;
 use super::sidebar::{
     ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged,
@@ -67,6 +67,9 @@ pub struct ToolbarState {
     pub alignment: Alignment,
     /// What the Paragraph Style menu shows as current.
     pub block_type: BlockType,
+    /// What the document is written as, which decides what the menu offers.
+    #[serde(default)]
+    pub writing_format: WritingFormat,
     pub active_marks: ActiveMarks,
     /// Whether the editor's own history has a step to undo or redo — the document's
     /// Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.

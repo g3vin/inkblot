@@ -157,33 +157,64 @@ private struct MarkToggle: View {
 
 /* ---------------- blocks ---------------- */
 
-/// Body or a heading, for the blocks the selection touches.
+/// Body or a heading, for the blocks the selection touches — or, in a script, its
+/// elements: a scene heading, action, a character, dialogue…
 private struct ParagraphStyleMenu: View {
     let model: AppModel
 
-    private static let options: [(BlockType, String)] = [
+    static let prose: [(BlockType, String)] = [
         (.paragraph, "Body"),
         (.heading1, "Heading 1"),
         (.heading2, "Heading 2"),
         (.heading3, "Heading 3"),
     ]
 
+    /// In the order ⌥⌘1 to ⌥⌘8 choose them in the page (`ScriptElement.ts`).
+    static let screenplay: [(BlockType, String)] = [
+        (.sceneHeading, "Scene Heading"),
+        (.action, "Action"),
+        (.character, "Character"),
+        (.parenthetical, "Parenthetical"),
+        (.dialogue, "Dialogue"),
+        (.transition, "Transition"),
+        (.shot, "Shot"),
+        (.centered, "Centered"),
+    ]
+
+    static let stageplay: [(BlockType, String)] = [
+        (.actHeading, "Act"),
+        (.sceneTitle, "Scene"),
+        (.stageDirection, "Stage Direction"),
+        (.stageCharacter, "Character"),
+        (.parenthetical, "Parenthetical"),
+        (.stageDialogue, "Dialogue"),
+    ]
+
+    static func options(_ format: WritingFormat) -> [(BlockType, String)] {
+        switch format {
+        case .prose: prose
+        case .screenplay: screenplay
+        case .stageplay: stageplay
+        }
+    }
+
     var body: some View {
         let state = model.bridge.toolbar
+        let format = state?.writingFormat ?? .prose
         Picker(selection: Binding(
             get: { state?.blockType ?? .paragraph },
             set: { block in
                 guard let target = state?.target else { return }
                 model.bridge.send(.setBlockType(SetBlockTypeCommand(target: target, block: block)))
             })) {
-            ForEach(Self.options, id: \.0) { option in
-                Text(option.1).tag(option.0)
+            ForEach(Array(Self.options(format).enumerated()), id: \.element.0) { index, option in
+                Text(format == .prose ? option.1 : "\(option.1)  ⌥⌘\(index + 1)").tag(option.0)
             }
         } label: {
-            Label("Paragraph Style", systemImage: "textformat.size")
+            Label(format == .prose ? "Paragraph Style" : "Script Element", systemImage: "textformat.size")
         }
         .pickerStyle(.menu)
-        .help("Paragraph style")
+        .help(format == .prose ? "Paragraph style" : "Script element — Enter and Tab move between them")
         .disabled(state?.target == nil)
     }
 }

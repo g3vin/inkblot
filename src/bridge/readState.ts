@@ -10,7 +10,7 @@
  * menu asks for `SelectionContext` at the moment of the right-click, and the same
  * function has already been answering the pushed one on every selection change.
  */
-import { Alignment, BlockType } from '../types'
+import { Alignment, BlockType, WritingFormat } from '../types'
 import type { ActiveMarks, SelectionContext, ToolbarState, EditorTarget } from '../types'
 import { isEditorReady } from '../lib/editorUtils'
 import { fromCssFontFamily } from '../lib/systemFonts'
@@ -52,6 +52,7 @@ interface PmEditor {
       }
     }
     doc: {
+      attrs?: Record<string, unknown>
       rangeHasMark(from: number, to: number, type: unknown): boolean
       nodesBetween(from: number, to: number, f: (node: PmNode) => boolean | void): void
     }
@@ -119,10 +120,21 @@ export function readActiveMarks(editor: unknown): ActiveMarks {
 export function readBlockType(editor: unknown): BlockType {
   if (!isEditorReady(editor)) return BlockType.Paragraph
   const live = asEditor(editor)
+  if (live.isActive('scriptElement')) {
+    const element = live.getAttributes('scriptElement').element
+    if (Object.values(BlockType).includes(element as BlockType)) return element as BlockType
+  }
   if (live.isActive('heading', { level: 1 })) return BlockType.Heading1
   if (live.isActive('heading', { level: 2 })) return BlockType.Heading2
   if (live.isActive('heading')) return BlockType.Heading3
   return BlockType.Paragraph
+}
+
+/** What the document is written as, from its doc node (DocWritingFormat.js). */
+export function readWritingFormat(editor: unknown): WritingFormat {
+  if (!isEditorReady(editor)) return WritingFormat.Prose
+  const format = asEditor(editor).state.doc.attrs?.writingFormat
+  return format === WritingFormat.Screenplay || format === WritingFormat.Stageplay ? format : WritingFormat.Prose
 }
 
 /** Whether the editor's own history can step back or forward. */
@@ -161,6 +173,7 @@ export function readToolbarState(
       fontSize: TOOLBAR_DEFAULTS.fontSize,
       alignment: Alignment.Left,
       blockType: BlockType.Paragraph,
+      writingFormat: WritingFormat.Prose,
       activeMarks: readActiveMarks(null),
       canUndo: false,
       canRedo: false,
@@ -189,6 +202,7 @@ export function readToolbarState(
       nodeAlignment ?? live.getAttributes('paragraph').textAlign ?? Alignment.Left
     ),
     blockType: readBlockType(editor),
+    writingFormat: readWritingFormat(editor),
     activeMarks: readActiveMarks(editor),
     ...readHistory(live),
     lastHighlightColor: remembered,

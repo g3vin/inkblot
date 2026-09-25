@@ -16,7 +16,7 @@ use super::references::{
     InsertCitationCommand, ReferenceRef, SetBibliographyOptionsCommand, SetCitationStyleCommand,
     SetReferenceAttachedCommand, UpdateReferenceCommand,
 };
-use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor};
+use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 use crate::types::json::JsonValue;
 use super::sidebar::{
     AddReplyCommand, ClipboardDropCommand, HighlightNoteCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
@@ -453,6 +453,15 @@ pub struct SetBlockTypeCommand {
     pub block: BlockType,
 }
 
+/// Write the document as prose, a screenplay or a stage play, converting its lines.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetWritingFormatCommand {
+    pub target: EditorTarget,
+    pub format: WritingFormat,
+}
+
 /// Toggle a list around the selection's blocks, as the page's input rules do for `- `
 /// and `1. `.
 #[typeshare]
@@ -552,6 +561,7 @@ pub enum NativeCommand {
     /// Leave the bubble editor and write its sentence back into the document.
     CloseBubbleSession(CloseBubbleSessionCommand),
     SetBlockType(SetBlockTypeCommand),
+    SetWritingFormat(SetWritingFormatCommand),
     ToggleList(ToggleListCommand),
     EditorHistory(EditorHistoryCommand),
     SetFocusMode(SetFocusModeCommand),

@@ -1292,6 +1292,7 @@ public enum NativeCommand: Codable, Equatable {
 	/// Leave the bubble editor and write its sentence back into the document.
 	case closeBubbleSession(CloseBubbleSessionCommand)
 	case setBlockType(SetBlockTypeCommand)
+	case setWritingFormat(SetWritingFormatCommand)
 	case toggleList(ToggleListCommand)
 	case editorHistory(EditorHistoryCommand)
 	case setFocusMode(SetFocusModeCommand)
@@ -1378,6 +1379,7 @@ public enum NativeCommand: Codable, Equatable {
 			openProject,
 			closeBubbleSession,
 			setBlockType,
+			setWritingFormat,
 			toggleList,
 			editorHistory,
 			setFocusMode,
@@ -1665,6 +1667,11 @@ public enum NativeCommand: Codable, Equatable {
 			case .setBlockType:
 				if let content = try? container.decode(SetBlockTypeCommand.self, forKey: .payload) {
 					self = .setBlockType(content)
+					return
+				}
+			case .setWritingFormat:
+				if let content = try? container.decode(SetWritingFormatCommand.self, forKey: .payload) {
+					self = .setWritingFormat(content)
 					return
 				}
 			case .toggleList:
@@ -1991,6 +1998,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setBlockType(let content):
 			try container.encode(CodingKeys.setBlockType, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setWritingFormat(let content):
+			try container.encode(CodingKeys.setWritingFormat, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .toggleList(let content):
 			try container.encode(CodingKeys.toggleList, forKey: .type)
@@ -5082,6 +5092,19 @@ public enum BlockType: String, Codable, Equatable {
 	case heading1
 	case heading2
 	case heading3
+	case sceneHeading
+	case action
+	case character
+	case parenthetical
+	case dialogue
+	case transition
+	case shot
+	case centered
+	case actHeading
+	case sceneTitle
+	case stageDirection
+	case stageCharacter
+	case stageDialogue
 }
 
 /// Turn the selection's blocks into paragraphs or headings — the toolbar's Paragraph
@@ -5359,6 +5382,25 @@ public struct SetWordCountVisibleCommand: Codable, Equatable {
 
 	public init(visible: Bool) {
 		self.visible = visible
+	}
+}
+
+/// What a document is written as. A script's lines are script elements, set on the
+/// page as a screenplay or a play is (`DocWritingFormat.js`).
+public enum WritingFormat: String, Codable, Equatable {
+	case prose
+	case screenplay
+	case stageplay
+}
+
+/// Write the document as prose, a screenplay or a stage play, converting its lines.
+public struct SetWritingFormatCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let format: WritingFormat
+
+	public init(target: EditorTarget, format: WritingFormat) {
+		self.target = target
+		self.format = format
 	}
 }
 
@@ -5693,6 +5735,8 @@ public struct ToolbarState: Codable, Equatable {
 	public let alignment: Alignment
 	/// What the Paragraph Style menu shows as current.
 	public let blockType: BlockType
+	/// What the document is written as, which decides what the menu offers.
+	public let writingFormat: WritingFormat?
 	public let activeMarks: ActiveMarks
 	/// Whether the editor's own history has a step to undo or redo — the document's
 	/// Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.
@@ -5702,7 +5746,7 @@ public struct ToolbarState: Codable, Equatable {
 	/// `SetHighlightCommand`.
 	public let lastHighlightColor: String
 
-	public init(target: EditorTarget?, color: String, highlight: String, font: String, fontSize: String, alignment: Alignment, blockType: BlockType, activeMarks: ActiveMarks, canUndo: Bool, canRedo: Bool, lastHighlightColor: String) {
+	public init(target: EditorTarget?, color: String, highlight: String, font: String, fontSize: String, alignment: Alignment, blockType: BlockType, writingFormat: WritingFormat?, activeMarks: ActiveMarks, canUndo: Bool, canRedo: Bool, lastHighlightColor: String) {
 		self.target = target
 		self.color = color
 		self.highlight = highlight
@@ -5710,6 +5754,7 @@ public struct ToolbarState: Codable, Equatable {
 		self.fontSize = fontSize
 		self.alignment = alignment
 		self.blockType = blockType
+		self.writingFormat = writingFormat
 		self.activeMarks = activeMarks
 		self.canUndo = canUndo
 		self.canRedo = canRedo

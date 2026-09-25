@@ -433,11 +433,17 @@ export default function usePrintLayoutController({
       if (event.altKey) togglePrintLayout()
       else stateRef.current.onPrint?.({ scope: 'document', bound: false })
     }
+    // File ▸ Write As, in a shell whose menus are the page's (DocWritingFormat.js).
+    const onWritingFormat = (event) => {
+      stateRef.current.activeEditor?.chain().focus().setWritingFormat(event.detail?.format).run()
+    }
+    window.addEventListener('inkblot:writing-format', onWritingFormat)
     window.addEventListener('inkblot:print-layout-toggle', onToggle)
     window.addEventListener('inkblot:print', onPrintEvent)
     window.addEventListener('inkblot:export', onExportEvent)
     window.addEventListener('keydown', onKeyDown)
     return () => {
+      window.removeEventListener('inkblot:writing-format', onWritingFormat)
       window.removeEventListener('inkblot:print-layout-toggle', onToggle)
       window.removeEventListener('inkblot:print', onPrintEvent)
       window.removeEventListener('inkblot:export', onExportEvent)
