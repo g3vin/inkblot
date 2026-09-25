@@ -10,7 +10,7 @@ There are two apps, and they share one editor:
 - **The Tauri app** (macOS desktop): the React/TipTap page in `src/`, hosted by Tauri,
   with Rust commands in `src-tauri/`.
 - **The Swift app** (macOS, iPadOS, iOS): a SwiftUI shell in `native/` that hosts the
-  same built page (`dist/`) in a `WKWebView` and draws the file tree, inspector, tab dock
+  same built page (`dist/`) in a `WKWebView` and draws the file tree, inspector, toolbar
   and menu bar natively.
 
 Both link the same Rust crates for domain logic and models. How the pieces fit is in
@@ -65,12 +65,13 @@ Run these before every commit, and the Swift ones as well when you touch `native
 
 | Command | What it checks | What only it catches |
 |---|---|---|
-| `npm test` | 22 suites under `scripts/canvas-tests/`, in jsdom, mounting real components | A component that throws on every render: lint, tsc and the build all pass on it |
+| `npm test` | 29 suites under `scripts/canvas-tests/`, in jsdom, mounting real components | A component that throws on every render: lint, tsc and the build all pass on it |
 | `npm run lint` | ESLint, including the React Compiler rules. The bar is 0 errors and 0 warnings | A ref written during render |
 | `npm run typecheck` | `tsc --noEmit` over the TypeScript | |
 | `npm run build` | The Vite production build | Bad dynamic imports, and named imports a module does not export |
-| `npm run parity` | One corpus (about 16,000 cases) through both the JS and the Rust implementation of every mirrored function | Float, rounding and string-semantics drift between JS and Rust |
+| `npm run parity` | One corpus (about 17,000 cases) through both the JS and the Rust implementation of every mirrored function | Float, rounding and string-semantics drift between JS and Rust |
 | `npm run types:check` | The generated TypeScript and Swift types are current, and the Swift typechecks | A Rust type change that was never regenerated |
+| `npm run test:layout` | Print Layout in real WebKit (needs `playwright-core` and its WebKit; see `scripts/print-tests/run.mjs`) | Page breaks that differ between jsdom and a real browser |
 | `cd src-tauri && cargo build --workspace && cargo test --workspace` | The Rust crates and their tests | Linker errors: `cargo check` does not link |
 
 For the Swift app:
