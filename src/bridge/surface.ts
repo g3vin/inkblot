@@ -40,10 +40,12 @@ import type {
   NotePreviewDismissed,
   NotesRemapped,
   OpenDocumentCommand,
+  PageLayoutCatalog,
   PageLayoutState,
   ReferenceSchema,
   ReferencesChanged,
   RevealReference,
+  PrintJobStatus,
   PrintRequest,
   ClipboardChanged,
   NotesChanged,
@@ -198,6 +200,10 @@ export interface DocumentSurface {
   publishPageLayoutState(payload: PageLayoutState): void
   /** Ask the shell to print the web view at a paper size. Not coalesced: each is a job. */
   publishPrintRequest(payload: PrintRequest): void
+  /** The Finishing tabs' fixed lists — sizes, formats, tokens — once. */
+  publishPageLayoutCatalog(payload: PageLayoutCatalog): void
+  /** Where a print or export has got to. Not coalesced: the last of a job must arrive. */
+  publishPrintJobStatus(payload: PrintJobStatus): void
   /** The project's sources for the document in view. Coalesced — each carries them all. */
   publishReferencesChanged(payload: ReferencesChanged): void
   /** The kinds of source and the styles, once. */
@@ -616,6 +622,8 @@ export function createDocumentSurface({
     publishWordCountsChanged(payload) { wordCountLists.push(payload) },
     publishPageLayoutState(payload) { pageLayoutChanges.push(payload) },
     publishPrintRequest(payload) { bridge.emit('printRequest', payload) },
+    publishPageLayoutCatalog(payload) { bridge.emit('pageLayoutCatalog', payload) },
+    publishPrintJobStatus(payload) { bridge.emit('printJobStatus', payload) },
     publishReferencesChanged(payload) { referenceLists.push(payload) },
     publishReferenceSchema(payload) { bridge.emit('referenceSchema', payload) },
     publishRevealReference(payload) { bridge.emit('revealReference', payload) },
@@ -623,7 +631,6 @@ export function createDocumentSurface({
       // A move queued for a preview that is closing would reopen nothing, but it would
       // arrive after the dismissal and be one message the shell has to reason about.
       markerMoves.cancel()
-      pageLayoutChanges.cancel()
       referenceLists.cancel()
       bridge.emit('notePreviewDismissed', payload)
     },

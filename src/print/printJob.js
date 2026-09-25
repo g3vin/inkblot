@@ -24,9 +24,10 @@ import { buildEditorExtensions } from '../lib/editorExtensions'
 import { withPrintBibliography } from '../lib/references/printBibliography'
 import { loadChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
+import { describeError, newJobId, reportJob } from './printJobStatus'
 import { foldingGuide, printSequence } from './imposition'
 import { paginationKey, settlePagination } from './PaginationExtension'
-import { normalizePageSetup, pageMetrics } from './pageSetup'
+import { pageMetrics, resolvePageSetup } from './pageSetup'
 import { pxToPt } from './pageSizes'
 import { PAGE_GAP } from './printLayoutConstants'
 import { imposeSheets, renderPages, snapshotBlocks } from './printRender'
@@ -127,7 +128,18 @@ const liveSource = (editor, setup) => {
   }
 }
 
-let currentJob = null
+/**
+ * Jobs run one at a time — there is one print root — in the order they were asked
+ * for. A second job waits for the first rather than being dropped: an Export PDF
+ * chosen while a print is still on its way must still happen.
+ */
+let queue = Promise.resolve()
+const enqueue = (run) => {
+  const job = queue.then(run)
+  queue = job.catch(() => {})
+  return job
+}
+
 const pendingFinish = new Map()
 
 documentSurface.onCommand('printFinished', ({ jobId, completed }) => {
@@ -155,8 +167,7 @@ const mountPrintRoot = (elements, widthPx, heightPx) => {
 }
 
 /** Ask the shell to print what #print-root holds. Resolves when the shell is done with it. */
-const requestHostPrint = ({ jobName, widthPx, heightPx, pdfPath }) => {
-  const jobId = `print-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+const requestHostPrint = ({ jobId = newJobId(), jobName, widthPx, heightPx, pdfPath }) => {
   const request = {
     jobId,
     jobName,
@@ -208,6 +219,7 @@ export const preparePrint = async ({
   bound = false,
   liveEditors = [],
   book,
+  onProgress = () => {},
 }) => {
   const liveByPath = new Map(liveEditors.filter((e) => e?.path && e.editor && !e.editor.isDestroyed).map((e) => [e.path, e.editor]))
   // A document whose bibliography appears only on paper gets it here (and so is laid
@@ -218,12 +230,16 @@ export const preparePrint = async ({
   )
   if (!chapters.length) return null
 
+  // A book with a setup of its own prints every chapter in it; otherwise the first
+  // chapter's decides, as it always has. A document alone prints in its own, or in
+  // its book's when it has none — which is what Print Layout showed it in.
   const firstOwn = chapters[0].content?.attrs?.pageSetup || readDocPageSetup(liveByPath.get(chapters[0].path)?.state.doc)
-  const setup = normalizePageSetup(scope === 'document' ? firstOwn : (book?.pageSetup || firstOwn))
+  const { setup } = resolvePageSetup({ docSetup: firstOwn, bookSetup: book?.pageSetup, scope })
 
   const sources = []
   try {
-    for (const chapter of chapters) {
+    for (const [index, chapter] of chapters.entries()) {
+      onProgress({ done: index, total: chapters.length })
       const live = chapter.printBibliography ? null : liveSource(liveByPath.get(chapter.path), setup)
       const laid = live || await layoutOffscreen(chapter.content, setup)
       sources.push({
@@ -256,50 +272,65 @@ export const preparePrint = async ({
  * and shell request as a document, so Print… and Export PDF work in both shells.
  * `markup` is the page's content; the page is `widthPx` × `heightPx`.
  */
-export const printFigure = async ({ markup, widthPx, heightPx, jobName, pdfPath }) => {
-  if (currentJob) return currentJob
-  currentJob = (async () => {
-    try {
-      const sheet = document.createElement('div')
-      sheet.className = 'print-sheet print-figure'
-      Object.assign(sheet.style, { width: `${widthPx}px`, height: `${heightPx}px`, overflow: 'hidden' })
-      sheet.innerHTML = markup
-      mountPrintRoot([sheet], widthPx, heightPx)
-      await waitForImages(sheet)
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-      const completed = await requestHostPrint({ jobName, widthPx, heightPx, pdfPath })
-      if (isNativeShell()) clearPrintRoot()
-      return completed
-    } finally {
-      currentJob = null
-    }
-  })()
-  return currentJob
-}
+export const printFigure = ({ markup, widthPx, heightPx, jobName, pdfPath }) => runJob({
+  kind: pdfPath ? 'export' : 'print',
+  format: pdfPath ? 'pdf' : undefined,
+  pdfPath,
+  prepare: async () => {
+    const sheet = document.createElement('div')
+    sheet.className = 'print-sheet print-figure'
+    Object.assign(sheet.style, { width: `${widthPx}px`, height: `${heightPx}px`, overflow: 'hidden' })
+    sheet.innerHTML = markup
+    return { elements: [sheet], widthPx, heightPx, jobName, images: sheet }
+  },
+})
 
-/** Print (or save as PDF, with `pdfPath`). Resolves once the shell has the job. */
-export const runPrintJob = async (options) => {
-  if (currentJob) return currentJob
-  currentJob = (async () => {
-    try {
-      const prepared = await preparePrint(options)
-      if (!prepared) return false
-      mountPrintRoot(prepared.elements, prepared.widthPx, prepared.heightPx)
-      // Let the print root lay out once before WebKit snapshots it.
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-      const completed = await requestHostPrint({
-        jobName: prepared.jobName,
-        widthPx: prepared.widthPx,
-        heightPx: prepared.heightPx,
-        pdfPath: options.pdfPath,
-      })
-      // The Swift shell says when it is done; the Tauri print sheet does not, so its
-      // print root stays (hidden on screen) until the next job replaces it.
-      if (isNativeShell()) clearPrintRoot()
-      return completed
-    } finally {
-      currentJob = null
+/**
+ * One job, from gathering its pages to the shell's answer, reporting each step.
+ * Resolves true when it printed or saved, false when there was nothing to print or the
+ * author cancelled; rejects, after reporting the failure, when it could not be done.
+ */
+const runJob = ({ jobId = newJobId(), kind, format, pdfPath, prepare }) => enqueue(async () => {
+  const report = (phase, extra = {}) => reportJob({ jobId, kind, format, phase, ...extra })
+  report('preparing')
+  try {
+    const prepared = await prepare(({ done, total }) => report('laying', { done, total }))
+    if (!prepared) {
+      report('failed', { message: 'There was nothing to print.' })
+      return false
     }
-  })()
-  return currentJob
-}
+    mountPrintRoot(prepared.elements, prepared.widthPx, prepared.heightPx)
+    if (prepared.images) await waitForImages(prepared.images)
+    // Let the print root lay out once before WebKit snapshots it.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    report('writing')
+    const completed = await requestHostPrint({
+      jobId,
+      jobName: prepared.jobName,
+      widthPx: prepared.widthPx,
+      heightPx: prepared.heightPx,
+      pdfPath,
+    })
+    // The Swift shell says when it is done; the Tauri print sheet does not, so its
+    // print root stays (hidden on screen) until the next job replaces it.
+    if (isNativeShell()) clearPrintRoot()
+    report(completed ? 'done' : 'cancelled', completed && pdfPath ? { path: pdfPath } : {})
+    return completed
+  } catch (error) {
+    if (isNativeShell()) clearPrintRoot()
+    report('failed', { message: describeError(error) })
+    throw error
+  }
+})
+
+/**
+ * Print (or save as PDF, with `pdfPath`). Resolves once the shell is done with the job.
+ * `jobId`, when given, is the id its statuses carry — an export passes its own.
+ */
+export const runPrintJob = (options) => runJob({
+  jobId: options.jobId,
+  kind: options.pdfPath ? 'export' : 'print',
+  format: options.pdfPath ? 'pdf' : undefined,
+  pdfPath: options.pdfPath,
+  prepare: (onProgress) => preparePrint({ ...options, onProgress }),
+})

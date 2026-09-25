@@ -37,6 +37,7 @@ fn page_setup() -> crate::types::PageSetup {
         page_number_format: PageNumberFormat::Arabic,
         widow_orphan_lines: 2,
         chapter_starts_on_recto: true,
+        format_id: Some("trade-6x9".into()),
     }
 }
 
@@ -379,7 +380,7 @@ fn every_command() -> Vec<NativeCommand> {
             options: bibliography_options(),
         }),
         NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true }),
-        NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup() }),
+        NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Book }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
         NativeCommand::SetPrintZoom(SetPrintZoomCommand { zoom: Some(1.25), fit: None }),
         NativeCommand::SetDisplayDensity(SetDisplayDensityCommand { points_per_inch: 127.0 }),
@@ -388,6 +389,11 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::PrintDocument(PrintDocumentCommand { scope: PrintScope::Folder, bound: true }),
         NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false }),
         NativeCommand::PrintFinished(PrintFinishedCommand { job_id: "p1".into(), completed: true }),
+        NativeCommand::ApplyFormat(ApplyFormatCommand { format_id: "manuscript".into(), target: PageSetupTarget::Document }),
+        NativeCommand::UseSetupForBook(UseSetupForBookCommand {}),
+        NativeCommand::ClearBookSetup(ClearBookSetupCommand {}),
+        NativeCommand::RefreshBookChapters(RefreshBookChaptersCommand {}),
+        NativeCommand::SetPrintScope(SetPrintScopeCommand { scope: PrintScope::Project }),
     ]
 }
 
@@ -689,15 +695,19 @@ fn every_event() -> Vec<WebviewEvent> {
             enabled: true,
             doc_path: Some("Manuscript/one".into()),
             setup: page_setup(),
+            ready: true,
+            setup_source: SetupSource::Document,
             has_own_setup: true,
+            format_id: Some("trade-6x9".into()),
+            format_modified: false,
             page_count: 212,
             current_page: 3,
             zoom: 1.0,
+            scope: PrintScope::Folder,
             book: book(),
+            book_setup_active: true,
             book_chapters: vec!["Manuscript/one".into(), "Manuscript/two".into()],
             suggested_inside_margin_mm: 12.7,
-            presets: vec![PageSizeOption { id: "a4".into(), label: "A4".into(), group: "ISO A".into(), width_mm: 210.0, height_mm: 297.0 }],
-            signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
         }),
         WebviewEvent::PrintRequest(PrintRequest {
             job_id: "p1".into(),
@@ -705,6 +715,28 @@ fn every_event() -> Vec<WebviewEvent> {
             paper_width_pt: 612.0,
             paper_height_pt: 792.0,
             pdf_path: None,
+        }),
+        WebviewEvent::PageLayoutCatalog(PageLayoutCatalog {
+            presets: vec![PageSizeOption { id: "a4".into(), label: "A4".into(), group: "ISO A".into(), width_mm: 210.0, height_mm: 297.0 }],
+            formats: vec![FormatOption {
+                id: "manuscript".into(),
+                label: "Standard Manuscript".into(),
+                group: "Submission".into(),
+                summary: "What agents and editors ask for.".into(),
+                kind: FormatKind::Prose,
+            }],
+            signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
+            tokens: vec![RunningToken { token: "{page}".into(), label: "Page Number".into() }],
+        }),
+        WebviewEvent::PrintJobStatus(PrintJobStatus {
+            job_id: "p1".into(),
+            kind: PrintJobKind::Export,
+            format: Some(ExportFormat::Pdf),
+            phase: PrintJobPhase::Laying,
+            done: Some(2),
+            total: Some(14),
+            message: None,
+            path: None,
         }),
     ]
 }
@@ -791,6 +823,11 @@ fn every_command_has_its_documented_wire_name() {
             "printDocument",
             "exportDocument",
             "printFinished",
+            "applyFormat",
+            "useSetupForBook",
+            "clearBookSetup",
+            "refreshBookChapters",
+            "setPrintScope",
         ]
     );
 }
@@ -836,6 +873,8 @@ fn every_event_has_its_documented_wire_name() {
             "revealReference",
             "pageLayoutState",
             "printRequest",
+            "pageLayoutCatalog",
+            "printJobStatus",
         ]
     );
 }
@@ -999,7 +1038,7 @@ fn the_toolbar_items_speak_camel_case() {
 
 #[test]
 fn a_page_setup_crosses_the_wire_in_millimetres_and_camel_case() {
-    let command = NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup() });
+    let command = NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Document });
     let wire = serde_json::to_value(&command).unwrap();
     assert_eq!(wire["type"], "setPageSetup");
     let setup = &wire["payload"]["setup"];
@@ -1018,4 +1057,32 @@ fn a_page_setup_without_verso_overrides_still_reads() {
     wire.as_object_mut().unwrap().remove("versoHeader");
     let setup: crate::types::PageSetup = serde_json::from_value(wire).unwrap();
     assert!(setup.verso_header.is_none());
+}
+
+#[test]
+fn a_page_setup_edit_from_an_older_shell_goes_to_the_document() {
+    let wire = json!({ "type": "setPageSetup", "payload": { "setup": serde_json::to_value(page_setup()).unwrap() } });
+    let command: NativeCommand = serde_json::from_value(wire).unwrap();
+    match command {
+        NativeCommand::SetPageSetup(edit) => assert_eq!(edit.target, PageSetupTarget::Document),
+        other => panic!("read as {other:?}"),
+    }
+}
+
+#[test]
+fn a_job_status_leaves_out_what_it_does_not_have() {
+    let event = WebviewEvent::PrintJobStatus(PrintJobStatus {
+        job_id: "p1".into(),
+        kind: PrintJobKind::Print,
+        format: None,
+        phase: PrintJobPhase::Done,
+        done: None,
+        total: None,
+        message: None,
+        path: None,
+    });
+    assert_eq!(
+        serde_json::to_value(&event).unwrap(),
+        json!({ "type": "printJobStatus", "payload": { "jobId": "p1", "kind": "print", "phase": "done" } })
+    );
 }

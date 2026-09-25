@@ -96,6 +96,25 @@ public struct AddReplyCommand: Codable, Equatable {
 	}
 }
 
+/// Which setup an edit goes to: the active document's own, or the one every chapter of
+/// its book prints in.
+public enum PageSetupTarget: String, Codable, Equatable {
+	case document
+	case book
+}
+
+/// Replace a setup with one of the catalog's formats (`FormatOption::id`). The page
+/// builds the setup, so every shell's "Standard Manuscript" is the same one.
+public struct ApplyFormatCommand: Codable, Equatable {
+	public let formatId: String
+	public let target: PageSetupTarget?
+
+	public init(formatId: String, target: PageSetupTarget?) {
+		self.formatId = formatId
+		self.target = target
+	}
+}
+
 /// The marks the toolbar can toggle.
 /// 
 /// A closed set rather than a string: a Swift menu item sending `"bolb"` should not
@@ -466,8 +485,11 @@ public struct PageSetup: Codable, Equatable {
 	/// A manual "recto" break, and each chapter of a compiled book, starts on an
 	/// odd page, inserting a blank verso when needed.
 	public let chapterStartsOnRecto: Bool
+	/// The catalog format (`formats.ts`) this setup was made from, kept after it is
+	/// changed so the inspector can say "Standard Manuscript (modified)".
+	public let formatId: String?
 
-	public init(presetId: String, widthMm: Double, heightMm: Double, orientation: PageOrientation, margins: PageMargins, mirrorMargins: Bool, columns: UInt32, columnGapMm: Double, header: RunningText, footer: RunningText, versoHeader: RunningText?, versoFooter: RunningText?, headerDistanceMm: Double, footerDistanceMm: Double, differentFirstPage: Bool, pageNumberStart: UInt32, pageNumberFormat: PageNumberFormat, widowOrphanLines: UInt32, chapterStartsOnRecto: Bool) {
+	public init(presetId: String, widthMm: Double, heightMm: Double, orientation: PageOrientation, margins: PageMargins, mirrorMargins: Bool, columns: UInt32, columnGapMm: Double, header: RunningText, footer: RunningText, versoHeader: RunningText?, versoFooter: RunningText?, headerDistanceMm: Double, footerDistanceMm: Double, differentFirstPage: Bool, pageNumberStart: UInt32, pageNumberFormat: PageNumberFormat, widowOrphanLines: UInt32, chapterStartsOnRecto: Bool, formatId: String?) {
 		self.presetId = presetId
 		self.widthMm = widthMm
 		self.heightMm = heightMm
@@ -487,6 +509,7 @@ public struct PageSetup: Codable, Equatable {
 		self.pageNumberFormat = pageNumberFormat
 		self.widowOrphanLines = widowOrphanLines
 		self.chapterStartsOnRecto = chapterStartsOnRecto
+		self.formatId = formatId
 	}
 }
 
@@ -934,6 +957,11 @@ public struct CitationStyleSpec: Codable, Equatable {
 	}
 }
 
+/// Take the book's own setup away: the book prints in its first chapter's again.
+public struct ClearBookSetupCommand: Codable, Equatable {
+	public init() {}
+}
+
 public struct ClipboardEntry: Codable, Equatable {
 	public let id: String
 	public let text: String
@@ -1070,6 +1098,11 @@ public enum NativeCommand: Codable, Equatable {
 	case printDocument(PrintDocumentCommand)
 	case exportDocument(ExportDocumentCommand)
 	case printFinished(PrintFinishedCommand)
+	case applyFormat(ApplyFormatCommand)
+	case useSetupForBook(UseSetupForBookCommand)
+	case clearBookSetup(ClearBookSetupCommand)
+	case refreshBookChapters(RefreshBookChaptersCommand)
+	case setPrintScope(SetPrintScopeCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1146,7 +1179,12 @@ public enum NativeCommand: Codable, Equatable {
 			goToPage,
 			printDocument,
 			exportDocument,
-			printFinished
+			printFinished,
+			applyFormat,
+			useSetupForBook,
+			clearBookSetup,
+			refreshBookChapters,
+			setPrintScope
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1532,6 +1570,31 @@ public enum NativeCommand: Codable, Equatable {
 					self = .printFinished(content)
 					return
 				}
+			case .applyFormat:
+				if let content = try? container.decode(ApplyFormatCommand.self, forKey: .payload) {
+					self = .applyFormat(content)
+					return
+				}
+			case .useSetupForBook:
+				if let content = try? container.decode(UseSetupForBookCommand.self, forKey: .payload) {
+					self = .useSetupForBook(content)
+					return
+				}
+			case .clearBookSetup:
+				if let content = try? container.decode(ClearBookSetupCommand.self, forKey: .payload) {
+					self = .clearBookSetup(content)
+					return
+				}
+			case .refreshBookChapters:
+				if let content = try? container.decode(RefreshBookChaptersCommand.self, forKey: .payload) {
+					self = .refreshBookChapters(content)
+					return
+				}
+			case .setPrintScope:
+				if let content = try? container.decode(SetPrintScopeCommand.self, forKey: .payload) {
+					self = .setPrintScope(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -1764,6 +1827,21 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .printFinished(let content):
 			try container.encode(CodingKeys.printFinished, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .applyFormat(let content):
+			try container.encode(CodingKeys.applyFormat, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .useSetupForBook(let content):
+			try container.encode(CodingKeys.useSetupForBook, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .clearBookSetup(let content):
+			try container.encode(CodingKeys.clearBookSetup, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .refreshBookChapters(let content):
+			try container.encode(CodingKeys.refreshBookChapters, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setPrintScope(let content):
+			try container.encode(CodingKeys.setPrintScope, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -2275,6 +2353,9 @@ public enum WebviewEvent: Codable, Equatable {
 	case wordCountsChanged(WordCountsChanged)
 	case pageLayoutState(PageLayoutState)
 	case printRequest(PrintRequest)
+	/// The Finishing tabs' fixed lists, sent once when the page mounts.
+	case pageLayoutCatalog(PageLayoutCatalog)
+	case printJobStatus(PrintJobStatus)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case toolbarState,
@@ -2310,7 +2391,9 @@ public enum WebviewEvent: Codable, Equatable {
 			revealReference,
 			wordCountsChanged,
 			pageLayoutState,
-			printRequest
+			printRequest,
+			pageLayoutCatalog,
+			printJobStatus
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -2491,6 +2574,16 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .printRequest(content)
 					return
 				}
+			case .pageLayoutCatalog:
+				if let content = try? container.decode(PageLayoutCatalog.self, forKey: .payload) {
+					self = .pageLayoutCatalog(content)
+					return
+				}
+			case .printJobStatus:
+				if let content = try? container.decode(PrintJobStatus.self, forKey: .payload) {
+					self = .printJobStatus(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
@@ -2601,6 +2694,12 @@ public enum WebviewEvent: Codable, Equatable {
 		case .printRequest(let content):
 			try container.encode(CodingKeys.printRequest, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .pageLayoutCatalog(let content):
+			try container.encode(CodingKeys.pageLayoutCatalog, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .printJobStatus(let content):
+			try container.encode(CodingKeys.printJobStatus, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -2666,6 +2765,31 @@ public struct FocusModeView: Codable, Equatable {
 		self.paragraphIndex = paragraphIndex
 		self.paragraphCount = paragraphCount
 		self.wordCount = wordCount
+	}
+}
+
+/// What a format is for, which decides what else the Finishing tabs offer with it.
+public enum FormatKind: String, Codable, Equatable {
+	case prose
+	case screenplay
+	case stagePlay
+}
+
+/// A whole page setup by name: "Standard Manuscript", "Trade Paperback 6 × 9".
+public struct FormatOption: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let group: String
+	/// One line on what it is and who asks for it.
+	public let summary: String
+	public let kind: FormatKind
+
+	public init(id: String, label: String, group: String, summary: String, kind: FormatKind) {
+		self.id = id
+		self.label = label
+		self.group = group
+		self.summary = summary
+		self.kind = kind
 	}
 }
 
@@ -3588,42 +3712,95 @@ public struct SignatureAdvice: Codable, Equatable {
 	}
 }
 
-/// Everything the Page tab shows. Published when the active document, its setup,
-/// its page count or the zoom changes.
+/// A running-head token and what it stands for, for the token menu.
+public struct RunningToken: Codable, Equatable {
+	/// As typed: `{page}`.
+	public let token: String
+	public let label: String
+
+	public init(token: String, label: String) {
+		self.token = token
+		self.label = label
+	}
+}
+
+/// What the Finishing tabs offer that never changes while the app runs. Sent once when
+/// the page mounts, apart from `PageLayoutState`, which goes out far more often.
+public struct PageLayoutCatalog: Codable, Equatable {
+	public let presets: [PageSizeOption]
+	public let formats: [FormatOption]
+	public let signatureAdvice: [SignatureAdvice]
+	public let tokens: [RunningToken]
+
+	public init(presets: [PageSizeOption], formats: [FormatOption], signatureAdvice: [SignatureAdvice], tokens: [RunningToken]) {
+		self.presets = presets
+		self.formats = formats
+		self.signatureAdvice = signatureAdvice
+		self.tokens = tokens
+	}
+}
+
+/// Where the setup a document lays out in came from.
+public enum SetupSource: String, Codable, Equatable {
+	/// The document's own.
+	case document
+	/// Its book's, which the document has none of its own to override.
+	case book
+	/// Neither: the default.
+	case `default`
+}
+
+/// Everything the Finishing tabs show that changes. Published when the active
+/// document, its setup, its page count, the book, the scope or the zoom changes — and
+/// only then: the page skips a state identical to the last.
 public struct PageLayoutState: Codable, Equatable {
 	/// Whether the active pane shows pages.
 	public let enabled: Bool
 	/// The active text document, or none (a canvas, or nothing open).
 	public let docPath: String?
-	/// The setup the document lays out in — its own, or the default.
+	/// False while the document's editor is not yet there to take an edit. An edit sent
+	/// meanwhile is kept and applied when it is.
+	public let ready: Bool
+	/// The setup the document lays out in — its own, its book's, or the default.
 	public let setup: PageSetup
+	public let setupSource: SetupSource
 	/// False while the document has never been given a setup of its own.
 	public let hasOwnSetup: Bool
+	/// The catalog format `setup` was made from, if it matches one.
+	public let formatId: String?
+	/// `setup` was made from `format_id` and then changed.
+	public let formatModified: Bool
 	public let pageCount: UInt32
 	public let currentPage: UInt32
 	public let zoom: Double
-	/// The book the active document belongs to.
+	/// What Print and Export cover.
+	public let scope: PrintScope
+	/// The book: the active document's folder's, or the project's under `Project`.
 	public let book: BookSettings
+	/// The book has a setup of its own, which every chapter prints in.
+	public let bookSetupActive: Bool
 	/// The book's chapters, in order: document tree paths.
 	public let bookChapters: [String]
 	/// A recommended inside margin for a book of this many pages, in mm.
 	public let suggestedInsideMarginMm: Double
-	public let presets: [PageSizeOption]
-	public let signatureAdvice: [SignatureAdvice]
 
-	public init(enabled: Bool, docPath: String?, setup: PageSetup, hasOwnSetup: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, book: BookSettings, bookChapters: [String], suggestedInsideMarginMm: Double, presets: [PageSizeOption], signatureAdvice: [SignatureAdvice]) {
+	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double) {
 		self.enabled = enabled
 		self.docPath = docPath
+		self.ready = ready
 		self.setup = setup
+		self.setupSource = setupSource
 		self.hasOwnSetup = hasOwnSetup
+		self.formatId = formatId
+		self.formatModified = formatModified
 		self.pageCount = pageCount
 		self.currentPage = currentPage
 		self.zoom = zoom
+		self.scope = scope
 		self.book = book
+		self.bookSetupActive = bookSetupActive
 		self.bookChapters = bookChapters
 		self.suggestedInsideMarginMm = suggestedInsideMarginMm
-		self.presets = presets
-		self.signatureAdvice = signatureAdvice
 	}
 }
 
@@ -3646,6 +3823,51 @@ public struct PrintFinishedCommand: Codable, Equatable {
 	public init(jobId: String, completed: Bool) {
 		self.jobId = jobId
 		self.completed = completed
+	}
+}
+
+/// What a print or export job is.
+public enum PrintJobKind: String, Codable, Equatable {
+	case print
+	case export
+}
+
+public enum PrintJobPhase: String, Codable, Equatable {
+	/// Gathering the chapters.
+	case preparing
+	/// Laying chapters out as pages: `done` of `total`.
+	case laying
+	/// Handing the pages to the printer, or writing the file.
+	case writing
+	case done
+	case failed
+	/// The author dismissed the print or save panel.
+	case cancelled
+}
+
+/// Where a print or export has got to. One job's statuses share its `job_id`; the last
+/// is `Done`, `Failed` or `Cancelled`.
+public struct PrintJobStatus: Codable, Equatable {
+	public let jobId: String
+	public let kind: PrintJobKind
+	public let format: ExportFormat?
+	public let phase: PrintJobPhase
+	public let done: UInt32?
+	public let total: UInt32?
+	/// What went wrong, for `Failed`.
+	public let message: String?
+	/// The file written, for an export that is `Done`.
+	public let path: String?
+
+	public init(jobId: String, kind: PrintJobKind, format: ExportFormat?, phase: PrintJobPhase, done: UInt32?, total: UInt32?, message: String?, path: String?) {
+		self.jobId = jobId
+		self.kind = kind
+		self.format = format
+		self.phase = phase
+		self.done = done
+		self.total = total
+		self.message = message
+		self.path = path
 	}
 }
 
@@ -4015,6 +4237,11 @@ public struct ReferencesChanged: Codable, Equatable {
 		self.hasBibliography = hasBibliography
 		self.references = references
 	}
+}
+
+/// The documents in the book's folder changed — list its chapters again.
+public struct RefreshBookChaptersCommand: Codable, Equatable {
+	public init() {}
 }
 
 /// Remove entries from the history. `None` clears it.
@@ -4603,12 +4830,16 @@ public struct SetHighlightCommand: Codable, Equatable {
 	}
 }
 
-/// Replace the active document's page setup. One undo step in the document.
+/// Replace the active document's page setup — one undo step in the document — or the
+/// book's.
 public struct SetPageSetupCommand: Codable, Equatable {
 	public let setup: PageSetup
+	/// Absent from an older shell, which only ever edited the document.
+	public let target: PageSetupTarget?
 
-	public init(setup: PageSetup) {
+	public init(setup: PageSetup, target: PageSetupTarget?) {
 		self.setup = setup
+		self.target = target
 	}
 }
 
@@ -4639,6 +4870,16 @@ public struct SetPrintLayoutCommand: Codable, Equatable {
 
 	public init(enabled: Bool) {
 		self.enabled = enabled
+	}
+}
+
+/// What Print and Export cover, and which book the Book tab shows: the active
+/// document's folder, or the whole project. `Document` shows the folder's book.
+public struct SetPrintScopeCommand: Codable, Equatable {
+	public let scope: PrintScope
+
+	public init(scope: PrintScope) {
+		self.scope = scope
 	}
 }
 
@@ -5113,6 +5354,11 @@ public struct UpdateReferenceCommand: Codable, Equatable {
 		self.id = id
 		self.patch = patch
 	}
+}
+
+/// Give the book the active document's setup, so every chapter prints in it.
+public struct UseSetupForBookCommand: Codable, Equatable {
+	public init() {}
 }
 
 public enum VersionAction: String, Codable, Equatable {

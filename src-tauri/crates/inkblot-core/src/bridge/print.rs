@@ -72,12 +72,62 @@ pub struct SetPrintLayoutCommand {
     pub enabled: bool,
 }
 
-/// Replace the active document's page setup. One undo step in the document.
+/// Which setup an edit goes to: the active document's own, or the one every chapter of
+/// its book prints in.
+#[typeshare]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PageSetupTarget {
+    #[default]
+    Document,
+    Book,
+}
+
+/// Replace the active document's page setup — one undo step in the document — or the
+/// book's.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetPageSetupCommand {
     pub setup: PageSetup,
+    /// Absent from an older shell, which only ever edited the document.
+    #[serde(default)]
+    pub target: PageSetupTarget,
+}
+
+/// Replace a setup with one of the catalog's formats (`FormatOption::id`). The page
+/// builds the setup, so every shell's "Standard Manuscript" is the same one.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplyFormatCommand {
+    pub format_id: String,
+    #[serde(default)]
+    pub target: PageSetupTarget,
+}
+
+/// Give the book the active document's setup, so every chapter prints in it.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UseSetupForBookCommand {}
+
+/// Take the book's own setup away: the book prints in its first chapter's again.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClearBookSetupCommand {}
+
+/// The documents in the book's folder changed — list its chapters again.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RefreshBookChaptersCommand {}
+
+/// What Print and Export cover, and which book the Book tab shows: the active
+/// document's folder, or the whole project. `Document` shows the folder's book.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPrintScopeCommand {
+    pub scope: PrintScope,
 }
 
 /// Replace the settings of the book the active document belongs to.
@@ -178,8 +228,67 @@ pub struct SignatureAdvice {
     pub label: String,
 }
 
-/// Everything the Page tab shows. Published when the active document, its setup,
-/// its page count or the zoom changes.
+/// Where the setup a document lays out in came from.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SetupSource {
+    /// The document's own.
+    Document,
+    /// Its book's, which the document has none of its own to override.
+    Book,
+    /// Neither: the default.
+    Default,
+}
+
+/// What a format is for, which decides what else the Finishing tabs offer with it.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FormatKind {
+    Prose,
+    Screenplay,
+    StagePlay,
+}
+
+/// A whole page setup by name: "Standard Manuscript", "Trade Paperback 6 × 9".
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FormatOption {
+    pub id: String,
+    pub label: String,
+    pub group: String,
+    /// One line on what it is and who asks for it.
+    pub summary: String,
+    pub kind: FormatKind,
+}
+
+/// A running-head token and what it stands for, for the token menu.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunningToken {
+    /// As typed: `{page}`.
+    pub token: String,
+    pub label: String,
+}
+
+/// What the Finishing tabs offer that never changes while the app runs. Sent once when
+/// the page mounts, apart from `PageLayoutState`, which goes out far more often.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageLayoutCatalog {
+    pub presets: Vec<PageSizeOption>,
+    pub formats: Vec<FormatOption>,
+    pub signature_advice: Vec<SignatureAdvice>,
+    pub tokens: Vec<RunningToken>,
+}
+
+/// Everything the Finishing tabs show that changes. Published when the active
+/// document, its setup, its page count, the book, the scope or the zoom changes — and
+/// only then: the page skips a state identical to the last.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -189,21 +298,80 @@ pub struct PageLayoutState {
     /// The active text document, or none (a canvas, or nothing open).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_path: Option<String>,
-    /// The setup the document lays out in — its own, or the default.
+    /// False while the document's editor is not yet there to take an edit. An edit sent
+    /// meanwhile is kept and applied when it is.
+    pub ready: bool,
+    /// The setup the document lays out in — its own, its book's, or the default.
     pub setup: PageSetup,
+    pub setup_source: SetupSource,
     /// False while the document has never been given a setup of its own.
     pub has_own_setup: bool,
+    /// The catalog format `setup` was made from, if it matches one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format_id: Option<String>,
+    /// `setup` was made from `format_id` and then changed.
+    pub format_modified: bool,
     pub page_count: u32,
     pub current_page: u32,
     pub zoom: f64,
-    /// The book the active document belongs to.
+    /// What Print and Export cover.
+    pub scope: PrintScope,
+    /// The book: the active document's folder's, or the project's under `Project`.
     pub book: BookSettings,
+    /// The book has a setup of its own, which every chapter prints in.
+    pub book_setup_active: bool,
     /// The book's chapters, in order: document tree paths.
     pub book_chapters: Vec<String>,
     /// A recommended inside margin for a book of this many pages, in mm.
     pub suggested_inside_margin_mm: f64,
-    pub presets: Vec<PageSizeOption>,
-    pub signature_advice: Vec<SignatureAdvice>,
+}
+
+/// What a print or export job is.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PrintJobKind {
+    Print,
+    Export,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PrintJobPhase {
+    /// Gathering the chapters.
+    Preparing,
+    /// Laying chapters out as pages: `done` of `total`.
+    Laying,
+    /// Handing the pages to the printer, or writing the file.
+    Writing,
+    Done,
+    Failed,
+    /// The author dismissed the print or save panel.
+    Cancelled,
+}
+
+/// Where a print or export has got to. One job's statuses share its `job_id`; the last
+/// is `Done`, `Failed` or `Cancelled`.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrintJobStatus {
+    pub job_id: String,
+    pub kind: PrintJobKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<ExportFormat>,
+    pub phase: PrintJobPhase,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total: Option<u32>,
+    /// What went wrong, for `Failed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// The file written, for an export that is `Done`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 /// Print the web view as it is now, on paper of this size, with no margins and no

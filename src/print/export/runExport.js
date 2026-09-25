@@ -13,7 +13,9 @@ import { mkdir, writeFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import { withPrintBibliography } from '../../lib/references/printBibliography'
 import { loadChapters } from '../compile'
 import { readDocPageSetup } from '../DocPageSetup'
+import { resolvePageSetup } from '../pageSetup'
 import { runPrintJob } from '../printJob'
+import { describeError, newJobId, reportJob } from '../printJobStatus'
 import { buildEpub } from './epub'
 import { buildHtmlDocument } from './html'
 import { decodeDataUri, resolveImage, toDataUri } from './images'
@@ -45,6 +47,11 @@ const withTitle = (chapter, compiled) => {
   }
 }
 
+/**
+ * Export, reporting where it has got to (`printJobStatus.js`). Resolves with the path
+ * written, or null when the author cancelled the save panel; rejects, after reporting
+ * the failure, when the file could not be made.
+ */
 export async function runExport({
   format,
   scope = 'document',
@@ -61,25 +68,48 @@ export async function runExport({
   const compiled = scope !== 'document'
   const title = compiled ? (book?.title || 'Book') : (docPath.split('/').pop() || 'Untitled')
 
-  const path = await save({
-    title: `Export ${spec.label}`,
-    defaultPath: `${safeFileName(title)}.${spec.ext}`,
-    filters: [{ name: spec.label, extensions: [spec.ext] }],
-  })
+  const jobId = newJobId()
+  let path
+  try {
+    path = await save({
+      title: `Export ${spec.label}`,
+      defaultPath: `${safeFileName(title)}.${spec.ext}`,
+      filters: [{ name: spec.label, extensions: [spec.ext] }],
+    })
+  } catch (error) {
+    reportJob({ jobId, kind: 'export', format, phase: 'failed', message: describeError(error) })
+    throw error
+  }
   if (!path) return null
 
   if (format === 'pdf') {
-    await runPrintJob({ projectName, docPath, scope, bound, liveEditors, book, pdfPath: path })
-    return path
+    const saved = await runPrintJob({ jobId, projectName, docPath, scope, bound, liveEditors, book, pdfPath: path })
+    return saved ? path : null
   }
 
+  const report = (phase, extra = {}) => reportJob({ jobId, kind: 'export', format, phase, ...extra })
+  report('preparing')
+  try {
+    await writeExport({ format, path, projectName, docPath, scope, liveByPath, compiled, title, book })
+  } catch (error) {
+    report('failed', { message: describeError(error) })
+    throw error
+  }
+  report('done', { path })
+  return path
+}
+
+/** Build a non-PDF export and write it to `path`. */
+async function writeExport({ format, path, projectName, docPath, scope, liveByPath, compiled, title, book }) {
   const chapters = await withPrintBibliography(
     projectName,
     await loadChapters(projectName, docPath, scope, (p) => liveByPath.get(p)?.getJSON() || null)
   )
-  const setup = compiled
-    ? (book?.pageSetup || chapters[0]?.content?.attrs?.pageSetup || null)
-    : (readDocPageSetup(liveByPath.get(docPath)?.state.doc) || chapters[0]?.content?.attrs?.pageSetup || null)
+  const { setup } = resolvePageSetup({
+    docSetup: (compiled ? null : readDocPageSetup(liveByPath.get(docPath)?.state.doc)) || chapters[0]?.content?.attrs?.pageSetup,
+    bookSetup: book?.pageSetup,
+    scope,
+  })
   const exportChapters = chapters.map((chapter) => ({ title: chapter.name, content: withTitle(chapter, compiled) }))
 
   if (format === 'html') {

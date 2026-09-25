@@ -1,0 +1,277 @@
+import AppKit
+import SwiftUI
+
+/// The top of every Finishing tab: what is being worked on, Print and Export, and where
+/// the last job got to.
+///
+/// The same view on Page, Book and Publish, pinned above each tab's settings, so Print
+/// is always in one place and never at the bottom of a long form. The scope it sets —
+/// this document, or its book — is also what the Page tab edits.
+struct FinishingActionHeader: View {
+    @Environment(AppModel.self) private var model
+    @AppStorage(LengthUnit.storageKey) private var unitsRaw = LengthUnit.defaultForLocale.rawValue
+    @State private var goingToPage = false
+    @State private var goTo = 1
+
+    var body: some View {
+        let layout = model.pageLayout
+        VStack(alignment: .leading, spacing: 8) {
+            scopeRow(layout)
+            actionRow(layout)
+            statusRow(layout)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
+    }
+
+    /* ---------------- what ---------------- */
+
+    private func scopeRow(_ layout: PageLayoutModel) -> some View {
+        HStack(spacing: 8) {
+            Picker("Work On", selection: Binding(
+                get: { layout.scope == .document ? 0 : 1 },
+                set: { layout.setScope($0 == 0 ? .document : (layout.scope == .project ? .project : .folder)) }
+            )) {
+                Text("This Document").tag(0)
+                Text("Book").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .help("What Print and Export cover, and whose page setup the Page tab edits")
+
+            optionsMenu(layout)
+        }
+    }
+
+    private func optionsMenu(_ layout: PageLayoutModel) -> some View {
+        Menu {
+            Picker("Units", selection: $unitsRaw) {
+                ForEach(LengthUnit.allCases) { Text($0.label).tag($0.rawValue) }
+            }
+            Toggle("Show Pages", isOn: Binding(get: { layout.isEnabled }, set: { layout.setPrintLayout($0) }))
+                .disabled(!layout.hasDocument)
+            Divider()
+            Button("Expand All Sections") { layout.setExpanded(true, FinishingSectionID.all) }
+            Button("Collapse All Sections") { layout.setExpanded(false, FinishingSectionID.all) }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Units and view options")
+    }
+
+    /* ---------------- do ---------------- */
+
+    private func actionRow(_ layout: PageLayoutModel) -> some View {
+        let scope = layout.scope
+        let bindable = scope != .document && layout.bindingEnabled
+        return HStack(spacing: 8) {
+            Group {
+                if bindable {
+                    Menu {
+                        Button("Print for Binding…") { layout.print(scope, bound: true) }
+                    } label: {
+                        Text("Print…")
+                    } primaryAction: {
+                        layout.print(scope)
+                    }
+                } else {
+                    Button("Print…") { layout.print(scope) }
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity)
+
+            Menu("Export") {
+                Button("PDF…") { layout.export(.pdf, scope: scope) }
+                Button("EPUB…") { layout.export(.epub, scope: scope) }
+                Button("Markdown…") { layout.export(.markdown, scope: scope) }
+                Button("HTML…") { layout.export(.html, scope: scope) }
+                if bindable {
+                    Divider()
+                    Button("PDF for Binding…") { layout.export(.pdf, scope: scope, bound: true) }
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .controlSize(.large)
+        .disabled(!layout.hasDocument || layout.job.map(Self.isRunning) == true)
+    }
+
+    /* ---------------- where it got to ---------------- */
+
+    @ViewBuilder
+    private func statusRow(_ layout: PageLayoutModel) -> some View {
+        if let job = layout.job {
+            JobStatusLine(job: job, onDismiss: layout.dismissJob)
+        } else if let state = layout.state {
+            HStack(spacing: 6) {
+                summary(state, layout)
+                Spacer(minLength: 0)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func summary(_ state: PageLayoutState, _ layout: PageLayoutModel) -> some View {
+        if state.scope != .document {
+            let chapters = state.bookChapters.count
+            Text("\(state.book.title.isEmpty ? "Book" : state.book.title) · \(chapters) chapter\(chapters == 1 ? "" : "s")")
+                .lineLimit(1)
+                .truncationMode(.middle)
+        } else if state.enabled, state.pageCount > 0 {
+            Button("Page \(state.currentPage) of \(state.pageCount)") {
+                goTo = Int(state.currentPage)
+                goingToPage = true
+            }
+            .buttonStyle(.link)
+            .help("Go to a page (⌥⌘G)")
+            .popover(isPresented: $goingToPage, arrowEdge: .bottom) {
+                goToPagePopover(pageCount: Int(state.pageCount), layout)
+            }
+        } else if state.docPath != nil {
+            Button("Show pages to see the page count") { layout.setPrintLayout(true) }
+                .buttonStyle(.link)
+        }
+    }
+
+    private func goToPagePopover(pageCount: Int, _ layout: PageLayoutModel) -> some View {
+        HStack(spacing: 8) {
+            Text("Go to page")
+            TextField("", value: $goTo, format: .number)
+                .frame(width: 56)
+                .multilineTextAlignment(.trailing)
+                .onSubmit { go(layout, pageCount) }
+            Text("of \(pageCount)").foregroundStyle(.secondary)
+            Button("Go") { go(layout, pageCount) }
+                .keyboardShortcut(.defaultAction)
+        }
+        .padding(12)
+    }
+
+    private func go(_ layout: PageLayoutModel, _ pageCount: Int) {
+        layout.goToPage(min(max(1, goTo), pageCount))
+        goingToPage = false
+    }
+
+    static func isRunning(_ job: PrintJobStatus) -> Bool {
+        switch job.phase {
+        case .preparing, .laying, .writing: true
+        case .done, .failed, .cancelled: false
+        }
+    }
+}
+
+/// One job's progress, result or failure, in a line.
+struct JobStatusLine: View {
+    let job: PrintJobStatus
+    let onDismiss: () -> Void
+
+    var body: some View {
+        switch job.phase {
+        case .preparing, .laying, .writing:
+            VStack(alignment: .leading, spacing: 4) {
+                if job.phase == .laying, let done = job.done, let total = job.total, total > 1 {
+                    ProgressView(value: Double(done), total: Double(total))
+                } else {
+                    ProgressView().progressViewStyle(.linear)
+                }
+                Text(Self.running(job)).font(.caption).foregroundStyle(.secondary)
+            }
+        case .done:
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                if let path = job.path {
+                    Text("Saved \(URL(fileURLWithPath: path).lastPathComponent)")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 4)
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                    }
+                    .buttonStyle(.link)
+                } else {
+                    Text("Sent to the printer")
+                    Spacer(minLength: 0)
+                }
+            }
+            .font(.caption)
+        case .failed:
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                Text("Could not \(job.kind == .export ? "export" : "print"): \(job.message ?? "something went wrong.")")
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                Spacer(minLength: 4)
+                Button { onDismiss() } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.borderless)
+                    .help("Dismiss")
+            }
+            .font(.caption)
+        case .cancelled:
+            EmptyView()
+        }
+    }
+
+    static func running(_ job: PrintJobStatus) -> String {
+        let what = job.kind == .export ? "Exporting \(job.format.map(Self.label) ?? "")" : "Printing"
+        if job.phase == .laying, let done = job.done, let total = job.total, total > 1 {
+            return "\(what): laying out chapter \(min(done + 1, total)) of \(total)…"
+        }
+        return "\(what)…"
+    }
+
+    static func label(_ format: ExportFormat) -> String {
+        switch format {
+        case .pdf: "PDF"
+        case .epub: "EPUB"
+        case .markdown: "Markdown"
+        case .html: "HTML"
+        }
+    }
+}
+
+/// Every Finishing section's id, for Expand and Collapse All.
+enum FinishingSectionID {
+    static let pageSize = "page.size"
+    static let headerFooter = "page.headerFooter"
+    static let textFlow = "page.textFlow"
+    static let bookInfo = "book.info"
+    static let chapters = "book.chapters"
+    static let bookSetup = "book.setup"
+    static let binding = "publish.binding"
+
+    static let all = [pageSize, headerFooter, textFlow, bookInfo, chapters, bookSetup, binding]
+}
+
+/// A Finishing tab: the action header pinned at the top, the tab's settings scrolling
+/// beneath it — or, with nothing to work on, why not.
+struct FinishingPanel<Content: View>: View {
+    @Environment(AppModel.self) private var model
+    /// Whether the tab needs a text document open (Page and Publish do; Book does not).
+    var needsDocument = true
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        let state = model.pageLayout.state
+        if let state, !needsDocument || state.docPath != nil {
+            Form { content }
+                .formStyle(.grouped)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    FinishingActionHeader()
+                }
+        } else {
+            ContentUnavailableView(
+                "No Document",
+                systemImage: "doc.richtext",
+                description: Text("Open a document to set up its pages, print it, or export it."))
+        }
+    }
+}

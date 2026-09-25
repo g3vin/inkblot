@@ -25,9 +25,10 @@ use super::sidebar::{
 };
 use crate::types::note::Note;
 use super::print::{
-    ExportDocumentCommand, GoToPageCommand, InsertBreakCommand, PrintDocumentCommand,
-    PrintFinishedCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
-    SetPrintLayoutCommand, SetPrintZoomCommand,
+    ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand, GoToPageCommand,
+    InsertBreakCommand, PrintDocumentCommand, PrintFinishedCommand, RefreshBookChaptersCommand,
+    SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand, SetPrintLayoutCommand,
+    SetPrintScopeCommand, SetPrintZoomCommand, UseSetupForBookCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -579,4 +580,9 @@ pub enum NativeCommand {
     PrintDocument(PrintDocumentCommand),
     ExportDocument(ExportDocumentCommand),
     PrintFinished(PrintFinishedCommand),
+    ApplyFormat(ApplyFormatCommand),
+    UseSetupForBook(UseSetupForBookCommand),
+    ClearBookSetup(ClearBookSetupCommand),
+    RefreshBookChapters(RefreshBookChaptersCommand),
+    SetPrintScope(SetPrintScopeCommand),
 }

@@ -76,10 +76,13 @@ pub use references::{
     SetCitationStyleCommand, SetReferenceAttachedCommand, UpdateReferenceCommand,
 };
 pub use print::{
-    ExportDocumentCommand, ExportFormat, GoToPageCommand, InsertBreakCommand, PageBreakKind,
-    PageLayoutState, PageSizeOption, PrintDocumentCommand, PrintFinishedCommand, PrintRequest,
-    PrintScope, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
-    SetPrintLayoutCommand, SetPrintZoomCommand, SignatureAdvice, ZoomFit,
+    ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand, ExportFormat, FormatKind,
+    FormatOption, GoToPageCommand, InsertBreakCommand, PageBreakKind, PageLayoutCatalog,
+    PageLayoutState, PageSetupTarget, PageSizeOption, PrintDocumentCommand, PrintFinishedCommand,
+    PrintJobKind, PrintJobPhase, PrintJobStatus, PrintRequest, PrintScope, RefreshBookChaptersCommand,
+    RunningToken, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
+    SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
+    UseSetupForBookCommand, ZoomFit,
 };
 pub use sidebar::{
     AddReplyCommand, HighlightNoteCommand, NotePreviewDismissed, ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,

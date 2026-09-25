@@ -27,6 +27,7 @@ import {
 } from './pageSetup'
 import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, ZOOM_STEPS } from './zoom'
 import { PAGE_GAP } from './printLayoutConstants'
+import { setCurrentPrintPage } from './printLayoutStore'
 import { nativeOwns } from '../lib/host'
 import './PrintLayout.css'
 
@@ -53,6 +54,7 @@ const chapterAt = (headings, pos, fallback) => {
 export default function PrintLayoutView({
   editor,
   pageSetup,
+  docPath = '',
   zoom,
   onZoomChange,
   docTitle = '',
@@ -163,6 +165,11 @@ export default function PrintLayoutView({
     scrollEl.addEventListener('scroll', onScroll, { passive: true })
     return () => scrollEl.removeEventListener('scroll', onScroll)
   }, [galley, scrollEl, setup.columns, slotStride, stripCount])
+
+  // And for the inspector's, which is drawn from what the controller publishes.
+  useEffect(() => {
+    setCurrentPrintPage(docPath, currentPage)
+  }, [currentPage, docPath])
 
   /*
    * Zoom, as smooth as the display allows.

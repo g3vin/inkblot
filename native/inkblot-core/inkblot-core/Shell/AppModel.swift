@@ -118,6 +118,42 @@ final class AppModel {
             #endif
             self?.showStats()
         }
+        watchTreeForBook()
+    }
+
+    /* ---------------- the book's chapters ---------------- */
+
+    /// The documents in tree order, as last told to the page.
+    @ObservationIgnored private var bookTreeSignature: [String] = []
+
+    /// A book is its folder's documents in tree order, so the Book tab's chapters change
+    /// when the tree does — a document added, removed, renamed or dragged. The tree is
+    /// reloaded on every write (autosave included), so the page is asked to list the
+    /// chapters again only when the order of the documents has actually changed.
+    private func watchTreeForBook() {
+        withObservationTracking {
+            _ = tree.root
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let signature = Self.orderedFilePaths(tree.root)
+                if signature != bookTreeSignature {
+                    bookTreeSignature = signature
+                    pageLayout.refreshChapters()
+                }
+                watchTreeForBook()
+            }
+        }
+    }
+
+    private static func orderedFilePaths(_ root: TreeNode?) -> [String] {
+        var paths: [String] = []
+        func walk(_ node: TreeNode) {
+            if node.type == .file { paths.append(node.path) }
+            node.children?.forEach(walk)
+        }
+        root.map(walk)
+        return paths
     }
 
     /* ---------------- writing stats ---------------- */
@@ -237,6 +273,18 @@ final class AppModel {
     func showPageSetup() {
         sidebar.isPresented = true
         sidebar.tab = .page
+    }
+
+    /// File ▸ Book Settings…: the Finishing layout's Book tab.
+    func showBook() {
+        sidebar.isPresented = true
+        sidebar.tab = .book
+    }
+
+    /// File ▸ Publish…: the Finishing layout's Publish tab.
+    func showPublish() {
+        sidebar.isPresented = true
+        sidebar.tab = .publish
     }
 
     /// Edit ▸ Paste and Match Style. The pasteboard is read here, not in the page —

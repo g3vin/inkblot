@@ -10,6 +10,8 @@ import { isTextDoc } from '../lib/docKind'
 import { listProjectTree, loadDocument } from '../lib/FileSystem'
 import { applyOrderToTree, getParentPath } from '../lib/fileTreeOrder'
 import { loadOrder } from '../lib/fileTreeState'
+import { nativeOwns } from '../lib/host'
+import { refreshPreferenceScope } from '../lib/preferences'
 import type { TreeNode } from '../types'
 
 export type CompileScope = 'document' | 'folder' | 'project'
@@ -52,6 +54,8 @@ const collectFiles = (node: TreeNode | null | undefined, out: string[] = []): st
 
 /** Tree paths of a folder's documents, depth-first in the tree's saved order. */
 export const listBookChapters = async (projectName: string, folder: string): Promise<string[]> => {
+  // A shell that draws the tree saves its order itself; read what it last saved.
+  if (nativeOwns('fileTree')) await refreshPreferenceScope('file-tree')
   const tree = await listProjectTree(projectName)
   const ordered = applyOrderToTree(tree as TreeNode, loadOrder(projectName) || {})
   return collectFiles(findFolder(ordered, folder || ''))

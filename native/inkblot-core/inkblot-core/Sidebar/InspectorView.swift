@@ -43,7 +43,7 @@ struct InspectorView: View {
             .disabled(sidebar.isSearching)
             .opacity(sidebar.isSearching ? 0.5 : 1)
 
-            searchBar
+            if showsSearchBar { searchBar }
 
             Group {
                 if sidebar.isSearching {
@@ -79,8 +79,19 @@ struct InspectorView: View {
         case .references: ReferencesPanelView()
         case .history: HistoryPanelView()
         case .page: PagePanelView()
+        case .book: BookPanelView()
+        case .publish: PublishPanelView()
         case .stats: StatsPanelView()
         }
+    }
+
+    /// The Finishing tabs are settings, not lists: "This Panel" has nothing there to
+    /// filter, so the bar goes while that is its scope. Set to search the document or
+    /// the project, it still does, from any tab.
+    private var showsSearchBar: Bool {
+        let sidebar = model.sidebar
+        let finishing: Set<SidebarModel.Tab> = [.page, .book, .publish]
+        return sidebar.isSearching || sidebar.scope != .panel || !finishing.contains(sidebar.tab)
     }
 
     /// Right-clicking the selector bar or the layout button: which layout, and

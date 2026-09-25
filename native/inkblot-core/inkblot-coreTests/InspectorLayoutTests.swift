@@ -8,13 +8,13 @@ import Testing
 struct InspectorLayoutTests {
     @Test func customizeListsShownTabsFirstThenTheRest() {
         let layouts = InspectorLayouts.defaults
-        #expect(layouts.rows(for: .finishing) == [.page, .notes, .references, .history, .stats, .clipboard, .workbench])
+        #expect(layouts.rows(for: .finishing) == [.page, .book, .publish, .notes, .references, .history, .stats, .clipboard, .workbench])
     }
 
     @Test func aTickedTabGoesLastAndTheLastTabStays() {
         var layouts = InspectorLayouts.defaults
         layouts.set(.clipboard, shown: true, in: .finishing)
-        #expect(layouts[.finishing] == [.page, .notes, .references, .history, .stats, .clipboard])
+        #expect(layouts[.finishing] == [.page, .book, .publish, .notes, .references, .history, .stats, .clipboard])
 
         layouts[.drafting] = [.notes]
         layouts.set(.notes, shown: false, in: .drafting)
@@ -24,10 +24,10 @@ struct InspectorLayoutTests {
     @Test func movesKeepShownTabsAheadOfHiddenOnes() {
         var layouts = InspectorLayouts.defaults
         // Page, past the hidden clipboard at the bottom: it lands last of the shown.
-        layouts.move(in: .finishing, fromOffsets: [0], toOffset: 7)
-        #expect(layouts[.finishing] == [.notes, .references, .history, .stats, .page])
-        layouts.move(in: .finishing, fromOffsets: [4], toOffset: 0)
-        #expect(layouts[.finishing] == [.page, .notes, .references, .history, .stats])
+        layouts.move(in: .finishing, fromOffsets: [0], toOffset: 9)
+        #expect(layouts[.finishing] == [.book, .publish, .notes, .references, .history, .stats, .page])
+        layouts.move(in: .finishing, fromOffsets: [6], toOffset: 0)
+        #expect(layouts[.finishing] == [.page, .book, .publish, .notes, .references, .history, .stats])
     }
 
     @Test func duplicatesAndEmptiesAreRepaired() {
@@ -66,5 +66,26 @@ struct InspectorLayoutTests {
         loaded.set(.stats, shown: false, in: .drafting)
         loaded.save(to: defaults)
         #expect(InspectorLayouts.load(from: defaults)[.drafting] == [.notes, .history])
+    }
+
+    @Test func bookAndPublishArriveBesidePageInALayoutSavedBeforeThem() throws {
+        let defaults = try #require(UserDefaults(suiteName: "InspectorLayoutTests.finishing"))
+        defer { defaults.removePersistentDomain(forName: "InspectorLayoutTests.finishing") }
+
+        // Saved by the build that added Stats: it knew every tab but Book and Publish.
+        defaults.set(["finishing": ["history", "page", "stats"]], forKey: InspectorLayouts.storageKey)
+        defaults.set(["clipboard", "workbench", "notes", "references", "history", "page", "stats"], forKey: InspectorLayouts.knownTabsKey)
+        var loaded = InspectorLayouts.load(from: defaults)
+        #expect(loaded[.finishing] == [.history, .page, .book, .publish, .stats])
+
+        // Once, only: hidden by the writer, they stay hidden.
+        loaded.set(.publish, shown: false, in: .finishing)
+        loaded.save(to: defaults)
+        #expect(InspectorLayouts.load(from: defaults)[.finishing] == [.history, .page, .book, .stats])
+    }
+
+    @Test func aNewTabWithNothingBeforeItGoesLast() {
+        #expect(InspectorLayouts.adding([.book], to: [.notes], defaults: [.page, .book, .notes]) == [.notes, .book])
+        #expect(InspectorLayouts.adding([.book, .publish], to: [.page], defaults: [.page, .book, .publish]) == [.page, .book, .publish])
     }
 }
