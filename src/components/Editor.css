@@ -29,9 +29,9 @@
 @import '../extensions/PinterestBoard.css';
 @import './RightSidebar/SidebarSearch.css';
 @import './RightSidebar/ClipboardPanel.css';
-@import './notes.css';
+@import './Notes.css';
 @import './EditorPanes.css';
-@import './Workbench.css';
+@import './RightSidebar/Workbench.css';
 @import './Editor.historyPanel.css';
 @import './EditorDragCaret.css';
 @import './FocusModeOverlay.css';

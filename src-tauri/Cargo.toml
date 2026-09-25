@@ -6,7 +6,7 @@ members = ["crates/*"]
 serde = { version = "1.0", features = ["derive"] }
 # float_roundtrip: without it serde_json's float parser is off by up to 1 ULP, so a
 # canvas coordinate changes in its last bit every time a document is loaded — and the
-# parity harness reports it as a diff-engine mismatch. Caught by scripts/parity.
+# parity harness reports it as a diff-engine mismatch. Caught by tests/parity.
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 url = "2.5.8"
 regex = "1.11"

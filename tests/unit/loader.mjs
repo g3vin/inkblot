@@ -41,7 +41,7 @@ export async function resolve(specifier, context, next) {
   if (specifier.startsWith('.') && context.parentURL) {
     const base = fileURLToPath(new URL(specifier, context.parentURL))
 
-    // A bare directory import (`../anicon`) resolves to its index — Vite does this,
+    // A bare directory import (`../icons`) resolves to its index — Vite does this,
     // Node does not.
     if (existsSync(base) && statSync(base).isDirectory()) {
       for (const index of ['/index.js', '/index.jsx', '/index.ts']) {

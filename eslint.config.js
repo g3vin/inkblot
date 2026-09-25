@@ -74,15 +74,15 @@ export default defineConfig([
     },
   },
   {
-    files: ['scripts/**/*.{js,mjs}', 'vite.config.js', 'eslint.config.js'],
+    files: ['scripts/**/*.{js,mjs}', 'tests/**/*.mjs', 'vite.config.js', 'eslint.config.js'],
     languageOptions: {
       globals: globals.node,
     },
   },
-  /* The canvas suites run under Node with a custom ESM loader, and mount components
+  /* The unit suites run under Node with a custom ESM loader, and mount components
      into jsdom — so they see both sets of globals. */
   {
-    files: ['scripts/canvas-tests/**/*.mjs'],
+    files: ['tests/unit/**/*.mjs'],
     languageOptions: {
       globals: { ...globals.node, ...globals.browser },
     },

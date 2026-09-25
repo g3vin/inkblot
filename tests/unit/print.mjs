@@ -4,7 +4,7 @@
  *
  * jsdom does no layout, so pagination is tested here as the function it is —
  * measured geometry in, pushes out. The measured half runs against real WebKit in
- * scripts/print-tests.
+ * tests/layout.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
