@@ -23,8 +23,7 @@ export function useEditorContextMenu(props) {
     editor, setTiles, setNotes, openRightSidebarTab, setSplitView, setSecondaryDoc,
     setCurrentDoc, splitView, currentDoc, secondaryDoc, activeDoc, projectName,
     refreshFiles, bubbles, onEnterFocusMode, onOpenDocInTab,
-    onOpenDocInSplit, onCloseTab, onCloseOtherTabs, onCloseTabsToTheRight,
-    onCloseAllTabs, onCloseSplit, onKeepTab, onSelectTab,
+    onOpenDocInSplit, onCloseSplit,
   } = props
 
   return useCallback(
@@ -35,8 +34,7 @@ export function useEditorContextMenu(props) {
         editor, setTiles, setNotes, openRightSidebarTab, setSplitView, setSecondaryDoc,
         setCurrentDoc, splitView, currentDoc, secondaryDoc, activeDoc, projectName,
         refreshFiles, bubbles, onEnterFocusMode, onOpenDocInTab,
-        onOpenDocInSplit, onCloseTab, onCloseOtherTabs, onCloseTabsToTheRight,
-        onCloseAllTabs, onCloseSplit, onKeepTab, onSelectTab,
+        onOpenDocInSplit, onCloseSplit,
       })
 
       // Each of these pops its own menu and returns true when it owns the click.
@@ -54,8 +52,7 @@ export function useEditorContextMenu(props) {
       editor, setTiles, setNotes, openRightSidebarTab, setSplitView, setSecondaryDoc,
       setCurrentDoc, splitView, currentDoc, secondaryDoc, activeDoc, projectName,
       refreshFiles, bubbles, onEnterFocusMode, onOpenDocInTab,
-      onOpenDocInSplit, onCloseTab, onCloseOtherTabs, onCloseTabsToTheRight,
-      onCloseAllTabs, onCloseSplit, onKeepTab, onSelectTab,
+      onOpenDocInSplit, onCloseSplit,
     ]
   )
 }

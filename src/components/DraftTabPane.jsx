@@ -80,7 +80,7 @@ export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
         {status ? <div className="draft-pane-status">{status}</div> : null}
 
         <p className="draft-pane-tip">
-          Or drag a file from the sidebar onto the dock below to open it in this tab bar.
+          Or open a document from the sidebar.
         </p>
       </form>
     </div>

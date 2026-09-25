@@ -159,12 +159,6 @@ part it is told the shell owns (`EditorWebController.nativeChrome`, read by
 | Models, windows | `ModelService` answers the model commands (synonyms, rhymes, Kokoro, dictation, the Pinterest scrape) from `inkblot-models`. `AuxiliaryWindows` opens detached document and Pinterest windows, each with its own page. |
 | Not native | Context menus (the page's, shown through `WebMenus`), dialogs, preferences, fonts and haptics go through the shim and `TauriHost`. Dictation and Read Aloud have no native toolbar buttons. |
 
-The tab dock, the native new-tab chooser and the Analytic Bubble (`WorkspaceModel`,
-`WorkspaceOverlay`, `NativeDraftPane`, `useNativeTabDock`) are built but switched off:
-the page no longer has a tab dock or an Analytic Bubble, and the web new-tab chooser is
-the one that can create maps. Turning one on means adding its part to `nativeChrome`
-and calling its hook from the page.
-
 ## Print Layout
 
 The editor shown as physical pages (View ▸ Print Layout, ⌥⌘P), printed exactly as

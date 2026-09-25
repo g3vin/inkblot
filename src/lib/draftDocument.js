@@ -1,8 +1,8 @@
 /**
  * draftDocument.js — making a draft tab into a document.
  *
- * `DraftTabPane` and the Swift shell's native chooser (through `useNativeDraftPane`)
- * both end here, so they accept and refuse the same names and make the same files.
+ * The rules for which names `DraftTabPane` accepts and which files it makes live here,
+ * apart from the component.
  */
 import { documentExists } from './FileSystem'
 import { createDocumentOfKind, nameForKind } from './createDocument'

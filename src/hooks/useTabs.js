@@ -58,24 +58,6 @@ export function useTabs({
     setActiveDoc(docPath)
   }, [withTabForDoc, setActiveDoc, setCurrentDoc, setTabs])
 
-  const selectTab = useCallback((tabId) => {
-    const tab = tabs.find(item => item.id === tabId)
-    if (!tab) return
-
-    setActiveTabId(tabId)
-    // A draft has no document, so the pane empties and DraftTabPane takes over.
-    setCurrentDoc(tab.docPath || '')
-    setActiveDoc(tab.docPath || '')
-  }, [tabs, setActiveDoc, setActiveTabId, setCurrentDoc])
-
-  const newDraftTab = useCallback(() => {
-    const id = createTabId()
-    setTabs(prev => [...prev, { id, docPath: null, ephemeral: false }])
-    setActiveTabId(id)
-    setCurrentDoc('')
-    setActiveDoc('')
-  }, [setActiveDoc, setActiveTabId, setCurrentDoc, setTabs])
-
   /** A draft became a real document: the tab it was opened from adopts it. */
   const adoptDraftDoc = useCallback((docPath) => {
     if (!docPath) return
@@ -87,96 +69,6 @@ export function useTabs({
     setCurrentDoc(docPath)
     setActiveDoc(docPath)
   }, [activeTabId, setActiveDoc, setCurrentDoc, setTabs])
-
-  const closeTab = useCallback((tabId) => {
-    const tab = tabs.find(item => item.id === tabId)
-    if (!tab) return
-
-    const remaining = tabs.filter(item => item.id !== tabId)
-    setTabs(remaining)
-
-    // Closing the tab a pane is showing closes the document with it.
-    if (tab.docPath && tab.docPath === secondaryDoc) {
-      setSecondaryDoc(null)
-      setSplitView(null)
-      if (tab.docPath !== currentDoc) return
-    }
-
-    const showsPrimary = tab.docPath ? tab.docPath === currentDoc : tabId === activeTabId
-    if (!showsPrimary) return
-
-    const fallback = remaining.find(item => item.docPath && item.docPath !== secondaryDoc)
-      || remaining.find(item => item.docPath)
-      || null
-
-    if (fallback) {
-      setActiveTabId(fallback.id)
-      setCurrentDoc(fallback.docPath)
-      setActiveDoc(fallback.docPath)
-      return
-    }
-
-    // Nothing left in the dock, but the split may still be holding a document —
-    // promote it rather than emptying the workspace.
-    if (secondaryDoc && secondaryDoc !== tab.docPath) {
-      setCurrentDoc(secondaryDoc)
-      setActiveDoc(secondaryDoc)
-      setSecondaryDoc(null)
-      setSplitView(null)
-      return
-    }
-
-    setActiveTabId(null)
-    setCurrentDoc('')
-    setActiveDoc('')
-  }, [activeTabId, currentDoc, secondaryDoc, tabs, setActiveDoc, setActiveTabId, setCurrentDoc, setSecondaryDoc, setSplitView, setTabs])
-
-  /** Promote an ephemeral tab so the next tree-opened document stops replacing it. */
-  const keepTab = useCallback((tabId) => {
-    setTabs(prev => prev.map(tab => (
-      tab.id === tabId ? { ...tab, ephemeral: false } : tab
-    )))
-  }, [setTabs])
-
-  /**
-   * Close a set of tabs at once (close others / to the right / all).
-   *
-   * `keptIds` is the whole surviving set, so the pane fallback can be decided in
-   * one place: whatever the panes were showing that no longer has a tab has to
-   * give the pane up.
-   */
-  const closeTabsTo = useCallback((keptIds) => {
-    const kept = tabs.filter(tab => keptIds.has(tab.id))
-    setTabs(kept)
-
-    const keptDocs = kept.map(tab => tab.docPath).filter(Boolean)
-
-    if (secondaryDoc && !keptDocs.includes(secondaryDoc)) {
-      setSecondaryDoc(null)
-      setSplitView(null)
-    }
-
-    if (currentDoc && !keptDocs.includes(currentDoc)) {
-      const fallback = kept.find(tab => tab.docPath)
-      setActiveTabId(fallback ? fallback.id : null)
-      setCurrentDoc(fallback?.docPath || '')
-      setActiveDoc(fallback?.docPath || '')
-    }
-  }, [currentDoc, secondaryDoc, tabs, setActiveDoc, setActiveTabId, setCurrentDoc, setSecondaryDoc, setSplitView, setTabs])
-
-  const closeOtherTabs = useCallback((tabId) => {
-    closeTabsTo(new Set([tabId]))
-  }, [closeTabsTo])
-
-  const closeTabsToTheRight = useCallback((tabId) => {
-    const index = tabs.findIndex(tab => tab.id === tabId)
-    if (index === -1) return
-    closeTabsTo(new Set(tabs.slice(0, index + 1).map(tab => tab.id)))
-  }, [closeTabsTo, tabs])
-
-  const closeAllTabs = useCallback(() => {
-    closeTabsTo(new Set())
-  }, [closeTabsTo])
 
   /**
    * Put a document in the secondary pane. Splitting a document against itself
@@ -212,14 +104,7 @@ export function useTabs({
 
   return {
     openDocInTab,
-    selectTab,
-    newDraftTab,
     adoptDraftDoc,
-    closeTab,
-    keepTab,
-    closeOtherTabs,
-    closeTabsToTheRight,
-    closeAllTabs,
     openDocInSplit,
     closeSplit,
     draftTabActive,

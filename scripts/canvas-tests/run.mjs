@@ -51,7 +51,6 @@
  *          and signature imposition for binding
  *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
  *          through the real @tauri-apps/api modules
- *   workspace the tab dock, new-tab chooser and sentence bubble drawn by the shell
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -70,7 +69,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'workspace', 'bubble', 'print', 'references', 'citations', 'maplib', 'maptrace', 'mapdom']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'references', 'citations', 'maplib', 'maptrace', 'mapdom']
 
 const failures = []
 

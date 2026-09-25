@@ -23,7 +23,6 @@ use super::sidebar::{
     RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
     TileRef, UpdateNoteCommand, VersionActionCommand,
 };
-use super::workspace::{CreateFromDraftCommand, NewTabCommand, OpenDocInTabCommand, TabRef};
 use crate::types::note::Note;
 use super::print::{
     ExportDocumentCommand, GoToPageCommand, InsertBreakCommand, PrintDocumentCommand,
@@ -580,10 +579,4 @@ pub enum NativeCommand {
     PrintDocument(PrintDocumentCommand),
     ExportDocument(ExportDocumentCommand),
     PrintFinished(PrintFinishedCommand),
-    /// The tab dock and the new-tab chooser, drawn by the shell (see `workspace.rs`).
-    SelectTab(TabRef),
-    CloseTab(TabRef),
-    NewTab(NewTabCommand),
-    OpenDocInTab(OpenDocInTabCommand),
-    CreateFromDraft(CreateFromDraftCommand),
 }

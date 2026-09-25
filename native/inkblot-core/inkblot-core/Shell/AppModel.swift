@@ -23,7 +23,6 @@ final class AppModel {
     let notePreviews: NotePreviewModel
     let bubble: BubbleModel
     let pageLayout: PageLayoutModel
-    let workspace: WorkspaceModel
     let memoRecorder = AudioMemoRecorder()
     let memoPlayer = AudioMemoPlayer()
     let language = LanguageServices()
@@ -42,7 +41,6 @@ final class AppModel {
         notePreviews = NotePreviewModel(bridge: bridge)
         bubble = BubbleModel(bridge: bridge)
         pageLayout = PageLayoutModel(bridge: bridge)
-        workspace = WorkspaceModel(bridge: bridge)
 
         bridge.addListener { [weak self] event in
             guard let self else { return }

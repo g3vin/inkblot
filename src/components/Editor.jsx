@@ -170,14 +170,7 @@ export default function Editor({
 
   const {
     openDocInTab,
-    selectTab,
-    newDraftTab,
     adoptDraftDoc,
-    closeTab,
-    keepTab,
-    closeOtherTabs,
-    closeTabsToTheRight,
-    closeAllTabs,
     openDocInSplit,
     closeSplit,
     draftTabActive,
@@ -666,16 +659,7 @@ export default function Editor({
         splitRatio={splitRatio}
         setSplitRatio={setSplitRatio}
 
-        tabs={tabs}
-        activeTabId={activeTabId}
         draftTabActive={draftTabActive}
-        onSelectTab={selectTab}
-        onCloseTab={closeTab}
-        onCloseOtherTabs={closeOtherTabs}
-        onCloseTabsToTheRight={closeTabsToTheRight}
-        onCloseAllTabs={closeAllTabs}
-        onKeepTab={keepTab}
-        onNewTab={newDraftTab}
         onOpenDocInTab={openDocInTab}
         onOpenDocInSplit={openDocInSplit}
         onCloseSplit={closeSplit}
