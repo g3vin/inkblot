@@ -1,27 +1,28 @@
 # Inkblot Privacy Policy
 
-Last updated: May 8, 2026
+Last updated: September 24, 2026
 
 Inkblot is a local-first writing application. This Privacy Policy explains what information Inkblot handles, where that information is stored, and when information may be sent to third-party services as part of features you choose to use.
 
-For purposes of this policy, "Inkblot," "we," "us," and "our" refer to the developer or publisher of Inkblot. Before publishing this policy, replace the contact placeholders below with your official legal name and contact information.
+For purposes of this policy, "Inkblot," "we," "us," and "our" refer to the developer or publisher of Inkblot. This policy covers every edition of Inkblot: the desktop app for macOS and the app for macOS, iPadOS and iOS.
 
 ## Summary
 
 Inkblot is designed so your writing stays on your device by default. We do not operate user accounts, advertising systems, analytics trackers, or cloud synchronization servers for Inkblot. We do not sell your personal information.
 
-Some optional features may contact third-party services to provide the feature you requested, such as dictionary lookups, Pinterest previews/searches, or downloading local machine-learning model files. Those third-party services may receive technical information such as your IP address and request details, and their own privacy policies apply.
+Some optional features may contact third-party services to provide the feature you requested, such as dictionary lookups, looking up the details of a source you cite, Pinterest previews and searches, or downloading local machine-learning model files. Those third-party services may receive technical information such as your IP address and request details, and their own privacy policies apply.
 
 ## Information Inkblot Stores Locally
 
 Inkblot stores the following information on your device:
 
-- Documents, projects, folders, notes, note images, formatting, embedded Pinterest board URLs, and document version history.
+- Documents, canvases, maps, projects, folders, notes, note images, voice memos, formatting, embedded Pinterest board URLs, and document version history.
+- The sources you cite (titles, authors, identifiers such as DOIs or ISBNs, and web addresses) and your citation style settings.
 - App preferences such as theme, accent color, read-aloud voice, open document/session state, split-view state, file tree order, and expanded folders.
 - Clipboard history entries created when you copy or drag selected text into Inkblot's clipboard panel.
 - Temporary app state needed to support editing, searching, drag-and-drop, read-aloud highlighting, and dictation previews.
 
-This local information is stored using your operating system's application data storage and browser-style local storage inside the Tauri app webview. We do not receive this local data unless you separately choose to send it to us outside the app, such as by email or support request.
+Projects are stored as ordinary files in the folder you choose, or in Inkblot's application data folder. Preferences are stored as files in that application data folder. We do not receive this local data unless you separately choose to send it to us outside the app, such as by email or support request.
 
 ## Documents, Notes, Images, and Version History
 
@@ -39,13 +40,15 @@ Clipboard history is stored locally in the app. You can clear Inkblot's clipboar
 
 Inkblot uses your microphone only when you start dictation. Dictation is intended to run offline using a local speech-recognition model. While dictation is active, Inkblot processes microphone audio to produce partial and final text and to show an audio level indicator.
 
-Inkblot does not intentionally store raw microphone recordings or send dictation audio to us. Final dictated text is inserted into your document and may then be saved locally as part of that document and its version history.
+Dictation does not store raw microphone recordings, and dictation audio is never sent to us. Final dictated text is inserted into your document and may then be saved locally as part of that document and its version history.
+
+Inkblot also lets you record voice memos and attach them to notes or place them on a canvas. A voice memo is recorded only when you start it, and it is saved as an audio file inside your project on your device. It is not sent to us.
 
 Your operating system may ask for microphone permission. You can revoke microphone access through your operating system settings.
 
 ## Read Aloud and Speech Features
 
-Inkblot's read-aloud feature converts selected text or document text into speech. The app prefers local speech generation using Kokoro or local/system speech tools. Text selected for read-aloud may be processed by local app code, a local Python speech worker, or your operating system's speech engine.
+Inkblot's read-aloud feature converts selected text or document text into speech. It generates speech on your device with the Kokoro speech model, and falls back to your operating system's built-in voices when that model is not available. Text you have read aloud is processed on your device and is not sent to us.
 
 Inkblot may download speech model files from third-party model hosts, such as Hugging Face, when local model files are not already available. These model downloads are for enabling local speech generation and do not require sending your document text to us. Depending on your operating system and installed voices, system speech features may be governed by your operating system's speech and privacy settings.
 
@@ -53,9 +56,17 @@ Inkblot may download speech model files from third-party model hosts, such as Hu
 
 Inkblot includes writing tools such as synonyms, antonyms, rhymes, parts-of-speech analysis, definitions, search, and replace.
 
-Most writing assistance runs locally in the app using local JavaScript, WebAssembly, or ONNX models. The dictionary feature sends the word you ask to define to `dictionaryapi.dev` so that it can return a definition. Model files used for local features may be downloaded from third-party hosting services, such as GitHub or Hugging Face, during setup, build, or first use.
+Most writing assistance runs locally in the app using local JavaScript, WebAssembly, or ONNX models. The dictionary feature sends the word you ask to define to `dictionaryapi.dev` so that it can return a definition. Model files used for local features, such as the synonym, rhyme, speech and dictation models, may be downloaded from GitHub or Hugging Face the first time you use the feature. These downloads send no document text.
+
+If you choose "Search Web" from the right-click menu, the selected text is opened as a Google search in your web browser, and Google's privacy policy applies.
 
 We do not use your writing assistance queries for advertising or tracking.
+
+## References and Citations
+
+When you add a source by pasting a DOI, ISBN, arXiv or PubMed identifier, or a web address, Inkblot looks up that source's details so you do not have to type them. To do this it sends the identifier or address you entered to the matching service: `doi.org` and Crossref for DOIs, Open Library and Google Books for ISBNs, arXiv, PubMed (the U.S. National Library of Medicine), YouTube or Vimeo for video links, or the web page itself to read its title and author. Only the identifier or address you entered is sent, never your document text.
+
+Citation and bibliography formatting runs on your device.
 
 ## Pinterest Features
 
@@ -71,8 +82,10 @@ Depending on the features you use, Inkblot may interact with:
 
 - Pinterest, for Pinterest search, login webviews, board previews, widgets, and pin images.
 - `dictionaryapi.dev`, for dictionary definitions.
-- GitHub, for downloading local model assets during setup or build.
-- Hugging Face or model-library infrastructure, for downloading local speech or tokenizer/model files when needed.
+- `doi.org`, Crossref, Open Library, Google Books, arXiv, PubMed, YouTube and Vimeo, and the web pages you cite, for looking up source details.
+- Google, when you choose to search the web for selected text.
+- GitHub, for downloading local model files the first time a feature needs them.
+- Hugging Face or model-library infrastructure, for downloading local speech, dictation or tokenizer model files when needed.
 - Your operating system, for microphone permission, clipboard access, file storage, audio playback, and system speech.
 
 We do not control third-party services. Information those services receive is handled according to their privacy policies.
@@ -133,8 +146,8 @@ For App Store privacy disclosures, Inkblot's current intended posture is:
 - Data collected by the developer: none, unless the user separately contacts the developer for support.
 - Data used for tracking: none.
 - Data linked to the user by the developer: none.
-- User content stored on device: documents, notes, images, clipboard history, dictation output, and version history.
-- Third-party requests: optional feature requests to Pinterest, `dictionaryapi.dev`, GitHub, Hugging Face/model hosts, and operating-system services as described in this policy.
+- User content stored on device: documents, notes, images, voice memos, cited sources, clipboard history, dictation output, and version history.
+- Third-party requests: optional feature requests to Pinterest, `dictionaryapi.dev`, the source lookup services listed above, Google web search, GitHub, Hugging Face/model hosts, and operating-system services as described in this policy.
 
 Confirm these disclosures before submission if you add analytics, accounts, crash reporting, cloud sync, payments, or other networked features.
 

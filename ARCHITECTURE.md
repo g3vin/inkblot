@@ -152,7 +152,7 @@ part it is told the shell owns (`EditorWebController.nativeChrome`, read by
 | Page under the glass | The page runs full width under both sidebars and the toolbar. The shell sends `setPanelInsets` with how much of each side they cover, and the page keeps its text column and a canvas's controls to what is left. During a live window resize neither the insets nor the web view's size are passed on until the drag ends (`EditorWebView`, `ContentView`): SwiftUI lays the column out at trial sizes mid-drag, and the page would render them. |
 | Project picker | `ProjectPicker`, modelled on Xcode's welcome window (⇧⌘1). The page draws nothing with no project open and does not queue commands, so `AppModel.openProject` resends until the page reports the project open. |
 | File tree | An `NSOutlineView` (`ProjectOutline`), because a SwiftUI `List` could not take drops between rows in nested folders. The manual order is the page's `inkblot-order:<project>` preference, read and written through the core (`TreeOrder`). Every change is a command the page performs (`createEntry`, `renameEntry`, …) through `useEntryOperations`. |
-| Inspector | A selector bar (`SidebarTabPicker`) over the Clipboard, Workbench, Notes, References, History and Page panels, with one search bar. Two layouts, drafting and finishing, each a user-chosen set of panels (`InspectorLayout`, Customize Layout…); a two-finger swipe steps through them (`InspectorSwipe`). `useNativeSidebar` publishes the state and applies the edits; version rows and search come from the core. |
+| Inspector | A selector bar (`SidebarTabPicker`) over the Clipboard, Workbench, Notes, References, History and Page panels, with one search bar. Two layouts, drafting and finishing, each a user-chosen set of panels (`InspectorLayout`, Customize Layout…); a two-finger swipe steps through them (`InspectorSwipeCatcher`). `useNativeSidebar` publishes the state and applies the edits; version rows and search come from the core. |
 | Bubble editor | Liquid Glass over the window (`Bubble/`). The page opens a session (`bubbleSessionOpened`) and writes the sentence back on `closeBubbleSession`; the shell holds no positions. `BubbleText`/`BubbleDrop`/`BubbleForms` port `lib/bubbleText.ts`/`bubbleDrop.js`/`bubbleForms.ts`, so change them together. The chips on sentences are the page's own glass, not the shell's: an overlay placed from reported positions trailed every scroll. |
 | Note cards | Liquid Glass (`Notes/`), placed from marker events (`useNativeNotePreviews`). Notes can be dragged from the Notes panel onto a canvas as a URL the page reads off an HTML5 drop (`NoteDrag`). |
 | Word count, Print Layout controls | Glass badges and controls placed from what the page publishes (`WordCountBadges`, `PrintLayoutControls`). The page leaves room for them (`.native-print-controls`). |
@@ -472,6 +472,9 @@ These differ from Xcode's template on purpose:
 - **A Pinterest board scrape** against a live, logged-in session.
 
 **Not built**
+- **A way to see and switch tabs.** `useTabs` still tracks open documents as tabs,
+  and "Open in New Tab" adds one, but nothing draws them since the tab dock was
+  removed. A restored session can still land on a draft tab (`DraftTabPane`).
 - **The Kokoro download.** The page never offers it (`download_kokoro_model` exists in
   both apps), so native Read Aloud needs the model installed by other means and
   otherwise falls back to kokoro-js's in-browser WASM build.
