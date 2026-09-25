@@ -694,6 +694,33 @@ public struct FrontMatter: Codable, Equatable {
 	}
 }
 
+/// A print-on-demand service, whose rules a book is checked against.
+public enum PublishingService: String, Codable, Equatable {
+	/// Not checked against anyone's rules.
+	case none
+	/// Amazon KDP paperback.
+	case kdp
+	case ingramSpark
+}
+
+/// The paper a book is printed on, which sets how thick its spine is.
+public enum PaperStock: String, Codable, Equatable {
+	case cream
+	case white
+	/// Colour interior, on heavier paper.
+	case color
+}
+
+public struct PublishingTarget: Codable, Equatable {
+	public let service: PublishingService
+	public let paper: PaperStock
+
+	public init(service: PublishingService, paper: PaperStock) {
+		self.service = service
+		self.paper = paper
+	}
+}
+
 /// A folder (or the whole project) compiled as one book: its chapters are the
 /// folder's documents in tree order. Kept per folder in preferences, not in any one
 /// document, because it belongs to all of them.
@@ -715,8 +742,10 @@ public struct BookSettings: Codable, Equatable {
 	public let chapterNumbering: ChapterNumbering?
 	public let frontMatter: FrontMatter?
 	public let backMatter: BackMatter?
+	/// Where the book is going to be printed, for the Publish tab's checks.
+	public let publishing: PublishingTarget?
 
-	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?) {
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?) {
 		self.folder = folder
 		self.title = title
 		self.author = author
@@ -728,6 +757,7 @@ public struct BookSettings: Codable, Equatable {
 		self.chapterNumbering = chapterNumbering
 		self.frontMatter = frontMatter
 		self.backMatter = backMatter
+		self.publishing = publishing
 	}
 }
 
@@ -3686,6 +3716,12 @@ public struct MapFile: Codable, Equatable {
 	}
 }
 
+/// Lay the book (or the document) out without printing it, to count its pages and
+/// words for the Publish tab.
+public struct MeasureBookCommand: Codable, Equatable {
+	public init() {}
+}
+
 /// Move a file or folder into another folder. See `RenameEntryCommand`.
 public struct MoveEntryCommand: Codable, Equatable {
 	public let path: String
@@ -4028,6 +4064,61 @@ public enum SetupSource: String, Codable, Equatable {
 	case `default`
 }
 
+/// How much a preflight finding matters.
+public enum PreflightSeverity: String, Codable, Equatable {
+	/// The service will reject the file.
+	case error
+	/// It will print, but not as well as it could.
+	case warning
+	/// Worth knowing.
+	case note
+}
+
+/// One thing the preflight found, and how to put it right when the page knows how.
+public struct PreflightIssue: Codable, Equatable {
+	public let id: String
+	public let severity: PreflightSeverity
+	public let message: String
+	/// The button's title — "Widen the Gutter" — when there is a fix.
+	public let fixLabel: String?
+	/// The setup with the fix made: applied as any other edit to it.
+	public let fixedSetup: PageSetup?
+
+	public init(id: String, severity: PreflightSeverity, message: String, fixLabel: String?, fixedSetup: PageSetup?) {
+		self.id = id
+		self.severity = severity
+		self.message = message
+		self.fixLabel = fixLabel
+		self.fixedSetup = fixedSetup
+	}
+}
+
+/// The Publish tab's figures for what Print covers, at its setup.
+public struct PublishingReport: Codable, Equatable {
+	/// 0 until the pages are known: shown, or measured.
+	public let pageCount: UInt32
+	/// The pages were counted by laying the whole scope out, not read off the screen.
+	public let measured: Bool
+	public let words: UInt32
+	/// At 250 words a minute.
+	public let readingMinutes: UInt32
+	/// For the service and paper chosen; 0 without a page count.
+	public let spineWidthMm: Double
+	/// Whether the spine is wide enough to carry text (KDP: more than 79 pages).
+	public let spineText: Bool
+	public let issues: [PreflightIssue]
+
+	public init(pageCount: UInt32, measured: Bool, words: UInt32, readingMinutes: UInt32, spineWidthMm: Double, spineText: Bool, issues: [PreflightIssue]) {
+		self.pageCount = pageCount
+		self.measured = measured
+		self.words = words
+		self.readingMinutes = readingMinutes
+		self.spineWidthMm = spineWidthMm
+		self.spineText = spineText
+		self.issues = issues
+	}
+}
+
 /// Everything the Finishing tabs show that changes. Published when the active
 /// document, its setup, its page count, the book, the scope or the zoom changes — and
 /// only then: the page skips a state identical to the last.
@@ -4072,8 +4163,9 @@ public struct PageLayoutState: Codable, Equatable {
 	public let lastExport: LastExport?
 	/// Text is selected in the active document, so Print can print just that.
 	public let hasSelection: Bool?
+	public let publishing: PublishingReport?
 
-	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?) {
+	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?) {
 		self.enabled = enabled
 		self.docPath = docPath
 		self.ready = ready
@@ -4095,6 +4187,7 @@ public struct PageLayoutState: Codable, Equatable {
 		self.coverFile = coverFile
 		self.lastExport = lastExport
 		self.hasSelection = hasSelection
+		self.publishing = publishing
 	}
 }
 

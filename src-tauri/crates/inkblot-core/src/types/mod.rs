@@ -58,7 +58,8 @@ pub use note::{
 pub use page_setup::{
     AuthorProfile, BackMatter, BindingSettings, BindingType, BookSettings, ChapterNumberStyle,
     ChapterNumbering, ChapterOpening, DuplexMode, FrontMatter,
-    LineSpacing, PageMargins, PageNumberFormat, PageOrientation, PageSetup, PrintAlignment,
+    LineSpacing, PageMargins, PageNumberFormat, PageOrientation, PageSetup, PaperStock, PrintAlignment, PublishingService,
+    PublishingTarget,
     PrintTypography, RunningText, SheetFit, TitlePageOptions, TitlePageStyle,
 };
 pub use read_aloud::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};

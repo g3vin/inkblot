@@ -251,6 +251,61 @@ pub struct ExportDocumentCommand {
     pub options: PrintOptions,
 }
 
+/// Lay the book (or the document) out without printing it, to count its pages and
+/// words for the Publish tab.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeasureBookCommand {}
+
+/// How much a preflight finding matters.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PreflightSeverity {
+    /// The service will reject the file.
+    Error,
+    /// It will print, but not as well as it could.
+    Warning,
+    /// Worth knowing.
+    Note,
+}
+
+/// One thing the preflight found, and how to put it right when the page knows how.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreflightIssue {
+    pub id: String,
+    pub severity: PreflightSeverity,
+    pub message: String,
+    /// The button's title — "Widen the Gutter" — when there is a fix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix_label: Option<String>,
+    /// The setup with the fix made: applied as any other edit to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixed_setup: Option<PageSetup>,
+}
+
+/// The Publish tab's figures for what Print covers, at its setup.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishingReport {
+    /// 0 until the pages are known: shown, or measured.
+    pub page_count: u32,
+    /// The pages were counted by laying the whole scope out, not read off the screen.
+    pub measured: bool,
+    pub words: u32,
+    /// At 250 words a minute.
+    pub reading_minutes: u32,
+    /// For the service and paper chosen; 0 without a page count.
+    pub spine_width_mm: f64,
+    /// Whether the spine is wide enough to carry text (KDP: more than 79 pages).
+    pub spine_text: bool,
+    pub issues: Vec<PreflightIssue>,
+}
+
 /// Export the last export again — same format, scope and file — without asking where.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -414,6 +469,8 @@ pub struct PageLayoutState {
     /// Text is selected in the active document, so Print can print just that.
     #[serde(default)]
     pub has_selection: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publishing: Option<PublishingReport>,
 }
 
 /// What a print or export job is.

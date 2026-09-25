@@ -203,6 +203,21 @@ export const setLastExport = (projectName, lastExport) => {
   emit()
 }
 
+/* ---------------- measurements ---------------- */
+
+// The last count of a scope's pages and words, by laying it out (Measure). Not kept
+// across launches: an old count of a book still being written would mislead.
+const measurements = new Map()
+
+const measureKey = (projectName, scope, docPath) => `${projectName}|${scope}|${scope === 'document' ? docPath : bookFolderFor(docPath, scope)}`
+
+export const getMeasurement = (projectName, scope, docPath) => measurements.get(measureKey(projectName, scope, docPath)) || null
+
+export const setMeasurement = (projectName, scope, docPath, measurement) => {
+  measurements.set(measureKey(projectName, scope, docPath), measurement)
+  emit()
+}
+
 /* ---------------- the page in view ---------------- */
 
 // Not persisted, and apart from the store's own listeners: it changes as the author

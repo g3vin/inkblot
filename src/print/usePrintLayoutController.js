@@ -36,6 +36,7 @@ import {
   getCurrentPrintPage,
   getDisplayPointsPerInch,
   getLastExport,
+  getMeasurement,
   getPrintScope,
   getPrintZoom,
   isPrintLayoutEnabled,
@@ -48,6 +49,8 @@ import {
   subscribeCurrentPrintPage,
   subscribePrintLayoutStore,
 } from './printLayoutStore'
+import { preflight, readingMinutes, spineWidthMm, SPINE_TEXT_MIN_PAGES } from './preflight'
+import { decodeDataUri, imageSize } from './export/images'
 import { BOOK_TYPOGRAPHY } from './typography'
 import { actualSizeZoom } from './zoom'
 
@@ -82,6 +85,55 @@ const TYPING_DEBOUNCE_MS = 120
 
 const usable = (editor) => (editor && !editor.isDestroyed && editor.view && !editor.view.isDestroyed ? editor : null)
 
+// Pixel widths of the document's pictures, by src: read once, not on every publish.
+const pixelWidths = new Map()
+const pixelWidth = (src) => {
+  if (!pixelWidths.has(src)) {
+    const image = src.startsWith('data:') ? decodeDataUri(src) : null
+    pixelWidths.set(src, (image && imageSize(image)?.width) || 0)
+    if (pixelWidths.size > 500) pixelWidths.delete(pixelWidths.keys().next().value)
+  }
+  return pixelWidths.get(src)
+}
+
+/** The active document's pictures as placed: their pixels over the inches they print at. */
+const placedImages = (editor, setup) => {
+  const images = []
+  if (!editor) return images
+  const textWidthIn = (setup.widthMm - setup.margins.insideMm - setup.margins.outsideMm - setup.margins.gutterMm) / 25.4
+  editor.state.doc.descendants((node) => {
+    if (node.type.name !== 'image' || typeof node.attrs.src !== 'string') return
+    const pixels = pixelWidth(node.attrs.src)
+    if (!pixels) return
+    const asked = Number.parseFloat(node.attrs.width)
+    const printedIn = Math.min(textWidthIn, Number.isFinite(asked) && asked > 0 ? asked / 96 : pixels / 96)
+    images.push({ pixelsWide: pixels, printedInches: printedIn })
+  })
+  return images
+}
+
+/**
+ * The Publish tab's figures: the pages (as shown, or as last measured), spine, reading
+ * time and preflight — for a book with a service chosen, or any document with pages.
+ */
+const publishingReport = ({ projectName, docPath, scope, book, setup, editor, pageCount, words }) => {
+  const measured = getMeasurement(projectName, scope, docPath)
+  // The pages on screen are the document's; a book's are only known once measured.
+  const pages = measured?.pageCount || (scope === 'document' ? pageCount : 0)
+  const allWords = measured?.words || (scope === 'document' ? words : 0)
+  const target = book.publishing || { service: 'none', paper: 'cream' }
+  const serviceFor = target.service === 'none' ? 'kdp' : target.service
+  return {
+    pageCount: pages,
+    measured: Boolean(measured?.pageCount),
+    words: allWords,
+    readingMinutes: readingMinutes(allWords),
+    spineWidthMm: pages ? Math.round(spineWidthMm({ pageCount: pages, paper: target.paper, service: serviceFor }) * 100) / 100 : 0,
+    spineText: pages >= SPINE_TEXT_MIN_PAGES,
+    issues: preflight({ setup, target, pageCount: pages, images: scope === 'document' ? placedImages(editor, setup) : [] }),
+  }
+}
+
 /** What the shell is told of the last export: enough to say "Export Again: Book.pdf". */
 const lastExportState = (last) => (last ? { format: last.format, scope: last.scope, path: last.path } : undefined)
 
@@ -97,6 +149,8 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
   const { formatId, modified } = formatOf(setup)
   const result = editor ? paginationKey.getState(editor.state)?.result : null
   const pageCount = result?.pageCount || 0
+  // The document's words; a book's would mean reading every chapter on each publish.
+  const docWords = editor && scope === 'document' ? countWords(editor.state.doc.textContent) : 0
   return {
     enabled: Boolean(docPath) && isPrintLayoutEnabled(projectName, docPath),
     docPath: docPath || undefined,
@@ -115,9 +169,19 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     bookChapters: chapters,
     suggestedInsideMarginMm: suggestedInsideMarginMm(Math.max(pageCount, 1)),
     author: getAuthorProfile(),
-    // The document's words; a book's would mean reading every chapter on each publish.
-    wordCount: editor && scope === 'document' ? countWords(editor.state.doc.textContent) : 0,
+    wordCount: docWords,
     lastExport: lastExportState(getLastExport(projectName)),
+    publishing: docPath ? publishingReport({
+      projectName,
+      docPath,
+      scope,
+      book,
+      // Under a book scope the book's own setup is what it prints in.
+      setup: scope !== 'document' && book.pageSetup ? book.pageSetup : setup,
+      editor,
+      pageCount,
+      words: docWords,
+    }) : undefined,
     hasSelection: Boolean(editor && !editor.state.selection.empty),
     // The cover on disk, for the Book tab's thumbnail: a project asset, once the root is known.
     coverFile: projectRoot && book.coverImage && !book.coverImage.startsWith('data:')
@@ -135,15 +199,16 @@ export default function usePrintLayoutController({
   secondaryEditor,
   onPrint,
   onExport,
+  onMeasure,
 }) {
   // The editor that holds the active document: the pane it is open in.
   const activeTextDoc = activeDoc && isTextDoc(activeDoc) ? activeDoc : null
   const activeEditor = activeTextDoc
     ? usable(activeTextDoc === secondaryDoc && activeTextDoc !== currentDoc ? secondaryEditor : editor)
     : null
-  const stateRef = useRef({ projectName, activeTextDoc, activeEditor, onPrint, onExport })
+  const stateRef = useRef({ projectName, activeTextDoc, activeEditor, onPrint, onExport, onMeasure })
   useEffect(() => {
-    stateRef.current = { projectName, activeTextDoc, activeEditor, onPrint, onExport }
+    stateRef.current = { projectName, activeTextDoc, activeEditor, onPrint, onExport, onMeasure }
   })
   const chaptersRef = useRef({ key: '', chapters: [] })
   const rootRef = useRef({ project: null, root: null })
@@ -340,6 +405,10 @@ export default function usePrintLayoutController({
       }),
       documentSurface.onCommand('exportDocument', ({ format, scope, bound, options }) => {
         stateRef.current.onExport?.({ format, scope, bound, options })
+      }),
+      documentSurface.onCommand('measureBook', () => {
+        const { projectName: project } = stateRef.current
+        stateRef.current.onMeasure?.({ scope: getPrintScope(project) })
       }),
       documentSurface.onCommand('exportAgain', () => {
         const last = getLastExport(stateRef.current.projectName)
