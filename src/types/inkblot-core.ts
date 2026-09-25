@@ -1247,7 +1247,7 @@ export interface GoToPageCommand {
 
 /**
  * Which note's hover cards the shell is showing, so the page can highlight the text
- * the note is about — the cards no longer quote it. `None` clears the highlight.
+ * the note is about, since the cards do not quote it. `None` clears the highlight.
  */
 export interface HighlightNoteCommand {
 	noteId?: string;

@@ -318,13 +318,12 @@
  * on .canvas-card-editing, which wraps it.
  *
  * A static card must NOT be included here. It carries both classes on one element
- * (`.canvas-card-body.ProseMirror`), so zeroing padding by that selector stripped the
- * card's own 12/14 padding — and since a card only gains the ProseMirror class once
- * it HAS content, the text sat flush against the border the moment you finished
- * typing and clicked away. That was the "padding disappears after editing" bug.
+ * (`.canvas-card-body.ProseMirror`), so zeroing padding by that selector would strip
+ * the card's own 12/14 padding, and since a card only gains the ProseMirror class once
+ * it has content, the text would sit flush against the border as soon as editing ends.
  *
- * The pane's editor padding it was guarding against is scoped to `.editor .ProseMirror`
- * and never applied inside a canvas card in the first place.
+ * The pane's editor padding is scoped to `.editor .ProseMirror` and never applies
+ * inside a canvas card.
  */
 .canvas-card-editing .ProseMirror {
   padding: 0;
@@ -683,7 +682,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  /* Clip the pins to the card's rounded bottom, now that the node itself must not. */
+  /* Clip the pins to the card's rounded bottom; the node itself must not clip. */
   border-radius: inherit;
 }
 

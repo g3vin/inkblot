@@ -3,9 +3,9 @@ import SwiftUI
 
 /// The inspector's show/hide, pinned to the window's top-right corner.
 ///
-/// Not a toolbar item, on purpose. As one it sat at the detail column's trailing edge —
-/// never the corner while the inspector was open — and fell into the overflow (») menu
-/// with everything else when the window got narrow. It cannot be a toolbar of its own
+/// Not a toolbar item, on purpose. As one it would sit at the detail column's trailing
+/// edge — never the corner while the inspector is open — and fall into the overflow (»)
+/// menu with everything else when the window gets narrow. It cannot be a toolbar of its own
 /// either: any non-customizable toolbar content turns Customize Toolbar… off for the
 /// whole window. So it is a titlebar accessory (`NSTitlebarAccessoryViewController`,
 /// `.trailing`), which AppKit lays out beside the toolbar rather than in it: always at

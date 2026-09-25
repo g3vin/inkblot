@@ -86,7 +86,7 @@ export default function Editor({
   const [splitOrientation, setSplitOrientation] = useState('columns') // 'columns' (side by side) | 'rows' (stacked)
   const [splitRatio, setSplitRatioState] = useState(0.5) // share of the split taken by the primary pane
   const [secondaryDoc, setSecondaryDoc] = useState(null) // The name of the second file
-  // The dock's tabs. A tab is { id, docPath }, where docPath: null is a draft —
+  // Open tabs. A tab is { id, docPath }, where docPath: null is a draft —
   // a tab that has not decided what document it is yet (see DraftTabPane).
   const [tabs, setTabs] = useState([])
   const [activeTabId, setActiveTabId] = useState(null)
@@ -292,8 +292,8 @@ export default function Editor({
         }
       }
 
-      // A tab whose document was deleted (or renamed) elsewhere would be a dot
-      // that opens nothing, so the dock drops it. Drafts have no document to check.
+      // A tab whose document was deleted (or renamed) elsewhere would open
+      // nothing, so it is dropped. Drafts have no document to check.
       const tabDocs = tabs.map(tab => tab.docPath).filter(Boolean)
       if (tabDocs.length) {
         const existence = await Promise.all(
