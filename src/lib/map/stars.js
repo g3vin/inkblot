@@ -24,8 +24,6 @@ export const STAR_PRESETS = [
   { id: 'BH', name: 'Black hole', temperatureK: 0, massSun: 10, radiusSun: 0.0000425, luminositySun: 0 },
 ]
 
-export const KM_PER_SOLAR_RADIUS = 695700
-
 export const starPreset = (id) => STAR_PRESETS.find((preset) => preset.id === id) || STAR_PRESETS[4]
 
 const clampByte = (value) => Math.round(Math.min(255, Math.max(0, value)))

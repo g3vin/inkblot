@@ -14,9 +14,6 @@ export const EARTH_RADIUS_KM = 6371.0088
 
 const RAD = Math.PI / 180
 
-/** Longitude folded into [-180, 180). */
-export const normalizeLon = (lon) => ((((lon + 180) % 360) + 360) % 360) - 180
-
 /** Great-circle distance (haversine). */
 export function haversineKm(a, b) {
   const phi1 = a[1] * RAD

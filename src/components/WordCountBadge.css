@@ -78,16 +78,6 @@
   position: relative;
 }
 
-.split-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  color: #999;
-  padding: 5px;
-  background: #f9f9f9;
-  text-align: center;
-  border-bottom: 1px solid #eee;
-}
-
 .editor {
   min-height: 100%;
 }

@@ -11,20 +11,16 @@
 import { getSessionValue } from './preferences'
 
 const PROJECT_OPEN_ID_KEY = 'inkblot:project-open-id'
-const PROJECT_NAME_KEY = 'inkblot:project-name'
 
 let projectOpenId: string | null = null
-let projectName: string | null = null
 
 /** Called when a project is opened, beside the session-store write. */
-export function setOpenProject(next: { projectName: string; projectOpenId: string }): void {
-  projectName = next.projectName
-  projectOpenId = next.projectOpenId
+export function setOpenProject(nextProjectOpenId: string): void {
+  projectOpenId = nextProjectOpenId
 }
 
 /** Called when the last project is closed. */
 export function clearOpenProject(): void {
-  projectName = null
   projectOpenId = null
 }
 
@@ -37,9 +33,4 @@ export function clearOpenProject(): void {
  */
 export function getProjectOpenId(): string {
   return String(projectOpenId || getSessionValue(PROJECT_OPEN_ID_KEY) || 'default')
-}
-
-export function getProjectName(): string | null {
-  const name = projectName || getSessionValue(PROJECT_NAME_KEY)
-  return name ? String(name) : null
 }
