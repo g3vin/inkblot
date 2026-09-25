@@ -314,4 +314,25 @@ struct FinishingTests {
         #expect(options.options.recipients.isEmpty)
         #expect(options.isDefault)
     }
+
+    @Test func thePublishingTargetGoesWithTheBookAndAFixIsAnEdit() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var book = try #require(layout.book)
+        #expect(book.service == PublishingService.none && book.paper == .cream)
+        book.service = .kdp
+        book.paper = .white
+        layout.apply(book)
+        let publishing = (wire.commands.last?.payload["settings"] as? [String: Any])?["publishing"] as? [String: Any]
+        #expect(publishing?["service"] as? String == "kdp")
+        #expect(publishing?["paper"] as? String == "white")
+
+        let fixed = try #require(layout.setup).setup
+        layout.fix(PreflightIssue(id: "mirror", severity: .warning, message: "", fixLabel: "Use Facing Pages", fixedSetup: fixed))
+        #expect(wire.commands.last?.type == "setPageSetup")
+        layout.measure()
+        #expect(wire.commands.last?.type == "measureBook")
+        #expect(PublishPanelView.duration(286) == "4 hr 46 min")
+    }
 }

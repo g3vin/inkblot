@@ -21,10 +21,10 @@ import { useNativeNotePreviews } from '../hooks/useNativeNotePreviews'
 import EditorCanvas from './EditorCanvas'
 import usePrintLayoutController from '../print/usePrintLayoutController'
 import PageSetupSheet from '../print/PageSetupSheet'
-import { runPrintJob } from '../print/printJob'
+import { measurePrint, runPrintJob } from '../print/printJob'
 import { runExport } from '../print/export/runExport'
 import { bookFolderFor } from '../print/compile'
-import { getBookForDoc, getBookSettings } from '../print/printLayoutStore'
+import { getBookForDoc, getBookSettings, setMeasurement } from '../print/printLayoutStore'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
@@ -479,6 +479,12 @@ export default function EditorLayout(props) {
     },
     onExport: ({ format, scope, bound, options, path }) => {
       runExport({ ...printOptions(scope), format, scope, bound, options, path }).catch((error) => console.error('[export] failed:', error))
+    },
+    onMeasure: ({ scope }) => {
+      const { projectName, docPath } = printOptions(scope)
+      measurePrint({ ...printOptions(scope), scope })
+        .then((measured) => { if (measured) setMeasurement(projectName, scope, docPath, measured) })
+        .catch((error) => console.error('[measure] failed:', error))
     },
   })
 

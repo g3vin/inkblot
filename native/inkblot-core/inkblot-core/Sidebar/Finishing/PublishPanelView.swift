@@ -3,8 +3,10 @@ import SwiftUI
 /// The Finishing layout's Publish tab: getting the writing out.
 ///
 /// Print and Export are in the header, as on every Finishing tab; here is what shapes
-/// them — for now, printing sheets to fold and bind by hand, which stays out of the way
-/// until it is switched on.
+/// them: the book checked against a print-on-demand service — its pages, spine and
+/// anything the service would reject, each with a fix — and printing sheets to fold
+/// and bind by hand, which stays out of the way until it is switched on. Writing
+/// statistics are the Stats tab's; these are the figures of the printed thing.
 struct PublishPanelView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(LengthUnit.storageKey) private var unitsRaw = LengthUnit.defaultForLocale.rawValue
@@ -14,6 +16,7 @@ struct PublishPanelView: View {
     var body: some View {
         FinishingPanel {
             if let state = model.pageLayout.state, let book = model.pageLayout.book {
+                publishingSection(state, book)
                 bindingSection(state, book)
             }
         }
@@ -28,6 +31,71 @@ struct PublishPanelView: View {
                 draft[keyPath: keyPath] = value
                 layout.apply(draft)
             })
+    }
+
+    /* ---------------- publishing ---------------- */
+
+    @ViewBuilder
+    private func publishingSection(_ state: PageLayoutState, _ book: BookDraft) -> some View {
+        let layout = model.pageLayout
+        let report = state.publishing
+        FinishingSection("Publishing", id: FinishingSectionID.publishing) {
+            Picker("Printed By", selection: binding(\.service)) {
+                Text("Not Chosen").tag(PublishingService.none)
+                Divider()
+                Text("Amazon KDP").tag(PublishingService.kdp)
+                Text("IngramSpark").tag(PublishingService.ingramSpark)
+            }
+            Picker("Paper", selection: binding(\.paper)) {
+                Text("Cream").tag(PaperStock.cream)
+                Text("White").tag(PaperStock.white)
+                Text("Colour").tag(PaperStock.color)
+            }
+            LabeledContent("Pages") {
+                HStack(spacing: 8) {
+                    if let report, report.pageCount > 0 {
+                        Text("\(report.pageCount)\(report.measured ? "" : " on screen")").monospacedDigit()
+                    } else {
+                        Text("Not counted").foregroundStyle(.secondary)
+                    }
+                    MeasureButton(report: report, measure: layout.measure)
+                }
+            }
+            if let report, report.words > 0 {
+                LabeledContent("Words") { Text(report.words.formatted()).monospacedDigit() }
+                LabeledContent("Reading Time") { Text(Self.duration(Int(report.readingMinutes))) }
+            }
+            if let report, report.pageCount > 0 {
+                LabeledContent("Spine") {
+                    Text(units.describe(report.spineWidthMm)).monospacedDigit()
+                }
+                FinishingNote(report.spineText
+                    ? "Wide enough for the title on the spine. Check the service’s cover calculator before the cover goes out."
+                    : "Under 80 pages the spine is too thin for text. Check the service’s cover calculator before the cover goes out.")
+            }
+            if book.service != PublishingService.none {
+                let issues = report?.issues ?? []
+                if issues.isEmpty {
+                    Label(report?.pageCount ?? 0 > 0 ? "Ready for the printer." : "The setup passes. Count the pages to check the rest.", systemImage: "checkmark.seal")
+                        .foregroundStyle(.green)
+                } else {
+                    ForEach(issues, id: \.id) { issue in
+                        PreflightRow(issue: issue) { layout.fix(issue) }
+                    }
+                }
+            }
+        } footer: {
+            FinishingNote(state.scope == .document
+                ? "For this document. Choose Book in the header to check the whole book."
+                : "For the whole book, at its page setup. Count the pages after changing the text or the setup.")
+        }
+    }
+
+    static func duration(_ minutes: Int) -> String {
+        guard minutes >= 60 else { return "\(max(1, minutes)) min" }
+        let hours = minutes / 60
+        let rest = minutes % 60
+        return rest == 0 ? "\(hours) hr" : "\(hours) hr \(rest) min"
     }
 
     /* ---------------- binding ---------------- */
@@ -89,5 +157,72 @@ struct PublishPanelView: View {
     /// Binding is for a book: the document's folder unless the whole project is chosen.
     private func bindingScope(_ state: PageLayoutState) -> PrintScope {
         state.scope == .project ? .project : .folder
+    }
+}
+
+/// Count the pages: spins until the new count arrives.
+private struct MeasureButton: View {
+    let report: PublishingReport?
+    let measure: () -> Void
+    @State private var counting = false
+
+    var body: some View {
+        Group {
+            if counting {
+                ProgressView().controlSize(.small)
+            } else {
+                Button(report?.measured == true ? "Recount" : "Count") {
+                    counting = true
+                    measure()
+                }
+                .controlSize(.small)
+                .help("Lay out everything Print covers, as it would print, to count its pages and words")
+            }
+        }
+        .onChange(of: report) { counting = false }
+        .task(id: counting) {
+            // Never spin for ever: a count that failed says so in the header.
+            guard counting else { return }
+            try? await Task.sleep(for: .seconds(120))
+            counting = false
+        }
+    }
+}
+
+/// One preflight finding: how much it matters, what it is, and its fix.
+private struct PreflightRow: View {
+    let issue: PreflightIssue
+    let fix: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label {
+                Text(issue.message).fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: symbol).foregroundStyle(tint)
+            }
+            if let label = issue.fixLabel, issue.fixedSetup != nil {
+                Button(label, action: fix)
+                    .controlSize(.small)
+                    .padding(.leading, 26)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var symbol: String {
+        switch issue.severity {
+        case .error: "xmark.octagon.fill"
+        case .warning: "exclamationmark.triangle.fill"
+        case .note: "info.circle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch issue.severity {
+        case .error: .red
+        case .warning: .orange
+        case .note: .secondary
+        }
     }
 }

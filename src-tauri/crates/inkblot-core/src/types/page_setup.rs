@@ -296,6 +296,42 @@ pub struct BookSettings {
     pub front_matter: FrontMatter,
     #[serde(default)]
     pub back_matter: BackMatter,
+    /// Where the book is going to be printed, for the Publish tab's checks.
+    #[serde(default)]
+    pub publishing: PublishingTarget,
+}
+
+/// A print-on-demand service, whose rules a book is checked against.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PublishingService {
+    /// Not checked against anyone's rules.
+    #[default]
+    None,
+    /// Amazon KDP paperback.
+    Kdp,
+    IngramSpark,
+}
+
+/// The paper a book is printed on, which sets how thick its spine is.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PaperStock {
+    #[default]
+    Cream,
+    White,
+    /// Colour interior, on heavier paper.
+    Color,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PublishingTarget {
+    pub service: PublishingService,
+    pub paper: PaperStock,
 }
 
 /// How a chapter's number is written in its heading.

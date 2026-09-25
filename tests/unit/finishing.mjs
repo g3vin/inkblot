@@ -493,3 +493,30 @@ ok('wrapping at 72 breaks between words and indents what follows a marker',
 
 ok('page ranges read as typed', same([...parsePageRanges('3-5, 9; 7–6')].sort((a, b) => a - b), [3, 4, 5, 6, 7, 9]) && parsePageRanges('  ') === null && parsePageRanges('abc') === null)
 ok('a copy for each reader is a file of its own', recipientPath('/Users/a/Book.pdf', 'Sam: Reader') === '/Users/a/Book – Sam- Reader.pdf')
+
+/* ---------------- publishing ---------------- */
+
+const pre = await import('../../src/print/preflight.ts')
+ok('a 300-page cream book\'s spine is 0.75 in', Math.abs(pre.spineWidthMm({ pageCount: 300, paper: 'cream', service: 'kdp' }) - 0.75 * 25.4) < 1e-9)
+ok('reading time at 250 words a minute', pre.readingMinutes(71_400) === 286)
+const tradeBook = formats.applyFormat('trade-6x9')
+const clean = pre.preflight({ setup: { ...tradeBook, margins: { ...tradeBook.margins, gutterMm: 10 } }, target: { service: 'kdp', paper: 'cream' }, pageCount: 212 })
+ok('a trade paperback with room at the spine passes KDP', clean.length === 0)
+const letterIssues = pre.preflight({ setup: formats.applyFormat('letter'), target: { service: 'kdp', paper: 'cream' }, pageCount: 17 })
+const issueIds = letterIssues.map((i) => i.id)
+ok('a Letter manuscript is caught for facing pages, too few pages and an odd count — Letter itself KDP prints',
+  ['mirror', 'pages-min', 'odd'].every((id) => issueIds.includes(id)) && !issueIds.includes('trim') && !issueIds.includes('gutter'))
+const a5 = formats.applyFormat('a5-novel')
+const a5Trim = pre.preflight({ setup: a5, target: { service: 'kdp', paper: 'cream' }, pageCount: 0 }).find((i) => i.id === 'trim')
+ok('A5 is not a KDP trim; the fix is the listed size nearest it, 5.5 × 8.5 in',
+  a5Trim && Math.abs(a5Trim.fixedSetup.widthMm - 5.5 * 25.4) < 0.01 && Math.abs(a5Trim.fixedSetup.heightMm - 8.5 * 25.4) < 0.01 &&
+  a5Trim.fixedSetup.formatId === a5.formatId)
+ok('IngramSpark prints A5', !pre.preflight({ setup: a5, target: { service: 'ingramSpark', paper: 'cream' }, pageCount: 0 }).some((i) => i.id === 'trim'))
+const thinGutter = pre.preflight({ setup: { ...tradeBook, margins: { ...tradeBook.margins, insideMm: 10, gutterMm: 0 } }, target: { service: 'ingramSpark', paper: 'white' }, pageCount: 420 })
+const gutterFix = thinGutter.find((i) => i.id === 'gutter')
+ok('a thick book with a thin gutter is widened to what its length needs',
+  gutterFix && Math.abs(gutterFix.fixedSetup.margins.insideMm + gutterFix.fixedSetup.margins.gutterMm - 0.625 * 25.4) < 0.01)
+const edgeIssue = pre.preflight({ setup: { ...tradeBook, margins: { ...tradeBook.margins, outsideMm: 3 } }, target: { service: 'kdp', paper: 'cream' }, pageCount: 0 }).find((i) => i.id === 'edges')
+ok('an outside margin under a quarter inch is widened to it', edgeIssue && edgeIssue.fixedSetup.margins.outsideMm === 6.35)
+ok('a picture printed at 150 dpi is flagged', pre.preflight({ setup: tradeBook, target: { service: 'kdp', paper: 'cream' }, pageCount: 0, images: [{ pixelsWide: 600, printedInches: 4 }] }).some((i) => i.id === 'dpi'))
+ok('no service, no checks', pre.preflight({ setup: formats.applyFormat('letter'), target: { service: 'none', paper: 'cream' }, pageCount: 3 }).length === 0)

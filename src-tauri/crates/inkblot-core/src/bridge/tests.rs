@@ -88,6 +88,7 @@ fn book() -> crate::types::BookSettings {
         },
         front_matter: crate::types::FrontMatter { half_title: true, dedication: "For M.".into(), contents: true, ..Default::default() },
         back_matter: crate::types::BackMatter { about_the_author: "A. Writer lives by the sea.".into(), ..Default::default() },
+        publishing: crate::types::PublishingTarget { service: crate::types::PublishingService::Kdp, paper: crate::types::PaperStock::Cream },
     }
 }
 
@@ -752,6 +753,21 @@ fn every_event() -> Vec<WebviewEvent> {
             cover_file: Some("/Users/a/Novel/.assets/ab12.jpg".into()),
             last_export: Some(LastExport { format: ExportFormat::Docx, scope: PrintScope::Folder, path: "/Users/a/Book.docx".into() }),
             has_selection: true,
+            publishing: Some(PublishingReport {
+                page_count: 212,
+                measured: true,
+                words: 71_400,
+                reading_minutes: 286,
+                spine_width_mm: 13.5,
+                spine_text: true,
+                issues: vec![PreflightIssue {
+                    id: "gutter".into(),
+                    severity: PreflightSeverity::Error,
+                    message: "The inside margin is too narrow for 212 pages.".into(),
+                    fix_label: Some("Widen the Gutter".into()),
+                    fixed_setup: Some(page_setup()),
+                }],
+            }),
         }),
         WebviewEvent::PrintRequest(PrintRequest {
             job_id: "p1".into(),

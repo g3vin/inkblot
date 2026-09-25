@@ -26,7 +26,7 @@ use super::sidebar::{
 use crate::types::note::Note;
 use super::print::{
     ApplyFormatCommand, ClearBookSetupCommand, ExportAgainCommand, ExportDocumentCommand, GoToPageCommand,
-    InsertBreakCommand, PrintDocumentCommand, PrintFinishedCommand, RefreshBookChaptersCommand,
+    InsertBreakCommand, MeasureBookCommand, PrintDocumentCommand, PrintFinishedCommand, RefreshBookChaptersCommand,
     SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand, SetPrintLayoutCommand,
     SetAuthorProfileCommand, SetBookCoverCommand, SetPrintScopeCommand, SetPrintZoomCommand, UseSetupForBookCommand,
 };

@@ -292,6 +292,7 @@ export const preparePrint = async ({
   book,
   options = {},
   onProgress = () => {},
+  measureOnly = false,
 }) => {
   const liveByPath = new Map(liveEditors.filter((e) => e?.path && e.editor && !e.editor.isDestroyed).map((e) => [e.path, e.editor]))
   const range = options.range || 'all'
@@ -371,6 +372,10 @@ export const preparePrint = async ({
       })
       : titlePages
     let pages = chapterOnly ? body : [...front, ...body]
+    // Counting for the Publish tab: every page as it would print, and every word.
+    if (measureOnly) {
+      return { pageCount: pages.length, words: words || loaded.reduce((n, c) => n + countWords(textOfContent(c.content)), 0) }
+    }
     if (range === 'currentChapter' && !compiled) pages = pagesOfChapterAt(pages, activeEditor)
     const wanted = parsePageRanges(options.pages)
     if (wanted) pages = pages.filter((page) => page.dataset.page && wanted.has(Number(page.dataset.page)))
@@ -474,6 +479,12 @@ export const runPrintJob = (options) => {
     prepare: (onProgress) => preparePrint({ ...options, onProgress }),
   })
 }
+
+/**
+ * Lay what a scope covers out as it would print, without printing it: its page count
+ * and words, for the Publish tab. Runs in the print queue, after any job before it.
+ */
+export const measurePrint = (options) => enqueue(() => preparePrint({ ...options, measureOnly: true }))
 
 /** `Book.pdf` for Sam Reader → `Book – Sam Reader.pdf`, beside it. */
 export const recipientPath = (path, recipient) => {

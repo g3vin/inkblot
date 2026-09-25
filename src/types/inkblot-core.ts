@@ -546,6 +546,28 @@ export interface FrontMatter {
 	contents: boolean;
 }
 
+/** A print-on-demand service, whose rules a book is checked against. */
+export enum PublishingService {
+	/** Not checked against anyone's rules. */
+	None = "none",
+	/** Amazon KDP paperback. */
+	Kdp = "kdp",
+	IngramSpark = "ingramSpark",
+}
+
+/** The paper a book is printed on, which sets how thick its spine is. */
+export enum PaperStock {
+	Cream = "cream",
+	White = "white",
+	/** Colour interior, on heavier paper. */
+	Color = "color",
+}
+
+export interface PublishingTarget {
+	service: PublishingService;
+	paper: PaperStock;
+}
+
 /**
  * A folder (or the whole project) compiled as one book: its chapters are the
  * folder's documents in tree order. Kept per folder in preferences, not in any one
@@ -571,6 +593,8 @@ export interface BookSettings {
 	chapterNumbering?: ChapterNumbering;
 	frontMatter?: FrontMatter;
 	backMatter?: BackMatter;
+	/** Where the book is going to be printed, for the Publish tab's checks. */
+	publishing?: PublishingTarget;
 }
 
 export enum BridgeErrorCode {
@@ -1903,6 +1927,13 @@ export interface MapFile {
 	viewport: MapViewport;
 }
 
+/**
+ * Lay the book (or the document) out without printing it, to count its pages and
+ * words for the Publish tab.
+ */
+export interface MeasureBookCommand {
+}
+
 /** Move a file or folder into another folder. See `RenameEntryCommand`. */
 export interface MoveEntryCommand {
 	path: string;
@@ -2140,6 +2171,43 @@ export enum SetupSource {
 	Default = "default",
 }
 
+/** How much a preflight finding matters. */
+export enum PreflightSeverity {
+	/** The service will reject the file. */
+	Error = "error",
+	/** It will print, but not as well as it could. */
+	Warning = "warning",
+	/** Worth knowing. */
+	Note = "note",
+}
+
+/** One thing the preflight found, and how to put it right when the page knows how. */
+export interface PreflightIssue {
+	id: string;
+	severity: PreflightSeverity;
+	message: string;
+	/** The button's title — "Widen the Gutter" — when there is a fix. */
+	fixLabel?: string;
+	/** The setup with the fix made: applied as any other edit to it. */
+	fixedSetup?: PageSetup;
+}
+
+/** The Publish tab's figures for what Print covers, at its setup. */
+export interface PublishingReport {
+	/** 0 until the pages are known: shown, or measured. */
+	pageCount: number;
+	/** The pages were counted by laying the whole scope out, not read off the screen. */
+	measured: boolean;
+	words: number;
+	/** At 250 words a minute. */
+	readingMinutes: number;
+	/** For the service and paper chosen; 0 without a page count. */
+	spineWidthMm: number;
+	/** Whether the spine is wide enough to carry text (KDP: more than 79 pages). */
+	spineText: boolean;
+	issues: PreflightIssue[];
+}
+
 /**
  * Everything the Finishing tabs show that changes. Published when the active
  * document, its setup, its page count, the book, the scope or the zoom changes — and
@@ -2190,6 +2258,7 @@ export interface PageLayoutState {
 	lastExport?: LastExport;
 	/** Text is selected in the active document, so Print can print just that. */
 	hasSelection?: boolean;
+	publishing?: PublishingReport;
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */

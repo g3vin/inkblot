@@ -177,6 +177,17 @@ final class PageLayoutModel {
         bridge.send(.exportDocument(ExportDocumentCommand(format: format, scope: scope, bound: bound, options: options)))
     }
 
+    /// Count what Print covers — its pages and words — by laying it all out.
+    func measure() {
+        bridge.send(.measureBook(MeasureBookCommand()))
+    }
+
+    /// Make a preflight fix: the setup it carries, applied as any other edit.
+    func fix(_ issue: PreflightIssue) {
+        guard let fixed = issue.fixedSetup else { return }
+        apply(PageSetupDraft(fixed))
+    }
+
     /// The last export again, to the same file.
     func exportAgain() {
         bridge.send(.exportAgain(ExportAgainCommand()))
@@ -489,6 +500,8 @@ struct BookDraft: Equatable {
     var acknowledgements: String
     var aboutTheAuthor: String
     var alsoBy: String
+    var service: PublishingService
+    var paper: PaperStock
 
     init(_ b: BookSettings) {
         folder = b.folder
@@ -518,6 +531,8 @@ struct BookDraft: Equatable {
         acknowledgements = b.backMatter?.acknowledgements ?? ""
         aboutTheAuthor = b.backMatter?.aboutTheAuthor ?? ""
         alsoBy = b.backMatter?.alsoBy ?? ""
+        service = b.publishing?.service ?? PublishingService.none
+        paper = b.publishing?.paper ?? .cream
     }
 
     /// Leave a chapter in or out of the book.
@@ -561,7 +576,8 @@ struct BookDraft: Equatable {
             frontMatter: FrontMatter(
                 halfTitle: halfTitle, copyright: copyright, dedication: dedication,
                 epigraph: epigraph, epigraphSource: epigraphSource, contents: contents),
-            backMatter: BackMatter(acknowledgements: acknowledgements, aboutTheAuthor: aboutTheAuthor, alsoBy: alsoBy))
+            backMatter: BackMatter(acknowledgements: acknowledgements, aboutTheAuthor: aboutTheAuthor, alsoBy: alsoBy),
+            publishing: PublishingTarget(service: service, paper: paper))
     }
 }
 
