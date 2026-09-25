@@ -1296,6 +1296,7 @@ public enum NativeCommand: Codable, Equatable {
 	case setPrintScope(SetPrintScopeCommand)
 	case setAuthorProfile(SetAuthorProfileCommand)
 	case setBookCover(SetBookCoverCommand)
+	case exportAgain(ExportAgainCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1379,7 +1380,8 @@ public enum NativeCommand: Codable, Equatable {
 			refreshBookChapters,
 			setPrintScope,
 			setAuthorProfile,
-			setBookCover
+			setBookCover,
+			exportAgain
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1800,6 +1802,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setBookCover(content)
 					return
 				}
+			case .exportAgain:
+				if let content = try? container.decode(ExportAgainCommand.self, forKey: .payload) {
+					self = .exportAgain(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -2053,6 +2060,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setBookCover(let content):
 			try container.encode(CodingKeys.setBookCover, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .exportAgain(let content):
+			try container.encode(CodingKeys.exportAgain, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -2925,11 +2935,20 @@ public struct EventEnvelope: Codable, Equatable {
 	}
 }
 
+/// Export the last export again — same format, scope and file — without asking where.
+public struct ExportAgainCommand: Codable, Equatable {
+	public init() {}
+}
+
 public enum ExportFormat: String, Codable, Equatable {
 	case pdf
 	case epub
 	case markdown
 	case html
+	/// Word, for an editor or an agent: styles, sections, headers and footers.
+	case docx
+	/// Plain text, for a submission form or an email.
+	case plainText
 }
 
 /// What a print or export covers.
@@ -2942,17 +2961,49 @@ public enum PrintScope: String, Codable, Equatable {
 	case project
 }
 
+/// Which part of what the scope covers is printed.
+public enum PrintRange: String, Codable, Equatable {
+	case all
+	/// The chapter the cursor is in: the active document in a book, or the Heading 1
+	/// section around the cursor in a document.
+	case currentChapter
+	/// The selected text, laid out alone.
+	case selection
+}
+
+/// How a print or a PDF is narrowed and marked. Every field is optional on the wire:
+/// no options is the whole thing, unmarked.
+public struct PrintOptions: Codable, Equatable {
+	public let range: PrintRange
+	/// Printed page numbers, as typed: `3-7, 10`. Empty prints every page.
+	public let pages: String
+	/// Text set faintly across every page — "DRAFT", or "Read copy for {recipient}".
+	public let watermark: String
+	/// Who a watermarked copy is for, one PDF each; filled into `{recipient}`.
+	public let recipients: [String]
+
+	public init(range: PrintRange, pages: String, watermark: String, recipients: [String]) {
+		self.range = range
+		self.pages = pages
+		self.watermark = watermark
+		self.recipients = recipients
+	}
+}
+
 /// Export to a file. The page asks where (a save panel) and writes it.
 public struct ExportDocumentCommand: Codable, Equatable {
 	public let format: ExportFormat
 	public let scope: PrintScope
 	/// PDF only: imposed for binding.
 	public let bound: Bool?
+	/// PDF only: a range, a watermark.
+	public let options: PrintOptions?
 
-	public init(format: ExportFormat, scope: PrintScope, bound: Bool?) {
+	public init(format: ExportFormat, scope: PrintScope, bound: Bool?, options: PrintOptions?) {
 		self.format = format
 		self.scope = scope
 		self.bound = bound
+		self.options = options
 	}
 }
 
@@ -3125,6 +3176,19 @@ public struct JumpToAnchorCommand: Codable, Equatable {
 		self.target = target
 		self.anchor = anchor
 		self.preferPositions = preferPositions
+	}
+}
+
+/// The export Export Again repeats.
+public struct LastExport: Codable, Equatable {
+	public let format: ExportFormat
+	public let scope: PrintScope
+	public let path: String
+
+	public init(format: ExportFormat, scope: PrintScope, path: String) {
+		self.format = format
+		self.scope = scope
+		self.path = path
 	}
 }
 
@@ -4004,8 +4068,12 @@ public struct PageLayoutState: Codable, Equatable {
 	public let wordCount: UInt32?
 	/// The book's cover as a file on disk, for the Book tab's thumbnail.
 	public let coverFile: String?
+	/// The project's last export, for Export Again.
+	public let lastExport: LastExport?
+	/// Text is selected in the active document, so Print can print just that.
+	public let hasSelection: Bool?
 
-	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?) {
+	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?) {
 		self.enabled = enabled
 		self.docPath = docPath
 		self.ready = ready
@@ -4025,6 +4093,8 @@ public struct PageLayoutState: Codable, Equatable {
 		self.author = author
 		self.wordCount = wordCount
 		self.coverFile = coverFile
+		self.lastExport = lastExport
+		self.hasSelection = hasSelection
 	}
 }
 
@@ -4032,10 +4102,12 @@ public struct PageLayoutState: Codable, Equatable {
 public struct PrintDocumentCommand: Codable, Equatable {
 	public let scope: PrintScope
 	public let bound: Bool
+	public let options: PrintOptions?
 
-	public init(scope: PrintScope, bound: Bool) {
+	public init(scope: PrintScope, bound: Bool, options: PrintOptions?) {
 		self.scope = scope
 		self.bound = bound
+		self.options = options
 	}
 }
 

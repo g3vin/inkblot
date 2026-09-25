@@ -414,8 +414,14 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::SetDisplayDensity(SetDisplayDensityCommand { points_per_inch: 127.0 }),
         NativeCommand::InsertBreak(InsertBreakCommand { target: EditorTarget::Primary, kind: PageBreakKind::Recto }),
         NativeCommand::GoToPage(GoToPageCommand { page: 12 }),
-        NativeCommand::PrintDocument(PrintDocumentCommand { scope: PrintScope::Folder, bound: true }),
-        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false }),
+        NativeCommand::PrintDocument(PrintDocumentCommand { scope: PrintScope::Folder, bound: true, options: PrintOptions::default() }),
+        NativeCommand::PrintDocument(PrintDocumentCommand {
+            scope: PrintScope::Document,
+            bound: false,
+            options: PrintOptions { range: PrintRange::CurrentChapter, pages: "3-7, 10".into(), watermark: "DRAFT".into(), recipients: vec![] },
+        }),
+        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false, options: PrintOptions::default() }),
+        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Docx, scope: PrintScope::Folder, bound: false, options: PrintOptions::default() }),
         NativeCommand::PrintFinished(PrintFinishedCommand { job_id: "p1".into(), completed: true }),
         NativeCommand::ApplyFormat(ApplyFormatCommand { format_id: "manuscript".into(), target: PageSetupTarget::Document }),
         NativeCommand::UseSetupForBook(UseSetupForBookCommand {}),
@@ -426,6 +432,7 @@ fn every_command() -> Vec<NativeCommand> {
             profile: crate::types::AuthorProfile { byline: "A. Writer".into(), email: "a@example.com".into(), ..Default::default() },
         }),
         NativeCommand::SetBookCover(SetBookCoverCommand { path: Some("/Users/a/cover.jpg".into()) }),
+        NativeCommand::ExportAgain(ExportAgainCommand {}),
     ]
 }
 
@@ -743,6 +750,8 @@ fn every_event() -> Vec<WebviewEvent> {
             author: crate::types::AuthorProfile { byline: "A. Writer".into(), ..Default::default() },
             word_count: 71_400,
             cover_file: Some("/Users/a/Novel/.assets/ab12.jpg".into()),
+            last_export: Some(LastExport { format: ExportFormat::Docx, scope: PrintScope::Folder, path: "/Users/a/Book.docx".into() }),
+            has_selection: true,
         }),
         WebviewEvent::PrintRequest(PrintRequest {
             job_id: "p1".into(),
@@ -857,6 +866,8 @@ fn every_command_has_its_documented_wire_name() {
             "insertBreak",
             "goToPage",
             "printDocument",
+            "printDocument",
+            "exportDocument",
             "exportDocument",
             "printFinished",
             "applyFormat",
@@ -866,6 +877,7 @@ fn every_command_has_its_documented_wire_name() {
             "setPrintScope",
             "setAuthorProfile",
             "setBookCover",
+            "exportAgain",
         ]
     );
 }

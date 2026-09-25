@@ -28,6 +28,9 @@ final class PageLayoutModel {
     /// publishes, so an edit made anywhere (an undo in the page, the other pane) shows.
     var setup: PageSetupDraft?
     var book: BookDraft?
+    /// How Print (and a PDF) is narrowed and marked, until it is set back: the same for
+    /// the header's popover, the File menu and ⌘P, so what the header says is what prints.
+    var printOptions = PrintOptionsDraft()
 
     /// The Finishing sections the author folded away, by id. Kept across launches.
     private(set) var collapsedSections: Set<String> = Set(UserDefaults.standard.stringArray(forKey: PageLayoutModel.collapsedKey) ?? [])
@@ -165,12 +168,21 @@ final class PageLayoutModel {
     }
 
     func print(_ scope: PrintScope, bound: Bool = false) {
-        bridge.send(.printDocument(PrintDocumentCommand(scope: scope, bound: bound)))
+        bridge.send(.printDocument(PrintDocumentCommand(scope: scope, bound: bound, options: printOptions.options)))
     }
 
+    /// Export. A PDF is the print saved, so it takes the print options; nothing else does.
     func export(_ format: ExportFormat, scope: PrintScope, bound: Bool = false) {
-        bridge.send(.exportDocument(ExportDocumentCommand(format: format, scope: scope, bound: bound)))
+        let options = format == .pdf ? printOptions.options : PrintOptionsDraft().options
+        bridge.send(.exportDocument(ExportDocumentCommand(format: format, scope: scope, bound: bound, options: options)))
     }
+
+    /// The last export again, to the same file.
+    func exportAgain() {
+        bridge.send(.exportAgain(ExportAgainCommand()))
+    }
+
+    var lastExport: LastExport? { state?.lastExport }
 
     /// The main display's logical density: points across over inches across.
     func sendDisplayDensity() {
@@ -407,6 +419,46 @@ struct TitlePageDraft: Equatable {
     }
 
     var options: TitlePageOptions { TitlePageOptions(style: style, showContact: showContact, showWordCount: showWordCount) }
+}
+
+struct PrintOptionsDraft: Equatable {
+    var range: PrintRange = .all
+    /// Printed page numbers, as typed: "3-7, 10".
+    var pages = ""
+    var watermark = ""
+    /// One name a line: a watermarked copy each.
+    var recipients = ""
+
+    var names: [String] {
+        recipients.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    var options: PrintOptions {
+        PrintOptions(
+            range: range,
+            pages: pages.trimmingCharacters(in: .whitespaces),
+            watermark: watermark.trimmingCharacters(in: .whitespaces),
+            recipients: watermark.isEmpty ? [] : names)
+    }
+
+    var isDefault: Bool { options == PrintOptionsDraft().options }
+
+    /// What Print will do differently, in a line for the header — or nil when nothing.
+    var summary: String? {
+        var parts: [String] = []
+        switch range {
+        case .all: break
+        case .currentChapter: parts.append("current chapter")
+        case .selection: parts.append("selection")
+        }
+        let typed = pages.trimmingCharacters(in: .whitespaces)
+        if !typed.isEmpty { parts.append("pages \(typed)") }
+        let mark = watermark.trimmingCharacters(in: .whitespaces)
+        if !mark.isEmpty {
+            parts.append(names.count > 1 ? "watermarked, \(names.count) copies" : "watermarked “\(mark)”")
+        }
+        return parts.isEmpty ? nil : "Printing " + parts.joined(separator: ", ")
+    }
 }
 
 struct BookDraft: Equatable {

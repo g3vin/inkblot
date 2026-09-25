@@ -13,6 +13,7 @@ struct FinishingActionHeader: View {
     @State private var goingToPage = false
     @State private var goTo = 1
     @State private var editingAuthor = false
+    @State private var choosingOptions = false
 
     var body: some View {
         let layout = model.pageLayout
@@ -92,20 +93,44 @@ struct FinishingActionHeader: View {
             .buttonStyle(.borderedProminent)
             .frame(maxWidth: .infinity)
 
+            Button {
+                choosingOptions = true
+            } label: {
+                Image(systemName: layout.printOptions.isDefault ? "slider.horizontal.3" : "slider.horizontal.below.square.filled.and.square")
+            }
+            .help("Print options: pages, the current chapter, the selection, a watermark")
+            .accessibilityLabel("Print Options")
+            .popover(isPresented: $choosingOptions, arrowEdge: .bottom) {
+                PrintOptionsPopover(hasSelection: layout.state?.hasSelection ?? false)
+            }
+
             Menu("Export") {
-                Button("PDF…") { layout.export(.pdf, scope: scope) }
-                Button("EPUB…") { layout.export(.epub, scope: scope) }
-                Button("Markdown…") { layout.export(.markdown, scope: scope) }
-                Button("HTML…") { layout.export(.html, scope: scope) }
-                if bindable {
-                    Divider()
-                    Button("PDF for Binding…") { layout.export(.pdf, scope: scope, bound: true) }
-                }
+                Self.exportItems(layout, scope: scope, bindable: bindable)
             }
             .frame(maxWidth: .infinity)
         }
         .controlSize(.large)
         .disabled(!layout.hasDocument || layout.job.map(Self.isRunning) == true)
+    }
+
+    /// The Export menu's items, here and in the File menu.
+    @ViewBuilder
+    static func exportItems(_ layout: PageLayoutModel, scope: PrintScope, bindable: Bool = false) -> some View {
+        if let last = layout.lastExport, last.scope == scope {
+            Button("Export Again: \(URL(fileURLWithPath: last.path).lastPathComponent)") { layout.exportAgain() }
+            Divider()
+        }
+        Button("PDF…") { layout.export(.pdf, scope: scope) }
+        Button("Word (.docx)…") { layout.export(.docx, scope: scope) }
+        Button("EPUB…") { layout.export(.epub, scope: scope) }
+        Divider()
+        Button("Markdown…") { layout.export(.markdown, scope: scope) }
+        Button("HTML…") { layout.export(.html, scope: scope) }
+        Button("Plain Text…") { layout.export(.plainText, scope: scope) }
+        if bindable {
+            Divider()
+            Button("PDF for Binding…") { layout.export(.pdf, scope: scope, bound: true) }
+        }
     }
 
     /* ---------------- where it got to ---------------- */
@@ -114,6 +139,16 @@ struct FinishingActionHeader: View {
     private func statusRow(_ layout: PageLayoutModel) -> some View {
         if let job = layout.job {
             JobStatusLine(job: job, onDismiss: layout.dismissJob)
+        } else if let options = layout.printOptions.summary {
+            HStack(spacing: 6) {
+                Image(systemName: "slider.horizontal.3")
+                Text(options).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 0)
+                Button("Reset") { layout.printOptions = PrintOptionsDraft() }
+                    .buttonStyle(.link)
+            }
+            .font(.caption)
+            .foregroundStyle(.orange)
         } else if let state = layout.state {
             HStack(spacing: 6) {
                 summary(state, layout)
@@ -239,6 +274,8 @@ struct JobStatusLine: View {
         case .epub: "EPUB"
         case .markdown: "Markdown"
         case .html: "HTML"
+        case .docx: "Word"
+        case .plainText: "Plain Text"
         }
     }
 }
@@ -283,5 +320,50 @@ struct FinishingPanel<Content: View>: View {
                 systemImage: "doc.richtext",
                 description: Text("Open a document to set up its pages, print it, or export it."))
         }
+    }
+}
+
+/// What Print covers and how it is marked: a range of it, and a watermark — for a read
+/// copy, a draft sent out, or a copy for each reader with their name across the page.
+struct PrintOptionsPopover: View {
+    @Environment(AppModel.self) private var model
+    let hasSelection: Bool
+
+    var body: some View {
+        @Bindable var layout = model.pageLayout
+        Form {
+            Picker("Print", selection: $layout.printOptions.range) {
+                Text("Everything").tag(PrintRange.all)
+                Text("The Current Chapter").tag(PrintRange.currentChapter)
+                Text("The Selection").tag(PrintRange.selection)
+                    .disabled(!hasSelection)
+            }
+            TextField("Pages", text: $layout.printOptions.pages, prompt: Text("All, or e.g. 3–7, 10"))
+            TextField("Watermark", text: $layout.printOptions.watermark, prompt: Text("e.g. DRAFT, or Copy for {recipient}"))
+            if !layout.printOptions.watermark.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("A Copy Each For")
+                    TextEditor(text: $layout.printOptions.recipients)
+                        .font(.body)
+                        .frame(height: 54)
+                        .scrollContentBackground(.hidden)
+                        .background(.background, in: .rect(cornerRadius: 4))
+                    Text("One name a line. Each copy has its reader’s name in place of {recipient}; as a PDF, each is a file of its own.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack {
+                Button("Reset") { layout.printOptions = PrintOptionsDraft() }
+                    .disabled(layout.printOptions.isDefault)
+                Spacer()
+                Button("Print…") { layout.print(layout.scope) }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 340)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }

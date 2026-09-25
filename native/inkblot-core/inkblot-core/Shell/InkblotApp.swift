@@ -126,6 +126,11 @@ struct InkblotCommands: Commands {
                 .disabled(!model.pageLayout.hasDocument || !model.pageLayout.bindingEnabled)
         }
         CommandGroup(after: .importExport) {
+            Button(model.pageLayout.lastExport.map { "Export Again: \(URL(fileURLWithPath: $0.path).lastPathComponent)" } ?? "Export Again") {
+                model.pageLayout.exportAgain()
+            }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+            .disabled(model.pageLayout.lastExport == nil || !model.pageLayout.hasDocument)
             Menu("Export") {
                 exportItems(.document)
             }
@@ -225,9 +230,12 @@ struct InkblotCommands: Commands {
     @ViewBuilder
     private func exportItems(_ scope: PrintScope) -> some View {
         Button("PDF…") { model.pageLayout.export(.pdf, scope: scope) }
+        Button("Word (.docx)…") { model.pageLayout.export(.docx, scope: scope) }
         Button("EPUB…") { model.pageLayout.export(.epub, scope: scope) }
+        Divider()
         Button("Markdown…") { model.pageLayout.export(.markdown, scope: scope) }
         Button("HTML…") { model.pageLayout.export(.html, scope: scope) }
+        Button("Plain Text…") { model.pageLayout.export(.plainText, scope: scope) }
     }
 
     private func markToggle(_ title: String, _ mark: MarkKind, _ isOn: KeyPath<ActiveMarks, Bool>) -> some View {

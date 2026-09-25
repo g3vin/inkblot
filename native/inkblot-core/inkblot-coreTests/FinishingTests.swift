@@ -281,4 +281,37 @@ struct FinishingTests {
         layout.setCover(nil)
         #expect(wire.commands.last?.payload["path"] == nil)
     }
+
+    @Test func printOptionsGoWithEveryPrintAndOnlyWithAPDF() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        #expect(layout.printOptions.summary == nil)
+        layout.printOptions.range = .currentChapter
+        layout.printOptions.pages = " 3-7 "
+        layout.printOptions.watermark = "Copy for {recipient}"
+        layout.printOptions.recipients = "Sam\n\n  Alex \n"
+        #expect(layout.printOptions.summary == "Printing current chapter, pages 3-7, watermarked, 2 copies")
+
+        layout.print(.document)
+        let printed = try #require(wire.commands.last?.payload["options"] as? [String: Any])
+        #expect(printed["range"] as? String == "currentChapter")
+        #expect(printed["pages"] as? String == "3-7")
+        #expect(printed["recipients"] as? [String] == ["Sam", "Alex"])
+
+        layout.export(.pdf, scope: .folder)
+        #expect((wire.commands.last?.payload["options"] as? [String: Any])?["watermark"] as? String == "Copy for {recipient}")
+        layout.export(.docx, scope: .folder)
+        #expect(wire.commands.last?.payload["format"] as? String == "docx")
+        #expect((wire.commands.last?.payload["options"] as? [String: Any])?["watermark"] as? String == "")
+
+        layout.exportAgain()
+        #expect(wire.commands.last?.type == "exportAgain")
+    }
+
+    @Test func recipientsWithoutAWatermarkAreNotSent() {
+        var options = PrintOptionsDraft()
+        options.recipients = "Sam"
+        #expect(options.options.recipients.isEmpty)
+        #expect(options.isDefault)
+    }
 }

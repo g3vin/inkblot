@@ -999,7 +999,8 @@ export type NativeCommand =
 	| { type: "refreshBookChapters", payload: RefreshBookChaptersCommand }
 	| { type: "setPrintScope", payload: SetPrintScopeCommand }
 	| { type: "setAuthorProfile", payload: SetAuthorProfileCommand }
-	| { type: "setBookCover", payload: SetBookCoverCommand };
+	| { type: "setBookCover", payload: SetBookCoverCommand }
+	| { type: "exportAgain", payload: ExportAgainCommand };
 
 /**
  * A command, with its place in the stream.
@@ -1420,11 +1421,19 @@ export interface EventEnvelope {
 	event: WebviewEvent;
 }
 
+/** Export the last export again — same format, scope and file — without asking where. */
+export interface ExportAgainCommand {
+}
+
 export enum ExportFormat {
 	Pdf = "pdf",
 	Epub = "epub",
 	Markdown = "markdown",
 	Html = "html",
+	/** Word, for an editor or an agent: styles, sections, headers and footers. */
+	Docx = "docx",
+	/** Plain text, for a submission form or an email. */
+	PlainText = "plainText",
 }
 
 /** What a print or export covers. */
@@ -1437,12 +1446,40 @@ export enum PrintScope {
 	Project = "project",
 }
 
+/** Which part of what the scope covers is printed. */
+export enum PrintRange {
+	All = "all",
+	/**
+	 * The chapter the cursor is in: the active document in a book, or the Heading 1
+	 * section around the cursor in a document.
+	 */
+	CurrentChapter = "currentChapter",
+	/** The selected text, laid out alone. */
+	Selection = "selection",
+}
+
+/**
+ * How a print or a PDF is narrowed and marked. Every field is optional on the wire:
+ * no options is the whole thing, unmarked.
+ */
+export interface PrintOptions {
+	range: PrintRange;
+	/** Printed page numbers, as typed: `3-7, 10`. Empty prints every page. */
+	pages: string;
+	/** Text set faintly across every page — "DRAFT", or "Read copy for {recipient}". */
+	watermark: string;
+	/** Who a watermarked copy is for, one PDF each; filled into `{recipient}`. */
+	recipients: string[];
+}
+
 /** Export to a file. The page asks where (a save panel) and writes it. */
 export interface ExportDocumentCommand {
 	format: ExportFormat;
 	scope: PrintScope;
 	/** PDF only: imposed for binding. */
 	bound?: boolean;
+	/** PDF only: a range, a watermark. */
+	options?: PrintOptions;
 }
 
 /**
@@ -1565,6 +1602,13 @@ export interface JumpToAnchorCommand {
 	 * on disk.
 	 */
 	preferPositions: boolean;
+}
+
+/** The export Export Again repeats. */
+export interface LastExport {
+	format: ExportFormat;
+	scope: PrintScope;
+	path: string;
 }
 
 export interface MapBackground {
@@ -2142,12 +2186,17 @@ export interface PageLayoutState {
 	wordCount?: number;
 	/** The book's cover as a file on disk, for the Book tab's thumbnail. */
 	coverFile?: string;
+	/** The project's last export, for Export Again. */
+	lastExport?: LastExport;
+	/** Text is selected in the active document, so Print can print just that. */
+	hasSelection?: boolean;
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
 export interface PrintDocumentCommand {
 	scope: PrintScope;
 	bound: boolean;
+	options?: PrintOptions;
 }
 
 /** The shell finished (or abandoned) a `PrintRequest`. */

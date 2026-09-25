@@ -182,6 +182,27 @@ export const getBookForDoc = (projectName, docPath) => (
   getBookSettings(projectName, bookFolderForScope(projectName, docPath))
 )
 
+/* ---------------- the last export ---------------- */
+
+const LAST_EXPORT_PREFIX = 'inkblot-last-export:'
+
+/** The project's last export — format, scope and file — for Export Again, or null. */
+export const getLastExport = (projectName) => {
+  if (!projectName) return null
+  try {
+    const stored = JSON.parse(getPreference(`${LAST_EXPORT_PREFIX}${projectName}`) || 'null')
+    return stored?.format && stored?.path && SCOPES.includes(stored.scope) ? stored : null
+  } catch {
+    return null
+  }
+}
+
+export const setLastExport = (projectName, lastExport) => {
+  if (!projectName) return
+  setPreference(`${LAST_EXPORT_PREFIX}${projectName}`, JSON.stringify(lastExport))
+  emit()
+}
+
 /* ---------------- the page in view ---------------- */
 
 // Not persisted, and apart from the store's own listeners: it changes as the author
