@@ -6,7 +6,7 @@ const MotionG = motion.g;
 
 /*
  * The map editor's icons. Line glyphs on the same 24×24, 2px-stroke grid as the
- * rest of src/anicon (the shapes follow Lucide's), sharing one hover motion — a
+ * rest of src/icons (the shapes follow Lucide's), sharing one hover motion — a
  * small lift — instead of a hand-tuned animation each, because a toolbar of twenty
  * icons all doing something different would be noise.
  */

@@ -17,7 +17,7 @@
  * is handed.
  */
 import { JSDOM } from 'jsdom'
-import { installGlobals } from '../../canvas-tests/install-globals.mjs'
+import { installGlobals } from '../../unit/install-globals.mjs'
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>')
 installGlobals(dom.window, ['document', 'DOMParser', 'Node', 'Element', 'HTMLElement'])

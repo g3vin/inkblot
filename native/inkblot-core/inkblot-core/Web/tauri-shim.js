@@ -20,7 +20,7 @@
  * same reason the bridge's are (see `NativeHost` in `src/bridge/transport.ts`); bytes
  * travel as base64 inside them.
  *
- * Tested by `scripts/canvas-tests/shim.mjs`, against the wire formats the real
+ * Tested by `tests/unit/shim.mjs`, against the wire formats the real
  * `@tauri-apps/*` packages produce.
  */
 ;(() => {

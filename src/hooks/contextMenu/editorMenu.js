@@ -6,7 +6,7 @@
  */
 import { createQuoteNote } from '../../lib/noteUtils'
 import { bubbleSessionAt, sessionForms, showSessionForm } from '../../extensions/BubbleSession'
-import { paragraphForBubble, selectionForBubble } from '../../components/useBubbleSessions'
+import { paragraphForBubble, selectionForBubble } from '../useBubbleSessions'
 
 /* ------------------------------------------------------------
    Helper: Remove highlight only within selection (native behavior)

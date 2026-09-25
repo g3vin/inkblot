@@ -91,7 +91,7 @@ class Channel<T> {
  * a `send` sees the result) and it is also the honest default: `WKWebView`'s message
  * handlers are asynchronous, so anything that only works because delivery was
  * synchronous is a bug this transport is *hiding*. The bridge client is written not to
- * need it, and `scripts/canvas-tests/bridge.mjs` runs the same suite through a
+ * need it, and `tests/unit/bridge.mjs` runs the same suite through a
  * deferred transport to prove it.
  */
 export function createInProcessTransports(): InProcessTransports {

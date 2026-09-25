@@ -2,7 +2,7 @@
  * SFIcon.jsx — app-wide icon component.
  *
  * Maps SF-Symbols-style names (e.g. "doc.text", "magnifyingglass") onto the
- * animated icons in src/anicon. Icons animate when their nearest interactive
+ * animated icons in src/icons. Icons animate when their nearest interactive
  * ancestor (button, file item, tile, …) is hovered or focused, unless the OS
  * prefers reduced motion.
  */
@@ -83,7 +83,7 @@ import {
   IconUserRound,
   IconUsers,
   IconX,
-} from '../anicon'
+} from '../icons'
 
 const ICON_HOVER_TRIGGER_SELECTOR = [
   'button',
@@ -97,7 +97,7 @@ const ICON_HOVER_TRIGGER_SELECTOR = [
   '.sidebar-search-field',
 ].join(', ')
 
-/** Resolve an SF-Symbols-style name to its anicon component (search icon as fallback). */
+/** Resolve an SF-Symbols-style name to its icon component (search icon as fallback). */
 const renderIcon = (name, filled, props) => {
   const normalizedName = name.replace(/\.fill$/, '')
 

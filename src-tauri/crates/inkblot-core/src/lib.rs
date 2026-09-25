@@ -32,7 +32,7 @@
 //! Several modules implement logic the webview also implements in JavaScript
 //! (`src/lib/`). Each says "Mirrors `src/lib/X`" at its top; `npm run parity` runs one
 //! corpus through both and fails on any difference. Adding a mirrored function means
-//! a case module in `scripts/parity/cases/` and an arm in `bin/parity.rs`. Numbers
+//! a case module in `tests/parity/cases/` and an arm in `bin/parity.rs`. Numbers
 //! and strings must follow JavaScript's rules, not Rust's — `js_number`, `js_string`
 //! and `canvas_geometry`'s `js_*` helpers exist for that.
 
