@@ -3,9 +3,8 @@ import SwiftUI
 
 /// A document's toolbar: the formatting controls, in the window's own toolbar.
 ///
-/// This is `Toolbar.jsx`'s end state, and the reason Phase 4 inverted it: it renders the
-/// `ToolbarState` the page pushes and sends `NativeCommand`s, and never asks the document
-/// anything. Every command names the editor the state came from (`toolbar.target`), so a
+/// It renders the `ToolbarState` the page pushes and sends `NativeCommand`s, and never
+/// asks the document anything. Every command names the editor the state came from (`toolbar.target`), so a
 /// state drawn a frame ago cannot apply itself to an editor elected since. With no live
 /// editor — a canvas with no card open, an empty pane — `target` is absent and the
 /// controls are disabled rather than stale.

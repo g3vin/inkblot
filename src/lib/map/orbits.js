@@ -17,7 +17,6 @@
  */
 
 export const DAYS_PER_YEAR = 365.256363
-export const SUN_MASS_EARTHS = 332946.0487
 /** Default masses, in suns, for a body that does not say. */
 const DEFAULT_MASS = { star: 1, planet: 3.003e-6, dwarf: 2e-9, moon: 3.69e-8, belt: 0, station: 0, barycenter: 0 }
 const KEPLER_STEPS = 16
@@ -97,8 +96,6 @@ export function systemPositionsAt(system, day) {
   for (const id of bodies.keys()) resolve(id)
   return positions
 }
-
-export const bodyPositionAt = (system, id, day) => systemPositionsAt(system, day).get(id) || null
 
 /** A body's orbit as `samples` points around its parent (offsets, AU), closed. */
 export function orbitPath(body, bodies, samples = 128) {

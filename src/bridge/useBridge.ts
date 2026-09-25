@@ -45,7 +45,7 @@ export function useBridgeEvent<T extends EventType>(
  * the whole reason this exists.
  *
  * The value is boxed and held as `unknown`, and the cast on the way out is an
- * assertion rather than a check — the same kind Phase 3 documented. It is sound for a
+ * assertion rather than a check. It is sound for a
  * reason narrower than the type system can express here: the box has exactly one
  * writer, the subscription for `type` just below, so what comes out is what that event
  * put in. Holding it as `EventPayload<T>` directly does not typecheck, because
@@ -67,8 +67,7 @@ export function useBridgeState<T extends EventType>(
  * `registration` is read through a ref rather than depended on, because its accessors
  * are recreated on every render and re-registering on every render would churn the
  * registry for no reason. The accessors are what make that safe: the registry always
- * calls the current one — which is the same rule the editor hooks follow, and for the
- * same reason (see the handoff's note about `useEditorDnd` and accessors).
+ * calls the current one, so it never hands out an editor that has been replaced.
  */
 export function useRegisterEditor(
   target: EditorTarget,

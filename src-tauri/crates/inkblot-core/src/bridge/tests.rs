@@ -707,7 +707,7 @@ fn every_event() -> Vec<WebviewEvent> {
 }
 
 #[test]
-fn every_command_has_the_wire_name_the_handoff_promised() {
+fn every_command_has_its_documented_wire_name() {
     let names: Vec<String> = every_command().iter().map(tag_of).collect();
 
     assert_eq!(
@@ -793,7 +793,7 @@ fn every_command_has_the_wire_name_the_handoff_promised() {
 }
 
 #[test]
-fn every_event_has_the_wire_name_the_handoff_promised() {
+fn every_event_has_its_documented_wire_name() {
     let names: Vec<String> = every_event().iter().map(tag_of).collect();
 
     assert_eq!(

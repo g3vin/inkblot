@@ -3,7 +3,7 @@ import SwiftUI
 /// The History tab: the document's versions as a timeline of days and bursts of edits.
 ///
 /// Rows come from the core (`VersionHistory.rowsJson` — deltas, diff snippets and
-/// session colours, all computed by the same diff engine the page used). Grouping into
+/// session colours, all computed by the same diff engine the page uses). Grouping into
 /// days is done here because a "day" is the viewer's, in their time zone; the burst
 /// rule is the page's `groupVersions`: a new group at a named version, a new session,
 /// or a gap of more than fifteen minutes.
@@ -205,7 +205,7 @@ struct HistoryPanelView: View {
         }
     }
 
-    /// The change, as the page's ChangeSnippet drew it: context, then what was added
+    /// The change, as the page's ChangeSnippet draws it: context, then what was added
     /// and what was struck out.
     private func preview(_ row: VersionRow) -> Text {
         if let summary = row.summary { return Text(summary).foregroundStyle(.secondary) }

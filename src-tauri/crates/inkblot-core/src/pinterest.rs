@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use url::Url;
 
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 // `default` so that one malformed pin in a report cannot fail the deserialization of
 // the whole scrape and lose every other pin with it.

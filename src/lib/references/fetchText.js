@@ -13,10 +13,3 @@ export async function fetchText(url, { accept = '' } = {}) {
   if (!result || typeof result.body !== 'string') throw new Error('No response')
   return result
 }
-
-/** The body parsed as JSON, or an error that says what went wrong. */
-export async function fetchJson(url, options) {
-  const result = await fetchText(url, options)
-  if (result.status >= 400) throw new Error(`HTTP ${result.status}`)
-  return JSON.parse(result.body)
-}

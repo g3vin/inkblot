@@ -22,8 +22,8 @@ import { resolveCanvasColor } from '../lib/canvasModel'
  *
  * refX is the marker's own x that lands ON the path's endpoint. It must be the TIP
  * (x = 9), not 8: at refX=8 the head overshoots the endpoint by one unit — and a
- * marker unit is a stroke-width, so the tip poked ~2px past the anchor and under the
- * card, which paints above the edge layer. That is the clipped-tip bug.
+ * marker unit is a stroke-width, so the tip pokes ~2px past the anchor and under the
+ * card, which paints above the edge layer.
  */
 function ArrowMarkers({ colors }) {
   return (

@@ -6,7 +6,7 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
 
-    /* Incremental adoption: the existing .js/.jsx is resolvable so a .ts file can
+    /* Mixed codebase: .js/.jsx is resolvable so a .ts file can
        import it, but is NOT type-checked. Turn checkJs on per-file with
        // @ts-check, or convert the file outright. */
     "allowJs": true,

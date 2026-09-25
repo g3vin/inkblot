@@ -31,10 +31,9 @@ const getPopupPosition = (x, y) => ({
  * hit-tests drops with elementFromPoint, and a real dragstart would fight the buttons
  * living inside every note tile.
  *
- * The note's TEXTAREA is a legitimate place to start a drag, and this is the whole
- * reason the first version of this didn't work: `.note-textarea` is width:100% and
- * fills the tile, so nearly every press lands on it. Skipping textareas outright left
- * only a few pixels of margin actually draggable. So a press on the textarea arms a
+ * The note's TEXTAREA is a legitimate place to start a drag: `.note-textarea` is
+ * width:100% and fills the tile, so nearly every press lands on it, and skipping
+ * textareas outright would leave only a few pixels of margin draggable. So a press on the textarea arms a
  * drag too — unless it is already focused, in which case the user is editing and the
  * pointer belongs to their text selection.
  */

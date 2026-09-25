@@ -36,6 +36,9 @@ export async function canvasMenu(ctx) {
     if (onNode) {
       items.push(
         await PredefinedMenuItem.new({ item: 'Separator' }),
+        await MenuItem.new({ text: 'Bring to Front', accelerator: 'CmdOrCtrl+Shift+]', action: () => run('bring-to-front') }),
+        await MenuItem.new({ text: 'Send to Back', accelerator: 'CmdOrCtrl+Shift+[', action: () => run('send-to-back') }),
+        await PredefinedMenuItem.new({ item: 'Separator' }),
         await MenuItem.new({ text: 'Delete', action: () => run('delete') })
       )
     }

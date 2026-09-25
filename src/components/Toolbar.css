@@ -39,8 +39,8 @@
 }
 
 /* Nothing in the toolbar may shrink. The titlebar column is narrow and flex
-   items default to shrinking, which used to squash the color swatches down to
-   an unclickable sliver; the toolbar scrolls instead. */
+   items default to shrinking, which would squash the color swatches down to an
+   unclickable sliver; the toolbar scrolls instead. */
 .toolbar > * {
   flex: 0 0 auto;
 }
@@ -135,8 +135,8 @@
   background: var(--surface-active);
 }
 
-/* Font names are arbitrary now that the list comes from the OS, so clip long
-   ones rather than letting the control stretch the titlebar. */
+/* Font names come from the OS and can be any length, so clip long ones rather
+   than letting the control stretch the titlebar. */
 .toolbar-select-font {
   width: 104px;
   text-overflow: ellipsis;

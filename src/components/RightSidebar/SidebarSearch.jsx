@@ -1,18 +1,18 @@
 /**
  * SidebarSearch.jsx — the right sidebar's one search bar, on every panel.
  *
- * Collapsed it is the filter box the sidebar always had. Focused, it expands
- * downward into the whole search surface that used to be a separate Search tab:
- * scopes, match options, find-and-replace, results, and — while the query is
+ * Collapsed it is a filter box. Focused, it expands downward into the whole search
+ * surface: scopes, match options, find-and-replace, results, and — while the query is
  * empty — what you probably want to search from where you are standing.
  *
  * The default scope is `panel`, which filters the panel showing beneath it
- * (clipboard entries, tiles, notes, versions) exactly as before. Picking any
+ * (clipboard entries, tiles, notes, versions). Picking any
  * other scope switches the bar from filtering to searching: it renders its own
  * results and stops filtering the panel, so the two never fight.
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import SFIcon from '../SFIcon'
+import { documentSurface } from '../../bridge'
 import { listProjectTree, loadDocument } from '../../lib/FileSystem'
 import {
   SEARCH_SCOPES,
@@ -214,6 +214,21 @@ export default function SidebarSearch({
     const index = documentResults.findIndex((result) => result.id === selectedResultId)
     return index === -1 ? 0 : index
   }, [documentResults, selectedResultId])
+
+  // The open document's matches, for a shell that marks them (a scrollbar gutter, the
+  // native find bar). Only this scope: project results carry no live positions, and
+  // `inkblot-core` answers those itself. The inline copy is inactive while the overlay
+  // is up, so one search is not published twice.
+  const matchesDocPath = activeDoc || currentDoc || ''
+  useEffect(() => {
+    if (!active || scope !== 'document' || !matchesDocPath) return
+    documentSurface.publishSearchMatches({
+      query: deferredQuery,
+      docPath: matchesDocPath,
+      results: documentResults,
+      activeIndex: selectedIndex === -1 ? undefined : selectedIndex,
+    })
+  }, [active, deferredQuery, documentResults, matchesDocPath, scope, selectedIndex])
 
   /* ---- Actions ---- */
 

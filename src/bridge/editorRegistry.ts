@@ -1,20 +1,16 @@
 /**
  * editorRegistry.ts — which editor `EditorTarget.Primary` means right now.
  *
- * **Sharp edge #5.** Today the active editor is a live TipTap object passed around by
- * reference: panes elect one on mouse movement, `CanvasCardEditor` registers itself on
- * mount, and `EditorLayout` reads `__inkblotCanvasCard` off the winner to tell the
- * third state apart. All three steps assume the holder and the editor are in one heap.
- *
- * Across a process boundary only a *name* can travel, so the protocol names three
- * (`EditorTarget`) and this registry is where a name is turned back into an object —
- * on the webview side, the only side that has one. The shell holds names; the surface
- * holds this.
+ * Panes elect an active editor on mouse movement and a canvas card editor claims the
+ * election while it is open. Across a process boundary only a *name* can travel, so
+ * the protocol names three targets (`EditorTarget`: `primary`, `secondary`,
+ * `canvasCard`) and this registry is the only place a name is turned back into a live
+ * editor — on the webview side, the only side that has one. The shell holds names; the
+ * surface holds this.
  *
  * **Everything is registered as an accessor, never as a value.** A TipTap editor is
  * replaced when a pane swaps documents, and a registry holding the old object would
- * hand out a destroyed editor. This is the same rule the hooks follow for the same
- * reason — see the handoff's note about `useEditorDnd` and accessors.
+ * hand out a destroyed editor. Hooks that take an editor follow the same rule.
  */
 import type { EditorTarget } from '../types'
 import { isEditorReady } from '../lib/editorUtils'
@@ -90,8 +86,7 @@ export function createEditorRegistry(): EditorRegistry {
         registrations.delete(target)
         // Withdrawing the winner is a change in the election result even though the
         // election did not run again. Without this the shell keeps rendering a toolbar
-        // for an editor that no longer exists — which is the destroyed-editor bug
-        // `CanvasCardEditor`'s unmount already guards against by hand.
+        // for an editor that no longer exists.
         if (target === activeTarget) announce()
       }
     },

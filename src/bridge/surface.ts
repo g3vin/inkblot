@@ -58,7 +58,14 @@ import type {
   ToolbarState,
   ViewOptions,
 } from '../types'
-import type { CommandPayload, CommandType, SurfaceBridge, Unsubscribe } from './client'
+import type {
+  CommandPayload,
+  CommandType,
+  RequestHandler,
+  RequestType,
+  SurfaceBridge,
+  Unsubscribe,
+} from './client'
 import type { EditorRegistry, ResolvedEditor } from './editorRegistry'
 import { createCoalescer, frameScheduler, type Scheduler } from './coalesce'
 import { TOOLBAR_DEFAULTS, readSelectionContext, readToolbarState } from './readState'
@@ -108,7 +115,15 @@ export interface DocumentSurface {
     handler: (payload: CommandPayload<T>) => void
   ): Unsubscribe
 
-  /** The remembered highlight color, which is now protocol state rather than editor storage. */
+  /**
+   * Answer a request, for the component that owns the answer — `ReadAloudControl` and
+   * `getReadAloudPayload`, which needs the read aloud module this file does not load.
+   * One handler per request: a later registration replaces an earlier one, and
+   * unsubscribing a replaced handler leaves its replacement in place.
+   */
+  onRequest<T extends RequestType>(type: T, handler: RequestHandler<T>): Unsubscribe
+
+  /** The remembered highlight color. It is protocol state, not editor storage. */
   lastHighlightColor(): string
 
   /** Read the active editor and push a `toolbarState`. Coalesced to one per frame. */
@@ -137,7 +152,7 @@ export interface DocumentSurface {
   /**
    * The right sidebar's state, for a shell that draws the sidebar itself. Notes, the
    * clipboard and tiles each carry the whole list, which is what makes coalescing
-   * them to one per frame safe (sharp edge #4) — a keystroke in a note would otherwise
+   * them to one per frame safe (see `coalesce.ts`) — a keystroke in a note would otherwise
    * be a message per keystroke.
    */
   publishNotesChanged(payload: NotesChanged): void
@@ -397,9 +412,9 @@ export function createDocumentSurface({
   }))
 
   /* `getReadAloudPayload` has no handler here on purpose. Building it needs the read
-     aloud chunker and the document's block structure, which `ReadAloudControl` owns;
-     it registers its own handler while it is mounted. An unanswered request replies
-     with an error rather than hanging — see `createSurfaceBridge`. */
+     aloud module, which loads Kokoro and which `ReadAloudControl` already owns; it
+     registers the handler through `onRequest` while it is mounted. When it is not, the
+     request replies with an error rather than hanging — see `createSurfaceBridge`. */
 
   /* ---------------- publishers ---------------- */
 
@@ -425,6 +440,11 @@ export function createDocumentSurface({
   return {
     setDelegates(next) { delegates = next },
     onCommand: (type, handler) => bridge.onCommand(type, handler),
+    onRequest(type, handler) {
+      const unsubscribe = bridge.onRequest(type, handler)
+      subscriptions.push(unsubscribe)
+      return unsubscribe
+    },
     lastHighlightColor: () => lastHighlightColor,
 
     publishToolbarState,

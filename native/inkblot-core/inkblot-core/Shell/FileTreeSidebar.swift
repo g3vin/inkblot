@@ -1,7 +1,10 @@
+#if os(macOS)
 import AppKit
+#endif
 import SwiftUI
 
-/// The project's files, natively — what replaces the page's `LeftSidebar`/`FileTree`.
+/// The project's files, natively — the Swift app's counterpart to the page's
+/// `LeftSidebar`/`FileTree`, which do not render when this does.
 ///
 /// Browsing is local: the tree is read from disk by the core and kept current by
 /// FSEvents (`ProjectTree`). **Every change goes through the page**, as a protocol
@@ -244,10 +247,17 @@ struct FileTreeSidebar: View {
         }
     }
 
+    /// Show in Finder. There is no Finder on iPadOS; the Files app is the nearest thing,
+    /// and it can only be sent a folder.
     private func reveal(_ entry: TreeEntry) {
         guard let root = model.tree.projectRoot else { return }
         let base = URL(fileURLWithPath: root).appendingPathComponent(entry.path)
+        #if os(macOS)
         NSWorkspace.shared.activateFileViewerSelecting([entry.isFolder ? base : base.appendingPathExtension("json")])
+        #else
+        let folder = entry.isFolder ? base : base.deletingLastPathComponent()
+        if let files = URL(string: "shareddocuments://" + folder.path) { Platform.open(files) }
+        #endif
     }
 }
 

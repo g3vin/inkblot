@@ -18,7 +18,7 @@ enum ToolbarID {
 /// or reuse one.** An item that goes away keeps its case, marked deprecated, until
 /// nobody's layout can still name it; AppKit skips ids a toolbar no longer offers.
 ///
-/// Adding an item — the whole recipe is in HANDOFF.md, "The toolbar is customizable":
+/// Adding an item — the whole recipe is in ARCHITECTURE.md, "A toolbar item":
 ///
 /// 1. A case here, with a new `inkblot.<area>.<name>` string.
 /// 2. A `ToolbarItem(id:)` in `DocumentToolbar`, `CanvasToolbar`, or — for one that
@@ -72,8 +72,8 @@ enum ToolbarItemID: String, CaseIterable {
     case notesPanel = "inkblot.panel.notes"
     case historyPanel = "inkblot.panel.history"
     case referencesPanel = "inkblot.panel.references"
-    /// No longer a toolbar item — the toggle is a titlebar accessory now
-    /// (`InspectorTitlebarToggle`). Kept because saved layouts may still name it.
+    /// Retired: the toggle is a titlebar accessory (`InspectorTitlebarToggle`), not a
+    /// toolbar item. Kept because saved layouts may still name it.
     case inspectorToggle = "inkblot.window.inspector-toggle"
 
     var id: String { rawValue }

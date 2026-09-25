@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web (lint, typecheck, unit tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  rust:
+    name: Rust (build, tests, parity, generated types)
+    # macOS: the crates link CoreText, Metal and Accelerate, and the Swift half of
+    # `types:check` needs swiftc.
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      # tauri::generate_context! embeds dist/, so it has to exist before cargo runs.
+      - run: npm run build
+      - name: cargo build
+        working-directory: src-tauri
+        run: cargo build --workspace --locked
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --workspace --locked
+      - run: npm run parity
+      - name: Install typeshare
+        # Pinned: a different typeshare can format the output differently.
+        run: command -v typeshare || cargo install typeshare-cli --version 1.13.4 --locked
+      - run: npm run types:check

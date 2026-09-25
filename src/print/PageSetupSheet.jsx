@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { getPreference, setPreference } from '../lib/preferences'
 import { bookFolderFor } from './compile'
 import { effectivePageSetup } from './DocPageSetup'
 import { SIGNATURE_GUIDANCE } from './imposition'
@@ -24,12 +25,8 @@ import './PageSetupSheet.css'
 
 const UNIT_KEY = 'inkblot-page-units'
 const defaultUnit = () => {
-  try {
-    const stored = window.localStorage.getItem(UNIT_KEY)
-    if (stored) return stored
-  } catch {
-    // Storage can be unavailable; the locale default is fine.
-  }
+  const stored = getPreference(UNIT_KEY)
+  if (stored) return stored
   return (navigator.language || '').endsWith('-US') ? 'in' : 'mm'
 }
 
@@ -88,11 +85,7 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
   const book = getBookSettings(projectName, folder)
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(UNIT_KEY, unit)
-    } catch {
-      // Not remembered; not needed.
-    }
+    setPreference(UNIT_KEY, unit)
   }, [unit])
 
   useEffect(() => {

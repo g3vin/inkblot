@@ -11,11 +11,6 @@
  * is elected by mouse movement and can be a canvas card that mounts and unmounts as
  * the user double-clicks around a board. A hook holding one editor would have to be
  * remounted on every election; a hook holding the registry is told.
- *
- * `Toolbar.jsx` used to own this loop, with its own `requestAnimationFrame` and its own
- * change-detection. Both are still here — the frame coalescing in `coalesce.ts`, the
- * change detection in React's own `setState` bailout — they are just no longer inside
- * a component that has to be next to the editor to do it.
  */
 import { useEffect } from 'react'
 import { documentSurface, editorRegistry } from './appBridge'

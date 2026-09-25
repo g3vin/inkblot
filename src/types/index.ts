@@ -21,7 +21,7 @@
  * the Rust field says so.
  *
  * It also holds `Loose<T>`, which is about neither: it is the input side of a
- * normalizer, and normalizers are most of what Phase 3 converted.
+ * normalizer — data from disk or another process that the normalizer does not control.
  */
 export * from './inkblot-core'
 

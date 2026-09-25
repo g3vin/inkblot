@@ -1,11 +1,10 @@
 /**
  * commands.ts — running a `NativeCommand` against a live editor.
  *
- * The mirror of `readState.ts`. Everything here was a method body inside `Toolbar.jsx`
- * — `applyColor`, `applyHighlight`, `applyFont`, `applyAlignment`, `insertTable` — and
- * everything here is a transcription of it rather than a reimplementation. The one
- * thing that changes is where it is called from: a struct off the bridge, instead of an
- * `onClick` two lines from the editor it drives.
+ * The mirror of `readState.ts`: formatting, alignment, tables, selection and text
+ * insertion, each driven by a command struct off the bridge rather than by a click
+ * next to the editor. Every toolbar and menu — the page's and the native shell's —
+ * reaches the editor through these.
  *
  * Each function takes the resolved editor, because resolving a target is the registry's
  * job and doing it twice is how the two disagree.

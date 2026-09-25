@@ -9,8 +9,8 @@
  * no file read required.
  *
  * The kind is deliberately NOT read from a `type` field inside the file:
- * saveDocument() whitelists the keys it writes, so any such field is unreliable
- * (FileTree has been writing a `type: 'doc'` that gets silently dropped).
+ * saveDocument() whitelists the keys it writes, so any such field would be
+ * silently dropped.
  */
 
 export const CANVAS_SUFFIX = '.canvas'

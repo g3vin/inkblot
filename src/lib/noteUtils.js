@@ -20,13 +20,6 @@ export const NOTE_COLOR_OPTIONS = [
   '#ffb86b',
 ]
 
-export const NOTE_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Notes' },
-  { value: 'pinned', label: 'Pinned' },
-  { value: 'quote', label: 'Anchored' },
-  { value: 'free', label: 'Free Notes' },
-]
-
 const nowIso = () => new Date().toISOString()
 
 /** Format a note timestamp as a short local time (e.g. "5:32 PM"). */
@@ -225,11 +218,4 @@ export const compareNotes = (a, b) => {
   }
 
   return compareDatesDesc(a.updatedAt, b.updatedAt)
-}
-
-export const matchesNoteFilter = (note, filterValue = 'all') => {
-  if (filterValue === 'pinned') return note.pinned
-  if (filterValue === 'quote') return note.type === 'quote'
-  if (filterValue === 'free') return note.type === 'free'
-  return true
 }

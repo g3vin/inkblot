@@ -12,7 +12,6 @@ import { getProjectOpenId as readProjectOpenId } from '../lib/projectContext'
 
 export const PINTEREST_CACHE_PREFIX = 'inkblot:pinterest-preview:'
 export const PINTEREST_PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
-export const PINTEREST_PROJECT_OPEN_ID_KEY = 'inkblot:project-open-id'
 export const PINTEREST_CACHE_VERSION = 1
 export const PINTEREST_CACHE_MAX_ITEMS = 80
 
@@ -27,10 +26,8 @@ export const getPinterestCacheKey = (url) => {
 /**
  * Which open of which project this is.
  *
- * Was `window.__inkblotProjectOpenId`, set by Editor.jsx and read from here — a node
- * view, with no React path back to the component that knows. It is still ambient for
- * that reason, but it is `lib/projectContext` now rather than a property anything can
- * assign, and that module keeps the same fall-through to the session store.
+ * Read from `lib/projectContext`, because a node view has no React path back to the
+ * component that knows.
  */
 export const getProjectOpenId = () => readProjectOpenId()
 

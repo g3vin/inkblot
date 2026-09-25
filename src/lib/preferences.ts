@@ -1,20 +1,18 @@
 /**
- * preferences.ts — where the app's settings live now that `localStorage` cannot.
+ * preferences.ts — the app's settings, stored on disk under AppData.
  *
- * A native shell cannot see `localStorage`. A `WKWebView` in a Swift app gets its own
- * store, per origin, that no native code can read — so a theme chosen in the webview
- * would be invisible to a native titlebar, and a file tree rewritten in Swift would be
- * invisible to the webview. Everything moves to disk under AppData, where both reach
- * it, through `inkblot_core::store::preferences`.
+ * Not `localStorage`: a `WKWebView` in a Swift app gets its own store, per origin,
+ * that no native code can read — so a theme chosen in the webview would be invisible
+ * to native chrome, and vice versa. On disk, through `inkblot_core::store::preferences`,
+ * both shells read the same values. Never use `localStorage` for app state.
  *
- * **The API stays synchronous.** Every call site reads during render — a `useState`
+ * **The API is synchronous.** Every call site reads during render — a `useState`
  * initializer, a node view's constructor — and none of them can await. So the whole
  * store is hydrated once, before React mounts (see `main.jsx`), and reads answer from
- * that cache. Writes update the cache immediately and reach disk on their own time;
- * nothing waits for them, which is exactly the bargain `localStorage` offered.
+ * that cache. Writes update the cache immediately and reach disk on their own time.
  *
- * A write that fails is logged and dropped, because that is also what `localStorage`
- * did when it was full — losing a remembered accent colour must not take the app down.
+ * A write that fails is logged and dropped — losing a remembered accent colour must
+ * not take the app down.
  *
  * ## Scopes
  *
@@ -22,12 +20,12 @@
  * the theme with it, and so the file read at every launch stays small. A key is routed
  * to its scope by prefix; see `scopeFor`.
  *
- * ## `sessionStorage` did not move
+ * ## Session values stay in memory
  *
  * `inkblot:project-open-id` and the per-project Pinterest refresh flag describe one app
- * launch. On disk they would outlive the thing they describe, so they are an in-memory
- * Map here — which is what `sessionStorage` was, in a shell where the webview lives
- * exactly as long as the app.
+ * launch. On disk they would outlive the thing they describe (a stale "already
+ * refreshed" flag is a board that never refreshes again), so they are an in-memory Map
+ * here (`getSessionValue` / `setSessionValue`).
  */
 import { invoke } from '@tauri-apps/api/core'
 
@@ -86,8 +84,8 @@ export function getPreference(key: string): string | null {
 
 /**
  * Values are strings, because that is what the store holds and what `getPreference`
- * hands back. The `String()` is still here for the call sites that are plain JS and
- * so are not held to this signature yet.
+ * hands back. The `String()` guards the plain-JS call sites, which the type checker
+ * does not hold to this signature.
  */
 export function setPreference(key: string, value: string): void {
   const scope = scopeFor(key)
@@ -129,17 +127,6 @@ export function renamePreferencePrefix(fromPrefix: string, toPrefix: string): vo
   invoke('preferences_rename_prefix', { scope, fromPrefix, toPrefix }).catch((error) => {
     console.error('[preferences] rename failed for %s:', fromPrefix, error)
   })
-}
-
-/** Every key currently held in a scope — what a prefix scan used to need. */
-export function preferenceKeys(prefix: string = ''): string[] {
-  const keys: string[] = []
-  for (const scoped of cache.values()) {
-    for (const key of scoped.keys()) {
-      if (key.startsWith(prefix)) keys.push(key)
-    }
-  }
-  return keys
 }
 
 /* ---------------- session state ---------------- */

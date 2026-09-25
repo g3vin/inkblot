@@ -187,11 +187,6 @@ export const clearDictationInlineRange = (editor) => {
   return editor.commands.clearDictationInlineRange()
 }
 
-export const getDictationInlineRange = (editor) => {
-  if (!editor || editor.isDestroyed) return null
-  return DICTATION_INLINE_PLUGIN_KEY.getState(editor.state)?.range || null
-}
-
 export const getDictationInlineState = (editor) => {
   if (!editor || editor.isDestroyed) return null
   return DICTATION_INLINE_PLUGIN_KEY.getState(editor.state) || null

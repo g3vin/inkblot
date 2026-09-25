@@ -1,24 +1,23 @@
 /**
- * transport.ts — how the two halves are wired together, and the one implementation
- * that exists today.
+ * transport.ts — how the shell and surface ends are wired together.
  *
- * The protocol says what is said. A transport says how it gets there, and it is the
- * only part of the bridge that changes when the Swift shell arrives:
+ * The protocol says what is said; a transport says how it gets there. It is the only
+ * part of the bridge that differs between hosts:
  *
- *   - today, `createInProcessTransports()` — both halves in one JavaScript heap,
- *     talking through function calls
- *   - Phase 5, a `WKWebView` pair: the shell posts with `evaluateJavaScript`, the
- *     surface posts with `webkit.messageHandlers.inkblot.postMessage`
+ *   - `createInProcessTransports()` — both ends in one JavaScript heap, talking through
+ *     function calls. The Tauri app and the test harness.
+ *   - `createNativeHostTransports()` — the Swift shell, reached through the
+ *     `window.__inkblotNative` object its injected `native-host.js` provides, merged
+ *     onto the in-process pair (see below).
  *
- * Nothing above this file knows which. That is the whole reason the React shell is
- * being moved onto the bridge now rather than after the port: the reference transport
- * proves the protocol with a test suite instead of with a debugger attached to Xcode.
+ * Nothing above this file knows which, so the test suites exercise the same client and
+ * surface code the Swift shell talks to.
  *
  * **Messages are copied, not shared.** The in-process transport round-trips every
  * message through JSON, which is slower than passing the object and is the point: a
  * handler that mutates what it was given, or a payload holding something unserializable
- * like a live `EditorView`, fails here rather than in Phase 5. That is the exact class
- * of bug `NoteAnnotation.js:155` is today.
+ * like a live `EditorView`, fails here, under test, rather than only across a real
+ * process boundary.
  */
 import type { InboundMessage, OutboundMessage } from '../types'
 
@@ -92,7 +91,7 @@ class Channel<T> {
  * a `send` sees the result) and it is also the honest default: `WKWebView`'s message
  * handlers are asynchronous, so anything that only works because delivery was
  * synchronous is a bug this transport is *hiding*. The bridge client is written not to
- * need it, and `scripts/canvas-tests/bridge.mjs` runs the same suite through a
+ * need it, and `tests/unit/bridge.mjs` runs the same suite through a
  * deferred transport to prove it.
  */
 export function createInProcessTransports(): InProcessTransports {
@@ -193,9 +192,9 @@ const NATIVE_REQUEST_PREFIX = 'native:'
 /**
  * Two shells, one surface: the React chrome in this process, and the Swift shell.
  *
- * Phase 5 moves the chrome to Swift a piece at a time, and until the last piece has
- * moved both are driving the same document. So this is not a replacement for the
- * in-process pair but a third party on it:
+ * Some chrome is native in the Swift shell (file tree, inspector, toolbar) and some is
+ * still the page's (context menus, dialogs), and both drive the same document. So this
+ * is not a replacement for the in-process pair but a third party on it:
  *
  *   - **Events go to both.** They are one stream from one surface, so both shells see
  *     the same sequence numbers and neither sees a gap.

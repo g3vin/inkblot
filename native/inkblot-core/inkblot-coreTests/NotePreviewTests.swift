@@ -19,8 +19,8 @@ struct NotePreviewTests {
 
     /* ---------------- patches ---------------- */
 
-    /// It once called itself — every native note edit was a stack overflow, and the
-    /// compiler was content, because the recursion is perfectly well-typed.
+    /// Also guards `.with` against calling itself: that recursion is well-typed, so the
+    /// compiler would not catch it, and every native note edit would overflow the stack.
     @Test func aPatchNamesOnlyWhatChanged() throws {
         let patch = NotePatch.with(pinned: true, previewLayout: NotePreviewLayout(offsetX: 4, offsetY: 5))
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(patch)) as! [String: Any]

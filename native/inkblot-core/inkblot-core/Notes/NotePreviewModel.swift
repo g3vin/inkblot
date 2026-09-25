@@ -7,7 +7,7 @@ import SwiftUI
 /// Which note's hover cards are showing, and where their anchor is.
 ///
 /// The page reports its note markers (`useNativeNotePreviews`); this turns those reports
-/// into the same behaviour `NoteHoverPreview` had:
+/// into the same behaviour `NoteHoverPreview` has in the Tauri app:
 ///
 ///  - hovering a marker opens its cards. Leaving the marker watches where the pointer
 ///    goes: heading for the card keeps them open (it is on its way), heading anywhere

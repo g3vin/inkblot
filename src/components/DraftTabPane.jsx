@@ -9,9 +9,8 @@
  */
 import { useState } from 'react'
 import SFIcon from './SFIcon'
-import { documentExists } from '../lib/FileSystem'
-import { DOCUMENT_KINDS as KINDS, createDocumentOfKind, nameForKind } from '../lib/createDocument'
-import { stripDocSuffix } from '../lib/docKind'
+import { DOCUMENT_KINDS as KINDS } from '../lib/createDocument'
+import { createDraftDocument, DraftRefusal } from '../lib/draftDocument'
 
 export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
   const [kind, setKind] = useState('doc')
@@ -23,35 +22,18 @@ export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
     event?.preventDefault?.()
     if (creating || !projectName) return
 
-    // The `.canvas` or `.map` suffix is what routes a document to its editor, so it
-    // follows the kind being created — never whatever the user typed.
-    const bare = stripDocSuffix(name.trim())
-    if (!bare) {
-      setStatus('Give it a name first.')
-      return
-    }
-    if (bare.includes('/')) {
-      setStatus('Names can’t contain “/”.')
-      return
-    }
-
-    const path = nameForKind(bare, kind)
-
     setCreating(true)
     try {
-      // Writing over a document that already exists would destroy it, and the
-      // draft has no other way to notice — it never listed the project.
-      if (await documentExists(projectName, path)) {
-        setStatus('A document with that name already exists.')
-        return
-      }
-
-      await createDocumentOfKind(projectName, path, kind)
+      const path = await createDraftDocument(projectName, name, kind)
       await refreshFiles?.()
       onCreated?.(path)
     } catch (error) {
-      console.warn('Failed to create document:', error)
-      setStatus('Could not create that document.')
+      if (error instanceof DraftRefusal) {
+        setStatus(error.message)
+      } else {
+        console.warn('Failed to create document:', error)
+        setStatus('Could not create that document.')
+      }
     } finally {
       setCreating(false)
     }
@@ -98,7 +80,7 @@ export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
         {status ? <div className="draft-pane-status">{status}</div> : null}
 
         <p className="draft-pane-tip">
-          Or drag a file from the sidebar onto the dock below to open it in this tab bar.
+          Or open a document from the sidebar.
         </p>
       </form>
     </div>

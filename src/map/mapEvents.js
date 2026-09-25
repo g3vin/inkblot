@@ -36,8 +36,6 @@ export function registerMapSurface(element) {
   }
 }
 
-export const mapSurfaceById = (surfaceId) => (surfaceId ? surfacesById.get(surfaceId) || null : null)
-
 /** Run a map command (see MapSurface's handler for the vocabulary). */
 export function dispatchMapCommand(surface, command, detail = {}) {
   if (!surface) return false

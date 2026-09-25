@@ -17,8 +17,6 @@ export const PT_PER_INCH = 72
 export type LengthUnit = 'mm' | 'cm' | 'in' | 'pt'
 
 export const mmToPx = (mm: number): number => (mm * PX_PER_INCH) / MM_PER_INCH
-export const pxToMm = (px: number): number => (px * MM_PER_INCH) / PX_PER_INCH
-export const mmToPt = (mm: number): number => (mm * PT_PER_INCH) / MM_PER_INCH
 export const pxToPt = (px: number): number => (px * PT_PER_INCH) / PX_PER_INCH
 
 const PER_MM: Record<LengthUnit, number> = {
@@ -97,6 +95,3 @@ export const matchPageSizePreset = (widthMm: number, heightMm: number): PageSize
   const [w, h] = widthMm <= heightMm ? [widthMm, heightMm] : [heightMm, widthMm]
   return PAGE_SIZE_PRESETS.find((p) => Math.abs(p.widthMm - w) < 0.5 && Math.abs(p.heightMm - h) < 0.5) || null
 }
-
-/** Sheets a document can be printed onto for imposition — the common desktop printer sizes. */
-export const SHEET_SIZE_IDS = ['letter', 'a4', 'legal', 'tabloid', 'a3'] as const

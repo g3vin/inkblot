@@ -313,7 +313,7 @@
 }
 
 /* Side by side, the right pane's status row holds the bottom-right corner; the left
-   pane's corner is the middle of the window, where the tab dock floats. */
+   pane's corner is the middle of the window, so the controls sit higher there. */
 .split-active:not(.split-rows) .pl-status {
   bottom: 58px;
 }
