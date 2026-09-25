@@ -43,6 +43,7 @@ import {
 } from './projectPaths'
 import { withDocLock } from './docLock'
 import { relocateAttachments } from './references/referenceStore'
+import { relocateBooks } from '../print/bookStore'
 import {
   buildTextVersionEntry,
   emitVersionsChanged,
@@ -540,6 +541,7 @@ export async function deleteEntry(projectName, entryPath, type = 'file') {
     await remove(targetPath, { recursive: true })
     if (type === 'file') await relocateSidecar(root, rel, null)
     await relocateAttachments(root, rel, null, { folder: type === 'folder' })
+    await relocateBooks(projectName, rel, null, { folder: type === 'folder' })
   } catch (e) {
     console.error('Delete entry failed:', e)
   }
@@ -580,6 +582,7 @@ export async function duplicateEntry(projectName, entryPath) {
 
     await copyFile(source, filePathFor(root, candidate))
     await relocateAttachments(root, rel, candidate, { copy: true })
+    await relocateBooks(projectName, rel, candidate, { copy: true })
     return candidate
   } catch (e) {
     console.error('Duplicate entry failed:', e)
@@ -614,6 +617,7 @@ export async function renameEntry(projectName, entryPath, newName, type = 'file'
     await rename(oldPath, newPath)
     if (type === 'file') await relocateSidecar(root, rel, nextPath)
     await relocateAttachments(root, rel, nextPath, { folder: type === 'folder' })
+    await relocateBooks(projectName, rel, nextPath, { folder: type === 'folder' })
     return nextPath
   } catch (e) {
     console.error('Rename entry failed:', e)
@@ -651,6 +655,7 @@ export async function moveEntry(projectName, entryPath, targetFolderPath, type =
     await rename(oldPath, newPath)
     if (type === 'file') await relocateSidecar(root, rel, nextPath)
     await relocateAttachments(root, rel, nextPath, { folder: type === 'folder' })
+    await relocateBooks(projectName, rel, nextPath, { folder: type === 'folder' })
     return nextPath
   } catch (e) {
     console.error('Move entry failed:', e)

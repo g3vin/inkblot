@@ -137,6 +137,11 @@ final class PageLayoutModel {
         bridge.send(.setAuthorProfile(SetAuthorProfileCommand(profile: profile)))
     }
 
+    /// Give the book a cover from an image file, or take it away with nil.
+    func setCover(_ url: URL?) {
+        bridge.send(.setBookCover(SetBookCoverCommand(path: url?.path)))
+    }
+
     func refreshChapters() {
         bridge.send(.refreshBookChapters(RefreshBookChaptersCommand()))
     }
@@ -419,6 +424,19 @@ struct BookDraft: Equatable {
     var paperThicknessMm: Double
     var cropMarks: Bool
     var includeGuide: Bool
+    var excluded: [String]
+    var numbering: ChapterNumberStyle
+    var numberPrefix: String
+    var numberIncludesTitle: Bool
+    var halfTitle: Bool
+    var copyright: String
+    var dedication: String
+    var epigraph: String
+    var epigraphSource: String
+    var contents: Bool
+    var acknowledgements: String
+    var aboutTheAuthor: String
+    var alsoBy: String
 
     init(_ b: BookSettings) {
         folder = b.folder
@@ -435,6 +453,37 @@ struct BookDraft: Equatable {
         paperThicknessMm = b.binding.paperThicknessMm
         cropMarks = b.binding.cropMarks
         includeGuide = b.binding.includeGuide
+        excluded = b.excluded ?? []
+        numbering = b.chapterNumbering?.style ?? .none
+        numberPrefix = b.chapterNumbering?.prefix ?? "Chapter"
+        numberIncludesTitle = b.chapterNumbering?.includeTitle ?? true
+        halfTitle = b.frontMatter?.halfTitle ?? false
+        copyright = b.frontMatter?.copyright ?? ""
+        dedication = b.frontMatter?.dedication ?? ""
+        epigraph = b.frontMatter?.epigraph ?? ""
+        epigraphSource = b.frontMatter?.epigraphSource ?? ""
+        contents = b.frontMatter?.contents ?? false
+        acknowledgements = b.backMatter?.acknowledgements ?? ""
+        aboutTheAuthor = b.backMatter?.aboutTheAuthor ?? ""
+        alsoBy = b.backMatter?.alsoBy ?? ""
+    }
+
+    /// Leave a chapter in or out of the book.
+    mutating func include(_ path: String, _ included: Bool) {
+        excluded.removeAll { $0 == path }
+        if !included { excluded.append(path) }
+    }
+
+    /// The copyright page most books print, for the author to adjust.
+    static func suggestedCopyright(title: String, author: String, year: Int = Calendar.current.component(.year, from: .now)) -> String {
+        """
+        \(title.isEmpty ? "Untitled" : title)
+        Copyright © \(year) \(author.isEmpty ? "the author" : author)
+
+        All rights reserved. No part of this book may be reproduced in any form without written permission from the author, except for brief quotations in a review.
+
+        This is a work of fiction. Names, characters, places and incidents are the product of the author’s imagination or are used fictitiously.
+        """
     }
 
     var settings: BookSettings {
@@ -453,7 +502,14 @@ struct BookDraft: Equatable {
                 duplex: duplex,
                 paperThicknessMm: max(0, paperThicknessMm),
                 cropMarks: cropMarks,
-                includeGuide: includeGuide))
+                includeGuide: includeGuide),
+            // Always sent, never nil: a missing field would read on the page as "reset".
+            excluded: excluded,
+            chapterNumbering: ChapterNumbering(style: numbering, prefix: numberPrefix, includeTitle: numberIncludesTitle),
+            frontMatter: FrontMatter(
+                halfTitle: halfTitle, copyright: copyright, dedication: dedication,
+                epigraph: epigraph, epigraphSource: epigraphSource, contents: contents),
+            backMatter: BackMatter(acknowledgements: acknowledgements, aboutTheAuthor: aboutTheAuthor, alsoBy: alsoBy))
     }
 }
 

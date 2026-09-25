@@ -19,6 +19,8 @@ import { useCallback, useEffect, useRef } from 'react'
 import { documentSurface } from '../bridge'
 import { isTextDoc } from '../lib/docKind'
 import { nativeOwns } from '../lib/host'
+import { importAssetFromPath } from '../lib/assets'
+import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { countWords } from '../lib/wordCount'
 import { listBookChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
@@ -83,7 +85,7 @@ const usable = (editor) => (editor && !editor.isDestroyed && editor.view && !edi
  * The state the Finishing tabs draw, for one document. Pure but for the store reads,
  * so the tests can check it without a bridge.
  */
-export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = [] }) => {
+export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = [], projectRoot = null }) => {
   const scope = getPrintScope(projectName)
   const book = getBookSettings(projectName, bookFolderForScope(projectName, docPath))
   const ownSetup = editor ? readDocPageSetup(editor.state.doc) : null
@@ -111,6 +113,10 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     author: getAuthorProfile(),
     // The document's words; a book's would mean reading every chapter on each publish.
     wordCount: editor && scope === 'document' ? countWords(editor.state.doc.textContent) : 0,
+    // The cover on disk, for the Book tab's thumbnail: a project asset, once the root is known.
+    coverFile: projectRoot && book.coverImage && !book.coverImage.startsWith('data:')
+      ? joinPath(projectRoot, book.coverImage)
+      : undefined,
   }
 }
 
@@ -134,6 +140,7 @@ export default function usePrintLayoutController({
     stateRef.current = { projectName, activeTextDoc, activeEditor, onPrint, onExport }
   })
   const chaptersRef = useRef({ key: '', chapters: [] })
+  const rootRef = useRef({ project: null, root: null })
   const chaptersRevision = useRef(0)
   const lastSent = useRef('')
   const debounceRef = useRef(null)
@@ -164,7 +171,23 @@ export default function usePrintLayoutController({
         })
         .catch(() => {})
     }
-    const state = buildPageLayoutState({ projectName: project, docPath: doc, editor: ed, chapters: chaptersRef.current.chapters })
+    if (project && rootRef.current.project !== project) {
+      rootRef.current = { project, root: null }
+      getProjectRoot(project)
+        .then((root) => {
+          if (rootRef.current.project !== project) return
+          rootRef.current.root = root
+          publish()
+        })
+        .catch(() => {})
+    }
+    const state = buildPageLayoutState({
+      projectName: project,
+      docPath: doc,
+      editor: ed,
+      chapters: chaptersRef.current.chapters,
+      projectRoot: rootRef.current.root,
+    })
     // The shell's zoom control holds the bottom-right corner while it shows; a status
     // row there moves over for it (WordCountBadge.css).
     document.documentElement.classList.toggle('print-layout-active', state.enabled)
@@ -279,6 +302,19 @@ export default function usePrintLayoutController({
         publish()
       }),
       documentSurface.onCommand('setAuthorProfile', ({ profile }) => setAuthorProfile(profile)),
+      documentSurface.onCommand('setBookCover', ({ path }) => {
+        const { project, folder, book } = currentBook()
+        if (!project) return
+        if (!path) {
+          const { coverImage: _removed, ...rest } = book
+          setBookSettings(project, folder, rest)
+          return
+        }
+        // Copied into the project, so the book keeps its cover wherever the file was.
+        importAssetFromPath(project, path)
+          .then((coverImage) => setBookSettings(project, folder, { ...getBookSettings(project, folder), coverImage }))
+          .catch((error) => console.error('Setting the cover failed:', error))
+      }),
       documentSurface.onCommand('setPrintScope', ({ scope }) => {
         setPrintScope(stateRef.current.projectName, scope)
       }),

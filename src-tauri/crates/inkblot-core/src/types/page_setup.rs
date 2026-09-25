@@ -286,4 +286,70 @@ pub struct BookSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_setup: Option<PageSetup>,
     pub binding: BindingSettings,
+    /// Chapters left out of the book, by tree path. The rest print in tree order; a
+    /// document added to the folder is in until it is left out.
+    #[serde(default)]
+    pub excluded: Vec<String>,
+    #[serde(default)]
+    pub chapter_numbering: ChapterNumbering,
+    #[serde(default)]
+    pub front_matter: FrontMatter,
+    #[serde(default)]
+    pub back_matter: BackMatter,
+}
+
+/// How a chapter's number is written in its heading.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChapterNumberStyle {
+    /// The chapters' own headings, as written.
+    #[default]
+    None,
+    /// "Chapter One"
+    Words,
+    /// "Chapter 1"
+    Numerals,
+    /// "Chapter I"
+    Roman,
+}
+
+/// Chapter headings a book adds as it compiles.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChapterNumbering {
+    pub style: ChapterNumberStyle,
+    /// The word before the number — "Chapter", "Part" — or empty for the number alone.
+    pub prefix: String,
+    /// Keep the chapter's own title under its number.
+    pub include_title: bool,
+}
+
+/// The pages before the first chapter. Empty text leaves its page out.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FrontMatter {
+    /// The title alone, on the first recto.
+    pub half_title: bool,
+    /// The copyright page, on the back of the title page.
+    pub copyright: String,
+    pub dedication: String,
+    pub epigraph: String,
+    /// Who the epigraph is by.
+    pub epigraph_source: String,
+    /// A table of contents with page numbers.
+    pub contents: bool,
+}
+
+/// The pages after the last chapter, each under its own heading. Empty text leaves it out.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct BackMatter {
+    pub acknowledgements: String,
+    pub about_the_author: String,
+    /// The author's other books, one per line.
+    pub also_by: String,
 }

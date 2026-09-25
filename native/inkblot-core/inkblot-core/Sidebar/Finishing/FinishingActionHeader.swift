@@ -253,9 +253,12 @@ enum FinishingSectionID {
     static let bookInfo = "book.info"
     static let chapters = "book.chapters"
     static let bookSetup = "book.setup"
+    static let headings = "book.headings"
+    static let frontMatter = "book.front"
+    static let backMatter = "book.back"
     static let binding = "publish.binding"
 
-    static let all = [pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, bookSetup, binding]
+    static let all = [pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, binding]
 }
 
 /// A Finishing tab: the action header pinned at the top, the tab's settings scrolling

@@ -327,6 +327,20 @@ public struct AuthorProfile: Codable, Equatable {
 	}
 }
 
+/// The pages after the last chapter, each under its own heading. Empty text leaves it out.
+public struct BackMatter: Codable, Equatable {
+	public let acknowledgements: String
+	public let aboutTheAuthor: String
+	/// The author's other books, one per line.
+	public let alsoBy: String
+
+	public init(acknowledgements: String, aboutTheAuthor: String, alsoBy: String) {
+		self.acknowledgements = acknowledgements
+		self.aboutTheAuthor = aboutTheAuthor
+		self.alsoBy = alsoBy
+	}
+}
+
 public struct Point: Codable, Equatable {
 	public let x: Double
 	public let y: Double
@@ -630,6 +644,56 @@ public struct PageSetup: Codable, Equatable {
 	}
 }
 
+/// How a chapter's number is written in its heading.
+public enum ChapterNumberStyle: String, Codable, Equatable {
+	/// The chapters' own headings, as written.
+	case none
+	/// "Chapter One"
+	case words
+	/// "Chapter 1"
+	case numerals
+	/// "Chapter I"
+	case roman
+}
+
+/// Chapter headings a book adds as it compiles.
+public struct ChapterNumbering: Codable, Equatable {
+	public let style: ChapterNumberStyle
+	/// The word before the number — "Chapter", "Part" — or empty for the number alone.
+	public let prefix: String
+	/// Keep the chapter's own title under its number.
+	public let includeTitle: Bool
+
+	public init(style: ChapterNumberStyle, prefix: String, includeTitle: Bool) {
+		self.style = style
+		self.prefix = prefix
+		self.includeTitle = includeTitle
+	}
+}
+
+/// The pages before the first chapter. Empty text leaves its page out.
+public struct FrontMatter: Codable, Equatable {
+	/// The title alone, on the first recto.
+	public let halfTitle: Bool
+	/// The copyright page, on the back of the title page.
+	public let copyright: String
+	public let dedication: String
+	public let epigraph: String
+	/// Who the epigraph is by.
+	public let epigraphSource: String
+	/// A table of contents with page numbers.
+	public let contents: Bool
+
+	public init(halfTitle: Bool, copyright: String, dedication: String, epigraph: String, epigraphSource: String, contents: Bool) {
+		self.halfTitle = halfTitle
+		self.copyright = copyright
+		self.dedication = dedication
+		self.epigraph = epigraph
+		self.epigraphSource = epigraphSource
+		self.contents = contents
+	}
+}
+
 /// A folder (or the whole project) compiled as one book: its chapters are the
 /// folder's documents in tree order. Kept per folder in preferences, not in any one
 /// document, because it belongs to all of them.
@@ -645,8 +709,14 @@ public struct BookSettings: Codable, Equatable {
 	/// The book's own page setup; absent means each chapter's first document's.
 	public let pageSetup: PageSetup?
 	public let binding: BindingSettings
+	/// Chapters left out of the book, by tree path. The rest print in tree order; a
+	/// document added to the folder is in until it is left out.
+	public let excluded: [String]?
+	public let chapterNumbering: ChapterNumbering?
+	public let frontMatter: FrontMatter?
+	public let backMatter: BackMatter?
 
-	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings) {
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?) {
 		self.folder = folder
 		self.title = title
 		self.author = author
@@ -654,6 +724,10 @@ public struct BookSettings: Codable, Equatable {
 		self.coverImage = coverImage
 		self.pageSetup = pageSetup
 		self.binding = binding
+		self.excluded = excluded
+		self.chapterNumbering = chapterNumbering
+		self.frontMatter = frontMatter
+		self.backMatter = backMatter
 	}
 }
 
@@ -1221,6 +1295,7 @@ public enum NativeCommand: Codable, Equatable {
 	case refreshBookChapters(RefreshBookChaptersCommand)
 	case setPrintScope(SetPrintScopeCommand)
 	case setAuthorProfile(SetAuthorProfileCommand)
+	case setBookCover(SetBookCoverCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1303,7 +1378,8 @@ public enum NativeCommand: Codable, Equatable {
 			clearBookSetup,
 			refreshBookChapters,
 			setPrintScope,
-			setAuthorProfile
+			setAuthorProfile,
+			setBookCover
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1719,6 +1795,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setAuthorProfile(content)
 					return
 				}
+			case .setBookCover:
+				if let content = try? container.decode(SetBookCoverCommand.self, forKey: .payload) {
+					self = .setBookCover(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -1969,6 +2050,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setAuthorProfile(let content):
 			try container.encode(CodingKeys.setAuthorProfile, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setBookCover(let content):
+			try container.encode(CodingKeys.setBookCover, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -3918,8 +4002,10 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Words in what Print covers — the document, or the book — as a title page
 	/// gives them.
 	public let wordCount: UInt32?
+	/// The book's cover as a file on disk, for the Book tab's thumbnail.
+	public let coverFile: String?
 
-	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?) {
+	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?) {
 		self.enabled = enabled
 		self.docPath = docPath
 		self.ready = ready
@@ -3938,6 +4024,7 @@ public struct PageLayoutState: Codable, Equatable {
 		self.suggestedInsideMarginMm = suggestedInsideMarginMm
 		self.author = author
 		self.wordCount = wordCount
+		self.coverFile = coverFile
 	}
 }
 
@@ -4841,6 +4928,16 @@ public struct SetBlockTypeCommand: Codable, Equatable {
 	public init(target: EditorTarget, block: BlockType) {
 		self.target = target
 		self.block = block
+	}
+}
+
+/// Give the book a cover: an image file the shell picked, which the page copies into
+/// the project's assets. No path takes the cover away.
+public struct SetBookCoverCommand: Codable, Equatable {
+	public let path: String?
+
+	public init(path: String?) {
+		self.path = path
 	}
 }
 
