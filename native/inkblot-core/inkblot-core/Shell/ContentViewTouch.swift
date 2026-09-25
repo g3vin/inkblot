@@ -19,7 +19,6 @@ struct ContentView: View {
             FileTreeSidebar()
         } detail: {
             EditorWebView(controller: model.web)
-                .overlay { WorkspaceOverlay() }
                 .overlay { NotePreviewOverlay() }
                 .ignoresSafeArea(.container, edges: .bottom)
                 // Above the keyboard: SwiftUI lifts bottom insets clear of it.
