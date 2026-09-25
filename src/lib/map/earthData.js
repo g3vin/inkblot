@@ -18,14 +18,7 @@ const LOADERS = {
   '50m': () => import('world-atlas/countries-50m.json'),
 }
 
-let importer = (level) => LOADERS[level]()
-
-/** Tests read the JSON from disk instead of going through the bundler. */
-export function setEarthImporter(nextImporter) {
-  importer = nextImporter
-  loaded.clear()
-  projected.clear()
-}
+const importer = (level) => LOADERS[level]()
 
 const loaded = new Map()
 

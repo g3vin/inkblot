@@ -34,8 +34,6 @@ export function readDetachedTarget() {
   }
 }
 
-export const isDetachedWindow = () => Boolean(readDetachedTarget())
-
 export async function openDocumentWindow(projectName, docPath) {
   if (!projectName || !docPath) return null
 

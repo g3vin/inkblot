@@ -129,17 +129,6 @@ export function renamePreferencePrefix(fromPrefix: string, toPrefix: string): vo
   })
 }
 
-/** Every key currently held that starts with `prefix`. */
-export function preferenceKeys(prefix: string = ''): string[] {
-  const keys: string[] = []
-  for (const scoped of cache.values()) {
-    for (const key of scoped.keys()) {
-      if (key.startsWith(prefix)) keys.push(key)
-    }
-  }
-  return keys
-}
-
 /* ---------------- session state ---------------- */
 
 /**

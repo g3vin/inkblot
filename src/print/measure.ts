@@ -102,11 +102,6 @@ interface TextGeometry {
 let cacheKey = ''
 let geometryCache = new WeakMap<PMNode, TextGeometry>()
 
-/** Forget every cached geometry (fonts loaded, styles changed). */
-export const resetMeasureCache = () => {
-  geometryCache = new WeakMap()
-}
-
 const measureTextGeometry = (dom: HTMLElement, scale: number, ownPush: number): TextGeometry => {
   const top = dom.getBoundingClientRect().top
   const range = document.createRange()

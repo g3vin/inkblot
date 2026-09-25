@@ -122,9 +122,8 @@ export default function Editor({
     try {
       // Ambient rather than React state: the Pinterest node views that read it have
       // no React path to reach. See lib/projectContext.
-      setOpenProject({ projectName: nextProjectName, projectOpenId })
+      setOpenProject(projectOpenId)
       setSessionValue('inkblot:project-open-id', projectOpenId)
-      setSessionValue('inkblot:project-name', nextProjectName)
       window.dispatchEvent(new CustomEvent('inkblot:project-opened', {
         detail: { projectName: nextProjectName, projectOpenId },
       }))
