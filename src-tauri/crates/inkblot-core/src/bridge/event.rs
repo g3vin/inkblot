@@ -21,7 +21,7 @@ use super::sidebar::{
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
-use super::print::{PageLayoutState, PrintRequest};
+use super::print::{PageLayoutCatalog, PageLayoutState, PrintJobStatus, PrintRequest};
 
 /// Which marks are on at the selection.
 #[typeshare]
@@ -493,4 +493,7 @@ pub enum WebviewEvent {
     WordCountsChanged(WordCountsChanged),
     PageLayoutState(PageLayoutState),
     PrintRequest(PrintRequest),
+    /// The Finishing tabs' fixed lists, sent once when the page mounts.
+    PageLayoutCatalog(PageLayoutCatalog),
+    PrintJobStatus(PrintJobStatus),
 }

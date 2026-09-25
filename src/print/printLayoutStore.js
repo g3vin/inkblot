@@ -14,12 +14,14 @@
 import { useSyncExternalStore } from 'react'
 
 import { getPreference, setPreference } from '../lib/preferences'
+import { bookFolderFor } from './compile'
 import { clampZoom } from './zoom'
 import { DEFAULT_SHEETS_PER_SIGNATURE } from './imposition'
 
 const ENABLED_PREFIX = 'inkblot-print-layout:'
 const ZOOM_KEY = 'inkblot-print-zoom'
 const BOOK_PREFIX = 'inkblot-book:'
+const SCOPE_PREFIX = 'inkblot-print-scope:'
 
 const listeners = new Set()
 let version = 0
@@ -64,8 +66,13 @@ export const setDisplayPointsPerInch = (ppi) => {
   emit()
 }
 
+/**
+ * No binding unless the author asks for it: most writers print pages to read, not
+ * sheets to fold, and hand-binding's settings are noise until then. A book that was
+ * set to bind keeps its stored setting.
+ */
 export const DEFAULT_BINDING = {
-  binding: 'signatures',
+  binding: 'none',
   sheetsPerSignature: DEFAULT_SHEETS_PER_SIGNATURE,
   sheetPresetId: 'letter',
   sheetFit: 'actualSize',
@@ -99,6 +106,57 @@ export const getBookSettings = (projectName, folder) => {
 export const setBookSettings = (projectName, folder, settings) => {
   setPreference(bookKey(projectName, folder), JSON.stringify({ ...settings, folder: folder || '' }))
   emit()
+}
+
+/* ---------------- scope ---------------- */
+
+const SCOPES = ['document', 'folder', 'project']
+
+/**
+ * What Print and Export cover, per project: the active document, its folder as a book,
+ * or the whole project as one. Also which book the Finishing tabs show — the folder's
+ * for `document` and `folder`, the project's for `project`.
+ */
+export const getPrintScope = (projectName) => {
+  const stored = projectName ? getPreference(`${SCOPE_PREFIX}${projectName}`) : null
+  return SCOPES.includes(stored) ? stored : 'document'
+}
+
+export const setPrintScope = (projectName, scope) => {
+  if (!projectName || !SCOPES.includes(scope)) return
+  setPreference(`${SCOPE_PREFIX}${projectName}`, scope)
+  emit()
+}
+
+/** The folder of the book a document belongs to under the project's scope. */
+export const bookFolderForScope = (projectName, docPath) => (
+  bookFolderFor(docPath, getPrintScope(projectName) === 'project' ? 'project' : 'folder')
+)
+
+/** The book a document belongs to under the project's scope. */
+export const getBookForDoc = (projectName, docPath) => (
+  getBookSettings(projectName, bookFolderForScope(projectName, docPath))
+)
+
+/* ---------------- the page in view ---------------- */
+
+// Not persisted, and apart from the store's own listeners: it changes as the author
+// scrolls, and only the inspector's "Page 3 of 212" cares.
+const currentPages = new Map()
+const pageListeners = new Set()
+
+export const getCurrentPrintPage = (docPath) => currentPages.get(docPath || '') || 1
+
+export const setCurrentPrintPage = (docPath, page) => {
+  const key = docPath || ''
+  if (currentPages.get(key) === page) return
+  currentPages.set(key, page)
+  for (const listener of pageListeners) listener()
+}
+
+export const subscribeCurrentPrintPage = (listener) => {
+  pageListeners.add(listener)
+  return () => pageListeners.delete(listener)
 }
 
 /** Re-render on any change to the store. Returns a version number to read through. */

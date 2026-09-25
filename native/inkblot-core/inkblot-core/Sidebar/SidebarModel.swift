@@ -13,7 +13,7 @@ import Observation
 @Observable
 final class SidebarModel {
     enum Tab: String, CaseIterable, Identifiable {
-        case clipboard, workbench, notes, references, history, page, stats
+        case clipboard, workbench, notes, references, history, page, book, publish, stats
         var id: String { rawValue }
 
         var title: String {
@@ -24,6 +24,8 @@ final class SidebarModel {
             case .references: "References"
             case .history: "History"
             case .page: "Page"
+            case .book: "Book"
+            case .publish: "Publish"
             case .stats: "Stats"
             }
         }
@@ -37,6 +39,8 @@ final class SidebarModel {
             case .references: "books.vertical"
             case .history: "clock"
             case .page: "doc.richtext"
+            case .book: "book.closed"
+            case .publish: "square.and.arrow.up"
             case .stats: "chart.bar.xaxis"
             }
         }

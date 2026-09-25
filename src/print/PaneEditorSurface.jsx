@@ -9,19 +9,37 @@
  * switching views never recreates the editor: selection, undo history and every
  * node view survive the switch.
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { EditorContent } from '@tiptap/react'
 
 import PrintLayoutView from './PrintLayoutView'
 import { useDocPageSetup } from './useDocPageSetup'
-import { getPrintZoom, isPrintLayoutEnabled, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
+import { getBookForDoc, getPrintZoom, isPrintLayoutEnabled, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
+import { resolvePageSetup } from './pageSetup'
+
+/**
+ * The book's setup, when the document has none of its own to show instead — as JSON,
+ * because the store parses a fresh object on every read and a memo keyed on that
+ * would lay the pages out again on every render.
+ */
+const bookSetupJson = (projectName, docPath, ownSetup) => {
+  if (ownSetup || !projectName || !docPath) return ''
+  const setup = getBookForDoc(projectName, docPath).pageSetup
+  return setup ? JSON.stringify(setup) : ''
+}
 
 const baseName = (path) => (path || '').split('/').filter(Boolean).pop() || ''
 
 export default function PaneEditorSurface({ editor, projectName, docPath, header = null, scrollRef }) {
   usePrintLayoutStore()
   const [scrollEl, setScrollEl] = useState(null)
-  const pageSetup = useDocPageSetup(editor)
+  const ownSetup = useDocPageSetup(editor)
+  // A chapter with no setup of its own shows its book's, as the book will print it.
+  const bookJson = bookSetupJson(projectName, docPath, ownSetup)
+  const pageSetup = useMemo(
+    () => resolvePageSetup({ docSetup: ownSetup, bookSetup: bookJson ? JSON.parse(bookJson) : null }).setup,
+    [ownSetup, bookJson]
+  )
   const printLayout = Boolean(editor) && isPrintLayoutEnabled(projectName, docPath)
   const zoom = getPrintZoom()
 
@@ -40,6 +58,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
         <PrintLayoutView
           editor={editor}
           pageSetup={pageSetup}
+          docPath={docPath}
           zoom={zoom}
           onZoomChange={setPrintZoom}
           docTitle={baseName(docPath)}

@@ -94,6 +94,10 @@ pub struct PageSetup {
     /// A manual "recto" break, and each chapter of a compiled book, starts on an
     /// odd page, inserting a blank verso when needed.
     pub chapter_starts_on_recto: bool,
+    /// The catalog format (`formats.ts`) this setup was made from, kept after it is
+    /// changed so the inspector can say "Standard Manuscript (modified)".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format_id: Option<String>,
 }
 
 /* ---------------- binding and books ---------------- */

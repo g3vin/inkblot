@@ -73,6 +73,23 @@ export async function hydratePreferences(): Promise<void> {
   hydrated = true
 }
 
+/**
+ * Read one scope from disk again, replacing what the cache holds for it.
+ *
+ * For a scope something other than this page writes: under the Swift shell the native
+ * file tree saves the tree's order straight through the core, and the cache filled at
+ * boot never hears of it. Only for such a scope — a write of the page's own still on
+ * its way to disk would be lost from the cache.
+ */
+export async function refreshPreferenceScope(scope: PreferenceScope): Promise<void> {
+  try {
+    const loaded = await invoke<PreferenceSnapshot | null>('preferences_load')
+    cache.set(scope, new Map(Object.entries(loaded?.[scope] || {})))
+  } catch (error) {
+    console.error('[preferences] reload of %s failed; keeping what was read:', scope, error)
+  }
+}
+
 /** Whether the cache has been filled. False in tests and before boot finishes. */
 export const isHydrated = (): boolean => hydrated
 

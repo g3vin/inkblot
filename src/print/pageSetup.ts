@@ -12,7 +12,7 @@
  * a recto and a verso — top, bottom and the content height never do — so where the
  * text breaks is independent of which side of the spread a page falls on.
  */
-import { PageNumberFormat, PageOrientation } from '../types'
+import { PageNumberFormat, PageOrientation, SetupSource } from '../types'
 import type { PageMargins, PageSetup, RunningText } from '../types'
 import { getPageSizePreset, mmToPx } from './pageSizes'
 
@@ -40,6 +40,7 @@ export const DEFAULT_PAGE_SETUP: PageSetup = {
   pageNumberFormat: PageNumberFormat.Arabic,
   widowOrphanLines: 2,
   chapterStartsOnRecto: false,
+  formatId: undefined,
 }
 
 /**
@@ -155,7 +156,37 @@ export const normalizePageSetup = (raw: unknown): PageSetup => {
     ),
     widowOrphanLines: Math.round(finite(r.widowOrphanLines, d.widowOrphanLines, 1, 5)),
     chapterStartsOnRecto: Boolean(r.chapterStartsOnRecto),
+    formatId: typeof r.formatId === 'string' && r.formatId ? r.formatId : undefined,
   }
+}
+
+/** Where a document's setup comes from, and the setup itself. */
+export interface ResolvedPageSetup {
+  setup: PageSetup
+  source: SetupSource
+}
+
+/**
+ * The setup a document lays out in, and prints in.
+ *
+ * A book with a setup of its own prints every chapter in it: that is what the author
+ * set it for. On screen, and printed alone, a document shows its own setup, then its
+ * book's, then the default — so a chapter with none of its own looks the way the book
+ * will print it. `scope` is what is being printed; on screen it is `'document'`.
+ */
+export const resolvePageSetup = ({
+  docSetup,
+  bookSetup,
+  scope = 'document',
+}: {
+  docSetup?: unknown
+  bookSetup?: unknown
+  scope?: 'document' | 'folder' | 'project'
+}): ResolvedPageSetup => {
+  if (scope !== 'document' && bookSetup) return { setup: normalizePageSetup(bookSetup), source: SetupSource.Book }
+  if (docSetup) return { setup: normalizePageSetup(docSetup), source: SetupSource.Document }
+  if (bookSetup) return { setup: normalizePageSetup(bookSetup), source: SetupSource.Book }
+  return { setup: normalizePageSetup(null), source: SetupSource.Default }
 }
 
 export interface Box {

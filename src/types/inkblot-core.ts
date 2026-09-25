@@ -79,6 +79,24 @@ export interface AddReplyCommand {
 }
 
 /**
+ * Which setup an edit goes to: the active document's own, or the one every chapter of
+ * its book prints in.
+ */
+export enum PageSetupTarget {
+	Document = "document",
+	Book = "book",
+}
+
+/**
+ * Replace a setup with one of the catalog's formats (`FormatOption::id`). The page
+ * builds the setup, so every shell's "Standard Manuscript" is the same one.
+ */
+export interface ApplyFormatCommand {
+	formatId: string;
+	target?: PageSetupTarget;
+}
+
+/**
  * The marks the toolbar can toggle.
  * 
  * A closed set rather than a string: a Swift menu item sending `"bolb"` should not
@@ -383,6 +401,11 @@ export interface PageSetup {
 	 * odd page, inserting a blank verso when needed.
 	 */
 	chapterStartsOnRecto: boolean;
+	/**
+	 * The catalog format (`formats.ts`) this setup was made from, kept after it is
+	 * changed so the inspector can say "Standard Manuscript (modified)".
+	 */
+	formatId?: string;
 }
 
 /**
@@ -698,6 +721,10 @@ export interface CitationStyleSpec {
 	noteStyle: boolean;
 }
 
+/** Take the book's own setup away: the book prints in its first chapter's again. */
+export interface ClearBookSetupCommand {
+}
+
 export interface ClipboardEntry {
 	id: string;
 	text: string;
@@ -819,7 +846,12 @@ export type NativeCommand =
 	| { type: "goToPage", payload: GoToPageCommand }
 	| { type: "printDocument", payload: PrintDocumentCommand }
 	| { type: "exportDocument", payload: ExportDocumentCommand }
-	| { type: "printFinished", payload: PrintFinishedCommand };
+	| { type: "printFinished", payload: PrintFinishedCommand }
+	| { type: "applyFormat", payload: ApplyFormatCommand }
+	| { type: "useSetupForBook", payload: UseSetupForBookCommand }
+	| { type: "clearBookSetup", payload: ClearBookSetupCommand }
+	| { type: "refreshBookChapters", payload: RefreshBookChaptersCommand }
+	| { type: "setPrintScope", payload: SetPrintScopeCommand };
 
 /**
  * A command, with its place in the stream.
@@ -1230,7 +1262,10 @@ export type WebviewEvent =
 	 */
 	| { type: "wordCountsChanged", payload: WordCountsChanged }
 	| { type: "pageLayoutState", payload: PageLayoutState }
-	| { type: "printRequest", payload: PrintRequest };
+	| { type: "printRequest", payload: PrintRequest }
+	/** The Finishing tabs' fixed lists, sent once when the page mounts. */
+	| { type: "pageLayoutCatalog", payload: PageLayoutCatalog }
+	| { type: "printJobStatus", payload: PrintJobStatus };
 
 export interface EventEnvelope {
 	seq: number;
@@ -1277,6 +1312,23 @@ export interface FocusModeView {
 	paragraphIndex: number;
 	paragraphCount: number;
 	wordCount: number;
+}
+
+/** What a format is for, which decides what else the Finishing tabs offer with it. */
+export enum FormatKind {
+	Prose = "prose",
+	Screenplay = "screenplay",
+	StagePlay = "stagePlay",
+}
+
+/** A whole page setup by name: "Standard Manuscript", "Trade Paperback 6 × 9". */
+export interface FormatOption {
+	id: string;
+	label: string;
+	group: string;
+	/** One line on what it is and who asks for it. */
+	summary: string;
+	kind: FormatKind;
 }
 
 /** Scroll a page (1-based, as numbered on screen) into view. */
@@ -1866,30 +1918,71 @@ export interface SignatureAdvice {
 	label: string;
 }
 
+/** A running-head token and what it stands for, for the token menu. */
+export interface RunningToken {
+	/** As typed: `{page}`. */
+	token: string;
+	label: string;
+}
+
 /**
- * Everything the Page tab shows. Published when the active document, its setup,
- * its page count or the zoom changes.
+ * What the Finishing tabs offer that never changes while the app runs. Sent once when
+ * the page mounts, apart from `PageLayoutState`, which goes out far more often.
+ */
+export interface PageLayoutCatalog {
+	presets: PageSizeOption[];
+	formats: FormatOption[];
+	signatureAdvice: SignatureAdvice[];
+	tokens: RunningToken[];
+}
+
+/** Where the setup a document lays out in came from. */
+export enum SetupSource {
+	/** The document's own. */
+	Document = "document",
+	/** Its book's, which the document has none of its own to override. */
+	Book = "book",
+	/** Neither: the default. */
+	Default = "default",
+}
+
+/**
+ * Everything the Finishing tabs show that changes. Published when the active
+ * document, its setup, its page count, the book, the scope or the zoom changes — and
+ * only then: the page skips a state identical to the last.
  */
 export interface PageLayoutState {
 	/** Whether the active pane shows pages. */
 	enabled: boolean;
 	/** The active text document, or none (a canvas, or nothing open). */
 	docPath?: string;
-	/** The setup the document lays out in — its own, or the default. */
+	/**
+	 * False while the document's editor is not yet there to take an edit. An edit sent
+	 * meanwhile is kept and applied when it is.
+	 */
+	ready: boolean;
+	/** The setup the document lays out in — its own, its book's, or the default. */
 	setup: PageSetup;
+	setupSource: SetupSource;
 	/** False while the document has never been given a setup of its own. */
 	hasOwnSetup: boolean;
+	/** The catalog format `setup` was made from, if it matches one. */
+	formatId?: string;
+	/** `setup` was made from `format_id` and then changed. */
+	formatModified: boolean;
 	pageCount: number;
 	currentPage: number;
 	zoom: number;
-	/** The book the active document belongs to. */
+	/** What Print and Export cover. */
+	scope: PrintScope;
+	/** The book: the active document's folder's, or the project's under `Project`. */
 	book: BookSettings;
+	/** The book has a setup of its own, which every chapter prints in. */
+	bookSetupActive: boolean;
 	/** The book's chapters, in order: document tree paths. */
 	bookChapters: string[];
 	/** A recommended inside margin for a book of this many pages, in mm. */
 	suggestedInsideMarginMm: number;
-	presets: PageSizeOption[];
-	signatureAdvice: SignatureAdvice[];
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
@@ -1902,6 +1995,42 @@ export interface PrintDocumentCommand {
 export interface PrintFinishedCommand {
 	jobId: string;
 	completed: boolean;
+}
+
+/** What a print or export job is. */
+export enum PrintJobKind {
+	Print = "print",
+	Export = "export",
+}
+
+export enum PrintJobPhase {
+	/** Gathering the chapters. */
+	Preparing = "preparing",
+	/** Laying chapters out as pages: `done` of `total`. */
+	Laying = "laying",
+	/** Handing the pages to the printer, or writing the file. */
+	Writing = "writing",
+	Done = "done",
+	Failed = "failed",
+	/** The author dismissed the print or save panel. */
+	Cancelled = "cancelled",
+}
+
+/**
+ * Where a print or export has got to. One job's statuses share its `job_id`; the last
+ * is `Done`, `Failed` or `Cancelled`.
+ */
+export interface PrintJobStatus {
+	jobId: string;
+	kind: PrintJobKind;
+	format?: ExportFormat;
+	phase: PrintJobPhase;
+	done?: number;
+	total?: number;
+	/** What went wrong, for `Failed`. */
+	message?: string;
+	/** The file written, for an export that is `Done`. */
+	path?: string;
 }
 
 /**
@@ -2158,6 +2287,10 @@ export interface ReferencesChanged {
 	hasBibliography: boolean;
 	/** Every source in the project, newest first. */
 	references: ReferenceView[];
+}
+
+/** The documents in the book's folder changed — list its chapters again. */
+export interface RefreshBookChaptersCommand {
 }
 
 /** Remove entries from the history. `None` clears it. */
@@ -2510,9 +2643,14 @@ export interface SetHighlightCommand {
 	remember: boolean;
 }
 
-/** Replace the active document's page setup. One undo step in the document. */
+/**
+ * Replace the active document's page setup — one undo step in the document — or the
+ * book's.
+ */
 export interface SetPageSetupCommand {
 	setup: PageSetup;
+	/** Absent from an older shell, which only ever edited the document. */
+	target?: PageSetupTarget;
 }
 
 /**
@@ -2537,6 +2675,14 @@ export interface SetPanelInsetsCommand {
 /** Show the active pane as pages, or as the continuous editor. */
 export interface SetPrintLayoutCommand {
 	enabled: boolean;
+}
+
+/**
+ * What Print and Export cover, and which book the Book tab shows: the active
+ * document's folder, or the whole project. `Document` shows the folder's book.
+ */
+export interface SetPrintScopeCommand {
+	scope: PrintScope;
 }
 
 export enum ZoomFit {
@@ -2881,6 +3027,10 @@ export interface UpdateNoteCommand {
 export interface UpdateReferenceCommand {
 	id: string;
 	patch: ReferencePatch;
+}
+
+/** Give the book the active document's setup, so every chapter prints in it. */
+export interface UseSetupForBookCommand {
 }
 
 export enum VersionAction {

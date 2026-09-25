@@ -27,7 +27,7 @@ enum InspectorLayout: String, CaseIterable, Identifiable {
     var defaultTabs: [SidebarModel.Tab] {
         switch self {
         case .drafting: [.clipboard, .workbench, .notes, .references, .history, .stats]
-        case .finishing: [.page, .notes, .references, .history, .stats]
+        case .finishing: [.page, .book, .publish, .notes, .references, .history, .stats]
         }
     }
 }
@@ -86,11 +86,13 @@ struct InspectorLayouts: Equatable {
     static let storageKey = "inkblot.inspector.layouts"
     /// The tabs there were when the layouts were last saved. A tab added since then is
     /// one the writer never chose to leave out, so a layout that has it by default gets
-    /// it, last, rather than a new panel being hidden behind Customize Layout….
+    /// it — after the tab it follows in the defaults, where there is one, so Book and
+    /// Publish arrive beside Page — rather than a new panel being hidden behind
+    /// Customize Layout….
     static let knownTabsKey = "inkblot.inspector.knownTabs"
     /// Tabs added after layouts could first be saved — which is what a saved layout
     /// with no `knownTabsKey` beside it did not know about.
-    static let addedLater: Set<SidebarModel.Tab> = [.stats]
+    static let addedLater: Set<SidebarModel.Tab> = [.stats, .book, .publish]
 
     static func load(from defaults: UserDefaults = .standard) -> InspectorLayouts {
         var layouts = InspectorLayouts()
@@ -99,11 +101,28 @@ struct InspectorLayouts: Equatable {
             ?? Set(SidebarModel.Tab.allCases).subtracting(addedLater)
         for layout in InspectorLayout.allCases {
             if let raw = stored[layout.rawValue] {
-                let saved = raw.compactMap(SidebarModel.Tab.init(rawValue:))
-                layouts[layout] = saved + layout.defaultTabs.filter { !known.contains($0) && !saved.contains($0) }
+                layouts[layout] = adding(
+                    layout.defaultTabs.filter { !known.contains($0) },
+                    to: raw.compactMap(SidebarModel.Tab.init(rawValue:)),
+                    defaults: layout.defaultTabs)
             }
         }
         return layouts
+    }
+
+    /// `saved` with each of `new` it lacks, each placed after the nearest tab before it
+    /// in `defaults` that `saved` shows — or last, when there is none.
+    static func adding(_ new: [SidebarModel.Tab], to saved: [SidebarModel.Tab], defaults: [SidebarModel.Tab]) -> [SidebarModel.Tab] {
+        var result = saved
+        for tab in new where !result.contains(tab) {
+            let before = defaults.prefix { $0 != tab }
+            if let anchor = before.last(where: result.contains), let index = result.firstIndex(of: anchor) {
+                result.insert(tab, at: index + 1)
+            } else {
+                result.append(tab)
+            }
+        }
+        return result
     }
 
     func save(to defaults: UserDefaults = .standard) {

@@ -47,6 +47,8 @@
  *          bundled styles, lookups against canned answers, and the library file
  *   citations citations and the bibliography in a real editor: the renderer, style changes,
  *          round trips, and the bibliography added on paper, a book numbered through
+ *   finishing the Finishing tabs' page half: formats, which setup prints, what the
+ *          controller publishes and when, and the print queue
  *   print  Print Layout's pure logic: page sizes and geometry, where pages break,
  *          and signature imposition for binding
  *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
@@ -69,7 +71,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'references', 'citations', 'maplib', 'maptrace', 'mapdom']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'references', 'citations', 'maplib', 'maptrace', 'mapdom']
 
 const failures = []
 

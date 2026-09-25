@@ -106,16 +106,24 @@ struct InkblotCommands: Commands {
                 .disabled(model.target == nil)
         }
 
-        // File ▸ Page Setup, Print and Export. ⌘P and ⌥⌘P are the page's too (it handles
-        // them as keystrokes, like the Format keys above), so these carry none.
+        // File ▸ Page Setup, Print and Export. The keys are these items' own: with the
+        // Finishing tabs drawn natively the page leaves ⌘P and ⌥⌘P alone (so one press
+        // is one print), and a key the page does not take comes back to the menu.
         CommandGroup(replacing: .printItem) {
             Button("Page Setup…") { model.showPageSetup() }
-            Button("Print…  ⌘P") { model.pageLayout.print(.document) }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+            Button("Book Settings…") { model.showBook() }
+            Button("Publish…") { model.showPublish() }
+            Divider()
+            Button("Print…") { model.pageLayout.print(.document) }
+                .keyboardShortcut("p", modifiers: .command)
                 .disabled(!model.pageLayout.hasDocument)
             Button("Print Book…") { model.pageLayout.print(.folder) }
                 .disabled(!model.pageLayout.hasDocument)
-            Button("Print Book for Binding…") { model.pageLayout.print(.folder, bound: true) }
+            Button("Print Whole Project…") { model.pageLayout.print(.project) }
                 .disabled(!model.pageLayout.hasDocument)
+            Button("Print Book for Binding…") { model.pageLayout.print(.folder, bound: true) }
+                .disabled(!model.pageLayout.hasDocument || !model.pageLayout.bindingEnabled)
         }
         CommandGroup(after: .importExport) {
             Menu("Export") {
@@ -124,7 +132,14 @@ struct InkblotCommands: Commands {
             .disabled(!model.pageLayout.hasDocument)
             Menu("Export Book") {
                 exportItems(.folder)
-                Button("PDF for Binding…") { model.pageLayout.export(.pdf, scope: .folder, bound: true) }
+                if model.pageLayout.bindingEnabled {
+                    Divider()
+                    Button("PDF for Binding…") { model.pageLayout.export(.pdf, scope: .folder, bound: true) }
+                }
+            }
+            .disabled(!model.pageLayout.hasDocument)
+            Menu("Export Whole Project") {
+                exportItems(.project)
             }
             .disabled(!model.pageLayout.hasDocument)
         }
@@ -187,9 +202,10 @@ struct InkblotCommands: Commands {
         // to run (it owns those settings); drawn here because the menu bar is ours.
         CommandGroup(after: .sidebar) {
             Divider()
-            Toggle("Print Layout  ⌥⌘P", isOn: Binding(
+            Toggle("Print Layout", isOn: Binding(
                 get: { model.pageLayout.isEnabled },
                 set: { model.pageLayout.setPrintLayout($0) }))
+                .keyboardShortcut("p", modifiers: [.command, .option])
                 .disabled(!model.pageLayout.hasDocument)
             Menu("Page Zoom") {
                 Button("Fit Width") { model.pageLayout.fit(.width) }

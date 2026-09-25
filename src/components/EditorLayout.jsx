@@ -24,7 +24,7 @@ import PageSetupSheet from '../print/PageSetupSheet'
 import { runPrintJob } from '../print/printJob'
 import { runExport } from '../print/export/runExport'
 import { bookFolderFor } from '../print/compile'
-import { getBookSettings } from '../print/printLayoutStore'
+import { getBookForDoc, getBookSettings } from '../print/printLayoutStore'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
@@ -462,7 +462,9 @@ export default function EditorLayout(props) {
         { path: currentDoc, editor },
         { path: props.secondaryDoc, editor: props.secondaryEditor },
       ],
-      book: getBookSettings(projectName, bookFolderFor(docPath, scope)),
+      // Printed alone, a document takes its book's setup when it has none — the book
+      // the Finishing tabs show, under the project's scope.
+      book: scope === 'document' ? getBookForDoc(projectName, docPath) : getBookSettings(projectName, bookFolderFor(docPath, scope)),
     }
   }, [activeDoc, currentDoc, editor, props.projectName, props.secondaryDoc, props.secondaryEditor])
   const printLayout = usePrintLayoutController({
