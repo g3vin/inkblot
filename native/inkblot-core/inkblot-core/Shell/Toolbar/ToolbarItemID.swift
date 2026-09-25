@@ -18,7 +18,7 @@ enum ToolbarID {
 /// or reuse one.** An item that goes away keeps its case, marked deprecated, until
 /// nobody's layout can still name it; AppKit skips ids a toolbar no longer offers.
 ///
-/// Adding an item — the whole recipe is in HANDOFF.md, "The toolbar is customizable":
+/// Adding an item — the whole recipe is in ARCHITECTURE.md, "A toolbar item":
 ///
 /// 1. A case here, with a new `inkblot.<area>.<name>` string.
 /// 2. A `ToolbarItem(id:)` in `DocumentToolbar`, `CanvasToolbar`, or — for one that
