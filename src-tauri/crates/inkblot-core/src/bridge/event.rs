@@ -18,7 +18,6 @@ use super::sidebar::{
     ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged,
     VersionsChanged,
 };
-use super::workspace::{DraftPaneChanged, SentenceStructure, TabsChanged};
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
@@ -73,8 +72,8 @@ pub struct ToolbarState {
     /// Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.
     pub can_undo: bool,
     pub can_redo: bool,
-    /// The color the context menu's "Highlight" item would apply — what used to live
-    /// on `editor.storage.lastHighlightColor`. See `SetHighlightCommand`.
+    /// The color the context menu's "Highlight" item would apply. See
+    /// `SetHighlightCommand`.
     pub last_highlight_color: String,
 }
 
@@ -93,8 +92,8 @@ pub struct SelectionContext {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_path: Option<String>,
     /// What is selected. `anchor.text` is the selected text, which is what every item
-    /// the menu offers is built from — the workbench tiles, the quote note, the
-    /// analytic bubble all take it verbatim. There is no separate `word` or `sentence`
+    /// the menu offers is built from — the workbench tiles and the quote note
+    /// both take it verbatim. There is no separate `word` or `sentence`
     /// field because nothing derives one: `editorMenu.js` reads the selection and
     /// stops.
     pub anchor: TextAnchor,
@@ -479,8 +478,4 @@ pub enum WebviewEvent {
     WordCountsChanged(WordCountsChanged),
     PageLayoutState(PageLayoutState),
     PrintRequest(PrintRequest),
-    /// The tab dock, the new-tab chooser and the sentence bubble (see `workspace.rs`).
-    TabsChanged(TabsChanged),
-    DraftPaneChanged(DraftPaneChanged),
-    SentenceStructure(SentenceStructure),
 }

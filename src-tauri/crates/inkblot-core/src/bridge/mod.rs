@@ -18,7 +18,6 @@
 //!   -> command    NativeCommand    (shell -> webview)
 //!   -> event      WebviewEvent     (webview -> shell)
 //!   -> sidebar    the inspector's notes, clipboard, tiles and versions
-//!   -> workspace  tabs, the new-tab chooser, the sentence bubble
 //!   -> envelope   what goes on the wire, plus the request/reply pair
 //! ```
 //!
@@ -30,7 +29,7 @@
 //! 1. Define a named payload struct (see `command.rs` for why it must be named), with
 //!    `#[typeshare]` and `#[serde(rename_all = "camelCase")]`, in the file for its
 //!    area, and add the variant to `NativeCommand` or `WebviewEvent`. An empty
-//!    payload still needs a struct (`NewTabCommand`): adjacent tagging sends one for
+//!    payload still needs a struct (with no fields): adjacent tagging sends one for
 //!    every variant.
 //! 2. Re-export it below, and add an instance to `every_command` / `every_event` and
 //!    its wire name to the matching test in `tests.rs`.
@@ -55,7 +54,6 @@ pub mod event;
 pub mod references;
 pub mod print;
 pub mod sidebar;
-pub mod workspace;
 
 pub use archive::{ArchiveAction, ArchiveActionCommand, ArchiveChanged, ArchivedItem, ArchivedKind};
 pub use bubble::{BubbleAside, BubbleChipRect, BubbleChipsChanged, BubbleForm, BubbleMode, BubbleSession, BubbleSessionOpened, BubbleWord, CloseBubbleSessionCommand};
@@ -100,10 +98,6 @@ pub use event::{
     ActiveEditorChanged, ActiveMarks, CanvasToolbarChanged, CanvasToolbarState, DocChanged, DragEnded, DragMoved, DragPayloadKind,
     DragStarted, FocusModeView, NoteMarkerEvent, NoteMarkerRect, NoteMarkersChanged, NotesRemapped, ProjectChanged, ReadAloudPayloadEvent,
     SearchMatches, SelectionContext, ToolbarState, ViewOptions, WebviewEvent, WordCountBadge, WordCountsChanged,
-};
-pub use workspace::{
-    CreateFromDraftCommand, DocTab, DraftKind, DraftPaneChanged, NewTabCommand,
-    OpenDocInTabCommand, ParseNode, SentenceParse, SentenceStructure, TabRef, TabsChanged,
 };
 
 #[cfg(test)]

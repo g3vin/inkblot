@@ -1070,12 +1070,6 @@ public enum NativeCommand: Codable, Equatable {
 	case printDocument(PrintDocumentCommand)
 	case exportDocument(ExportDocumentCommand)
 	case printFinished(PrintFinishedCommand)
-	/// The tab dock and the new-tab chooser, drawn by the shell (see `workspace.rs`).
-	case selectTab(TabRef)
-	case closeTab(TabRef)
-	case newTab(NewTabCommand)
-	case openDocInTab(OpenDocInTabCommand)
-	case createFromDraft(CreateFromDraftCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1152,12 +1146,7 @@ public enum NativeCommand: Codable, Equatable {
 			goToPage,
 			printDocument,
 			exportDocument,
-			printFinished,
-			selectTab,
-			closeTab,
-			newTab,
-			openDocInTab,
-			createFromDraft
+			printFinished
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1543,31 +1532,6 @@ public enum NativeCommand: Codable, Equatable {
 					self = .printFinished(content)
 					return
 				}
-			case .selectTab:
-				if let content = try? container.decode(TabRef.self, forKey: .payload) {
-					self = .selectTab(content)
-					return
-				}
-			case .closeTab:
-				if let content = try? container.decode(TabRef.self, forKey: .payload) {
-					self = .closeTab(content)
-					return
-				}
-			case .newTab:
-				if let content = try? container.decode(NewTabCommand.self, forKey: .payload) {
-					self = .newTab(content)
-					return
-				}
-			case .openDocInTab:
-				if let content = try? container.decode(OpenDocInTabCommand.self, forKey: .payload) {
-					self = .openDocInTab(content)
-					return
-				}
-			case .createFromDraft:
-				if let content = try? container.decode(CreateFromDraftCommand.self, forKey: .payload) {
-					self = .createFromDraft(content)
-					return
-				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -1801,21 +1765,6 @@ public enum NativeCommand: Codable, Equatable {
 		case .printFinished(let content):
 			try container.encode(CodingKeys.printFinished, forKey: .type)
 			try container.encode(content, forKey: .payload)
-		case .selectTab(let content):
-			try container.encode(CodingKeys.selectTab, forKey: .type)
-			try container.encode(content, forKey: .payload)
-		case .closeTab(let content):
-			try container.encode(CodingKeys.closeTab, forKey: .type)
-			try container.encode(content, forKey: .payload)
-		case .newTab(let content):
-			try container.encode(CodingKeys.newTab, forKey: .type)
-			try container.encode(content, forKey: .payload)
-		case .openDocInTab(let content):
-			try container.encode(CodingKeys.openDocInTab, forKey: .type)
-			try container.encode(content, forKey: .payload)
-		case .createFromDraft(let content):
-			try container.encode(CodingKeys.createFromDraft, forKey: .type)
-			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -1885,25 +1834,6 @@ public struct CreateEntryCommand: Codable, Equatable {
 
 	public init(parentFolder: String, name: String, kind: EntryKind) {
 		self.parentFolder = parentFolder
-		self.name = name
-		self.kind = kind
-	}
-}
-
-public enum DraftKind: String, Codable, Equatable {
-	case doc
-	case canvas
-}
-
-/// Make the draft into a document. The page checks the name and makes the file; the
-/// answer is the next `DraftPaneChanged` — gone if it worked, with a status if not.
-public struct CreateFromDraftCommand: Codable, Equatable {
-	public let tabId: String
-	public let name: String
-	public let kind: DraftKind
-
-	public init(tabId: String, name: String, kind: DraftKind) {
-		self.tabId = tabId
 		self.name = name
 		self.kind = kind
 	}
@@ -2068,21 +1998,6 @@ public struct DocChanged: Codable, Equatable {
 	}
 }
 
-/// One open tab: a document, or a draft that has not decided what it is yet.
-public struct DocTab: Codable, Equatable {
-	public let id: String
-	/// `None` for a draft.
-	public let docPath: String?
-	/// Opened by a single click and replaced by the next one, until it is edited.
-	public let ephemeral: Bool?
-
-	public init(id: String, docPath: String?, ephemeral: Bool?) {
-		self.id = id
-		self.docPath = docPath
-		self.ephemeral = ephemeral
-	}
-}
-
 /// A document's part of the references. The sources, and which documents each is
 /// attached to, are the project's (`.inkblot-references.json`).
 public struct DocumentCitations: Codable, Equatable {
@@ -2104,39 +2019,6 @@ public struct DocumentText: Codable, Equatable {
 	public init(docPath: String, text: String) {
 		self.docPath = docPath
 		self.text = text
-	}
-}
-
-public struct Rect: Codable, Equatable {
-	public let x: Double
-	public let y: Double
-	public let width: Double
-	public let height: Double
-
-	public init(x: Double, y: Double, width: Double, height: Double) {
-		self.x = x
-		self.y = y
-		self.width = width
-		self.height = height
-	}
-}
-
-/// Where the chooser goes, or that it is gone. The page keeps the pane itself (a draft
-/// holds the pane open, and a split stays up around it) and reports its rectangle, in
-/// the web view's coordinates, for the shell to draw into.
-public struct DraftPaneChanged: Codable, Equatable {
-	/// The draft being shown; `None` when no draft is.
-	public let tabId: String?
-	public let rect: Rect?
-	/// Why the last attempt was refused ("A document with that name already exists.").
-	public let status: String?
-	public let creating: Bool?
-
-	public init(tabId: String?, rect: Rect?, status: String?, creating: Bool?) {
-		self.tabId = tabId
-		self.rect = rect
-		self.status = status
-		self.creating = creating
 	}
 }
 
@@ -2338,10 +2220,6 @@ public enum WebviewEvent: Codable, Equatable {
 	case wordCountsChanged(WordCountsChanged)
 	case pageLayoutState(PageLayoutState)
 	case printRequest(PrintRequest)
-	/// The tab dock, the new-tab chooser and the sentence bubble (see `workspace.rs`).
-	case tabsChanged(TabsChanged)
-	case draftPaneChanged(DraftPaneChanged)
-	case sentenceStructure(SentenceStructure)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case toolbarState,
@@ -2377,10 +2255,7 @@ public enum WebviewEvent: Codable, Equatable {
 			revealReference,
 			wordCountsChanged,
 			pageLayoutState,
-			printRequest,
-			tabsChanged,
-			draftPaneChanged,
-			sentenceStructure
+			printRequest
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -2561,21 +2436,6 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .printRequest(content)
 					return
 				}
-			case .tabsChanged:
-				if let content = try? container.decode(TabsChanged.self, forKey: .payload) {
-					self = .tabsChanged(content)
-					return
-				}
-			case .draftPaneChanged:
-				if let content = try? container.decode(DraftPaneChanged.self, forKey: .payload) {
-					self = .draftPaneChanged(content)
-					return
-				}
-			case .sentenceStructure:
-				if let content = try? container.decode(SentenceStructure.self, forKey: .payload) {
-					self = .sentenceStructure(content)
-					return
-				}
 			}
 		}
 		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
@@ -2685,15 +2545,6 @@ public enum WebviewEvent: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .printRequest(let content):
 			try container.encode(CodingKeys.printRequest, forKey: .type)
-			try container.encode(content, forKey: .payload)
-		case .tabsChanged(let content):
-			try container.encode(CodingKeys.tabsChanged, forKey: .type)
-			try container.encode(content, forKey: .payload)
-		case .draftPaneChanged(let content):
-			try container.encode(CodingKeys.draftPaneChanged, forKey: .type)
-			try container.encode(content, forKey: .payload)
-		case .sentenceStructure(let content):
-			try container.encode(CodingKeys.sentenceStructure, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -3395,12 +3246,6 @@ public struct MoveEntryCommand: Codable, Equatable {
 	}
 }
 
-/// Open a draft tab, as the dock's `+` does. Nothing to say, but adjacent tagging
-/// wants a payload, so it is an empty object.
-public struct NewTabCommand: Codable, Equatable {
-	public init() {}
-}
-
 public enum NoteType: String, Codable, Equatable {
 	/// Anchored to a text range in the document.
 	case quote
@@ -3634,15 +3479,6 @@ public struct NotesRemapped: Codable, Equatable {
 	}
 }
 
-/// Open a document in a tab of its own — a document dropped on the dock.
-public struct OpenDocInTabCommand: Codable, Equatable {
-	public let docPath: String
-
-	public init(docPath: String) {
-		self.docPath = docPath
-	}
-}
-
 public struct OpenDocumentCommand: Codable, Equatable {
 	/// A project-relative tree path. A `.canvas` suffix makes it a canvas — routing is
 	/// purely by suffix (`doc_kind`), so there is no kind field to get wrong.
@@ -3733,18 +3569,6 @@ public struct PageLayoutState: Codable, Equatable {
 		self.suggestedInsideMarginMm = suggestedInsideMarginMm
 		self.presets = presets
 		self.signatureAdvice = signatureAdvice
-	}
-}
-
-/// A node of a parse: a phrase with children, or a leaf (a part-of-speech tag, or a
-/// word) with none.
-public struct ParseNode: Codable, Equatable {
-	public let label: String
-	public let children: [ParseNode]?
-
-	public init(label: String, children: [ParseNode]?) {
-		self.label = label
-		self.children = children
 	}
 }
 
@@ -3895,6 +3719,20 @@ public struct ReadAloudQuery: Codable, Equatable {
 	public init(target: EditorTarget?, selectionOnly: Bool) {
 		self.target = target
 		self.selectionOnly = selectionOnly
+	}
+}
+
+public struct Rect: Codable, Equatable {
+	public let x: Double
+	public let y: Double
+	public let width: Double
+	public let height: Double
+
+	public init(x: Double, y: Double, width: Double, height: Double) {
+		self.x = x
+		self.y = y
+		self.width = width
+		self.height = height
 	}
 }
 
@@ -4501,8 +4339,8 @@ public struct SelectionContext: Codable, Equatable {
 	public let target: EditorTarget?
 	public let docPath: String?
 	/// What is selected. `anchor.text` is the selected text, which is what every item
-	/// the menu offers is built from — the workbench tiles, the quote note, the
-	/// analytic bubble all take it verbatim. There is no separate `word` or `sentence`
+	/// the menu offers is built from — the workbench tiles and the quote note
+	/// both take it verbatim. There is no separate `word` or `sentence`
 	/// field because nothing derives one: `editorMenu.js` reads the selection and
 	/// stops.
 	public let anchor: TextAnchor
@@ -4520,33 +4358,6 @@ public struct SelectionContext: Codable, Equatable {
 		self.empty = empty
 		self.touchesHighlight = touchesHighlight
 		self.isCanvas = isCanvas
-	}
-}
-
-/// One way the sentence parses, and the grammar's score for it — higher is likelier.
-/// Not a probability: the parser mixes products and log-sums, so it is only good for
-/// ordering.
-public struct SentenceParse: Codable, Equatable {
-	public let score: Double
-	public let tree: ParseNode
-
-	public init(score: Double, tree: ParseNode) {
-		self.score = score
-		self.tree = tree
-	}
-}
-
-/// "Open Analytic Bubble" was chosen: the sentence, its best parses, and where the
-/// right-click was, in the web view's coordinates.
-public struct SentenceStructure: Codable, Equatable {
-	public let sentence: String
-	public let parses: [SentenceParse]
-	public let anchor: Rect?
-
-	public init(sentence: String, parses: [SentenceParse], anchor: Rect?) {
-		self.sentence = sentence
-		self.parses = parses
-		self.anchor = anchor
 	}
 }
 
@@ -4911,33 +4722,6 @@ public struct SyncNotesCommand: Codable, Equatable {
 	}
 }
 
-public struct TabRef: Codable, Equatable {
-	public let tabId: String
-
-	public init(tabId: String) {
-		self.tabId = tabId
-	}
-}
-
-/// Everything the dock draws. Sent whole whenever any of it changes.
-public struct TabsChanged: Codable, Equatable {
-	public let tabs: [DocTab]
-	public let activeTabId: String?
-	/// The documents in the two panes — a tab showing one of these keeps its name
-	/// visible in the collapsed dock.
-	public let currentDoc: String?
-	public let secondaryDoc: String?
-	public let split: Bool
-
-	public init(tabs: [DocTab], activeTabId: String?, currentDoc: String?, secondaryDoc: String?, split: Bool) {
-		self.tabs = tabs
-		self.activeTabId = activeTabId
-		self.currentDoc = currentDoc
-		self.secondaryDoc = secondaryDoc
-		self.split = split
-	}
-}
-
 /// A command aimed at an editor with nothing else to say.
 public struct TargetOnly: Codable, Equatable {
 	public let target: EditorTarget
@@ -5110,8 +4894,8 @@ public struct ToolbarState: Codable, Equatable {
 	/// Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.
 	public let canUndo: Bool
 	public let canRedo: Bool
-	/// The color the context menu's "Highlight" item would apply — what used to live
-	/// on `editor.storage.lastHighlightColor`. See `SetHighlightCommand`.
+	/// The color the context menu's "Highlight" item would apply. See
+	/// `SetHighlightCommand`.
 	public let lastHighlightColor: String
 
 	public init(target: EditorTarget?, color: String, highlight: String, font: String, fontSize: String, alignment: Alignment, blockType: BlockType, activeMarks: ActiveMarks, canUndo: Bool, canRedo: Bool, lastHighlightColor: String) {

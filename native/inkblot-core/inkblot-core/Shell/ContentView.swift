@@ -58,7 +58,6 @@ struct ContentView: View {
         } detail: {
             EditorWebView(controller: model.web, onLiveResizeEnd: publishPanelInsets)
                 .overlay {
-                    WorkspaceOverlay()
                     WordCountBadges()
                     PrintLayoutControls()
                     NotePreviewOverlay()

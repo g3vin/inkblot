@@ -819,13 +819,7 @@ export type NativeCommand =
 	| { type: "goToPage", payload: GoToPageCommand }
 	| { type: "printDocument", payload: PrintDocumentCommand }
 	| { type: "exportDocument", payload: ExportDocumentCommand }
-	| { type: "printFinished", payload: PrintFinishedCommand }
-	/** The tab dock and the new-tab chooser, drawn by the shell (see `workspace.rs`). */
-	| { type: "selectTab", payload: TabRef }
-	| { type: "closeTab", payload: TabRef }
-	| { type: "newTab", payload: NewTabCommand }
-	| { type: "openDocInTab", payload: OpenDocInTabCommand }
-	| { type: "createFromDraft", payload: CreateFromDraftCommand };
+	| { type: "printFinished", payload: PrintFinishedCommand };
 
 /**
  * A command, with its place in the stream.
@@ -876,21 +870,6 @@ export interface CreateEntryCommand {
 	/** The bare name. For a canvas or map the page adds the `.canvas` or `.map` suffix. */
 	name: string;
 	kind: EntryKind;
-}
-
-export enum DraftKind {
-	Doc = "doc",
-	Canvas = "canvas",
-}
-
-/**
- * Make the draft into a document. The page checks the name and makes the file; the
- * answer is the next `DraftPaneChanged` — gone if it worked, with a status if not.
- */
-export interface CreateFromDraftCommand {
-	tabId: string;
-	name: string;
-	kind: DraftKind;
 }
 
 /** A new, empty source of a kind, for entering by hand. */
@@ -1019,15 +998,6 @@ export interface DocChanged {
 	charCount: number;
 }
 
-/** One open tab: a document, or a draft that has not decided what it is yet. */
-export interface DocTab {
-	id: string;
-	/** `None` for a draft. */
-	docPath?: string;
-	/** Opened by a single click and replaced by the next one, until it is edited. */
-	ephemeral?: boolean;
-}
-
 /**
  * A document's part of the references. The sources, and which documents each is
  * attached to, are the project's (`.inkblot-references.json`).
@@ -1042,27 +1012,6 @@ export interface DocumentCitations {
 export interface DocumentText {
 	docPath: string;
 	text: string;
-}
-
-export interface Rect {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-}
-
-/**
- * Where the chooser goes, or that it is gone. The page keeps the pane itself (a draft
- * holds the pane open, and a split stays up around it) and reports its rectangle, in
- * the web view's coordinates, for the shell to draw into.
- */
-export interface DraftPaneChanged {
-	/** The draft being shown; `None` when no draft is. */
-	tabId?: string;
-	rect?: Rect;
-	/** Why the last attempt was refused ("A document with that name already exists."). */
-	status?: string;
-	creating?: boolean;
 }
 
 /**
@@ -1242,11 +1191,7 @@ export type WebviewEvent =
 	 */
 	| { type: "wordCountsChanged", payload: WordCountsChanged }
 	| { type: "pageLayoutState", payload: PageLayoutState }
-	| { type: "printRequest", payload: PrintRequest }
-	/** The tab dock, the new-tab chooser and the sentence bubble (see `workspace.rs`). */
-	| { type: "tabsChanged", payload: TabsChanged }
-	| { type: "draftPaneChanged", payload: DraftPaneChanged }
-	| { type: "sentenceStructure", payload: SentenceStructure };
+	| { type: "printRequest", payload: PrintRequest };
 
 export interface EventEnvelope {
 	seq: number;
@@ -1683,13 +1628,6 @@ export interface MoveEntryCommand {
 	targetFolder: string;
 }
 
-/**
- * Open a draft tab, as the dock's `+` does. Nothing to say, but adjacent tagging
- * wants a payload, so it is an empty object.
- */
-export interface NewTabCommand {
-}
-
 export enum NoteType {
 	/** Anchored to a text range in the document. */
 	Quote = "quote",
@@ -1853,11 +1791,6 @@ export interface NotesRemapped {
 	droppedNoteIds: string[];
 }
 
-/** Open a document in a tab of its own — a document dropped on the dock. */
-export interface OpenDocInTabCommand {
-	docPath: string;
-}
-
 export interface OpenDocumentCommand {
 	/**
 	 * A project-relative tree path. A `.canvas` suffix makes it a canvas — routing is
@@ -1918,15 +1851,6 @@ export interface PageLayoutState {
 	suggestedInsideMarginMm: number;
 	presets: PageSizeOption[];
 	signatureAdvice: SignatureAdvice[];
-}
-
-/**
- * A node of a parse: a phrase with children, or a leaf (a part-of-speech tag, or a
- * word) with none.
- */
-export interface ParseNode {
-	label: string;
-	children?: ParseNode[];
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
@@ -2035,6 +1959,13 @@ export interface ReadAloudQuery {
 	target?: EditorTarget;
 	/** Read only the selection rather than the whole document. */
 	selectionOnly: boolean;
+}
+
+export interface Rect {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
 }
 
 export enum ReferenceStatus {
@@ -2381,8 +2312,8 @@ export interface SelectionContext {
 	docPath?: string;
 	/**
 	 * What is selected. `anchor.text` is the selected text, which is what every item
-	 * the menu offers is built from — the workbench tiles, the quote note, the
-	 * analytic bubble all take it verbatim. There is no separate `word` or `sentence`
+	 * the menu offers is built from — the workbench tiles and the quote note
+	 * both take it verbatim. There is no separate `word` or `sentence`
 	 * field because nothing derives one: `editorMenu.js` reads the selection and
 	 * stops.
 	 */
@@ -2395,26 +2326,6 @@ export interface SelectionContext {
 	touchesHighlight: boolean;
 	/** True when the pane is showing a canvas. The editor items do not apply. */
 	isCanvas: boolean;
-}
-
-/**
- * One way the sentence parses, and the grammar's score for it — higher is likelier.
- * Not a probability: the parser mixes products and log-sums, so it is only good for
- * ordering.
- */
-export interface SentenceParse {
-	score: number;
-	tree: ParseNode;
-}
-
-/**
- * "Open Analytic Bubble" was chosen: the sentence, its best parses, and where the
- * right-click was, in the web view's coordinates.
- */
-export interface SentenceStructure {
-	sentence: string;
-	parses: SentenceParse[];
-	anchor?: Rect;
 }
 
 /** Text alignment, as the toolbar offers it. */
@@ -2683,23 +2594,6 @@ export interface SyncNotesCommand {
 	notes: Note[];
 }
 
-export interface TabRef {
-	tabId: string;
-}
-
-/** Everything the dock draws. Sent whole whenever any of it changes. */
-export interface TabsChanged {
-	tabs: DocTab[];
-	activeTabId?: string;
-	/**
-	 * The documents in the two panes — a tab showing one of these keeps its name
-	 * visible in the collapsed dock.
-	 */
-	currentDoc?: string;
-	secondaryDoc?: string;
-	split: boolean;
-}
-
 /** A command aimed at an editor with nothing else to say. */
 export interface TargetOnly {
 	target: EditorTarget;
@@ -2849,8 +2743,8 @@ export interface ToolbarState {
 	canUndo: boolean;
 	canRedo: boolean;
 	/**
-	 * The color the context menu's "Highlight" item would apply — what used to live
-	 * on `editor.storage.lastHighlightColor`. See `SetHighlightCommand`.
+	 * The color the context menu's "Highlight" item would apply. See
+	 * `SetHighlightCommand`.
 	 */
 	lastHighlightColor: string;
 }

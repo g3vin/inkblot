@@ -37,11 +37,6 @@ import { detectNativeHost } from '../bridge/transport'
  *  - `printControls` the Print Layout button (bottom-left of the editor) and its zoom
  *                   control (bottom-right) — drawn by the shell as Liquid Glass from
  *                   `pageLayoutState`. The page leaves them room and draws no zoom bar.
- *  - `tabDock`      the floating tab bar at the bottom — the shell draws it from what
- *                   `useNativeTabDock` publishes and sends back selections and closes
- *  - `draftPane`    the new-tab chooser. The page keeps the pane (a draft holds it
- *                   open) and reports where it is; the shell draws the chooser there
- *  - `sentenceBubble` the Analytic Bubble — the page parses, the shell draws the trees
  */
 export type NativeChrome =
   | 'fileTree'
@@ -54,9 +49,6 @@ export type NativeChrome =
   | 'projectPicker'
   | 'pageSetup'
   | 'printControls'
-  | 'tabDock'
-  | 'draftPane'
-  | 'sentenceBubble'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null

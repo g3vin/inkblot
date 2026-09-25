@@ -344,13 +344,7 @@ export default function EditorLayout(props) {
     onEnterFocusMode: () => setFocusModeOpen(true),
     onOpenDocInTab: props.onOpenDocInTab,
     onOpenDocInSplit: props.onOpenDocInSplit,
-    onCloseTab: props.onCloseTab,
-    onCloseOtherTabs: props.onCloseOtherTabs,
-    onCloseTabsToTheRight: props.onCloseTabsToTheRight,
-    onCloseAllTabs: props.onCloseAllTabs,
     onCloseSplit: props.onCloseSplit,
-    onKeepTab: props.onKeepTab,
-    onSelectTab: props.onSelectTab,
   })
 
   // Renaming and creating happen in the tree's own inline text box, which is no

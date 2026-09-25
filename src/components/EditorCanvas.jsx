@@ -38,8 +38,6 @@ import { useEditorDocLoader } from '../hooks/useEditorDocLoader'
 import { useEditorNotes } from '../hooks/useEditorNotes'
 import { formatWordStats, useEditorWordCount } from '../hooks/useEditorWordCount'
 import DraftTabPane from './DraftTabPane'
-import NativeDraftPane from './NativeDraftPane'
-import { nativeOwns } from '../lib/host'
 import FocusModeOverlay from './FocusModeOverlay'
 import VersionComparePane from './VersionComparePane'
 import SFIcon from './SFIcon'
@@ -72,7 +70,6 @@ export default function EditorCanvas({
   focusModeOpen = false,
   onExitFocusMode,
   draftTabActive = false,
-  activeTabId = null,
   onDraftCreated,
   refreshFiles,
   compare = null,
@@ -596,7 +593,6 @@ export default function EditorCanvas({
       : ''
   }`
   const showDraftPane = draftTabActive && !currentDoc
-  const nativeDraftPane = nativeOwns('draftPane')
   const primaryPaneOwnsFocus = primaryIsStructured || showDraftPane
 
   // The divider is a track in the split grid, so the two panes are sized by the
@@ -674,20 +670,11 @@ export default function EditorCanvas({
             />
           ) : null}
           {showDraftPane ? (
-            nativeDraftPane ? (
-              <NativeDraftPane
-                tabId={activeTabId}
-                projectName={projectName}
-                onCreated={onDraftCreated}
-                refreshFiles={refreshFiles}
-              />
-            ) : (
-              <DraftTabPane
-                projectName={projectName}
-                onCreated={onDraftCreated}
-                refreshFiles={refreshFiles}
-              />
-            )
+            <DraftTabPane
+              projectName={projectName}
+              onCreated={onDraftCreated}
+              refreshFiles={refreshFiles}
+            />
           ) : primaryIsCanvas ? (
             <CanvasPane
               projectName={projectName}
