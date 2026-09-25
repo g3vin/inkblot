@@ -4,5 +4,5 @@
 //! Desktop binary. All wiring lives in the library — see `lib.rs`.
 
 fn main() {
-    app_lib::run()
+    inkblot_lib::run()
 }
