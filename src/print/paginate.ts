@@ -20,6 +20,14 @@
  *   atom   something unbreakable: an image block, a Pinterest board, a conversation.
  *   row    one table row; a table breaks only between rows.
  *   break  a manual page, column or recto break; the next unit starts after it.
+ *
+ * A script adds rules of its own, carried on the units (measure.ts sets them):
+ *   keepWithNext      a scene heading, a character, a parenthetical: never last on a page
+ *   keepWithPrevious  a transition: never first on a page — the line before comes over
+ *   split: 'never'    a parenthetical moves whole
+ *   split: 'sentences' dialogue breaks only between sentences, with two lines or more on
+ *                     each side; the page it leaves ends "(MORE)" and the next opens with
+ *                     the speaker's name and "(CONT'D)" — `continuations` says where
  */
 
 export type ManualBreakKind = 'page' | 'column' | 'recto'
@@ -42,7 +50,22 @@ export interface LayoutUnit {
   lines?: LayoutLine[]
   /** Headings: never the last thing on a page. */
   keepWithNext?: boolean
+  /** A script's transition: never the first thing on a page. */
+  keepWithPrevious?: boolean
+  /** Where a text unit may break: between any lines (the default), only between
+   * sentences, or not at all. */
+  split?: 'lines' | 'sentences' | 'never'
+  /** For `split: 'sentences'`: whether line `index` starts a sentence. */
+  canBreakBefore?: (index: number) => boolean
+  /** Dialogue split across pages is marked (MORE) and CUE (CONT'D). */
+  continuation?: { cue: string }
   breakKind?: ManualBreakKind
+}
+
+/** A speech carried over a page: drawn at the line push at `pos`. */
+export interface Continuation {
+  pos: number
+  cue: string
 }
 
 export interface LayoutFrame {
@@ -76,6 +99,29 @@ export interface LayoutResult {
   slotStarts: Array<number | null>
   /** Slots whose content starts after a manual recto/page break or at the document start. */
   chapterStartSlots: number[]
+  /** Speeches carried over a page, for their (MORE) and (CONT'D). */
+  continuations: Continuation[]
+}
+
+/** The fewest lines of a speech left on either side of a page break. */
+const SPEECH_MIN_LINES = 2
+
+/** The height of a unit's first line: what a (MORE) or a (CONT'D) takes. */
+const lineHeightOf = (u: LayoutUnit): number => {
+  const first = u.lines?.[0]
+  return first ? Math.max(0, first.bottom - first.top) : 0
+}
+
+/**
+ * The lines of a speech that may end a page: the first index `k` it can break before,
+ * at or after `from`, leaving `SPEECH_MIN_LINES` on each side — or -1.
+ */
+const firstSentenceBreak = (u: LayoutUnit, from: number): number => {
+  const lines = u.lines || []
+  for (let k = Math.max(from, SPEECH_MIN_LINES); k <= lines.length - SPEECH_MIN_LINES; k += 1) {
+    if (u.canBreakBefore?.(k)) return k
+  }
+  return -1
 }
 
 /** Layout tolerance, px. Measured rects carry subpixel noise; half a pixel is not a line. */
@@ -90,6 +136,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
   const slotBottom = (s: number) => s * stride + slotHeight
 
   const pushes: Push[] = []
+  const continuations: Continuation[] = []
   const slotStarts: Array<number | null> = [0]
   const chapterStartSlots: number[] = [0]
   let offset = 0
@@ -128,6 +175,14 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
   const headFits = (u: LayoutUnit | undefined): boolean => {
     if (!u || u.kind === 'break') return true
     const bottom = slotBottom(slot)
+    if (u.kind === 'text' && u.split === 'never') return u.bottom + offset <= bottom + EPS
+    if (u.kind === 'text' && u.split === 'sentences' && u.lines && u.lines.length > 1) {
+      if (u.bottom + offset <= bottom + EPS) return true
+      // The shortest part that may stay, with its (MORE) under it.
+      const k = firstSentenceBreak(u, 0)
+      if (k < 0) return false
+      return u.lines[k - 1].bottom + offset + lineHeightOf(u) <= bottom + EPS
+    }
     if (u.kind === 'text' && u.lines && u.lines.length > 1) {
       const need = u.lines[Math.min(minLines, u.lines.length) - 1]
       return need.bottom + offset <= bottom + EPS
@@ -135,13 +190,42 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
     return u.bottom + offset <= bottom + EPS
   }
 
+  // Where each unit was placed from, so a transition can bring the line before it over.
+  interface Placed { index: number; pushes: number; continuations: number; offset: number; slot: number; hadContent: boolean }
+  const history: Placed[] = []
+  const sendOver = new Set<number>()
+
   for (let i = 0; i < units.length; i += 1) {
     const u = units[i]
 
     if (u.kind === 'break') {
       forced = u.breakKind || 'page'
+      history.length = 0
       continue
     }
+
+    // A transition that would open a page takes the line before it along — and that
+    // line's speaker, and a scene heading above them, which may not be left behind:
+    // undo their placing, and place them again at the head of the next page.
+    const last = history[history.length - 1]
+    if (u.keepWithPrevious && !forced && last && last.index === i - 1 && last.slot === slot &&
+      u.bottom + offset > slotBottom(slot) + EPS) {
+      let h = history.length - 1
+      while (h > 0 && units[history[h - 1].index].keepWithNext && history[h - 1].slot === slot && history[h - 1].index === history[h].index - 1) h -= 1
+      const from = history[h]
+      if (from.hadContent && !sendOver.has(from.index)) {
+        pushes.length = from.pushes
+        continuations.length = from.continuations
+        offset = from.offset
+        slotHasContent = true
+        sendOver.add(from.index)
+        history.length = h
+        i = from.index - 1
+        continue
+      }
+    }
+    const placing: Placed = { index: i, pushes: pushes.length, continuations: continuations.length, offset, slot, hadContent: slotHasContent }
+    if (sendOver.has(i) && slotHasContent) pushBlockTo(u, slot + 1)
 
     if (forced) {
       const target = slotAfterBreak(forced)
@@ -175,8 +259,44 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
       const bottom = slotBottom(slot)
       if (u.bottom + offset <= bottom + EPS) break
 
-      const lines = u.kind === 'text' ? u.lines || [] : []
+      const lines = u.kind === 'text' && u.split !== 'never' ? u.lines || [] : []
       const remaining = lines.length - firstLine
+
+      if (u.split === 'sentences' && remaining > 1) {
+        // Dialogue: break at the last sentence that fits above a (MORE).
+        const more = u.continuation ? lineHeightOf(u) : 0
+        let fit = firstLine
+        while (fit < lines.length && lines[fit].bottom + offset + more <= bottom + EPS) fit += 1
+        let k = -1
+        for (let c = fit; c > firstLine; c -= 1) {
+          if (c - firstLine >= SPEECH_MIN_LINES && lines.length - c >= SPEECH_MIN_LINES && u.canBreakBefore?.(c)) {
+            k = c
+            break
+          }
+        }
+        const atHead = firstLine > 0 || !slotHasContent
+        if (k < 0 && !atHead) {
+          pushBlockTo(u, slot + 1)
+          markSlot(slot, u.pos)
+          continue
+        }
+        // Nowhere a sentence ends and nowhere better to go: break between lines.
+        if (k < 0) k = Math.max(firstLine + 1, Math.min(fit, lines.length - 1))
+        if (k >= lines.length) break
+        // The next page opens with the speaker's name, a line above the speech.
+        const height = slotTop(slot + 1) + more - (lines[k].top + offset)
+        if (height > EPS) {
+          pushes.push({ kind: 'line', pos: lines[k].pos, height })
+          offset += height
+          if (u.continuation) continuations.push({ pos: lines[k].pos, cue: u.continuation.cue })
+        }
+        slot += 1
+        slotHasContent = true
+        markSlot(slot, lines[k].pos)
+        firstLine = k
+        continue
+      }
+
       if (remaining > 1) {
         // First line that does not fit.
         let j = firstLine
@@ -216,6 +336,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
       break
     }
     slotHasContent = true
+    history.push(placing)
   }
 
   // A trailing manual break still opens its page, so the author sees it.
@@ -227,5 +348,5 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
 
   const slotCount = Math.max(slot + 1, slotStarts.length)
   const pageCount = Math.max(1, Math.ceil(slotCount / columns))
-  return { pushes, slotCount, pageCount, slotStarts, chapterStartSlots }
+  return { pushes, slotCount, pageCount, slotStarts, chapterStartSlots, continuations }
 }

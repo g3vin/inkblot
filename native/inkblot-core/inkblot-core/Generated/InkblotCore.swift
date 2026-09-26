@@ -1328,6 +1328,8 @@ public enum NativeCommand: Codable, Equatable {
 	case setAuthorProfile(SetAuthorProfileCommand)
 	case setBookCover(SetBookCoverCommand)
 	case exportAgain(ExportAgainCommand)
+	case measureBook(MeasureBookCommand)
+	case importScript(ImportScriptCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1413,7 +1415,9 @@ public enum NativeCommand: Codable, Equatable {
 			setPrintScope,
 			setAuthorProfile,
 			setBookCover,
-			exportAgain
+			exportAgain,
+			measureBook,
+			importScript
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1844,6 +1848,16 @@ public enum NativeCommand: Codable, Equatable {
 					self = .exportAgain(content)
 					return
 				}
+			case .measureBook:
+				if let content = try? container.decode(MeasureBookCommand.self, forKey: .payload) {
+					self = .measureBook(content)
+					return
+				}
+			case .importScript:
+				if let content = try? container.decode(ImportScriptCommand.self, forKey: .payload) {
+					self = .importScript(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -2103,6 +2117,12 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .exportAgain(let content):
 			try container.encode(CodingKeys.exportAgain, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .measureBook(let content):
+			try container.encode(CodingKeys.measureBook, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .importScript(let content):
+			try container.encode(CodingKeys.importScript, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -2989,6 +3009,10 @@ public enum ExportFormat: String, Codable, Equatable {
 	case docx
 	/// Plain text, for a submission form or an email.
 	case plainText
+	/// Fountain, the plain-text screenplay format.
+	case fountain
+	/// Final Draft's own file.
+	case fdx
 }
 
 /// What a print or export covers.
@@ -3112,6 +3136,12 @@ public struct HighlightNoteCommand: Codable, Equatable {
 	public init(noteId: String?) {
 		self.noteId = noteId
 	}
+}
+
+/// Import a script: File ▸ Import Fountain Script…. The page asks for the file and
+/// makes a new document of it beside the one open.
+public struct ImportScriptCommand: Codable, Equatable {
+	public init() {}
 }
 
 /// Put the bibliography at the end of the document, or move it there.

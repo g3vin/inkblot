@@ -23,6 +23,7 @@ import usePrintLayoutController from '../print/usePrintLayoutController'
 import PageSetupSheet from '../print/PageSetupSheet'
 import { measurePrint, runPrintJob } from '../print/printJob'
 import { runExport } from '../print/export/runExport'
+import { importFountainScript } from '../script/importScript'
 import { bookFolderFor } from '../print/compile'
 import { getBookForDoc, getBookSettings, setMeasurement } from '../print/printLayoutStore'
 import LeftSidebar from './LeftSidebar'
@@ -487,6 +488,22 @@ export default function EditorLayout(props) {
         .catch((error) => console.error('[measure] failed:', error))
     },
   })
+
+  // File ▸ Import Fountain Script…: a new document beside the open one, opened in a tab.
+  const { projectName: importProject, refreshFiles: importRefresh, onOpenDocInTab: importOpen } = props
+  useEffect(() => {
+    const onImport = () => {
+      importFountainScript({ projectName: importProject, nearDoc: activeDoc || currentDoc })
+        .then(async (path) => {
+          if (!path) return
+          await importRefresh?.()
+          importOpen?.(path)
+        })
+        .catch((error) => console.error('[import] failed:', error))
+    }
+    window.addEventListener('inkblot:import-script', onImport)
+    return () => window.removeEventListener('inkblot:import-script', onImport)
+  }, [activeDoc, currentDoc, importOpen, importProject, importRefresh])
 
   // The page's own Page Setup, for a shell that does not draw one (host.ts).
   const [pageSetupOpen, setPageSetupOpen] = useState(false)

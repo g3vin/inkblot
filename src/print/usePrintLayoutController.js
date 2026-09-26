@@ -24,7 +24,7 @@ import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { countWords } from '../lib/wordCount'
 import { listBookChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
-import { applyFormat, FORMAT_OPTIONS, formatOf } from './formats'
+import { applyFormat, FORMAT_OPTIONS, formatOf, writingFormatOf } from './formats'
 import { SIGNATURE_GUIDANCE } from './imposition'
 import { paginationKey } from './PaginationExtension'
 import { PAGE_SIZE_GROUP_LABELS, PAGE_SIZE_PRESETS } from './pageSizes'
@@ -354,7 +354,12 @@ export default function usePrintLayoutController({
       documentSurface.onCommand('setPageSetup', ({ setup, target }) => applySetup(setup, target)),
       documentSurface.onCommand('applyFormat', ({ formatId, target }) => {
         const setup = applyFormat(formatId)
-        if (setup) applySetup(setup, target)
+        if (!setup) return
+        applySetup(setup, target)
+        // A script's format makes the document a script: its lines become elements.
+        const writing = writingFormatOf(formatId)
+        const ed = stateRef.current.activeEditor
+        if (writing && target !== 'book' && ed) ed.commands.setWritingFormat(writing)
       }),
       documentSurface.onCommand('useSetupForBook', () => {
         const { activeEditor: ed } = stateRef.current
@@ -410,6 +415,8 @@ export default function usePrintLayoutController({
         const { projectName: project } = stateRef.current
         stateRef.current.onMeasure?.({ scope: getPrintScope(project) })
       }),
+      // File ▸ Import Fountain Script…: the pane holding the tree does it (EditorLayout).
+      documentSurface.onCommand('importScript', () => window.dispatchEvent(new CustomEvent('inkblot:import-script'))),
       documentSurface.onCommand('exportAgain', () => {
         const last = getLastExport(stateRef.current.projectName)
         if (last) stateRef.current.onExport?.(last)

@@ -1,5 +1,5 @@
 /**
- * runExport.js — File ▸ Export: PDF, EPUB, Word, Markdown, HTML and plain text, for a document or a
+ * runExport.js — File ▸ Export: PDF, EPUB, Word, Markdown, HTML, plain text, Fountain and Final Draft, for a document or a
  * book (a folder or the project, compiled in tree order).
  *
  * Asks where to save with the system save panel, then writes the file through the
@@ -21,11 +21,13 @@ import { countWords } from '../../lib/wordCount'
 import { runPrintJob } from '../printJob'
 import { describeError, newJobId, reportJob } from '../printJobStatus'
 import { buildDocx } from './docx'
+import { buildFdx } from './fdx'
 import { buildEpub } from './epub'
 import { buildHtmlDocument } from './html'
 import { decodeDataUri, resolveImage, toDataUri } from './images'
 import { toMarkdown } from './markdown'
 import { buildPlainText } from './text'
+import { serializeFountain } from '../../script/fountain'
 import { mapImageSources, portableContent } from './portable'
 
 const FORMATS = {
@@ -35,6 +37,8 @@ const FORMATS = {
   html: { ext: 'html', label: 'HTML' },
   docx: { ext: 'docx', label: 'Word' },
   plainText: { ext: 'txt', label: 'Plain Text' },
+  fountain: { ext: 'fountain', label: 'Fountain' },
+  fdx: { ext: 'fdx', label: 'Final Draft' },
 }
 
 const safeFileName = (name) => (name || 'Untitled').replace(/[/\\:*?"<>|]+/g, '-').trim() || 'Untitled'
@@ -220,6 +224,29 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
       [...frontDocs, ...exportChapters.map((chapter) => chapter.content)],
       { wrap: 0, sceneBreak: setup.typography?.sceneBreak || '* * *' }
     )
+    await writeTextFile(path, text)
+    return path
+  }
+
+  if (format === 'fountain' || format === 'fdx') {
+    // A script, or a book of them, as one: the chapters' lines one after another.
+    const [first] = exportChapters
+    const doc = {
+      type: 'doc',
+      attrs: first?.content?.attrs || {},
+      content: exportChapters.flatMap((chapter, i) => [
+        ...(i > 0 ? [{ type: 'pageBreak' }] : []),
+        ...(chapter.content?.content || []),
+      ]),
+    }
+    const profile = getAuthorProfile()
+    const titlePage = {
+      title,
+      credit: author ? 'Written by' : '',
+      author,
+      contact: profile.agent || [profile.legalName, profile.address, profile.email, profile.phone].filter(Boolean).join('\n'),
+    }
+    const text = format === 'fountain' ? serializeFountain(doc, { titlePage }) : buildFdx(doc, { titlePage })
     await writeTextFile(path, text)
     return path
   }

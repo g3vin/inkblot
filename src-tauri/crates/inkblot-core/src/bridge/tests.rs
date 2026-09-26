@@ -436,6 +436,8 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::SetBookCover(SetBookCoverCommand { path: Some("/Users/a/cover.jpg".into()) }),
         NativeCommand::ExportAgain(ExportAgainCommand {}),
+        NativeCommand::MeasureBook(MeasureBookCommand {}),
+        NativeCommand::ImportScript(ImportScriptCommand {}),
     ]
 }
 
@@ -899,6 +901,8 @@ fn every_command_has_its_documented_wire_name() {
             "setAuthorProfile",
             "setBookCover",
             "exportAgain",
+            "measureBook",
+            "importScript",
         ]
     );
 }
@@ -1213,6 +1217,8 @@ fn a_print_from_an_older_shell_has_no_options() {
     assert_eq!(old.options, PrintOptions::default());
     let wire = serde_json::to_value(ExportFormat::PlainText).unwrap();
     assert_eq!(wire, "plainText");
+    assert_eq!(serde_json::to_value(ExportFormat::Fountain).unwrap(), "fountain");
+    assert_eq!(serde_json::to_value(ExportFormat::Fdx).unwrap(), "fdx");
     let partial: PrintOptions = serde_json::from_value(json!({ "watermark": "DRAFT" })).unwrap();
     assert_eq!(partial.range, PrintRange::All);
     assert!(partial.pages.is_empty());

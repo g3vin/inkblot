@@ -13,14 +13,47 @@
  */
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
 import { BODY_ELEMENT } from './elements'
 import { SCRIPT_NODE } from './ScriptElement'
+import { labelScenes, NUMBERED_ELEMENTS, readSceneNumbers } from './sceneNumbers'
 
 export const WRITING_FORMATS = ['prose', 'screenplay', 'stageplay']
 
 /** A document's writing format: 'prose' unless it says otherwise. */
 export const readWritingFormat = (doc) => (WRITING_FORMATS.includes(doc?.attrs?.writingFormat) ? doc.attrs.writingFormat : 'prose')
+
+/* ---------------- scene numbers ---------------- */
+
+export { readSceneNumbers }
+
+/** Every scene heading's number, by position. */
+export const sceneNumbers = (doc) => {
+  const mode = readSceneNumbers(doc)
+  const out = new Map()
+  if (mode === 'off') return out
+  const headings = []
+  doc.forEach((node, pos) => {
+    if (node.type.name === SCRIPT_NODE && NUMBERED_ELEMENTS.has(node.attrs.element)) headings.push({ pos, number: node.attrs.sceneNumber })
+  })
+  const labels = labelScenes(mode, headings.map((h) => h.number || null))
+  headings.forEach((h, i) => out.set(h.pos, labels[i]))
+  return out
+}
+
+const sceneNumberKey = new PluginKey('sceneNumbers')
+
+const sceneDecorations = (doc) => {
+  const numbers = sceneNumbers(doc)
+  if (!numbers.size) return DecorationSet.empty
+  const decorations = []
+  for (const [pos, label] of numbers) {
+    const node = doc.nodeAt(pos)
+    if (node) decorations.push(Decoration.node(pos, pos + node.nodeSize, { 'data-scene-number': label, class: 'is-numbered' }))
+  }
+  return DecorationSet.create(doc, decorations)
+}
 
 const markEditor = (view) => {
   const format = readWritingFormat(view.state.doc)
@@ -47,12 +80,27 @@ export const DocWritingFormat = Extension.create({
       types: ['doc'],
       attributes: {
         writingFormat: { default: null, parseHTML: () => null, renderHTML: () => ({}) },
+        sceneNumbers: { default: null, parseHTML: () => null, renderHTML: () => ({}) },
       },
     }]
   },
 
   addCommands() {
     return {
+      /** 'off', 'on', or 'locked': numbers fixed on the headings, for a shooting script. */
+      setSceneNumbers: (mode) => ({ state, tr, dispatch }) => {
+        if (!['off', 'on', 'locked'].includes(mode)) return false
+        const current = sceneNumbers(state.doc)
+        tr.setDocAttribute('sceneNumbers', mode === 'off' ? null : mode)
+        state.doc.forEach((node, pos) => {
+          if (node.type.name !== SCRIPT_NODE || !NUMBERED_ELEMENTS.has(node.attrs.element)) return
+          // Locking writes today's numbers down; anything else lets them go.
+          const number = mode === 'locked' ? (current.get(pos) || null) : null
+          if (node.attrs.sceneNumber !== number) tr.setNodeMarkup(pos, undefined, { ...node.attrs, sceneNumber: number })
+        })
+        if (dispatch) dispatch(tr)
+        return true
+      },
       setWritingFormat: (format) => ({ state, tr, dispatch }) => {
         if (!WRITING_FORMATS.includes(format)) return false
         const from = readWritingFormat(state.doc)
@@ -84,6 +132,15 @@ export const DocWritingFormat = Extension.create({
 
   addProseMirrorPlugins() {
     return [new Plugin({
+      key: sceneNumberKey,
+      // The numbers in both margins of each heading (Script.css), as decorations: they
+      // follow the scenes as they move, with nothing to store until they are locked.
+      state: {
+        init: (_config, state) => sceneDecorations(state.doc),
+        apply: (tr, previous) => (tr.docChanged ? sceneDecorations(tr.doc) : previous),
+      },
+      props: { decorations: (state) => sceneNumberKey.getState(state) },
+    }), new Plugin({
       key: new PluginKey('writingFormatClass'),
       view: (view) => {
         markEditor(view)

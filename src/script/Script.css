@@ -132,3 +132,60 @@
   color: var(--text-tertiary, #9a9a9a);
   pointer-events: none;
 }
+
+/* ---- a speech carried over a page (paginate.ts, PaginationExtension.ts) ----
+   The push between the pages holds "(MORE)" at its top — the line under the part of
+   the speech that stays — and the speaker's name at its foot, the first line of the
+   next page. Measured from the dialogue's indent to the character's. */
+
+.pg-line-push.pg-continued {
+  position: relative;
+}
+
+.pg-continued :is(.pg-more, .pg-contd) {
+  position: absolute;
+  left: 12ch;
+  font-family: "Courier Prime", "Courier New", Courier, monospace;
+  font-size: 12pt;
+  line-height: 1;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+.pg-continued .pg-more {
+  top: 0;
+}
+
+.pg-continued .pg-contd {
+  bottom: 0;
+}
+
+.is-stageplay .pg-continued :is(.pg-more, .pg-contd) {
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+/* ---- scene numbers (DocWritingFormat.js): in both margins of each heading ---- */
+
+.ProseMirror.is-script .script-sceneHeading.is-numbered {
+  position: relative;
+}
+
+.ProseMirror.is-script .script-sceneHeading.is-numbered::before,
+.ProseMirror.is-script .script-sceneHeading.is-numbered::after {
+  content: attr(data-scene-number);
+  position: absolute;
+  top: 0;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.ProseMirror.is-script .script-sceneHeading.is-numbered::before {
+  right: calc(100% + 3ch);
+}
+
+.ProseMirror.is-script .script-sceneHeading.is-numbered::after {
+  left: 63ch;
+}

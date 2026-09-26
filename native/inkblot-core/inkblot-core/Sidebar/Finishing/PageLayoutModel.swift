@@ -188,6 +188,11 @@ final class PageLayoutModel {
         apply(PageSetupDraft(fixed))
     }
 
+    /// Ask for a Fountain script and make a new document of it.
+    func importScript() {
+        bridge.send(.importScript(ImportScriptCommand()))
+    }
+
     /// The last export again, to the same file.
     func exportAgain() {
         bridge.send(.exportAgain(ExportAgainCommand()))
