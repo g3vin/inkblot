@@ -16,7 +16,7 @@
  * keeps the seam thin.
  */
 import { EditorTarget, Pane } from '../types'
-import { countWords } from '../lib/wordCount'
+import { countEditorWords } from '../lib/wordCount'
 import type {
   ActiveEditorChanged,
   ArchiveChanged,
@@ -27,6 +27,8 @@ import type {
   CanvasDropDocCommand,
   CanvasDropNoteCommand,
   CanvasToolbarChanged,
+  MapChromeChanged,
+  MapCommandRequest,
   CanvasRestoreCommand,
   CanvasRevealCommand,
   DictationCancelCommand,
@@ -58,6 +60,7 @@ import type {
   SelectionContext,
   SetContentCommand,
   SyncNotesCommand,
+  TabsChanged,
   ToolbarState,
   ViewOptions,
 } from '../types'
@@ -89,6 +92,7 @@ export interface SurfaceDelegates {
   canvasDropNote?(command: CanvasDropNoteCommand): void
   canvasReveal?(command: CanvasRevealCommand): void
   canvasRestore?(command: CanvasRestoreCommand): void
+  mapCommand?(command: MapCommandRequest): void
 }
 
 export interface DocumentSurfaceOptions {
@@ -149,6 +153,8 @@ export interface DocumentSurface {
   publishSelectionContext(options?: { docPath?: string | null; isCanvas?: boolean }): void
   /** The canvas's own controls, or none while they are not up. Coalesced per frame. */
   publishCanvasToolbar(payload: CanvasToolbarChanged): void
+  /** The active map's toolbar and inspector, or none. Coalesced per frame. */
+  publishMapChrome(payload: MapChromeChanged): void
   /** Push the election result. Not coalesced — it is rare and ordering matters. */
   publishActiveEditor(info?: Partial<ActiveEditorChanged>): void
   publishDocChanged(payload: DocChanged): void
@@ -211,6 +217,9 @@ export interface DocumentSurface {
   /** Show a source in the References panel. */
   publishRevealReference(payload: RevealReference): void
 
+  /** The tabs and the split, whole. Coalesced — a tab switch changes several fields at once. */
+  publishTabsChanged(payload: TabsChanged): void
+
   /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
   publishDragStarted(): void
   publishDragMoved(x: number, y: number): void
@@ -262,7 +271,7 @@ export function createDocumentSurface({
       pane: pending.pane,
       docPath: pending.docPath,
       userEdit: pending.userEdit,
-      wordCount: countWords(editor.getText()),
+      wordCount: countEditorWords(editor),
       charCount: editor.state.doc.textContent.length,
       inserted: pending.inserted,
       deleted: pending.deleted,
@@ -342,6 +351,10 @@ export function createDocumentSurface({
     (payload) => bridge.emit('canvasToolbarChanged', payload),
     scheduler
   )
+  const mapChrome = createCoalescer<MapChromeChanged>(
+    (payload) => bridge.emit('mapChromeChanged', payload),
+    scheduler
+  )
   const selection = createCoalescer<SelectionContext>(
     (context) => bridge.emit('selectionContext', context),
     scheduler
@@ -397,6 +410,10 @@ export function createDocumentSurface({
   )
   const referenceLists = createCoalescer<ReferencesChanged>(
     (payload) => bridge.emit('referencesChanged', payload),
+    scheduler
+  )
+  const tabChanges = createCoalescer<TabsChanged>(
+    (payload) => bridge.emit('tabsChanged', payload),
     scheduler
   )
   const dragMoves = createCoalescer<{ dragId: string; clientX: number; clientY: number }>(
@@ -506,6 +523,7 @@ export function createDocumentSurface({
   handle('canvasDropNote', (payload) => delegates.canvasDropNote?.(payload))
   handle('canvasReveal', (payload) => delegates.canvasReveal?.(payload))
   handle('canvasRestore', (payload) => delegates.canvasRestore?.(payload))
+  handle('mapCommand', (payload) => delegates.mapCommand?.(payload))
 
   /* ---------------- request handlers ---------------- */
 
@@ -591,6 +609,7 @@ export function createDocumentSurface({
     },
 
     publishCanvasToolbar(payload) { canvasToolbar.push(payload) },
+    publishMapChrome(payload) { mapChrome.push(payload) },
 
     publishDocChanged(payload) { bridge.emit('docChanged', payload) },
     noteDocTransaction,
@@ -624,6 +643,7 @@ export function createDocumentSurface({
     publishArchiveChanged(payload) { bridge.emit('archiveChanged', payload) },
     publishWordCountsChanged(payload) { wordCountLists.push(payload) },
     publishPageLayoutState(payload) { pageLayoutChanges.push(payload) },
+    publishTabsChanged(payload) { tabChanges.push(payload) },
     publishPrintRequest(payload) { bridge.emit('printRequest', payload) },
     publishPageLayoutCatalog(payload) { bridge.emit('pageLayoutCatalog', payload) },
     publishPrintJobStatus(payload) { bridge.emit('printJobStatus', payload) },
@@ -662,6 +682,7 @@ export function createDocumentSurface({
       for (const target of [...pendingDocChanges.keys()]) sendDocChange(target)
       toolbar.flush()
       canvasToolbar.flush()
+      mapChrome.flush()
       selection.flush()
       dragMoves.flush()
       clipboardChanges.flush()
@@ -671,6 +692,7 @@ export function createDocumentSurface({
       chipLists.flush()
       wordCountLists.flush()
       pageLayoutChanges.flush()
+      tabChanges.flush()
       referenceLists.flush()
       for (const coalescer of notesByDoc.values()) coalescer.flush()
       for (const coalescer of notesChangedByDoc.values()) coalescer.flush()
@@ -681,6 +703,7 @@ export function createDocumentSurface({
       pendingDocChanges.clear()
       toolbar.cancel()
       canvasToolbar.cancel()
+      mapChrome.cancel()
       selection.cancel()
       dragMoves.cancel()
       clipboardChanges.cancel()
@@ -690,6 +713,7 @@ export function createDocumentSurface({
       chipLists.cancel()
       wordCountLists.cancel()
       pageLayoutChanges.cancel()
+      tabChanges.cancel()
       for (const coalescer of notesByDoc.values()) coalescer.cancel()
       for (const coalescer of notesChangedByDoc.values()) coalescer.cancel()
       notesByDoc.clear()

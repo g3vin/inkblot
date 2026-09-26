@@ -20,8 +20,9 @@ import { debounce } from 'lodash'
 
 import { documentSurface, editorRegistry } from '../bridge'
 import { isEditorReady } from '../lib/editorUtils'
-import { countWords } from '../lib/wordCount'
+import { countEditorWords, countWords } from '../lib/wordCount'
 import { nativeOwns } from '../lib/host'
+import { getPrintZoom, isPrintLayoutEnabled, subscribePrintLayoutStore } from '../print/printLayoutStore'
 import { EditorTarget, Pane } from '../types'
 import { visibleRect } from './useNativeNotePreviews'
 
@@ -46,7 +47,7 @@ const getWordStats = (targetEditor, previousTotal = 0, includeTotal = true) => {
     : doc.textBetween(selection.from, selection.to, '\n')
 
   return {
-    total: includeTotal ? countWords(targetEditor.getText()) : previousTotal,
+    total: includeTotal ? countEditorWords(targetEditor) : previousTotal,
     selected: selection?.empty ? null : countWords(selectedText),
   }
 }
@@ -67,12 +68,11 @@ const publishLoaded = (paneId, targetEditor) => {
   const target = paneId === 'secondary' ? EditorTarget.Secondary : EditorTarget.Primary
   const docPath = editorRegistry.resolve(target)?.docPath
   if (!docPath) return
-  const text = targetEditor.getText()
   documentSurface.publishDocChanged({
     pane,
     docPath,
     userEdit: false,
-    wordCount: countWords(text),
+    wordCount: countEditorWords(targetEditor),
     charCount: targetEditor.state.doc.textContent.length,
   })
 }
@@ -164,12 +164,19 @@ export function useEditorWordCount({ editor, secondaryEditor, showWordCountBadge
   return { primaryWordStats, secondaryWordStats, syncWordStats }
 }
 
+/** A status row's height: its badges' (`.native-word-count .word-count`). */
+const STATUS_ROW_HEIGHT = 24
+
 /**
  * Says where the page's badges are, for a shell that draws them — measured at most once
  * a frame, whatever moved or changed them, and sent only when something did. Print
  * Layout's page count is one of them (`.word-count` too), drawn the same way beside it. The panes
  * are watched for size too: dragging the split divider moves a badge without a scroll
  * or a window resize.
+ *
+ * With them goes each text pane's status row (`.pane-status[data-doc]`, EditorCanvas):
+ * where the pane's own Print Layout toggle and zoom go, what they show, and whether the
+ * pointer is over the pane — a split shows a pane's controls only then.
  */
 function useNativeWordCounts() {
   const nativeWordCount = nativeOwns('wordCount')
@@ -179,6 +186,19 @@ function useNativeWordCounts() {
     document.documentElement.classList.add('native-word-count')
     let last = ''
     let frame = 0
+    // The pane under the pointer, followed as it moves and dropped as it leaves the page.
+    let hoveredPane = null
+    const onPointerMove = (event) => {
+      const pane = event.target?.closest?.('.pane') || null
+      if (pane === hoveredPane) return
+      hoveredPane = pane
+      publish()
+    }
+    const onPointerLeave = () => {
+      if (!hoveredPane) return
+      hoveredPane = null
+      publish()
+    }
     const publish = () => {
       if (frame) return
       frame = window.requestAnimationFrame(() => {
@@ -198,24 +218,72 @@ function useNativeWordCounts() {
             bottom: rect.bottom,
           })
         }
-        const key = JSON.stringify(badges)
+        const panes = []
+        for (const row of document.querySelectorAll('.pane-status[data-doc]')) {
+          const pane = row.closest('.pane')
+          if (!pane) continue
+          const edges = pane.getBoundingClientRect()
+          const { bottom } = row.getBoundingClientRect()
+          if (!edges.width || !edges.height) continue
+          const { doc: docPath, project } = row.dataset
+          panes.push({
+            pane: row.dataset.pane === 'secondary' ? Pane.Secondary : Pane.Primary,
+            docPath,
+            printLayout: isPrintLayoutEnabled(project, docPath),
+            zoom: getPrintZoom(project, docPath),
+            hovered: pane === hoveredPane,
+            left: edges.left,
+            top: bottom - STATUS_ROW_HEIGHT,
+            right: edges.right,
+            bottom,
+          })
+        }
+        const key = JSON.stringify([badges, panes])
         if (key === last) return
         last = key
-        documentSurface.publishWordCountsChanged({ badges })
+        documentSurface.publishWordCountsChanged({ badges, panes })
       })
     }
-    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(publish)
+    // Only mutations that touch a badge: a badge added, removed or re-texted. Every
+    // keystroke in a document is a mutation too, and each one used to measure every
+    // badge (and every clipping ancestor above it) for a badge that had not moved.
+    const touchesBadge = (node) => {
+      const element = node?.nodeType === 1 ? node : node?.parentElement
+      if (!element) return false
+      return Boolean(element.closest('.word-count') || element.querySelector?.('.word-count'))
+    }
+    const onMutations = (records) => {
+      for (const record of records) {
+        // The root's classes, which can move the status row.
+        if (record.type === 'attributes') return publish()
+        if (record.type === 'characterData') {
+          if (record.target.parentElement?.closest('.word-count')) return publish()
+          continue
+        }
+        if (record.target.nodeType === 1 && record.target.closest('.word-count')) return publish()
+        for (const node of record.addedNodes) if (touchesBadge(node)) return publish()
+        for (const node of record.removedNodes) if (touchesBadge(node)) return publish()
+      }
+    }
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(onMutations)
     mutations?.observe(document.body, { childList: true, subtree: true, characterData: true })
+    mutations?.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     const resizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publish)
     window.addEventListener('resize', publish)
+    const unsubscribePrint = subscribePrintLayoutStore(publish)
+    document.addEventListener('pointermove', onPointerMove, true)
+    document.documentElement.addEventListener('pointerleave', onPointerLeave)
     publish()
     return () => {
+      unsubscribePrint()
+      document.removeEventListener('pointermove', onPointerMove, true)
+      document.documentElement.removeEventListener('pointerleave', onPointerLeave)
       mutations?.disconnect()
       resizes?.disconnect()
       window.removeEventListener('resize', publish)
       if (frame) window.cancelAnimationFrame(frame)
       document.documentElement.classList.remove('native-word-count')
-      documentSurface.publishWordCountsChanged({ badges: [] })
+      documentSurface.publishWordCountsChanged({ badges: [], panes: [] })
     }
   }, [nativeWordCount])
 }

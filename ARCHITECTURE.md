@@ -148,13 +148,14 @@ part it is told the shell owns (`EditorWebController.nativeChrome`, read by
 | Part | How |
 |---|---|
 | Window and toolbar | Standard macOS 26 chrome: a regular-height unified toolbar, NavigationSplitView's sidebar toggle, and the inspector toggle as a titlebar accessory in the top-right corner (`InspectorTitlebarToggle`), so it never falls into ». AppKit places the traffic lights and drags the window. |
-| Formatting toolbar | Native and customizable (`Shell/Toolbar/`). `DocumentToolbar` renders the pushed `ToolbarState`; a canvas with no card being edited gets `CanvasToolbar`, from `canvasToolbarChanged`, and its buttons go back as `canvasCommand`s. The page draws a toolbar row only for a comparison. Right-clicking the band also offers Customize Inspector Layout… (`ToolbarContextMenu`). |
+| Formatting toolbar | Native and customizable (`Shell/Toolbar/`). `DocumentToolbar` renders the pushed `ToolbarState`; a canvas with no card being edited gets `CanvasToolbar`, from `canvasToolbarChanged`, and its buttons go back as `canvasCommand`s; an active map gets `MapToolbar`, from `mapChromeChanged`, and its buttons go back as `mapCommand`s. The page draws a toolbar row only for a comparison. Right-clicking the band also offers Customize Inspector Layout… (`ToolbarContextMenu`). |
 | Page under the glass | The page runs full width under both sidebars and the toolbar. The shell sends `setPanelInsets` with how much of each side they cover, and the page keeps its text column and a canvas's controls to what is left. During a live window resize neither the insets nor the web view's size are passed on until the drag ends (`EditorWebView`, `ContentView`): SwiftUI lays the column out at trial sizes mid-drag, and the page would render them. |
 | Project picker | `ProjectPicker`, modelled on Xcode's welcome window (⇧⌘1). The page draws nothing with no project open and does not queue commands, so `AppModel.openProject` resends until the page reports the project open. |
 | File tree | An `NSOutlineView` (`ProjectOutline`), because a SwiftUI `List` could not take drops between rows in nested folders. The manual order is the page's `inkblot-order:<project>` preference, read and written through the core (`TreeOrder`). Every change is a command the page performs (`createEntry`, `renameEntry`, …) through `useEntryOperations`. |
-| Inspector | A selector bar (`SidebarTabPicker`) over the Clipboard, Workbench, Notes, References, History and Page panels, with one search bar. Two layouts, drafting and finishing, each a user-chosen set of panels (`InspectorLayout`, Customize Layout…); a two-finger swipe steps through them (`InspectorSwipeCatcher`). `useNativeSidebar` publishes the state and applies the edits; version rows and search come from the core. |
+| Inspector | A selector bar (`SidebarTabPicker`) over the Clipboard, Workbench, Notes, References, History and Page panels, with one search bar. While a map is the active document, its Map panel (`MapPanelView`) leads the bar and is chosen for the writer; no layout holds it. Two layouts, drafting and finishing, each a user-chosen set of panels (`InspectorLayout`, Customize Layout…); a two-finger swipe steps through them (`InspectorSwipeCatcher`). `useNativeSidebar` publishes the state and applies the edits; version rows and search come from the core. |
 | Bubble editor | Liquid Glass over the window (`Bubble/`). The page opens a session (`bubbleSessionOpened`) and writes the sentence back on `closeBubbleSession`; the shell holds no positions. `BubbleText`/`BubbleDrop`/`BubbleForms` port `lib/bubbleText.ts`/`bubbleDrop.js`/`bubbleForms.ts`, so change them together. The chips on sentences are the page's own glass, not the shell's: an overlay placed from reported positions trailed every scroll. |
 | Note cards | Liquid Glass (`Notes/`), placed from marker events (`useNativeNotePreviews`). Notes can be dragged from the Notes panel onto a canvas as a URL the page reads off an HTML5 drop (`NoteDrag`). |
+| Tabs and split view | A tab bar over the page column only, drawn in the window as Xcode's editor tabs are (`Shell/Tabs/`), not macOS window tabs: AppKit draws those across the whole window, inspector included, and makes each tab a window of its own, which would mean a page per tab over the same files. It sits in the detail column's `safeAreaBar`, so it counts in the top inset the page is sent. The tabs are `useTabs`'s, published by `useNativeTabs` (`tabsChanged`) and changed by command (`bridge/tabs.rs`). A tab owns its split, as in Safari or Xcode: `useTabs` records the panes' split into the active tab and restores a tab's own on arriving at it. ⌃Tab is caught by a key monitor before the web view, which otherwise takes it as focus navigation. |
 | Word count, Print Layout controls | Glass badges and controls placed from what the page publishes (`WordCountBadges`, `PrintLayoutControls`). The page leaves room for them (`.native-print-controls`). |
 | Models, windows | `ModelService` answers the model commands (synonyms, rhymes, Kokoro, dictation, the Pinterest scrape) from `inkblot-models`. `AuxiliaryWindows` opens detached document and Pinterest windows, each with its own page. |
 | Not native | Context menus (the page's, shown through `WebMenus`), dialogs, preferences, fonts and haptics go through the shim and `TauriHost`. Dictation and Read Aloud have no native toolbar buttons. |
@@ -221,6 +222,17 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
 - **Heavy things are lazy.** d3-geo and the atlases load only when an Earth map opens.
   The tracer runs in a module worker and falls back to the main thread if the worker
   will not start under `inkblot://`.
+- **The inspector is a form the page builds** (`useMapPanel`, `inspector/panelBuilder.js`):
+  sections of typed fields named by id (`MapPanel`, `bridge/map.rs`). The page draws it
+  under Tauri (`MapPanelView.jsx`); the Swift app draws it as its inspector's Map panel
+  and sends each edit back as `mapCommand { panel-field | panel-action, id }`. Every
+  figure in it comes from the page's maths, so the shell never interprets a field. Add a
+  field in the builder and both apps have it; add a field *type* in `map.rs` and draw it
+  in both `MapPanelView`s.
+- **What a map draws over itself stays in the page**: the scale bar, compass, title,
+  tool hint and timeline. Under the Swift shell the map runs beneath the glass sidebars
+  and toolbar, so these are placed in the part left uncovered (`useVisibleBox`, from the
+  shell's `setPanelInsets` through `PanelInsetsContext`).
 - **Rust twins only what Rust uses**: the kind, normalizing and creating maps, word
   counts, links, search matches and version entries. The maths (geometry, geodesy,
   travel, orbits, calendar) is JS only. Port a module, with parity cases, when native
@@ -317,13 +329,13 @@ the library.
 examples.
 
 **A toolbar item.** The window toolbar is AppKit's customizable toolbar, through
-SwiftUI's `.toolbar(id:)`. A document and a canvas each have their own saved layout
-(`ToolbarID.document`, `ToolbarID.canvas`), switched inside one toolbar builder on
-`ContentView`. Files are in `Shell/Toolbar/`.
+SwiftUI's `.toolbar(id:)`. A document, a canvas and a map each have their own saved
+layout (`ToolbarID.document`, `ToolbarID.canvas`, `ToolbarID.map`), switched inside one
+toolbar builder on `ContentView` (`WindowToolbar`). Files are in `Shell/Toolbar/`.
 1. Add a `ToolbarItemID` case, `inkblot.<area>.<name>`. Ids are keys in people's saved
    layouts: never rename or reuse one; a removed item's case stays, deprecated.
-2. Add the `ToolbarItem` to `DocumentToolbar`, `CanvasToolbar`, or `SharedToolbarItems`
-   for both. Its place in the builder is its place in the default set and the palette.
+2. Add the `ToolbarItem` to `DocumentToolbar`, `CanvasToolbar`, `MapToolbar`, or
+   `SharedToolbarItems` for all of them. Its place in the builder is its place in the default set and the palette.
 3. Add `.defaultCustomization(.hidden)` unless every new user should see it. Items that
    belong together are one item holding a `ControlGroup`.
 4. Give it a `Label` with a title and an SF Symbol, and `.help(…)`.
@@ -461,6 +473,10 @@ These differ from Xcode's template on purpose:
   detached and Pinterest windows, drops onto a canvas, note drags from the Notes panel,
   model downloads, a rename of an open document in the native tree, a restore from
   native History, and a voice memo. Click through them with the Tauri app closed.
+- **The tab bar:** its look in light and dark, a tab's context menu, dragging a tab to
+  reorder it, and dropping a document from the file tree onto the bar. Selecting,
+  ⌘T/⌘W, ⌘1–⌘9, ⌃Tab, the split commands and a tab keeping its split were driven
+  through Accessibility.
 - **Print Layout:** a real print and PDF from both apps, the Swift Page tab, the Tauri
   Page Setup sheet, a folded 16-page signature, an EPUB in Apple Books or `epubcheck`,
   and a Pinterest embed in print (a cloned iframe reloads, and may print blank).
@@ -472,9 +488,8 @@ These differ from Xcode's template on purpose:
 - **A Pinterest board scrape** against a live, logged-in session.
 
 **Not built**
-- **A way to see and switch tabs.** `useTabs` still tracks open documents as tabs,
-  and "Open in New Tab" adds one, but nothing draws them since the tab dock was
-  removed. A restored session can still land on a draft tab (`DraftTabPane`).
+- **Tabs in the Tauri app.** Only the Swift shell draws a tab bar (`nativeOwns('tabBar')`);
+  the Tauri page tracks tabs and splits but shows no way to switch between them.
 - **The Kokoro download.** The page never offers it (`download_kokoro_model` exists in
   both apps), so native Read Aloud needs the model installed by other means and
   otherwise falls back to kokoro-js's in-browser WASM build.
@@ -482,8 +497,7 @@ These differ from Xcode's template on purpose:
   not shown under the Swift app.
 - **Move Folder Location** from the project picker (no `move_project` over UniFFI).
 - **Toolbar items** still wanted: New Document/Canvas/Folder (the naming sheet is
-  view-local to `FileTreeSidebar`), Bubble, workbench lookups, highlight, split
-  right/down and new tab, theme, and focusing the inspector's search.
+  view-local to `FileTreeSidebar`), Bubble, workbench lookups, highlight, theme, and focusing the inspector's search.
 - **A native context menu** built from the `getSelectionContext` request, which would
   take the page out of the right-click. Today's menus are the page's, shown through
   `WebMenus`.

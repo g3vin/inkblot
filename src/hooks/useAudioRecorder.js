@@ -8,7 +8,7 @@
  * `stop()` resolves to the saved clip (or null if nothing was captured), so a caller
  * can decide what to do with it — attach it to a note, or drop it on a canvas.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { canRecordAudio, saveAudioClip, startAudioRecording } from '../lib/audioNotes'
 
 export function useAudioRecorder(projectName) {
@@ -77,13 +77,13 @@ export function useAudioRecorder(projectName) {
     stop,
   ])
 
-  return {
-    supported: canRecordAudio(),
-    recording,
-    elapsed,
-    error,
-    start,
-    stop,
-    toggle,
-  }
+  const [supported] = useState(canRecordAudio)
+
+  // One object per change of what it holds, not per render: callers put it in their
+  // callbacks' dependencies, and a new one each render re-subscribed their listeners
+  // every frame of a canvas pan.
+  return useMemo(
+    () => ({ supported, recording, elapsed, error, start, stop, toggle }),
+    [supported, recording, elapsed, error, start, stop, toggle]
+  )
 }

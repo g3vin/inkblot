@@ -11,7 +11,7 @@
   left: 10px;
   z-index: 5;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   pointer-events: none;
 }
 
@@ -38,17 +38,13 @@
   flex-direction: row-reverse;
 }
 
-/* Under the Swift shell the Print Layout button holds the bottom-left corner of the
-   editor (PrintLayoutControls.swift): 32px from 10px in, then the row's gap. */
-.native-print-controls .editor-container:not(.split-rows) .primary-pane .pane-status,
-.native-print-controls .split-rows .secondary-pane .pane-status {
-  left: 50px;
-}
-
-/* …and while the active document is in Print Layout, its zoom control holds the
-   bottom-right corner — which, side by side, is where the right pane's status sits. */
-.native-print-controls.print-layout-active .split-active:not(.split-rows) .secondary-pane .pane-status {
-  right: 170px;
+/* Under the Swift shell each text pane's Print Layout toggle and zoom hold its own
+   bottom-right corner (PrintLayoutControls.swift), so every pane's badges keep to its
+   bottom-left, the right pane's included. */
+.native-print-controls .split-active:not(.split-rows) .secondary-pane .pane-status {
+  left: 10px;
+  right: auto;
+  flex-direction: row;
 }
 
 .pane-header-centered {
@@ -83,7 +79,12 @@
 }
 
 /* Under the Swift shell the badge is drawn natively, as Liquid Glass, over this one —
-   which stays, invisible, to be measured (useEditorWordCount). */
+   which stays, invisible, to be measured (useEditorWordCount) — at the tab bar's
+   height, as the rest of the bottom row is (FileTreeSidebar.swift). */
 .native-word-count .word-count {
   opacity: 0;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 12px;
 }

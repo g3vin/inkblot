@@ -18,6 +18,7 @@ import { pinLabel } from '../lib/map/mapModel'
 import { orbitPath } from '../lib/map/orbits'
 import { habitableZoneAU, temperatureToColor } from '../lib/map/stars'
 import { projectedEarth } from '../lib/map/earthData'
+import { hashSeed, INKED_STYLE, ROUGH_STYLE, roughenPath } from '../lib/map/roughen'
 import { travelerPositionAt } from '../lib/map/timeline'
 import { useAssetUrl } from '../canvas/useAssetUrl'
 import { PinGlyph } from './mapGlyphs'
@@ -187,7 +188,10 @@ const RouteLayer = memo(function RouteLayer({ map, projector, space, day, select
         const d = linePath(projector, space, coords)
         const stroke = route.style.stroke || 'var(--map-route)'
         const dash = route.style.dash
-        const filter = dash === 'rough' ? `url(#${idPrefix}-rough)` : dash === 'inked' ? `url(#${idPrefix}-inked)` : undefined
+        // Rough and inked are a wobble drawn into the line (roughen.js); the hit path
+        // keeps the true one.
+        const style = dash === 'rough' ? ROUGH_STYLE : dash === 'inked' ? INKED_STYLE : null
+        const drawn = style ? roughenPath(d, style, hashSeed(route.id)) : d
         return (
           <g
             key={route.id}
@@ -199,11 +203,10 @@ const RouteLayer = memo(function RouteLayer({ map, projector, space, day, select
             <path id={`${idPrefix}-route-${route.id}`} className="map-route-hit" d={d} />
             <path
               className="map-route-line"
-              d={d}
+              d={drawn}
               stroke={stroke}
               strokeWidth={route.style.width}
               strokeDasharray={DASHES[dash] || undefined}
-              filter={filter}
               markerEnd={route.style.arrow ? `url(#${idPrefix}-arrow)` : undefined}
             />
           </g>
@@ -358,14 +361,6 @@ export function MapDefs({ idPrefix }) {
       <marker id={`${idPrefix}-arrow`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="strokeWidth">
         <path d="M0 0 L10 5 L0 10 z" fill="context-stroke" stroke="none" />
       </marker>
-      <filter id={`${idPrefix}-rough`} x="-5%" y="-5%" width="110%" height="110%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="2" seed="3" />
-        <feDisplacementMap in="SourceGraphic" scale="3" />
-      </filter>
-      <filter id={`${idPrefix}-inked`} x="-5%" y="-5%" width="110%" height="110%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="1" seed="9" result="grain" />
-        <feDisplacementMap in="SourceGraphic" in2="grain" scale="1.2" />
-      </filter>
       <pattern id={`${idPrefix}-hatch-diagonal`} width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
         <line x1="0" y1="0" x2="0" y2="10" stroke="currentColor" strokeWidth="1.2" />
       </pattern>
@@ -392,7 +387,8 @@ export function MapDefs({ idPrefix }) {
  * Every layer, in paint order. `interactive` false leaves out selection chrome — a
  * thumbnail or an export is the map, not the editor.
  */
-export default function MapLayers({
+/** Memoized: a pan or zoom changes none of its props, so the layers sit it out. */
+const MapLayers = memo(function MapLayers({
   map,
   projector,
   space,
@@ -428,4 +424,6 @@ export default function MapLayers({
       <TravelerLayer map={map} projector={projector} space={space} day={day} schedules={schedules} selection={selection} />
     </g>
   )
-}
+})
+
+export default MapLayers

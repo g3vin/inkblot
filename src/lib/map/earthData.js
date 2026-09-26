@@ -63,15 +63,21 @@ export async function projectedEarth(projector, level) {
   }
   const earth = await loadEarth(level)
   const path = projector.path
+  // Every country's own outline is most of the work (1.6 MB of path at 50m) and only
+  // a country hit-test wants it, so it is drawn the first time it is asked for.
+  let countries = null
   const result = {
     sphere: path(SPHERE) || '',
     graticule: path(GRATICULE) || '',
     land: path(earth.land) || '',
     borders: path(earth.borders) || '',
-    countries: earth.countries.features.map((country) => ({
-      name: country.properties?.name || '',
-      d: path(country) || '',
-    })),
+    get countries() {
+      countries ??= earth.countries.features.map((country) => ({
+        name: country.properties?.name || '',
+        d: path(country) || '',
+      }))
+      return countries
+    },
   }
   projected.set(key, result)
   while (projected.size > PROJECTED_LIMIT) projected.delete(projected.keys().next().value)

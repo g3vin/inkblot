@@ -18,11 +18,13 @@ use super::references::{
 };
 use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 use crate::types::json::JsonValue;
+use super::map::MapCommandRequest;
 use super::sidebar::{
     AddReplyCommand, ClipboardDropCommand, HighlightNoteCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
     RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
     TileRef, UpdateNoteCommand, VersionActionCommand,
 };
+use super::tabs::{CloseSplitCommand, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand, SetTabOrderCommand, TabRef};
 use crate::types::note::Note;
 use super::print::{
     ApplyFormatCommand, ClearBookSetupCommand, ExportAgainCommand, ExportDocumentCommand, GoToPageCommand,
@@ -534,6 +536,8 @@ pub enum NativeCommand {
     CanvasDropNote(CanvasDropNoteCommand),
     CanvasReveal(CanvasRevealCommand),
     CanvasRestore(CanvasRestoreCommand),
+    /// Run a command on a map (`map.rs`).
+    MapCommand(MapCommandRequest),
     InsertPlainText(InsertPlainTextCommand),
     CreateEntry(CreateEntryCommand),
     RenameEntry(RenameEntryCommand),
@@ -598,6 +602,15 @@ pub enum NativeCommand {
     SetAuthorProfile(SetAuthorProfileCommand),
     SetBookCover(SetBookCoverCommand),
     ExportAgain(ExportAgainCommand),
+    /* The tab bar and split view, drawn by the shell (`tabs.rs`). */
+    SelectTab(TabRef),
+    CloseTab(TabRef),
+    SetTabOrder(SetTabOrderCommand),
+    NewTab(NewTabCommand),
+    OpenDocInTab(OpenDocInTabCommand),
+    OpenDocInWindow(OpenDocInWindowCommand),
+    OpenInSplit(OpenInSplitCommand),
+    CloseSplit(CloseSplitCommand),
     MeasureBook(MeasureBookCommand),
     ImportScript(ImportScriptCommand),
     SetSceneNumbers(SetSceneNumbersCommand),

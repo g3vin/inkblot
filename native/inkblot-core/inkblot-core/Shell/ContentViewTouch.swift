@@ -2,7 +2,7 @@
 import SwiftUI
 
 /// The window on iPadOS and iOS: the same three columns as the Mac, laid out the way
-/// the platform lays them out.
+/// the platform lays them out. A map puts its tools in the toolbar, as on the Mac.
 ///
 /// The Mac's window has no titlebar row and floats its own toggles over the page (see
 /// `WindowChrome`). Here `NavigationSplitView` brings the platform's own: a sidebar
@@ -29,6 +29,21 @@ struct ContentView: View {
                             sidebar.isPresented.toggle()
                         } label: {
                             Label("Inspector", systemImage: "sidebar.right")
+                        }
+                    }
+                }
+                // A map's own controls while a map is the active document, as on the Mac
+                // (`MapToolbar`); its inspector is a panel of the inspector.
+                .toolbar {
+                    if let map = model.bridge.activeMapChrome {
+                        ToolbarItemGroup(placement: .principal) {
+                            let send = { (command: String, detail: [String: Any]?) in
+                                model.bridge.send(.mapCommand(MapCommandRequest(
+                                    surfaceId: map.surfaceId, command: command, detail: detail.map { AnyCodable($0) })))
+                            }
+                            MapToolButtons(tools: MapToolOption.drawing + MapToolOption.measuring, state: map, send: send)
+                            MapHistoryButtons(state: map, send: send)
+                            MapZoomButtons(state: map, send: send)
                         }
                     }
                 }

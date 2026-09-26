@@ -6,6 +6,14 @@ Notable changes to Inkblot. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Map version history:** maps compare and merge like canvases — place by place,
+  route by route, with whole-map settings (style, scale, timeline, …) as their own
+  differences — and their history rows say what changed ("+2 places · 3 moved ·
+  Style"), in the native sidebar as well as the page. Filtering a map's history
+  finds versions by the names written on the map.
+
 ## [0.1.0] - 2026-09-24
 
 The first tagged version: the writing app, its shared Rust core, and a native Swift

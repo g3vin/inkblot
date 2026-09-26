@@ -25,10 +25,12 @@ import { EditorTarget } from '../types'
 import { documentSurface, dragHandoff, DragPayloadKind, editorRegistry, useRegisterEditor } from '../bridge'
 import { readAnchor } from '../bridge/anchors'
 import { canvasDelegates } from '../bridge/canvasDelegates'
+import { mapDelegates } from '../bridge/mapDelegates'
 import { useSurfacePublisher } from '../bridge/useSurfacePublisher'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
+import { nativeOwns } from '../lib/host'
 import CanvasPane from '../canvas/CanvasPane'
 import MapPane from '../map/MapPane'
 import { useEditorAutosave } from '../hooks/useEditorAutosave'
@@ -157,7 +159,11 @@ export default function EditorCanvas({
 
   /* ---------------- Editors ---------------- */
 
-  const editor = useEditor({
+  // Built once. useEditor compares these options by identity on every render, and a
+  // fresh extension array or editorProps object made it call setOptions — handing both
+  // editors new props and recomputing every decoration and plugin view — each time
+  // this component rendered, which is on every word-count tick and note change.
+  const [primaryOptions] = useState(() => ({
     extensions: buildEditorExtensions(
       StarterKit.configure({
         bulletList: { keepMarks: true },
@@ -168,15 +174,18 @@ export default function EditorCanvas({
     editorProps: {
       handlePaste: createPasteHandler(),
     },
-  })
-
-  const secondaryEditor = useEditor({
+  }))
+  const [secondaryOptions] = useState(() => ({
     extensions: buildEditorExtensions(StarterKit),
     content: '',
     editorProps: {
       handlePaste: createPasteHandler(),
     },
-  })
+  }))
+
+  const editor = useEditor(primaryOptions)
+
+  const secondaryEditor = useEditor(secondaryOptions)
 
   // Tag drags that start inside an editor's DOM with the selection payload so
   // other drop targets (clipboard panel, opposite pane) know what is moving.
@@ -532,6 +541,7 @@ export default function EditorCanvas({
   useEffect(() => {
     documentSurface.setDelegates({
       ...canvasDelegates,
+      ...mapDelegates,
       openDocument: ({ path, pane }) => openDocFromCanvas(pane, path),
     })
   }, [openDocFromCanvas])
@@ -593,6 +603,9 @@ export default function EditorCanvas({
       : ''
   }`
   const showDraftPane = draftTabActive && !currentDoc
+  // A split pane names its document above it, with a × to close it — unless the shell
+  // draws the tabs, whose split tab names both documents, the first pane's first.
+  const paneHeaders = splitView === 'editor' && !nativeOwns('tabBar')
   const primaryPaneOwnsFocus = primaryIsStructured || showDraftPane
 
   // The divider is a track in the split grid, so the two panes are sized by the
@@ -685,7 +698,7 @@ export default function EditorCanvas({
               notesByDoc={notesByDoc}
               setNotesForDoc={setNotesForDoc}
               openDocs={openDocs}
-              showHeader={splitView === 'editor'}
+              showHeader={paneHeaders}
               onClose={closePrimary}
               isActive={activeDoc === currentDoc}
             />
@@ -696,16 +709,19 @@ export default function EditorCanvas({
               setActiveEditor={setActiveEditor}
               onActivate={() => activatePane(currentDoc, null)}
               onOpenDoc={(docPath) => openDocFromCanvas('primary', docPath)}
-              showHeader={splitView === 'editor'}
+              showHeader={paneHeaders}
               onClose={closePrimary}
               isActive={activeDoc === currentDoc}
+              // Its inspector panel stays while the other pane is worked in — unless
+              // that is a map too, whose panel it then is.
+              chromeWhileInactive={secondaryKind !== 'map'}
             />
           ) : (
             <PaneEditorSurface
               editor={liveEditor}
               projectName={projectName}
               docPath={currentDoc}
-              header={splitView === 'editor' ? (
+              header={paneHeaders ? (
                 <div className="pane-header pane-header-centered">
                   <span>{currentDoc}</span>
                   <button onClick={closePrimary}>×</button>
@@ -714,7 +730,7 @@ export default function EditorCanvas({
             />
           )}
           {!primaryIsStructured && !showDraftPane ? (
-            <div className="pane-status">
+            <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName}>
               {showWordCountBadge ? <div className="word-count">{formatWordStats(primaryWordStats)}</div> : null}
             </div>
           ) : null}
@@ -765,7 +781,7 @@ export default function EditorCanvas({
                 notesByDoc={notesByDoc}
                 setNotesForDoc={setNotesForDoc}
                 openDocs={openDocs}
-                showHeader
+                showHeader={paneHeaders}
                 onClose={closeSecondary}
                 isActive={activeDoc === secondaryDoc}
               />
@@ -776,25 +792,26 @@ export default function EditorCanvas({
                 setActiveEditor={setActiveEditor}
                 onActivate={() => activatePane(secondaryDoc, null)}
                 onOpenDoc={(docPath) => openDocFromCanvas('secondary', docPath)}
-                showHeader
+                showHeader={paneHeaders}
                 onClose={closeSecondary}
                 isActive={activeDoc === secondaryDoc}
+                chromeWhileInactive={primaryKind !== 'map'}
               />
             ) : (
               <PaneEditorSurface
                 editor={liveSecondaryEditor}
                 projectName={projectName}
                 docPath={secondaryDoc}
-                header={(
+                header={paneHeaders ? (
                   <div className="pane-header split-header pane-header-centered">
                     <span>{secondaryDoc}</span>
                     <button onClick={closeSecondary}>×</button>
                   </div>
-                )}
+                ) : null}
               />
             )}
             {!secondaryIsStructured ? (
-              <div className="pane-status">
+              <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName}>
                 {showWordCountBadge ? <div className="word-count">{formatWordStats(secondaryWordStats)}</div> : null}
               </div>
             ) : null}

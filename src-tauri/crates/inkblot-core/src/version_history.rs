@@ -168,6 +168,8 @@ fn entry_text(entry: Option<&VersionEntry>) -> String {
         .unwrap_or_default()
 }
 
+/// The change in word count between two structured entries (a canvas or a map),
+/// whose words are names and labels rather than prose to diff.
 fn canvas_delta(newer: &VersionEntry, older: Option<&VersionEntry>) -> WordDelta {
     let diff = version_words(newer) as i64 - older.map(version_words).unwrap_or(0) as i64;
     WordDelta {
@@ -234,6 +236,12 @@ pub fn version_rows(versions: &[VersionEntry]) -> Vec<VersionRow> {
                     }
                 };
                 (canvas_delta(entry, previous), Vec::new(), Some(summary))
+            } else if let Some(map) = &entry.map {
+                let summary = crate::map::diff::summarize_map_change(
+                    previous.and_then(|p| p.map.as_ref()),
+                    map,
+                );
+                (canvas_delta(entry, previous), Vec::new(), Some(summary))
             } else {
                 let before = entry_text(previous);
                 let after = entry_text(Some(entry));
@@ -265,7 +273,7 @@ pub fn span_delta(versions: &[VersionEntry], newest: usize, oldest: usize) -> Wo
         return WordDelta::default();
     };
     let before = versions.get(oldest + 1);
-    if newer.canvas.is_some() {
+    if newer.canvas.is_some() || newer.map.is_some() {
         return canvas_delta(newer, before);
     }
     word_delta(&entry_text(before), &entry_text(Some(newer)))
@@ -797,6 +805,41 @@ mod tests {
         );
         assert_eq!(rows[0].session_color, session_color("s2"));
         assert!(rows[0].summary.is_none());
+    }
+
+    fn map_version(id: &str, map: crate::types::JsonValue) -> VersionEntry {
+        crate::store::versions::build_map_version_entry(
+            id.into(),
+            "2026-09-22T12:00:00.000Z".into(),
+            "s".into(),
+            map,
+            None,
+            true,
+        )
+    }
+
+    #[test]
+    fn a_map_row_summarises_what_changed_on_the_map() {
+        let versions = vec![
+            map_version(
+                "v2",
+                serde_json::json!({ "type": "map", "pins": [
+                    { "id": "a", "name": "Old Harbour", "at": [9, 9] },
+                    { "id": "b", "name": "Keep", "at": [1, 1] },
+                ] }),
+            ),
+            map_version(
+                "v1",
+                serde_json::json!({ "type": "map", "pins": [{ "id": "a", "name": "Harbour", "at": [0, 0] }] }),
+            ),
+        ];
+        let rows = version_rows(&versions);
+        assert_eq!(rows[0].summary.as_deref(), Some("+1 place · 1 edited"));
+        assert_eq!(rows[1].summary.as_deref(), Some("Snapshot · 1 place"));
+        // "Old Harbour" + "Keep" against "Harbour".
+        assert_eq!(rows[0].delta, WordDelta { added: 2, removed: 0 });
+        assert!(rows[0].snippet.is_empty());
+        assert_eq!(span_delta(&versions, 0, 1), WordDelta { added: 3, removed: 0 });
     }
 
     #[test]

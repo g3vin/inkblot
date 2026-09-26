@@ -166,6 +166,22 @@ await act(async () => { store.setPrintZoom(store.getPrintZoom()) })
 await act(async () => { await wait(160) })
 ok('a state identical to the last is not sent again', heard.pageLayoutState.length === before)
 
+// Each document has its own zoom: a split's two sides zoom apart.
+const zoomBefore = lastState().zoom
+await act(async () => { shellBridge.send('setPrintZoom', { zoom: 2.5, docPath: 'Novel/Other' }) })
+await act(async () => { await wait(160) })
+ok('a zoom naming another document is that document\'s',
+  store.getPrintZoom('P', 'Novel/Other') === 2.5 && lastState().zoom === zoomBefore)
+await act(async () => { store.setPrintZoom(0.5, 'P', 'Novel/Left') })
+ok('and leaves the one it did not name as it was', store.getPrintZoom('P', 'Novel/Other') === 2.5 && store.getPrintZoom('P', 'Novel/Left') === 0.5)
+ok('one never zoomed is not moved by either', store.getPrintZoom('P', 'Novel/Unzoomed') === store.getPrintZoom())
+await act(async () => { shellBridge.send('setPrintLayout', { enabled: true, docPath: 'Novel/Other' }) })
+ok('a pane\'s toggle shows its own document as pages, not the active one',
+  store.isPrintLayoutEnabled('P', 'Novel/Other') && !store.isPrintLayoutEnabled('P', 'Novel/Two'))
+await act(async () => { shellBridge.send('setPrintLayout', { enabled: false, docPath: 'Novel/Other' }) })
+await act(async () => { store.setPrintZoom(zoomBefore, 'P', 'Novel/Two') })
+await act(async () => { await wait(160) })
+
 // Typing is debounced into one publish.
 const typedBefore = heard.pageLayoutState.length
 await act(async () => {

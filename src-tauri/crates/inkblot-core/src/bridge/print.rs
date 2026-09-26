@@ -110,12 +110,15 @@ pub struct PrintOptions {
 
 /* ---------------- commands ---------------- */
 
-/// Show the active pane as pages, or as the continuous editor.
+/// Show a document as pages, or as the continuous editor: the one named — a pane's own
+/// toggle names the document in it — or else the active one.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetPrintLayoutCommand {
     pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doc_path: Option<String>,
 }
 
 /// Which setup an edit goes to: the active document's own, or the one every chapter of
@@ -202,7 +205,8 @@ pub struct SetBookSettingsCommand {
     pub settings: BookSettings,
 }
 
-/// A zoom level (1 = 100%), or a fit. `fit` wins when both are present.
+/// A zoom level (1 = 100%), or a fit. `fit` wins when both are present. Each document
+/// has its own zoom: this is the named one's, or else the active one's.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -211,6 +215,8 @@ pub struct SetPrintZoomCommand {
     pub zoom: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fit: Option<ZoomFit>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doc_path: Option<String>,
 }
 
 /// The display's logical density — its width in points over its width in inches —

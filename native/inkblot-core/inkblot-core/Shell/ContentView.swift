@@ -7,7 +7,8 @@ import SwiftUI
 ///
 /// All of it standard macOS 26 chrome: a regular-height unified toolbar with no title — a
 /// band of Liquid Glass — holding the formatting controls (`DocumentToolbar`), or on a
-/// canvas the canvas's own (`CanvasToolbar`) until a card is being edited, the sidebar
+/// canvas the canvas's own (`CanvasToolbar`) until a card is being edited, or on a map
+/// the map's (`MapToolbar`), the sidebar
 /// toggle NavigationSplitView provides, and an inspector toggle in the top-right corner.
 /// The first two are the user's to rearrange (Customize Toolbar…, see `ToolbarItemID`);
 /// the toggles are fixed.
@@ -33,11 +34,11 @@ struct ContentView: View {
     /// which re-measures it — SwiftUI reports that as a geometry action cycling, and the
     /// sidebars' glass as updated more than once a frame.
     @State private var panelInsets = PanelInsetsBox()
-    /// Whether the canvas's controls hold the toolbar rather than the formatting ones.
-    /// Mirrors `bridge.canvasToolbar != nil`, but flipped inside `withAnimation`: the
-    /// bridge is not SwiftUI and sets its state plainly, so without the mirror the two
-    /// toolbars would snap from one to the other.
-    @State private var canvasToolbarShown = false
+    /// Which controls hold the toolbar: the formatting ones, a canvas's or a map's.
+    /// Mirrors what the bridge says (`WindowToolbar.current`), but flipped inside
+    /// `withAnimation`: the bridge is not SwiftUI and sets its state plainly, so without
+    /// the mirror the toolbars would snap from one to the other.
+    @State private var toolbarShown = WindowToolbar.document
     /// The narrowest the window may get and the widest the inspector may, from the
     /// panes' current widths. State, unlike `panelInsets`, because layout reads it — and
     /// safe to be, because neither limit moves anything that feeds the measurement.
@@ -82,26 +83,36 @@ struct ContentView: View {
                     guard !model.web.webView.inLiveResize else { return }
                     publishPanelInsets()
                 }
+                // The open documents' tabs, over the page column only, as Xcode's editor
+                // tabs are. A bar rather than an overlay: it counts in the safe area
+                // measured just above, so the page's text starts below it — and the page
+                // still runs on underneath.
+                .safeAreaBar(edge: .top) {
+                    if showsTabBar { DocumentTabBar() }
+                }
                 // On a canvas its own controls take the document toolbar's place until a
-                // card's text is being edited — the page says which (`canvasToolbar`).
+                // card's text is being edited — the page says which (`canvasToolbar`) —
+                // and on a map, the map's (`mapChrome`).
                 //
-                // Two customizable toolbars, so each keeps its own layout: the id is what
+                // Three customizable toolbars, so each keeps its own layout: the id is what
                 // AppKit saves a layout under, and it switches with the contents. One
                 // modifier on the page itself — not one per toolbar on hidden views in a
                 // `.background`, which looped the split view's constraint pass until
                 // AppKit threw once the window got narrow.
-                .toolbar(id: canvasToolbarShown && model.bridge.canvasToolbar != nil
-                         ? ToolbarID.canvas : ToolbarID.document) {
-                    if canvasToolbarShown, let canvas = model.bridge.canvasToolbar {
-                        CanvasToolbar(model: model, state: canvas)
-                    } else {
+                .toolbar(id: toolbarShown.resolved(model.bridge).id) {
+                    switch toolbarShown.resolved(model.bridge) {
+                    case .canvas:
+                        if let canvas = model.bridge.canvasToolbar { CanvasToolbar(model: model, state: canvas) }
+                    case .map:
+                        if let map = model.bridge.activeMapChrome { MapToolbar(model: model, state: map) }
+                    case .document:
                         DocumentToolbar(model: model)
                     }
                 }
         }
         .inspector(isPresented: $sidebar.isPresented) {
             InspectorView()
-                .inspectorColumnWidth(min: PaneLimits.inspectorMin, ideal: 310, max: paneLimits.inspectorMax)
+                .inspectorColumnWidth(min: PaneLimits.inspectorMin, ideal: PaneLimits.inspectorIdeal, max: paneLimits.inspectorMax)
         }
         // The page must stay at least as wide as the inspector — see `PaneLimits`.
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width.rounded() }) { width in
@@ -149,9 +160,9 @@ struct ContentView: View {
         // are the window's, where set-aside words go.
         .overlay { BubbleOverlay() }
         // Only the swap animates — not every zoom tick or selection change inside the
-        // canvas toolbar, which is why this watches whether there is one, not what it is.
-        .onChange(of: model.bridge.canvasToolbar != nil, initial: true) { _, shown in
-            withAnimation(.smooth(duration: 0.3)) { canvasToolbarShown = shown }
+        // canvas or map toolbar, which is why this watches which there is, not what it is.
+        .onChange(of: WindowToolbar.current(model.bridge), initial: true) { _, shown in
+            withAnimation(.smooth(duration: 0.3)) { toolbarShown = shown }
         }
         // A new project is a new page, which starts not knowing them.
         .onChange(of: model.bridge.project.projectName) { old, new in
@@ -160,8 +171,16 @@ struct ContentView: View {
             // picker, as there is nothing here to edit.
             if old != nil, new == nil { dismissWindow(id: "main") }
         }
+        // ⌘W closes a tab here, and the window anywhere else.
+        .onAppear { [web = model.web] in model.tabs.watchKeyWindow { web.webView.window } }
         // Closing the editor goes back to the picker, as closing a project does in Xcode.
         .onDisappear { openWindow(id: ProjectPickerView.windowID) }
+    }
+
+    /// The tab bar is up when it is wanted, there are tabs to show, and nothing modal
+    /// has the window (the bubble editor hides the toolbar too).
+    private var showsTabBar: Bool {
+        model.tabs.showsTabBar && model.tabs.needsTabBar && model.bubble.open == nil && hasContent
     }
 
     /// Whether a project or a document is open yet.
@@ -181,6 +200,38 @@ struct ContentView: View {
         model.bridge.send(.setPanelInsets(SetPanelInsetsCommand(
             leading: Double(insets.leading), trailing: Double(insets.trailing), top: Double(insets.top))))
         if model.notePreviews.panelInsets != insets { model.notePreviews.panelInsets = insets }
+    }
+}
+
+/// Which controls the window's toolbar holds.
+enum WindowToolbar: Equatable {
+    case document, canvas, map
+
+    /// What the page says should be up. A map's toolbar only while a map is active, a
+    /// canvas's only while no card is being edited; otherwise the formatting controls.
+    static func current(_ bridge: ShellBridge) -> WindowToolbar {
+        if bridge.activeMapChrome != nil { return .map }
+        if bridge.canvasToolbar != nil { return .canvas }
+        return .document
+    }
+
+    /// This, if the bridge still has its state; the document toolbar if not. The mirror
+    /// trails the bridge by an animation, and a toolbar whose state has gone cannot draw.
+    func resolved(_ bridge: ShellBridge) -> WindowToolbar {
+        switch self {
+        case .canvas: bridge.canvasToolbar != nil ? .canvas : .document
+        case .map: bridge.activeMapChrome != nil ? .map : .document
+        case .document: .document
+        }
+    }
+
+    /// The id AppKit saves this toolbar's layout under.
+    var id: String {
+        switch self {
+        case .document: ToolbarID.document
+        case .canvas: ToolbarID.canvas
+        case .map: ToolbarID.map
+        }
     }
 }
 
@@ -224,6 +275,8 @@ nonisolated struct PaneLimits: Equatable, Sendable {
     static let sidebarMin: CGFloat = 200
     static let inspectorMin: CGFloat = 260
     static let inspectorMax: CGFloat = 520
+    /// The inspector's width when it first opens; after that, only its divider moves it.
+    static let inspectorIdeal: CGFloat = 310
     /// The window's own floor (`InkblotApp`).
     static let windowFloor: CGFloat = 760
     /// How much wider than the inspector the page stays, for the dividers and rounding.

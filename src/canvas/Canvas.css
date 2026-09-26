@@ -19,14 +19,9 @@
  * .pane-scroll — a canvas must have no scrolling ancestor to fight with, since
  * it consumes wheel events itself for pan and zoom.
  *
- * --canvas-grid-* are written imperatively by useCanvasViewport on every frame:
- * the grid is a background, so it cannot ride the world layer's transform.
+ * The dot grid is drawn by .canvas-grid, below.
  */
 .canvas-surface {
-  --canvas-grid-size: 24px;
-  --canvas-grid-x: 0px;
-  --canvas-grid-y: 0px;
-
   /*
    * The default colour of an uncoloured card, group, and arrow: near-black on a
    * light canvas, near-white on a dark one. Deliberately NOT the accent — the accent
@@ -35,6 +30,11 @@
    * colour, so this token is the single place the neutral default is defined.
    */
   --canvas-ink: #1b1f27;
+  /* Card shadows sit in the world, so their blur scales with the zoom — at 400% the
+     app's 28–40px popover shadow is a 160px blur on every card, repainted each time
+     the canvas moves. Tighter here, for the same look at a fraction of the cost. */
+  --canvas-card-shadow: 0 1px 2px rgba(17, 24, 39, 0.06), 0 6px 14px rgba(17, 24, 39, 0.1);
+  --canvas-card-shadow-hover: 0 1px 2px rgba(17, 24, 39, 0.08), 0 10px 20px rgba(17, 24, 39, 0.14);
 
   position: relative;
   flex: 1;
@@ -43,6 +43,23 @@
   overscroll-behavior: none;
   touch-action: none;
   background-color: var(--surface-0);
+}
+
+/*
+ * The dot grid. --canvas-grid-* are written imperatively by useCanvasViewport on
+ * every frame: the grid is a background, so it cannot ride the world layer's
+ * transform. They are set on this element alone — custom properties inherit, so set
+ * on the surface they restyled every card on the canvas each frame. It takes no
+ * pointer events: a press on empty canvas has to land on the surface itself.
+ */
+.canvas-grid {
+  --canvas-grid-size: 24px;
+  --canvas-grid-x: 0px;
+  --canvas-grid-y: 0px;
+
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   background-image: radial-gradient(
     circle at 1px 1px,
     var(--border-muted) 1px,
@@ -62,11 +79,15 @@
 /* Follows the app's theming: an explicit data-theme wins, otherwise the OS. */
 :root[data-theme='dark'] .canvas-surface {
   --canvas-ink: #eef1f6;
+  --canvas-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 14px rgba(0, 0, 0, 0.28);
+  --canvas-card-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.24), 0 10px 20px rgba(0, 0, 0, 0.36);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .canvas-surface {
     --canvas-ink: #eef1f6;
+    --canvas-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 14px rgba(0, 0, 0, 0.28);
+    --canvas-card-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.24), 0 10px 20px rgba(0, 0, 0, 0.36);
   }
 }
 
@@ -76,6 +97,21 @@
 
 .canvas-surface.is-panning {
   cursor: grabbing;
+}
+
+/*
+ * While the canvas pans or zooms (useCanvasViewport sets it; it clears ~120ms after
+ * the last step). Cards slide under a still cursor, so :hover would flip from card
+ * to card, each flip easing a large shadow in and out; hit-testing and transitions
+ * wait until the canvas stops.
+ */
+.canvas-surface[data-gesturing] .canvas-world,
+.canvas-surface[data-gesturing] .canvas-edge-hit {
+  pointer-events: none;
+}
+
+.canvas-surface[data-gesturing] .canvas-world * {
+  transition: none !important;
 }
 
 /*
@@ -247,14 +283,14 @@
   border: 1px solid var(--card-edge);
   border-radius: var(--floating-note-radius, 16px);
   background: var(--card-tint);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--canvas-card-shadow);
   cursor: default;
   transition: box-shadow 0.14s ease, border-color 0.14s ease;
 }
 
 .canvas-node-text:hover,
 .canvas-node-file:hover {
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--canvas-card-shadow-hover);
   border-color: var(--card-edge-hover);
 }
 
@@ -607,12 +643,12 @@
   border: 1px solid var(--card-edge);
   border-radius: var(--floating-note-radius, 16px);
   background: var(--card-tint);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--canvas-card-shadow);
   transition: box-shadow 0.14s ease, border-color 0.14s ease;
 }
 
 .canvas-node-link:hover {
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--canvas-card-shadow-hover);
   border-color: var(--card-edge-hover);
 }
 
@@ -916,8 +952,9 @@
 .canvas-edge-hit {
   fill: none;
   stroke: transparent;
-  stroke-width: 14;
-  vector-effect: non-scaling-stroke;
+  /* Divided by the zoom (updated once a zoom settles) rather than non-scaling-stroke,
+     which re-derives every hit path in screen space on each frame of a pan or zoom. */
+  stroke-width: calc(14px / var(--canvas-zoom, 1));
   pointer-events: stroke;
   cursor: pointer;
 }
@@ -973,7 +1010,9 @@
   background: var(--surface-0);
   opacity: 0;
   cursor: crosshair;
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  /* Opacity only: the scale below follows --canvas-zoom, and a transition on it
+     started one animation per port on every card each time a zoom settled. */
+  transition: opacity 0.12s ease;
   /* Ports are chrome, not content — keep them a constant size as the canvas zooms. */
   transform: scale(calc(1 / var(--canvas-zoom, 1)));
 }

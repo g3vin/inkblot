@@ -1,3 +1,6 @@
+#if os(macOS)
+import AppKit
+#endif
 import SwiftUI
 
 /// The Swift app: a SwiftUI shell around the editor bundle (`dist/`), which runs
@@ -8,6 +11,14 @@ import SwiftUI
 @main
 struct InkblotApp: App {
     @State private var model = AppModel()
+
+    #if os(macOS)
+    init() {
+        // The tabs are the window's own (`DocumentTabBar`), not AppKit's: with automatic
+        // tabbing on, AppKit would add its Show Tab Bar and Merge All Windows beside ours.
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+    #endif
 
     var body: some Scene {
         #if os(macOS)
@@ -41,7 +52,8 @@ struct InkblotApp: App {
         .defaultLaunchBehavior(.presented)
         .restorationBehavior(.disabled)
         .keyboardShortcut("1", modifiers: [.command, .shift])
-        // `Window`, not `WindowGroup` — see `AppModel` on why there is one page.
+        // `Window`, not `WindowGroup` — see `AppModel` on why there is one page. The tabs
+        // are drawn in it, over the page column, as Xcode's editor tabs are.
         Window("Inkblot", id: "main") {
             ContentView()
                 .environment(model)
@@ -100,6 +112,35 @@ struct InkblotCommands: Commands {
     let model: AppModel
 
     var body: some Commands {
+        #if os(macOS)
+        // File ▸ New Tab and Close Tab. ⌘W closes the tab in the editor window, and the
+        // window anywhere else or once no tab is left (`TabsModel.closeFromMenu`).
+        CommandGroup(after: .newItem) {
+            Button("New Tab") { model.tabs.newTab() }
+                .keyboardShortcut("t", modifiers: .command)
+                .disabled(model.bridge.project.projectName == nil)
+        }
+        CommandGroup(replacing: .saveItem) {
+            Button(model.tabs.editorIsKey && model.tabs.hasTabs ? "Close Tab" : "Close") {
+                model.tabs.closeFromMenu()
+            }
+            .keyboardShortcut("w", modifiers: .command)
+            Button("Close Window") { NSApp.keyWindow?.performClose(nil) }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
+        }
+
+        // Window ▸ the next and previous tab, where Safari and Xcode put them.
+        CommandGroup(before: .windowList) {
+            Button("Show Previous Tab") { model.tabs.selectAdjacent(-1) }
+                .keyboardShortcut(.tab, modifiers: [.control, .shift])
+                .disabled(!model.tabs.canCycle)
+            Button("Show Next Tab") { model.tabs.selectAdjacent(1) }
+                .keyboardShortcut(.tab, modifiers: .control)
+                .disabled(!model.tabs.canCycle)
+            Divider()
+        }
+        #endif
+
         CommandGroup(after: .pasteboard) {
             Button("Paste and Match Style") { model.pasteAndMatchStyle() }
                 .keyboardShortcut("v", modifiers: [.command, .option, .shift])
@@ -221,6 +262,24 @@ struct InkblotCommands: Commands {
         // The page's own View items — theme, accent color, word count. Still the page's
         // to run (it owns those settings); drawn here because the menu bar is ours.
         CommandGroup(after: .sidebar) {
+            #if os(macOS)
+            Divider()
+            Button(model.tabs.showsTabBar ? "Hide Tab Bar" : "Show Tab Bar") {
+                model.tabs.showsTabBar.toggle()
+            }
+            .keyboardShortcut("t", modifiers: [.command, .shift])
+            // Split view: a second document beside the tab's own, or below it. Xcode's
+            // keys for its editors. With the split open, the other one turns it.
+            Button("Split Right") { model.tabs.openSplit(.columns) }
+                .keyboardShortcut("t", modifiers: [.command, .control])
+                .disabled(!model.tabs.canSplit || model.tabs.split == .columns)
+            Button("Split Down") { model.tabs.openSplit(.rows) }
+                .keyboardShortcut("t", modifiers: [.command, .control, .option])
+                .disabled(!model.tabs.canSplit || model.tabs.split == .rows)
+            Button("Close Split") { model.tabs.closeSplit() }
+                .keyboardShortcut("w", modifiers: [.command, .control, .shift])
+                .disabled(model.tabs.split == nil)
+            #endif
             Divider()
             Toggle("Print Layout", isOn: Binding(
                 get: { model.pageLayout.isEnabled },

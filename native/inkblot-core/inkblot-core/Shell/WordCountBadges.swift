@@ -16,15 +16,16 @@ struct WordCountBadges: View {
             // By position: split panes can show one document twice.
             ForEach(Array(model.bridge.wordCounts.enumerated()), id: \.offset) { _, badge in
                 Text(badge.text)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .monospacedDigit()
                     .foregroundStyle(.primary.opacity(0.85))
                     .lineLimit(1)
                     .fixedSize()
                     // The page's badge is the same text in the same box — as tall as
-                    // the file tree's + and filter bar.
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
+                    // the file tree's filter bar and the tab bar, and exactly as wide,
+                    // so the gap the page leaves between two badges is the gap drawn.
+                    .padding(.horizontal, 10)
+                    .frame(width: max(badge.right - badge.left, 0), height: max(badge.bottom - badge.top, 0))
                     .glassEffect(.regular, in: .capsule)
                     .position(x: (badge.left + badge.right) / 2, y: y(of: badge))
             }

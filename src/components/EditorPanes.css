@@ -240,7 +240,7 @@
    two outer tracks from the split ratio; the gutter track is the divider itself,
    so dragging it never has to reason about a separate gap. */
 .editor-container.split-active {
-  --split-gutter: 10px;
+  --split-gutter: 1px;
   display: grid;
   grid-template-columns: var(--split-primary, 1fr) var(--split-gutter) var(--split-secondary, 1fr);
   gap: 0;
@@ -269,35 +269,50 @@
   pointer-events: none;
 }
 
+/* The divider is a hairline, as a split in any Mac app is; it lights up to be dragged.
+   Above the panes, so its wider hit area (below) reaches over their edges. */
 .split-resizer {
   position: relative;
+  z-index: 6;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--border-color);
   cursor: col-resize;
   touch-action: none;
+  transition: background-color 160ms ease;
+}
+
+.split-resizer:hover,
+.is-split-resizing > .split-resizer {
+  background: var(--accent-color);
 }
 
 .split-rows .split-resizer {
   cursor: row-resize;
 }
 
-/* The hit area is wider than the 10px track, so the divider is easy to grab
+/* The hit area is wider than the 1px track, so the divider is easy to grab
    without stealing clicks from the text next to it. */
 .split-resizer::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -3px;
-  right: -3px;
+  left: -4px;
+  right: -4px;
 }
 
 .split-rows .split-resizer::before {
-  top: -3px;
-  bottom: -3px;
+  top: -4px;
+  bottom: -4px;
   left: 0;
   right: 0;
+}
+
+/* The line is the divider now; the grip it once carried would only thicken it. */
+.split-resizer-grip {
+  display: none;
 }
 
 .split-resizer-grip {

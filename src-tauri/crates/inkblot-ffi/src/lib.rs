@@ -398,12 +398,18 @@ impl VersionHistory {
         Ok(serde_json::to_string(&delta)?)
     }
 
-    /// The plain text of a version, for filtering the timeline by what it said.
+    /// The plain text of a version, for filtering the timeline by what it said. A map
+    /// says what is written on it: its places', routes' and labels' names.
     pub fn text_of(&self, version_id: String) -> String {
-        self.versions
-            .iter()
-            .find(|v| v.id == version_id)
-            .and_then(|v| v.content_html.as_deref())
+        let Some(version) = self.versions.iter().find(|v| v.id == version_id) else {
+            return String::new();
+        };
+        if let Some(map) = &version.map {
+            return inkblot_core::map::model::map_text(map);
+        }
+        version
+            .content_html
+            .as_deref()
             .map(inkblot_core::version_history::html_to_text)
             .unwrap_or_default()
     }

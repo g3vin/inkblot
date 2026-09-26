@@ -25,8 +25,19 @@ export function useSurfacePublisher(): void {
   useEffect(() => {
     let attachedTo: Emitter | null = null
     let publish: (() => void) | null = null
+    let frame: number | ReturnType<typeof setTimeout> | null = null
+    const nextFrame = (run: () => void) => (
+      typeof requestAnimationFrame === 'function' ? requestAnimationFrame(run) : setTimeout(run, 16)
+    )
+    const cancelFrame = () => {
+      if (frame == null) return
+      if (typeof cancelAnimationFrame === 'function' && typeof frame === 'number') cancelAnimationFrame(frame)
+      else clearTimeout(frame as ReturnType<typeof setTimeout>)
+      frame = null
+    }
 
     const detach = () => {
+      cancelFrame()
       if (attachedTo && publish && !attachedTo.isDestroyed) {
         attachedTo.off('selectionUpdate', publish)
         attachedTo.off('transaction', publish)
@@ -57,14 +68,24 @@ export function useSurfacePublisher(): void {
         return
       }
 
-      publish = () => {
+      const publishNow = () => {
         documentSurface.publishToolbarState()
         documentSurface.publishSelectionContext()
+      }
+      // A keystroke fires selectionUpdate and transaction both, and a burst of typing
+      // several of each a frame. Reading the state (undo depth, every mark's isActive)
+      // for each was the cost, not the send, so the read waits for the frame too.
+      publish = () => {
+        if (frame != null) return
+        frame = nextFrame(() => {
+          frame = null
+          if (attachedTo === editor && !editor.isDestroyed) publishNow()
+        })
       }
       attachedTo = editor
       editor.on('selectionUpdate', publish)
       editor.on('transaction', publish)
-      publish()
+      publishNow()
     }
 
     const unsubscribe = editorRegistry.onChange(() => {
