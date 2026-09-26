@@ -11,13 +11,23 @@
  */
 import { createZip } from './zip'
 import type { ZipEntry } from './zip'
-import { chapterBodyHtml, escapeHtml, PROSE_CSS } from './html'
+import type { FrontSection } from '../bookMatter'
+import { chapterBodyHtml, escapeHtml, frontSectionHtml, PROSE_CSS } from './html'
 import type { ExportChapter } from './html'
 import { collectImageSources, mapImageSources } from './portable'
 import { isRemote } from './images'
 import type { ResolvedImage } from './images'
 
 const XHTML_NS = 'http://www.w3.org/1999/xhtml'
+
+/** The EPUB structural semantics of each front-matter page. */
+const FRONT_TYPES: Record<FrontSection['kind'], string> = {
+  halfTitle: 'halftitlepage',
+  titlePage: 'titlepage',
+  copyright: 'copyright-page',
+  dedication: 'dedication',
+  epigraph: 'epigraph',
+}
 
 export interface EpubOptions {
   title: string
@@ -27,6 +37,10 @@ export interface EpubOptions {
   /** Turns an image src into bytes, or null to drop it. */
   resolveImage: (src: string) => Promise<ResolvedImage | null>
   cover?: ResolvedImage | null
+  /** A book's pages before its first chapter. */
+  front?: FrontSection[]
+  /** A contents page in the reading order, as well as the reader's own navigation. */
+  contents?: boolean
   /** Fixed for tests; a fresh urn:uuid otherwise. */
   identifier?: string
   modified?: Date
@@ -108,6 +122,18 @@ export const buildEpub = async (options: EpubOptions): Promise<Uint8Array> => {
     }
   })
 
+  const frontFiles = (options.front || []).map((section, i) => {
+    const id = `front-${String(i + 1).padStart(2, '0')}`
+    return {
+      id,
+      href: `text/${id}.xhtml`,
+      xhtml: xhtmlPage(title, language, `<section epub:type="${FRONT_TYPES[section.kind]}" class="front-matter fm-${section.kind}">\n${toXhtmlBody(frontSectionHtml(section))}\n</section>`),
+    }
+  })
+  const contentsPage = options.contents && chapterFiles.length
+    ? xhtmlPage('Contents', language, `<section epub:type="toc" class="contents">\n<h1>Contents</h1>\n<ol>\n${chapterFiles.map((c) => `<li><a href="${c.href.replace('text/', '')}">${escapeHtml(c.title)}</a></li>`).join('\n')}\n</ol>\n</section>`)
+    : null
+
   const cover = options.cover || null
   const coverHref = cover ? `images/cover.${cover.ext}` : null
   const coverPage = cover
@@ -127,7 +153,7 @@ ${chapterFiles.map((c) => `<li><a href="${c.href}">${escapeHtml(c.title)}</a></l
 </nav>
 <nav epub:type="landmarks" hidden="hidden">
 <ol>
-${cover ? '<li><a epub:type="cover" href="text/cover.xhtml">Cover</a></li>\n' : ''}<li><a epub:type="bodymatter" href="${chapterFiles[0]?.href || ''}">Start</a></li>
+${cover ? '<li><a epub:type="cover" href="text/cover.xhtml">Cover</a></li>\n' : ''}${contentsPage ? '<li><a epub:type="toc" href="text/contents.xhtml">Contents</a></li>\n' : ''}<li><a epub:type="bodymatter" href="${chapterFiles[0]?.href || ''}">Start</a></li>
 </ol>
 </nav>
 </body>
@@ -158,11 +184,15 @@ ${chapterFiles.map((c, i) => `<navPoint id="nav-${i + 1}" playOrder="${i + 1}"><
       `<item id="cover-image" href="${coverHref}" media-type="${cover.mime}" properties="cover-image"/>`,
       '<item id="cover" href="text/cover.xhtml" media-type="application/xhtml+xml"/>',
     ] : []),
+    ...frontFiles.map((f) => `<item id="${f.id}" href="${f.href}" media-type="application/xhtml+xml"/>`),
+    ...(contentsPage ? ['<item id="contents" href="text/contents.xhtml" media-type="application/xhtml+xml"/>'] : []),
     ...chapterFiles.map((c) => `<item id="${c.id}" href="${c.href}" media-type="application/xhtml+xml"/>`),
     ...packaged.map((img, i) => `<item id="image-${i + 1}" href="${img.href}" media-type="${img.mime}"/>`),
   ]
   const spine = [
     ...(cover ? ['<itemref idref="cover" linear="yes"/>'] : []),
+    ...frontFiles.map((f) => `<itemref idref="${f.id}"/>`),
+    ...(contentsPage ? ['<itemref idref="contents"/>'] : []),
     ...chapterFiles.map((c) => `<itemref idref="${c.id}"/>`),
   ]
   const opf = `<?xml version="1.0" encoding="utf-8"?>
@@ -201,6 +231,8 @@ ${spine.join('\n')}
       { name: `OEBPS/${coverHref}`, data: cover.bytes, store: true },
       { name: 'OEBPS/text/cover.xhtml', data: coverPage },
     ] : []),
+    ...frontFiles.map((f) => ({ name: `OEBPS/${f.href}`, data: f.xhtml })),
+    ...(contentsPage ? [{ name: 'OEBPS/text/contents.xhtml', data: contentsPage }] : []),
     ...chapterFiles.map((c) => ({ name: `OEBPS/${c.href}`, data: c.xhtml })),
     // Images are already compressed; deflating them again costs time for nothing.
     ...packaged.map((img) => ({ name: `OEBPS/${img.href}`, data: img.bytes, store: true })),

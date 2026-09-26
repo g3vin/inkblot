@@ -12,7 +12,7 @@
  * id stable when the same file is normalized by the page and by the core.
  */
 import {
-  normalizeMap, createEmptyMap, isMapPayload, readMapViewport, countMapWords, mapDocRefs, MAP_KINDS,
+  normalizeMap, createEmptyMap, isMapPayload, readMapViewport, countMapWords, mapText, mapDocRefs, MAP_KINDS,
 } from '../../../src/lib/map/mapModel.js'
 import { collectMapMatches } from '../../../src/lib/map/mapSearch.js'
 import { createMatcher } from '../../../src/lib/sidebarSearch.js'
@@ -35,7 +35,7 @@ function* wrongTypedMaps() {
   }
 }
 
-const FULL = {
+export const FULL = {
   type: 'map',
   formatVersion: 1,
   mapKind: 'image',
@@ -156,6 +156,7 @@ export default {
       yield { fn: 'isMapPayload', args: [arg], expected: isMapPayload(arg) }
       yield { fn: 'readMapViewport', args: [arg], expected: readMapViewport(arg) }
       yield { fn: 'countMapWords', args: [arg], expected: countMapWords(arg) }
+      yield { fn: 'mapText', args: [arg], expected: mapText(arg) }
       yield { fn: 'mapDocRefs', args: [arg], expected: mapDocRefs(arg) }
     }
 

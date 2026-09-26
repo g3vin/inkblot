@@ -1,14 +1,12 @@
 /**
  * MapToolbar.jsx — the floating tool bar across the top of a map.
  *
- * It floats inside the map rather than sitting in the window's titlebar, so it
- * works the same under the Tauri window and the Swift shell's native toolbar, and in
- * either half of a split.
+ * It floats inside the map rather than sitting in the window's titlebar, so it works
+ * in either half of a split. Under the Swift shell (`mapChrome`) it is not drawn: the
+ * window's own toolbar becomes the map's (`MapToolbar.swift`).
  */
 import SFIcon from '../components/SFIcon'
-import { MAP_TOOLS } from './mapOptions'
-
-const formatZoom = (zoom) => (zoom >= 10 ? `${Math.round(zoom)}×` : zoom >= 1 ? `${Math.round(zoom * 100)}%` : `${Math.round(zoom * 1000) / 10}%`)
+import { MAP_TOOLS, formatZoom } from './mapOptions'
 
 export default function MapToolbar({
   tool,

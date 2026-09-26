@@ -13,6 +13,8 @@ import { getDocPreviewExtensions } from '../../lib/editorExtensions'
 import { normalizePageSetup } from '../pageSetup'
 import type { PageSetup } from '../pageSetup'
 import { PageOrientation } from '../../types'
+import type { FrontSection } from '../bookMatter'
+import { leadingPt } from '../typography'
 import { portableContent } from './portable'
 import type { PMJSON } from './portable'
 
@@ -54,6 +56,19 @@ th p, td p { margin: 0; }
 mark { background: #fff59d; }
 hr { border: 0; border-top: 1px solid #ccc; margin: 2em 0; }
 .page-break { break-after: page; page-break-after: always; height: 0; }
+p.script-el { font-family: 'Courier Prime', 'Courier New', Courier, monospace; font-size: 12pt; line-height: 1.2; margin: 0; max-width: 60ch; }
+p.script-sceneHeading, p.script-action, p.script-character, p.script-transition, p.script-shot, p.script-centered,
+p.script-sceneTitle, p.script-stageCharacter, p.script-stageDirection { margin-top: 1.2em; }
+p.script-sceneHeading, p.script-character, p.script-transition, p.script-shot, p.script-actHeading, p.script-sceneTitle, p.script-stageCharacter { text-transform: uppercase; }
+p.script-sceneHeading { font-weight: 700; }
+p.script-character { margin-left: 22ch; }
+p.script-parenthetical { margin-left: 16ch; max-width: 25ch; }
+p.script-dialogue { margin-left: 10ch; max-width: 35ch; }
+p.script-transition { text-align: right; }
+p.script-centered, p.script-actHeading, p.script-sceneTitle, p.script-stageCharacter { text-align: center; }
+p.script-actHeading { margin-top: 2.4em; text-decoration: underline; }
+p.script-stageDirection { margin-left: 25ch; max-width: 35ch; font-style: italic; }
+p.script-el[data-scene-number]::before { content: attr(data-scene-number) '  '; }
 .page-break-recto { break-after: right; page-break-after: right; }
 .sc { font-variant: small-caps; }
 .bibliography { margin-top: 2.5em; }
@@ -62,7 +77,36 @@ hr { border: 0; border-top: 1px solid #ccc; margin: 2em 0; }
 .bibliography-entries.is-hanging .bibliography-entry { padding-left: 2em; text-indent: -2em; }
 .bibliography-annotation { margin: -0.4em 0 1em 2em; font-size: 0.95em; }
 .bibliography-empty { display: none; }
+.front-matter { text-align: center; margin: 3em 0; break-after: page; page-break-after: always; }
+.fm-title { font-size: 1.8em; margin: 2em 0 0.5em; }
+.fm-author { font-size: 1.2em; }
+.fm-copyright { text-align: left; font-size: 0.8em; }
+.fm-dedication, .fm-epigraph { font-style: italic; }
+.fm-epigraph { border: 0; margin: 3em 10%; padding: 0; color: inherit; }
+.fm-source { font-style: normal; text-align: right; }
+.contents ol { list-style: none; padding: 0; }
+.contents li { margin: 0.3em 0; }
 `
+
+/** Text with its line breaks kept, escaped: a paragraph per blank line. */
+const paragraphsHtml = (text: string, className = ''): string => text
+  .split(/\r?\n\s*\r?\n/)
+  .map((p) => p.trim())
+  .filter(Boolean)
+  .map((p) => `<p${className ? ` class="${className}"` : ''}>${p.split(/\r?\n/).map(escapeHtml).join('<br/>')}</p>`)
+  .join('\n')
+
+/** One front-matter page's markup: shared by the HTML file and the EPUB's pages. */
+export const frontSectionHtml = (section: FrontSection): string => {
+  switch (section.kind) {
+    case 'halfTitle': return `<p class="fm-title">${escapeHtml(section.title || '')}</p>`
+    case 'titlePage': return `<p class="fm-title">${escapeHtml(section.title || '')}</p>${section.author ? `\n<p class="fm-author">${escapeHtml(section.author)}</p>` : ''}`
+    case 'copyright': return paragraphsHtml(section.text || '', 'fm-copyright')
+    case 'dedication': return paragraphsHtml(section.text || '', 'fm-dedication')
+    case 'epigraph': return `<blockquote class="fm-epigraph">\n${paragraphsHtml(section.text || '')}${section.source ? `\n<p class="fm-source">— ${escapeHtml(section.source)}</p>` : ''}\n</blockquote>`
+    default: return ''
+  }
+}
 
 export const buildHtmlDocument = ({
   title,
@@ -70,12 +114,18 @@ export const buildHtmlDocument = ({
   language = 'en',
   chapters,
   setup: setupInput,
+  front = [],
+  contents = false,
 }: {
   title: string
   author?: string
   language?: string
   chapters: ExportChapter[]
   setup?: PageSetup | null
+  /** A book's pages before its first chapter. */
+  front?: FrontSection[]
+  /** A list of the chapters, linked, after the front matter. */
+  contents?: boolean
 }): string => {
   const setup = normalizePageSetup(setupInput)
   // Millimetres to three places: enough for any printer, and no float noise in the CSS.
@@ -99,7 +149,20 @@ ${setup.mirrorMargins ? `@page :left { margin-left: ${mm(m.outsideMm)}; margin-r
   h1, h2, h3 { break-after: avoid; }
   p { orphans: ${setup.widowOrphanLines}; widows: ${setup.widowOrphanLines}; }
 }`
-  const body = chapters.map((chapter, i) => (
+  const t = setup.typography
+  const typeCss = t ? `
+main { font-family: ${t.fontFamily}; font-size: ${t.fontSizePt}pt; line-height: ${Math.round(leadingPt(t) * 100) / 100}pt; text-align: ${t.alignment === 'justify' ? 'justify' : 'left'}; hyphens: ${t.hyphenate ? 'auto' : 'manual'}; }
+main p { margin: 0 0 ${t.paragraphSpacingPt}pt; text-indent: ${t.firstLineIndentMm}mm; }
+main :is(li, td, th, blockquote) p { text-indent: 0; }
+${t.noIndentAfterBreak ? 'main :is(h1, h2, h3, hr) + p, .chapter > p:first-child { text-indent: 0; }' : ''}
+main hr { border: 0; text-align: center; }
+main hr::after { content: ${JSON.stringify(t.sceneBreak)}; letter-spacing: 0.2em; }
+.chapter > h1:first-child { padding-top: ${t.chapterSinkMm}mm; text-align: center; }` : ''
+  const frontHtml = front.map((section) => `<section class="front-matter fm-${section.kind}">\n${frontSectionHtml(section)}\n</section>`)
+  if (contents && chapters.length) {
+    frontHtml.push(`<nav class="front-matter contents" aria-label="Contents">\n<h2>Contents</h2>\n<ol>\n${chapters.map((c, i) => `<li><a href="#chapter-${i + 1}">${escapeHtml(c.title)}</a></li>`).join('\n')}\n</ol>\n</nav>`)
+  }
+  const body = frontHtml.join('\n') + (frontHtml.length ? '\n' : '') + chapters.map((chapter, i) => (
     `<section class="chapter" id="chapter-${i + 1}" aria-label="${escapeHtml(chapter.title)}">\n${chapterBodyHtml(chapter.content)}\n</section>`
   )).join('\n')
   return `<!doctype html>
@@ -109,7 +172,7 @@ ${setup.mirrorMargins ? `@page :left { margin-left: ${mm(m.outsideMm)}; margin-r
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 ${author ? `<meta name="author" content="${escapeHtml(author)}">\n` : ''}<meta name="generator" content="Inkblot">
-<style>${PROSE_CSS}${pageCss}
+<style>${PROSE_CSS}${pageCss}${typeCss}
 </style>
 </head>
 <body>

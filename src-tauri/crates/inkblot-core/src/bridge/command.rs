@@ -16,18 +16,21 @@ use super::references::{
     InsertCitationCommand, ReferenceRef, SetBibliographyOptionsCommand, SetCitationStyleCommand,
     SetReferenceAttachedCommand, UpdateReferenceCommand,
 };
-use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor};
+use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 use crate::types::json::JsonValue;
+use super::map::MapCommandRequest;
 use super::sidebar::{
     AddReplyCommand, ClipboardDropCommand, HighlightNoteCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
     RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
     TileRef, UpdateNoteCommand, VersionActionCommand,
 };
+use super::tabs::{CloseSplitCommand, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand, SetTabOrderCommand, TabRef};
 use crate::types::note::Note;
 use super::print::{
-    ExportDocumentCommand, GoToPageCommand, InsertBreakCommand, PrintDocumentCommand,
-    PrintFinishedCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
-    SetPrintLayoutCommand, SetPrintZoomCommand,
+    ApplyFormatCommand, ClearBookSetupCommand, ExportAgainCommand, ExportDocumentCommand, GoToPageCommand,
+    ImportScriptCommand, InsertBreakCommand, MeasureBookCommand, ScriptReportCommand, SetSceneNumbersCommand, PrintDocumentCommand, PrintFinishedCommand, RefreshBookChaptersCommand,
+    SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand, SetPrintLayoutCommand,
+    SetAuthorProfileCommand, SetBookCoverCommand, SetPrintScopeCommand, SetPrintZoomCommand, UseSetupForBookCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -452,6 +455,15 @@ pub struct SetBlockTypeCommand {
     pub block: BlockType,
 }
 
+/// Write the document as prose, a screenplay or a stage play, converting its lines.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetWritingFormatCommand {
+    pub target: EditorTarget,
+    pub format: WritingFormat,
+}
+
 /// Toggle a list around the selection's blocks, as the page's input rules do for `- `
 /// and `1. `.
 #[typeshare]
@@ -524,6 +536,8 @@ pub enum NativeCommand {
     CanvasDropNote(CanvasDropNoteCommand),
     CanvasReveal(CanvasRevealCommand),
     CanvasRestore(CanvasRestoreCommand),
+    /// Run a command on a map (`map.rs`).
+    MapCommand(MapCommandRequest),
     InsertPlainText(InsertPlainTextCommand),
     CreateEntry(CreateEntryCommand),
     RenameEntry(RenameEntryCommand),
@@ -551,6 +565,7 @@ pub enum NativeCommand {
     /// Leave the bubble editor and write its sentence back into the document.
     CloseBubbleSession(CloseBubbleSessionCommand),
     SetBlockType(SetBlockTypeCommand),
+    SetWritingFormat(SetWritingFormatCommand),
     ToggleList(ToggleListCommand),
     EditorHistory(EditorHistoryCommand),
     SetFocusMode(SetFocusModeCommand),
@@ -579,4 +594,25 @@ pub enum NativeCommand {
     PrintDocument(PrintDocumentCommand),
     ExportDocument(ExportDocumentCommand),
     PrintFinished(PrintFinishedCommand),
+    ApplyFormat(ApplyFormatCommand),
+    UseSetupForBook(UseSetupForBookCommand),
+    ClearBookSetup(ClearBookSetupCommand),
+    RefreshBookChapters(RefreshBookChaptersCommand),
+    SetPrintScope(SetPrintScopeCommand),
+    SetAuthorProfile(SetAuthorProfileCommand),
+    SetBookCover(SetBookCoverCommand),
+    ExportAgain(ExportAgainCommand),
+    /* The tab bar and split view, drawn by the shell (`tabs.rs`). */
+    SelectTab(TabRef),
+    CloseTab(TabRef),
+    SetTabOrder(SetTabOrderCommand),
+    NewTab(NewTabCommand),
+    OpenDocInTab(OpenDocInTabCommand),
+    OpenDocInWindow(OpenDocInWindowCommand),
+    OpenInSplit(OpenInSplitCommand),
+    CloseSplit(CloseSplitCommand),
+    MeasureBook(MeasureBookCommand),
+    ImportScript(ImportScriptCommand),
+    SetSceneNumbers(SetSceneNumbersCommand),
+    ScriptReport(ScriptReportCommand),
 }

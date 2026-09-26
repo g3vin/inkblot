@@ -20,6 +20,7 @@ import { createInProcessTransports, createNativeHostTransports, detectNativeHost
 import { createShellBridge, createSurfaceBridge } from './client'
 import { createEditorRegistry } from './editorRegistry'
 import { createDocumentSurface } from './surface'
+import { setDocChangeSink } from './docChangeSink'
 
 const nativeHost = detectNativeHost()
 const transports = nativeHost
@@ -39,3 +40,6 @@ export const documentSurface = createDocumentSurface({
   bridge: surfaceEnd,
   registry: editorRegistry,
 })
+
+// Every editor's `DocChangeReporter` reports to the one surface.
+setDocChangeSink((editor, transaction) => documentSurface.noteDocTransaction(editor, transaction))

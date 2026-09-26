@@ -167,14 +167,18 @@ const textExtent = (style) => {
  * And tell its `.margin-hang` wrapper how wide it is, which depends on its dots or count.
  */
 const fitChips = (view) => {
-  for (const chip of view.dom.querySelectorAll('.bubble-session-chip')) {
-    const parent = chip.parentElement
-    if (!parent) continue
-    const extent = textExtent(window.getComputedStyle(parent))
-    if (extent) chip.style.setProperty('--bubble-text-extent', String(extent))
-    const width = chip.offsetWidth + parseFloat(window.getComputedStyle(chip).marginLeft)
-    if (width > 0) parent.style.setProperty('--hang-width', `${width}px`)
-  }
+  const chips = [...view.dom.querySelectorAll('.bubble-session-chip')].filter((chip) => chip.parentElement)
+  if (!chips.length) return
+  // All the reads, then all the writes: measured chip by chip, each write forced the
+  // next chip's read to lay the document out again — once per chip, per keystroke.
+  const extents = chips.map((chip) => textExtent(window.getComputedStyle(chip.parentElement)))
+  chips.forEach((chip, i) => {
+    if (extents[i]) chip.style.setProperty('--bubble-text-extent', String(extents[i]))
+  })
+  const widths = chips.map((chip) => chip.offsetWidth + parseFloat(window.getComputedStyle(chip).marginLeft))
+  chips.forEach((chip, i) => {
+    if (widths[i] > 0) chip.parentElement.style.setProperty('--hang-width', `${widths[i]}px`)
+  })
 }
 
 const buildChips = (doc, editor) => {

@@ -32,3 +32,13 @@ export const fitPageZoom = (pageWidth: number, pageHeight: number, availableWidt
 export const actualSizeZoom = (pointsPerInch: number | null | undefined): number | null => (
   pointsPerInch && pointsPerInch > 0 ? clampZoom(pointsPerInch / 96) : null
 )
+
+/**
+ * `px` rounded to a whole device pixel. The sizer is the stage's size times the zoom,
+ * and a fractional size centres the pages — and every glyph on them — between device
+ * pixels, which reads as soft text.
+ */
+export const snapToDevicePixel = (px: number): number => {
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1
+  return Math.round(px * dpr) / dpr
+}

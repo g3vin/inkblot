@@ -257,3 +257,29 @@ export function inferSide(node, point) {
   if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'right' : 'left'
   return dy > 0 ? 'bottom' : 'top'
 }
+
+/* ---------------- culling ---------------- */
+
+/**
+ * The world rect a canvas renders cards in: what `viewport` shows on a `width` ×
+ * `height` surface, and `margin` screens more on every side, so a pan has room to
+ * run before anything has to appear.
+ */
+export function cullRectFor(v, width, height, margin = 1) {
+  const w = width / v.zoom
+  const h = height / v.zoom
+  return { x: v.x - w * margin, y: v.y - h * margin, width: w * (1 + 2 * margin), height: h * (1 + 2 * margin) }
+}
+
+/**
+ * Whether `cull` still serves `viewport`: the view sits inside it with a quarter
+ * screen to spare all round, and it is not so much larger than the view (after a
+ * zoom in) that it keeps far more cards mounted than it needs to.
+ */
+export function cullRectHolds(cull, v, width, height) {
+  if (!cull) return false
+  const w = width / v.zoom
+  const h = height / v.zoom
+  if (cull.width > w * 5 || cull.height > h * 5) return false
+  return rectContains(cull, { x: v.x - w / 4, y: v.y - h / 4, width: w * 1.5, height: h * 1.5 })
+}

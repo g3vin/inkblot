@@ -37,6 +37,27 @@ fn page_setup() -> crate::types::PageSetup {
         page_number_format: PageNumberFormat::Arabic,
         widow_orphan_lines: 2,
         chapter_starts_on_recto: true,
+        format_id: Some("trade-6x9".into()),
+        typography: None,
+        title_page: None,
+    }
+}
+
+fn typography() -> crate::types::PrintTypography {
+    use crate::types::{ChapterOpening, LineSpacing, PrintAlignment, PrintTypography};
+    PrintTypography {
+        font_family: "Georgia, serif".into(),
+        font_size_pt: 11.0,
+        line_spacing: LineSpacing::Multiple,
+        line_value: 1.2,
+        first_line_indent_mm: 7.62,
+        paragraph_spacing_pt: 0.0,
+        alignment: PrintAlignment::Justify,
+        hyphenate: true,
+        scene_break: "* * *".into(),
+        chapter_opening: ChapterOpening::DropCap,
+        chapter_sink_mm: 25.4,
+        no_indent_after_break: true,
     }
 }
 
@@ -59,6 +80,15 @@ fn book() -> crate::types::BookSettings {
             crop_marks: true,
             include_guide: true,
         },
+        excluded: vec!["Manuscript/notes".into()],
+        chapter_numbering: crate::types::ChapterNumbering {
+            style: crate::types::ChapterNumberStyle::Words,
+            prefix: "Chapter".into(),
+            include_title: true,
+        },
+        front_matter: crate::types::FrontMatter { half_title: true, dedication: "For M.".into(), contents: true, ..Default::default() },
+        back_matter: crate::types::BackMatter { about_the_author: "A. Writer lives by the sea.".into(), ..Default::default() },
+        publishing: crate::types::PublishingTarget { service: crate::types::PublishingService::Kdp, paper: crate::types::PaperStock::Cream },
     }
 }
 
@@ -252,6 +282,11 @@ fn every_command() -> Vec<NativeCommand> {
             command: "zoom-to-fit".into(),
             detail: None,
         }),
+        NativeCommand::MapCommand(MapCommandRequest {
+            surface_id: "map-surface-0".into(),
+            command: "panel-field".into(),
+            detail: Some(json!({ "id": "pin.name", "value": "Harrowgate" })),
+        }),
         NativeCommand::CanvasDropDoc(CanvasDropDocCommand {
             surface_id: "surface-1".into(),
             path: "chapters/one.md".into(),
@@ -339,6 +374,8 @@ fn every_command() -> Vec<NativeCommand> {
             archive: false,
         }),
         NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::Heading1 }),
+        NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::SceneHeading }),
+        NativeCommand::SetWritingFormat(SetWritingFormatCommand { target: EditorTarget::Primary, format: WritingFormat::Screenplay }),
         NativeCommand::ToggleList(ToggleListCommand { target: EditorTarget::Primary, list: ListKind::Ordered }),
         NativeCommand::EditorHistory(EditorHistoryCommand { target: EditorTarget::Primary, action: HistoryAction::Undo }),
         NativeCommand::SetFocusMode(SetFocusModeCommand { open: true }),
@@ -378,16 +415,44 @@ fn every_command() -> Vec<NativeCommand> {
             doc_path: "a".into(),
             options: bibliography_options(),
         }),
-        NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true }),
-        NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup() }),
+        NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true, doc_path: Some("a.md".into()) }),
+        NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Book }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
-        NativeCommand::SetPrintZoom(SetPrintZoomCommand { zoom: Some(1.25), fit: None }),
+        NativeCommand::SetPrintZoom(SetPrintZoomCommand { zoom: Some(1.25), fit: None, doc_path: None }),
         NativeCommand::SetDisplayDensity(SetDisplayDensityCommand { points_per_inch: 127.0 }),
         NativeCommand::InsertBreak(InsertBreakCommand { target: EditorTarget::Primary, kind: PageBreakKind::Recto }),
         NativeCommand::GoToPage(GoToPageCommand { page: 12 }),
-        NativeCommand::PrintDocument(PrintDocumentCommand { scope: PrintScope::Folder, bound: true }),
-        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false }),
+        NativeCommand::PrintDocument(PrintDocumentCommand { scope: PrintScope::Folder, bound: true, options: PrintOptions::default() }),
+        NativeCommand::PrintDocument(PrintDocumentCommand {
+            scope: PrintScope::Document,
+            bound: false,
+            options: PrintOptions { range: PrintRange::CurrentChapter, pages: "3-7, 10".into(), watermark: "DRAFT".into(), recipients: vec![], scenes: vec![], highlight_character: "MARY".into() },
+        }),
+        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false, options: PrintOptions::default() }),
+        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Docx, scope: PrintScope::Folder, bound: false, options: PrintOptions::default() }),
         NativeCommand::PrintFinished(PrintFinishedCommand { job_id: "p1".into(), completed: true }),
+        NativeCommand::ApplyFormat(ApplyFormatCommand { format_id: "manuscript".into(), target: PageSetupTarget::Document }),
+        NativeCommand::UseSetupForBook(UseSetupForBookCommand {}),
+        NativeCommand::ClearBookSetup(ClearBookSetupCommand {}),
+        NativeCommand::RefreshBookChapters(RefreshBookChaptersCommand {}),
+        NativeCommand::SetPrintScope(SetPrintScopeCommand { scope: PrintScope::Project }),
+        NativeCommand::SetAuthorProfile(SetAuthorProfileCommand {
+            profile: crate::types::AuthorProfile { byline: "A. Writer".into(), email: "a@example.com".into(), ..Default::default() },
+        }),
+        NativeCommand::SetBookCover(SetBookCoverCommand { path: Some("/Users/a/cover.jpg".into()) }),
+        NativeCommand::ExportAgain(ExportAgainCommand {}),
+        NativeCommand::SelectTab(TabRef { tab_id: "tab-1".into() }),
+        NativeCommand::CloseTab(TabRef { tab_id: "tab-1".into() }),
+        NativeCommand::SetTabOrder(SetTabOrderCommand { tab_ids: vec!["tab-2".into(), "tab-1".into()] }),
+        NativeCommand::NewTab(NewTabCommand {}),
+        NativeCommand::OpenDocInTab(OpenDocInTabCommand { doc_path: "Act One/Scene".into() }),
+        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand { doc_path: "Act One/Scene".into() }),
+        NativeCommand::OpenInSplit(OpenInSplitCommand { doc_path: Some("Notes".into()), orientation: SplitOrientation::Columns }),
+        NativeCommand::CloseSplit(CloseSplitCommand {}),
+        NativeCommand::MeasureBook(MeasureBookCommand {}),
+        NativeCommand::ImportScript(ImportScriptCommand {}),
+        NativeCommand::SetSceneNumbers(SetSceneNumbersCommand { mode: SceneNumbering::Locked }),
+        NativeCommand::ScriptReport(ScriptReportCommand { report: ScriptReportKind::Scenes, output: ReportOutput::Csv }),
     ]
 }
 
@@ -471,6 +536,107 @@ fn an_archived_item_is_camel_case_and_names_its_kind() {
     assert_eq!(bare.bubble, None);
 }
 
+fn map_button(id: &str, label: &str) -> MapPanelButton {
+    MapPanelButton {
+        id: id.into(),
+        label: label.into(),
+        role: MapButtonRole::Normal,
+        disabled: false,
+        symbol: None,
+        help: None,
+    }
+}
+
+/// A map's chrome with one of every kind of field, so each is on the wire at least once.
+fn map_chrome() -> MapChromeState {
+    let fields = vec![
+        MapPanelField::Text(MapTextInput {
+            id: "pin.name".into(),
+            label: "Name".into(),
+            value: "Harrowgate".into(),
+            placeholder: None,
+            multiline: false,
+            focus_key: 0,
+        }),
+        MapPanelField::Number(MapNumberInput {
+            id: "route.width".into(),
+            label: "Width".into(),
+            value: Some(2.5),
+            min: Some(0.5),
+            max: Some(20.0),
+            step: Some(0.5),
+            suffix: Some("px".into()),
+            allow_empty: false,
+            help: None,
+        }),
+        MapPanelField::Choice(MapChoiceInput {
+            id: "route.dash".into(),
+            label: "Style".into(),
+            value: "solid".into(),
+            options: vec![MapChoice { value: "solid".into(), label: "Solid".into(), group: None }],
+            help: None,
+        }),
+        MapPanelField::Toggle(MapToggleInput { id: "route.arrow".into(), label: "Arrow at end".into(), value: false }),
+        MapPanelField::Color(MapColorInput { id: "pin.color".into(), label: "Colour".into(), value: None, fallback: "#c0392b".into() }),
+        MapPanelField::Stat(MapStatRow { label: "Length".into(), value: "42 km".into(), action: None }),
+        MapPanelField::Note(MapNoteText { text: "Tip".into(), tone: MapNoteTone::Warning, swatch: None, action: None }),
+        MapPanelField::Button(map_button("pin.open", "Open")),
+        MapPanelField::Buttons(MapButtonRow { buttons: vec![map_button("theme.clean", "Clean")] }),
+        MapPanelField::ListRow(MapListRow { id: "places.p1".into(), title: "Harrowgate".into(), subtitle: None, swatch: None, indent: 0 }),
+        MapPanelField::Markers(MapMarkerInput {
+            id: "pin.icon".into(),
+            value: "city".into(),
+            color: None,
+            options: vec![MapChoice { value: "city".into(), label: "City".into(), group: None }],
+        }),
+        MapPanelField::Date(MapDateInput {
+            id: "traveler.startDay".into(),
+            label: "On".into(),
+            value: Some(MapDateParts { year: 1850.0, month: 3.0, day: 1.0, hour: 9.0, minute: 30.0 }),
+            mode: MapCalendarMode::Gregorian,
+            months: vec!["January".into()],
+            allow_empty: false,
+            placeholder: None,
+        }),
+        MapPanelField::Table(MapTableView {
+            columns: vec!["Harrowgate".into()],
+            rows: vec![MapTableRowView {
+                label: "Harrowgate".into(),
+                cells: vec![MapTableCell { text: "—".into(), detail: None, strong: false }],
+            }],
+        }),
+        MapPanelField::Preview(MapShapePreview { width: 100.0, height: 50.0, path: "M0 0L10 10Z".into(), filled: true }),
+        MapPanelField::Group(MapPanelGroup {
+            id: "leg.l1".into(),
+            title: "Leg 1".into(),
+            swatch: None,
+            actions: vec![map_button("leg.l1.remove", "×")],
+            fields: vec![],
+            collapsible: false,
+        }),
+    ];
+    MapChromeState {
+        surface_id: "map-surface-0".into(),
+        doc_path: "World.map".into(),
+        tool: MapTool::Pin,
+        zoom: 2.5,
+        zoom_label: "250%".into(),
+        can_undo: true,
+        can_redo: false,
+        has_selection: true,
+        panel: MapPanel {
+            title: "Place".into(),
+            can_go_back: true,
+            problems: 0,
+            tabs: vec![],
+            tab: None,
+            sections: vec![MapPanelSection { id: "place".into(), title: "Place".into(), actions: vec![], fields }],
+        },
+        reveal_panel: 1,
+        active: true,
+    }
+}
+
 fn every_event() -> Vec<WebviewEvent> {
     let marker = NoteMarkerEvent {
         note_id: "n1".into(),
@@ -491,6 +657,7 @@ fn every_event() -> Vec<WebviewEvent> {
             font_size: "18px".into(),
             alignment: Alignment::Left,
             block_type: BlockType::Heading2,
+            writing_format: WritingFormat::Prose,
             active_marks: ActiveMarks::default(),
             can_undo: true,
             can_redo: false,
@@ -510,6 +677,9 @@ fn every_event() -> Vec<WebviewEvent> {
             user_edit: true,
             word_count: 120,
             char_count: 640,
+            inserted: 3,
+            deleted: 1,
+            paste: false,
         }),
         WebviewEvent::NotesRemapped(NotesRemapped {
             doc_path: "chapters/one.md".into(),
@@ -541,6 +711,7 @@ fn every_event() -> Vec<WebviewEvent> {
                 record_elapsed_ms: 0.0,
             }),
         }),
+        WebviewEvent::MapChromeChanged(MapChromeChanged { state: Some(map_chrome()) }),
         WebviewEvent::SearchMatches(SearchMatches {
             query: "hesitated".into(),
             doc_path: "chapters/one.md".into(),
@@ -635,6 +806,10 @@ fn every_event() -> Vec<WebviewEvent> {
             badges: vec![WordCountBadge {
                 text: "12 words".into(), left: 600.0, top: 700.0, right: 660.0, bottom: 722.0,
             }],
+            panes: vec![PaneStatus {
+                pane: Pane::Secondary, doc_path: "a.md".into(), print_layout: true, zoom: 1.25, hovered: true,
+                left: 400.0, top: 700.0, right: 800.0, bottom: 722.0,
+            }],
         }),
         WebviewEvent::ArchiveChanged(ArchiveChanged {
             doc_path: "a.md".into(),
@@ -686,15 +861,45 @@ fn every_event() -> Vec<WebviewEvent> {
             enabled: true,
             doc_path: Some("Manuscript/one".into()),
             setup: page_setup(),
+            ready: true,
+            setup_source: SetupSource::Document,
             has_own_setup: true,
+            format_id: Some("trade-6x9".into()),
+            format_modified: false,
             page_count: 212,
             current_page: 3,
             zoom: 1.0,
+            scope: PrintScope::Folder,
             book: book(),
+            book_setup_active: true,
             book_chapters: vec!["Manuscript/one".into(), "Manuscript/two".into()],
             suggested_inside_margin_mm: 12.7,
-            presets: vec![PageSizeOption { id: "a4".into(), label: "A4".into(), group: "ISO A".into(), width_mm: 210.0, height_mm: 297.0 }],
-            signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
+            author: crate::types::AuthorProfile { byline: "A. Writer".into(), ..Default::default() },
+            word_count: 71_400,
+            cover_file: Some("/Users/a/Novel/.assets/ab12.jpg".into()),
+            last_export: Some(LastExport { format: ExportFormat::Docx, scope: PrintScope::Folder, path: "/Users/a/Book.docx".into() }),
+            has_selection: true,
+            publishing: Some(PublishingReport {
+                page_count: 212,
+                measured: true,
+                words: 71_400,
+                reading_minutes: 286,
+                spine_width_mm: 13.5,
+                spine_text: true,
+                issues: vec![PreflightIssue {
+                    id: "gutter".into(),
+                    severity: PreflightSeverity::Error,
+                    message: "The inside margin is too narrow for 212 pages.".into(),
+                    fix_label: Some("Widen the Gutter".into()),
+                    fixed_setup: Some(page_setup()),
+                }],
+            }),
+            script: Some(ScriptSummary {
+                format: WritingFormat::Screenplay,
+                scene_numbers: SceneNumbering::Locked,
+                characters: vec!["MARY".into(), "JOHN".into()],
+                scenes: vec![SceneSummary { number: Some("12A".into()), heading: "INT. KITCHEN - NIGHT".into(), page: 14 }],
+            }),
         }),
         WebviewEvent::PrintRequest(PrintRequest {
             job_id: "p1".into(),
@@ -702,6 +907,36 @@ fn every_event() -> Vec<WebviewEvent> {
             paper_width_pt: 612.0,
             paper_height_pt: 792.0,
             pdf_path: None,
+        }),
+        WebviewEvent::PageLayoutCatalog(PageLayoutCatalog {
+            presets: vec![PageSizeOption { id: "a4".into(), label: "A4".into(), group: "ISO A".into(), width_mm: 210.0, height_mm: 297.0 }],
+            formats: vec![FormatOption {
+                id: "manuscript".into(),
+                label: "Standard Manuscript".into(),
+                group: "Submission".into(),
+                summary: "What agents and editors ask for.".into(),
+                kind: FormatKind::Prose,
+            }],
+            signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
+            tokens: vec![RunningToken { token: "{page}".into(), label: "Page Number".into() }],
+            default_typography: typography(),
+        }),
+        WebviewEvent::PrintJobStatus(PrintJobStatus {
+            job_id: "p1".into(),
+            kind: PrintJobKind::Export,
+            format: Some(ExportFormat::Pdf),
+            phase: PrintJobPhase::Laying,
+            done: Some(2),
+            total: Some(14),
+            message: None,
+            path: None,
+        }),
+        WebviewEvent::TabsChanged(TabsChanged {
+            tabs: vec![
+                DocTab { id: "tab-1".into(), doc_path: Some("Act One/Scene".into()), secondary_doc: Some("Notes".into()), split: Some(SplitOrientation::Rows) },
+                DocTab { id: "tab-2".into(), doc_path: None, secondary_doc: None, split: None },
+            ],
+            active_tab_id: Some("tab-1".into()),
         }),
     ]
 }
@@ -733,6 +968,7 @@ fn every_command_has_its_documented_wire_name() {
             "dictationCancel",
             "syncNotes",
             "canvasCommand",
+            "mapCommand",
             "canvasDropDoc",
             "canvasDropNote",
             "canvasReveal",
@@ -762,6 +998,8 @@ fn every_command_has_its_documented_wire_name() {
             "openProject",
             "closeBubbleSession",
             "setBlockType",
+            "setBlockType",
+            "setWritingFormat",
             "toggleList",
             "editorHistory",
             "setFocusMode",
@@ -786,8 +1024,30 @@ fn every_command_has_its_documented_wire_name() {
             "insertBreak",
             "goToPage",
             "printDocument",
+            "printDocument",
+            "exportDocument",
             "exportDocument",
             "printFinished",
+            "applyFormat",
+            "useSetupForBook",
+            "clearBookSetup",
+            "refreshBookChapters",
+            "setPrintScope",
+            "setAuthorProfile",
+            "setBookCover",
+            "exportAgain",
+            "selectTab",
+            "closeTab",
+            "setTabOrder",
+            "newTab",
+            "openDocInTab",
+            "openDocInWindow",
+            "openInSplit",
+            "closeSplit",
+            "measureBook",
+            "importScript",
+            "setSceneNumbers",
+            "scriptReport",
         ]
     );
 }
@@ -808,6 +1068,7 @@ fn every_event_has_its_documented_wire_name() {
             "noteMarkerPin",
             "activeEditorChanged",
             "canvasToolbarChanged",
+            "mapChromeChanged",
             "searchMatches",
             "focusModeView",
             "readAloudPayload",
@@ -833,6 +1094,9 @@ fn every_event_has_its_documented_wire_name() {
             "revealReference",
             "pageLayoutState",
             "printRequest",
+            "pageLayoutCatalog",
+            "printJobStatus",
+            "tabsChanged",
         ]
     );
 }
@@ -947,6 +1211,9 @@ fn envelope_sequence_numbers_survive_the_wire() {
             user_edit: true,
             word_count: 1,
             char_count: 2,
+            inserted: 0,
+            deleted: 0,
+            paste: true,
         }),
     });
 
@@ -993,7 +1260,7 @@ fn the_toolbar_items_speak_camel_case() {
 
 #[test]
 fn a_page_setup_crosses_the_wire_in_millimetres_and_camel_case() {
-    let command = NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup() });
+    let command = NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Document });
     let wire = serde_json::to_value(&command).unwrap();
     assert_eq!(wire["type"], "setPageSetup");
     let setup = &wire["payload"]["setup"];
@@ -1012,4 +1279,140 @@ fn a_page_setup_without_verso_overrides_still_reads() {
     wire.as_object_mut().unwrap().remove("versoHeader");
     let setup: crate::types::PageSetup = serde_json::from_value(wire).unwrap();
     assert!(setup.verso_header.is_none());
+}
+
+#[test]
+fn a_page_setup_edit_from_an_older_shell_goes_to_the_document() {
+    let wire = json!({ "type": "setPageSetup", "payload": { "setup": serde_json::to_value(page_setup()).unwrap() } });
+    let command: NativeCommand = serde_json::from_value(wire).unwrap();
+    match command {
+        NativeCommand::SetPageSetup(edit) => assert_eq!(edit.target, PageSetupTarget::Document),
+        other => panic!("read as {other:?}"),
+    }
+}
+
+#[test]
+fn a_job_status_leaves_out_what_it_does_not_have() {
+    let event = WebviewEvent::PrintJobStatus(PrintJobStatus {
+        job_id: "p1".into(),
+        kind: PrintJobKind::Print,
+        format: None,
+        phase: PrintJobPhase::Done,
+        done: None,
+        total: None,
+        message: None,
+        path: None,
+    });
+    assert_eq!(
+        serde_json::to_value(&event).unwrap(),
+        json!({ "type": "printJobStatus", "payload": { "jobId": "p1", "kind": "print", "phase": "done" } })
+    );
+}
+
+#[test]
+fn a_page_setup_carries_its_typography_in_camel_case() {
+    use crate::types::{ChapterOpening, LineSpacing, PrintAlignment, PrintTypography, TitlePageOptions, TitlePageStyle};
+    let mut setup = page_setup();
+    setup.typography = Some(PrintTypography {
+        font_family: "\"Courier Prime\", Courier, monospace".into(),
+        font_size_pt: 12.0,
+        line_spacing: LineSpacing::Double,
+        line_value: 2.0,
+        first_line_indent_mm: 12.7,
+        paragraph_spacing_pt: 0.0,
+        alignment: PrintAlignment::Left,
+        hyphenate: false,
+        scene_break: "#".into(),
+        chapter_opening: ChapterOpening::DropCapAndSmallCaps,
+        chapter_sink_mm: 76.2,
+        no_indent_after_break: true,
+    });
+    setup.title_page = Some(TitlePageOptions { style: TitlePageStyle::Manuscript, show_contact: true, show_word_count: true });
+    let wire = serde_json::to_value(&setup).unwrap();
+    assert_eq!(wire["typography"]["lineSpacing"], "double");
+    assert_eq!(wire["typography"]["chapterOpening"], "dropCapAndSmallCaps");
+    assert_eq!(wire["titlePage"]["style"], "manuscript");
+    round_trip(&setup);
+}
+
+#[test]
+fn a_script_element_is_a_block_type_and_an_old_toolbar_is_prose() {
+    assert_eq!(serde_json::to_value(BlockType::StageDirection).unwrap(), "stageDirection");
+    assert_eq!(serde_json::to_value(WritingFormat::Stageplay).unwrap(), "stageplay");
+    let mut toolbar = serde_json::to_value(every_event().into_iter().find_map(|e| match e {
+        WebviewEvent::ToolbarState(state) => Some(state),
+        _ => None,
+    }).unwrap()).unwrap();
+    toolbar.as_object_mut().unwrap().remove("writingFormat");
+    let read: ToolbarState = serde_json::from_value(toolbar).unwrap();
+    assert_eq!(read.writing_format, WritingFormat::Prose);
+}
+
+#[test]
+fn a_print_from_an_older_shell_has_no_options() {
+    let old: PrintDocumentCommand = serde_json::from_value(json!({ "scope": "document", "bound": false })).unwrap();
+    assert_eq!(old.options, PrintOptions::default());
+    let wire = serde_json::to_value(ExportFormat::PlainText).unwrap();
+    assert_eq!(wire, "plainText");
+    assert_eq!(serde_json::to_value(ExportFormat::Fountain).unwrap(), "fountain");
+    assert_eq!(serde_json::to_value(ExportFormat::Fdx).unwrap(), "fdx");
+    let partial: PrintOptions = serde_json::from_value(json!({ "watermark": "DRAFT" })).unwrap();
+    assert_eq!(partial.range, PrintRange::All);
+    assert!(partial.pages.is_empty());
+    assert!(partial.scenes.is_empty() && partial.highlight_character.is_empty());
+    let sides: PrintOptions = serde_json::from_value(json!({ "range": "scenes", "scenes": [2, 5], "highlightCharacter": "MARY" })).unwrap();
+    assert_eq!((sides.range, sides.scenes, sides.highlight_character.as_str()), (PrintRange::Scenes, vec![2, 5], "MARY"));
+}
+
+#[test]
+fn a_book_saved_before_compiling_reads_with_everything_in() {
+    let mut old = serde_json::to_value(book()).unwrap();
+    for key in ["excluded", "chapterNumbering", "frontMatter", "backMatter"] {
+        old.as_object_mut().unwrap().remove(key);
+    }
+    let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
+    assert!(read.excluded.is_empty());
+    assert_eq!(read.chapter_numbering.style, crate::types::ChapterNumberStyle::None);
+    assert!(!read.front_matter.contents);
+    let wire = serde_json::to_value(book()).unwrap();
+    assert_eq!(wire["chapterNumbering"]["style"], "words");
+    assert_eq!(wire["frontMatter"]["halfTitle"], true);
+    assert_eq!(wire["backMatter"]["aboutTheAuthor"], "A. Writer lives by the sea.");
+}
+
+#[test]
+fn an_author_profile_missing_fields_reads_as_blank() {
+    let profile: crate::types::AuthorProfile = serde_json::from_value(json!({ "byline": "A. Writer" })).unwrap();
+    assert_eq!(profile.byline, "A. Writer");
+    assert!(profile.email.is_empty());
+}
+
+#[test]
+fn a_map_panel_field_is_type_and_payload_in_camel_case() {
+    let field = MapPanelField::ListRow(MapListRow {
+        id: "places.p1".into(),
+        title: "Harrowgate".into(),
+        subtitle: None,
+        swatch: Some("#aa3322".into()),
+        indent: 1,
+    });
+    assert_eq!(
+        serde_json::to_value(&field).unwrap(),
+        json!({
+            "type": "listRow",
+            "payload": { "id": "places.p1", "title": "Harrowgate", "swatch": "#aa3322", "indent": 1 }
+        })
+    );
+}
+
+#[test]
+fn a_map_tool_and_its_chrome_speak_camel_case() {
+    let value = serde_json::to_value(map_chrome()).unwrap();
+    assert_eq!(value["tool"], json!("pin"));
+    assert_eq!(value["surfaceId"], json!("map-surface-0"));
+    assert_eq!(value["revealPanel"], json!(1));
+    assert_eq!(value["panel"]["canGoBack"], json!(true));
+    assert_eq!(value["panel"]["sections"][0]["fields"][0]["payload"]["focusKey"], json!(0));
+    // A panel with no tab chosen says nothing about one.
+    assert!(value["panel"].get("tab").is_none());
 }

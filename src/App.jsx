@@ -302,16 +302,28 @@ export default function App() {
           ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for Binding…', action: printEvent('inkblot:export', { format: 'pdf', scope, bound: true }) })]
           : []),
         MenuItem.new({ id: `export-epub-${scope}`, text: `EPUB${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'epub', scope }) }),
+        MenuItem.new({ id: `export-docx-${scope}`, text: `Word (.docx)${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'docx', scope }) }),
         MenuItem.new({ id: `export-md-${scope}`, text: `Markdown${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'markdown', scope }) }),
         MenuItem.new({ id: `export-html-${scope}`, text: `HTML${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'html', scope }) }),
+        MenuItem.new({ id: `export-text-${scope}`, text: `Plain Text${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'plainText', scope }) }),
+        PredefinedMenuItem.new({ item: 'Separator' }),
+        MenuItem.new({ id: `export-fountain-${scope}`, text: `Fountain${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'fountain', scope }) }),
+        MenuItem.new({ id: `export-fdx-${scope}`, text: `Final Draft (.fdx)${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'fdx', scope }) }),
       ])
       const fileItems = [
         await PredefinedMenuItem.new({ item: 'Separator' }),
         await MenuItem.new({ id: 'page-setup', text: 'Page Setup…', action: printEvent('inkblot:page-setup') }),
+        await Submenu.new({
+          text: 'Write As',
+          items: await Promise.all([['prose', 'Prose'], ['screenplay', 'Screenplay'], ['stageplay', 'Stage Play']].map(([format, text]) => (
+            MenuItem.new({ id: `write-as-${format}`, text, action: printEvent('inkblot:writing-format', { format }) })
+          ))),
+        }),
         await MenuItem.new({ id: 'print-document', text: 'Print…  ⌘P', action: printEvent('inkblot:print', { scope: 'document' }) }),
         await MenuItem.new({ id: 'print-book', text: 'Print Book…', action: printEvent('inkblot:print', { scope: 'folder' }) }),
         await MenuItem.new({ id: 'print-book-bound', text: 'Print Book for Binding…', action: printEvent('inkblot:print', { scope: 'folder', bound: true }) }),
         await PredefinedMenuItem.new({ item: 'Separator' }),
+        await MenuItem.new({ id: 'import-fountain', text: 'Import Fountain Script…', action: printEvent('inkblot:import-script') }),
         await Submenu.new({ text: 'Export', items: await exportItems('document') }),
         await Submenu.new({ text: 'Export Book', items: await exportItems('folder') }),
       ]

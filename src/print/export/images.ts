@@ -73,3 +73,57 @@ export const toDataUri = (image: ResolvedImage): string => {
   }
   return `data:${image.mime};base64,${btoa(binary)}`
 }
+
+/**
+ * An image's pixel size, read from its header: PNG, GIF and JPEG, the formats every
+ * word processor opens. Null for anything else, or bytes too short to say.
+ */
+export const imageSize = (image: ResolvedImage): { width: number; height: number } | null => {
+  const b = image.bytes
+  const u16 = (i: number, little = false) => (little ? b[i] | (b[i + 1] << 8) : (b[i] << 8) | b[i + 1])
+  const u32 = (i: number) => ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0
+  if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+    return { width: u32(16), height: u32(20) }
+  }
+  if (b.length > 10 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) {
+    return { width: u16(6, true), height: u16(8, true) }
+  }
+  if (b.length > 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) {
+        i += 1
+        continue
+      }
+      const marker = b[i + 1]
+      // Start-of-frame markers, not the huffman (C4), JPEG-LS (C8) or arithmetic (CC) ones.
+      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        return { width: u16(i + 7), height: u16(i + 5) }
+      }
+      i += 2 + u16(i + 2)
+    }
+  }
+  return null
+}
+
+/**
+ * An image a word processor can open: PNG, JPEG and GIF as they are; anything else
+ * (WebP, SVG, AVIF, HEIC) redrawn as a PNG, where the browser can draw it. Null when
+ * it cannot, and the export leaves the image out.
+ */
+export const toPortableImage = async (image: ResolvedImage): Promise<ResolvedImage | null> => {
+  if (['image/png', 'image/jpeg', 'image/gif'].includes(image.mime) && imageSize(image)) return image
+  if (typeof document === 'undefined' || typeof createImageBitmap === 'undefined') return null
+  try {
+    const bitmap = await createImageBitmap(new Blob([image.bytes as BlobPart], { type: image.mime }))
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) return null
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/png', ext: 'png' }
+  } catch {
+    return null
+  }
+}

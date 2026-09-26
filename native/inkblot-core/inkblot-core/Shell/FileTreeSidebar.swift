@@ -97,16 +97,20 @@ struct FileTreeSidebar: View {
         .overlay(alignment: .bottom) {
             GlassEffectContainer {
                 HStack(spacing: 8) {
+                    // The tab bar's sizes: a 28-point round button, a 24-point capsule.
+                    // Sized outside the menu: a borderless menu ignores its label's frame.
                     Menu {
                         newItems(in: "")
                     } label: {
                         Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .medium))
                     }
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
                     .menuIndicator(.hidden)
                     .fixedSize()
-                    .padding(8)
+                    .frame(width: 28, height: 28)
+                    .contentShape(.circle)
                     .glassEffect(.regular.interactive(), in: .circle)
                     .help("New Document, Canvas, Map or Folder")
 
@@ -140,6 +144,22 @@ struct FileTreeSidebar: View {
             ClosureMenuItem("New Folder", systemImage: "folder") { ask(.create(.folder, in: folder)) },
         ]
         guard let entry else { return items }
+        if !entry.isFolder {
+            // A tab of its own, or beside what is open. Not split against itself: the
+            // primary pane already has it, and one document is never in both.
+            var open = [ClosureMenuItem("Open in New Tab", systemImage: "plus.square.on.square") {
+                model.tabs.openInTab(entry.path)
+            }]
+            if entry.path != model.tabs.currentDoc {
+                open.append(ClosureMenuItem("Open in Split Right", systemImage: "rectangle.split.2x1") {
+                    model.tabs.openSplit(.columns, docPath: entry.path)
+                })
+                open.append(ClosureMenuItem("Open in Split Below", systemImage: "rectangle.split.1x2") {
+                    model.tabs.openSplit(.rows, docPath: entry.path)
+                })
+            }
+            items.insert(contentsOf: open + [.separator()], at: 0)
+        }
         items.append(.separator())
         items.append(ClosureMenuItem("Rename…") { ask(.rename(entry)) })
         if !entry.isFolder {
@@ -200,6 +220,7 @@ struct FileTreeSidebar: View {
             let newPath = folder.isEmpty ? source.name : "\(folder)/\(source.name)"
             if source.containingParent != folder {
                 model.bridge.send(.moveEntry(MoveEntryCommand(path: path, isFolder: source.isFolder, targetFolder: folder)))
+                model.statsFollowMove(of: path, into: folder, isFolder: source.isFolder)
             }
             let placed = model.tree.place(path: path, isFolder: source.isFolder, newPath: newPath, in: folder, at: index)
             index = index.map { _ in placed + 1 }
@@ -244,6 +265,7 @@ struct FileTreeSidebar: View {
             model.bridge.send(.createEntry(CreateEntryCommand(parentFolder: folder, name: name, kind: kind)))
         case .rename(let entry):
             model.bridge.send(.renameEntry(RenameEntryCommand(path: entry.path, isFolder: entry.isFolder, newName: name)))
+            model.statsFollowRename(of: entry.path, to: name, isFolder: entry.isFolder)
         }
     }
 
@@ -301,8 +323,10 @@ private struct FilterBar: View {
             }
             button("plusminus.circle", help: "Expand or Collapse All Folders", action: toggleExpansion)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 32)
+        .font(.system(size: 12))
+        .imageScale(.small)
+        .padding(.horizontal, 9)
+        .frame(height: 24)
         .glassEffect(.regular.interactive(), in: .capsule)
         .contentShape(.capsule)
         .onTapGesture { focused = true }

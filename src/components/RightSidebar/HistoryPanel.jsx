@@ -1,7 +1,7 @@
 /**
  * HistoryPanel.jsx — the History tab of the right sidebar.
  *
- * The full version-control surface for a document (text OR canvas):
+ * The full version-control surface for a document (text, canvas or map):
  *   - a condensed timeline: day sections, then bursts of edits grouped by time
  *     and editing session (color-coded dot), expandable to individual checkpoints
  *   - named versions ("First Draft", "Final Submission") with a filter to show
@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getVersions } from '../../lib/FileSystem'
 import { isCanvasDoc, isMapDoc, isTextDoc } from '../../lib/docKind'
-import { summarizeMapChange } from '../../lib/map/mapModel'
+import { mapText, summarizeMapChange } from '../../lib/map/mapModel'
 import {
   describeCanvasDiff,
   diffCanvases,
@@ -164,7 +164,7 @@ export default function HistoryPanel({
     if (namedOnly) list = list.filter((entry) => entry.name)
     if (!normalizedQuery) return list
     return list.filter((entry) =>
-      `${entry.name || ''} ${entry.timestamp || ''} ${htmlToText(entry.contentHtml || '')}`
+      `${entry.name || ''} ${entry.timestamp || ''} ${entry.map ? mapText(entry.map) : htmlToText(entry.contentHtml || '')}`
         .toLowerCase()
         .includes(normalizedQuery)
     )
@@ -313,19 +313,16 @@ export default function HistoryPanel({
             >
               <SFIcon name="clock" size={13} />
             </button>
-            {/* Compare/merge knows prose and cards; a map restores or copies whole. */}
-            {isMap ? null : (
-              <button
-                className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
-                title="Compare / merge"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onOpenCompare?.(docName, id, 'current')
-                }}
-              >
-                <SFIcon name="git.pullrequest" size={13} />
-              </button>
-            )}
+            <button
+              className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
+              title="Compare / merge"
+              onClick={(event) => {
+                event.stopPropagation()
+                onOpenCompare?.(docName, id, 'current')
+              }}
+            >
+              <SFIcon name="git.pullrequest" size={13} />
+            </button>
             <button
               className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
               title="Make a copy as a new document"

@@ -14,6 +14,7 @@ import type {
   ApplyMarkCommand,
   EditorHistoryCommand,
   SetBlockTypeCommand,
+  SetWritingFormatCommand,
   ToggleListCommand,
   InsertCitationCommand,
   InsertPlainTextCommand,
@@ -55,6 +56,8 @@ interface Chain {
   scrollIntoView(): Chain
   setParagraph(): Chain
   setHeading(attrs: { level: 1 | 2 | 3 }): Chain
+  setScriptElement(element: string): Chain
+  setWritingFormat(format: string): Chain
   toggleBulletList(): Chain
   toggleOrderedList(): Chain
   undo(): Chain
@@ -165,8 +168,15 @@ export function setBlockType(editor: unknown, { block }: SetBlockTypeCommand): b
       case BlockType.Heading1: chain.focus().setHeading({ level: 1 }).run(); break
       case BlockType.Heading2: chain.focus().setHeading({ level: 2 }).run(); break
       case BlockType.Heading3: chain.focus().setHeading({ level: 3 }).run(); break
+      // A script's elements share their names with the node's `element` attribute.
+      default: chain.focus().setScriptElement(block).run(); break
     }
   })
+}
+
+/** Write the document as prose, a screenplay or a play (DocWritingFormat.js). */
+export function setWritingFormat(editor: unknown, { format }: SetWritingFormatCommand): boolean {
+  return run(editor, (chain) => { chain.focus().setWritingFormat(format).run() })
 }
 
 export function toggleList(editor: unknown, { list }: ToggleListCommand): boolean {

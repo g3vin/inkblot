@@ -19,7 +19,6 @@
 }
 
 .map-surface {
-  --map-zoom: 1;
   --map-inv-zoom: 1;
   --map-paper: var(--surface-0);
   --map-sheet: var(--surface-1);
@@ -157,6 +156,20 @@
   transform: scale(var(--map-inv-zoom));
 }
 
+/* The ground is scenery: nothing on it is picked, so it is never hit-tested — the
+   Earth's land alone is a 58,000-point path, tested on every pointer move otherwise.
+   A system's bodies are items, so only its rings are left out. */
+.map-ground:not(.map-system),
+.map-system :is(.map-orbit, .map-habitable, .map-belt) {
+  pointer-events: none;
+}
+
+/* While the map pans or zooms (useMapViewport; it clears ~120ms after the last step)
+   nothing under the moving cursor is hit-tested or hovered. */
+.map-surface[data-gesturing] .map-svg {
+  pointer-events: none;
+}
+
 .map-earth-sphere {
   fill: var(--map-water);
 }
@@ -176,11 +189,14 @@
   stroke-linejoin: round;
 }
 
+/* Solid, not dashed: with non-scaling-stroke a dash is measured in screen pixels along
+   the whole mesh, on screen or not, so the dashes to draw grew with the zoom — millions
+   of them a frame, zoomed in on a country. */
 .map-earth-borders {
   fill: none;
   stroke: var(--map-border);
-  stroke-width: 0.7;
-  stroke-dasharray: 3 2;
+  stroke-width: 0.6;
+  stroke-opacity: 0.75;
   vector-effect: non-scaling-stroke;
 }
 
@@ -218,8 +234,13 @@
   pointer-events: none;
 }
 
-.map-route.is-selected .map-route-line {
-  filter: drop-shadow(0 0 3px var(--map-accent));
+/* The selection glow is the hit path, which already runs under the line, drawn: a
+   drop-shadow filter was recomputed over the route's whole box on every repaint. */
+.map-route.is-selected .map-route-hit {
+  stroke: color-mix(in srgb, var(--map-accent) 35%, transparent);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .map-label {

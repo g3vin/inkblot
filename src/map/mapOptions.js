@@ -18,6 +18,9 @@ export const MAP_TOOLS = [
   { id: 'area', icon: 'map.area', label: 'Measure area', key: 'A' },
 ]
 
+/** The zoom as the toolbar writes it: 250%, 12×. */
+export const formatZoom = (zoom) => (zoom >= 10 ? `${Math.round(zoom)}×` : zoom >= 1 ? `${Math.round(zoom * 100)}%` : `${Math.round(zoom * 1000) / 10}%`)
+
 /** What the hint strip says while a tool is in hand (and once drawing has begun). */
 export const TOOL_HINTS = {
   pin: 'Click to place. Drag a document from the file tree to place it.',

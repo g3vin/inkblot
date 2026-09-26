@@ -10,18 +10,20 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use super::archive::ArchiveChanged;
+use super::map::MapChromeChanged;
 use super::bubble::{BubbleChipsChanged, BubbleSessionOpened};
 use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
-use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor};
+use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor, WritingFormat};
 use crate::types::json::JsonValue;
 use super::sidebar::{
     ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged,
     VersionsChanged,
 };
+use super::tabs::TabsChanged;
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
-use super::print::{PageLayoutState, PrintRequest};
+use super::print::{PageLayoutCatalog, PageLayoutState, PrintJobStatus, PrintRequest};
 
 /// Which marks are on at the selection.
 #[typeshare]
@@ -67,6 +69,9 @@ pub struct ToolbarState {
     pub alignment: Alignment,
     /// What the Paragraph Style menu shows as current.
     pub block_type: BlockType,
+    /// What the document is written as, which decides what the menu offers.
+    #[serde(default)]
+    pub writing_format: WritingFormat,
     pub active_marks: ActiveMarks,
     /// Whether the editor's own history has a step to undo or redo — the document's
     /// Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.
@@ -121,6 +126,21 @@ pub struct DocChanged {
     pub user_edit: bool,
     pub word_count: u32,
     pub char_count: u32,
+    /// Positions inserted and removed since the last `DocChanged` for this pane.
+    ///
+    /// The page throttles this event, so these are sums over every transaction in the
+    /// window, not one keystroke. Positions rather than characters — a split paragraph
+    /// is two — which is close enough for "how much did the writer do", and exact for
+    /// plain typing.
+    #[serde(default)]
+    pub inserted: u32,
+    #[serde(default)]
+    pub deleted: u32,
+    /// The window was a paste or a drop. The page sends one on its own rather than
+    /// folding it into the typing around it, so a shell can tell written words from
+    /// pasted ones.
+    #[serde(default)]
+    pub paste: bool,
 }
 
 /// Note anchors after a remap.
@@ -292,14 +312,40 @@ pub struct WordCountBadge {
     pub bottom: f64,
 }
 
-/// Every word-count badge the user can see — the whole list, so it is safe to coalesce.
-/// The page's badges stay where they are, invisible, to be measured; the shell draws
-/// them as Liquid Glass, which only a view above the page can be.
+/// One text pane's status row, for a shell that draws the pane's own Print Layout
+/// toggle and zoom at its bottom-right corner, level with its badges. `left` and `right`
+/// are the pane's edges; `top` and `bottom` the row's. Client coordinates, as the
+/// badges' are.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaneStatus {
+    pub pane: Pane,
+    pub doc_path: String,
+    /// Shown as pages.
+    pub print_layout: bool,
+    /// Its zoom as pages (1 = 100%), whether or not it is shown as them.
+    pub zoom: f64,
+    /// The pointer is over it. A split shows a pane's controls only then.
+    #[serde(default)]
+    pub hovered: bool,
+    pub left: f64,
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+}
+
+/// Every word-count badge the user can see, and every text pane's status row — the
+/// whole lists, so it is safe to coalesce. The page's badges stay where they are,
+/// invisible, to be measured; the shell draws them as Liquid Glass, which only a view
+/// above the page can be.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WordCountsChanged {
     pub badges: Vec<WordCountBadge>,
+    #[serde(default)]
+    pub panes: Vec<PaneStatus>,
 }
 
 /// What focus mode is showing.
@@ -442,6 +488,8 @@ pub enum WebviewEvent {
     NoteMarkerPin(NoteMarkerEvent),
     ActiveEditorChanged(ActiveEditorChanged),
     CanvasToolbarChanged(CanvasToolbarChanged),
+    /// The active map's toolbar and inspector (`map.rs`). Coalesced per frame.
+    MapChromeChanged(MapChromeChanged),
     SearchMatches(SearchMatches),
     FocusModeView(FocusModeView),
     ReadAloudPayload(ReadAloudPayloadEvent),
@@ -478,4 +526,9 @@ pub enum WebviewEvent {
     WordCountsChanged(WordCountsChanged),
     PageLayoutState(PageLayoutState),
     PrintRequest(PrintRequest),
+    /// The Finishing tabs' fixed lists, sent once when the page mounts.
+    PageLayoutCatalog(PageLayoutCatalog),
+    PrintJobStatus(PrintJobStatus),
+    /// The tabs and the split, whole (`tabs.rs`). Coalesced per frame.
+    TabsChanged(TabsChanged),
 }

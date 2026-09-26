@@ -18,6 +18,7 @@
 //!   -> command    NativeCommand    (shell -> webview)
 //!   -> event      WebviewEvent     (webview -> shell)
 //!   -> sidebar    the inspector's notes, clipboard, tiles and versions
+//!   -> tabs       the tab bar and split view
 //!   -> envelope   what goes on the wire, plus the request/reply pair
 //! ```
 //!
@@ -51,9 +52,11 @@ pub mod command;
 pub mod common;
 pub mod envelope;
 pub mod event;
+pub mod map;
 pub mod references;
 pub mod print;
 pub mod sidebar;
+pub mod tabs;
 
 pub use archive::{ArchiveAction, ArchiveActionCommand, ArchiveChanged, ArchivedItem, ArchivedKind};
 pub use bubble::{BubbleAside, BubbleChipRect, BubbleChipsChanged, BubbleForm, BubbleMode, BubbleSession, BubbleSessionOpened, BubbleWord, CloseBubbleSessionCommand};
@@ -65,7 +68,7 @@ pub use command::{
     OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand,
     SetColorCommand, SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand,
     SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,
-    SetBlockTypeCommand, ToggleListCommand, EditorHistoryCommand, SetFocusModeCommand, SetWordCountVisibleCommand,
+    SetBlockTypeCommand, SetWritingFormatCommand, ToggleListCommand, EditorHistoryCommand, SetFocusModeCommand, SetWordCountVisibleCommand,
 };
 pub use references::{
     AddReferenceCommand, BibliographyInclude, BibliographyOptions, ChooseReferenceCandidateCommand,
@@ -76,10 +79,16 @@ pub use references::{
     SetCitationStyleCommand, SetReferenceAttachedCommand, UpdateReferenceCommand,
 };
 pub use print::{
-    ExportDocumentCommand, ExportFormat, GoToPageCommand, InsertBreakCommand, PageBreakKind,
-    PageLayoutState, PageSizeOption, PrintDocumentCommand, PrintFinishedCommand, PrintRequest,
-    PrintScope, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
-    SetPrintLayoutCommand, SetPrintZoomCommand, SignatureAdvice, ZoomFit,
+    ExportAgainCommand, ImportScriptCommand, LastExport, MeasureBookCommand, ReportOutput, SceneNumbering, SceneSummary,
+    ScriptReportCommand, ScriptReportKind, ScriptSummary, SetSceneNumbersCommand, PreflightIssue, PreflightSeverity, PrintOptions, PrintRange,
+    PublishingReport,
+    ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand, ExportFormat, FormatKind,
+    FormatOption, GoToPageCommand, InsertBreakCommand, PageBreakKind, PageLayoutCatalog,
+    PageLayoutState, PageSetupTarget, PageSizeOption, PrintDocumentCommand, PrintFinishedCommand,
+    PrintJobKind, PrintJobPhase, PrintJobStatus, PrintRequest, PrintScope, RefreshBookChaptersCommand,
+    RunningToken, SetAuthorProfileCommand, SetBookCoverCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
+    SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
+    UseSetupForBookCommand, ZoomFit,
 };
 pub use sidebar::{
     AddReplyCommand, HighlightNoteCommand, NotePreviewDismissed, ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,
@@ -88,7 +97,15 @@ pub use sidebar::{
     TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,
     WorkbenchTile,
 };
-pub use common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor};
+pub use map::{
+    MapButtonRole, MapButtonRow, MapCalendarMode, MapChoice, MapChoiceInput, MapChromeChanged, MapChromeState,
+    MapColorInput, MapCommandRequest, MapDateInput, MapDateParts, MapListRow, MapMarkerInput, MapNoteText,
+    MapNoteTone, MapNumberInput, MapPanel, MapPanelButton, MapPanelField, MapPanelGroup, MapPanelSection,
+    MapPanelTab, MapShapePreview, MapStatRow,
+    MapTableCell, MapTableRowView, MapTableView, MapTextInput, MapToggleInput,
+    MapTool,
+};
+pub use common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 pub use envelope::{
     BridgeError, BridgeErrorCode, BridgeReply, BridgeRequest, CommandEnvelope, DocumentText,
     EditorQuery, EventEnvelope, InboundMessage, OutboundMessage, ReadAloudQuery, ReplyEnvelope,
@@ -97,7 +114,11 @@ pub use envelope::{
 pub use event::{
     ActiveEditorChanged, ActiveMarks, CanvasToolbarChanged, CanvasToolbarState, DocChanged, DragEnded, DragMoved, DragPayloadKind,
     DragStarted, FocusModeView, NoteMarkerEvent, NoteMarkerRect, NoteMarkersChanged, NotesRemapped, ProjectChanged, ReadAloudPayloadEvent,
-    SearchMatches, SelectionContext, ToolbarState, ViewOptions, WebviewEvent, WordCountBadge, WordCountsChanged,
+    SearchMatches, SelectionContext, ToolbarState, ViewOptions, WebviewEvent, WordCountBadge, WordCountsChanged, PaneStatus,
+};
+pub use tabs::{
+    CloseSplitCommand, DocTab, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand,
+    SetTabOrderCommand, SplitOrientation, TabRef, TabsChanged,
 };
 
 #[cfg(test)]

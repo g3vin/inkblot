@@ -16,6 +16,7 @@
 import { imposePages } from './imposition'
 import { mmToPx } from './pageSizes'
 import {
+  describeWordCount,
   formatPageNumber,
   normalizePageSetup,
   pageLeftMargin,
@@ -23,6 +24,7 @@ import {
   runningTextFor,
 } from './pageSetup'
 import { getPageSizePreset } from './pageSizes'
+import { applyTypography } from './typography'
 
 /** Editing chrome that must never reach paper. */
 const STRIP_SELECTORS = [
@@ -136,8 +138,10 @@ const renderWindow = (snapshot, from, to, bleed) => {
  * must open on a recto.
  *
  * source: { snapshot, result, setup, stride, title, chapterTitleAt(pos) }
+ * `onChapterStart(index, folio)` is told the folio each source's first page carries,
+ * for a table of contents.
  */
-export const renderPages = (sources, { bookTitle = '', author = '' } = {}) => {
+export const renderPages = (sources, { bookTitle = '', author = '', surname, words = 0, onChapterStart } = {}) => {
   const pages = []
   if (!sources.length) return pages
   const setup = normalizePageSetup(sources[0].setup)
@@ -157,6 +161,8 @@ export const renderPages = (sources, { bookTitle = '', author = '' } = {}) => {
     Object.assign(page.style, { width: `${m.width}px`, height: `${m.height}px` })
     return page
   }
+  const wordsText = words > 0 ? describeWordCount(words) : ''
+  const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
 
   sources.forEach((source, chapterIndex) => {
     const { snapshot, result, stride } = source
@@ -173,6 +179,8 @@ export const renderPages = (sources, { bookTitle = '', author = '' } = {}) => {
       const page = document.createElement('div')
       page.className = `print-page${blank ? ' is-blank' : ''}`
       Object.assign(page.style, { width: `${m.width}px`, height: `${m.height}px` })
+      // The type the flow was laid out in, so the cloned lines are set as they were.
+      applyTypography(page, setup.typography)
 
       const left = pageLeftMargin(setup, physical)
       for (let c = 0; c < columns && !blank; c += 1) {
@@ -201,6 +209,9 @@ export const renderPages = (sources, { bookTitle = '', author = '' } = {}) => {
         title: bookTitle || source.title,
         chapter: source.chapterTitleAt?.(startPos) || source.title,
         author,
+        surname,
+        words: wordsText,
+        date,
       }
       const flags = { chapterFirstPage: chapterStarts.has(firstSlot), blank }
       const header = runningTextFor(setup, 'header', physical, ctx, flags)
@@ -216,6 +227,12 @@ export const renderPages = (sources, { bookTitle = '', author = '' } = {}) => {
         }))
       }
       page.dataset.folio = formatPageNumber(ctx.page, setup.pageNumberFormat)
+      // For narrowing a print afterwards: the printed number, and where in its
+      // chapter the page starts.
+      page.dataset.page = String(ctx.page)
+      page.dataset.chapter = String(chapterIndex)
+      page.dataset.pos = String(startPos)
+      if (p === 0) onChapterStart?.(chapterIndex, page.dataset.folio)
       pages.push(page)
     }
   })

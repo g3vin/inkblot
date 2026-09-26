@@ -7,6 +7,7 @@
  * figure. When a route or region is selected, its corners get handles to drag, and
  * the middle of each side a handle that adds a corner there.
  */
+import { memo } from 'react'
 import { formatArea, formatDistance } from '../lib/map/mapUnits'
 import { lineKm, resolvePin } from '../lib/map/mapSpace'
 import { pathData } from '../lib/map/mapGeometry'
@@ -43,7 +44,7 @@ function Measure({ at, text }) {
   )
 }
 
-export default function MapDraft({ map, projector, space, day, draft, selection, selectedItem, rubberRef }) {
+const MapDraft = memo(function MapDraft({ map, projector, space, day, draft, selection, selectedItem, rubberRef }) {
   const parts = []
 
   if (draft && draft.nodes.length) {
@@ -97,4 +98,6 @@ export default function MapDraft({ map, projector, space, day, draft, selection,
   }
 
   return <g className="map-draft">{parts}</g>
-}
+})
+
+export default MapDraft
