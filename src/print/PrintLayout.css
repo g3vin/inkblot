@@ -641,6 +641,52 @@
   font: 600 12px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* ---- the cover (CoverView.jsx) ---- */
+
+.cover-view {
+  container-type: inline-size;
+  min-height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  background: var(--pl-desk);
+  color: var(--pl-ink);
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.cover-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cover-bar span { opacity: 0.7; flex: 1; }
+.cover-bar button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(0, 0, 0, 0.2); background: var(--pl-paper); color: inherit; cursor: pointer; }
+.cover-stage-host { display: flex; justify-content: center; }
+
+.cover-stage {
+  position: relative;
+  background: #ffffff;
+  box-shadow: var(--pl-page-shadow);
+  outline: 2px solid transparent;
+}
+
+.cover-stage.is-over { outline-color: var(--accent-color, #0a84ff); }
+.cover-part { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.cover-part.is-spine { background: rgba(0, 0, 0, 0.03); }
+.cover-part.is-over { background: color-mix(in srgb, var(--accent-color, #0a84ff) 18%, transparent); }
+.cover-picture { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cover-drop { color: #8a8a8e; text-align: center; padding: 8px; }
+.cover-part.is-spine .cover-drop { writing-mode: vertical-rl; }
+.cover-guides { position: absolute; inset: 0; pointer-events: none; }
+.cover-guides > * { position: absolute; box-sizing: border-box; }
+.cover-trim { border: 1px dashed #d0021b; }
+.cover-safe { border: 1px dotted rgba(10, 132, 255, 0.8); }
+.cover-fold { top: 0; bottom: 0; width: 0; border-left: 1px dashed rgba(0, 0, 0, 0.55); }
+.cover-barcode { display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0, 0, 0, 0.5); background: rgba(255, 255, 255, 0.75); color: #555555; font-size: 10px; }
+.cover-note { max-width: 640px; margin: 16px auto 0; text-align: center; opacity: 0.7; }
+
 /* ---- the pages and sheets that go to paper ---- */
 
 #print-root {

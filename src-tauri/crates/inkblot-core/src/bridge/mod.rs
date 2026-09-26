@@ -89,7 +89,7 @@ pub use print::{
     SetHeadImageCommand, BookRow, BookRowSection, EditBookItemCommand, EditorMode, MoveBookItemCommand,
     OpenBookItemCommand, RemoveBookItemCommand, SetBookItemHiddenCommand, PrintJobKind, PrintJobPhase, PrintJobStatus, PrintRequest, PrintScope, RefreshBookChaptersCommand, TypesetFocus, TypesetHistoryChanged, TypesetVersionRow,
     TypesetVersionKind, SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
-    PreviewTypesetVersionCommand,
+    PreviewTypesetVersionCommand, CoverSetAction, CoverSetView, CoverState, EditCoverSetsCommand, SetCoverImageCommand,
     RunningToken, SetAuthorProfileCommand, SetBookCoverCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
     SetEditorModeCommand, SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
     UseSetupForBookCommand, ZoomFit,

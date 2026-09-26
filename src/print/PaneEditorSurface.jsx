@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { EditorContent } from '@tiptap/react'
 
 import BookPages from './BookPages'
+import CoverView from './CoverView'
 import { setLiveHead } from './ChapterHeadDecorations'
 import { readChapterMeta } from './DocChapterMeta'
 import PrintLayoutView from './PrintLayoutView'
@@ -24,7 +25,7 @@ import { readDocPageSetup } from './DocPageSetup'
 import { documentSurface } from '../bridge'
 import { assetUrl, isAssetPath, writeAssetFromFile } from '../lib/assets'
 import { useDocPageSetup } from './useDocPageSetup'
-import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, isPrintLayoutEnabled, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
+import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, isPrintLayoutEnabled, isShowingCover, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
 import { resolvePageSetup } from './pageSetup'
 
 /**
@@ -140,7 +141,9 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     >
       {header}
       <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} printLayout={printLayout} />
-      {printLayout && inBook ? (
+      {printLayout && placement && isShowingCover() ? (
+        <CoverView projectName={projectName} docPath={docPath} folder={placement.folder} setup={pageSetup} />
+      ) : printLayout && inBook ? (
         <BookPages
           projectName={projectName}
           docPath={docPath}

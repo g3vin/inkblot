@@ -137,6 +137,8 @@ struct FinishingActionHeader: View {
             Divider()
             Button("PDF for Binding…") { layout.export(.pdf, scope: scope, bound: true) }
         }
+        Divider()
+        Button("Cover PDF (Full Wrap)…") { layout.export(.coverPdf, scope: scope == .document ? .folder : scope) }
     }
 
     /* ---------------- where it got to ---------------- */
@@ -285,6 +287,7 @@ struct JobStatusLine: View {
         case .fountain: "Fountain"
         case .fdx: "Final Draft"
         case .csv: "Report"
+        case .coverPdf: "Cover PDF"
         }
     }
 }
@@ -293,6 +296,7 @@ struct JobStatusLine: View {
 enum FinishingSectionID {
     static let thisPage = "typeset.thisPage"
     static let style = "typeset.style"
+    static let cover = "output.cover"
     static let pageSize = "page.size"
     static let headerFooter = "page.headerFooter"
     static let textFlow = "page.textFlow"
@@ -308,7 +312,7 @@ enum FinishingSectionID {
     static let publishing = "publish.publishing"
     static let script = "publish.script"
 
-    static let all = [thisPage, style, pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
+    static let all = [thisPage, style, cover, pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
 }
 
 /// A Finishing tab: the action header pinned at the top, the tab's settings scrolling

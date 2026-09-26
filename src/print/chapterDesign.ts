@@ -96,6 +96,48 @@ export const activeCoverOf = (book: Partial<BookSettings> | null | undefined): C
   return covers.find((c) => c.id === activeCover) || null
 }
 
+/** The book's cover versions changed, with `coverImage` following the active front. */
+export const withCovers = <B extends Partial<BookSettings>>(book: B, covers: CoverSet[], activeCover?: string): B => {
+  const active = covers.find((c) => c.id === activeCover) || covers[0]
+  const out: B = { ...book, covers, activeCover: active?.id }
+  if (!active) delete out.activeCover
+  if (active?.front) out.coverImage = active.front
+  else delete out.coverImage
+  return out
+}
+
+/**
+ * A change to a book's cover versions: a new one (empty, and made active), a copy, a
+ * new name, one gone, which is active, how its pictures fit.
+ */
+export const editCovers = <B extends Partial<BookSettings>>(
+  book: B,
+  { action, id, name, fit, newId }: { action: string; id?: string | null; name?: string | null; fit?: CoverFit | null; newId: string }
+): B => {
+  const { covers, activeCover } = coversOf(book)
+  const target = covers.find((c) => c.id === (id || activeCover))
+  const unique = (base: string) => {
+    let n = 1
+    let candidate = base
+    while (covers.some((c) => c.name === candidate)) candidate = `${base} ${++n}`
+    return candidate
+  }
+  switch (action) {
+    case 'add': return withCovers(book, [...covers, { id: newId, name: unique(name?.trim() || 'Cover'), fit: CoverFit.Fill }], newId)
+    case 'duplicate':
+      return target ? withCovers(book, [...covers, { ...target, id: newId, name: unique(`${target.name} Copy`) }], newId) : book
+    case 'rename':
+      return target && name?.trim() ? withCovers(book, covers.map((c) => (c === target ? { ...c, name: name.trim() } : c)), activeCover) : book
+    case 'delete': {
+      const rest = covers.filter((c) => c !== target)
+      return withCovers(book, rest, activeCover === target?.id ? rest[0]?.id : activeCover)
+    }
+    case 'activate': return target ? withCovers(book, covers, target.id) : book
+    case 'setFit': return target && fit ? withCovers(book, covers.map((c) => (c === target ? { ...c, fit } : c)), activeCover) : book
+    default: return book
+  }
+}
+
 /**
  * The book with one part of its active cover set — a new version, "Cover", when it has
  * none — or cleared, with `path` null. `coverImage` follows the active front.
