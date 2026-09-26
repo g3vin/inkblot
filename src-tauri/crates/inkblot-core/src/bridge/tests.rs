@@ -421,7 +421,7 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::PrintDocument(PrintDocumentCommand {
             scope: PrintScope::Document,
             bound: false,
-            options: PrintOptions { range: PrintRange::CurrentChapter, pages: "3-7, 10".into(), watermark: "DRAFT".into(), recipients: vec![] },
+            options: PrintOptions { range: PrintRange::CurrentChapter, pages: "3-7, 10".into(), watermark: "DRAFT".into(), recipients: vec![], scenes: vec![], highlight_character: "MARY".into() },
         }),
         NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false, options: PrintOptions::default() }),
         NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Docx, scope: PrintScope::Folder, bound: false, options: PrintOptions::default() }),
@@ -438,6 +438,8 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::ExportAgain(ExportAgainCommand {}),
         NativeCommand::MeasureBook(MeasureBookCommand {}),
         NativeCommand::ImportScript(ImportScriptCommand {}),
+        NativeCommand::SetSceneNumbers(SetSceneNumbersCommand { mode: SceneNumbering::Locked }),
+        NativeCommand::ScriptReport(ScriptReportCommand { report: ScriptReportKind::Scenes, output: ReportOutput::Csv }),
     ]
 }
 
@@ -773,6 +775,12 @@ fn every_event() -> Vec<WebviewEvent> {
                     fixed_setup: Some(page_setup()),
                 }],
             }),
+            script: Some(ScriptSummary {
+                format: WritingFormat::Screenplay,
+                scene_numbers: SceneNumbering::Locked,
+                characters: vec!["MARY".into(), "JOHN".into()],
+                scenes: vec![SceneSummary { number: Some("12A".into()), heading: "INT. KITCHEN - NIGHT".into(), page: 14 }],
+            }),
         }),
         WebviewEvent::PrintRequest(PrintRequest {
             job_id: "p1".into(),
@@ -903,6 +911,8 @@ fn every_command_has_its_documented_wire_name() {
             "exportAgain",
             "measureBook",
             "importScript",
+            "setSceneNumbers",
+            "scriptReport",
         ]
     );
 }
@@ -1222,6 +1232,9 @@ fn a_print_from_an_older_shell_has_no_options() {
     let partial: PrintOptions = serde_json::from_value(json!({ "watermark": "DRAFT" })).unwrap();
     assert_eq!(partial.range, PrintRange::All);
     assert!(partial.pages.is_empty());
+    assert!(partial.scenes.is_empty() && partial.highlight_character.is_empty());
+    let sides: PrintOptions = serde_json::from_value(json!({ "range": "scenes", "scenes": [2, 5], "highlightCharacter": "MARY" })).unwrap();
+    assert_eq!((sides.range, sides.scenes, sides.highlight_character.as_str()), (PrintRange::Scenes, vec![2, 5], "MARY"));
 }
 
 #[test]

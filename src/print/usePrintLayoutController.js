@@ -29,6 +29,11 @@ import { SIGNATURE_GUIDANCE } from './imposition'
 import { paginationKey } from './PaginationExtension'
 import { PAGE_SIZE_GROUP_LABELS, PAGE_SIZE_PRESETS } from './pageSizes'
 import { normalizePageSetup, resolvePageSetup, suggestedInsideMarginMm } from './pageSetup'
+import { printedPageAt } from './printJob'
+import { readWritingFormat } from '../script/DocWritingFormat'
+import { breakdown } from '../script/reports'
+import { saveScriptReport } from '../script/runReport'
+import { readSceneNumbers } from '../script/sceneNumbers'
 import {
   bookFolderForScope,
   getAuthorProfile,
@@ -134,6 +139,23 @@ const publishingReport = ({ projectName, docPath, scope, book, setup, editor, pa
   }
 }
 
+/**
+ * A script's scenes and cast, for the Publish tab's Script Production section; none
+ * for prose.
+ */
+export const scriptSummary = (editor, setup) => {
+  const doc = editor?.state.doc
+  const format = readWritingFormat(doc)
+  if (!doc || format === 'prose') return undefined
+  const data = breakdown(doc, printedPageAt(editor, setup) || undefined)
+  return {
+    format,
+    sceneNumbers: readSceneNumbers(doc),
+    characters: data.characters.map((c) => c.name),
+    scenes: data.scenes.map((scene) => ({ number: scene.number || undefined, heading: scene.heading, page: scene.page || 0 })),
+  }
+}
+
 /** What the shell is told of the last export: enough to say "Export Again: Book.pdf". */
 const lastExportState = (last) => (last ? { format: last.format, scope: last.scope, path: last.path } : undefined)
 
@@ -183,6 +205,7 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
       words: docWords,
     }) : undefined,
     hasSelection: Boolean(editor && !editor.state.selection.empty),
+    script: scriptSummary(editor, setup),
     // The cover on disk, for the Book tab's thumbnail: a project asset, once the root is known.
     coverFile: projectRoot && book.coverImage && !book.coverImage.startsWith('data:')
       ? joinPath(projectRoot, book.coverImage)
@@ -414,6 +437,14 @@ export default function usePrintLayoutController({
       documentSurface.onCommand('measureBook', () => {
         const { projectName: project } = stateRef.current
         stateRef.current.onMeasure?.({ scope: getPrintScope(project) })
+      }),
+      documentSurface.onCommand('setSceneNumbers', ({ mode }) => {
+        stateRef.current.activeEditor?.chain().focus().setSceneNumbers(mode).run()
+      }),
+      documentSurface.onCommand('scriptReport', ({ report, output }) => {
+        const { activeEditor: ed, activeTextDoc: path } = stateRef.current
+        if (output === 'print') stateRef.current.onPrint?.({ scope: 'document', bound: false, options: { report } })
+        else saveScriptReport({ editor: ed, docPath: path, report }).catch((error) => console.error('[report] failed:', error))
       }),
       // File ▸ Import Fountain Script…: the pane holding the tree does it (EditorLayout).
       documentSurface.onCommand('importScript', () => window.dispatchEvent(new CustomEvent('inkblot:import-script'))),

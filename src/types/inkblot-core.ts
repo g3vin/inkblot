@@ -1027,7 +1027,9 @@ export type NativeCommand =
 	| { type: "setBookCover", payload: SetBookCoverCommand }
 	| { type: "exportAgain", payload: ExportAgainCommand }
 	| { type: "measureBook", payload: MeasureBookCommand }
-	| { type: "importScript", payload: ImportScriptCommand };
+	| { type: "importScript", payload: ImportScriptCommand }
+	| { type: "setSceneNumbers", payload: SetSceneNumbersCommand }
+	| { type: "scriptReport", payload: ScriptReportCommand };
 
 /**
  * A command, with its place in the stream.
@@ -1465,6 +1467,8 @@ export enum ExportFormat {
 	Fountain = "fountain",
 	/** Final Draft's own file. */
 	Fdx = "fdx",
+	/** A report on a script, as a spreadsheet. */
+	Csv = "csv",
 }
 
 /** What a print or export covers. */
@@ -1487,6 +1491,11 @@ export enum PrintRange {
 	CurrentChapter = "currentChapter",
 	/** The selected text, laid out alone. */
 	Selection = "selection",
+	/**
+	 * Sides: the pages the scenes in `scenes` are on, with their page and scene
+	 * numbers as in the whole script.
+	 */
+	Scenes = "scenes",
 }
 
 /**
@@ -1501,6 +1510,10 @@ export interface PrintOptions {
 	watermark: string;
 	/** Who a watermarked copy is for, one PDF each; filled into `{recipient}`. */
 	recipients: string[];
+	/** The scenes Sides print, by index in the script (0 is the first scene). */
+	scenes: number[];
+	/** A character whose speeches are highlighted, for an actor's copy. */
+	highlightCharacter: string;
 }
 
 /** Export to a file. The page asks where (a save panel) and writes it. */
@@ -2223,6 +2236,43 @@ export interface PublishingReport {
 }
 
 /**
+ * What a document is written as. A script's lines are script elements, set on the
+ * page as a screenplay or a play is (`DocWritingFormat.js`).
+ */
+export enum WritingFormat {
+	Prose = "prose",
+	Screenplay = "screenplay",
+	Stageplay = "stageplay",
+}
+
+/** How a script's scenes are numbered. */
+export enum SceneNumbering {
+	Off = "off",
+	/** Numbered in order, renumbering as scenes come and go. */
+	On = "on",
+	/** Fixed where they are, for a shooting script: a scene added later is 12A. */
+	Locked = "locked",
+}
+
+/** One scene of a script. */
+export interface SceneSummary {
+	/** Its number, when scenes are numbered. */
+	number?: string;
+	heading: string;
+	/** The page it starts on, once the script is laid out; 0 before. */
+	page: number;
+}
+
+/** A script's scenes and cast. */
+export interface ScriptSummary {
+	format: WritingFormat;
+	sceneNumbers: SceneNumbering;
+	/** Everyone who speaks, most lines first. */
+	characters: string[];
+	scenes: SceneSummary[];
+}
+
+/**
  * Everything the Finishing tabs show that changes. Published when the active
  * document, its setup, its page count, the book, the scope or the zoom changes — and
  * only then: the page skips a state identical to the last.
@@ -2273,6 +2323,11 @@ export interface PageLayoutState {
 	/** Text is selected in the active document, so Print can print just that. */
 	hasSelection?: boolean;
 	publishing?: PublishingReport;
+	/**
+	 * A screenplay's or a play's scenes and cast, for the Publish tab's Script
+	 * Production section. None for prose.
+	 */
+	script?: ScriptSummary;
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
@@ -2687,6 +2742,29 @@ export interface RevealSearchResultCommand {
 	noteId?: string;
 }
 
+/** A breakdown of the active script. */
+export enum ScriptReportKind {
+	/** Who speaks, how often, in which scenes. */
+	Characters = "characters",
+	/** Every scene: its page, its length in eighths of a page, who is in it. */
+	Scenes = "scenes",
+	/** Every place, and the scenes set there. */
+	Locations = "locations",
+}
+
+export enum ReportOutput {
+	/** Printed, on the script's own pages. */
+	Print = "print",
+	/** A spreadsheet file. */
+	Csv = "csv",
+}
+
+/** Print or save a report on the active script. */
+export interface ScriptReportCommand {
+	report: ScriptReportKind;
+	output: ReportOutput;
+}
+
 export enum SearchResultType {
 	/** A hit in a saved document, addressed by ProseMirror position. */
 	ProjectMatch = "project-match",
@@ -3021,6 +3099,11 @@ export interface SetReferenceAttachedCommand {
 	attached: boolean;
 }
 
+/** Number the active script's scenes, stop, or lock them. */
+export interface SetSceneNumbersCommand {
+	mode: SceneNumbering;
+}
+
 export interface SetSelectionCommand {
 	target: EditorTarget;
 	anchor: TextAnchor;
@@ -3048,16 +3131,6 @@ export interface SetTitlebarInsetCommand {
  */
 export interface SetWordCountVisibleCommand {
 	visible: boolean;
-}
-
-/**
- * What a document is written as. A script's lines are script elements, set on the
- * page as a screenplay or a play is (`DocWritingFormat.js`).
- */
-export enum WritingFormat {
-	Prose = "prose",
-	Screenplay = "screenplay",
-	Stageplay = "stageplay",
 }
 
 /** Write the document as prose, a screenplay or a stage play, converting its lines. */

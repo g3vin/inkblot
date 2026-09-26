@@ -37,6 +37,8 @@ import { bookAuthor, getAuthorProfile } from './printLayoutStore'
 import { buildTitlePages, textOfContent } from './titlePage'
 import { applyTypography, loadTypographyFont, typographyKey } from './typography'
 import { countWords } from '../lib/wordCount'
+import { characterName } from '../script/elements'
+import { breakdown, REPORT_TITLES, reportDocument } from '../script/reports'
 
 const PRINT_ROOT_ID = 'print-root'
 const PAGE_STYLE_ID = 'print-page-style'
@@ -267,6 +269,69 @@ const pagesOfChapterAt = (pages, editor) => {
   })
 }
 
+/**
+ * The printed number of the page a position is on, from an editor's pagination; null
+ * before it has laid out.
+ */
+export const printedPageAt = (editor, setup) => {
+  const result = editor ? paginationKey.getState(editor.state)?.result : null
+  const starts = result?.slotStarts
+  if (!starts?.length || !result.pageCount) return null
+  const columns = Math.max(1, Math.round(starts.length / result.pageCount))
+  const first = setup?.pageNumberStart ?? 1
+  return (pos) => {
+    let slot = 0
+    starts.forEach((start, i) => { if (start != null && start <= pos) slot = i })
+    return first + Math.floor(slot / columns)
+  }
+}
+
+/** A report on the script being written, as a chapter to lay out. */
+const reportChapter = (editor, docPath, report) => {
+  const name = docPath.split('/').pop() || docPath
+  const setup = readDocPageSetup(editor.state.doc)
+  const data = breakdown(editor.state.doc, printedPageAt(editor, setup) || undefined)
+  return { path: docPath, name: `${REPORT_TITLES[report] || 'Report'}: ${name}`, content: reportDocument(report, data, name), report: true }
+}
+
+/**
+ * Sides: the pages the chosen scenes are on — each scene from its heading to the next —
+ * by where each page starts and the next begins.
+ */
+export const pagesOfScenes = (pages, editor, chosen) => {
+  const scenes = breakdown(editor.state.doc).scenes
+  const ranges = (chosen || [])
+    .filter((i) => scenes[i])
+    .map((i) => [scenes[i].pos, scenes[i + 1]?.pos ?? Infinity])
+  const body = pages.filter((page) => page.dataset.pos != null)
+  return body.filter((page, i) => {
+    const start = Number(page.dataset.pos)
+    const end = body[i + 1] ? Number(body[i + 1].dataset.pos) : Infinity
+    return ranges.some(([from, to]) => start < to && end > from)
+  })
+}
+
+const SPOKEN = ['script-dialogue', 'script-stageDialogue', 'script-parenthetical']
+
+/**
+ * An actor's copy: every speech of one character marked, name and lines. The pages'
+ * clones are walked in order, so a speech carried over a page stays marked.
+ */
+export const highlightSpeeches = (pages, name) => {
+  const wanted = characterName(name)
+  let speaking = false
+  for (const page of pages) {
+    for (const line of page.querySelectorAll('.script-el')) {
+      if (line.classList.contains('script-character') || line.classList.contains('script-stageCharacter')) {
+        speaking = characterName(line.textContent || '') === wanted
+      } else if (!SPOKEN.some((cls) => line.classList.contains(cls))) {
+        speaking = false
+      }
+      if (speaking) line.classList.add('is-highlighted')
+    }
+  }
+}
+
 /** Text set faintly across a page, corner to corner. */
 const watermark = (text, pageWidth) => {
   const mark = document.createElement('div')
@@ -297,6 +362,12 @@ export const preparePrint = async ({
   const liveByPath = new Map(liveEditors.filter((e) => e?.path && e.editor && !e.editor.isDestroyed).map((e) => [e.path, e.editor]))
   const range = options.range || 'all'
   const activeEditor = liveByPath.get(docPath)
+  // A report, or sides, is of the script being written.
+  const report = options.report || null
+  if (report || range === 'scenes') {
+    if (!activeEditor) throw new Error('Open the script to print from it.')
+    scope = 'document'
+  }
   // The selection prints alone, as a document of its own.
   if (range === 'selection') {
     const selection = activeEditor?.state.selection
@@ -307,7 +378,9 @@ export const preparePrint = async ({
   const author = bookAuthor(book)
   // A document whose bibliography appears only on paper gets it here (and so is laid
   // out afresh below, not taken from its live pages).
-  const loaded = range === 'selection'
+  const loaded = report
+    ? [reportChapter(activeEditor, docPath, report)]
+    : range === 'selection'
     ? [selectionChapter(activeEditor, docPath)]
     : await withPrintBibliography(
       projectName,
@@ -335,7 +408,7 @@ export const preparePrint = async ({
     for (const [index, chapter] of chapters.entries()) {
       onProgress({ done: index, total: chapters.length })
       // A chapter the book numbered is not what its editor shows: lay it out afresh.
-      const changed = chapter.printBibliography || chapter.selection || chapter.content !== loaded[index]?.content || chapterOnly
+      const changed = chapter.printBibliography || chapter.selection || chapter.report || chapter.content !== loaded[index]?.content || chapterOnly
       const live = changed ? null : liveSource(liveByPath.get(chapter.path), setup)
       const laid = live || await layoutOffscreen(chapter.content, setup)
       sources.push({
@@ -359,7 +432,8 @@ export const preparePrint = async ({
       onChapterStart: (index, folio) => { folios[index] = folio },
     })
     const m0 = pageMetrics(setup)
-    const titlePages = buildTitlePages({ setup, title: bookTitle, profile, author, words })
+    // A report is not the script: it has no title page of its own.
+    const titlePages = report ? [] : buildTitlePages({ setup, title: bookTitle, profile, author, words })
     const front = compiled
       ? buildFrontMatterPages({
         setup,
@@ -377,9 +451,14 @@ export const preparePrint = async ({
       return { pageCount: pages.length, words: words || loaded.reduce((n, c) => n + countWords(textOfContent(c.content)), 0) }
     }
     if (range === 'currentChapter' && !compiled) pages = pagesOfChapterAt(pages, activeEditor)
+    if (range === 'scenes') pages = pagesOfScenes(pages, activeEditor, options.scenes)
+    if (options.highlightCharacter?.trim()) highlightSpeeches(pages, options.highlightCharacter)
     const wanted = parsePageRanges(options.pages)
     if (wanted) pages = pages.filter((page) => page.dataset.page && wanted.has(Number(page.dataset.page)))
-    if (!pages.length) throw new Error(wanted ? 'None of those pages are in what is being printed.' : 'There was nothing to print.')
+    if (!pages.length) {
+      if (range === 'scenes') throw new Error('Choose the scenes to print as sides.')
+      throw new Error(wanted ? 'None of those pages are in what is being printed.' : 'There was nothing to print.')
+    }
     if (options.watermark?.trim()) {
       const text = options.watermark.trim().replace(/\{recipient\}/g, options.recipient || '')
       for (const page of pages) page.appendChild(watermark(text, m0.width))

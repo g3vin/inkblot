@@ -1330,6 +1330,8 @@ public enum NativeCommand: Codable, Equatable {
 	case exportAgain(ExportAgainCommand)
 	case measureBook(MeasureBookCommand)
 	case importScript(ImportScriptCommand)
+	case setSceneNumbers(SetSceneNumbersCommand)
+	case scriptReport(ScriptReportCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1417,7 +1419,9 @@ public enum NativeCommand: Codable, Equatable {
 			setBookCover,
 			exportAgain,
 			measureBook,
-			importScript
+			importScript,
+			setSceneNumbers,
+			scriptReport
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1858,6 +1862,16 @@ public enum NativeCommand: Codable, Equatable {
 					self = .importScript(content)
 					return
 				}
+			case .setSceneNumbers:
+				if let content = try? container.decode(SetSceneNumbersCommand.self, forKey: .payload) {
+					self = .setSceneNumbers(content)
+					return
+				}
+			case .scriptReport:
+				if let content = try? container.decode(ScriptReportCommand.self, forKey: .payload) {
+					self = .scriptReport(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -2123,6 +2137,12 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .importScript(let content):
 			try container.encode(CodingKeys.importScript, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setSceneNumbers(let content):
+			try container.encode(CodingKeys.setSceneNumbers, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .scriptReport(let content):
+			try container.encode(CodingKeys.scriptReport, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -3013,6 +3033,8 @@ public enum ExportFormat: String, Codable, Equatable {
 	case fountain
 	/// Final Draft's own file.
 	case fdx
+	/// A report on a script, as a spreadsheet.
+	case csv
 }
 
 /// What a print or export covers.
@@ -3033,6 +3055,9 @@ public enum PrintRange: String, Codable, Equatable {
 	case currentChapter
 	/// The selected text, laid out alone.
 	case selection
+	/// Sides: the pages the scenes in `scenes` are on, with their page and scene
+	/// numbers as in the whole script.
+	case scenes
 }
 
 /// How a print or a PDF is narrowed and marked. Every field is optional on the wire:
@@ -3045,12 +3070,18 @@ public struct PrintOptions: Codable, Equatable {
 	public let watermark: String
 	/// Who a watermarked copy is for, one PDF each; filled into `{recipient}`.
 	public let recipients: [String]
+	/// The scenes Sides print, by index in the script (0 is the first scene).
+	public let scenes: [UInt32]
+	/// A character whose speeches are highlighted, for an actor's copy.
+	public let highlightCharacter: String
 
-	public init(range: PrintRange, pages: String, watermark: String, recipients: [String]) {
+	public init(range: PrintRange, pages: String, watermark: String, recipients: [String], scenes: [UInt32], highlightCharacter: String) {
 		self.range = range
 		self.pages = pages
 		self.watermark = watermark
 		self.recipients = recipients
+		self.scenes = scenes
+		self.highlightCharacter = highlightCharacter
 	}
 }
 
@@ -4159,6 +4190,54 @@ public struct PublishingReport: Codable, Equatable {
 	}
 }
 
+/// What a document is written as. A script's lines are script elements, set on the
+/// page as a screenplay or a play is (`DocWritingFormat.js`).
+public enum WritingFormat: String, Codable, Equatable {
+	case prose
+	case screenplay
+	case stageplay
+}
+
+/// How a script's scenes are numbered.
+public enum SceneNumbering: String, Codable, Equatable {
+	case off
+	/// Numbered in order, renumbering as scenes come and go.
+	case on
+	/// Fixed where they are, for a shooting script: a scene added later is 12A.
+	case locked
+}
+
+/// One scene of a script.
+public struct SceneSummary: Codable, Equatable {
+	/// Its number, when scenes are numbered.
+	public let number: String?
+	public let heading: String
+	/// The page it starts on, once the script is laid out; 0 before.
+	public let page: UInt32
+
+	public init(number: String?, heading: String, page: UInt32) {
+		self.number = number
+		self.heading = heading
+		self.page = page
+	}
+}
+
+/// A script's scenes and cast.
+public struct ScriptSummary: Codable, Equatable {
+	public let format: WritingFormat
+	public let sceneNumbers: SceneNumbering
+	/// Everyone who speaks, most lines first.
+	public let characters: [String]
+	public let scenes: [SceneSummary]
+
+	public init(format: WritingFormat, sceneNumbers: SceneNumbering, characters: [String], scenes: [SceneSummary]) {
+		self.format = format
+		self.sceneNumbers = sceneNumbers
+		self.characters = characters
+		self.scenes = scenes
+	}
+}
+
 /// Everything the Finishing tabs show that changes. Published when the active
 /// document, its setup, its page count, the book, the scope or the zoom changes — and
 /// only then: the page skips a state identical to the last.
@@ -4204,8 +4283,11 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Text is selected in the active document, so Print can print just that.
 	public let hasSelection: Bool?
 	public let publishing: PublishingReport?
+	/// A screenplay's or a play's scenes and cast, for the Publish tab's Script
+	/// Production section. None for prose.
+	public let script: ScriptSummary?
 
-	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?) {
+	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
 		self.docPath = docPath
 		self.ready = ready
@@ -4228,6 +4310,7 @@ public struct PageLayoutState: Codable, Equatable {
 		self.lastExport = lastExport
 		self.hasSelection = hasSelection
 		self.publishing = publishing
+		self.script = script
 	}
 }
 
@@ -4946,6 +5029,34 @@ public struct RevealSearchResultCommand: Codable, Equatable {
 	}
 }
 
+/// A breakdown of the active script.
+public enum ScriptReportKind: String, Codable, Equatable {
+	/// Who speaks, how often, in which scenes.
+	case characters
+	/// Every scene: its page, its length in eighths of a page, who is in it.
+	case scenes
+	/// Every place, and the scenes set there.
+	case locations
+}
+
+public enum ReportOutput: String, Codable, Equatable {
+	/// Printed, on the script's own pages.
+	case print
+	/// A spreadsheet file.
+	case csv
+}
+
+/// Print or save a report on the active script.
+public struct ScriptReportCommand: Codable, Equatable {
+	public let report: ScriptReportKind
+	public let output: ReportOutput
+
+	public init(report: ScriptReportKind, output: ReportOutput) {
+		self.report = report
+		self.output = output
+	}
+}
+
 public enum SearchResultType: String, Codable, Equatable {
 	/// A hit in a saved document, addressed by ProseMirror position.
 	case projectMatch = "project-match"
@@ -5374,6 +5485,15 @@ public struct SetReferenceAttachedCommand: Codable, Equatable {
 	}
 }
 
+/// Number the active script's scenes, stop, or lock them.
+public struct SetSceneNumbersCommand: Codable, Equatable {
+	public let mode: SceneNumbering
+
+	public init(mode: SceneNumbering) {
+		self.mode = mode
+	}
+}
+
 public struct SetSelectionCommand: Codable, Equatable {
 	public let target: EditorTarget
 	public let anchor: TextAnchor
@@ -5413,14 +5533,6 @@ public struct SetWordCountVisibleCommand: Codable, Equatable {
 	public init(visible: Bool) {
 		self.visible = visible
 	}
-}
-
-/// What a document is written as. A script's lines are script elements, set on the
-/// page as a screenplay or a play is (`DocWritingFormat.js`).
-public enum WritingFormat: String, Codable, Equatable {
-	case prose
-	case screenplay
-	case stageplay
 }
 
 /// Write the document as prose, a screenplay or a stage play, converting its lines.

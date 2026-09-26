@@ -16,6 +16,10 @@ struct PublishPanelView: View {
     var body: some View {
         FinishingPanel {
             if let state = model.pageLayout.state, let book = model.pageLayout.book {
+                // Only for a screenplay or a play: a novelist never sees it.
+                if let script = state.script {
+                    ScriptProductionSection(script: script)
+                }
                 publishingSection(state, book)
                 bindingSection(state, book)
             }

@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::common::EditorTarget;
+use super::common::{EditorTarget, WritingFormat};
 use crate::types::page_setup::{AuthorProfile, BookSettings, PageSetup, PrintTypography};
 
 #[typeshare]
@@ -68,6 +68,8 @@ pub enum ExportFormat {
     Fountain,
     /// Final Draft's own file.
     Fdx,
+    /// A report on a script, as a spreadsheet.
+    Csv,
 }
 
 /// Which part of what the scope covers is printed.
@@ -82,6 +84,9 @@ pub enum PrintRange {
     CurrentChapter,
     /// The selected text, laid out alone.
     Selection,
+    /// Sides: the pages the scenes in `scenes` are on, with their page and scene
+    /// numbers as in the whole script.
+    Scenes,
 }
 
 /// How a print or a PDF is narrowed and marked. Every field is optional on the wire:
@@ -97,6 +102,10 @@ pub struct PrintOptions {
     pub watermark: String,
     /// Who a watermarked copy is for, one PDF each; filled into `{recipient}`.
     pub recipients: Vec<String>,
+    /// The scenes Sides print, by index in the script (0 is the first scene).
+    pub scenes: Vec<u32>,
+    /// A character whose speeches are highlighted, for an actor's copy.
+    pub highlight_character: String,
 }
 
 /* ---------------- commands ---------------- */
@@ -482,6 +491,88 @@ pub struct PageLayoutState {
     pub has_selection: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub publishing: Option<PublishingReport>,
+    /// A screenplay's or a play's scenes and cast, for the Publish tab's Script
+    /// Production section. None for prose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub script: Option<ScriptSummary>,
+}
+
+/// How a script's scenes are numbered.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SceneNumbering {
+    #[default]
+    Off,
+    /// Numbered in order, renumbering as scenes come and go.
+    On,
+    /// Fixed where they are, for a shooting script: a scene added later is 12A.
+    Locked,
+}
+
+/// One scene of a script.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneSummary {
+    /// Its number, when scenes are numbered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number: Option<String>,
+    pub heading: String,
+    /// The page it starts on, once the script is laid out; 0 before.
+    pub page: u32,
+}
+
+/// A script's scenes and cast.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptSummary {
+    pub format: WritingFormat,
+    pub scene_numbers: SceneNumbering,
+    /// Everyone who speaks, most lines first.
+    pub characters: Vec<String>,
+    pub scenes: Vec<SceneSummary>,
+}
+
+/// Number the active script's scenes, stop, or lock them.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetSceneNumbersCommand {
+    pub mode: SceneNumbering,
+}
+
+/// A breakdown of the active script.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ScriptReportKind {
+    /// Who speaks, how often, in which scenes.
+    Characters,
+    /// Every scene: its page, its length in eighths of a page, who is in it.
+    Scenes,
+    /// Every place, and the scenes set there.
+    Locations,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReportOutput {
+    /// Printed, on the script's own pages.
+    Print,
+    /// A spreadsheet file.
+    Csv,
+}
+
+/// Print or save a report on the active script.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptReportCommand {
+    pub report: ScriptReportKind,
+    pub output: ReportOutput,
 }
 
 /// What a print or export job is.

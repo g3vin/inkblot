@@ -733,3 +733,79 @@ ok('plain text: a script in its columns, a speech under its name', toPlainText(s
 ].join('\n'), JSON.stringify(toPlainText(scriptDoc)))
 ok('Markdown: a script reads as one, a speech hanging from its name',
   toMarkdown(scriptDoc) === '**INT. KITCHEN - DAY**\n\nRain.\n\nMARY  \n(quietly)  \nHello.\n\nCUT TO:\n', JSON.stringify(toMarkdown(scriptDoc)))
+
+/* ---------------- script reports ---------------- */
+
+const { breakdown, formatEighths, reportCsv, reportDocument } = await import('../../src/script/reports.ts')
+const shoot = {
+  type: 'doc',
+  attrs: { writingFormat: 'screenplay', sceneNumbers: 'on' },
+  content: [
+    line('sceneHeading', 'INT. KITCHEN - NIGHT'), line('action', 'Rain on the glass.'),
+    line('character', 'MARY'), line('dialogue', 'You came back, then.'),
+    line('character', 'JOHN (V.O.)'), line('parenthetical', '(quietly)'), line('dialogue', 'I did.'),
+    line('character', 'MARY'), line('dialogue', 'Why?'),
+    line('sceneHeading', 'EXT. GARDEN - DAY'), line('action', 'John, alone.'),
+    line('sceneHeading', 'INT. KITCHEN - DAY'), line('character', 'JOHN'), line('dialogue', 'Hello, "house", again.'),
+  ],
+}
+const b = breakdown(shoot)
+ok('breakdown: scenes with numbers, settings, places, times and cast',
+  same(b.scenes.map((s) => [s.number, s.setting, s.location, s.time, s.cast]), [
+    ['1', 'INT', 'KITCHEN', 'NIGHT', ['MARY', 'JOHN']], ['2', 'EXT', 'GARDEN', 'DAY', []], ['3', 'INT', 'KITCHEN', 'DAY', ['JOHN']],
+  ]), JSON.stringify(b.scenes))
+ok('breakdown: characters by speeches, words spoken, scenes, extensions dropped',
+  same(b.characters.map((c) => [c.name, c.speeches, c.words, c.scenes, c.firstScene]), [['JOHN', 2, 5, 2, '1'], ['MARY', 2, 5, 1, '1']]), JSON.stringify(b.characters))
+ok('breakdown: places, most screen time first', b.locations[0].name === 'KITCHEN' && same(b.locations[0].scenes, ['1', '3']) && same(b.locations[0].settings, ['INT']))
+ok('breakdown: every scene is at least an eighth, and a short script is on page 1', b.scenes.every((s) => s.eighths >= 1 && s.page === 1))
+ok('breakdown: positions match the editor\'s', (() => {
+  const ed = scriptEditor(shoot)
+  const fromEditor = breakdown(ed.state.doc).scenes.map((s) => s.pos)
+  ed.destroy()
+  return same(fromEditor, b.scenes.map((s) => s.pos))
+})())
+ok('breakdown: pages from the layout when there is one', breakdown(shoot, (pos) => (pos > 100 ? 2 : 1)).scenes.map((s) => s.page).join() === '1,2,2')
+ok('eighths are written as a production writes them', formatEighths(3) === '3/8' && formatEighths(8) === '1' && formatEighths(10) === '1 2/8')
+const csv = reportCsv('scenes', b)
+ok('a report as CSV: headings, a row a scene, quoting where needed, CRLF',
+  csv.startsWith('Scene,Heading,Page,Length,Cast\r\n1,INT. KITCHEN - NIGHT,1,') && csv.includes('"MARY, JOHN"') && csv.endsWith('\r\n'))
+ok('a quote in a cell is doubled', reportCsv('characters', { characters: [{ name: 'THE "BOSS"', speeches: 1, words: 1, scenes: 1, firstScene: '1', firstPage: 1 }], scenes: [], locations: [] }).includes('"THE ""BOSS"""'))
+const reportDoc = reportDocument('characters', b, 'Script')
+ok('a report as a document: a heading and a table with a header row', reportDoc.content[0].type === 'heading' && reportDoc.content[1].type === 'table' &&
+  reportDoc.content[1].content[0].content[0].type === 'tableHeader' && reportDoc.content[1].content.length === 3)
+
+const { scriptSummary } = await import('../../src/print/usePrintLayoutController.js')
+const summaryEd = scriptEditor(shoot)
+const summary = scriptSummary(summaryEd, null)
+ok('the Publish tab is told a script\'s scenes and cast', summary.format === 'screenplay' && summary.sceneNumbers === 'on' &&
+  same(summary.characters, ['JOHN', 'MARY']) && summary.scenes.length === 3 && summary.scenes[2].number === '3')
+summaryEd.destroy()
+ok('and nothing for prose', scriptSummary(new Editor({ element: document.createElement('div'), extensions: buildEditorExtensions(StarterKit.configure({})), content: '<p>Once.</p>' }), null) === undefined)
+
+const { pagesOfScenes, highlightSpeeches } = await import('../../src/print/printJob.js')
+const fakePage = (pos, lines = []) => {
+  const page = document.createElement('div')
+  if (pos != null) page.dataset.pos = String(pos)
+  for (const [element, text] of lines) {
+    const p = document.createElement('p')
+    p.className = `script-el script-${element}`
+    p.textContent = text
+    page.appendChild(p)
+  }
+  return page
+}
+const sidesEd = scriptEditor(shoot)
+const [s1, s2, s3] = breakdown(sidesEd.state.doc).scenes.map((s) => s.pos)
+const sidePages = [fakePage(null), fakePage(0), fakePage(s2 - 5), fakePage(s3 + 2)]
+ok('sides: the pages a chosen scene is on, a page it starts partway down included, never the title page',
+  same(pagesOfScenes(sidePages, sidesEd, [1]).map((p) => p.dataset.pos), [String(s2 - 5)]) &&
+  same(pagesOfScenes(sidePages, sidesEd, [0]).map((p) => p.dataset.pos), [String(s1), String(s2 - 5)]))
+sidesEd.destroy()
+const actorPages = [
+  fakePage(0, [['character', 'MARY'], ['dialogue', 'Hi.'], ['character', 'JOHN'], ['parenthetical', '(beat)'], ['dialogue', 'Hello.']]),
+  fakePage(50, [['dialogue', 'And more.'], ['action', 'She goes.'], ['character', 'John (cont\'d)'], ['dialogue', 'Wait.']]),
+]
+highlightSpeeches(actorPages, 'John')
+const marked = actorPages.flatMap((p) => [...p.querySelectorAll('.is-highlighted')].map((el) => el.textContent))
+ok('an actor\'s copy marks their speeches, over the page and with an extension, and no one else\'s',
+  same(marked, ['JOHN', '(beat)', 'Hello.', 'And more.', 'John (cont\'d)', 'Wait.']), JSON.stringify(marked))
