@@ -8,6 +8,11 @@ Notable changes to Inkblot. The format follows
 
 ### Added
 
+- **Typeset and Print & Export:** the Finishing layout's Page, Book and Publish tabs
+  are two tabs in the order a book is made — Typeset (what is in the book, the page,
+  the type, how chapters open, the running heads, the front and back matter), then
+  Print & Export. A saved layout shows the new tabs where the old ones were.
+
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
   differences — and their history rows say what changed ("+2 places · 3 moved ·

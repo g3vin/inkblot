@@ -2,8 +2,8 @@ import AppKit
 import Observation
 import SwiftUI
 
-/// Print Layout and the Finishing tabs, as the shell sees them: Page, Book and Publish,
-/// and the File and View menus' print items.
+/// Print Layout and the Finishing tabs, as the shell sees them: Typeset and Print &
+/// Export, and the File and View menus' print items.
 ///
 /// The page owns every part of it. A document's page setup lives on its doc node, so
 /// only the page can change it without racing autosave; the book settings live in
@@ -11,7 +11,7 @@ import SwiftUI
 /// `pageLayoutCatalog`) and this model edits by command — see `bridge/print.rs`.
 ///
 /// **The drafts live here, not in the tabs.** A tab is rebuilt every time it is switched
-/// to or swiped past, and Page, Book and Publish all edit the same setup and book; held
+/// to or swiped past, and Typeset and Print & Export edit the same setup and book; held
 /// in a view's state, a draft would be thrown away with it.
 @MainActor
 @Observable
@@ -23,8 +23,8 @@ final class PageLayoutModel {
     /// failed (until the next job or it is dismissed).
     private(set) var job: PrintJobStatus?
 
-    /// The setup the Page tab edits — the document's, or the book's under a book scope —
-    /// and the book the Book and Publish tabs edit. Rebuilt from each state the page
+    /// The setup Typeset edits — the document's, or the book's under a book scope — and
+    /// the book both tabs edit. Rebuilt from each state the page
     /// publishes, so an edit made anywhere (an undo in the page, the other pane) shows.
     var setup: PageSetupDraft?
     var book: BookDraft?
@@ -66,7 +66,7 @@ final class PageLayoutModel {
     var isEnabled: Bool { state?.enabled ?? false }
     var hasDocument: Bool { state?.docPath != nil }
     var scope: PrintScope { state?.scope ?? .document }
-    /// Under a book scope the Page tab edits the book's setup, which every chapter
+    /// Under a book scope Typeset edits the book's setup, which every chapter
     /// prints in; under the document scope, the document's own.
     var editsBook: Bool { scope != .document }
     var bindingEnabled: Bool { (book?.binding ?? BindingType.none) != BindingType.none }
@@ -114,7 +114,7 @@ final class PageLayoutModel {
         bridge.send(.setPrintScope(SetPrintScopeCommand(scope: scope)))
     }
 
-    /// Send the setup draft to whichever setup the Page tab edits.
+    /// Send the setup draft to whichever setup Typeset edits.
     func apply(_ draft: PageSetupDraft) {
         setup = draft
         bridge.send(.setPageSetup(SetPageSetupCommand(setup: draft.setup, target: editsBook ? .book : .document)))
@@ -538,6 +538,14 @@ struct BookDraft: Equatable {
     var alsoBy: String
     var service: PublishingService
     var paper: PaperStock
+    var startAt: Int
+    var showInTree: Bool
+    var chapterDesign: ChapterDesign?
+    var partDesign: ChapterDesign?
+    var items: [BookItem]
+    var continuous: Bool
+    var covers: [CoverSet]
+    var activeCover: String?
 
     init(_ b: BookSettings) {
         folder = b.folder
@@ -569,6 +577,14 @@ struct BookDraft: Equatable {
         alsoBy = b.backMatter?.alsoBy ?? ""
         service = b.publishing?.service ?? PublishingService.none
         paper = b.publishing?.paper ?? .cream
+        startAt = Int(b.chapterNumbering?.startAt ?? 1)
+        showInTree = b.chapterNumbering?.showInTree ?? false
+        chapterDesign = b.chapterDesign
+        partDesign = b.partDesign
+        items = b.items ?? []
+        continuous = b.continuous ?? false
+        covers = b.covers ?? []
+        activeCover = b.activeCover
     }
 
     /// Leave a chapter in or out of the book.
@@ -608,12 +624,20 @@ struct BookDraft: Equatable {
                 includeGuide: includeGuide),
             // Always sent, never nil: a missing field would read on the page as "reset".
             excluded: excluded,
-            chapterNumbering: ChapterNumbering(style: numbering, prefix: numberPrefix, includeTitle: numberIncludesTitle),
+            chapterNumbering: ChapterNumbering(
+                style: numbering, prefix: numberPrefix, includeTitle: numberIncludesTitle,
+                startAt: startAt == 0 ? 0 : 1, showInTree: showInTree),
             frontMatter: FrontMatter(
                 halfTitle: halfTitle, copyright: copyright, dedication: dedication,
                 epigraph: epigraph, epigraphSource: epigraphSource, contents: contents),
             backMatter: BackMatter(acknowledgements: acknowledgements, aboutTheAuthor: aboutTheAuthor, alsoBy: alsoBy),
-            publishing: PublishingTarget(service: service, paper: paper))
+            publishing: PublishingTarget(service: service, paper: paper),
+            chapterDesign: chapterDesign,
+            partDesign: partDesign,
+            items: items,
+            continuous: continuous,
+            covers: covers,
+            activeCover: activeCover)
     }
 }
 

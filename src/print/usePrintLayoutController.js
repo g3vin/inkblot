@@ -22,6 +22,7 @@ import { nativeOwns } from '../lib/host'
 import { importAssetFromPath } from '../lib/assets'
 import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { countEditorWords } from '../lib/wordCount'
+import { withCoverPart } from './chapterDesign'
 import { listBookChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
 import { applyFormat, FORMAT_OPTIONS, formatOf, writingFormatOf } from './formats'
@@ -415,13 +416,12 @@ export default function usePrintLayoutController({
         const { project, folder, book } = currentBook()
         if (!project) return
         if (!path) {
-          const { coverImage: _removed, ...rest } = book
-          setBookSettings(project, folder, rest)
+          setBookSettings(project, folder, withCoverPart(book, 'front', null))
           return
         }
         // Copied into the project, so the book keeps its cover wherever the file was.
         importAssetFromPath(project, path)
-          .then((coverImage) => setBookSettings(project, folder, { ...getBookSettings(project, folder), coverImage }))
+          .then((front) => setBookSettings(project, folder, withCoverPart(getBookSettings(project, folder), 'front', front)))
           .catch((error) => console.error('Setting the cover failed:', error))
       }),
       documentSurface.onCommand('setPrintScope', ({ scope }) => {

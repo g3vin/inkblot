@@ -349,6 +349,105 @@ export interface BindingSettings {
 	includeGuide: boolean;
 }
 
+/** What an entry in a book's contents is. */
+export enum BookItemKind {
+	/** A manuscript document, by tree path. */
+	Chapter = "chapter",
+	/** A part divider: everything after it, to the next part or the back matter, is in it. */
+	Part = "part",
+	/**
+	 * A page the book has of its own — a dedication, About the Author — kept as a real
+	 * document in the book folder's `.book/`.
+	 */
+	Matter = "matter",
+	/** A page laid out from the book's data: a title page, the contents. */
+	Generated = "generated",
+}
+
+/** Which page of front or back matter a matter document is. */
+export enum MatterKind {
+	AlsoBy = "alsoBy",
+	Copyright = "copyright",
+	Dedication = "dedication",
+	Epigraph = "epigraph",
+	Foreword = "foreword",
+	Preface = "preface",
+	Introduction = "introduction",
+	Afterword = "afterword",
+	Acknowledgements = "acknowledgements",
+	AboutAuthor = "aboutAuthor",
+	Glossary = "glossary",
+	Excerpt = "excerpt",
+	ReadingGuide = "readingGuide",
+	CallToAction = "callToAction",
+	/** A half title or title page made editable. */
+	HalfTitle = "halfTitle",
+	TitlePage = "titlePage",
+	Custom = "custom",
+}
+
+export enum GeneratedKind {
+	HalfTitle = "halfTitle",
+	TitlePage = "titlePage",
+	Contents = "contents",
+	/** Endnotes gathered at the end of the book. */
+	Notes = "notes",
+	Bibliography = "bibliography",
+}
+
+/** What a chapter is, which decides whether it is numbered and what its head says. */
+export enum ChapterType {
+	/** Numbered. */
+	Chapter = "chapter",
+	Prologue = "prologue",
+	Epilogue = "epilogue",
+	Interlude = "interlude",
+	/** Headed by its title alone. */
+	Unnumbered = "unnumbered",
+}
+
+export enum PageStart {
+	/** The next page, whichever side. */
+	Any = "any",
+	Recto = "recto",
+	Verso = "verso",
+}
+
+export enum PagePosition {
+	Top = "top",
+	/** Down the page, as a chapter opens. */
+	Sunk = "sunk",
+	Centered = "centered",
+	Bottom = "bottom",
+}
+
+/** How a page of front or back matter sits: overrides of what its kind does by default. */
+export interface PageOptions {
+	start: PageStart;
+	position: PagePosition;
+	runningHeads: boolean;
+	folio: boolean;
+	/** Show the page's heading (its kind's name, or its title). */
+	heading: boolean;
+}
+
+/** One entry in a book's contents, in book order. */
+export interface BookItem {
+	/** Stable within the book. */
+	id: string;
+	kind: BookItemKind;
+	/** A chapter's tree path, or a matter document's path (`<folder>/.book/…`). */
+	path?: string;
+	/** A part's title, or a name given to a matter page. */
+	title?: string;
+	/** Left out of the Typeset pages, print, export and the continuous document. */
+	hidden?: boolean;
+	matter?: MatterKind;
+	generated?: GeneratedKind;
+	chapterType?: ChapterType;
+	page?: PageOptions;
+}
+
 export enum PageOrientation {
 	Portrait = "portrait",
 	Landscape = "landscape",
@@ -530,6 +629,10 @@ export interface ChapterNumbering {
 	prefix: string;
 	/** Keep the chapter's own title under its number. */
 	includeTitle: boolean;
+	/** The first chapter's number: 1, or 0 for a book that opens on "Chapter Zero". */
+	startAt: number;
+	/** Show each chapter's number beside it in the file tree. */
+	showInTree: boolean;
 }
 
 /** The pages before the first chapter. Empty text leaves its page out. */
@@ -568,10 +671,112 @@ export interface PublishingTarget {
 	paper: PaperStock;
 }
 
+/** The decoration a chapter head carries. */
+export enum OrnamentKind {
+	None = "none",
+	/** A short rule. */
+	Rule = "rule",
+	/** A typed glyph: `ornament_glyph`. */
+	Glyph = "glyph",
+	/** A picture: `ornament_image`. */
+	Image = "image",
+}
+
+/** Where the ornament, or a chapter's own picture, sits in the head. */
+export enum OrnamentPosition {
+	/** Above the number. */
+	Above = "above",
+	/** Between the number and the title. */
+	Between = "between",
+	/** Below the title. */
+	Below = "below",
+}
+
+export enum HeadAlignment {
+	Left = "left",
+	Center = "center",
+	Right = "right",
+}
+
+/** How a line of a chapter head is set. */
+export enum HeadCase {
+	AsWritten = "asWritten",
+	Upper = "upper",
+	SmallCaps = "smallCaps",
+	Italic = "italic",
+}
+
+/** Where a chapter starts, relative to the one before it. */
+export enum ChapterBreak {
+	NewPage = "newPage",
+	/** A right-hand page, with a blank verso before it when needed. */
+	NewRightPage = "newRightPage",
+	/** Straight on after the chapter before, when its head and two lines fit. */
+	Continue = "continue",
+}
+
 /**
- * A folder (or the whole project) compiled as one book: its chapters are the
- * folder's documents in tree order. Kept per folder in preferences, not in any one
- * document, because it belongs to all of them.
+ * How every chapter of a book opens: what its head shows and how it is set. The same
+ * design heads the chapters in the continuous editor, on the Typeset pages, in print
+ * and in every export — `ChapterHead.js` renders it for all of them.
+ */
+export interface ChapterDesign {
+	/** The number label — "Chapter One" — as `ChapterNumbering` writes it. */
+	showNumber: boolean;
+	showTitle: boolean;
+	showSubtitle: boolean;
+	/** Each chapter's own heading picture, where it has one. */
+	showImage: boolean;
+	ornament: OrnamentKind;
+	ornamentGlyph: string;
+	/** A project-relative image path, or a data URI. */
+	ornamentImage?: string;
+	ornamentPosition: OrnamentPosition;
+	/** The picture's width, as a percentage of the text block. */
+	imageWidthPct: number;
+	alignment: HeadAlignment;
+	numberCase: HeadCase;
+	titleCase: HeadCase;
+	/** A CSS font family list for the head; absent sets it in the body's face. */
+	headingFont?: string;
+	numberSizePt: number;
+	titleSizePt: number;
+	chapterBreak: ChapterBreak;
+	/** The book style (`bookStyles.ts`) this design came from, kept once it is changed. */
+	styleId?: string;
+}
+
+/** How a cover image is fitted to the part of the cover it is for. */
+export enum CoverFit {
+	/** Fill the part, cropping what overflows. */
+	Fill = "fill",
+	Fit = "fit",
+	Stretch = "stretch",
+}
+
+/**
+ * One version of a book's cover. The images are project-relative paths under
+ * `.assets/covers/`; `wrap`, when set, is used instead of the three parts.
+ */
+export interface CoverSet {
+	id: string;
+	name: string;
+	front?: string;
+	back?: string;
+	spine?: string;
+	wrap?: string;
+	fit?: CoverFit;
+	/**
+	 * The spine width, in mm, the spine or wrap image was made for — so a page count
+	 * that has changed since can be pointed out.
+	 */
+	madeForSpineMm?: number;
+}
+
+/**
+ * A folder (or the whole project) compiled as one book. Kept per folder in the
+ * project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
+ * belongs to all of them.
  */
 export interface BookSettings {
 	/** The folder's tree path; empty for the project root. */
@@ -595,6 +800,28 @@ export interface BookSettings {
 	backMatter?: BackMatter;
 	/** Where the book is going to be printed, for the Publish tab's checks. */
 	publishing?: PublishingTarget;
+	/**
+	 * How every chapter opens. Absent in a book set up before designs: the page
+	 * derives one from `chapter_numbering` and the setup's recto rule.
+	 */
+	chapterDesign?: ChapterDesign;
+	/** How a part's divider page is set; absent uses the chapter design's. */
+	partDesign?: ChapterDesign;
+	/**
+	 * The book's contents in book order: chapters, parts, front and back matter. Its
+	 * own order — the file tree is never changed by it. Empty until the book is first
+	 * typeset: the chapters are then the folder's documents in tree order, less
+	 * `excluded`, and the matter is `front_matter` and `back_matter`.
+	 */
+	items?: BookItem[];
+	/**
+	 * Opening one of the folder's documents shows the others above and below it, in
+	 * tree order, to scroll straight through.
+	 */
+	continuous?: boolean;
+	/** The book's covers; `active_cover` is the one print, EPUB and export use. */
+	covers?: CoverSet[];
+	activeCover?: string;
 }
 
 export enum BridgeErrorCode {
@@ -4011,6 +4238,14 @@ export interface WritingSession {
 	minutes?: StatsMinute[];
 	/** The writing timer run this session was part of, if any. */
 	timerRunId?: string;
+}
+
+export enum CoverPart {
+	Front = "front",
+	Back = "back",
+	Spine = "spine",
+	/** One image across back, spine and front. */
+	Wrap = "wrap",
 }
 
 /**

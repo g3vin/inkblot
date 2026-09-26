@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// The Finishing layout's Publish tab: getting the writing out.
+/// The Typeset layout's Print & Export tab: getting the book out — the last step, after
+/// it is typeset and proofed.
 ///
-/// Print and Export are in the header, as on every Finishing tab; here is what shapes
-/// them: the book checked against a print-on-demand service — its pages, spine and
+/// Print and Export are in the header; here is what shapes them: the book checked against a print-on-demand service — its pages, spine and
 /// anything the service would reject, each with a fix — and printing sheets to fold
 /// and bind by hand, which stays out of the way until it is switched on. Writing
 /// statistics are the Stats tab's; these are the figures of the printed thing.
-struct PublishPanelView: View {
+struct OutputPanelView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(LengthUnit.storageKey) private var unitsRaw = LengthUnit.defaultForLocale.rawValue
 

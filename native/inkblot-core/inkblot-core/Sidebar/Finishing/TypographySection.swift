@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The Page tab's Typography section: the type the text prints in.
+/// The Typeset tab's Typography section: the type the text prints in.
 ///
 /// Off, a page prints in the editor's own font, as it always has. On, the setup carries
 /// its own font, size, spacing, indents and scene breaks, and Print Layout shows the
@@ -158,7 +158,7 @@ final class FontFamilies {
 }
 
 /// The font menu: AppKit's pop-up rather than a SwiftUI `Picker`, which made a view for
-/// every installed family — hundreds — and diffed them all each time the Page tab
+/// every installed family — hundreds — and diffed them all each time the Typeset tab
 /// appeared or the setup changed. The menu is built once per control and only its
 /// selection follows the setup after that.
 struct FontFamilyPopUp: NSViewRepresentable {

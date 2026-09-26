@@ -16,6 +16,7 @@ import { useSyncExternalStore } from 'react'
 
 import { getPreference, setPreference } from '../lib/preferences'
 import { onBooksChanged, storedBook, storeBook } from './bookStore'
+import { coversOf, designFor } from './chapterDesign'
 import { bookFolderFor } from './compile'
 import { clampZoom } from './zoom'
 import { DEFAULT_SHEETS_PER_SIGNATURE } from './imposition'
@@ -93,7 +94,7 @@ export const DEFAULT_BINDING = {
   includeGuide: true,
 }
 
-export const DEFAULT_CHAPTER_NUMBERING = { style: 'none', prefix: 'Chapter', includeTitle: true }
+export const DEFAULT_CHAPTER_NUMBERING = { style: 'none', prefix: 'Chapter', includeTitle: true, startAt: 1, showInTree: false }
 
 export const DEFAULT_FRONT_MATTER = {
   halfTitle: false,
@@ -116,7 +117,11 @@ onBooksChanged(() => emit())
 export const getBookSettings = (projectName, folder) => {
   const stored = objectOr(storedBook(projectName, folder))
   const name = (folder || projectName || 'Untitled').split('/').filter(Boolean).pop() || 'Untitled'
-  return {
+  const chapterNumbering = { ...DEFAULT_CHAPTER_NUMBERING, ...objectOr(stored.chapterNumbering) }
+  chapterNumbering.startAt = chapterNumbering.startAt === 0 ? 0 : 1
+  const { covers, activeCover } = coversOf(stored)
+  const cover = covers.find((c) => c.id === activeCover)
+  const book = {
     folder: folder || '',
     title: name,
     author: '',
@@ -124,10 +129,20 @@ export const getBookSettings = (projectName, folder) => {
     ...stored,
     binding: { ...DEFAULT_BINDING, ...objectOr(stored.binding) },
     excluded: Array.isArray(stored.excluded) ? stored.excluded.filter((p) => typeof p === 'string') : [],
-    chapterNumbering: { ...DEFAULT_CHAPTER_NUMBERING, ...objectOr(stored.chapterNumbering) },
+    chapterNumbering,
     frontMatter: { ...DEFAULT_FRONT_MATTER, ...objectOr(stored.frontMatter) },
     backMatter: { ...DEFAULT_BACK_MATTER, ...objectOr(stored.backMatter) },
+    chapterDesign: designFor({ chapterDesign: stored.chapterDesign, chapterNumbering }, stored.pageSetup),
+    items: Array.isArray(stored.items) ? stored.items.filter((item) => item && typeof item.id === 'string' && item.kind) : [],
+    continuous: stored.continuous === true,
+    covers,
   }
+  if (stored.partDesign) book.partDesign = designFor({ chapterDesign: stored.partDesign })
+  // The active cover's front is the book's cover wherever one image is wanted.
+  if (activeCover) book.activeCover = activeCover
+  if (cover?.front) book.coverImage = cover.front
+  else delete book.coverImage
+  return book
 }
 
 /** Store a folder's book settings. Resolves when they are saved in the project. */

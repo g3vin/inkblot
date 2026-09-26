@@ -1,13 +1,16 @@
 import AppKit
 import SwiftUI
 
-/// The top of every Finishing tab: what is being worked on, Print and Export, and where
-/// the last job got to.
+/// The top of the Typeset and Print & Export tabs: what is being worked on, Print and
+/// Export, and where the last job got to.
 ///
-/// The same view on Page, Book and Publish, pinned above each tab's settings, so Print
-/// is always in one place and never at the bottom of a long form. The scope it sets —
-/// this document, or its book — is also what the Page tab edits.
+/// Pinned above each tab's settings. On Print & Export it carries Print and Export, so
+/// they are always in one place and never at the bottom of a long form; Typeset, a step
+/// before, shows only what is being worked on and where the last job got to. The scope
+/// it sets — this document, or its book — is also what Typeset edits.
 struct FinishingActionHeader: View {
+    /// Print and Export: on Print & Export, not on Typeset.
+    var showsActions = true
     @Environment(AppModel.self) private var model
     @AppStorage(LengthUnit.storageKey) private var unitsRaw = LengthUnit.defaultForLocale.rawValue
     @State private var goingToPage = false
@@ -19,7 +22,7 @@ struct FinishingActionHeader: View {
         let layout = model.pageLayout
         VStack(alignment: .leading, spacing: 8) {
             scopeRow(layout)
-            actionRow(layout)
+            if showsActions { actionRow(layout) }
             statusRow(layout)
         }
         .padding(.horizontal, 12)
@@ -45,7 +48,7 @@ struct FinishingActionHeader: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .help("What Print and Export cover, and whose page setup the Page tab edits")
+            .help("What Print and Export cover, and whose page setup Typeset edits")
 
             optionsMenu(layout)
         }
@@ -312,8 +315,11 @@ enum FinishingSectionID {
 /// beneath it — or, with nothing to work on, why not.
 struct FinishingPanel<Content: View>: View {
     @Environment(AppModel.self) private var model
-    /// Whether the tab needs a text document open (Page and Publish do; Book does not).
+    /// Whether the tab needs a text document open (Print & Export does; Typeset, whose
+    /// book sections stand on their own, does not).
     var needsDocument = true
+    /// Print and Export in the header.
+    var showsActions = true
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -322,7 +328,7 @@ struct FinishingPanel<Content: View>: View {
             Form { content }
                 .formStyle(.grouped)
                 .safeAreaInset(edge: .top, spacing: 0) {
-                    FinishingActionHeader()
+                    FinishingActionHeader(showsActions: showsActions)
                 }
         } else {
             ContentUnavailableView(

@@ -265,11 +265,11 @@ struct FinishingTests {
         wire.event("pageLayoutState", state())
         var book = try #require(layout.book)
         book.numbering = .words
-        #expect(BookPanelView.label(42, book) == "Chapter Forty-Two")
-        #expect(BookPanelView.label(105, book) == "Chapter One Hundred Five")
+        #expect(BookSections.label(42, book) == "Chapter Forty-Two")
+        #expect(BookSections.label(105, book) == "Chapter One Hundred Five")
         book.numbering = .roman
         book.numberPrefix = ""
-        #expect(BookPanelView.label(4, book) == "IV")
+        #expect(BookSections.label(4, book) == "IV")
     }
 
     @Test func aCoverIsPickedByPathAndRemovedWithNone() {
@@ -333,6 +333,6 @@ struct FinishingTests {
         #expect(wire.commands.last?.type == "setPageSetup")
         layout.measure()
         #expect(wire.commands.last?.type == "measureBook")
-        #expect(PublishPanelView.duration(286) == "4 hr 46 min")
+        #expect(OutputPanelView.duration(286) == "4 hr 46 min")
     }
 }

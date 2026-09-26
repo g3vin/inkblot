@@ -2,26 +2,37 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The Finishing layout's Book tab: what goes into the book.
+/// The book's sections of the Typeset tab: what goes into the book.
 ///
-/// A book is a folder of documents, in the order the file tree shows — the active
-/// document's folder, or the whole project. Its title and author go on the running
-/// heads, the EPUB and the PDF; its own page setup, when it has one, is what every
-/// chapter prints in. Which chapters are in, how they are headed, and the pages before
-/// and after them are all the book's, kept in the project and applied whenever it is
-/// printed or exported.
-struct BookPanelView: View {
+/// A book is a folder of documents — the active document's folder, or the whole
+/// project. Its title and author go on the running heads, the EPUB and the PDF; its own
+/// page setup, when it has one, is what every chapter prints in. Which chapters are in,
+/// how they are headed, and the pages before and after them are all the book's, kept
+/// in the project and applied whenever it is printed or exported.
+struct BookSections: View {
+    enum Kind: Hashable {
+        case info, chapters, headings, frontMatter, backMatter, setup
+    }
+
+    let kinds: [Kind]
+
     @Environment(AppModel.self) private var model
 
+    init(_ kinds: Kind...) {
+        self.kinds = kinds
+    }
+
     var body: some View {
-        FinishingPanel(needsDocument: false) {
-            if let state = model.pageLayout.state, let book = model.pageLayout.book {
-                infoSection(state, book)
-                chaptersSection(state, book)
-                headingsSection(book)
-                frontMatterSection(book)
-                backMatterSection(book)
-                setupSection(state)
+        if let state = model.pageLayout.state, let book = model.pageLayout.book {
+            ForEach(kinds, id: \.self) { kind in
+                switch kind {
+                case .info: infoSection(state, book)
+                case .chapters: chaptersSection(state, book)
+                case .headings: headingsSection(book)
+                case .frontMatter: frontMatterSection(book)
+                case .backMatter: backMatterSection(book)
+                case .setup: setupSection(state)
+                }
             }
         }
     }
@@ -224,7 +235,7 @@ struct BookPanelView: View {
                 CommitTextField("Epigraph By", text: binding(\.epigraphSource), prompt: "Who said it")
             }
         } footer: {
-            FinishingNote("Printed before the first chapter, each on a page of its own and unnumbered. The title page is set on the Page tab. Leave a box empty to leave its page out.")
+            FinishingNote("Printed before the first chapter, each on a page of its own and unnumbered. The title page is set under Title Page. Leave a box empty to leave its page out.")
         }
     }
 

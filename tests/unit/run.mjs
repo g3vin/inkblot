@@ -53,6 +53,8 @@
  *          publishes, when it withdraws it, and every click taken back by id
  *   print  Print Layout's pure logic: page sizes and geometry, where pages break,
  *          and signature imposition for binding
+ *   typeset how a book's chapters open, its contents, covers and history, and what an
+ *          old book reads as the first time it is typeset
  *   tabs   document tabs and split view: what closing a tab leaves in each pane, and
  *          the tab bar drawn by the shell, driven over the bridge
  *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
@@ -75,7 +77,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapnative', 'tabs']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapnative', 'tabs']
 
 const failures = []
 

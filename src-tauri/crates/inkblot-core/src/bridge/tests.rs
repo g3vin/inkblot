@@ -85,10 +85,57 @@ fn book() -> crate::types::BookSettings {
             style: crate::types::ChapterNumberStyle::Words,
             prefix: "Chapter".into(),
             include_title: true,
+            start_at: 0,
+            show_in_tree: true,
         },
         front_matter: crate::types::FrontMatter { half_title: true, dedication: "For M.".into(), contents: true, ..Default::default() },
         back_matter: crate::types::BackMatter { about_the_author: "A. Writer lives by the sea.".into(), ..Default::default() },
         publishing: crate::types::PublishingTarget { service: crate::types::PublishingService::Kdp, paper: crate::types::PaperStock::Cream },
+        chapter_design: Some(crate::types::ChapterDesign {
+            show_number: true,
+            ornament: crate::types::OrnamentKind::Glyph,
+            ornament_glyph: "❦".into(),
+            chapter_break: crate::types::ChapterBreak::NewRightPage,
+            style_id: Some("classic".into()),
+            ..Default::default()
+        }),
+        part_design: None,
+        items: vec![
+            crate::types::BookItem {
+                id: "d1".into(),
+                kind: crate::types::BookItemKind::Matter,
+                path: Some("Manuscript/.book/dedication-d1".into()),
+                title: None,
+                hidden: false,
+                matter: Some(crate::types::MatterKind::Dedication),
+                generated: None,
+                chapter_type: None,
+                page: Some(crate::types::PageOptions { position: crate::types::PagePosition::Sunk, ..Default::default() }),
+            },
+            crate::types::BookItem {
+                id: "c1".into(),
+                kind: crate::types::BookItemKind::Chapter,
+                path: Some("Manuscript/One".into()),
+                title: None,
+                hidden: true,
+                matter: None,
+                generated: None,
+                chapter_type: Some(crate::types::ChapterType::Prologue),
+                page: None,
+            },
+        ],
+        continuous: true,
+        covers: vec![crate::types::CoverSet {
+            id: "v1".into(),
+            name: "Cover".into(),
+            front: Some(".assets/covers/front.jpg".into()),
+            back: None,
+            spine: None,
+            wrap: None,
+            fit: crate::types::CoverFit::Fill,
+            made_for_spine_mm: Some(12.4),
+        }],
+        active_cover: Some("v1".into()),
     }
 }
 
@@ -1378,6 +1425,32 @@ fn a_book_saved_before_compiling_reads_with_everything_in() {
     assert_eq!(wire["chapterNumbering"]["style"], "words");
     assert_eq!(wire["frontMatter"]["halfTitle"], true);
     assert_eq!(wire["backMatter"]["aboutTheAuthor"], "A. Writer lives by the sea.");
+}
+
+#[test]
+fn a_book_saved_before_typesetting_reads_with_no_design_contents_or_covers() {
+    let mut old = serde_json::to_value(book()).unwrap();
+    for key in ["chapterDesign", "partDesign", "items", "continuous", "covers", "activeCover"] {
+        old.as_object_mut().unwrap().remove(key);
+    }
+    old["chapterNumbering"].as_object_mut().unwrap().remove("startAt");
+    old["chapterNumbering"].as_object_mut().unwrap().remove("showInTree");
+    let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
+    assert!(read.chapter_design.is_none() && read.items.is_empty() && read.covers.is_empty());
+    assert!(!read.continuous);
+    assert_eq!(read.chapter_numbering.start_at, 1, "an old book counts from one");
+    assert!(!read.chapter_numbering.show_in_tree);
+
+    let wire = serde_json::to_value(book()).unwrap();
+    assert_eq!(wire["chapterDesign"]["chapterBreak"], "newRightPage");
+    assert_eq!(wire["chapterDesign"]["ornament"], "glyph");
+    assert_eq!(wire["items"][0]["matter"], "dedication");
+    assert_eq!(wire["items"][0]["page"]["position"], "sunk");
+    assert_eq!(wire["items"][1]["chapterType"], "prologue");
+    assert_eq!(wire["covers"][0]["madeForSpineMm"], 12.4);
+    let design: crate::types::ChapterDesign = serde_json::from_value(json!({ "showNumber": true })).unwrap();
+    assert!(design.show_title && design.show_number, "a partial design fills the rest in");
+    assert_eq!(design.chapter_break, crate::types::ChapterBreak::NewPage);
 }
 
 #[test]

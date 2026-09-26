@@ -56,8 +56,10 @@ pub use note::{
     NOTE_COLOR_OPTIONS,
 };
 pub use page_setup::{
-    AuthorProfile, BackMatter, BindingSettings, BindingType, BookSettings, ChapterNumberStyle,
-    ChapterNumbering, ChapterOpening, DuplexMode, FrontMatter,
+    AuthorProfile, BackMatter, BindingSettings, BindingType, BookItem, BookItemKind, BookSettings,
+    ChapterBreak, ChapterDesign, ChapterNumberStyle, ChapterNumbering, ChapterOpening, ChapterType,
+    CoverFit, CoverPart, CoverSet, DuplexMode, FrontMatter, GeneratedKind, HeadAlignment, HeadCase,
+    MatterKind, OrnamentKind, OrnamentPosition, PageOptions, PagePosition, PageStart,
     LineSpacing, PageMargins, PageNumberFormat, PageOrientation, PageSetup, PaperStock, PrintAlignment, PublishingService,
     PublishingTarget,
     PrintTypography, RunningText, SheetFit, TitlePageOptions, TitlePageStyle,

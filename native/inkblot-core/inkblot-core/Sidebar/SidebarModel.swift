@@ -13,7 +13,7 @@ import Observation
 @Observable
 final class SidebarModel {
     enum Tab: String, CaseIterable, Identifiable {
-        case clipboard, workbench, notes, references, history, page, book, publish, stats
+        case clipboard, workbench, notes, references, history, typeset, output, stats
         /// The map's inspector. Not one of the layouts' panels: it is in the selector
         /// bar, first, only while a map is showing (`hasMap`).
         case map
@@ -29,9 +29,8 @@ final class SidebarModel {
             case .notes: "Notes"
             case .references: "References"
             case .history: "History"
-            case .page: "Page"
-            case .book: "Book"
-            case .publish: "Publish"
+            case .typeset: "Typeset"
+            case .output: "Print & Export"
             case .stats: "Stats"
             case .map: "Map"
             }
@@ -45,9 +44,8 @@ final class SidebarModel {
             case .notes: "note.text"
             case .references: "books.vertical"
             case .history: "clock"
-            case .page: "doc.richtext"
-            case .book: "book.closed"
-            case .publish: "square.and.arrow.up"
+            case .typeset: "textformat"
+            case .output: "printer"
             case .stats: "chart.bar.xaxis"
             case .map: "map"
             }
@@ -214,7 +212,7 @@ final class SidebarModel {
         layout = defaults.string(forKey: Self.layoutKey).flatMap(InspectorLayout.init(rawValue:)) ?? .drafting
         var chosen: [InspectorLayout: Tab] = [.drafting: .workbench]
         for (key, value) in defaults.dictionary(forKey: Self.chosenKey) as? [String: String] ?? [:] {
-            if let layout = InspectorLayout(rawValue: key), let tab = Tab(rawValue: value) { chosen[layout] = tab }
+            if let layout = InspectorLayout(rawValue: key), let tab = Tab(rawValue: value) ?? InspectorLayouts.renamed[value] { chosen[layout] = tab }
         }
         self.chosen = chosen
         bridge.addListener { [weak self] event in self?.handle(event) }
