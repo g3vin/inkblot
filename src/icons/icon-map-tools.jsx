@@ -248,3 +248,14 @@ export const IconFootprints = make(
     <path d="M4 13h4" />
   </>,
 );
+
+/* The timeline's: bars on a baseline, a Gantt chart's shape (Lucide's `chart-gantt`). */
+export const IconTimeline = make(
+  "IconTimeline",
+  <>
+    <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+    <path d="M7 6h8" />
+    <path d="M11 11h8" />
+    <path d="M9 16h5" />
+  </>,
+);

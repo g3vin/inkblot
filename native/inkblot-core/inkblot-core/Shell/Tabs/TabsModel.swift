@@ -213,7 +213,7 @@ extension DocTab {
 
     static func name(of docPath: String) -> String {
         let leaf = docPath.split(separator: "/").last.map(String.init) ?? docPath
-        for suffix in [".canvas", ".map"] where leaf.hasSuffix(suffix) {
+        for suffix in [".canvas", ".map", ".timeline"] where leaf.hasSuffix(suffix) {
             return String(leaf.dropLast(suffix.count))
         }
         return leaf
@@ -239,6 +239,7 @@ extension DocTab {
     static func symbol(of docPath: String) -> String {
         if docPath.hasSuffix(".canvas") { return "rectangle.on.rectangle" }
         if docPath.hasSuffix(".map") { return "map" }
+        if docPath.hasSuffix(".timeline") { return "calendar.day.timeline.left" }
         return "doc.text"
     }
 }

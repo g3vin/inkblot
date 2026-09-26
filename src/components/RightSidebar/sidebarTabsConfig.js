@@ -7,6 +7,7 @@ export const RIGHT_SIDEBAR_TABS = [
   { id: 'clipboard', icon: 'doc.on.clipboard', label: 'Clipboard' },
   { id: 'workbench', icon: 'hammer', label: 'Workbench' },
   { id: 'notes', icon: 'doc.text', label: 'Notes' },
+  { id: 'timeline', icon: 'timeline', label: 'Timeline' },
   { id: 'history', icon: 'clock', label: 'History' },
 ]
 

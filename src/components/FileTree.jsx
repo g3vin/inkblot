@@ -452,7 +452,9 @@ export default function FileTree({
               ? 'Canvas name...'
               : newEntryType === 'map'
                 ? 'Map name...'
-                : 'File name...'
+                : newEntryType === 'timeline'
+                  ? 'Timeline name...'
+                  : 'File name...'
         }
       />
     </div>
@@ -710,6 +712,14 @@ export default function FileTree({
               aria-label="New map"
             >
               <SFIcon name="map" />
+            </button>
+            <button
+              className="file-tree-action"
+              onClick={() => beginNewEntry('timeline', '')}
+              title="New timeline"
+              aria-label="New timeline"
+            >
+              <SFIcon name="timeline" />
             </button>
             <button
               className="file-tree-action"

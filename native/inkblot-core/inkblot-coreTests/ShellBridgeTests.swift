@@ -60,6 +60,30 @@ struct ShellBridgeTests {
         #expect(bridge.droppedEventCount == 0)
     }
 
+    /// A timeline view's chrome, as `TimelineSurface.jsx` publishes it: the toolbar's
+    /// state while it is the active document, withdrawn with `{}`.
+    @Test func aTimelineViewsChromeIsWhatThePageLastPublished() {
+        let (bridge, _) = attached()
+        bridge.receive(json: event(0, "timelineChromeChanged", #"""
+        {"state":{"surfaceId":"timeline-surface-0","docPath":"Plot/Main.timeline","scale":"manuscript",
+         "canUndo":true,"canRedo":false,"hasSelection":false,"lensOn":true,
+         "panel":{"title":"Main","canGoBack":false,"problems":0,"tabs":[{"id":"view","label":"View"}],"tab":"view","sections":[]},
+         "revealPanel":0,"active":true}}
+        """#))
+        #expect(bridge.activeTimelineChrome?.scale == .manuscript)
+        #expect(bridge.timelineChrome?.panel.tabs.first?.id == "view")
+        bridge.receive(json: event(1, "timelineChromeChanged", "{}"))
+        #expect(bridge.timelineChrome == nil)
+        #expect(bridge.droppedEventCount == 0)
+    }
+
+    @Test func theTimeLensSwitchesAreThePages() {
+        let (bridge, _) = attached()
+        bridge.receive(json: event(0, "timelineCursorChanged", #"{"lensOn":true,"lensEditing":false,"editingRanges":true}"#))
+        #expect(bridge.timelineCursor.lensOn)
+        #expect(bridge.timelineCursor.editingRanges)
+    }
+
     @Test func aGapInTheEventStreamIsCounted() {
         let (bridge, _) = attached()
         bridge.receive(json: event(0, "projectChanged", "{}"))

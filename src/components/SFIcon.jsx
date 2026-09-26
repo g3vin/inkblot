@@ -41,6 +41,7 @@ import {
   IconMap,
   IconMapPin,
   IconCompass,
+  IconTimeline,
   IconCursor,
   IconRoute,
   IconRegion,
@@ -134,6 +135,8 @@ const renderIcon = (name, filled, props) => {
       return <IconCanvas {...props} />
     case 'map':
       return <IconCompass {...props} />
+    case 'timeline':
+      return <IconTimeline {...props} />
     case 'mappin':
       return <IconMapPin {...props} />
     case 'cursorarrow':

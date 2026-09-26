@@ -46,7 +46,7 @@ struct InspectorLayouts: Equatable {
         get { tabs[layout] ?? layout.defaultTabs }
         set {
             var seen = Set<SidebarModel.Tab>()
-            let unique = newValue.filter { $0 != .map && seen.insert($0).inserted }
+            let unique = newValue.filter { !SidebarModel.Tab.contextual.contains($0) && seen.insert($0).inserted }
             tabs[layout] = unique.isEmpty ? nil : unique
         }
     }

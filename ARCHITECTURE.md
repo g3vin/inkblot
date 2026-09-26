@@ -49,8 +49,10 @@ in its header comment. This document covers what spans modules.
   (`editingNodeId`). Every other card is static HTML from `generateHTML`.
 - **A map is the third document kind**, routed by the `.map` suffix the same way:
   `<name>.map.json`. See [Maps](#maps).
+- **A timeline view is the fourth**, `<name>.timeline.json`. It holds how the project's
+  one chronology is shown, never events. See [Timeline](#timeline).
 - **Text documents** are `<path>.json`: `{ content, notes, versions?, archive?,
-  citations? }`.
+  citations?, timeline? }`. `timeline` is the passages attached to timeline events.
   - `archive` holds bubble sessions the writer archived (`bridge/archive.rs`). A
     session still open lives in the text as a `bubbleSession` mark whose attributes
     are the whole session, so version history restores it.
@@ -236,6 +238,39 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
 - **Rust twins only what Rust uses**: the kind, normalizing and creating maps, word
   counts, links, search matches and version entries. The maths (geometry, geodesy,
   travel, orbits, calendar) is JS only. Port a module, with parity cases, when native
+  code first needs it.
+
+## Timeline
+
+- **One chronology per project**, `.story/timeline.json` beside `.story/calendar.json`:
+  events, lanes, eras and tags (`types/timeline.rs`, `src/lib/timeline/`). Timeline
+  documents are views of it — scale, range, filters — so every view, document, map and
+  canvas card shows the same events, and a change anywhere is drawn everywhere.
+- **Time is the map's axis**: a float story day in the project calendar. A date is
+  optional. `order`, a fractional-index key compared as a plain string, is sequence;
+  `setEventTime` keeps a dated event's key between its dated neighbours, so sequence and
+  chronology never disagree, and undated events are placed by key alone.
+- **Links go one way by id and the other by path.** Everything names an event by id; an
+  event names documents, map legs, canvas cards and notes by path, kept right through
+  renames by `timelineLinks.js` (which also rewrites undo snapshots).
+- **Passages live in their document**, in a ProseMirror plugin's state
+  (`TimelineAnchors.js`): mapped through every transaction, restored with the cached
+  EditorState, saved by the autosave with the text (`timeline` is carried forward by
+  both the JS and Rust saves). A change that moves no text is saved alone
+  (`saveDocumentTimeline`).
+- **One store, previews and one undo** (`timelineStore.js`): a drag previews the
+  chronology everywhere and commits on release. An undo step can carry `effects` on other
+  files — a map leg moved with its linked event — so one ⌘Z puts both back. A map open in
+  a pane claims a leg edit (`map:set-leg`) rather than being written under.
+- **The story's "now" and the time lens** (`storyCursor.js`) are shared, unsaved state:
+  maps scrub and follow the day; the lens is a window of time the editor highlights
+  passages in, draggable in the lens bar and in any view.
+- **Three layouts**: by date, in order, and the manuscript — passages in reading order
+  (the book's compile order) joined to when they happen, flashbacks and flash-forwards
+  found by `manuscriptThreads`.
+- **Native chrome as the map's**: the page publishes `timelineChromeChanged` (the
+  inspector is a `MapPanel` form) and the shell draws `TimelineToolbar.swift` and
+  `TimelinePanelView.swift`. The logic is JS only; port it with parity cases when native
   code first needs it.
 
 ## JavaScript and Rust parity
@@ -482,6 +517,9 @@ These differ from Xcode's template on purpose:
   and a Pinterest embed in print (a cloned iframe reloads, and may print blank).
 - **Maps:** the map tracer's worker under `inkblot://`, the Earth chunks' first-open
   latency in WebKit, and the fantasy themes' SVG filter cost at high zoom.
+- **Timeline:** driven in WebKit through a harness (drag, undo, the lens, the three
+  layouts); not yet clicked through in either app, nor the native toolbar, inspector
+  panel and Timeline menu.
 - **Offline launch.** Launch the bundled Tauri `.app` with the network off, and check
   that the synonym model loads from AppData and dictation finds its model.
 - **Read Aloud's native voice** on a machine with no Python installed.
@@ -495,6 +533,9 @@ These differ from Xcode's template on purpose:
   otherwise falls back to kokoro-js's in-browser WASM build.
 - **Dictation and Read Aloud buttons** in the native toolbar. The page's controls are
   not shown under the Swift app.
+- **Timeline, still to come:** version history for the chronology, the document
+  Timeline tab in the Swift inspector (the page has one), attaching an existing note to
+  an event, continuity checks, relative dates, and export.
 - **Move Folder Location** from the project picker (no `move_project` over UniFFI).
 - **Toolbar items** still wanted: New Document/Canvas/Folder (the naming sheet is
   view-local to `FileTreeSidebar`), Bubble, workbench lookups, highlight, theme, and focusing the inspector's search.

@@ -105,6 +105,8 @@ struct ContentView: View {
                         if let canvas = model.bridge.canvasToolbar { CanvasToolbar(model: model, state: canvas) }
                     case .map:
                         if let map = model.bridge.activeMapChrome { MapToolbar(model: model, state: map) }
+                    case .timeline:
+                        if let timeline = model.bridge.activeTimelineChrome { TimelineToolbar(model: model, state: timeline) }
                     case .document:
                         DocumentToolbar(model: model)
                     }
@@ -205,12 +207,13 @@ struct ContentView: View {
 
 /// Which controls the window's toolbar holds.
 enum WindowToolbar: Equatable {
-    case document, canvas, map
+    case document, canvas, map, timeline
 
     /// What the page says should be up. A map's toolbar only while a map is active, a
     /// canvas's only while no card is being edited; otherwise the formatting controls.
     static func current(_ bridge: ShellBridge) -> WindowToolbar {
         if bridge.activeMapChrome != nil { return .map }
+        if bridge.activeTimelineChrome != nil { return .timeline }
         if bridge.canvasToolbar != nil { return .canvas }
         return .document
     }
@@ -221,6 +224,7 @@ enum WindowToolbar: Equatable {
         switch self {
         case .canvas: bridge.canvasToolbar != nil ? .canvas : .document
         case .map: bridge.activeMapChrome != nil ? .map : .document
+        case .timeline: bridge.activeTimelineChrome != nil ? .timeline : .document
         case .document: .document
         }
     }
@@ -231,6 +235,7 @@ enum WindowToolbar: Equatable {
         case .document: ToolbarID.document
         case .canvas: ToolbarID.canvas
         case .map: ToolbarID.map
+        case .timeline: ToolbarID.timeline
         }
     }
 }

@@ -17,6 +17,7 @@ import { getRightSidebarTabs } from './sidebarTabsConfig'
 import Workbench from './Workbench'
 import NotesPanel from '../NotesPanel'
 import HistoryPanel from './HistoryPanel'
+import TimelineSidebarPanel from '../../timeline/TimelineSidebarPanel'
 import SidebarSearch from './SidebarSearch'
 import ClipboardPanel from './ClipboardPanel'
 import SFIcon from '../SFIcon'
@@ -756,6 +757,16 @@ export default function RightSidebar({
           query={panelQuery}
           jumpToText={jumpToText}
           clearActiveNoteHighlight={clearActiveNoteHighlight}
+        />
+      )
+    }
+
+    if (tabId === 'timeline') {
+      return (
+        <TimelineSidebarPanel
+          projectName={projectName}
+          docPath={activeDoc}
+          editor={activeDoc === secondaryDoc && activeDoc !== currentDoc ? secondaryEditor : editor}
         />
       )
     }

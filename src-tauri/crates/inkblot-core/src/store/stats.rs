@@ -478,6 +478,9 @@ pub fn count_document(doc_path: &str, raw: &Value) -> DocWordCount {
         count_canvas(raw)
     } else if crate::doc_kind::is_map_doc(doc_path) {
         (crate::map::model::count_map_words(raw), 0)
+    } else if crate::doc_kind::is_timeline_doc(doc_path) {
+        // A view of the chronology: none of the writing is in it.
+        (0, 0)
     } else {
         let mut text = String::new();
         let mut chars = 0u32;

@@ -41,6 +41,10 @@ import { detectNativeHost } from '../bridge/transport'
  *                   map is active, and its inspector, which is a panel of the shell's
  *                   inspector — drawn from what `MapSurface` publishes
  *                   (`mapChromeChanged`). The scale bar and timeline stay in the page.
+ *  - `timelineChrome` a timeline view's tool bar and inspector, as `mapChrome` is a
+ *                   map's — drawn from what `TimelineSurface` publishes
+ *                   (`timelineChromeChanged`). The lanes, axis and manuscript stay in
+ *                   the page.
  *  - `tabBar`       the open documents' tabs, over the page column, and the split's
  *                   commands — drawn by the shell from what `useNativeTabs` publishes.
  *                   The page keeps the panes and their divider.
@@ -57,6 +61,7 @@ export type NativeChrome =
   | 'pageSetup'
   | 'printControls'
   | 'mapChrome'
+  | 'timelineChrome'
   | 'tabBar'
 
 export function isNativeShell(): boolean {

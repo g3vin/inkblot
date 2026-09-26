@@ -131,6 +131,7 @@ struct FileTreeSidebar: View {
         Button("New Document", systemImage: "doc.text") { ask(.create(.document, in: folder)) }
         Button("New Canvas", systemImage: "rectangle.on.rectangle") { ask(.create(.canvas, in: folder)) }
         Button("New Map", systemImage: "map") { ask(.create(.map, in: folder)) }
+        Button("New Timeline", systemImage: "calendar.day.timeline.left") { ask(.create(.timeline, in: folder)) }
         Button("New Folder", systemImage: "folder") { ask(.create(.folder, in: folder)) }
     }
 
@@ -141,6 +142,7 @@ struct FileTreeSidebar: View {
             ClosureMenuItem("New Document", systemImage: "doc.text") { ask(.create(.document, in: folder)) },
             ClosureMenuItem("New Canvas", systemImage: "rectangle.on.rectangle") { ask(.create(.canvas, in: folder)) },
             ClosureMenuItem("New Map", systemImage: "map") { ask(.create(.map, in: folder)) },
+            ClosureMenuItem("New Timeline", systemImage: "calendar.day.timeline.left") { ask(.create(.timeline, in: folder)) },
             ClosureMenuItem("New Folder", systemImage: "folder") { ask(.create(.folder, in: folder)) },
         ]
         guard let entry else { return items }
@@ -373,6 +375,7 @@ struct NamePrompt: Identifiable {
         case .create(.document, _): "New Document"
         case .create(.canvas, _): "New Canvas"
         case .create(.map, _): "New Map"
+        case .create(.timeline, _): "New Timeline"
         case .create(.folder, _): "New Folder"
         case .rename(let entry): "Rename “\(entry.displayName)”"
         }

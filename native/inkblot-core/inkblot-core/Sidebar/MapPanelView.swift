@@ -22,31 +22,7 @@ struct MapPanelView: View {
 
     var body: some View {
         if let state = model.bridge.mapChrome {
-            let send = MapPanelSender(bridge: model.bridge, surfaceId: state.surfaceId)
-            Form {
-                ForEach(state.panel.sections, id: \.id) { section in
-                    Section {
-                        ForEach(Array(section.fields.enumerated()), id: \.offset) { _, field in
-                            MapPanelFieldView(field: field, send: send)
-                        }
-                    } header: {
-                        if !section.title.isEmpty || !section.actions.isEmpty {
-                            HStack {
-                                Text(section.title)
-                                Spacer()
-                                ForEach(section.actions, id: \.id) { MapPanelButtonView(button: $0, send: send, small: true) }
-                            }
-                        }
-                    }
-                }
-            }
-            .formStyle(.grouped)
-            // A panel for another map, or another thing on this one, starts at the top
-            // with its own fields, not the last one's drafts.
-            .id("\(state.surfaceId)/\(state.panel.title)/\(state.panel.tab ?? "")")
-            .safeAreaInset(edge: .top, spacing: 0) {
-                MapPanelHeader(panel: state.panel, send: send)
-            }
+            PanelFormView(panel: state.panel, send: MapPanelSender(bridge: model.bridge, surfaceId: state.surfaceId))
         } else {
             ContentUnavailableView(
                 "No Map",
@@ -56,13 +32,54 @@ struct MapPanelView: View {
     }
 }
 
-/// Sends the panel's edits to the map they came from.
+/// A panel form the page built (`MapPanel`) — a map's inspector, or a timeline view's,
+/// which is built the same way — drawn natively, every edit sent back by id.
+struct PanelFormView: View {
+    let panel: MapPanel
+    let send: MapPanelSender
+
+    var body: some View {
+        Form {
+            ForEach(panel.sections, id: \.id) { section in
+                Section {
+                    ForEach(Array(section.fields.enumerated()), id: \.offset) { _, field in
+                        MapPanelFieldView(field: field, send: send)
+                    }
+                } header: {
+                    if !section.title.isEmpty || !section.actions.isEmpty {
+                        HStack {
+                            Text(section.title)
+                            Spacer()
+                            ForEach(section.actions, id: \.id) { MapPanelButtonView(button: $0, send: send, small: true) }
+                        }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        // A panel for another map, or another thing on this one, starts at the top
+        // with its own fields, not the last one's drafts.
+        .id("\(send.surfaceId)/\(panel.title)/\(panel.tab ?? "")")
+        .safeAreaInset(edge: .top, spacing: 0) {
+            MapPanelHeader(panel: panel, send: send)
+        }
+    }
+}
+
+/// Sends a panel's edits to the surface they came from: a map, or a timeline view.
 struct MapPanelSender {
+    enum Owner { case map, timeline }
+
     let bridge: ShellBridge
     let surfaceId: String
+    var owner: Owner = .map
 
     func command(_ name: String, _ detail: [String: Any]? = nil) {
-        bridge.send(.mapCommand(MapCommandRequest(surfaceId: surfaceId, command: name, detail: detail.map { AnyCodable($0) })))
+        let detail = detail.map { AnyCodable($0) }
+        switch owner {
+        case .map: bridge.send(.mapCommand(MapCommandRequest(surfaceId: surfaceId, command: name, detail: detail)))
+        case .timeline: bridge.send(.timelineCommand(TimelineCommandRequest(surfaceId: surfaceId, command: name, detail: detail)))
+        }
     }
 
     /// A field's new value; `nil` is `null`, which clears a field that may be empty.
@@ -87,10 +104,10 @@ private struct MapPanelHeader: View {
             HStack(spacing: 6) {
                 if panel.canGoBack {
                     Button { send.command("panel-back") } label: {
-                        Label("Back to the Map", systemImage: "chevron.left").labelStyle(.iconOnly)
+                        Label(send.owner == .map ? "Back to the Map" : "Back to the Timeline", systemImage: "chevron.left").labelStyle(.iconOnly)
                     }
                     .buttonStyle(.borderless)
-                    .help("Back to the map’s settings")
+                    .help(send.owner == .map ? "Back to the map’s settings" : "Back to the timeline’s settings")
                 }
                 Text(panel.title)
                     .font(.headline)

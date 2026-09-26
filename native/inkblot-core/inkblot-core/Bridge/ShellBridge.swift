@@ -35,6 +35,12 @@ final class ShellBridge {
     /// The map's chrome while the map is the active document: its toolbar's turn. A map
     /// beside the active document keeps `mapChrome` — and its inspector panel — only.
     var activeMapChrome: MapChromeState? { mapChrome?.active == false ? nil : mapChrome }
+    /// The timeline view's toolbar and inspector, as a map's: `nil` when none is showing.
+    private(set) var timelineChrome: TimelineChromeState?
+    /// The timeline view's chrome while it is the active document: its toolbar's turn.
+    var activeTimelineChrome: TimelineChromeState? { timelineChrome?.active == false ? nil : timelineChrome }
+    /// The time lens's and passage handles' switches, for the Timeline menu.
+    private(set) var timelineCursor = TimelineCursorChanged(lensOn: false, lensEditing: false, editingRanges: false)
     /// Which editor the page elected, and which document it is showing.
     private(set) var activeEditor: ActiveEditorChanged?
     /// The open project. `nil` name is the landing screen.
@@ -219,6 +225,8 @@ final class ShellBridge {
         case .activeEditorChanged(let info): activeEditor = info
         case .canvasToolbarChanged(let changed): canvasToolbar = changed.state
         case .mapChromeChanged(let changed): mapChrome = changed.state
+        case .timelineChromeChanged(let changed): timelineChrome = changed.state
+        case .timelineCursorChanged(let cursor): timelineCursor = cursor
         case .projectChanged(let changed): project = changed
         case .docChanged(let changed): lastDocChanged = changed
         case .viewOptions(let options): viewOptions = options

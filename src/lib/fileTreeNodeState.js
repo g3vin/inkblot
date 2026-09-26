@@ -60,7 +60,7 @@ export function deriveFileNodeState(node, context = {}) {
   const isCanvas = kind === 'canvas'
   const iconName = isFolder
     ? (storyPreset?.folderIcon || (isExpanded ? 'folder.fill' : 'folder'))
-    : (isCanvas ? 'canvas' : kind === 'map' ? 'map' : null)
+    : (isCanvas ? 'canvas' : kind === 'map' ? 'map' : kind === 'timeline' ? 'timeline' : null)
   const hasEntryIcon = Boolean(iconName)
   // Only a document's icon fills in — a folder's is already solid when open.
   const iconFilled = !isFolder && isActive && hasEntryIcon

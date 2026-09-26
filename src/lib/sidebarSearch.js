@@ -10,7 +10,7 @@
  * Kept free of React and of the filesystem (callers inject `listProjectTree` /
  * `loadDocument`) so the matching rules can be tested directly.
  */
-import { isCanvasDoc, isMapDoc } from './docKind'
+import { isCanvasDoc, isMapDoc, isTimelineDoc } from './docKind'
 import { collectCanvasMatches } from './canvasSearch'
 import { collectMapMatches } from './map/mapSearch'
 import { getPreference, setPreference, removePreference } from './preferences'
@@ -293,6 +293,9 @@ export const searchProject = async ({
       if (results.length >= MAX_PROJECT_RESULTS) break
       continue
     }
+
+    // A timeline view holds no text of its own — its events are the project's.
+    if (isTimelineDoc(entry.path)) continue
 
     // A map is the same: no notes, and its text is addressed by item id.
     if (isMapDoc(entry.path)) {

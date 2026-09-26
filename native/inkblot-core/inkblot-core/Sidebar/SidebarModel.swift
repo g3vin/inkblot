@@ -17,10 +17,15 @@ final class SidebarModel {
         /// The map's inspector. Not one of the layouts' panels: it is in the selector
         /// bar, first, only while a map is showing (`hasMap`).
         case map
+        /// A timeline view's inspector: the same, while a timeline view is showing.
+        case timeline
         var id: String { rawValue }
 
-        /// The panels a layout can hold — every one but the map's.
-        static var arrangeable: [Tab] { allCases.filter { $0 != .map } }
+        /// The panels that come and go with what is showing, rather than with a layout.
+        static let contextual: Set<Tab> = [.map, .timeline]
+
+        /// The panels a layout can hold — every one but the contextual ones.
+        static var arrangeable: [Tab] { allCases.filter { !contextual.contains($0) } }
 
         var title: String {
             switch self {
@@ -34,6 +39,7 @@ final class SidebarModel {
             case .publish: "Publish"
             case .stats: "Stats"
             case .map: "Map"
+            case .timeline: "Timeline"
             }
         }
 
@@ -50,6 +56,7 @@ final class SidebarModel {
             case .publish: "square.and.arrow.up"
             case .stats: "chart.bar.xaxis"
             case .map: "map"
+            case .timeline: "calendar.day.timeline.left"
             }
         }
     }
@@ -71,19 +78,22 @@ final class SidebarModel {
     var isCustomizingLayout = false
 
     /// The selector bar's tabs: the layout's, after the map's while a map is showing.
-    var tabs: [Tab] { hasMap ? [.map] + layouts[layout] : layouts[layout] }
+    var tabs: [Tab] { contextTabs + layouts[layout] }
+
+    /// The contextual panels showing now: a map's, a timeline view's.
+    private var contextTabs: [Tab] { (hasMap ? [.map] : []) + (hasTimeline ? [.timeline] : []) }
 
     /// The panel showing. Setting one the layout does not hold switches to the layout
     /// that does; if neither does it shows anyway, with nothing lit in the bar — File ▸
     /// Page Setup… still opens Page after Page is taken out of both.
     var tab: Tab {
         get {
-            if showingMap && hasMap { return .map }
+            if let showingContext, contextTabs.contains(showingContext) { return showingContext }
             return chosen[layout] ?? layouts[layout].first ?? .workbench
         }
         set {
-            showingMap = newValue == .map
-            guard newValue != .map else { return }
+            showingContext = Tab.contextual.contains(newValue) ? newValue : nil
+            guard !Tab.contextual.contains(newValue) else { return }
             if !layouts[layout].contains(newValue), layouts[layout.other].contains(newValue) {
                 layout = layout.other
             }
@@ -98,7 +108,7 @@ final class SidebarModel {
 
     func showLayout(_ next: InspectorLayout) {
         layout = next
-        showingMap = false
+        showingContext = nil
         if !layouts[layout].contains(chosen[layout] ?? .map) { chosen[layout] = layouts[layout].first }
         saveSelection()
     }
@@ -108,10 +118,12 @@ final class SidebarModel {
     /// A map is showing — the active document, or beside it in a split, where its panel
     /// stays in the bar while the other document is worked in.
     var hasMap: Bool { bridge.mapChrome != nil }
-    /// The map's panel is the one showing, while there is a map. Chosen for the writer
-    /// when a map becomes active, as Xcode's inspector follows what is selected; they
-    /// can move to another panel, and are left there until the next map.
-    private var showingMap = false
+    /// A timeline view is showing, likewise.
+    var hasTimeline: Bool { bridge.timelineChrome != nil }
+    /// The contextual panel showing — the map's or the timeline's — while its document
+    /// is. Chosen for the writer when one becomes active, as Xcode's inspector follows
+    /// what is selected; they can move to another panel, and are left there until the next.
+    private var showingContext: Tab?
     /// The last `revealPanel` each map asked with, so a republish shows nothing.
     @ObservationIgnored private var mapReveals: [String: UInt32] = [:]
 
@@ -120,7 +132,19 @@ final class SidebarModel {
         let wasActive = mapReveals[state.surfaceId] != nil
         let asked = state.revealPanel != (mapReveals[state.surfaceId] ?? 0)
         mapReveals[state.surfaceId] = state.revealPanel
-        if !wasActive || asked { showingMap = true }
+        if !wasActive || asked { showingContext = .map }
+        if asked { isPresented = true }
+    }
+
+    /// The last `revealPanel` each timeline view asked with.
+    @ObservationIgnored private var timelineReveals: [String: UInt32] = [:]
+
+    private func timelineChanged(_ state: TimelineChromeState?) {
+        guard let state else { return }
+        let wasActive = timelineReveals[state.surfaceId] != nil
+        let asked = state.revealPanel != (timelineReveals[state.surfaceId] ?? 0)
+        timelineReveals[state.surfaceId] = state.revealPanel
+        if !wasActive || asked { showingContext = .timeline }
         if asked { isPresented = true }
     }
 
@@ -254,6 +278,9 @@ final class SidebarModel {
             // back when it does.
             if changed.state == nil { mapReveals = [:] }
             mapChanged(changed.state)
+        case .timelineChromeChanged(let changed):
+            if changed.state == nil { timelineReveals = [:] }
+            timelineChanged(changed.state)
         case .showSidebarTab(let request):
             isPresented = true
             tab = Tab(request.tab)
@@ -552,6 +579,7 @@ extension SidebarModel.Tab {
         case .notes: .notes
         case .history: .history
         case .references: .references
+        case .timeline: .timeline
         }
     }
 }

@@ -28,6 +28,15 @@ import type {
   CanvasDropNoteCommand,
   CanvasToolbarChanged,
   MapChromeChanged,
+  AttachTimelineEventCommand,
+  JumpToTimelinePassageCommand,
+  RevealTimelineEventCommand,
+  SetTimeLensCommand,
+  SetTimelineRangeEditingCommand,
+  TimelineChromeChanged,
+  TimelineCommandRequest,
+  TimelineCursorChanged,
+  TimelineRangesChanged,
   MapCommandRequest,
   CanvasRestoreCommand,
   CanvasRevealCommand,
@@ -93,6 +102,13 @@ export interface SurfaceDelegates {
   canvasReveal?(command: CanvasRevealCommand): void
   canvasRestore?(command: CanvasRestoreCommand): void
   mapCommand?(command: MapCommandRequest): void
+  timelineCommand?(command: TimelineCommandRequest): void
+  /** The passage is already selected in `editor` (a document at `docPath`). */
+  attachTimelineEvent?(command: AttachTimelineEventCommand, editor: unknown, docPath: string | null): void
+  jumpToTimelinePassage?(command: JumpToTimelinePassageCommand): void
+  revealTimelineEvent?(command: RevealTimelineEventCommand): void
+  setTimeLens?(command: SetTimeLensCommand): void
+  setTimelineRangeEditing?(command: SetTimelineRangeEditingCommand): void
 }
 
 export interface DocumentSurfaceOptions {
@@ -155,6 +171,12 @@ export interface DocumentSurface {
   publishCanvasToolbar(payload: CanvasToolbarChanged): void
   /** The active map's toolbar and inspector, or none. Coalesced per frame. */
   publishMapChrome(payload: MapChromeChanged): void
+  /** The active timeline view's toolbar and inspector, or none. Coalesced per frame. */
+  publishTimelineChrome(payload: TimelineChromeChanged): void
+  /** A document's timeline passages. Coalesced per document. */
+  publishTimelineRanges(payload: TimelineRangesChanged): void
+  /** The time lens's and passage handles' switches. Not coalesced: rare. */
+  publishTimelineCursor(payload: TimelineCursorChanged): void
   /** Push the election result. Not coalesced — it is rare and ordering matters. */
   publishActiveEditor(info?: Partial<ActiveEditorChanged>): void
   publishDocChanged(payload: DocChanged): void
@@ -355,6 +377,20 @@ export function createDocumentSurface({
     (payload) => bridge.emit('mapChromeChanged', payload),
     scheduler
   )
+  const timelineChrome = createCoalescer<TimelineChromeChanged>(
+    (payload) => bridge.emit('timelineChromeChanged', payload),
+    scheduler
+  )
+  // Keyed by document, as notes are: two panes map their passages independently.
+  const timelineRangesByDoc = new Map<string, ReturnType<typeof createCoalescer<TimelineRangesChanged>>>()
+  const timelineRangesCoalescer = (docPath: string) => {
+    let coalescer = timelineRangesByDoc.get(docPath)
+    if (!coalescer) {
+      coalescer = createCoalescer<TimelineRangesChanged>((payload) => bridge.emit('timelineRangesChanged', payload), scheduler)
+      timelineRangesByDoc.set(docPath, coalescer)
+    }
+    return coalescer
+  }
   const selection = createCoalescer<SelectionContext>(
     (context) => bridge.emit('selectionContext', context),
     scheduler
@@ -524,6 +560,19 @@ export function createDocumentSurface({
   handle('canvasReveal', (payload) => delegates.canvasReveal?.(payload))
   handle('canvasRestore', (payload) => delegates.canvasRestore?.(payload))
   handle('mapCommand', (payload) => delegates.mapCommand?.(payload))
+  handle('timelineCommand', (payload) => delegates.timelineCommand?.(payload))
+  // The passage is put in the selection first, from its anchor, so attaching reads the
+  // text the shell meant even if positions moved on the way.
+  handle('attachTimelineEvent', (payload) => {
+    withEditor(payload, (editor, resolved) => {
+      if (!commands.setSelection(editor, { target: payload.target, anchor: payload.anchor, scrollIntoView: false, focus: false })) return
+      delegates.attachTimelineEvent?.(payload, editor, resolved.docPath)
+    })
+  })
+  handle('jumpToTimelinePassage', (payload) => delegates.jumpToTimelinePassage?.(payload))
+  handle('revealTimelineEvent', (payload) => delegates.revealTimelineEvent?.(payload))
+  handle('setTimeLens', (payload) => delegates.setTimeLens?.(payload))
+  handle('setTimelineRangeEditing', (payload) => delegates.setTimelineRangeEditing?.(payload))
 
   /* ---------------- request handlers ---------------- */
 
@@ -610,6 +659,9 @@ export function createDocumentSurface({
 
     publishCanvasToolbar(payload) { canvasToolbar.push(payload) },
     publishMapChrome(payload) { mapChrome.push(payload) },
+    publishTimelineChrome(payload) { timelineChrome.push(payload) },
+    publishTimelineRanges(payload) { timelineRangesCoalescer(payload.docPath).push(payload) },
+    publishTimelineCursor(payload) { bridge.emit('timelineCursorChanged', payload) },
 
     publishDocChanged(payload) { bridge.emit('docChanged', payload) },
     noteDocTransaction,
@@ -683,6 +735,8 @@ export function createDocumentSurface({
       toolbar.flush()
       canvasToolbar.flush()
       mapChrome.flush()
+      timelineChrome.flush()
+      for (const coalescer of timelineRangesByDoc.values()) coalescer.flush()
       selection.flush()
       dragMoves.flush()
       clipboardChanges.flush()
@@ -704,6 +758,9 @@ export function createDocumentSurface({
       toolbar.cancel()
       canvasToolbar.cancel()
       mapChrome.cancel()
+      timelineChrome.cancel()
+      for (const coalescer of timelineRangesByDoc.values()) coalescer.cancel()
+      timelineRangesByDoc.clear()
       selection.cancel()
       dragMoves.cancel()
       clipboardChanges.cancel()
