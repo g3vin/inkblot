@@ -1348,6 +1348,8 @@ export type NativeCommand =
 	| { type: "applyBookStyle", payload: ApplyBookStyleCommand }
 	| { type: "setChapterMeta", payload: SetChapterMetaCommand }
 	| { type: "setHeadImage", payload: SetHeadImageCommand }
+	| { type: "setCoverImage", payload: SetCoverImageCommand }
+	| { type: "editCoverSets", payload: EditCoverSetsCommand }
 	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
 	| { type: "restoreTypesetVersion", payload: TypesetVersionRef }
 	| { type: "renameTypesetVersion", payload: RenameTypesetVersionCommand }
@@ -1408,6 +1410,55 @@ export interface Contributor {
 export interface ContributorRoleSpec {
 	id: string;
 	label: string;
+}
+
+/** A cover version as the Cover section draws it: its pictures as files on disk. */
+export interface CoverSetView {
+	id: string;
+	name: string;
+	frontFile?: string;
+	backFile?: string;
+	spineFile?: string;
+	wrapFile?: string;
+	fit: CoverFit;
+}
+
+/** How much a preflight finding matters. */
+export enum PreflightSeverity {
+	/** The service will reject the file. */
+	Error = "error",
+	/** It will print, but not as well as it could. */
+	Warning = "warning",
+	/** Worth knowing. */
+	Note = "note",
+}
+
+/** One thing the preflight found, and how to put it right when the page knows how. */
+export interface PreflightIssue {
+	id: string;
+	severity: PreflightSeverity;
+	message: string;
+	/** The button's title — "Widen the Gutter" — when there is a fix. */
+	fixLabel?: string;
+	/** The setup with the fix made: applied as any other edit to it. */
+	fixedSetup?: PageSetup;
+}
+
+/** A book's covers, the size of its full wrap, and what is wrong with them. */
+export interface CoverState {
+	sets: CoverSetView[];
+	active?: string;
+	trimWidthMm: number;
+	trimHeightMm: number;
+	/** From the page count and the paper; 0 until the pages are counted. */
+	spineWidthMm: number;
+	bleedMm: number;
+	wrapWidthMm: number;
+	wrapHeightMm: number;
+	pageCount: number;
+	checks: PreflightIssue[];
+	/** The cover is what the Typeset view is showing. */
+	showing?: boolean;
 }
 
 /** What kind of entry `createEntry` makes. */
@@ -1752,6 +1803,26 @@ export interface EditBookItemCommand {
 	page?: PageOptions;
 }
 
+/** What is done to the book's cover versions. */
+export enum CoverSetAction {
+	/** A new, empty version, made active. */
+	Add = "add",
+	Duplicate = "duplicate",
+	Rename = "rename",
+	Delete = "delete",
+	/** Make it the one print, export and the EPUB use. */
+	Activate = "activate",
+	/** How its pictures are fitted to the parts. */
+	SetFit = "setFit",
+}
+
+export interface EditCoverSetsCommand {
+	action: CoverSetAction;
+	id?: string;
+	name?: string;
+	fit?: CoverFit;
+}
+
 /** A step through the editor's own undo history. */
 export enum HistoryAction {
 	Undo = "undo",
@@ -1863,6 +1934,11 @@ export enum ExportFormat {
 	Fdx = "fdx",
 	/** A report on a script, as a spreadsheet. */
 	Csv = "csv",
+	/**
+	 * The book's cover as one full-wrap PDF — back, spine and front, with bleed — as
+	 * KDP and IngramSpark take it.
+	 */
+	CoverPdf = "coverPdf",
 }
 
 /** What a print or export covers. */
@@ -2974,27 +3050,6 @@ export enum SetupSource {
 	Default = "default",
 }
 
-/** How much a preflight finding matters. */
-export enum PreflightSeverity {
-	/** The service will reject the file. */
-	Error = "error",
-	/** It will print, but not as well as it could. */
-	Warning = "warning",
-	/** Worth knowing. */
-	Note = "note",
-}
-
-/** One thing the preflight found, and how to put it right when the page knows how. */
-export interface PreflightIssue {
-	id: string;
-	severity: PreflightSeverity;
-	message: string;
-	/** The button's title — "Widen the Gutter" — when there is a fix. */
-	fixLabel?: string;
-	/** The setup with the fix made: applied as any other edit to it. */
-	fixedSetup?: PageSetup;
-}
-
 /** The Publish tab's figures for what Print covers, at its setup. */
 export interface PublishingReport {
 	/** 0 until the pages are known: shown, or measured. */
@@ -3094,6 +3149,8 @@ export interface PageLayoutState {
 	selectedBookItem?: string;
 	/** The active chapter's head: its subtitle, picture and epigraph. */
 	chapterMeta?: ChapterMeta;
+	/** The book's covers and its wrap. */
+	cover?: CoverState;
 	/** The chapter's picture and the book's ornament picture on disk, for thumbnails. */
 	chapterImageFile?: string;
 	ornamentImageFile?: string;
@@ -3838,6 +3895,24 @@ export interface SetContentCommand {
 	isLoad: boolean;
 }
 
+export enum CoverPart {
+	Front = "front",
+	Back = "back",
+	Spine = "spine",
+	/** One image across back, spine and front. */
+	Wrap = "wrap",
+}
+
+/**
+ * A picture for a part of a cover version — the active one, with no id — copied into
+ * the project; none takes the part's picture away.
+ */
+export interface SetCoverImageCommand {
+	setId?: string;
+	part: CoverPart;
+	path?: string;
+}
+
 /**
  * The display's logical density — its width in points over its width in inches —
  * which is what "Actual size" zoom needs and only the shell can measure.
@@ -4525,14 +4600,6 @@ export interface WritingSession {
 	minutes?: StatsMinute[];
 	/** The writing timer run this session was part of, if any. */
 	timerRunId?: string;
-}
-
-export enum CoverPart {
-	Front = "front",
-	Back = "back",
-	Spine = "spine",
-	/** One image across back, spine and front. */
-	Wrap = "wrap",
 }
 
 /**

@@ -34,6 +34,7 @@ use super::print::{
     UseSetupForBookCommand, MoveBookItemCommand, SetBookItemHiddenCommand, AddBookItemCommand, RemoveBookItemCommand,
     EditBookItemCommand, OpenBookItemCommand, ApplyBookStyleCommand, SetChapterMetaCommand, SetHeadImageCommand,
     SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand, PreviewTypesetVersionCommand,
+    SetCoverImageCommand, EditCoverSetsCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -599,6 +600,9 @@ pub enum NativeCommand {
     ApplyBookStyle(ApplyBookStyleCommand),
     SetChapterMeta(SetChapterMetaCommand),
     SetHeadImage(SetHeadImageCommand),
+    /* Covers (`print.rs`). */
+    SetCoverImage(SetCoverImageCommand),
+    EditCoverSets(EditCoverSetsCommand),
     /* The typeset history (`print.rs`). */
     SaveTypesetVersion(SaveTypesetVersionCommand),
     RestoreTypesetVersion(TypesetVersionRef),

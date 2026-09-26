@@ -1745,6 +1745,8 @@ public enum NativeCommand: Codable, Equatable {
 	case applyBookStyle(ApplyBookStyleCommand)
 	case setChapterMeta(SetChapterMetaCommand)
 	case setHeadImage(SetHeadImageCommand)
+	case setCoverImage(SetCoverImageCommand)
+	case editCoverSets(EditCoverSetsCommand)
 	case saveTypesetVersion(SaveTypesetVersionCommand)
 	case restoreTypesetVersion(TypesetVersionRef)
 	case renameTypesetVersion(RenameTypesetVersionCommand)
@@ -1859,6 +1861,8 @@ public enum NativeCommand: Codable, Equatable {
 			applyBookStyle,
 			setChapterMeta,
 			setHeadImage,
+			setCoverImage,
+			editCoverSets,
 			saveTypesetVersion,
 			restoreTypesetVersion,
 			renameTypesetVersion,
@@ -2289,6 +2293,16 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setHeadImage(content)
 					return
 				}
+			case .setCoverImage:
+				if let content = try? container.decode(SetCoverImageCommand.self, forKey: .payload) {
+					self = .setCoverImage(content)
+					return
+				}
+			case .editCoverSets:
+				if let content = try? container.decode(EditCoverSetsCommand.self, forKey: .payload) {
+					self = .editCoverSets(content)
+					return
+				}
 			case .saveTypesetVersion:
 				if let content = try? container.decode(SaveTypesetVersionCommand.self, forKey: .payload) {
 					self = .saveTypesetVersion(content)
@@ -2703,6 +2717,12 @@ public enum NativeCommand: Codable, Equatable {
 		case .setHeadImage(let content):
 			try container.encode(CodingKeys.setHeadImage, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .setCoverImage(let content):
+			try container.encode(CodingKeys.setCoverImage, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .editCoverSets(let content):
+			try container.encode(CodingKeys.editCoverSets, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		case .saveTypesetVersion(let content):
 			try container.encode(CodingKeys.saveTypesetVersion, forKey: .type)
 			try container.encode(content, forKey: .payload)
@@ -2850,6 +2870,87 @@ public struct ContributorRoleSpec: Codable, Equatable {
 	public init(id: String, label: String) {
 		self.id = id
 		self.label = label
+	}
+}
+
+/// A cover version as the Cover section draws it: its pictures as files on disk.
+public struct CoverSetView: Codable, Equatable {
+	public let id: String
+	public let name: String
+	public let frontFile: String?
+	public let backFile: String?
+	public let spineFile: String?
+	public let wrapFile: String?
+	public let fit: CoverFit
+
+	public init(id: String, name: String, frontFile: String?, backFile: String?, spineFile: String?, wrapFile: String?, fit: CoverFit) {
+		self.id = id
+		self.name = name
+		self.frontFile = frontFile
+		self.backFile = backFile
+		self.spineFile = spineFile
+		self.wrapFile = wrapFile
+		self.fit = fit
+	}
+}
+
+/// How much a preflight finding matters.
+public enum PreflightSeverity: String, Codable, Equatable {
+	/// The service will reject the file.
+	case error
+	/// It will print, but not as well as it could.
+	case warning
+	/// Worth knowing.
+	case note
+}
+
+/// One thing the preflight found, and how to put it right when the page knows how.
+public struct PreflightIssue: Codable, Equatable {
+	public let id: String
+	public let severity: PreflightSeverity
+	public let message: String
+	/// The button's title — "Widen the Gutter" — when there is a fix.
+	public let fixLabel: String?
+	/// The setup with the fix made: applied as any other edit to it.
+	public let fixedSetup: PageSetup?
+
+	public init(id: String, severity: PreflightSeverity, message: String, fixLabel: String?, fixedSetup: PageSetup?) {
+		self.id = id
+		self.severity = severity
+		self.message = message
+		self.fixLabel = fixLabel
+		self.fixedSetup = fixedSetup
+	}
+}
+
+/// A book's covers, the size of its full wrap, and what is wrong with them.
+public struct CoverState: Codable, Equatable {
+	public let sets: [CoverSetView]
+	public let active: String?
+	public let trimWidthMm: Double
+	public let trimHeightMm: Double
+	/// From the page count and the paper; 0 until the pages are counted.
+	public let spineWidthMm: Double
+	public let bleedMm: Double
+	public let wrapWidthMm: Double
+	public let wrapHeightMm: Double
+	public let pageCount: UInt32
+	public let checks: [PreflightIssue]
+	/// The cover is what the Typeset view is showing.
+	public let showing: Bool?
+
+	public init(sets: [CoverSetView], active: String?, trimWidthMm: Double, trimHeightMm: Double, spineWidthMm: Double, bleedMm: Double, wrapWidthMm: Double, wrapHeightMm: Double, pageCount: UInt32, checks: [PreflightIssue], showing: Bool?) {
+		self.sets = sets
+		self.active = active
+		self.trimWidthMm = trimWidthMm
+		self.trimHeightMm = trimHeightMm
+		self.spineWidthMm = spineWidthMm
+		self.bleedMm = bleedMm
+		self.wrapWidthMm = wrapWidthMm
+		self.wrapHeightMm = wrapHeightMm
+		self.pageCount = pageCount
+		self.checks = checks
+		self.showing = showing
 	}
 }
 
@@ -3282,6 +3383,33 @@ public struct EditBookItemCommand: Codable, Equatable {
 		self.title = title
 		self.chapterType = chapterType
 		self.page = page
+	}
+}
+
+/// What is done to the book's cover versions.
+public enum CoverSetAction: String, Codable, Equatable {
+	/// A new, empty version, made active.
+	case add
+	case duplicate
+	case rename
+	case delete
+	/// Make it the one print, export and the EPUB use.
+	case activate
+	/// How its pictures are fitted to the parts.
+	case setFit
+}
+
+public struct EditCoverSetsCommand: Codable, Equatable {
+	public let action: CoverSetAction
+	public let id: String?
+	public let name: String?
+	public let fit: CoverFit?
+
+	public init(action: CoverSetAction, id: String?, name: String?, fit: CoverFit?) {
+		self.action = action
+		self.id = id
+		self.name = name
+		self.fit = fit
 	}
 }
 
@@ -3786,6 +3914,9 @@ public enum ExportFormat: String, Codable, Equatable {
 	case fdx
 	/// A report on a script, as a spreadsheet.
 	case csv
+	/// The book's cover as one full-wrap PDF — back, spine and front, with bleed — as
+	/// KDP and IngramSpark take it.
+	case coverPdf
 }
 
 /// What a print or export covers.
@@ -5594,35 +5725,6 @@ public enum SetupSource: String, Codable, Equatable {
 	case `default`
 }
 
-/// How much a preflight finding matters.
-public enum PreflightSeverity: String, Codable, Equatable {
-	/// The service will reject the file.
-	case error
-	/// It will print, but not as well as it could.
-	case warning
-	/// Worth knowing.
-	case note
-}
-
-/// One thing the preflight found, and how to put it right when the page knows how.
-public struct PreflightIssue: Codable, Equatable {
-	public let id: String
-	public let severity: PreflightSeverity
-	public let message: String
-	/// The button's title — "Widen the Gutter" — when there is a fix.
-	public let fixLabel: String?
-	/// The setup with the fix made: applied as any other edit to it.
-	public let fixedSetup: PageSetup?
-
-	public init(id: String, severity: PreflightSeverity, message: String, fixLabel: String?, fixedSetup: PageSetup?) {
-		self.id = id
-		self.severity = severity
-		self.message = message
-		self.fixLabel = fixLabel
-		self.fixedSetup = fixedSetup
-	}
-}
-
 /// The Publish tab's figures for what Print covers, at its setup.
 public struct PublishingReport: Codable, Equatable {
 	/// 0 until the pages are known: shown, or measured.
@@ -5737,6 +5839,8 @@ public struct PageLayoutState: Codable, Equatable {
 	public let selectedBookItem: String?
 	/// The active chapter's head: its subtitle, picture and epigraph.
 	public let chapterMeta: ChapterMeta?
+	/// The book's covers and its wrap.
+	public let cover: CoverState?
 	/// The chapter's picture and the book's ornament picture on disk, for thumbnails.
 	public let chapterImageFile: String?
 	public let ornamentImageFile: String?
@@ -5758,7 +5862,7 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Production section. None for prose.
 	public let script: ScriptSummary?
 
-	public init(enabled: Bool, mode: EditorMode?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
+	public init(enabled: Bool, mode: EditorMode?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, cover: CoverState?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
 		self.mode = mode
 		self.docPath = docPath
@@ -5778,6 +5882,7 @@ public struct PageLayoutState: Codable, Equatable {
 		self.bookItems = bookItems
 		self.selectedBookItem = selectedBookItem
 		self.chapterMeta = chapterMeta
+		self.cover = cover
 		self.chapterImageFile = chapterImageFile
 		self.ornamentImageFile = ornamentImageFile
 		self.suggestedInsideMarginMm = suggestedInsideMarginMm
@@ -6908,6 +7013,28 @@ public struct SetContentCommand: Codable, Equatable {
 	}
 }
 
+public enum CoverPart: String, Codable, Equatable {
+	case front
+	case back
+	case spine
+	/// One image across back, spine and front.
+	case wrap
+}
+
+/// A picture for a part of a cover version — the active one, with no id — copied into
+/// the project; none takes the part's picture away.
+public struct SetCoverImageCommand: Codable, Equatable {
+	public let setId: String?
+	public let part: CoverPart
+	public let path: String?
+
+	public init(setId: String?, part: CoverPart, path: String?) {
+		self.setId = setId
+		self.part = part
+		self.path = path
+	}
+}
+
 /// The display's logical density — its width in points over its width in inches —
 /// which is what "Actual size" zoom needs and only the shell can measure.
 public struct SetDisplayDensityCommand: Codable, Equatable {
@@ -7841,14 +7968,6 @@ public struct WritingSession: Codable, Equatable {
 		self.minutes = minutes
 		self.timerRunId = timerRunId
 	}
-}
-
-public enum CoverPart: String, Codable, Equatable {
-	case front
-	case back
-	case spine
-	/// One image across back, spine and front.
-	case wrap
 }
 
 /// Which kind of document a tree path refers to. A pure function of the path — see

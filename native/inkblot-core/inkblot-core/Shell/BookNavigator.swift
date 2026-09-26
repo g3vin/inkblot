@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The left sidebar in Typeset mode: the book's contents, in the book's own order.
@@ -59,21 +60,25 @@ struct BookNavigator: View {
 
     /* ---------------- the list ---------------- */
 
-    /// A row of the list: an entry, or one of the three headings between them.
+    /// A row of the list: the cover, an entry, or one of the three headings between them.
     private enum Line: Identifiable {
+        case cover
         case heading(BookRowSection)
         case item(BookRow)
 
         var id: String {
             switch self {
+            case .cover: Self.coverId
             case .heading(let section): "heading.\(section.rawValue)"
             case .item(let row): row.id
             }
         }
+
+        static let coverId = "cover"
     }
 
     private func lines(_ rows: [BookRow]) -> [Line] {
-        var out: [Line] = []
+        var out: [Line] = [.cover]
         for section in [BookRowSection.front, .body, .back] {
             out.append(.heading(section))
             out += rows.filter { $0.section == section }.map(Line.item)
@@ -84,12 +89,17 @@ struct BookNavigator: View {
     private func list(_ state: PageLayoutState) -> some View {
         let rows = state.bookItems ?? []
         let all = lines(rows)
+        let showingCover = state.cover?.showing == true
         return List(selection: Binding(
-            get: { state.selectedBookItem },
-            set: { id in if let id, id != state.selectedBookItem { open(id) } }
+            get: { showingCover ? Line.coverId : state.selectedBookItem },
+            set: { id in if let id, id != (showingCover ? Line.coverId : state.selectedBookItem) { open(id) } }
         )) {
             ForEach(all) { line in
                 switch line {
+                case .cover:
+                    CoverRowView(cover: state.cover)
+                        .tag(Line.coverId)
+                        .moveDisabled(true)
                 case .heading(let section):
                     Text(Self.title(of: section))
                         .font(.caption.weight(.semibold))
@@ -120,7 +130,7 @@ struct BookNavigator: View {
 
     /// A drag, as "before this entry": the first entry at or after where it landed.
     private func move(_ all: [Line], from source: IndexSet, to destination: Int) {
-        guard let from = source.first, case .item(let moving) = all[from] else { return }
+        guard let from = source.first, case .item(let moving) = all[from], destination > 0 else { return }
         let before = all[destination...].lazy.compactMap { line -> String? in
             if case .item(let row) = line, row.id != moving.id { return row.id }
             return nil
@@ -224,6 +234,33 @@ struct BookNavigator: View {
     private func add(_ entry: BookMatterMenu.Entry) {
         model.bridge.send(.addBookItem(AddBookItemCommand(
             matter: entry.matter, generated: entry.generated, part: false, before: nil, title: nil, back: entry.back)))
+    }
+}
+
+/// The book's cover, first in the navigator: its front, and how many versions it has.
+private struct CoverRowView: View {
+    let cover: CoverState?
+
+    var body: some View {
+        let active = cover?.sets.first { $0.id == cover?.active }
+        HStack(spacing: 8) {
+            Group {
+                if let file = active?.frontFile ?? active?.wrapFile, let image = NSImage(contentsOfFile: file) {
+                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
+                } else {
+                    Image(systemName: "book.closed").foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 20, height: 26)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Cover")
+                if let cover, cover.sets.count > 1, let active {
+                    Text("\(active.name) · \(cover.sets.count) versions").font(.caption).foregroundStyle(.secondary)
+                } else if (cover?.checks.contains { $0.severity == .warning || $0.severity == .error }) == true {
+                    Text("Needs a look").font(.caption).foregroundStyle(.orange)
+                }
+            }
+        }
     }
 }
 

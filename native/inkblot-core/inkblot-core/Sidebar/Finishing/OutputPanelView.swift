@@ -21,6 +21,7 @@ struct OutputPanelView: View {
                     ScriptProductionSection(script: script)
                 }
                 publishingSection(state, book)
+                CoverSection()
                 bindingSection(state, book)
             }
         }

@@ -18,7 +18,7 @@ use typeshare::typeshare;
 
 use super::common::{EditorTarget, WritingFormat};
 use crate::types::page_setup::{
-    AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, RunningText, GeneratedKind, MatterKind, PageOptions, PageSetup,
+    AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, CoverFit, CoverPart, RunningText, GeneratedKind, MatterKind, PageOptions, PageSetup,
     PrintTypography,
 };
 
@@ -73,6 +73,9 @@ pub enum ExportFormat {
     Fdx,
     /// A report on a script, as a spreadsheet.
     Csv,
+    /// The book's cover as one full-wrap PDF — back, spine and front, with bleed — as
+    /// KDP and IngramSpark take it.
+    CoverPdf,
 }
 
 /// Which part of what the scope covers is printed.
@@ -242,6 +245,90 @@ pub struct OpenBookItemCommand {
 #[serde(rename_all = "camelCase")]
 pub struct TypesetFocus {
     pub section_id: String,
+}
+
+/* ---------------- covers ---------------- */
+
+/// A cover version as the Cover section draws it: its pictures as files on disk.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverSetView {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub front_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub back_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spine_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrap_file: Option<String>,
+    pub fit: CoverFit,
+}
+
+/// A book's covers, the size of its full wrap, and what is wrong with them.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverState {
+    pub sets: Vec<CoverSetView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active: Option<String>,
+    pub trim_width_mm: f64,
+    pub trim_height_mm: f64,
+    /// From the page count and the paper; 0 until the pages are counted.
+    pub spine_width_mm: f64,
+    pub bleed_mm: f64,
+    pub wrap_width_mm: f64,
+    pub wrap_height_mm: f64,
+    pub page_count: u32,
+    pub checks: Vec<PreflightIssue>,
+    /// The cover is what the Typeset view is showing.
+    #[serde(default)]
+    pub showing: bool,
+}
+
+/// A picture for a part of a cover version — the active one, with no id — copied into
+/// the project; none takes the part's picture away.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCoverImageCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub set_id: Option<String>,
+    pub part: CoverPart,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+/// What is done to the book's cover versions.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CoverSetAction {
+    /// A new, empty version, made active.
+    Add,
+    Duplicate,
+    Rename,
+    Delete,
+    /// Make it the one print, export and the EPUB use.
+    Activate,
+    /// How its pictures are fitted to the parts.
+    SetFit,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditCoverSetsCommand {
+    pub action: CoverSetAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fit: Option<CoverFit>,
 }
 
 /* ---------------- the typeset history ---------------- */
@@ -793,6 +880,9 @@ pub struct PageLayoutState {
     /// The active chapter's head: its subtitle, picture and epigraph.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chapter_meta: Option<ChapterMeta>,
+    /// The book's covers and its wrap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<CoverState>,
     /// The chapter's picture and the book's ornament picture on disk, for thumbnails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chapter_image_file: Option<String>,

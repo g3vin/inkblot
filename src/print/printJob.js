@@ -753,6 +753,18 @@ export const runPrintJob = (options) => {
  * Lay what a scope covers out as it would print, without printing it: its page count
  * and words, for the Publish tab. Runs in the print queue, after any job before it.
  */
+/**
+ * Print pages already made — a book's cover, laid out whole — through the same print
+ * root and shell request as a book, or save them as a PDF.
+ */
+export const printPages = ({ elements, widthPx, heightPx, jobName, pdfPath, jobId, format = 'pdf' }) => runJob({
+  jobId,
+  kind: pdfPath ? 'export' : 'print',
+  format,
+  pdfPath,
+  prepare: async () => ({ elements, widthPx, heightPx, jobName, images: elements[0] }),
+})
+
 export const measurePrint = (options) => enqueue(() => preparePrint({ ...options, measureOnly: true }))
 
 /** `Book.pdf` for Sam Reader → `Book – Sam Reader.pdf`, beside it. */

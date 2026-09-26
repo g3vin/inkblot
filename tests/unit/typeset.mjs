@@ -463,3 +463,50 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   ok('renaming the folder takes its history with it, chapters and all',
     moved.length === 1 && Object.keys(moved[0].snapshot.chapters)[0] === 'Book/One' && (await store.typesetEntries(P, 'Novel')).length === 0)
 }
+
+/* ---- covers: the wrap, its checks, its versions ---- */
+
+{
+  const wrap = await import(`${C}/print/coverWrap.ts`)
+  const design = await import(`${C}/print/chapterDesign.ts`)
+  const { spineWidthMm } = await import(`${C}/print/preflight.ts`)
+  const { mmToPx } = await import(`${C}/print/pageSizes.ts`)
+
+  const spine = spineWidthMm({ pageCount: 220, paper: 'cream', service: 'kdp' })
+  const g = wrap.wrapGeometry(152.4, 228.6, spine)
+  ok('a 6 × 9 wrap is two covers, the spine and ⅛″ of bleed each side wide, and the trim and bleed high',
+    Math.abs(g.wrapWidthMm - (2 * 152.4 + spine + 2 * 3.175)) < 1e-9 && Math.abs(g.wrapHeightMm - (228.6 + 2 * 3.175)) < 1e-9)
+  ok('…the back on the left, the front on the right, the spine between',
+    g.back.x === 0 && Math.abs(g.spine.x - (3.175 + 152.4)) < 1e-9 && Math.abs(g.front.x + g.front.width - g.wrapWidthMm) < 1e-9)
+
+  const set = { id: 'v', name: 'Cover', front: 'f.jpg', back: 'b.jpg', spine: 's.jpg', fit: 'fill', madeForSpineMm: spine + 2 }
+  const good = { width: Math.ceil((g.front.width / 25.4) * 300), height: Math.ceil((g.wrapHeightMm / 25.4) * 300) }
+  const checks = wrap.coverChecks({ set, geometry: g, pageCount: 220, sizes: { front: good, back: { width: 600, height: 900 }, spine: { width: 200, height: 3000 } } })
+  const ids = checks.map((c) => c.id)
+  ok('a back too small to print sharp is pointed out, a front big enough is not',
+    ids.includes('cover-dpi-back') && !ids.includes('cover-dpi-front'))
+  ok('a spine made for another page count is pointed out', ids.includes('cover-spine-changed'))
+  ok('a print-sized front is also judged as an e-book cover', ids.includes('cover-ebook-shape') === (Math.abs(good.height / good.width - 1.6) > 0.08))
+  ok('under 80 pages the spine takes no text',
+    wrap.coverChecks({ set, geometry: wrap.wrapGeometry(152.4, 228.6, 2), pageCount: 60, sizes: {} }).some((c) => c.id === 'cover-spine-text'))
+  ok('no cover at all says so, and nothing else', wrap.coverChecks({ set: null, geometry: g, pageCount: 0, sizes: {} }).map((c) => c.id).join() === 'cover-none')
+  ok('uncounted pages are pointed out, for the spine', wrap.coverChecks({ set, geometry: g, pageCount: 0, sizes: {} }).some((c) => c.id === 'cover-count'))
+
+  const page = wrap.coverPage(g, set, { front: 'data:f', back: 'data:b', spine: 'data:s' })
+  const imgs = [...page.querySelectorAll('img')]
+  ok('the cover prints as one page the size of the wrap, each picture on its part',
+    page.style.width === `${mmToPx(g.wrapWidthMm)}px` && imgs.length === 3 && imgs[2].style.left === `${mmToPx(g.front.x)}px` && imgs[0].style.objectFit === 'cover')
+  const whole = wrap.coverPage(g, { ...set, wrap: 'data:w', fit: 'fit' }, { wrap: 'data:w' })
+  ok('a wrap picture is one, across it all', whole.querySelectorAll('img').length === 1 && whole.querySelector('img').style.objectFit === 'contain')
+
+  let book = { title: 'T', coverImage: 'old.jpg' }
+  book = design.editCovers(book, { action: 'add', newId: 'n1' })
+  ok('a new version joins the book’s old cover, and is the one in use', book.covers.length === 2 && book.activeCover === 'n1' && !book.coverImage)
+  book = design.editCovers(book, { action: 'duplicate', id: 'cover', newId: 'n2' })
+  ok('a copy is named as one', book.covers.find((c) => c.id === 'n2').name === 'Cover Copy' && book.coverImage === 'old.jpg')
+  book = design.editCovers(book, { action: 'rename', id: 'n2', name: 'Hardcover', newId: 'x' })
+  book = design.editCovers(book, { action: 'setFit', id: 'n2', fit: 'stretch', newId: 'x' })
+  book = design.editCovers(book, { action: 'delete', id: 'n2', newId: 'x' })
+  ok('deleting the one in use makes the first the cover', book.covers.length === 2 && book.activeCover === 'cover' && book.coverImage === 'old.jpg')
+  ok('an action on a version that is not there changes nothing', design.editCovers(book, { action: 'rename', id: 'gone', name: 'X', newId: 'x' }) === book)
+}

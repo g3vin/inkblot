@@ -61,6 +61,13 @@ Notable changes to Inkblot. The format follows
   Typeset, the History tab shows it, with the text history a click away; restoring a
   text version keeps the typesetting as it is. Typesetting no longer adds text-history
   checkpoints.
+- **Covers:** a book's cover — a front, a back and a spine, or one picture across the
+  whole wrap — in as many versions as wanted, one of them in use. The Cover, first in
+  the Book navigator, shows the full wrap to scale in Typeset, with its trim, bleed,
+  safe areas, spine folds and barcode box, and takes pictures dropped on it. Each is
+  checked as KDP and IngramSpark would (300 dpi, the spine it was made for, no spine
+  text under 80 pages, an e-book front's shape and size), and exported as one full-wrap
+  PDF with ⅛″ bleed. The front is the EPUB's cover.
 
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own

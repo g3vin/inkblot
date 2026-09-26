@@ -61,7 +61,7 @@ struct BookSections: View {
             CommitTextField("Language", text: binding(\.language), prompt: "en-US")
             LabeledContent("Cover") {
                 HStack(spacing: 8) {
-                    if let file = state.coverFile, let image = NSImage(contentsOfFile: file) {
+                    if let file = state.cover?.sets.first(where: { $0.id == state.cover?.active })?.frontFile, let image = NSImage(contentsOfFile: file) {
                         Image(nsImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
@@ -70,25 +70,12 @@ struct BookSections: View {
                             .shadow(radius: 1, y: 1)
                             .accessibilityLabel("The cover")
                     }
-                    Button(book.coverImage == nil ? "Choose…" : "Change…", action: chooseCover)
-                    if book.coverImage != nil {
-                        Button("Remove", role: .destructive) { layout.setCover(nil) }
-                    }
+                    Button("Show the Cover") { layout.showCover() }
                 }
             }
         } footer: {
             FinishingNote("The title and author go on the running heads, the EPUB and the PDF. The language is what an e-reader reads it in; the cover is the EPUB’s.")
         }
-    }
-
-    private func chooseCover() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        panel.message = "Choose an image for the book’s cover"
-        panel.prompt = "Use as Cover"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.pageLayout.setCover(url)
     }
 
     private func folderLabel(_ folder: String) -> String {

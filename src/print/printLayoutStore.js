@@ -252,6 +252,20 @@ export const setSelectedBookItem = (projectName, id) => {
   emit()
 }
 
+/* ---------------- the cover, in view ---------------- */
+
+// Whether the Typeset view shows the book's cover (chosen in the Book navigator) in
+// place of its pages. Not kept across launches.
+let showingCover = false
+
+export const isShowingCover = () => showingCover
+
+export const setShowingCover = (showing) => {
+  if (showingCover === Boolean(showing)) return
+  showingCover = Boolean(showing)
+  emit()
+}
+
 /* ---------------- a typeset version, previewed ---------------- */
 
 // `{ id, compare, snapshot }` while the Typeset view shows a typeset version's pages;

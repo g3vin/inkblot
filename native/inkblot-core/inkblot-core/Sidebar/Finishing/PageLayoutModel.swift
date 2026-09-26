@@ -170,6 +170,23 @@ final class PageLayoutModel {
         bridge.send(.previewTypesetVersion(PreviewTypesetVersionCommand(id: id, compare: compare)))
     }
 
+    /* ---------------- covers ---------------- */
+
+    /// A picture for a part of the active cover version, or none.
+    func setCoverImage(_ part: CoverPart, url: URL?, set: String? = nil) {
+        bridge.send(.setCoverImage(SetCoverImageCommand(setId: set, part: part, path: url?.path)))
+    }
+
+    func editCovers(_ action: CoverSetAction, id: String? = nil, name: String? = nil, fit: CoverFit? = nil) {
+        bridge.send(.editCoverSets(EditCoverSetsCommand(action: action, id: id, name: name, fit: fit)))
+    }
+
+    /// The cover in the Typeset view, in place of the pages.
+    func showCover() {
+        setMode(.typeset)
+        bridge.send(.openBookItem(OpenBookItemCommand(id: "cover")))
+    }
+
     func setChapterMeta(_ meta: ChapterMeta) {
         bridge.send(.setChapterMeta(SetChapterMetaCommand(meta: meta)))
     }

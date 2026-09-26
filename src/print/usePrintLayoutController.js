@@ -22,7 +22,9 @@ import { nativeOwns } from '../lib/host'
 import { importAssetFromPath } from '../lib/assets'
 import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { countEditorWords } from '../lib/wordCount'
-import { withCoverPart } from './chapterDesign'
+import { editCovers, withCoverPart } from './chapterDesign'
+import { bookSpine, buildCoverState, loadCoverSizes } from './coverState'
+import { newItemId } from './bookItems'
 import { reconcileBookItems } from './bookItems'
 import { addBookItem, editBookItem, moveBookItem, openablePath, removeBookItem, setBookItemHidden } from './bookContents'
 import { bookRows } from './bookRows'
@@ -55,6 +57,7 @@ import {
   getPrintScope,
   getPrintZoom,
   getSelectedBookItem,
+  isShowingCover,
   isPrintLayoutEnabled,
   setAuthorProfile,
   setBookSettings,
@@ -63,6 +66,7 @@ import {
   setPrintScope,
   setPrintZoom,
   setSelectedBookItem,
+  setShowingCover,
   subscribeCurrentPrintPage,
   subscribePrintLayoutStore,
 } from './printLayoutStore'
@@ -219,6 +223,7 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     bookChapters: chapters,
     bookItems: rows,
     selectedBookItem: selected?.id,
+    cover: buildCoverState({ projectName, docPath, book, setup, projectRoot, showing: isShowingCover() }),
     chapterMeta: editor ? (readChapterMeta(editor.state.doc) || undefined) : undefined,
     chapterImageFile: fileOf(projectRoot, readChapterMeta(editor?.state.doc)?.image),
     ornamentImageFile: fileOf(projectRoot, book.chapterDesign?.ornamentImage),
@@ -315,6 +320,12 @@ export default function usePrintLayoutController({
           rootRef.current.root = root
           publish()
         })
+        .catch(() => {})
+    }
+    // The cover pictures' sizes, for their checks: read once, then published again.
+    if (project) {
+      loadCoverSizes(project, getBookSettings(project, folder))
+        .then((read) => { if (read) publish() })
         .catch(() => {})
     }
     const state = buildPageLayoutState({
@@ -488,9 +499,36 @@ export default function usePrintLayoutController({
         // Copied into the project, so the book keeps the picture wherever the file was.
         importAssetFromPath(project, path).then(apply).catch(failed('Setting the picture'))
       }),
+      documentSurface.onCommand('setCoverImage', ({ setId, part, path }) => {
+        const { project, folder } = currentBook()
+        if (!project) return
+        const apply = (image) => {
+          let book = withCoverPart(getBookSettings(project, folder), part, image, setId || undefined)
+          // A spine or a wrap is made for the spine the book has now: say so, to notice
+          // when the page count moves it.
+          if (image && (part === 'spine' || part === 'wrap')) {
+            const { spineMm } = bookSpine(project, stateRef.current.activeTextDoc, book)
+            if (spineMm) {
+              const id = setId || book.activeCover
+              book = { ...book, covers: book.covers.map((c) => (c.id === id ? { ...c, madeForSpineMm: spineMm } : c)) }
+            }
+          }
+          setBookSettings(project, folder, book)
+        }
+        if (!path) apply(null)
+        else importAssetFromPath(project, path).then(apply).catch(failed('Setting the cover'))
+      }),
+      documentSurface.onCommand('editCoverSets', (command) => {
+        const { project, folder } = currentBook()
+        if (!project) return
+        setBookSettings(project, folder, editCovers(getBookSettings(project, folder), { ...command, newId: `cover-${newItemId()}` }))
+      }),
       documentSurface.onCommand('openBookItem', ({ id }) => {
         const { project, folder } = currentBook()
         if (!project) return
+        // The cover is not a page of the book: it has a view of its own.
+        setShowingCover(id === 'cover')
+        if (id === 'cover') return
         setSelectedBookItem(project, id)
         openablePath(project, folder, id)
           .then((path) => { if (path) stateRef.current.onOpenDoc?.(path) })
@@ -588,6 +626,7 @@ export default function usePrintLayoutController({
       const { project, folder } = currentBook()
       const id = event.detail?.id
       if (!project || !id) return
+      setShowingCover(false)
       setSelectedBookItem(project, id)
       openablePath(project, folder, id)
         .then((path) => { if (path) stateRef.current.onOpenDoc?.(path) })

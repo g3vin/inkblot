@@ -15,10 +15,14 @@ import { chapterTitleOf, compileSections, frontMatterSections, paragraphsOf } fr
 import { bookFolderFor, loadBookSections, loadChapters } from '../compile'
 import { readDocPageSetup } from '../DocPageSetup'
 import { resolvePageSetup } from '../pageSetup'
-import { bookAuthor, getAuthorProfile, setLastExport } from '../printLayoutStore'
+import { bookAuthor, getAuthorProfile, getMeasurement, getPrintScope, setLastExport, setMeasurement } from '../printLayoutStore'
+import { activeCoverOf } from '../chapterDesign'
+import { coverPage } from '../coverWrap'
+import { bookWrap } from '../coverState'
+import { mmToPx } from '../pageSizes'
 import { textOfContent } from '../titlePage'
 import { countWords } from '../../lib/wordCount'
-import { runPrintJob } from '../printJob'
+import { measurePrint, printPages, runPrintJob } from '../printJob'
 import { describeError, newJobId, reportJob } from '../printJobStatus'
 import { buildDocx } from './docx'
 import { buildFdx } from './fdx'
@@ -39,6 +43,7 @@ const FORMATS = {
   plainText: { ext: 'txt', label: 'Plain Text' },
   fountain: { ext: 'fountain', label: 'Fountain' },
   fdx: { ext: 'fdx', label: 'Final Draft' },
+  coverPdf: { ext: 'pdf', label: 'Cover PDF' },
 }
 
 const safeFileName = (name) => (name || 'Untitled').replace(/[/\\:*?"<>|]+/g, '-').trim() || 'Untitled'
@@ -75,7 +80,8 @@ export async function runExport({
   try {
     if (!path) path = await save({
       title: `Export ${spec.label}`,
-      defaultPath: `${safeFileName(title)}.${spec.ext}`,
+      // The cover beside the interior, not over it.
+      defaultPath: `${safeFileName(format === 'coverPdf' ? `${title} Cover` : title)}.${spec.ext}`,
       filters: [{ name: spec.label, extensions: [spec.ext] }],
     })
   } catch (error) {
@@ -85,6 +91,11 @@ export async function runExport({
   if (!path) return null
 
   const remember = () => setLastExport(projectName, { format, scope, path, bound: Boolean(bound), options })
+  if (format === 'coverPdf') {
+    const saved = await exportCoverPdf({ jobId, projectName, docPath, book, liveEditors, path })
+    if (saved) remember()
+    return saved ? path : null
+  }
   if (format === 'pdf') {
     const saved = await runPrintJob({ jobId, projectName, docPath, scope, bound, liveEditors, book, options, pdfPath: path })
     if (saved) remember()
@@ -102,6 +113,39 @@ export async function runExport({
   report('done', { path })
   remember()
   return path
+}
+
+/**
+ * The book's cover as one full-wrap PDF, at the size the printer takes it: the book's
+ * pages counted first, when they have not been, so the spine is right.
+ */
+async function exportCoverPdf({ jobId, projectName, docPath, book, liveEditors, path }) {
+  const scope = getPrintScope(projectName) === 'project' ? 'project' : 'folder'
+  if (!getMeasurement(projectName, scope, docPath)) {
+    const measured = await measurePrint({ projectName, docPath, scope, liveEditors, book })
+    if (measured) setMeasurement(projectName, scope, docPath, measured)
+  }
+  const setup = resolvePageSetup({ docSetup: readDocPageSetup(liveEditors.find((e) => e.path === docPath)?.editor?.state.doc), bookSetup: book?.pageSetup, scope }).setup
+  const { geometry } = bookWrap(projectName, docPath, book, book?.pageSetup || setup)
+  const set = activeCoverOf(book)
+  if (!set) throw new Error('The book has no cover yet.')
+  const urls = {}
+  for (const part of ['front', 'back', 'spine', 'wrap']) {
+    const src = set[part]
+    if (!src) continue
+    const image = await resolveImage(projectName, src)
+    if (image) urls[part] = toDataUri(image)
+  }
+  const page = coverPage(geometry, set, urls)
+  return printPages({
+    jobId,
+    elements: [page],
+    widthPx: mmToPx(geometry.wrapWidthMm),
+    heightPx: mmToPx(geometry.wrapHeightMm),
+    jobName: `${book?.title || 'Book'} — Cover`,
+    pdfPath: path,
+    format: 'coverPdf',
+  })
 }
 
 /** Build a non-PDF export and write it to `path`. */
