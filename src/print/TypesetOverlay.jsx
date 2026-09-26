@@ -26,6 +26,7 @@ import { createPortal } from 'react-dom'
 
 import { pageLeftMargin } from './pageSetup'
 import { mmToPx } from './pageSizes'
+import { anchorBlock } from './TypesetAnchors'
 import { TYPESET_META } from './TypesetLock'
 
 const PX_PER_MM = mmToPx(1)
@@ -300,6 +301,7 @@ export default function TypesetOverlay({ pages, metrics, setup, zoom, editor, ty
     const pos = imagePos(imageHover)
     if (pos == null) return
     const tr = editor.state.tr
+    anchorBlock(tr, pos)
     for (const [key, value] of Object.entries(attrs)) tr.setNodeAttribute(pos, key, value)
     tr.setMeta(TYPESET_META, true)
     editor.view.dispatch(tr)

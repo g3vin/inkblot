@@ -1348,6 +1348,11 @@ export type NativeCommand =
 	| { type: "applyBookStyle", payload: ApplyBookStyleCommand }
 	| { type: "setChapterMeta", payload: SetChapterMetaCommand }
 	| { type: "setHeadImage", payload: SetHeadImageCommand }
+	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
+	| { type: "restoreTypesetVersion", payload: TypesetVersionRef }
+	| { type: "renameTypesetVersion", payload: RenameTypesetVersionCommand }
+	| { type: "deleteTypesetVersion", payload: TypesetVersionRef }
+	| { type: "previewTypesetVersion", payload: PreviewTypesetVersionCommand }
 	| { type: "setPrintLayout", payload: SetPrintLayoutCommand }
 	| { type: "setPageSetup", payload: SetPageSetupCommand }
 	| { type: "setBookSettings", payload: SetBookSettingsCommand }
@@ -1829,6 +1834,8 @@ export type WebviewEvent =
 	| { type: "printJobStatus", payload: PrintJobStatus }
 	/** A Typeset page's handle was picked: show its section in the inspector. */
 	| { type: "typesetFocus", payload: TypesetFocus }
+	/** A book's typeset history, newest first. */
+	| { type: "typesetHistoryChanged", payload: TypesetHistoryChanged }
 	/** The tabs and the split, whole (`tabs.rs`). Coalesced per frame. */
 	| { type: "tabsChanged", payload: TabsChanged };
 
@@ -3134,6 +3141,15 @@ export interface PaneStatus {
 	bottom: number;
 }
 
+/**
+ * Show a typeset version's pages in the Typeset view — alone, or beside the current
+ * typeset to compare them. No id stops previewing.
+ */
+export interface PreviewTypesetVersionCommand {
+	id?: string;
+	compare?: boolean;
+}
+
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
 export interface PrintDocumentCommand {
 	scope: PrintScope;
@@ -3479,6 +3495,11 @@ export interface RenameEntryCommand {
 	newName: string;
 }
 
+export interface RenameTypesetVersionCommand {
+	id: string;
+	name: string;
+}
+
 /** Name a version, or clear its name with `None`. */
 export interface RenameVersionCommand {
 	docPath: string;
@@ -3553,6 +3574,11 @@ export interface RevealSearchResultCommand {
 	nodeId?: string;
 	/** A notes-scope match names the note. */
 	noteId?: string;
+}
+
+/** Keep the book's typeset as it is now, under a name. */
+export interface SaveTypesetVersionCommand {
+	name: string;
 }
 
 /** A breakdown of the active script. */
@@ -4307,6 +4333,49 @@ export interface TreeNode {
  */
 export interface TypesetFocus {
 	sectionId: string;
+}
+
+/** Why a typeset version was kept. */
+export enum TypesetVersionKind {
+	/** A while after the typesetting changed. */
+	Auto = "auto",
+	/** Saved, and named, by the writer. */
+	Named = "named",
+	/** What a print or an export was made from. */
+	Export = "export",
+	/** The typeset as it was just before another was restored. */
+	Restore = "restore",
+}
+
+/** One typeset version of a book, as the History tab lists it. */
+export interface TypesetVersionRow {
+	id: string;
+	/** ISO 8601. */
+	timestamp: string;
+	kind: TypesetVersionKind;
+	name?: string;
+	/** What changed since the version before it, a line a change. */
+	summary: string[];
+}
+
+/**
+ * A book's typeset history, newest first. Published by the page when it changes and
+ * when the book in view does.
+ */
+export interface TypesetHistoryChanged {
+	folder: string;
+	rows: TypesetVersionRow[];
+	/** The version the Typeset view is previewing, if any. */
+	previewing?: string;
+	/** And whether beside the current typeset, to compare. */
+	comparing?: boolean;
+	/** What the last restore could not put back: "2 settings had no paragraph left". */
+	note?: string;
+}
+
+/** A typeset version, by id: to restore, delete, or stop previewing (`id` absent). */
+export interface TypesetVersionRef {
+	id: string;
 }
 
 export interface UpdateNoteCommand {

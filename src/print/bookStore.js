@@ -17,6 +17,7 @@ import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 
 import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { getPreference } from '../lib/preferences'
+import { relocateTypesetHistory } from './typesetHistoryStore'
 
 export const BOOKS_FILE = '.inkblot-books.json'
 const LEGACY_PREFIX = 'inkblot-book:'
@@ -100,6 +101,8 @@ export const booksSettled = async (projectName) => {
  */
 export const relocateBooks = async (projectName, fromRel, toRel, { folder = false, copy = false } = {}) => {
   if (!projectName || !fromRel) return
+  // The typeset history follows too: it is kept by book, and names chapters by path.
+  await relocateTypesetHistory(projectName, fromRel, toRel, { folder, copy })
   const entry = entryFor(projectName)
   await entry.loaded
   const moved = (path) => (folder ? path === fromRel || path.startsWith(`${fromRel}/`) : path === fromRel)

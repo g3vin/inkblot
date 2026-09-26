@@ -1745,6 +1745,11 @@ public enum NativeCommand: Codable, Equatable {
 	case applyBookStyle(ApplyBookStyleCommand)
 	case setChapterMeta(SetChapterMetaCommand)
 	case setHeadImage(SetHeadImageCommand)
+	case saveTypesetVersion(SaveTypesetVersionCommand)
+	case restoreTypesetVersion(TypesetVersionRef)
+	case renameTypesetVersion(RenameTypesetVersionCommand)
+	case deleteTypesetVersion(TypesetVersionRef)
+	case previewTypesetVersion(PreviewTypesetVersionCommand)
 	case setPrintLayout(SetPrintLayoutCommand)
 	case setPageSetup(SetPageSetupCommand)
 	case setBookSettings(SetBookSettingsCommand)
@@ -1854,6 +1859,11 @@ public enum NativeCommand: Codable, Equatable {
 			applyBookStyle,
 			setChapterMeta,
 			setHeadImage,
+			saveTypesetVersion,
+			restoreTypesetVersion,
+			renameTypesetVersion,
+			deleteTypesetVersion,
+			previewTypesetVersion,
 			setPrintLayout,
 			setPageSetup,
 			setBookSettings,
@@ -2279,6 +2289,31 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setHeadImage(content)
 					return
 				}
+			case .saveTypesetVersion:
+				if let content = try? container.decode(SaveTypesetVersionCommand.self, forKey: .payload) {
+					self = .saveTypesetVersion(content)
+					return
+				}
+			case .restoreTypesetVersion:
+				if let content = try? container.decode(TypesetVersionRef.self, forKey: .payload) {
+					self = .restoreTypesetVersion(content)
+					return
+				}
+			case .renameTypesetVersion:
+				if let content = try? container.decode(RenameTypesetVersionCommand.self, forKey: .payload) {
+					self = .renameTypesetVersion(content)
+					return
+				}
+			case .deleteTypesetVersion:
+				if let content = try? container.decode(TypesetVersionRef.self, forKey: .payload) {
+					self = .deleteTypesetVersion(content)
+					return
+				}
+			case .previewTypesetVersion:
+				if let content = try? container.decode(PreviewTypesetVersionCommand.self, forKey: .payload) {
+					self = .previewTypesetVersion(content)
+					return
+				}
 			case .setPrintLayout:
 				if let content = try? container.decode(SetPrintLayoutCommand.self, forKey: .payload) {
 					self = .setPrintLayout(content)
@@ -2667,6 +2702,21 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setHeadImage(let content):
 			try container.encode(CodingKeys.setHeadImage, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .saveTypesetVersion(let content):
+			try container.encode(CodingKeys.saveTypesetVersion, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .restoreTypesetVersion(let content):
+			try container.encode(CodingKeys.restoreTypesetVersion, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .renameTypesetVersion(let content):
+			try container.encode(CodingKeys.renameTypesetVersion, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .deleteTypesetVersion(let content):
+			try container.encode(CodingKeys.deleteTypesetVersion, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .previewTypesetVersion(let content):
+			try container.encode(CodingKeys.previewTypesetVersion, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setPrintLayout(let content):
 			try container.encode(CodingKeys.setPrintLayout, forKey: .type)
@@ -3318,6 +3368,8 @@ public enum WebviewEvent: Codable, Equatable {
 	case printJobStatus(PrintJobStatus)
 	/// A Typeset page's handle was picked: show its section in the inspector.
 	case typesetFocus(TypesetFocus)
+	/// A book's typeset history, newest first.
+	case typesetHistoryChanged(TypesetHistoryChanged)
 	/// The tabs and the split, whole (`tabs.rs`). Coalesced per frame.
 	case tabsChanged(TabsChanged)
 
@@ -3360,6 +3412,7 @@ public enum WebviewEvent: Codable, Equatable {
 			pageLayoutCatalog,
 			printJobStatus,
 			typesetFocus,
+			typesetHistoryChanged,
 			tabsChanged
 	}
 
@@ -3561,6 +3614,11 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .typesetFocus(content)
 					return
 				}
+			case .typesetHistoryChanged:
+				if let content = try? container.decode(TypesetHistoryChanged.self, forKey: .payload) {
+					self = .typesetHistoryChanged(content)
+					return
+				}
 			case .tabsChanged:
 				if let content = try? container.decode(TabsChanged.self, forKey: .payload) {
 					self = .tabsChanged(content)
@@ -3687,6 +3745,9 @@ public enum WebviewEvent: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .typesetFocus(let content):
 			try container.encode(CodingKeys.typesetFocus, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .typesetHistoryChanged(let content):
+			try container.encode(CodingKeys.typesetHistoryChanged, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .tabsChanged(let content):
 			try container.encode(CodingKeys.tabsChanged, forKey: .type)
@@ -5761,6 +5822,18 @@ public struct PaneStatus: Codable, Equatable {
 	}
 }
 
+/// Show a typeset version's pages in the Typeset view — alone, or beside the current
+/// typeset to compare them. No id stops previewing.
+public struct PreviewTypesetVersionCommand: Codable, Equatable {
+	public let id: String?
+	public let compare: Bool?
+
+	public init(id: String?, compare: Bool?) {
+		self.id = id
+		self.compare = compare
+	}
+}
+
 /// Print. `bound` imposes the pages for binding, with the book's binding settings.
 public struct PrintDocumentCommand: Codable, Equatable {
 	public let scope: PrintScope
@@ -6253,6 +6326,16 @@ public struct RenameEntryCommand: Codable, Equatable {
 	}
 }
 
+public struct RenameTypesetVersionCommand: Codable, Equatable {
+	public let id: String
+	public let name: String
+
+	public init(id: String, name: String) {
+		self.id = id
+		self.name = name
+	}
+}
+
 /// Name a version, or clear its name with `None`.
 public struct RenameVersionCommand: Codable, Equatable {
 	public let docPath: String
@@ -6484,6 +6567,15 @@ public struct RevealSearchResultCommand: Codable, Equatable {
 		self.anchor = anchor
 		self.nodeId = nodeId
 		self.noteId = noteId
+	}
+}
+
+/// Keep the book's typeset as it is now, under a name.
+public struct SaveTypesetVersionCommand: Codable, Equatable {
+	public let name: String
+
+	public init(name: String) {
+		self.name = name
 	}
 }
 
@@ -7479,6 +7571,67 @@ public struct TypesetFocus: Codable, Equatable {
 
 	public init(sectionId: String) {
 		self.sectionId = sectionId
+	}
+}
+
+/// Why a typeset version was kept.
+public enum TypesetVersionKind: String, Codable, Equatable {
+	/// A while after the typesetting changed.
+	case auto
+	/// Saved, and named, by the writer.
+	case named
+	/// What a print or an export was made from.
+	case export
+	/// The typeset as it was just before another was restored.
+	case restore
+}
+
+/// One typeset version of a book, as the History tab lists it.
+public struct TypesetVersionRow: Codable, Equatable {
+	public let id: String
+	/// ISO 8601.
+	public let timestamp: String
+	public let kind: TypesetVersionKind
+	public let name: String?
+	/// What changed since the version before it, a line a change.
+	public let summary: [String]
+
+	public init(id: String, timestamp: String, kind: TypesetVersionKind, name: String?, summary: [String]) {
+		self.id = id
+		self.timestamp = timestamp
+		self.kind = kind
+		self.name = name
+		self.summary = summary
+	}
+}
+
+/// A book's typeset history, newest first. Published by the page when it changes and
+/// when the book in view does.
+public struct TypesetHistoryChanged: Codable, Equatable {
+	public let folder: String
+	public let rows: [TypesetVersionRow]
+	/// The version the Typeset view is previewing, if any.
+	public let previewing: String?
+	/// And whether beside the current typeset, to compare.
+	public let comparing: Bool?
+	/// What the last restore could not put back: "2 settings had no paragraph left".
+	public let note: String?
+
+	public init(folder: String, rows: [TypesetVersionRow], previewing: String?, comparing: Bool?, note: String?) {
+		self.folder = folder
+		self.rows = rows
+		self.previewing = previewing
+		self.comparing = comparing
+		self.note = note
+	}
+}
+
+/// A typeset version, by id: to restore, delete, or stop previewing (`id` absent).
+public struct TypesetVersionRef: Codable, Equatable {
+	public let id: String
+
+	public init(id: String) {
+		self.id = id
 	}
 }
 

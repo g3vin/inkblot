@@ -363,3 +363,103 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
     readChapterMeta(editor.state.doc)?.subtitle === 'Sub' && editor.state.doc.attrs.pageSetup?.presetId === 'a5')
   editor.destroy()
 }
+
+/* ---- the typeset history ---- */
+
+{
+  const { Editor } = await import('@tiptap/core')
+  const { getDocPreviewExtensions } = await import(`${C}/lib/editorExtensions.js`)
+  const history = await import(`${C}/print/typesetHistory.ts`)
+  const { anchorBlock } = await import(`${C}/print/TypesetAnchors.ts`)
+  const docSetup = await import(`${C}/print/DocPageSetup.js`)
+
+  const editor = new Editor({ extensions: getDocPreviewExtensions(), content: '<p>One two three.</p><p>Four.</p>' })
+  const tighten = (pos, value) => {
+    const tr = editor.state.tr
+    anchorBlock(tr, pos)
+    tr.setNodeAttribute(pos, 'textAlign', null)
+    editor.view.dispatch(tr)
+    return value
+  }
+  tighten(0)
+  const id = editor.state.doc.firstChild.attrs.typesetId
+  ok('a block the typesetter touches gets a typeset id, and keeps it', Boolean(id) && anchorBlock(editor.state.tr, 0) === id)
+  ok('a block never touched has none', !editor.state.doc.child(1).attrs.typesetId)
+  editor.commands.setTextSelection(5)
+  editor.commands.splitBlock()
+  const ids = []
+  editor.state.doc.forEach((node) => ids.push(node.attrs.typesetId))
+  ok('a block split in two is two blocks with ids of their own', ids[0] === id && ids[1] && ids[1] !== id)
+  editor.destroy()
+
+  const chapter = (width, setup, subtitle, text = 'x') => ({
+    type: 'doc',
+    attrs: { pageSetup: setup, chapter: subtitle ? { subtitle } : null },
+    content: [
+      { type: 'paragraph', content: [{ type: 'text', text }] },
+      { type: 'image', attrs: { src: 'a.png', width, align: 'center', typesetId: 'img1' } },
+    ],
+  })
+  const setupA = { presetId: 'trade-6x9', widthMm: 152.4, heightMm: 228.6, margins: { topMm: 19, bottomMm: 19, insideMm: 19, outsideMm: 16, gutterMm: 3 } }
+  const setupB = { ...setupA, margins: { ...setupA.margins, insideMm: 22 } }
+  const bookA = { title: 'T', author: 'A', chapterDesign: { styleId: 'classic' }, items: [{ id: 'c1', kind: 'chapter', path: 'N/One', hidden: false }] }
+  const bookB = { ...bookA, title: 'Changed Title', chapterDesign: { styleId: 'modern' }, items: [{ id: 'c1', kind: 'chapter', path: 'N/One', hidden: true }] }
+  const a = history.snapshotOf(bookA, { 'N/One': chapter(200, setupA, '') })
+  const b = history.snapshotOf(bookB, { 'N/One': chapter(300, setupB, 'Rain') })
+  ok('a typeset snapshot leaves out the book’s title and author', !('title' in a.book) && !('author' in a.book))
+  ok('…and holds each chapter’s setup, head and typeset blocks', a.chapters['N/One'].blocks.img1.width === 200 && a.chapters['N/One'].pageSetup.presetId === 'trade-6x9')
+  ok('the same typeset is the same, whatever order its keys are in',
+    history.sameSnapshot(a, history.snapshotOf({ items: bookA.items, chapterDesign: { styleId: 'classic' }, author: 'Z' }, { 'N/One': chapter(200, setupA, '') })))
+  ok('changing a title is not a change of typesetting', history.sameSnapshot(a, history.snapshotOf({ ...bookA, title: 'X' }, { 'N/One': chapter(200, setupA, '') })))
+  const lines = history.typesetDiff(a, b)
+  ok('what changed reads as a designer would say it',
+    lines.includes('Style classic → modern') && lines.some((l) => /One: Inside margin 19 mm → 22 mm/.test(l)) &&
+    lines.includes('One: subtitle added') && lines.includes('One hidden') && lines.some((l) => /1 paragraph or picture set/.test(l)), JSON.stringify(lines))
+  ok('the first version says the typesetting began', history.typesetDiff(null, a)[0] === 'Typesetting begun')
+
+  const rewritten = chapter(300, setupB, 'Rain', 'words written since')
+  rewritten.content.push({ type: 'paragraph', content: [{ type: 'text', text: 'and more' }] })
+  const restored = history.applyChapterTypeset(rewritten, a.chapters['N/One'])
+  ok('restoring a typeset puts its settings back onto the text as it is now',
+    restored.content.content[0].content[0].text === 'words written since' && restored.content.content[2].content[0].text === 'and more' &&
+    restored.content.content[1].attrs.width === 200 && restored.content.attrs.pageSetup.margins.insideMm === 19 && !restored.content.attrs.chapter)
+  const gone = history.applyChapterTypeset({ type: 'doc', content: [{ type: 'paragraph' }] }, a.chapters['N/One'])
+  ok('…and says how many settings had nowhere left to go', gone.orphans === 1)
+  ok('restoring keeps the book’s title', history.restoreBook({ title: 'Now', author: 'B', chapterDesign: {} }, a).title === 'Now' &&
+    history.restoreBook({ title: 'Now' }, a).chapterDesign.styleId === 'classic')
+
+  let entries = []
+  for (let i = 0; i < 70; i += 1) entries = history.pushEntry(entries, { id: `a${i}`, kind: i === 3 ? 'named' : i === 5 ? 'export' : 'auto', summary: [], snapshot: a, timestamp: '' })
+  ok('automatic versions are capped, the oldest going first; named and exported ones stay',
+    entries.filter((e) => e.kind === 'auto').length === history.AUTO_CAP && entries.some((e) => e.id === 'a3') && entries.some((e) => e.id === 'a5') && !entries.some((e) => e.id === 'a0'))
+
+  // A text version restored keeps the typesetting as it is now.
+  const ed = new Editor({ extensions: getDocPreviewExtensions(), content: chapter(250, setupB, 'Rain') })
+  docSetup.setContentKeepingPageSetup(ed, chapter(100, setupA, '', 'an older draft'))
+  const after = ed.getJSON()
+  ok('restoring a text version keeps the typesetting as it is now',
+    after.content[0].content[0].text === 'an older draft' && JSON.stringify(after).includes('"width":250') &&
+    after.attrs.pageSetup.margins.insideMm === 22 && after.attrs.chapter?.subtitle === 'Rain')
+  ed.destroy()
+}
+
+/* ---- the typeset history, on disk ---- */
+
+{
+  const store = await import(`${C}/print/typesetHistoryStore.js`)
+  const { files } = await import('./stub-fs.mjs')
+  const P = 'History'
+  const entry = (id, kind = 'auto') => ({ id, kind, timestamp: '2026-09-26T12:00:00Z', summary: ['x'], snapshot: { book: {}, chapters: { 'Novel/One': { pageSetup: null, chapter: null, blocks: {} } } } })
+  await store.addTypesetEntry(P, 'Novel', entry('v1'))
+  await store.addTypesetEntry(P, 'Novel', entry('v2'))
+  await store.renameTypesetEntry(P, 'Novel', 'v1', 'Proof one')
+  const renamed = await store.typesetEntries(P, 'Novel')
+  ok('a version kept is in the project’s history file, and naming it makes it named',
+    [...files.keys()].some((k) => k.endsWith('/History/.inkblot-typeset-history.json')) && renamed[0].name === 'Proof one' && renamed[0].kind === 'named')
+  await store.deleteTypesetEntry(P, 'Novel', 'v2')
+  ok('a version deleted is gone', (await store.typesetEntries(P, 'Novel')).length === 1)
+  await store.relocateTypesetHistory(P, 'Novel', 'Book', { folder: true })
+  const moved = await store.typesetEntries(P, 'Book')
+  ok('renaming the folder takes its history with it, chapters and all',
+    moved.length === 1 && Object.keys(moved[0].snapshot.chapters)[0] === 'Book/One' && (await store.typesetEntries(P, 'Novel')).length === 0)
+}

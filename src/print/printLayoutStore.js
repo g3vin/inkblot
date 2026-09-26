@@ -252,6 +252,19 @@ export const setSelectedBookItem = (projectName, id) => {
   emit()
 }
 
+/* ---------------- a typeset version, previewed ---------------- */
+
+// `{ id, compare, snapshot }` while the Typeset view shows a typeset version's pages;
+// null otherwise. Not kept across launches.
+let typesetPreview = null
+
+export const getTypesetPreview = () => typesetPreview
+
+export const setTypesetPreview = (preview) => {
+  typesetPreview = preview && preview.snapshot ? preview : null
+  emit()
+}
+
 /* ---------------- the last export ---------------- */
 
 const LAST_EXPORT_PREFIX = 'inkblot-last-export:'

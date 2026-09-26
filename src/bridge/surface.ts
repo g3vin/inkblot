@@ -49,6 +49,7 @@ import type {
   RevealReference,
   PrintJobStatus,
   TypesetFocus,
+  TypesetHistoryChanged,
   PrintRequest,
   ClipboardChanged,
   NotesChanged,
@@ -213,6 +214,8 @@ export interface DocumentSurface {
   publishPrintJobStatus(payload: PrintJobStatus): void
   /** A Typeset page's handle was picked: the inspector shows its section. */
   publishTypesetFocus(payload: TypesetFocus): void
+  /** A book's typeset history, newest first. Not coalesced: each carries it all. */
+  publishTypesetHistoryChanged(payload: TypesetHistoryChanged): void
   /** The project's sources for the document in view. Coalesced — each carries them all. */
   publishReferencesChanged(payload: ReferencesChanged): void
   /** The kinds of source and the styles, once. */
@@ -651,6 +654,7 @@ export function createDocumentSurface({
     publishPageLayoutCatalog(payload) { bridge.emit('pageLayoutCatalog', payload) },
     publishPrintJobStatus(payload) { bridge.emit('printJobStatus', payload) },
     publishTypesetFocus(payload) { bridge.emit('typesetFocus', payload) },
+    publishTypesetHistoryChanged(payload) { bridge.emit('typesetHistoryChanged', payload) },
     publishReferencesChanged(payload) { referenceLists.push(payload) },
     publishReferenceSchema(payload) { bridge.emit('referenceSchema', payload) },
     publishRevealReference(payload) { bridge.emit('revealReference', payload) },

@@ -52,6 +52,15 @@ Notable changes to Inkblot. The format follows
   letter for a drop cap, and snap a picture in the text to the text block. Each shows
   its value as it moves, commits once when let go, and opens its section in the Typeset
   tab. A change to the whole book offers to be undone.
+- **Typeset history:** a book's typesetting has a history of its own, apart from the
+  text's. A version is kept a while after the typesetting changes, when saved under a
+  name (⌥⌘S), and every time the book is printed or exported — so the interior sent to
+  the printer can always be had again. Each says what changed ("Inside margin 19 mm →
+  22 mm", "Style Classic → Modern"). A version can be previewed as pages, compared beside
+  the current ones, or restored onto the text as it is now without changing a word. In
+  Typeset, the History tab shows it, with the text history a click away; restoring a
+  text version keeps the typesetting as it is. Typesetting no longer adds text-history
+  checkpoints.
 
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
