@@ -131,6 +131,8 @@ struct InkblotCommands: Commands {
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
             .disabled(model.pageLayout.lastExport == nil || !model.pageLayout.hasDocument)
+            Button("Import Fountain Script…") { model.pageLayout.importScript() }
+                .disabled(!model.hasProject)
             Menu("Export") {
                 exportItems(.document)
             }
@@ -249,6 +251,11 @@ struct InkblotCommands: Commands {
         Button("Markdown…") { model.pageLayout.export(.markdown, scope: scope) }
         Button("HTML…") { model.pageLayout.export(.html, scope: scope) }
         Button("Plain Text…") { model.pageLayout.export(.plainText, scope: scope) }
+        if model.isScript {
+            Divider()
+            Button("Fountain…") { model.pageLayout.export(.fountain, scope: scope) }
+            Button("Final Draft (.fdx)…") { model.pageLayout.export(.fdx, scope: scope) }
+        }
     }
 
     private func markToggle(_ title: String, _ mark: MarkKind, _ isOn: KeyPath<ActiveMarks, Bool>) -> some View {

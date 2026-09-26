@@ -76,7 +76,7 @@ pub use references::{
     SetCitationStyleCommand, SetReferenceAttachedCommand, UpdateReferenceCommand,
 };
 pub use print::{
-    ExportAgainCommand, LastExport, MeasureBookCommand, PreflightIssue, PreflightSeverity, PrintOptions, PrintRange,
+    ExportAgainCommand, ImportScriptCommand, LastExport, MeasureBookCommand, PreflightIssue, PreflightSeverity, PrintOptions, PrintRange,
     PublishingReport,
     ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand, ExportFormat, FormatKind,
     FormatOption, GoToPageCommand, InsertBreakCommand, PageBreakKind, PageLayoutCatalog,

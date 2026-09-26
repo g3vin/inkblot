@@ -583,3 +583,153 @@ ok('a capitalised line ending "TO:" is a transition, and a scene heading follows
 typing.commands.setScriptElement(scriptEls.elementsFor('screenplay')[1].id)
 ok('⌥⌘2 is action', elementsOf(typing)[2] === 'action')
 typing.destroy()
+
+/* ---------------- a script across pages ---------------- */
+
+const { paginate } = await import('../../src/print/paginate.ts')
+const pgFrame = { slotHeight: 100, stride: 100, columns: 1, minLines: 2 }
+// A line is 10 px; units are laid end to end from `top`, positions 10 apart per line.
+const textUnit = (pos, top, count, extra = {}) => ({
+  kind: 'text', pos, top, bottom: top + count * 10,
+  lines: Array.from({ length: count }, (_, i) => ({ top: top + i * 10, bottom: top + i * 10 + 10, pos: pos + 1 + i * 10 })),
+  ...extra,
+})
+const sentencesAt = (...indexes) => ({ split: 'sentences', canBreakBefore: (k) => indexes.includes(k), continuation: { cue: 'MARY' } })
+
+const speech = paginate([textUnit(0, 0, 6), textUnit(100, 60, 7, sentencesAt(3, 5))], pgFrame)
+ok('a speech breaks at a sentence, leaving room for (MORE), and the next page opens a line down for the name',
+  speech.pushes.length === 1 && speech.pushes[0].kind === 'line' && speech.pushes[0].pos === 131 && speech.pushes[0].height === 20 &&
+  same(speech.continuations, [{ pos: 131, cue: 'MARY' }]))
+
+const noSentence = paginate([textUnit(0, 0, 6), textUnit(100, 60, 7, sentencesAt())], pgFrame)
+ok('a speech with no sentence ending where it could break goes over whole', noSentence.pushes[0].kind === 'block' && noSentence.continuations.length === 0)
+
+const speaker = paginate([textUnit(0, 0, 8), textUnit(100, 80, 1, { keepWithNext: true }), textUnit(200, 90, 4, sentencesAt())], pgFrame)
+ok('and takes its speaker with it', speaker.pushes[0].kind === 'block' && speaker.pushes[0].pos === 100 && speaker.pushes[0].height === 20)
+
+const paren = paginate([textUnit(0, 0, 9), textUnit(100, 90, 2, { split: 'never' })], pgFrame)
+ok('a parenthetical never splits', paren.pushes.length === 1 && paren.pushes[0].kind === 'block')
+
+const transition = paginate([textUnit(0, 0, 7), textUnit(100, 70, 1, { keepWithNext: true }), textUnit(200, 80, 2), textUnit(300, 100, 1, { keepWithPrevious: true })], pgFrame)
+ok('a transition never opens a page: the speech and speaker before it come over with it',
+  transition.pushes.length === 1 && transition.pushes[0].pos === 100 && transition.pushes[0].height === 30 && transition.pageCount === 2)
+
+const prosePages = paginate([textUnit(0, 0, 6), textUnit(100, 60, 7)], pgFrame)
+ok('prose is split between lines as before, with no continuations', prosePages.slotStarts[1] === 141 && prosePages.continuations.length === 0)
+
+const { sceneNumbers } = await import('../../src/script/DocWritingFormat.js')
+const sceneEditor = scriptEditor({ type: 'doc', attrs: { writingFormat: 'screenplay' }, content: [line('sceneHeading', 'INT. A'), line('action', 'x'), line('sceneHeading', 'EXT. B')] })
+const labels = (ed) => [...sceneNumbers(ed.state.doc).values()]
+ok('scenes are unnumbered until asked', labels(sceneEditor).length === 0)
+sceneEditor.commands.setSceneNumbers('on')
+ok('then numbered in order', same(labels(sceneEditor), ['1', '2']) && sceneEditor.view.dom.querySelector('[data-scene-number="2"]'))
+sceneEditor.commands.setSceneNumbers('locked')
+sceneEditor.commands.setTextSelection(endOf(sceneEditor, 1))
+sceneEditor.commands.keyboardShortcut('Enter')
+sceneEditor.commands.setScriptElement('sceneHeading')
+sceneEditor.commands.insertContent('INT. C')
+ok('locked, a scene added between 1 and 2 is 1A', same(labels(sceneEditor), ['1', '1A', '2']))
+sceneEditor.commands.setSceneNumbers('on')
+ok('unlocked, they number in order again', same(labels(sceneEditor), ['1', '2', '3']))
+sceneEditor.destroy()
+
+ok('the Screenplay format is Courier on exact 12-point lines, 1½-inch left margin, no number on page one',
+  (() => { const f = formats.applyFormat('screenplay'); return f.typography.lineSpacing === 'exact' && f.typography.lineValue === 12 && f.margins.insideMm === 38.1 && f.differentFirstPage && f.header.right === '{page}.' })())
+ok('and makes a document a screenplay', formats.writingFormatOf('screenplay') === 'screenplay' && formats.writingFormatOf('stageplay') === 'stageplay' && formats.writingFormatOf('letter') === null)
+
+/* ---------------- Fountain and Final Draft ---------------- */
+
+const { parseFountain, serializeFountain } = await import('../../src/script/fountain.ts')
+const { buildFdx } = await import('../../src/print/export/fdx.ts')
+
+const FOUNTAIN = `Title: Brick & Steel
+Credit: Written by
+Author: Stu Maschwitz
+Draft date: 1/20/2012
+Contact:
+    Next Level Productions
+    1588 Mission Dr.
+
+EXT. BRICK'S PATIO - DAY #1#
+
+A gorgeous day.  The sun is shining. [[A note.]]
+
+/* A scene cut
+for time. */
+
+BRICK (V.O.)
+(quietly)
+I love this *patio*.
+
+STEEL ^
+And I **love** you.
+
+CUT TO:
+
+.FLASHBACK
+
+> THE END <
+
+@McCLANE
+Yippee.
+
+!SILENCE.
+
+===
+
+INT. HOUSE - NIGHT
+Brick sits.
+`
+
+const parsed = parseFountain(FOUNTAIN)
+const els = parsed.doc.content.map((n) => n.type === 'scriptElement' ? n.attrs.element : n.type)
+const textOf = (n) => (n.content || []).map((c) => c.text || (c.type === 'hardBreak' ? '\n' : '')).join('')
+ok('Fountain: the title page block', parsed.titlePage.title === 'Brick & Steel' && parsed.titlePage.author === 'Stu Maschwitz' && parsed.titlePage.contact === 'Next Level Productions\n1588 Mission Dr.')
+ok('Fountain: every element, with notes and the boneyard left out', same(els, [
+  'sceneHeading', 'action', 'character', 'parenthetical', 'dialogue', 'character', 'dialogue', 'transition',
+  'sceneHeading', 'centered', 'character', 'dialogue', 'action', 'pageBreak', 'sceneHeading', 'action',
+]), els.join(','))
+ok('Fountain: scene numbers are kept, locked', parsed.doc.content[0].attrs.sceneNumber === '1' && parsed.doc.attrs.sceneNumbers === 'locked' && textOf(parsed.doc.content[0]) === "EXT. BRICK'S PATIO - DAY")
+ok('Fountain: a note is gone from the action', textOf(parsed.doc.content[1]) === 'A gorgeous day.  The sun is shining.')
+ok('Fountain: emphasis becomes marks', parsed.doc.content[4].content.some((c) => c.text === 'patio' && c.marks?.[0]?.type === 'italic'))
+ok('Fountain: ^ is dual dialogue', parsed.doc.content[5].attrs.dual === true && textOf(parsed.doc.content[5]) === 'STEEL')
+ok('Fountain: a forced character and forced action', textOf(parsed.doc.content[10]) === 'McCLANE' && textOf(parsed.doc.content[12]) === 'SILENCE.')
+ok('Fountain: "FADE IN:" opening a script is not a title page', parseFountain('FADE IN:\n\nINT. A - DAY\n').doc.content[1].attrs.element === 'sceneHeading')
+
+const written = serializeFountain(parsed.doc, { titlePage: parsed.titlePage })
+const again = parseFountain(written)
+const shape = (doc) => doc.content.map((n) => [n.type === 'scriptElement' ? n.attrs.element : n.type, textOf(n).toUpperCase(), Boolean(n.attrs?.dual)])
+ok('Fountain: what is written reads back the same', same(shape(again.doc), shape(parsed.doc)) && again.titlePage.author === 'Stu Maschwitz', written)
+ok('Fountain: a heading without its keyword is forced; a name in capitals needs no @',
+  written.includes('\n.FLASHBACK #1A#\n') && written.includes('\nMCCLANE\nYippee.') && written.includes('\nSILENCE.\n'))
+ok('Fountain: a lower-case name is forced', serializeFountain({ type: 'doc', content: [line('character', 'Dr. 3'), line('dialogue', 'Hi')] }).startsWith('DR. 3\n') &&
+  serializeFountain({ type: 'doc', content: [line('character', '42'), line('dialogue', 'Hi')] }).startsWith('@42\n'))
+ok('Fountain: capitals in action with speech under them are forced, so they are not read as a name',
+  serializeFountain({ type: 'doc', content: [line('action', 'BANG'), line('dialogue', 'Ow.')] }).startsWith('!BANG'))
+
+const fdx = buildFdx(parsed.doc, { titlePage: parsed.titlePage })
+const fdxDoc = new DOMParser().parseFromString(fdx, 'application/xml')
+ok('FDX: parses as XML', !fdxDoc.querySelector('parsererror'))
+const fdxTypes = [...fdxDoc.querySelectorAll('FinalDraft > Content > Paragraph')].map((p) => p.getAttribute('Type') || 'Dual')
+ok('FDX: paragraph types, the dual speeches in one', same(fdxTypes.slice(0, 4), ['Scene Heading', 'Action', 'Dual', 'Transition']), fdxTypes.join(','))
+ok('FDX: scene number, styled runs, a page break and the title page',
+  fdxDoc.querySelector('Paragraph[Type="Scene Heading"]').getAttribute('Number') === '1' &&
+  fdxDoc.querySelector('Text[Style="Italic"]')?.textContent === 'patio' &&
+  fdxDoc.querySelectorAll('Paragraph[StartsNewPage="Yes"]').length === 1 &&
+  fdxDoc.querySelector('TitlePage Text')?.textContent === 'BRICK & STEEL')
+
+const { toMarkdown } = await import('../../src/print/export/markdown.ts')
+const scriptDoc = { type: 'doc', attrs: { writingFormat: 'screenplay' }, content: [line('sceneHeading', 'int. kitchen - day'), line('action', 'Rain.'), line('character', 'mary'), line('parenthetical', '(quietly)'), line('dialogue', 'Hello.'), line('transition', 'cut to:')] }
+const scriptDocx = await buildDocx({ title: 'Script', author: '', setup: formats.applyFormat('screenplay'), chapters: [{ title: 'Script', content: scriptDoc }], front: [], contents: false, profile, words: 0, resolveImage: async () => null, modified: new Date(0) })
+const scriptStyles = readZipEntry(scriptDocx, 'word/styles.xml')
+const scriptBody = readZipEntry(scriptDocx, 'word/document.xml')
+ok('Word: a script gets its element styles, and its lines use them',
+  scriptStyles.includes('w:styleId="ScriptCharacter"') && scriptStyles.includes('<w:name w:val="Dialogue"/>') &&
+  scriptBody.includes('<w:pStyle w:val="ScriptParenthetical"/>') && scriptBody.includes('<w:pStyle w:val="ScriptTransition"/>') &&
+  !new dom.window.DOMParser().parseFromString(scriptStyles, 'application/xml').querySelector('parsererror'))
+ok('Word: prose gets no script styles', !readZipEntry(docx, 'word/styles.xml').includes('ScriptCharacter'))
+ok('plain text: a script in its columns, a speech under its name', toPlainText(scriptDoc) === [
+  'INT. KITCHEN - DAY', '', 'Rain.', '', `${' '.repeat(22)}MARY`, `${' '.repeat(16)}(quietly)`, `${' '.repeat(10)}Hello.`, '', `${' '.repeat(53)}CUT TO:`,
+].join('\n'), JSON.stringify(toPlainText(scriptDoc)))
+ok('Markdown: a script reads as one, a speech hanging from its name',
+  toMarkdown(scriptDoc) === '**INT. KITCHEN - DAY**\n\nRain.\n\nMARY  \n(quietly)  \nHello.\n\nCUT TO:\n', JSON.stringify(toMarkdown(scriptDoc)))

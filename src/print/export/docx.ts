@@ -282,6 +282,8 @@ class Writer {
       }
       case 'table':
         return this.table(node)
+      case 'scriptElement':
+        return this.paragraph({ style: scriptStyleId(attrs.element) }, this.inline(node.content))
       case 'bibliography': {
         const out = [this.paragraph({ style: 'Heading2', align: 'center' }, run(String(attrs.title || 'References')))]
         for (const note of (attrs.notes as unknown[]) || []) out.push(this.paragraph({ flush: true }, run(htmlText(note))))
@@ -502,7 +504,53 @@ const lineSpacing = (t: PrintTypography | undefined): string => {
   }
 }
 
-const stylesXml = (t: PrintTypography | undefined, language: string): string => {
+/**
+ * A script's elements as paragraph styles, so a producer's assistant opening the file in
+ * Word finds "Character" and "Dialogue" in the style list, set as the page has them
+ * (Script.css): indents from the left margin in tenths of an inch, a blank line before
+ * the lines that open something, capitals where the page shows them.
+ */
+interface ScriptStyle { id: string; name: string; left?: number; right?: number; before?: number; jc?: string; caps?: boolean; b?: boolean; i?: boolean; u?: boolean; keepNext?: boolean }
+
+const INCH = 1440
+const LINE = 240
+
+const SCRIPT_STYLES: ScriptStyle[] = [
+  { id: 'sceneHeading', name: 'Scene Heading', before: LINE, caps: true, b: true, keepNext: true },
+  { id: 'action', name: 'Action', before: LINE },
+  { id: 'character', name: 'Character', left: 2.2 * INCH, before: LINE, caps: true, keepNext: true },
+  { id: 'parenthetical', name: 'Parenthetical', left: 1.6 * INCH, right: 1.9 * INCH, keepNext: true },
+  { id: 'dialogue', name: 'Dialogue', left: 1.0 * INCH, right: 1.5 * INCH },
+  { id: 'transition', name: 'Transition', before: LINE, jc: 'right', caps: true },
+  { id: 'shot', name: 'Shot', before: LINE, caps: true, keepNext: true },
+  { id: 'centered', name: 'Centered', before: LINE, jc: 'center' },
+  { id: 'actHeading', name: 'Act', before: 2 * LINE, jc: 'center', caps: true, u: true, keepNext: true },
+  { id: 'sceneTitle', name: 'Scene', before: LINE, jc: 'center', caps: true, keepNext: true },
+  { id: 'stageDirection', name: 'Stage Direction', left: 2.5 * INCH, before: LINE, i: true },
+  { id: 'stageCharacter', name: 'Stage Character', before: LINE, jc: 'center', caps: true, keepNext: true },
+  { id: 'stageDialogue', name: 'Stage Dialogue' },
+]
+
+/** The style id a script element's paragraphs take ("ScriptDialogue"). */
+export const scriptStyleId = (element: unknown): string => {
+  const spec = SCRIPT_STYLES.find((s) => s.id === element) || SCRIPT_STYLES[1]
+  return `Script${spec.id[0].toUpperCase()}${spec.id.slice(1)}`
+}
+
+const scriptStylesXml = (stage: boolean): string => SCRIPT_STYLES.map((s) => {
+  // A play's parentheticals sit further in, in italics.
+  const spec = stage && s.id === 'parenthetical' ? { ...s, left: 2.0 * INCH, right: 1.0 * INCH, i: true } : s
+  const p = [
+    spec.keepNext ? '<w:keepNext/>' : '',
+    `<w:spacing w:before="${spec.before || 0}" w:after="0"/>`,
+    `<w:ind w:left="${Math.round(spec.left || 0)}" w:right="${Math.round(spec.right || 0)}" w:firstLine="0"/>`,
+    `<w:jc w:val="${spec.jc || 'left'}"/>`,
+  ].join('')
+  const r = [spec.b ? '<w:b/>' : '', spec.i ? '<w:i/>' : '', spec.caps ? '<w:caps/>' : '', spec.u ? '<w:u w:val="single"/>' : ''].join('')
+  return `<w:style w:type="paragraph" w:customStyle="1" w:styleId="${scriptStyleId(spec.id)}"><w:name w:val="${spec.name}"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr>${p}</w:pPr>${r ? `<w:rPr>${r}</w:rPr>` : ''}</w:style>`
+}).join('\n')
+
+const stylesXml = (t: PrintTypography | undefined, language: string, script: 'screenplay' | 'stageplay' | null = null): string => {
   const font = t ? firstFamily(t.fontFamily) : 'Georgia'
   const size = Math.round((t?.fontSizePt || 12) * 2)
   const indent = t ? twips(t.firstLineIndentMm) : 0
@@ -528,7 +576,7 @@ ${heading(6, 1)}
 <w:style w:type="paragraph" w:styleId="Bibliography"><w:name w:val="Bibliography"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:hanging="720"/><w:jc w:val="left"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Header"><w:name w:val="header"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Footer"><w:name w:val="footer"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>
-<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>
+${script ? `${scriptStylesXml(script === 'stageplay')}\n` : ''}<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>
 </w:styles>`
 }
 
@@ -558,6 +606,8 @@ export const buildDocx = async (options: DocxOptions): Promise<Uint8Array> => {
   const w = new Writer(setup, type)
   const language = options.language || 'en-US'
   const chapters = options.chapters.map((c) => portableContent(c.content))
+  const written = chapters.map((c) => c.attrs?.writingFormat).find((f) => f === 'screenplay' || f === 'stageplay')
+  const scriptFormat = (written as 'screenplay' | 'stageplay' | undefined) || null
 
   // Fixed relationships first, so their ids are known.
   w.rel(`${REL}/styles`, 'styles.xml')
@@ -659,7 +709,7 @@ ${author ? `<dc:creator>${x(author)}</dc:creator>\n` : ''}<dc:language>${x(langu
     { name: '[Content_Types].xml', data: contentTypes },
     { name: '_rels/.rels', data: rootRels },
     { name: 'word/document.xml', data: document },
-    { name: 'word/styles.xml', data: stylesXml(type, language) },
+    { name: 'word/styles.xml', data: stylesXml(type, language, scriptFormat) },
     { name: 'word/settings.xml', data: settingsXml(setup, type, Boolean(options.contents)) },
     { name: 'word/numbering.xml', data: numberingXml(w.lists) },
     { name: 'word/_rels/document.xml.rels', data: docRels },

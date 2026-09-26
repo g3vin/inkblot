@@ -94,10 +94,50 @@ const blockText = (node: PMJSON, options: Required<TextOptions>, prefix = ''): s
   }
 }
 
+/* ---- a script, laid out as a typewriter would: columns of a 60-character line ---- */
+
+interface ScriptColumns { left: number; width: number; upper?: boolean; align?: 'right' | 'center'; before?: boolean }
+
+const SCRIPT_COLUMNS: Record<string, ScriptColumns> = {
+  sceneHeading: { left: 0, width: 60, upper: true, before: true },
+  action: { left: 0, width: 60, before: true },
+  shot: { left: 0, width: 60, upper: true, before: true },
+  character: { left: 22, width: 38, upper: true, before: true },
+  parenthetical: { left: 16, width: 25 },
+  dialogue: { left: 10, width: 35 },
+  transition: { left: 0, width: 60, upper: true, align: 'right', before: true },
+  centered: { left: 0, width: 60, align: 'center', before: true },
+  actHeading: { left: 0, width: 60, upper: true, align: 'center', before: true },
+  sceneTitle: { left: 0, width: 60, upper: true, align: 'center', before: true },
+  stageCharacter: { left: 0, width: 60, upper: true, align: 'center', before: true },
+  stageDialogue: { left: 0, width: 60 },
+  stageDirection: { left: 25, width: 35, before: true },
+}
+
+const scriptText = (doc: PMJSON): string => {
+  const out: string[] = []
+  for (const node of doc.content || []) {
+    if (node.type === 'pageBreak') continue
+    const spec = SCRIPT_COLUMNS[String(node.attrs?.element)] || SCRIPT_COLUMNS.action
+    let text = inlineText(node.content)
+    if (spec.upper) text = text.toUpperCase()
+    const lines = wrapText(text, spec.width).split('\n').map((l) => {
+      if (spec.align === 'right') return ' '.repeat(Math.max(0, 60 - l.length)) + l
+      if (spec.align === 'center') return center(l, 60)
+      return ' '.repeat(spec.left) + l
+    })
+    if (spec.before && out.length) out.push('')
+    out.push(...lines)
+  }
+  return out.join('\n')
+}
+
 /** One document's content as plain text. */
 export const toPlainText = (content: PMJSON, options: TextOptions = {}): string => {
   const settled: Required<TextOptions> = { wrap: options.wrap ?? 0, sceneBreak: options.sceneBreak || '* * *' }
   const doc = portableContent(content)
+  const format = doc.attrs?.writingFormat
+  if (format === 'screenplay' || format === 'stageplay') return scriptText(doc).replace(/[ \t]+$/gm, '')
   return (doc.content || []).flatMap((node) => blockText(node, settled)).join('\n\n').replace(/[ \t]+$/gm, '')
 }
 

@@ -105,7 +105,7 @@ struct FinishingActionHeader: View {
             }
 
             Menu("Export") {
-                Self.exportItems(layout, scope: scope, bindable: bindable)
+                Self.exportItems(layout, scope: scope, bindable: bindable, script: model.isScript)
             }
             .frame(maxWidth: .infinity)
         }
@@ -115,7 +115,7 @@ struct FinishingActionHeader: View {
 
     /// The Export menu's items, here and in the File menu.
     @ViewBuilder
-    static func exportItems(_ layout: PageLayoutModel, scope: PrintScope, bindable: Bool = false) -> some View {
+    static func exportItems(_ layout: PageLayoutModel, scope: PrintScope, bindable: Bool = false, script: Bool = false) -> some View {
         if let last = layout.lastExport, last.scope == scope {
             Button("Export Again: \(URL(fileURLWithPath: last.path).lastPathComponent)") { layout.exportAgain() }
             Divider()
@@ -127,6 +127,11 @@ struct FinishingActionHeader: View {
         Button("Markdown…") { layout.export(.markdown, scope: scope) }
         Button("HTML…") { layout.export(.html, scope: scope) }
         Button("Plain Text…") { layout.export(.plainText, scope: scope) }
+        if script {
+            Divider()
+            Button("Fountain…") { layout.export(.fountain, scope: scope) }
+            Button("Final Draft (.fdx)…") { layout.export(.fdx, scope: scope) }
+        }
         if bindable {
             Divider()
             Button("PDF for Binding…") { layout.export(.pdf, scope: scope, bound: true) }
@@ -276,6 +281,8 @@ struct JobStatusLine: View {
         case .html: "HTML"
         case .docx: "Word"
         case .plainText: "Plain Text"
+        case .fountain: "Fountain"
+        case .fdx: "Final Draft"
         }
     }
 }
@@ -367,4 +374,15 @@ struct PrintOptionsPopover: View {
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
     }
+}
+
+extension AppModel {
+    /// The open document is a screenplay or a stage play: its exports include Fountain
+    /// and Final Draft.
+    var isScript: Bool {
+        guard let format = bridge.toolbar?.writingFormat else { return false }
+        return format != .prose
+    }
+
+    var hasProject: Bool { bridge.project.projectName != nil }
 }

@@ -10,7 +10,7 @@
  * A setup remembers the format it was made from (`formatId`), so after the author
  * changes a margin the inspector can still say what it started as: "(modified)".
  */
-import { FormatKind, TitlePageStyle } from '../types'
+import { ChapterOpening, FormatKind, LineSpacing, PrintAlignment, TitlePageStyle } from '../types'
 import type { FormatOption, PageSetup } from '../types'
 import { DEFAULT_PAGE_SETUP, bookPageSetup, normalizePageSetup } from './pageSetup'
 import { getPageSizePreset } from './pageSizes'
@@ -47,7 +47,43 @@ const bookPage = (presetId: string): PageSetup => ({
   titlePage: { style: TitlePageStyle.Book, showContact: false, showWordCount: false },
 })
 
+/**
+ * A script's page: Courier 12 on exact 12-point lines — ten characters to the inch and
+ * six lines to it, which is what makes a page about a minute of screen time. The left
+ * margin is wider, for the brads; the page number sits at the head, with a full stop,
+ * and not on the first page. Where each element sits across it is Script.css.
+ */
+const scriptPage = (presetId: string, left: number): PageSetup => {
+  const inch = 25.4
+  return {
+    ...plainPage(presetId),
+    margins: { topMm: inch, bottomMm: inch, insideMm: Math.round(left * inch * 1000) / 1000, outsideMm: inch, gutterMm: 0 },
+    header: { left: '', center: '', right: '{page}.' },
+    footer: { left: '', center: '', right: '' },
+    headerDistanceMm: inch / 2,
+    differentFirstPage: true,
+    // A script's own rules decide where speeches break (paginate.ts).
+    widowOrphanLines: 1,
+    typography: {
+      fontFamily: COURIER,
+      fontSizePt: 12,
+      lineSpacing: LineSpacing.Exact,
+      lineValue: 12,
+      firstLineIndentMm: 0,
+      paragraphSpacingPt: 0,
+      alignment: PrintAlignment.Left,
+      hyphenate: false,
+      sceneBreak: '',
+      chapterOpening: ChapterOpening.Plain,
+      chapterSinkMm: 0,
+      noIndentAfterBreak: false,
+    },
+    titlePage: { style: TitlePageStyle.Screenplay, showContact: true, showWordCount: false },
+  }
+}
+
 const GROUP_EVERYDAY = 'Everyday'
+const GROUP_SCRIPT = 'Scripts'
 const GROUP_SUBMISSION = 'Submission'
 const GROUP_BOOK = 'Books'
 
@@ -144,11 +180,41 @@ export const FORMAT_PRESETS: FormatPreset[] = [
     kind: FormatKind.Prose,
     build: () => bookPage('a5'),
   },
+  {
+    id: 'screenplay',
+    label: 'Screenplay',
+    group: GROUP_SCRIPT,
+    summary: 'The industry page: Courier 12, 1½-inch left margin, a page about a minute of screen time.',
+    kind: FormatKind.Screenplay,
+    build: () => scriptPage('letter', 1.5),
+  },
+  {
+    id: 'screenplay-a4',
+    label: 'Screenplay (A4)',
+    group: GROUP_SCRIPT,
+    summary: 'The same screenplay page on A4, as British and European productions print it.',
+    kind: FormatKind.Screenplay,
+    build: () => scriptPage('a4', 1.5),
+  },
+  {
+    id: 'stageplay',
+    label: 'Stage Play',
+    group: GROUP_SCRIPT,
+    summary: 'A play as theatres and publishers read it: names centred, directions indented and in italics.',
+    kind: FormatKind.StagePlay,
+    build: () => scriptPage('letter', 1.5),
+  },
 ]
 
 const BY_ID = new Map(FORMAT_PRESETS.map((f) => [f.id, f]))
 
 export const getFormat = (id: string | null | undefined): FormatPreset | null => (id && BY_ID.get(id)) || null
+
+/** What a format makes a document written as: a script's, or null for prose. */
+export const writingFormatOf = (id: string | null | undefined): 'screenplay' | 'stageplay' | null => {
+  const kind = getFormat(id)?.kind
+  return kind === FormatKind.Screenplay ? 'screenplay' : kind === FormatKind.StagePlay ? 'stageplay' : null
+}
 
 /** The catalog's formats, as they cross the bridge. */
 export const FORMAT_OPTIONS: FormatOption[] = FORMAT_PRESETS.map(({ id, label, group, summary, kind }) => ({

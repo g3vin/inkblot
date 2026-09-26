@@ -64,6 +64,10 @@ pub enum ExportFormat {
     Docx,
     /// Plain text, for a submission form or an email.
     PlainText,
+    /// Fountain, the plain-text screenplay format.
+    Fountain,
+    /// Final Draft's own file.
+    Fdx,
 }
 
 /// Which part of what the scope covers is printed.
@@ -305,6 +309,13 @@ pub struct PublishingReport {
     pub spine_text: bool,
     pub issues: Vec<PreflightIssue>,
 }
+
+/// Import a script: File ▸ Import Fountain Script…. The page asks for the file and
+/// makes a new document of it beside the one open.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportScriptCommand {}
 
 /// Export the last export again — same format, scope and file — without asking where.
 #[typeshare]

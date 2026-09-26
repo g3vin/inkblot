@@ -152,6 +152,16 @@ const block = (node: PMJSON, options: MarkdownOptions): string => {
       return '<div style="break-after: page"></div>'
     case 'bibliography':
       return bibliographyMarkdown(node.attrs)
+    case 'scriptElement': {
+      // A script line as it reads on the page: names and headings in capitals, a
+      // heading in bold, a parenthetical or a speech indented under its speaker.
+      const element = String(node.attrs?.element || 'action')
+      const text = inline(node.content, options)
+      if (!text) return ''
+      if (['sceneHeading', 'actHeading', 'sceneTitle'].includes(element)) return `**${text.toUpperCase()}**`
+      if (['character', 'stageCharacter', 'transition', 'shot'].includes(element)) return escapeLineStart(text.toUpperCase())
+      return text.split('\n').map(escapeLineStart).join('\n')
+    }
     default:
       return node.content ? blocks(node.content, options) : ''
   }
@@ -162,9 +172,19 @@ const listItem = (item: PMJSON, marker: string, options: MarkdownOptions): strin
   return indent(body, ' '.repeat(marker.length), marker)
 }
 
-const blocks = (nodes: PMJSON[] = [], options: MarkdownOptions, separator = '\n\n'): string => nodes
-  .map((node) => block(node, options))
-  .filter((text) => text !== '')
-  .join(separator)
+const SPOKEN = new Set(['parenthetical', 'dialogue', 'stageDialogue'])
+
+/** A speech's lines hang from the name above them: a line break, not a new paragraph. */
+const hangs = (node: PMJSON): boolean => node.type === 'scriptElement' && SPOKEN.has(String(node.attrs?.element))
+
+const blocks = (nodes: PMJSON[] = [], options: MarkdownOptions, separator = '\n\n'): string => {
+  let out = ''
+  for (const node of nodes) {
+    const text = block(node, options)
+    if (text === '') continue
+    out += out ? `${hangs(node) ? '  \n' : separator}${text}` : text
+  }
+  return out
+}
 
 export const toMarkdown = (doc: PMJSON, options: MarkdownOptions = {}): string => `${blocks(doc.content, options).trimEnd()}\n`

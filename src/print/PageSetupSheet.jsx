@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { getPreference, setPreference } from '../lib/preferences'
-import { applyFormat, FORMAT_PRESETS, formatOf } from './formats'
+import { applyFormat, FORMAT_PRESETS, formatOf, writingFormatOf } from './formats'
 import { SIGNATURE_GUIDANCE } from './imposition'
 import { normalizePageSetup, resolvePageSetup, suggestedInsideMarginMm } from './pageSetup'
 import { fromMm, PAGE_SIZE_GROUP_LABELS, PAGE_SIZE_PRESETS, matchPageSizePreset, toMm } from './pageSizes'
@@ -188,6 +188,9 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
                 onChange={(event) => {
                   const next = applyFormat(event.target.value)
                   if (next) replace(next)
+                  // A script's format makes the document a script.
+                  const writing = writingFormatOf(event.target.value)
+                  if (writing && next) editor?.commands.setWritingFormat(writing)
                 }}
               >
                 {[...new Set(FORMAT_PRESETS.map((f) => f.group))].map((group) => (

@@ -1025,7 +1025,9 @@ export type NativeCommand =
 	| { type: "setPrintScope", payload: SetPrintScopeCommand }
 	| { type: "setAuthorProfile", payload: SetAuthorProfileCommand }
 	| { type: "setBookCover", payload: SetBookCoverCommand }
-	| { type: "exportAgain", payload: ExportAgainCommand };
+	| { type: "exportAgain", payload: ExportAgainCommand }
+	| { type: "measureBook", payload: MeasureBookCommand }
+	| { type: "importScript", payload: ImportScriptCommand };
 
 /**
  * A command, with its place in the stream.
@@ -1459,6 +1461,10 @@ export enum ExportFormat {
 	Docx = "docx",
 	/** Plain text, for a submission form or an email. */
 	PlainText = "plainText",
+	/** Fountain, the plain-text screenplay format. */
+	Fountain = "fountain",
+	/** Final Draft's own file. */
+	Fdx = "fdx",
 }
 
 /** What a print or export covers. */
@@ -1552,6 +1558,13 @@ export interface GoToPageCommand {
  */
 export interface HighlightNoteCommand {
 	noteId?: string;
+}
+
+/**
+ * Import a script: File ▸ Import Fountain Script…. The page asks for the file and
+ * makes a new document of it beside the one open.
+ */
+export interface ImportScriptCommand {
 }
 
 /** Put the bibliography at the end of the document, or move it there. */

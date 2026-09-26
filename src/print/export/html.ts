@@ -56,6 +56,19 @@ th p, td p { margin: 0; }
 mark { background: #fff59d; }
 hr { border: 0; border-top: 1px solid #ccc; margin: 2em 0; }
 .page-break { break-after: page; page-break-after: always; height: 0; }
+p.script-el { font-family: 'Courier Prime', 'Courier New', Courier, monospace; font-size: 12pt; line-height: 1.2; margin: 0; max-width: 60ch; }
+p.script-sceneHeading, p.script-action, p.script-character, p.script-transition, p.script-shot, p.script-centered,
+p.script-sceneTitle, p.script-stageCharacter, p.script-stageDirection { margin-top: 1.2em; }
+p.script-sceneHeading, p.script-character, p.script-transition, p.script-shot, p.script-actHeading, p.script-sceneTitle, p.script-stageCharacter { text-transform: uppercase; }
+p.script-sceneHeading { font-weight: 700; }
+p.script-character { margin-left: 22ch; }
+p.script-parenthetical { margin-left: 16ch; max-width: 25ch; }
+p.script-dialogue { margin-left: 10ch; max-width: 35ch; }
+p.script-transition { text-align: right; }
+p.script-centered, p.script-actHeading, p.script-sceneTitle, p.script-stageCharacter { text-align: center; }
+p.script-actHeading { margin-top: 2.4em; text-decoration: underline; }
+p.script-stageDirection { margin-left: 25ch; max-width: 35ch; font-style: italic; }
+p.script-el[data-scene-number]::before { content: attr(data-scene-number) '  '; }
 .page-break-recto { break-after: right; page-break-after: right; }
 .sc { font-variant: small-caps; }
 .bibliography { margin-top: 2.5em; }
