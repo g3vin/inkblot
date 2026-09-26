@@ -133,7 +133,15 @@ await act(async () => {
 })
 await settle()
 
-const paneText = () => document.querySelector('.primary-pane .editor')?.textContent || ''
+// The document's text as the pane shows it — less a chapter's designed head, which
+// Typeset draws around the text as decorations and is not part of it.
+const paneText = () => {
+  const editor = document.querySelector('.primary-pane .editor')
+  if (!editor) return ''
+  const copy = editor.cloneNode(true)
+  copy.querySelectorAll('.chapter-head').forEach((el) => el.remove())
+  return copy.textContent || ''
+}
 const wordCount = () => document.querySelector('.primary-pane .word-count')?.textContent || ''
 
 /* ---------------- It mounts at all ---------------- */
@@ -339,6 +347,9 @@ ok('…with the live editor inside the page stage', !!document.querySelector('.p
 ok('…the same editor instance, with the same text', control.editor === editorBefore && paneText() === textBefore)
 ok('…a page count beside the word count', /Page 1 of \d+/.test(document.querySelector('.primary-pane .pane-status .pl-page-count-badge')?.textContent || ''))
 ok('…and a zoom bar', !!document.querySelector('.primary-pane .pl-status'))
+ok('in Typeset, a chapter of a book is shown among the book\'s pages', !!document.querySelector('.primary-pane .book-pages .book-pages-live .pl-stage'))
+ok('…opening with its designed head, drawn around its live text', !!document.querySelector('.primary-pane .pl-flow .ProseMirror > .chapter-head.is-live-top') &&
+  !!document.querySelector('.primary-pane .pl-flow .ProseMirror .chapter-head.is-live-bottom'))
 
 await act(async () => {
   control.editor.commands.setPageSetup(bookPageSetup('trade-6x9'))

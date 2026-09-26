@@ -39,6 +39,11 @@ Notable changes to Inkblot. The format follows
   (Classic, Elegant, Modern, Minimal, Ornate, Large Print, Manuscript) set all of it —
   type, heads, running heads — in one click. Pictures in the text are set to the text
   block and kept with their captions, and preflight uses the book's minimum resolution.
+- **The whole book in Typeset:** the chapter open is set live among the rest of the
+  book's pages — the same pages Print makes, recomposed in the background as the book
+  changes — on the side of the spread it opens on and numbered on from the page before.
+  Its designed head is drawn around its real title, and its subtitle and epigraph are
+  typed in place. Clicking another entry's page opens it.
 
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own

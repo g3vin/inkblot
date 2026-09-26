@@ -204,6 +204,45 @@
   letter-spacing: 0.04em;
 }
 
+/* The live editor's head (ChapterHeadDecorations.ts): the design around the chapter's
+   real title, as two widgets and the heading between them. */
+.chapter-head.is-live-top { margin-bottom: 0; }
+.chapter-head.is-live-top:empty { display: none; }
+.chapter-head.is-live-bottom { margin-top: 0; padding-top: 0; }
+
+.has-print-type .ProseMirror > h1.ch-live-title,
+.ProseMirror > h1.ch-live-title {
+  margin: 0;
+  padding-top: 0;
+  font-weight: normal;
+  line-height: 1.2;
+}
+
+.chapter-head.is-live-top + h1.ch-live-title { margin-top: 0.1em; }
+
+.chapter-head .ch-editable {
+  outline: none;
+  cursor: text;
+  border-radius: 2px;
+}
+
+.chapter-head .ch-editable:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color, #0a84ff) 45%, transparent);
+}
+
+/* An empty line of the head is a hint in Typeset, and nothing on paper — the widgets
+   never print: a compiled chapter's head is the chapterHead node. */
+.chapter-head .ch-editable[data-empty] { min-height: 0; }
+.chapter-head .ch-editable[data-empty]::before {
+  content: attr(data-placeholder);
+  opacity: 0;
+  font-style: italic;
+  transition: opacity 120ms;
+}
+.chapter-head:hover .ch-editable[data-empty]::before,
+.chapter-head .ch-editable[data-empty]:focus::before { opacity: 0.4; }
+.chapter-head .ch-epigraph:has(.ch-editable[data-empty]:only-child) { margin-top: 0.2em; }
+
 /* ---- pictures in the text, set for print ---- */
 
 .pt-images .ProseMirror img {
