@@ -34,6 +34,7 @@ import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, snapToDeviceP
 import { PAGE_GAP } from './printLayoutConstants'
 import { setCurrentPrintPage } from './printLayoutStore'
 import { nativeOwns } from '../lib/host'
+import TypesetOverlay from './TypesetOverlay'
 import './PrintLayout.css'
 import './PrintTypography.css'
 
@@ -72,6 +73,8 @@ export default function PrintLayoutView({
   // book: which side it is on, and the folio it carries.
   firstPhysical = 1,
   folioStart = null,
+  // In Typeset: what the page's handles change (TypesetOverlay.jsx), or null for none.
+  typeset = null,
   children,
 }) {
   const setup = useMemo(() => normalizePageSetup(pageSetup), [pageSetup])
@@ -597,6 +600,9 @@ export default function PrintLayoutView({
               <div key={mask.top} className="pl-mask" style={{ left: '-4000px', right: '-4000px', top: `${mask.top}px`, height: `${mask.height}px` }} />
             ))}
           </div>
+          {typeset && !galley ? (
+            <TypesetOverlay pages={pages} metrics={metrics} setup={setup} zoom={zoom} editor={editor} typeset={typeset} />
+          ) : null}
         </div>
       </div>
       {pageCountHost ? createPortal(pageCountBadge, pageCountHost) : null}
