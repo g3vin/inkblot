@@ -55,6 +55,52 @@ export interface ActiveMarks {
 	orderedList: boolean;
 }
 
+/** Which page of front or back matter a matter document is. */
+export enum MatterKind {
+	AlsoBy = "alsoBy",
+	Copyright = "copyright",
+	Dedication = "dedication",
+	Epigraph = "epigraph",
+	Foreword = "foreword",
+	Preface = "preface",
+	Introduction = "introduction",
+	Afterword = "afterword",
+	Acknowledgements = "acknowledgements",
+	AboutAuthor = "aboutAuthor",
+	Glossary = "glossary",
+	Excerpt = "excerpt",
+	ReadingGuide = "readingGuide",
+	CallToAction = "callToAction",
+	/** A half title or title page made editable. */
+	HalfTitle = "halfTitle",
+	TitlePage = "titlePage",
+	Custom = "custom",
+}
+
+export enum GeneratedKind {
+	HalfTitle = "halfTitle",
+	TitlePage = "titlePage",
+	Contents = "contents",
+	/** Endnotes gathered at the end of the book. */
+	Notes = "notes",
+	Bibliography = "bibliography",
+}
+
+/**
+ * Add a page of front or back matter (a document, made from its kind's template), a
+ * page the book lays out itself, or a part divider — where the standard order has it.
+ */
+export interface AddBookItemCommand {
+	matter?: MatterKind;
+	generated?: GeneratedKind;
+	/** A part divider, before the entry `before` (or at the end of the chapters). */
+	part?: boolean;
+	before?: string;
+	title?: string;
+	/** For a kind that can go either side (Also By): the back. */
+	back?: boolean;
+}
+
 /**
  * Quick add: a URL, DOI, ISBN, arXiv id or PMID is looked up; anything else is
  * searched for as a title. The source exists at once, `resolving`, attached to the
@@ -364,37 +410,6 @@ export enum BookItemKind {
 	Generated = "generated",
 }
 
-/** Which page of front or back matter a matter document is. */
-export enum MatterKind {
-	AlsoBy = "alsoBy",
-	Copyright = "copyright",
-	Dedication = "dedication",
-	Epigraph = "epigraph",
-	Foreword = "foreword",
-	Preface = "preface",
-	Introduction = "introduction",
-	Afterword = "afterword",
-	Acknowledgements = "acknowledgements",
-	AboutAuthor = "aboutAuthor",
-	Glossary = "glossary",
-	Excerpt = "excerpt",
-	ReadingGuide = "readingGuide",
-	CallToAction = "callToAction",
-	/** A half title or title page made editable. */
-	HalfTitle = "halfTitle",
-	TitlePage = "titlePage",
-	Custom = "custom",
-}
-
-export enum GeneratedKind {
-	HalfTitle = "halfTitle",
-	TitlePage = "titlePage",
-	Contents = "contents",
-	/** Endnotes gathered at the end of the book. */
-	Notes = "notes",
-	Bibliography = "bibliography",
-}
-
 /** What a chapter is, which decides whether it is numbered and what its head says. */
 export enum ChapterType {
 	/** Numbered. */
@@ -446,6 +461,39 @@ export interface BookItem {
 	generated?: GeneratedKind;
 	chapterType?: ChapterType;
 	page?: PageOptions;
+}
+
+/** Where in the book an entry is: before the first chapter, among them, or after. */
+export enum BookRowSection {
+	Front = "front",
+	Body = "body",
+	Back = "back",
+}
+
+/**
+ * One entry of a book as the navigator draws it: a `BookItem` with what the page
+ * worked out about it — its number, its label, which part it is in.
+ */
+export interface BookRow {
+	id: string;
+	kind: BookItemKind;
+	title: string;
+	path?: string;
+	hidden: boolean;
+	matter?: MatterKind;
+	generated?: GeneratedKind;
+	chapterType?: ChapterType;
+	/** A numbered chapter's number, or a part's. */
+	number?: number;
+	/** "Chapter One", "Prologue", "Part II" — what its head says. */
+	label?: string;
+	section: BookRowSection;
+	/** The part it is in, by id. */
+	part?: string;
+	/** Its page options, its own over its kind's. */
+	page: PageOptions;
+	/** Printed from text from before matter pages were documents; opening it makes it one. */
+	legacy?: boolean;
 }
 
 export enum PageOrientation {
@@ -1241,6 +1289,12 @@ export type NativeCommand =
 	| { type: "setCitationStyle", payload: SetCitationStyleCommand }
 	| { type: "setBibliographyOptions", payload: SetBibliographyOptionsCommand }
 	| { type: "setEditorMode", payload: SetEditorModeCommand }
+	| { type: "moveBookItem", payload: MoveBookItemCommand }
+	| { type: "setBookItemHidden", payload: SetBookItemHiddenCommand }
+	| { type: "addBookItem", payload: AddBookItemCommand }
+	| { type: "removeBookItem", payload: RemoveBookItemCommand }
+	| { type: "editBookItem", payload: EditBookItemCommand }
+	| { type: "openBookItem", payload: OpenBookItemCommand }
 	| { type: "setPrintLayout", payload: SetPrintLayoutCommand }
 	| { type: "setPageSetup", payload: SetPageSetupCommand }
 	| { type: "setBookSettings", payload: SetBookSettingsCommand }
@@ -1627,6 +1681,17 @@ export interface DragStarted {
 /** Copy a document beside itself as "<name> copy", and open the copy. */
 export interface DuplicateEntryCommand {
 	path: string;
+}
+
+/**
+ * Rename an entry, change what kind of chapter it is, or how its page sits. Each field
+ * present is set; absent ones are left as they are.
+ */
+export interface EditBookItemCommand {
+	id: string;
+	title?: string;
+	chapterType?: ChapterType;
+	page?: PageOptions;
 }
 
 /** A step through the editor's own undo history. */
@@ -2551,6 +2616,15 @@ export interface MapToggleInput {
 export interface MeasureBookCommand {
 }
 
+/**
+ * Move an entry to before another (or to the end, with none). Only the book's order
+ * changes — never the file tree.
+ */
+export interface MoveBookItemCommand {
+	id: string;
+	before?: string;
+}
+
 /** Move a file or folder into another folder. See `RenameEntryCommand`. */
 export interface MoveEntryCommand {
 	path: string;
@@ -2724,6 +2798,11 @@ export interface NotesRemapped {
 	 * can tell "deleted" from "never sent".
 	 */
 	droppedNoteIds: string[];
+}
+
+/** Select an entry: open its document, or show its page, and make it This Page. */
+export interface OpenBookItemCommand {
+	id: string;
 }
 
 /** Open a document in a tab of its own, and show it. */
@@ -2939,6 +3018,13 @@ export interface PageLayoutState {
 	bookSetupActive: boolean;
 	/** The book's chapters, in order: document tree paths. */
 	bookChapters: string[];
+	/** The book's contents in book order, as the Book navigator lists them. */
+	bookItems?: BookRow[];
+	/**
+	 * The entry the navigator has selected, whose page the Typeset tab's This Page
+	 * section shows.
+	 */
+	selectedBookItem?: string;
 	/** A recommended inside margin for a book of this many pages, in mm. */
 	suggestedInsideMarginMm: number;
 	/** Who wrote it: the title page's byline and contact details. */
@@ -3292,6 +3378,15 @@ export interface ReferencesChanged {
 export interface RefreshBookChaptersCommand {
 }
 
+/**
+ * Take a matter page, a generated page or a part out of the book. A matter page's
+ * document is deleted with it (the navigator asks first). A chapter cannot be removed
+ * here — only hidden: it is the manuscript's.
+ */
+export interface RemoveBookItemCommand {
+	id: string;
+}
+
 /** Remove entries from the history. `None` clears it. */
 export interface RemoveClipboardEntriesCommand {
 	ids?: string[];
@@ -3592,6 +3687,15 @@ export interface SetBlockTypeCommand {
  */
 export interface SetBookCoverCommand {
 	path?: string;
+}
+
+/**
+ * Hide an entry from the Typeset pages, print, export and the continuous document, or
+ * show it again.
+ */
+export interface SetBookItemHiddenCommand {
+	id: string;
+	hidden: boolean;
 }
 
 /** Replace the settings of the book the active document belongs to. */

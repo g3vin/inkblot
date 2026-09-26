@@ -21,6 +21,8 @@ import type { PMJSON } from './portable'
 export interface ExportChapter {
   title: string
   content: PMJSON
+  /** False for a page before the first chapter — a copyright page — which a contents omits. */
+  inContents?: boolean
 }
 
 export const escapeHtml = (value: string): string => value
@@ -160,7 +162,7 @@ main hr::after { content: ${JSON.stringify(t.sceneBreak)}; letter-spacing: 0.2em
 .chapter > h1:first-child { padding-top: ${t.chapterSinkMm}mm; text-align: center; }` : ''
   const frontHtml = front.map((section) => `<section class="front-matter fm-${section.kind}">\n${frontSectionHtml(section)}\n</section>`)
   if (contents && chapters.length) {
-    frontHtml.push(`<nav class="front-matter contents" aria-label="Contents">\n<h2>Contents</h2>\n<ol>\n${chapters.map((c, i) => `<li><a href="#chapter-${i + 1}">${escapeHtml(c.title)}</a></li>`).join('\n')}\n</ol>\n</nav>`)
+    frontHtml.push(`<nav class="front-matter contents" aria-label="Contents">\n<h2>Contents</h2>\n<ol>\n${chapters.map((c, i) => (c.inContents === false ? '' : `<li><a href="#chapter-${i + 1}">${escapeHtml(c.title)}</a></li>`)).filter(Boolean).join('\n')}\n</ol>\n</nav>`)
   }
   const body = frontHtml.join('\n') + (frontHtml.length ? '\n' : '') + chapters.map((chapter, i) => (
     `<section class="chapter" id="chapter-${i + 1}" aria-label="${escapeHtml(chapter.title)}">\n${chapterBodyHtml(chapter.content)}\n</section>`

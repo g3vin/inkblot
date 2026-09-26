@@ -19,6 +19,16 @@ Notable changes to Inkblot. The format follows
   locked prose offers Edit Text, a round trip to Write and back to the same page.
   Typesetting edits no longer add text-history checkpoints. This replaces the
   per-document Print Layout switch.
+- **The Book navigator:** in Typeset, the left sidebar is the book's contents in the
+  book's own order — front matter, parts, chapters, back matter. Drag to reorder the
+  book without touching the file tree; hide any entry from the pages, print and export.
+  Front and back matter (a dedication, a copyright page, About the Author, …) are pages
+  of their own, made only when added, with pictures, history and everything else a
+  document has; a half title, title page and contents are laid out from the book. A
+  Files | Book switch shows either sidebar in either mode. Chapters can be made a
+  prologue, an epilogue or an interlude, which the book does not number. The front
+  matter is numbered in roman, and the contents give each chapter's page. A book set up
+  before keeps its text front and back matter, which become pages when first changed.
 
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own

@@ -7,9 +7,10 @@
  * which is laid out rather than flowed, is `frontMatter.js` for print and part of each
  * export's own builder.
  */
-import { ChapterNumberStyle } from '../types'
+import { BookItemKind, ChapterNumberStyle, ChapterType, MatterKind } from '../types'
 import type { BackMatter, ChapterNumbering, FrontMatter } from '../types'
-import type { Chapter } from './compile'
+import { chapterNumbers, isLegacyMatter, partNumbers, sectionsOf } from './bookItems'
+import type { BookSection, Chapter } from './compile'
 import { toRoman } from './pageSetup'
 
 interface PMNode {
@@ -179,4 +180,128 @@ export const frontMatterSections = (
   if (front.dedication?.trim()) out.push({ kind: 'dedication', text: front.dedication.trim() })
   if (front.epigraph?.trim()) out.push({ kind: 'epigraph', text: front.epigraph.trim(), source: front.epigraphSource?.trim() || '' })
   return out
+}
+
+/* ---------------- a book compiled from its contents ---------------- */
+
+/** Where a section falls: before the first chapter, among them, or after the last. */
+export type SectionRole = 'front' | 'body' | 'back'
+
+/** A book section as it prints: headed, numbered, and placed. */
+export interface CompiledSection extends BookSection {
+  role: SectionRole
+  /** A numbered chapter's number, or a part's. */
+  number?: number
+  /** The label its head carries: "Chapter One", "Prologue", "Part II". */
+  label?: string | null
+}
+
+const TYPE_LABELS: Partial<Record<ChapterType, string>> = {
+  [ChapterType.Prologue]: 'Prologue',
+  [ChapterType.Epilogue]: 'Epilogue',
+  [ChapterType.Interlude]: 'Interlude',
+}
+
+/** A legacy matter page's text, as it was typed into the Book tab before pages were documents. */
+export const legacyMatterContent = (
+  kind: MatterKind | undefined,
+  book: { frontMatter?: Partial<FrontMatter> | null; backMatter?: Partial<BackMatter> | null } | null | undefined,
+  author = ''
+): Doc => {
+  const front = book?.frontMatter || {}
+  const back = book?.backMatter || {}
+  const centered = (value: string) => paragraphsOf(value).map((n) => ({ ...n, attrs: { textAlign: 'center' } }))
+  switch (kind) {
+    case MatterKind.Copyright: return { type: 'doc', content: paragraphsOf(front.copyright || '') }
+    case MatterKind.Dedication: return { type: 'doc', content: centered(front.dedication || '') }
+    case MatterKind.Epigraph: return {
+      type: 'doc',
+      content: [...centered(front.epigraph || ''), ...(front.epigraphSource?.trim() ? centered(`— ${front.epigraphSource.trim()}`) : [])],
+    }
+    case MatterKind.Acknowledgements: return { type: 'doc', content: [heading([text('Acknowledgements')]), ...paragraphsOf(back.acknowledgements || '')] }
+    case MatterKind.AboutAuthor: return { type: 'doc', content: [heading([text('About the Author')]), ...paragraphsOf(back.aboutTheAuthor || '')] }
+    case MatterKind.AlsoBy: return {
+      type: 'doc',
+      content: [heading([text(author ? `Also by ${author}` : 'Also By')]), ...paragraphsOf(back.alsoBy || '', { linePerParagraph: true })],
+    }
+    default: return { type: 'doc', content: [] }
+  }
+}
+
+/** A part's divider: its number and its title, as one heading. */
+export const partContent = (label: string | null, title: string): Doc => {
+  const inline: PMNode[] = label ? [text(label)] : []
+  if (title && title !== label) inline.push(...(inline.length ? [{ type: 'hardBreak' }] : []), text(title))
+  return { type: 'doc', attrs: { bookPart: true }, content: inline.length ? [heading(inline)] : [] }
+}
+
+/**
+ * A book's sections as they print and export: each chapter headed by its number (or
+ * its type — "Prologue"), each part a divider, legacy matter set from its text, and each
+ * placed front, body or back. Generated pages (a title page, the contents) pass through
+ * for the printer or the export to lay out.
+ */
+export const compileSections = (
+  sections: BookSection[],
+  book: {
+    chapterNumbering?: ChapterNumbering | null
+    frontMatter?: Partial<FrontMatter> | null
+    backMatter?: Partial<BackMatter> | null
+  } | null | undefined,
+  { author = '', insertTitles = false }: { author?: string; insertTitles?: boolean } = {}
+): CompiledSection[] => {
+  const items = sections.map((s) => s.item)
+  const numbering = book?.chapterNumbering
+  const numbers = chapterNumbers(items, numbering?.startAt ?? 1)
+  const parts = partNumbers(items)
+  const { front, back } = sectionsOf(sections.map((s) => ({ ...s.item, section: s })))
+  const roleOf = new Map<BookSection, SectionRole>()
+  front.forEach((it) => roleOf.set(it.section, 'front'))
+  back.forEach((it) => roleOf.set(it.section, 'back'))
+  const partNumbering = {
+    style: !numbering?.style || numbering.style === ChapterNumberStyle.None ? ChapterNumberStyle.Words : numbering.style,
+    prefix: 'Part',
+    includeTitle: true,
+  } as ChapterNumbering
+
+  return sections.map((section) => {
+    const role = roleOf.get(section) || 'body'
+    const { item } = section
+    if (item.kind === BookItemKind.Part) {
+      const n = parts.get(item.id)
+      const label = n ? chapterLabel(n, partNumbering) : null
+      return { ...section, role, number: n, label, content: partContent(label, item.title || section.name) }
+    }
+    if (item.kind === BookItemKind.Matter) {
+      const content = isLegacyMatter(item) ? legacyMatterContent(item.matter, book, author) : section.content
+      return { ...section, role, content }
+    }
+    if (item.kind !== BookItemKind.Chapter || !section.content) return { ...section, role }
+    const number = numbers.get(item.id)
+    const typeLabel = TYPE_LABELS[item.chapterType as ChapterType]
+    let content = section.content
+    let label: string | null = null
+    if (number != null) {
+      content = headChapter(section.content, section.name, number, numbering, { insertTitle: insertTitles })
+      label = chapterLabel(number, numbering)
+    } else if (typeLabel) {
+      // A prologue is headed by what it is, over its own title when the book keeps titles.
+      content = headChapter(section.content, section.name, 0, null, { insertTitle: insertTitles })
+      content = labelled(content, typeLabel, numbering?.includeTitle !== false)
+      label = typeLabel
+    } else {
+      content = headChapter(section.content, section.name, 0, null, { insertTitle: insertTitles })
+    }
+    return { ...section, role, number, label, content }
+  })
+}
+
+/** A chapter's content with `label` over (or instead of) its opening title. */
+const labelled = (content: Doc, label: string, keepTitle: boolean): Doc => {
+  const blocks = (content.content || []) as PMNode[]
+  const first = blocks[0]
+  const opensWithTitle = first?.type === 'heading' && first.attrs?.level === 1
+  const title = opensWithTitle ? (first.content || []) : []
+  const inline = keepTitle && title.length ? [text(label), { type: 'hardBreak' }, ...title] : [text(label)]
+  return { ...content, content: [heading(inline, opensWithTitle ? first.attrs : {}), ...(opensWithTitle ? blocks.slice(1) : blocks)] }
 }

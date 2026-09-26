@@ -22,11 +22,12 @@ import { documentSurface } from '../bridge'
 import { isNativeShell } from '../lib/host'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { withPrintBibliography } from '../lib/references/printBibliography'
-import { compileBook } from './bookMatter'
-import { loadChapters } from './compile'
+import { chapterTitleOf, compileSections } from './bookMatter'
+import { pageOptionsOf } from './bookItems'
+import { bookFolderFor, loadBookSections, loadChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
 import { describeError, newJobId, reportJob } from './printJobStatus'
-import { buildFrontMatterPages } from './frontMatter'
+import { contentsPages, halfTitlePage } from './frontMatter'
 import { foldingGuide, printSequence } from './imposition'
 import { paginationKey, settlePagination } from './PaginationExtension'
 import { pageMetrics, resolvePageSetup, setupUsesToken, surnameOf } from './pageSetup'
@@ -345,6 +346,58 @@ const watermark = (text, pageWidth) => {
 }
 
 /**
+ * A book's front matter as pages: the half title, the title page and the contents laid
+ * out from the book, and its own pages (a copyright page, a dedication) flowed like any
+ * chapter — each where the book put it and on the side it opens on, numbered in roman
+ * from one, and run to an even count so the first chapter opens on a right-hand page.
+ * Set after the body, so the contents know each chapter's folio.
+ */
+const buildBookFront = async ({ sections, chapters, folios, setup, bookTitle, author, profile, words, placement, onProgress }) => {
+  const front = sections.filter((s) => s.role === 'front')
+  const hasTitlePage = front.some((s) => s.item.generated === 'titlePage')
+  // A book with no title page among its contents prints the setup's, as it always has,
+  // after its half title.
+  const sequence = [...front]
+  if (!hasTitlePage && setup.titlePage) {
+    const at = sequence.findIndex((s) => s.item.generated !== 'halfTitle')
+    sequence.splice(at < 0 ? sequence.length : at, 0, { item: { id: 'setup-title-page', kind: 'generated', generated: 'titlePage', hidden: false } })
+  }
+  const entries = []
+  chapters.forEach((chapter, i) => {
+    const title = chapter.item?.kind === 'part'
+      ? (chapter.label ? `${chapter.label}${chapter.item.title ? `: ${chapter.item.title}` : ''}` : chapter.name)
+      : chapterTitleOf(chapter.content, chapter.name)
+    entries.push({ title, folio: folios[i] || '', part: chapter.item?.kind === 'part' })
+  })
+  const titleSetup = setup.titlePage ? setup : { ...setup, titlePage: { style: 'book', showContact: false, showWordCount: false } }
+  const sources = []
+  for (const [index, section] of sequence.entries()) {
+    onProgress({ done: index, total: sequence.length })
+    const kind = section.item.generated
+    if (kind === 'halfTitle') {
+      sources.push({ fixed: (physical) => [halfTitlePage(setup, physical, bookTitle)], startOn: 'recto' })
+    } else if (kind === 'titlePage') {
+      sources.push({ fixed: () => buildTitlePages({ setup: titleSetup, title: bookTitle, profile, author, words }).slice(0, 1), startOn: 'recto' })
+    } else if (kind === 'contents') {
+      sources.push({ fixed: (physical) => contentsPages(setup, entries, physical), startOn: 'recto' })
+    } else if (section.content) {
+      const laid = await layoutOffscreen(section.content, setup)
+      sources.push({ ...laid, setup, title: section.name, chapterTitleAt: () => section.name, ...placement(section) })
+    }
+  }
+  if (!sources.length) return []
+  const pages = renderPages(sources, { bookTitle, author, surname: surnameOf(author), words, numberStart: 1, numberFormat: 'lowerRoman' })
+  if ((setup.mirrorMargins || setup.chapterStartsOnRecto) && pages.length % 2 === 1) {
+    const m = pageMetrics(setup)
+    const blank = document.createElement('div')
+    blank.className = 'print-page is-blank'
+    Object.assign(blank.style, { width: `${m.width}px`, height: `${m.height}px` })
+    pages.push(blank)
+  }
+  return pages
+}
+
+/**
  * Build the printable pages (or sheets) for a job and mount them in #print-root.
  * Exposed apart from printing so Print Preview and tests can use the same pages.
  */
@@ -376,24 +429,45 @@ export const preparePrint = async ({
   }
   const compiled = scope !== 'document'
   const author = bookAuthor(book)
-  // A document whose bibliography appears only on paper gets it here (and so is laid
-  // out afresh below, not taken from its live pages).
-  const loaded = report
-    ? [reportChapter(activeEditor, docPath, report)]
-    : range === 'selection'
-    ? [selectionChapter(activeEditor, docPath)]
-    : await withPrintBibliography(
+  const live = (path) => liveByPath.get(path)?.getJSON() || null
+  // A book is its contents in book order: front matter, parts, chapters, back matter.
+  // Each chapter is numbered as the book numbers it; a document is as it is.
+  let sections = null
+  let loaded
+  if (compiled && !report && range !== 'selection') {
+    const raw = await loadBookSections(projectName, bookFolderFor(docPath, scope), book, live)
+    // A document whose bibliography appears only on paper gets it here (and so is laid
+    // out afresh below, not taken from its live pages).
+    const withBibliography = await withPrintBibliography(
       projectName,
-      await loadChapters(projectName, docPath, scope, (path) => liveByPath.get(path)?.getJSON() || null, { excluded: compiled ? book?.excluded : [] })
+      raw.filter((s) => s.item.kind === 'chapter' && s.content).map((s) => ({ path: s.path, name: s.name, content: s.content }))
     )
-  if (!loaded.length) return null
-  // A book's chapters get their numbers and its back matter; a document is as it is.
-  let chapters = compiled ? compileBook(loaded, book, { author }) : loaded
+    const byPath = new Map(withBibliography.map((c) => [c.path, c]))
+    const withNotes = raw.map((s) => {
+      const c = s.item.kind === 'chapter' ? byPath.get(s.path) : null
+      return c ? { ...s, content: c.content, original: s.content, printBibliography: c.printBibliography } : { ...s, original: s.content }
+    })
+    sections = compileSections(withNotes, book, { author })
+    loaded = sections.filter((s) => s.item.kind === 'chapter' && s.content)
+  } else {
+    loaded = report
+      ? [reportChapter(activeEditor, docPath, report)]
+      : range === 'selection'
+      ? [selectionChapter(activeEditor, docPath)]
+      : await withPrintBibliography(projectName, await loadChapters(projectName, docPath, 'document', live))
+  }
+  if (!loaded.length && !sections?.some((s) => s.content)) return null
+  // What flows as pages: a document's chapter; a book's body and back matter — the
+  // front matter is set after, once the body's folios are known for its contents.
+  let chapters = sections
+    ? sections.filter((s) => s.role !== 'front' && s.content)
+    : loaded
 
   // A book with a setup of its own prints every chapter in it; otherwise the first
   // chapter's decides, as it always has. A document alone prints in its own, or in
   // its book's when it has none — which is what Print Layout showed it in.
-  const firstOwn = chapters[0].content?.attrs?.pageSetup || readDocPageSetup(liveByPath.get(chapters[0].path)?.state.doc)
+  const first = chapters[0] || loaded[0] || sections?.find((s) => s.content)
+  const firstOwn = first?.content?.attrs?.pageSetup || readDocPageSetup(liveByPath.get(first?.path)?.state.doc)
   const { setup } = resolvePageSetup({ docSetup: firstOwn, bookSetup: book?.pageSetup, scope })
   // The current chapter of a book is the document being written in, numbered as it
   // would be in the whole book.
@@ -403,22 +477,31 @@ export const preparePrint = async ({
     if (!chapters.length) throw new Error('This document is left out of the book.')
   }
 
+  /** How a book's section sits: its item's page options; a chapter follows the setup. */
+  const placement = (section) => {
+    if (!section?.item || section.item.kind === 'chapter') return {}
+    const options = pageOptionsOf(section.item)
+    return { startOn: options.start, runningHeads: options.runningHeads, folio: options.folio, position: options.position }
+  }
+
   const sources = []
   try {
     for (const [index, chapter] of chapters.entries()) {
       onProgress({ done: index, total: chapters.length })
       // A chapter the book numbered is not what its editor shows: lay it out afresh.
-      const changed = chapter.printBibliography || chapter.selection || chapter.report || chapter.content !== loaded[index]?.content || chapterOnly
-      const live = changed ? null : liveSource(liveByPath.get(chapter.path), setup)
+      const original = sections ? chapter.original : loaded[index]?.content
+      const changed = chapter.printBibliography || chapter.selection || chapter.report || chapter.content !== original || chapterOnly
+      const live = changed || !chapter.path ? null : liveSource(liveByPath.get(chapter.path), setup)
       const laid = live || await layoutOffscreen(chapter.content, setup)
       sources.push({
         ...laid,
         setup,
         title: chapter.name,
         chapterTitleAt: chapterTitleAt(laid.headings, chapter.name),
+        ...placement(chapter),
       })
     }
-    const bookTitle = scope === 'document' ? chapters[0].name : (book?.title || chapters[0].name)
+    const bookTitle = scope === 'document' ? (chapters[0] || loaded[0]).name : (book?.title || chapters[0]?.name || '')
     const profile = getAuthorProfile()
     // Words only when something shows them: counting a whole book is not free.
     const needsWords = setup.titlePage?.showWordCount || setupUsesToken(setup, 'words')
@@ -432,19 +515,24 @@ export const preparePrint = async ({
       onChapterStart: (index, folio) => { folios[index] = folio },
     })
     const m0 = pageMetrics(setup)
-    // A report is not the script: it has no title page of its own.
-    const titlePages = report ? [] : buildTitlePages({ setup, title: bookTitle, profile, author, words })
-    const front = compiled
-      ? buildFrontMatterPages({
+    let front
+    if (sections && !chapterOnly) {
+      front = await buildBookFront({
+        sections,
+        chapters,
+        folios,
         setup,
-        book,
-        title: bookTitle,
-        titlePages,
-        contents: book?.frontMatter?.contents
-          ? sources.map((source, i) => ({ title: source.headings[0]?.text || source.title, folio: folios[i] || '' }))
-          : null,
+        bookTitle,
+        author,
+        profile,
+        words,
+        placement,
+        onProgress,
       })
-      : titlePages
+    } else {
+      // A report is not the script: it has no title page of its own.
+      front = report ? [] : buildTitlePages({ setup, title: bookTitle, profile, author, words })
+    }
     let pages = chapterOnly ? body : [...front, ...body]
     // Counting for the Publish tab: every page as it would print, and every word.
     if (measureOnly) {

@@ -51,7 +51,7 @@ struct ContentView: View {
         @Bindable var sidebar = model.sidebar
         @Bindable var timer = model.timer
         NavigationSplitView(columnVisibility: $columns) {
-            FileTreeSidebar()
+            LeftSidebarColumn()
                 // Inside the column width, which has to be the column's outermost
                 // modifier or SwiftUI ignores its ideal.
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.width.rounded() }) { width in
@@ -312,3 +312,29 @@ private final class PanelInsetsBox {
     var measured = EdgeInsets()
 }
 #endif
+
+/// The left column: the file tree or the book's contents, with the switch between them.
+struct LeftSidebarColumn: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Group {
+            switch model.leftSidebar {
+            case .files: FileTreeSidebar()
+            case .book: BookNavigator()
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Picker("Show", selection: $model.leftSidebar) {
+                ForEach(LeftSidebar.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .help("The project’s files, or the book’s contents in the book’s own order")
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
+            .disabled(!model.hasProject)
+        }
+    }
+}
