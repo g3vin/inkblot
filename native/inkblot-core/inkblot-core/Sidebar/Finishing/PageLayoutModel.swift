@@ -22,6 +22,8 @@ final class PageLayoutModel {
     /// The latest print or export, while it is worth showing: running, just finished, or
     /// failed (until the next job or it is dismissed).
     private(set) var job: PrintJobStatus?
+    /// The book's typeset history, newest first, as the page last published it.
+    private(set) var typesetHistory: TypesetHistoryChanged?
 
     /// The setup Typeset edits — the document's, or the book's under a book scope — and
     /// the book both tabs edit. Rebuilt from each state the page
@@ -52,6 +54,7 @@ final class PageLayoutModel {
             case .pageLayoutState(let next): receive(next)
             case .pageLayoutCatalog(let next): catalog = next
             case .printJobStatus(let status): receive(status)
+            case .typesetHistoryChanged(let history): typesetHistory = history
             default: break
             }
         }
@@ -140,6 +143,31 @@ final class PageLayoutModel {
     /// Apply a book style (`bookStyles.ts`): the book's type, chapter design and heads.
     func applyStyle(_ id: String) {
         bridge.send(.applyBookStyle(ApplyBookStyleCommand(id: id)))
+    }
+
+    /* ---------------- the typeset history ---------------- */
+
+    func saveTypesetVersion(_ name: String) {
+        bridge.send(.saveTypesetVersion(SaveTypesetVersionCommand(name: name)))
+    }
+
+    func restoreTypesetVersion(_ id: String) {
+        bridge.send(.restoreTypesetVersion(TypesetVersionRef(id: id)))
+    }
+
+    func renameTypesetVersion(_ id: String, to name: String) {
+        bridge.send(.renameTypesetVersion(RenameTypesetVersionCommand(id: id, name: name)))
+    }
+
+    func deleteTypesetVersion(_ id: String) {
+        bridge.send(.deleteTypesetVersion(TypesetVersionRef(id: id)))
+    }
+
+    /// Show a version's pages in the Typeset view — beside the current ones, to compare —
+    /// or, with no id, stop.
+    func previewTypesetVersion(_ id: String?, compare: Bool = false) {
+        if id != nil { setMode(.typeset) }
+        bridge.send(.previewTypesetVersion(PreviewTypesetVersionCommand(id: id, compare: compare)))
     }
 
     func setChapterMeta(_ meta: ChapterMeta) {

@@ -244,6 +244,93 @@ pub struct TypesetFocus {
     pub section_id: String,
 }
 
+/* ---------------- the typeset history ---------------- */
+
+/// Why a typeset version was kept.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TypesetVersionKind {
+    /// A while after the typesetting changed.
+    Auto,
+    /// Saved, and named, by the writer.
+    Named,
+    /// What a print or an export was made from.
+    Export,
+    /// The typeset as it was just before another was restored.
+    Restore,
+}
+
+/// One typeset version of a book, as the History tab lists it.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesetVersionRow {
+    pub id: String,
+    /// ISO 8601.
+    pub timestamp: String,
+    pub kind: TypesetVersionKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// What changed since the version before it, a line a change.
+    pub summary: Vec<String>,
+}
+
+/// A book's typeset history, newest first. Published by the page when it changes and
+/// when the book in view does.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesetHistoryChanged {
+    pub folder: String,
+    pub rows: Vec<TypesetVersionRow>,
+    /// The version the Typeset view is previewing, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previewing: Option<String>,
+    /// And whether beside the current typeset, to compare.
+    #[serde(default)]
+    pub comparing: bool,
+    /// What the last restore could not put back: "2 settings had no paragraph left".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// Keep the book's typeset as it is now, under a name.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveTypesetVersionCommand {
+    pub name: String,
+}
+
+/// A typeset version, by id: to restore, delete, or stop previewing (`id` absent).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesetVersionRef {
+    pub id: String,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameTypesetVersionCommand {
+    pub id: String,
+    pub name: String,
+}
+
+/// Show a typeset version's pages in the Typeset view — alone, or beside the current
+/// typeset to compare them. No id stops previewing.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewTypesetVersionCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub compare: bool,
+}
+
 /* ---------------- commands ---------------- */
 
 /// The window's mode: writing a draft, or setting it as a book.

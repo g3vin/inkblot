@@ -17,7 +17,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import { PAGE_GAP } from './printLayoutConstants'
 import { preparePrint } from './printJob'
-import { bookAuthor, getPrintScope, usePrintLayoutStore } from './printLayoutStore'
+import { bookAuthor, getPrintScope, getTypesetPreview, usePrintLayoutStore } from './printLayoutStore'
+import { previewBook, previewContent, TYPESET_PREVIEW_EVENT } from './useTypesetHistory'
 
 /** How long after a change the book is composed again. */
 const COMPOSE_DELAY_MS = 900
@@ -58,11 +59,37 @@ function PageStack({ pages, zoom, onOpen }) {
 export default function BookPages({ projectName, docPath, editor, placement, zoom, scrollEl, renderLive }) {
   const version = usePrintLayoutStore()
   const [composed, setComposed] = useState({ before: [], after: [], firstPhysical: 1, folioStart: null, busy: true })
+  // The current book whole, while comparing it with a version.
+  const [composedAll, setComposedAll] = useState(null)
   const runRef = useRef(0)
   const timerRef = useRef(null)
   const liveRef = useRef(null)
   const anchorRef = useRef(null)
   const itemId = placement?.row?.id
+  // A typeset version previewed: the whole book as that version set it, and — to
+  // compare — beside it as it is now.
+  const preview = getTypesetPreview()
+  const [previewPages, setPreviewPages] = useState(null)
+
+  useEffect(() => {
+    if (!preview) {
+      setPreviewPages(null)
+      return undefined
+    }
+    let live = true
+    const scope = getPrintScope(projectName) === 'project' ? 'project' : 'folder'
+    preparePrint({
+      projectName,
+      docPath,
+      scope,
+      book: previewBook(placement.book, preview.snapshot),
+      liveEditors: [{ path: docPath, editor }],
+      mapContent: previewContent(preview.snapshot),
+    })
+      .then((prepared) => { if (live) setPreviewPages(prepared?.elements || []) })
+      .catch((error) => console.error('[typeset] previewing failed:', error))
+    return () => { live = false }
+  }, [preview?.id, preview?.snapshot, projectName, docPath]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const compose = useCallback(async () => {
     const run = ++runRef.current
@@ -78,6 +105,7 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
       })
       if (run !== runRef.current) return
       const pages = prepared?.elements || []
+      if (preview?.compare) setComposedAll(pages)
       const first = pages.findIndex((page) => page.dataset.item === itemId)
       let last = first
       while (last + 1 < pages.length && (pages[last + 1].dataset.item === itemId || !pages[last + 1].dataset.item)) last += 1
@@ -96,7 +124,7 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
       if (run === runRef.current) setComposed((c) => ({ ...c, busy: false }))
       console.error('[typeset] composing the book failed:', error)
     }
-  }, [docPath, editor, itemId, placement, projectName])
+  }, [docPath, editor, itemId, placement, preview?.compare, projectName])
 
   const schedule = useCallback((delay = COMPOSE_DELAY_MS) => {
     clearTimeout(timerRef.current)
@@ -128,6 +156,31 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
   const open = useCallback((id) => {
     if (id && id !== itemId) window.dispatchEvent(new CustomEvent(OPEN_BOOK_ITEM_EVENT, { detail: { id } }))
   }, [itemId])
+
+  if (preview) {
+    const act = (action) => window.dispatchEvent(new CustomEvent(TYPESET_PREVIEW_EVENT, { detail: { action } }))
+    return (
+      <div className="book-pages is-previewing">
+        <div className="book-preview-bar" role="toolbar" aria-label="Previewing a typeset version">
+          <span>{preview.compare ? 'Comparing' : 'Previewing'} {preview.name ? `“${preview.name}”` : 'an earlier typeset'}</span>
+          <button type="button" onClick={() => act('restore')}>Restore</button>
+          <button type="button" onClick={() => act('done')}>Done</button>
+        </div>
+        <div className={preview.compare ? 'book-compare' : ''}>
+          <div>
+            {preview.compare ? <div className="book-compare-label">That version</div> : null}
+            {previewPages ? <PageStack pages={previewPages} zoom={preview.compare ? zoom * 0.5 : zoom} onOpen={() => {}} /> : <div className="book-pages-status">Setting that version…</div>}
+          </div>
+          {preview.compare ? (
+            <div>
+              <div className="book-compare-label">Now</div>
+              <PageStack pages={composedAll || [...composed.before, ...composed.after]} zoom={zoom * 0.5} onOpen={() => {}} />
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="book-pages">

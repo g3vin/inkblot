@@ -23,7 +23,7 @@ use super::tabs::TabsChanged;
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
-use super::print::{PageLayoutCatalog, PageLayoutState, PrintJobStatus, PrintRequest, TypesetFocus};
+use super::print::{PageLayoutCatalog, PageLayoutState, PrintJobStatus, PrintRequest, TypesetFocus, TypesetHistoryChanged};
 
 /// Which marks are on at the selection.
 #[typeshare]
@@ -531,6 +531,8 @@ pub enum WebviewEvent {
     PrintJobStatus(PrintJobStatus),
     /// A Typeset page's handle was picked: show its section in the inspector.
     TypesetFocus(TypesetFocus),
+    /// A book's typeset history, newest first.
+    TypesetHistoryChanged(TypesetHistoryChanged),
     /// The tabs and the split, whole (`tabs.rs`). Coalesced per frame.
     TabsChanged(TabsChanged),
 }

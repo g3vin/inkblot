@@ -487,6 +487,11 @@ fn every_command() -> Vec<NativeCommand> {
             meta: crate::types::ChapterMeta { subtitle: "In which it rains".into(), ..Default::default() },
         }),
         NativeCommand::SetHeadImage(SetHeadImageCommand { target: HeadImageTarget::Ornament, path: Some("/Users/a/fleuron.png".into()) }),
+        NativeCommand::SaveTypesetVersion(SaveTypesetVersionCommand { name: "Sent to KDP".into() }),
+        NativeCommand::RestoreTypesetVersion(TypesetVersionRef { id: "v1".into() }),
+        NativeCommand::RenameTypesetVersion(RenameTypesetVersionCommand { id: "v1".into(), name: "Proof 2".into() }),
+        NativeCommand::DeleteTypesetVersion(TypesetVersionRef { id: "v1".into() }),
+        NativeCommand::PreviewTypesetVersion(PreviewTypesetVersionCommand { id: Some("v1".into()), compare: true }),
         NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true, doc_path: Some("a.md".into()) }),
         NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Book }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
@@ -1026,6 +1031,19 @@ fn every_event() -> Vec<WebviewEvent> {
             path: None,
         }),
         WebviewEvent::TypesetFocus(TypesetFocus { section_id: "page.size".into() }),
+        WebviewEvent::TypesetHistoryChanged(TypesetHistoryChanged {
+            folder: "Novel".into(),
+            rows: vec![TypesetVersionRow {
+                id: "v1".into(),
+                timestamp: "2026-09-26T12:00:00Z".into(),
+                kind: TypesetVersionKind::Export,
+                name: Some("Exported PDF".into()),
+                summary: vec!["Inside margin 19 mm → 22 mm".into()],
+            }],
+            previewing: None,
+            comparing: false,
+            note: None,
+        }),
         WebviewEvent::TabsChanged(TabsChanged {
             tabs: vec![
                 DocTab { id: "tab-1".into(), doc_path: Some("Act One/Scene".into()), secondary_doc: Some("Notes".into()), split: Some(SplitOrientation::Rows) },
@@ -1121,6 +1139,11 @@ fn every_command_has_its_documented_wire_name() {
             "applyBookStyle",
             "setChapterMeta",
             "setHeadImage",
+            "saveTypesetVersion",
+            "restoreTypesetVersion",
+            "renameTypesetVersion",
+            "deleteTypesetVersion",
+            "previewTypesetVersion",
             "setPrintLayout",
             "setPageSetup",
             "setBookSettings",
@@ -1202,6 +1225,7 @@ fn every_event_has_its_documented_wire_name() {
             "pageLayoutCatalog",
             "printJobStatus",
             "typesetFocus",
+            "typesetHistoryChanged",
             "tabsChanged",
         ]
     );

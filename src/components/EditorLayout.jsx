@@ -26,6 +26,11 @@ import { runExport } from '../print/export/runExport'
 import { importFountainScript } from '../script/importScript'
 import { bookFolderFor } from '../print/compile'
 import { getBookForDoc, getBookSettings, setMeasurement } from '../print/printLayoutStore'
+import { TYPESET_MILESTONE_EVENT } from '../print/useTypesetHistory'
+
+/** What a format is called in the typeset history: "Exported PDF". */
+const EXPORT_NAMES = { pdf: 'PDF', epub: 'EPUB', docx: 'Word', html: 'HTML', markdown: 'Markdown', plainText: 'Plain Text', fountain: 'Fountain', fdx: 'Final Draft' }
+const milestone = (label) => window.dispatchEvent(new CustomEvent(TYPESET_MILESTONE_EVENT, { detail: { label } }))
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
@@ -479,11 +484,16 @@ export default function EditorLayout(props) {
     secondaryDoc: props.secondaryDoc,
     editor,
     secondaryEditor: props.secondaryEditor,
+    // What a print or an export was made from is kept in the typeset history.
     onPrint: ({ scope, bound, options }) => {
-      runPrintJob({ ...printOptions(scope), scope, bound, options }).catch((error) => console.error('[print] failed:', error))
+      runPrintJob({ ...printOptions(scope), scope, bound, options })
+        .then((done) => { if (done !== false && !options?.report) milestone(bound ? 'Printed for binding' : 'Printed') })
+        .catch((error) => console.error('[print] failed:', error))
     },
     onExport: ({ format, scope, bound, options, path }) => {
-      runExport({ ...printOptions(scope), format, scope, bound, options, path }).catch((error) => console.error('[export] failed:', error))
+      runExport({ ...printOptions(scope), format, scope, bound, options, path })
+        .then((written) => { if (written) milestone(`Exported ${EXPORT_NAMES[format] || format}`) })
+        .catch((error) => console.error('[export] failed:', error))
     },
     // A page of the book's own — a dedication — opened from the Book navigator.
     onOpenDoc: (path) => {

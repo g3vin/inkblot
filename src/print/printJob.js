@@ -492,6 +492,9 @@ export const preparePrint = async ({
   options = {},
   onProgress = () => {},
   measureOnly = false,
+  // A book's chapters as another typeset set them (a typeset version previewed): each
+  // one's content, given its path, before it compiles.
+  mapContent = null,
 }) => {
   const liveByPath = new Map(liveEditors.filter((e) => e?.path && e.editor && !e.editor.isDestroyed).map((e) => [e.path, e.editor]))
   const range = options.range || 'all'
@@ -516,7 +519,8 @@ export const preparePrint = async ({
   let sections = null
   let loaded
   if (compiled && !report && range !== 'selection') {
-    const raw = await loadBookSections(projectName, bookFolderFor(docPath, scope), book, live)
+    const loadedRaw = await loadBookSections(projectName, bookFolderFor(docPath, scope), book, live)
+    const raw = mapContent ? loadedRaw.map((s) => (s.content ? { ...s, content: mapContent(s.path, s.content) } : s)) : loadedRaw
     // A document whose bibliography appears only on paper gets it here (and so is laid
     // out afresh below, not taken from its live pages).
     const withBibliography = await withPrintBibliography(

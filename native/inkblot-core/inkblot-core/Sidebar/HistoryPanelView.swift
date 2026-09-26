@@ -23,8 +23,13 @@ struct HistoryPanelView: View {
     @State private var pendingDelete: VersionRow?
     @State private var showingArchive = false
 
+    /// In Typeset, which history: the book's typesetting, or the document's text.
+    @State private var showingText = false
+
     var body: some View {
-        if showingArchive && isTextDocument {
+        if model.pageLayout.mode == .typeset && !showingText {
+            TypesetHistoryView { showingText = true }
+        } else if showingArchive && isTextDocument {
             ArchiveListView { showingArchive = false }
         } else {
             versions
@@ -35,6 +40,16 @@ struct HistoryPanelView: View {
         let sidebar = model.sidebar
         let sections = sections
         return Form {
+            if model.pageLayout.mode == .typeset {
+                Section {
+                    Picker("History", selection: Binding(get: { showingText }, set: { showingText = $0 })) {
+                        Text("Typeset").tag(false)
+                        Text("Text").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+            }
             Section {
                 HStack(spacing: 8) {
                     SegmentedTextPicker(options: HistoryFilter.allCases, selection: $filter, title: \.title)

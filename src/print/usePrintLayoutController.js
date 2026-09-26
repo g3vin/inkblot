@@ -28,6 +28,7 @@ import { addBookItem, editBookItem, moveBookItem, openablePath, removeBookItem, 
 import { bookRows } from './bookRows'
 import { BOOK_CHAPTERS_CHANGED_EVENT } from './useBookPlacement'
 import { OPEN_BOOK_ITEM_EVENT } from './BookPages'
+import useTypesetHistory from './useTypesetHistory'
 import { applyBookStyle, BOOK_STYLES, bookStyle } from './bookStyles'
 import { readChapterMeta } from './DocChapterMeta'
 import { listBookChapters } from './compile'
@@ -577,6 +578,9 @@ export default function usePrintLayoutController({
     ]
     return () => subscriptions.forEach((unsubscribe) => unsubscribe())
   }, [applySetup, currentBook, publish, togglePrintLayout, zoomTo])
+
+  // The typeset history: kept as the book is set, restored, previewed.
+  useTypesetHistory({ stateRef, currentBook, activeEditor })
 
   // A page of another entry, clicked in the Typeset view of the whole book.
   useEffect(() => {

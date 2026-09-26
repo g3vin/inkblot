@@ -35,6 +35,7 @@ import { DocChapterMeta } from '../print/DocChapterMeta'
 import { DocPageSetup } from '../print/DocPageSetup'
 import { PageBreak } from '../print/PageBreak'
 import { Pagination } from '../print/PaginationExtension'
+import { TypesetAnchors } from '../print/TypesetAnchors'
 import { TypesetLock } from '../print/TypesetLock'
 import { DocWritingFormat } from '../script/DocWritingFormat'
 import { ScriptElement } from '../script/ScriptElement'
@@ -97,6 +98,8 @@ export const buildEditorExtensions = (starterKit) => [
   Pagination,
   // A chapter's prose, held while the book is typeset (Typeset mode).
   TypesetLock,
+  // A stable name for each block the typesetter touched (the typeset history).
+  TypesetAnchors,
   // A screenplay's or a play's lines, and which the document is written as.
   ScriptElement,
   DocWritingFormat,
