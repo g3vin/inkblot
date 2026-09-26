@@ -292,6 +292,7 @@ struct JobStatusLine: View {
 /// Every Finishing section's id, for Expand and Collapse All.
 enum FinishingSectionID {
     static let thisPage = "typeset.thisPage"
+    static let style = "typeset.style"
     static let pageSize = "page.size"
     static let headerFooter = "page.headerFooter"
     static let textFlow = "page.textFlow"
@@ -307,7 +308,7 @@ enum FinishingSectionID {
     static let publishing = "publish.publishing"
     static let script = "publish.script"
 
-    static let all = [thisPage, pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
+    static let all = [thisPage, style, pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
 }
 
 /// A Finishing tab: the action header pinned at the top, the tab's settings scrolling

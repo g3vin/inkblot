@@ -168,6 +168,55 @@ pub struct PrintTypography {
     pub chapter_sink_mm: f64,
     /// A paragraph after a heading or a scene break starts flush, as books set it.
     pub no_indent_after_break: bool,
+    /// How pictures in the text are set. Absent sets them as they were placed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub images: Option<ImageTypesetting>,
+}
+
+/// Where a picture in the text sits across the text block.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImageAlign {
+    /// Centred, as a book sets its pictures.
+    #[default]
+    Center,
+    /// Where the writer put it.
+    AsPlaced,
+}
+
+/// How the pictures in a book's text are set for print.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ImageTypesetting {
+    /// The widest a picture is set, as a percentage of the text block.
+    pub max_width_pct: f64,
+    pub align: ImageAlign,
+    /// A picture never breaks from the caption under it.
+    pub keep_with_caption: bool,
+    /// Pictures that print at fewer dots per inch than this are pointed out.
+    pub min_dpi: u32,
+}
+
+impl Default for ImageTypesetting {
+    fn default() -> Self {
+        Self { max_width_pct: 100.0, align: ImageAlign::Center, keep_with_caption: true, min_dpi: 300 }
+    }
+}
+
+/// What a chapter's head shows beyond its title, kept on the chapter's own document
+/// (the `chapter` attribute of its TipTap `doc` node), so it travels with it.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChapterMeta {
+    pub subtitle: String,
+    /// The chapter's own heading picture: a project-relative path, or a data URI.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    pub epigraph: String,
+    pub epigraph_source: String,
 }
 
 #[typeshare]

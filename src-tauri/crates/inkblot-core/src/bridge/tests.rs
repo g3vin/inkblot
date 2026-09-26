@@ -58,6 +58,7 @@ fn typography() -> crate::types::PrintTypography {
         chapter_opening: ChapterOpening::DropCap,
         chapter_sink_mm: 25.4,
         no_indent_after_break: true,
+        images: Some(crate::types::ImageTypesetting::default()),
     }
 }
 
@@ -481,6 +482,11 @@ fn every_command() -> Vec<NativeCommand> {
             page: None,
         }),
         NativeCommand::OpenBookItem(OpenBookItemCommand { id: "d1".into() }),
+        NativeCommand::ApplyBookStyle(ApplyBookStyleCommand { id: "classic".into() }),
+        NativeCommand::SetChapterMeta(SetChapterMetaCommand {
+            meta: crate::types::ChapterMeta { subtitle: "In which it rains".into(), ..Default::default() },
+        }),
+        NativeCommand::SetHeadImage(SetHeadImageCommand { target: HeadImageTarget::Ornament, path: Some("/Users/a/fleuron.png".into()) }),
         NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true, doc_path: Some("a.md".into()) }),
         NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Book }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
@@ -957,6 +963,9 @@ fn every_event() -> Vec<WebviewEvent> {
                 legacy: false,
             }],
             selected_book_item: Some("c:Manuscript/one".into()),
+            chapter_meta: Some(crate::types::ChapterMeta { subtitle: "In which it rains".into(), ..Default::default() }),
+            chapter_image_file: None,
+            ornament_image_file: None,
             suggested_inside_margin_mm: 12.7,
             author: crate::types::AuthorProfile { byline: "A. Writer".into(), ..Default::default() },
             word_count: 71_400,
@@ -1004,6 +1013,7 @@ fn every_event() -> Vec<WebviewEvent> {
             signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
             tokens: vec![RunningToken { token: "{page}".into(), label: "Page Number".into() }],
             default_typography: typography(),
+            book_styles: vec![],
         }),
         WebviewEvent::PrintJobStatus(PrintJobStatus {
             job_id: "p1".into(),
@@ -1107,6 +1117,9 @@ fn every_command_has_its_documented_wire_name() {
             "removeBookItem",
             "editBookItem",
             "openBookItem",
+            "applyBookStyle",
+            "setChapterMeta",
+            "setHeadImage",
             "setPrintLayout",
             "setPageSetup",
             "setBookSettings",
@@ -1417,6 +1430,7 @@ fn a_page_setup_carries_its_typography_in_camel_case() {
         chapter_opening: ChapterOpening::DropCapAndSmallCaps,
         chapter_sink_mm: 76.2,
         no_indent_after_break: true,
+        images: None,
     });
     setup.title_page = Some(TitlePageOptions { style: TitlePageStyle::Manuscript, show_contact: true, show_word_count: true });
     let wire = serde_json::to_value(&setup).unwrap();

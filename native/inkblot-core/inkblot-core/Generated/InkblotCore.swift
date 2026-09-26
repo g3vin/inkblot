@@ -149,6 +149,15 @@ public struct AddReplyCommand: Codable, Equatable {
 	}
 }
 
+/// Apply a book style to the book: its type, its chapter design and its running heads.
+public struct ApplyBookStyleCommand: Codable, Equatable {
+	public let id: String
+
+	public init(id: String) {
+		self.id = id
+	}
+}
+
 /// Which setup an edit goes to: the active document's own, or the one every chapter of
 /// its book prints in.
 public enum PageSetupTarget: String, Codable, Equatable {
@@ -702,6 +711,32 @@ public enum ChapterOpening: String, Codable, Equatable {
 	case dropCapAndSmallCaps
 }
 
+/// Where a picture in the text sits across the text block.
+public enum ImageAlign: String, Codable, Equatable {
+	/// Centred, as a book sets its pictures.
+	case center
+	/// Where the writer put it.
+	case asPlaced
+}
+
+/// How the pictures in a book's text are set for print.
+public struct ImageTypesetting: Codable, Equatable {
+	/// The widest a picture is set, as a percentage of the text block.
+	public let maxWidthPct: Double
+	public let align: ImageAlign
+	/// A picture never breaks from the caption under it.
+	public let keepWithCaption: Bool
+	/// Pictures that print at fewer dots per inch than this are pointed out.
+	public let minDpi: UInt32
+
+	public init(maxWidthPct: Double, align: ImageAlign, keepWithCaption: Bool, minDpi: UInt32) {
+		self.maxWidthPct = maxWidthPct
+		self.align = align
+		self.keepWithCaption = keepWithCaption
+		self.minDpi = minDpi
+	}
+}
+
 /// Type for print: set on the page's text in Print Layout, on paper and in the PDF,
 /// and carried into a DOCX's styles — never on the continuous editor.
 public struct PrintTypography: Codable, Equatable {
@@ -724,8 +759,10 @@ public struct PrintTypography: Codable, Equatable {
 	public let chapterSinkMm: Double
 	/// A paragraph after a heading or a scene break starts flush, as books set it.
 	public let noIndentAfterBreak: Bool
+	/// How pictures in the text are set. Absent sets them as they were placed.
+	public let images: ImageTypesetting?
 
-	public init(fontFamily: String, fontSizePt: Double, lineSpacing: LineSpacing, lineValue: Double, firstLineIndentMm: Double, paragraphSpacingPt: Double, alignment: PrintAlignment, hyphenate: Bool, sceneBreak: String, chapterOpening: ChapterOpening, chapterSinkMm: Double, noIndentAfterBreak: Bool) {
+	public init(fontFamily: String, fontSizePt: Double, lineSpacing: LineSpacing, lineValue: Double, firstLineIndentMm: Double, paragraphSpacingPt: Double, alignment: PrintAlignment, hyphenate: Bool, sceneBreak: String, chapterOpening: ChapterOpening, chapterSinkMm: Double, noIndentAfterBreak: Bool, images: ImageTypesetting?) {
 		self.fontFamily = fontFamily
 		self.fontSizePt = fontSizePt
 		self.lineSpacing = lineSpacing
@@ -738,6 +775,7 @@ public struct PrintTypography: Codable, Equatable {
 		self.chapterOpening = chapterOpening
 		self.chapterSinkMm = chapterSinkMm
 		self.noIndentAfterBreak = noIndentAfterBreak
+		self.images = images
 	}
 }
 
@@ -1100,6 +1138,28 @@ public struct BookSettings: Codable, Equatable {
 		self.continuous = continuous
 		self.covers = covers
 		self.activeCover = activeCover
+	}
+}
+
+/// A book style (`bookStyles.ts`): a coordinated design, applied whole.
+public struct BookStyleOption: Codable, Equatable {
+	public let id: String
+	public let label: String
+	/// One line: what it looks like, and what it suits.
+	public let description: String
+	public let typography: PrintTypography
+	public let design: ChapterDesign
+	public let header: RunningText
+	public let versoHeader: RunningText?
+
+	public init(id: String, label: String, description: String, typography: PrintTypography, design: ChapterDesign, header: RunningText, versoHeader: RunningText?) {
+		self.id = id
+		self.label = label
+		self.description = description
+		self.typography = typography
+		self.design = design
+		self.header = header
+		self.versoHeader = versoHeader
 	}
 }
 
@@ -1489,6 +1549,23 @@ public struct CanvasToolbarChanged: Codable, Equatable {
 	}
 }
 
+/// What a chapter's head shows beyond its title, kept on the chapter's own document
+/// (the `chapter` attribute of its TipTap `doc` node), so it travels with it.
+public struct ChapterMeta: Codable, Equatable {
+	public let subtitle: String
+	/// The chapter's own heading picture: a project-relative path, or a data URI.
+	public let image: String?
+	public let epigraph: String
+	public let epigraphSource: String
+
+	public init(subtitle: String, image: String?, epigraph: String, epigraphSource: String) {
+		self.subtitle = subtitle
+		self.image = image
+		self.epigraph = epigraph
+		self.epigraphSource = epigraphSource
+	}
+}
+
 public struct ChooseReferenceCandidateCommand: Codable, Equatable {
 	public let id: String
 	public let index: UInt32
@@ -1665,6 +1742,9 @@ public enum NativeCommand: Codable, Equatable {
 	case removeBookItem(RemoveBookItemCommand)
 	case editBookItem(EditBookItemCommand)
 	case openBookItem(OpenBookItemCommand)
+	case applyBookStyle(ApplyBookStyleCommand)
+	case setChapterMeta(SetChapterMetaCommand)
+	case setHeadImage(SetHeadImageCommand)
 	case setPrintLayout(SetPrintLayoutCommand)
 	case setPageSetup(SetPageSetupCommand)
 	case setBookSettings(SetBookSettingsCommand)
@@ -1771,6 +1851,9 @@ public enum NativeCommand: Codable, Equatable {
 			removeBookItem,
 			editBookItem,
 			openBookItem,
+			applyBookStyle,
+			setChapterMeta,
+			setHeadImage,
 			setPrintLayout,
 			setPageSetup,
 			setBookSettings,
@@ -2181,6 +2264,21 @@ public enum NativeCommand: Codable, Equatable {
 					self = .openBookItem(content)
 					return
 				}
+			case .applyBookStyle:
+				if let content = try? container.decode(ApplyBookStyleCommand.self, forKey: .payload) {
+					self = .applyBookStyle(content)
+					return
+				}
+			case .setChapterMeta:
+				if let content = try? container.decode(SetChapterMetaCommand.self, forKey: .payload) {
+					self = .setChapterMeta(content)
+					return
+				}
+			case .setHeadImage:
+				if let content = try? container.decode(SetHeadImageCommand.self, forKey: .payload) {
+					self = .setHeadImage(content)
+					return
+				}
 			case .setPrintLayout:
 				if let content = try? container.decode(SetPrintLayoutCommand.self, forKey: .payload) {
 					self = .setPrintLayout(content)
@@ -2560,6 +2658,15 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .openBookItem(let content):
 			try container.encode(CodingKeys.openBookItem, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .applyBookStyle(let content):
+			try container.encode(CodingKeys.applyBookStyle, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setChapterMeta(let content):
+			try container.encode(CodingKeys.setChapterMeta, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setHeadImage(let content):
+			try container.encode(CodingKeys.setHeadImage, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setPrintLayout(let content):
 			try container.encode(CodingKeys.setPrintLayout, forKey: .type)
@@ -5379,13 +5486,17 @@ public struct PageLayoutCatalog: Codable, Equatable {
 	public let tokens: [RunningToken]
 	/// What "Set Type for Print" starts from.
 	public let defaultTypography: PrintTypography
+	/// Whole designs for a book, one click each: its type, how its chapters open, its
+	/// running heads.
+	public let bookStyles: [BookStyleOption]?
 
-	public init(presets: [PageSizeOption], formats: [FormatOption], signatureAdvice: [SignatureAdvice], tokens: [RunningToken], defaultTypography: PrintTypography) {
+	public init(presets: [PageSizeOption], formats: [FormatOption], signatureAdvice: [SignatureAdvice], tokens: [RunningToken], defaultTypography: PrintTypography, bookStyles: [BookStyleOption]?) {
 		self.presets = presets
 		self.formats = formats
 		self.signatureAdvice = signatureAdvice
 		self.tokens = tokens
 		self.defaultTypography = defaultTypography
+		self.bookStyles = bookStyles
 	}
 }
 
@@ -5552,6 +5663,11 @@ public struct PageLayoutState: Codable, Equatable {
 	/// The entry the navigator has selected, whose page the Typeset tab's This Page
 	/// section shows.
 	public let selectedBookItem: String?
+	/// The active chapter's head: its subtitle, picture and epigraph.
+	public let chapterMeta: ChapterMeta?
+	/// The chapter's picture and the book's ornament picture on disk, for thumbnails.
+	public let chapterImageFile: String?
+	public let ornamentImageFile: String?
 	/// A recommended inside margin for a book of this many pages, in mm.
 	public let suggestedInsideMarginMm: Double
 	/// Who wrote it: the title page's byline and contact details.
@@ -5570,7 +5686,7 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Production section. None for prose.
 	public let script: ScriptSummary?
 
-	public init(enabled: Bool, mode: EditorMode?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
+	public init(enabled: Bool, mode: EditorMode?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
 		self.mode = mode
 		self.docPath = docPath
@@ -5589,6 +5705,9 @@ public struct PageLayoutState: Codable, Equatable {
 		self.bookChapters = bookChapters
 		self.bookItems = bookItems
 		self.selectedBookItem = selectedBookItem
+		self.chapterMeta = chapterMeta
+		self.chapterImageFile = chapterImageFile
+		self.ornamentImageFile = ornamentImageFile
 		self.suggestedInsideMarginMm = suggestedInsideMarginMm
 		self.author = author
 		self.wordCount = wordCount
@@ -6630,6 +6749,15 @@ public struct SetCaretAtDocPosCommand: Codable, Equatable {
 	}
 }
 
+/// Set the active chapter's subtitle, picture and epigraph.
+public struct SetChapterMetaCommand: Codable, Equatable {
+	public let meta: ChapterMeta
+
+	public init(meta: ChapterMeta) {
+		self.meta = meta
+	}
+}
+
 public struct SetCitationStyleCommand: Codable, Equatable {
 	/// Absent sets only the project's default.
 	public let docPath: String?
@@ -6727,6 +6855,25 @@ public struct SetFontSizeCommand: Codable, Equatable {
 	public init(target: EditorTarget, size: String) {
 		self.target = target
 		self.size = size
+	}
+}
+
+/// Which picture of a chapter head a file is for.
+public enum HeadImageTarget: String, Codable, Equatable {
+	/// The active chapter's own picture.
+	case chapter
+	/// The ornament every chapter's head carries.
+	case ornament
+}
+
+/// A picture for a chapter head, copied into the project — or none, to take it away.
+public struct SetHeadImageCommand: Codable, Equatable {
+	public let target: HeadImageTarget
+	public let path: String?
+
+	public init(target: HeadImageTarget, path: String?) {
+		self.target = target
+		self.path = path
 	}
 }
 

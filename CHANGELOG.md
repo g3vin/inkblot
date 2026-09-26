@@ -29,6 +29,16 @@ Notable changes to Inkblot. The format follows
   prologue, an epilogue or an interlude, which the book does not number. The front
   matter is numbered in roman, and the contents give each chapter's page. A book set up
   before keeps its text front and back matter, which become pages when first changed.
+- **Chapter openings and book styles:** a book's chapters open with a designed head —
+  "Chapter One" (from 0 or 1, in words, numerals or roman), the title, a subtitle, an
+  ornament (a rule, a glyph or a picture) and the chapter's own picture, placed above,
+  between or below, left, centred or right, in capitals, small capitals or italic, in
+  the body's face or one of its own — the same in print, the PDF, the EPUB, HTML, Word,
+  Markdown and text. Each chapter's subtitle, picture and epigraph are its own. Chapters
+  can start on a new page, a right-hand page, or run straight on. Seven book styles
+  (Classic, Elegant, Modern, Minimal, Ornate, Large Print, Manuscript) set all of it —
+  type, heads, running heads — in one click. Pictures in the text are set to the text
+  block and kept with their captions, and preflight uses the book's minimum resolution.
 
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own

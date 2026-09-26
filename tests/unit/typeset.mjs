@@ -252,3 +252,114 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   ok('a page of the book’s own belongs to the book’s folder',
     bookFolderFor('Book/.book/dedication-x', 'folder') === 'Book' && bookFolderFor('.book/copyright-y', 'folder') === '' && bookFolderFor('Book/One', 'folder') === 'Book')
 }
+
+/* ---- chapter heads, as the book designs them ---- */
+
+{
+  const matter = await import(`${C}/print/bookMatter.ts`)
+  const { DEFAULT_CHAPTER_DESIGN } = await import(`${C}/print/chapterDesign.ts`)
+  const { chapterHeadSpec, chapterHeadText } = await import(`${C}/print/ChapterHead.js`)
+  const portable = await import(`${C}/print/export/portable.ts`)
+  const { runOn } = await import(`${C}/print/printJob.js`)
+  const { BOOK_STYLES, applyBookStyle, bookStyle } = await import(`${C}/print/bookStyles.ts`)
+  const { normalizeChapterMeta } = await import(`${C}/print/DocChapterMeta.js`)
+  const { generateHTML, Editor } = await import('@tiptap/core')
+  const { getDocPreviewExtensions } = await import(`${C}/lib/editorExtensions.js`)
+  const { normalizePageSetup } = await import(`${C}/print/pageSetup.ts`)
+
+  const h1 = (text) => ({ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text }] })
+  const p = (text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })
+  const design = { ...DEFAULT_CHAPTER_DESIGN, showNumber: true, ornament: 'glyph', ornamentGlyph: '❦', ornamentPosition: 'below' }
+  const chapter = {
+    type: 'doc',
+    attrs: { chapter: { subtitle: 'In which it rains', image: '.assets/storm.png', epigraph: 'Rain.', epigraphSource: 'A Poet' } },
+    content: [h1('The Storm'), p('It rained.')],
+  }
+
+  const headed = matter.headWithDesign(chapter, 'storm', 'Chapter One', design)
+  const head = headed.content[0].attrs.head
+  ok('a chapter opens with its head: number, title from its Heading 1, and its own subtitle, picture and epigraph',
+    headed.content[0].type === 'chapterHead' && head.label === 'Chapter One' && head.title === 'The Storm' &&
+    head.subtitle === 'In which it rains' && head.image === '.assets/storm.png' && head.epigraphSource === 'A Poet')
+  ok('…in place of the Heading 1, the text after it untouched', headed.content.length === 2 && headed.content[1].content[0].text === 'It rained.')
+  const quiet = matter.headWithDesign(chapter, 'storm', 'Chapter One', { ...design, showNumber: false, showSubtitle: false, showImage: false })
+  ok('what the design leaves out, the head does not show',
+    !quiet.content[0].attrs.head.label && !quiet.content[0].attrs.head.subtitle && !quiet.content[0].attrs.head.image && quiet.content[0].attrs.head.title === 'The Storm')
+  ok('a chapter with no Heading 1 is titled by its document’s name',
+    matter.headWithDesign({ type: 'doc', content: [p('x')] }, 'Rainfall', null, design).content[0].attrs.head.title === 'Rainfall')
+
+  const spec = JSON.stringify(chapterHeadSpec(head))
+  ok('the head renders number, title, subtitle, the ornament below the title, and the epigraph, in that order',
+    spec.indexOf('ch-number') < spec.indexOf('ch-title') && spec.indexOf('ch-title') < spec.indexOf('ch-subtitle') &&
+    spec.indexOf('ch-subtitle') < spec.indexOf('is-glyph') && spec.indexOf('is-glyph') < spec.indexOf('ch-epigraph'))
+  ok('its running head and contents entry read "Chapter One: The Storm"', chapterHeadText(head) === 'Chapter One: The Storm' &&
+    matter.chapterTitleOf(headed, 'x') === 'Chapter One: The Storm')
+  const html = generateHTML(headed, getDocPreviewExtensions())
+  ok('generateHTML draws it — as the HTML and EPUB exports do', html.includes('class="chapter-head"') && html.includes('<h1 class="ch-title">The Storm</h1>') && html.includes('❦'))
+
+  ok('a head’s pictures are among the document’s, for an export to package', JSON.stringify(portable.collectImageSources(headed)) === '[".assets/storm.png"]')
+  const mapped = portable.mapImageSources(headed, (src) => `images/${src.split('/').pop()}`)
+  ok('…and rewritten with the rest', mapped.content[0].attrs.head.image === 'images/storm.png')
+  const blocks = portable.headsToBlocks(headed)
+  ok('for Markdown, text and Word the head is a heading and blocks: number and title, subtitle, picture, epigraph',
+    blocks.content.some((n) => n.type === 'heading' && n.content.map((c) => c.text || '/').join('') === 'Chapter One/The Storm') &&
+    blocks.content.some((n) => n.content?.[0]?.text === 'In which it rains') &&
+    blocks.content.some((n) => n.content?.[0]?.type === 'image') && blocks.content.some((n) => n.type === 'blockquote'))
+  ok('the head’s title is the document’s first heading in an export', portable.firstHeadingText(headed) === 'Chapter One: The Storm')
+
+  const sections = [
+    { item: { id: 'p', kind: 'chapter', path: 'P', chapterType: 'prologue', hidden: false }, path: 'P', name: 'P', content: { type: 'doc', content: [h1('Before'), p('.')] } },
+    { item: { id: 'pt', kind: 'part', title: 'The Crossing', hidden: false }, path: '', name: 'The Crossing', content: null },
+    { item: { id: 'a', kind: 'chapter', path: 'A', hidden: false }, path: 'A', name: 'A', content: chapter },
+  ]
+  const compiled = matter.compileSections(sections, {
+    chapterNumbering: { style: 'none', prefix: 'Chapter', includeTitle: true, startAt: 1 },
+    chapterDesign: design,
+  })
+  ok('a designed book heads each chapter with the design: "Chapter One" in words, though numbering was never chosen',
+    compiled[2].content.content[0].attrs.head.label === 'Chapter One')
+  ok('a prologue is headed "Prologue" and not counted', compiled[0].content.content[0].attrs.head.label === 'Prologue' && compiled[0].number === undefined)
+  ok('a part is a designed head too', compiled[1].content.content[0].type === 'chapterHead' && compiled[1].content.content[0].attrs.head.label === 'Part One')
+
+  // Chapters run on: one flow, each member knowing where it starts.
+  const flow = runOn([compiled[0], compiled[2]], { chapterBreak: 'continue' })
+  const editor = new Editor({ extensions: getDocPreviewExtensions(), content: flow[0].content })
+  const firstSize = editor.state.doc.content.child(0).nodeSize + editor.state.doc.content.child(1).nodeSize
+  ok('chapters that run on are one flow', flow.length === 1 && flow[0].members.length === 2)
+  ok('…each starting where the one before ended, counted as ProseMirror counts', flow[0].members[1].pos === firstSize &&
+    editor.state.doc.nodeAt(flow[0].members[1].pos)?.type.name === 'chapterHead')
+  editor.destroy()
+  ok('a part is not run into', runOn(compiled, { chapterBreak: 'continue' }).length === 3)
+  ok('nor anything, when chapters start on new pages', runOn([compiled[0], compiled[2]], { chapterBreak: 'newPage' }).length === 2)
+
+  // Book styles.
+  ok('style ids are unique, and each is its own design', new Set(BOOK_STYLES.map((s) => s.id)).size === BOOK_STYLES.length &&
+    BOOK_STYLES.every((s) => s.design.styleId === s.id))
+  const styled = applyBookStyle({ title: 'T' }, bookStyle('classic'), normalizePageSetup({ presetId: 'trade-6x9' }))
+  ok('applying a style gives the book its type, heads and chapter design',
+    styled.pageSetup.typography.chapterOpening === 'dropCapAndSmallCaps' && styled.chapterDesign.styleId === 'classic' &&
+    styled.pageSetup.mirrorMargins && styled.pageSetup.versoHeader?.center === '{author}' && styled.pageSetup.chapterStartsOnRecto)
+  const restyled = applyBookStyle(styled, bookStyle('manuscript'), normalizePageSetup(null))
+  ok('and another replaces it, keeping the book’s own page', restyled.chapterDesign.styleId === 'manuscript' && !restyled.pageSetup.versoHeader &&
+    restyled.pageSetup.widthMm === styled.pageSetup.widthMm)
+
+  ok('a chapter’s head with nothing in it is none', normalizeChapterMeta({ subtitle: '' }) === null)
+  ok('a subtitle is one line', normalizeChapterMeta({ subtitle: 'a\nb' }).subtitle === 'a b')
+}
+
+/* ---- typesetting is allowed on a locked chapter ---- */
+
+{
+  const { Editor } = await import('@tiptap/core')
+  const { StarterKit } = await import('@tiptap/starter-kit')
+  const { TypesetLock } = await import(`${C}/print/TypesetLock.ts`)
+  const { DocPageSetup } = await import(`${C}/print/DocPageSetup.js`)
+  const { DocChapterMeta, readChapterMeta } = await import(`${C}/print/DocChapterMeta.js`)
+  const editor = new Editor({ extensions: [StarterKit, DocPageSetup, DocChapterMeta, TypesetLock], content: '<h1>A</h1><p>b</p>' })
+  editor.storage.typesetLock.locked = true
+  editor.commands.setChapterMeta({ subtitle: 'Sub' })
+  editor.commands.setPageSetup({ presetId: 'a5' })
+  ok('a chapter’s subtitle and page setup are set on a locked chapter',
+    readChapterMeta(editor.state.doc)?.subtitle === 'Sub' && editor.state.doc.attrs.pageSetup?.presetId === 'a5')
+  editor.destroy()
+}

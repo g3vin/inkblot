@@ -137,6 +137,21 @@ final class PageLayoutModel {
         bridge.send(.setBookSettings(SetBookSettingsCommand(settings: draft.settings)))
     }
 
+    /// Apply a book style (`bookStyles.ts`): the book's type, chapter design and heads.
+    func applyStyle(_ id: String) {
+        bridge.send(.applyBookStyle(ApplyBookStyleCommand(id: id)))
+    }
+
+    func setChapterMeta(_ meta: ChapterMeta) {
+        bridge.send(.setChapterMeta(SetChapterMetaCommand(meta: meta)))
+    }
+
+    /// A picture for the active chapter's head, or the ornament every head carries — or
+    /// none, with `url` nil.
+    func setHeadImage(_ target: HeadImageTarget, url: URL?) {
+        bridge.send(.setHeadImage(SetHeadImageCommand(target: target, path: url?.path)))
+    }
+
     func applyFormat(_ id: String) {
         bridge.send(.applyFormat(ApplyFormatCommand(formatId: id, target: editsBook ? .book : .document)))
     }
@@ -414,6 +429,7 @@ struct TypographyDraft: Equatable {
     var chapterOpening: ChapterOpening
     var chapterSinkMm: Double
     var noIndentAfterBreak: Bool
+    var images: ImageTypesetting?
 
     init(_ t: PrintTypography) {
         fontFamily = t.fontFamily
@@ -428,6 +444,7 @@ struct TypographyDraft: Equatable {
         chapterOpening = t.chapterOpening
         chapterSinkMm = t.chapterSinkMm
         noIndentAfterBreak = t.noIndentAfterBreak
+        images = t.images
     }
 
     var typography: PrintTypography {
@@ -436,7 +453,7 @@ struct TypographyDraft: Equatable {
             lineValue: lineValue, firstLineIndentMm: max(0, firstLineIndentMm),
             paragraphSpacingPt: max(0, paragraphSpacingPt), alignment: alignment, hyphenate: hyphenate,
             sceneBreak: sceneBreak, chapterOpening: chapterOpening, chapterSinkMm: max(0, chapterSinkMm),
-            noIndentAfterBreak: noIndentAfterBreak)
+            noIndentAfterBreak: noIndentAfterBreak, images: images)
     }
 
     /// The family a CSS list starts with, unquoted: what the font menu shows.

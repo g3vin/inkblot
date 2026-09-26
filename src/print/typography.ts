@@ -11,8 +11,8 @@
  * the 23 or so lines a page a manuscript reader expects: single spacing is 1.15 × the
  * size, and 1.5 and double are multiples of that.
  */
-import { ChapterOpening, LineSpacing, PrintAlignment } from '../types'
-import type { PrintTypography } from '../types'
+import { ChapterOpening, ImageAlign, LineSpacing, PrintAlignment } from '../types'
+import type { ImageTypesetting, PrintTypography } from '../types'
 
 /** Single spacing, as a multiple of the font size. */
 export const SINGLE_LEADING = 1.15
@@ -80,6 +80,26 @@ export const normalizeTypography = (raw: unknown): PrintTypography | undefined =
     chapterOpening: oneOf(r.chapterOpening, Object.values(ChapterOpening), d.chapterOpening),
     chapterSinkMm: finite(r.chapterSinkMm, d.chapterSinkMm, 0, 300),
     noIndentAfterBreak: Boolean(r.noIndentAfterBreak),
+    ...(r.images && typeof r.images === 'object' ? { images: normalizeImageTypesetting(r.images) } : {}),
+  }
+}
+
+export const DEFAULT_IMAGE_TYPESETTING: ImageTypesetting = {
+  maxWidthPct: 100,
+  align: ImageAlign.Center,
+  keepWithCaption: true,
+  minDpi: 300,
+}
+
+/** How a book's pictures are set, with anything missing filled in. */
+export const normalizeImageTypesetting = (raw: unknown): ImageTypesetting => {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const d = DEFAULT_IMAGE_TYPESETTING
+  return {
+    maxWidthPct: finite(r.maxWidthPct, d.maxWidthPct, 10, 100),
+    align: oneOf(r.align, Object.values(ImageAlign), d.align),
+    keepWithCaption: r.keepWithCaption === undefined ? d.keepWithCaption : Boolean(r.keepWithCaption),
+    minDpi: Math.round(finite(r.minDpi, d.minDpi, 72, 1200)),
   }
 }
 
@@ -111,6 +131,7 @@ export const typographyVars = (t: PrintTypography | undefined | null): Record<st
     '--pt-hyphens': t.hyphenate ? 'auto' : 'manual',
     '--pt-break': cssString(t.sceneBreak),
     '--pt-sink': `${t.chapterSinkMm}mm`,
+    ...(t.images ? { '--pt-image-max': `${t.images.maxWidthPct}%` } : {}),
   }
 }
 
@@ -121,6 +142,11 @@ export const typographyClasses = (t: PrintTypography | undefined | null): string
   if (t.chapterOpening === ChapterOpening.DropCap || t.chapterOpening === ChapterOpening.DropCapAndSmallCaps) out.push('pt-drop-cap')
   if (t.chapterOpening === ChapterOpening.SmallCaps || t.chapterOpening === ChapterOpening.DropCapAndSmallCaps) out.push('pt-small-caps')
   if (t.noIndentAfterBreak) out.push('pt-flush-after-break')
+  if (t.images) {
+    out.push('pt-images')
+    if (t.images.align === ImageAlign.Center) out.push('pt-images-center')
+    if (t.images.keepWithCaption) out.push('pt-images-keep')
+  }
   return out
 }
 

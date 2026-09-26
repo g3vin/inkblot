@@ -8,10 +8,11 @@
  * export's own builder.
  */
 import { BookItemKind, ChapterNumberStyle, ChapterType, MatterKind } from '../types'
-import type { BackMatter, ChapterNumbering, FrontMatter } from '../types'
+import type { BackMatter, ChapterDesign, ChapterMeta, ChapterNumbering, FrontMatter } from '../types'
 import { chapterNumbers, isLegacyMatter, partNumbers, sectionsOf } from './bookItems'
 import type { BookSection, Chapter } from './compile'
 import { toRoman } from './pageSetup'
+import { chapterHeadText } from './ChapterHead'
 
 interface PMNode {
   type: string
@@ -149,10 +150,85 @@ const inlineText = (nodes: PMNode[] = []): string => nodes
   .map((n) => (n.type === 'text' ? n.text || '' : n.type === 'hardBreak' ? ': ' : inlineText(n.content)))
   .join('')
 
-/** What a chapter is called in a contents or an EPUB's navigation: its first heading. */
+/** What a chapter is called in a contents or an EPUB's navigation: its head, or its first heading. */
 export const chapterTitleOf = (content: Doc, fallback: string): string => {
-  const first = (content.content || []).find((n) => (n as PMNode).type === 'heading') as PMNode | undefined
+  const blocks = (content.content || []) as PMNode[]
+  const head = blocks.find((n) => n.type === 'chapterHead')
+  if (head) return chapterHeadText((head.attrs?.head || {}) as ChapterHeadValue) || fallback
+  const first = blocks.find((n) => n.type === 'heading')
   return inlineText(first?.content).trim() || fallback
+}
+
+/* ---------------- chapter heads, as the book designs them ---------------- */
+
+/** Everything a chapter head shows, resolved: what `ChapterHead.js` renders. */
+export interface ChapterHeadValue {
+  label?: string | null
+  title?: string
+  subtitle?: string
+  image?: string
+  imageWidthPct?: number
+  ornament?: string
+  ornamentGlyph?: string
+  ornamentImage?: string
+  ornamentPosition?: string
+  alignment?: string
+  numberCase?: string
+  titleCase?: string
+  headingFont?: string
+  numberSizePt?: number
+  titleSizePt?: number
+  epigraph?: string
+  epigraphSource?: string
+}
+
+/** A chapter's head: the book's design, filled with this chapter's number, title and own head. */
+export const chapterHeadFor = (
+  design: ChapterDesign,
+  { label = null, title = '', meta = null }: { label?: string | null; title?: string; meta?: Partial<ChapterMeta> | null }
+): ChapterHeadValue => {
+  const head: ChapterHeadValue = {
+    alignment: design.alignment,
+    numberCase: design.numberCase,
+    titleCase: design.titleCase,
+    numberSizePt: design.numberSizePt,
+    titleSizePt: design.titleSizePt,
+    ornament: design.ornament,
+    ornamentPosition: design.ornamentPosition,
+    imageWidthPct: design.imageWidthPct,
+  }
+  if (design.showNumber && label) head.label = label
+  if (design.showTitle && title) head.title = title
+  if (design.showSubtitle && meta?.subtitle) head.subtitle = meta.subtitle
+  if (design.showImage && meta?.image) head.image = meta.image
+  if (meta?.epigraph) {
+    head.epigraph = meta.epigraph
+    if (meta.epigraphSource) head.epigraphSource = meta.epigraphSource
+  }
+  if (design.headingFont) head.headingFont = design.headingFont
+  if (design.ornamentGlyph) head.ornamentGlyph = design.ornamentGlyph
+  if (design.ornamentImage) head.ornamentImage = design.ornamentImage
+  return head
+}
+
+/** A heading's inline content as plain text, a line break as a space. */
+const plainTitle = (nodes: PMNode[] = []): string => nodes
+  .map((n) => (n.type === 'text' ? n.text || '' : n.type === 'hardBreak' ? ' ' : plainTitle(n.content)))
+  .join('')
+  .trim()
+
+/**
+ * A chapter's content opening with its head: its opening Heading 1 becomes the head's
+ * title (or its document's name does, with none), with its label over it.
+ */
+export const headWithDesign = (content: Doc, name: string, label: string | null, design: ChapterDesign): Doc => {
+  const blocks = (content.content || []) as PMNode[]
+  const first = blocks[0]
+  const opensWithTitle = first?.type === 'heading' && first.attrs?.level === 1
+  const title = opensWithTitle ? plainTitle(first.content) : name
+  const meta = (content.attrs?.chapter || null) as Partial<ChapterMeta> | null
+  const head: PMNode = { type: 'chapterHead', attrs: { head: chapterHeadFor(design, { label, title, meta }) } }
+  return { ...content, content: [head, ...(opensWithTitle ? blocks.slice(1) : blocks)] }
 }
 
 /** One of the pages before the first chapter, as an export writes it. */
@@ -228,8 +304,12 @@ export const legacyMatterContent = (
   }
 }
 
-/** A part's divider: its number and its title, as one heading. */
-export const partContent = (label: string | null, title: string): Doc => {
+/** A part's divider: its number and its title, as one heading — or, designed, as a head. */
+export const partContent = (label: string | null, title: string, design?: ChapterDesign | null): Doc => {
+  if (design) {
+    const head = chapterHeadFor({ ...design, showNumber: true, showTitle: true }, { label, title: title === label ? '' : title })
+    return { type: 'doc', attrs: { bookPart: true }, content: [{ type: 'chapterHead', attrs: { head } }] }
+  }
   const inline: PMNode[] = label ? [text(label)] : []
   if (title && title !== label) inline.push(...(inline.length ? [{ type: 'hardBreak' }] : []), text(title))
   return { type: 'doc', attrs: { bookPart: true }, content: inline.length ? [heading(inline)] : [] }
@@ -247,9 +327,13 @@ export const compileSections = (
     chapterNumbering?: ChapterNumbering | null
     frontMatter?: Partial<FrontMatter> | null
     backMatter?: Partial<BackMatter> | null
+    chapterDesign?: ChapterDesign | null
+    partDesign?: ChapterDesign | null
   } | null | undefined,
   { author = '', insertTitles = false }: { author?: string; insertTitles?: boolean } = {}
 ): CompiledSection[] => {
+  // A book set up before designs is headed as it was, by its numbering alone.
+  const design = book?.chapterDesign || null
   const items = sections.map((s) => s.item)
   const numbering = book?.chapterNumbering
   const numbers = chapterNumbers(items, numbering?.startAt ?? 1)
@@ -270,7 +354,7 @@ export const compileSections = (
     if (item.kind === BookItemKind.Part) {
       const n = parts.get(item.id)
       const label = n ? chapterLabel(n, partNumbering) : null
-      return { ...section, role, number: n, label, content: partContent(label, item.title || section.name) }
+      return { ...section, role, number: n, label, content: partContent(label, item.title || section.name, design ? (book?.partDesign || design) : null) }
     }
     if (item.kind === BookItemKind.Matter) {
       const content = isLegacyMatter(item) ? legacyMatterContent(item.matter, book, author) : section.content
@@ -281,7 +365,12 @@ export const compileSections = (
     const typeLabel = TYPE_LABELS[item.chapterType as ChapterType]
     let content = section.content
     let label: string | null = null
-    if (number != null) {
+    if (design) {
+      label = number != null ? chapterLabel(number, { ...numbering, style: numbering?.style && numbering.style !== ChapterNumberStyle.None ? numbering.style : ChapterNumberStyle.Words, prefix: numbering?.prefix ?? 'Chapter' } as ChapterNumbering) : (typeLabel || null)
+      // A prologue says what it is whether or not the book shows chapter numbers.
+      const shown = typeLabel ? { ...design, showNumber: true } : design
+      content = headWithDesign(section.content, section.name, label, shown)
+    } else if (number != null) {
       content = headChapter(section.content, section.name, number, numbering, { insertTitle: insertTitles })
       label = chapterLabel(number, numbering)
     } else if (typeLabel) {

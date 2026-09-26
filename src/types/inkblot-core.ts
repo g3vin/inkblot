@@ -124,6 +124,11 @@ export interface AddReplyCommand {
 	parentNoteId: string;
 }
 
+/** Apply a book style to the book: its type, its chapter design and its running heads. */
+export interface ApplyBookStyleCommand {
+	id: string;
+}
+
 /**
  * Which setup an edit goes to: the active document's own, or the one every chapter of
  * its book prints in.
@@ -557,6 +562,25 @@ export enum ChapterOpening {
 	DropCapAndSmallCaps = "dropCapAndSmallCaps",
 }
 
+/** Where a picture in the text sits across the text block. */
+export enum ImageAlign {
+	/** Centred, as a book sets its pictures. */
+	Center = "center",
+	/** Where the writer put it. */
+	AsPlaced = "asPlaced",
+}
+
+/** How the pictures in a book's text are set for print. */
+export interface ImageTypesetting {
+	/** The widest a picture is set, as a percentage of the text block. */
+	maxWidthPct: number;
+	align: ImageAlign;
+	/** A picture never breaks from the caption under it. */
+	keepWithCaption: boolean;
+	/** Pictures that print at fewer dots per inch than this are pointed out. */
+	minDpi: number;
+}
+
 /**
  * Type for print: set on the page's text in Print Layout, on paper and in the PDF,
  * and carried into a DOCX's styles — never on the continuous editor.
@@ -583,6 +607,8 @@ export interface PrintTypography {
 	chapterSinkMm: number;
 	/** A paragraph after a heading or a scene break starts flush, as books set it. */
 	noIndentAfterBreak: boolean;
+	/** How pictures in the text are set. Absent sets them as they were placed. */
+	images?: ImageTypesetting;
 }
 
 export enum TitlePageStyle {
@@ -872,6 +898,18 @@ export interface BookSettings {
 	activeCover?: string;
 }
 
+/** A book style (`bookStyles.ts`): a coordinated design, applied whole. */
+export interface BookStyleOption {
+	id: string;
+	label: string;
+	/** One line: what it looks like, and what it suits. */
+	description: string;
+	typography: PrintTypography;
+	design: ChapterDesign;
+	header: RunningText;
+	versoHeader?: RunningText;
+}
+
 export enum BridgeErrorCode {
 	/** No live editor to answer for — an empty pane, or a canvas with no card open. */
 	NoEditor = "noEditor",
@@ -1148,6 +1186,18 @@ export interface CanvasToolbarChanged {
 	state?: CanvasToolbarState;
 }
 
+/**
+ * What a chapter's head shows beyond its title, kept on the chapter's own document
+ * (the `chapter` attribute of its TipTap `doc` node), so it travels with it.
+ */
+export interface ChapterMeta {
+	subtitle: string;
+	/** The chapter's own heading picture: a project-relative path, or a data URI. */
+	image?: string;
+	epigraph: string;
+	epigraphSource: string;
+}
+
 export interface ChooseReferenceCandidateCommand {
 	id: string;
 	index: number;
@@ -1295,6 +1345,9 @@ export type NativeCommand =
 	| { type: "removeBookItem", payload: RemoveBookItemCommand }
 	| { type: "editBookItem", payload: EditBookItemCommand }
 	| { type: "openBookItem", payload: OpenBookItemCommand }
+	| { type: "applyBookStyle", payload: ApplyBookStyleCommand }
+	| { type: "setChapterMeta", payload: SetChapterMetaCommand }
+	| { type: "setHeadImage", payload: SetHeadImageCommand }
 	| { type: "setPrintLayout", payload: SetPrintLayoutCommand }
 	| { type: "setPageSetup", payload: SetPageSetupCommand }
 	| { type: "setBookSettings", payload: SetBookSettingsCommand }
@@ -2881,6 +2934,11 @@ export interface PageLayoutCatalog {
 	tokens: RunningToken[];
 	/** What "Set Type for Print" starts from. */
 	defaultTypography: PrintTypography;
+	/**
+	 * Whole designs for a book, one click each: its type, how its chapters open, its
+	 * running heads.
+	 */
+	bookStyles?: BookStyleOption[];
 }
 
 /**
@@ -3025,6 +3083,11 @@ export interface PageLayoutState {
 	 * section shows.
 	 */
 	selectedBookItem?: string;
+	/** The active chapter's head: its subtitle, picture and epigraph. */
+	chapterMeta?: ChapterMeta;
+	/** The chapter's picture and the book's ornament picture on disk, for thumbnails. */
+	chapterImageFile?: string;
+	ornamentImageFile?: string;
 	/** A recommended inside margin for a book of this many pages, in mm. */
 	suggestedInsideMarginMm: number;
 	/** Who wrote it: the title page's byline and contact details. */
@@ -3709,6 +3772,11 @@ export interface SetCaretAtDocPosCommand {
 	pos: number;
 }
 
+/** Set the active chapter's subtitle, picture and epigraph. */
+export interface SetChapterMetaCommand {
+	meta: ChapterMeta;
+}
+
 export interface SetCitationStyleCommand {
 	/** Absent sets only the project's default. */
 	docPath?: string;
@@ -3779,6 +3847,20 @@ export interface SetFontSizeCommand {
 	 * on the mark and what the toolbar displays.
 	 */
 	size: string;
+}
+
+/** Which picture of a chapter head a file is for. */
+export enum HeadImageTarget {
+	/** The active chapter's own picture. */
+	Chapter = "chapter",
+	/** The ornament every chapter's head carries. */
+	Ornament = "ornament",
+}
+
+/** A picture for a chapter head, copied into the project — or none, to take it away. */
+export interface SetHeadImageCommand {
+	target: HeadImageTarget;
+	path?: string;
 }
 
 /**

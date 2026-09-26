@@ -29,6 +29,8 @@ import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import ResizableImage from '../extensions/ResizableImage'
 import TabIndent from '../extensions/TabIndent'
+import { ChapterHead } from '../print/ChapterHead'
+import { DocChapterMeta } from '../print/DocChapterMeta'
 import { DocPageSetup } from '../print/DocPageSetup'
 import { PageBreak } from '../print/PageBreak'
 import { Pagination } from '../print/PaginationExtension'
@@ -85,6 +87,9 @@ export const buildEditorExtensions = (starterKit) => [
   Citation,
   Bibliography,
   DocPageSetup,
+  DocChapterMeta,
+  // A compiled chapter's head (bookMatter.ts): never in a document on disk.
+  ChapterHead,
   PageBreak,
   Pagination,
   // A chapter's prose, held while the book is typeset (Typeset mode).

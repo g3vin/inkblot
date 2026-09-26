@@ -16,6 +16,7 @@
 import { Extension } from '@tiptap/core'
 
 import { normalizePageSetup } from './pageSetup'
+import { TYPESET_META } from './TypesetLock'
 
 export const DocPageSetup = Extension.create({
   name: 'docPageSetup',
@@ -39,8 +40,13 @@ export const DocPageSetup = Extension.create({
 
   addCommands() {
     return {
+      // Typesetting, not writing: allowed on a locked chapter, and kept out of the text
+      // history (TypesetLock.ts).
       setPageSetup: (setup) => ({ tr, dispatch }) => {
-        if (dispatch) tr.setDocAttribute('pageSetup', setup ? normalizePageSetup(setup) : null)
+        if (dispatch) {
+          tr.setDocAttribute('pageSetup', setup ? normalizePageSetup(setup) : null)
+          tr.setMeta(TYPESET_META, true)
+        }
         return true
       },
     }

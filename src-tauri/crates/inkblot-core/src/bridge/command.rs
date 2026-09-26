@@ -32,7 +32,7 @@ use super::print::{
     SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand, SetPrintLayoutCommand,
     SetAuthorProfileCommand, SetBookCoverCommand, SetEditorModeCommand, SetPrintScopeCommand, SetPrintZoomCommand,
     UseSetupForBookCommand, MoveBookItemCommand, SetBookItemHiddenCommand, AddBookItemCommand, RemoveBookItemCommand,
-    EditBookItemCommand, OpenBookItemCommand,
+    EditBookItemCommand, OpenBookItemCommand, ApplyBookStyleCommand, SetChapterMetaCommand, SetHeadImageCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -594,6 +594,10 @@ pub enum NativeCommand {
     RemoveBookItem(RemoveBookItemCommand),
     EditBookItem(EditBookItemCommand),
     OpenBookItem(OpenBookItemCommand),
+    /* Chapter openings and book styles (`print.rs`). */
+    ApplyBookStyle(ApplyBookStyleCommand),
+    SetChapterMeta(SetChapterMetaCommand),
+    SetHeadImage(SetHeadImageCommand),
     SetPrintLayout(SetPrintLayoutCommand),
     SetPageSetup(SetPageSetupCommand),
     SetBookSettings(SetBookSettingsCommand),

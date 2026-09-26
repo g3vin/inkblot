@@ -2,16 +2,15 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The book's sections of the Typeset tab: what goes into the book.
+/// The book's sections of the Typeset tab: the book itself, and the setup it prints in.
 ///
 /// A book is a folder of documents — the active document's folder, or the whole
 /// project. Its title and author go on the running heads, the EPUB and the PDF; its own
-/// page setup, when it has one, is what every chapter prints in. Which chapters are in,
-/// how they are headed, and the pages before and after them are all the book's, kept
-/// in the project and applied whenever it is printed or exported.
+/// page setup, when it has one, is what every chapter prints in. What is in it, and in
+/// what order, is the Book navigator's; how its chapters open is Chapter Openings'.
 struct BookSections: View {
     enum Kind: Hashable {
-        case info, chapters, headings, frontMatter, backMatter, setup
+        case info, setup
     }
 
     let kinds: [Kind]
@@ -27,10 +26,6 @@ struct BookSections: View {
             ForEach(kinds, id: \.self) { kind in
                 switch kind {
                 case .info: infoSection(state, book)
-                case .chapters: chaptersSection(state, book)
-                case .headings: headingsSection(book)
-                case .frontMatter: frontMatterSection(book)
-                case .backMatter: backMatterSection(book)
                 case .setup: setupSection(state)
                 }
             }
@@ -101,92 +96,7 @@ struct BookSections: View {
         return name.map { "The “\($0)” Folder" } ?? "The Project’s Top Folder"
     }
 
-    /* ---------------- chapters ---------------- */
-
-    @ViewBuilder
-    private func chaptersSection(_ state: PageLayoutState, _ book: BookDraft) -> some View {
-        let layout = model.pageLayout
-        let excluded = Set(book.excluded)
-        let included = state.bookChapters.filter { !excluded.contains($0) }.count
-        FinishingSection("Chapters", id: FinishingSectionID.chapters) {
-            if state.bookChapters.isEmpty {
-                FinishingNote("There are no documents in this book yet.")
-            } else {
-                LabeledContent("In the Book") {
-                    Text(included == state.bookChapters.count ? "All \(included)" : "\(included) of \(state.bookChapters.count)")
-                        .monospacedDigit()
-                }
-                ForEach(Array(state.bookChapters.enumerated()), id: \.element) { index, path in
-                    Toggle(isOn: Binding(
-                        get: { !excluded.contains(path) },
-                        set: { on in
-                            guard var draft = layout.book else { return }
-                            draft.include(path, on)
-                            layout.apply(draft)
-                        }
-                    )) {
-                        HStack(spacing: 8) {
-                            Text("\(index + 1)")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                                .frame(minWidth: 18, alignment: .trailing)
-                            Text(path.split(separator: "/").last.map(String.init) ?? path)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .foregroundStyle(excluded.contains(path) ? .secondary : .primary)
-                            if path == state.docPath {
-                                Image(systemName: "pencil")
-                                    .foregroundStyle(.secondary)
-                                    .help("The document you are writing in")
-                            }
-                        }
-                    }
-                    .toggleStyle(.checkbox)
-                }
-                if !excluded.isEmpty {
-                    Button("Include Every Chapter") {
-                        guard var draft = layout.book else { return }
-                        draft.excluded = []
-                        layout.apply(draft)
-                    }
-                }
-            }
-        } footer: {
-            FinishingNote("In the order the file tree shows: drag documents in the tree to reorder the book. A chapter left out still prints on its own.")
-        }
-    }
-
     /* ---------------- chapter headings ---------------- */
-
-    @ViewBuilder
-    private func headingsSection(_ book: BookDraft) -> some View {
-        FinishingSection("Chapter Headings", id: FinishingSectionID.headings) {
-            Picker("Number Chapters", selection: binding(\.numbering)) {
-                Text("No, Use Their Own Headings").tag(ChapterNumberStyle.none)
-                Divider()
-                Text("One, Two, Three").tag(ChapterNumberStyle.words)
-                Text("1, 2, 3").tag(ChapterNumberStyle.numerals)
-                Text("I, II, III").tag(ChapterNumberStyle.roman)
-            }
-            if book.numbering != .none {
-                CommitTextField("Before the Number", text: binding(\.numberPrefix), prompt: "Chapter")
-                Toggle("Keep Each Chapter’s Title", isOn: binding(\.numberIncludesTitle))
-                LabeledContent("Heading") {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text(Self.label(3, book))
-                        if book.numberIncludesTitle {
-                            Text("The Chapter’s Title").foregroundStyle(.secondary)
-                        }
-                    }
-                    .font(.system(.callout, design: .serif))
-                }
-            }
-        } footer: {
-            FinishingNote(book.numbering == .none
-                ? "Each chapter prints under its own first heading."
-                : "The number replaces a chapter’s opening Heading 1, and its title goes under the number. A chapter without one is titled by its document’s name.")
-        }
-    }
 
     /// The heading chapter `n` gets, as `bookMatter.ts` writes it.
     static func label(_ n: Int, _ book: BookDraft) -> String {
@@ -209,45 +119,6 @@ struct BookSections: View {
         return spelled.split(separator: " ").map { word in
             word.split(separator: "-").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: "-")
         }.joined(separator: " ")
-    }
-
-    /* ---------------- front and back matter ---------------- */
-
-    @ViewBuilder
-    private func frontMatterSection(_ book: BookDraft) -> some View {
-        FinishingSection("Front Matter", id: FinishingSectionID.frontMatter) {
-            Toggle("Half-Title Page", isOn: binding(\.halfTitle))
-                .help("A page with the title alone, before the title page")
-            Toggle("Contents", isOn: binding(\.contents))
-                .help("A table of contents with each chapter’s page number")
-            CommitTextEditor("Copyright Page", text: binding(\.copyright), prompt: "Copyright © Year Author. All rights reserved.")
-            if book.copyright.isEmpty {
-                Button("Use the Usual Wording") {
-                    guard var draft = model.pageLayout.book else { return }
-                    draft.copyright = BookDraft.suggestedCopyright(title: draft.title, author: draft.author.isEmpty ? (model.pageLayout.state?.author?.byline ?? "") : draft.author)
-                    model.pageLayout.apply(draft)
-                }
-                .controlSize(.small)
-            }
-            CommitTextEditor("Dedication", text: binding(\.dedication), prompt: "For…")
-            CommitTextEditor("Epigraph", text: binding(\.epigraph))
-            if !book.epigraph.isEmpty {
-                CommitTextField("Epigraph By", text: binding(\.epigraphSource), prompt: "Who said it")
-            }
-        } footer: {
-            FinishingNote("Printed before the first chapter, each on a page of its own and unnumbered. The title page is set under Title Page. Leave a box empty to leave its page out.")
-        }
-    }
-
-    @ViewBuilder
-    private func backMatterSection(_ book: BookDraft) -> some View {
-        FinishingSection("Back Matter", id: FinishingSectionID.backMatter) {
-            CommitTextEditor("Acknowledgements", text: binding(\.acknowledgements))
-            CommitTextEditor("About the Author", text: binding(\.aboutTheAuthor))
-            CommitTextEditor("Also by the Author", text: binding(\.alsoBy), prompt: "One title per line")
-        } footer: {
-            FinishingNote("Printed after the last chapter, each under its own heading, and listed in the contents.")
-        }
     }
 
     /* ---------------- page setup ---------------- */
