@@ -41,7 +41,8 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     [ownSetup, bookJson]
   )
   const printLayout = Boolean(editor) && isPrintLayoutEnabled(projectName, docPath)
-  const zoom = getPrintZoom()
+  const zoom = getPrintZoom(projectName, docPath)
+  const onZoomChange = useCallback((z) => setPrintZoom(z, projectName, docPath), [projectName, docPath])
   const author = projectName && docPath ? bookAuthor(getBookForDoc(projectName, docPath)) : ''
 
   const setScroll = useCallback((el) => {
@@ -61,7 +62,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           pageSetup={pageSetup}
           docPath={docPath}
           zoom={zoom}
-          onZoomChange={setPrintZoom}
+          onZoomChange={onZoomChange}
           docTitle={baseName(docPath)}
           author={author}
           scrollEl={scrollEl}

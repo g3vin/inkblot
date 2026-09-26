@@ -49,8 +49,12 @@
  *          round trips, and the bibliography added on paper, a book numbered through
  *   finishing the Finishing tabs' page half: formats, which setup prints, what the
  *          controller publishes and when, and the print queue
+ *   mapnative a map under a shell that draws its toolbar and inspector: what it
+ *          publishes, when it withdraws it, and every click taken back by id
  *   print  Print Layout's pure logic: page sizes and geometry, where pages break,
  *          and signature imposition for binding
+ *   tabs   document tabs and split view: what closing a tab leaves in each pane, and
+ *          the tab bar drawn by the shell, driven over the bridge
  *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
  *          through the real @tauri-apps/api modules
  *
@@ -71,7 +75,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'references', 'citations', 'maplib', 'maptrace', 'mapdom']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapnative', 'tabs']
 
 const failures = []
 

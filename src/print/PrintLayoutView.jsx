@@ -29,8 +29,8 @@ import {
   surnameOf,
 } from './pageSetup'
 import { loadTypographyFont, typographyClasses, typographyKey, typographyVars } from './typography'
-import { countWords } from '../lib/wordCount'
-import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, ZOOM_STEPS } from './zoom'
+import { countEditorWords } from '../lib/wordCount'
+import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, snapToDevicePixel, ZOOM_STEPS } from './zoom'
 import { PAGE_GAP } from './printLayoutConstants'
 import { setCurrentPrintPage } from './printLayoutStore'
 import { nativeOwns } from '../lib/host'
@@ -116,10 +116,20 @@ export default function PrintLayoutView({
   // Follow the plugin's result.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return undefined
+    // Every transaction lands here — each caret move too. The headings are read again
+    // only when the document changed, and handed on only when they differ: a new array
+    // each time re-rendered every page of the stage per keystroke and click.
+    let lastDoc = null
     const read = () => {
       const state = paginationKey.getState(editor.state)
       setResult(state?.result || EMPTY_RESULT)
-      setHeadings(chapterHeadings(editor.state.doc))
+      const doc = editor.state.doc
+      if (doc === lastDoc) return
+      lastDoc = doc
+      const next = chapterHeadings(doc)
+      setHeadings((prev) => (
+        prev.length === next.length && prev.every((h, i) => h.pos === next[i].pos && h.text === next[i].text) ? prev : next
+      ))
     }
     read()
     editor.on('transaction', read)
@@ -140,7 +150,7 @@ export default function PrintLayoutView({
   // Words only when a running head shows them.
   const wordsText = useMemo(() => (
     setupUsesToken(setup, 'words') && editor && !editor.isDestroyed
-      ? describeWordCount(countWords(editor.state.doc.textContent))
+      ? describeWordCount(countEditorWords(editor))
       : ''
   ), [editor, result, setup]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -227,7 +237,7 @@ export default function PrintLayoutView({
     if (!sizer) return
     let live = liveRef.current
     if (!live) {
-      live = { base: zoomRef.current || 1, s: 1, tx: 0, ty: 0, ax, ay }
+      live = { base: zoomRef.current || 1, s: 1, tx: 0, ty: 0, ax, ay, ox: 0, oy: 0 }
       // Picked up mid-settle: from wherever the settling transition has got to.
       if (sizer.classList.contains('is-settling')) {
         const m = new DOMMatrixReadOnly(getComputedStyle(sizer).transform)
@@ -235,6 +245,11 @@ export default function PrintLayoutView({
         live.ty = m.f
         sizer.classList.remove('is-settling')
       }
+      // The sizer's untransformed origin, read once: reading it on every step, just
+      // after the last step wrote a transform, forced a style pass per wheel tick.
+      const rect = sizer.getBoundingClientRect()
+      live.ox = rect.left - live.tx
+      live.oy = rect.top - live.ty
       liveRef.current = live
       sizer.classList.add('is-zooming')
     }
@@ -247,9 +262,8 @@ export default function PrintLayoutView({
       // screen = o + t + s·q for a point q of the sizer, o its untransformed origin;
       // scaling by f about a moves t to f·t + (1 − f)(a − o).
       const f = target / current
-      const rect = sizer.getBoundingClientRect()
-      live.tx = f * live.tx + (1 - f) * (ax - (rect.left - live.tx))
-      live.ty = f * live.ty + (1 - f) * (ay - (rect.top - live.ty))
+      live.tx = f * live.tx + (1 - f) * (ax - live.ox)
+      live.ty = f * live.ty + (1 - f) * (ay - live.oy)
       live.s = target / live.base
     }
     sizer.style.transform = `translate(${live.tx}px, ${live.ty}px) scale(${live.s})`
@@ -397,7 +411,16 @@ export default function PrintLayoutView({
     }
     const onGestureChange = (event) => {
       event.preventDefault()
+      pinchingRef.current = true
       zoomVisual(pinchFrom * event.scale, event.clientX, event.clientY)
+      // WebKit can drop a gestureend (the pointer leaves the window, focus moves). Without
+      // it the pages would stay a stretched bitmap and ⌘-wheel would stay locked out, so
+      // a pinch that has gone quiet commits anyway; if it resumes it zooms on from there.
+      window.clearTimeout(commitTimerRef.current)
+      commitTimerRef.current = window.setTimeout(() => {
+        pinchingRef.current = false
+        commitZoom()
+      }, 400)
     }
     const onGestureEnd = (event) => {
       event.preventDefault()
@@ -521,7 +544,7 @@ export default function PrintLayoutView({
 
   return (
     <div className="print-layout">
-      <div ref={sizerRef} className="pl-sizer" style={{ width: `${stageWidth * zoom}px`, height: `${stageHeight * zoom}px` }}>
+      <div ref={sizerRef} className="pl-sizer" style={{ width: `${snapToDevicePixel(stageWidth * zoom)}px`, height: `${snapToDevicePixel(stageHeight * zoom)}px` }}>
         <div className={['pl-stage', ...typographyClasses(setup.typography)].join(' ')} style={stageStyle}>
           <div className="pl-pages" aria-hidden="true">
             {pages.map((page) => (

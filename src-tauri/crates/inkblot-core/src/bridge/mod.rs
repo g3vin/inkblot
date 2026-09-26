@@ -18,6 +18,7 @@
 //!   -> command    NativeCommand    (shell -> webview)
 //!   -> event      WebviewEvent     (webview -> shell)
 //!   -> sidebar    the inspector's notes, clipboard, tiles and versions
+//!   -> tabs       the tab bar and split view
 //!   -> envelope   what goes on the wire, plus the request/reply pair
 //! ```
 //!
@@ -51,9 +52,11 @@ pub mod command;
 pub mod common;
 pub mod envelope;
 pub mod event;
+pub mod map;
 pub mod references;
 pub mod print;
 pub mod sidebar;
+pub mod tabs;
 
 pub use archive::{ArchiveAction, ArchiveActionCommand, ArchiveChanged, ArchivedItem, ArchivedKind};
 pub use bubble::{BubbleAside, BubbleChipRect, BubbleChipsChanged, BubbleForm, BubbleMode, BubbleSession, BubbleSessionOpened, BubbleWord, CloseBubbleSessionCommand};
@@ -94,6 +97,14 @@ pub use sidebar::{
     TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,
     WorkbenchTile,
 };
+pub use map::{
+    MapButtonRole, MapButtonRow, MapCalendarMode, MapChoice, MapChoiceInput, MapChromeChanged, MapChromeState,
+    MapColorInput, MapCommandRequest, MapDateInput, MapDateParts, MapListRow, MapMarkerInput, MapNoteText,
+    MapNoteTone, MapNumberInput, MapPanel, MapPanelButton, MapPanelField, MapPanelGroup, MapPanelSection,
+    MapPanelTab, MapShapePreview, MapStatRow,
+    MapTableCell, MapTableRowView, MapTableView, MapTextInput, MapToggleInput,
+    MapTool,
+};
 pub use common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 pub use envelope::{
     BridgeError, BridgeErrorCode, BridgeReply, BridgeRequest, CommandEnvelope, DocumentText,
@@ -103,7 +114,11 @@ pub use envelope::{
 pub use event::{
     ActiveEditorChanged, ActiveMarks, CanvasToolbarChanged, CanvasToolbarState, DocChanged, DragEnded, DragMoved, DragPayloadKind,
     DragStarted, FocusModeView, NoteMarkerEvent, NoteMarkerRect, NoteMarkersChanged, NotesRemapped, ProjectChanged, ReadAloudPayloadEvent,
-    SearchMatches, SelectionContext, ToolbarState, ViewOptions, WebviewEvent, WordCountBadge, WordCountsChanged,
+    SearchMatches, SelectionContext, ToolbarState, ViewOptions, WebviewEvent, WordCountBadge, WordCountsChanged, PaneStatus,
+};
+pub use tabs::{
+    CloseSplitCommand, DocTab, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand,
+    SetTabOrderCommand, SplitOrientation, TabRef, TabsChanged,
 };
 
 #[cfg(test)]

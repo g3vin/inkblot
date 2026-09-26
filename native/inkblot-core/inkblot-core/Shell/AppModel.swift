@@ -9,8 +9,9 @@ import Observation
 /// One main window. The page holds per-window state (the open project, its panes
 /// and tabs) and a second `WindowGroup` instance would be a second page over the same
 /// files with no coordination between them — two autosaves racing on one document.
-/// `InkblotApp` uses a single scene for exactly that reason (detached documents are
-/// separate windows with their own page; see `AuxiliaryWindows`).
+/// `InkblotApp` uses a single scene for exactly that reason, and draws the tabs in the
+/// window (`DocumentTabBar`) rather than as macOS window tabs. Detached documents are
+/// separate windows with their own page; see `AuxiliaryWindows`.
 @MainActor
 @Observable
 final class AppModel {
@@ -23,6 +24,7 @@ final class AppModel {
     let notePreviews: NotePreviewModel
     let bubble: BubbleModel
     let pageLayout: PageLayoutModel
+    let tabs: TabsModel
     let statsService: StatsService
     let stats: StatsTracker
     let timer: WritingTimer
@@ -50,6 +52,7 @@ final class AppModel {
         notePreviews = NotePreviewModel(bridge: bridge)
         bubble = BubbleModel(bridge: bridge)
         pageLayout = PageLayoutModel(bridge: bridge)
+        tabs = TabsModel(bridge: bridge)
         let statsService = StatsService(core: core.core)
         self.statsService = statsService
         let stats = StatsTracker(

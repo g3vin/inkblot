@@ -11,6 +11,16 @@ struct InspectorLayoutTests {
         #expect(layouts.rows(for: .finishing) == [.page, .book, .publish, .notes, .references, .history, .stats, .clipboard, .workbench])
     }
 
+    /// The map's panel follows the active map; no layout holds it or offers it.
+    @Test func noLayoutHoldsTheMapPanel() {
+        var layouts = InspectorLayouts.defaults
+        #expect(!layouts.rows(for: .drafting).contains(.map))
+        layouts[.drafting] = [.map, .notes]
+        #expect(layouts[.drafting] == [.notes])
+        layouts.set(.map, shown: true, in: .finishing)
+        #expect(!layouts[.finishing].contains(.map))
+    }
+
     @Test func aTickedTabGoesLastAndTheLastTabStays() {
         var layouts = InspectorLayouts.defaults
         layouts.set(.clipboard, shown: true, in: .finishing)

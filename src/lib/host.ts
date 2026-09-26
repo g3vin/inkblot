@@ -37,6 +37,13 @@ import { detectNativeHost } from '../bridge/transport'
  *  - `printControls` the Print Layout button (bottom-left of the editor) and its zoom
  *                   control (bottom-right) — drawn by the shell as Liquid Glass from
  *                   `pageLayoutState`. The page leaves them room and draws no zoom bar.
+ *  - `mapChrome`    a map's tool bar, which takes the window toolbar's place while a
+ *                   map is active, and its inspector, which is a panel of the shell's
+ *                   inspector — drawn from what `MapSurface` publishes
+ *                   (`mapChromeChanged`). The scale bar and timeline stay in the page.
+ *  - `tabBar`       the open documents' tabs, over the page column, and the split's
+ *                   commands — drawn by the shell from what `useNativeTabs` publishes.
+ *                   The page keeps the panes and their divider.
  */
 export type NativeChrome =
   | 'fileTree'
@@ -49,6 +56,8 @@ export type NativeChrome =
   | 'projectPicker'
   | 'pageSetup'
   | 'printControls'
+  | 'mapChrome'
+  | 'tabBar'
 
 export function isNativeShell(): boolean {
   return detectNativeHost() !== null

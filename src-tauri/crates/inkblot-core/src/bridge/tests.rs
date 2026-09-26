@@ -282,6 +282,11 @@ fn every_command() -> Vec<NativeCommand> {
             command: "zoom-to-fit".into(),
             detail: None,
         }),
+        NativeCommand::MapCommand(MapCommandRequest {
+            surface_id: "map-surface-0".into(),
+            command: "panel-field".into(),
+            detail: Some(json!({ "id": "pin.name", "value": "Harrowgate" })),
+        }),
         NativeCommand::CanvasDropDoc(CanvasDropDocCommand {
             surface_id: "surface-1".into(),
             path: "chapters/one.md".into(),
@@ -410,10 +415,10 @@ fn every_command() -> Vec<NativeCommand> {
             doc_path: "a".into(),
             options: bibliography_options(),
         }),
-        NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true }),
+        NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true, doc_path: Some("a.md".into()) }),
         NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Book }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
-        NativeCommand::SetPrintZoom(SetPrintZoomCommand { zoom: Some(1.25), fit: None }),
+        NativeCommand::SetPrintZoom(SetPrintZoomCommand { zoom: Some(1.25), fit: None, doc_path: None }),
         NativeCommand::SetDisplayDensity(SetDisplayDensityCommand { points_per_inch: 127.0 }),
         NativeCommand::InsertBreak(InsertBreakCommand { target: EditorTarget::Primary, kind: PageBreakKind::Recto }),
         NativeCommand::GoToPage(GoToPageCommand { page: 12 }),
@@ -436,6 +441,14 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::SetBookCover(SetBookCoverCommand { path: Some("/Users/a/cover.jpg".into()) }),
         NativeCommand::ExportAgain(ExportAgainCommand {}),
+        NativeCommand::SelectTab(TabRef { tab_id: "tab-1".into() }),
+        NativeCommand::CloseTab(TabRef { tab_id: "tab-1".into() }),
+        NativeCommand::SetTabOrder(SetTabOrderCommand { tab_ids: vec!["tab-2".into(), "tab-1".into()] }),
+        NativeCommand::NewTab(NewTabCommand {}),
+        NativeCommand::OpenDocInTab(OpenDocInTabCommand { doc_path: "Act One/Scene".into() }),
+        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand { doc_path: "Act One/Scene".into() }),
+        NativeCommand::OpenInSplit(OpenInSplitCommand { doc_path: Some("Notes".into()), orientation: SplitOrientation::Columns }),
+        NativeCommand::CloseSplit(CloseSplitCommand {}),
         NativeCommand::MeasureBook(MeasureBookCommand {}),
         NativeCommand::ImportScript(ImportScriptCommand {}),
         NativeCommand::SetSceneNumbers(SetSceneNumbersCommand { mode: SceneNumbering::Locked }),
@@ -523,6 +536,107 @@ fn an_archived_item_is_camel_case_and_names_its_kind() {
     assert_eq!(bare.bubble, None);
 }
 
+fn map_button(id: &str, label: &str) -> MapPanelButton {
+    MapPanelButton {
+        id: id.into(),
+        label: label.into(),
+        role: MapButtonRole::Normal,
+        disabled: false,
+        symbol: None,
+        help: None,
+    }
+}
+
+/// A map's chrome with one of every kind of field, so each is on the wire at least once.
+fn map_chrome() -> MapChromeState {
+    let fields = vec![
+        MapPanelField::Text(MapTextInput {
+            id: "pin.name".into(),
+            label: "Name".into(),
+            value: "Harrowgate".into(),
+            placeholder: None,
+            multiline: false,
+            focus_key: 0,
+        }),
+        MapPanelField::Number(MapNumberInput {
+            id: "route.width".into(),
+            label: "Width".into(),
+            value: Some(2.5),
+            min: Some(0.5),
+            max: Some(20.0),
+            step: Some(0.5),
+            suffix: Some("px".into()),
+            allow_empty: false,
+            help: None,
+        }),
+        MapPanelField::Choice(MapChoiceInput {
+            id: "route.dash".into(),
+            label: "Style".into(),
+            value: "solid".into(),
+            options: vec![MapChoice { value: "solid".into(), label: "Solid".into(), group: None }],
+            help: None,
+        }),
+        MapPanelField::Toggle(MapToggleInput { id: "route.arrow".into(), label: "Arrow at end".into(), value: false }),
+        MapPanelField::Color(MapColorInput { id: "pin.color".into(), label: "Colour".into(), value: None, fallback: "#c0392b".into() }),
+        MapPanelField::Stat(MapStatRow { label: "Length".into(), value: "42 km".into(), action: None }),
+        MapPanelField::Note(MapNoteText { text: "Tip".into(), tone: MapNoteTone::Warning, swatch: None, action: None }),
+        MapPanelField::Button(map_button("pin.open", "Open")),
+        MapPanelField::Buttons(MapButtonRow { buttons: vec![map_button("theme.clean", "Clean")] }),
+        MapPanelField::ListRow(MapListRow { id: "places.p1".into(), title: "Harrowgate".into(), subtitle: None, swatch: None, indent: 0 }),
+        MapPanelField::Markers(MapMarkerInput {
+            id: "pin.icon".into(),
+            value: "city".into(),
+            color: None,
+            options: vec![MapChoice { value: "city".into(), label: "City".into(), group: None }],
+        }),
+        MapPanelField::Date(MapDateInput {
+            id: "traveler.startDay".into(),
+            label: "On".into(),
+            value: Some(MapDateParts { year: 1850.0, month: 3.0, day: 1.0, hour: 9.0, minute: 30.0 }),
+            mode: MapCalendarMode::Gregorian,
+            months: vec!["January".into()],
+            allow_empty: false,
+            placeholder: None,
+        }),
+        MapPanelField::Table(MapTableView {
+            columns: vec!["Harrowgate".into()],
+            rows: vec![MapTableRowView {
+                label: "Harrowgate".into(),
+                cells: vec![MapTableCell { text: "—".into(), detail: None, strong: false }],
+            }],
+        }),
+        MapPanelField::Preview(MapShapePreview { width: 100.0, height: 50.0, path: "M0 0L10 10Z".into(), filled: true }),
+        MapPanelField::Group(MapPanelGroup {
+            id: "leg.l1".into(),
+            title: "Leg 1".into(),
+            swatch: None,
+            actions: vec![map_button("leg.l1.remove", "×")],
+            fields: vec![],
+            collapsible: false,
+        }),
+    ];
+    MapChromeState {
+        surface_id: "map-surface-0".into(),
+        doc_path: "World.map".into(),
+        tool: MapTool::Pin,
+        zoom: 2.5,
+        zoom_label: "250%".into(),
+        can_undo: true,
+        can_redo: false,
+        has_selection: true,
+        panel: MapPanel {
+            title: "Place".into(),
+            can_go_back: true,
+            problems: 0,
+            tabs: vec![],
+            tab: None,
+            sections: vec![MapPanelSection { id: "place".into(), title: "Place".into(), actions: vec![], fields }],
+        },
+        reveal_panel: 1,
+        active: true,
+    }
+}
+
 fn every_event() -> Vec<WebviewEvent> {
     let marker = NoteMarkerEvent {
         note_id: "n1".into(),
@@ -597,6 +711,7 @@ fn every_event() -> Vec<WebviewEvent> {
                 record_elapsed_ms: 0.0,
             }),
         }),
+        WebviewEvent::MapChromeChanged(MapChromeChanged { state: Some(map_chrome()) }),
         WebviewEvent::SearchMatches(SearchMatches {
             query: "hesitated".into(),
             doc_path: "chapters/one.md".into(),
@@ -690,6 +805,10 @@ fn every_event() -> Vec<WebviewEvent> {
         WebviewEvent::WordCountsChanged(WordCountsChanged {
             badges: vec![WordCountBadge {
                 text: "12 words".into(), left: 600.0, top: 700.0, right: 660.0, bottom: 722.0,
+            }],
+            panes: vec![PaneStatus {
+                pane: Pane::Secondary, doc_path: "a.md".into(), print_layout: true, zoom: 1.25, hovered: true,
+                left: 400.0, top: 700.0, right: 800.0, bottom: 722.0,
             }],
         }),
         WebviewEvent::ArchiveChanged(ArchiveChanged {
@@ -812,6 +931,13 @@ fn every_event() -> Vec<WebviewEvent> {
             message: None,
             path: None,
         }),
+        WebviewEvent::TabsChanged(TabsChanged {
+            tabs: vec![
+                DocTab { id: "tab-1".into(), doc_path: Some("Act One/Scene".into()), secondary_doc: Some("Notes".into()), split: Some(SplitOrientation::Rows) },
+                DocTab { id: "tab-2".into(), doc_path: None, secondary_doc: None, split: None },
+            ],
+            active_tab_id: Some("tab-1".into()),
+        }),
     ]
 }
 
@@ -842,6 +968,7 @@ fn every_command_has_its_documented_wire_name() {
             "dictationCancel",
             "syncNotes",
             "canvasCommand",
+            "mapCommand",
             "canvasDropDoc",
             "canvasDropNote",
             "canvasReveal",
@@ -909,6 +1036,14 @@ fn every_command_has_its_documented_wire_name() {
             "setAuthorProfile",
             "setBookCover",
             "exportAgain",
+            "selectTab",
+            "closeTab",
+            "setTabOrder",
+            "newTab",
+            "openDocInTab",
+            "openDocInWindow",
+            "openInSplit",
+            "closeSplit",
             "measureBook",
             "importScript",
             "setSceneNumbers",
@@ -933,6 +1068,7 @@ fn every_event_has_its_documented_wire_name() {
             "noteMarkerPin",
             "activeEditorChanged",
             "canvasToolbarChanged",
+            "mapChromeChanged",
             "searchMatches",
             "focusModeView",
             "readAloudPayload",
@@ -960,6 +1096,7 @@ fn every_event_has_its_documented_wire_name() {
             "printRequest",
             "pageLayoutCatalog",
             "printJobStatus",
+            "tabsChanged",
         ]
     );
 }
@@ -1199,26 +1336,16 @@ fn a_page_setup_carries_its_typography_in_camel_case() {
 }
 
 #[test]
-fn an_author_profile_missing_fields_reads_as_blank() {
-    let profile: crate::types::AuthorProfile = serde_json::from_value(json!({ "byline": "A. Writer" })).unwrap();
-    assert_eq!(profile.byline, "A. Writer");
-    assert!(profile.email.is_empty());
-}
-
-#[test]
-fn a_book_saved_before_compiling_reads_with_everything_in() {
-    let mut old = serde_json::to_value(book()).unwrap();
-    for key in ["excluded", "chapterNumbering", "frontMatter", "backMatter"] {
-        old.as_object_mut().unwrap().remove(key);
-    }
-    let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
-    assert!(read.excluded.is_empty());
-    assert_eq!(read.chapter_numbering.style, crate::types::ChapterNumberStyle::None);
-    assert!(!read.front_matter.contents);
-    let wire = serde_json::to_value(book()).unwrap();
-    assert_eq!(wire["chapterNumbering"]["style"], "words");
-    assert_eq!(wire["frontMatter"]["halfTitle"], true);
-    assert_eq!(wire["backMatter"]["aboutTheAuthor"], "A. Writer lives by the sea.");
+fn a_script_element_is_a_block_type_and_an_old_toolbar_is_prose() {
+    assert_eq!(serde_json::to_value(BlockType::StageDirection).unwrap(), "stageDirection");
+    assert_eq!(serde_json::to_value(WritingFormat::Stageplay).unwrap(), "stageplay");
+    let mut toolbar = serde_json::to_value(every_event().into_iter().find_map(|e| match e {
+        WebviewEvent::ToolbarState(state) => Some(state),
+        _ => None,
+    }).unwrap()).unwrap();
+    toolbar.as_object_mut().unwrap().remove("writingFormat");
+    let read: ToolbarState = serde_json::from_value(toolbar).unwrap();
+    assert_eq!(read.writing_format, WritingFormat::Prose);
 }
 
 #[test]
@@ -1238,14 +1365,54 @@ fn a_print_from_an_older_shell_has_no_options() {
 }
 
 #[test]
-fn a_script_element_is_a_block_type_and_an_old_toolbar_is_prose() {
-    assert_eq!(serde_json::to_value(BlockType::StageDirection).unwrap(), "stageDirection");
-    assert_eq!(serde_json::to_value(WritingFormat::Stageplay).unwrap(), "stageplay");
-    let mut toolbar = serde_json::to_value(every_event().into_iter().find_map(|e| match e {
-        WebviewEvent::ToolbarState(state) => Some(state),
-        _ => None,
-    }).unwrap()).unwrap();
-    toolbar.as_object_mut().unwrap().remove("writingFormat");
-    let read: ToolbarState = serde_json::from_value(toolbar).unwrap();
-    assert_eq!(read.writing_format, WritingFormat::Prose);
+fn a_book_saved_before_compiling_reads_with_everything_in() {
+    let mut old = serde_json::to_value(book()).unwrap();
+    for key in ["excluded", "chapterNumbering", "frontMatter", "backMatter"] {
+        old.as_object_mut().unwrap().remove(key);
+    }
+    let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
+    assert!(read.excluded.is_empty());
+    assert_eq!(read.chapter_numbering.style, crate::types::ChapterNumberStyle::None);
+    assert!(!read.front_matter.contents);
+    let wire = serde_json::to_value(book()).unwrap();
+    assert_eq!(wire["chapterNumbering"]["style"], "words");
+    assert_eq!(wire["frontMatter"]["halfTitle"], true);
+    assert_eq!(wire["backMatter"]["aboutTheAuthor"], "A. Writer lives by the sea.");
+}
+
+#[test]
+fn an_author_profile_missing_fields_reads_as_blank() {
+    let profile: crate::types::AuthorProfile = serde_json::from_value(json!({ "byline": "A. Writer" })).unwrap();
+    assert_eq!(profile.byline, "A. Writer");
+    assert!(profile.email.is_empty());
+}
+
+#[test]
+fn a_map_panel_field_is_type_and_payload_in_camel_case() {
+    let field = MapPanelField::ListRow(MapListRow {
+        id: "places.p1".into(),
+        title: "Harrowgate".into(),
+        subtitle: None,
+        swatch: Some("#aa3322".into()),
+        indent: 1,
+    });
+    assert_eq!(
+        serde_json::to_value(&field).unwrap(),
+        json!({
+            "type": "listRow",
+            "payload": { "id": "places.p1", "title": "Harrowgate", "swatch": "#aa3322", "indent": 1 }
+        })
+    );
+}
+
+#[test]
+fn a_map_tool_and_its_chrome_speak_camel_case() {
+    let value = serde_json::to_value(map_chrome()).unwrap();
+    assert_eq!(value["tool"], json!("pin"));
+    assert_eq!(value["surfaceId"], json!("map-surface-0"));
+    assert_eq!(value["revealPanel"], json!(1));
+    assert_eq!(value["panel"]["canGoBack"], json!(true));
+    assert_eq!(value["panel"]["sections"][0]["fields"][0]["payload"]["focusKey"], json!(0));
+    // A panel with no tab chosen says nothing about one.
+    assert!(value["panel"].get("tab").is_none());
 }

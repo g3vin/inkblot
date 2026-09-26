@@ -64,15 +64,26 @@ export function useCanvasSelection() {
     const base = additive ? selectionRef.current : EMPTY
     setMarquee({ ...origin, width: 0, height: 0 })
 
+    // One update a frame: a pointer reports faster than the display, and each update
+    // re-renders the surface.
+    let frame = 0
+    let last = null
     const onMove = (moveEvent) => {
-      const point = toWorld(moveEvent.clientX, moveEvent.clientY)
-      setMarquee(rectFromPoints(origin, point))
+      last = moveEvent
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        const point = toWorld(last.clientX, last.clientY)
+        setMarquee(rectFromPoints(origin, point))
+      })
     }
 
     const onUp = (upEvent) => {
       window.removeEventListener('pointermove', onMove, true)
       window.removeEventListener('pointerup', onUp, true)
       window.removeEventListener('pointercancel', onUp, true)
+      if (frame) cancelAnimationFrame(frame)
+      frame = 0
       setMarquee(null)
 
       const point = toWorld(upEvent.clientX, upEvent.clientY)

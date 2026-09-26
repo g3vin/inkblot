@@ -63,6 +63,11 @@ struct InspectorView: View {
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
+        // The column is as wide as the writer drags it, whatever the panel. Without
+        // this, a panel whose controls want more room than the column has — or merely a
+        // different ideal width — passes that up, and the split view resizes the column
+        // to it each time that tab comes up. The panel fits itself to the column instead.
+        .frame(minWidth: 0, idealWidth: PaneLimits.inspectorIdeal, maxWidth: .infinity, maxHeight: .infinity)
         .background {
             InspectorSwipeCatcher(isEnabled: model.bubble.open == nil && !sidebar.isSearching) { step in
                 withAnimation(.smooth(duration: 0.25)) { sidebar.step(by: step) }
@@ -82,15 +87,16 @@ struct InspectorView: View {
         case .book: BookPanelView()
         case .publish: PublishPanelView()
         case .stats: StatsPanelView()
+        case .map: MapPanelView()
         }
     }
 
-    /// The Finishing tabs are settings, not lists: "This Panel" has nothing there to
+    /// The Finishing tabs and a map's panel are settings, not lists: "This Panel" has nothing there to
     /// filter, so the bar goes while that is its scope. Set to search the document or
     /// the project, it still does, from any tab.
     private var showsSearchBar: Bool {
         let sidebar = model.sidebar
-        let finishing: Set<SidebarModel.Tab> = [.page, .book, .publish]
+        let finishing: Set<SidebarModel.Tab> = [.page, .book, .publish, .map]
         return sidebar.isSearching || sidebar.scope != .panel || !finishing.contains(sidebar.tab)
     }
 
@@ -222,7 +228,7 @@ struct SearchResultsView: View {
 }
 
 /// The small round button beside the selector bar that swaps the inspector's layout. It
-/// shows the layout in use; clicking it brings the other.
+/// shows a swap glyph; clicking it brings the other layout.
 private struct LayoutSwitchButton: View {
     let layout: InspectorLayout
     let action: () -> Void
@@ -231,9 +237,8 @@ private struct LayoutSwitchButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: layout.symbol)
+            Image(systemName: "arrow.right.arrow.left")
                 .font(.system(size: 12, weight: .medium))
-                .contentTransition(.symbolEffect(.replace))
                 .frame(width: Self.diameter, height: Self.diameter)
                 .contentShape(.circle)
         }

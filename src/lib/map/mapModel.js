@@ -24,6 +24,8 @@
  * type is replaced by the default, never coerced.
  */
 
+import { describeMapDiff, diffMaps } from './mapDiff'
+
 export const MAP_FORMAT_VERSION = 1
 
 export const MAP_KINDS = ['blank', 'image', 'earth', 'system']
@@ -447,24 +449,33 @@ export const pinLabel = (pin, docDisplayName = (doc) => doc.split('/').filter(Bo
 
 const words = (text) => String(text || '').split(/\s+/).filter(Boolean).length
 
-/** Words written onto a map — names and labels. Mirrors countCanvasWords. */
-export function countMapWords(map) {
-  if (!isObject(map)) return 0
-  let total = 0
-  const lists = [map.pins, map.routes, map.regions, map.travelers]
-  for (const list of lists) {
+/**
+ * Every piece of text written onto a map — names, labels and the cartouche — in the
+ * order countMapWords and mapText read them.
+ */
+function mapStrings(map) {
+  if (!isObject(map)) return []
+  const out = []
+  for (const list of [map.pins, map.routes, map.regions, map.travelers]) {
     for (const item of Array.isArray(list) ? list : []) {
-      if (isObject(item) && typeof item.name === 'string') total += words(item.name)
+      if (isObject(item) && typeof item.name === 'string') out.push(item.name)
     }
   }
   for (const label of Array.isArray(map.labels) ? map.labels : []) {
-    if (isObject(label) && typeof label.text === 'string') total += words(label.text)
+    if (isObject(label) && typeof label.text === 'string') out.push(label.text)
   }
   const cartouche = objectOr(objectOr(map.style).cartouche)
-  if (typeof cartouche.title === 'string') total += words(cartouche.title)
-  if (typeof cartouche.subtitle === 'string') total += words(cartouche.subtitle)
-  return total
+  for (const key of ['title', 'subtitle']) {
+    if (typeof cartouche[key] === 'string') out.push(cartouche[key])
+  }
+  return out
 }
+
+/** Words written onto a map — names and labels. Mirrors countCanvasWords. */
+export const countMapWords = (map) => mapStrings(map).reduce((total, text) => total + words(text), 0)
+
+/** The text written onto a map, space-separated — what filtering its history searches. */
+export const mapText = (map) => mapStrings(map).join(' ')
 
 /* ---------- doc references ---------- */
 
@@ -540,8 +551,7 @@ const countOf = (map, key) => (Array.isArray(map?.[key]) ? map[key].length : 0)
 
 /**
  * One line for a history row: what a version holds, or how it differs from the
- * version before it. Counts only — a moved pin reads as "Edited", which is honest
- * about what a row this size can say.
+ * version before it (see describeMapDiff).
  */
 export function summarizeMapChange(previous, next) {
   if (!previous) {
@@ -551,10 +561,5 @@ export function summarizeMapChange(previous, next) {
       .map(([count, one, many]) => `${count} ${count === 1 ? one : many}`)
     return parts.length ? `Snapshot · ${parts.join(', ')}` : 'Snapshot · empty map'
   }
-  const parts = []
-  for (const [key, one, many] of COUNTED) {
-    const delta = countOf(next, key) - countOf(previous, key)
-    if (delta) parts.push(`${delta > 0 ? '+' : '−'}${Math.abs(delta)} ${Math.abs(delta) === 1 ? one : many}`)
-  }
-  return parts.length ? parts.join(', ') : 'Edited'
+  return describeMapDiff(diffMaps(previous, next))
 }

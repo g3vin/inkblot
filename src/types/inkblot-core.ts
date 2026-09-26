@@ -930,6 +930,9 @@ export interface CloseBubbleSessionCommand {
 	archive: boolean;
 }
 
+export interface CloseSplitCommand {
+}
+
 /**
  * Everything the shell can ask the document surface to do.
  * 
@@ -963,6 +966,8 @@ export type NativeCommand =
 	| { type: "canvasDropNote", payload: CanvasDropNoteCommand }
 	| { type: "canvasReveal", payload: CanvasRevealCommand }
 	| { type: "canvasRestore", payload: CanvasRestoreCommand }
+	/** Run a command on a map (`map.rs`). */
+	| { type: "mapCommand", payload: MapCommandRequest }
 	| { type: "insertPlainText", payload: InsertPlainTextCommand }
 	| { type: "createEntry", payload: CreateEntryCommand }
 	| { type: "renameEntry", payload: RenameEntryCommand }
@@ -1026,6 +1031,14 @@ export type NativeCommand =
 	| { type: "setAuthorProfile", payload: SetAuthorProfileCommand }
 	| { type: "setBookCover", payload: SetBookCoverCommand }
 	| { type: "exportAgain", payload: ExportAgainCommand }
+	| { type: "selectTab", payload: TabRef }
+	| { type: "closeTab", payload: TabRef }
+	| { type: "setTabOrder", payload: SetTabOrderCommand }
+	| { type: "newTab", payload: NewTabCommand }
+	| { type: "openDocInTab", payload: OpenDocInTabCommand }
+	| { type: "openDocInWindow", payload: OpenDocInWindowCommand }
+	| { type: "openInSplit", payload: OpenInSplitCommand }
+	| { type: "closeSplit", payload: CloseSplitCommand }
 	| { type: "measureBook", payload: MeasureBookCommand }
 	| { type: "importScript", payload: ImportScriptCommand }
 	| { type: "setSceneNumbers", payload: SetSceneNumbersCommand }
@@ -1239,6 +1252,28 @@ export interface DocChanged {
 	paste?: boolean;
 }
 
+/** How a split lays its two panes out. */
+export enum SplitOrientation {
+	/** Side by side. */
+	Columns = "columns",
+	/** One above the other. */
+	Rows = "rows",
+}
+
+/**
+ * One open tab: a document, or a draft that has not decided what it is yet, and the
+ * split it shows.
+ */
+export interface DocTab {
+	id: string;
+	/** `None` for a draft. */
+	docPath?: string;
+	/** The split's document, while this tab has a split. */
+	secondaryDoc?: string;
+	/** How the split is laid out, while this tab has one. */
+	split?: SplitOrientation;
+}
+
 /** A saved document's length, read from disk. */
 export interface DocWordCount {
 	docPath: string;
@@ -1401,6 +1436,8 @@ export type WebviewEvent =
 	| { type: "noteMarkerPin", payload: NoteMarkerEvent }
 	| { type: "activeEditorChanged", payload: ActiveEditorChanged }
 	| { type: "canvasToolbarChanged", payload: CanvasToolbarChanged }
+	/** The active map's toolbar and inspector (`map.rs`). Coalesced per frame. */
+	| { type: "mapChromeChanged", payload: MapChromeChanged }
 	| { type: "searchMatches", payload: SearchMatches }
 	| { type: "focusModeView", payload: FocusModeView }
 	| { type: "readAloudPayload", payload: ReadAloudPayloadEvent }
@@ -1443,7 +1480,9 @@ export type WebviewEvent =
 	| { type: "printRequest", payload: PrintRequest }
 	/** The Finishing tabs' fixed lists, sent once when the page mounts. */
 	| { type: "pageLayoutCatalog", payload: PageLayoutCatalog }
-	| { type: "printJobStatus", payload: PrintJobStatus };
+	| { type: "printJobStatus", payload: PrintJobStatus }
+	/** The tabs and the split, whole (`tabs.rs`). Coalesced per frame. */
+	| { type: "tabsChanged", payload: TabsChanged };
 
 export interface EventEnvelope {
 	seq: number;
@@ -1707,6 +1746,27 @@ export interface MapBody {
 	orbit?: MapOrbit | null;
 }
 
+export enum MapButtonRole {
+	Normal = "normal",
+	Primary = "primary",
+	Destructive = "destructive",
+}
+
+/** Clicked, it sends `panel-action { id }`. */
+export interface MapPanelButton {
+	id: string;
+	label: string;
+	role: MapButtonRole;
+	disabled: boolean;
+	/** An SF Symbol name, for a button that shows one. */
+	symbol?: string;
+	help?: string;
+}
+
+export interface MapButtonRow {
+	buttons: MapPanelButton[];
+}
+
 export interface MapCalibration {
 	a: number[];
 	b: number[];
@@ -1722,6 +1782,145 @@ export interface MapCartouche {
 	subtitle?: string | null;
 }
 
+export interface MapChoice {
+	value: string;
+	label: string;
+	/** The heading this option sits under; consecutive options share one. */
+	group?: string;
+}
+
+/** A pop-up menu. The value sent back is the chosen option's `value`. */
+export interface MapChoiceInput {
+	id: string;
+	label: string;
+	value: string;
+	options: MapChoice[];
+	help?: string;
+}
+
+/**
+ * The map's tools, as the toolbar offers them. `Pan` and `Calibrate` are not on the
+ * toolbar — the space bar and the Scale section reach them — but either can be the
+ * tool in hand.
+ */
+export enum MapTool {
+	Select = "select",
+	Pan = "pan",
+	Pin = "pin",
+	Route = "route",
+	Region = "region",
+	Label = "label",
+	Ruler = "ruler",
+	Area = "area",
+	Calibrate = "calibrate",
+}
+
+export interface MapPanelTab {
+	id: string;
+	label: string;
+}
+
+/**
+ * One row of a section. Each is named by an `id` where it can be edited or clicked,
+ * which is all a command carries back.
+ */
+export type MapPanelField = 
+	| { type: "text", payload: MapTextInput }
+	| { type: "number", payload: MapNumberInput }
+	| { type: "choice", payload: MapChoiceInput }
+	| { type: "toggle", payload: MapToggleInput }
+	| { type: "color", payload: MapColorInput }
+	| { type: "stat", payload: MapStatRow }
+	| { type: "note", payload: MapNoteText }
+	| { type: "button", payload: MapPanelButton }
+	| { type: "buttons", payload: MapButtonRow }
+	| { type: "listRow", payload: MapListRow }
+	| { type: "markers", payload: MapMarkerInput }
+	| { type: "date", payload: MapDateInput }
+	| { type: "table", payload: MapTableView }
+	| { type: "preview", payload: MapShapePreview }
+	| { type: "group", payload: MapPanelGroup };
+
+export interface MapPanelSection {
+	id: string;
+	/** May be empty: a section that is only a Delete button. */
+	title: string;
+	/** Buttons beside the title ("Add", "Show"). */
+	actions: MapPanelButton[];
+	fields: MapPanelField[];
+}
+
+/** The inspector: the map's settings in tabs, or the one thing selected. */
+export interface MapPanel {
+	/** The map's name, or what is selected ("Place", "Route"). */
+	title: string;
+	/** Something is selected; `panel-back` returns to the map's settings. */
+	canGoBack: boolean;
+	/** How many problems the journeys have (someone in two places at once). */
+	problems: number;
+	/** Empty while one thing is being edited. */
+	tabs: MapPanelTab[];
+	tab?: string;
+	sections: MapPanelSection[];
+}
+
+export interface MapChromeState {
+	/** The surface commands go back to. */
+	surfaceId: string;
+	docPath: string;
+	tool: MapTool;
+	/** 1 is 100%. */
+	zoom: number;
+	/** The zoom as the page writes it: `250%`, `12×`. */
+	zoomLabel: string;
+	canUndo: boolean;
+	canRedo: boolean;
+	hasSelection: boolean;
+	panel: MapPanel;
+	/**
+	 * Bumped when the page wants the inspector shown on this panel: a label just
+	 * placed, an item double-clicked, a traveller dropped on. The shell compares it
+	 * with the last value it saw, so a republish of the same state shows nothing.
+	 */
+	revealPanel: number;
+	/** The map is the active document, so the toolbar is its. */
+	active?: boolean;
+}
+
+/**
+ * The map's toolbar and inspector, or `None` when no map is showing. A map in a split
+ * stays here while the other pane is being worked in, `active` false: its inspector
+ * panel stays in the bar, and the toolbar goes back to the document's.
+ */
+export interface MapChromeChanged {
+	state?: MapChromeState;
+}
+
+/**
+ * A colour well. `value` is `None` for the default (drawn as `fallback`); the value
+ * sent back is `#rrggbb`, or `null` for Reset.
+ */
+export interface MapColorInput {
+	id: string;
+	label: string;
+	value?: string;
+	fallback: string;
+}
+
+/**
+ * Run a command on a map, named by surface id as a canvas command is.
+ * 
+ * The vocabulary is `MapSurface`'s: `tool { tool }`, `undo`, `redo`, `zoom-in`,
+ * `zoom-out`, `zoom-to-fit`, `delete`, `panel-tab { id }`, `panel-back`,
+ * `panel-field { id, value }`, `panel-action { id }`. Untyped, as `CanvasCommandRequest`'s
+ * is: a field's value is whatever that field holds.
+ */
+export interface MapCommandRequest {
+	surfaceId: string;
+	command: string;
+	detail?: unknown;
+}
+
 export interface MapCompass {
 	show: boolean;
 	at: number[];
@@ -1733,6 +1932,42 @@ export interface MapCustomUnit {
 	id: string;
 	name: string;
 	km: number;
+}
+
+/**
+ * A date in the project's calendar, taken apart. The page puts it back together, so
+ * the shell never does calendar arithmetic.
+ */
+export interface MapDateParts {
+	year: number;
+	/** 1-based, into `MapDateInput.months`. */
+	month: number;
+	day: number;
+	hour: number;
+	minute: number;
+}
+
+export enum MapCalendarMode {
+	/** Day 1, Day 2…: only `day` counts. */
+	Day = "day",
+	Gregorian = "gregorian",
+	/** The world's own months (`MapDateInput.months`). */
+	Custom = "custom",
+}
+
+/**
+ * A date field. The value sent back is `MapDateParts`, or `null` to clear an
+ * `allow_empty` one. With no `value`, the field is a button offering to set one.
+ */
+export interface MapDateInput {
+	id: string;
+	label: string;
+	value?: MapDateParts;
+	mode: MapCalendarMode;
+	/** The months' names, in order. */
+	months: string[];
+	allowEmpty: boolean;
+	placeholder?: string;
 }
 
 export enum EarthProjection {
@@ -1954,6 +2189,133 @@ export interface MapFile {
 	viewport: MapViewport;
 }
 
+/** A row in a list of things on the map; clicked, it sends `panel-action { id }`. */
+export interface MapListRow {
+	id: string;
+	title: string;
+	subtitle?: string;
+	swatch?: string;
+	/** How many levels in (a moon under its planet). */
+	indent: number;
+}
+
+/**
+ * A place's marker: one of `options`, whose values are the page's icon ids. The value
+ * sent back is the id.
+ */
+export interface MapMarkerInput {
+	id: string;
+	value: string;
+	color?: string;
+	options: MapChoice[];
+}
+
+export enum MapNoteTone {
+	Note = "note",
+	Warning = "warning",
+}
+
+/** A line of explanation, or a warning. `swatch` is a colour shown before it. */
+export interface MapNoteText {
+	text: string;
+	tone: MapNoteTone;
+	swatch?: string;
+	/** A button after the text ("Go there"). */
+	action?: MapPanelButton;
+}
+
+/**
+ * Committed as `number` fields are on the page: on Return or blur, clamped to
+ * `min`/`max`. The value sent back is a number, or `null` to clear an `allow_empty`
+ * field.
+ */
+export interface MapNumberInput {
+	id: string;
+	label: string;
+	value?: number;
+	min?: number;
+	max?: number;
+	/** What the stepper adds; `None` for any value. */
+	step?: number;
+	suffix?: string;
+	allowEmpty: boolean;
+	help?: string;
+}
+
+/**
+ * Rows that belong to one thing — a leg of a journey, a terrain — with their own
+ * title and buttons. `collapsible` ones start closed.
+ */
+export interface MapPanelGroup {
+	id: string;
+	title: string;
+	swatch?: string;
+	actions: MapPanelButton[];
+	fields: MapPanelField[];
+	collapsible: boolean;
+}
+
+/**
+ * A traced picture's outlines, previewed: polylines in `width` × `height` space,
+ * written as SVG path data using only `M`, `L` and `Z`.
+ */
+export interface MapShapePreview {
+	width: number;
+	height: number;
+	path: string;
+	filled: boolean;
+}
+
+/**
+ * A figure: "Length — 42 km". With `action`, the figure is a button (an arrival date
+ * that jumps the timeline there).
+ */
+export interface MapStatRow {
+	label: string;
+	value: string;
+	action?: MapPanelButton;
+}
+
+export interface MapTableCell {
+	text: string;
+	detail?: string;
+	strong: boolean;
+}
+
+export interface MapTableRowView {
+	label: string;
+	cells: MapTableCell[];
+}
+
+/** The table of distances between places. */
+export interface MapTableView {
+	columns: string[];
+	rows: MapTableRowView[];
+}
+
+/**
+ * Committed on Return or when focus leaves, never per keystroke: a name typed is one
+ * undo step. The value sent back is a string.
+ */
+export interface MapTextInput {
+	id: string;
+	label: string;
+	value: string;
+	placeholder?: string;
+	multiline: boolean;
+	/**
+	 * Changes when the page wants the caret here with the text selected — a rename.
+	 * Zero is never a request.
+	 */
+	focusKey: number;
+}
+
+export interface MapToggleInput {
+	id: string;
+	label: string;
+	value: boolean;
+}
+
 /**
  * Lay the book (or the document) out without printing it, to count its pages and
  * words for the Publish tab.
@@ -1967,6 +2329,10 @@ export interface MoveEntryCommand {
 	isFolder: boolean;
 	/** Tree path; empty for the project root. */
 	targetFolder: string;
+}
+
+/** Open a draft tab, where the page asks what the new document is called. */
+export interface NewTabCommand {
 }
 
 export enum NoteType {
@@ -2132,6 +2498,19 @@ export interface NotesRemapped {
 	droppedNoteIds: string[];
 }
 
+/** Open a document in a tab of its own, and show it. */
+export interface OpenDocInTabCommand {
+	docPath: string;
+}
+
+/**
+ * Open a document in a detached window of its own (a tab's Move to New Window). The
+ * page opens it as "Open in New Window" does.
+ */
+export interface OpenDocInWindowCommand {
+	docPath: string;
+}
+
 export interface OpenDocumentCommand {
 	/**
 	 * A project-relative tree path. A `.canvas` suffix makes it a canvas — routing is
@@ -2139,6 +2518,15 @@ export interface OpenDocumentCommand {
 	 */
 	path: string;
 	pane: Pane;
+}
+
+/**
+ * Open the active tab's split, or turn it. Without a `doc_path` the split keeps what
+ * it shows, or else takes the next tab's document.
+ */
+export interface OpenInSplitCommand {
+	docPath?: string;
+	orientation: SplitOrientation;
 }
 
 /**
@@ -2328,6 +2716,27 @@ export interface PageLayoutState {
 	 * Production section. None for prose.
 	 */
 	script?: ScriptSummary;
+}
+
+/**
+ * One text pane's status row, for a shell that draws the pane's own Print Layout
+ * toggle and zoom at its bottom-right corner, level with its badges. `left` and `right`
+ * are the pane's edges; `top` and `bottom` the row's. Client coordinates, as the
+ * badges' are.
+ */
+export interface PaneStatus {
+	pane: Pane;
+	docPath: string;
+	/** Shown as pages. */
+	printLayout: boolean;
+	/** Its zoom as pages (1 = 100%), whether or not it is shown as them. */
+	zoom: number;
+	/** The pointer is over it. A split shows a pane's controls only then. */
+	hovered?: boolean;
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
@@ -3067,9 +3476,13 @@ export interface SetPanelInsetsCommand {
 	top?: number;
 }
 
-/** Show the active pane as pages, or as the continuous editor. */
+/**
+ * Show a document as pages, or as the continuous editor: the one named — a pane's own
+ * toggle names the document in it — or else the active one.
+ */
 export interface SetPrintLayoutCommand {
 	enabled: boolean;
+	docPath?: string;
 }
 
 /**
@@ -3087,10 +3500,14 @@ export enum ZoomFit {
 	Actual = "actual",
 }
 
-/** A zoom level (1 = 100%), or a fit. `fit` wins when both are present. */
+/**
+ * A zoom level (1 = 100%), or a fit. `fit` wins when both are present. Each document
+ * has its own zoom: this is the named one's, or else the active one's.
+ */
 export interface SetPrintZoomCommand {
 	zoom?: number;
 	fit?: ZoomFit;
+	docPath?: string;
 }
 
 export interface SetReferenceAttachedCommand {
@@ -3109,6 +3526,14 @@ export interface SetSelectionCommand {
 	anchor: TextAnchor;
 	scrollIntoView: boolean;
 	focus: boolean;
+}
+
+/**
+ * The tabs' order, as the shell's tab bar now shows it after a drag. Tabs it does not
+ * name keep their order after the ones it does.
+ */
+export interface SetTabOrderCommand {
+	tabIds: string[];
 }
 
 /**
@@ -3223,6 +3648,19 @@ export interface StoryFolderAncestor {
 export interface SyncNotesCommand {
 	docPath: string;
 	notes: Note[];
+}
+
+export interface TabRef {
+	tabId: string;
+}
+
+/**
+ * The tabs, in order, and which is showing. Sent whole whenever any of it changes,
+ * so it is coalesced to one per frame.
+ */
+export interface TabsChanged {
+	tabs: DocTab[];
+	activeTabId?: string;
 }
 
 /** A command aimed at an editor with nothing else to say. */
@@ -3522,12 +3960,14 @@ export interface WordCountBadge {
 }
 
 /**
- * Every word-count badge the user can see — the whole list, so it is safe to coalesce.
- * The page's badges stay where they are, invisible, to be measured; the shell draws
- * them as Liquid Glass, which only a view above the page can be.
+ * Every word-count badge the user can see, and every text pane's status row — the
+ * whole lists, so it is safe to coalesce. The page's badges stay where they are,
+ * invisible, to be measured; the shell draws them as Liquid Glass, which only a view
+ * above the page can be.
  */
 export interface WordCountsChanged {
 	badges: WordCountBadge[];
+	panes?: PaneStatus[];
 }
 
 /**

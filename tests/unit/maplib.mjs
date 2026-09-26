@@ -11,6 +11,7 @@ import {
   normalizeMap, createEmptyMap, serializeMap, isMapPayload, rewriteMapDocRefs, countMapWords,
   summarizeMapChange, mapDocRefs,
 } from '../../src/lib/map/mapModel.js'
+import { diffMaps, mapDiffIsEmpty, mergeMaps, mapChangeKey, mapItemTitle } from '../../src/lib/map/mapDiff.js'
 import {
   cumulativeLengths, pointAtDistance, catmullRomSample, ringArea, regionArea, pointInRegion,
   segmentRingCrossings, nearestOnPolyline, simplifyDP, chaikin, polylineLength,
@@ -63,7 +64,59 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('a new blank map is a sheet and remembers it wants setting up', empty.background.width === 4000 && empty.setupPending === true)
   ok('words are counted from names and labels', countMapWords({ pins: [{ name: 'Old Quay' }], labels: [{ text: 'Grey Sea' }] }) === 4)
   ok('history rows summarise counts', summarizeMapChange(null, map) === 'Snapshot · 2 places, 1 route, 1 traveler')
-  ok('history rows summarise changes', summarizeMapChange(map, { ...map, pins: [map.pins[0]], routes: [] }) === '−1 place, −1 route')
+  ok('history rows summarise changes', summarizeMapChange(map, { ...map, pins: [map.pins[0]], routes: [] }) === '−1 place · −1 route')
+}
+
+/* ---------------- history: compare and merge ---------------- */
+
+{
+  const older = normalizeMap({
+    pins: [
+      { id: 'port', name: 'Port', at: [0, 0] },
+      { id: 'keep', name: 'Keep', at: [5, 5] },
+      { id: 'mill', name: 'Mill', at: [9, 9] },
+    ],
+    routes: [{ id: 'road', nodes: [{ pin: 'port' }, { pin: 'mill' }] }],
+    style: { theme: 'clean' },
+  })
+  const newer = normalizeMap({
+    ...older,
+    pins: [
+      { ...older.pins[0], at: [3, 3] },
+      { ...older.pins[1], name: 'Old Keep' },
+      { id: 'inn', name: 'Inn', at: [1, 1] },
+    ],
+    style: { ...older.style, theme: 'night' },
+    viewport: { x: 400, y: 0, zoom: 2 },
+  })
+  const diff = diffMaps(older, newer)
+  ok('a placement change is a move', diff.moved.length === 1 && diff.moved[0].after.id === 'port')
+  ok('a rename is an edit', diff.edited.length === 1 && diff.edited[0].after.id === 'keep')
+  ok('an added and a removed place are both found',
+    diff.added[0]?.item.id === 'inn' && diff.removed[0]?.item.id === 'mill')
+  ok('a changed style is a setting, and the viewport is not', diff.settings.map((s) => s.section).join() === 'style')
+
+  const keys = [
+    ...diff.added.map((c) => mapChangeKey('added', c)),
+    ...diff.removed.map((c) => mapChangeKey('removed', c)),
+    ...diff.edited.map((c) => mapChangeKey('edited', c)),
+    ...diff.moved.map((c) => mapChangeKey('moved', c)),
+    ...diff.settings.map((c) => mapChangeKey('setting', c)),
+  ]
+  const allLeft = mergeMaps(older, newer, diff, Object.fromEntries(keys.map((key) => [key, 'left'])))
+  ok('keeping the left of every change gives back the left map', mapDiffIsEmpty(diffMaps(older, allLeft)))
+  ok('the restored place is back where it was in paint order',
+    allLeft.pins.map((pin) => pin.id).join() === 'port,keep,mill')
+  ok('no decisions leaves the right map', mapDiffIsEmpty(diffMaps(newer, mergeMaps(older, newer, diff, {}))))
+
+  const dropMill = mergeMaps(newer, older, diffMaps(newer, older), { 'added:pins:mill': 'left' })
+  ok('a route stop on a dropped place is cleaned up on load',
+    normalizeMap(dropMill).routes.length === 0)
+  ok('an item is titled by its name, its text, its doc, or its kind',
+    mapItemTitle('pins', { name: 'Port' }) === 'Port' &&
+    mapItemTitle('labels', { text: 'Grey Sea' }) === 'Grey Sea' &&
+    mapItemTitle('pins', { doc: 'Settings/Rivertown' }) === 'Rivertown' &&
+    mapItemTitle('routes', {}) === 'Untitled route')
 }
 
 /* ---------------- geometry ---------------- */
@@ -345,4 +398,18 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   const fit = fitMapBounds({ x: 0, y: 0, width: 4000, height: 3000 }, 800, 600, 0)
   const center = worldToScreen(2000, 1500, fit)
   ok('fit centers the sheet', near(center.x, 400) && near(center.y, 300))
+}
+
+// roughen: a wobble baked into route geometry, in place of a turbulence filter
+{
+  const { roughenPath, parsePath, ROUGH_STYLE, hashSeed } = await import('../../src/lib/map/roughen.js')
+  const straight = 'M0,0L100,0'
+  const rough = roughenPath(straight, ROUGH_STYLE, hashSeed('r1'))
+  const [line] = parsePath(rough)
+  ok('roughen keeps the line one subpath', parsePath(rough).length === 1)
+  ok('roughen keeps both ends where they were', line.points[0][0] === 0 && line.points[0][1] === 0 && line.points.at(-1)[0] === 100 && line.points.at(-1)[1] === 0)
+  ok('roughen wobbles in between, within its amplitude', line.points.some(([, y]) => Math.abs(y) > 0.01) && line.points.every(([, y]) => Math.abs(y) <= ROUGH_STYLE.amplitude + 1e-9))
+  ok('roughen is the same for the same seed', roughenPath(straight, ROUGH_STYLE, 7) === roughenPath(straight, ROUGH_STYLE, 7))
+  ok('roughen reads pathData\'s spaced form and keeps subpaths', parsePath(roughenPath('M0 0L10 0M20 0L30 0', ROUGH_STYLE, 1)).length === 2)
+  ok('roughen of nothing is nothing', roughenPath('', ROUGH_STYLE, 1) === '')
 }

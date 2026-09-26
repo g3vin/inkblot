@@ -1,17 +1,18 @@
 /**
- * MapTracePanel.jsx — trace a map's picture into clean outlines.
+ * traceSection.js — trace a map's picture into clean outlines.
  *
  * The picture is decoded at no more than 2048 px across (600 for the live preview),
  * handed to a worker, and the result drawn over the map as an SVG asset — so the
  * trace can be shown alone, over the picture, or not at all. Outlines can also become
  * the map's own regions, which is how a scanned coastline becomes land that travel
  * can be measured against.
+ *
+ * `useMapTrace` holds the settings and the preview; `traceSection` describes them.
  */
-import { useEffect, useRef, useState } from 'react'
-import { assetUrl, writeAsset } from '../lib/assets'
-import { DEFAULT_TRACE_OPTIONS, traceImage, traceToSvg } from '../lib/map/trace'
-import { newId } from '../lib/map/mapModel'
-import { CheckField, NumberField, Section, SelectField } from './inspector/fields'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { assetUrl, writeAsset } from '../../lib/assets'
+import { DEFAULT_TRACE_OPTIONS, traceImage, traceToSvg } from '../../lib/map/trace'
+import { newId } from '../../lib/map/mapModel'
 
 const PREVIEW_SIZE = 600
 const FULL_SIZE = 2048
@@ -38,7 +39,7 @@ const pending = new Map()
 function traceOffThread(image, options, scale) {
   try {
     if (!worker) {
-      worker = new Worker(new URL('../lib/map/trace.worker.js', import.meta.url), { type: 'module' })
+      worker = new Worker(new URL('../../lib/map/trace.worker.js', import.meta.url), { type: 'module' })
       worker.onmessage = (event) => {
         const job = pending.get(event.data.id)
         if (!job) return
@@ -62,14 +63,14 @@ function traceOffThread(image, options, scale) {
   }
 }
 
-export default function MapTracePanel({ map, dispatch, projectName }) {
+export function useMapTrace({ map, dispatch, projectName }) {
   const [options, setOptions] = useState(DEFAULT_TRACE_OPTIONS)
   const [open, setOpen] = useState(false)
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState('')
   const [regionCount, setRegionCount] = useState(3)
   const runRef = useRef(0)
-  const { image, width, height, trace } = map.background
+  const { image, width, height } = map.background
 
   // A live preview at low resolution, redone as the settings change.
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function MapTracePanel({ map, dispatch, projectName }) {
     return () => clearTimeout(timer)
   }, [image, open, options, projectName])
 
-  const apply = async () => {
+  const apply = useCallback(async () => {
     setBusy('Tracing…')
     try {
       const decoded = await decode(await assetUrl(projectName, image), FULL_SIZE)
@@ -101,9 +102,9 @@ export default function MapTracePanel({ map, dispatch, projectName }) {
       console.error('[map] trace failed:', error)
       setBusy('The picture could not be traced.')
     }
-  }
+  }, [dispatch, height, image, options, projectName, width])
 
-  const makeRegions = () => {
+  const makeRegions = useCallback(() => {
     const shapes = (preview?.shapes || []).filter((shape) => shape.closed).sort((a, b) => b.area - a.area).slice(0, regionCount)
     const regions = shapes.map((shape, index) => ({
       id: newId(),
@@ -115,55 +116,40 @@ export default function MapTracePanel({ map, dispatch, projectName }) {
       stroke: null,
     }))
     if (regions.length) dispatch({ type: 'items/add', collection: 'regions', items: regions })
-  }
+  }, [dispatch, preview, regionCount])
 
+  return { options, setOptions, open, setOpen, preview, busy, regionCount, setRegionCount, apply, makeRegions }
+}
+
+export function traceSection(ui, { map, dispatch, trace }) {
+  const { options, setOptions, open, setOpen, preview, busy, regionCount, setRegionCount, apply, makeRegions } = trace
+  const { width, height } = map.background
   const set = (patch) => setOptions((current) => ({ ...current, ...patch }))
-
-  return (
-    <Section title="Trace into outlines" actions={<button type="button" className="map-button" onClick={() => setOpen((value) => !value)}>{open ? 'Close' : 'Trace…'}</button>}>
-      {!open ? <p className="map-note">Turn a photo or scan of a drawn map into clean vector lines.</p> : null}
-      {open ? (
-        <>
-          <SelectField
-            label="Read it as"
-            value={options.mode}
-            options={[{ value: 'outline', label: 'Filled shapes (outlines)' }, { value: 'lines', label: 'Pen lines (centre lines)' }]}
-            onChange={(mode) => set({ mode })}
-          />
-          <CheckField label="Automatic contrast" checked={!Number.isFinite(options.threshold)} onChange={(auto) => set({ threshold: auto ? null : preview?.threshold ?? 128 })} />
-          {Number.isFinite(options.threshold) ? (
-            <NumberField label="Ink darker than" value={options.threshold} min={1} max={254} step={1} onCommit={(threshold) => set({ threshold })} />
-          ) : null}
-          <CheckField label="Light ink on dark" checked={options.invert} onChange={(invert) => set({ invert })} />
-          <NumberField label="Ignore specks under" value={options.minArea} min={0} step={4} suffix="px²" onCommit={(minArea) => set({ minArea })} />
-          <NumberField label="Simplify" value={options.detail} min={0.2} max={20} step={0.2} suffix="px" onCommit={(detail) => set({ detail })} />
-          <NumberField label="Smoothing" value={options.smoothing} min={0} max={5} step={1} onCommit={(smoothing) => set({ smoothing })} />
-          {preview ? (
-            <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 150, background: 'var(--map-sheet)', borderRadius: 8, marginTop: 6 }} aria-label="Trace preview">
-              <path
-                d={preview.shapes.map((shape) => `M${shape.points.map(([x, y]) => `${x} ${y}`).join('L')}${shape.closed ? 'Z' : ''}`).join('')}
-                fill={preview.mode === 'lines' ? 'none' : 'currentColor'}
-                fillOpacity={0.2}
-                fillRule="evenodd"
-                stroke="currentColor"
-                strokeWidth={Math.max(1, width / 300)}
-              />
-            </svg>
-          ) : <p className="map-note">Working out a preview…</p>}
-          <p className="map-note">{preview ? `${preview.shapes.length} ${preview.mode === 'lines' ? 'lines' : 'shapes'} found.` : ''}</p>
-          <div className="map-row">
-            <button type="button" className="map-button is-primary" onClick={apply} disabled={Boolean(busy) && busy === 'Tracing…'}>Trace the picture</button>
-            {trace ? <button type="button" className="map-button" onClick={() => dispatch({ type: 'section/patch', section: 'background', patch: { trace: null } })}>Remove trace</button> : null}
-          </div>
-          {busy ? <p className="map-note">{busy}</p> : null}
-          {options.mode === 'outline' && preview?.shapes.length ? (
-            <div className="map-row" style={{ marginTop: 8 }}>
-              <button type="button" className="map-button" onClick={makeRegions}>Make regions from the largest</button>
-              <input className="map-input" style={{ width: 56 }} type="number" min="1" max="50" value={regionCount} onChange={(event) => setRegionCount(Math.max(1, Math.min(50, Number(event.target.value) || 1)))} aria-label="How many regions" />
-            </div>
-          ) : null}
-        </>
-      ) : null}
-    </Section>
-  )
+  const fields = !open
+    ? [ui.note('Turn a photo or scan of a drawn map into clean vector lines.')]
+    : [
+        ui.choice('trace.mode', 'Read it as', options.mode, [{ value: 'outline', label: 'Filled shapes (outlines)' }, { value: 'lines', label: 'Pen lines (centre lines)' }], (mode) => set({ mode })),
+        ui.toggle('trace.autoContrast', 'Automatic contrast', !Number.isFinite(options.threshold), (auto) => set({ threshold: auto ? null : preview?.threshold ?? 128 })),
+        Number.isFinite(options.threshold) ? ui.number('trace.threshold', 'Ink darker than', options.threshold, (threshold) => set({ threshold }), { min: 1, max: 254, step: 1 }) : null,
+        ui.toggle('trace.invert', 'Light ink on dark', options.invert, (invert) => set({ invert })),
+        ui.number('trace.minArea', 'Ignore specks under', options.minArea, (minArea) => set({ minArea }), { min: 0, step: 4, suffix: 'px²' }),
+        ui.number('trace.detail', 'Simplify', options.detail, (detail) => set({ detail }), { min: 0.2, max: 20, step: 0.2, suffix: 'px' }),
+        ui.number('trace.smoothing', 'Smoothing', options.smoothing, (smoothing) => set({ smoothing }), { min: 0, max: 5, step: 1 }),
+        preview
+          ? ui.preview(width, height, preview.shapes.map((shape) => `M${shape.points.map(([x, y]) => `${x} ${y}`).join('L')}${shape.closed ? 'Z' : ''}`).join(''), preview.mode !== 'lines')
+          : ui.note('Working out a preview…'),
+        preview ? ui.note(`${preview.shapes.length} ${preview.mode === 'lines' ? 'lines' : 'shapes'} found.`) : null,
+        ui.buttons([
+          ui.button('trace.apply', 'Trace the picture', apply, { role: 'primary', disabled: busy === 'Tracing…' }),
+          map.background.trace ? ui.button('trace.remove', 'Remove trace', () => dispatch({ type: 'section/patch', section: 'background', patch: { trace: null } })) : null,
+        ]),
+        busy ? ui.note(busy) : null,
+        ...(options.mode === 'outline' && preview?.shapes.length
+          ? [
+              ui.number('trace.regionCount', 'How many regions', regionCount, (count) => setRegionCount(Math.round(count)), { min: 1, max: 50, step: 1 }),
+              ui.buttonField('trace.makeRegions', 'Make regions from the largest', makeRegions),
+            ]
+          : []),
+      ]
+  return ui.section('trace', 'Trace into outlines', fields, [ui.button('trace.toggle', open ? 'Close' : 'Trace…', () => setOpen(!open))])
 }

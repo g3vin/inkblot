@@ -34,6 +34,7 @@ import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
 import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
+import { PanelInsetsContext } from '../map/panelInsets'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
 import BubbleEditor from './BubbleEditor'
 import { useBubbleSessions } from '../hooks/useBubbleSessions'
@@ -186,8 +187,11 @@ export default function EditorLayout(props) {
   // the instance.
   const activeEditorInfo = useBridgeState('activeEditorChanged', EMPTY_ACTIVE_EDITOR)
   const activeIsCanvas = isCanvasDoc(activeDoc || currentDoc)
-  // A canvas or a map pans instead of scrolling, and runs on under the sidebars.
-  const activeUnderlays = !isTextDoc(activeDoc || currentDoc)
+  // A canvas or a map pans instead of scrolling, and runs on under the sidebars — when
+  // it has the editor to itself. In a split both panes keep the document's column
+  // whichever is active, or hovering from one to the other would slide the other one
+  // under the sidebars and the toolbar and back.
+  const activeUnderlays = !isTextDoc(activeDoc || currentDoc) && props.splitView !== 'editor'
   // The titlebar element the active canvas portals its toolbar into. A ref
   // callback rather than a ref object, so mounting/unmounting the slot re-renders
   // the consumers that are waiting for it.
@@ -625,6 +629,7 @@ export default function EditorLayout(props) {
       : { '--app-titlebar-height': `${nativePanelInsets.top}px` }
 
   return (
+    <PanelInsetsContext.Provider value={nativePanelInsets}>
     <CanvasToolbarSlotContext.Provider value={canvasToolbarTarget}>
     <CompareToolbarSlotContext.Provider value={comparing ? compareToolbarSlot : null}>
     <div
@@ -752,5 +757,6 @@ export default function EditorLayout(props) {
     </div>
     </CompareToolbarSlotContext.Provider>
     </CanvasToolbarSlotContext.Provider>
+    </PanelInsetsContext.Provider>
   )
 }

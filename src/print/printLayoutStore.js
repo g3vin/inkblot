@@ -40,6 +40,7 @@ const subscribe = (listener) => {
 }
 
 const docKey = (projectName, docPath) => `${ENABLED_PREFIX}${projectName || ''}/${docPath || ''}`
+const zoomKey = (projectName, docPath) => `${ZOOM_KEY}:${projectName}/${docPath}`
 
 export const isPrintLayoutEnabled = (projectName, docPath) => (
   Boolean(projectName && docPath) && getPreference(docKey(projectName, docPath)) === 'true'
@@ -51,13 +52,21 @@ export const setPrintLayoutEnabled = (projectName, docPath, enabled) => {
   emit()
 }
 
-export const getPrintZoom = () => {
-  const stored = Number.parseFloat(getPreference(ZOOM_KEY) || '')
+/**
+ * A document's zoom. Each document keeps its own, so zooming one side of a split leaves
+ * the other as it was. One never zoomed shows the zoom set for no document in
+ * particular (and from before zoom was a document's), which zooming a document never
+ * changes — or it would move every such document with it.
+ */
+export const getPrintZoom = (projectName, docPath) => {
+  const own = projectName && docPath ? getPreference(zoomKey(projectName, docPath)) : null
+  const stored = Number.parseFloat(own || getPreference(ZOOM_KEY) || '')
   return Number.isFinite(stored) ? clampZoom(stored) : 1
 }
 
-export const setPrintZoom = (zoom) => {
-  setPreference(ZOOM_KEY, String(clampZoom(zoom)))
+export const setPrintZoom = (zoom, projectName, docPath) => {
+  const value = String(clampZoom(zoom))
+  setPreference(projectName && docPath ? zoomKey(projectName, docPath) : ZOOM_KEY, value)
   emit()
 }
 

@@ -1,14 +1,15 @@
 import Foundation
 
-/// The window's two customizable toolbars.
+/// The window's three customizable toolbars.
 ///
-/// A document and a canvas each have their own: their own default set, and their own
+/// A document, a canvas and a map each have their own: their own default set, and their own
 /// layout once the user has changed it. AppKit saves a customized layout under the
 /// toolbar's id (NSToolbar autosave, in UserDefaults), so these strings are storage
 /// keys as much as names — renaming one quietly resets everyone's layout.
 enum ToolbarID {
     static let document = "inkblot.toolbar.document"
     static let canvas = "inkblot.toolbar.canvas"
+    static let map = "inkblot.toolbar.map"
 }
 
 /// Every item either toolbar can hold, whether it starts in the toolbar or only in the
@@ -21,8 +22,8 @@ enum ToolbarID {
 /// Adding an item — the whole recipe is in ARCHITECTURE.md, "A toolbar item":
 ///
 /// 1. A case here, with a new `inkblot.<area>.<name>` string.
-/// 2. A `ToolbarItem(id:)` in `DocumentToolbar`, `CanvasToolbar`, or — for one that
-///    belongs in both — `SharedToolbarItems`.
+/// 2. A `ToolbarItem(id:)` in `DocumentToolbar`, `CanvasToolbar`, `MapToolbar`, or —
+///    for one that belongs in all of them — `SharedToolbarItems`.
 /// 3. `.defaultCustomization(.hidden)` unless it belongs in the default set. Most new
 ///    items do not: the palette is where they are found, and the default set is what
 ///    every new user sees.
@@ -64,7 +65,15 @@ enum ToolbarItemID: String, CaseIterable {
     case canvasZoom = "inkblot.canvas.zoom"
     case canvasDelete = "inkblot.canvas.delete"
 
-    /* ---------------- both ---------------- */
+    /* ---------------- map ---------------- */
+
+    case mapDrawingTools = "inkblot.map.drawing-tools"
+    case mapMeasureTools = "inkblot.map.measure-tools"
+    case mapHistory = "inkblot.map.undo-redo"
+    case mapZoom = "inkblot.map.zoom"
+    case mapDelete = "inkblot.map.delete"
+
+    /* ---------------- all of them ---------------- */
 
     case snapshot = "inkblot.history.snapshot"
     case clipboardPanel = "inkblot.panel.clipboard"
@@ -74,6 +83,8 @@ enum ToolbarItemID: String, CaseIterable {
     case referencesPanel = "inkblot.panel.references"
     case statsPanel = "inkblot.panel.stats"
     case writingTimer = "inkblot.timer"
+    case newTab = "inkblot.tabs.new-tab"
+    case split = "inkblot.tabs.split"
     /// Retired: the toggle is a titlebar accessory (`InspectorTitlebarToggle`), not a
     /// toolbar item. Kept because saved layouts may still name it.
     case inspectorToggle = "inkblot.window.inspector-toggle"

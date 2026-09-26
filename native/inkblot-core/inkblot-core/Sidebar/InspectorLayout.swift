@@ -46,7 +46,7 @@ struct InspectorLayouts: Equatable {
         get { tabs[layout] ?? layout.defaultTabs }
         set {
             var seen = Set<SidebarModel.Tab>()
-            let unique = newValue.filter { seen.insert($0).inserted }
+            let unique = newValue.filter { $0 != .map && seen.insert($0).inserted }
             tabs[layout] = unique.isEmpty ? nil : unique
         }
     }
@@ -55,7 +55,7 @@ struct InspectorLayouts: Equatable {
     /// order, then the ones it does not.
     func rows(for layout: InspectorLayout) -> [SidebarModel.Tab] {
         let shown = self[layout]
-        return shown + SidebarModel.Tab.allCases.filter { !shown.contains($0) }
+        return shown + SidebarModel.Tab.arrangeable.filter { !shown.contains($0) }
     }
 
     /// Show or hide `tab` in `layout`. A newly shown tab goes last; the last tab a
@@ -98,7 +98,7 @@ struct InspectorLayouts: Equatable {
         var layouts = InspectorLayouts()
         let stored = defaults.dictionary(forKey: storageKey) as? [String: [String]] ?? [:]
         let known = defaults.stringArray(forKey: knownTabsKey).map { Set($0.compactMap(SidebarModel.Tab.init(rawValue:))) }
-            ?? Set(SidebarModel.Tab.allCases).subtracting(addedLater)
+            ?? Set(SidebarModel.Tab.arrangeable).subtracting(addedLater)
         for layout in InspectorLayout.allCases {
             if let raw = stored[layout.rawValue] {
                 layouts[layout] = adding(
@@ -128,6 +128,6 @@ struct InspectorLayouts: Equatable {
     func save(to defaults: UserDefaults = .standard) {
         let stored = Dictionary(uniqueKeysWithValues: tabs.map { ($0.key.rawValue, $0.value.map(\.rawValue)) })
         defaults.set(stored, forKey: Self.storageKey)
-        defaults.set(SidebarModel.Tab.allCases.map(\.rawValue), forKey: Self.knownTabsKey)
+        defaults.set(SidebarModel.Tab.arrangeable.map(\.rawValue), forKey: Self.knownTabsKey)
     }
 }

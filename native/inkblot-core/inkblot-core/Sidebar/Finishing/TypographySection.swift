@@ -50,19 +50,9 @@ struct TypographySection: View {
 
     @ViewBuilder
     private func controls(_ t: TypographyDraft) -> some View {
-        Picker("Font", selection: Binding(
-            get: { t.primaryFamily },
-            set: { name in edit { $0.fontFamily = TypographyDraft.cssFamily(name) } }
-        )) {
-            let families = FontFamilies.shared
-            if !families.contains(t.primaryFamily) {
-                Text(t.primaryFamily).tag(t.primaryFamily)
-            }
-            Section("Suggested") {
-                ForEach(families.suggested, id: \.self) { Text($0).font(.custom($0, size: 13)).tag($0) }
-            }
-            Section("All Fonts") {
-                ForEach(families.all, id: \.self) { Text($0).tag($0) }
+        LabeledContent("Font") {
+            FontFamilyPopUp(selection: t.primaryFamily) { name in
+                edit { $0.fontFamily = TypographyDraft.cssFamily(name) }
             }
         }
         LabeledContent("Size") {
@@ -165,6 +155,69 @@ final class FontFamilies {
     }
 
     func contains(_ family: String) -> Bool { installed.contains(family) }
+}
+
+/// The font menu: AppKit's pop-up rather than a SwiftUI `Picker`, which made a view for
+/// every installed family — hundreds — and diffed them all each time the Page tab
+/// appeared or the setup changed. The menu is built once per control and only its
+/// selection follows the setup after that.
+struct FontFamilyPopUp: NSViewRepresentable {
+    let selection: String
+    let choose: (String) -> Void
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.changed(_:))
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.parent = self
+        let item = { button.menu?.items.first { $0.representedObject as? String == selection } }
+        if item() == nil { button.menu = Self.menu(including: selection) }
+        button.select(item())
+    }
+
+    /// The suggested families, each in its own face, then every family — with the setup's
+    /// own first when it is not installed, so the menu still names it.
+    private static func menu(including current: String) -> NSMenu {
+        let families = FontFamilies.shared
+        let menu = NSMenu()
+        func add(_ family: String, face: Bool = false) {
+            let item = NSMenuItem(title: family, action: nil, keyEquivalent: "")
+            item.representedObject = family
+            if face, let font = NSFont(name: family, size: 13) ?? NSFontManager.shared.font(withFamily: family, traits: [], weight: 5, size: 13) {
+                item.attributedTitle = NSAttributedString(string: family, attributes: [.font: font])
+            }
+            menu.addItem(item)
+        }
+        if !families.contains(current) {
+            add(current)
+            menu.addItem(.separator())
+        }
+        menu.addItem(.sectionHeader(title: "Suggested"))
+        families.suggested.forEach { add($0, face: true) }
+        menu.addItem(.separator())
+        menu.addItem(.sectionHeader(title: "All Fonts"))
+        families.all.forEach { add($0) }
+        return menu
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject {
+        var parent: FontFamilyPopUp
+
+        init(_ parent: FontFamilyPopUp) { self.parent = parent }
+
+        @objc func changed(_ button: NSPopUpButton) {
+            guard let family = button.selectedItem?.representedObject as? String else { return }
+            parent.choose(family)
+        }
+    }
 }
 
 /* ---------------- the title page ---------------- */

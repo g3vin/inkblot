@@ -1,15 +1,13 @@
 # Contributing
 
-Inkblot is proprietary software (see [LICENSE](LICENSE)). These are the working
-conventions for everyone with access to the repository.
+Inkblot is proprietary software (see [LICENSE](LICENSE)). These are the working conventions for everyone with access to the repository.
 
 Before changing anything that crosses a boundary (page ↔ shell, JavaScript ↔ Rust,
 Rust ↔ Swift), read [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Branches
 
-`main` is always releasable. Work happens on short-lived branches cut from `main`
-and merged back through a pull request.
+`main` is always releasable. Work happens on short-lived branches cut from `main` and merged back through a pull request.
 
 Name a branch `<type>/<topic>`, using the same types as commits:
 
@@ -40,8 +38,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
 - **Scopes** name the area: `core`, `models`, `ffi`, `native`, `bridge`, `canvas`,
   `maps`, `print`, `references`, `notes`, `editor`.
 - Put a behaviour change in its own commit, separate from a refactor.
-- A breaking change to the bridge protocol or the on-disk format gets a
-  `BREAKING CHANGE:` footer.
+- A breaking change to the bridge protocol or the on-disk format gets a `BREAKING CHANGE:` footer.
 
 ## Pull requests
 
@@ -49,8 +46,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
    web, Rust and generated-type checks. The Xcode tests and `npm run test:layout` are
    local only, so run them yourself when you touch `native/` or `src/print/`.
 2. Fill in the pull request template.
-3. Merge with a merge commit, so the branch's history stays readable, and delete the
-   branch.
+3. Merge with a merge commit, so the branch's history stays readable, and delete the branch.
 
 ## Code style
 

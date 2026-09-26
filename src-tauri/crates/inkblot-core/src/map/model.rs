@@ -605,30 +605,37 @@ pub fn create_empty_map(map_kind: &str) -> Value {
 
 /* ---------- queries ---------- */
 
-fn words(value: &Value) -> usize {
-    value.as_str().map_or(0, |text| text_words(text).len())
-}
-
-/// Words written onto a map — names and labels. Mirrors `count_canvas_words`.
-pub fn count_map_words(map: &Value) -> u32 {
-    let Some(object) = map.as_object() else { return 0 };
-    let mut total = 0;
+/// Every piece of text written onto a map — names, labels and the cartouche — in the
+/// order `count_map_words` and `map_text` read them.
+fn map_strings(map: &Value) -> Vec<&str> {
+    let Some(object) = map.as_object() else { return Vec::new() };
+    let mut out = Vec::new();
     for key in ["pins", "routes", "regions", "travelers"] {
         for item in object.get(key).and_then(Value::as_array).into_iter().flatten() {
-            if item.is_object() {
-                total += words(&item["name"]);
+            if let Some(name) = item.as_object().and_then(|item| item.get("name")).and_then(Value::as_str) {
+                out.push(name);
             }
         }
     }
     for label in object.get("labels").and_then(Value::as_array).into_iter().flatten() {
-        if label.is_object() {
-            total += words(&label["text"]);
+        if let Some(text) = label.as_object().and_then(|label| label.get("text")).and_then(Value::as_str) {
+            out.push(text);
         }
     }
     let cartouche = object_or(object_or(object.get("style")).get("cartouche"));
-    total += cartouche.get("title").map_or(0, words);
-    total += cartouche.get("subtitle").map_or(0, words);
-    total as u32
+    out.extend(["title", "subtitle"].into_iter().filter_map(|key| cartouche.get(key).and_then(Value::as_str)));
+    out
+}
+
+/// Words written onto a map — names and labels. Mirrors `count_canvas_words`.
+pub fn count_map_words(map: &Value) -> u32 {
+    map_strings(map).into_iter().map(|text| text_words(text).len()).sum::<usize>() as u32
+}
+
+/// The text written onto a map, space-separated — what filtering a map's history
+/// by a place's name searches.
+pub fn map_text(map: &Value) -> String {
+    map_strings(map).join(" ")
 }
 
 /// Every doc the map links to, deduplicated, in first-seen order.

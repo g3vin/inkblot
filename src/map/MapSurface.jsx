@@ -11,9 +11,12 @@
  * though `pan` exists for a trackpad-less mouse and for the space bar.
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { documentSurface } from '../bridge'
+import { nativeOwns } from '../lib/host'
 import { getDocDisplayName, isMapDoc } from '../lib/docKind'
 import { isCharacterDoc } from '../lib/storyStructure'
 import { createProjector } from '../lib/map/mapProjection'
+import { projectedEarth } from '../lib/map/earthData'
 import { createSpace, resolvePin } from '../lib/map/mapSpace'
 import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timeline'
 import { makePin, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
@@ -23,11 +26,14 @@ import { nearestOnPolyline } from '../lib/map/mapGeometry'
 import MapLayers, { MapDefs } from './MapLayers'
 import { earthLevelFor } from './mapRender'
 import MapToolbar from './MapToolbar'
-import { TOOL_HINTS } from './mapOptions'
-import MapInspector from './MapInspector'
+import { MAP_TOOLS, TOOL_HINTS, formatZoom } from './mapOptions'
+import MapPanelView from './MapPanelView'
+import { useMapPanel } from './inspector/useMapPanel'
+import { runPanelCommand } from './inspector/panelBuilder'
 import MapTimeline from './MapTimeline'
 import MapSetup from './MapSetup'
 import MapChrome from './MapChrome'
+import { useVisibleBox } from './useVisibleBox'
 import MapHoverCard from './MapHoverCard'
 import MapDraft from './MapDraft'
 import { useMapDocument } from './useMapDocument'
@@ -51,6 +57,8 @@ const SNAP_PX = 14
 
 const DRAWING_TOOLS = new Set(['route', 'region', 'ruler', 'area', 'calibrate'])
 
+const TOOL_IDS = new Set([...MAP_TOOLS.map((option) => option.id), 'pan', 'calibrate'])
+
 const round = (value) => Math.round(value * 1e6) / 1e6
 const roundPoint = (point) => (point ? [round(point[0]), round(point[1])] : null)
 
@@ -62,6 +70,7 @@ export default function MapSurface({
   onActivate,
   onOpenDoc,
   isActive = true,
+  chromeWhileInactive = false,
 }) {
   const idPrefix = `map${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const [day, setDay] = useState(() => initialMap.timeline?.day || 0)
@@ -72,11 +81,18 @@ export default function MapSurface({
   const [hover, setHover] = useState(null)
   const [focusBody, setFocusBody] = useState(null)
   const [inspectorOpen, setInspectorOpen] = useState(true)
+  // Under a shell that draws the inspector, asking for it is a count it watches.
+  const [revealPanel, setRevealPanel] = useState(0)
+  const showInspector = useCallback(() => {
+    setInspectorOpen(true)
+    setRevealPanel((count) => count + 1)
+  }, [])
   const [renameRequest, setRenameRequest] = useState(0)
   const [isPanning, setIsPanning] = useState(false)
   const [calibration, setCalibration] = useState(null)
 
   const view = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.() })
+  const box = useVisibleBox(view.surfaceRef)
   const { map, mapRef, dispatch, undo, redo, saveView, canUndo, canRedo } = useMapDocument({
     projectName,
     docPath,
@@ -113,7 +129,15 @@ export default function MapSurface({
     }
     return missing
   }, [docs.loaded, docs.paths, map.pins, map.travelers])
-  const earthLevel = map.mapKind === 'earth' ? earthLevelFor(map.earth, view.viewport.zoom) : '110m'
+  const earthLevel = map.mapKind === 'earth' ? earthLevelFor(map.earth, view.settledZoom) : '110m'
+  // Drawing the 50m Earth is one long task. Headed that way, do it while the map is
+  // idle, so arriving at the zoom that shows it is a cache hit, not a stall.
+  const warmFineEarth = map.mapKind === 'earth' && earthLevel === '110m' && earthLevelFor(map.earth, 2.5) === '50m' && view.settledZoom >= 1.6
+  useEffect(() => {
+    if (!warmFineEarth) return undefined
+    const timer = window.setTimeout(() => { projectedEarth(projector, '50m') }, 300)
+    return () => window.clearTimeout(timer)
+  }, [projector, warmFineEarth])
   const selectedItem = useMemo(() => {
     if (!selection) return null
     const list = selection.kind === 'body' ? map.system.bodies : map[`${selection.kind}s`]
@@ -285,6 +309,12 @@ export default function MapSurface({
   const lastClickRef = useRef({ time: 0, x: 0, y: 0 })
   const spaceHeldRef = useRef(false)
 
+  // Ends a drag still in progress if the surface goes away mid-drag (the pane closed,
+  // the document switched): its window listeners would otherwise outlive it, holding
+  // the old map, until the next pointerup anywhere.
+  const endDragRef = useRef(null)
+  useEffect(() => () => endDragRef.current?.(), [])
+
   const onPointerDown = useCallback(
     (event) => {
       if (event.target.closest('.map-floating, .map-setup, button, input, select, textarea')) return
@@ -389,6 +419,7 @@ export default function MapSurface({
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
         window.removeEventListener('pointercancel', onUp)
+        endDragRef.current = null
         if (frame) cancelAnimationFrame(frame)
         if (moved) {
           if (pending) flush()
@@ -420,7 +451,7 @@ export default function MapSurface({
             id: newId(), text: 'New label', at, route: null, path: null, startOffset: 0.5,
             size: labelSizeNow(), rotation: 0, font: 'serif', minZoom: 0, maxZoom: null,
           }, 'label')
-          setInspectorOpen(true)
+          showInspector()
           setRenameRequest((count) => count + 1)
           return
         }
@@ -430,8 +461,15 @@ export default function MapSurface({
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
       window.addEventListener('pointercancel', onUp)
+      endDragRef.current = () => {
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        window.removeEventListener('pointercancel', onUp)
+        if (frame) cancelAnimationFrame(frame)
+        endDragRef.current = null
+      }
     },
-    [addDraftPoint, addItem, finishDraft, labelSizeNow, map, mapRef, onActivate, patchItem, pinNear, select, storedAt, tool, view]
+    [addDraftPoint, addItem, finishDraft, labelSizeNow, map, mapRef, onActivate, patchItem, pinNear, select, showInspector, storedAt, tool, view]
   )
 
   const onDoubleClick = useCallback(
@@ -445,7 +483,7 @@ export default function MapSurface({
         const pin = map.pins.find((candidate) => candidate.id === id)
         if (pin?.doc && docs.paths.has(pin.doc)) onOpenDoc?.(pin.doc)
         else {
-          setInspectorOpen(true)
+          showInspector()
           setRenameRequest((count) => count + 1)
         }
       } else if (kind === 'traveler') {
@@ -465,11 +503,11 @@ export default function MapSurface({
         nodes.splice(nearest.index + 1, 0, { at })
         patchItem('routes', route.id, { nodes })
       } else {
-        setInspectorOpen(true)
+        showInspector()
         setRenameRequest((count) => count + 1)
       }
     },
-    [day, docs.paths, map, onOpenDoc, patchItem, space, storedAt, tool]
+    [day, docs.paths, map, onOpenDoc, patchItem, showInspector, space, storedAt, tool]
   )
 
   /* ---------------- hover ---------------- */
@@ -557,7 +595,7 @@ export default function MapSurface({
         const item = list.find((candidate) => candidate.id === itemId)
         if (!item) continue
         setSelection({ kind, id: itemId })
-        setInspectorOpen(true)
+        showInspector()
         let point = null
         if (kind === 'pin') point = resolvePin(current, space, item, day)
         else if (kind === 'label') point = item.at || item.path?.[0] || null
@@ -571,7 +609,7 @@ export default function MapSurface({
         return
       }
     },
-    [day, mapRef, projector, space, view]
+    [day, mapRef, projector, showInspector, space, view]
   )
 
   useEffect(() => {
@@ -628,7 +666,7 @@ export default function MapSurface({
         const traveler = { id: newId(), doc: path, name: null, color: null, startPin: start.id, startDay: Math.floor(day), legs: [] }
         dispatch({ type: 'items/add', collection: 'travelers', items: [traveler] })
         setSelection({ kind: 'traveler', id: traveler.id })
-        setInspectorOpen(true)
+        showInspector()
         return
       }
       // A second drop of the same place moves nothing; it selects the pin already there.
@@ -654,7 +692,7 @@ export default function MapSurface({
       }
       addItem('pins', pin, 'pin')
     },
-    [addItem, day, dispatch, docPath, mapRef, onActivate, pinNear, projector, storedAt, view]
+    [addItem, day, dispatch, docPath, mapRef, onActivate, pinNear, projector, showInspector, storedAt, view]
   )
 
   useEffect(() => {
@@ -662,8 +700,20 @@ export default function MapSurface({
     if (!surface) return undefined
     const onDrop = (event) => dropDoc(event.detail || {})
     const onCommand = (event) => {
-      const { command, clientX, clientY, itemId, itemKind } = event.detail || {}
+      const detail = event.detail || {}
+      const { command, clientX, clientY, itemId, itemKind } = detail
       if (command === 'zoom-to-fit') fitAll()
+      /* The window toolbar and the inspector, when the shell draws them (`mapChrome`). */
+      else if (command === 'tool') {
+        if (TOOL_IDS.has(detail.tool)) setTool(detail.tool)
+      } else if (command === 'undo') undo()
+      else if (command === 'redo') redo()
+      else if (command === 'zoom-in') view.zoomIn()
+      else if (command === 'zoom-out') view.zoomOut()
+      else if (command === 'delete' && !itemId) removeSelection()
+      else if (command === 'panel-tab') panelRef.current.handlers.get('@tab')?.(detail.id)
+      else if (command === 'panel-back') panelRef.current.handlers.get('@back')?.()
+      else if (command === 'panel-field' || command === 'panel-action') runPanelCommand(panelRef.current.handlers, command, detail)
       else if (command === 'add-pin') {
         const at = storedAt(clientX, clientY)
         if (at) addItem('pins', makePin({ at }), 'pin')
@@ -681,7 +731,7 @@ export default function MapSurface({
           const pin = mapRef.current.pins.find((candidate) => candidate.id === itemId)
           if (pin?.doc) onOpenDoc?.(pin.doc)
         } else {
-          setInspectorOpen(true)
+          showInspector()
           setRenameRequest((count) => count + 1)
         }
       }
@@ -692,7 +742,7 @@ export default function MapSurface({
       surface.removeEventListener(MAP_DROP_DOC_EVENT, onDrop)
       surface.removeEventListener(MAP_COMMAND_EVENT, onCommand)
     }
-  }, [addItem, dispatch, dropDoc, fitAll, labelSizeNow, mapRef, onOpenDoc, storedAt, view.surfaceRef])
+  }, [addItem, dispatch, dropDoc, fitAll, labelSizeNow, mapRef, onOpenDoc, redo, removeSelection, showInspector, storedAt, undo, view])
 
   /* ---------------- the day ---------------- */
 
@@ -704,6 +754,85 @@ export default function MapSurface({
     },
     []
   )
+
+  /* ---------------- the inspector ---------------- */
+
+  const mapPanel = useMapPanel({
+    projectName,
+    docPath,
+    map,
+    dispatch,
+    space,
+    projector,
+    day,
+    onDay: changeDay,
+    schedules,
+    conflicts,
+    selection,
+    selectedItem,
+    onSelect: select,
+    docs,
+    missingDocs,
+    calendar,
+    onCalendar: saveCalendar,
+    onOpenDoc,
+    renameRequest,
+    onTool: setTool,
+    calibration,
+    onCalibrationDone: () => setCalibration(null),
+    focusBody,
+    onFocusBody: setFocusBody,
+    onReveal: reveal,
+    surfaceRef: view.surfaceRef,
+    viewport: view.viewport,
+  })
+  // Commands arrive through a listener set up once; they reach the panel as last built.
+  const panelRef = useRef(mapPanel)
+  useEffect(() => {
+    panelRef.current = mapPanel
+  })
+
+  /*
+   * Under a shell that draws the map's toolbar and inspector (`mapChrome`), the active
+   * map publishes them instead of rendering them, and the shell sends every click back
+   * as a map command. A map beside a document goes on publishing while the document is
+   * worked in (`chromeWhileInactive`), marked not active: the inspector keeps its panel,
+   * the toolbar goes back to the document's. Withdrawn when this map stops being the
+   * one — the other pane's map became active — or goes away. Only a change is sent:
+   * panning re-renders the map on every frame and changes nothing the chrome shows.
+   */
+  const nativeChrome = nativeOwns('mapChrome')
+  const publishing = nativeChrome && (isActive || chromeWhileInactive)
+  const lastChromeRef = useRef(null)
+  useEffect(() => {
+    if (!publishing) return undefined
+    return () => {
+      lastChromeRef.current = null
+      documentSurface.publishMapChrome({})
+    }
+  }, [publishing])
+  useEffect(() => {
+    if (!publishing) return
+    const surfaceId = view.surfaceRef.current?.dataset.surfaceId
+    if (!surfaceId) return
+    const state = {
+      surfaceId,
+      docPath,
+      tool,
+      zoom: view.viewport.zoom,
+      zoomLabel: formatZoom(view.viewport.zoom),
+      canUndo,
+      canRedo,
+      hasSelection: Boolean(selection),
+      panel: mapPanel.panel,
+      revealPanel,
+      active: isActive,
+    }
+    const json = JSON.stringify(state)
+    if (json === lastChromeRef.current) return
+    lastChromeRef.current = json
+    documentSurface.publishMapChrome({ state })
+  })
 
   /* ---------------- setup ---------------- */
 
@@ -732,6 +861,11 @@ export default function MapSurface({
     : null
 
   const showTimeline = map.travelers.length > 0 || isSystem
+  const hint = TOOL_HINTS[tool]
+    ? draft?.tool === tool && draft.nodes.length ? TOOL_HINTS[`${tool}-drawing`] || TOOL_HINTS[tool] : TOOL_HINTS[tool]
+    : null
+  // The page's inspector, when it draws one: only under Tauri.
+  const pageInspector = !nativeChrome && inspectorOpen
 
   return (
     <div
@@ -755,7 +889,7 @@ export default function MapSurface({
             projector={projector}
             space={space}
             day={day}
-            zoom={view.viewport.zoom}
+            zoom={view.settledZoom}
             schedules={schedules}
             selection={selection}
             missingDocs={missingDocs}
@@ -776,9 +910,9 @@ export default function MapSurface({
         </g>
       </svg>
 
-      <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} surfaceRef={view.surfaceRef} />
+      <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} />
 
-      <MapToolbar
+      {nativeChrome ? null : <MapToolbar
         map={map}
         tool={tool}
         onTool={setTool}
@@ -792,47 +926,21 @@ export default function MapSurface({
         canRedo={canRedo}
         inspectorOpen={inspectorOpen}
         onToggleInspector={() => setInspectorOpen((open) => !open)}
-      />
+      />}
 
-      {TOOL_HINTS[tool] ? (
-        <div className="map-floating map-hint">
-          {draft?.tool === tool && draft.nodes.length ? TOOL_HINTS[`${tool}-drawing`] || TOOL_HINTS[tool] : TOOL_HINTS[tool]}
+      {hint ? (
+        <div
+          className="map-floating map-hint"
+          // Under the page's toolbar, or at the top of what the shell's glass leaves.
+          style={nativeChrome ? { top: box.top + 12, left: box.left + box.width / 2 } : undefined}
+        >
+          {hint}
         </div>
       ) : null}
 
-      <MapInspector
-        open={inspectorOpen}
-        onClose={() => setInspectorOpen(false)}
-        projectName={projectName}
-        docPath={docPath}
-        map={map}
-        dispatch={dispatch}
-        space={space}
-        projector={projector}
-        day={day}
-        onDay={changeDay}
-        schedules={schedules}
-        conflicts={conflicts}
-        selection={selection}
-        selectedItem={selectedItem}
-        onSelect={select}
-        docs={docs}
-        missingDocs={missingDocs}
-        calendar={calendar}
-        onCalendar={saveCalendar}
-        onOpenDoc={onOpenDoc}
-        renameRequest={renameRequest}
-        draft={draft}
-        onTool={setTool}
-        calibration={calibration}
-        onCalibrationDone={() => setCalibration(null)}
-        focusBody={focusBody}
-        onFocusBody={setFocusBody}
-        onReveal={reveal}
-        surfaceRef={view.surfaceRef}
-        idPrefix={idPrefix}
-        viewport={view.viewport}
-      />
+      {pageInspector ? (
+        <MapPanelView panel={mapPanel.panel} handlers={mapPanel.handlers} onClose={() => setInspectorOpen(false)} />
+      ) : null}
 
       {showTimeline ? (
         <MapTimeline
@@ -842,7 +950,8 @@ export default function MapSurface({
           calendar={calendar}
           conflicts={conflicts}
           isSystem={isSystem}
-          inspectorOpen={inspectorOpen}
+          inspectorOpen={pageInspector}
+          box={box}
         />
       ) : null}
 

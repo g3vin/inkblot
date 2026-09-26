@@ -21,7 +21,7 @@ import { isTextDoc } from '../lib/docKind'
 import { nativeOwns } from '../lib/host'
 import { importAssetFromPath } from '../lib/assets'
 import { getProjectRoot, joinPath } from '../lib/projectPaths'
-import { countWords } from '../lib/wordCount'
+import { countEditorWords } from '../lib/wordCount'
 import { listBookChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
 import { applyFormat, FORMAT_OPTIONS, formatOf, writingFormatOf } from './formats'
@@ -172,7 +172,7 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
   const result = editor ? paginationKey.getState(editor.state)?.result : null
   const pageCount = result?.pageCount || 0
   // The document's words; a book's would mean reading every chapter on each publish.
-  const docWords = editor && scope === 'document' ? countWords(editor.state.doc.textContent) : 0
+  const docWords = editor && scope === 'document' ? countEditorWords(editor) : 0
   return {
     enabled: Boolean(docPath) && isPrintLayoutEnabled(projectName, docPath),
     docPath: docPath || undefined,
@@ -184,7 +184,7 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     formatModified: modified,
     pageCount,
     currentPage: Math.min(getCurrentPrintPage(docPath), Math.max(pageCount, 1)),
-    zoom: getPrintZoom(),
+    zoom: getPrintZoom(projectName, docPath),
     scope,
     book,
     bookSetupActive: Boolean(book.pageSetup),
@@ -229,9 +229,16 @@ export default function usePrintLayoutController({
   const activeEditor = activeTextDoc
     ? usable(activeTextDoc === secondaryDoc && activeTextDoc !== currentDoc ? secondaryEditor : editor)
     : null
-  const stateRef = useRef({ projectName, activeTextDoc, activeEditor, onPrint, onExport, onMeasure })
+  // A pane's own controls name its document; the rest act on the active one.
+  const editorFor = (docPath) => {
+    if (!docPath || docPath === activeTextDoc) return activeEditor
+    if (docPath === currentDoc) return usable(editor)
+    if (docPath === secondaryDoc) return usable(secondaryEditor)
+    return null
+  }
+  const stateRef = useRef({ projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure })
   useEffect(() => {
-    stateRef.current = { projectName, activeTextDoc, activeEditor, onPrint, onExport, onMeasure }
+    stateRef.current = { projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure }
   })
   const chaptersRef = useRef({ key: '', chapters: [] })
   const rootRef = useRef({ project: null, root: null })
@@ -241,8 +248,9 @@ export default function usePrintLayoutController({
   // A setup sent before the document's editor was there to take it: applied when it is.
   const pendingSetup = useRef(null)
 
-  const togglePrintLayout = useCallback((enabled) => {
-    const { projectName: project, activeTextDoc: doc } = stateRef.current
+  const togglePrintLayout = useCallback((enabled, docPath) => {
+    const { projectName: project, activeTextDoc: active } = stateRef.current
+    const doc = docPath && isTextDoc(docPath) ? docPath : active
     if (!doc) return
     setPrintLayoutEnabled(project, doc, enabled ?? !isPrintLayoutEnabled(project, doc))
   }, [])
@@ -356,9 +364,11 @@ export default function usePrintLayoutController({
 
   // Through the view when it is showing, which eases to the new zoom about the pane's
   // centre; straight to the store when it is not.
-  const zoomTo = useCallback(({ zoom, fit }) => {
-    const pagination = stateRef.current.activeEditor?.storage?.pagination
-    const setZoom = (z) => (pagination?.zoomTo ? pagination.zoomTo(z) : setPrintZoom(z))
+  const zoomTo = useCallback(({ zoom, fit, docPath }) => {
+    const { projectName: project, activeTextDoc: active, editorFor } = stateRef.current
+    const doc = docPath || active
+    const pagination = editorFor(doc)?.storage?.pagination
+    const setZoom = (z) => (pagination?.zoomTo ? pagination.zoomTo(z) : setPrintZoom(z, project, doc))
     if (fit === 'actual') {
       const z = actualSizeZoom(getDisplayPointsPerInch())
       if (z) setZoom(z)
@@ -373,7 +383,7 @@ export default function usePrintLayoutController({
 
   useEffect(() => {
     const subscriptions = [
-      documentSurface.onCommand('setPrintLayout', ({ enabled }) => togglePrintLayout(enabled)),
+      documentSurface.onCommand('setPrintLayout', ({ enabled, docPath }) => togglePrintLayout(enabled, docPath)),
       documentSurface.onCommand('setPageSetup', ({ setup, target }) => applySetup(setup, target)),
       documentSurface.onCommand('applyFormat', ({ formatId, target }) => {
         const setup = applyFormat(formatId)
@@ -458,7 +468,7 @@ export default function usePrintLayoutController({
 
   // The web's own menus (App.jsx, and the Swift shell's mirror of them) and keys.
   useEffect(() => {
-    const onToggle = () => togglePrintLayout()
+    const onToggle = (event) => togglePrintLayout(undefined, event?.detail?.docPath)
     const onPrintEvent = (event) => stateRef.current.onPrint?.({ scope: 'document', bound: false, ...(event.detail || {}) })
     const onExportEvent = (event) => stateRef.current.onExport?.({ scope: 'document', bound: false, ...(event.detail || {}) })
     // ⌥⌘P toggles pages, as it does in Word; ⌘P prints, which a WKWebView otherwise

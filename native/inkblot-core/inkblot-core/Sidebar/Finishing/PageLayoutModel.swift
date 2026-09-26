@@ -104,8 +104,9 @@ final class PageLayoutModel {
 
     /* ---------------- commands ---------------- */
 
-    func setPrintLayout(_ enabled: Bool) {
-        bridge.send(.setPrintLayout(SetPrintLayoutCommand(enabled: enabled)))
+    /// The active document's view, or the one named — a pane's own toggle names its.
+    func setPrintLayout(_ enabled: Bool, docPath: String? = nil) {
+        bridge.send(.setPrintLayout(SetPrintLayoutCommand(enabled: enabled, docPath: docPath)))
         if enabled { sendDisplayDensity() }
     }
 
@@ -149,13 +150,14 @@ final class PageLayoutModel {
         bridge.send(.refreshBookChapters(RefreshBookChaptersCommand()))
     }
 
-    func zoom(_ zoom: Double) {
-        bridge.send(.setPrintZoom(SetPrintZoomCommand(zoom: zoom, fit: nil)))
+    /// Each document has its own zoom: the active one's, or the one named.
+    func zoom(_ zoom: Double, docPath: String? = nil) {
+        bridge.send(.setPrintZoom(SetPrintZoomCommand(zoom: zoom, fit: nil, docPath: docPath)))
     }
 
-    func fit(_ fit: ZoomFit) {
+    func fit(_ fit: ZoomFit, docPath: String? = nil) {
         if fit == .actual { sendDisplayDensity() }
-        bridge.send(.setPrintZoom(SetPrintZoomCommand(zoom: nil, fit: fit)))
+        bridge.send(.setPrintZoom(SetPrintZoomCommand(zoom: nil, fit: fit, docPath: docPath)))
     }
 
     func insertBreak(_ kind: PageBreakKind, target: EditorTarget?) {

@@ -20,6 +20,7 @@ import './Editor.css'
 
 import ProjectLanding from './ProjectLanding'
 import { useTabs } from '../hooks/useTabs'
+import { useNativeTabs } from '../hooks/useNativeTabs'
 import { useEntryOperations } from '../hooks/useEntryOperations'
 import { useClipboardHistory } from '../hooks/useClipboardHistory'
 import {
@@ -169,15 +170,22 @@ export default function Editor({
 
   const {
     openDocInTab,
+    selectTab,
+    newDraftTab,
+    closeTab,
+    setTabOrder,
     adoptDraftDoc,
     openDocInSplit,
     closeSplit,
     draftTabActive,
     setSplitRatio,
   } = useTabs({
+    activeDoc,
     activeTabId,
     currentDoc,
     secondaryDoc,
+    splitView,
+    splitOrientation,
     setActiveDoc,
     setActiveTabId,
     setCurrentDoc,
@@ -187,6 +195,23 @@ export default function Editor({
     setSplitView,
     setTabs,
     tabs,
+  })
+
+  // The tabs, when the shell shows them as windows.
+  useNativeTabs({
+    enabled: nativeOwns('tabBar'),
+    projectName,
+    tabs,
+    activeTabId,
+    actions: {
+      selectTab,
+      closeTab,
+      setTabOrder,
+      newDraftTab,
+      openDocInTab,
+      openDocInSplit,
+      closeSplit,
+    },
   })
 
   // Rename, move, delete and duplicate — from the tree, a menu, or the native shell —

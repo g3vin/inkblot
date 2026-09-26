@@ -310,3 +310,18 @@
 .toolbar-group-merge > button.vcp-apply:hover:not(:disabled) {
   filter: brightness(1.08);
 }
+
+/* ---- Map differences: the fields that changed, as each side has them ---- */
+
+.vcp-map-fields {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.vcp-map-field {
+  color: var(--text-subtle);
+}
