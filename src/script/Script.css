@@ -189,3 +189,11 @@
 .ProseMirror.is-script .script-sceneHeading.is-numbered::after {
   left: 63ch;
 }
+
+/* ---- an actor's copy (printJob.js): one character's speeches marked, name and lines ---- */
+
+.script-el.is-highlighted {
+  background: #fff0a0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}

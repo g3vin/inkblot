@@ -96,9 +96,9 @@ const blockText = (node: PMJSON, options: Required<TextOptions>, prefix = ''): s
 
 /* ---- a script, laid out as a typewriter would: columns of a 60-character line ---- */
 
-interface ScriptColumns { left: number; width: number; upper?: boolean; align?: 'right' | 'center'; before?: boolean }
+export interface ScriptColumns { left: number; width: number; upper?: boolean; align?: 'right' | 'center'; before?: boolean }
 
-const SCRIPT_COLUMNS: Record<string, ScriptColumns> = {
+export const SCRIPT_COLUMNS: Record<string, ScriptColumns> = {
   sceneHeading: { left: 0, width: 60, upper: true, before: true },
   action: { left: 0, width: 60, before: true },
   shot: { left: 0, width: 60, upper: true, before: true },

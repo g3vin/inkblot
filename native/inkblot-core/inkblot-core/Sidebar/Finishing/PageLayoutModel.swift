@@ -188,6 +188,27 @@ final class PageLayoutModel {
         apply(PageSetupDraft(fixed))
     }
 
+    /* ---------------- script production ---------------- */
+
+    /// Number the script's scenes, stop numbering them, or lock the numbers.
+    func setSceneNumbers(_ mode: SceneNumbering) {
+        bridge.send(.setSceneNumbers(SetSceneNumbersCommand(mode: mode)))
+    }
+
+    func scriptReport(_ report: ScriptReportKind, output: ReportOutput) {
+        bridge.send(.scriptReport(ScriptReportCommand(report: report, output: output)))
+    }
+
+    /// Sides: the pages the chosen scenes are on, in the script's own numbering, with
+    /// the highlight Print would use.
+    func printSides(_ scenes: [UInt32]) {
+        var sides = PrintOptionsDraft()
+        sides.range = .scenes
+        sides.scenes = scenes.sorted()
+        sides.highlightCharacter = printOptions.highlightCharacter
+        bridge.send(.printDocument(PrintDocumentCommand(scope: .document, bound: false, options: sides.options)))
+    }
+
     /// Ask for a Fountain script and make a new document of it.
     func importScript() {
         bridge.send(.importScript(ImportScriptCommand()))
@@ -444,6 +465,10 @@ struct PrintOptionsDraft: Equatable {
     var watermark = ""
     /// One name a line: a watermarked copy each.
     var recipients = ""
+    /// Sides: the scenes to print, by index.
+    var scenes: [UInt32] = []
+    /// An actor's copy: whose speeches to mark.
+    var highlightCharacter = ""
 
     var names: [String] {
         recipients.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
@@ -454,7 +479,9 @@ struct PrintOptionsDraft: Equatable {
             range: range,
             pages: pages.trimmingCharacters(in: .whitespaces),
             watermark: watermark.trimmingCharacters(in: .whitespaces),
-            recipients: watermark.isEmpty ? [] : names)
+            recipients: watermark.isEmpty ? [] : names,
+            scenes: range == .scenes ? scenes : [],
+            highlightCharacter: highlightCharacter)
     }
 
     var isDefault: Bool { options == PrintOptionsDraft().options }
@@ -466,7 +493,9 @@ struct PrintOptionsDraft: Equatable {
         case .all: break
         case .currentChapter: parts.append("current chapter")
         case .selection: parts.append("selection")
+        case .scenes: parts.append(scenes.count == 1 ? "1 scene" : "\(scenes.count) scenes")
         }
+        if !highlightCharacter.isEmpty { parts.append("\(highlightCharacter.capitalized) highlighted") }
         let typed = pages.trimmingCharacters(in: .whitespaces)
         if !typed.isEmpty { parts.append("pages \(typed)") }
         let mark = watermark.trimmingCharacters(in: .whitespaces)

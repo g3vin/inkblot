@@ -283,6 +283,7 @@ struct JobStatusLine: View {
         case .plainText: "Plain Text"
         case .fountain: "Fountain"
         case .fdx: "Final Draft"
+        case .csv: "Report"
         }
     }
 }
@@ -302,8 +303,9 @@ enum FinishingSectionID {
     static let backMatter = "book.back"
     static let binding = "publish.binding"
     static let publishing = "publish.publishing"
+    static let script = "publish.script"
 
-    static let all = [pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, publishing, binding]
+    static let all = [pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
 }
 
 /// A Finishing tab: the action header pinned at the top, the tab's settings scrolling

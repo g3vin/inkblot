@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 
-const FORMAT_LABELS = { pdf: 'PDF', epub: 'EPUB', markdown: 'Markdown', html: 'HTML', docx: 'Word', plainText: 'Plain Text', fountain: 'Fountain', fdx: 'Final Draft' }
+const FORMAT_LABELS = { pdf: 'PDF', epub: 'EPUB', markdown: 'Markdown', html: 'HTML', docx: 'Word', plainText: 'Plain Text', fountain: 'Fountain', fdx: 'Final Draft', csv: 'Report' }
 const DONE_LINGER_MS = 6000
 
 const fileName = (path) => (path || '').split(/[/\\]/).pop()
