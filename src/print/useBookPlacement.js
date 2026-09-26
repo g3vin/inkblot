@@ -44,6 +44,6 @@ export const useBookPlacement = (projectName, docPath) => {
     const items = reconcileBookItems(book, listed.chapters, folder)
     const rows = bookRows(items, book.chapterNumbering)
     const row = rows.find((r) => r.path === docPath) || null
-    return { folder, book, items, rows, row }
+    return { folder, book, items, rows, row, chapters: listed.chapters }
   }, [docPath, folder, listed, projectName, version]) // eslint-disable-line react-hooks/exhaustive-deps
 }

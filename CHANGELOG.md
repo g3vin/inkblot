@@ -68,6 +68,13 @@ Notable changes to Inkblot. The format follows
   checked as KDP and IngramSpark would (300 dpi, the spine it was made for, no spine
   text under 80 pages, an e-book front's shape and size), and exported as one full-wrap
   PDF with ⅛″ bleed. The front is the EPUB's cover.
+- **A folder read as one document:** in Write, a folder can read continuously — its
+  documents one after another in tree order, less what the book hides, each under a
+  slim divider — to scroll from the end of one chapter into the next; clicking into one
+  opens it where it was clicked, and the arrow keys cross from one into the next.
+- **Numbered documents in the file tree:** a folder can show each chapter's number
+  beside its name, from 1 or from 0, leaving out prologues and hidden chapters. Both are
+  in the folder's menu in the tree, and under Typeset › Book.
 
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own

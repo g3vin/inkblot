@@ -1745,6 +1745,7 @@ public enum NativeCommand: Codable, Equatable {
 	case applyBookStyle(ApplyBookStyleCommand)
 	case setChapterMeta(SetChapterMetaCommand)
 	case setHeadImage(SetHeadImageCommand)
+	case setFolderBookOptions(SetFolderBookOptionsCommand)
 	case setCoverImage(SetCoverImageCommand)
 	case editCoverSets(EditCoverSetsCommand)
 	case saveTypesetVersion(SaveTypesetVersionCommand)
@@ -1861,6 +1862,7 @@ public enum NativeCommand: Codable, Equatable {
 			applyBookStyle,
 			setChapterMeta,
 			setHeadImage,
+			setFolderBookOptions,
 			setCoverImage,
 			editCoverSets,
 			saveTypesetVersion,
@@ -2293,6 +2295,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setHeadImage(content)
 					return
 				}
+			case .setFolderBookOptions:
+				if let content = try? container.decode(SetFolderBookOptionsCommand.self, forKey: .payload) {
+					self = .setFolderBookOptions(content)
+					return
+				}
 			case .setCoverImage:
 				if let content = try? container.decode(SetCoverImageCommand.self, forKey: .payload) {
 					self = .setCoverImage(content)
@@ -2716,6 +2723,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setHeadImage(let content):
 			try container.encode(CodingKeys.setHeadImage, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setFolderBookOptions(let content):
+			try container.encode(CodingKeys.setFolderBookOptions, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setCoverImage(let content):
 			try container.encode(CodingKeys.setCoverImage, forKey: .type)
@@ -7060,6 +7070,23 @@ public struct SetFocusModeCommand: Codable, Equatable {
 
 	public init(open: Bool) {
 		self.open = open
+	}
+}
+
+/// A folder's book options, from the file tree's menu: numbering its documents in the
+/// tree, where they count from, and scrolling from one into the next. Each field present
+/// is set; the rest of the folder's book is left as it is.
+public struct SetFolderBookOptionsCommand: Codable, Equatable {
+	public let folder: String
+	public let numberInTree: Bool?
+	public let startAt: UInt32?
+	public let continuous: Bool?
+
+	public init(folder: String, numberInTree: Bool?, startAt: UInt32?, continuous: Bool?) {
+		self.folder = folder
+		self.numberInTree = numberInTree
+		self.startAt = startAt
+		self.continuous = continuous
 	}
 }
 

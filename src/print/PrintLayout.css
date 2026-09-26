@@ -641,6 +641,39 @@
   font: 600 12px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* ---- a folder read as one document, in Write (ContinuousStack.jsx) ---- */
+
+.continuous-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: var(--editor-max-width, 720px);
+  margin: 40px auto 18px;
+  padding: 0 24px;
+  color: var(--text-secondary, #6e6e73);
+  font: 600 11px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.continuous-divider::before,
+.continuous-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.continuous-number {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.continuous-live > .continuous-divider:first-child { margin-top: 12px; }
+.continuous-doc { cursor: text; }
+.continuous-doc .continuous-text { outline: none; }
+.continuous-doc:hover .continuous-text { opacity: 0.92; }
+.continuous-placeholder { min-height: 60vh; }
+
 /* ---- the cover (CoverView.jsx) ---- */
 
 .cover-view {

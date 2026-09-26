@@ -78,6 +78,7 @@ struct FileTreeSidebar: View {
         let shown = filter.apply(to: model.tree.root, recent: Set(model.tree.recent))
         return ProjectOutline(
             root: shown,
+            numbers: model.tree.chapterNumbers,
             isFiltered: filter.isActive,
             expansion: expansion,
             selection: $selection,
@@ -160,6 +161,7 @@ struct FileTreeSidebar: View {
             }
             items.insert(contentsOf: open + [.separator()], at: 0)
         }
+        if entry.isFolder { items.append(contentsOf: bookItems(for: entry.path)) }
         items.append(.separator())
         items.append(ClosureMenuItem("Rename…") { ask(.rename(entry)) })
         if !entry.isFolder {
@@ -182,6 +184,32 @@ struct FileTreeSidebar: View {
         items.append(.separator())
         items.append(ClosureMenuItem("Delete…") { pendingDelete = entry })
         return items
+    }
+
+    /// A folder's book options: its documents numbered in the tree, and read as one.
+    private func bookItems(for folder: String) -> [NSMenuItem] {
+        let start = model.tree.numberedFolders[folder]
+        let numbered = start != nil
+        let from0 = start == 0
+        let send = { (number: Bool?, start: UInt32?, continuous: Bool?) in
+            model.bridge.send(.setFolderBookOptions(SetFolderBookOptionsCommand(
+                folder: folder, numberInTree: number, startAt: start, continuous: continuous)))
+        }
+        let numbers = NSMenuItem(title: "Number Documents", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        let off = ClosureMenuItem("Off") { send(false, nil, nil) }
+        off.state = numbered ? .off : .on
+        let one = ClosureMenuItem("From 1") { send(true, 1, nil) }
+        one.state = numbered && !from0 ? .on : .off
+        let zero = ClosureMenuItem("From 0") { send(true, 0, nil) }
+        zero.state = from0 ? .on : .off
+        [off, one, zero].forEach(submenu.addItem)
+        numbers.submenu = submenu
+        let continuous = ClosureMenuItem("Read as One Document") {
+            send(nil, nil, !model.tree.continuousFolders.contains(folder))
+        }
+        continuous.state = model.tree.continuousFolders.contains(folder) ? .on : .off
+        return [.separator(), numbers, continuous]
     }
 
     /* ---------------- entries ---------------- */

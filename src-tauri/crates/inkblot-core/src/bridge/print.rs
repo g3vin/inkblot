@@ -247,6 +247,22 @@ pub struct TypesetFocus {
     pub section_id: String,
 }
 
+/// A folder's book options, from the file tree's menu: numbering its documents in the
+/// tree, where they count from, and scrolling from one into the next. Each field present
+/// is set; the rest of the folder's book is left as it is.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetFolderBookOptionsCommand {
+    pub folder: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number_in_tree: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_at: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuous: Option<bool>,
+}
+
 /* ---------------- covers ---------------- */
 
 /// A cover version as the Cover section draws it: its pictures as files on disk.
