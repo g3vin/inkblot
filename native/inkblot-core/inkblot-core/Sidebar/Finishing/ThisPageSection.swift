@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The Typeset tab's first section: the entry selected in the Book navigator (or the
@@ -25,6 +26,10 @@ struct ThisPageSection: View {
                 if let label = row.label {
                     LabeledContent("Heading", value: label)
                 }
+                // The chapter's own head: on its document, so only while it is the one open.
+                if row.path != nil, row.path == model.pageLayout.state?.docPath {
+                    chapterHead
+                }
             } else {
                 Picker("Starts On", selection: page(\.start)) {
                     Text("The Next Page").tag(PageStart.any)
@@ -51,6 +56,43 @@ struct ThisPageSection: View {
         }
     }
 
+    /// The open chapter's subtitle, epigraph and picture.
+    @ViewBuilder
+    private var chapterHead: some View {
+        let meta = model.pageLayout.state?.chapterMeta
+        CommitTextField("Subtitle", text: metaBinding(\.subtitle), prompt: "In which…")
+        CommitTextEditor("Epigraph", text: metaBinding(\.epigraph))
+        if !(meta?.epigraph ?? "").isEmpty {
+            CommitTextField("Epigraph By", text: metaBinding(\.epigraphSource), prompt: "Who said it")
+        }
+        LabeledContent("Picture") {
+            HStack(spacing: 8) {
+                if let file = model.pageLayout.state?.chapterImageFile, let image = NSImage(contentsOfFile: file) {
+                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fit).frame(width: 40, height: 28)
+                }
+                Button(meta?.image == nil ? "Choose…" : "Change…") {
+                    ChapterOpeningsSection.choosePicture(message: "Choose a picture for this chapter’s head") {
+                        model.pageLayout.setHeadImage(.chapter, url: $0)
+                    }
+                }
+                if meta?.image != nil {
+                    Button("Remove", role: .destructive) { model.pageLayout.setHeadImage(.chapter, url: nil) }
+                }
+            }
+        }
+    }
+
+    private func metaBinding(_ keyPath: WritableKeyPath<ChapterMetaDraft, String>) -> Binding<String> {
+        Binding(
+            get: { ChapterMetaDraft(model.pageLayout.state?.chapterMeta)[keyPath: keyPath] },
+            set: { value in
+                var draft = ChapterMetaDraft(model.pageLayout.state?.chapterMeta)
+                guard draft[keyPath: keyPath] != value else { return }
+                draft[keyPath: keyPath] = value
+                model.pageLayout.setChapterMeta(draft.meta)
+            })
+    }
+
     private var note: String {
         switch row.kind {
         case .chapter: "A prologue, an epilogue or an interlude is headed by what it is and not numbered; the chapters after it count on."
@@ -73,6 +115,26 @@ struct ThisPageSection: View {
 
     private func edit(chapterType: ChapterType) {
         model.bridge.send(.editBookItem(EditBookItemCommand(id: row.id, title: nil, chapterType: chapterType, page: nil)))
+    }
+}
+
+/// A chapter's own head as something a control can write to.
+struct ChapterMetaDraft: Equatable {
+    var subtitle = ""
+    var image: String?
+    var epigraph = ""
+    var epigraphSource = ""
+
+    init(_ meta: ChapterMeta?) {
+        guard let meta else { return }
+        subtitle = meta.subtitle
+        image = meta.image
+        epigraph = meta.epigraph
+        epigraphSource = meta.epigraphSource
+    }
+
+    var meta: ChapterMeta {
+        ChapterMeta(subtitle: subtitle, image: image, epigraph: epigraph, epigraphSource: epigraphSource)
     }
 }
 

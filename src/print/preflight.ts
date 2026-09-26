@@ -75,8 +75,11 @@ export const nearestTrim = (service: Exclude<PublishingService, PublishingServic
   ))
 }
 
-/** An image in the document, as placed: its pixels and how wide it prints, in inches. */
-export interface PlacedImage { pixelsWide: number; printedInches: number }
+/**
+ * An image in the document, as placed: its pixels and how wide it prints, in inches —
+ * and, when it was placed wider than the text block, how wide it was asked to be.
+ */
+export interface PlacedImage { pixelsWide: number; printedInches: number; askedInches?: number }
 
 /**
  * What stands between this setup and the service printing it. Each issue carries the
@@ -160,13 +163,22 @@ export const preflight = ({ setup: input, target, pageCount, images = [] }: {
     })
   }
 
-  const blurry = images.filter((img) => img.printedInches > 0 && img.pixelsWide / img.printedInches < 300)
+  const minDpi = setup.typography?.images?.minDpi || 300
+  const blurry = images.filter((img) => img.printedInches > 0 && img.pixelsWide / img.printedInches < minDpi)
   if (blurry.length) {
     const worst = Math.min(...blurry.map((img) => Math.round(img.pixelsWide / img.printedInches)))
     issues.push({
       id: 'dpi',
       severity: PreflightSeverity.Warning,
-      message: `${blurry.length === 1 ? 'A picture prints' : `${blurry.length} pictures print`} at under 300 dots per inch (as low as ${worst}), and may look soft. Use a larger image, or place it smaller.`,
+      message: `${blurry.length === 1 ? 'A picture prints' : `${blurry.length} pictures print`} at under ${minDpi} dots per inch (as low as ${worst}), and may look soft. Use a larger image, or place it smaller.`,
+    })
+  }
+  const wide = images.filter((img) => img.askedInches && img.askedInches > img.printedInches + 0.01)
+  if (wide.length) {
+    issues.push({
+      id: 'image-width',
+      severity: PreflightSeverity.Note,
+      message: `${wide.length === 1 ? 'A picture was placed' : `${wide.length} pictures were placed`} wider than the text block, and ${wide.length === 1 ? 'is' : 'are'} set to its width in print.`,
     })
   }
   return issues

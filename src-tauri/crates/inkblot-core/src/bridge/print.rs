@@ -18,7 +18,7 @@ use typeshare::typeshare;
 
 use super::common::{EditorTarget, WritingFormat};
 use crate::types::page_setup::{
-    AuthorProfile, BookItemKind, BookSettings, ChapterType, GeneratedKind, MatterKind, PageOptions, PageSetup,
+    AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, RunningText, GeneratedKind, MatterKind, PageOptions, PageSetup,
     PrintTypography,
 };
 
@@ -588,6 +588,63 @@ pub struct PageLayoutCatalog {
     pub tokens: Vec<RunningToken>,
     /// What "Set Type for Print" starts from.
     pub default_typography: PrintTypography,
+    /// Whole designs for a book, one click each: its type, how its chapters open, its
+    /// running heads.
+    #[serde(default)]
+    pub book_styles: Vec<BookStyleOption>,
+}
+
+/// A book style (`bookStyles.ts`): a coordinated design, applied whole.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookStyleOption {
+    pub id: String,
+    pub label: String,
+    /// One line: what it looks like, and what it suits.
+    pub description: String,
+    pub typography: PrintTypography,
+    pub design: ChapterDesign,
+    pub header: RunningText,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verso_header: Option<RunningText>,
+}
+
+/// Apply a book style to the book: its type, its chapter design and its running heads.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplyBookStyleCommand {
+    pub id: String,
+}
+
+/// Set the active chapter's subtitle, picture and epigraph.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetChapterMetaCommand {
+    pub meta: ChapterMeta,
+}
+
+/// Which picture of a chapter head a file is for.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HeadImageTarget {
+    /// The active chapter's own picture.
+    Chapter,
+    /// The ornament every chapter's head carries.
+    Ornament,
+}
+
+/// A picture for a chapter head, copied into the project — or none, to take it away.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetHeadImageCommand {
+    pub target: HeadImageTarget,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 /// Everything the Finishing tabs show that changes. Published when the active
@@ -636,6 +693,14 @@ pub struct PageLayoutState {
     /// section shows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_book_item: Option<String>,
+    /// The active chapter's head: its subtitle, picture and epigraph.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_meta: Option<ChapterMeta>,
+    /// The chapter's picture and the book's ornament picture on disk, for thumbnails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_image_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ornament_image_file: Option<String>,
     /// A recommended inside margin for a book of this many pages, in mm.
     pub suggested_inside_margin_mm: f64,
     /// Who wrote it: the title page's byline and contact details.

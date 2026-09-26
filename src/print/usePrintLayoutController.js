@@ -26,6 +26,8 @@ import { withCoverPart } from './chapterDesign'
 import { reconcileBookItems } from './bookItems'
 import { addBookItem, editBookItem, moveBookItem, openablePath, removeBookItem, setBookItemHidden } from './bookContents'
 import { bookRows } from './bookRows'
+import { applyBookStyle, BOOK_STYLES, bookStyle } from './bookStyles'
+import { readChapterMeta } from './DocChapterMeta'
 import { listBookChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
 import { applyFormat, FORMAT_OPTIONS, formatOf, writingFormatOf } from './formats'
@@ -90,6 +92,7 @@ export const PAGE_LAYOUT_CATALOG = {
   signatureAdvice: SIGNATURE_GUIDANCE.map((g) => ({ sheets: g.sheets, label: g.label })),
   tokens: RUNNING_TOKENS,
   defaultTypography: BOOK_TYPOGRAPHY,
+  bookStyles: BOOK_STYLES,
 }
 
 /** A failed navigator command, said once in the console: the next publish shows the book as it is. */
@@ -121,8 +124,9 @@ const placedImages = (editor, setup) => {
     const pixels = pixelWidth(node.attrs.src)
     if (!pixels) return
     const asked = Number.parseFloat(node.attrs.width)
-    const printedIn = Math.min(textWidthIn, Number.isFinite(asked) && asked > 0 ? asked / 96 : pixels / 96)
-    images.push({ pixelsWide: pixels, printedInches: printedIn })
+    const askedIn = Number.isFinite(asked) && asked > 0 ? asked / 96 : pixels / 96
+    const maxIn = textWidthIn * ((setup.typography?.images?.maxWidthPct || 100) / 100)
+    images.push({ pixelsWide: pixels, printedInches: Math.min(maxIn, askedIn), askedInches: askedIn > maxIn ? askedIn : undefined })
   })
   return images
 }
@@ -165,6 +169,9 @@ export const scriptSummary = (editor, setup) => {
     scenes: data.scenes.map((scene) => ({ number: scene.number || undefined, heading: scene.heading, page: scene.page || 0 })),
   }
 }
+
+/** A project picture as a file on disk, for a thumbnail: none for a data URI, or before the root is known. */
+const fileOf = (projectRoot, path) => (projectRoot && path && !path.startsWith('data:') ? joinPath(projectRoot, path) : undefined)
 
 /** What the shell is told of the last export: enough to say "Export Again: Book.pdf". */
 const lastExportState = (last) => (last ? { format: last.format, scope: last.scope, path: last.path } : undefined)
@@ -209,6 +216,9 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     bookChapters: chapters,
     bookItems: rows,
     selectedBookItem: selected?.id,
+    chapterMeta: editor ? (readChapterMeta(editor.state.doc) || undefined) : undefined,
+    chapterImageFile: fileOf(projectRoot, readChapterMeta(editor?.state.doc)?.image),
+    ornamentImageFile: fileOf(projectRoot, book.chapterDesign?.ornamentImage),
     suggestedInsideMarginMm: suggestedInsideMarginMm(Math.max(pageCount, 1)),
     author: getAuthorProfile(),
     wordCount: docWords,
@@ -433,6 +443,47 @@ export default function usePrintLayoutController({
       documentSurface.onCommand('editBookItem', (command) => {
         const { project, folder } = currentBook()
         if (project) editBookItem(project, folder, command).catch(failed('Changing it'))
+      }),
+      documentSurface.onCommand('applyBookStyle', ({ id }) => {
+        const style = bookStyle(id)
+        const { project, folder, book } = currentBook()
+        if (!style || !project) return
+        const { activeEditor: ed } = stateRef.current
+        const own = ed ? readDocPageSetup(ed.state.doc) : null
+        const fallback = resolvePageSetup({ docSetup: own, bookSetup: book.pageSetup }).setup
+        setBookSettings(project, folder, applyBookStyle(book, style, fallback))
+      }),
+      documentSurface.onCommand('setChapterMeta', ({ meta }) => {
+        stateRef.current.activeEditor?.commands.setChapterMeta(meta)
+      }),
+      documentSurface.onCommand('setHeadImage', ({ target, path }) => {
+        const { project, folder } = currentBook()
+        if (!project) return
+        const apply = (image) => {
+          if (target === 'chapter') {
+            const ed = stateRef.current.activeEditor
+            if (!ed) return
+            const meta = readChapterMeta(ed.state.doc) || { subtitle: '', epigraph: '', epigraphSource: '' }
+            ed.commands.setChapterMeta({ ...meta, image: image || undefined })
+            return
+          }
+          const book = getBookSettings(project, folder)
+          const design = { ...book.chapterDesign }
+          if (image) {
+            design.ornamentImage = image
+            design.ornament = 'image'
+          } else {
+            delete design.ornamentImage
+            if (design.ornament === 'image') design.ornament = 'none'
+          }
+          setBookSettings(project, folder, { ...book, chapterDesign: design })
+        }
+        if (!path) {
+          apply(null)
+          return
+        }
+        // Copied into the project, so the book keeps the picture wherever the file was.
+        importAssetFromPath(project, path).then(apply).catch(failed('Setting the picture'))
       }),
       documentSurface.onCommand('openBookItem', ({ id }) => {
         const { project, folder } = currentBook()

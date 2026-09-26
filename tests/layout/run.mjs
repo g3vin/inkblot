@@ -299,6 +299,44 @@ for (const [label, setup] of [['Letter', null], ['6 × 9 mirrored', BOOK]]) {
   await page.close()
 }
 
+/* ---------------- 5b. a designed chapter head ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: true, sceneBreak: '* * *', chapterOpening: 'dropCapAndSmallCaps',
+    chapterSinkMm: 40, noIndentAfterBreak: true,
+  }
+  const page = await open(manuscript(8, 7), { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(async () => {
+    const { editor, preparePrint } = window.__print
+    const head = { label: 'Chapter One', title: 'The Road', subtitle: 'In which it rains', ornament: 'glyph', ornamentGlyph: '❦', ornamentPosition: 'below', alignment: 'center', titleSizePt: 20 }
+    const json = editor.getJSON()
+    json.content = [{ type: 'chapterHead', attrs: { head } }, ...json.content.filter((n) => n.type !== 'heading')]
+    editor.commands.setContent(json)
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    const live = document.querySelector('.pl-flow .ProseMirror > .chapter-head')
+    const first = live?.nextElementSibling
+    const sink = live ? parseFloat(getComputedStyle(live).paddingTop) : 0
+    const drop = first ? getComputedStyle(first, '::first-letter').getPropertyValue('initial-letter') || getComputedStyle(first, '::first-letter').getPropertyValue('-webkit-initial-letter') : ''
+    const prepared = await preparePrint({ projectName: 'x', docPath: 'Harness', scope: 'document', liveEditors: [{ path: 'Harness', editor }] })
+    const printed = prepared.elements[0].querySelector('.chapter-head')
+    return {
+      live: Boolean(live),
+      parts: live ? [...live.children].map((el) => el.className) : [],
+      sink,
+      drop,
+      printed: Boolean(printed),
+      printedTitle: printed?.querySelector('.ch-title')?.textContent,
+    }
+  })
+  ok('a chapter head sets its number, title, subtitle and ornament in order', JSON.stringify(r.parts) === JSON.stringify(['ch-number', 'ch-title', 'ch-subtitle', 'ch-ornament is-glyph']), JSON.stringify(r.parts))
+  ok('it sits down its page by the sink (40 mm)', Math.abs(r.sink - 40 * 96 / 25.4) < 1, `${r.sink}`)
+  ok('the paragraph after it opens with a drop cap', /3/.test(r.drop), r.drop)
+  ok('and it prints, as shown', r.printed && r.printedTitle === 'The Road')
+  await page.close()
+}
+
 /* ---------------- 6. a whole manuscript ---------------- */
 
 {

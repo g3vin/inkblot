@@ -22,6 +22,8 @@ import { documentSurface } from '../bridge'
 import { isNativeShell } from '../lib/host'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { withPrintBibliography } from '../lib/references/printBibliography'
+import { assetUrl, isAssetPath } from '../lib/assets'
+import { mapImageSources } from './export/portable'
 import { chapterTitleOf, compileSections } from './bookMatter'
 import { pageOptionsOf } from './bookItems'
 import { bookFolderFor, loadBookSections, loadChapters } from './compile'
@@ -54,6 +56,12 @@ const headingText = (node) => node.textBetween(0, node.content.size, '', (leaf) 
 export const chapterHeadings = (doc) => {
   const out = []
   doc.forEach((node, pos) => {
+    // A compiled chapter's head: its title, as a running head wants it.
+    if (node.type.name === 'chapterHead') {
+      const text = node.attrs.head?.title || node.attrs.head?.label || ''
+      if (text) out.push({ pos, text })
+      return
+    }
     if (node.type.name !== 'heading' || node.attrs.level !== 1) return
     const text = headingText(node)
     if (text) out.push({ pos, text })
@@ -346,6 +354,66 @@ const watermark = (text, pageWidth) => {
 }
 
 /**
+ * A book's chapters, where its design runs them on: each run of chapters becomes one
+ * flow, so a chapter starts on the page the last one ended on when its head and a few
+ * lines fit there (the pagination keeps a head with what follows). Each member keeps
+ * where it starts in the flow, for the contents.
+ */
+export const runOn = (chapters, design) => {
+  if (design?.chapterBreak !== 'continue') return chapters
+  const out = []
+  for (const chapter of chapters) {
+    const last = out[out.length - 1]
+    const joins = chapter.item?.kind === 'chapter' && last && (last.item?.kind === 'chapter' || last.members)
+    if (!joins) {
+      out.push(chapter)
+      continue
+    }
+    const base = last.members ? last : {
+      ...last,
+      members: [{ name: last.name, content: last.content, pos: 0 }],
+      content: { ...last.content, content: [...(last.content.content || [])] },
+    }
+    const size = base.content.content.reduce((n, node) => n + nodeSize(node), 0)
+    base.members.push({ name: chapter.name, content: chapter.content, pos: size })
+    base.content = { ...base.content, content: [...base.content.content, ...(chapter.content.content || [])] }
+    base.original = null
+    out[out.length - 1] = base
+  }
+  return out
+}
+
+/** A JSON node's size in ProseMirror positions, as the document it is part of counts it. */
+const nodeSize = (node) => {
+  if (node.type === 'text') return (node.text || '').length
+  const inner = (node.content || []).reduce((n, child) => n + nodeSize(child), 0)
+  // A leaf is one position; anything with content opens and closes around it.
+  return node.content || !LEAVES.has(node.type) ? inner + 2 : 1
+}
+const LEAVES = new Set(['hardBreak', 'image', 'horizontalRule', 'pageBreak', 'chapterHead', 'citation', 'noteAnnotation'])
+
+/**
+ * A book's sections with each chapter head's pictures — stored as project paths — made
+ * URLs the page can show, for laying it out and printing it.
+ */
+const withDisplayImages = async (projectName, sections) => {
+  const urls = new Map()
+  for (const section of sections) {
+    for (const node of section.content?.content || []) {
+      if (node.type !== 'chapterHead') continue
+      for (const key of ['image', 'ornamentImage']) {
+        const src = node.attrs?.head?.[key]
+        if (typeof src === 'string' && isAssetPath(src) && !urls.has(src)) urls.set(src, await assetUrl(projectName, src))
+      }
+    }
+  }
+  if (!urls.size) return sections
+  return sections.map((section) => (section.content
+    ? { ...section, content: mapImageSources(section.content, (src) => urls.get(src) || src) }
+    : section))
+}
+
+/**
  * A book's front matter as pages: the half title, the title page and the contents laid
  * out from the book, and its own pages (a copyright page, a dedication) flowed like any
  * chapter — each where the book put it and on the side it opens on, numbered in roman
@@ -364,6 +432,12 @@ const buildBookFront = async ({ sections, chapters, folios, setup, bookTitle, au
   }
   const entries = []
   chapters.forEach((chapter, i) => {
+    if (chapter.members) {
+      chapter.members.forEach((member, m) => {
+        entries.push({ title: chapterTitleOf(member.content, member.name), folio: chapter.memberFolios?.[m] || folios[i] || '' })
+      })
+      return
+    }
     const title = chapter.item?.kind === 'part'
       ? (chapter.label ? `${chapter.label}${chapter.item.title ? `: ${chapter.item.title}` : ''}` : chapter.name)
       : chapterTitleOf(chapter.content, chapter.name)
@@ -447,7 +521,7 @@ export const preparePrint = async ({
       const c = s.item.kind === 'chapter' ? byPath.get(s.path) : null
       return c ? { ...s, content: c.content, original: s.content, printBibliography: c.printBibliography } : { ...s, original: s.content }
     })
-    sections = compileSections(withNotes, book, { author })
+    sections = await withDisplayImages(projectName, compileSections(withNotes, book, { author }))
     loaded = sections.filter((s) => s.item.kind === 'chapter' && s.content)
   } else {
     loaded = report
@@ -459,8 +533,9 @@ export const preparePrint = async ({
   if (!loaded.length && !sections?.some((s) => s.content)) return null
   // What flows as pages: a document's chapter; a book's body and back matter — the
   // front matter is set after, once the body's folios are known for its contents.
+  const design = sections ? book?.chapterDesign : null
   let chapters = sections
-    ? sections.filter((s) => s.role !== 'front' && s.content)
+    ? runOn(sections.filter((s) => s.role !== 'front' && s.content), design)
     : loaded
 
   // A book with a setup of its own prints every chapter in it; otherwise the first
@@ -477,8 +552,11 @@ export const preparePrint = async ({
     if (!chapters.length) throw new Error('This document is left out of the book.')
   }
 
-  /** How a book's section sits: its item's page options; a chapter follows the setup. */
+  /** How a book's section sits: its item's page options; a chapter follows the design. */
   const placement = (section) => {
+    if (section?.item?.kind === 'chapter' && design) {
+      return { startOn: design.chapterBreak === 'newRightPage' ? 'recto' : 'any' }
+    }
     if (!section?.item || section.item.kind === 'chapter') return {}
     const options = pageOptionsOf(section.item)
     return { startOn: options.start, runningHeads: options.runningHeads, folio: options.folio, position: options.position }
@@ -514,6 +592,18 @@ export const preparePrint = async ({
       words,
       onChapterStart: (index, folio) => { folios[index] = folio },
     })
+    // Chapters run on into one flow have their own folios: the page each head is on.
+    for (const [index, chapter] of chapters.entries()) {
+      if (!chapter.members) continue
+      chapter.memberFolios = chapter.members.map(({ pos }) => {
+        let folio = folios[index] || ''
+        for (const page of body) {
+          if (page.dataset.chapter !== String(index)) continue
+          if (Number(page.dataset.pos) <= pos) folio = page.dataset.folio
+        }
+        return folio
+      })
+    }
     const m0 = pageMetrics(setup)
     let front
     if (sections && !chapterOnly) {

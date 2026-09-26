@@ -28,7 +28,7 @@ import { decodeDataUri, resolveImage, toDataUri } from './images'
 import { toMarkdown } from './markdown'
 import { buildPlainText } from './text'
 import { serializeFountain } from '../../script/fountain'
-import { mapImageSources, portableContent } from './portable'
+import { headsToBlocks, mapImageSources, portableContent } from './portable'
 
 const FORMATS = {
   pdf: { ext: 'pdf', label: 'PDF' },
@@ -134,10 +134,13 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
   })
   // A book's pages in order — its own front matter pages, parts, chapters headed as it
   // numbers them, back matter — each titled for the contents; a document as it is.
+  // HTML and EPUB draw a chapter's head as it is designed; the other formats set it as
+  // a heading and the blocks under it.
+  const drawsHeads = format === 'html' || format === 'epub'
   const exportChapters = (sections ? sections.filter((s) => s.content) : chapters)
     .map((chapter) => ({
       title: chapterTitleOf(chapter.content, chapter.name),
-      content: chapter.content,
+      content: drawsHeads ? chapter.content : headsToBlocks(chapter.content),
       inContents: chapter.role !== 'front',
     }))
   // The pages an export sets from the book itself: the half title and the title page.

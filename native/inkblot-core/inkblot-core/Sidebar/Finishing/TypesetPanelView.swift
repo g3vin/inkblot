@@ -9,6 +9,7 @@ import SwiftUI
 /// Print and Export are the next tab's: this one ends by pointing there.
 struct TypesetPanelView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage(LengthUnit.storageKey) private var unitsRaw = LengthUnit.defaultForLocale.rawValue
 
     private var selectedRow: BookRow? {
         guard let state = model.pageLayout.state, let id = state.selectedBookItem else { return nil }
@@ -21,9 +22,10 @@ struct TypesetPanelView: View {
                 ThisPageSection(row: row)
             }
             BookSections(.info)
+            StyleGallerySection()
             PageSetupSections(.format, .page)
             PageSetupSections(.typography, .textFlow)
-            BookSections(.headings)
+            ChapterOpeningsSection(unit: LengthUnit(rawValue: unitsRaw) ?? .inches)
             PageSetupSections(.headerFooter, .titlePage)
             BookSections(.setup)
             Section {

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The Typeset tab's Typography section: the type the text prints in.
+/// The Typeset tab's Body Text section: the type the text prints in.
 ///
 /// Off, a page prints in the editor's own font, as it always has. On, the setup carries
 /// its own font, size, spacing, indents and scene breaks, and Print Layout shows the
@@ -14,7 +14,7 @@ struct TypographySection: View {
     let apply: (PageSetupDraft) -> Void
 
     var body: some View {
-        FinishingSection("Typography", id: FinishingSectionID.typography) {
+        FinishingSection("Body Text", id: FinishingSectionID.typography) {
             Toggle("Set Type for Print", isOn: Binding(
                 get: { setup.typography != nil },
                 set: { on in
@@ -29,7 +29,7 @@ struct TypographySection: View {
         } footer: {
             FinishingNote(setup.typography == nil
                 ? "Pages print in the editor’s font. Set type for print to choose a font, spacing and scene breaks for the page alone."
-                : "A horizontal rule prints as the scene break. The chapter opening applies to the first paragraph after each Heading 1.")
+                : "A horizontal rule prints as the scene break. How chapters open — the drop cap, how far down the page — is under Chapter Openings.")
         }
     }
 
@@ -115,14 +115,6 @@ struct TypographySection: View {
                 .help("Common scene breaks")
             }
         }
-        Picker("Chapter Opening", selection: binding(\.chapterOpening)) {
-            Text("Plain").tag(ChapterOpening.plain)
-            Text("Drop Cap").tag(ChapterOpening.dropCap)
-            Text("Small Caps").tag(ChapterOpening.smallCaps)
-            Text("Drop Cap & Small Caps").tag(ChapterOpening.dropCapAndSmallCaps)
-        }
-        LengthField("Chapter Title Drop", millimeters: binding(\.chapterSinkMm), unit: unit)
-            .help("How far down its page a chapter's title sits, from the top margin")
     }
 
     static let sceneBreaks = ["* * *", "#", "⁂", "❧", "~", "• • •"]
@@ -131,7 +123,7 @@ struct TypographySection: View {
     private static let fallback = PrintTypography(
         fontFamily: "Georgia, serif", fontSizePt: 12, lineSpacing: .single, lineValue: 1,
         firstLineIndentMm: 0, paragraphSpacingPt: 0, alignment: .left, hyphenate: false,
-        sceneBreak: "* * *", chapterOpening: .plain, chapterSinkMm: 0, noIndentAfterBreak: false)
+        sceneBreak: "* * *", chapterOpening: .plain, chapterSinkMm: 0, noIndentAfterBreak: false, images: nil)
 }
 
 /// The fonts the font menu offers: a few that print well first, then every family
