@@ -1348,6 +1348,7 @@ export type NativeCommand =
 	| { type: "applyBookStyle", payload: ApplyBookStyleCommand }
 	| { type: "setChapterMeta", payload: SetChapterMetaCommand }
 	| { type: "setHeadImage", payload: SetHeadImageCommand }
+	| { type: "setFolderBookOptions", payload: SetFolderBookOptionsCommand }
 	| { type: "setCoverImage", payload: SetCoverImageCommand }
 	| { type: "editCoverSets", payload: EditCoverSetsCommand }
 	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
@@ -3931,6 +3932,18 @@ export interface SetEditorModeCommand {
  */
 export interface SetFocusModeCommand {
 	open: boolean;
+}
+
+/**
+ * A folder's book options, from the file tree's menu: numbering its documents in the
+ * tree, where they count from, and scrolling from one into the next. Each field present
+ * is set; the rest of the folder's book is left as it is.
+ */
+export interface SetFolderBookOptionsCommand {
+	folder: string;
+	numberInTree?: boolean;
+	startAt?: number;
+	continuous?: boolean;
 }
 
 export interface SetFontFamilyCommand {

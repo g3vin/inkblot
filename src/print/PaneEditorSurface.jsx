@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { EditorContent } from '@tiptap/react'
 
 import BookPages from './BookPages'
+import ContinuousStack from './ContinuousStack'
 import CoverView from './CoverView'
 import { setLiveHead } from './ChapterHeadDecorations'
 import { readChapterMeta } from './DocChapterMeta'
@@ -57,7 +58,7 @@ const useAssetUrls = (projectName, sources) => {
   return urls
 }
 
-export default function PaneEditorSurface({ editor, projectName, docPath, header = null, scrollRef }) {
+export default function PaneEditorSurface({ editor, projectName, docPath, header = null, scrollRef, onOpenDoc }) {
   usePrintLayoutStore()
   const [scrollEl, setScrollEl] = useState(null)
   const ownSetup = useDocPageSetup(editor)
@@ -76,7 +77,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
   }, [editor, locked])
   // Where the document sits in its book: in Typeset, a chapter is shown among the book's
   // pages, opening with its designed head.
-  const placement = useBookPlacement(printLayout ? projectName : null, printLayout ? docPath : null)
+  const placement = useBookPlacement(editor ? projectName : null, editor ? docPath : null)
   const row = placement?.row
   const inBook = Boolean(printLayout && row && !row.hidden)
   const design = placement?.book?.chapterDesign
@@ -131,7 +132,22 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     else if (scrollRef) scrollRef.current = el
   }, [scrollRef])
 
-  const content = editor ? <EditorContent editor={editor} className="editor" /> : null
+  const editorContent = editor ? <EditorContent editor={editor} className="editor" /> : null
+  // In Write, a folder read as one document: its other documents above and below.
+  const continuous = !printLayout && editor && placement?.book?.continuous && placement.row && placement.row.kind === 'chapter'
+  const content = continuous ? (
+    <ContinuousStack
+      projectName={projectName}
+      docPath={docPath}
+      editor={editor}
+      placement={placement}
+      scrollEl={scrollEl}
+      onOpenDoc={onOpenDoc}
+    >
+      {editorContent}
+    </ContinuousStack>
+  ) : editorContent
+  const pageContent = editorContent
 
   return (
     <div
@@ -166,7 +182,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
               folioStart={folioStart}
               typeset={typeset}
             >
-              {content}
+              {pageContent}
             </PrintLayoutView>
           )}
         />
@@ -184,7 +200,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           statusHost={scrollEl?.parentElement || null}
           typeset={typeset}
         >
-          {content}
+          {pageContent}
         </PrintLayoutView>
       ) : content}
       <TypesetToast

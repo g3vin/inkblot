@@ -22,6 +22,14 @@ final class ProjectTree {
     private(set) var projectName: String?
     private(set) var projectRoot: String?
     private(set) var root: TreeNode?
+    /// Each document's chapter number, where its folder numbers them in the tree.
+    private(set) var chapterNumbers: [String: Int] = [:]
+    /// Which folders number their documents, from the project's books file.
+    @ObservationIgnored private var numbering: [String: BookIndex.Numbering] = [:]
+    /// Folders that number their documents in the tree, and what they count from.
+    var numberedFolders: [String: Int] { numbering.mapValues(\.startAt) }
+    /// Folders whose documents read as one continuous document.
+    private(set) var continuousFolders: Set<String> = []
     private(set) var loadError: String?
     /// Files opened lately, newest first — what the filter bar's clock shows.
     private(set) var recent: [String] = []
@@ -70,6 +78,10 @@ final class ProjectTree {
         } catch {
             loadError = error.localizedDescription
         }
+        // The watcher fires on the books file too: a change to a book's numbering shows.
+        numbering = projectRoot.map(BookIndex.read(root:)) ?? [:]
+        let continuous = projectRoot.map(BookIndex.continuous(root:)) ?? []
+        if continuous != continuousFolders { continuousFolders = continuous }
         applyOrder()
     }
 
@@ -120,6 +132,8 @@ final class ProjectTree {
         }
         let before = order
         root = TreeOrder.apply(&order, to: unordered, keeping: inFlight)
+        let numbers = BookIndex.numbers(tree: root, books: numbering)
+        if numbers != chapterNumbers { chapterNumbers = numbers }
         // Once the tree shows a placed entry, its move has landed.
         if !inFlight.isEmpty { inFlight.subtract(Self.ids(in: unordered)) }
         if order != before { saveOrder() }

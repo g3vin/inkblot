@@ -59,6 +59,10 @@ struct BookSections: View {
             CommitTextField("Title", text: binding(\.title))
             CommitTextField("Author", text: binding(\.author), prompt: "Your name")
             CommitTextField("Language", text: binding(\.language), prompt: "en-US")
+            Toggle("Read as One Document", isOn: binding(\.continuous))
+                .help("In Write, the folder’s documents follow one another: scroll from the end of one chapter into the next")
+            Toggle("Number Documents in the File Tree", isOn: binding(\.showInTree))
+                .help("Each chapter’s number beside its name in the file tree, counting from the first chapter’s number")
             LabeledContent("Cover") {
                 HStack(spacing: 8) {
                     if let file = state.cover?.sets.first(where: { $0.id == state.cover?.active })?.frontFile, let image = NSImage(contentsOfFile: file) {

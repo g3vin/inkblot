@@ -12,6 +12,8 @@ import SwiftUI
 /// It only shows and reports. What a drop or a menu item does is `FileTreeSidebar`'s.
 struct ProjectOutline: NSViewRepresentable {
     let root: TreeNode?
+    /// Chapter numbers to show before documents' names, by path.
+    var numbers: [String: Int] = [:]
     /// The tree is narrowed by the filter bar: everything shown is expanded, and the
     /// folders the user had open are kept for when the filter is cleared.
     var isFiltered = false
@@ -70,7 +72,7 @@ struct ProjectOutline: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         let coordinator = context.coordinator
         coordinator.parent = self
-        coordinator.show(root, filtered: isFiltered)
+        coordinator.show(root, filtered: isFiltered, numbers: numbers)
         coordinator.apply(expansion)
         coordinator.select(selection)
     }
@@ -101,6 +103,7 @@ struct ProjectOutline: NSViewRepresentable {
         weak var outline: NSOutlineView?
         private var shown: TreeNode?
         private var filtered = false
+        private var numbers: [String: Int] = [:]
         private var lastExpansion: UUID?
         private var top: [Item] = []
         private var items: [String: Item] = [:]
@@ -109,9 +112,10 @@ struct ProjectOutline: NSViewRepresentable {
 
         /* ---------------- contents ---------------- */
 
-        func show(_ root: TreeNode?, filtered: Bool) {
-            guard let outline, root != shown || filtered != self.filtered else { return }
+        func show(_ root: TreeNode?, filtered: Bool, numbers: [String: Int] = [:]) {
+            guard let outline, root != shown || filtered != self.filtered || numbers != self.numbers else { return }
             shown = root
+            self.numbers = numbers
             self.filtered = filtered
             var live: [String: Item] = [:]
             func build(_ node: TreeNode) -> Item {
@@ -171,7 +175,18 @@ struct ProjectOutline: NSViewRepresentable {
             guard let item = item as? Item else { return nil }
             let id = NSUserInterfaceItemIdentifier("row")
             let cell = outlineView.makeView(withIdentifier: id, owner: nil) as? NSTableCellView ?? Self.makeCell(id)
-            cell.textField?.stringValue = item.isFolder ? item.node.name : docDisplayName(path: item.path)
+            let name = item.isFolder ? item.node.name : docDisplayName(path: item.path)
+            if let number = numbers[item.path] {
+                // The chapter's number before its name, quieter: "3  The Road".
+                let label = NSMutableAttributedString(string: "\(number)  ", attributes: [
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                ])
+                label.append(NSAttributedString(string: name, attributes: [.foregroundColor: NSColor.labelColor]))
+                cell.textField?.attributedStringValue = label
+            } else {
+                cell.textField?.stringValue = name
+            }
             let symbol = item.isFolder ? "folder"
                 : isCanvasDoc(path: item.path) ? "rectangle.on.rectangle"
                 : isMapDoc(path: item.path) ? "map" : "doc.text"

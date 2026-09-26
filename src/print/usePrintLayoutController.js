@@ -499,6 +499,19 @@ export default function usePrintLayoutController({
         // Copied into the project, so the book keeps the picture wherever the file was.
         importAssetFromPath(project, path).then(apply).catch(failed('Setting the picture'))
       }),
+      documentSurface.onCommand('setFolderBookOptions', ({ folder, numberInTree, startAt, continuous }) => {
+        const project = stateRef.current.projectName
+        if (!project) return
+        const book = getBookSettings(project, folder)
+        const numbering = { ...book.chapterNumbering }
+        if (numberInTree !== undefined) numbering.showInTree = Boolean(numberInTree)
+        if (startAt !== undefined) numbering.startAt = startAt === 0 ? 0 : 1
+        setBookSettings(project, folder, {
+          ...book,
+          chapterNumbering: numbering,
+          ...(continuous !== undefined ? { continuous: Boolean(continuous) } : {}),
+        })
+      }),
       documentSurface.onCommand('setCoverImage', ({ setId, part, path }) => {
         const { project, folder } = currentBook()
         if (!project) return

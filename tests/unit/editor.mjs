@@ -75,6 +75,7 @@ function Harness() {
   const [splitView, setSplitView] = useState(null)
   const [activeDoc, setActiveDoc] = useState('one')
   const [notesByDoc, setNotesByDoc] = useState({})
+  control.currentDoc = currentDoc
 
   const setNotesForDoc = useCallback((docName, notes) => {
     setNotesByDoc((current) => ({ ...current, [docName]: notes }))
@@ -372,6 +373,24 @@ ok('the page setup is saved with the document', withSetup?.content?.attrs?.pageS
 await act(async () => { control.setCurrentDoc('one') })
 await settle()
 ok('…and is back when the document is reopened', readDocPageSetup(control.editor.state.doc)?.mirrorMargins === true)
+
+/* ---------------- A folder read as one document ---------------- */
+
+await act(async () => { printStore.setBookSettings(P, '', { ...printStore.getBookSettings(P, ''), continuous: true }) })
+await settle()
+await settle()
+const neighbours = () => [...document.querySelectorAll('.primary-pane .continuous-stack .continuous-doc')]
+ok('a folder read as one shows its next document below the one open',
+  neighbours().some((s) => s.dataset.path === 'two') && !!document.querySelector('.primary-pane .continuous-live .ProseMirror'))
+ok('…drawn from what it says', neighbours().find((s) => s.dataset.path === 'two')?.textContent.includes('the second chapter'))
+await act(async () => { neighbours().find((s) => s.dataset.path === 'two').dispatchEvent(new window.MouseEvent('click', { bubbles: true })) })
+await settle()
+ok('clicking into it opens it, the one left drawn above',
+  control.currentDoc === 'two' && neighbours().some((s) => s.dataset.path === 'one'))
+await act(async () => { control.setCurrentDoc('one') })
+await act(async () => { printStore.setBookSettings(P, '', { ...printStore.getBookSettings(P, ''), continuous: false }) })
+await settle()
+ok('read as separate documents again, there are no neighbours', !document.querySelector('.primary-pane .continuous-stack'))
 
 /* ---------------- Unmount ---------------- */
 

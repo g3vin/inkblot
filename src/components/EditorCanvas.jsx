@@ -721,6 +721,7 @@ export default function EditorCanvas({
               editor={liveEditor}
               projectName={projectName}
               docPath={currentDoc}
+              onOpenDoc={(path) => openDocFromCanvas('primary', path)}
               header={paneHeaders ? (
                 <div className="pane-header pane-header-centered">
                   <span>{currentDoc}</span>
@@ -802,6 +803,7 @@ export default function EditorCanvas({
                 editor={liveSecondaryEditor}
                 projectName={projectName}
                 docPath={secondaryDoc}
+                onOpenDoc={(path) => openDocFromCanvas('secondary', path)}
                 header={paneHeaders ? (
                   <div className="pane-header split-header pane-header-centered">
                     <span>{secondaryDoc}</span>
