@@ -10,6 +10,9 @@ import { useEffect, useRef, useState } from 'react'
 import SFIcon from '../components/SFIcon'
 import { formatDay } from '../lib/map/calendar'
 
+/** The shortest step of playback: 30 a second, less a little for frame jitter. */
+const PLAYBACK_FRAME_MS = 1000 / 30 - 4
+
 /** Days of story per second of playback. */
 const SPEEDS = [
   { value: 1 / 24, label: '1 hour/s' },
@@ -20,7 +23,18 @@ const SPEEDS = [
   { value: 365.25, label: '1 year/s' },
 ]
 
-export default function MapTimeline({ day, onDay, extent, calendar, conflicts, isSystem, inspectorOpen }) {
+/**
+ * Centred in the part of the map the shell's panels leave uncovered (`box`), and to
+ * the left of the page's own inspector when that is open.
+ */
+function timelinePlacement(box, inspectorOpen) {
+  if (!box?.surfaceWidth) return inspectorOpen ? { left: 'calc(50% - 146px)' } : undefined
+  const reserved = inspectorOpen ? 292 : 0
+  const width = Math.max(0, box.width - reserved)
+  return { left: `${box.left + width / 2}px`, width: `min(720px, ${Math.max(0, width - 40)}px)`, minWidth: 0 }
+}
+
+export default function MapTimeline({ day, onDay, extent, calendar, conflicts, isSystem, inspectorOpen, box }) {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(isSystem ? 30 : 1)
   const dayRef = useRef(day)
@@ -36,16 +50,29 @@ export default function MapTimeline({ day, onDay, extent, calendar, conflicts, i
   const min = Math.floor(Math.min(extent.from - span * 0.05, day))
   const max = Math.ceil(Math.max(extent.to + span * 0.05, day, min + 1))
 
+  // Read through a ref: `max` follows the day shown, so as a dependency it restarted
+  // the playback loop on every frame of a star system's turning.
+  const maxRef = useRef(max)
+  useEffect(() => {
+    maxRef.current = max
+  }, [max])
+
   useEffect(() => {
     if (!playing) return undefined
     let frame = 0
     let last = performance.now()
     const tick = (now) => {
+      // Each step re-draws the whole map, so playback steps at most 30 times a second
+      // rather than at the display's 60 or 120: as smooth to watch, half the work.
+      if (now - last < PLAYBACK_FRAME_MS) {
+        frame = requestAnimationFrame(tick)
+        return
+      }
       const next = dayRef.current + ((now - last) / 1000) * speed
       last = now
       // A journey plays through once and stops at its end; a star system turns forever.
-      if (!isSystem && next >= max) {
-        onDayRef.current(max)
+      if (!isSystem && next >= maxRef.current) {
+        onDayRef.current(maxRef.current)
         setPlaying(false)
         return
       }
@@ -54,7 +81,7 @@ export default function MapTimeline({ day, onDay, extent, calendar, conflicts, i
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [isSystem, max, playing, speed])
+  }, [isSystem, playing, speed])
 
   const togglePlay = () => {
     if (!playing && !isSystem && day >= max - 1e-6) onDay(min)
@@ -68,7 +95,7 @@ export default function MapTimeline({ day, onDay, extent, calendar, conflicts, i
   return (
     <div
       className="map-floating map-timeline"
-      style={inspectorOpen ? { left: 'calc(50% - 146px)' } : undefined}
+      style={timelinePlacement(box, inspectorOpen)}
       aria-label="Story timeline"
     >
       <div className="map-timeline-row">

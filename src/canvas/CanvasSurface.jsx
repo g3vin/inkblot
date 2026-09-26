@@ -15,6 +15,8 @@ import { debounce } from 'lodash'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from './canvasToolbarSlot'
 import { documentSurface } from '../bridge'
 import { saveCanvasDocument } from '../lib/canvasFileSystem'
+import { cullRectFor, cullRectHolds, rectsIntersect } from '../lib/canvasGeometry'
+import { isAudioPath } from '../lib/assets'
 import {
   expandGroupSelection,
   groupsToRefit,
@@ -85,9 +87,30 @@ export default function CanvasSurface({
     [docPath, projectName]
   )
 
+  /*
+   * Culling. Only the cards within a screen of the view are mounted; zoomed in on a
+   * large board, the rest were still restyled, laid out and composited on every frame.
+   * The rect is recomputed only once a pan has used up most of its margin, so a pan
+   * renders nothing until then. Measured by a ResizeObserver, not per frame.
+   */
+  const [cullRect, setCullRect] = useState(null)
+  const cullRectRef = useRef(null)
+  const surfaceSizeRef = useRef(null)
+  const recull = useCallback((v, force = false) => {
+    const size = surfaceSizeRef.current
+    if (!size?.width || !size?.height) return
+    if (!force && cullRectHolds(cullRectRef.current, v, size.width, size.height)) return
+    const next = cullRectFor(v, size.width, size.height)
+    cullRectRef.current = next
+    setCullRect(next)
+  }, [])
+
   const handleViewportChange = useCallback(
-    (nextViewport) => saveViewport(stateRef.current, nextViewport),
-    [saveViewport]
+    (nextViewport) => {
+      saveViewport(stateRef.current, nextViewport)
+      recull(nextViewport)
+    },
+    [recull, saveViewport]
   )
 
   useEffect(
@@ -101,7 +124,8 @@ export default function CanvasSurface({
   const {
     surfaceRef,
     worldRef,
-    viewport,
+    gridRef,
+    zoom,
     viewportRef,
     screenToWorldAt,
     startPan,
@@ -120,6 +144,18 @@ export default function CanvasSurface({
     initialState,
     viewportRef,
   })
+
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface || typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      surfaceSizeRef.current = { width, height }
+      recull(viewportRef.current, true)
+    })
+    observer.observe(surface)
+    return () => observer.disconnect()
+  }, [recull, surfaceRef, viewportRef])
 
   const { selection, selectionRef, marquee, clear, selectNode, selectEdge, selectAll, startMarquee } =
     useCanvasSelection()
@@ -552,7 +588,7 @@ export default function CanvasSurface({
     documentSurface.publishCanvasToolbar({
       state: {
         surfaceId,
-        zoom: viewport.zoom,
+        zoom,
         canUndo,
         canRedo,
         hasSelection,
@@ -581,8 +617,24 @@ export default function CanvasSurface({
     snapPrefs.grid,
     snapPrefs.guides,
     surfaceRef,
-    viewport.zoom,
+    zoom,
   ])
+
+  // What is kept mounted whatever the cull: the selection (a drag moves it by its
+  // elements), the card being edited, and audio, which would stop mid-memo.
+  const visibleNodeIds = useMemo(() => {
+    if (!cullRect) return state.nodeOrder
+    return state.nodeOrder.filter((id) => {
+      const node = state.nodes[id]
+      if (!node) return false
+      return (
+        rectsIntersect(node, cullRect) ||
+        selection.nodes.has(id) ||
+        editingNodeId === id ||
+        (node.type === 'file' && isAudioPath(node.file))
+      )
+    })
+  }, [cullRect, editingNodeId, selection.nodes, state.nodeOrder, state.nodes])
 
   return (
     <div
@@ -598,6 +650,7 @@ export default function CanvasSurface({
       // Middle-click otherwise pastes or starts autoscroll depending on platform.
       onAuxClick={(event) => event.preventDefault()}
     >
+      <div ref={gridRef} className="canvas-grid" aria-hidden="true" />
       <div ref={worldRef} className="canvas-world">
         {/* Behind the nodes, so an arrow tucks under the cards it joins. */}
         <CanvasEdges
@@ -609,7 +662,7 @@ export default function CanvasSurface({
           pendingEdgeRef={pendingEdgeRef}
         />
 
-        {state.nodeOrder.map((id) => (
+        {visibleNodeIds.map((id) => (
           <CanvasNode
             key={id}
             node={state.nodes[id]}
@@ -649,7 +702,7 @@ export default function CanvasSurface({
           <div
             className="canvas-marquee"
             style={{
-              transform: `translate3d(${marquee.x}px, ${marquee.y}px, 0)`,
+              transform: `translate(${marquee.x}px, ${marquee.y}px)`,
               width: `${marquee.width}px`,
               height: `${marquee.height}px`,
             }}
@@ -676,7 +729,7 @@ export default function CanvasSurface({
           edited — when one is, the text Toolbar takes the titlebar instead. */}
       {isActive && toolbarSlot && !nativeToolbar ? createPortal(
         <CanvasToolbar
-          zoom={viewport.zoom}
+          zoom={zoom}
           canUndo={canUndo}
           canRedo={canRedo}
           hasSelection={hasSelection}

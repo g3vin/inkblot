@@ -40,6 +40,13 @@ export interface DocTab {
   docPath: string | null
   /** Opened implicitly, not deliberately; closes with its document. */
   ephemeral: boolean
+  /**
+   * The tab's split: the document beside or below its own, brought back when the tab
+   * is selected again. `null` is no split; absent (a session saved before tabs owned
+   * their splits) is not known yet, and the tab takes whatever the panes show.
+   */
+  secondaryDoc?: string | null
+  splitOrientation?: SplitOrientation
 }
 
 /** What one project remembers between launches. */
@@ -82,6 +89,12 @@ export const normalizeTabs = (tabs: unknown): DocTab[] => {
       id: tab.id as string,
       docPath: typeof tab.docPath === 'string' && tab.docPath ? tab.docPath : null,
       ephemeral: Boolean(tab.ephemeral),
+      ...(tab.secondaryDoc === undefined ? {} : {
+        secondaryDoc: typeof tab.secondaryDoc === 'string' && tab.secondaryDoc ? tab.secondaryDoc : null,
+      }),
+      ...(tab.splitOrientation === 'rows' || tab.splitOrientation === 'columns'
+        ? { splitOrientation: tab.splitOrientation as SplitOrientation }
+        : {}),
     }))
 }
 
@@ -126,9 +139,9 @@ export const createTabId = (): string =>
  * paths creates its tab itself, so by the time this runs the document already
  * has one and the active tab is left alone.
  *
- * The split's second document is the exception: it is on screen *beside* the
- * primary one, so it cannot share a tab and gets its own. That tab stays
- * ephemeral — closing the split takes it away again.
+ * The split's second document gets no tab of its own: the split belongs to the
+ * tab it was opened in (`secondaryDoc` on the tab). Ephemeral tabs are what older
+ * sessions gave it, and they still go when their document leaves the panes.
  *
  * Returns `tabs` unchanged when nothing needs to happen, so this is safe to run
  * from an effect on every document change.
@@ -158,17 +171,115 @@ export const ensureTabsForOpenDocs = (
     changed = true
   }
 
-  if (secondaryDoc && !next.some(tab => tab.docPath === secondaryDoc)) {
-    next = [...next, { id: createTabId(), docPath: secondaryDoc, ephemeral: true }]
-    changed = true
-  }
-
   const kept = next.filter(tab => (
     !tab.ephemeral || (tab.docPath && open.includes(tab.docPath))
   ))
   if (kept.length !== next.length) changed = true
 
   return changed ? kept : tabs
+}
+
+/**
+ * What the tab operations below read and change: the tabs, and what the two panes
+ * show. `currentDoc` is the primary pane (`''` when it is empty or holds a draft);
+ * `activeDoc` is whichever pane has the page's attention.
+ */
+export interface TabWorkspace {
+  tabs: DocTab[]
+  activeTabId: string | null
+  currentDoc: string
+  secondaryDoc: string | null
+  activeDoc: string
+  splitView: SplitView
+  splitOrientation: SplitOrientation
+}
+
+/** What the panes show of a split: the document beside the primary one, or none. */
+export interface PaneSplit {
+  secondaryDoc: string
+  splitOrientation: SplitOrientation
+}
+
+export const splitOfPanes = (ws: Pick<TabWorkspace, 'splitView' | 'secondaryDoc' | 'splitOrientation'>): PaneSplit | null => (
+  ws.splitView === 'editor' && ws.secondaryDoc
+    ? { secondaryDoc: ws.secondaryDoc, splitOrientation: ws.splitOrientation }
+    : null
+)
+
+/** A tab's split, or null — never its own document against itself. */
+export const splitOfTab = (tab: DocTab): PaneSplit | null => (
+  tab.secondaryDoc && tab.secondaryDoc !== tab.docPath
+    ? { secondaryDoc: tab.secondaryDoc, splitOrientation: tab.splitOrientation || 'columns' }
+    : null
+)
+
+/**
+ * Show a tab: its document in the primary pane, and its split, or none. A draft has
+ * no document, so the primary pane empties and DraftTabPane takes over.
+ */
+export const selectTabIn = (ws: TabWorkspace, tabId: string): TabWorkspace => {
+  const tab = ws.tabs.find(item => item.id === tabId)
+  if (!tab) return ws
+  const docPath = tab.docPath || ''
+  const split = splitOfTab(tab)
+  return {
+    ...ws,
+    activeTabId: tab.id,
+    currentDoc: docPath,
+    activeDoc: docPath,
+    secondaryDoc: split?.secondaryDoc ?? null,
+    splitView: split ? 'editor' : null,
+    splitOrientation: split?.splitOrientation ?? ws.splitOrientation,
+  }
+}
+
+/**
+ * Close one tab. Closing the tab being shown shows the next one along — the
+ * right-hand neighbour, else the left, as Safari does — with its split; closing the
+ * last one empties the window.
+ */
+export const closeTabIn = (ws: TabWorkspace, tabId: string): TabWorkspace => {
+  const index = ws.tabs.findIndex(item => item.id === tabId)
+  if (index === -1) return ws
+  const tab = ws.tabs[index]
+  const remaining = ws.tabs.filter(item => item.id !== tabId)
+  const next: TabWorkspace = { ...ws, tabs: remaining }
+
+  const shown = tab.id === ws.activeTabId || (tab.docPath !== null && tab.docPath === ws.currentDoc)
+  if (!shown) return next
+
+  const along = [...remaining.slice(index), ...remaining.slice(0, index).reverse()]
+  const fallback = along.find(item => item.docPath) || along[0]
+  if (fallback) return selectTabIn(next, fallback.id)
+
+  return { ...next, activeTabId: null, currentDoc: '', activeDoc: '', secondaryDoc: null, splitView: null }
+}
+
+/**
+ * Write what the panes show into the tab that is showing it, so selecting the tab
+ * again brings its split back. Returns `tabs` unchanged when the tab already says so.
+ */
+export const recordSplitIn = (tabs: DocTab[], tabId: string | null, split: PaneSplit | null): DocTab[] => {
+  const tab = tabs.find(item => item.id === tabId)
+  if (!tab) return tabs
+  const secondaryDoc = split?.secondaryDoc ?? null
+  const splitOrientation = split?.splitOrientation ?? tab.splitOrientation
+  if (tab.secondaryDoc === secondaryDoc && tab.splitOrientation === splitOrientation) return tabs
+  return tabs.map(item => (
+    item.id === tabId
+      ? { ...item, secondaryDoc, ...(splitOrientation ? { splitOrientation } : {}) }
+      : item
+  ))
+}
+
+/**
+ * Put the tabs in the order the shell shows them. Tabs `ids` does not name keep their
+ * order after the ones it does; ids of tabs that are gone are ignored.
+ */
+export const orderTabsIn = (tabs: DocTab[], ids: string[]): DocTab[] => {
+  const named = ids.map(id => tabs.find(tab => tab.id === id)).filter((tab): tab is DocTab => Boolean(tab))
+  const ordered = [...new Set(named), ...tabs.filter(tab => !ids.includes(tab.id))]
+  return ordered.every((tab, index) => tab === tabs[index]) ? tabs : ordered
 }
 
 /**

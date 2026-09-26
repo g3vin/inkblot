@@ -2,7 +2,7 @@
  * Viewport math: screen/world round trips, zooming about the cursor, zoom-to-fit, and
  * rectangle hit tests.
  */
-import { screenToWorld, worldToScreen, zoomAt, fitViewport, nodesBounds, panBy, clampZoom, rectFromPoints, rectsIntersect } from '../../src/lib/canvasGeometry.js'
+import { screenToWorld, worldToScreen, zoomAt, fitViewport, nodesBounds, panBy, clampZoom, rectFromPoints, rectsIntersect, cullRectFor, cullRectHolds } from '../../src/lib/canvasGeometry.js'
 import { ok } from './assert.mjs'
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps
 
@@ -43,3 +43,13 @@ ok('zoom-to-fit on empty canvas resets to origin', fitEmpty.x === 0 && fitEmpty.
 const r = rectFromPoints({ x: 300, y: 200 }, { x: 100, y: 50 })
 ok('marquee normalizes a backwards drag', r.x === 100 && r.y === 50 && r.width === 200 && r.height === 150)
 ok('marquee hit-test', rectsIntersect(r, { x: 250, y: 180, width: 20, height: 20 }) && !rectsIntersect(r, { x: 900, y: 900, width: 5, height: 5 }))
+
+// culling: a screen of margin all round, kept until a pan has used most of it
+const view = { x: 100, y: 50, zoom: 2 }
+const cull = cullRectFor(view, 800, 600)
+ok('cull rect is the view plus a screen each side', cull.x === -300 && cull.y === -250 && cull.width === 1200 && cull.height === 900)
+ok('cull rect holds for the view it was made for', cullRectHolds(cull, view, 800, 600))
+ok('cull rect holds through a small pan', cullRectHolds(cull, { ...view, x: view.x + 150 }, 800, 600))
+ok('cull rect is redone once a pan nears its edge', !cullRectHolds(cull, { ...view, x: view.x + 350 }, 800, 600))
+ok('cull rect is redone after a deep zoom in', !cullRectHolds(cull, { x: 200, y: 150, zoom: 4 }, 800, 600))
+ok('no cull rect never holds', !cullRectHolds(null, view, 800, 600))

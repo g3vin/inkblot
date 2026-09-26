@@ -1,0 +1,338 @@
+import Foundation
+import SwiftUI
+import Testing
+@testable import inkblot_core
+
+/// The Finishing tabs' model: what it draws from what the page publishes, where its
+/// edits go, and the print jobs it reports — against the JSON the page sends.
+@MainActor
+struct FinishingTests {
+    @MainActor private final class Wire {
+        let bridge = ShellBridge()
+        var seq = 0
+        var sent: [String] = []
+
+        init() {
+            bridge.detach()
+            bridge.attach { [unowned self] in sent.append($0) }
+        }
+
+        func event(_ type: String, _ payload: String) {
+            bridge.receive(json: #"{"kind":"event","message":{"seq":\#(seq),"event":{"type":"\#(type)","payload":\#(payload)}}}"#)
+            seq += 1
+        }
+
+        /// The commands sent, as their `type` and `payload`.
+        var commands: [(type: String, payload: [String: Any])] {
+            sent.compactMap { raw in
+                guard let object = try? JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any],
+                      let message = object["message"] as? [String: Any],
+                      let command = message["command"] as? [String: Any],
+                      let type = command["type"] as? String
+                else { return nil }
+                return (type, command["payload"] as? [String: Any] ?? [:])
+            }
+        }
+    }
+
+    private func setup(preset: String, width: Double, height: Double, formatId: String? = nil) -> String {
+        let format = formatId.map { #","formatId":"\#($0)""# } ?? ""
+        return #"""
+        {"presetId":"\#(preset)","widthMm":\#(width),"heightMm":\#(height),"orientation":"portrait",
+         "margins":{"topMm":25.4,"bottomMm":25.4,"insideMm":25.4,"outsideMm":25.4,"gutterMm":0},
+         "mirrorMargins":false,"columns":1,"columnGapMm":6.35,
+         "header":{"left":"","center":"","right":""},"footer":{"left":"","center":"{page}","right":""},
+         "headerDistanceMm":12.7,"footerDistanceMm":12.7,"differentFirstPage":false,
+         "pageNumberStart":1,"pageNumberFormat":"arabic","widowOrphanLines":2,"chapterStartsOnRecto":false\#(format)}
+        """#
+    }
+
+    private func state(scope: String = "document", bookSetup: String? = nil, binding: String = "none") -> String {
+        let book = bookSetup.map { #","pageSetup":\#($0)"# } ?? ""
+        return #"""
+        {"enabled":true,"docPath":"Novel/One","ready":true,
+         "setup":\#(setup(preset: "a4", width: 210, height: 297, formatId: "a4")),"setupSource":"document",
+         "hasOwnSetup":true,"formatId":"a4","formatModified":false,"pageCount":12,"currentPage":3,"zoom":1,
+         "scope":"\#(scope)",
+         "book":{"folder":"Novel","title":"The Novel","author":"A. Writer","language":"en-US"\#(book),
+                 "binding":{"binding":"\#(binding)","sheetsPerSignature":4,"sheetPresetId":"letter","sheetFit":"actualSize",
+                            "duplex":"automatic","paperThicknessMm":0.1,"cropMarks":true,"includeGuide":true}},
+         "bookSetupActive":\#(bookSetup != nil),"bookChapters":["Novel/One","Novel/Two"],"suggestedInsideMarginMm":9.525}
+        """#
+    }
+
+    @Test func theDraftIsTheDocumentsSetupUnderTheDocumentScope() {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state(bookSetup: setup(preset: "trade-6x9", width: 152.4, height: 228.6)))
+        #expect(wire.bridge.droppedEventCount == 0)
+        #expect(layout.setup?.presetId == "a4")
+        #expect(layout.editsBook == false)
+        #expect(layout.state?.currentPage == 3)
+    }
+
+    @Test func underABookScopeTheDraftAndTheEditsAreTheBooks() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state(scope: "folder", bookSetup: setup(preset: "trade-6x9", width: 152.4, height: 228.6)))
+        #expect(layout.editsBook)
+        #expect(layout.setup?.presetId == "trade-6x9")
+
+        var draft = try #require(layout.setup)
+        draft.topMm = 30
+        layout.apply(draft)
+        let edit = try #require(wire.commands.last)
+        #expect(edit.type == "setPageSetup")
+        #expect(edit.payload["target"] as? String == "book")
+
+        layout.applyFormat("a5-novel")
+        #expect(wire.commands.last?.type == "applyFormat")
+        #expect(wire.commands.last?.payload["target"] as? String == "book")
+    }
+
+    @Test func aBookWithNoSetupOfItsOwnStartsFromTheDocuments() {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state(scope: "project"))
+        #expect(layout.editsBook)
+        #expect(layout.setup?.presetId == "a4")
+    }
+
+    @Test func anEditIsKeptOnTheModelSoARebuiltTabShowsIt() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var draft = try #require(layout.setup)
+        draft.header.center = "{title}"
+        layout.apply(draft)
+        // Before the page answers, a tab built now reads the edit, not the old state.
+        #expect(layout.setup?.header.center == "{title}")
+        #expect(wire.commands.last?.payload["target"] as? String == "document")
+    }
+
+    @Test func theCatalogArrivesOnce() {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutCatalog", #"""
+        {"presets":[{"id":"a4","label":"A4","group":"ISO A","widthMm":210,"heightMm":297}],
+         "formats":[{"id":"a4","label":"A4","group":"Everyday","summary":"A plain page.","kind":"prose"}],
+         "signatureAdvice":[{"sheets":4,"label":"Standard"}],
+         "tokens":[{"token":"{page}","label":"Page Number"}],
+         "defaultTypography":{"fontFamily":"Palatino, serif","fontSizePt":11,"lineSpacing":"multiple","lineValue":1.2,
+           "firstLineIndentMm":7.62,"paragraphSpacingPt":0,"alignment":"justify","hyphenate":true,"sceneBreak":"* * *",
+           "chapterOpening":"dropCapAndSmallCaps","chapterSinkMm":38.1,"noIndentAfterBreak":true}}
+        """#)
+        #expect(wire.bridge.droppedEventCount == 0)
+        #expect(layout.format("a4")?.summary == "A plain page.")
+        #expect(layout.catalog?.tokens.first?.token == "{page}")
+        #expect(layout.catalog?.defaultTypography.chapterOpening == .dropCapAndSmallCaps)
+    }
+
+    @Test func aJobIsShownWhileItRunsAndAFailureStays() async throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("printJobStatus", #"{"jobId":"j1","kind":"export","format":"pdf","phase":"laying","done":2,"total":14}"#)
+        #expect(layout.job?.phase == .laying)
+        #expect(FinishingActionHeader.isRunning(layout.job!))
+        wire.event("printJobStatus", #"{"jobId":"j1","kind":"export","format":"pdf","phase":"done","path":"/tmp/Book.pdf"}"#)
+        #expect(layout.job?.path == "/tmp/Book.pdf")
+
+        wire.event("printJobStatus", #"{"jobId":"j2","kind":"print","phase":"cancelled"}"#)
+        #expect(layout.job == nil)
+
+        wire.event("printJobStatus", #"{"jobId":"j3","kind":"print","phase":"failed","message":"No printer."}"#)
+        #expect(layout.job?.message == "No printer.")
+        layout.dismissJob()
+        #expect(layout.job == nil)
+        #expect(wire.bridge.droppedEventCount == 0)
+    }
+
+    @Test func theScopeIsTheBooksForBinding() {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state(binding: "saddle"))
+        #expect(layout.bindingEnabled)
+        layout.setScope(.project)
+        #expect(wire.commands.last?.type == "setPrintScope")
+        #expect(wire.commands.last?.payload["scope"] as? String == "project")
+    }
+
+    @Test func aDraftHoldsItsValuesToWhatThePageAccepts() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var draft = try #require(layout.setup)
+        draft.headerDistanceMm = 80   // further in than the 25.4 mm top margin
+        draft.pageNumberStart = 250_000
+        draft.widowOrphanLines = 9
+        let setup = draft.setup
+        #expect(setup.headerDistanceMm == 25.4)
+        #expect(setup.pageNumberStart == 99_999)
+        #expect(setup.widowOrphanLines == 5)
+        #expect(setup.formatId == "a4")
+    }
+
+    @Test func lengthsRoundTripThroughEveryUnit() {
+        for unit in LengthUnit.allCases {
+            #expect(abs(unit.toMm(unit.fromMm(25.4)) - 25.4) < 1e-9)
+        }
+        #expect(LengthUnit.points.fromMm(25.4) == 72)
+    }
+
+    @Test func sectionsRememberBeingFolded() {
+        let layout = PageLayoutModel(bridge: Wire().bridge)
+        let ids = [FinishingSectionID.binding]
+        layout.setExpanded(false, ids)
+        #expect(layout.expansion(FinishingSectionID.binding).wrappedValue == false)
+        layout.setExpanded(true, ids)
+        #expect(layout.expansion(FinishingSectionID.binding).wrappedValue == true)
+    }
+
+    @Test func typographyAndTheTitlePageRoundTripThroughTheDraft() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var draft = try #require(layout.setup)
+        #expect(draft.typography == nil)
+        draft.typography = TypographyDraft(PrintTypography(
+            fontFamily: TypographyDraft.cssFamily("Courier Prime"), fontSizePt: 200, lineSpacing: .double, lineValue: 2,
+            firstLineIndentMm: -3, paragraphSpacingPt: 0, alignment: .left, hyphenate: false,
+            sceneBreak: "#", chapterOpening: .plain, chapterSinkMm: 63.5, noIndentAfterBreak: false))
+        draft.titlePage = TitlePageDraft(style: .manuscript)
+        layout.apply(draft)
+
+        let sent = try #require(wire.commands.last?.payload["setup"] as? [String: Any])
+        let type = try #require(sent["typography"] as? [String: Any])
+        #expect(type["fontFamily"] as? String == #""Courier Prime", Courier, monospace"#)
+        #expect(type["fontSizePt"] as? Double == 72)
+        #expect(type["firstLineIndentMm"] as? Double == 0)
+        #expect(type["lineSpacing"] as? String == "double")
+        let title = try #require(sent["titlePage"] as? [String: Any])
+        #expect(title["style"] as? String == "manuscript")
+        #expect(title["showContact"] as? Bool == true)
+        #expect(title["showWordCount"] as? Bool == true)
+        #expect(layout.setup?.typography?.primaryFamily == "Courier Prime")
+        #expect(TypographyDraft.cssFamily("Palatino") == #""Palatino", Georgia, serif"#)
+    }
+
+    @Test func aBookTitlePageLeavesOutTheContactBlock() {
+        let page = TitlePageDraft(style: .book)
+        #expect(!page.showContact && !page.showWordCount)
+        #expect(TitlePageDraft(style: .screenplay).showContact)
+    }
+
+    @Test func theAuthorIsSentAsAWhole() {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        layout.setAuthor(AuthorProfile(byline: "A. Writer", legalName: "Ann Writer", address: "1 Road\nTown", email: "a@b.c", phone: "", agent: ""))
+        #expect(wire.commands.last?.type == "setAuthorProfile")
+        let profile = wire.commands.last?.payload["profile"] as? [String: Any]
+        #expect(profile?["legalName"] as? String == "Ann Writer")
+    }
+
+    @Test func aWordCountIsRoundedAsAManuscriptGivesIt() {
+        #expect(RunningPreviewContext.describeWordCount(44) == "about 40 words")
+        #expect(RunningPreviewContext.describeWordCount(4_449) == "about \(4_400.formatted()) words")
+        #expect(RunningPreviewContext.describeWordCount(88_600) == "about \(89_000.formatted()) words")
+    }
+
+    @Test func aChapterLeftOutIsSentWithEveryOtherBookSetting() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var book = try #require(layout.book)
+        #expect(book.excluded.isEmpty && book.numbering == .none && book.numberPrefix == "Chapter")
+        book.include("Novel/Two", false)
+        book.include("Novel/Two", false)
+        book.numbering = .words
+        book.dedication = "For M."
+        layout.apply(book)
+
+        let settings = try #require(wire.commands.last?.payload["settings"] as? [String: Any])
+        #expect(settings["excluded"] as? [String] == ["Novel/Two"])
+        #expect((settings["chapterNumbering"] as? [String: Any])?["style"] as? String == "words")
+        #expect((settings["frontMatter"] as? [String: Any])?["dedication"] as? String == "For M.")
+        // Sent even when empty, so the page never reads a missing field as a reset.
+        #expect((settings["backMatter"] as? [String: Any])?["alsoBy"] as? String == "")
+
+        book.include("Novel/Two", true)
+        #expect(book.excluded.isEmpty)
+    }
+
+    @Test func aChapterHeadingIsSpelledAsThePageSpellsIt() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var book = try #require(layout.book)
+        book.numbering = .words
+        #expect(BookPanelView.label(42, book) == "Chapter Forty-Two")
+        #expect(BookPanelView.label(105, book) == "Chapter One Hundred Five")
+        book.numbering = .roman
+        book.numberPrefix = ""
+        #expect(BookPanelView.label(4, book) == "IV")
+    }
+
+    @Test func aCoverIsPickedByPathAndRemovedWithNone() {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        layout.setCover(URL(fileURLWithPath: "/Users/a/cover.jpg"))
+        #expect(wire.commands.last?.type == "setBookCover")
+        #expect(wire.commands.last?.payload["path"] as? String == "/Users/a/cover.jpg")
+        layout.setCover(nil)
+        #expect(wire.commands.last?.payload["path"] == nil)
+    }
+
+    @Test func printOptionsGoWithEveryPrintAndOnlyWithAPDF() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        #expect(layout.printOptions.summary == nil)
+        layout.printOptions.range = .currentChapter
+        layout.printOptions.pages = " 3-7 "
+        layout.printOptions.watermark = "Copy for {recipient}"
+        layout.printOptions.recipients = "Sam\n\n  Alex \n"
+        #expect(layout.printOptions.summary == "Printing current chapter, pages 3-7, watermarked, 2 copies")
+
+        layout.print(.document)
+        let printed = try #require(wire.commands.last?.payload["options"] as? [String: Any])
+        #expect(printed["range"] as? String == "currentChapter")
+        #expect(printed["pages"] as? String == "3-7")
+        #expect(printed["recipients"] as? [String] == ["Sam", "Alex"])
+
+        layout.export(.pdf, scope: .folder)
+        #expect((wire.commands.last?.payload["options"] as? [String: Any])?["watermark"] as? String == "Copy for {recipient}")
+        layout.export(.docx, scope: .folder)
+        #expect(wire.commands.last?.payload["format"] as? String == "docx")
+        #expect((wire.commands.last?.payload["options"] as? [String: Any])?["watermark"] as? String == "")
+
+        layout.exportAgain()
+        #expect(wire.commands.last?.type == "exportAgain")
+    }
+
+    @Test func recipientsWithoutAWatermarkAreNotSent() {
+        var options = PrintOptionsDraft()
+        options.recipients = "Sam"
+        #expect(options.options.recipients.isEmpty)
+        #expect(options.isDefault)
+    }
+
+    @Test func thePublishingTargetGoesWithTheBookAndAFixIsAnEdit() throws {
+        let wire = Wire()
+        let layout = PageLayoutModel(bridge: wire.bridge)
+        wire.event("pageLayoutState", state())
+        var book = try #require(layout.book)
+        #expect(book.service == PublishingService.none && book.paper == .cream)
+        book.service = .kdp
+        book.paper = .white
+        layout.apply(book)
+        let publishing = (wire.commands.last?.payload["settings"] as? [String: Any])?["publishing"] as? [String: Any]
+        #expect(publishing?["service"] as? String == "kdp")
+        #expect(publishing?["paper"] as? String == "white")
+
+        let fixed = try #require(layout.setup).setup
+        layout.fix(PreflightIssue(id: "mirror", severity: .warning, message: "", fixLabel: "Use Facing Pages", fixedSetup: fixed))
+        #expect(wire.commands.last?.type == "setPageSetup")
+        layout.measure()
+        #expect(wire.commands.last?.type == "measureBook")
+        #expect(PublishPanelView.duration(286) == "4 hr 46 min")
+    }
+}

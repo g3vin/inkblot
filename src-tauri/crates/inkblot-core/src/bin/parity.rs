@@ -27,7 +27,7 @@ use inkblot_core::types::{
 };
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
-    map::model as map_model, story_structure as story, version_history as history,
+    map::diff as map_diff, map::model as map_model, story_structure as story, version_history as history,
 };
 
 /// `String(x || '')`, the coercion the JS entry points open with.
@@ -490,7 +490,30 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         "isMapPayload" => json!(map_model::is_map_payload(args.first())),
         "readMapViewport" => json!(map_model::read_map_viewport(&args[0])),
         "countMapWords" => json!(map_model::count_map_words(&args[0])),
+        "mapText" => json!(map_model::map_text(&args[0])),
         "mapDocRefs" => json!(map_model::map_doc_refs(&args[0])),
+
+        /* ---- map::diff ---- */
+        "diffMaps" => json!(map_diff::diff_maps(&args[0], &args[1])),
+        "mapDiffIsEmpty" => json!(map_diff::map_diff_is_empty(&map_diff::diff_maps(
+            &args[0], &args[1]
+        ))),
+        "describeMapDiff" => json!(map_diff::describe_map_diff(&map_diff::diff_maps(
+            &args[0], &args[1]
+        ))),
+        "mergeMaps" => {
+            let diff = map_diff::diff_maps(&args[0], &args[1]);
+            json!(map_diff::merge_maps(
+                &args[0],
+                &args[1],
+                &diff,
+                &named_choices(&args[2])
+            ))
+        }
+        "summarizeMapChange" => json!(map_diff::summarize_map_change(
+            (!args[0].is_null()).then_some(&args[0]),
+            &args[1]
+        )),
         "collectMapMatches" => {
             let matcher = Matcher::new(args[1].as_str().unwrap_or_default(), matcher_options(&args[2]));
             json!(search::collect_map_matches(

@@ -13,8 +13,14 @@ import Observation
 @Observable
 final class SidebarModel {
     enum Tab: String, CaseIterable, Identifiable {
-        case clipboard, workbench, notes, references, history, page
+        case clipboard, workbench, notes, references, history, page, book, publish, stats
+        /// The map's inspector. Not one of the layouts' panels: it is in the selector
+        /// bar, first, only while a map is showing (`hasMap`).
+        case map
         var id: String { rawValue }
+
+        /// The panels a layout can hold — every one but the map's.
+        static var arrangeable: [Tab] { allCases.filter { $0 != .map } }
 
         var title: String {
             switch self {
@@ -24,6 +30,10 @@ final class SidebarModel {
             case .references: "References"
             case .history: "History"
             case .page: "Page"
+            case .book: "Book"
+            case .publish: "Publish"
+            case .stats: "Stats"
+            case .map: "Map"
             }
         }
 
@@ -36,6 +46,10 @@ final class SidebarModel {
             case .references: "books.vertical"
             case .history: "clock"
             case .page: "doc.richtext"
+            case .book: "book.closed"
+            case .publish: "square.and.arrow.up"
+            case .stats: "chart.bar.xaxis"
+            case .map: "map"
             }
         }
     }
@@ -56,16 +70,21 @@ final class SidebarModel {
     /// Customize Layout… is showing.
     var isCustomizingLayout = false
 
-    /// The selector bar's tabs.
-    var tabs: [Tab] { layouts[layout] }
+    /// The selector bar's tabs: the layout's, after the map's while a map is showing.
+    var tabs: [Tab] { hasMap ? [.map] + layouts[layout] : layouts[layout] }
 
     /// The panel showing. Setting one the layout does not hold switches to the layout
     /// that does; if neither does it shows anyway, with nothing lit in the bar — File ▸
     /// Page Setup… still opens Page after Page is taken out of both.
     var tab: Tab {
-        get { chosen[layout] ?? tabs.first ?? .workbench }
+        get {
+            if showingMap && hasMap { return .map }
+            return chosen[layout] ?? layouts[layout].first ?? .workbench
+        }
         set {
-            if !tabs.contains(newValue), layouts[layout.other].contains(newValue) {
+            showingMap = newValue == .map
+            guard newValue != .map else { return }
+            if !layouts[layout].contains(newValue), layouts[layout.other].contains(newValue) {
                 layout = layout.other
             }
             chosen[layout] = newValue
@@ -79,8 +98,30 @@ final class SidebarModel {
 
     func showLayout(_ next: InspectorLayout) {
         layout = next
-        if !tabs.contains(tab) { chosen[layout] = tabs.first }
+        showingMap = false
+        if !layouts[layout].contains(chosen[layout] ?? .map) { chosen[layout] = layouts[layout].first }
         saveSelection()
+    }
+
+    /* ---------------- the map's panel ---------------- */
+
+    /// A map is showing — the active document, or beside it in a split, where its panel
+    /// stays in the bar while the other document is worked in.
+    var hasMap: Bool { bridge.mapChrome != nil }
+    /// The map's panel is the one showing, while there is a map. Chosen for the writer
+    /// when a map becomes active, as Xcode's inspector follows what is selected; they
+    /// can move to another panel, and are left there until the next map.
+    private var showingMap = false
+    /// The last `revealPanel` each map asked with, so a republish shows nothing.
+    @ObservationIgnored private var mapReveals: [String: UInt32] = [:]
+
+    private func mapChanged(_ state: MapChromeState?) {
+        guard let state else { return }
+        let wasActive = mapReveals[state.surfaceId] != nil
+        let asked = state.revealPanel != (mapReveals[state.surfaceId] ?? 0)
+        mapReveals[state.surfaceId] = state.revealPanel
+        if !wasActive || asked { showingMap = true }
+        if asked { isPresented = true }
     }
 
     /// The next tab along the bar (`step` +1) or the previous one (-1). Stops at the
@@ -139,6 +180,10 @@ final class SidebarModel {
     private(set) var historyDocPath: String?
     private(set) var history: VersionHistory?
     private(set) var historyRows: [VersionRow] = []
+    /// Each burst's word change, by its newest and oldest version. A burst's delta is a
+    /// diff of two whole versions, and the list asks for every burst each time it draws —
+    /// which, uncached, was the pause on opening History. Emptied with each reload.
+    @ObservationIgnored private var spanDeltas: [String: WordDelta] = [:]
     /// Each document's archive, as the page last sent it (`archiveChanged`). The page owns
     /// the file it is kept in, as it owns the document.
     private(set) var archives: [String: [ArchivedItem]] = [:]
@@ -204,6 +249,11 @@ final class SidebarModel {
         case .activeEditorChanged(let changed):
             if changed.docPath != historyDocPath { loadHistory(for: changed.docPath) }
             if scope == .document { runSearch() }
+        case .mapChromeChanged(let changed):
+            // A map that stopped being active starts fresh next time: its panel comes
+            // back when it does.
+            if changed.state == nil { mapReveals = [:] }
+            mapChanged(changed.state)
         case .showSidebarTab(let request):
             isPresented = true
             tab = Tab(request.tab)
@@ -228,18 +278,23 @@ final class SidebarModel {
     func reloadHistory() {
         guard let projectName, let docPath = historyDocPath else {
             history = nil
+            spanDeltas = [:]
             historyRows = []
             return
         }
         let loaded = VersionHistory.load(core: core.core, projectName: projectName, docName: docPath)
         history = loaded
+        spanDeltas = [:]
         historyRows = (try? loaded.rowsJson()).flatMap { try? JSONDecoder().decode([VersionRow].self, from: Data($0.utf8)) } ?? []
     }
 
     func spanDelta(newest: VersionRow, oldest: VersionRow) -> WordDelta {
+        let key = "\(newest.id)|\(oldest.id)"
+        if let cached = spanDeltas[key] { return cached }
         guard let json = try? history?.spanDeltaJson(newestId: newest.id, oldestId: oldest.id),
               let delta = try? JSONDecoder().decode(WordDelta.self, from: Data(json.utf8))
         else { return WordDelta(added: 0, removed: 0) }
+        spanDeltas[key] = delta
         return delta
     }
 

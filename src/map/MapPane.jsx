@@ -23,6 +23,7 @@ export default function MapPane({
   showHeader = false,
   onClose,
   isActive = true,
+  chromeWhileInactive = false,
 }) {
   const [loaded, setLoaded] = useState(null)
 
@@ -66,6 +67,7 @@ export default function MapPane({
           onActivate={onActivate}
           onOpenDoc={onOpenDoc}
           isActive={isActive}
+          chromeWhileInactive={chromeWhileInactive}
         />
       ) : (
         <div className="map-surface is-loading" />

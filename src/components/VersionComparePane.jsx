@@ -7,7 +7,9 @@
  * Either side can be any version checkpoint or the current document. Text
  * documents diff paragraph-by-paragraph (unchanged runs collapse like a git hunk
  * header; changed runs show word-level marks). Canvases diff card-by-card: added
- * / removed / edited / moved cards and arrows.
+ * / removed / edited / moved cards and arrows. Maps diff item-by-item (places,
+ * routes, regions, labels, travelers, …) and section-by-section for the settings
+ * that belong to the whole map (style, scale, timeline, …) — see lib/map/mapDiff.js.
  *
  * Merge mode puts a Left/Right (or Both, for text) choice on every difference and
  * builds a new state from the answers — applied straight to the open document
@@ -24,6 +26,7 @@ import { generateJSON } from '@tiptap/core'
 import {
   appendVersionEntry,
   buildCanvasVersionEntry,
+  buildMapVersionEntry,
   buildTextVersionEntry,
   createDocumentFromVersion,
   getVersions,
@@ -31,7 +34,18 @@ import {
 } from '../lib/FileSystem'
 import { getDocPreviewExtensions } from '../lib/editorExtensions'
 import { readDocPageSetup, setContentKeepingPageSetup, withPageSetup } from '../print/DocPageSetup'
-import { isCanvasDoc } from '../lib/docKind'
+import { getDocDisplayName, isCanvasDoc, isMapDoc } from '../lib/docKind'
+import { countMapWords, isMapPayload, normalizeMap } from '../lib/map/mapModel'
+import {
+  MAP_COLLECTIONS,
+  MAP_SETTINGS,
+  briefValue,
+  changedKeys,
+  diffMaps,
+  mapChangeKey,
+  mapItemTitle,
+  mergeMaps,
+} from '../lib/map/mapDiff'
 import {
   canvasNodeText,
   countCanvasWords,
@@ -46,6 +60,7 @@ import {
   wordDelta,
 } from '../lib/versionHistory'
 import { dispatchCanvasRestore } from '../canvas/canvasEvents'
+import { dispatchMapRestore } from '../map/mapEvents'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
 import SFIcon from './SFIcon'
 import './VersionComparePane.css'
@@ -61,6 +76,31 @@ const MAX_RATIO = 0.8
 const COLUMN_PADDING = 16
 
 const sideLabel = (entry) => entry.name || formatFullTimestamp(entry.timestamp)
+
+/** A map as the diff reads it: normalized, so a raw file and its saved form agree. */
+const readMap = (raw) => (isMapPayload(raw) ? normalizeMap(raw) : null)
+
+// What a map item's fields are called in a compare row; anything else shows its key.
+const MAP_FIELD_LABELS = {
+  at: 'position',
+  body: 'on body',
+  nodes: 'stops',
+  rings: 'outline',
+  doc: 'linked document',
+  legs: 'journey',
+  startPin: 'starts at',
+  startDay: 'start day',
+  startOffset: 'along route',
+  kmPerUnit: 'km per unit',
+  displayUnit: 'unit',
+  kmh: 'speed (km/h)',
+  hoursPerDay: 'hours a day',
+  minZoom: 'shown from zoom',
+  maxZoom: 'hidden past zoom',
+}
+
+const mapCollection = (key) => MAP_COLLECTIONS.find((entry) => entry.key === key)
+const mapSettingLabel = (key) => MAP_SETTINGS.find((entry) => entry.key === key)?.label || key
 
 /** Word-diff tokens rendered for one side: equal + this side's own changes. */
 function DiffText({ ops, side }) {
@@ -87,8 +127,8 @@ function DiffText({ ops, side }) {
  *
  * For text, both sides can be kept at once ('both'); the toggles behave as
  * checkboxes and the last one standing cannot be switched off — a difference has
- * to resolve to something. For canvas cards there is no "both" (a card is either
- * the old one or the new one), so they behave as a radio pair.
+ * to resolve to something. For canvas cards and map items there is no "both" (a
+ * card is either the old one or the new one), so they behave as a radio pair.
  */
 function ChoicePicker({ value, onChange, allowBoth = false }) {
   const leftOn = value === 'left' || value === 'both'
@@ -144,6 +184,9 @@ export default function VersionComparePane({
   setVersions,
 }) {
   const isCanvas = isCanvasDoc(docName)
+  const isMap = isMapDoc(docName)
+  // A canvas or a map: listed difference by difference, with no editor behind it.
+  const isStructured = isCanvas || isMap
   const toolbarSlot = useContext(CompareToolbarSlotContext)
 
   const [versions, setLocalVersions] = useState([])
@@ -153,6 +196,7 @@ export default function VersionComparePane({
   const [choices, setChoices] = useState({})
   const [expandedEqual, setExpandedEqual] = useState(() => new Set())
   const [currentCanvas, setCurrentCanvas] = useState(null)
+  const [currentMap, setCurrentMap] = useState(null)
   const [busy, setBusy] = useState(false)
   const [ratio, setRatio] = useState(0.5)
   const [resizing, setResizing] = useState(false)
@@ -196,18 +240,20 @@ export default function VersionComparePane({
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [onClose])
 
-  // The "current" side of a canvas is whatever autosave last wrote (≤1s stale).
+  // The "current" side of a canvas or map is whatever autosave last wrote (≤1s stale).
   useEffect(() => {
-    if (!isCanvas) return undefined
+    if (!isStructured) return undefined
     let cancelled = false
     ;(async () => {
       const raw = await loadDocument(projectName, docName)
-      if (!cancelled) setCurrentCanvas(raw)
+      if (cancelled) return
+      if (isMap) setCurrentMap(readMap(raw))
+      else setCurrentCanvas(raw)
     })()
     return () => {
       cancelled = true
     }
-  }, [isCanvas, projectName, docName])
+  }, [isMap, isStructured, projectName, docName])
 
   // A new pair of sides is a new comparison: stale choices must not apply.
   useEffect(() => {
@@ -221,7 +267,24 @@ export default function VersionComparePane({
     return map
   }, [versions])
 
+  // Normalized once per list, not per render: normalizing gives an item without an id
+  // a fresh one, and a fresh id every render would make every item look new.
+  const mapsById = useMemo(() => {
+    const out = new Map()
+    if (!isMap) return out
+    for (const entry of versions || []) {
+      if (entry.map) out.set(String(entry.id), readMap(entry.map))
+    }
+    return out
+  }, [isMap, versions])
+
   const resolveSide = useCallback((id) => {
+    if (isMap) {
+      if (id === CURRENT) return { label: 'Current map', map: currentMap }
+      const entry = byId.get(id)
+      if (!entry) return { label: '—', map: null }
+      return { label: sideLabel(entry), timestamp: entry.timestamp, map: mapsById.get(id) || null }
+    }
     if (id === CURRENT) {
       return isCanvas
         ? { label: 'Current canvas', canvas: currentCanvas }
@@ -235,7 +298,7 @@ export default function VersionComparePane({
       html: entry.contentHtml || '',
       canvas: entry.canvas || null,
     }
-  }, [byId, currentCanvas, editor, isCanvas])
+  }, [byId, currentCanvas, currentMap, editor, isCanvas, isMap, mapsById])
 
   const left = resolveSide(leftId)
   const right = resolveSide(rightId)
@@ -243,8 +306,8 @@ export default function VersionComparePane({
   /* ---------------- text diff ---------------- */
 
   const chunks = useMemo(
-    () => (isCanvas ? null : diffHtmlDocuments(left.html, right.html)),
-    [isCanvas, left.html, right.html]
+    () => (isStructured ? null : diffHtmlDocuments(left.html, right.html)),
+    [isStructured, left.html, right.html]
   )
 
   const chunkOps = useMemo(() => {
@@ -259,9 +322,9 @@ export default function VersionComparePane({
   }, [chunks])
 
   const textStats = useMemo(() => {
-    if (isCanvas) return null
+    if (isStructured) return null
     return wordDelta(htmlToText(left.html), htmlToText(right.html))
-  }, [isCanvas, left.html, right.html])
+  }, [isStructured, left.html, right.html])
 
   /* ---------------- canvas diff ---------------- */
 
@@ -281,6 +344,25 @@ export default function VersionComparePane({
       ...canvasDiff.edgesRemoved.map((edge) => ({ key: `edgeRemoved:${edge.id}`, kind: 'Removed arrow', left: edge, right: null, isEdge: true })),
     ]
   }, [canvasDiff])
+
+  /* ---------------- map diff ---------------- */
+
+  const mapDiff = useMemo(() => {
+    if (!isMap || !left.map || !right.map) return null
+    return diffMaps(left.map, right.map)
+  }, [isMap, left.map, right.map])
+
+  const mapChanges = useMemo(() => {
+    if (!mapDiff) return []
+    const noun = (collection) => mapCollection(collection)?.one || 'item'
+    return [
+      ...mapDiff.added.map((change) => ({ key: mapChangeKey('added', change), kind: `Added ${noun(change.collection)}`, collection: change.collection, left: null, right: change.item })),
+      ...mapDiff.removed.map((change) => ({ key: mapChangeKey('removed', change), kind: `Removed ${noun(change.collection)}`, collection: change.collection, left: change.item, right: null })),
+      ...mapDiff.edited.map((change) => ({ key: mapChangeKey('edited', change), kind: `Edited ${noun(change.collection)}`, collection: change.collection, left: change.before, right: change.after })),
+      ...mapDiff.moved.map((change) => ({ key: mapChangeKey('moved', change), kind: `Moved ${noun(change.collection)}`, collection: change.collection, left: change.before, right: change.after })),
+      ...mapDiff.settings.map((change) => ({ key: mapChangeKey('setting', change), kind: mapSettingLabel(change.section), section: change.section, left: change.before, right: change.after })),
+    ]
+  }, [mapDiff])
 
   /* ---------------- merge actions ---------------- */
 
@@ -338,11 +420,38 @@ export default function VersionComparePane({
     }
   }, [canvasDiff, choices, docName, left.canvas, onClose, projectName, refreshVersions, right.canvas])
 
+  const applyMapMerge = useCallback(async () => {
+    if (!mapDiff) return
+    setBusy(true)
+    try {
+      const merged = normalizeMap(mergeMaps(left.map, right.map, mapDiff, choices))
+
+      const current = await loadDocument(projectName, docName)
+      if (current) {
+        await appendVersionEntry(projectName, docName, buildMapVersionEntry({ map: current, auto: true }))
+      }
+      dispatchMapRestore(docName, merged)
+      await appendVersionEntry(projectName, docName, buildMapVersionEntry({
+        map: merged,
+        name: mergedName,
+        auto: false,
+      }))
+      await refreshVersions()
+      onClose?.()
+    } finally {
+      setBusy(false)
+    }
+  }, [choices, docName, left.map, mapDiff, onClose, projectName, refreshVersions, right.map])
+
   const saveMergeAsCopy = useCallback(async () => {
     setBusy(true)
     try {
       let newPath = null
-      if (isCanvas) {
+      if (isMap) {
+        if (!mapDiff) return
+        const merged = normalizeMap(mergeMaps(left.map, right.map, mapDiff, choices))
+        newPath = await createDocumentFromVersion(projectName, docName, { map: merged }, 'merged')
+      } else if (isCanvas) {
         if (!canvasDiff) return
         const merged = mergeCanvases(left.canvas, right.canvas, canvasDiff, choices)
         newPath = await createDocumentFromVersion(projectName, docName, { canvas: merged }, 'merged')
@@ -365,7 +474,7 @@ export default function VersionComparePane({
     } finally {
       setBusy(false)
     }
-  }, [canvasDiff, chunks, choices, docName, editor, isCanvas, left.canvas, onClose, onOpenDocInTab, projectName, refreshFiles, right.canvas])
+  }, [canvasDiff, chunks, choices, docName, editor, isCanvas, isMap, left.canvas, left.map, mapDiff, onClose, onOpenDocInTab, projectName, refreshFiles, right.canvas, right.map])
 
   /* ---------------- divider ---------------- */
 
@@ -404,27 +513,32 @@ export default function VersionComparePane({
     setRightId(leftId)
   }
 
-  const changedCount = isCanvas
-    ? canvasItems.length
-    : (chunks || []).filter((chunk) => chunk.type === 'changed').length
+  const changedCount = isMap
+    ? mapChanges.length
+    : isCanvas
+      ? canvasItems.length
+      : (chunks || []).filter((chunk) => chunk.type === 'changed').length
 
-  const identical = changedCount === 0 && Boolean(isCanvas ? canvasDiff : chunks)
+  const identical = changedCount === 0 && Boolean(isMap ? mapDiff : isCanvas ? canvasDiff : chunks)
 
-  // Canvas only lists differences, so an identical pair leaves the body empty. Text
-  // still shows its unchanged paragraphs side by side, so it keeps its columns.
-  const hasBodyContent = isCanvas ? canvasItems.length > 0 : (chunks || []).length > 0
+  // A canvas or map only lists differences, so an identical pair leaves the body empty.
+  // Text still shows its unchanged paragraphs side by side, so it keeps its columns.
+  const hasBodyContent = isStructured ? changedCount > 0 : (chunks || []).length > 0
 
-  const statsLine = isCanvas
+  const differences = `${changedCount} difference${changedCount === 1 ? '' : 's'}`
+  const statsLine = isMap
+    ? (mapDiff ? `${differences} · ${countMapWords(left.map)} → ${countMapWords(right.map)} words` : 'Loading…')
+    : isCanvas
     ? (canvasDiff
         ? `${changedCount} difference${changedCount === 1 ? '' : 's'} · ${countCanvasWords(left.canvas)} → ${countCanvasWords(right.canvas)} words`
         : 'Loading…')
     : `${changedCount} difference${changedCount === 1 ? '' : 's'} · +${textStats.added} −${textStats.removed} words · ${textWords(htmlToText(left.html)).length} → ${textWords(htmlToText(right.html)).length}`
 
-  const canApply = isCanvas ? Boolean(canvasDiff) : Boolean(editor && chunks)
+  const canApply = isMap ? Boolean(mapDiff) : isCanvas ? Boolean(canvasDiff) : Boolean(editor && chunks)
 
   const sideOptions = (
     <>
-      <option value={CURRENT}>{isCanvas ? 'Current canvas' : 'Current document'}</option>
+      <option value={CURRENT}>{isMap ? 'Current map' : isCanvas ? 'Current canvas' : 'Current document'}</option>
       {(versions || []).map((entry) => (
         <option key={entry.id} value={String(entry.id)}>
           {entry.name ? `★ ${entry.name}` : formatFullTimestamp(entry.timestamp)}
@@ -493,7 +607,7 @@ export default function VersionComparePane({
                 type="button"
                 className="vcp-apply"
                 disabled={busy || !canApply}
-                onClick={() => void (isCanvas ? applyCanvasMerge() : applyTextMerge())}
+                onClick={() => void (isMap ? applyMapMerge() : isCanvas ? applyCanvasMerge() : applyTextMerge())}
                 title="Replace the open document with the merged result (a backup version is kept)"
               >
                 Apply merge
@@ -623,6 +737,71 @@ export default function VersionComparePane({
     </div>
   )
 
+  /* ---------------- body: map ---------------- */
+
+  /** The fields that differ, as this side has them. */
+  const mapFields = (keys, value) => (
+    <ul className="vcp-map-fields">
+      {keys.map((key) => (
+        <li key={key}>
+          <span className="vcp-map-field">{MAP_FIELD_LABELS[key] || key}</span> {briefValue(value?.[key])}
+        </li>
+      ))}
+    </ul>
+  )
+
+  const mapCell = (item, side) => {
+    const value = item[side]
+    const other = item[side === 'left' ? 'right' : 'left']
+
+    if (item.section) {
+      if (value === null) return <span className="vcp-empty-hint">(not set)</span>
+      const isRecord = value && typeof value === 'object' && !Array.isArray(value)
+      if (!isRecord) return <span className="vcp-card-text">{briefValue(value)}</span>
+      return mapFields(changedKeys(value, other), value)
+    }
+
+    if (!value) return <span className="vcp-empty-hint">(not present)</span>
+    const title = <span className="vcp-card-text">“{mapItemTitle(item.collection, value, getDocDisplayName)}”</span>
+    if (!other) return title
+    return (
+      <>
+        {title}
+        {mapFields(changedKeys(item.left, item.right), value)}
+      </>
+    )
+  }
+
+  const renderMapBody = () => (
+    <div className="vcp-rows">
+      {mapChanges.map((item) => (
+        <div key={item.key} className="vcp-changed">
+          <div className="vcp-kind">{item.kind}</div>
+          <div className="vcp-row vcp-row-changed">
+            <div className={`vcp-cell vcp-cell-left${item.left === null ? ' vcp-cell-empty' : ''}`}>
+              {mapCell(item, 'left')}
+            </div>
+            <div className={`vcp-cell vcp-cell-right${item.right === null ? ' vcp-cell-empty' : ''}`}>
+              {mapCell(item, 'right')}
+            </div>
+          </div>
+          {mergeMode ? (
+            <ChoicePicker
+              value={choices[item.key] || 'right'}
+              onChange={(choice) => setChoices((current) => ({ ...current, [item.key]: choice }))}
+            />
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderBody = () => {
+    if (isMap) return mapDiff ? renderMapBody() : null
+    if (isCanvas) return canvasDiff ? renderCanvasBody() : null
+    return renderTextBody()
+  }
+
   return (
     <>
       {toolbarSlot ? createPortal(toolbar, toolbarSlot) : null}
@@ -655,7 +834,7 @@ export default function VersionComparePane({
 
         <div ref={bodyRef} className="vcp-body">
           <div className="vcp-scroll">
-            {isCanvas ? (canvasDiff ? renderCanvasBody() : null) : renderTextBody()}
+            {renderBody()}
           </div>
           {/* Nothing to divide when there are no columns below — a bare line down an
               empty pane reads as a rendering fault. */}

@@ -27,7 +27,7 @@
 }
 
 .pss-sheet header,
-.pss-sheet footer {
+.pss-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -35,10 +35,28 @@
   border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
 }
 
-.pss-sheet footer {
+/* Print and Export first, before any setting: the sheet is mostly opened to use them. */
+.pss-actions {
   flex-wrap: wrap;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-  border-bottom: 0;
+}
+
+.pss-actions .pss-segmented {
+  flex-basis: 100%;
+}
+
+.pss-primary {
+  font-weight: 600;
+}
+
+.pss-job {
+  flex-basis: 100%;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.pss-job.is-failed {
+  color: var(--danger, #e5484d);
+  opacity: 1;
 }
 
 .pss-sheet h2 {

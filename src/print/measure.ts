@@ -33,6 +33,12 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import type { LayoutLine, LayoutUnit, ManualBreakKind, Push } from './paginate'
 
 const HEADING = 'heading'
+const SCRIPT = 'scriptElement'
+/** A script's lines that are never the last on a page. */
+const KEEP_WITH_NEXT = new Set(['sceneHeading', 'shot', 'character', 'parenthetical', 'actHeading', 'sceneTitle', 'stageCharacter'])
+
+/** A character's name, less any extension already on it: "MARY (V.O.)" → "MARY". */
+const speakerName = (text: string): string => text.replace(/\s*\(.*\)\s*$/, '').trim().toUpperCase()
 
 export interface MeasureContext {
   view: EditorView
@@ -257,7 +263,43 @@ export const measureUnits = (ctx: MeasureContext): LayoutUnit[] => {
       bottom: lines[lines.length - 1].bottom,
       lines,
       keepWithNext: node.type.name === HEADING,
+      ...(node.type.name === SCRIPT ? scriptRules(node, pos, lines) : {}),
     })
+  }
+
+  /** How a script's line may break (paginate.ts): its element decides. */
+  const scriptRules = (node: PMNode, pos: number, lines: LayoutLine[]): Partial<LayoutUnit> => {
+    const element = node.attrs.element as string
+    if (KEEP_WITH_NEXT.has(element)) return { keepWithNext: true, ...(element === 'parenthetical' ? { split: 'never' as const } : {}) }
+    if (element === 'transition') return { keepWithPrevious: true }
+    if (element !== 'dialogue' && element !== 'stageDialogue') return {}
+    const doc = view.state.doc
+    const start = pos + 1
+    return {
+      split: 'sentences',
+      // A line starts a sentence when what comes before it ends one.
+      canBreakBefore: (index: number) => {
+        const at = lines[index]?.pos
+        if (at == null || at <= start) return false
+        const before = doc.textBetween(Math.max(start, at - 4), at).trimEnd()
+        return /[.?!…]["'”’)\]]*$/.test(before)
+      },
+      continuation: { cue: speakerBefore(pos) },
+    }
+  }
+
+  /** The name over a speech: the character line above it, past any parenthetical. */
+  const speakerBefore = (pos: number): string => {
+    const $pos = view.state.doc.resolve(pos)
+    const parent = $pos.parent
+    for (let i = $pos.index() - 1; i >= 0; i -= 1) {
+      const node = parent.child(i)
+      if (node.type.name !== SCRIPT) break
+      const element = node.attrs.element
+      if (element === 'character' || element === 'stageCharacter') return speakerName(node.textContent)
+      if (element !== 'parenthetical' && element !== 'dialogue' && element !== 'stageDialogue') break
+    }
+    return ''
   }
 
   const measureAtom = (pos: number, dom: HTMLElement) => {

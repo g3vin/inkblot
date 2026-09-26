@@ -10,11 +10,57 @@
    gap masks (.pl-masks) that hide anything a split paragraph or table draws into
    the space between pages. Only the editor takes pointer events. */
 
-/* The desk: Word's light grey, in either theme — the paper is white in both, and a
-   grey a shade darker than the sidebars' keeps the page column distinct from them. */
+/* The desk and the paper follow the app's theme. In light, Word's light grey under
+   white paper — a grey a shade darker than the sidebars' keeps the page column
+   distinct from them. In dark, the mirror of that: a near-black page, like the
+   continuous editor, on a grey lighter than the sidebars, with light ink.
+   What goes to the printer is always ink on white (.print-scope, below). */
 .pane-scroll.is-print-layout,
 .print-layout {
   --pl-desk: #d5d6d9;
+  --pl-paper: #ffffff;
+  --pl-ink: #1b1b1b;
+  --pl-ink-secondary: #555555;
+  --pl-running: #555555;
+  --pl-faint: rgba(0, 0, 0, 0.3);
+  --pl-blank: rgba(0, 0, 0, 0.25);
+  --pl-header: #3a3a3c;
+  --pl-page-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.18),
+    0 6px 14px rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme='dark'] :is(.pane-scroll.is-print-layout, .print-layout:not(.print-offscreen)) {
+  --pl-desk: #27292c;
+  --pl-paper: #0b0b0c;
+  --pl-ink: #e8ebee;
+  --pl-ink-secondary: #aab2ba;
+  --pl-running: #9ea6ae;
+  --pl-faint: rgba(255, 255, 255, 0.3);
+  --pl-blank: rgba(255, 255, 255, 0.25);
+  --pl-header: #c4cad0;
+  --pl-page-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) :is(.pane-scroll.is-print-layout, .print-layout:not(.print-offscreen)) {
+    --pl-desk: #27292c;
+    --pl-paper: #0b0b0c;
+    --pl-ink: #e8ebee;
+    --pl-ink-secondary: #aab2ba;
+    --pl-running: #9ea6ae;
+    --pl-faint: rgba(255, 255, 255, 0.3);
+    --pl-blank: rgba(255, 255, 255, 0.25);
+    --pl-header: #c4cad0;
+    --pl-page-shadow:
+      0 0 0 0.5px rgba(0, 0, 0, 0.6),
+      0 2px 6px rgba(0, 0, 0, 0.5),
+      0 6px 14px rgba(0, 0, 0, 0.35);
+  }
 }
 
 /* The scroller itself is the desk, so it runs the pane's full height: up under the
@@ -24,9 +70,9 @@
   background: var(--pl-desk);
 }
 
-/* A split pane's name is on the desk now, in either theme. */
+/* A split pane's name is on the desk now. */
 .pane-scroll.is-print-layout > .pane-header {
-  color: #3a3a3c;
+  color: var(--pl-header);
 }
 
 /* No spacer after the pages: the stage keeps its own margin below the last one. */
@@ -35,9 +81,6 @@
 }
 
 .print-layout {
-  --pl-paper: #ffffff;
-  --pl-ink: #1b1b1b;
-  --pl-running: #555555;
   --pl-guide: rgba(84, 165, 255, 0.35);
   position: relative;
   min-height: 100%;
@@ -58,6 +101,23 @@
   transform-origin: 0 0;
 }
 
+/* Nothing inside the stage may be composited. WebKit paints a scaled element sharp at
+   any zoom only while it is drawn into its ancestor's layer; once a descendant needs a
+   layer of its own — a box that scrolls, a backdrop filter, a 3D transform — the stage
+   is promoted with it, rasterised at 1×, and the compositor stretches that bitmap: the
+   text stays soft at 200% however long you wait. So each such thing is flattened here. */
+.print-layout .pl-stage .tableWrapper {
+  overflow: visible;
+}
+
+.print-layout .pl-stage .bubble-session-chip {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 60%),
+    color-mix(in srgb, var(--accent-color) 30%, var(--pl-paper));
+}
+
 /* Mid-zoom the sizer is scaled as one composited layer (PrintLayoutView's zoom), so a
    pinch moves a picture of the pages and never lays the text out again until it ends. */
 .pl-sizer.is-zooming {
@@ -75,10 +135,7 @@
 .pl-page {
   position: absolute;
   background: var(--pl-paper);
-  box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.18),
-    0 2px 6px rgba(0, 0, 0, 0.18),
-    0 10px 28px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--pl-page-shadow);
   pointer-events: none;
 }
 
@@ -88,7 +145,7 @@
   inset: auto 0 50% 0;
   text-align: center;
   font: italic 11px/1 -apple-system, BlinkMacSystemFont, sans-serif;
-  color: rgba(0, 0, 0, 0.25);
+  color: var(--pl-blank);
 }
 
 .pl-guide {
@@ -128,7 +185,7 @@
   font: 600 10px/1 -apple-system, BlinkMacSystemFont, sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.3);
+  color: var(--pl-faint);
 }
 
 .pl-masks {
@@ -151,8 +208,15 @@
   z-index: 1;
 }
 
-:is(.print-layout, .print-scope) .editor {
-  /* Ink on paper, whatever the app's theme: the page is white in dark mode too. */
+/* Ink on paper: the page's own ink on screen, and always dark on white when printed. */
+.print-layout .editor {
+  --text-primary: var(--pl-ink);
+  --text-secondary: var(--pl-ink-secondary);
+  --text-color: var(--pl-ink);
+  color: var(--pl-ink);
+}
+
+.print-scope .editor {
   --text-primary: #1b1b1b;
   --text-secondary: #555555;
   --text-color: #1b1b1b;
@@ -239,7 +303,7 @@
   font: 600 9px/1 -apple-system, BlinkMacSystemFont, sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.3);
+  color: var(--pl-faint);
 }
 
 .print-layout .ProseMirror .page-break.ProseMirror-selectednode::after {

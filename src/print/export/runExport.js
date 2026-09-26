@@ -1,5 +1,5 @@
 /**
- * runExport.js — File ▸ Export: PDF, EPUB, Markdown and HTML, for a document or a
+ * runExport.js — File ▸ Export: PDF, EPUB, Word, Markdown, HTML, plain text, Fountain and Final Draft, for a document or a
  * book (a folder or the project, compiled in tree order).
  *
  * Asks where to save with the system save panel, then writes the file through the
@@ -11,20 +11,34 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { mkdir, writeFile, writeTextFile } from '@tauri-apps/plugin-fs'
 
 import { withPrintBibliography } from '../../lib/references/printBibliography'
+import { chapterTitleOf, compileBook, frontMatterSections, paragraphsOf } from '../bookMatter'
 import { loadChapters } from '../compile'
 import { readDocPageSetup } from '../DocPageSetup'
+import { resolvePageSetup } from '../pageSetup'
+import { bookAuthor, getAuthorProfile, setLastExport } from '../printLayoutStore'
+import { textOfContent } from '../titlePage'
+import { countWords } from '../../lib/wordCount'
 import { runPrintJob } from '../printJob'
+import { describeError, newJobId, reportJob } from '../printJobStatus'
+import { buildDocx } from './docx'
+import { buildFdx } from './fdx'
 import { buildEpub } from './epub'
 import { buildHtmlDocument } from './html'
 import { decodeDataUri, resolveImage, toDataUri } from './images'
 import { toMarkdown } from './markdown'
-import { firstHeadingText, mapImageSources, portableContent } from './portable'
+import { buildPlainText } from './text'
+import { serializeFountain } from '../../script/fountain'
+import { mapImageSources, portableContent } from './portable'
 
 const FORMATS = {
   pdf: { ext: 'pdf', label: 'PDF' },
   epub: { ext: 'epub', label: 'EPUB' },
   markdown: { ext: 'md', label: 'Markdown' },
   html: { ext: 'html', label: 'HTML' },
+  docx: { ext: 'docx', label: 'Word' },
+  plainText: { ext: 'txt', label: 'Plain Text' },
+  fountain: { ext: 'fountain', label: 'Fountain' },
+  fdx: { ext: 'fdx', label: 'Final Draft' },
 }
 
 const safeFileName = (name) => (name || 'Untitled').replace(/[/\\:*?"<>|]+/g, '-').trim() || 'Untitled'
@@ -33,18 +47,10 @@ const dirOf = (path) => path.replace(/[/\\][^/\\]*$/, '')
 const stemOf = (path) => path.replace(/^.*[/\\]/, '').replace(/\.[^.]+$/, '')
 
 /**
- * A chapter's content, opening with its title as an H1 when it does not already
- * open with a heading — so a compiled book's chapters are headed in every format.
+ * Export, reporting where it has got to (`printJobStatus.js`). Resolves with the path
+ * written, or null when the author cancelled the save panel; rejects, after reporting
+ * the failure, when the file could not be made.
  */
-const withTitle = (chapter, compiled) => {
-  const content = chapter.content
-  if (!compiled || firstHeadingText(content)) return content
-  return {
-    ...content,
-    content: [{ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: chapter.name }] }, ...(content.content || [])],
-  }
-}
-
 export async function runExport({
   format,
   scope = 'document',
@@ -53,6 +59,8 @@ export async function runExport({
   docPath,
   liveEditors = [],
   book,
+  options = {},
+  path: knownPath = null,
 }) {
   const spec = FORMATS[format]
   if (!spec || !projectName || !docPath) return null
@@ -61,26 +69,59 @@ export async function runExport({
   const compiled = scope !== 'document'
   const title = compiled ? (book?.title || 'Book') : (docPath.split('/').pop() || 'Untitled')
 
-  const path = await save({
-    title: `Export ${spec.label}`,
-    defaultPath: `${safeFileName(title)}.${spec.ext}`,
-    filters: [{ name: spec.label, extensions: [spec.ext] }],
-  })
+  const jobId = newJobId()
+  // Export Again writes where the last one did, without asking.
+  let path = knownPath
+  try {
+    if (!path) path = await save({
+      title: `Export ${spec.label}`,
+      defaultPath: `${safeFileName(title)}.${spec.ext}`,
+      filters: [{ name: spec.label, extensions: [spec.ext] }],
+    })
+  } catch (error) {
+    reportJob({ jobId, kind: 'export', format, phase: 'failed', message: describeError(error) })
+    throw error
+  }
   if (!path) return null
 
+  const remember = () => setLastExport(projectName, { format, scope, path, bound: Boolean(bound), options })
   if (format === 'pdf') {
-    await runPrintJob({ projectName, docPath, scope, bound, liveEditors, book, pdfPath: path })
-    return path
+    const saved = await runPrintJob({ jobId, projectName, docPath, scope, bound, liveEditors, book, options, pdfPath: path })
+    if (saved) remember()
+    return saved ? path : null
   }
 
+  const report = (phase, extra = {}) => reportJob({ jobId, kind: 'export', format, phase, ...extra })
+  report('preparing')
+  try {
+    await writeExport({ format, path, projectName, docPath, scope, liveByPath, compiled, title, book })
+  } catch (error) {
+    report('failed', { message: describeError(error) })
+    throw error
+  }
+  report('done', { path })
+  remember()
+  return path
+}
+
+/** Build a non-PDF export and write it to `path`. */
+async function writeExport({ format, path, projectName, docPath, scope, liveByPath, compiled, title, book }) {
+  const author = bookAuthor(book)
   const chapters = await withPrintBibliography(
     projectName,
-    await loadChapters(projectName, docPath, scope, (p) => liveByPath.get(p)?.getJSON() || null)
+    await loadChapters(projectName, docPath, scope, (p) => liveByPath.get(p)?.getJSON() || null, { excluded: compiled ? book?.excluded : [] })
   )
-  const setup = compiled
-    ? (book?.pageSetup || chapters[0]?.content?.attrs?.pageSetup || null)
-    : (readDocPageSetup(liveByPath.get(docPath)?.state.doc) || chapters[0]?.content?.attrs?.pageSetup || null)
-  const exportChapters = chapters.map((chapter) => ({ title: chapter.name, content: withTitle(chapter, compiled) }))
+  const { setup } = resolvePageSetup({
+    docSetup: (compiled ? null : readDocPageSetup(liveByPath.get(docPath)?.state.doc)) || chapters[0]?.content?.attrs?.pageSetup,
+    bookSetup: book?.pageSetup,
+    scope,
+  })
+  // A book's chapters are headed — numbered, or by their names — and followed by its
+  // back matter; a document exports as it is.
+  const exportChapters = (compiled ? compileBook(chapters, book, { author, insertTitles: true }) : chapters)
+    .map((chapter) => ({ title: chapterTitleOf(chapter.content, chapter.name), content: chapter.content }))
+  const front = compiled ? frontMatterSections(book, { title, author, titlePage: Boolean(setup.titlePage) }) : []
+  const contents = compiled && Boolean(book?.frontMatter?.contents)
 
   if (format === 'html') {
     // Inline every image, so the file stands alone.
@@ -101,10 +142,12 @@ export async function runExport({
     }
     const html = buildHtmlDocument({
       title,
-      author: book?.author || '',
+      author,
       language: book?.language || 'en',
       chapters: inlined,
       setup,
+      front,
+      contents,
     })
     await writeTextFile(path, html)
     return path
@@ -130,8 +173,12 @@ export async function runExport({
       pending.push({ src, decoded, rel })
       return rel
     }
-    const md = exportChapters
-      .map((chapter) => toMarkdown(portableContent(chapter.content), { imageSrc }))
+    // The front matter as plain paragraphs: Markdown has no pages to set it on.
+    const frontDocs = front
+      .filter((section) => section.text)
+      .map((section) => ({ type: 'doc', content: paragraphsOf(section.source ? `${section.text}\n\n— ${section.source}` : section.text) }))
+    const md = [...frontDocs, ...exportChapters.map((chapter) => chapter.content)]
+      .map((content) => toMarkdown(portableContent(content), { imageSrc }))
       .join('\n<div style="break-after: page"></div>\n\n')
     if (pending.length) await mkdir(`${dirOf(path)}/${assetsDir}`, { recursive: true })
     for (const item of pending) {
@@ -142,16 +189,80 @@ export async function runExport({
     return path
   }
 
+  if (format === 'docx') {
+    // A document alone still gets its title page; a book's is among its front matter.
+    const sections = compiled ? front : (setup.titlePage ? [{ kind: 'titlePage', title, author }] : [])
+    const words = setup.titlePage?.showWordCount
+      ? chapters.reduce((n, c) => n + countWords(textOfContent(c.content)), 0)
+      : 0
+    const bytes = await buildDocx({
+      title,
+      author,
+      language: book?.language || 'en-US',
+      chapters: exportChapters,
+      setup,
+      front: sections,
+      contents,
+      profile: getAuthorProfile(),
+      words,
+      resolveImage: (src) => resolveImage(projectName, src),
+    })
+    await writeFile(path, bytes)
+    return path
+  }
+
+  if (format === 'plainText') {
+    const frontDocs = front
+      .filter((section) => section.text || section.kind === 'titlePage')
+      .map((section) => ({
+        type: 'doc',
+        content: section.kind === 'titlePage'
+          ? paragraphsOf([title, author && `by ${author}`].filter(Boolean).join('\n'))
+          : paragraphsOf(section.source ? `${section.text}\n\n— ${section.source}` : section.text),
+      }))
+    const text = buildPlainText(
+      [...frontDocs, ...exportChapters.map((chapter) => chapter.content)],
+      { wrap: 0, sceneBreak: setup.typography?.sceneBreak || '* * *' }
+    )
+    await writeTextFile(path, text)
+    return path
+  }
+
+  if (format === 'fountain' || format === 'fdx') {
+    // A script, or a book of them, as one: the chapters' lines one after another.
+    const [first] = exportChapters
+    const doc = {
+      type: 'doc',
+      attrs: first?.content?.attrs || {},
+      content: exportChapters.flatMap((chapter, i) => [
+        ...(i > 0 ? [{ type: 'pageBreak' }] : []),
+        ...(chapter.content?.content || []),
+      ]),
+    }
+    const profile = getAuthorProfile()
+    const titlePage = {
+      title,
+      credit: author ? 'Written by' : '',
+      author,
+      contact: profile.agent || [profile.legalName, profile.address, profile.email, profile.phone].filter(Boolean).join('\n'),
+    }
+    const text = format === 'fountain' ? serializeFountain(doc, { titlePage }) : buildFdx(doc, { titlePage })
+    await writeTextFile(path, text)
+    return path
+  }
+
   if (format === 'epub') {
     let cover = null
     if (book?.coverImage) cover = await resolveImage(projectName, book.coverImage)
     const bytes = await buildEpub({
       title,
-      author: book?.author || '',
+      author,
       language: book?.language || 'en',
       chapters: exportChapters,
       resolveImage: (src) => resolveImage(projectName, src),
       cover,
+      front,
+      contents,
     })
     await writeFile(path, bytes)
     return path

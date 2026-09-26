@@ -778,3 +778,70 @@ const nativeCommand = (type, payload, seq = nativeSeq++) =>
   ok('and it unmounts without throwing', unmountError === null)
   host.remove()
 }
+
+/* ---------------- docChanged: edits summed per window, pastes on their own ---------------- */
+{
+  const transports = createInProcessTransports()
+  const shell = createShellBridge(transports.shell)
+  const bridge = createSurfaceBridge(transports.surface)
+  const registry = createEditorRegistry()
+
+  let pending = []
+  const manual = (callback) => {
+    pending.push(callback)
+    return () => { pending = pending.filter((entry) => entry !== callback) }
+  }
+  const surface = createDocumentSurface({
+    bridge, registry, scheduler: immediateScheduler, docChangeScheduler: manual,
+  })
+
+  let text = 'she hesitated'
+  const editor = makeEditor(text)
+  editor.getText = () => text
+  editor.state.doc.textContent = text
+  registry.register(EditorTarget.Primary, { getEditor: () => editor, getDocPath: () => 'chapters/one' })
+
+  // A transaction as ProseMirror shapes it: step maps, and metadata by key.
+  const tr = ({ inserted = 0, deleted = 0, meta = {} } = {}) => ({
+    getMeta: (key) => meta[key],
+    mapping: { maps: [{ forEach: (f) => f(0, deleted, 0, inserted) }] },
+  })
+
+  const changes = []
+  shell.on('docChanged', (payload) => changes.push(payload))
+
+  surface.noteDocTransaction(editor, tr({ inserted: 1 }))
+  surface.noteDocTransaction(editor, tr({ inserted: 1 }))
+  surface.noteDocTransaction(editor, tr({ deleted: 1 }))
+  ok('typing waits for the window before it is sent', changes.length === 0)
+
+  text = 'she hesitated at'
+  editor.state.doc.textContent = text
+  for (const callback of pending.splice(0)) callback()
+  ok('a window of typing is one docChanged', changes.length === 1)
+  ok('which sums what was inserted and deleted in it',
+    changes[0].inserted === 2 && changes[0].deleted === 1)
+  ok('and counts the document as it is at the end of it',
+    changes[0].wordCount === 3 && changes[0].charCount === text.length)
+  ok('typing is the writer\'s edit, and not a paste',
+    changes[0].userEdit === true && changes[0].paste === false)
+
+  surface.noteDocTransaction(editor, tr({ inserted: 1 }))
+  surface.noteDocTransaction(editor, tr({ inserted: 40, meta: { uiEvent: 'paste' } }))
+  ok('a paste sends the typing before it, then itself, at once', changes.length === 3)
+  ok('the typing is not marked a paste', changes[1].paste === false && changes[1].inserted === 1)
+  ok('and the paste is', changes[2].paste === true && changes[2].inserted === 40)
+  ok('with nothing left waiting behind it', pending.length === 0)
+
+  surface.noteDocTransaction(editor, tr({ inserted: 1, meta: { addToHistory: false } }))
+  surface.flush()
+  ok('a plugin\'s bookkeeping is not the writer', changes[3].userEdit === false)
+
+  const stranger = makeEditor('a print job')
+  stranger.getText = () => 'a print job'
+  surface.noteDocTransaction(stranger, tr({ inserted: 1 }))
+  surface.flush()
+  ok('an editor that is not registered is not reported', changes.length === 4)
+
+  surface.dispose()
+}

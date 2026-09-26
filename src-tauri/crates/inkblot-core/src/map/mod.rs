@@ -5,4 +5,5 @@
 //! Each module here mirrors one in `src/lib/map/`; `npm run parity` holds each pair
 //! together. Rendering, projection and image tracing stay in the page.
 
+pub mod diff;
 pub mod model;

@@ -35,11 +35,13 @@ import type { EditorView } from '@tiptap/pm/view'
 
 import { measureUnits } from './measure'
 import { paginate } from './paginate'
-import type { LayoutFrame, LayoutResult, Push } from './paginate'
+import type { Continuation, LayoutFrame, LayoutResult, Push } from './paginate'
 
 export interface PaginationFrame extends LayoutFrame {
   /** Bumped by the caller whenever something outside the document changed layout. */
   revision?: number
+  /** The print typography the text is set in (`typographyKey`): a change re-measures every line. */
+  typeKey?: string
 }
 
 export interface PaginationState {
@@ -58,13 +60,22 @@ const META_PUSHES = 'paginationPushes'
 const MAX_PASSES = 4
 /** Pushes within this many px of each other are the same push. */
 const PUSH_TOLERANCE = 0.75
-/** Wait for typing to pause this long before re-measuring a long document. */
-const SETTLE_MS = 30
+/**
+ * Wait for typing to pause this long before re-measuring. Each pass reads the layout
+ * of every block, so at 30ms — shorter than the gap between keystrokes — it ran after
+ * nearly every key; a line crossing a page's foot is covered by the gap mask meanwhile.
+ */
+const SETTLE_MS = 120
 
 const samePushes = (a: Push[], b: Push[]) => (
   a.length === b.length && a.every((p, i) => (
     p.kind === b[i].kind && p.pos === b[i].pos && Math.abs(p.height - b[i].height) < PUSH_TOLERANCE
   ))
+)
+
+/** The same speeches carried over, under the same names: nothing to redraw. */
+const sameContinuations = (a: LayoutResult, b: LayoutResult) => (
+  JSON.stringify(a.continuations || []) === JSON.stringify(b.continuations || [])
 )
 
 const blockWidget = (height: number) => () => {
@@ -90,27 +101,41 @@ const rowWidget = (height: number) => () => {
   return el
 }
 
-const lineWidget = (height: number) => () => {
+const lineWidget = (height: number, cue: string | null = null) => () => {
   const el = document.createElement('span')
   el.className = 'pg-line-push'
   el.style.height = `${height}px`
   el.setAttribute('contenteditable', 'false')
   el.setAttribute('aria-hidden', 'true')
+  if (cue != null) {
+    // A speech carried over the page: (MORE) under the part that stays, and the
+    // speaker's name again over the part that goes on (paginate.ts).
+    el.classList.add('pg-continued')
+    const more = document.createElement('span')
+    more.className = 'pg-more'
+    more.textContent = '(MORE)'
+    const contd = document.createElement('span')
+    contd.className = 'pg-contd'
+    contd.textContent = `${cue} (CONT'D)`.trim()
+    el.append(more, contd)
+  }
   return el
 }
 
-const buildDecorations = (state: EditorState, pushes: Push[]): DecorationSet => {
+const buildDecorations = (state: EditorState, pushes: Push[], continuations: Continuation[] = []): DecorationSet => {
   const decorations: Decoration[] = []
   const { doc } = state
+  const cues = new Map(continuations.map((c) => [c.pos, c.cue]))
   for (const push of pushes) {
     if (push.pos < 0 || push.pos > doc.content.size) continue
     const h = Math.round(push.height * 100) / 100
     if (push.kind === 'line') {
-      decorations.push(Decoration.widget(push.pos, lineWidget(h), {
+      const cue = cues.has(push.pos) ? cues.get(push.pos) as string : null
+      decorations.push(Decoration.widget(push.pos, lineWidget(h, cue), {
         side: -1,
         marks: [],
         ignoreSelection: true,
-        key: `pg-l-${h}`,
+        key: `pg-l-${h}${cue != null ? `-${cue}` : ''}`,
       }))
       continue
     }
@@ -175,6 +200,12 @@ class PaginationView {
     // Images, fonts and node views change height without a transaction.
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => {
+        // Continuous view: nothing to paginate.
+        if (!paginationKey.getState(this.view.state)?.frame) return
+        // Typing grows the text a line at a time; the edit's own debounced pass will
+        // measure it. Cutting that wait short here is what made every wrapped line
+        // cost a full pass.
+        if (this.timer) return
         // A resize long after our last push is the content's own (an image decoded,
         // a board expanded): a fresh change, with a fresh pass budget. One right
         // after a push is that push landing, and spends the current budget.
@@ -223,8 +254,10 @@ class PaginationView {
   schedule(immediate: boolean) {
     if (this.destroyed) return
     if (this.timer) clearTimeout(this.timer)
+    this.timer = null
     cancelFrame(this.raf)
     const run = () => {
+      this.timer = null
       this.raf = nextFrame(() => this.run())
     }
     if (immediate) run()
@@ -242,7 +275,7 @@ class PaginationView {
 
     const pushes = computePushes(view, state)
     if (!pushes) return
-    if (samePushes(pushes.pushes, state.pushes) && state.result) return
+    if (samePushes(pushes.pushes, state.pushes) && state.result && sameContinuations(pushes.result, state.result)) return
     this.lastDispatchAt = now()
     view.dispatch(view.state.tr
       .setMeta(META_PUSHES, pushes)
@@ -316,7 +349,7 @@ export const computePushes = (view: EditorView, state: PaginationState): { pushe
   const rect = dom.getBoundingClientRect()
   const scale = rect.width / dom.offsetWidth || 1
   const originOffset = parseFloat(getComputedStyle(dom).paddingTop) || 0
-  const layoutKey = `${dom.offsetWidth}|${frame.slotHeight}`
+  const layoutKey = `${dom.offsetWidth}|${frame.slotHeight}|${frame.typeKey || ''}|${frame.revision || 0}`
   const units = measureUnits({ view, scale, applied: state.pushes, originOffset, layoutKey })
   const result = paginate(units, frame)
   return { pushes: result.pushes, result }
@@ -358,7 +391,7 @@ export const Pagination = Extension.create<Record<string, never>, PaginationStor
             }
             const next = tr.getMeta(META_PUSHES) as { pushes: Push[]; result: LayoutResult } | undefined
             if (next) {
-              return { ...value, pushes: next.pushes, result: next.result, decorations: buildDecorations(newState, next.pushes) }
+              return { ...value, pushes: next.pushes, result: next.result, decorations: buildDecorations(newState, next.pushes, next.result?.continuations) }
             }
             if (!tr.docChanged || !value.frame) return value
             const pushes = mapPushes(value.pushes, tr)
@@ -401,7 +434,7 @@ export const settlePagination = (view: EditorView, maxPasses = 6): LayoutResult 
     if (!state?.frame) return null
     const next = computePushes(view, state)
     if (!next) return state.result
-    if (samePushes(next.pushes, state.pushes) && state.result) return state.result
+    if (samePushes(next.pushes, state.pushes) && state.result && sameContinuations(next.result, state.result)) return state.result
     view.dispatch(view.state.tr.setMeta(META_PUSHES, next).setMeta('addToHistory', false))
   }
   return paginationKey.getState(view.state)?.result || null

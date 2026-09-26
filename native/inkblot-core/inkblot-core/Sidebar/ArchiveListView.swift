@@ -14,39 +14,44 @@ struct ArchiveListView: View {
 
     var body: some View {
         let sidebar = model.sidebar
-        VStack(spacing: 0) {
-            HStack {
-                Button("History", systemImage: "chevron.left", action: back)
-                    .help("Back to the document's versions")
-                Spacer()
-                Text("Archive").font(.headline)
+        Form {
+            Section {
+                HStack {
+                    Button("History", systemImage: "chevron.left", action: back)
+                        .buttonStyle(.borderless)
+                        .help("Back to the document's versions")
+                    Spacer()
+                    Text("Archive").font(.headline)
+                }
+            } footer: {
+                if !sidebar.historyArchive.isEmpty {
+                    Text("\(sidebar.historyArchive.count.formatted()) archived")
+                }
             }
-            .padding(12)
 
             if sidebar.historyArchive.isEmpty {
-                ContentUnavailableView {
-                    Label("Nothing Archived", systemImage: "archivebox")
-                } description: {
-                    Text(sidebar.historyDocPath == nil
-                        ? "Open a document to see its archive."
-                        : "Things you archive, like a bubble, are kept here.")
+                Section {
+                    ContentUnavailableView {
+                        Label("Nothing Archived", systemImage: "archivebox")
+                    } description: {
+                        Text(sidebar.historyDocPath == nil
+                            ? "Open a document to see its archive."
+                            : "Things you archive, like a bubble, are kept here.")
+                    }
                 }
-                .frame(maxHeight: .infinity)
             } else {
-                List(sidebar.historyArchive, id: \.id) { item in
-                    row(item)
-                        .contextMenu {
-                            Button("Restore", systemImage: "arrow.uturn.backward") { sidebar.archiveAction(.restore, item) }
-                            Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = item }
-                        }
-                        .swipeActions {
-                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = item }
-                            Button("Restore", systemImage: "arrow.uturn.backward") { sidebar.archiveAction(.restore, item) }
-                        }
+                Section {
+                    ForEach(sidebar.historyArchive, id: \.id) { item in
+                        row(item)
+                            .contextMenu {
+                                Button("Restore", systemImage: "arrow.uturn.backward") { sidebar.archiveAction(.restore, item) }
+                                Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = item }
+                            }
+                    }
                 }
-                .listStyle(.inset)
             }
         }
+        .formStyle(.grouped)
         .confirmationDialog("Delete this for good?", isPresented: Binding(
             get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
         ), presenting: pendingDelete) { item in

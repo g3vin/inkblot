@@ -30,6 +30,11 @@ final class ShellBridge {
     /// The active canvas's own toolbar, while it should be up: `nil` when no canvas is
     /// active or a card is being edited — the formatting toolbar's turn.
     private(set) var canvasToolbar: CanvasToolbarState?
+    /// The active map's toolbar and inspector: `nil` when no map is the active document.
+    private(set) var mapChrome: MapChromeState?
+    /// The map's chrome while the map is the active document: its toolbar's turn. A map
+    /// beside the active document keeps `mapChrome` — and its inspector panel — only.
+    var activeMapChrome: MapChromeState? { mapChrome?.active == false ? nil : mapChrome }
     /// Which editor the page elected, and which document it is showing.
     private(set) var activeEditor: ActiveEditorChanged?
     /// The open project. `nil` name is the landing screen.
@@ -38,6 +43,11 @@ final class ShellBridge {
     private(set) var lastDocChanged: DocChanged?
     /// Every word-count badge the page can see. The shell draws them, as glass.
     private(set) var wordCounts: [WordCountBadge] = []
+    /// Each text pane's status row: where its Print Layout toggle and zoom go.
+    private(set) var paneStatuses: [PaneStatus] = []
+    /// The open tabs and the split, for the tab bar (`TabsModel`). `nil` until the page
+    /// has published them.
+    private(set) var tabs: TabsChanged?
     /// The page's focus mode and word-count badge, for the toolbar items that toggle them.
     private(set) var viewOptions = ViewOptions(focusMode: false, wordCountVisible: true)
 
@@ -208,10 +218,15 @@ final class ShellBridge {
         case .toolbarState(let state): toolbar = state
         case .activeEditorChanged(let info): activeEditor = info
         case .canvasToolbarChanged(let changed): canvasToolbar = changed.state
+        case .mapChromeChanged(let changed): mapChrome = changed.state
         case .projectChanged(let changed): project = changed
         case .docChanged(let changed): lastDocChanged = changed
         case .viewOptions(let options): viewOptions = options
-        case .wordCountsChanged(let changed): wordCounts = changed.badges
+        case .wordCountsChanged(let changed):
+            wordCounts = changed.badges
+            let panes = changed.panes ?? []
+            if paneStatuses != panes { paneStatuses = panes }
+        case .tabsChanged(let changed): tabs = changed
         default: break
         }
     }

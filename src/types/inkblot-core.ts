@@ -79,6 +79,24 @@ export interface AddReplyCommand {
 }
 
 /**
+ * Which setup an edit goes to: the active document's own, or the one every chapter of
+ * its book prints in.
+ */
+export enum PageSetupTarget {
+	Document = "document",
+	Book = "book",
+}
+
+/**
+ * Replace a setup with one of the catalog's formats (`FormatOption::id`). The page
+ * builds the setup, so every shell's "Standard Manuscript" is the same one.
+ */
+export interface ApplyFormatCommand {
+	formatId: string;
+	target?: PageSetupTarget;
+}
+
+/**
  * The marks the toolbar can toggle.
  * 
  * A closed set rather than a string: a Swift menu item sending `"bolb"` should not
@@ -225,6 +243,31 @@ export interface AudioClip {
 	createdAt: string;
 }
 
+/**
+ * Who wrote it, for title pages and running heads. One per app: it is the writer's,
+ * not any one project's.
+ */
+export interface AuthorProfile {
+	/** The name on the work — a pen name, if there is one. */
+	byline: string;
+	/** The name the contact details are under. */
+	legalName: string;
+	/** Street address, one line per line. */
+	address: string;
+	email: string;
+	phone: string;
+	/** An agent or agency, when the work goes out through one. */
+	agent: string;
+}
+
+/** The pages after the last chapter, each under its own heading. Empty text leaves it out. */
+export interface BackMatter {
+	acknowledgements: string;
+	aboutTheAuthor: string;
+	/** The author's other books, one per line. */
+	alsoBy: string;
+}
+
 export interface Point {
 	x: number;
 	y: number;
@@ -342,6 +385,77 @@ export enum PageNumberFormat {
 	LowerRoman = "lowerRoman",
 }
 
+export enum LineSpacing {
+	Single = "single",
+	OneAndAHalf = "oneAndAHalf",
+	Double = "double",
+	/** `line_value` times the font's size. */
+	Multiple = "multiple",
+	/** Exactly `line_value` points from baseline to baseline, as a script is set. */
+	Exact = "exact",
+}
+
+export enum PrintAlignment {
+	Left = "left",
+	Justify = "justify",
+}
+
+/** How a chapter's first paragraph opens. */
+export enum ChapterOpening {
+	Plain = "plain",
+	/** A large initial set into the first lines. */
+	DropCap = "dropCap",
+	/** The first line in small capitals. */
+	SmallCaps = "smallCaps",
+	DropCapAndSmallCaps = "dropCapAndSmallCaps",
+}
+
+/**
+ * Type for print: set on the page's text in Print Layout, on paper and in the PDF,
+ * and carried into a DOCX's styles — never on the continuous editor.
+ */
+export interface PrintTypography {
+	/** A CSS font family list: `"Courier Prime", Courier, monospace`. */
+	fontFamily: string;
+	fontSizePt: number;
+	lineSpacing: LineSpacing;
+	/** The multiple, or the exact leading in points; unused otherwise. */
+	lineValue: number;
+	firstLineIndentMm: number;
+	/** Space between paragraphs. */
+	paragraphSpacingPt: number;
+	alignment: PrintAlignment;
+	hyphenate: boolean;
+	/**
+	 * What a horizontal rule prints as — a scene break: `#`, `* * *`, `❧`. Empty
+	 * prints a blank line.
+	 */
+	sceneBreak: string;
+	chapterOpening: ChapterOpening;
+	/** How far down the page a chapter's title starts, below the top margin. */
+	chapterSinkMm: number;
+	/** A paragraph after a heading or a scene break starts flush, as books set it. */
+	noIndentAfterBreak: boolean;
+}
+
+export enum TitlePageStyle {
+	/**
+	 * Contact details top-left, word count top-right, title and byline centred: the
+	 * standard manuscript submission.
+	 */
+	Manuscript = "manuscript",
+	/** Title, author, and nothing else: a book's title page. */
+	Book = "book",
+	/** Title, "Written by", author centred; contact details bottom-left. */
+	Screenplay = "screenplay",
+}
+
+export interface TitlePageOptions {
+	style: TitlePageStyle;
+	showContact: boolean;
+	showWordCount: boolean;
+}
+
 export interface PageSetup {
 	/** A `pageSizes.ts` preset id, or `"custom"`. */
 	presetId: string;
@@ -383,6 +497,75 @@ export interface PageSetup {
 	 * odd page, inserting a blank verso when needed.
 	 */
 	chapterStartsOnRecto: boolean;
+	/**
+	 * The catalog format (`formats.ts`) this setup was made from, kept after it is
+	 * changed so the inspector can say "Standard Manuscript (modified)".
+	 */
+	formatId?: string;
+	/**
+	 * How the text is set on the page. Absent prints in the editor's own font, as a
+	 * document always did before it could be set for print.
+	 */
+	typography?: PrintTypography;
+	/** A title page before the text, printed and exported but never numbered. */
+	titlePage?: TitlePageOptions;
+}
+
+/** How a chapter's number is written in its heading. */
+export enum ChapterNumberStyle {
+	/** The chapters' own headings, as written. */
+	None = "none",
+	/** "Chapter One" */
+	Words = "words",
+	/** "Chapter 1" */
+	Numerals = "numerals",
+	/** "Chapter I" */
+	Roman = "roman",
+}
+
+/** Chapter headings a book adds as it compiles. */
+export interface ChapterNumbering {
+	style: ChapterNumberStyle;
+	/** The word before the number — "Chapter", "Part" — or empty for the number alone. */
+	prefix: string;
+	/** Keep the chapter's own title under its number. */
+	includeTitle: boolean;
+}
+
+/** The pages before the first chapter. Empty text leaves its page out. */
+export interface FrontMatter {
+	/** The title alone, on the first recto. */
+	halfTitle: boolean;
+	/** The copyright page, on the back of the title page. */
+	copyright: string;
+	dedication: string;
+	epigraph: string;
+	/** Who the epigraph is by. */
+	epigraphSource: string;
+	/** A table of contents with page numbers. */
+	contents: boolean;
+}
+
+/** A print-on-demand service, whose rules a book is checked against. */
+export enum PublishingService {
+	/** Not checked against anyone's rules. */
+	None = "none",
+	/** Amazon KDP paperback. */
+	Kdp = "kdp",
+	IngramSpark = "ingramSpark",
+}
+
+/** The paper a book is printed on, which sets how thick its spine is. */
+export enum PaperStock {
+	Cream = "cream",
+	White = "white",
+	/** Colour interior, on heavier paper. */
+	Color = "color",
+}
+
+export interface PublishingTarget {
+	service: PublishingService;
+	paper: PaperStock;
 }
 
 /**
@@ -402,6 +585,16 @@ export interface BookSettings {
 	/** The book's own page setup; absent means each chapter's first document's. */
 	pageSetup?: PageSetup;
 	binding: BindingSettings;
+	/**
+	 * Chapters left out of the book, by tree path. The rest print in tree order; a
+	 * document added to the folder is in until it is left out.
+	 */
+	excluded?: string[];
+	chapterNumbering?: ChapterNumbering;
+	frontMatter?: FrontMatter;
+	backMatter?: BackMatter;
+	/** Where the book is going to be printed, for the Publish tab's checks. */
+	publishing?: PublishingTarget;
 }
 
 export enum BridgeErrorCode {
@@ -698,6 +891,10 @@ export interface CitationStyleSpec {
 	noteStyle: boolean;
 }
 
+/** Take the book's own setup away: the book prints in its first chapter's again. */
+export interface ClearBookSetupCommand {
+}
+
 export interface ClipboardEntry {
 	id: string;
 	text: string;
@@ -733,6 +930,9 @@ export interface CloseBubbleSessionCommand {
 	archive: boolean;
 }
 
+export interface CloseSplitCommand {
+}
+
 /**
  * Everything the shell can ask the document surface to do.
  * 
@@ -766,6 +966,8 @@ export type NativeCommand =
 	| { type: "canvasDropNote", payload: CanvasDropNoteCommand }
 	| { type: "canvasReveal", payload: CanvasRevealCommand }
 	| { type: "canvasRestore", payload: CanvasRestoreCommand }
+	/** Run a command on a map (`map.rs`). */
+	| { type: "mapCommand", payload: MapCommandRequest }
 	| { type: "insertPlainText", payload: InsertPlainTextCommand }
 	| { type: "createEntry", payload: CreateEntryCommand }
 	| { type: "renameEntry", payload: RenameEntryCommand }
@@ -793,6 +995,7 @@ export type NativeCommand =
 	/** Leave the bubble editor and write its sentence back into the document. */
 	| { type: "closeBubbleSession", payload: CloseBubbleSessionCommand }
 	| { type: "setBlockType", payload: SetBlockTypeCommand }
+	| { type: "setWritingFormat", payload: SetWritingFormatCommand }
 	| { type: "toggleList", payload: ToggleListCommand }
 	| { type: "editorHistory", payload: EditorHistoryCommand }
 	| { type: "setFocusMode", payload: SetFocusModeCommand }
@@ -819,7 +1022,27 @@ export type NativeCommand =
 	| { type: "goToPage", payload: GoToPageCommand }
 	| { type: "printDocument", payload: PrintDocumentCommand }
 	| { type: "exportDocument", payload: ExportDocumentCommand }
-	| { type: "printFinished", payload: PrintFinishedCommand };
+	| { type: "printFinished", payload: PrintFinishedCommand }
+	| { type: "applyFormat", payload: ApplyFormatCommand }
+	| { type: "useSetupForBook", payload: UseSetupForBookCommand }
+	| { type: "clearBookSetup", payload: ClearBookSetupCommand }
+	| { type: "refreshBookChapters", payload: RefreshBookChaptersCommand }
+	| { type: "setPrintScope", payload: SetPrintScopeCommand }
+	| { type: "setAuthorProfile", payload: SetAuthorProfileCommand }
+	| { type: "setBookCover", payload: SetBookCoverCommand }
+	| { type: "exportAgain", payload: ExportAgainCommand }
+	| { type: "selectTab", payload: TabRef }
+	| { type: "closeTab", payload: TabRef }
+	| { type: "setTabOrder", payload: SetTabOrderCommand }
+	| { type: "newTab", payload: NewTabCommand }
+	| { type: "openDocInTab", payload: OpenDocInTabCommand }
+	| { type: "openDocInWindow", payload: OpenDocInWindowCommand }
+	| { type: "openInSplit", payload: OpenInSplitCommand }
+	| { type: "closeSplit", payload: CloseSplitCommand }
+	| { type: "measureBook", payload: MeasureBookCommand }
+	| { type: "importScript", payload: ImportScriptCommand }
+	| { type: "setSceneNumbers", payload: SetSceneNumbersCommand }
+	| { type: "scriptReport", payload: ScriptReportCommand };
 
 /**
  * A command, with its place in the stream.
@@ -877,6 +1100,21 @@ export interface CreateReferenceCommand {
 	id: string;
 	docPath?: string;
 	kind: string;
+}
+
+/** One local day, summed. */
+export interface DayStat {
+	/** `YYYY-MM-DD`, the writer's local date. */
+	day: string;
+	openSecs: number;
+	activeSecs: number;
+	wordsAdded: number;
+	wordsDeleted: number;
+	wordsPasted: number;
+	/** Sessions that began on this day. */
+	sessions: number;
+	/** Active seconds in each of the day's 24 local hours. */
+	hours: number[];
 }
 
 /** Delete a file or folder. The shell has already asked the user. */
@@ -996,6 +1234,52 @@ export interface DocChanged {
 	userEdit: boolean;
 	wordCount: number;
 	charCount: number;
+	/**
+	 * Positions inserted and removed since the last `DocChanged` for this pane.
+	 * 
+	 * The page throttles this event, so these are sums over every transaction in the
+	 * window, not one keystroke. Positions rather than characters — a split paragraph
+	 * is two — which is close enough for "how much did the writer do", and exact for
+	 * plain typing.
+	 */
+	inserted?: number;
+	deleted?: number;
+	/**
+	 * The window was a paste or a drop. The page sends one on its own rather than
+	 * folding it into the typing around it, so a shell can tell written words from
+	 * pasted ones.
+	 */
+	paste?: boolean;
+}
+
+/** How a split lays its two panes out. */
+export enum SplitOrientation {
+	/** Side by side. */
+	Columns = "columns",
+	/** One above the other. */
+	Rows = "rows",
+}
+
+/**
+ * One open tab: a document, or a draft that has not decided what it is yet, and the
+ * split it shows.
+ */
+export interface DocTab {
+	id: string;
+	/** `None` for a draft. */
+	docPath?: string;
+	/** The split's document, while this tab has a split. */
+	secondaryDoc?: string;
+	/** How the split is laid out, while this tab has one. */
+	split?: SplitOrientation;
+}
+
+/** A saved document's length, read from disk. */
+export interface DocWordCount {
+	docPath: string;
+	words: number;
+	/** UTF-16 code units of text, as the page's `textContent.length` counts them. */
+	chars: number;
 }
 
 /**
@@ -1152,6 +1436,8 @@ export type WebviewEvent =
 	| { type: "noteMarkerPin", payload: NoteMarkerEvent }
 	| { type: "activeEditorChanged", payload: ActiveEditorChanged }
 	| { type: "canvasToolbarChanged", payload: CanvasToolbarChanged }
+	/** The active map's toolbar and inspector (`map.rs`). Coalesced per frame. */
+	| { type: "mapChromeChanged", payload: MapChromeChanged }
 	| { type: "searchMatches", payload: SearchMatches }
 	| { type: "focusModeView", payload: FocusModeView }
 	| { type: "readAloudPayload", payload: ReadAloudPayloadEvent }
@@ -1191,11 +1477,20 @@ export type WebviewEvent =
 	 */
 	| { type: "wordCountsChanged", payload: WordCountsChanged }
 	| { type: "pageLayoutState", payload: PageLayoutState }
-	| { type: "printRequest", payload: PrintRequest };
+	| { type: "printRequest", payload: PrintRequest }
+	/** The Finishing tabs' fixed lists, sent once when the page mounts. */
+	| { type: "pageLayoutCatalog", payload: PageLayoutCatalog }
+	| { type: "printJobStatus", payload: PrintJobStatus }
+	/** The tabs and the split, whole (`tabs.rs`). Coalesced per frame. */
+	| { type: "tabsChanged", payload: TabsChanged };
 
 export interface EventEnvelope {
 	seq: number;
 	event: WebviewEvent;
+}
+
+/** Export the last export again — same format, scope and file — without asking where. */
+export interface ExportAgainCommand {
 }
 
 export enum ExportFormat {
@@ -1203,6 +1498,16 @@ export enum ExportFormat {
 	Epub = "epub",
 	Markdown = "markdown",
 	Html = "html",
+	/** Word, for an editor or an agent: styles, sections, headers and footers. */
+	Docx = "docx",
+	/** Plain text, for a submission form or an email. */
+	PlainText = "plainText",
+	/** Fountain, the plain-text screenplay format. */
+	Fountain = "fountain",
+	/** Final Draft's own file. */
+	Fdx = "fdx",
+	/** A report on a script, as a spreadsheet. */
+	Csv = "csv",
 }
 
 /** What a print or export covers. */
@@ -1215,12 +1520,49 @@ export enum PrintScope {
 	Project = "project",
 }
 
+/** Which part of what the scope covers is printed. */
+export enum PrintRange {
+	All = "all",
+	/**
+	 * The chapter the cursor is in: the active document in a book, or the Heading 1
+	 * section around the cursor in a document.
+	 */
+	CurrentChapter = "currentChapter",
+	/** The selected text, laid out alone. */
+	Selection = "selection",
+	/**
+	 * Sides: the pages the scenes in `scenes` are on, with their page and scene
+	 * numbers as in the whole script.
+	 */
+	Scenes = "scenes",
+}
+
+/**
+ * How a print or a PDF is narrowed and marked. Every field is optional on the wire:
+ * no options is the whole thing, unmarked.
+ */
+export interface PrintOptions {
+	range: PrintRange;
+	/** Printed page numbers, as typed: `3-7, 10`. Empty prints every page. */
+	pages: string;
+	/** Text set faintly across every page — "DRAFT", or "Read copy for {recipient}". */
+	watermark: string;
+	/** Who a watermarked copy is for, one PDF each; filled into `{recipient}`. */
+	recipients: string[];
+	/** The scenes Sides print, by index in the script (0 is the first scene). */
+	scenes: number[];
+	/** A character whose speeches are highlighted, for an actor's copy. */
+	highlightCharacter: string;
+}
+
 /** Export to a file. The page asks where (a save panel) and writes it. */
 export interface ExportDocumentCommand {
 	format: ExportFormat;
 	scope: PrintScope;
 	/** PDF only: imposed for binding. */
 	bound?: boolean;
+	/** PDF only: a range, a watermark. */
+	options?: PrintOptions;
 }
 
 /**
@@ -1240,6 +1582,23 @@ export interface FocusModeView {
 	wordCount: number;
 }
 
+/** What a format is for, which decides what else the Finishing tabs offer with it. */
+export enum FormatKind {
+	Prose = "prose",
+	Screenplay = "screenplay",
+	StagePlay = "stagePlay",
+}
+
+/** A whole page setup by name: "Standard Manuscript", "Trade Paperback 6 × 9". */
+export interface FormatOption {
+	id: string;
+	label: string;
+	group: string;
+	/** One line on what it is and who asks for it. */
+	summary: string;
+	kind: FormatKind;
+}
+
 /** Scroll a page (1-based, as numbered on screen) into view. */
 export interface GoToPageCommand {
 	page: number;
@@ -1251,6 +1610,13 @@ export interface GoToPageCommand {
  */
 export interface HighlightNoteCommand {
 	noteId?: string;
+}
+
+/**
+ * Import a script: File ▸ Import Fountain Script…. The page asks for the file and
+ * makes a new document of it beside the one open.
+ */
+export interface ImportScriptCommand {
 }
 
 /** Put the bibliography at the end of the document, or move it there. */
@@ -1328,6 +1694,13 @@ export interface JumpToAnchorCommand {
 	preferPositions: boolean;
 }
 
+/** The export Export Again repeats. */
+export interface LastExport {
+	format: ExportFormat;
+	scope: PrintScope;
+	path: string;
+}
+
 export interface MapBackground {
 	/** A project asset path (`.assets/<hash>.<ext>`). */
 	image?: string | null;
@@ -1373,6 +1746,27 @@ export interface MapBody {
 	orbit?: MapOrbit | null;
 }
 
+export enum MapButtonRole {
+	Normal = "normal",
+	Primary = "primary",
+	Destructive = "destructive",
+}
+
+/** Clicked, it sends `panel-action { id }`. */
+export interface MapPanelButton {
+	id: string;
+	label: string;
+	role: MapButtonRole;
+	disabled: boolean;
+	/** An SF Symbol name, for a button that shows one. */
+	symbol?: string;
+	help?: string;
+}
+
+export interface MapButtonRow {
+	buttons: MapPanelButton[];
+}
+
 export interface MapCalibration {
 	a: number[];
 	b: number[];
@@ -1388,6 +1782,145 @@ export interface MapCartouche {
 	subtitle?: string | null;
 }
 
+export interface MapChoice {
+	value: string;
+	label: string;
+	/** The heading this option sits under; consecutive options share one. */
+	group?: string;
+}
+
+/** A pop-up menu. The value sent back is the chosen option's `value`. */
+export interface MapChoiceInput {
+	id: string;
+	label: string;
+	value: string;
+	options: MapChoice[];
+	help?: string;
+}
+
+/**
+ * The map's tools, as the toolbar offers them. `Pan` and `Calibrate` are not on the
+ * toolbar — the space bar and the Scale section reach them — but either can be the
+ * tool in hand.
+ */
+export enum MapTool {
+	Select = "select",
+	Pan = "pan",
+	Pin = "pin",
+	Route = "route",
+	Region = "region",
+	Label = "label",
+	Ruler = "ruler",
+	Area = "area",
+	Calibrate = "calibrate",
+}
+
+export interface MapPanelTab {
+	id: string;
+	label: string;
+}
+
+/**
+ * One row of a section. Each is named by an `id` where it can be edited or clicked,
+ * which is all a command carries back.
+ */
+export type MapPanelField = 
+	| { type: "text", payload: MapTextInput }
+	| { type: "number", payload: MapNumberInput }
+	| { type: "choice", payload: MapChoiceInput }
+	| { type: "toggle", payload: MapToggleInput }
+	| { type: "color", payload: MapColorInput }
+	| { type: "stat", payload: MapStatRow }
+	| { type: "note", payload: MapNoteText }
+	| { type: "button", payload: MapPanelButton }
+	| { type: "buttons", payload: MapButtonRow }
+	| { type: "listRow", payload: MapListRow }
+	| { type: "markers", payload: MapMarkerInput }
+	| { type: "date", payload: MapDateInput }
+	| { type: "table", payload: MapTableView }
+	| { type: "preview", payload: MapShapePreview }
+	| { type: "group", payload: MapPanelGroup };
+
+export interface MapPanelSection {
+	id: string;
+	/** May be empty: a section that is only a Delete button. */
+	title: string;
+	/** Buttons beside the title ("Add", "Show"). */
+	actions: MapPanelButton[];
+	fields: MapPanelField[];
+}
+
+/** The inspector: the map's settings in tabs, or the one thing selected. */
+export interface MapPanel {
+	/** The map's name, or what is selected ("Place", "Route"). */
+	title: string;
+	/** Something is selected; `panel-back` returns to the map's settings. */
+	canGoBack: boolean;
+	/** How many problems the journeys have (someone in two places at once). */
+	problems: number;
+	/** Empty while one thing is being edited. */
+	tabs: MapPanelTab[];
+	tab?: string;
+	sections: MapPanelSection[];
+}
+
+export interface MapChromeState {
+	/** The surface commands go back to. */
+	surfaceId: string;
+	docPath: string;
+	tool: MapTool;
+	/** 1 is 100%. */
+	zoom: number;
+	/** The zoom as the page writes it: `250%`, `12×`. */
+	zoomLabel: string;
+	canUndo: boolean;
+	canRedo: boolean;
+	hasSelection: boolean;
+	panel: MapPanel;
+	/**
+	 * Bumped when the page wants the inspector shown on this panel: a label just
+	 * placed, an item double-clicked, a traveller dropped on. The shell compares it
+	 * with the last value it saw, so a republish of the same state shows nothing.
+	 */
+	revealPanel: number;
+	/** The map is the active document, so the toolbar is its. */
+	active?: boolean;
+}
+
+/**
+ * The map's toolbar and inspector, or `None` when no map is showing. A map in a split
+ * stays here while the other pane is being worked in, `active` false: its inspector
+ * panel stays in the bar, and the toolbar goes back to the document's.
+ */
+export interface MapChromeChanged {
+	state?: MapChromeState;
+}
+
+/**
+ * A colour well. `value` is `None` for the default (drawn as `fallback`); the value
+ * sent back is `#rrggbb`, or `null` for Reset.
+ */
+export interface MapColorInput {
+	id: string;
+	label: string;
+	value?: string;
+	fallback: string;
+}
+
+/**
+ * Run a command on a map, named by surface id as a canvas command is.
+ * 
+ * The vocabulary is `MapSurface`'s: `tool { tool }`, `undo`, `redo`, `zoom-in`,
+ * `zoom-out`, `zoom-to-fit`, `delete`, `panel-tab { id }`, `panel-back`,
+ * `panel-field { id, value }`, `panel-action { id }`. Untyped, as `CanvasCommandRequest`'s
+ * is: a field's value is whatever that field holds.
+ */
+export interface MapCommandRequest {
+	surfaceId: string;
+	command: string;
+	detail?: unknown;
+}
+
 export interface MapCompass {
 	show: boolean;
 	at: number[];
@@ -1399,6 +1932,42 @@ export interface MapCustomUnit {
 	id: string;
 	name: string;
 	km: number;
+}
+
+/**
+ * A date in the project's calendar, taken apart. The page puts it back together, so
+ * the shell never does calendar arithmetic.
+ */
+export interface MapDateParts {
+	year: number;
+	/** 1-based, into `MapDateInput.months`. */
+	month: number;
+	day: number;
+	hour: number;
+	minute: number;
+}
+
+export enum MapCalendarMode {
+	/** Day 1, Day 2…: only `day` counts. */
+	Day = "day",
+	Gregorian = "gregorian",
+	/** The world's own months (`MapDateInput.months`). */
+	Custom = "custom",
+}
+
+/**
+ * A date field. The value sent back is `MapDateParts`, or `null` to clear an
+ * `allow_empty` one. With no `value`, the field is a button offering to set one.
+ */
+export interface MapDateInput {
+	id: string;
+	label: string;
+	value?: MapDateParts;
+	mode: MapCalendarMode;
+	/** The months' names, in order. */
+	months: string[];
+	allowEmpty: boolean;
+	placeholder?: string;
 }
 
 export enum EarthProjection {
@@ -1620,12 +2189,150 @@ export interface MapFile {
 	viewport: MapViewport;
 }
 
+/** A row in a list of things on the map; clicked, it sends `panel-action { id }`. */
+export interface MapListRow {
+	id: string;
+	title: string;
+	subtitle?: string;
+	swatch?: string;
+	/** How many levels in (a moon under its planet). */
+	indent: number;
+}
+
+/**
+ * A place's marker: one of `options`, whose values are the page's icon ids. The value
+ * sent back is the id.
+ */
+export interface MapMarkerInput {
+	id: string;
+	value: string;
+	color?: string;
+	options: MapChoice[];
+}
+
+export enum MapNoteTone {
+	Note = "note",
+	Warning = "warning",
+}
+
+/** A line of explanation, or a warning. `swatch` is a colour shown before it. */
+export interface MapNoteText {
+	text: string;
+	tone: MapNoteTone;
+	swatch?: string;
+	/** A button after the text ("Go there"). */
+	action?: MapPanelButton;
+}
+
+/**
+ * Committed as `number` fields are on the page: on Return or blur, clamped to
+ * `min`/`max`. The value sent back is a number, or `null` to clear an `allow_empty`
+ * field.
+ */
+export interface MapNumberInput {
+	id: string;
+	label: string;
+	value?: number;
+	min?: number;
+	max?: number;
+	/** What the stepper adds; `None` for any value. */
+	step?: number;
+	suffix?: string;
+	allowEmpty: boolean;
+	help?: string;
+}
+
+/**
+ * Rows that belong to one thing — a leg of a journey, a terrain — with their own
+ * title and buttons. `collapsible` ones start closed.
+ */
+export interface MapPanelGroup {
+	id: string;
+	title: string;
+	swatch?: string;
+	actions: MapPanelButton[];
+	fields: MapPanelField[];
+	collapsible: boolean;
+}
+
+/**
+ * A traced picture's outlines, previewed: polylines in `width` × `height` space,
+ * written as SVG path data using only `M`, `L` and `Z`.
+ */
+export interface MapShapePreview {
+	width: number;
+	height: number;
+	path: string;
+	filled: boolean;
+}
+
+/**
+ * A figure: "Length — 42 km". With `action`, the figure is a button (an arrival date
+ * that jumps the timeline there).
+ */
+export interface MapStatRow {
+	label: string;
+	value: string;
+	action?: MapPanelButton;
+}
+
+export interface MapTableCell {
+	text: string;
+	detail?: string;
+	strong: boolean;
+}
+
+export interface MapTableRowView {
+	label: string;
+	cells: MapTableCell[];
+}
+
+/** The table of distances between places. */
+export interface MapTableView {
+	columns: string[];
+	rows: MapTableRowView[];
+}
+
+/**
+ * Committed on Return or when focus leaves, never per keystroke: a name typed is one
+ * undo step. The value sent back is a string.
+ */
+export interface MapTextInput {
+	id: string;
+	label: string;
+	value: string;
+	placeholder?: string;
+	multiline: boolean;
+	/**
+	 * Changes when the page wants the caret here with the text selected — a rename.
+	 * Zero is never a request.
+	 */
+	focusKey: number;
+}
+
+export interface MapToggleInput {
+	id: string;
+	label: string;
+	value: boolean;
+}
+
+/**
+ * Lay the book (or the document) out without printing it, to count its pages and
+ * words for the Publish tab.
+ */
+export interface MeasureBookCommand {
+}
+
 /** Move a file or folder into another folder. See `RenameEntryCommand`. */
 export interface MoveEntryCommand {
 	path: string;
 	isFolder: boolean;
 	/** Tree path; empty for the project root. */
 	targetFolder: string;
+}
+
+/** Open a draft tab, where the page asks what the new document is called. */
+export interface NewTabCommand {
 }
 
 export enum NoteType {
@@ -1791,6 +2498,19 @@ export interface NotesRemapped {
 	droppedNoteIds: string[];
 }
 
+/** Open a document in a tab of its own, and show it. */
+export interface OpenDocInTabCommand {
+	docPath: string;
+}
+
+/**
+ * Open a document in a detached window of its own (a tab's Move to New Window). The
+ * page opens it as "Open in New Window" does.
+ */
+export interface OpenDocInWindowCommand {
+	docPath: string;
+}
+
 export interface OpenDocumentCommand {
 	/**
 	 * A project-relative tree path. A `.canvas` suffix makes it a canvas — routing is
@@ -1798,6 +2518,15 @@ export interface OpenDocumentCommand {
 	 */
 	path: string;
 	pane: Pane;
+}
+
+/**
+ * Open the active tab's split, or turn it. Without a `doc_path` the split keeps what
+ * it shows, or else takes the next tab's document.
+ */
+export interface OpenInSplitCommand {
+	docPath?: string;
+	orientation: SplitOrientation;
 }
 
 /**
@@ -1827,42 +2556,236 @@ export interface SignatureAdvice {
 	label: string;
 }
 
+/** A running-head token and what it stands for, for the token menu. */
+export interface RunningToken {
+	/** As typed: `{page}`. */
+	token: string;
+	label: string;
+}
+
 /**
- * Everything the Page tab shows. Published when the active document, its setup,
- * its page count or the zoom changes.
+ * What the Finishing tabs offer that never changes while the app runs. Sent once when
+ * the page mounts, apart from `PageLayoutState`, which goes out far more often.
+ */
+export interface PageLayoutCatalog {
+	presets: PageSizeOption[];
+	formats: FormatOption[];
+	signatureAdvice: SignatureAdvice[];
+	tokens: RunningToken[];
+	/** What "Set Type for Print" starts from. */
+	defaultTypography: PrintTypography;
+}
+
+/** Where the setup a document lays out in came from. */
+export enum SetupSource {
+	/** The document's own. */
+	Document = "document",
+	/** Its book's, which the document has none of its own to override. */
+	Book = "book",
+	/** Neither: the default. */
+	Default = "default",
+}
+
+/** How much a preflight finding matters. */
+export enum PreflightSeverity {
+	/** The service will reject the file. */
+	Error = "error",
+	/** It will print, but not as well as it could. */
+	Warning = "warning",
+	/** Worth knowing. */
+	Note = "note",
+}
+
+/** One thing the preflight found, and how to put it right when the page knows how. */
+export interface PreflightIssue {
+	id: string;
+	severity: PreflightSeverity;
+	message: string;
+	/** The button's title — "Widen the Gutter" — when there is a fix. */
+	fixLabel?: string;
+	/** The setup with the fix made: applied as any other edit to it. */
+	fixedSetup?: PageSetup;
+}
+
+/** The Publish tab's figures for what Print covers, at its setup. */
+export interface PublishingReport {
+	/** 0 until the pages are known: shown, or measured. */
+	pageCount: number;
+	/** The pages were counted by laying the whole scope out, not read off the screen. */
+	measured: boolean;
+	words: number;
+	/** At 250 words a minute. */
+	readingMinutes: number;
+	/** For the service and paper chosen; 0 without a page count. */
+	spineWidthMm: number;
+	/** Whether the spine is wide enough to carry text (KDP: more than 79 pages). */
+	spineText: boolean;
+	issues: PreflightIssue[];
+}
+
+/**
+ * What a document is written as. A script's lines are script elements, set on the
+ * page as a screenplay or a play is (`DocWritingFormat.js`).
+ */
+export enum WritingFormat {
+	Prose = "prose",
+	Screenplay = "screenplay",
+	Stageplay = "stageplay",
+}
+
+/** How a script's scenes are numbered. */
+export enum SceneNumbering {
+	Off = "off",
+	/** Numbered in order, renumbering as scenes come and go. */
+	On = "on",
+	/** Fixed where they are, for a shooting script: a scene added later is 12A. */
+	Locked = "locked",
+}
+
+/** One scene of a script. */
+export interface SceneSummary {
+	/** Its number, when scenes are numbered. */
+	number?: string;
+	heading: string;
+	/** The page it starts on, once the script is laid out; 0 before. */
+	page: number;
+}
+
+/** A script's scenes and cast. */
+export interface ScriptSummary {
+	format: WritingFormat;
+	sceneNumbers: SceneNumbering;
+	/** Everyone who speaks, most lines first. */
+	characters: string[];
+	scenes: SceneSummary[];
+}
+
+/**
+ * Everything the Finishing tabs show that changes. Published when the active
+ * document, its setup, its page count, the book, the scope or the zoom changes — and
+ * only then: the page skips a state identical to the last.
  */
 export interface PageLayoutState {
 	/** Whether the active pane shows pages. */
 	enabled: boolean;
 	/** The active text document, or none (a canvas, or nothing open). */
 	docPath?: string;
-	/** The setup the document lays out in — its own, or the default. */
+	/**
+	 * False while the document's editor is not yet there to take an edit. An edit sent
+	 * meanwhile is kept and applied when it is.
+	 */
+	ready: boolean;
+	/** The setup the document lays out in — its own, its book's, or the default. */
 	setup: PageSetup;
+	setupSource: SetupSource;
 	/** False while the document has never been given a setup of its own. */
 	hasOwnSetup: boolean;
+	/** The catalog format `setup` was made from, if it matches one. */
+	formatId?: string;
+	/** `setup` was made from `format_id` and then changed. */
+	formatModified: boolean;
 	pageCount: number;
 	currentPage: number;
 	zoom: number;
-	/** The book the active document belongs to. */
+	/** What Print and Export cover. */
+	scope: PrintScope;
+	/** The book: the active document's folder's, or the project's under `Project`. */
 	book: BookSettings;
+	/** The book has a setup of its own, which every chapter prints in. */
+	bookSetupActive: boolean;
 	/** The book's chapters, in order: document tree paths. */
 	bookChapters: string[];
 	/** A recommended inside margin for a book of this many pages, in mm. */
 	suggestedInsideMarginMm: number;
-	presets: PageSizeOption[];
-	signatureAdvice: SignatureAdvice[];
+	/** Who wrote it: the title page's byline and contact details. */
+	author?: AuthorProfile;
+	/**
+	 * Words in what Print covers — the document, or the book — as a title page
+	 * gives them.
+	 */
+	wordCount?: number;
+	/** The book's cover as a file on disk, for the Book tab's thumbnail. */
+	coverFile?: string;
+	/** The project's last export, for Export Again. */
+	lastExport?: LastExport;
+	/** Text is selected in the active document, so Print can print just that. */
+	hasSelection?: boolean;
+	publishing?: PublishingReport;
+	/**
+	 * A screenplay's or a play's scenes and cast, for the Publish tab's Script
+	 * Production section. None for prose.
+	 */
+	script?: ScriptSummary;
+}
+
+/**
+ * One text pane's status row, for a shell that draws the pane's own Print Layout
+ * toggle and zoom at its bottom-right corner, level with its badges. `left` and `right`
+ * are the pane's edges; `top` and `bottom` the row's. Client coordinates, as the
+ * badges' are.
+ */
+export interface PaneStatus {
+	pane: Pane;
+	docPath: string;
+	/** Shown as pages. */
+	printLayout: boolean;
+	/** Its zoom as pages (1 = 100%), whether or not it is shown as them. */
+	zoom: number;
+	/** The pointer is over it. A split shows a pane's controls only then. */
+	hovered?: boolean;
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
 export interface PrintDocumentCommand {
 	scope: PrintScope;
 	bound: boolean;
+	options?: PrintOptions;
 }
 
 /** The shell finished (or abandoned) a `PrintRequest`. */
 export interface PrintFinishedCommand {
 	jobId: string;
 	completed: boolean;
+}
+
+/** What a print or export job is. */
+export enum PrintJobKind {
+	Print = "print",
+	Export = "export",
+}
+
+export enum PrintJobPhase {
+	/** Gathering the chapters. */
+	Preparing = "preparing",
+	/** Laying chapters out as pages: `done` of `total`. */
+	Laying = "laying",
+	/** Handing the pages to the printer, or writing the file. */
+	Writing = "writing",
+	Done = "done",
+	Failed = "failed",
+	/** The author dismissed the print or save panel. */
+	Cancelled = "cancelled",
+}
+
+/**
+ * Where a print or export has got to. One job's statuses share its `job_id`; the last
+ * is `Done`, `Failed` or `Cancelled`.
+ */
+export interface PrintJobStatus {
+	jobId: string;
+	kind: PrintJobKind;
+	format?: ExportFormat;
+	phase: PrintJobPhase;
+	done?: number;
+	total?: number;
+	/** What went wrong, for `Failed`. */
+	message?: string;
+	/** The file written, for an export that is `Done`. */
+	path?: string;
 }
 
 /**
@@ -2121,6 +3044,10 @@ export interface ReferencesChanged {
 	references: ReferenceView[];
 }
 
+/** The documents in the book's folder changed — list its chapters again. */
+export interface RefreshBookChaptersCommand {
+}
+
 /** Remove entries from the history. `None` clears it. */
 export interface RemoveClipboardEntriesCommand {
 	ids?: string[];
@@ -2222,6 +3149,29 @@ export interface RevealSearchResultCommand {
 	nodeId?: string;
 	/** A notes-scope match names the note. */
 	noteId?: string;
+}
+
+/** A breakdown of the active script. */
+export enum ScriptReportKind {
+	/** Who speaks, how often, in which scenes. */
+	Characters = "characters",
+	/** Every scene: its page, its length in eighths of a page, who is in it. */
+	Scenes = "scenes",
+	/** Every place, and the scenes set there. */
+	Locations = "locations",
+}
+
+export enum ReportOutput {
+	/** Printed, on the script's own pages. */
+	Print = "print",
+	/** A spreadsheet file. */
+	Csv = "csv",
+}
+
+/** Print or save a report on the active script. */
+export interface ScriptReportCommand {
+	report: ScriptReportKind;
+	output: ReportOutput;
 }
 
 export enum SearchResultType {
@@ -2348,6 +3298,11 @@ export interface SetAlignmentCommand {
 	alignment: Alignment;
 }
 
+/** Replace the writer's profile — byline and contact details — for every project. */
+export interface SetAuthorProfileCommand {
+	profile: AuthorProfile;
+}
+
 export interface SetBibliographyOptionsCommand {
 	docPath: string;
 	options: BibliographyOptions;
@@ -2363,6 +3318,19 @@ export enum BlockType {
 	Heading1 = "heading1",
 	Heading2 = "heading2",
 	Heading3 = "heading3",
+	SceneHeading = "sceneHeading",
+	Action = "action",
+	Character = "character",
+	Parenthetical = "parenthetical",
+	Dialogue = "dialogue",
+	Transition = "transition",
+	Shot = "shot",
+	Centered = "centered",
+	ActHeading = "actHeading",
+	SceneTitle = "sceneTitle",
+	StageDirection = "stageDirection",
+	StageCharacter = "stageCharacter",
+	StageDialogue = "stageDialogue",
 }
 
 /**
@@ -2372,6 +3340,14 @@ export enum BlockType {
 export interface SetBlockTypeCommand {
 	target: EditorTarget;
 	block: BlockType;
+}
+
+/**
+ * Give the book a cover: an image file the shell picked, which the page copies into
+ * the project's assets. No path takes the cover away.
+ */
+export interface SetBookCoverCommand {
+	path?: string;
 }
 
 /** Replace the settings of the book the active document belongs to. */
@@ -2471,9 +3447,14 @@ export interface SetHighlightCommand {
 	remember: boolean;
 }
 
-/** Replace the active document's page setup. One undo step in the document. */
+/**
+ * Replace the active document's page setup — one undo step in the document — or the
+ * book's.
+ */
 export interface SetPageSetupCommand {
 	setup: PageSetup;
+	/** Absent from an older shell, which only ever edited the document. */
+	target?: PageSetupTarget;
 }
 
 /**
@@ -2495,9 +3476,21 @@ export interface SetPanelInsetsCommand {
 	top?: number;
 }
 
-/** Show the active pane as pages, or as the continuous editor. */
+/**
+ * Show a document as pages, or as the continuous editor: the one named — a pane's own
+ * toggle names the document in it — or else the active one.
+ */
 export interface SetPrintLayoutCommand {
 	enabled: boolean;
+	docPath?: string;
+}
+
+/**
+ * What Print and Export cover, and which book the Book tab shows: the active
+ * document's folder, or the whole project. `Document` shows the folder's book.
+ */
+export interface SetPrintScopeCommand {
+	scope: PrintScope;
 }
 
 export enum ZoomFit {
@@ -2507,10 +3500,14 @@ export enum ZoomFit {
 	Actual = "actual",
 }
 
-/** A zoom level (1 = 100%), or a fit. `fit` wins when both are present. */
+/**
+ * A zoom level (1 = 100%), or a fit. `fit` wins when both are present. Each document
+ * has its own zoom: this is the named one's, or else the active one's.
+ */
 export interface SetPrintZoomCommand {
 	zoom?: number;
 	fit?: ZoomFit;
+	docPath?: string;
 }
 
 export interface SetReferenceAttachedCommand {
@@ -2519,11 +3516,24 @@ export interface SetReferenceAttachedCommand {
 	attached: boolean;
 }
 
+/** Number the active script's scenes, stop, or lock them. */
+export interface SetSceneNumbersCommand {
+	mode: SceneNumbering;
+}
+
 export interface SetSelectionCommand {
 	target: EditorTarget;
 	anchor: TextAnchor;
 	scrollIntoView: boolean;
 	focus: boolean;
+}
+
+/**
+ * The tabs' order, as the shell's tab bar now shows it after a drag. Tabs it does not
+ * name keep their order after the ones it does.
+ */
+export interface SetTabOrderCommand {
+	tabIds: string[];
 }
 
 /**
@@ -2548,6 +3558,12 @@ export interface SetWordCountVisibleCommand {
 	visible: boolean;
 }
 
+/** Write the document as prose, a screenplay or a stage play, converting its lines. */
+export interface SetWritingFormatCommand {
+	target: EditorTarget;
+	format: WritingFormat;
+}
+
 export enum SidebarTab {
 	Clipboard = "clipboard",
 	Workbench = "workbench",
@@ -2562,6 +3578,46 @@ export enum SidebarTab {
  */
 export interface ShowSidebarTab {
 	tab: SidebarTab;
+}
+
+/**
+ * One minute of a session. `minute` counts from the session's start, so a session
+ * that runs past midnight lands its later minutes on the next day.
+ */
+export interface StatsMinute {
+	minute: number;
+	/** Seconds in this minute the document was in front of the writer. */
+	openSecs?: number;
+	/** Seconds in this minute the writer was typing — see `WritingSession::active_secs`. */
+	activeSecs?: number;
+	wordsAdded?: number;
+	wordsDeleted?: number;
+	wordsPasted?: number;
+}
+
+/**
+ * Which sessions a query is about. No project is everything; a project with no
+ * document is the whole project.
+ */
+export interface StatsScope {
+	project?: string;
+	docPath?: string;
+}
+
+/** Everything in a scope, summed. */
+export interface StatsTotals {
+	sessions: number;
+	openSecs: number;
+	activeSecs: number;
+	wordsAdded: number;
+	wordsDeleted: number;
+	wordsPasted: number;
+	longestSessionSecs: number;
+	/** Local days with any words written. */
+	daysWritten: number;
+	/** Unix milliseconds of the first and latest session, when there are any. */
+	firstSession?: number;
+	lastSession?: number;
 }
 
 export interface StoryFolderPreset {
@@ -2592,6 +3648,19 @@ export interface StoryFolderAncestor {
 export interface SyncNotesCommand {
 	docPath: string;
 	notes: Note[];
+}
+
+export interface TabRef {
+	tabId: string;
+}
+
+/**
+ * The tabs, in order, and which is showing. Sent whole whenever any of it changes,
+ * so it is coalesced to one per frame.
+ */
+export interface TabsChanged {
+	tabs: DocTab[];
+	activeTabId?: string;
 }
 
 /** A command aimed at an editor with nothing else to say. */
@@ -2692,6 +3761,30 @@ export interface TilesChanged {
 	tiles: WorkbenchTile[];
 }
 
+/**
+ * One run of the writing timer: a routine from its start to its end, or to where the
+ * writer stopped it. Recorded as it goes, like a session, and kept by `id`.
+ */
+export interface TimerRun {
+	id: string;
+	routineName: string;
+	/** The project open when the run began. */
+	project?: string;
+	/** Unix milliseconds. */
+	start: number;
+	end: number;
+	utcOffsetMinutes: number;
+	/** Time in writing segments and in breaks, paused time excluded. */
+	writeSecs?: number;
+	breakSecs?: number;
+	wordsWritten?: number;
+	/** Writing segments that ran to their end — a sprint finished, not skipped. */
+	sprintsCompleted?: number;
+	sprintsSkipped?: number;
+	/** The routine ran to its last segment, rather than being stopped. */
+	completed?: boolean;
+}
+
 /** The list kinds the toolbar can toggle. */
 export enum ListKind {
 	Bullet = "bullet",
@@ -2735,6 +3828,8 @@ export interface ToolbarState {
 	alignment: Alignment;
 	/** What the Paragraph Style menu shows as current. */
 	blockType: BlockType;
+	/** What the document is written as, which decides what the menu offers. */
+	writingFormat?: WritingFormat;
 	activeMarks: ActiveMarks;
 	/**
 	 * Whether the editor's own history has a step to undo or redo — the document's
@@ -2778,6 +3873,10 @@ export interface UpdateNoteCommand {
 export interface UpdateReferenceCommand {
 	id: string;
 	patch: ReferencePatch;
+}
+
+/** Give the book the active document's setup, so every chapter prints in it. */
+export interface UseSetupForBookCommand {
 }
 
 export enum VersionAction {
@@ -2861,12 +3960,57 @@ export interface WordCountBadge {
 }
 
 /**
- * Every word-count badge the user can see — the whole list, so it is safe to coalesce.
- * The page's badges stay where they are, invisible, to be measured; the shell draws
- * them as Liquid Glass, which only a view above the page can be.
+ * Every word-count badge the user can see, and every text pane's status row — the
+ * whole lists, so it is safe to coalesce. The page's badges stay where they are,
+ * invisible, to be measured; the shell draws them as Liquid Glass, which only a view
+ * above the page can be.
  */
 export interface WordCountsChanged {
 	badges: WordCountBadge[];
+	panes?: PaneStatus[];
+}
+
+/**
+ * One sitting at one document.
+ * 
+ * A session ends when the writer moves to another document or project, or has been
+ * away longer than the idle cutoff. A shell records the same session repeatedly as it
+ * goes — a checkpoint, so a crash loses a minute rather than an evening — and the
+ * store keeps the latest record for each `id`.
+ */
+export interface WritingSession {
+	id: string;
+	project: string;
+	docPath: string;
+	/** Unix milliseconds. */
+	start: number;
+	end: number;
+	/**
+	 * The writer's UTC offset when the session began, in minutes east of UTC. Days
+	 * and hours are the writer's local ones, and the offset travels with the record
+	 * rather than being looked up later, so a trip or a DST change does not move
+	 * last week's words onto a different day.
+	 */
+	utcOffsetMinutes: number;
+	/** Time the document was frontmost with the writer present. */
+	openSecs?: number;
+	/**
+	 * Time spent typing: the gaps between edits that were short enough to be one
+	 * run of writing, as the shell's "active gap" setting decides.
+	 */
+	activeSecs?: number;
+	/** Words that appeared by typing. Pasted words are counted apart. */
+	wordsAdded?: number;
+	wordsDeleted?: number;
+	wordsPasted?: number;
+	charsAdded?: number;
+	charsDeleted?: number;
+	/** The document's length when the session began and when it last changed. */
+	startWords?: number;
+	endWords?: number;
+	minutes?: StatsMinute[];
+	/** The writing timer run this session was part of, if any. */
+	timerRunId?: string;
 }
 
 /**

@@ -21,10 +21,11 @@ import { useNativeNotePreviews } from '../hooks/useNativeNotePreviews'
 import EditorCanvas from './EditorCanvas'
 import usePrintLayoutController from '../print/usePrintLayoutController'
 import PageSetupSheet from '../print/PageSetupSheet'
-import { runPrintJob } from '../print/printJob'
+import { measurePrint, runPrintJob } from '../print/printJob'
 import { runExport } from '../print/export/runExport'
+import { importFountainScript } from '../script/importScript'
 import { bookFolderFor } from '../print/compile'
-import { getBookSettings } from '../print/printLayoutStore'
+import { getBookForDoc, getBookSettings, setMeasurement } from '../print/printLayoutStore'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
@@ -33,6 +34,7 @@ import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
 import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
+import { PanelInsetsContext } from '../map/panelInsets'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
 import BubbleEditor from './BubbleEditor'
 import { useBubbleSessions } from '../hooks/useBubbleSessions'
@@ -185,8 +187,11 @@ export default function EditorLayout(props) {
   // the instance.
   const activeEditorInfo = useBridgeState('activeEditorChanged', EMPTY_ACTIVE_EDITOR)
   const activeIsCanvas = isCanvasDoc(activeDoc || currentDoc)
-  // A canvas or a map pans instead of scrolling, and runs on under the sidebars.
-  const activeUnderlays = !isTextDoc(activeDoc || currentDoc)
+  // A canvas or a map pans instead of scrolling, and runs on under the sidebars — when
+  // it has the editor to itself. In a split both panes keep the document's column
+  // whichever is active, or hovering from one to the other would slide the other one
+  // under the sidebars and the toolbar and back.
+  const activeUnderlays = !isTextDoc(activeDoc || currentDoc) && props.splitView !== 'editor'
   // The titlebar element the active canvas portals its toolbar into. A ref
   // callback rather than a ref object, so mounting/unmounting the slot re-renders
   // the consumers that are waiting for it.
@@ -462,7 +467,9 @@ export default function EditorLayout(props) {
         { path: currentDoc, editor },
         { path: props.secondaryDoc, editor: props.secondaryEditor },
       ],
-      book: getBookSettings(projectName, bookFolderFor(docPath, scope)),
+      // Printed alone, a document takes its book's setup when it has none — the book
+      // the Finishing tabs show, under the project's scope.
+      book: scope === 'document' ? getBookForDoc(projectName, docPath) : getBookSettings(projectName, bookFolderFor(docPath, scope)),
     }
   }, [activeDoc, currentDoc, editor, props.projectName, props.secondaryDoc, props.secondaryEditor])
   const printLayout = usePrintLayoutController({
@@ -472,13 +479,35 @@ export default function EditorLayout(props) {
     secondaryDoc: props.secondaryDoc,
     editor,
     secondaryEditor: props.secondaryEditor,
-    onPrint: ({ scope, bound }) => {
-      runPrintJob({ ...printOptions(scope), scope, bound }).catch((error) => console.error('[print] failed:', error))
+    onPrint: ({ scope, bound, options }) => {
+      runPrintJob({ ...printOptions(scope), scope, bound, options }).catch((error) => console.error('[print] failed:', error))
     },
-    onExport: ({ format, scope, bound }) => {
-      runExport({ ...printOptions(scope), format, scope, bound }).catch((error) => console.error('[export] failed:', error))
+    onExport: ({ format, scope, bound, options, path }) => {
+      runExport({ ...printOptions(scope), format, scope, bound, options, path }).catch((error) => console.error('[export] failed:', error))
+    },
+    onMeasure: ({ scope }) => {
+      const { projectName, docPath } = printOptions(scope)
+      measurePrint({ ...printOptions(scope), scope })
+        .then((measured) => { if (measured) setMeasurement(projectName, scope, docPath, measured) })
+        .catch((error) => console.error('[measure] failed:', error))
     },
   })
+
+  // File ▸ Import Fountain Script…: a new document beside the open one, opened in a tab.
+  const { projectName: importProject, refreshFiles: importRefresh, onOpenDocInTab: importOpen } = props
+  useEffect(() => {
+    const onImport = () => {
+      importFountainScript({ projectName: importProject, nearDoc: activeDoc || currentDoc })
+        .then(async (path) => {
+          if (!path) return
+          await importRefresh?.()
+          importOpen?.(path)
+        })
+        .catch((error) => console.error('[import] failed:', error))
+    }
+    window.addEventListener('inkblot:import-script', onImport)
+    return () => window.removeEventListener('inkblot:import-script', onImport)
+  }, [activeDoc, currentDoc, importOpen, importProject, importRefresh])
 
   // The page's own Page Setup, for a shell that does not draw one (host.ts).
   const [pageSetupOpen, setPageSetupOpen] = useState(false)
@@ -600,6 +629,7 @@ export default function EditorLayout(props) {
       : { '--app-titlebar-height': `${nativePanelInsets.top}px` }
 
   return (
+    <PanelInsetsContext.Provider value={nativePanelInsets}>
     <CanvasToolbarSlotContext.Provider value={canvasToolbarTarget}>
     <CompareToolbarSlotContext.Provider value={comparing ? compareToolbarSlot : null}>
     <div
@@ -727,5 +757,6 @@ export default function EditorLayout(props) {
     </div>
     </CompareToolbarSlotContext.Provider>
     </CanvasToolbarSlotContext.Provider>
+    </PanelInsetsContext.Provider>
   )
 }

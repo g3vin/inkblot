@@ -1,0 +1,243 @@
+/* ============================================================
+   Type set for print (typography.ts)
+
+   Every rule hangs off `.has-print-type`, which only a page's container carries —
+   Print Layout's stage, the off-screen layout of a print job, a printed page — so the
+   continuous editor keeps the writer's own font. The same rules apply on screen and on
+   paper, which is what keeps a printed page's lines where Print Layout showed them.
+   ============================================================ */
+
+.has-print-type .ProseMirror {
+  font-family: var(--pt-font);
+  font-size: var(--pt-size);
+  line-height: var(--pt-leading);
+  text-align: var(--pt-align);
+  -webkit-hyphens: var(--pt-hyphens);
+  hyphens: var(--pt-hyphens);
+}
+
+.has-print-type .ProseMirror p {
+  margin: 0 0 var(--pt-para);
+  min-height: 0;
+  text-indent: var(--pt-indent);
+}
+
+/* A paragraph inside something else — a list, a table, a quote — is not indented. */
+.has-print-type .ProseMirror :is(li, td, th, blockquote) p {
+  text-indent: 0;
+}
+
+.has-print-type .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--pt-font);
+  line-height: 1.2;
+  text-align: left;
+  -webkit-hyphens: manual;
+  hyphens: manual;
+}
+
+.has-print-type .ProseMirror h1 {
+  text-align: center;
+  margin: 0 0 calc(var(--pt-leading) * 2);
+}
+
+/* A chapter opens partway down its page: at the head of the document, or after a
+   break to a new page. */
+.has-print-type .ProseMirror > h1:first-child,
+.has-print-type .ProseMirror > .page-break + h1 {
+  padding-top: var(--pt-sink);
+}
+
+/* After a heading or a scene break a book sets the first line flush. */
+.pt-flush-after-break .ProseMirror > :is(h1, h2, h3, h4, h5, h6, hr) + p,
+.pt-flush-after-break .ProseMirror > p:first-child {
+  text-indent: 0;
+}
+
+/* A horizontal rule is a scene break, and prints as the setup's glyph. */
+.has-print-type .ProseMirror hr {
+  border: 0;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  background: none;
+  overflow: visible;
+  text-align: center;
+  line-height: var(--pt-leading);
+}
+
+.has-print-type .ProseMirror hr::after {
+  content: var(--pt-break);
+  display: block;
+  min-height: var(--pt-leading);
+  text-align: center;
+  color: inherit;
+  letter-spacing: 0.2em;
+}
+
+/* A chapter's opening: a drop cap, the first line in small capitals, or both — on the
+   first paragraph after a chapter title, or of a document without one. */
+.pt-drop-cap .ProseMirror > h1 + p::first-letter,
+.pt-drop-cap .ProseMirror > p:first-child::first-letter {
+  -webkit-initial-letter: 3;
+  initial-letter: 3;
+  margin-right: 0.08em;
+  font-weight: normal;
+}
+
+.pt-drop-cap .ProseMirror > h1 + p,
+.pt-drop-cap .ProseMirror > p:first-child {
+  text-indent: 0;
+}
+
+.pt-small-caps .ProseMirror > h1 + p::first-line,
+.pt-small-caps .ProseMirror > p:first-child::first-line {
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+
+/* Running heads and feet in the text's face, no larger than the text. */
+.has-print-type .pl-running {
+  font-family: var(--pt-font);
+  font-size: min(var(--pt-size), 12pt);
+}
+
+/* ---- the title page (titlePage.js) ---- */
+
+.print-title-page {
+  font-family: var(--pt-font, Georgia, 'Times New Roman', serif);
+  font-size: var(--pt-size, 12pt);
+  line-height: 1.3;
+  color: #1b1b1b;
+}
+
+.print-title-page .tp-block {
+  position: absolute;
+  white-space: pre-line;
+}
+
+.print-title-page .tp-center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+.print-title-page .tp-title {
+  font-size: 1.6em;
+  line-height: 1.25;
+  margin-bottom: 1em;
+}
+
+.print-title-page.is-manuscript .tp-title {
+  font-size: 1em;
+  text-transform: uppercase;
+}
+
+.print-title-page.is-screenplay .tp-title {
+  font-size: 1em;
+  text-transform: uppercase;
+  text-decoration: underline;
+}
+
+/* ---- a book's front matter (frontMatter.js) ---- */
+
+.print-matter {
+  font-family: var(--pt-font, Georgia, 'Times New Roman', serif);
+  font-size: var(--pt-size, 12pt);
+  line-height: 1.4;
+  color: #1b1b1b;
+}
+
+.print-matter > div {
+  position: absolute;
+}
+
+.print-matter .fm-center {
+  text-align: center;
+}
+
+.print-matter .fm-title {
+  font-size: 1.5em;
+  letter-spacing: 0.04em;
+}
+
+.print-matter .fm-copyright-text {
+  font-size: 0.8em;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.print-matter .fm-dedication-text {
+  font-style: italic;
+  white-space: pre-line;
+}
+
+.print-matter .fm-epigraph-wrap {
+  padding: 0 12%;
+  box-sizing: border-box;
+}
+
+.print-matter .fm-epigraph-text {
+  font-style: italic;
+  white-space: pre-line;
+}
+
+.print-matter .fm-epigraph-source {
+  margin-top: 0.8em;
+  text-align: right;
+}
+
+.print-matter .fm-contents-heading {
+  font-size: 1.4em;
+  text-align: center;
+  margin-bottom: 1.6em;
+}
+
+.print-matter .fm-contents-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  height: 1.8em;
+}
+
+.print-matter .fm-contents-title {
+  flex: 0 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.print-matter .fm-contents-leader {
+  flex: 1 1 0;
+  min-width: 1em;
+  border-bottom: 1px dotted currentColor;
+  opacity: 0.5;
+  transform: translateY(-0.25em);
+}
+
+.print-matter .fm-contents-folio {
+  flex: 0 0 auto;
+  font-variant-numeric: oldstyle-nums tabular-nums;
+}
+
+/* ---- a watermark across a printed page (printJob.js) ---- */
+
+.print-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.print-watermark span {
+  transform: rotate(-45deg);
+  white-space: nowrap;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.1);
+}

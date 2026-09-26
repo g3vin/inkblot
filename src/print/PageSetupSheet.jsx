@@ -14,13 +14,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { getPreference, setPreference } from '../lib/preferences'
-import { bookFolderFor } from './compile'
-import { effectivePageSetup } from './DocPageSetup'
+import { applyFormat, FORMAT_PRESETS, formatOf, writingFormatOf } from './formats'
 import { SIGNATURE_GUIDANCE } from './imposition'
-import { bookPageSetup, normalizePageSetup, suggestedInsideMarginMm } from './pageSetup'
+import { normalizePageSetup, resolvePageSetup, suggestedInsideMarginMm } from './pageSetup'
 import { fromMm, PAGE_SIZE_GROUP_LABELS, PAGE_SIZE_PRESETS, matchPageSizePreset, toMm } from './pageSizes'
-import { getBookSettings, setBookSettings, usePrintLayoutStore } from './printLayoutStore'
+import { bookFolderForScope, getBookSettings, getPrintScope, setBookSettings, setPrintScope, usePrintLayoutStore } from './printLayoutStore'
+import { BOOK_TYPOGRAPHY } from './typography'
 import { useDocPageSetup } from './useDocPageSetup'
+import { usePrintJobStatus } from './usePrintJobStatus'
 import './PageSetupSheet.css'
 
 const UNIT_KEY = 'inkblot-page-units'
@@ -67,7 +68,7 @@ function Running({ label, value, onChange }) {
         <input
           key={`${key}:${value[key]}`}
           defaultValue={value[key]}
-          placeholder={key === 'center' ? 'Centre' : key[0].toUpperCase() + key.slice(1)}
+          placeholder={key[0].toUpperCase() + key.slice(1)}
           onBlur={commit(key)}
           onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
         />
@@ -79,10 +80,21 @@ function Running({ label, value, onChange }) {
 export default function PageSetupSheet({ editor, projectName, docPath, pageCount = 0, onClose }) {
   usePrintLayoutStore()
   const own = useDocPageSetup(editor)
-  const setup = useMemo(() => normalizePageSetup(own || (editor ? effectivePageSetup(editor.state.doc) : null)), [own, editor])
   const [unit, setUnit] = useState(defaultUnit)
-  const folder = bookFolderFor(docPath, 'folder')
+  // Which setup the sheet edits: the document's own, or the one its whole book prints in.
+  const [target, setTarget] = useState('document')
+  const scope = getPrintScope(projectName)
+  const folder = bookFolderForScope(projectName, docPath)
   const book = getBookSettings(projectName, folder)
+  const bookSetupJson = book.pageSetup ? JSON.stringify(book.pageSetup) : ''
+  const setup = useMemo(() => {
+    const bookSetup = bookSetupJson ? JSON.parse(bookSetupJson) : null
+    return target === 'book'
+      ? normalizePageSetup(bookSetup || own)
+      : resolvePageSetup({ docSetup: own, bookSetup }).setup
+  }, [own, bookSetupJson, target])
+  const { formatId, modified } = formatOf(setup)
+  const job = usePrintJobStatus()
 
   useEffect(() => {
     setPreference(UNIT_KEY, unit)
@@ -94,9 +106,13 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const apply = (patch) => editor?.chain().setPageSetup({ ...setup, ...patch }).run()
-  const applyMargins = (patch) => apply({ margins: { ...setup.margins, ...patch } })
   const applyBook = (patch) => setBookSettings(projectName, folder, { ...book, ...patch })
+  const replace = (next) => {
+    if (target === 'book') applyBook({ pageSetup: normalizePageSetup(next) })
+    else editor?.chain().setPageSetup(next).run()
+  }
+  const apply = (patch) => replace({ ...setup, ...patch })
+  const applyMargins = (patch) => apply({ margins: { ...setup.margins, ...patch } })
   const applyBinding = (patch) => applyBook({ binding: { ...book.binding, ...patch } })
 
   const groups = useMemo(() => {
@@ -123,14 +139,75 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
           <h2>Page Setup</h2>
           <select value={unit} onChange={(event) => setUnit(event.target.value)} aria-label="Units">
             <option value="in">Inches</option>
-            <option value="mm">Millimetres</option>
-            <option value="cm">Centimetres</option>
+            <option value="mm">Millimeters</option>
+            <option value="cm">Centimeters</option>
             <option value="pt">Points</option>
           </select>
           <button type="button" onClick={onClose}>Done</button>
         </header>
 
+        <div className="pss-actions">
+          <div className="pss-segmented" role="radiogroup" aria-label="Print">
+            {[['document', 'This Document'], ['folder', 'Book'], ['project', 'Whole Project']].map(([value, label]) => (
+              <button key={value} type="button" className={scope === value ? 'is-on' : ''} onClick={() => setPrintScope(projectName, value)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="pss-primary" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:print', { detail: { scope } }))}>Print…</button>
+          <select
+            value=""
+            aria-label="Export"
+            onChange={(event) => {
+              const [format, bound] = event.target.value.split(':')
+              if (format) window.dispatchEvent(new CustomEvent('inkblot:export', { detail: { format, scope, bound: bound === 'bound' } }))
+            }}
+          >
+            <option value="" hidden>Export…</option>
+            <option value="pdf">PDF</option>
+            <option value="epub">EPUB</option>
+            <option value="markdown">Markdown</option>
+            <option value="html">HTML</option>
+            {book.binding.binding !== 'none' && scope !== 'document' ? <option value="pdf:bound">PDF for Binding</option> : null}
+          </select>
+          {job ? <span className={`pss-job is-${job.phase}`} role="status">{job.text}</span> : null}
+        </div>
+
         <div className="pss-body">
+          <section>
+            <h3>Format</h3>
+            <div className="pss-segmented" role="radiogroup" aria-label="Edit">
+              <button type="button" className={target === 'document' ? 'is-on' : ''} onClick={() => setTarget('document')}>This Document</button>
+              <button type="button" className={target === 'book' ? 'is-on' : ''} onClick={() => setTarget('book')}>Whole Book</button>
+            </div>
+            {target === 'book' ? <p className="pss-note">Editing the setup every chapter of the book prints in.</p> : null}
+            <label className="pss-field wide">
+              <span>Format</span>
+              <select
+                value={formatId || 'custom'}
+                onChange={(event) => {
+                  const next = applyFormat(event.target.value)
+                  if (next) replace(next)
+                  // A script's format makes the document a script.
+                  const writing = writingFormatOf(event.target.value)
+                  if (writing && next) editor?.commands.setWritingFormat(writing)
+                }}
+              >
+                {[...new Set(FORMAT_PRESETS.map((f) => f.group))].map((group) => (
+                  <optgroup key={group} label={group}>
+                    {FORMAT_PRESETS.filter((f) => f.group === group).map((f) => (
+                      <option key={f.id} value={f.id}>{f.label}{f.id === formatId && modified ? ' (modified)' : ''}</option>
+                    ))}
+                  </optgroup>
+                ))}
+                {formatId ? null : <option value="custom">Custom</option>}
+              </select>
+            </label>
+            {target === 'document' && book.pageSetup ? (
+              <p className="pss-note">This book prints every chapter in its own setup, so what is set here shows on screen and when this document is printed alone.</p>
+            ) : null}
+          </section>
+
           <section>
             <h3>Page</h3>
             <label className="pss-field wide">
@@ -161,16 +238,6 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              className="pss-link"
-              onClick={() => {
-                const b = bookPageSetup(setup.presetId)
-                apply({ ...b, presetId: setup.presetId, widthMm: setup.widthMm, heightMm: setup.heightMm, orientation: setup.orientation })
-              }}
-            >
-              Set up as a book
-            </button>
           </section>
 
           <section>
@@ -212,6 +279,68 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
               {setup.columns > 1 ? <Length label="Gap" mm={setup.columnGapMm} unit={unit} onChange={(v) => apply({ columnGapMm: v })} /> : null}
             </div>
             {setup.columns > 1 ? <p className="pss-note">Pages are edited as a single running column; Print, PDF and binding set the columns side by side.</p> : null}
+          </section>
+
+          <section>
+            <h3>Typography</h3>
+            <label className="pss-check">
+              <input
+                type="checkbox"
+                checked={Boolean(setup.typography)}
+                onChange={(event) => apply({ typography: event.target.checked ? { ...BOOK_TYPOGRAPHY } : undefined })}
+              />
+              Set type for print
+            </label>
+            {setup.typography ? (() => {
+              const t = setup.typography
+              const applyType = (patch) => apply({ typography: { ...t, ...patch } })
+              return (
+                <>
+                  <label className="pss-field wide">
+                    <span>Font</span>
+                    <input key={`f:${t.fontFamily}`} defaultValue={t.fontFamily} onBlur={(event) => applyType({ fontFamily: event.target.value })} />
+                  </label>
+                  <div className="pss-row">
+                    <label className="pss-field">
+                      <span>Size</span>
+                      <input type="number" min="5" max="72" step="0.5" key={`s:${t.fontSizePt}`} defaultValue={t.fontSizePt} onBlur={(event) => applyType({ fontSizePt: Number(event.target.value) || t.fontSizePt })} />
+                      <em>pt</em>
+                    </label>
+                    <label className="pss-field">
+                      <span>Spacing</span>
+                      <select value={t.lineSpacing} onChange={(event) => applyType({ lineSpacing: event.target.value })}>
+                        <option value="single">Single</option>
+                        <option value="oneAndAHalf">1.5 lines</option>
+                        <option value="double">Double</option>
+                        <option value="multiple">Multiple</option>
+                        <option value="exact">Exactly</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="pss-row">
+                    <Length label="Indent" mm={t.firstLineIndentMm} unit={unit} onChange={(v) => applyType({ firstLineIndentMm: v })} />
+                    <label className="pss-field">
+                      <span>Scene break</span>
+                      <input key={`b:${t.sceneBreak}`} defaultValue={t.sceneBreak} onBlur={(event) => applyType({ sceneBreak: event.target.value })} />
+                    </label>
+                  </div>
+                  <div className="pss-segmented" role="radiogroup" aria-label="Alignment">
+                    {[['left', 'Ragged Right'], ['justify', 'Justified']].map(([value, label]) => (
+                      <button key={value} type="button" className={t.alignment === value ? 'is-on' : ''} onClick={() => applyType({ alignment: value })}>{label}</button>
+                    ))}
+                  </div>
+                  <p className="pss-note">Type for print shows in Print Layout and on paper; the editor keeps your writing font.</p>
+                </>
+              )
+            })() : null}
+            <label className="pss-check">
+              <input
+                type="checkbox"
+                checked={Boolean(setup.titlePage)}
+                onChange={(event) => apply({ titlePage: event.target.checked ? { style: 'book', showContact: false, showWordCount: false } : undefined })}
+              />
+              Add a title page when printing
+            </label>
           </section>
 
           <section>
@@ -258,9 +387,9 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
           <section>
             <h3>Text flow</h3>
             <label className="pss-field wide">
-              <span>Keep together</span>
+              <span>Widow &amp; orphan control</span>
               <select value={setup.widowOrphanLines} onChange={(event) => apply({ widowOrphanLines: Number(event.target.value) })}>
-                <option value={1}>Allow widows and orphans</option>
+                <option value={1}>Off</option>
                 <option value={2}>At least 2 lines</option>
                 <option value={3}>At least 3 lines</option>
               </select>
@@ -276,20 +405,29 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
             <label className="pss-field wide"><span>Title</span><input key={`t:${book.title}`} defaultValue={book.title} onBlur={(event) => applyBook({ title: event.target.value })} /></label>
             <label className="pss-field wide"><span>Author</span><input key={`a:${book.author}`} defaultValue={book.author} onBlur={(event) => applyBook({ author: event.target.value })} /></label>
             <label className="pss-field wide"><span>Language</span><input key={`l:${book.language}`} defaultValue={book.language} onBlur={(event) => applyBook({ language: event.target.value })} /></label>
-            <p className="pss-note">A book is this document&apos;s folder, its documents in file-tree order.</p>
+            <p className="pss-note">{scope === 'project' ? 'The book is the whole project' : 'A book is this document\u2019s folder'}, its documents in file-tree order.</p>
           </section>
 
           <section>
             <h3>Binding</h3>
-            <label className="pss-field wide">
-              <span>Binding</span>
-              <select value={book.binding.binding} onChange={(event) => applyBinding({ binding: event.target.value })}>
-                <option value="signatures">Sewn signatures</option>
-                <option value="saddle">Saddle stitch (booklet)</option>
-                <option value="perfect">Perfect bound</option>
-                <option value="none">None</option>
-              </select>
+            <label className="pss-check">
+              <input
+                type="checkbox"
+                checked={book.binding.binding !== 'none'}
+                onChange={(event) => applyBinding({ binding: event.target.checked ? 'signatures' : 'none' })}
+              />
+              Print for hand binding
             </label>
+            {book.binding.binding !== 'none' ? (
+              <label className="pss-field wide">
+                <span>Binding</span>
+                <select value={book.binding.binding} onChange={(event) => applyBinding({ binding: event.target.value })}>
+                  <option value="signatures">Sewn signatures</option>
+                  <option value="saddle">Saddle stitch (booklet)</option>
+                  <option value="perfect">Perfect bound</option>
+                </select>
+              </label>
+            ) : null}
             {book.binding.binding === 'signatures' ? (
               <>
                 <label className="pss-field wide">
@@ -341,16 +479,6 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
           </section>
         </div>
 
-        <footer>
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:print', { detail: { scope: 'document' } }))}>Print…</button>
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:print', { detail: { scope: 'folder', bound: true } }))} disabled={book.binding.binding === 'none'}>Print Book for Binding…</button>
-          <span className="pss-spacer" />
-          {['pdf', 'epub', 'markdown', 'html'].map((format) => (
-            <button key={format} type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:export', { detail: { format, scope: 'document' } }))}>
-              {format === 'markdown' ? 'Markdown' : format.toUpperCase()}
-            </button>
-          ))}
-        </footer>
       </div>
     </div>,
     document.body

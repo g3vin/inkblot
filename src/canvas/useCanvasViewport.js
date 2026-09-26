@@ -2,10 +2,10 @@
  * useCanvasViewport.js — pan/zoom for the canvas surface.
  *
  * The viewport lives in a ref, not React state: a pan or zoom writes the world
- * layer's transform directly and commits to state only on the trailing frame, so
- * a gesture never costs one render per event. Read `viewportRef.current` for the
- * live value; the returned `viewport` is for rendering (zoom %, culling) and may
- * lag by a frame.
+ * layer's transform directly, so a gesture never costs one render per event. Read
+ * `viewportRef.current` for the live value. What React holds is the zoom alone,
+ * rounded to a percent, for the readout: a pan leaves it unchanged, so a pan renders
+ * nothing, and mid-zoom it is refreshed at most every 100ms and again on settling.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -22,6 +22,11 @@ import {
 /** World units. Exported so snap-to-grid lands on the grid the user can see. */
 export const GRID_SIZE = 24
 const WHEEL_ZOOM_SENSITIVITY = 0.01
+/** The most one wheel event zooms by, in px of delta: ×1.22 a mouse notch. */
+const MAX_ZOOM_WHEEL_DELTA = 20
+
+/** The zoom as the readout shows it: to the percent. */
+const roundZoom = (zoom) => Math.round(zoom * 100) / 100
 const ZOOM_STEP = 1.2
 
 /**
@@ -41,15 +46,35 @@ function canScrollBy(el, deltaY) {
 export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef }) {
   const surfaceRef = useRef(null)
   const worldRef = useRef(null)
+  const gridRef = useRef(null)
   const viewportRef = useRef(initialViewport)
   const frameRef = useRef(0)
-  const [viewport, setViewportState] = useState(initialViewport)
+  const settleTimerRef = useRef(0)
+  const surfaceRectRef = useRef(null)
+  const [zoom, setZoomState] = useState(() => roundZoom(initialViewport.zoom))
+  const zoomSetAtRef = useRef(0)
+  // The first frame of a gesture reaches the readout at once; the rest are throttled.
+  const leadingRef = useRef(true)
   const [isPanning, setIsPanning] = useState(false)
   const onViewportChangeRef = useRef(onViewportChange)
 
   useEffect(() => {
     onViewportChangeRef.current = onViewportChange
   }, [onViewportChange])
+
+  /** The gesture has gone quiet: what a moving canvas skips is brought up to date. */
+  const settle = useCallback(() => {
+    settleTimerRef.current = 0
+    const surface = surfaceRef.current
+    if (!surface) return
+    // Read by the chrome inside the world (resize strips, ports, hit strokes) to hold
+    // a constant on-screen size. Inherited by every element under it, so writing it
+    // restyles the whole canvas — once here, never per frame.
+    surface.style.setProperty('--canvas-zoom', String(viewportRef.current.zoom))
+    delete surface.dataset.gesturing
+    surfaceRectRef.current = null
+    setZoomState(roundZoom(viewportRef.current.zoom))
+  }, [])
 
   /** Write the viewport to the DOM now; sync React (and the saver) on the next frame. */
   const applyViewport = useCallback((next) => {
@@ -58,25 +83,40 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     if (worldRef.current) {
       worldRef.current.style.transform = worldTransform(next)
     }
-    // The dot grid is a background on the surface, so it has to be panned/scaled
-    // by hand rather than riding the world layer's transform. --canvas-zoom lets
-    // chrome inside the world (resize handles) cancel the scale and hold a
-    // constant on-screen size.
-    if (surfaceRef.current) {
-      const style = surfaceRef.current.style
-      style.setProperty('--canvas-zoom', String(next.zoom))
+    // The dot grid is a background on its own layer, so it has to be panned/scaled
+    // by hand rather than riding the world layer's transform. Its variables live on
+    // it alone: set on the surface they would restyle every card each frame.
+    if (gridRef.current) {
+      const style = gridRef.current.style
       style.setProperty('--canvas-grid-size', `${GRID_SIZE * next.zoom}px`)
       style.setProperty('--canvas-grid-x', `${-next.x * next.zoom}px`)
       style.setProperty('--canvas-grid-y', `${-next.y * next.zoom}px`)
     }
 
+    // While the canvas moves, hover effects and hit-testing are off (Canvas.css):
+    // cards sliding under a still cursor would otherwise flip :hover card after card.
+    const surface = surfaceRef.current
+    if (surface) {
+      if (!('gesturing' in surface.dataset)) {
+        surface.dataset.gesturing = ''
+        leadingRef.current = true
+      }
+      window.clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = window.setTimeout(settle, 120)
+    }
+
     if (frameRef.current) return
     frameRef.current = requestAnimationFrame(() => {
       frameRef.current = 0
-      setViewportState(viewportRef.current)
+      const now = performance.now()
+      if (leadingRef.current || now - zoomSetAtRef.current >= 100) {
+        leadingRef.current = false
+        zoomSetAtRef.current = now
+        setZoomState(roundZoom(viewportRef.current.zoom))
+      }
       onViewportChangeRef.current?.(viewportRef.current)
     })
-  }, [])
+  }, [settle])
 
   /*
    * Resetting the id to 0 is load-bearing, not tidiness.
@@ -93,6 +133,8 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     () => () => {
       cancelAnimationFrame(frameRef.current)
       frameRef.current = 0
+      window.clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = 0
     },
     []
   )
@@ -100,12 +142,25 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
   // Push the initial viewport into the DOM on mount (the layer starts untransformed).
   useEffect(() => {
     applyViewport(viewportRef.current)
+    settle()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** Pointer position relative to the surface, which is what the math expects. */
+  /**
+   * Pointer position relative to the surface, which is what the math expects.
+   *
+   * Mid-gesture the surface's rect is the one read at the gesture's first event: a
+   * wheel tick that measured it right after the last tick wrote a transform forced a
+   * layout on every tick. Outside a gesture it is always read fresh (`settle` drops
+   * the kept one), since a pane can move without resizing.
+   */
   const toSurfacePoint = useCallback((clientX, clientY) => {
-    const rect = surfaceRef.current?.getBoundingClientRect()
+    const surface = surfaceRef.current
+    let rect = surface && 'gesturing' in surface.dataset ? surfaceRectRef.current : null
+    if (!rect) {
+      rect = surface?.getBoundingClientRect() || null
+      surfaceRectRef.current = rect
+    }
     if (!rect) return { x: 0, y: 0 }
     return { x: clientX - rect.left, y: clientY - rect.top }
   }, [])
@@ -158,7 +213,10 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
       // A trackpad pinch arrives as a wheel event with ctrlKey set.
       if (event.ctrlKey || event.metaKey) {
         const point = toSurfacePoint(event.clientX, event.clientY)
-        const factor = Math.exp(-event.deltaY * unit * WHEEL_ZOOM_SENSITIVITY)
+        // Clamped: a mouse notch is ~100px, which unclamped zoomed ×2.7 a click; a
+        // trackpad pinch sends a few px an event and is untouched.
+        const delta = Math.max(-MAX_ZOOM_WHEEL_DELTA, Math.min(MAX_ZOOM_WHEEL_DELTA, event.deltaY * unit))
+        const factor = Math.exp(-delta * WHEEL_ZOOM_SENSITIVITY)
         applyViewport(zoomAt(viewportRef.current, factor, point.x, point.y))
         return
       }
@@ -314,26 +372,33 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     return { width: rect?.width || 0, height: rect?.height || 0 }
   }, [])
 
+  /** A command's jump (zoom in, fit, centre): the whole gesture at once, so it settles at once. */
+  const jumpTo = useCallback((next) => {
+    applyViewport(next)
+    window.clearTimeout(settleTimerRef.current)
+    settle()
+  }, [applyViewport, settle])
+
   const zoomBy = useCallback((factor) => {
     const { width, height } = surfaceSize()
-    applyViewport(zoomAt(viewportRef.current, factor, width / 2, height / 2))
-  }, [applyViewport, surfaceSize])
+    jumpTo(zoomAt(viewportRef.current, factor, width / 2, height / 2))
+  }, [jumpTo, surfaceSize])
 
   const zoomIn = useCallback(() => zoomBy(ZOOM_STEP), [zoomBy])
   const zoomOut = useCallback(() => zoomBy(1 / ZOOM_STEP), [zoomBy])
 
   const setZoom = useCallback((zoom) => {
     const { width, height } = surfaceSize()
-    applyViewport(zoomTo(viewportRef.current, clampZoom(zoom), width, height))
-  }, [applyViewport, surfaceSize])
+    jumpTo(zoomTo(viewportRef.current, clampZoom(zoom), width, height))
+  }, [jumpTo, surfaceSize])
 
   const resetZoom = useCallback(() => setZoom(1), [setZoom])
 
   /** Frame `nodes` (all of them, or just a selection) in the visible area. */
   const zoomToFit = useCallback((nodes, options) => {
     const { width, height } = surfaceSize()
-    applyViewport(fitViewport(nodesBounds(nodes), width, height, options))
-  }, [applyViewport, surfaceSize])
+    jumpTo(fitViewport(nodesBounds(nodes), width, height, options))
+  }, [jumpTo, surfaceSize])
 
   /**
    * Center one node, holding the current zoom. Revealing a search hit should move
@@ -344,17 +409,18 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     if (!node) return
     const { width, height } = surfaceSize()
     const { zoom } = viewportRef.current
-    applyViewport({
+    jumpTo({
       zoom,
       x: node.x + node.width / 2 - width / (2 * zoom),
       y: node.y + node.height / 2 - height / (2 * zoom),
     })
-  }, [applyViewport, surfaceSize])
+  }, [jumpTo, surfaceSize])
 
   return {
     surfaceRef,
     worldRef,
-    viewport,
+    gridRef,
+    zoom,
     viewportRef,
     applyViewport,
     screenToWorldAt,

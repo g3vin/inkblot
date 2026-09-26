@@ -14,14 +14,17 @@ import SwiftUI
 /// The archive button opens the document's archive (`ArchiveListView`) in its place.
 struct HistoryPanelView: View {
     @Environment(AppModel.self) private var model
-    @State private var namedOnly = false
+    @State private var filter = HistoryFilter.all
     @State private var expanded: Set<String> = []
+    /// The version whose actions are showing under it. One at a time, so the list stays
+    /// a list to scan rather than a wall of buttons.
+    @State private var selected: String?
     @State private var renaming: VersionRow?
     @State private var pendingDelete: VersionRow?
     @State private var showingArchive = false
 
     var body: some View {
-        if showingArchive {
+        if showingArchive && isTextDocument {
             ArchiveListView { showingArchive = false }
         } else {
             versions
@@ -30,44 +33,52 @@ struct HistoryPanelView: View {
 
     private var versions: some View {
         let sidebar = model.sidebar
-        return VStack(spacing: 0) {
-            HStack {
-                Button("Snapshot Now", systemImage: "plus") { sidebar.versionAction(.snapshot) }
-                    .disabled(sidebar.historyDocPath == nil)
-                    .help("Save the current state as a version you can name")
-                Spacer()
-                Toggle(isOn: $namedOnly) { Image(systemName: "tag") }
-                    .toggleStyle(.button)
-                    .help(namedOnly ? "Show all versions" : "Show only named versions")
-                Button("Archive", systemImage: "archivebox") { showingArchive = true }
-                    .labelStyle(.iconOnly)
-                    .disabled(sidebar.historyDocPath == nil)
-                    .help("View the archive: things put away out of this document")
+        let sections = sections
+        return Form {
+            Section {
+                HStack(spacing: 8) {
+                    SegmentedTextPicker(options: HistoryFilter.allCases, selection: $filter, title: \.title)
+                        .accessibilityLabel("Show")
+                    // Only prose has things archived out of it; a canvas or map has none.
+                    if isTextDocument {
+                        Button("Archive", systemImage: "archivebox") { showingArchive = true }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.borderless)
+                            .disabled(sidebar.historyDocPath == nil)
+                            .help("View the archive: things put away out of this document")
+                    }
+                }
+                Button {
+                    sidebar.versionAction(.snapshot)
+                } label: {
+                    Label("Snapshot Now", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(sidebar.historyDocPath == nil)
+                .help("Save the current state as a version you can name")
+            } footer: {
+                Text(caption)
             }
-            .padding(12)
 
             if sections.isEmpty {
-                ContentUnavailableView {
-                    Text(emptyTitle)
-                } description: {
-                    Text(sidebar.historyDocPath == nil
-                        ? "Open a document to see its history."
-                        : "Checkpoints appear as you write.")
+                Section {
+                    ContentUnavailableView {
+                        Label(emptyTitle, systemImage: "clock")
+                    } description: {
+                        Text(emptyDescription)
+                    }
                 }
-                .frame(maxHeight: .infinity)
             } else {
-                List {
-                    ForEach(sections) { section in
-                        Section(section.label) {
-                            ForEach(section.groups) { group in
-                                groupView(group)
-                            }
+                ForEach(sections) { section in
+                    Section(section.label) {
+                        ForEach(section.groups) { group in
+                            groupView(group)
                         }
                     }
                 }
-                .listStyle(.inset)
             }
         }
+        .formStyle(.grouped)
         .sheet(item: $renaming) { row in
             RenameVersionSheet(row: row) { name in
                 sidebar.renameVersion(row, to: name)
@@ -82,7 +93,31 @@ struct HistoryPanelView: View {
     }
 
     private var emptyTitle: String {
-        model.sidebar.historyRows.isEmpty ? "No Versions Yet" : (namedOnly ? "No Named Versions" : "No Matching Versions")
+        model.sidebar.historyRows.isEmpty ? "No Versions Yet" : (filter == .named ? "No Named Versions" : "No Matching Versions")
+    }
+
+    /// A rich-text document, rather than a canvas or a map.
+    private var isTextDocument: Bool {
+        guard let path = model.sidebar.historyDocPath else { return true }
+        return !isCanvasDoc(path: path) && !isMapDoc(path: path)
+    }
+
+    private var emptyDescription: String {
+        guard let path = model.sidebar.historyDocPath else { return "Open a document to see its history." }
+        if isMapDoc(path: path) { return "Checkpoints appear as you work on the map." }
+        if isCanvasDoc(path: path) { return "Checkpoints appear as you work on the canvas." }
+        return "Checkpoints appear as you write."
+    }
+
+    /// Which document, and how much history it has.
+    private var caption: String {
+        let sidebar = model.sidebar
+        guard let path = sidebar.historyDocPath else { return "No document open" }
+        let rows = sidebar.historyRows
+        let named = rows.filter { $0.name != nil }.count
+        var text = "\(docDisplayName(path: path)) · \(rows.count.formatted()) \(rows.count == 1 ? "version" : "versions")"
+        if named > 0 { text += ", \(named.formatted()) named" }
+        return text
     }
 
     /* ---------------- grouping ---------------- */
@@ -104,7 +139,7 @@ struct HistoryPanelView: View {
     private var sections: [DaySection] {
         let sidebar = model.sidebar
         var list = sidebar.historyRows
-        if namedOnly { list = list.filter { $0.name != nil } }
+        if filter == .named { list = list.filter { $0.name != nil } }
         if !sidebar.query.isEmpty {
             list = list.filter { row in
                 sidebar.matchesFilter(row.name ?? "", row.timestamp, sidebar.versionText(row))
@@ -149,10 +184,11 @@ struct HistoryPanelView: View {
         } else {
             let newest = group.rows[0]
             let oldest = group.rows[group.rows.count - 1]
-            DisclosureGroup(isExpanded: Binding(
+            let isExpanded = Binding(
                 get: { expanded.contains(group.id) },
                 set: { if $0 { expanded.insert(group.id) } else { expanded.remove(group.id) } }
-            )) {
+            )
+            DisclosureGroup(isExpanded: isExpanded) {
                 ForEach(group.rows, id: \.id) { rowView($0) }
             } label: {
                 HStack(spacing: 6) {
@@ -162,47 +198,82 @@ struct HistoryPanelView: View {
                     Spacer()
                     DeltaBadge(delta: model.sidebar.spanDelta(newest: newest, oldest: oldest))
                 }
-                .font(.callout)
+                // The whole label opens the burst, not only its chevron.
+                .contentShape(Rectangle())
+                .onTapGesture { withAnimation(.snappy(duration: 0.2)) { isExpanded.wrappedValue.toggle() } }
+                .help("\(group.rows.count) checkpoints in one burst of writing")
             }
         }
     }
 
     private func rowView(_ row: VersionRow) -> some View {
-        let sidebar = model.sidebar
-        return VStack(alignment: .leading, spacing: 4) {
+        let isSelected = selected == row.id
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 SessionDot(color: row.sessionColor)
-                Text(Self.time(row.timestamp)).font(.callout)
+                if let name = row.name {
+                    Image(systemName: "tag.fill")
+                        .font(.caption)
+                        .foregroundStyle(.tint)
+                    Text(name)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                    Text(Self.time(row.timestamp))
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                } else {
+                    Text(Self.time(row.timestamp))
+                }
+                Spacer(minLength: 4)
                 DeltaBadge(delta: row.delta)
-                Spacer()
                 Menu {
-                    Button("Restore This Version", systemImage: "clock.arrow.circlepath") { sidebar.versionAction(.restore, row) }
-                    Button("Compare with Current", systemImage: "arrow.left.arrow.right") { sidebar.versionAction(.compare, row) }
-                    Button("Make a Copy", systemImage: "doc.on.doc") { sidebar.versionAction(.makeCopy, row) }
-                    Divider()
-                    Button(row.name == nil ? "Name This Version…" : "Rename…", systemImage: "tag") { renaming = row }
-                    Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = row }
+                    actions(row)
                 } label: {
                     Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(.secondary)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
-            }
-            if let name = row.name {
-                Text(name).font(.headline)
+                .help("More actions")
             }
             preview(row)
                 .font(.callout)
-                .lineLimit(3)
+                .lineLimit(isSelected ? 8 : 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if isSelected {
+                HStack(spacing: 8) {
+                    Button("Restore", systemImage: "clock.arrow.circlepath") { model.sidebar.versionAction(.restore, row) }
+                        .help("Replace the document with this version")
+                    Button("Compare", systemImage: "arrow.left.arrow.right") { model.sidebar.versionAction(.compare, row) }
+                        .help("Compare this version with the current document")
+                    Spacer()
+                }
+                .controlSize(.small)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(.vertical, 2)
-        .help(Self.fullTimestamp(row.timestamp))
-        .contextMenu {
-            Button("Restore This Version") { sidebar.versionAction(.restore, row) }
-            Button("Compare with Current") { sidebar.versionAction(.compare, row) }
-            Button("Make a Copy") { sidebar.versionAction(.makeCopy, row) }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.snappy(duration: 0.2)) { selected = isSelected ? nil : row.id }
         }
+        .help(Self.fullTimestamp(row.timestamp))
+        .contextMenu { actions(row) }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
+    }
+
+    /// Everything a version can do, for its menu and its context menu alike.
+    @ViewBuilder
+    private func actions(_ row: VersionRow) -> some View {
+        let sidebar = model.sidebar
+        Button("Restore This Version", systemImage: "clock.arrow.circlepath") { sidebar.versionAction(.restore, row) }
+        Button("Compare with Current", systemImage: "arrow.left.arrow.right") { sidebar.versionAction(.compare, row) }
+        Button("Make a Copy", systemImage: "doc.on.doc") { sidebar.versionAction(.makeCopy, row) }
+        Divider()
+        Button(row.name == nil ? "Name This Version…" : "Rename…", systemImage: "tag") { renaming = row }
+        Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = row }
     }
 
     /// The change, as the page's ChangeSnippet draws it: context, then what was added
@@ -306,3 +377,15 @@ private struct RenameVersionSheet: View {
 }
 
 extension VersionRow: Identifiable {}
+
+/// The History tab's filter: every checkpoint, or only the versions given a name.
+enum HistoryFilter: String, CaseIterable, Identifiable {
+    case all, named
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .named: "Named"
+        }
+    }
+}

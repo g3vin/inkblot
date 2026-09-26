@@ -23,6 +23,7 @@ import { Citation } from '../extensions/Citation'
 import { CustomTextStyle } from '../extensions/CustomTextStyle'
 import ConversationTile from '../extensions/ConversationTile'
 import { DictationInline } from '../extensions/DictationInline'
+import { DocChangeReporter } from '../extensions/DocChangeReporter'
 import { NoteAnnotation } from '../extensions/NoteAnnotation'
 import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
@@ -31,6 +32,8 @@ import TabIndent from '../extensions/TabIndent'
 import { DocPageSetup } from '../print/DocPageSetup'
 import { PageBreak } from '../print/PageBreak'
 import { Pagination } from '../print/PaginationExtension'
+import { DocWritingFormat } from '../script/DocWritingFormat'
+import { ScriptElement } from '../script/ScriptElement'
 
 /**
  * Everything both panes and cards understand.
@@ -42,6 +45,7 @@ import { Pagination } from '../print/PaginationExtension'
  */
 const sharedExtensions = () => [
   CustomTextStyle,
+  DocChangeReporter,
   BubbleSession,
   Color,
   FontFamily,
@@ -67,7 +71,9 @@ const sharedExtensions = () => [
  * pane configures list marks differently from the secondary one.
  */
 export const buildEditorExtensions = (starterKit) => [
-  starterKit,
+  // The empty paragraph the editor keeps last would be prose in a script: a script
+  // ends on its own lines (ScriptElement.ts).
+  starterKit.configure({ trailingNode: { notAfter: ['scriptElement'] } }),
   Dropcursor.configure({
     color: 'rgba(84, 165, 255, 0.95)',
     width: 2,
@@ -80,6 +86,9 @@ export const buildEditorExtensions = (starterKit) => [
   DocPageSetup,
   PageBreak,
   Pagination,
+  // A screenplay's or a play's lines, and which the document is written as.
+  ScriptElement,
+  DocWritingFormat,
   ...sharedExtensions(),
 ]
 

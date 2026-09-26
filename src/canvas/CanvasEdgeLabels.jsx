@@ -35,7 +35,7 @@ function EdgeLabel({ edge, mid, autoEdit, onCommit, onStopEditing }) {
   return (
     <div
       className={`canvas-edge-label${editing ? ' is-editing' : ''}`}
-      style={{ transform: `translate3d(${mid.x}px, ${mid.y}px, 0) translate(-50%, -50%)` }}
+      style={{ transform: `translate(${mid.x}px, ${mid.y}px) translate(-50%, -50%)` }}
       onPointerDown={(event) => event.stopPropagation()}
       onDoubleClick={(event) => {
         event.stopPropagation()

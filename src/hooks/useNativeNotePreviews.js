@@ -149,7 +149,10 @@ export function useNativeNotePreviews({ enabled }) {
       if (markersFrame) return
       markersFrame = window.requestAnimationFrame(() => {
         markersFrame = 0
-        const markers = collectMarkers()
+        // Mid-zoom the pages are a picture being stretched (PrintLayoutView), moved every
+        // frame. Following it would measure every dot and cross the bridge each frame;
+        // the dots step aside instead and come back where the zoom lands.
+        const markers = document.querySelector('.pl-sizer.is-zooming') ? [] : collectMarkers()
         const key = JSON.stringify(markers)
         if (key === lastMarkers) return
         lastMarkers = key

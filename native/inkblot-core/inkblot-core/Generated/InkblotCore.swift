@@ -96,6 +96,25 @@ public struct AddReplyCommand: Codable, Equatable {
 	}
 }
 
+/// Which setup an edit goes to: the active document's own, or the one every chapter of
+/// its book prints in.
+public enum PageSetupTarget: String, Codable, Equatable {
+	case document
+	case book
+}
+
+/// Replace a setup with one of the catalog's formats (`FormatOption::id`). The page
+/// builds the setup, so every shell's "Standard Manuscript" is the same one.
+public struct ApplyFormatCommand: Codable, Equatable {
+	public let formatId: String
+	public let target: PageSetupTarget?
+
+	public init(formatId: String, target: PageSetupTarget?) {
+		self.formatId = formatId
+		self.target = target
+	}
+}
+
 /// The marks the toolbar can toggle.
 /// 
 /// A closed set rather than a string: a Swift menu item sending `"bolb"` should not
@@ -284,6 +303,44 @@ public struct AudioClip: Codable, Equatable {
 	}
 }
 
+/// Who wrote it, for title pages and running heads. One per app: it is the writer's,
+/// not any one project's.
+public struct AuthorProfile: Codable, Equatable {
+	/// The name on the work — a pen name, if there is one.
+	public let byline: String
+	/// The name the contact details are under.
+	public let legalName: String
+	/// Street address, one line per line.
+	public let address: String
+	public let email: String
+	public let phone: String
+	/// An agent or agency, when the work goes out through one.
+	public let agent: String
+
+	public init(byline: String, legalName: String, address: String, email: String, phone: String, agent: String) {
+		self.byline = byline
+		self.legalName = legalName
+		self.address = address
+		self.email = email
+		self.phone = phone
+		self.agent = agent
+	}
+}
+
+/// The pages after the last chapter, each under its own heading. Empty text leaves it out.
+public struct BackMatter: Codable, Equatable {
+	public let acknowledgements: String
+	public let aboutTheAuthor: String
+	/// The author's other books, one per line.
+	public let alsoBy: String
+
+	public init(acknowledgements: String, aboutTheAuthor: String, alsoBy: String) {
+		self.acknowledgements = acknowledgements
+		self.aboutTheAuthor = aboutTheAuthor
+		self.alsoBy = alsoBy
+	}
+}
+
 public struct Point: Codable, Equatable {
 	public let x: Double
 	public let y: Double
@@ -433,6 +490,92 @@ public enum PageNumberFormat: String, Codable, Equatable {
 	case lowerRoman
 }
 
+public enum LineSpacing: String, Codable, Equatable {
+	case single
+	case oneAndAHalf
+	case double
+	/// `line_value` times the font's size.
+	case multiple
+	/// Exactly `line_value` points from baseline to baseline, as a script is set.
+	case exact
+}
+
+public enum PrintAlignment: String, Codable, Equatable {
+	case left
+	case justify
+}
+
+/// How a chapter's first paragraph opens.
+public enum ChapterOpening: String, Codable, Equatable {
+	case plain
+	/// A large initial set into the first lines.
+	case dropCap
+	/// The first line in small capitals.
+	case smallCaps
+	case dropCapAndSmallCaps
+}
+
+/// Type for print: set on the page's text in Print Layout, on paper and in the PDF,
+/// and carried into a DOCX's styles — never on the continuous editor.
+public struct PrintTypography: Codable, Equatable {
+	/// A CSS font family list: `"Courier Prime", Courier, monospace`.
+	public let fontFamily: String
+	public let fontSizePt: Double
+	public let lineSpacing: LineSpacing
+	/// The multiple, or the exact leading in points; unused otherwise.
+	public let lineValue: Double
+	public let firstLineIndentMm: Double
+	/// Space between paragraphs.
+	public let paragraphSpacingPt: Double
+	public let alignment: PrintAlignment
+	public let hyphenate: Bool
+	/// What a horizontal rule prints as — a scene break: `#`, `* * *`, `❧`. Empty
+	/// prints a blank line.
+	public let sceneBreak: String
+	public let chapterOpening: ChapterOpening
+	/// How far down the page a chapter's title starts, below the top margin.
+	public let chapterSinkMm: Double
+	/// A paragraph after a heading or a scene break starts flush, as books set it.
+	public let noIndentAfterBreak: Bool
+
+	public init(fontFamily: String, fontSizePt: Double, lineSpacing: LineSpacing, lineValue: Double, firstLineIndentMm: Double, paragraphSpacingPt: Double, alignment: PrintAlignment, hyphenate: Bool, sceneBreak: String, chapterOpening: ChapterOpening, chapterSinkMm: Double, noIndentAfterBreak: Bool) {
+		self.fontFamily = fontFamily
+		self.fontSizePt = fontSizePt
+		self.lineSpacing = lineSpacing
+		self.lineValue = lineValue
+		self.firstLineIndentMm = firstLineIndentMm
+		self.paragraphSpacingPt = paragraphSpacingPt
+		self.alignment = alignment
+		self.hyphenate = hyphenate
+		self.sceneBreak = sceneBreak
+		self.chapterOpening = chapterOpening
+		self.chapterSinkMm = chapterSinkMm
+		self.noIndentAfterBreak = noIndentAfterBreak
+	}
+}
+
+public enum TitlePageStyle: String, Codable, Equatable {
+	/// Contact details top-left, word count top-right, title and byline centred: the
+	/// standard manuscript submission.
+	case manuscript
+	/// Title, author, and nothing else: a book's title page.
+	case book
+	/// Title, "Written by", author centred; contact details bottom-left.
+	case screenplay
+}
+
+public struct TitlePageOptions: Codable, Equatable {
+	public let style: TitlePageStyle
+	public let showContact: Bool
+	public let showWordCount: Bool
+
+	public init(style: TitlePageStyle, showContact: Bool, showWordCount: Bool) {
+		self.style = style
+		self.showContact = showContact
+		self.showWordCount = showWordCount
+	}
+}
+
 public struct PageSetup: Codable, Equatable {
 	/// A `pageSizes.ts` preset id, or `"custom"`.
 	public let presetId: String
@@ -466,8 +609,16 @@ public struct PageSetup: Codable, Equatable {
 	/// A manual "recto" break, and each chapter of a compiled book, starts on an
 	/// odd page, inserting a blank verso when needed.
 	public let chapterStartsOnRecto: Bool
+	/// The catalog format (`formats.ts`) this setup was made from, kept after it is
+	/// changed so the inspector can say "Standard Manuscript (modified)".
+	public let formatId: String?
+	/// How the text is set on the page. Absent prints in the editor's own font, as a
+	/// document always did before it could be set for print.
+	public let typography: PrintTypography?
+	/// A title page before the text, printed and exported but never numbered.
+	public let titlePage: TitlePageOptions?
 
-	public init(presetId: String, widthMm: Double, heightMm: Double, orientation: PageOrientation, margins: PageMargins, mirrorMargins: Bool, columns: UInt32, columnGapMm: Double, header: RunningText, footer: RunningText, versoHeader: RunningText?, versoFooter: RunningText?, headerDistanceMm: Double, footerDistanceMm: Double, differentFirstPage: Bool, pageNumberStart: UInt32, pageNumberFormat: PageNumberFormat, widowOrphanLines: UInt32, chapterStartsOnRecto: Bool) {
+	public init(presetId: String, widthMm: Double, heightMm: Double, orientation: PageOrientation, margins: PageMargins, mirrorMargins: Bool, columns: UInt32, columnGapMm: Double, header: RunningText, footer: RunningText, versoHeader: RunningText?, versoFooter: RunningText?, headerDistanceMm: Double, footerDistanceMm: Double, differentFirstPage: Bool, pageNumberStart: UInt32, pageNumberFormat: PageNumberFormat, widowOrphanLines: UInt32, chapterStartsOnRecto: Bool, formatId: String?, typography: PrintTypography?, titlePage: TitlePageOptions?) {
 		self.presetId = presetId
 		self.widthMm = widthMm
 		self.heightMm = heightMm
@@ -487,6 +638,86 @@ public struct PageSetup: Codable, Equatable {
 		self.pageNumberFormat = pageNumberFormat
 		self.widowOrphanLines = widowOrphanLines
 		self.chapterStartsOnRecto = chapterStartsOnRecto
+		self.formatId = formatId
+		self.typography = typography
+		self.titlePage = titlePage
+	}
+}
+
+/// How a chapter's number is written in its heading.
+public enum ChapterNumberStyle: String, Codable, Equatable {
+	/// The chapters' own headings, as written.
+	case none
+	/// "Chapter One"
+	case words
+	/// "Chapter 1"
+	case numerals
+	/// "Chapter I"
+	case roman
+}
+
+/// Chapter headings a book adds as it compiles.
+public struct ChapterNumbering: Codable, Equatable {
+	public let style: ChapterNumberStyle
+	/// The word before the number — "Chapter", "Part" — or empty for the number alone.
+	public let prefix: String
+	/// Keep the chapter's own title under its number.
+	public let includeTitle: Bool
+
+	public init(style: ChapterNumberStyle, prefix: String, includeTitle: Bool) {
+		self.style = style
+		self.prefix = prefix
+		self.includeTitle = includeTitle
+	}
+}
+
+/// The pages before the first chapter. Empty text leaves its page out.
+public struct FrontMatter: Codable, Equatable {
+	/// The title alone, on the first recto.
+	public let halfTitle: Bool
+	/// The copyright page, on the back of the title page.
+	public let copyright: String
+	public let dedication: String
+	public let epigraph: String
+	/// Who the epigraph is by.
+	public let epigraphSource: String
+	/// A table of contents with page numbers.
+	public let contents: Bool
+
+	public init(halfTitle: Bool, copyright: String, dedication: String, epigraph: String, epigraphSource: String, contents: Bool) {
+		self.halfTitle = halfTitle
+		self.copyright = copyright
+		self.dedication = dedication
+		self.epigraph = epigraph
+		self.epigraphSource = epigraphSource
+		self.contents = contents
+	}
+}
+
+/// A print-on-demand service, whose rules a book is checked against.
+public enum PublishingService: String, Codable, Equatable {
+	/// Not checked against anyone's rules.
+	case none
+	/// Amazon KDP paperback.
+	case kdp
+	case ingramSpark
+}
+
+/// The paper a book is printed on, which sets how thick its spine is.
+public enum PaperStock: String, Codable, Equatable {
+	case cream
+	case white
+	/// Colour interior, on heavier paper.
+	case color
+}
+
+public struct PublishingTarget: Codable, Equatable {
+	public let service: PublishingService
+	public let paper: PaperStock
+
+	public init(service: PublishingService, paper: PaperStock) {
+		self.service = service
+		self.paper = paper
 	}
 }
 
@@ -505,8 +736,16 @@ public struct BookSettings: Codable, Equatable {
 	/// The book's own page setup; absent means each chapter's first document's.
 	public let pageSetup: PageSetup?
 	public let binding: BindingSettings
+	/// Chapters left out of the book, by tree path. The rest print in tree order; a
+	/// document added to the folder is in until it is left out.
+	public let excluded: [String]?
+	public let chapterNumbering: ChapterNumbering?
+	public let frontMatter: FrontMatter?
+	public let backMatter: BackMatter?
+	/// Where the book is going to be printed, for the Publish tab's checks.
+	public let publishing: PublishingTarget?
 
-	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings) {
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?) {
 		self.folder = folder
 		self.title = title
 		self.author = author
@@ -514,6 +753,11 @@ public struct BookSettings: Codable, Equatable {
 		self.coverImage = coverImage
 		self.pageSetup = pageSetup
 		self.binding = binding
+		self.excluded = excluded
+		self.chapterNumbering = chapterNumbering
+		self.frontMatter = frontMatter
+		self.backMatter = backMatter
+		self.publishing = publishing
 	}
 }
 
@@ -934,6 +1178,11 @@ public struct CitationStyleSpec: Codable, Equatable {
 	}
 }
 
+/// Take the book's own setup away: the book prints in its first chapter's again.
+public struct ClearBookSetupCommand: Codable, Equatable {
+	public init() {}
+}
+
 public struct ClipboardEntry: Codable, Equatable {
 	public let id: String
 	public let text: String
@@ -985,6 +1234,10 @@ public struct CloseBubbleSessionCommand: Codable, Equatable {
 	}
 }
 
+public struct CloseSplitCommand: Codable, Equatable {
+	public init() {}
+}
+
 /// Everything the shell can ask the document surface to do.
 /// 
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
@@ -1016,6 +1269,8 @@ public enum NativeCommand: Codable, Equatable {
 	case canvasDropNote(CanvasDropNoteCommand)
 	case canvasReveal(CanvasRevealCommand)
 	case canvasRestore(CanvasRestoreCommand)
+	/// Run a command on a map (`map.rs`).
+	case mapCommand(MapCommandRequest)
 	case insertPlainText(InsertPlainTextCommand)
 	case createEntry(CreateEntryCommand)
 	case renameEntry(RenameEntryCommand)
@@ -1043,6 +1298,7 @@ public enum NativeCommand: Codable, Equatable {
 	/// Leave the bubble editor and write its sentence back into the document.
 	case closeBubbleSession(CloseBubbleSessionCommand)
 	case setBlockType(SetBlockTypeCommand)
+	case setWritingFormat(SetWritingFormatCommand)
 	case toggleList(ToggleListCommand)
 	case editorHistory(EditorHistoryCommand)
 	case setFocusMode(SetFocusModeCommand)
@@ -1070,6 +1326,26 @@ public enum NativeCommand: Codable, Equatable {
 	case printDocument(PrintDocumentCommand)
 	case exportDocument(ExportDocumentCommand)
 	case printFinished(PrintFinishedCommand)
+	case applyFormat(ApplyFormatCommand)
+	case useSetupForBook(UseSetupForBookCommand)
+	case clearBookSetup(ClearBookSetupCommand)
+	case refreshBookChapters(RefreshBookChaptersCommand)
+	case setPrintScope(SetPrintScopeCommand)
+	case setAuthorProfile(SetAuthorProfileCommand)
+	case setBookCover(SetBookCoverCommand)
+	case exportAgain(ExportAgainCommand)
+	case selectTab(TabRef)
+	case closeTab(TabRef)
+	case setTabOrder(SetTabOrderCommand)
+	case newTab(NewTabCommand)
+	case openDocInTab(OpenDocInTabCommand)
+	case openDocInWindow(OpenDocInWindowCommand)
+	case openInSplit(OpenInSplitCommand)
+	case closeSplit(CloseSplitCommand)
+	case measureBook(MeasureBookCommand)
+	case importScript(ImportScriptCommand)
+	case setSceneNumbers(SetSceneNumbersCommand)
+	case scriptReport(ScriptReportCommand)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case applyMark,
@@ -1096,6 +1372,7 @@ public enum NativeCommand: Codable, Equatable {
 			canvasDropNote,
 			canvasReveal,
 			canvasRestore,
+			mapCommand,
 			insertPlainText,
 			createEntry,
 			renameEntry,
@@ -1121,6 +1398,7 @@ public enum NativeCommand: Codable, Equatable {
 			openProject,
 			closeBubbleSession,
 			setBlockType,
+			setWritingFormat,
 			toggleList,
 			editorHistory,
 			setFocusMode,
@@ -1146,7 +1424,27 @@ public enum NativeCommand: Codable, Equatable {
 			goToPage,
 			printDocument,
 			exportDocument,
-			printFinished
+			printFinished,
+			applyFormat,
+			useSetupForBook,
+			clearBookSetup,
+			refreshBookChapters,
+			setPrintScope,
+			setAuthorProfile,
+			setBookCover,
+			exportAgain,
+			selectTab,
+			closeTab,
+			setTabOrder,
+			newTab,
+			openDocInTab,
+			openDocInWindow,
+			openInSplit,
+			closeSplit,
+			measureBook,
+			importScript,
+			setSceneNumbers,
+			scriptReport
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -1277,6 +1575,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .canvasRestore(content)
 					return
 				}
+			case .mapCommand:
+				if let content = try? container.decode(MapCommandRequest.self, forKey: .payload) {
+					self = .mapCommand(content)
+					return
+				}
 			case .insertPlainText:
 				if let content = try? container.decode(InsertPlainTextCommand.self, forKey: .payload) {
 					self = .insertPlainText(content)
@@ -1400,6 +1703,11 @@ public enum NativeCommand: Codable, Equatable {
 			case .setBlockType:
 				if let content = try? container.decode(SetBlockTypeCommand.self, forKey: .payload) {
 					self = .setBlockType(content)
+					return
+				}
+			case .setWritingFormat:
+				if let content = try? container.decode(SetWritingFormatCommand.self, forKey: .payload) {
+					self = .setWritingFormat(content)
 					return
 				}
 			case .toggleList:
@@ -1532,6 +1840,106 @@ public enum NativeCommand: Codable, Equatable {
 					self = .printFinished(content)
 					return
 				}
+			case .applyFormat:
+				if let content = try? container.decode(ApplyFormatCommand.self, forKey: .payload) {
+					self = .applyFormat(content)
+					return
+				}
+			case .useSetupForBook:
+				if let content = try? container.decode(UseSetupForBookCommand.self, forKey: .payload) {
+					self = .useSetupForBook(content)
+					return
+				}
+			case .clearBookSetup:
+				if let content = try? container.decode(ClearBookSetupCommand.self, forKey: .payload) {
+					self = .clearBookSetup(content)
+					return
+				}
+			case .refreshBookChapters:
+				if let content = try? container.decode(RefreshBookChaptersCommand.self, forKey: .payload) {
+					self = .refreshBookChapters(content)
+					return
+				}
+			case .setPrintScope:
+				if let content = try? container.decode(SetPrintScopeCommand.self, forKey: .payload) {
+					self = .setPrintScope(content)
+					return
+				}
+			case .setAuthorProfile:
+				if let content = try? container.decode(SetAuthorProfileCommand.self, forKey: .payload) {
+					self = .setAuthorProfile(content)
+					return
+				}
+			case .setBookCover:
+				if let content = try? container.decode(SetBookCoverCommand.self, forKey: .payload) {
+					self = .setBookCover(content)
+					return
+				}
+			case .exportAgain:
+				if let content = try? container.decode(ExportAgainCommand.self, forKey: .payload) {
+					self = .exportAgain(content)
+					return
+				}
+			case .selectTab:
+				if let content = try? container.decode(TabRef.self, forKey: .payload) {
+					self = .selectTab(content)
+					return
+				}
+			case .closeTab:
+				if let content = try? container.decode(TabRef.self, forKey: .payload) {
+					self = .closeTab(content)
+					return
+				}
+			case .setTabOrder:
+				if let content = try? container.decode(SetTabOrderCommand.self, forKey: .payload) {
+					self = .setTabOrder(content)
+					return
+				}
+			case .newTab:
+				if let content = try? container.decode(NewTabCommand.self, forKey: .payload) {
+					self = .newTab(content)
+					return
+				}
+			case .openDocInTab:
+				if let content = try? container.decode(OpenDocInTabCommand.self, forKey: .payload) {
+					self = .openDocInTab(content)
+					return
+				}
+			case .openDocInWindow:
+				if let content = try? container.decode(OpenDocInWindowCommand.self, forKey: .payload) {
+					self = .openDocInWindow(content)
+					return
+				}
+			case .openInSplit:
+				if let content = try? container.decode(OpenInSplitCommand.self, forKey: .payload) {
+					self = .openInSplit(content)
+					return
+				}
+			case .closeSplit:
+				if let content = try? container.decode(CloseSplitCommand.self, forKey: .payload) {
+					self = .closeSplit(content)
+					return
+				}
+			case .measureBook:
+				if let content = try? container.decode(MeasureBookCommand.self, forKey: .payload) {
+					self = .measureBook(content)
+					return
+				}
+			case .importScript:
+				if let content = try? container.decode(ImportScriptCommand.self, forKey: .payload) {
+					self = .importScript(content)
+					return
+				}
+			case .setSceneNumbers:
+				if let content = try? container.decode(SetSceneNumbersCommand.self, forKey: .payload) {
+					self = .setSceneNumbers(content)
+					return
+				}
+			case .scriptReport:
+				if let content = try? container.decode(ScriptReportCommand.self, forKey: .payload) {
+					self = .scriptReport(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(NativeCommand.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for NativeCommand"))
@@ -1612,6 +2020,9 @@ public enum NativeCommand: Codable, Equatable {
 		case .canvasRestore(let content):
 			try container.encode(CodingKeys.canvasRestore, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .mapCommand(let content):
+			try container.encode(CodingKeys.mapCommand, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		case .insertPlainText(let content):
 			try container.encode(CodingKeys.insertPlainText, forKey: .type)
 			try container.encode(content, forKey: .payload)
@@ -1686,6 +2097,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setBlockType(let content):
 			try container.encode(CodingKeys.setBlockType, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setWritingFormat(let content):
+			try container.encode(CodingKeys.setWritingFormat, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .toggleList(let content):
 			try container.encode(CodingKeys.toggleList, forKey: .type)
@@ -1764,6 +2178,66 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .printFinished(let content):
 			try container.encode(CodingKeys.printFinished, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .applyFormat(let content):
+			try container.encode(CodingKeys.applyFormat, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .useSetupForBook(let content):
+			try container.encode(CodingKeys.useSetupForBook, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .clearBookSetup(let content):
+			try container.encode(CodingKeys.clearBookSetup, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .refreshBookChapters(let content):
+			try container.encode(CodingKeys.refreshBookChapters, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setPrintScope(let content):
+			try container.encode(CodingKeys.setPrintScope, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setAuthorProfile(let content):
+			try container.encode(CodingKeys.setAuthorProfile, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setBookCover(let content):
+			try container.encode(CodingKeys.setBookCover, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .exportAgain(let content):
+			try container.encode(CodingKeys.exportAgain, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .selectTab(let content):
+			try container.encode(CodingKeys.selectTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .closeTab(let content):
+			try container.encode(CodingKeys.closeTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setTabOrder(let content):
+			try container.encode(CodingKeys.setTabOrder, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .newTab(let content):
+			try container.encode(CodingKeys.newTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .openDocInTab(let content):
+			try container.encode(CodingKeys.openDocInTab, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .openDocInWindow(let content):
+			try container.encode(CodingKeys.openDocInWindow, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .openInSplit(let content):
+			try container.encode(CodingKeys.openInSplit, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .closeSplit(let content):
+			try container.encode(CodingKeys.closeSplit, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .measureBook(let content):
+			try container.encode(CodingKeys.measureBook, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .importScript(let content):
+			try container.encode(CodingKeys.importScript, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setSceneNumbers(let content):
+			try container.encode(CodingKeys.setSceneNumbers, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .scriptReport(let content):
+			try container.encode(CodingKeys.scriptReport, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		}
 	}
@@ -1849,6 +2323,32 @@ public struct CreateReferenceCommand: Codable, Equatable {
 		self.id = id
 		self.docPath = docPath
 		self.kind = kind
+	}
+}
+
+/// One local day, summed.
+public struct DayStat: Codable, Equatable {
+	/// `YYYY-MM-DD`, the writer's local date.
+	public let day: String
+	public let openSecs: UInt32
+	public let activeSecs: UInt32
+	public let wordsAdded: UInt32
+	public let wordsDeleted: UInt32
+	public let wordsPasted: UInt32
+	/// Sessions that began on this day.
+	public let sessions: UInt32
+	/// Active seconds in each of the day's 24 local hours.
+	public let hours: [UInt32]
+
+	public init(day: String, openSecs: UInt32, activeSecs: UInt32, wordsAdded: UInt32, wordsDeleted: UInt32, wordsPasted: UInt32, sessions: UInt32, hours: [UInt32]) {
+		self.day = day
+		self.openSecs = openSecs
+		self.activeSecs = activeSecs
+		self.wordsAdded = wordsAdded
+		self.wordsDeleted = wordsDeleted
+		self.wordsPasted = wordsPasted
+		self.sessions = sessions
+		self.hours = hours
 	}
 }
 
@@ -1988,13 +2488,69 @@ public struct DocChanged: Codable, Equatable {
 	public let userEdit: Bool
 	public let wordCount: UInt32
 	public let charCount: UInt32
+	/// Positions inserted and removed since the last `DocChanged` for this pane.
+	/// 
+	/// The page throttles this event, so these are sums over every transaction in the
+	/// window, not one keystroke. Positions rather than characters — a split paragraph
+	/// is two — which is close enough for "how much did the writer do", and exact for
+	/// plain typing.
+	public let inserted: UInt32?
+	public let deleted: UInt32?
+	/// The window was a paste or a drop. The page sends one on its own rather than
+	/// folding it into the typing around it, so a shell can tell written words from
+	/// pasted ones.
+	public let paste: Bool?
 
-	public init(pane: Pane, docPath: String, userEdit: Bool, wordCount: UInt32, charCount: UInt32) {
+	public init(pane: Pane, docPath: String, userEdit: Bool, wordCount: UInt32, charCount: UInt32, inserted: UInt32?, deleted: UInt32?, paste: Bool?) {
 		self.pane = pane
 		self.docPath = docPath
 		self.userEdit = userEdit
 		self.wordCount = wordCount
 		self.charCount = charCount
+		self.inserted = inserted
+		self.deleted = deleted
+		self.paste = paste
+	}
+}
+
+/// How a split lays its two panes out.
+public enum SplitOrientation: String, Codable, Equatable {
+	/// Side by side.
+	case columns
+	/// One above the other.
+	case rows
+}
+
+/// One open tab: a document, or a draft that has not decided what it is yet, and the
+/// split it shows.
+public struct DocTab: Codable, Equatable {
+	public let id: String
+	/// `None` for a draft.
+	public let docPath: String?
+	/// The split's document, while this tab has a split.
+	public let secondaryDoc: String?
+	/// How the split is laid out, while this tab has one.
+	public let split: SplitOrientation?
+
+	public init(id: String, docPath: String?, secondaryDoc: String?, split: SplitOrientation?) {
+		self.id = id
+		self.docPath = docPath
+		self.secondaryDoc = secondaryDoc
+		self.split = split
+	}
+}
+
+/// A saved document's length, read from disk.
+public struct DocWordCount: Codable, Equatable {
+	public let docPath: String
+	public let words: UInt32
+	/// UTF-16 code units of text, as the page's `textContent.length` counts them.
+	public let chars: UInt32
+
+	public init(docPath: String, words: UInt32, chars: UInt32) {
+		self.docPath = docPath
+		self.words = words
+		self.chars = chars
 	}
 }
 
@@ -2184,6 +2740,8 @@ public enum WebviewEvent: Codable, Equatable {
 	case noteMarkerPin(NoteMarkerEvent)
 	case activeEditorChanged(ActiveEditorChanged)
 	case canvasToolbarChanged(CanvasToolbarChanged)
+	/// The active map's toolbar and inspector (`map.rs`). Coalesced per frame.
+	case mapChromeChanged(MapChromeChanged)
 	case searchMatches(SearchMatches)
 	case focusModeView(FocusModeView)
 	case readAloudPayload(ReadAloudPayloadEvent)
@@ -2220,6 +2778,11 @@ public enum WebviewEvent: Codable, Equatable {
 	case wordCountsChanged(WordCountsChanged)
 	case pageLayoutState(PageLayoutState)
 	case printRequest(PrintRequest)
+	/// The Finishing tabs' fixed lists, sent once when the page mounts.
+	case pageLayoutCatalog(PageLayoutCatalog)
+	case printJobStatus(PrintJobStatus)
+	/// The tabs and the split, whole (`tabs.rs`). Coalesced per frame.
+	case tabsChanged(TabsChanged)
 
 	enum CodingKeys: String, CodingKey, Codable {
 		case toolbarState,
@@ -2231,6 +2794,7 @@ public enum WebviewEvent: Codable, Equatable {
 			noteMarkerPin,
 			activeEditorChanged,
 			canvasToolbarChanged,
+			mapChromeChanged,
 			searchMatches,
 			focusModeView,
 			readAloudPayload,
@@ -2255,7 +2819,10 @@ public enum WebviewEvent: Codable, Equatable {
 			revealReference,
 			wordCountsChanged,
 			pageLayoutState,
-			printRequest
+			printRequest,
+			pageLayoutCatalog,
+			printJobStatus,
+			tabsChanged
 	}
 
 	private enum ContainerCodingKeys: String, CodingKey {
@@ -2309,6 +2876,11 @@ public enum WebviewEvent: Codable, Equatable {
 			case .canvasToolbarChanged:
 				if let content = try? container.decode(CanvasToolbarChanged.self, forKey: .payload) {
 					self = .canvasToolbarChanged(content)
+					return
+				}
+			case .mapChromeChanged:
+				if let content = try? container.decode(MapChromeChanged.self, forKey: .payload) {
+					self = .mapChromeChanged(content)
 					return
 				}
 			case .searchMatches:
@@ -2436,6 +3008,21 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .printRequest(content)
 					return
 				}
+			case .pageLayoutCatalog:
+				if let content = try? container.decode(PageLayoutCatalog.self, forKey: .payload) {
+					self = .pageLayoutCatalog(content)
+					return
+				}
+			case .printJobStatus:
+				if let content = try? container.decode(PrintJobStatus.self, forKey: .payload) {
+					self = .printJobStatus(content)
+					return
+				}
+			case .tabsChanged:
+				if let content = try? container.decode(TabsChanged.self, forKey: .payload) {
+					self = .tabsChanged(content)
+					return
+				}
 			}
 		}
 		throw DecodingError.typeMismatch(WebviewEvent.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for WebviewEvent"))
@@ -2470,6 +3057,9 @@ public enum WebviewEvent: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .canvasToolbarChanged(let content):
 			try container.encode(CodingKeys.canvasToolbarChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .mapChromeChanged(let content):
+			try container.encode(CodingKeys.mapChromeChanged, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .searchMatches(let content):
 			try container.encode(CodingKeys.searchMatches, forKey: .type)
@@ -2546,6 +3136,15 @@ public enum WebviewEvent: Codable, Equatable {
 		case .printRequest(let content):
 			try container.encode(CodingKeys.printRequest, forKey: .type)
 			try container.encode(content, forKey: .payload)
+		case .pageLayoutCatalog(let content):
+			try container.encode(CodingKeys.pageLayoutCatalog, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .printJobStatus(let content):
+			try container.encode(CodingKeys.printJobStatus, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .tabsChanged(let content):
+			try container.encode(CodingKeys.tabsChanged, forKey: .type)
+			try container.encode(content, forKey: .payload)
 		}
 	}
 }
@@ -2560,11 +3159,26 @@ public struct EventEnvelope: Codable, Equatable {
 	}
 }
 
+/// Export the last export again — same format, scope and file — without asking where.
+public struct ExportAgainCommand: Codable, Equatable {
+	public init() {}
+}
+
 public enum ExportFormat: String, Codable, Equatable {
 	case pdf
 	case epub
 	case markdown
 	case html
+	/// Word, for an editor or an agent: styles, sections, headers and footers.
+	case docx
+	/// Plain text, for a submission form or an email.
+	case plainText
+	/// Fountain, the plain-text screenplay format.
+	case fountain
+	/// Final Draft's own file.
+	case fdx
+	/// A report on a script, as a spreadsheet.
+	case csv
 }
 
 /// What a print or export covers.
@@ -2577,17 +3191,58 @@ public enum PrintScope: String, Codable, Equatable {
 	case project
 }
 
+/// Which part of what the scope covers is printed.
+public enum PrintRange: String, Codable, Equatable {
+	case all
+	/// The chapter the cursor is in: the active document in a book, or the Heading 1
+	/// section around the cursor in a document.
+	case currentChapter
+	/// The selected text, laid out alone.
+	case selection
+	/// Sides: the pages the scenes in `scenes` are on, with their page and scene
+	/// numbers as in the whole script.
+	case scenes
+}
+
+/// How a print or a PDF is narrowed and marked. Every field is optional on the wire:
+/// no options is the whole thing, unmarked.
+public struct PrintOptions: Codable, Equatable {
+	public let range: PrintRange
+	/// Printed page numbers, as typed: `3-7, 10`. Empty prints every page.
+	public let pages: String
+	/// Text set faintly across every page — "DRAFT", or "Read copy for {recipient}".
+	public let watermark: String
+	/// Who a watermarked copy is for, one PDF each; filled into `{recipient}`.
+	public let recipients: [String]
+	/// The scenes Sides print, by index in the script (0 is the first scene).
+	public let scenes: [UInt32]
+	/// A character whose speeches are highlighted, for an actor's copy.
+	public let highlightCharacter: String
+
+	public init(range: PrintRange, pages: String, watermark: String, recipients: [String], scenes: [UInt32], highlightCharacter: String) {
+		self.range = range
+		self.pages = pages
+		self.watermark = watermark
+		self.recipients = recipients
+		self.scenes = scenes
+		self.highlightCharacter = highlightCharacter
+	}
+}
+
 /// Export to a file. The page asks where (a save panel) and writes it.
 public struct ExportDocumentCommand: Codable, Equatable {
 	public let format: ExportFormat
 	public let scope: PrintScope
 	/// PDF only: imposed for binding.
 	public let bound: Bool?
+	/// PDF only: a range, a watermark.
+	public let options: PrintOptions?
 
-	public init(format: ExportFormat, scope: PrintScope, bound: Bool?) {
+	public init(format: ExportFormat, scope: PrintScope, bound: Bool?, options: PrintOptions?) {
 		self.format = format
 		self.scope = scope
 		self.bound = bound
+		self.options = options
 	}
 }
 
@@ -2614,6 +3269,31 @@ public struct FocusModeView: Codable, Equatable {
 	}
 }
 
+/// What a format is for, which decides what else the Finishing tabs offer with it.
+public enum FormatKind: String, Codable, Equatable {
+	case prose
+	case screenplay
+	case stagePlay
+}
+
+/// A whole page setup by name: "Standard Manuscript", "Trade Paperback 6 × 9".
+public struct FormatOption: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let group: String
+	/// One line on what it is and who asks for it.
+	public let summary: String
+	public let kind: FormatKind
+
+	public init(id: String, label: String, group: String, summary: String, kind: FormatKind) {
+		self.id = id
+		self.label = label
+		self.group = group
+		self.summary = summary
+		self.kind = kind
+	}
+}
+
 /// Scroll a page (1-based, as numbered on screen) into view.
 public struct GoToPageCommand: Codable, Equatable {
 	public let page: UInt32
@@ -2631,6 +3311,12 @@ public struct HighlightNoteCommand: Codable, Equatable {
 	public init(noteId: String?) {
 		self.noteId = noteId
 	}
+}
+
+/// Import a script: File ▸ Import Fountain Script…. The page asks for the file and
+/// makes a new document of it beside the one open.
+public struct ImportScriptCommand: Codable, Equatable {
+	public init() {}
 }
 
 /// Put the bibliography at the end of the document, or move it there.
@@ -2738,6 +3424,19 @@ public struct JumpToAnchorCommand: Codable, Equatable {
 	}
 }
 
+/// The export Export Again repeats.
+public struct LastExport: Codable, Equatable {
+	public let format: ExportFormat
+	public let scope: PrintScope
+	public let path: String
+
+	public init(format: ExportFormat, scope: PrintScope, path: String) {
+		self.format = format
+		self.scope = scope
+		self.path = path
+	}
+}
+
 public struct MapBackground: Codable, Equatable {
 	/// A project asset path (`.assets/<hash>.<ext>`).
 	public let image: String?
@@ -2812,6 +3511,40 @@ public struct MapBody: Codable, Equatable {
 	}
 }
 
+public enum MapButtonRole: String, Codable, Equatable {
+	case normal
+	case primary
+	case destructive
+}
+
+/// Clicked, it sends `panel-action { id }`.
+public struct MapPanelButton: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let role: MapButtonRole
+	public let disabled: Bool
+	/// An SF Symbol name, for a button that shows one.
+	public let symbol: String?
+	public let help: String?
+
+	public init(id: String, label: String, role: MapButtonRole, disabled: Bool, symbol: String?, help: String?) {
+		self.id = id
+		self.label = label
+		self.role = role
+		self.disabled = disabled
+		self.symbol = symbol
+		self.help = help
+	}
+}
+
+public struct MapButtonRow: Codable, Equatable {
+	public let buttons: [MapPanelButton]
+
+	public init(buttons: [MapPanelButton]) {
+		self.buttons = buttons
+	}
+}
+
 public struct MapCalibration: Codable, Equatable {
 	public let a: [Double]
 	public let b: [Double]
@@ -2841,6 +3574,357 @@ public struct MapCartouche: Codable, Equatable {
 	}
 }
 
+public struct MapChoice: Codable, Equatable {
+	public let value: String
+	public let label: String
+	/// The heading this option sits under; consecutive options share one.
+	public let group: String?
+
+	public init(value: String, label: String, group: String?) {
+		self.value = value
+		self.label = label
+		self.group = group
+	}
+}
+
+/// A pop-up menu. The value sent back is the chosen option's `value`.
+public struct MapChoiceInput: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let value: String
+	public let options: [MapChoice]
+	public let help: String?
+
+	public init(id: String, label: String, value: String, options: [MapChoice], help: String?) {
+		self.id = id
+		self.label = label
+		self.value = value
+		self.options = options
+		self.help = help
+	}
+}
+
+/// The map's tools, as the toolbar offers them. `Pan` and `Calibrate` are not on the
+/// toolbar — the space bar and the Scale section reach them — but either can be the
+/// tool in hand.
+public enum MapTool: String, Codable, Equatable {
+	case select
+	case pan
+	case pin
+	case route
+	case region
+	case label
+	case ruler
+	case area
+	case calibrate
+}
+
+public struct MapPanelTab: Codable, Equatable {
+	public let id: String
+	public let label: String
+
+	public init(id: String, label: String) {
+		self.id = id
+		self.label = label
+	}
+}
+
+/// One row of a section. Each is named by an `id` where it can be edited or clicked,
+/// which is all a command carries back.
+public enum MapPanelField: Codable, Equatable {
+	case text(MapTextInput)
+	case number(MapNumberInput)
+	case choice(MapChoiceInput)
+	case toggle(MapToggleInput)
+	case color(MapColorInput)
+	case stat(MapStatRow)
+	case note(MapNoteText)
+	case button(MapPanelButton)
+	case buttons(MapButtonRow)
+	case listRow(MapListRow)
+	case markers(MapMarkerInput)
+	case date(MapDateInput)
+	case table(MapTableView)
+	case preview(MapShapePreview)
+	case group(MapPanelGroup)
+
+	enum CodingKeys: String, CodingKey, Codable {
+		case text,
+			number,
+			choice,
+			toggle,
+			color,
+			stat,
+			note,
+			button,
+			buttons,
+			listRow,
+			markers,
+			date,
+			table,
+			preview,
+			group
+	}
+
+	private enum ContainerCodingKeys: String, CodingKey {
+		case type, payload
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: ContainerCodingKeys.self)
+		if let type = try? container.decode(CodingKeys.self, forKey: .type) {
+			switch type {
+			case .text:
+				if let content = try? container.decode(MapTextInput.self, forKey: .payload) {
+					self = .text(content)
+					return
+				}
+			case .number:
+				if let content = try? container.decode(MapNumberInput.self, forKey: .payload) {
+					self = .number(content)
+					return
+				}
+			case .choice:
+				if let content = try? container.decode(MapChoiceInput.self, forKey: .payload) {
+					self = .choice(content)
+					return
+				}
+			case .toggle:
+				if let content = try? container.decode(MapToggleInput.self, forKey: .payload) {
+					self = .toggle(content)
+					return
+				}
+			case .color:
+				if let content = try? container.decode(MapColorInput.self, forKey: .payload) {
+					self = .color(content)
+					return
+				}
+			case .stat:
+				if let content = try? container.decode(MapStatRow.self, forKey: .payload) {
+					self = .stat(content)
+					return
+				}
+			case .note:
+				if let content = try? container.decode(MapNoteText.self, forKey: .payload) {
+					self = .note(content)
+					return
+				}
+			case .button:
+				if let content = try? container.decode(MapPanelButton.self, forKey: .payload) {
+					self = .button(content)
+					return
+				}
+			case .buttons:
+				if let content = try? container.decode(MapButtonRow.self, forKey: .payload) {
+					self = .buttons(content)
+					return
+				}
+			case .listRow:
+				if let content = try? container.decode(MapListRow.self, forKey: .payload) {
+					self = .listRow(content)
+					return
+				}
+			case .markers:
+				if let content = try? container.decode(MapMarkerInput.self, forKey: .payload) {
+					self = .markers(content)
+					return
+				}
+			case .date:
+				if let content = try? container.decode(MapDateInput.self, forKey: .payload) {
+					self = .date(content)
+					return
+				}
+			case .table:
+				if let content = try? container.decode(MapTableView.self, forKey: .payload) {
+					self = .table(content)
+					return
+				}
+			case .preview:
+				if let content = try? container.decode(MapShapePreview.self, forKey: .payload) {
+					self = .preview(content)
+					return
+				}
+			case .group:
+				if let content = try? container.decode(MapPanelGroup.self, forKey: .payload) {
+					self = .group(content)
+					return
+				}
+			}
+		}
+		throw DecodingError.typeMismatch(MapPanelField.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for MapPanelField"))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: ContainerCodingKeys.self)
+		switch self {
+		case .text(let content):
+			try container.encode(CodingKeys.text, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .number(let content):
+			try container.encode(CodingKeys.number, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .choice(let content):
+			try container.encode(CodingKeys.choice, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .toggle(let content):
+			try container.encode(CodingKeys.toggle, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .color(let content):
+			try container.encode(CodingKeys.color, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .stat(let content):
+			try container.encode(CodingKeys.stat, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .note(let content):
+			try container.encode(CodingKeys.note, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .button(let content):
+			try container.encode(CodingKeys.button, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .buttons(let content):
+			try container.encode(CodingKeys.buttons, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .listRow(let content):
+			try container.encode(CodingKeys.listRow, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .markers(let content):
+			try container.encode(CodingKeys.markers, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .date(let content):
+			try container.encode(CodingKeys.date, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .table(let content):
+			try container.encode(CodingKeys.table, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .preview(let content):
+			try container.encode(CodingKeys.preview, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .group(let content):
+			try container.encode(CodingKeys.group, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		}
+	}
+}
+
+public struct MapPanelSection: Codable, Equatable {
+	public let id: String
+	/// May be empty: a section that is only a Delete button.
+	public let title: String
+	/// Buttons beside the title ("Add", "Show").
+	public let actions: [MapPanelButton]
+	public let fields: [MapPanelField]
+
+	public init(id: String, title: String, actions: [MapPanelButton], fields: [MapPanelField]) {
+		self.id = id
+		self.title = title
+		self.actions = actions
+		self.fields = fields
+	}
+}
+
+/// The inspector: the map's settings in tabs, or the one thing selected.
+public struct MapPanel: Codable, Equatable {
+	/// The map's name, or what is selected ("Place", "Route").
+	public let title: String
+	/// Something is selected; `panel-back` returns to the map's settings.
+	public let canGoBack: Bool
+	/// How many problems the journeys have (someone in two places at once).
+	public let problems: UInt32
+	/// Empty while one thing is being edited.
+	public let tabs: [MapPanelTab]
+	public let tab: String?
+	public let sections: [MapPanelSection]
+
+	public init(title: String, canGoBack: Bool, problems: UInt32, tabs: [MapPanelTab], tab: String?, sections: [MapPanelSection]) {
+		self.title = title
+		self.canGoBack = canGoBack
+		self.problems = problems
+		self.tabs = tabs
+		self.tab = tab
+		self.sections = sections
+	}
+}
+
+public struct MapChromeState: Codable, Equatable {
+	/// The surface commands go back to.
+	public let surfaceId: String
+	public let docPath: String
+	public let tool: MapTool
+	/// 1 is 100%.
+	public let zoom: Double
+	/// The zoom as the page writes it: `250%`, `12×`.
+	public let zoomLabel: String
+	public let canUndo: Bool
+	public let canRedo: Bool
+	public let hasSelection: Bool
+	public let panel: MapPanel
+	/// Bumped when the page wants the inspector shown on this panel: a label just
+	/// placed, an item double-clicked, a traveller dropped on. The shell compares it
+	/// with the last value it saw, so a republish of the same state shows nothing.
+	public let revealPanel: UInt32
+	/// The map is the active document, so the toolbar is its.
+	public let active: Bool?
+
+	public init(surfaceId: String, docPath: String, tool: MapTool, zoom: Double, zoomLabel: String, canUndo: Bool, canRedo: Bool, hasSelection: Bool, panel: MapPanel, revealPanel: UInt32, active: Bool?) {
+		self.surfaceId = surfaceId
+		self.docPath = docPath
+		self.tool = tool
+		self.zoom = zoom
+		self.zoomLabel = zoomLabel
+		self.canUndo = canUndo
+		self.canRedo = canRedo
+		self.hasSelection = hasSelection
+		self.panel = panel
+		self.revealPanel = revealPanel
+		self.active = active
+	}
+}
+
+/// The map's toolbar and inspector, or `None` when no map is showing. A map in a split
+/// stays here while the other pane is being worked in, `active` false: its inspector
+/// panel stays in the bar, and the toolbar goes back to the document's.
+public struct MapChromeChanged: Codable, Equatable {
+	public let state: MapChromeState?
+
+	public init(state: MapChromeState?) {
+		self.state = state
+	}
+}
+
+/// A colour well. `value` is `None` for the default (drawn as `fallback`); the value
+/// sent back is `#rrggbb`, or `null` for Reset.
+public struct MapColorInput: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let value: String?
+	public let fallback: String
+
+	public init(id: String, label: String, value: String?, fallback: String) {
+		self.id = id
+		self.label = label
+		self.value = value
+		self.fallback = fallback
+	}
+}
+
+/// Run a command on a map, named by surface id as a canvas command is.
+/// 
+/// The vocabulary is `MapSurface`'s: `tool { tool }`, `undo`, `redo`, `zoom-in`,
+/// `zoom-out`, `zoom-to-fit`, `delete`, `panel-tab { id }`, `panel-back`,
+/// `panel-field { id, value }`, `panel-action { id }`. Untyped, as `CanvasCommandRequest`'s
+/// is: a field's value is whatever that field holds.
+public struct MapCommandRequest: Codable, Equatable {
+	public let surfaceId: String
+	public let command: String
+	public let detail: AnyCodable?
+
+	public init(surfaceId: String, command: String, detail: AnyCodable?) {
+		self.surfaceId = surfaceId
+		self.command = command
+		self.detail = detail
+	}
+}
+
 public struct MapCompass: Codable, Equatable {
 	public let show: Bool
 	public let at: [Double]
@@ -2864,6 +3948,56 @@ public struct MapCustomUnit: Codable, Equatable {
 		self.id = id
 		self.name = name
 		self.km = km
+	}
+}
+
+/// A date in the project's calendar, taken apart. The page puts it back together, so
+/// the shell never does calendar arithmetic.
+public struct MapDateParts: Codable, Equatable {
+	public let year: Double
+	/// 1-based, into `MapDateInput.months`.
+	public let month: Double
+	public let day: Double
+	public let hour: Double
+	public let minute: Double
+
+	public init(year: Double, month: Double, day: Double, hour: Double, minute: Double) {
+		self.year = year
+		self.month = month
+		self.day = day
+		self.hour = hour
+		self.minute = minute
+	}
+}
+
+public enum MapCalendarMode: String, Codable, Equatable {
+	/// Day 1, Day 2…: only `day` counts.
+	case day
+	case gregorian
+	/// The world's own months (`MapDateInput.months`).
+	case custom
+}
+
+/// A date field. The value sent back is `MapDateParts`, or `null` to clear an
+/// `allow_empty` one. With no `value`, the field is a button offering to set one.
+public struct MapDateInput: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let value: MapDateParts?
+	public let mode: MapCalendarMode
+	/// The months' names, in order.
+	public let months: [String]
+	public let allowEmpty: Bool
+	public let placeholder: String?
+
+	public init(id: String, label: String, value: MapDateParts?, mode: MapCalendarMode, months: [String], allowEmpty: Bool, placeholder: String?) {
+		self.id = id
+		self.label = label
+		self.value = value
+		self.mode = mode
+		self.months = months
+		self.allowEmpty = allowEmpty
+		self.placeholder = placeholder
 	}
 }
 
@@ -3232,6 +4366,212 @@ public struct MapFile: Codable, Equatable {
 	}
 }
 
+/// A row in a list of things on the map; clicked, it sends `panel-action { id }`.
+public struct MapListRow: Codable, Equatable {
+	public let id: String
+	public let title: String
+	public let subtitle: String?
+	public let swatch: String?
+	/// How many levels in (a moon under its planet).
+	public let indent: UInt32
+
+	public init(id: String, title: String, subtitle: String?, swatch: String?, indent: UInt32) {
+		self.id = id
+		self.title = title
+		self.subtitle = subtitle
+		self.swatch = swatch
+		self.indent = indent
+	}
+}
+
+/// A place's marker: one of `options`, whose values are the page's icon ids. The value
+/// sent back is the id.
+public struct MapMarkerInput: Codable, Equatable {
+	public let id: String
+	public let value: String
+	public let color: String?
+	public let options: [MapChoice]
+
+	public init(id: String, value: String, color: String?, options: [MapChoice]) {
+		self.id = id
+		self.value = value
+		self.color = color
+		self.options = options
+	}
+}
+
+public enum MapNoteTone: String, Codable, Equatable {
+	case note
+	case warning
+}
+
+/// A line of explanation, or a warning. `swatch` is a colour shown before it.
+public struct MapNoteText: Codable, Equatable {
+	public let text: String
+	public let tone: MapNoteTone
+	public let swatch: String?
+	/// A button after the text ("Go there").
+	public let action: MapPanelButton?
+
+	public init(text: String, tone: MapNoteTone, swatch: String?, action: MapPanelButton?) {
+		self.text = text
+		self.tone = tone
+		self.swatch = swatch
+		self.action = action
+	}
+}
+
+/// Committed as `number` fields are on the page: on Return or blur, clamped to
+/// `min`/`max`. The value sent back is a number, or `null` to clear an `allow_empty`
+/// field.
+public struct MapNumberInput: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let value: Double?
+	public let min: Double?
+	public let max: Double?
+	/// What the stepper adds; `None` for any value.
+	public let step: Double?
+	public let suffix: String?
+	public let allowEmpty: Bool
+	public let help: String?
+
+	public init(id: String, label: String, value: Double?, min: Double?, max: Double?, step: Double?, suffix: String?, allowEmpty: Bool, help: String?) {
+		self.id = id
+		self.label = label
+		self.value = value
+		self.min = min
+		self.max = max
+		self.step = step
+		self.suffix = suffix
+		self.allowEmpty = allowEmpty
+		self.help = help
+	}
+}
+
+/// Rows that belong to one thing — a leg of a journey, a terrain — with their own
+/// title and buttons. `collapsible` ones start closed.
+public struct MapPanelGroup: Codable, Equatable {
+	public let id: String
+	public let title: String
+	public let swatch: String?
+	public let actions: [MapPanelButton]
+	public let fields: [MapPanelField]
+	public let collapsible: Bool
+
+	public init(id: String, title: String, swatch: String?, actions: [MapPanelButton], fields: [MapPanelField], collapsible: Bool) {
+		self.id = id
+		self.title = title
+		self.swatch = swatch
+		self.actions = actions
+		self.fields = fields
+		self.collapsible = collapsible
+	}
+}
+
+/// A traced picture's outlines, previewed: polylines in `width` × `height` space,
+/// written as SVG path data using only `M`, `L` and `Z`.
+public struct MapShapePreview: Codable, Equatable {
+	public let width: Double
+	public let height: Double
+	public let path: String
+	public let filled: Bool
+
+	public init(width: Double, height: Double, path: String, filled: Bool) {
+		self.width = width
+		self.height = height
+		self.path = path
+		self.filled = filled
+	}
+}
+
+/// A figure: "Length — 42 km". With `action`, the figure is a button (an arrival date
+/// that jumps the timeline there).
+public struct MapStatRow: Codable, Equatable {
+	public let label: String
+	public let value: String
+	public let action: MapPanelButton?
+
+	public init(label: String, value: String, action: MapPanelButton?) {
+		self.label = label
+		self.value = value
+		self.action = action
+	}
+}
+
+public struct MapTableCell: Codable, Equatable {
+	public let text: String
+	public let detail: String?
+	public let strong: Bool
+
+	public init(text: String, detail: String?, strong: Bool) {
+		self.text = text
+		self.detail = detail
+		self.strong = strong
+	}
+}
+
+public struct MapTableRowView: Codable, Equatable {
+	public let label: String
+	public let cells: [MapTableCell]
+
+	public init(label: String, cells: [MapTableCell]) {
+		self.label = label
+		self.cells = cells
+	}
+}
+
+/// The table of distances between places.
+public struct MapTableView: Codable, Equatable {
+	public let columns: [String]
+	public let rows: [MapTableRowView]
+
+	public init(columns: [String], rows: [MapTableRowView]) {
+		self.columns = columns
+		self.rows = rows
+	}
+}
+
+/// Committed on Return or when focus leaves, never per keystroke: a name typed is one
+/// undo step. The value sent back is a string.
+public struct MapTextInput: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let value: String
+	public let placeholder: String?
+	public let multiline: Bool
+	/// Changes when the page wants the caret here with the text selected — a rename.
+	/// Zero is never a request.
+	public let focusKey: UInt32
+
+	public init(id: String, label: String, value: String, placeholder: String?, multiline: Bool, focusKey: UInt32) {
+		self.id = id
+		self.label = label
+		self.value = value
+		self.placeholder = placeholder
+		self.multiline = multiline
+		self.focusKey = focusKey
+	}
+}
+
+public struct MapToggleInput: Codable, Equatable {
+	public let id: String
+	public let label: String
+	public let value: Bool
+
+	public init(id: String, label: String, value: Bool) {
+		self.id = id
+		self.label = label
+		self.value = value
+	}
+}
+
+/// Lay the book (or the document) out without printing it, to count its pages and
+/// words for the Publish tab.
+public struct MeasureBookCommand: Codable, Equatable {
+	public init() {}
+}
+
 /// Move a file or folder into another folder. See `RenameEntryCommand`.
 public struct MoveEntryCommand: Codable, Equatable {
 	public let path: String
@@ -3244,6 +4584,11 @@ public struct MoveEntryCommand: Codable, Equatable {
 		self.isFolder = isFolder
 		self.targetFolder = targetFolder
 	}
+}
+
+/// Open a draft tab, where the page asks what the new document is called.
+public struct NewTabCommand: Codable, Equatable {
+	public init() {}
 }
 
 public enum NoteType: String, Codable, Equatable {
@@ -3479,6 +4824,25 @@ public struct NotesRemapped: Codable, Equatable {
 	}
 }
 
+/// Open a document in a tab of its own, and show it.
+public struct OpenDocInTabCommand: Codable, Equatable {
+	public let docPath: String
+
+	public init(docPath: String) {
+		self.docPath = docPath
+	}
+}
+
+/// Open a document in a detached window of its own (a tab's Move to New Window). The
+/// page opens it as "Open in New Window" does.
+public struct OpenDocInWindowCommand: Codable, Equatable {
+	public let docPath: String
+
+	public init(docPath: String) {
+		self.docPath = docPath
+	}
+}
+
 public struct OpenDocumentCommand: Codable, Equatable {
 	/// A project-relative tree path. A `.canvas` suffix makes it a canvas — routing is
 	/// purely by suffix (`doc_kind`), so there is no kind field to get wrong.
@@ -3488,6 +4852,18 @@ public struct OpenDocumentCommand: Codable, Equatable {
 	public init(path: String, pane: Pane) {
 		self.path = path
 		self.pane = pane
+	}
+}
+
+/// Open the active tab's split, or turn it. Without a `doc_path` the split keeps what
+/// it shows, or else takes the next tab's document.
+public struct OpenInSplitCommand: Codable, Equatable {
+	public let docPath: String?
+	public let orientation: SplitOrientation
+
+	public init(docPath: String?, orientation: SplitOrientation) {
+		self.docPath = docPath
+		self.orientation = orientation
 	}
 }
 
@@ -3533,42 +4909,254 @@ public struct SignatureAdvice: Codable, Equatable {
 	}
 }
 
-/// Everything the Page tab shows. Published when the active document, its setup,
-/// its page count or the zoom changes.
+/// A running-head token and what it stands for, for the token menu.
+public struct RunningToken: Codable, Equatable {
+	/// As typed: `{page}`.
+	public let token: String
+	public let label: String
+
+	public init(token: String, label: String) {
+		self.token = token
+		self.label = label
+	}
+}
+
+/// What the Finishing tabs offer that never changes while the app runs. Sent once when
+/// the page mounts, apart from `PageLayoutState`, which goes out far more often.
+public struct PageLayoutCatalog: Codable, Equatable {
+	public let presets: [PageSizeOption]
+	public let formats: [FormatOption]
+	public let signatureAdvice: [SignatureAdvice]
+	public let tokens: [RunningToken]
+	/// What "Set Type for Print" starts from.
+	public let defaultTypography: PrintTypography
+
+	public init(presets: [PageSizeOption], formats: [FormatOption], signatureAdvice: [SignatureAdvice], tokens: [RunningToken], defaultTypography: PrintTypography) {
+		self.presets = presets
+		self.formats = formats
+		self.signatureAdvice = signatureAdvice
+		self.tokens = tokens
+		self.defaultTypography = defaultTypography
+	}
+}
+
+/// Where the setup a document lays out in came from.
+public enum SetupSource: String, Codable, Equatable {
+	/// The document's own.
+	case document
+	/// Its book's, which the document has none of its own to override.
+	case book
+	/// Neither: the default.
+	case `default`
+}
+
+/// How much a preflight finding matters.
+public enum PreflightSeverity: String, Codable, Equatable {
+	/// The service will reject the file.
+	case error
+	/// It will print, but not as well as it could.
+	case warning
+	/// Worth knowing.
+	case note
+}
+
+/// One thing the preflight found, and how to put it right when the page knows how.
+public struct PreflightIssue: Codable, Equatable {
+	public let id: String
+	public let severity: PreflightSeverity
+	public let message: String
+	/// The button's title — "Widen the Gutter" — when there is a fix.
+	public let fixLabel: String?
+	/// The setup with the fix made: applied as any other edit to it.
+	public let fixedSetup: PageSetup?
+
+	public init(id: String, severity: PreflightSeverity, message: String, fixLabel: String?, fixedSetup: PageSetup?) {
+		self.id = id
+		self.severity = severity
+		self.message = message
+		self.fixLabel = fixLabel
+		self.fixedSetup = fixedSetup
+	}
+}
+
+/// The Publish tab's figures for what Print covers, at its setup.
+public struct PublishingReport: Codable, Equatable {
+	/// 0 until the pages are known: shown, or measured.
+	public let pageCount: UInt32
+	/// The pages were counted by laying the whole scope out, not read off the screen.
+	public let measured: Bool
+	public let words: UInt32
+	/// At 250 words a minute.
+	public let readingMinutes: UInt32
+	/// For the service and paper chosen; 0 without a page count.
+	public let spineWidthMm: Double
+	/// Whether the spine is wide enough to carry text (KDP: more than 79 pages).
+	public let spineText: Bool
+	public let issues: [PreflightIssue]
+
+	public init(pageCount: UInt32, measured: Bool, words: UInt32, readingMinutes: UInt32, spineWidthMm: Double, spineText: Bool, issues: [PreflightIssue]) {
+		self.pageCount = pageCount
+		self.measured = measured
+		self.words = words
+		self.readingMinutes = readingMinutes
+		self.spineWidthMm = spineWidthMm
+		self.spineText = spineText
+		self.issues = issues
+	}
+}
+
+/// What a document is written as. A script's lines are script elements, set on the
+/// page as a screenplay or a play is (`DocWritingFormat.js`).
+public enum WritingFormat: String, Codable, Equatable {
+	case prose
+	case screenplay
+	case stageplay
+}
+
+/// How a script's scenes are numbered.
+public enum SceneNumbering: String, Codable, Equatable {
+	case off
+	/// Numbered in order, renumbering as scenes come and go.
+	case on
+	/// Fixed where they are, for a shooting script: a scene added later is 12A.
+	case locked
+}
+
+/// One scene of a script.
+public struct SceneSummary: Codable, Equatable {
+	/// Its number, when scenes are numbered.
+	public let number: String?
+	public let heading: String
+	/// The page it starts on, once the script is laid out; 0 before.
+	public let page: UInt32
+
+	public init(number: String?, heading: String, page: UInt32) {
+		self.number = number
+		self.heading = heading
+		self.page = page
+	}
+}
+
+/// A script's scenes and cast.
+public struct ScriptSummary: Codable, Equatable {
+	public let format: WritingFormat
+	public let sceneNumbers: SceneNumbering
+	/// Everyone who speaks, most lines first.
+	public let characters: [String]
+	public let scenes: [SceneSummary]
+
+	public init(format: WritingFormat, sceneNumbers: SceneNumbering, characters: [String], scenes: [SceneSummary]) {
+		self.format = format
+		self.sceneNumbers = sceneNumbers
+		self.characters = characters
+		self.scenes = scenes
+	}
+}
+
+/// Everything the Finishing tabs show that changes. Published when the active
+/// document, its setup, its page count, the book, the scope or the zoom changes — and
+/// only then: the page skips a state identical to the last.
 public struct PageLayoutState: Codable, Equatable {
 	/// Whether the active pane shows pages.
 	public let enabled: Bool
 	/// The active text document, or none (a canvas, or nothing open).
 	public let docPath: String?
-	/// The setup the document lays out in — its own, or the default.
+	/// False while the document's editor is not yet there to take an edit. An edit sent
+	/// meanwhile is kept and applied when it is.
+	public let ready: Bool
+	/// The setup the document lays out in — its own, its book's, or the default.
 	public let setup: PageSetup
+	public let setupSource: SetupSource
 	/// False while the document has never been given a setup of its own.
 	public let hasOwnSetup: Bool
+	/// The catalog format `setup` was made from, if it matches one.
+	public let formatId: String?
+	/// `setup` was made from `format_id` and then changed.
+	public let formatModified: Bool
 	public let pageCount: UInt32
 	public let currentPage: UInt32
 	public let zoom: Double
-	/// The book the active document belongs to.
+	/// What Print and Export cover.
+	public let scope: PrintScope
+	/// The book: the active document's folder's, or the project's under `Project`.
 	public let book: BookSettings
+	/// The book has a setup of its own, which every chapter prints in.
+	public let bookSetupActive: Bool
 	/// The book's chapters, in order: document tree paths.
 	public let bookChapters: [String]
 	/// A recommended inside margin for a book of this many pages, in mm.
 	public let suggestedInsideMarginMm: Double
-	public let presets: [PageSizeOption]
-	public let signatureAdvice: [SignatureAdvice]
+	/// Who wrote it: the title page's byline and contact details.
+	public let author: AuthorProfile?
+	/// Words in what Print covers — the document, or the book — as a title page
+	/// gives them.
+	public let wordCount: UInt32?
+	/// The book's cover as a file on disk, for the Book tab's thumbnail.
+	public let coverFile: String?
+	/// The project's last export, for Export Again.
+	public let lastExport: LastExport?
+	/// Text is selected in the active document, so Print can print just that.
+	public let hasSelection: Bool?
+	public let publishing: PublishingReport?
+	/// A screenplay's or a play's scenes and cast, for the Publish tab's Script
+	/// Production section. None for prose.
+	public let script: ScriptSummary?
 
-	public init(enabled: Bool, docPath: String?, setup: PageSetup, hasOwnSetup: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, book: BookSettings, bookChapters: [String], suggestedInsideMarginMm: Double, presets: [PageSizeOption], signatureAdvice: [SignatureAdvice]) {
+	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
 		self.docPath = docPath
+		self.ready = ready
 		self.setup = setup
+		self.setupSource = setupSource
 		self.hasOwnSetup = hasOwnSetup
+		self.formatId = formatId
+		self.formatModified = formatModified
 		self.pageCount = pageCount
 		self.currentPage = currentPage
 		self.zoom = zoom
+		self.scope = scope
 		self.book = book
+		self.bookSetupActive = bookSetupActive
 		self.bookChapters = bookChapters
 		self.suggestedInsideMarginMm = suggestedInsideMarginMm
-		self.presets = presets
-		self.signatureAdvice = signatureAdvice
+		self.author = author
+		self.wordCount = wordCount
+		self.coverFile = coverFile
+		self.lastExport = lastExport
+		self.hasSelection = hasSelection
+		self.publishing = publishing
+		self.script = script
+	}
+}
+
+/// One text pane's status row, for a shell that draws the pane's own Print Layout
+/// toggle and zoom at its bottom-right corner, level with its badges. `left` and `right`
+/// are the pane's edges; `top` and `bottom` the row's. Client coordinates, as the
+/// badges' are.
+public struct PaneStatus: Codable, Equatable {
+	public let pane: Pane
+	public let docPath: String
+	/// Shown as pages.
+	public let printLayout: Bool
+	/// Its zoom as pages (1 = 100%), whether or not it is shown as them.
+	public let zoom: Double
+	/// The pointer is over it. A split shows a pane's controls only then.
+	public let hovered: Bool?
+	public let left: Double
+	public let top: Double
+	public let right: Double
+	public let bottom: Double
+
+	public init(pane: Pane, docPath: String, printLayout: Bool, zoom: Double, hovered: Bool?, left: Double, top: Double, right: Double, bottom: Double) {
+		self.pane = pane
+		self.docPath = docPath
+		self.printLayout = printLayout
+		self.zoom = zoom
+		self.hovered = hovered
+		self.left = left
+		self.top = top
+		self.right = right
+		self.bottom = bottom
 	}
 }
 
@@ -3576,10 +5164,12 @@ public struct PageLayoutState: Codable, Equatable {
 public struct PrintDocumentCommand: Codable, Equatable {
 	public let scope: PrintScope
 	public let bound: Bool
+	public let options: PrintOptions?
 
-	public init(scope: PrintScope, bound: Bool) {
+	public init(scope: PrintScope, bound: Bool, options: PrintOptions?) {
 		self.scope = scope
 		self.bound = bound
+		self.options = options
 	}
 }
 
@@ -3591,6 +5181,51 @@ public struct PrintFinishedCommand: Codable, Equatable {
 	public init(jobId: String, completed: Bool) {
 		self.jobId = jobId
 		self.completed = completed
+	}
+}
+
+/// What a print or export job is.
+public enum PrintJobKind: String, Codable, Equatable {
+	case print
+	case export
+}
+
+public enum PrintJobPhase: String, Codable, Equatable {
+	/// Gathering the chapters.
+	case preparing
+	/// Laying chapters out as pages: `done` of `total`.
+	case laying
+	/// Handing the pages to the printer, or writing the file.
+	case writing
+	case done
+	case failed
+	/// The author dismissed the print or save panel.
+	case cancelled
+}
+
+/// Where a print or export has got to. One job's statuses share its `job_id`; the last
+/// is `Done`, `Failed` or `Cancelled`.
+public struct PrintJobStatus: Codable, Equatable {
+	public let jobId: String
+	public let kind: PrintJobKind
+	public let format: ExportFormat?
+	public let phase: PrintJobPhase
+	public let done: UInt32?
+	public let total: UInt32?
+	/// What went wrong, for `Failed`.
+	public let message: String?
+	/// The file written, for an export that is `Done`.
+	public let path: String?
+
+	public init(jobId: String, kind: PrintJobKind, format: ExportFormat?, phase: PrintJobPhase, done: UInt32?, total: UInt32?, message: String?, path: String?) {
+		self.jobId = jobId
+		self.kind = kind
+		self.format = format
+		self.phase = phase
+		self.done = done
+		self.total = total
+		self.message = message
+		self.path = path
 	}
 }
 
@@ -3962,6 +5597,11 @@ public struct ReferencesChanged: Codable, Equatable {
 	}
 }
 
+/// The documents in the book's folder changed — list its chapters again.
+public struct RefreshBookChaptersCommand: Codable, Equatable {
+	public init() {}
+}
+
 /// Remove entries from the history. `None` clears it.
 public struct RemoveClipboardEntriesCommand: Codable, Equatable {
 	public let ids: [String]?
@@ -4235,6 +5875,34 @@ public struct RevealSearchResultCommand: Codable, Equatable {
 	}
 }
 
+/// A breakdown of the active script.
+public enum ScriptReportKind: String, Codable, Equatable {
+	/// Who speaks, how often, in which scenes.
+	case characters
+	/// Every scene: its page, its length in eighths of a page, who is in it.
+	case scenes
+	/// Every place, and the scenes set there.
+	case locations
+}
+
+public enum ReportOutput: String, Codable, Equatable {
+	/// Printed, on the script's own pages.
+	case print
+	/// A spreadsheet file.
+	case csv
+}
+
+/// Print or save a report on the active script.
+public struct ScriptReportCommand: Codable, Equatable {
+	public let report: ScriptReportKind
+	public let output: ReportOutput
+
+	public init(report: ScriptReportKind, output: ReportOutput) {
+		self.report = report
+		self.output = output
+	}
+}
+
 public enum SearchResultType: String, Codable, Equatable {
 	/// A hit in a saved document, addressed by ProseMirror position.
 	case projectMatch = "project-match"
@@ -4384,6 +6052,15 @@ public struct SetAlignmentCommand: Codable, Equatable {
 	}
 }
 
+/// Replace the writer's profile — byline and contact details — for every project.
+public struct SetAuthorProfileCommand: Codable, Equatable {
+	public let profile: AuthorProfile
+
+	public init(profile: AuthorProfile) {
+		self.profile = profile
+	}
+}
+
 public struct SetBibliographyOptionsCommand: Codable, Equatable {
 	public let docPath: String
 	public let options: BibliographyOptions
@@ -4402,6 +6079,19 @@ public enum BlockType: String, Codable, Equatable {
 	case heading1
 	case heading2
 	case heading3
+	case sceneHeading
+	case action
+	case character
+	case parenthetical
+	case dialogue
+	case transition
+	case shot
+	case centered
+	case actHeading
+	case sceneTitle
+	case stageDirection
+	case stageCharacter
+	case stageDialogue
 }
 
 /// Turn the selection's blocks into paragraphs or headings — the toolbar's Paragraph
@@ -4413,6 +6103,16 @@ public struct SetBlockTypeCommand: Codable, Equatable {
 	public init(target: EditorTarget, block: BlockType) {
 		self.target = target
 		self.block = block
+	}
+}
+
+/// Give the book a cover: an image file the shell picked, which the page copies into
+/// the project's assets. No path takes the cover away.
+public struct SetBookCoverCommand: Codable, Equatable {
+	public let path: String?
+
+	public init(path: String?) {
+		self.path = path
 	}
 }
 
@@ -4548,12 +6248,16 @@ public struct SetHighlightCommand: Codable, Equatable {
 	}
 }
 
-/// Replace the active document's page setup. One undo step in the document.
+/// Replace the active document's page setup — one undo step in the document — or the
+/// book's.
 public struct SetPageSetupCommand: Codable, Equatable {
 	public let setup: PageSetup
+	/// Absent from an older shell, which only ever edited the document.
+	public let target: PageSetupTarget?
 
-	public init(setup: PageSetup) {
+	public init(setup: PageSetup, target: PageSetupTarget?) {
 		self.setup = setup
+		self.target = target
 	}
 }
 
@@ -4578,12 +6282,25 @@ public struct SetPanelInsetsCommand: Codable, Equatable {
 	}
 }
 
-/// Show the active pane as pages, or as the continuous editor.
+/// Show a document as pages, or as the continuous editor: the one named — a pane's own
+/// toggle names the document in it — or else the active one.
 public struct SetPrintLayoutCommand: Codable, Equatable {
 	public let enabled: Bool
+	public let docPath: String?
 
-	public init(enabled: Bool) {
+	public init(enabled: Bool, docPath: String?) {
 		self.enabled = enabled
+		self.docPath = docPath
+	}
+}
+
+/// What Print and Export cover, and which book the Book tab shows: the active
+/// document's folder, or the whole project. `Document` shows the folder's book.
+public struct SetPrintScopeCommand: Codable, Equatable {
+	public let scope: PrintScope
+
+	public init(scope: PrintScope) {
+		self.scope = scope
 	}
 }
 
@@ -4594,14 +6311,17 @@ public enum ZoomFit: String, Codable, Equatable {
 	case actual
 }
 
-/// A zoom level (1 = 100%), or a fit. `fit` wins when both are present.
+/// A zoom level (1 = 100%), or a fit. `fit` wins when both are present. Each document
+/// has its own zoom: this is the named one's, or else the active one's.
 public struct SetPrintZoomCommand: Codable, Equatable {
 	public let zoom: Double?
 	public let fit: ZoomFit?
+	public let docPath: String?
 
-	public init(zoom: Double?, fit: ZoomFit?) {
+	public init(zoom: Double?, fit: ZoomFit?, docPath: String?) {
 		self.zoom = zoom
 		self.fit = fit
+		self.docPath = docPath
 	}
 }
 
@@ -4617,6 +6337,15 @@ public struct SetReferenceAttachedCommand: Codable, Equatable {
 	}
 }
 
+/// Number the active script's scenes, stop, or lock them.
+public struct SetSceneNumbersCommand: Codable, Equatable {
+	public let mode: SceneNumbering
+
+	public init(mode: SceneNumbering) {
+		self.mode = mode
+	}
+}
+
 public struct SetSelectionCommand: Codable, Equatable {
 	public let target: EditorTarget
 	public let anchor: TextAnchor
@@ -4628,6 +6357,16 @@ public struct SetSelectionCommand: Codable, Equatable {
 		self.anchor = anchor
 		self.scrollIntoView = scrollIntoView
 		self.focus = focus
+	}
+}
+
+/// The tabs' order, as the shell's tab bar now shows it after a drag. Tabs it does not
+/// name keep their order after the ones it does.
+public struct SetTabOrderCommand: Codable, Equatable {
+	public let tabIds: [String]
+
+	public init(tabIds: [String]) {
+		self.tabIds = tabIds
 	}
 }
 
@@ -4658,6 +6397,17 @@ public struct SetWordCountVisibleCommand: Codable, Equatable {
 	}
 }
 
+/// Write the document as prose, a screenplay or a stage play, converting its lines.
+public struct SetWritingFormatCommand: Codable, Equatable {
+	public let target: EditorTarget
+	public let format: WritingFormat
+
+	public init(target: EditorTarget, format: WritingFormat) {
+		self.target = target
+		self.format = format
+	}
+}
+
 public enum SidebarTab: String, Codable, Equatable {
 	case clipboard
 	case workbench
@@ -4673,6 +6423,69 @@ public struct ShowSidebarTab: Codable, Equatable {
 
 	public init(tab: SidebarTab) {
 		self.tab = tab
+	}
+}
+
+/// One minute of a session. `minute` counts from the session's start, so a session
+/// that runs past midnight lands its later minutes on the next day.
+public struct StatsMinute: Codable, Equatable {
+	public let minute: UInt32
+	/// Seconds in this minute the document was in front of the writer.
+	public let openSecs: UInt32?
+	/// Seconds in this minute the writer was typing — see `WritingSession::active_secs`.
+	public let activeSecs: UInt32?
+	public let wordsAdded: UInt32?
+	public let wordsDeleted: UInt32?
+	public let wordsPasted: UInt32?
+
+	public init(minute: UInt32, openSecs: UInt32?, activeSecs: UInt32?, wordsAdded: UInt32?, wordsDeleted: UInt32?, wordsPasted: UInt32?) {
+		self.minute = minute
+		self.openSecs = openSecs
+		self.activeSecs = activeSecs
+		self.wordsAdded = wordsAdded
+		self.wordsDeleted = wordsDeleted
+		self.wordsPasted = wordsPasted
+	}
+}
+
+/// Which sessions a query is about. No project is everything; a project with no
+/// document is the whole project.
+public struct StatsScope: Codable, Equatable {
+	public let project: String?
+	public let docPath: String?
+
+	public init(project: String?, docPath: String?) {
+		self.project = project
+		self.docPath = docPath
+	}
+}
+
+/// Everything in a scope, summed.
+public struct StatsTotals: Codable, Equatable {
+	public let sessions: UInt32
+	public let openSecs: UInt32
+	public let activeSecs: UInt32
+	public let wordsAdded: UInt32
+	public let wordsDeleted: UInt32
+	public let wordsPasted: UInt32
+	public let longestSessionSecs: UInt32
+	/// Local days with any words written.
+	public let daysWritten: UInt32
+	/// Unix milliseconds of the first and latest session, when there are any.
+	public let firstSession: Double?
+	public let lastSession: Double?
+
+	public init(sessions: UInt32, openSecs: UInt32, activeSecs: UInt32, wordsAdded: UInt32, wordsDeleted: UInt32, wordsPasted: UInt32, longestSessionSecs: UInt32, daysWritten: UInt32, firstSession: Double?, lastSession: Double?) {
+		self.sessions = sessions
+		self.openSecs = openSecs
+		self.activeSecs = activeSecs
+		self.wordsAdded = wordsAdded
+		self.wordsDeleted = wordsDeleted
+		self.wordsPasted = wordsPasted
+		self.longestSessionSecs = longestSessionSecs
+		self.daysWritten = daysWritten
+		self.firstSession = firstSession
+		self.lastSession = lastSession
 	}
 }
 
@@ -4719,6 +6532,26 @@ public struct SyncNotesCommand: Codable, Equatable {
 	public init(docPath: String, notes: [Note]) {
 		self.docPath = docPath
 		self.notes = notes
+	}
+}
+
+public struct TabRef: Codable, Equatable {
+	public let tabId: String
+
+	public init(tabId: String) {
+		self.tabId = tabId
+	}
+}
+
+/// The tabs, in order, and which is showing. Sent whole whenever any of it changes,
+/// so it is coalesced to one per frame.
+public struct TabsChanged: Codable, Equatable {
+	public let tabs: [DocTab]
+	public let activeTabId: String?
+
+	public init(tabs: [DocTab], activeTabId: String?) {
+		self.tabs = tabs
+		self.activeTabId = activeTabId
 	}
 }
 
@@ -4849,6 +6682,43 @@ public struct TilesChanged: Codable, Equatable {
 	}
 }
 
+/// One run of the writing timer: a routine from its start to its end, or to where the
+/// writer stopped it. Recorded as it goes, like a session, and kept by `id`.
+public struct TimerRun: Codable, Equatable {
+	public let id: String
+	public let routineName: String
+	/// The project open when the run began.
+	public let project: String?
+	/// Unix milliseconds.
+	public let start: Double
+	public let end: Double
+	public let utcOffsetMinutes: Int32
+	/// Time in writing segments and in breaks, paused time excluded.
+	public let writeSecs: UInt32?
+	public let breakSecs: UInt32?
+	public let wordsWritten: UInt32?
+	/// Writing segments that ran to their end — a sprint finished, not skipped.
+	public let sprintsCompleted: UInt32?
+	public let sprintsSkipped: UInt32?
+	/// The routine ran to its last segment, rather than being stopped.
+	public let completed: Bool?
+
+	public init(id: String, routineName: String, project: String?, start: Double, end: Double, utcOffsetMinutes: Int32, writeSecs: UInt32?, breakSecs: UInt32?, wordsWritten: UInt32?, sprintsCompleted: UInt32?, sprintsSkipped: UInt32?, completed: Bool?) {
+		self.id = id
+		self.routineName = routineName
+		self.project = project
+		self.start = start
+		self.end = end
+		self.utcOffsetMinutes = utcOffsetMinutes
+		self.writeSecs = writeSecs
+		self.breakSecs = breakSecs
+		self.wordsWritten = wordsWritten
+		self.sprintsCompleted = sprintsCompleted
+		self.sprintsSkipped = sprintsSkipped
+		self.completed = completed
+	}
+}
+
 /// The list kinds the toolbar can toggle.
 public enum ListKind: String, Codable, Equatable {
 	case bullet
@@ -4889,6 +6759,8 @@ public struct ToolbarState: Codable, Equatable {
 	public let alignment: Alignment
 	/// What the Paragraph Style menu shows as current.
 	public let blockType: BlockType
+	/// What the document is written as, which decides what the menu offers.
+	public let writingFormat: WritingFormat?
 	public let activeMarks: ActiveMarks
 	/// Whether the editor's own history has a step to undo or redo — the document's
 	/// Undo/Redo toolbar item. A canvas reports its own in `CanvasToolbarState`.
@@ -4898,7 +6770,7 @@ public struct ToolbarState: Codable, Equatable {
 	/// `SetHighlightCommand`.
 	public let lastHighlightColor: String
 
-	public init(target: EditorTarget?, color: String, highlight: String, font: String, fontSize: String, alignment: Alignment, blockType: BlockType, activeMarks: ActiveMarks, canUndo: Bool, canRedo: Bool, lastHighlightColor: String) {
+	public init(target: EditorTarget?, color: String, highlight: String, font: String, fontSize: String, alignment: Alignment, blockType: BlockType, writingFormat: WritingFormat?, activeMarks: ActiveMarks, canUndo: Bool, canRedo: Bool, lastHighlightColor: String) {
 		self.target = target
 		self.color = color
 		self.highlight = highlight
@@ -4906,6 +6778,7 @@ public struct ToolbarState: Codable, Equatable {
 		self.fontSize = fontSize
 		self.alignment = alignment
 		self.blockType = blockType
+		self.writingFormat = writingFormat
 		self.activeMarks = activeMarks
 		self.canUndo = canUndo
 		self.canRedo = canRedo
@@ -4958,6 +6831,11 @@ public struct UpdateReferenceCommand: Codable, Equatable {
 		self.id = id
 		self.patch = patch
 	}
+}
+
+/// Give the book the active document's setup, so every chapter prints in it.
+public struct UseSetupForBookCommand: Codable, Equatable {
+	public init() {}
 }
 
 public enum VersionAction: String, Codable, Equatable {
@@ -5070,14 +6948,74 @@ public struct WordCountBadge: Codable, Equatable {
 	}
 }
 
-/// Every word-count badge the user can see — the whole list, so it is safe to coalesce.
-/// The page's badges stay where they are, invisible, to be measured; the shell draws
-/// them as Liquid Glass, which only a view above the page can be.
+/// Every word-count badge the user can see, and every text pane's status row — the
+/// whole lists, so it is safe to coalesce. The page's badges stay where they are,
+/// invisible, to be measured; the shell draws them as Liquid Glass, which only a view
+/// above the page can be.
 public struct WordCountsChanged: Codable, Equatable {
 	public let badges: [WordCountBadge]
+	public let panes: [PaneStatus]?
 
-	public init(badges: [WordCountBadge]) {
+	public init(badges: [WordCountBadge], panes: [PaneStatus]?) {
 		self.badges = badges
+		self.panes = panes
+	}
+}
+
+/// One sitting at one document.
+/// 
+/// A session ends when the writer moves to another document or project, or has been
+/// away longer than the idle cutoff. A shell records the same session repeatedly as it
+/// goes — a checkpoint, so a crash loses a minute rather than an evening — and the
+/// store keeps the latest record for each `id`.
+public struct WritingSession: Codable, Equatable {
+	public let id: String
+	public let project: String
+	public let docPath: String
+	/// Unix milliseconds.
+	public let start: Double
+	public let end: Double
+	/// The writer's UTC offset when the session began, in minutes east of UTC. Days
+	/// and hours are the writer's local ones, and the offset travels with the record
+	/// rather than being looked up later, so a trip or a DST change does not move
+	/// last week's words onto a different day.
+	public let utcOffsetMinutes: Int32
+	/// Time the document was frontmost with the writer present.
+	public let openSecs: UInt32?
+	/// Time spent typing: the gaps between edits that were short enough to be one
+	/// run of writing, as the shell's "active gap" setting decides.
+	public let activeSecs: UInt32?
+	/// Words that appeared by typing. Pasted words are counted apart.
+	public let wordsAdded: UInt32?
+	public let wordsDeleted: UInt32?
+	public let wordsPasted: UInt32?
+	public let charsAdded: UInt32?
+	public let charsDeleted: UInt32?
+	/// The document's length when the session began and when it last changed.
+	public let startWords: UInt32?
+	public let endWords: UInt32?
+	public let minutes: [StatsMinute]?
+	/// The writing timer run this session was part of, if any.
+	public let timerRunId: String?
+
+	public init(id: String, project: String, docPath: String, start: Double, end: Double, utcOffsetMinutes: Int32, openSecs: UInt32?, activeSecs: UInt32?, wordsAdded: UInt32?, wordsDeleted: UInt32?, wordsPasted: UInt32?, charsAdded: UInt32?, charsDeleted: UInt32?, startWords: UInt32?, endWords: UInt32?, minutes: [StatsMinute]?, timerRunId: String?) {
+		self.id = id
+		self.project = project
+		self.docPath = docPath
+		self.start = start
+		self.end = end
+		self.utcOffsetMinutes = utcOffsetMinutes
+		self.openSecs = openSecs
+		self.activeSecs = activeSecs
+		self.wordsAdded = wordsAdded
+		self.wordsDeleted = wordsDeleted
+		self.wordsPasted = wordsPasted
+		self.charsAdded = charsAdded
+		self.charsDeleted = charsDeleted
+		self.startWords = startWords
+		self.endWords = endWords
+		self.minutes = minutes
+		self.timerRunId = timerRunId
 	}
 }
 

@@ -20,6 +20,37 @@ struct SharedToolbarItems: CustomizableToolbarContent {
         panelItem(.notes, id: .notesPanel)
         panelItem(.history, id: .historyPanel)
         panelItem(.references, id: .referencesPanel)
+        panelItem(.stats, id: .statsPanel)
+
+        ToolbarItem(id: ToolbarItemID.writingTimer.id) {
+            TimerToolbarControl()
+        }
+        .defaultCustomization(.hidden)
+
+        ToolbarItem(id: ToolbarItemID.newTab.id) {
+            Button("New Tab", systemImage: "plus.square.on.square") { model.tabs.newTab() }
+                .help("Open a new tab (⌘T)")
+                .disabled(model.bridge.project.projectName == nil)
+        }
+        .defaultCustomization(.hidden)
+
+        ToolbarItem(id: ToolbarItemID.split.id) {
+            let tabs = model.tabs
+            ControlGroup {
+                Button("Split Right", systemImage: "rectangle.split.2x1") { tabs.openSplit(.columns) }
+                    .help("Show another tab beside this one (⌃⌘T)")
+                    .disabled(!tabs.canSplit || tabs.split == .columns)
+                Button("Split Down", systemImage: "rectangle.split.1x2") { tabs.openSplit(.rows) }
+                    .help("Show another tab below this one (⌃⌥⌘T)")
+                    .disabled(!tabs.canSplit || tabs.split == .rows)
+                Button("Close Split", systemImage: "rectangle") { tabs.closeSplit() }
+                    .help("Close the split (⌃⇧⌘W)")
+                    .disabled(tabs.split == nil)
+            } label: {
+                Label("Split", systemImage: "rectangle.split.2x1")
+            }
+        }
+        .defaultCustomization(.hidden)
 
     }
 

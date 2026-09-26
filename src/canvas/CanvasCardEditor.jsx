@@ -12,7 +12,7 @@
  * withdraws, the registry resolves `CanvasCard` to no editor, and the toolbar goes
  * quiet.
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { EditorTarget } from '../types'
 import { editorRegistry, useRegisterEditor } from '../bridge'
@@ -22,11 +22,14 @@ import { isEditorReady } from '../lib/editorUtils'
 
 export default function CanvasCardEditor({ node, setActiveEditor, onCommit, onExit, docPath = null }) {
   const containerRef = useRef(null)
-  const editor = useEditor({
+  // Built once: new extension instances each render made useEditor call setOptions
+  // on every render. The card's content is read at creation only, as before.
+  const [options] = useState(() => ({
     extensions: buildCardExtensions(),
     content: node.inkblotTipTap || node.text || '',
     autofocus: 'end',
-  })
+  }))
+  const editor = useEditor(options)
 
   // Commit through a ref so the unmount effect below doesn't need onCommit in its
   // deps — re-running it would tear the editor down mid-edit.
