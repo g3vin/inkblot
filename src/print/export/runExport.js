@@ -11,8 +11,8 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { mkdir, writeFile, writeTextFile } from '@tauri-apps/plugin-fs'
 
 import { withPrintBibliography } from '../../lib/references/printBibliography'
-import { chapterTitleOf, compileBook, frontMatterSections, paragraphsOf } from '../bookMatter'
-import { loadChapters } from '../compile'
+import { chapterTitleOf, compileSections, frontMatterSections, paragraphsOf } from '../bookMatter'
+import { bookFolderFor, loadBookSections, loadChapters } from '../compile'
 import { readDocPageSetup } from '../DocPageSetup'
 import { resolvePageSetup } from '../pageSetup'
 import { bookAuthor, getAuthorProfile, setLastExport } from '../printLayoutStore'
@@ -107,21 +107,48 @@ export async function runExport({
 /** Build a non-PDF export and write it to `path`. */
 async function writeExport({ format, path, projectName, docPath, scope, liveByPath, compiled, title, book }) {
   const author = bookAuthor(book)
-  const chapters = await withPrintBibliography(
-    projectName,
-    await loadChapters(projectName, docPath, scope, (p) => liveByPath.get(p)?.getJSON() || null, { excluded: compiled ? book?.excluded : [] })
-  )
+  const live = (p) => liveByPath.get(p)?.getJSON() || null
+  // A book is its contents in book order; a document exports as it is.
+  let chapters
+  let sections = null
+  if (compiled) {
+    const raw = await loadBookSections(projectName, bookFolderFor(docPath, scope), book, live)
+    const noted = await withPrintBibliography(
+      projectName,
+      raw.filter((s) => s.item.kind === 'chapter' && s.content).map((s) => ({ path: s.path, name: s.name, content: s.content }))
+    )
+    const byPath = new Map(noted.map((c) => [c.path, c]))
+    sections = compileSections(
+      raw.map((s) => (s.item.kind === 'chapter' && byPath.has(s.path) ? { ...s, content: byPath.get(s.path).content } : s)),
+      book,
+      { author, insertTitles: true }
+    )
+    chapters = sections.filter((s) => s.item.kind === 'chapter' && s.content)
+  } else {
+    chapters = await withPrintBibliography(projectName, await loadChapters(projectName, docPath, 'document', live))
+  }
   const { setup } = resolvePageSetup({
     docSetup: (compiled ? null : readDocPageSetup(liveByPath.get(docPath)?.state.doc)) || chapters[0]?.content?.attrs?.pageSetup,
     bookSetup: book?.pageSetup,
     scope,
   })
-  // A book's chapters are headed — numbered, or by their names — and followed by its
-  // back matter; a document exports as it is.
-  const exportChapters = (compiled ? compileBook(chapters, book, { author, insertTitles: true }) : chapters)
-    .map((chapter) => ({ title: chapterTitleOf(chapter.content, chapter.name), content: chapter.content }))
-  const front = compiled ? frontMatterSections(book, { title, author, titlePage: Boolean(setup.titlePage) }) : []
-  const contents = compiled && Boolean(book?.frontMatter?.contents)
+  // A book's pages in order — its own front matter pages, parts, chapters headed as it
+  // numbers them, back matter — each titled for the contents; a document as it is.
+  const exportChapters = (sections ? sections.filter((s) => s.content) : chapters)
+    .map((chapter) => ({
+      title: chapterTitleOf(chapter.content, chapter.name),
+      content: chapter.content,
+      inContents: chapter.role !== 'front',
+    }))
+  // The pages an export sets from the book itself: the half title and the title page.
+  const generated = new Set((sections || []).filter((s) => s.role === 'front').map((s) => s.item.generated).filter(Boolean))
+  const front = compiled
+    ? frontMatterSections(
+      { frontMatter: { halfTitle: generated.has('halfTitle') } },
+      { title, author, titlePage: generated.has('titlePage') || Boolean(setup.titlePage) }
+    )
+    : []
+  const contents = compiled && (sections || []).some((s) => s.item.generated === 'contents')
 
   if (format === 'html') {
     // Inline every image, so the file stands alone.

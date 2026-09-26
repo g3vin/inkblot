@@ -114,11 +114,14 @@ export const buildEpub = async (options: EpubOptions): Promise<Uint8Array> => {
       // An image that could not be packaged would be a broken reference: drop it.
       .replace(/<img[^>]*src=""[^>]*\/>/g, '')
     const id = `chapter-${String(i + 1).padStart(3, '0')}`
+    // A page before the chapters is front matter to a reading system, not a chapter.
+    const type = chapter.inContents === false ? 'frontmatter' : 'chapter'
     return {
       id,
       href: `text/${id}.xhtml`,
       title: chapter.title,
-      xhtml: xhtmlPage(chapter.title, language, `<section epub:type="chapter" id="${id}">\n${body}\n</section>`),
+      inContents: chapter.inContents,
+      xhtml: xhtmlPage(chapter.title, language, `<section epub:type="${type}" id="${id}">\n${body}\n</section>`),
     }
   })
 
@@ -131,7 +134,7 @@ export const buildEpub = async (options: EpubOptions): Promise<Uint8Array> => {
     }
   })
   const contentsPage = options.contents && chapterFiles.length
-    ? xhtmlPage('Contents', language, `<section epub:type="toc" class="contents">\n<h1>Contents</h1>\n<ol>\n${chapterFiles.map((c) => `<li><a href="${c.href.replace('text/', '')}">${escapeHtml(c.title)}</a></li>`).join('\n')}\n</ol>\n</section>`)
+    ? xhtmlPage('Contents', language, `<section epub:type="toc" class="contents">\n<h1>Contents</h1>\n<ol>\n${chapterFiles.filter((c) => c.inContents !== false).map((c) => `<li><a href="${c.href.replace('text/', '')}">${escapeHtml(c.title)}</a></li>`).join('\n')}\n</ol>\n</section>`)
     : null
 
   const cover = options.cover || null
@@ -153,7 +156,7 @@ ${chapterFiles.map((c) => `<li><a href="${c.href}">${escapeHtml(c.title)}</a></l
 </nav>
 <nav epub:type="landmarks" hidden="hidden">
 <ol>
-${cover ? '<li><a epub:type="cover" href="text/cover.xhtml">Cover</a></li>\n' : ''}${contentsPage ? '<li><a epub:type="toc" href="text/contents.xhtml">Contents</a></li>\n' : ''}<li><a epub:type="bodymatter" href="${chapterFiles[0]?.href || ''}">Start</a></li>
+${cover ? '<li><a epub:type="cover" href="text/cover.xhtml">Cover</a></li>\n' : ''}${contentsPage ? '<li><a epub:type="toc" href="text/contents.xhtml">Contents</a></li>\n' : ''}<li><a epub:type="bodymatter" href="${(chapterFiles.find((c) => c.inContents !== false) || chapterFiles[0])?.href || ''}">Start</a></li>
 </ol>
 </nav>
 </body>

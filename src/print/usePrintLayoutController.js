@@ -23,6 +23,9 @@ import { importAssetFromPath } from '../lib/assets'
 import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { countEditorWords } from '../lib/wordCount'
 import { withCoverPart } from './chapterDesign'
+import { reconcileBookItems } from './bookItems'
+import { addBookItem, editBookItem, moveBookItem, openablePath, removeBookItem, setBookItemHidden } from './bookContents'
+import { bookRows } from './bookRows'
 import { listBookChapters } from './compile'
 import { readDocPageSetup } from './DocPageSetup'
 import { applyFormat, FORMAT_OPTIONS, formatOf, writingFormatOf } from './formats'
@@ -46,6 +49,7 @@ import {
   getMeasurement,
   getPrintScope,
   getPrintZoom,
+  getSelectedBookItem,
   isPrintLayoutEnabled,
   setAuthorProfile,
   setBookSettings,
@@ -53,6 +57,7 @@ import {
   setEditorMode,
   setPrintScope,
   setPrintZoom,
+  setSelectedBookItem,
   subscribeCurrentPrintPage,
   subscribePrintLayoutStore,
 } from './printLayoutStore'
@@ -86,6 +91,9 @@ export const PAGE_LAYOUT_CATALOG = {
   tokens: RUNNING_TOKENS,
   defaultTypography: BOOK_TYPOGRAPHY,
 }
+
+/** A failed navigator command, said once in the console: the next publish shows the book as it is. */
+const failed = (what) => (error) => console.error(`[book] ${what} failed:`, error)
 
 /** How long typing waits before the page count it changed is published. */
 const TYPING_DEBOUNCE_MS = 120
@@ -167,7 +175,14 @@ const lastExportState = (last) => (last ? { format: last.format, scope: last.sco
  */
 export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = [], projectRoot = null }) => {
   const scope = getPrintScope(projectName)
-  const book = getBookSettings(projectName, bookFolderForScope(projectName, docPath))
+  const folder = bookFolderForScope(projectName, docPath)
+  const book = getBookSettings(projectName, folder)
+  // The book's contents as the navigator lists them, and which is selected: the one
+  // chosen there, while it is still the document open — or else the document open.
+  const items = reconcileBookItems(book, chapters, folder)
+  const rows = bookRows(items, book.chapterNumbering)
+  const chosen = rows.find((row) => row.id === getSelectedBookItem(projectName))
+  const selected = chosen && (!chosen.path || chosen.path === docPath) ? chosen : rows.find((row) => row.path && row.path === docPath)
   const ownSetup = editor ? readDocPageSetup(editor.state.doc) : null
   const { setup, source } = resolvePageSetup({ docSetup: ownSetup, bookSetup: book.pageSetup })
   const { formatId, modified } = formatOf(setup)
@@ -192,6 +207,8 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     book,
     bookSetupActive: Boolean(book.pageSetup),
     bookChapters: chapters,
+    bookItems: rows,
+    selectedBookItem: selected?.id,
     suggestedInsideMarginMm: suggestedInsideMarginMm(Math.max(pageCount, 1)),
     author: getAuthorProfile(),
     wordCount: docWords,
@@ -226,6 +243,7 @@ export default function usePrintLayoutController({
   onPrint,
   onExport,
   onMeasure,
+  onOpenDoc,
 }) {
   // The editor that holds the active document: the pane it is open in.
   const activeTextDoc = activeDoc && isTextDoc(activeDoc) ? activeDoc : null
@@ -239,9 +257,9 @@ export default function usePrintLayoutController({
     if (docPath === secondaryDoc) return usable(secondaryEditor)
     return null
   }
-  const stateRef = useRef({ projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure })
+  const stateRef = useRef({ projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure, onOpenDoc })
   useEffect(() => {
-    stateRef.current = { projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure }
+    stateRef.current = { projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure, onOpenDoc }
   })
   const chaptersRef = useRef({ key: '', chapters: [] })
   const rootRef = useRef({ project: null, root: null })
@@ -387,6 +405,43 @@ export default function usePrintLayoutController({
   useEffect(() => {
     const subscriptions = [
       documentSurface.onCommand('setEditorMode', ({ mode }) => setEditorMode(stateRef.current.projectName, mode)),
+      // The Book navigator: the book's own order and contents, never the file tree's.
+      documentSurface.onCommand('moveBookItem', ({ id, before }) => {
+        const { project, folder } = currentBook()
+        if (project) moveBookItem(project, folder, id, before).catch(failed('Moving it'))
+      }),
+      documentSurface.onCommand('setBookItemHidden', ({ id, hidden }) => {
+        const { project, folder } = currentBook()
+        if (project) setBookItemHidden(project, folder, id, hidden).catch(failed('Hiding it'))
+      }),
+      documentSurface.onCommand('addBookItem', (command) => {
+        const { project, folder } = currentBook()
+        if (!project) return
+        addBookItem(project, folder, command)
+          .then((item) => {
+            if (!item) return
+            setSelectedBookItem(project, item.id)
+            // A new page of the book's is opened, to be written.
+            if (item.path) stateRef.current.onOpenDoc?.(item.path)
+          })
+          .catch(failed('Adding it'))
+      }),
+      documentSurface.onCommand('removeBookItem', ({ id }) => {
+        const { project, folder } = currentBook()
+        if (project) removeBookItem(project, folder, id).catch(failed('Removing it'))
+      }),
+      documentSurface.onCommand('editBookItem', (command) => {
+        const { project, folder } = currentBook()
+        if (project) editBookItem(project, folder, command).catch(failed('Changing it'))
+      }),
+      documentSurface.onCommand('openBookItem', ({ id }) => {
+        const { project, folder } = currentBook()
+        if (!project) return
+        setSelectedBookItem(project, id)
+        openablePath(project, folder, id)
+          .then((path) => { if (path) stateRef.current.onOpenDoc?.(path) })
+          .catch(failed('Opening it'))
+      }),
       documentSurface.onCommand('setPrintLayout', ({ enabled, docPath }) => togglePrintLayout(enabled, docPath)),
       documentSurface.onCommand('setPageSetup', ({ setup, target }) => applySetup(setup, target)),
       documentSurface.onCommand('applyFormat', ({ formatId, target }) => {

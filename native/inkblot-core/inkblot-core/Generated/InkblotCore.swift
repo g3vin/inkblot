@@ -65,6 +65,59 @@ public struct ActiveMarks: Codable, Equatable {
 	}
 }
 
+/// Which page of front or back matter a matter document is.
+public enum MatterKind: String, Codable, Equatable {
+	case alsoBy
+	case copyright
+	case dedication
+	case epigraph
+	case foreword
+	case preface
+	case introduction
+	case afterword
+	case acknowledgements
+	case aboutAuthor
+	case glossary
+	case excerpt
+	case readingGuide
+	case callToAction
+	/// A half title or title page made editable.
+	case halfTitle
+	case titlePage
+	case custom
+}
+
+public enum GeneratedKind: String, Codable, Equatable {
+	case halfTitle
+	case titlePage
+	case contents
+	/// Endnotes gathered at the end of the book.
+	case notes
+	case bibliography
+}
+
+/// Add a page of front or back matter (a document, made from its kind's template), a
+/// page the book lays out itself, or a part divider — where the standard order has it.
+public struct AddBookItemCommand: Codable, Equatable {
+	public let matter: MatterKind?
+	public let generated: GeneratedKind?
+	/// A part divider, before the entry `before` (or at the end of the chapters).
+	public let part: Bool?
+	public let before: String?
+	public let title: String?
+	/// For a kind that can go either side (Also By): the back.
+	public let back: Bool?
+
+	public init(matter: MatterKind?, generated: GeneratedKind?, part: Bool?, before: String?, title: String?, back: Bool?) {
+		self.matter = matter
+		self.generated = generated
+		self.part = part
+		self.before = before
+		self.title = title
+		self.back = back
+	}
+}
+
 /// Quick add: a URL, DOI, ISBN, arXiv id or PMID is looked up; anything else is
 /// searched for as a title. The source exists at once, `resolving`, attached to the
 /// document — the writer does not wait on the network.
@@ -457,37 +510,6 @@ public enum BookItemKind: String, Codable, Equatable {
 	case generated
 }
 
-/// Which page of front or back matter a matter document is.
-public enum MatterKind: String, Codable, Equatable {
-	case alsoBy
-	case copyright
-	case dedication
-	case epigraph
-	case foreword
-	case preface
-	case introduction
-	case afterword
-	case acknowledgements
-	case aboutAuthor
-	case glossary
-	case excerpt
-	case readingGuide
-	case callToAction
-	/// A half title or title page made editable.
-	case halfTitle
-	case titlePage
-	case custom
-}
-
-public enum GeneratedKind: String, Codable, Equatable {
-	case halfTitle
-	case titlePage
-	case contents
-	/// Endnotes gathered at the end of the book.
-	case notes
-	case bibliography
-}
-
 /// What a chapter is, which decides whether it is numbered and what its head says.
 public enum ChapterType: String, Codable, Equatable {
 	/// Numbered.
@@ -558,6 +580,54 @@ public struct BookItem: Codable, Equatable {
 		self.generated = generated
 		self.chapterType = chapterType
 		self.page = page
+	}
+}
+
+/// Where in the book an entry is: before the first chapter, among them, or after.
+public enum BookRowSection: String, Codable, Equatable {
+	case front
+	case body
+	case back
+}
+
+/// One entry of a book as the navigator draws it: a `BookItem` with what the page
+/// worked out about it — its number, its label, which part it is in.
+public struct BookRow: Codable, Equatable {
+	public let id: String
+	public let kind: BookItemKind
+	public let title: String
+	public let path: String?
+	public let hidden: Bool
+	public let matter: MatterKind?
+	public let generated: GeneratedKind?
+	public let chapterType: ChapterType?
+	/// A numbered chapter's number, or a part's.
+	public let number: UInt32?
+	/// "Chapter One", "Prologue", "Part II" — what its head says.
+	public let label: String?
+	public let section: BookRowSection
+	/// The part it is in, by id.
+	public let part: String?
+	/// Its page options, its own over its kind's.
+	public let page: PageOptions
+	/// Printed from text from before matter pages were documents; opening it makes it one.
+	public let legacy: Bool?
+
+	public init(id: String, kind: BookItemKind, title: String, path: String?, hidden: Bool, matter: MatterKind?, generated: GeneratedKind?, chapterType: ChapterType?, number: UInt32?, label: String?, section: BookRowSection, part: String?, page: PageOptions, legacy: Bool?) {
+		self.id = id
+		self.kind = kind
+		self.title = title
+		self.path = path
+		self.hidden = hidden
+		self.matter = matter
+		self.generated = generated
+		self.chapterType = chapterType
+		self.number = number
+		self.label = label
+		self.section = section
+		self.part = part
+		self.page = page
+		self.legacy = legacy
 	}
 }
 
@@ -1589,6 +1659,12 @@ public enum NativeCommand: Codable, Equatable {
 	case setCitationStyle(SetCitationStyleCommand)
 	case setBibliographyOptions(SetBibliographyOptionsCommand)
 	case setEditorMode(SetEditorModeCommand)
+	case moveBookItem(MoveBookItemCommand)
+	case setBookItemHidden(SetBookItemHiddenCommand)
+	case addBookItem(AddBookItemCommand)
+	case removeBookItem(RemoveBookItemCommand)
+	case editBookItem(EditBookItemCommand)
+	case openBookItem(OpenBookItemCommand)
 	case setPrintLayout(SetPrintLayoutCommand)
 	case setPageSetup(SetPageSetupCommand)
 	case setBookSettings(SetBookSettingsCommand)
@@ -1689,6 +1765,12 @@ public enum NativeCommand: Codable, Equatable {
 			setCitationStyle,
 			setBibliographyOptions,
 			setEditorMode,
+			moveBookItem,
+			setBookItemHidden,
+			addBookItem,
+			removeBookItem,
+			editBookItem,
+			openBookItem,
 			setPrintLayout,
 			setPageSetup,
 			setBookSettings,
@@ -2069,6 +2151,36 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setEditorMode(content)
 					return
 				}
+			case .moveBookItem:
+				if let content = try? container.decode(MoveBookItemCommand.self, forKey: .payload) {
+					self = .moveBookItem(content)
+					return
+				}
+			case .setBookItemHidden:
+				if let content = try? container.decode(SetBookItemHiddenCommand.self, forKey: .payload) {
+					self = .setBookItemHidden(content)
+					return
+				}
+			case .addBookItem:
+				if let content = try? container.decode(AddBookItemCommand.self, forKey: .payload) {
+					self = .addBookItem(content)
+					return
+				}
+			case .removeBookItem:
+				if let content = try? container.decode(RemoveBookItemCommand.self, forKey: .payload) {
+					self = .removeBookItem(content)
+					return
+				}
+			case .editBookItem:
+				if let content = try? container.decode(EditBookItemCommand.self, forKey: .payload) {
+					self = .editBookItem(content)
+					return
+				}
+			case .openBookItem:
+				if let content = try? container.decode(OpenBookItemCommand.self, forKey: .payload) {
+					self = .openBookItem(content)
+					return
+				}
 			case .setPrintLayout:
 				if let content = try? container.decode(SetPrintLayoutCommand.self, forKey: .payload) {
 					self = .setPrintLayout(content)
@@ -2430,6 +2542,24 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setEditorMode(let content):
 			try container.encode(CodingKeys.setEditorMode, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .moveBookItem(let content):
+			try container.encode(CodingKeys.moveBookItem, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setBookItemHidden(let content):
+			try container.encode(CodingKeys.setBookItemHidden, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .addBookItem(let content):
+			try container.encode(CodingKeys.addBookItem, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .removeBookItem(let content):
+			try container.encode(CodingKeys.removeBookItem, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .editBookItem(let content):
+			try container.encode(CodingKeys.editBookItem, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .openBookItem(let content):
+			try container.encode(CodingKeys.openBookItem, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setPrintLayout(let content):
 			try container.encode(CodingKeys.setPrintLayout, forKey: .type)
@@ -2979,6 +3109,22 @@ public struct DuplicateEntryCommand: Codable, Equatable {
 
 	public init(path: String) {
 		self.path = path
+	}
+}
+
+/// Rename an entry, change what kind of chapter it is, or how its page sits. Each field
+/// present is set; absent ones are left as they are.
+public struct EditBookItemCommand: Codable, Equatable {
+	public let id: String
+	public let title: String?
+	public let chapterType: ChapterType?
+	public let page: PageOptions?
+
+	public init(id: String, title: String?, chapterType: ChapterType?, page: PageOptions?) {
+		self.id = id
+		self.title = title
+		self.chapterType = chapterType
+		self.page = page
 	}
 }
 
@@ -4854,6 +5000,18 @@ public struct MeasureBookCommand: Codable, Equatable {
 	public init() {}
 }
 
+/// Move an entry to before another (or to the end, with none). Only the book's order
+/// changes — never the file tree.
+public struct MoveBookItemCommand: Codable, Equatable {
+	public let id: String
+	public let before: String?
+
+	public init(id: String, before: String?) {
+		self.id = id
+		self.before = before
+	}
+}
+
 /// Move a file or folder into another folder. See `RenameEntryCommand`.
 public struct MoveEntryCommand: Codable, Equatable {
 	public let path: String
@@ -5103,6 +5261,15 @@ public struct NotesRemapped: Codable, Equatable {
 		self.docPath = docPath
 		self.notes = notes
 		self.droppedNoteIds = droppedNoteIds
+	}
+}
+
+/// Select an entry: open its document, or show its page, and make it This Page.
+public struct OpenBookItemCommand: Codable, Equatable {
+	public let id: String
+
+	public init(id: String) {
+		self.id = id
 	}
 }
 
@@ -5380,6 +5547,11 @@ public struct PageLayoutState: Codable, Equatable {
 	public let bookSetupActive: Bool
 	/// The book's chapters, in order: document tree paths.
 	public let bookChapters: [String]
+	/// The book's contents in book order, as the Book navigator lists them.
+	public let bookItems: [BookRow]?
+	/// The entry the navigator has selected, whose page the Typeset tab's This Page
+	/// section shows.
+	public let selectedBookItem: String?
 	/// A recommended inside margin for a book of this many pages, in mm.
 	public let suggestedInsideMarginMm: Double
 	/// Who wrote it: the title page's byline and contact details.
@@ -5398,7 +5570,7 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Production section. None for prose.
 	public let script: ScriptSummary?
 
-	public init(enabled: Bool, mode: EditorMode?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
+	public init(enabled: Bool, mode: EditorMode?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
 		self.mode = mode
 		self.docPath = docPath
@@ -5415,6 +5587,8 @@ public struct PageLayoutState: Codable, Equatable {
 		self.book = book
 		self.bookSetupActive = bookSetupActive
 		self.bookChapters = bookChapters
+		self.bookItems = bookItems
+		self.selectedBookItem = selectedBookItem
 		self.suggestedInsideMarginMm = suggestedInsideMarginMm
 		self.author = author
 		self.wordCount = wordCount
@@ -5897,6 +6071,17 @@ public struct ReferencesChanged: Codable, Equatable {
 /// The documents in the book's folder changed — list its chapters again.
 public struct RefreshBookChaptersCommand: Codable, Equatable {
 	public init() {}
+}
+
+/// Take a matter page, a generated page or a part out of the book. A matter page's
+/// document is deleted with it (the navigator asks first). A chapter cannot be removed
+/// here — only hidden: it is the manuscript's.
+public struct RemoveBookItemCommand: Codable, Equatable {
+	public let id: String
+
+	public init(id: String) {
+		self.id = id
+	}
 }
 
 /// Remove entries from the history. `None` clears it.
@@ -6410,6 +6595,18 @@ public struct SetBookCoverCommand: Codable, Equatable {
 
 	public init(path: String?) {
 		self.path = path
+	}
+}
+
+/// Hide an entry from the Typeset pages, print, export and the continuous document, or
+/// show it again.
+public struct SetBookItemHiddenCommand: Codable, Equatable {
+	public let id: String
+	public let hidden: Bool
+
+	public init(id: String, hidden: Bool) {
+		self.id = id
+		self.hidden = hidden
 	}
 }
 

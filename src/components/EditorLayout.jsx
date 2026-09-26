@@ -485,6 +485,11 @@ export default function EditorLayout(props) {
     onExport: ({ format, scope, bound, options, path }) => {
       runExport({ ...printOptions(scope), format, scope, bound, options, path }).catch((error) => console.error('[export] failed:', error))
     },
+    // A page of the book's own — a dedication — opened from the Book navigator.
+    onOpenDoc: (path) => {
+      setActiveDoc(path)
+      setCurrentDoc(path)
+    },
     onMeasure: ({ scope }) => {
       const { projectName, docPath } = printOptions(scope)
       measurePrint({ ...printOptions(scope), scope })

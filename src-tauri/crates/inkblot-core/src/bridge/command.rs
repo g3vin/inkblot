@@ -31,7 +31,8 @@ use super::print::{
     ImportScriptCommand, InsertBreakCommand, MeasureBookCommand, ScriptReportCommand, SetSceneNumbersCommand, PrintDocumentCommand, PrintFinishedCommand, RefreshBookChaptersCommand,
     SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand, SetPrintLayoutCommand,
     SetAuthorProfileCommand, SetBookCoverCommand, SetEditorModeCommand, SetPrintScopeCommand, SetPrintZoomCommand,
-    UseSetupForBookCommand,
+    UseSetupForBookCommand, MoveBookItemCommand, SetBookItemHiddenCommand, AddBookItemCommand, RemoveBookItemCommand,
+    EditBookItemCommand, OpenBookItemCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -586,6 +587,13 @@ pub enum NativeCommand {
     SetCitationStyle(SetCitationStyleCommand),
     SetBibliographyOptions(SetBibliographyOptionsCommand),
     SetEditorMode(SetEditorModeCommand),
+    /* The Book navigator (`print.rs`). */
+    MoveBookItem(MoveBookItemCommand),
+    SetBookItemHidden(SetBookItemHiddenCommand),
+    AddBookItem(AddBookItemCommand),
+    RemoveBookItem(RemoveBookItemCommand),
+    EditBookItem(EditBookItemCommand),
+    OpenBookItem(OpenBookItemCommand),
     SetPrintLayout(SetPrintLayoutCommand),
     SetPageSetup(SetPageSetupCommand),
     SetBookSettings(SetBookSettingsCommand),

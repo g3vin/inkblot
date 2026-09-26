@@ -6,6 +6,8 @@
  * tree — the same order the tree shows, from the same saved order map — and loading
  * each one's content. Canvases are not chapters and are skipped.
  */
+import { BookItemKind } from '../types'
+import type { BookItem, BookSettings } from '../types'
 import { isTextDoc } from '../lib/docKind'
 import { listProjectTree, loadDocument } from '../lib/FileSystem'
 import { applyOrderToTree, getParentPath } from '../lib/fileTreeOrder'
@@ -13,6 +15,7 @@ import { loadOrder } from '../lib/fileTreeState'
 import { nativeOwns } from '../lib/host'
 import { refreshPreferenceScope } from '../lib/preferences'
 import type { TreeNode } from '../types'
+import { isLegacyMatter, itemTitle, reconcileBookItems } from './bookItems'
 
 export type CompileScope = 'document' | 'folder' | 'project'
 
@@ -25,10 +28,16 @@ export interface Chapter {
   content: { type: 'doc'; attrs?: Record<string, unknown>; content?: unknown[] }
 }
 
-/** The folder a scope compiles, for a document: its parent, or the project root. */
-export const bookFolderFor = (docPath: string | null | undefined, scope: CompileScope): string => (
-  scope === 'project' ? '' : getParentPath(docPath || '')
-)
+/**
+ * The folder a scope compiles, for a document: its parent, or the project root. A page
+ * of the book's own — kept in the book folder's `.book/` — belongs to that folder.
+ */
+export const bookFolderFor = (docPath: string | null | undefined, scope: CompileScope): string => {
+  if (scope === 'project') return ''
+  const parent = getParentPath(docPath || '')
+  if (parent === '.book') return ''
+  return parent.endsWith('/.book') ? parent.slice(0, -'/.book'.length) : parent
+}
 
 const findFolder = (node: TreeNode | null | undefined, path: string): TreeNode | null => {
   if (!node) return null
@@ -92,4 +101,43 @@ export const loadChapters = async (
     chapters.push({ path, name: path.split('/').pop() || path, content })
   }
   return chapters
+}
+
+/** One entry of a book as it compiles: its item, and the content it prints. */
+export interface BookSection {
+  item: BookItem
+  /** The document's tree path; empty for a page the book lays out itself. */
+  path: string
+  /** What it is called: a chapter's document name, a matter page's kind. */
+  name: string
+  /** TipTap JSON for a chapter or a matter page; null for a part or a generated page. */
+  content: Chapter['content'] | null
+}
+
+/**
+ * A book's contents in book order, less what is hidden, each with its content: the
+ * open documents' as they are now (`live`), the rest from disk. A legacy matter page —
+ * text from before front and back matter were documents — has none; `bookMatter.ts`
+ * sets its text.
+ */
+export const loadBookSections = async (
+  projectName: string,
+  folder: string,
+  book: Partial<BookSettings> | null | undefined,
+  live: (path: string) => Chapter['content'] | null = () => null
+): Promise<BookSection[]> => {
+  const chapters = await listBookChapters(projectName, folder)
+  const items = reconcileBookItems(book || {}, chapters, folder).filter((item) => !item.hidden)
+  const sections: BookSection[] = []
+  for (const item of items) {
+    const path = item.path || ''
+    const readable = (item.kind === BookItemKind.Chapter || item.kind === BookItemKind.Matter) && path && !isLegacyMatter(item)
+    let content: Chapter['content'] | null = null
+    if (readable) {
+      content = live(path) || asDoc((await loadDocument(projectName, path))?.content)
+    }
+    const name = item.kind === BookItemKind.Chapter ? (path.split('/').pop() || path) : itemTitle(item)
+    sections.push({ item, path: item.kind === BookItemKind.Part ? '' : path, name, content })
+  }
+  return sections
 }

@@ -114,6 +114,14 @@ export const relocateBooks = async (projectName, fromRel, toRel, { folder = fals
       const kept = copy ? excluded : excluded.filter((p) => !moved(p))
       next = { ...book, excluded: toRel ? [...kept, ...excluded.filter(moved).map(to)] : kept }
     }
+    // The book's own order of its contents: a chapter, a part's folder, a page of its
+    // matter (in the folder's `.book/`) follows its document. A copy leaves the book as
+    // it is; a delete takes the entry out when the tree next reconciles it.
+    const items = Array.isArray(book?.items) ? book.items : []
+    if (!copy && toRel && items.some((item) => item?.path && moved(item.path))) {
+      touched = true
+      next = { ...next, items: items.map((item) => (item?.path && moved(item.path) ? { ...item, path: to(item.path) } : item)) }
+    }
     if (folder && moved(key)) {
       touched = true
       if (copy) books[key] = next

@@ -32,6 +32,10 @@ final class AppModel {
     let goals: GoalsModel
     /// Sprint mode has the file tree hidden; `ContentView` follows.
     var sprintHidesFileTree = false
+    /// What the left sidebar shows: the project's files, or the book's contents. It
+    /// follows the mode — Typeset brings the book, Write the files — and can be switched
+    /// on its own, to write a dedication with the drafting panels beside it.
+    var leftSidebar: LeftSidebar = .files
     /// What sprint mode changed, to put back when the writing segment ends.
     @ObservationIgnored private var sprintRestore: (inspector: Bool, focusMode: Bool)?
     let memoRecorder = AudioMemoRecorder()
@@ -86,6 +90,7 @@ final class AppModel {
             guard let self else { return }
             let layout = InspectorLayout(mode)
             if sidebar.layout != layout { sidebar.showLayout(layout) }
+            leftSidebar = mode == .typeset ? .book : .files
         }
         sidebar.onLayoutChanged = { [weak self] layout in self?.pageLayout.setMode(layout.mode) }
 
@@ -109,7 +114,8 @@ final class AppModel {
                 stats.edit(changed)
                 // A document the tree has not seen — made by the page, most likely. The
                 // watcher will catch it too; this just does not wait for the latency.
-                if !tree.filePaths.contains(changed.docPath) { tree.reload() }
+                // A page of the book's own is not in the tree: nothing to wait for.
+                if !tree.filePaths.contains(changed.docPath) && !LeftSidebar.isBookPage(changed.docPath) { tree.reload() }
             default:
                 break
             }
@@ -306,5 +312,22 @@ final class AppModel {
             return
         }
         bridge.send(.insertPlainText(InsertPlainTextCommand(target: target, text: text)))
+    }
+}
+
+/// What the window's left sidebar shows.
+enum LeftSidebar: String, CaseIterable {
+    case files, book
+
+    var title: String {
+        switch self {
+        case .files: "Files"
+        case .book: "Book"
+        }
+    }
+
+    /// A page of a book's own, kept in its folder's `.book/`, which the tree does not list.
+    static func isBookPage(_ path: String) -> Bool {
+        path.hasPrefix(".book/") || path.contains("/.book/")
     }
 }

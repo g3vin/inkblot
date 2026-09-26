@@ -236,6 +236,22 @@ export const getBookForDoc = (projectName, docPath) => (
   getBookSettings(projectName, bookFolderForScope(projectName, docPath))
 )
 
+/* ---------------- the Book navigator's selection ---------------- */
+
+// Which entry of the book the navigator has selected, by project: for a page the book
+// lays out (a title page, the contents) there is no document to be "the active one".
+// Not kept across launches.
+const selectedItems = new Map()
+
+export const getSelectedBookItem = (projectName) => selectedItems.get(projectName || '') || null
+
+export const setSelectedBookItem = (projectName, id) => {
+  if (getSelectedBookItem(projectName) === (id || null)) return
+  if (id) selectedItems.set(projectName || '', id)
+  else selectedItems.delete(projectName || '')
+  emit()
+}
+
 /* ---------------- the last export ---------------- */
 
 const LAST_EXPORT_PREFIX = 'inkblot-last-export:'
