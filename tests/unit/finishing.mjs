@@ -175,10 +175,16 @@ ok('a zoom naming another document is that document\'s',
 await act(async () => { store.setPrintZoom(0.5, 'P', 'Novel/Left') })
 ok('and leaves the one it did not name as it was', store.getPrintZoom('P', 'Novel/Other') === 2.5 && store.getPrintZoom('P', 'Novel/Left') === 0.5)
 ok('one never zoomed is not moved by either', store.getPrintZoom('P', 'Novel/Unzoomed') === store.getPrintZoom())
-await act(async () => { shellBridge.send('setPrintLayout', { enabled: true, docPath: 'Novel/Other' }) })
-ok('a pane\'s toggle shows its own document as pages, not the active one',
-  store.isPrintLayoutEnabled('P', 'Novel/Other') && !store.isPrintLayoutEnabled('P', 'Novel/Two'))
+await act(async () => { shellBridge.send('setEditorMode', { mode: 'typeset' }) })
+await act(async () => { await wait(30) })
+ok('Typeset mode shows every document as pages, the active one and the rest',
+  store.isPrintLayoutEnabled('P', 'Novel/Other') && store.isPrintLayoutEnabled('P', 'Novel/Two'))
+ok('and the state says so', lastState().mode === 'typeset' && lastState().enabled)
+ok('the mode is the project\'s: another project is still writing', store.getEditorMode('Q') === 'write')
+await act(async () => { shellBridge.send('setEditorMode', { mode: 'nonsense' }) })
+ok('a mode that is not one changes nothing', store.getEditorMode('P') === 'typeset')
 await act(async () => { shellBridge.send('setPrintLayout', { enabled: false, docPath: 'Novel/Other' }) })
+ok('the old Print Layout switch turns Typeset off, for every document', store.getEditorMode('P') === 'write' && !store.isPrintLayoutEnabled('P', 'Novel/Two'))
 await act(async () => { store.setPrintZoom(zoomBefore, 'P', 'Novel/Two') })
 await act(async () => { await wait(160) })
 

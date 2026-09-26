@@ -49,6 +49,11 @@ struct ToolbarRegistryTests {
         "inkblot.timer",
         "inkblot.tabs.new-tab",
         "inkblot.tabs.split",
+        "inkblot.view.editor-mode",
+        "inkblot.typeset.insert",
+        "inkblot.typeset.zoom",
+        "inkblot.typeset.print",
+        "inkblot.typeset.export",
         "inkblot.window.inspector-toggle",
     ]
 
@@ -62,13 +67,13 @@ struct ToolbarRegistryTests {
     }
 
     @Test func everyIdIsNamespaced() {
-        for id in ToolbarItemID.allCases.map(\.rawValue) + [ToolbarID.document, ToolbarID.canvas, ToolbarID.map] {
+        for id in ToolbarItemID.allCases.map(\.rawValue) + [ToolbarID.document, ToolbarID.canvas, ToolbarID.map, ToolbarID.typeset] {
             #expect(id.hasPrefix("inkblot."), "\(id)")
         }
     }
 
     @Test func theToolbarsSaveApart() {
-        let ids = [ToolbarID.document, ToolbarID.canvas, ToolbarID.map]
+        let ids = [ToolbarID.document, ToolbarID.canvas, ToolbarID.map, ToolbarID.typeset]
         #expect(Set(ids).count == ids.count)
     }
 }

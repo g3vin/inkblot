@@ -1,17 +1,16 @@
 import SwiftUI
 
-/// Print Layout's controls, as Liquid Glass, for each text pane: in its bottom-right
-/// corner the button that shows its document as pages, and — while it does — that
-/// document's zoom beside it. Level with the pane's word and page counts, which keep to
-/// its bottom-left (`.native-print-controls`, WordCountBadge.css), and so, along the
-/// bottom of the window, with the file tree's bottom bar.
+/// The pages' zoom, as Liquid Glass, for each text pane showing pages — every one, in
+/// Typeset mode — in its bottom-right corner. Level with the pane's word and page
+/// counts, which keep to its bottom-left (`.native-print-controls`, WordCountBadge.css),
+/// and so, along the bottom of the window, with the file tree's bottom bar. (Pages are
+/// on or off with the window's mode now, not per pane: the toolbar's Write | Typeset.)
 ///
-/// Per pane, so one side of a split can be pages and the other not, and zooming one
-/// leaves the other alone. In a split a pane's controls show only while the pointer is
-/// over that pane (the page says which, `hovered`) or over the controls themselves;
-/// a lone pane always shows its. Where the panes are and what each shows comes from the
-/// page's `paneStatuses`; what the buttons do goes back as commands naming the pane's
-/// document.
+/// Per pane, so zooming one side of a split leaves the other alone. In a split a
+/// pane's control shows only while the pointer is over that pane (the page says which,
+/// `hovered`) or over the control itself; a lone pane always shows its. Where the panes
+/// are and what each shows comes from the page's `paneStatuses`; what the buttons do
+/// goes back as commands naming the pane's document.
 struct PrintLayoutControls: View {
     @Environment(AppModel.self) private var model
 
@@ -29,9 +28,7 @@ struct PrintLayoutControls: View {
     /// The page's `ZOOM_STEPS` (src/print/zoom.ts).
     private static let steps: [Double] = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4]
     private static let menuSteps: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2, 3]
-    /// The tab bar's sizes, as the rest of the bottom row has: a round button, and a
-    /// capsule a little shorter.
-    private static let toggleSize: CGFloat = 28
+    /// The tab bar's capsule height, as the rest of the bottom row has.
     private static let height: CGFloat = 24
     private static let zoomWidth: CGFloat = 124
     private static let compactZoomWidth: CGFloat = 56
@@ -65,17 +62,15 @@ struct PrintLayoutControls: View {
         }
     }
 
-    /// One pane's toggle, and its zoom while it shows pages.
+    /// One pane's zoom, while it shows pages.
     @ViewBuilder
     private func controls(for pane: PaneStatus, at index: Int, among panes: [PaneStatus]) -> some View {
         let right = min(pane.right, frame.width - insets.trailing) - Self.edge
         let y = midY(of: pane, among: panes)
-        let zoomRight = right - Self.toggleSize - Self.gap
+        let zoomRight = right
         let width: CGFloat? = pane.printLayout ? zoomWidth(from: countsEnd(of: pane, y: y), to: zoomRight) : nil
         let shown = panes.count == 1 || pane.hovered == true || onControls.contains(index)
         Group {
-            toggle(pane)
-                .position(x: right - Self.toggleSize / 2, y: y)
             if let width {
                 zoomControl(pane, zoom: requestedZoom[pane.docPath] ?? pane.zoom, compact: width < Self.zoomWidth)
                     .frame(width: width)
@@ -101,7 +96,7 @@ struct PrintLayoutControls: View {
             .max() ?? pane.left
     }
 
-    /// The zoom's width in the room between the counts and the toggle: the whole
+    /// The zoom's width in the room between the counts and the pane's edge: the whole
     /// control, or in a narrow pane just its menu, or — narrower still — none; the View
     /// menu and ⌘+/⌘− still zoom.
     private func zoomWidth(from start: CGFloat, to end: CGFloat) -> CGFloat? {
@@ -118,24 +113,6 @@ struct PrintLayoutControls: View {
         let isAbove = panes.contains { $0.top >= pane.bottom && $0.left < pane.right && $0.right > pane.left }
         guard !isAbove, let barY = model.sidebarBarMidY else { return (pane.top + pane.bottom) / 2 }
         return barY - frame.minY
-    }
-
-    private func toggle(_ pane: PaneStatus) -> some View {
-        let enabled = pane.printLayout
-        return Button {
-            model.pageLayout.setPrintLayout(!enabled, docPath: pane.docPath)
-        } label: {
-            Image(systemName: enabled ? "doc.richtext.fill" : "doc.richtext")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(enabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary.opacity(0.85)))
-                .frame(width: Self.toggleSize, height: Self.toggleSize)
-                .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .glassEffect(enabled ? .regular.tint(.accentColor.opacity(0.25)).interactive() : .regular.interactive(), in: .circle)
-        .help(enabled ? "Hide Print Layout (⌥⌘P)" : "Show Print Layout (⌥⌘P)")
-        .accessibilityLabel("Print Layout, \(DocTab.name(of: pane.docPath))")
-        .accessibilityAddTraits(enabled ? .isSelected : [])
     }
 
     private func zoomControl(_ pane: PaneStatus, zoom: Double, compact: Bool) -> some View {

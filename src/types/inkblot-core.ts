@@ -1240,6 +1240,7 @@ export type NativeCommand =
 	| { type: "insertBibliography", payload: InsertBibliographyCommand }
 	| { type: "setCitationStyle", payload: SetCitationStyleCommand }
 	| { type: "setBibliographyOptions", payload: SetBibliographyOptionsCommand }
+	| { type: "setEditorMode", payload: SetEditorModeCommand }
 	| { type: "setPrintLayout", payload: SetPrintLayoutCommand }
 	| { type: "setPageSetup", payload: SetPageSetupCommand }
 	| { type: "setBookSettings", payload: SetBookSettingsCommand }
@@ -2803,6 +2804,20 @@ export interface PageLayoutCatalog {
 	defaultTypography: PrintTypography;
 }
 
+/**
+ * The window's mode: writing a draft, or setting it as a book.
+ * 
+ * Write shows every text pane as the continuous editor in the writer's own font, with
+ * the file tree and the drafting panels. Typeset shows every text pane as the pages it
+ * will print on, with the book's navigator in place of the file tree, the typeset
+ * toolbar and panels, and the chapters' prose locked — it is edited in Write, where
+ * proofing happens. The page owns the mode; the shell asks for a change.
+ */
+export enum EditorMode {
+	Write = "write",
+	Typeset = "typeset",
+}
+
 /** Where the setup a document lays out in came from. */
 export enum SetupSource {
 	/** The document's own. */
@@ -2895,6 +2910,8 @@ export interface ScriptSummary {
 export interface PageLayoutState {
 	/** Whether the active pane shows pages. */
 	enabled: boolean;
+	/** Write or Typeset, for the whole window. */
+	mode?: EditorMode;
 	/** The active text document, or none (a canvas, or nothing open). */
 	docPath?: string;
 	/**
@@ -3627,6 +3644,10 @@ export interface SetContentCommand {
  */
 export interface SetDisplayDensityCommand {
 	pointsPerInch: number;
+}
+
+export interface SetEditorModeCommand {
+	mode: EditorMode;
 }
 
 /**

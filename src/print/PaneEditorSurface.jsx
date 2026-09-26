@@ -9,10 +9,12 @@
  * switching views never recreates the editor: selection, undo history and every
  * node view survive the switch.
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { EditorContent } from '@tiptap/react'
 
 import PrintLayoutView from './PrintLayoutView'
+import TypesetEditText from './TypesetEditText'
+import { isMatterPath } from './TypesetLock'
 import { useDocPageSetup } from './useDocPageSetup'
 import { bookAuthor, getBookForDoc, getPrintZoom, isPrintLayoutEnabled, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
 import { resolvePageSetup } from './pageSetup'
@@ -41,6 +43,12 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     [ownSetup, bookJson]
   )
   const printLayout = Boolean(editor) && isPrintLayoutEnabled(projectName, docPath)
+  // In Typeset a chapter's prose is locked — it is written in Write — and the book's own
+  // pages, its front and back matter, are not: they are only ever edited here.
+  const locked = printLayout && !isMatterPath(docPath)
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && editor.storage.typesetLock) editor.storage.typesetLock.locked = locked
+  }, [editor, locked])
   const zoom = getPrintZoom(projectName, docPath)
   const onZoomChange = useCallback((z) => setPrintZoom(z, projectName, docPath), [projectName, docPath])
   const author = projectName && docPath ? bookAuthor(getBookForDoc(projectName, docPath)) : ''
@@ -54,8 +62,13 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
   const content = editor ? <EditorContent editor={editor} className="editor" /> : null
 
   return (
-    <div ref={setScroll} className={`pane-scroll${printLayout ? ' is-print-layout' : ''}`} tabIndex={printLayout ? -1 : undefined}>
+    <div
+      ref={setScroll}
+      className={`pane-scroll${printLayout ? ' is-print-layout' : ''}${locked ? ' is-typeset-locked' : ''}`}
+      tabIndex={printLayout ? -1 : undefined}
+    >
       {header}
+      <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} printLayout={printLayout} />
       {printLayout ? (
         <PrintLayoutView
           editor={editor}

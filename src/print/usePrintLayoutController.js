@@ -41,6 +41,7 @@ import {
   getBookSettings,
   getCurrentPrintPage,
   getDisplayPointsPerInch,
+  getEditorMode,
   getLastExport,
   getMeasurement,
   getPrintScope,
@@ -49,7 +50,7 @@ import {
   setAuthorProfile,
   setBookSettings,
   setDisplayPointsPerInch,
-  setPrintLayoutEnabled,
+  setEditorMode,
   setPrintScope,
   setPrintZoom,
   subscribeCurrentPrintPage,
@@ -176,6 +177,7 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
   const docWords = editor && scope === 'document' ? countEditorWords(editor) : 0
   return {
     enabled: Boolean(docPath) && isPrintLayoutEnabled(projectName, docPath),
+    mode: getEditorMode(projectName),
     docPath: docPath || undefined,
     ready: Boolean(editor),
     setup,
@@ -249,11 +251,11 @@ export default function usePrintLayoutController({
   // A setup sent before the document's editor was there to take it: applied when it is.
   const pendingSetup = useRef(null)
 
-  const togglePrintLayout = useCallback((enabled, docPath) => {
-    const { projectName: project, activeTextDoc: active } = stateRef.current
-    const doc = docPath && isTextDoc(docPath) ? docPath : active
-    if (!doc) return
-    setPrintLayoutEnabled(project, doc, enabled ?? !isPrintLayoutEnabled(project, doc))
+  // Pages on or off is the window's mode now: Typeset shows every text pane as pages.
+  const togglePrintLayout = useCallback((enabled) => {
+    const { projectName: project } = stateRef.current
+    const typeset = enabled ?? getEditorMode(project) !== 'typeset'
+    setEditorMode(project, typeset ? 'typeset' : 'write')
   }, [])
 
   const publish = useCallback(() => {
@@ -384,6 +386,7 @@ export default function usePrintLayoutController({
 
   useEffect(() => {
     const subscriptions = [
+      documentSurface.onCommand('setEditorMode', ({ mode }) => setEditorMode(stateRef.current.projectName, mode)),
       documentSurface.onCommand('setPrintLayout', ({ enabled, docPath }) => togglePrintLayout(enabled, docPath)),
       documentSurface.onCommand('setPageSetup', ({ setup, target }) => applySetup(setup, target)),
       documentSurface.onCommand('applyFormat', ({ formatId, target }) => {

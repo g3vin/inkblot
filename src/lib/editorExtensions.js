@@ -32,6 +32,7 @@ import TabIndent from '../extensions/TabIndent'
 import { DocPageSetup } from '../print/DocPageSetup'
 import { PageBreak } from '../print/PageBreak'
 import { Pagination } from '../print/PaginationExtension'
+import { TypesetLock } from '../print/TypesetLock'
 import { DocWritingFormat } from '../script/DocWritingFormat'
 import { ScriptElement } from '../script/ScriptElement'
 
@@ -86,6 +87,8 @@ export const buildEditorExtensions = (starterKit) => [
   DocPageSetup,
   PageBreak,
   Pagination,
+  // A chapter's prose, held while the book is typeset (Typeset mode).
+  TypesetLock,
   // A screenplay's or a play's lines, and which the document is written as.
   ScriptElement,
   DocWritingFormat,

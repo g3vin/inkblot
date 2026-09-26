@@ -10,6 +10,8 @@
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 
+import { TYPESET_META } from './TypesetLock'
+
 export const PAGE_BREAK_KINDS = ['page', 'column', 'recto']
 
 const LABELS = {
@@ -57,7 +59,13 @@ export const PageBreak = Node.create({
 
   addCommands() {
     return {
+      // Typesetting, not writing: allowed on a chapter's locked pages in Typeset, and not
+      // a change the text history records.
       insertPageBreak: (kind = 'page') => ({ chain }) => chain()
+        .command(({ tr }) => {
+          tr.setMeta(TYPESET_META, true)
+          return true
+        })
         .insertContent({ type: this.name, attrs: { kind: PAGE_BREAK_KINDS.includes(kind) ? kind : 'page' } })
         .run(),
     }

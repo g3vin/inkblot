@@ -1,25 +1,34 @@
 import Foundation
 import SwiftUI
 
-/// The inspector's two sets of panels: one for writing a draft, one for finishing it —
-/// editing, laying it out and printing. The small button beside the selector bar swaps
-/// between them (`InspectorView`), and Customize Layout… decides what each one holds.
+/// The inspector's two sets of panels: one for writing a draft, one for typesetting it
+/// and getting it out. They are the window's two modes' panels (`EditorMode`): choosing
+/// one switches the mode, and switching the mode brings its layout. The small button
+/// beside the selector bar swaps between them (`InspectorView`), and Customize Layout…
+/// decides what each one holds. The raw values are storage keys and stay as they were.
 enum InspectorLayout: String, CaseIterable, Identifiable {
     case drafting, finishing
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .drafting: "Drafting"
-        case .finishing: "Finishing"
+        case .drafting: "Write"
+        case .finishing: "Typeset"
         }
     }
 
     var symbol: String {
         switch self {
         case .drafting: "pencil.line"
-        case .finishing: "printer"
+        case .finishing: "textformat"
         }
+    }
+
+    /// The window mode this layout is the panels of.
+    var mode: EditorMode { self == .finishing ? .typeset : .write }
+
+    init(_ mode: EditorMode) {
+        self = mode == .typeset ? .finishing : .drafting
     }
 
     var other: InspectorLayout { self == .drafting ? .finishing : .drafting }

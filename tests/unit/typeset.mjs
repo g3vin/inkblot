@@ -52,3 +52,47 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   const other = design.withCoverPart(two, 'back', 'x.jpg', 'a')
   ok('a part can be set on a version that is not active', other.covers[0].back === 'x.jpg' && other.activeCover === 'b')
 }
+
+/* ---- Typeset mode: the prose is locked, and typesetting is let through ---- */
+
+{
+  const { JSDOM } = await import('jsdom')
+  const { installGlobals } = await import('./install-globals.mjs')
+  const dom = new JSDOM('<!doctype html><html><body></body></html>')
+  installGlobals(dom.window, ['document', 'navigator', 'DOMParser', 'Node', 'Element', 'HTMLElement'])
+  if (!globalThis.window) Object.defineProperty(globalThis, 'window', { value: dom.window, writable: true, configurable: true })
+  const { Editor } = await import('@tiptap/core')
+  const { StarterKit } = await import('@tiptap/starter-kit')
+  const lock = await import(`${C}/print/TypesetLock.ts`)
+  const { DocPageSetup } = await import(`${C}/print/DocPageSetup.js`)
+
+  const editor = new Editor({
+    extensions: [StarterKit, DocPageSetup, lock.TypesetLock],
+    content: '<h1>The Road</h1><p>She walked on.</p><p>The end.</p>',
+  })
+  const text = () => editor.getText()
+  const before = text()
+  editor.storage.typesetLock.locked = true
+
+  editor.commands.insertContentAt(18, 'slowly ')
+  ok('typing in the prose of a locked chapter is refused', text() === before)
+  editor.chain().setTextSelection({ from: 12, to: 20 }).toggleBold().run()
+  ok('and so is formatting it', !editor.getHTML().includes('<strong>'))
+  editor.commands.insertContentAt(5, 'Long ')
+  ok('the chapter’s title is typed in place', editor.state.doc.firstChild.textContent === 'The Long Road')
+  const paragraphAt = editor.state.doc.firstChild.nodeSize
+  const tr = editor.state.tr.setNodeAttribute(paragraphAt, 'level', 1)
+  ok('a node’s attributes change — the kind of edit typesetting makes', lock.allowedWhileLocked(tr))
+  const marked = editor.state.tr.insertText('x', 20).setMeta(lock.TYPESET_META, true)
+  ok('anything marked as typesetting is let through', lock.allowedWhileLocked(marked))
+  editor.commands.setContent('<p>A restored version.</p>')
+  ok('a whole document replaced — a version restored, a load — is let through', text() === 'A restored version.')
+
+  editor.storage.typesetLock.locked = false
+  editor.commands.insertContentAt(1, 'Now ')
+  ok('unlocked — in Write — the prose is written as ever', text().startsWith('Now A restored'))
+
+  ok('a matter document is a page of the book’s own, in its folder’s .book/',
+    lock.isMatterPath('Novel/.book/dedication-d1') && lock.isMatterPath('.book/copyright-c') && !lock.isMatterPath('Novel/One') && !lock.isMatterPath('Novel/.bookish'))
+  editor.destroy()
+}

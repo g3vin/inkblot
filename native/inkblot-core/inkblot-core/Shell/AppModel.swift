@@ -81,6 +81,14 @@ final class AppModel {
         stats.onRecord = { [weak goals] in goals?.refresh() }
         stats.onTick = { [weak goals] in goals?.check() }
 
+        // The mode and the inspector's layout are one choice: each follows the other.
+        pageLayout.onModeChanged = { [weak self] mode in
+            guard let self else { return }
+            let layout = InspectorLayout(mode)
+            if sidebar.layout != layout { sidebar.showLayout(layout) }
+        }
+        sidebar.onLayoutChanged = { [weak self] layout in self?.pageLayout.setMode(layout.mode) }
+
         bridge.addListener { [weak self] event in
             guard let self else { return }
             switch event {

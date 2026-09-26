@@ -110,6 +110,13 @@ struct InspectorLayoutTests {
         #expect(InspectorLayouts.tabs(from: ["page", "gone", "book", "notes"]) == [.typeset, .notes])
     }
 
+    /// The layouts are the window's modes' panels, each way round.
+    @Test func eachLayoutIsAModesPanels() {
+        #expect(InspectorLayout.drafting.mode == .write && InspectorLayout.finishing.mode == .typeset)
+        #expect(InspectorLayout(.typeset) == .finishing && InspectorLayout(.write) == .drafting)
+        #expect(InspectorLayout.finishing.title == "Typeset" && InspectorLayout.drafting.title == "Write")
+    }
+
     @Test func aNewTabWithNothingBeforeItGoesLast() {
         #expect(InspectorLayouts.adding([.output], to: [.notes], defaults: [.typeset, .output, .notes]) == [.notes, .output])
         #expect(InspectorLayouts.adding([.typeset, .output], to: [.history], defaults: [.typeset, .output, .history]) == [.history, .typeset, .output])

@@ -281,11 +281,20 @@ struct InkblotCommands: Commands {
                 .disabled(model.tabs.split == nil)
             #endif
             Divider()
-            Toggle("Print Layout", isOn: Binding(
-                get: { model.pageLayout.isEnabled },
-                set: { model.pageLayout.setPrintLayout($0) }))
-                .keyboardShortcut("p", modifiers: [.command, .option])
-                .disabled(!model.pageLayout.hasDocument)
+            // The window's mode. ⌥⌘P, the key Print Layout had: Typeset is where pages are.
+            Picker("Mode", selection: Binding(
+                get: { model.pageLayout.mode },
+                set: { model.pageLayout.setMode($0) })) {
+                Text("Write").tag(EditorMode.write)
+                Text("Typeset").tag(EditorMode.typeset)
+            }
+            .pickerStyle(.inline)
+            .disabled(!model.hasProject)
+            Button(model.pageLayout.mode == .typeset ? "Back to Write" : "Typeset the Book") {
+                model.pageLayout.setMode(model.pageLayout.mode == .typeset ? .write : .typeset)
+            }
+            .keyboardShortcut("p", modifiers: [.command, .option])
+            .disabled(!model.hasProject)
             Menu("Page Zoom") {
                 Button("Fit Width") { model.pageLayout.fit(.width) }
                 Button("Fit Page") { model.pageLayout.fit(.page) }

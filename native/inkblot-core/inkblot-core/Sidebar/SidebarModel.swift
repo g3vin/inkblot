@@ -57,7 +57,12 @@ final class SidebarModel {
     /* ---------------- layouts ---------------- */
 
     /// Which of the two sets of panels the selector bar offers.
-    private(set) var layout: InspectorLayout
+    private(set) var layout: InspectorLayout {
+        didSet { if layout != oldValue { onLayoutChanged?(layout) } }
+    }
+    /// Told when the layout changes, whoever changed it: the window's mode follows
+    /// (`AppModel`).
+    @ObservationIgnored var onLayoutChanged: ((InspectorLayout) -> Void)?
     /// What each layout holds, as Customize Layout… left it.
     private(set) var layouts: InspectorLayouts
     /// The tab each layout last showed, so swapping back returns to it.
