@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Publish tab's tools for a screenplay or a play in production: its scene numbers,
+/// The Print & Export tab's tools for a screenplay or a play in production: its scene numbers,
 /// breakdown reports, sides for an audition or a day's shoot, and an actor's copy with
 /// their speeches marked. Shown only when the document is a script.
 struct ScriptProductionSection: View {

@@ -83,9 +83,8 @@ struct InspectorView: View {
         case .notes: NotesPanelView()
         case .references: ReferencesPanelView()
         case .history: HistoryPanelView()
-        case .page: PagePanelView()
-        case .book: BookPanelView()
-        case .publish: PublishPanelView()
+        case .typeset: TypesetPanelView()
+        case .output: OutputPanelView()
         case .stats: StatsPanelView()
         case .map: MapPanelView()
         }
@@ -96,7 +95,7 @@ struct InspectorView: View {
     /// the project, it still does, from any tab.
     private var showsSearchBar: Bool {
         let sidebar = model.sidebar
-        let finishing: Set<SidebarModel.Tab> = [.page, .book, .publish, .map]
+        let finishing: Set<SidebarModel.Tab> = [.typeset, .output, .map]
         return sidebar.isSearching || sidebar.scope != .panel || !finishing.contains(sidebar.tab)
     }
 

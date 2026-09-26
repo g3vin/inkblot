@@ -129,7 +129,7 @@ final class AppModel {
     /// The documents in tree order, as last told to the page.
     @ObservationIgnored private var bookTreeSignature: [String] = []
 
-    /// A book is its folder's documents in tree order, so the Book tab's chapters change
+    /// A book is its folder's documents in tree order, so the Typeset tab's chapters change
     /// when the tree does — a document added, removed, renamed or dragged. The tree is
     /// reloaded on every write (autosave included), so the page is asked to list the
     /// chapters again only when the order of the documents has actually changed.
@@ -272,22 +272,22 @@ final class AppModel {
         bridge.send(.setAlignment(SetAlignmentCommand(target: target, alignment: alignment)))
     }
 
-    /// File ▸ Page Setup…: the inspector's Page tab.
+    /// File ▸ Page Setup…: the inspector's Typeset tab.
     func showPageSetup() {
         sidebar.isPresented = true
-        sidebar.tab = .page
+        sidebar.tab = .typeset
     }
 
-    /// File ▸ Book Settings…: the Finishing layout's Book tab.
+    /// File ▸ Book Settings…: the Typeset tab, where the book is set up.
     func showBook() {
         sidebar.isPresented = true
-        sidebar.tab = .book
+        sidebar.tab = .typeset
     }
 
-    /// File ▸ Publish…: the Finishing layout's Publish tab.
+    /// File ▸ Publish…: the Print & Export tab.
     func showPublish() {
         sidebar.isPresented = true
-        sidebar.tab = .publish
+        sidebar.tab = .output
     }
 
     /// Edit ▸ Paste and Match Style. The pasteboard is read here, not in the page —

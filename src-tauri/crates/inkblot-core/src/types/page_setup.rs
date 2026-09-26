@@ -266,9 +266,9 @@ pub struct BindingSettings {
     pub include_guide: bool,
 }
 
-/// A folder (or the whole project) compiled as one book: its chapters are the
-/// folder's documents in tree order. Kept per folder in preferences, not in any one
-/// document, because it belongs to all of them.
+/// A folder (or the whole project) compiled as one book. Kept per folder in the
+/// project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
+/// belongs to all of them.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -299,6 +299,28 @@ pub struct BookSettings {
     /// Where the book is going to be printed, for the Publish tab's checks.
     #[serde(default)]
     pub publishing: PublishingTarget,
+    /// How every chapter opens. Absent in a book set up before designs: the page
+    /// derives one from `chapter_numbering` and the setup's recto rule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_design: Option<ChapterDesign>,
+    /// How a part's divider page is set; absent uses the chapter design's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part_design: Option<ChapterDesign>,
+    /// The book's contents in book order: chapters, parts, front and back matter. Its
+    /// own order — the file tree is never changed by it. Empty until the book is first
+    /// typeset: the chapters are then the folder's documents in tree order, less
+    /// `excluded`, and the matter is `front_matter` and `back_matter`.
+    #[serde(default)]
+    pub items: Vec<BookItem>,
+    /// Opening one of the folder's documents shows the others above and below it, in
+    /// tree order, to scroll straight through.
+    #[serde(default)]
+    pub continuous: bool,
+    /// The book's covers; `active_cover` is the one print, EPUB and export use.
+    #[serde(default)]
+    pub covers: Vec<CoverSet>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_cover: Option<String>,
 }
 
 /// A print-on-demand service, whose rules a book is checked against.
@@ -352,7 +374,7 @@ pub enum ChapterNumberStyle {
 
 /// Chapter headings a book adds as it compiles.
 #[typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ChapterNumbering {
     pub style: ChapterNumberStyle,
@@ -360,6 +382,329 @@ pub struct ChapterNumbering {
     pub prefix: String,
     /// Keep the chapter's own title under its number.
     pub include_title: bool,
+    /// The first chapter's number: 1, or 0 for a book that opens on "Chapter Zero".
+    pub start_at: u32,
+    /// Show each chapter's number beside it in the file tree.
+    pub show_in_tree: bool,
+}
+
+impl Default for ChapterNumbering {
+    fn default() -> Self {
+        Self {
+            style: ChapterNumberStyle::None,
+            prefix: String::new(),
+            include_title: false,
+            start_at: 1,
+            show_in_tree: false,
+        }
+    }
+}
+
+/* ---------------- chapter openings ---------------- */
+
+/// Where a chapter starts, relative to the one before it.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChapterBreak {
+    #[default]
+    NewPage,
+    /// A right-hand page, with a blank verso before it when needed.
+    NewRightPage,
+    /// Straight on after the chapter before, when its head and two lines fit.
+    Continue,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HeadAlignment {
+    Left,
+    #[default]
+    Center,
+    Right,
+}
+
+/// How a line of a chapter head is set.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HeadCase {
+    #[default]
+    AsWritten,
+    Upper,
+    SmallCaps,
+    Italic,
+}
+
+/// The decoration a chapter head carries.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OrnamentKind {
+    #[default]
+    None,
+    /// A short rule.
+    Rule,
+    /// A typed glyph: `ornament_glyph`.
+    Glyph,
+    /// A picture: `ornament_image`.
+    Image,
+}
+
+/// Where the ornament, or a chapter's own picture, sits in the head.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OrnamentPosition {
+    /// Above the number.
+    #[default]
+    Above,
+    /// Between the number and the title.
+    Between,
+    /// Below the title.
+    Below,
+}
+
+/// How every chapter of a book opens: what its head shows and how it is set. The same
+/// design heads the chapters in the continuous editor, on the Typeset pages, in print
+/// and in every export — `ChapterHead.js` renders it for all of them.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChapterDesign {
+    /// The number label — "Chapter One" — as `ChapterNumbering` writes it.
+    pub show_number: bool,
+    pub show_title: bool,
+    pub show_subtitle: bool,
+    /// Each chapter's own heading picture, where it has one.
+    pub show_image: bool,
+    pub ornament: OrnamentKind,
+    pub ornament_glyph: String,
+    /// A project-relative image path, or a data URI.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ornament_image: Option<String>,
+    pub ornament_position: OrnamentPosition,
+    /// The picture's width, as a percentage of the text block.
+    pub image_width_pct: f64,
+    pub alignment: HeadAlignment,
+    pub number_case: HeadCase,
+    pub title_case: HeadCase,
+    /// A CSS font family list for the head; absent sets it in the body's face.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub heading_font: Option<String>,
+    pub number_size_pt: f64,
+    pub title_size_pt: f64,
+    pub chapter_break: ChapterBreak,
+    /// The book style (`bookStyles.ts`) this design came from, kept once it is changed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style_id: Option<String>,
+}
+
+impl Default for ChapterDesign {
+    fn default() -> Self {
+        Self {
+            show_number: false,
+            show_title: true,
+            show_subtitle: true,
+            show_image: true,
+            ornament: OrnamentKind::None,
+            ornament_glyph: String::new(),
+            ornament_image: None,
+            ornament_position: OrnamentPosition::Above,
+            image_width_pct: 40.0,
+            alignment: HeadAlignment::Center,
+            number_case: HeadCase::AsWritten,
+            title_case: HeadCase::AsWritten,
+            heading_font: None,
+            number_size_pt: 12.0,
+            title_size_pt: 20.0,
+            chapter_break: ChapterBreak::NewPage,
+            style_id: None,
+        }
+    }
+}
+
+/* ---------------- the book's contents ---------------- */
+
+/// What an entry in a book's contents is.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BookItemKind {
+    /// A manuscript document, by tree path.
+    Chapter,
+    /// A part divider: everything after it, to the next part or the back matter, is in it.
+    Part,
+    /// A page the book has of its own — a dedication, About the Author — kept as a real
+    /// document in the book folder's `.book/`.
+    Matter,
+    /// A page laid out from the book's data: a title page, the contents.
+    Generated,
+}
+
+/// Which page of front or back matter a matter document is.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MatterKind {
+    AlsoBy,
+    Copyright,
+    Dedication,
+    Epigraph,
+    Foreword,
+    Preface,
+    Introduction,
+    Afterword,
+    Acknowledgements,
+    AboutAuthor,
+    Glossary,
+    Excerpt,
+    ReadingGuide,
+    CallToAction,
+    /// A half title or title page made editable.
+    HalfTitle,
+    TitlePage,
+    Custom,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GeneratedKind {
+    HalfTitle,
+    TitlePage,
+    Contents,
+    /// Endnotes gathered at the end of the book.
+    Notes,
+    Bibliography,
+}
+
+/// What a chapter is, which decides whether it is numbered and what its head says.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChapterType {
+    /// Numbered.
+    #[default]
+    Chapter,
+    Prologue,
+    Epilogue,
+    Interlude,
+    /// Headed by its title alone.
+    Unnumbered,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PageStart {
+    /// The next page, whichever side.
+    #[default]
+    Any,
+    Recto,
+    Verso,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PagePosition {
+    #[default]
+    Top,
+    /// Down the page, as a chapter opens.
+    Sunk,
+    Centered,
+    Bottom,
+}
+
+/// How a page of front or back matter sits: overrides of what its kind does by default.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PageOptions {
+    pub start: PageStart,
+    pub position: PagePosition,
+    pub running_heads: bool,
+    pub folio: bool,
+    /// Show the page's heading (its kind's name, or its title).
+    pub heading: bool,
+}
+
+/// One entry in a book's contents, in book order.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookItem {
+    /// Stable within the book.
+    pub id: String,
+    pub kind: BookItemKind,
+    /// A chapter's tree path, or a matter document's path (`<folder>/.book/…`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// A part's title, or a name given to a matter page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Left out of the Typeset pages, print, export and the continuous document.
+    #[serde(default)]
+    pub hidden: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matter: Option<MatterKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generated: Option<GeneratedKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_type: Option<ChapterType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<PageOptions>,
+}
+
+/* ---------------- covers ---------------- */
+
+/// How a cover image is fitted to the part of the cover it is for.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CoverFit {
+    /// Fill the part, cropping what overflows.
+    #[default]
+    Fill,
+    Fit,
+    Stretch,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CoverPart {
+    Front,
+    Back,
+    Spine,
+    /// One image across back, spine and front.
+    Wrap,
+}
+
+/// One version of a book's cover. The images are project-relative paths under
+/// `.assets/covers/`; `wrap`, when set, is used instead of the three parts.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverSet {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub front: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub back: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spine: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrap: Option<String>,
+    #[serde(default)]
+    pub fit: CoverFit,
+    /// The spine width, in mm, the spine or wrap image was made for — so a page count
+    /// that has changed since can be pointed out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub made_for_spine_mm: Option<f64>,
 }
 
 /// The pages before the first chapter. Empty text leaves its page out.

@@ -444,6 +444,123 @@ public struct BindingSettings: Codable, Equatable {
 	}
 }
 
+/// What an entry in a book's contents is.
+public enum BookItemKind: String, Codable, Equatable {
+	/// A manuscript document, by tree path.
+	case chapter
+	/// A part divider: everything after it, to the next part or the back matter, is in it.
+	case part
+	/// A page the book has of its own — a dedication, About the Author — kept as a real
+	/// document in the book folder's `.book/`.
+	case matter
+	/// A page laid out from the book's data: a title page, the contents.
+	case generated
+}
+
+/// Which page of front or back matter a matter document is.
+public enum MatterKind: String, Codable, Equatable {
+	case alsoBy
+	case copyright
+	case dedication
+	case epigraph
+	case foreword
+	case preface
+	case introduction
+	case afterword
+	case acknowledgements
+	case aboutAuthor
+	case glossary
+	case excerpt
+	case readingGuide
+	case callToAction
+	/// A half title or title page made editable.
+	case halfTitle
+	case titlePage
+	case custom
+}
+
+public enum GeneratedKind: String, Codable, Equatable {
+	case halfTitle
+	case titlePage
+	case contents
+	/// Endnotes gathered at the end of the book.
+	case notes
+	case bibliography
+}
+
+/// What a chapter is, which decides whether it is numbered and what its head says.
+public enum ChapterType: String, Codable, Equatable {
+	/// Numbered.
+	case chapter
+	case prologue
+	case epilogue
+	case interlude
+	/// Headed by its title alone.
+	case unnumbered
+}
+
+public enum PageStart: String, Codable, Equatable {
+	/// The next page, whichever side.
+	case any
+	case recto
+	case verso
+}
+
+public enum PagePosition: String, Codable, Equatable {
+	case top
+	/// Down the page, as a chapter opens.
+	case sunk
+	case centered
+	case bottom
+}
+
+/// How a page of front or back matter sits: overrides of what its kind does by default.
+public struct PageOptions: Codable, Equatable {
+	public let start: PageStart
+	public let position: PagePosition
+	public let runningHeads: Bool
+	public let folio: Bool
+	/// Show the page's heading (its kind's name, or its title).
+	public let heading: Bool
+
+	public init(start: PageStart, position: PagePosition, runningHeads: Bool, folio: Bool, heading: Bool) {
+		self.start = start
+		self.position = position
+		self.runningHeads = runningHeads
+		self.folio = folio
+		self.heading = heading
+	}
+}
+
+/// One entry in a book's contents, in book order.
+public struct BookItem: Codable, Equatable {
+	/// Stable within the book.
+	public let id: String
+	public let kind: BookItemKind
+	/// A chapter's tree path, or a matter document's path (`<folder>/.book/…`).
+	public let path: String?
+	/// A part's title, or a name given to a matter page.
+	public let title: String?
+	/// Left out of the Typeset pages, print, export and the continuous document.
+	public let hidden: Bool?
+	public let matter: MatterKind?
+	public let generated: GeneratedKind?
+	public let chapterType: ChapterType?
+	public let page: PageOptions?
+
+	public init(id: String, kind: BookItemKind, path: String?, title: String?, hidden: Bool?, matter: MatterKind?, generated: GeneratedKind?, chapterType: ChapterType?, page: PageOptions?) {
+		self.id = id
+		self.kind = kind
+		self.path = path
+		self.title = title
+		self.hidden = hidden
+		self.matter = matter
+		self.generated = generated
+		self.chapterType = chapterType
+		self.page = page
+	}
+}
+
 public enum PageOrientation: String, Codable, Equatable {
 	case portrait
 	case landscape
@@ -663,11 +780,17 @@ public struct ChapterNumbering: Codable, Equatable {
 	public let prefix: String
 	/// Keep the chapter's own title under its number.
 	public let includeTitle: Bool
+	/// The first chapter's number: 1, or 0 for a book that opens on "Chapter Zero".
+	public let startAt: UInt32
+	/// Show each chapter's number beside it in the file tree.
+	public let showInTree: Bool
 
-	public init(style: ChapterNumberStyle, prefix: String, includeTitle: Bool) {
+	public init(style: ChapterNumberStyle, prefix: String, includeTitle: Bool, startAt: UInt32, showInTree: Bool) {
 		self.style = style
 		self.prefix = prefix
 		self.includeTitle = includeTitle
+		self.startAt = startAt
+		self.showInTree = showInTree
 	}
 }
 
@@ -721,9 +844,136 @@ public struct PublishingTarget: Codable, Equatable {
 	}
 }
 
-/// A folder (or the whole project) compiled as one book: its chapters are the
-/// folder's documents in tree order. Kept per folder in preferences, not in any one
-/// document, because it belongs to all of them.
+/// The decoration a chapter head carries.
+public enum OrnamentKind: String, Codable, Equatable {
+	case none
+	/// A short rule.
+	case rule
+	/// A typed glyph: `ornament_glyph`.
+	case glyph
+	/// A picture: `ornament_image`.
+	case image
+}
+
+/// Where the ornament, or a chapter's own picture, sits in the head.
+public enum OrnamentPosition: String, Codable, Equatable {
+	/// Above the number.
+	case above
+	/// Between the number and the title.
+	case between
+	/// Below the title.
+	case below
+}
+
+public enum HeadAlignment: String, Codable, Equatable {
+	case left
+	case center
+	case right
+}
+
+/// How a line of a chapter head is set.
+public enum HeadCase: String, Codable, Equatable {
+	case asWritten
+	case upper
+	case smallCaps
+	case italic
+}
+
+/// Where a chapter starts, relative to the one before it.
+public enum ChapterBreak: String, Codable, Equatable {
+	case newPage
+	/// A right-hand page, with a blank verso before it when needed.
+	case newRightPage
+	/// Straight on after the chapter before, when its head and two lines fit.
+	case `continue`
+}
+
+/// How every chapter of a book opens: what its head shows and how it is set. The same
+/// design heads the chapters in the continuous editor, on the Typeset pages, in print
+/// and in every export — `ChapterHead.js` renders it for all of them.
+public struct ChapterDesign: Codable, Equatable {
+	/// The number label — "Chapter One" — as `ChapterNumbering` writes it.
+	public let showNumber: Bool
+	public let showTitle: Bool
+	public let showSubtitle: Bool
+	/// Each chapter's own heading picture, where it has one.
+	public let showImage: Bool
+	public let ornament: OrnamentKind
+	public let ornamentGlyph: String
+	/// A project-relative image path, or a data URI.
+	public let ornamentImage: String?
+	public let ornamentPosition: OrnamentPosition
+	/// The picture's width, as a percentage of the text block.
+	public let imageWidthPct: Double
+	public let alignment: HeadAlignment
+	public let numberCase: HeadCase
+	public let titleCase: HeadCase
+	/// A CSS font family list for the head; absent sets it in the body's face.
+	public let headingFont: String?
+	public let numberSizePt: Double
+	public let titleSizePt: Double
+	public let chapterBreak: ChapterBreak
+	/// The book style (`bookStyles.ts`) this design came from, kept once it is changed.
+	public let styleId: String?
+
+	public init(showNumber: Bool, showTitle: Bool, showSubtitle: Bool, showImage: Bool, ornament: OrnamentKind, ornamentGlyph: String, ornamentImage: String?, ornamentPosition: OrnamentPosition, imageWidthPct: Double, alignment: HeadAlignment, numberCase: HeadCase, titleCase: HeadCase, headingFont: String?, numberSizePt: Double, titleSizePt: Double, chapterBreak: ChapterBreak, styleId: String?) {
+		self.showNumber = showNumber
+		self.showTitle = showTitle
+		self.showSubtitle = showSubtitle
+		self.showImage = showImage
+		self.ornament = ornament
+		self.ornamentGlyph = ornamentGlyph
+		self.ornamentImage = ornamentImage
+		self.ornamentPosition = ornamentPosition
+		self.imageWidthPct = imageWidthPct
+		self.alignment = alignment
+		self.numberCase = numberCase
+		self.titleCase = titleCase
+		self.headingFont = headingFont
+		self.numberSizePt = numberSizePt
+		self.titleSizePt = titleSizePt
+		self.chapterBreak = chapterBreak
+		self.styleId = styleId
+	}
+}
+
+/// How a cover image is fitted to the part of the cover it is for.
+public enum CoverFit: String, Codable, Equatable {
+	/// Fill the part, cropping what overflows.
+	case fill
+	case fit
+	case stretch
+}
+
+/// One version of a book's cover. The images are project-relative paths under
+/// `.assets/covers/`; `wrap`, when set, is used instead of the three parts.
+public struct CoverSet: Codable, Equatable {
+	public let id: String
+	public let name: String
+	public let front: String?
+	public let back: String?
+	public let spine: String?
+	public let wrap: String?
+	public let fit: CoverFit?
+	/// The spine width, in mm, the spine or wrap image was made for — so a page count
+	/// that has changed since can be pointed out.
+	public let madeForSpineMm: Double?
+
+	public init(id: String, name: String, front: String?, back: String?, spine: String?, wrap: String?, fit: CoverFit?, madeForSpineMm: Double?) {
+		self.id = id
+		self.name = name
+		self.front = front
+		self.back = back
+		self.spine = spine
+		self.wrap = wrap
+		self.fit = fit
+		self.madeForSpineMm = madeForSpineMm
+	}
+}
+
+/// A folder (or the whole project) compiled as one book. Kept per folder in the
+/// project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
+/// belongs to all of them.
 public struct BookSettings: Codable, Equatable {
 	/// The folder's tree path; empty for the project root.
 	public let folder: String
@@ -744,8 +994,24 @@ public struct BookSettings: Codable, Equatable {
 	public let backMatter: BackMatter?
 	/// Where the book is going to be printed, for the Publish tab's checks.
 	public let publishing: PublishingTarget?
+	/// How every chapter opens. Absent in a book set up before designs: the page
+	/// derives one from `chapter_numbering` and the setup's recto rule.
+	public let chapterDesign: ChapterDesign?
+	/// How a part's divider page is set; absent uses the chapter design's.
+	public let partDesign: ChapterDesign?
+	/// The book's contents in book order: chapters, parts, front and back matter. Its
+	/// own order — the file tree is never changed by it. Empty until the book is first
+	/// typeset: the chapters are then the folder's documents in tree order, less
+	/// `excluded`, and the matter is `front_matter` and `back_matter`.
+	public let items: [BookItem]?
+	/// Opening one of the folder's documents shows the others above and below it, in
+	/// tree order, to scroll straight through.
+	public let continuous: Bool?
+	/// The book's covers; `active_cover` is the one print, EPUB and export use.
+	public let covers: [CoverSet]?
+	public let activeCover: String?
 
-	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?) {
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?) {
 		self.folder = folder
 		self.title = title
 		self.author = author
@@ -758,6 +1024,12 @@ public struct BookSettings: Codable, Equatable {
 		self.frontMatter = frontMatter
 		self.backMatter = backMatter
 		self.publishing = publishing
+		self.chapterDesign = chapterDesign
+		self.partDesign = partDesign
+		self.items = items
+		self.continuous = continuous
+		self.covers = covers
+		self.activeCover = activeCover
 	}
 }
 
@@ -7017,6 +7289,14 @@ public struct WritingSession: Codable, Equatable {
 		self.minutes = minutes
 		self.timerRunId = timerRunId
 	}
+}
+
+public enum CoverPart: String, Codable, Equatable {
+	case front
+	case back
+	case spine
+	/// One image across back, spine and front.
+	case wrap
 }
 
 /// Which kind of document a tree path refers to. A pure function of the path — see

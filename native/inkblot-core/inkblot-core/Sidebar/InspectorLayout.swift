@@ -27,7 +27,7 @@ enum InspectorLayout: String, CaseIterable, Identifiable {
     var defaultTabs: [SidebarModel.Tab] {
         switch self {
         case .drafting: [.clipboard, .workbench, .notes, .references, .history, .stats]
-        case .finishing: [.page, .book, .publish, .notes, .references, .history, .stats]
+        case .finishing: [.typeset, .output, .notes, .references, .history, .stats]
         }
     }
 }
@@ -86,24 +86,34 @@ struct InspectorLayouts: Equatable {
     static let storageKey = "inkblot.inspector.layouts"
     /// The tabs there were when the layouts were last saved. A tab added since then is
     /// one the writer never chose to leave out, so a layout that has it by default gets
-    /// it — after the tab it follows in the defaults, where there is one, so Book and
-    /// Publish arrive beside Page — rather than a new panel being hidden behind
+    /// it — after the tab it follows in the defaults, where there is one, so Print &
+    /// Export arrives beside Typeset — rather than a new panel being hidden behind
     /// Customize Layout….
     static let knownTabsKey = "inkblot.inspector.knownTabs"
     /// Tabs added after layouts could first be saved — which is what a saved layout
     /// with no `knownTabsKey` beside it did not know about.
-    static let addedLater: Set<SidebarModel.Tab> = [.stats, .book, .publish]
+    static let addedLater: Set<SidebarModel.Tab> = [.stats, .typeset, .output]
+
+    /// Tabs that became others: Page and Book are Typeset now, Publish is Print & Export.
+    /// A saved layout names them by their old raw values.
+    static let renamed: [String: SidebarModel.Tab] = ["page": .typeset, "book": .typeset, "publish": .output]
+
+    /// A saved list of raw values as tabs: renamed ones as what they became, each once.
+    static func tabs(from raw: [String]) -> [SidebarModel.Tab] {
+        var seen = Set<SidebarModel.Tab>()
+        return raw.compactMap { SidebarModel.Tab(rawValue: $0) ?? renamed[$0] }.filter { seen.insert($0).inserted }
+    }
 
     static func load(from defaults: UserDefaults = .standard) -> InspectorLayouts {
         var layouts = InspectorLayouts()
         let stored = defaults.dictionary(forKey: storageKey) as? [String: [String]] ?? [:]
-        let known = defaults.stringArray(forKey: knownTabsKey).map { Set($0.compactMap(SidebarModel.Tab.init(rawValue:))) }
+        let known = defaults.stringArray(forKey: knownTabsKey).map { Set(tabs(from: $0)) }
             ?? Set(SidebarModel.Tab.arrangeable).subtracting(addedLater)
         for layout in InspectorLayout.allCases {
             if let raw = stored[layout.rawValue] {
                 layouts[layout] = adding(
                     layout.defaultTabs.filter { !known.contains($0) },
-                    to: raw.compactMap(SidebarModel.Tab.init(rawValue:)),
+                    to: tabs(from: raw),
                     defaults: layout.defaultTabs)
             }
         }

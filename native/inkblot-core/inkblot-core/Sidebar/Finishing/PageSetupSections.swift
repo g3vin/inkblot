@@ -1,34 +1,50 @@
 import SwiftUI
 
-/// The Finishing layout's Page tab: how the pages look.
+/// The page-setup sections of the Typeset tab: the format, the page and its margins,
+/// the header and footer, the type, the title page, and how text flows across pages.
+/// Under the Book scope they edit the setup every chapter prints in.
 ///
-/// Format first — a whole setup by name, which is all most writers need — then the
-/// parts of it: the page and its margins, the header and footer, and how text flows
-/// across pages. Under the Book scope it edits the setup every chapter prints in.
-///
-/// Every control edits the model's draft and sends the whole value back. A choice (a
-/// picker, a toggle) applies at once; typed text applies when it is committed, so a
-/// running head typed letter by letter is one undo step in the document, not twenty.
-struct PagePanelView: View {
+/// Laid out by `TypesetPanelView`, which interleaves them with the book's sections in
+/// the order a book is typeset. Every control edits the model's draft and sends the
+/// whole value back. A choice (a picker, a toggle) applies at once; typed text applies
+/// when it is committed, so a running head typed letter by letter is one undo step in
+/// the document, not twenty.
+struct PageSetupSections: View {
+    enum Kind: Hashable {
+        case format, page, headerFooter, typography, titlePage, textFlow
+    }
+
+    let kinds: [Kind]
+
     @Environment(AppModel.self) private var model
     @AppStorage(LengthUnit.storageKey) private var unitsRaw = LengthUnit.defaultForLocale.rawValue
 
     @State private var editingAuthor = false
 
+    init(_ kinds: Kind...) {
+        self.kinds = kinds
+    }
+
     private var units: LengthUnit { LengthUnit(rawValue: unitsRaw) ?? .inches }
 
     var body: some View {
-        FinishingPanel {
-            if let state = model.pageLayout.state, let setup = model.pageLayout.setup {
-                formatSection(state, setup)
-                pageSection(state, setup)
-                headerFooterSection(state, setup)
-                TypographySection(
-                    setup: setup, unit: units,
-                    defaultTypography: model.pageLayout.catalog?.defaultTypography,
-                    apply: model.pageLayout.apply)
-                TitlePageSection(setup: setup, apply: model.pageLayout.apply) { editingAuthor = true }
-                textFlowSection(setup)
+        Group {
+            if let state = model.pageLayout.state, state.docPath != nil, let setup = model.pageLayout.setup {
+                ForEach(kinds, id: \.self) { kind in
+                    switch kind {
+                    case .format: formatSection(state, setup)
+                    case .page: pageSection(state, setup)
+                    case .headerFooter: headerFooterSection(state, setup)
+                    case .typography:
+                        TypographySection(
+                            setup: setup, unit: units,
+                            defaultTypography: model.pageLayout.catalog?.defaultTypography,
+                            apply: model.pageLayout.apply)
+                    case .titlePage:
+                        TitlePageSection(setup: setup, apply: model.pageLayout.apply) { editingAuthor = true }
+                    case .textFlow: textFlowSection(setup)
+                    }
+                }
             }
         }
         .sheet(isPresented: $editingAuthor) {
