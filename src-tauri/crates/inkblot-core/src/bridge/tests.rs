@@ -462,6 +462,7 @@ fn every_command() -> Vec<NativeCommand> {
             doc_path: "a".into(),
             options: bibliography_options(),
         }),
+        NativeCommand::SetEditorMode(SetEditorModeCommand { mode: EditorMode::Typeset }),
         NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true, doc_path: Some("a.md".into()) }),
         NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Book }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
@@ -906,6 +907,7 @@ fn every_event() -> Vec<WebviewEvent> {
         WebviewEvent::RevealReference(RevealReference { id: "r1".into() }),
         WebviewEvent::PageLayoutState(PageLayoutState {
             enabled: true,
+            mode: EditorMode::Typeset,
             doc_path: Some("Manuscript/one".into()),
             setup: page_setup(),
             ready: true,
@@ -1063,6 +1065,7 @@ fn every_command_has_its_documented_wire_name() {
             "insertBibliography",
             "setCitationStyle",
             "setBibliographyOptions",
+            "setEditorMode",
             "setPrintLayout",
             "setPageSetup",
             "setBookSettings",

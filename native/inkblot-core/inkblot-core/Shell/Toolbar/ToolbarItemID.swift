@@ -1,15 +1,16 @@
 import Foundation
 
-/// The window's three customizable toolbars.
+/// The window's four customizable toolbars.
 ///
-/// A document, a canvas and a map each have their own: their own default set, and their own
-/// layout once the user has changed it. AppKit saves a customized layout under the
+/// A document, a canvas and a map each have their own, and a document in Typeset mode has
+/// the typeset one: their own default set, and their own layout once the user has changed it. AppKit saves a customized layout under the
 /// toolbar's id (NSToolbar autosave, in UserDefaults), so these strings are storage
 /// keys as much as names — renaming one quietly resets everyone's layout.
 enum ToolbarID {
     static let document = "inkblot.toolbar.document"
     static let canvas = "inkblot.toolbar.canvas"
     static let map = "inkblot.toolbar.map"
+    static let typeset = "inkblot.toolbar.typeset"
 }
 
 /// Every item either toolbar can hold, whether it starts in the toolbar or only in the
@@ -85,6 +86,15 @@ enum ToolbarItemID: String, CaseIterable {
     case writingTimer = "inkblot.timer"
     case newTab = "inkblot.tabs.new-tab"
     case split = "inkblot.tabs.split"
+    /* ---------------- typeset ---------------- */
+
+    /// Write | Typeset. In the document toolbar and the typeset one, first in both.
+    case editorMode = "inkblot.view.editor-mode"
+    case typesetInsert = "inkblot.typeset.insert"
+    case typesetZoom = "inkblot.typeset.zoom"
+    case typesetPrint = "inkblot.typeset.print"
+    case typesetExport = "inkblot.typeset.export"
+
     /// Retired: the toggle is a titlebar accessory (`InspectorTitlebarToggle`), not a
     /// toolbar item. Kept because saved layouts may still name it.
     case inspectorToggle = "inkblot.window.inspector-toggle"

@@ -1588,6 +1588,7 @@ public enum NativeCommand: Codable, Equatable {
 	case insertBibliography(InsertBibliographyCommand)
 	case setCitationStyle(SetCitationStyleCommand)
 	case setBibliographyOptions(SetBibliographyOptionsCommand)
+	case setEditorMode(SetEditorModeCommand)
 	case setPrintLayout(SetPrintLayoutCommand)
 	case setPageSetup(SetPageSetupCommand)
 	case setBookSettings(SetBookSettingsCommand)
@@ -1687,6 +1688,7 @@ public enum NativeCommand: Codable, Equatable {
 			insertBibliography,
 			setCitationStyle,
 			setBibliographyOptions,
+			setEditorMode,
 			setPrintLayout,
 			setPageSetup,
 			setBookSettings,
@@ -2062,6 +2064,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setBibliographyOptions(content)
 					return
 				}
+			case .setEditorMode:
+				if let content = try? container.decode(SetEditorModeCommand.self, forKey: .payload) {
+					self = .setEditorMode(content)
+					return
+				}
 			case .setPrintLayout:
 				if let content = try? container.decode(SetPrintLayoutCommand.self, forKey: .payload) {
 					self = .setPrintLayout(content)
@@ -2420,6 +2427,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setBibliographyOptions(let content):
 			try container.encode(CodingKeys.setBibliographyOptions, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setEditorMode(let content):
+			try container.encode(CodingKeys.setEditorMode, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setPrintLayout(let content):
 			try container.encode(CodingKeys.setPrintLayout, forKey: .type)
@@ -5212,6 +5222,18 @@ public struct PageLayoutCatalog: Codable, Equatable {
 	}
 }
 
+/// The window's mode: writing a draft, or setting it as a book.
+/// 
+/// Write shows every text pane as the continuous editor in the writer's own font, with
+/// the file tree and the drafting panels. Typeset shows every text pane as the pages it
+/// will print on, with the book's navigator in place of the file tree, the typeset
+/// toolbar and panels, and the chapters' prose locked — it is edited in Write, where
+/// proofing happens. The page owns the mode; the shell asks for a change.
+public enum EditorMode: String, Codable, Equatable {
+	case write
+	case typeset
+}
+
 /// Where the setup a document lays out in came from.
 public enum SetupSource: String, Codable, Equatable {
 	/// The document's own.
@@ -5331,6 +5353,8 @@ public struct ScriptSummary: Codable, Equatable {
 public struct PageLayoutState: Codable, Equatable {
 	/// Whether the active pane shows pages.
 	public let enabled: Bool
+	/// Write or Typeset, for the whole window.
+	public let mode: EditorMode?
 	/// The active text document, or none (a canvas, or nothing open).
 	public let docPath: String?
 	/// False while the document's editor is not yet there to take an edit. An edit sent
@@ -5374,8 +5398,9 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Production section. None for prose.
 	public let script: ScriptSummary?
 
-	public init(enabled: Bool, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
+	public init(enabled: Bool, mode: EditorMode?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
+		self.mode = mode
 		self.docPath = docPath
 		self.ready = ready
 		self.setup = setup
@@ -6462,6 +6487,14 @@ public struct SetDisplayDensityCommand: Codable, Equatable {
 
 	public init(pointsPerInch: Double) {
 		self.pointsPerInch = pointsPerInch
+	}
+}
+
+public struct SetEditorModeCommand: Codable, Equatable {
+	public let mode: EditorMode
+
+	public init(mode: EditorMode) {
+		self.mode = mode
 	}
 }
 

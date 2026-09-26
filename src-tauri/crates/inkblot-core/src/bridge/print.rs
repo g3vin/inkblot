@@ -110,6 +110,29 @@ pub struct PrintOptions {
 
 /* ---------------- commands ---------------- */
 
+/// The window's mode: writing a draft, or setting it as a book.
+///
+/// Write shows every text pane as the continuous editor in the writer's own font, with
+/// the file tree and the drafting panels. Typeset shows every text pane as the pages it
+/// will print on, with the book's navigator in place of the file tree, the typeset
+/// toolbar and panels, and the chapters' prose locked — it is edited in Write, where
+/// proofing happens. The page owns the mode; the shell asks for a change.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EditorMode {
+    #[default]
+    Write,
+    Typeset,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetEditorModeCommand {
+    pub mode: EditorMode,
+}
+
 /// Show a document as pages, or as the continuous editor: the one named — a pane's own
 /// toggle names the document in it — or else the active one.
 #[typeshare]
@@ -450,6 +473,9 @@ pub struct PageLayoutCatalog {
 pub struct PageLayoutState {
     /// Whether the active pane shows pages.
     pub enabled: bool,
+    /// Write or Typeset, for the whole window.
+    #[serde(default)]
+    pub mode: EditorMode,
     /// The active text document, or none (a canvas, or nothing open).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_path: Option<String>,

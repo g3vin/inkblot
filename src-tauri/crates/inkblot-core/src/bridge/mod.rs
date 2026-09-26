@@ -85,9 +85,9 @@ pub use print::{
     ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand, ExportFormat, FormatKind,
     FormatOption, GoToPageCommand, InsertBreakCommand, PageBreakKind, PageLayoutCatalog,
     PageLayoutState, PageSetupTarget, PageSizeOption, PrintDocumentCommand, PrintFinishedCommand,
-    PrintJobKind, PrintJobPhase, PrintJobStatus, PrintRequest, PrintScope, RefreshBookChaptersCommand,
+    EditorMode, PrintJobKind, PrintJobPhase, PrintJobStatus, PrintRequest, PrintScope, RefreshBookChaptersCommand,
     RunningToken, SetAuthorProfileCommand, SetBookCoverCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
-    SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
+    SetEditorModeCommand, SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
     UseSetupForBookCommand, ZoomFit,
 };
 pub use sidebar::{

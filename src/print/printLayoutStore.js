@@ -21,7 +21,6 @@ import { bookFolderFor } from './compile'
 import { clampZoom } from './zoom'
 import { DEFAULT_SHEETS_PER_SIGNATURE } from './imposition'
 
-const ENABLED_PREFIX = 'inkblot-print-layout:'
 const ZOOM_KEY = 'inkblot-print-zoom'
 const SCOPE_PREFIX = 'inkblot-print-scope:'
 const AUTHOR_KEY = 'inkblot-author-profile'
@@ -40,16 +39,47 @@ const subscribe = (listener) => {
   return () => listeners.delete(listener)
 }
 
-const docKey = (projectName, docPath) => `${ENABLED_PREFIX}${projectName || ''}/${docPath || ''}`
 const zoomKey = (projectName, docPath) => `${ZOOM_KEY}:${projectName}/${docPath}`
 
-export const isPrintLayoutEnabled = (projectName, docPath) => (
-  Boolean(projectName && docPath) && getPreference(docKey(projectName, docPath)) === 'true'
+/* ---------------- the window's mode ---------------- */
+
+const MODE_PREFIX = 'inkblot-editor-mode:'
+export const EDITOR_MODES = ['write', 'typeset']
+
+/**
+ * Write or Typeset, per project: the mode it was left in. Typeset shows every text
+ * pane as its pages and locks the chapters' prose; Write is the continuous editor. It
+ * replaced a per-document Print Layout switch, whose old preferences are not read.
+ */
+export const getEditorMode = (projectName) => (
+  projectName && getPreference(`${MODE_PREFIX}${projectName}`) === 'typeset' ? 'typeset' : 'write'
 )
 
-export const setPrintLayoutEnabled = (projectName, docPath, enabled) => {
-  if (!projectName || !docPath) return
-  setPreference(docKey(projectName, docPath), enabled ? 'true' : 'false')
+export const setEditorMode = (projectName, mode) => {
+  if (!projectName || !EDITOR_MODES.includes(mode) || getEditorMode(projectName) === mode) return
+  setPreference(`${MODE_PREFIX}${projectName}`, mode)
+  emit()
+}
+
+/** Whether a document shows as pages: every one does, in Typeset. */
+export const isPrintLayoutEnabled = (projectName, docPath) => (
+  Boolean(projectName && docPath) && getEditorMode(projectName) === 'typeset'
+)
+
+/** Pages on or off — which, now, is the mode. Kept for the menus and keys that ask. */
+export const setPrintLayoutEnabled = (projectName, _docPath, enabled) => {
+  setEditorMode(projectName, enabled ? 'typeset' : 'write')
+}
+
+// Where "Edit Text" left Typeset from, so "Back to Typeset" can return to it. Not kept
+// across launches: it is a round trip, not a setting.
+let typesetReturn = null
+
+/** `{ docPath, pos }` while a Typeset → Write round trip is open, else null. */
+export const getTypesetReturn = () => typesetReturn
+
+export const setTypesetReturn = (value) => {
+  typesetReturn = value && value.docPath ? { docPath: value.docPath, pos: value.pos ?? null } : null
   emit()
 }
 

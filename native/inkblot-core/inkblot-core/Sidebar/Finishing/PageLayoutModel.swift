@@ -64,6 +64,11 @@ final class PageLayoutModel {
     }
 
     var isEnabled: Bool { state?.enabled ?? false }
+    /// Write or Typeset: the page's, for the whole window.
+    var mode: EditorMode { state?.mode.flatMap { $0 } ?? .write }
+    /// Told when the page's mode changes — asked for here, or by the page itself ("Edit
+    /// Text", "Back to Typeset", ⌥⌘P in a page menu).
+    @ObservationIgnored var onModeChanged: ((EditorMode) -> Void)?
     var hasDocument: Bool { state?.docPath != nil }
     var scope: PrintScope { state?.scope ?? .document }
     /// Under a book scope Typeset edits the book's setup, which every chapter
@@ -76,6 +81,7 @@ final class PageLayoutModel {
     private func receive(_ next: PageLayoutState) {
         let previous = state
         state = next
+        if previous?.mode != next.mode { onModeChanged?(next.mode ?? .write) }
         if previous?.setup != next.setup || previous?.book != next.book || previous?.scope != next.scope || setup == nil {
             setup = PageSetupDraft(editsBook ? (next.book.pageSetup ?? next.setup) : next.setup)
         }
@@ -103,6 +109,12 @@ final class PageLayoutModel {
     }
 
     /* ---------------- commands ---------------- */
+
+    func setMode(_ mode: EditorMode) {
+        guard mode != self.mode else { return }
+        bridge.send(.setEditorMode(SetEditorModeCommand(mode: mode)))
+        if mode == .typeset { sendDisplayDensity() }
+    }
 
     /// The active document's view, or the one named — a pane's own toggle names its.
     func setPrintLayout(_ enabled: Bool, docPath: String? = nil) {

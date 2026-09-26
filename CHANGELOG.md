@@ -12,6 +12,13 @@ Notable changes to Inkblot. The format follows
   are two tabs in the order a book is made — Typeset (what is in the book, the page,
   the type, how chapters open, the running heads, the front and back matter), then
   Print & Export. A saved layout shows the new tabs where the old ones were.
+- **Write and Typeset modes:** one switch, first in the toolbar (and ⌥⌘P), for the
+  whole window. Typeset shows every text pane as its pages, with a typesetting toolbar
+  and the Typeset panels; a chapter's prose is locked there — it is written and proofed
+  in Write — while its title, breaks and attributes can still be set. Double-clicking
+  locked prose offers Edit Text, a round trip to Write and back to the same page.
+  Typesetting edits no longer add text-history checkpoints. This replaces the
+  per-document Print Layout switch.
 
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own

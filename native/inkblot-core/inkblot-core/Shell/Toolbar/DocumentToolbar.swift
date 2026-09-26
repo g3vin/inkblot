@@ -20,6 +20,10 @@ struct DocumentToolbar: CustomizableToolbarContent {
     let model: AppModel
 
     var body: some CustomizableToolbarContent {
+        ToolbarItem(id: ToolbarItemID.editorMode.id) { EditorModePicker(model: model) }
+
+        ToolbarSpacer(.fixed)
+
         ToolbarItem(id: ToolbarItemID.font.id) { FontMenu(model: model) }
         ToolbarItem(id: ToolbarItemID.fontSize.id) { FontSizeMenu(model: model) }
 

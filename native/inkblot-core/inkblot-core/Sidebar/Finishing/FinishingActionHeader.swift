@@ -59,8 +59,6 @@ struct FinishingActionHeader: View {
             Picker("Units", selection: $unitsRaw) {
                 ForEach(LengthUnit.allCases) { Text($0.label).tag($0.rawValue) }
             }
-            Toggle("Show Pages", isOn: Binding(get: { layout.isEnabled }, set: { layout.setPrintLayout($0) }))
-                .disabled(!layout.hasDocument)
             Button("Author Details…") { editingAuthor = true }
             Divider()
             Button("Expand All Sections") { layout.setExpanded(true, FinishingSectionID.all) }
@@ -185,7 +183,7 @@ struct FinishingActionHeader: View {
                 goToPagePopover(pageCount: Int(state.pageCount), layout)
             }
         } else if state.docPath != nil {
-            Button("Show pages to see the page count") { layout.setPrintLayout(true) }
+            Button("Typeset to see the page count") { layout.setMode(.typeset) }
                 .buttonStyle(.link)
         }
     }

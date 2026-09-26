@@ -107,6 +107,8 @@ struct ContentView: View {
                         if let map = model.bridge.activeMapChrome { MapToolbar(model: model, state: map) }
                     case .document:
                         DocumentToolbar(model: model)
+                    case .typeset:
+                        TypesetToolbar(model: model)
                     }
                 }
         }
@@ -161,7 +163,7 @@ struct ContentView: View {
         .overlay { BubbleOverlay() }
         // Only the swap animates — not every zoom tick or selection change inside the
         // canvas or map toolbar, which is why this watches which there is, not what it is.
-        .onChange(of: WindowToolbar.current(model.bridge), initial: true) { _, shown in
+        .onChange(of: WindowToolbar.current(model.bridge, mode: model.pageLayout.mode), initial: true) { _, shown in
             withAnimation(.smooth(duration: 0.3)) { toolbarShown = shown }
         }
         // A new project is a new page, which starts not knowing them.
@@ -205,14 +207,15 @@ struct ContentView: View {
 
 /// Which controls the window's toolbar holds.
 enum WindowToolbar: Equatable {
-    case document, canvas, map
+    case document, canvas, map, typeset
 
     /// What the page says should be up. A map's toolbar only while a map is active, a
-    /// canvas's only while no card is being edited; otherwise the formatting controls.
-    static func current(_ bridge: ShellBridge) -> WindowToolbar {
+    /// canvas's only while no card is being edited; otherwise the formatting controls —
+    /// or, in Typeset mode, the typesetting ones.
+    static func current(_ bridge: ShellBridge, mode: EditorMode) -> WindowToolbar {
         if bridge.activeMapChrome != nil { return .map }
         if bridge.canvasToolbar != nil { return .canvas }
-        return .document
+        return mode == .typeset ? .typeset : .document
     }
 
     /// This, if the bridge still has its state; the document toolbar if not. The mirror
@@ -222,6 +225,7 @@ enum WindowToolbar: Equatable {
         case .canvas: bridge.canvasToolbar != nil ? .canvas : .document
         case .map: bridge.activeMapChrome != nil ? .map : .document
         case .document: .document
+        case .typeset: .typeset
         }
     }
 
@@ -231,6 +235,7 @@ enum WindowToolbar: Equatable {
         case .document: ToolbarID.document
         case .canvas: ToolbarID.canvas
         case .map: ToolbarID.map
+        case .typeset: ToolbarID.typeset
         }
     }
 }
