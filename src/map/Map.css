@@ -855,3 +855,18 @@
   color: var(--text-muted);
   line-height: 1.5;
 }
+
+/* ---------------- timeline events at their places ---------------- */
+
+.map-timeline-event {
+  --event: var(--map-accent);
+  pointer-events: none;
+}
+
+.map-timeline-event-text {
+  font: 600 11px/1 -apple-system, system-ui, sans-serif;
+  fill: var(--event);
+  stroke: var(--map-paper);
+  stroke-width: 3px;
+  paint-order: stroke;
+}

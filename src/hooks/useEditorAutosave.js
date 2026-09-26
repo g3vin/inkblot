@@ -22,6 +22,7 @@ import { debounce } from 'lodash'
 import { saveDocument, getVersions } from '../lib/FileSystem'
 import { isEditorReady } from '../lib/editorUtils'
 import { isTextDoc } from '../lib/docKind'
+import { readEditorTimelineRanges } from '../extensions/TimelineAnchors'
 
 const AUTOSAVE_DEBOUNCE_MS = 800
 const HISTORY_CHECKPOINT_DEBOUNCE_MS = 15000
@@ -82,6 +83,7 @@ export function useEditorAutosave({
     await saveDocument(projectName, docName, {
       content: contentJson,
       notes: getNotesForDoc(docName),
+      timeline: readEditorTimelineRanges(targetEditor, docName),
       _appendVersion: true,
       _version: {
         contentHtml,
@@ -114,6 +116,7 @@ export function useEditorAutosave({
       await saveDocument(projectName, currentDoc, {
         content: contentJson,
         notes: getNotesForDoc(currentDoc),
+        timeline: readEditorTimelineRanges(editor, currentDoc),
       })
 
     }, AUTOSAVE_DEBOUNCE_MS)
@@ -170,6 +173,7 @@ export function useEditorAutosave({
       await saveDocument(projectName, secondaryDoc, {
         content: secondaryEditor.getJSON(),
         notes: getNotesForDoc(secondaryDoc),
+        timeline: readEditorTimelineRanges(secondaryEditor, secondaryDoc),
       })
     }, AUTOSAVE_DEBOUNCE_MS)
 
@@ -221,6 +225,7 @@ export function useEditorAutosave({
       await saveDocument(projectName, activeDoc, {
         content: contentJson,
         notes: activeDocNotes,
+        timeline: readEditorTimelineRanges(targetEditor, activeDoc),
       })
     }, AUTOSAVE_DEBOUNCE_MS)
 

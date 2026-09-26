@@ -222,6 +222,10 @@ struct InkblotCommands: Commands {
             .disabled(model.sidebar.references == nil)
         }
 
+        CommandMenu("Timeline") {
+            TimelineMenuItems(model: model)
+        }
+
         CommandMenu("Timer") {
             TimerMenuItems(model: model)
         }

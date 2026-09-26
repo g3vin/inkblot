@@ -113,6 +113,27 @@ export const makeNoteNode = ({ x = 0, y = 0, file = '', noteId = '', ...rest } =
   ...rest,
 })
 
+export const DEFAULT_TIMELINE_EVENT_NODE_SIZE = { width: 260, height: 120 }
+
+/** Where the chronology lives: what a timeline event card's `file` names. */
+export const TIMELINE_FILE = '.story/timeline.json'
+
+/**
+ * A timeline event, placed on the canvas. Like a note card it is a reference, not a
+ * copy: a spec `file` node naming the project's chronology, plus the event's id — so
+ * the card shows the event as it is now, dates and all, wherever it has been dragged.
+ */
+export const makeTimelineEventNode = ({ x = 0, y = 0, eventId = '', ...rest } = {}) => ({
+  id: newId(),
+  type: 'file',
+  x: Math.round(x),
+  y: Math.round(y),
+  ...DEFAULT_TIMELINE_EVENT_NODE_SIZE,
+  file: TIMELINE_FILE,
+  inkblotTimelineEventId: eventId,
+  ...rest,
+})
+
 /** A URL on the canvas. A Pinterest board url renders as the board (CanvasLinkNode). */
 export const makeLinkNode = ({ x = 0, y = 0, url = '', ...rest } = {}) => ({
   id: newId(),

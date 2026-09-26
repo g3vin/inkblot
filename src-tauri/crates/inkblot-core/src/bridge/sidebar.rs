@@ -305,6 +305,7 @@ pub enum SidebarTab {
     Notes,
     History,
     References,
+    Timeline,
 }
 
 /// The page wants a sidebar tab shown — "Add note", "Open Version History", a new

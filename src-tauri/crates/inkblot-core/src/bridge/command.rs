@@ -19,6 +19,10 @@ use super::references::{
 use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 use crate::types::json::JsonValue;
 use super::map::MapCommandRequest;
+use super::timeline::{
+    AttachTimelineEventCommand, JumpToTimelinePassageCommand, RevealTimelineEventCommand, SetTimeLensCommand,
+    SetTimelineRangeEditingCommand, TimelineCommandRequest,
+};
 use super::sidebar::{
     AddReplyCommand, ClipboardDropCommand, HighlightNoteCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
     RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
@@ -331,10 +335,11 @@ pub enum EntryKind {
     Document,
     Canvas,
     Map,
+    Timeline,
     Folder,
 }
 
-/// Create a document, canvas, map or folder in the open project, and open it if it is
+/// Create a document, canvas, map, timeline or folder in the open project, and open it if it is
 /// not a folder.
 ///
 /// The page does the writing, not the shell, for the same reason as every command
@@ -347,7 +352,7 @@ pub enum EntryKind {
 pub struct CreateEntryCommand {
     /// Tree path of the folder to create in; empty for the project root.
     pub parent_folder: String,
-    /// The bare name. For a canvas or map the page adds the `.canvas` or `.map` suffix.
+    /// The bare name. For a canvas, map or timeline the page adds its suffix.
     pub name: String,
     pub kind: EntryKind,
 }
@@ -538,6 +543,14 @@ pub enum NativeCommand {
     CanvasRestore(CanvasRestoreCommand),
     /// Run a command on a map (`map.rs`).
     MapCommand(MapCommandRequest),
+    /// Run a command on a timeline view (`timeline.rs`).
+    TimelineCommand(TimelineCommandRequest),
+    /// Attach a passage to a timeline event.
+    AttachTimelineEvent(AttachTimelineEventCommand),
+    JumpToTimelinePassage(JumpToTimelinePassageCommand),
+    RevealTimelineEvent(RevealTimelineEventCommand),
+    SetTimeLens(SetTimeLensCommand),
+    SetTimelineRangeEditing(SetTimelineRangeEditingCommand),
     InsertPlainText(InsertPlainTextCommand),
     CreateEntry(CreateEntryCommand),
     RenameEntry(RenameEntryCommand),

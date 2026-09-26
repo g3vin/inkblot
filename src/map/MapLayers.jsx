@@ -381,6 +381,37 @@ export function MapDefs({ idPrefix }) {
   )
 }
 
+/**
+ * Timeline events happening here and now: each event placed at one of this map's pins
+ * whose time covers the map's day, as a flag over the pin. Only the editing surface
+ * passes any; a thumbnail or an export draws the map alone.
+ */
+function TimelineEventLayer({ map, projector, space, day, events }) {
+  if (!events?.length) return null
+  const pins = new Map(map.pins.map((pin) => [pin.id, pin]))
+  const stacked = new Map()
+  return (
+    <g className="map-timeline-events">
+      {events.map((event) => {
+        const pin = pins.get(event.pin)
+        const at = pin ? projector.toWorld(resolvePin(map, space, pin, day)) : null
+        if (!at) return null
+        const level = stacked.get(event.pin) || 0
+        stacked.set(event.pin, level + 1)
+        return (
+          <g key={event.id} className="map-timeline-event" data-timeline-event={event.id} transform={`translate(${at[0]} ${at[1]})`} style={event.color ? { '--event': event.color } : undefined}>
+            <g className="map-mark">
+              <text className="map-timeline-event-text" y={-22 - level * 16} textAnchor="middle">
+                ◆ {event.title || 'Event'}
+              </text>
+            </g>
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
 /* ---------------- all together ---------------- */
 
 /**
@@ -404,6 +435,7 @@ const MapLayers = memo(function MapLayers({
   hidePinNames = false,
   inlineAssets = null,
   earthPaths = null,
+  timelineEvents = null,
 }) {
   // Only on a star system does anything but a traveller move with the day. Holding
   // the day still for the other layers lets them skip re-rendering during playback.
@@ -422,6 +454,7 @@ const MapLayers = memo(function MapLayers({
       <LabelLayer map={map} projector={projector} space={space} day={staticDay} zoom={zoom} selection={selection} idPrefix={idPrefix} />
       <PinLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} missingDocs={missingDocs} hideNames={hidePinNames} />
       <TravelerLayer map={map} projector={projector} space={space} day={day} schedules={schedules} selection={selection} />
+      <TimelineEventLayer map={map} projector={projector} space={space} day={day} events={timelineEvents} />
     </g>
   )
 })

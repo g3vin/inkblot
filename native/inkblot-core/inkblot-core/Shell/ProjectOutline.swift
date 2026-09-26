@@ -174,7 +174,8 @@ struct ProjectOutline: NSViewRepresentable {
             cell.textField?.stringValue = item.isFolder ? item.node.name : docDisplayName(path: item.path)
             let symbol = item.isFolder ? "folder"
                 : isCanvasDoc(path: item.path) ? "rectangle.on.rectangle"
-                : isMapDoc(path: item.path) ? "map" : "doc.text"
+                : isMapDoc(path: item.path) ? "map"
+                : item.path.hasSuffix(".timeline") ? "calendar.day.timeline.left" : "doc.text"
             cell.imageView?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
             return cell
         }

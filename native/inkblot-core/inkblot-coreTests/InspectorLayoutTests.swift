@@ -21,6 +21,15 @@ struct InspectorLayoutTests {
         #expect(!layouts[.finishing].contains(.map))
     }
 
+    /// A timeline view's panel is contextual too: it comes and goes with the view.
+    @Test func noLayoutHoldsTheTimelinePanel() {
+        var layouts = InspectorLayouts()
+        #expect(!layouts.rows(for: .drafting).contains(.timeline))
+        layouts[.drafting] = [.timeline, .notes]
+        #expect(layouts[.drafting] == [.notes])
+        #expect(SidebarModel.Tab(SidebarTab.timeline) == .timeline)
+    }
+
     @Test func aTickedTabGoesLastAndTheLastTabStays() {
         var layouts = InspectorLayouts.defaults
         layouts.set(.clipboard, shown: true, in: .finishing)

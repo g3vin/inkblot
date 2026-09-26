@@ -12,6 +12,7 @@ import {
   stripCanvasSuffix,
   getDocDisplayName,
   isMapDoc,
+  isTimelineDoc,
   isTextDoc,
   withDocSuffix,
   stripDocSuffix,
@@ -53,6 +54,12 @@ const PATHS = [
   'Treasure.Map',
   'atlas.map.backup',
   'Lands 🗺️.map',
+  'Plot/Main.timeline',
+  '.timeline',
+  'timeline',
+  'x.map.timeline',
+  'x.timeline.map',
+  'Main.timeline.old',
 ]
 
 const FUNCTIONS = {
@@ -62,6 +69,7 @@ const FUNCTIONS = {
   stripCanvasSuffix,
   getDocDisplayName,
   isMapDoc,
+  isTimelineDoc,
   isTextDoc,
   stripDocSuffix,
 }
@@ -75,7 +83,7 @@ export default {
       }
     }
     for (const path of PATHS) {
-      for (const kind of ['canvas', 'map', 'text', 'folder', undefined]) {
+      for (const kind of ['canvas', 'map', 'timeline', 'text', 'folder', undefined]) {
         yield { fn: 'withDocSuffix', args: [path, kind ?? null], expected: withDocSuffix(path, kind) }
       }
     }

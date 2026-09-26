@@ -35,6 +35,7 @@ pub mod read_aloud;
 pub mod search;
 pub mod stats;
 pub mod story;
+pub mod timeline;
 
 pub use canvas::{CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState};
 pub use diff::{
@@ -66,3 +67,7 @@ pub use read_aloud::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
 pub use search::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
 pub use stats::{DayStat, DocWordCount, StatsMinute, StatsScope, StatsTotals, TimerRun, WritingSession};
 pub use story::{StoryFolderAncestor, StoryFolderPreset};
+pub use timeline::{
+    StoryTimeline, TimelineEra, TimelineEvent, TimelineEventNote, TimelineLane, TimelineLink, TimelineLinkKind, TimelinePlace,
+    TimelineRange, TimelineScale, TimelineTag, TimelineViewFile, TimelineViewFilter,
+};

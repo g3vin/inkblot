@@ -25,6 +25,7 @@ import { createFolder } from '../lib/FileSystem'
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import { followMovedDoc } from '../lib/map/mapLinks'
+import { followMovedDocInTimeline } from '../lib/timeline/timelineLinks'
 import {
   deleteEntry,
   duplicateEntry,
@@ -124,9 +125,12 @@ export function useEntryOperations({
       return failed ? null : nextPath
     }
 
-    // Maps link to documents by path; a rename or move takes the links with it.
+    // Maps and the timeline link to documents by path; a rename or move takes the links with it.
     const followed = async (projectNameArg, entryPath, type, nextPath) => {
-      if (nextPath) await followMovedDoc(projectNameArg, entryPath, nextPath, type)
+      if (nextPath) {
+        await followMovedDoc(projectNameArg, entryPath, nextPath, type)
+        await followMovedDocInTimeline(projectNameArg, entryPath, nextPath, type)
+      }
       return nextPath
     }
 

@@ -1,8 +1,8 @@
 import Foundation
 
-/// The window's three customizable toolbars.
+/// The window's four customizable toolbars.
 ///
-/// A document, a canvas and a map each have their own: their own default set, and their own
+/// A document, a canvas, a map and a timeline each have their own: their own default set, and their own
 /// layout once the user has changed it. AppKit saves a customized layout under the
 /// toolbar's id (NSToolbar autosave, in UserDefaults), so these strings are storage
 /// keys as much as names — renaming one quietly resets everyone's layout.
@@ -10,6 +10,7 @@ enum ToolbarID {
     static let document = "inkblot.toolbar.document"
     static let canvas = "inkblot.toolbar.canvas"
     static let map = "inkblot.toolbar.map"
+    static let timeline = "inkblot.toolbar.timeline"
 }
 
 /// Every item either toolbar can hold, whether it starts in the toolbar or only in the
@@ -22,7 +23,8 @@ enum ToolbarID {
 /// Adding an item — the whole recipe is in ARCHITECTURE.md, "A toolbar item":
 ///
 /// 1. A case here, with a new `inkblot.<area>.<name>` string.
-/// 2. A `ToolbarItem(id:)` in `DocumentToolbar`, `CanvasToolbar`, `MapToolbar`, or —
+/// 2. A `ToolbarItem(id:)` in `DocumentToolbar`, `CanvasToolbar`, `MapToolbar`,
+///    `TimelineToolbar`, or —
 ///    for one that belongs in all of them — `SharedToolbarItems`.
 /// 3. `.defaultCustomization(.hidden)` unless it belongs in the default set. Most new
 ///    items do not: the palette is where they are found, and the default set is what
@@ -72,6 +74,15 @@ enum ToolbarItemID: String, CaseIterable {
     case mapHistory = "inkblot.map.undo-redo"
     case mapZoom = "inkblot.map.zoom"
     case mapDelete = "inkblot.map.delete"
+
+    /* ---------------- timeline ---------------- */
+
+    case timelineAddEvent = "inkblot.timeline.add-event"
+    case timelineScale = "inkblot.timeline.scale"
+    case timelineHistory = "inkblot.timeline.undo-redo"
+    case timelineZoom = "inkblot.timeline.zoom"
+    case timelineLens = "inkblot.timeline.lens"
+    case timelineDelete = "inkblot.timeline.delete"
 
     /* ---------------- all of them ---------------- */
 

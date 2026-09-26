@@ -25,6 +25,7 @@ import ConversationTile from '../extensions/ConversationTile'
 import { DictationInline } from '../extensions/DictationInline'
 import { DocChangeReporter } from '../extensions/DocChangeReporter'
 import { NoteAnnotation } from '../extensions/NoteAnnotation'
+import { TimelineAnchors } from '../extensions/TimelineAnchors'
 import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import ResizableImage from '../extensions/ResizableImage'
@@ -79,6 +80,7 @@ export const buildEditorExtensions = (starterKit) => [
     width: 2,
   }),
   NoteAnnotation,
+  TimelineAnchors,
   ConversationTile,
   PinterestBoard,
   Citation,

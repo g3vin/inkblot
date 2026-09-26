@@ -193,7 +193,7 @@ export function journeysSections(ui, { map, schedules, conflicts, calendar, onCa
   ]
 }
 
-function calendarFields(ui, cal, onCalendar) {
+export function calendarFields(ui, cal, onCalendar) {
   const custom = (patch) => onCalendar({ ...cal, custom: { ...cal.custom, ...patch } })
   return [
     ui.choice(

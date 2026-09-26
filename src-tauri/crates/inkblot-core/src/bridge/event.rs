@@ -11,6 +11,7 @@ use typeshare::typeshare;
 
 use super::archive::ArchiveChanged;
 use super::map::MapChromeChanged;
+use super::timeline::{TimelineChromeChanged, TimelineCursorChanged, TimelineRangesChanged};
 use super::bubble::{BubbleChipsChanged, BubbleSessionOpened};
 use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
 use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor, WritingFormat};
@@ -490,6 +491,12 @@ pub enum WebviewEvent {
     CanvasToolbarChanged(CanvasToolbarChanged),
     /// The active map's toolbar and inspector (`map.rs`). Coalesced per frame.
     MapChromeChanged(MapChromeChanged),
+    /// The active timeline view's toolbar and inspector (`timeline.rs`). Coalesced per frame.
+    TimelineChromeChanged(TimelineChromeChanged),
+    /// The time lens and passage handles, switched on or off.
+    TimelineCursorChanged(TimelineCursorChanged),
+    /// A document's timeline passages, as its editor maps them. Coalesced per frame.
+    TimelineRangesChanged(TimelineRangesChanged),
     SearchMatches(SearchMatches),
     FocusModeView(FocusModeView),
     ReadAloudPayload(ReadAloudPayloadEvent),

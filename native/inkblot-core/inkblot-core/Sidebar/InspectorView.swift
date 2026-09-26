@@ -88,15 +88,16 @@ struct InspectorView: View {
         case .publish: PublishPanelView()
         case .stats: StatsPanelView()
         case .map: MapPanelView()
+        case .timeline: TimelinePanelView()
         }
     }
 
-    /// The Finishing tabs and a map's panel are settings, not lists: "This Panel" has nothing there to
+    /// The Finishing tabs and a map's or timeline's panel are settings, not lists: "This Panel" has nothing there to
     /// filter, so the bar goes while that is its scope. Set to search the document or
     /// the project, it still does, from any tab.
     private var showsSearchBar: Bool {
         let sidebar = model.sidebar
-        let finishing: Set<SidebarModel.Tab> = [.page, .book, .publish, .map]
+        let finishing: Set<SidebarModel.Tab> = [.page, .book, .publish, .map, .timeline]
         return sidebar.isSearching || sidebar.scope != .panel || !finishing.contains(sidebar.tab)
     }
 
