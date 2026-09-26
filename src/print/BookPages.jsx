@@ -1,0 +1,142 @@
+/**
+ * BookPages.jsx — the whole book, as pages, in Typeset.
+ *
+ * The document open is live — its pages are the editor, with the typesetting handles —
+ * and the rest of the book stands before and after it as the pages it prints on: the
+ * same pages Print makes (`preparePrint`), cut from the book as it compiles, so the front
+ * matter, every chapter's head, each folio and running head are what paper will show.
+ * The live chapter sits among them on the side of the spread it opens on, numbered on
+ * from the page before it.
+ *
+ * The book is composed again, in the background, a moment after anything changes it —
+ * its design, its contents, the page count of the chapter being set. Until it has been,
+ * the pages already shown stay; the live chapter is held still on screen as the pages
+ * before it change. Clicking a page of another entry opens it.
+ */
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+
+import { PAGE_GAP } from './printLayoutConstants'
+import { preparePrint } from './printJob'
+import { bookAuthor, getPrintScope, usePrintLayoutStore } from './printLayoutStore'
+
+/** How long after a change the book is composed again. */
+const COMPOSE_DELAY_MS = 900
+
+/** The event a click on another entry's page sends; the controller opens it. */
+export const OPEN_BOOK_ITEM_EVENT = 'inkblot:open-book-item'
+
+/** Printed pages, shown at the zoom, one under the other. */
+function PageStack({ pages, zoom, onOpen }) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const host = ref.current
+    if (!host) return
+    host.replaceChildren(...pages.map((page) => {
+      const frame = document.createElement('div')
+      frame.className = 'book-page'
+      frame.dataset.item = page.dataset.item || ''
+      frame.appendChild(page)
+      return frame
+    }))
+  }, [pages])
+  const onClick = (event) => {
+    const item = event.target.closest?.('.book-page')?.dataset.item
+    if (item) onOpen(item)
+  }
+  if (!pages.length) return null
+  return (
+    <div
+      ref={ref}
+      className="book-pages-stack print-scope"
+      style={{ zoom, gap: `${PAGE_GAP}px`, paddingBottom: `${PAGE_GAP}px` }}
+      onClick={onClick}
+      role="presentation"
+    />
+  )
+}
+
+export default function BookPages({ projectName, docPath, editor, placement, zoom, scrollEl, renderLive }) {
+  const version = usePrintLayoutStore()
+  const [composed, setComposed] = useState({ before: [], after: [], firstPhysical: 1, folioStart: null, busy: true })
+  const runRef = useRef(0)
+  const timerRef = useRef(null)
+  const liveRef = useRef(null)
+  const anchorRef = useRef(null)
+  const itemId = placement?.row?.id
+
+  const compose = useCallback(async () => {
+    const run = ++runRef.current
+    setComposed((c) => ({ ...c, busy: true }))
+    try {
+      const scope = getPrintScope(projectName) === 'project' ? 'project' : 'folder'
+      const prepared = await preparePrint({
+        projectName,
+        docPath,
+        scope,
+        book: placement.book,
+        liveEditors: [{ path: docPath, editor }],
+      })
+      if (run !== runRef.current) return
+      const pages = prepared?.elements || []
+      const first = pages.findIndex((page) => page.dataset.item === itemId)
+      let last = first
+      while (last + 1 < pages.length && (pages[last + 1].dataset.item === itemId || !pages[last + 1].dataset.item)) last += 1
+      // A blank page the book puts before the chapter to open it on a recto is the
+      // chapter's own side of the spread: it stays with the pages before.
+      setComposed(first < 0
+        ? { before: pages, after: [], firstPhysical: 1, folioStart: null, busy: false }
+        : {
+          before: pages.slice(0, first),
+          after: pages.slice(last + 1),
+          firstPhysical: first + 1,
+          folioStart: Number(pages[first].dataset.page) || null,
+          busy: false,
+        })
+    } catch (error) {
+      if (run === runRef.current) setComposed((c) => ({ ...c, busy: false }))
+      console.error('[typeset] composing the book failed:', error)
+    }
+  }, [docPath, editor, itemId, placement, projectName])
+
+  const schedule = useCallback((delay = COMPOSE_DELAY_MS) => {
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(compose, delay)
+  }, [compose])
+
+  // Again whenever the book or the document changes; soon at first.
+  useEffect(() => {
+    schedule(200)
+    return () => clearTimeout(timerRef.current)
+  }, [schedule, version])
+
+  useEffect(() => {
+    if (!editor) return undefined
+    const onTransaction = ({ transaction }) => { if (transaction.docChanged) schedule() }
+    editor.on('transaction', onTransaction)
+    return () => editor.off('transaction', onTransaction)
+  }, [editor, schedule])
+
+  // The live chapter holds still on screen while the pages before it change.
+  useLayoutEffect(() => {
+    const live = liveRef.current
+    if (!live || !scrollEl) return
+    const top = live.offsetTop
+    if (anchorRef.current != null && anchorRef.current !== top) scrollEl.scrollTop += top - anchorRef.current
+    anchorRef.current = top
+  }, [composed.before, scrollEl])
+
+  const open = useCallback((id) => {
+    if (id && id !== itemId) window.dispatchEvent(new CustomEvent(OPEN_BOOK_ITEM_EVENT, { detail: { id } }))
+  }, [itemId])
+
+  return (
+    <div className="book-pages">
+      <PageStack pages={composed.before} zoom={zoom} onOpen={open} />
+      <div ref={liveRef} className="book-pages-live">
+        {renderLive({ firstPhysical: composed.firstPhysical, folioStart: composed.folioStart, author: bookAuthor(placement.book), bookTitle: placement.book.title })}
+      </div>
+      <PageStack pages={composed.after} zoom={zoom} onOpen={open} />
+      {composed.busy ? <div className="book-pages-status" aria-live="polite">Setting the book…</div> : null}
+    </div>
+  )
+}

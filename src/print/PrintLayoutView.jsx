@@ -68,6 +68,10 @@ export default function PrintLayoutView({
   scrollEl,
   statusHost,
   showGuides = false,
+  // Where the document's first page falls in its book, in the Typeset view of a whole
+  // book: which side it is on, and the folio it carries.
+  firstPhysical = 1,
+  folioStart = null,
   children,
 }) {
   const setup = useMemo(() => normalizePageSetup(pageSetup), [pageSetup])
@@ -159,14 +163,15 @@ export default function PrintLayoutView({
     const chapterStarts = new Set(result.chapterStartSlots)
     for (let strip = 0; strip < stripCount; strip += 1) {
       const pageIndex = galley ? Math.floor(strip / setup.columns) : strip
-      const physical = pageIndex + 1
+      const physical = firstPhysical + pageIndex
       const firstSlot = pageIndex * setup.columns
       const pageSlots = result.slotStarts.slice(firstSlot, firstSlot + setup.columns)
       const blank = pageIndex > 0 && pageSlots.every((s) => s == null)
       const startPos = pageSlots.find((s) => s != null) ?? 0
+      const start = Number.isFinite(folioStart) ? folioStart : setup.pageNumberStart
       const ctx = {
-        page: setup.pageNumberStart + pageIndex,
-        pages: setup.pageNumberStart + Math.max(result.pageCount, 1) - 1,
+        page: start + pageIndex,
+        pages: start + Math.max(result.pageCount, 1) - 1,
         title: docTitle,
         chapter: chapterAt(headings, startPos, docTitle),
         author,
@@ -187,7 +192,7 @@ export default function PrintLayoutView({
       })
     }
     return out
-  }, [author, docTitle, flowX, galley, headings, result, setup, slotStride, stripCount, wordsText])
+  }, [author, docTitle, firstPhysical, flowX, folioStart, galley, headings, result, setup, slotStride, stripCount, wordsText])
 
   // Which page is in view, for "Page X of Y".
   useEffect(() => {

@@ -448,19 +448,26 @@ const buildBookFront = async ({ sections, chapters, folios, setup, bookTitle, au
   for (const [index, section] of sequence.entries()) {
     onProgress({ done: index, total: sequence.length })
     const kind = section.item.generated
+    const itemId = section.item.id
     if (kind === 'halfTitle') {
-      sources.push({ fixed: (physical) => [halfTitlePage(setup, physical, bookTitle)], startOn: 'recto' })
+      sources.push({ fixed: (physical) => [halfTitlePage(setup, physical, bookTitle)], startOn: 'recto', itemId })
     } else if (kind === 'titlePage') {
-      sources.push({ fixed: () => buildTitlePages({ setup: titleSetup, title: bookTitle, profile, author, words }).slice(0, 1), startOn: 'recto' })
+      sources.push({ fixed: () => buildTitlePages({ setup: titleSetup, title: bookTitle, profile, author, words }).slice(0, 1), startOn: 'recto', itemId })
     } else if (kind === 'contents') {
-      sources.push({ fixed: (physical) => contentsPages(setup, entries, physical), startOn: 'recto' })
+      sources.push({ fixed: (physical) => contentsPages(setup, entries, physical), startOn: 'recto', itemId })
     } else if (section.content) {
       const laid = await layoutOffscreen(section.content, setup)
-      sources.push({ ...laid, setup, title: section.name, chapterTitleAt: () => section.name, ...placement(section) })
+      sources.push({ ...laid, setup, title: section.name, chapterTitleAt: () => section.name, itemId, ...placement(section) })
     }
   }
   if (!sources.length) return []
-  const pages = renderPages(sources, { bookTitle, author, surname: surnameOf(author), words, numberStart: 1, numberFormat: 'lowerRoman' })
+  let pages
+  try {
+    pages = renderPages(sources, { bookTitle, author, surname: surnameOf(author), words, numberStart: 1, numberFormat: 'lowerRoman' })
+  } finally {
+    // The pages are clones: the off-screen editors they were cut from can go.
+    for (const source of sources) source.destroy?.()
+  }
   if ((setup.mirrorMargins || setup.chapterStartsOnRecto) && pages.length % 2 === 1) {
     const m = pageMetrics(setup)
     const blank = document.createElement('div')
@@ -576,6 +583,7 @@ export const preparePrint = async ({
         setup,
         title: chapter.name,
         chapterTitleAt: chapterTitleAt(laid.headings, chapter.name),
+        itemId: chapter.item?.id,
         ...placement(chapter),
       })
     }

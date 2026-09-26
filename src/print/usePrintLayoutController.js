@@ -26,6 +26,8 @@ import { withCoverPart } from './chapterDesign'
 import { reconcileBookItems } from './bookItems'
 import { addBookItem, editBookItem, moveBookItem, openablePath, removeBookItem, setBookItemHidden } from './bookContents'
 import { bookRows } from './bookRows'
+import { BOOK_CHAPTERS_CHANGED_EVENT } from './useBookPlacement'
+import { OPEN_BOOK_ITEM_EVENT } from './BookPages'
 import { applyBookStyle, BOOK_STYLES, bookStyle } from './bookStyles'
 import { readChapterMeta } from './DocChapterMeta'
 import { listBookChapters } from './compile'
@@ -519,6 +521,7 @@ export default function usePrintLayoutController({
       documentSurface.onCommand('refreshBookChapters', () => {
         chaptersRevision.current += 1
         publish()
+        window.dispatchEvent(new CustomEvent(BOOK_CHAPTERS_CHANGED_EVENT))
       }),
       documentSurface.onCommand('setAuthorProfile', ({ profile }) => setAuthorProfile(profile)),
       documentSurface.onCommand('setBookCover', ({ path }) => {
@@ -574,6 +577,21 @@ export default function usePrintLayoutController({
     ]
     return () => subscriptions.forEach((unsubscribe) => unsubscribe())
   }, [applySetup, currentBook, publish, togglePrintLayout, zoomTo])
+
+  // A page of another entry, clicked in the Typeset view of the whole book.
+  useEffect(() => {
+    const onOpenItem = (event) => {
+      const { project, folder } = currentBook()
+      const id = event.detail?.id
+      if (!project || !id) return
+      setSelectedBookItem(project, id)
+      openablePath(project, folder, id)
+        .then((path) => { if (path) stateRef.current.onOpenDoc?.(path) })
+        .catch(failed('Opening it'))
+    }
+    window.addEventListener(OPEN_BOOK_ITEM_EVENT, onOpenItem)
+    return () => window.removeEventListener(OPEN_BOOK_ITEM_EVENT, onOpenItem)
+  }, [currentBook])
 
   // The web's own menus (App.jsx, and the Swift shell's mirror of them) and keys.
   useEffect(() => {

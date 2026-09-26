@@ -199,6 +199,7 @@ export const renderPages = (sources, {
       const fixed = source.fixed(physicalOf(pages.length))
       fixed.forEach((page, i) => {
         if (i === 0) onChapterStart?.(chapterIndex, '')
+        if (source.itemId) page.dataset.item = source.itemId
         pages.push(page)
       })
       return
@@ -279,6 +280,8 @@ export const renderPages = (sources, {
       page.dataset.page = String(ctx.page)
       page.dataset.chapter = String(chapterIndex)
       page.dataset.pos = String(startPos)
+      // Which entry of the book the page is of, for the Typeset view to open it.
+      if (source.itemId) page.dataset.item = source.itemId
       if (p === 0) onChapterStart?.(chapterIndex, page.dataset.folio)
       pages.push(page)
     }

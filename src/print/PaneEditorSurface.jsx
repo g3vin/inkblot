@@ -12,9 +12,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { EditorContent } from '@tiptap/react'
 
+import BookPages from './BookPages'
+import { setLiveHead } from './ChapterHeadDecorations'
+import { readChapterMeta } from './DocChapterMeta'
 import PrintLayoutView from './PrintLayoutView'
 import TypesetEditText from './TypesetEditText'
 import { isMatterPath } from './TypesetLock'
+import { useBookPlacement } from './useBookPlacement'
+import { assetUrl, isAssetPath } from '../lib/assets'
 import { useDocPageSetup } from './useDocPageSetup'
 import { bookAuthor, getBookForDoc, getPrintZoom, isPrintLayoutEnabled, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
 import { resolvePageSetup } from './pageSetup'
@@ -31,6 +36,22 @@ const bookSetupJson = (projectName, docPath, ownSetup) => {
 }
 
 const baseName = (path) => (path || '').split('/').filter(Boolean).pop() || ''
+
+/** URLs the page can show for project pictures, by their stored paths. */
+const useAssetUrls = (projectName, sources) => {
+  const wanted = sources.filter((src) => typeof src === 'string' && isAssetPath(src))
+  const key = wanted.join('|')
+  const [urls, setUrls] = useState(() => new Map())
+  useEffect(() => {
+    if (!projectName || !wanted.length) return undefined
+    let live = true
+    Promise.all(wanted.map(async (src) => [src, await assetUrl(projectName, src)]))
+      .then((pairs) => { if (live) setUrls(new Map(pairs)) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [projectName, key]) // eslint-disable-line react-hooks/exhaustive-deps
+  return urls
+}
 
 export default function PaneEditorSurface({ editor, projectName, docPath, header = null, scrollRef }) {
   usePrintLayoutStore()
@@ -49,6 +70,20 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
   useEffect(() => {
     if (editor && !editor.isDestroyed && editor.storage.typesetLock) editor.storage.typesetLock.locked = locked
   }, [editor, locked])
+  // Where the document sits in its book: in Typeset, a chapter is shown among the book's
+  // pages, opening with its designed head.
+  const placement = useBookPlacement(printLayout ? projectName : null, printLayout ? docPath : null)
+  const row = placement?.row
+  const inBook = Boolean(printLayout && row && !row.hidden)
+  const design = placement?.book?.chapterDesign
+  const headed = inBook && row.kind === 'chapter' && design
+  const meta = headed ? readChapterMeta(editor?.state.doc) : null
+  const images = useAssetUrls(projectName, headed ? [design.ornamentImage, meta?.image] : [])
+  useEffect(() => {
+    setLiveHead(editor, headed
+      ? { design, label: row.label || null, name: baseName(docPath), imageUrl: (src) => images.get(src) || src }
+      : null)
+  }, [design, docPath, editor, headed, images, row?.label])
   const zoom = getPrintZoom(projectName, docPath)
   const onZoomChange = useCallback((z) => setPrintZoom(z, projectName, docPath), [projectName, docPath])
   const author = projectName && docPath ? bookAuthor(getBookForDoc(projectName, docPath)) : ''
@@ -69,7 +104,33 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     >
       {header}
       <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} printLayout={printLayout} />
-      {printLayout ? (
+      {printLayout && inBook ? (
+        <BookPages
+          projectName={projectName}
+          docPath={docPath}
+          editor={editor}
+          placement={placement}
+          zoom={zoom}
+          scrollEl={scrollEl}
+          renderLive={({ firstPhysical, folioStart, author: bookBy, bookTitle }) => (
+            <PrintLayoutView
+              editor={editor}
+              pageSetup={pageSetup}
+              docPath={docPath}
+              zoom={zoom}
+              onZoomChange={onZoomChange}
+              docTitle={bookTitle || baseName(docPath)}
+              author={bookBy || author}
+              scrollEl={scrollEl}
+              statusHost={scrollEl?.parentElement || null}
+              firstPhysical={firstPhysical}
+              folioStart={folioStart}
+            >
+              {content}
+            </PrintLayoutView>
+          )}
+        />
+      ) : printLayout ? (
         <PrintLayoutView
           editor={editor}
           pageSetup={pageSetup}

@@ -26,7 +26,10 @@ export const bookRows = (items: BookItem[], numbering?: Partial<ChapterNumbering
     const number = item.kind === BookItemKind.Part ? parts.get(item.id) : chapters.get(item.id)
     let label: string | undefined
     if (item.kind === BookItemKind.Part && number) label = chapterLabel(number, partStyle) || undefined
-    else if (number != null && style) label = chapterLabel(number, numbering as ChapterNumbering) || undefined
+    // As compiling writes it: in words until the book chooses how to number.
+    else if (number != null) {
+      label = chapterLabel(number, { ...numbering, style: style || ChapterNumberStyle.Words, prefix: numbering?.prefix ?? 'Chapter' } as ChapterNumbering) || undefined
+    }
     else if (item.chapterType && TYPE_LABELS[item.chapterType]) label = TYPE_LABELS[item.chapterType]
     const row: BookRow = {
       id: item.id,
