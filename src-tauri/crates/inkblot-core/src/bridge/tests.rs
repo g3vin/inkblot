@@ -1025,6 +1025,7 @@ fn every_event() -> Vec<WebviewEvent> {
             message: None,
             path: None,
         }),
+        WebviewEvent::TypesetFocus(TypesetFocus { section_id: "page.size".into() }),
         WebviewEvent::TabsChanged(TabsChanged {
             tabs: vec![
                 DocTab { id: "tab-1".into(), doc_path: Some("Act One/Scene".into()), secondary_doc: Some("Notes".into()), split: Some(SplitOrientation::Rows) },
@@ -1200,6 +1201,7 @@ fn every_event_has_its_documented_wire_name() {
             "printRequest",
             "pageLayoutCatalog",
             "printJobStatus",
+            "typesetFocus",
             "tabsChanged",
         ]
     );

@@ -44,6 +44,14 @@ Notable changes to Inkblot. The format follows
   changes — on the side of the spread it opens on and numbered on from the page before.
   Its designed head is drawn around its real title, and its subtitle and epigraph are
   typed in place. Clicking another entry's page opens it.
+- **Typesetting on the page:** drag the text block's edges to set the margins (the
+  inside and outside as the spread has them; ⌥ both, ⇧ unsnapped), drag the running
+  head and foot to move them and click them to edit what they say and the folio, drag a
+  chapter's head down its page, move its picture above, between or below and size it by
+  its corner, drop a picture onto it, click a scene break for its glyph and the opening
+  letter for a drop cap, and snap a picture in the text to the text block. Each shows
+  its value as it moves, commits once when let go, and opens its section in the Typeset
+  tab. A change to the whole book offers to be undone.
 
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own

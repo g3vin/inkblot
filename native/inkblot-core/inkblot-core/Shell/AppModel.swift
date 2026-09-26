@@ -110,6 +110,11 @@ final class AppModel {
                 web.print(request) { [weak self] completed in
                     self?.bridge.send(.printFinished(PrintFinishedCommand(jobId: request.jobId, completed: completed)))
                 }
+            case .typesetFocus(let focus):
+                // Picked on a Typeset page: where it is set, in the Typeset tab.
+                sidebar.isPresented = true
+                if sidebar.tab != .typeset { sidebar.tab = .typeset }
+                pageLayout.setExpanded(true, [focus.sectionId])
             case .docChanged(let changed):
                 stats.edit(changed)
                 // A document the tree has not seen — made by the page, most likely. The

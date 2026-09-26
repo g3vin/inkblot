@@ -94,11 +94,11 @@ const BOOK = {
 
 const browser = await webkit.launch()
 
-const open = async (content, { zoom = 1, setup = null } = {}) => {
+const open = async (content, { zoom = 1, setup = null, typeset = false } = {}) => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 960 } })
   page.on('pageerror', (e) => ok(`no page error (${e.message})`, false))
   await page.addInitScript((c) => { window.__content = c }, content)
-  await page.goto(`${base}?zoom=${zoom}&setup=${encodeURIComponent(JSON.stringify(setup))}`)
+  await page.goto(`${base}?zoom=${zoom}&setup=${encodeURIComponent(JSON.stringify(setup))}${typeset ? '&typeset=1' : ''}`)
   await page.waitForFunction(() => window.__print?.editor && window.__print.paginationKey.getState(window.__print.editor.state)?.result, null, { timeout: 30000 })
   await settle(page)
   return page
@@ -334,6 +334,103 @@ for (const [label, setup] of [['Letter', null], ['6 × 9 mirrored', BOOK]]) {
   ok('it sits down its page by the sink (40 mm)', Math.abs(r.sink - 40 * 96 / 25.4) < 1, `${r.sink}`)
   ok('the paragraph after it opens with a drop cap', /3/.test(r.drop), r.drop)
   ok('and it prints, as shown', r.printed && r.printedTitle === 'The Road')
+  await page.close()
+}
+
+/* ---------------- 5c. typesetting on the page ---------------- */
+
+{
+  const page = await open(manuscript(6, 9), { setup: BOOK, typeset: true })
+  // Over the first page: its text block's top edge, and the running head.
+  const stage = await page.locator('.pl-stage').boundingBox()
+  await page.mouse.move(stage.x + stage.width / 2, stage.y + 300)
+  await page.waitForSelector('.typeset-overlay .to-edge.is-h')
+  const top = await page.locator('.typeset-overlay .to-edge.is-h').first().boundingBox()
+  const before = await page.evaluate(() => window.__print.editor.state.doc.attrs.pageSetup.margins.topMm)
+  await page.mouse.move(top.x + top.width / 2, top.y + top.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(top.x + top.width / 2, top.y + top.height / 2 + 38, { steps: 6 })
+  const tip = await page.locator('.typeset-overlay .to-tip').textContent().catch(() => '')
+  await page.mouse.up()
+  const r = await page.evaluate(() => ({
+    after: window.__print.editor.state.doc.attrs.pageSetup.margins.topMm,
+    edits: window.__typesetEdits || [],
+    focus: window.__typesetFocus || [],
+  }))
+  ok('dragging the text block’s top edge down widens the top margin, snapped to half a millimetre',
+    r.after > before + 8 && r.after < before + 12 && Math.abs(r.after * 2 - Math.round(r.after * 2)) < 1e-9, `${before} → ${r.after}`)
+  ok('…in one change, when it is let go', r.edits.length === 1 && r.edits[0].label === 'Margins')
+  ok('…showing the value as it goes', /mm · .*″/.test(tip || ''), tip)
+  ok('…and the inspector is shown where margins are set', r.focus.includes('page.size'))
+
+  // The running head: click it, and say something else.
+  await page.mouse.move(stage.x + stage.width / 2, stage.y + 300)
+  const head = await page.locator('.typeset-overlay .to-running.is-header').boundingBox()
+  await page.mouse.click(head.x + head.width / 2, head.y + head.height / 2)
+  await page.waitForSelector('.typeset-overlay .to-popover input')
+  const center = page.locator('.typeset-overlay .to-popover input').nth(1)
+  await center.fill('{title} — {page}')
+  await center.press('Enter')
+  const header = await page.evaluate(() => window.__print.editor.state.doc.attrs.pageSetup.header.center)
+  ok('clicking the running head edits what it says', header === '{title} — {page}', header)
+  await page.close()
+}
+
+/* ---------------- 5d. a chapter's head and a scene break, on the page ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: true, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 30, noIndentAfterBreak: true,
+  }
+  const design = {
+    showNumber: true, showTitle: true, showSubtitle: true, showImage: true, ornament: 'rule', ornamentGlyph: '',
+    ornamentPosition: 'between', imageWidthPct: 40, alignment: 'center', numberCase: 'smallCaps', titleCase: 'asWritten',
+    numberSizePt: 12, titleSizePt: 20, chapterBreak: 'newPage',
+  }
+  const content = `<h1>The Road</h1>${manuscript(4, 11).replace(/<h1>[^<]*<\/h1>/g, '')}<hr><p>After the break.</p>`
+  const page = await browser.newPage({ viewport: { width: 1280, height: 960 } })
+  page.on('pageerror', (e) => ok(`no page error (${e.message})`, false))
+  await page.addInitScript(({ c, d }) => { window.__content = c; window.__design = d }, { c: content, d: design })
+  await page.goto(`${base}?zoom=1&setup=${encodeURIComponent(JSON.stringify({ ...BOOK, typography }))}&typeset=1`)
+  await page.waitForFunction(() => window.__print?.editor && window.__print.paginationKey.getState(window.__print.editor.state)?.result, null, { timeout: 30000 })
+  await page.evaluate((d) => window.__print.setLiveHead(window.__print.editor, { design: d, label: 'Chapter One', name: 'road' }), design)
+  await settle(page)
+  const live = await page.evaluate(() => ({
+    number: document.querySelector('.pl-flow .chapter-head.is-live-top .ch-number')?.textContent,
+    rule: Boolean(document.querySelector('.pl-flow .chapter-head.is-live-top .ch-ornament.is-rule')),
+    title: document.querySelector('.pl-flow .ProseMirror > h1.ch-live-title')?.textContent,
+    subtitle: Boolean(document.querySelector('.pl-flow .chapter-head.is-live-bottom .ch-subtitle[contenteditable]')),
+  }))
+  ok('the live chapter opens with its designed head around its real title',
+    live.number === 'Chapter One' && live.rule && live.title === 'The Road' && live.subtitle, JSON.stringify(live))
+
+  // Its subtitle, typed in place.
+  await page.click('.pl-flow .chapter-head.is-live-bottom .ch-subtitle')
+  await page.keyboard.type('In which it rains')
+  await page.keyboard.press('Enter')
+  const subtitle = await page.evaluate(() => window.__print.editor.state.doc.attrs.chapter?.subtitle)
+  ok('a subtitle is typed in place, and kept with the chapter', subtitle === 'In which it rains', subtitle)
+
+  // Its sink: dragged down.
+  const stage = await page.locator('.pl-stage').boundingBox()
+  await page.mouse.move(stage.x + stage.width / 2, stage.y + 200)
+  const sink = await page.locator('.typeset-overlay .to-sink').boundingBox()
+  await page.mouse.move(sink.x + sink.width / 2, sink.y + sink.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(sink.x + sink.width / 2, sink.y + sink.height / 2 + 38, { steps: 5 })
+  await page.mouse.up()
+  const sunk = await page.evaluate(() => window.__print.editor.state.doc.attrs.pageSetup.typography.chapterSinkMm)
+  ok('dragging the head’s top sets how far down the page it opens', sunk > 38 && sunk < 42, `${sunk}`)
+
+  // A scene break, clicked, and given another glyph.
+  await page.locator('.pl-flow .ProseMirror hr').last().scrollIntoViewIfNeeded()
+  await page.locator('.pl-flow .ProseMirror hr').last().click()
+  await page.waitForSelector('.typeset-overlay .to-popover .to-glyphs')
+  await page.locator('.typeset-overlay .to-popover button', { hasText: '❦' }).click()
+  const glyph = await page.evaluate(() => window.__print.editor.state.doc.attrs.pageSetup.typography.sceneBreak)
+  ok('clicking a scene break chooses its glyph', glyph === '❦', glyph)
   await page.close()
 }
 

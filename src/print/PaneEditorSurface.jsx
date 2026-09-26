@@ -19,9 +19,12 @@ import PrintLayoutView from './PrintLayoutView'
 import TypesetEditText from './TypesetEditText'
 import { isMatterPath } from './TypesetLock'
 import { useBookPlacement } from './useBookPlacement'
-import { assetUrl, isAssetPath } from '../lib/assets'
+import { TypesetToast } from './TypesetOverlay'
+import { readDocPageSetup } from './DocPageSetup'
+import { documentSurface } from '../bridge'
+import { assetUrl, isAssetPath, writeAssetFromFile } from '../lib/assets'
 import { useDocPageSetup } from './useDocPageSetup'
-import { bookAuthor, getBookForDoc, getPrintZoom, isPrintLayoutEnabled, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
+import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, isPrintLayoutEnabled, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
 import { resolvePageSetup } from './pageSetup'
 
 /**
@@ -84,6 +87,39 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
       ? { design, label: row.label || null, name: baseName(docPath), imageUrl: (src) => images.get(src) || src }
       : null)
   }, [design, docPath, editor, headed, images, row?.label])
+  // What the page's handles change, in Typeset.
+  const [toast, setToast] = useState(null)
+  const typeset = useMemo(() => {
+    if (!printLayout || !editor || !placement) return null
+    const { folder } = placement
+    const book = placement.book
+    const editBook = (change, label) => {
+      const before = getBookSettings(projectName, folder)
+      setBookSettings(projectName, folder, change(before))
+      setToast({ label, before, folder })
+    }
+    return {
+      design: headed ? design : null,
+      numbering: book.chapterNumbering,
+      editBook,
+      editDesign: (patch, label) => editBook((b) => ({ ...b, chapterDesign: { ...b.chapterDesign, ...patch } }), label),
+      // The document's own setup where it has one — undone like any edit — or the book's.
+      editSetup: (next, label) => {
+        if (readDocPageSetup(editor.state.doc)) editor.commands.setPageSetup(next)
+        else editBook((b) => ({ ...b, pageSetup: next }), label)
+      },
+      setHeadPicture: (file) => {
+        writeAssetFromFile(projectName, file)
+          .then((image) => {
+            const current = readChapterMeta(editor.state.doc) || { subtitle: '', epigraph: '', epigraphSource: '' }
+            editor.commands.setChapterMeta({ ...current, image })
+            if (design && !design.showImage) editBook((b) => ({ ...b, chapterDesign: { ...b.chapterDesign, showImage: true } }), 'Chapter Picture')
+          })
+          .catch((error) => console.error('[typeset] the picture could not be added:', error))
+      },
+      focus: (sectionId) => documentSurface.publishTypesetFocus({ sectionId }),
+    }
+  }, [design, editor, headed, placement, printLayout, projectName])
   const zoom = getPrintZoom(projectName, docPath)
   const onZoomChange = useCallback((z) => setPrintZoom(z, projectName, docPath), [projectName, docPath])
   const author = projectName && docPath ? bookAuthor(getBookForDoc(projectName, docPath)) : ''
@@ -125,6 +161,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
               statusHost={scrollEl?.parentElement || null}
               firstPhysical={firstPhysical}
               folioStart={folioStart}
+              typeset={typeset}
             >
               {content}
             </PrintLayoutView>
@@ -142,10 +179,19 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           scrollEl={scrollEl}
           // The pane, not the scroller: the zoom bar stays put while the pages scroll.
           statusHost={scrollEl?.parentElement || null}
+          typeset={typeset}
         >
           {content}
         </PrintLayoutView>
       ) : content}
+      <TypesetToast
+        toast={toast}
+        onUndo={() => {
+          if (toast) setBookSettings(projectName, toast.folder, toast.before)
+          setToast(null)
+        }}
+        onDone={() => setToast(null)}
+      />
     </div>
   )
 }

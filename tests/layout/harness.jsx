@@ -14,6 +14,7 @@ import { buildEditorExtensions } from '../../src/lib/editorExtensions'
 import PrintLayoutView from '../../src/print/PrintLayoutView'
 import { computePushes, paginationKey } from '../../src/print/PaginationExtension'
 import { preparePrint } from '../../src/print/printJob'
+import { setLiveHead } from '../../src/print/ChapterHeadDecorations'
 
 const params = new URLSearchParams(location.search)
 const initialSetup = JSON.parse(params.get('setup') || 'null')
@@ -30,13 +31,26 @@ function Harness() {
       if (initialSetup) created.commands.setPageSetup(initialSetup)
     },
   })
-  window.__print = { editor, paginationKey, computePushes, preparePrint, setZoom }
+  window.__print = { editor, paginationKey, computePushes, preparePrint, setZoom, setLiveHead }
   const setup = editor?.state.doc.attrs.pageSetup || initialSetup
+  // `?typeset=1`: the page's handles, their edits recorded and applied to the document.
+  const typeset = params.get('typeset') && editor ? {
+    design: window.__design || null,
+    numbering: {},
+    editSetup: (next, label) => {
+      window.__typesetEdits = [...(window.__typesetEdits || []), { label, setup: next }]
+      editor.commands.setPageSetup(next)
+    },
+    editDesign: () => {},
+    editBook: () => {},
+    setHeadPicture: () => {},
+    focus: (section) => { window.__typesetFocus = [...(window.__typesetFocus || []), section] },
+  } : null
   return (
     <div className="pane primary-pane" style={{ position: 'relative', height: '100vh' }}>
       <div ref={setScrollEl} className="pane-scroll" style={{ height: '100vh', overflow: 'auto' }} tabIndex={-1}>
         {editor ? (
-          <PrintLayoutView editor={editor} pageSetup={setup} zoom={zoom} onZoomChange={setZoom} docTitle="Harness" scrollEl={scrollEl}>
+          <PrintLayoutView editor={editor} pageSetup={setup} zoom={zoom} onZoomChange={setZoom} docTitle="Harness" scrollEl={scrollEl} typeset={typeset}>
             <EditorContent editor={editor} className="editor" />
           </PrintLayoutView>
         ) : null}

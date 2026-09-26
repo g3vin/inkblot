@@ -3316,6 +3316,8 @@ public enum WebviewEvent: Codable, Equatable {
 	/// The Finishing tabs' fixed lists, sent once when the page mounts.
 	case pageLayoutCatalog(PageLayoutCatalog)
 	case printJobStatus(PrintJobStatus)
+	/// A Typeset page's handle was picked: show its section in the inspector.
+	case typesetFocus(TypesetFocus)
 	/// The tabs and the split, whole (`tabs.rs`). Coalesced per frame.
 	case tabsChanged(TabsChanged)
 
@@ -3357,6 +3359,7 @@ public enum WebviewEvent: Codable, Equatable {
 			printRequest,
 			pageLayoutCatalog,
 			printJobStatus,
+			typesetFocus,
 			tabsChanged
 	}
 
@@ -3553,6 +3556,11 @@ public enum WebviewEvent: Codable, Equatable {
 					self = .printJobStatus(content)
 					return
 				}
+			case .typesetFocus:
+				if let content = try? container.decode(TypesetFocus.self, forKey: .payload) {
+					self = .typesetFocus(content)
+					return
+				}
 			case .tabsChanged:
 				if let content = try? container.decode(TabsChanged.self, forKey: .payload) {
 					self = .tabsChanged(content)
@@ -3676,6 +3684,9 @@ public enum WebviewEvent: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .printJobStatus(let content):
 			try container.encode(CodingKeys.printJobStatus, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .typesetFocus(let content):
+			try container.encode(CodingKeys.typesetFocus, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .tabsChanged(let content):
 			try container.encode(CodingKeys.tabsChanged, forKey: .type)
@@ -7457,6 +7468,17 @@ public struct TreeNode: Codable, Equatable {
 		self.name = name
 		self.path = path
 		self.children = children
+	}
+}
+
+/// Something on a Typeset page was picked — a margin, a running head, a chapter's
+/// number — and the inspector should show where it is set: the Typeset tab, with that
+/// section open (`FinishingSectionID`).
+public struct TypesetFocus: Codable, Equatable {
+	public let sectionId: String
+
+	public init(sectionId: String) {
+		self.sectionId = sectionId
 	}
 }
 

@@ -1827,6 +1827,8 @@ export type WebviewEvent =
 	/** The Finishing tabs' fixed lists, sent once when the page mounts. */
 	| { type: "pageLayoutCatalog", payload: PageLayoutCatalog }
 	| { type: "printJobStatus", payload: PrintJobStatus }
+	/** A Typeset page's handle was picked: show its section in the inspector. */
+	| { type: "typesetFocus", payload: TypesetFocus }
 	/** The tabs and the split, whole (`tabs.rs`). Coalesced per frame. */
 	| { type: "tabsChanged", payload: TabsChanged };
 
@@ -4296,6 +4298,15 @@ export interface TreeNode {
 	path: string;
 	/** Present on folders only. */
 	children?: TreeNode[];
+}
+
+/**
+ * Something on a Typeset page was picked — a margin, a running head, a chapter's
+ * number — and the inspector should show where it is set: the Typeset tab, with that
+ * section open (`FinishingSectionID`).
+ */
+export interface TypesetFocus {
+	sectionId: string;
 }
 
 export interface UpdateNoteCommand {

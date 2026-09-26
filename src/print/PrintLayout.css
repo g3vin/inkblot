@@ -419,6 +419,143 @@
   position: relative;
 }
 
+/* ---- typesetting on the page (TypesetOverlay.jsx) ---- */
+
+.typeset-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  --to-accent: var(--accent-color, #0a84ff);
+}
+
+.typeset-overlay > * { position: absolute; pointer-events: auto; }
+.typeset-overlay .to-block { pointer-events: none; border: 1px dashed color-mix(in srgb, var(--to-accent) 55%, transparent); box-sizing: border-box; }
+.typeset-overlay .to-edge { background: transparent; }
+.typeset-overlay .to-edge.is-h { height: 10px; cursor: ns-resize; }
+.typeset-overlay .to-edge.is-v { width: 10px; cursor: ew-resize; }
+.typeset-overlay .to-edge:hover,
+.typeset-overlay.is-dragging .to-edge { background: color-mix(in srgb, var(--to-accent) 22%, transparent); }
+.typeset-overlay .to-running { cursor: ns-resize; border-radius: 3px; }
+.typeset-overlay .to-running:hover { background: color-mix(in srgb, var(--to-accent) 10%, transparent); outline: 1px solid color-mix(in srgb, var(--to-accent) 40%, transparent); }
+.typeset-overlay .to-sink { height: 6px; cursor: ns-resize; border-top: 2px solid transparent; }
+.typeset-overlay .to-sink:hover,
+.typeset-overlay.is-dragging .to-sink { border-top-color: var(--to-accent); }
+.typeset-overlay .to-headdrop { pointer-events: none; }
+.typeset-overlay.is-dragging .to-headdrop,
+.typeset-overlay .to-headdrop:has(~ *:hover) { pointer-events: none; }
+
+.typeset-overlay :is(.to-headbar, .to-imagebar) {
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--pl-paper, #ffffff);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+  opacity: 0;
+  transition: opacity 120ms;
+  font: 12px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.pl-stage:hover .typeset-overlay :is(.to-headbar, .to-imagebar) { opacity: 1; }
+
+.typeset-overlay :is(.to-headbar, .to-imagebar, .to-popover) button,
+.typeset-overlay .to-file {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--pl-ink, #1b1b1b);
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.typeset-overlay :is(.to-headbar, .to-imagebar, .to-popover) button:hover,
+.typeset-overlay .to-file:hover { background: color-mix(in srgb, var(--to-accent) 14%, transparent); }
+.typeset-overlay :is(.to-headbar, .to-popover) button.is-on { background: var(--to-accent); color: #ffffff; }
+.typeset-overlay .to-file input { display: none; }
+.typeset-overlay .to-sep { width: 1px; margin: 3px 2px; background: rgba(0, 0, 0, 0.15); }
+
+.typeset-overlay .to-picture { cursor: grab; outline: 1px dashed transparent; }
+.typeset-overlay .to-picture:hover { outline-color: var(--to-accent); }
+.typeset-overlay .to-picture-corner {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--to-accent);
+  cursor: nwse-resize;
+  opacity: 0;
+}
+.typeset-overlay .to-picture:hover .to-picture-corner { opacity: 1; }
+
+.typeset-overlay .to-tip {
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font: 11px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.typeset-overlay .to-popover {
+  z-index: 4;
+  transform: translateX(-50%);
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--pl-paper, #ffffff);
+  color: var(--pl-ink, #1b1b1b);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.typeset-overlay .to-list { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.typeset-overlay .to-list > button { justify-content: flex-start; }
+.typeset-overlay .to-glyphs { display: grid; grid-template-columns: repeat(5, auto); gap: 2px; }
+.typeset-overlay .to-field { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; }
+.typeset-overlay .to-field input { font: inherit; padding: 2px 4px; border: 1px solid rgba(0, 0, 0, 0.2); border-radius: 4px; background: transparent; color: inherit; }
+.typeset-overlay .to-row { display: flex; align-items: center; gap: 4px; }
+.typeset-overlay .to-tokens { display: flex; flex-wrap: wrap; gap: 4px; opacity: 0.7; }
+
+.typeset-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 56px;
+  z-index: 1000;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 8px 7px 14px;
+  border-radius: 10px;
+  background: rgba(30, 30, 32, 0.92);
+  color: #ffffff;
+  font: 12px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.typeset-toast button {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* ---- a whole book, in Typeset (BookPages.jsx) ---- */
 
 .book-pages {

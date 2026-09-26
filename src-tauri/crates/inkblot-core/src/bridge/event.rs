@@ -23,7 +23,7 @@ use super::tabs::TabsChanged;
 use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
 use crate::types::search::SearchResult;
-use super::print::{PageLayoutCatalog, PageLayoutState, PrintJobStatus, PrintRequest};
+use super::print::{PageLayoutCatalog, PageLayoutState, PrintJobStatus, PrintRequest, TypesetFocus};
 
 /// Which marks are on at the selection.
 #[typeshare]
@@ -529,6 +529,8 @@ pub enum WebviewEvent {
     /// The Finishing tabs' fixed lists, sent once when the page mounts.
     PageLayoutCatalog(PageLayoutCatalog),
     PrintJobStatus(PrintJobStatus),
+    /// A Typeset page's handle was picked: show its section in the inspector.
+    TypesetFocus(TypesetFocus),
     /// The tabs and the split, whole (`tabs.rs`). Coalesced per frame.
     TabsChanged(TabsChanged),
 }

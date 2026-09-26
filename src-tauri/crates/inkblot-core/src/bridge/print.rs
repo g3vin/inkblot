@@ -234,6 +234,16 @@ pub struct OpenBookItemCommand {
     pub id: String,
 }
 
+/// Something on a Typeset page was picked — a margin, a running head, a chapter's
+/// number — and the inspector should show where it is set: the Typeset tab, with that
+/// section open (`FinishingSectionID`).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesetFocus {
+    pub section_id: String,
+}
+
 /* ---------------- commands ---------------- */
 
 /// The window's mode: writing a draft, or setting it as a book.
