@@ -38,6 +38,7 @@ import { Pagination } from '../print/PaginationExtension'
 import { TypesetAnchors } from '../print/TypesetAnchors'
 import { ParagraphTypeset } from '../print/ParagraphTypeset'
 import { ProofMarks } from '../print/proofIssues'
+import { Footnote } from '../print/Footnote'
 import { TypesetLock } from '../print/TypesetLock'
 import { DocWritingFormat } from '../script/DocWritingFormat'
 import { ScriptElement } from '../script/ScriptElement'
@@ -97,6 +98,8 @@ export const buildEditorExtensions = (starterKit) => [
   // A chapter's designed head, drawn around its real title in Typeset.
   ChapterHeadDecorations,
   PageBreak,
+  // A note at its mark, set at the page's foot or after the chapter.
+  Footnote,
   Pagination,
   // A chapter's prose, held while the book is typeset (Typeset mode).
   TypesetLock,

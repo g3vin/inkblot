@@ -163,14 +163,25 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
       const pages = prepared?.elements || []
       if (preview?.compare) setComposedAll(pages)
       const first = pages.findIndex((page) => page.dataset.item === itemId)
+      // Notes numbered on through the book: the live chapter's first is one past those
+      // before it — each counted once, though a paragraph over a page shows twice.
+      const noteStart = (() => {
+        if (placement.book?.notes?.numbering !== 'continuous' || first <= 0) return 1
+        const ids = new Set()
+        for (const page of pages.slice(0, first)) {
+          for (const ref of page.querySelectorAll('.footnote-ref[data-footnote]')) ids.add(ref.dataset.footnote)
+        }
+        return ids.size + 1
+      })()
       let last = first
       while (last + 1 < pages.length && (pages[last + 1].dataset.item === itemId || !pages[last + 1].dataset.item)) last += 1
       // A blank page the book puts before the chapter to open it on a recto is the
       // chapter's own side of the spread: it stays with the pages before.
       setComposed(first < 0
-        ? { before: pages, after: [], all: pages, firstPhysical: 1, folioStart: null, busy: false }
+        ? { before: pages, after: [], all: pages, firstPhysical: 1, folioStart: null, noteStart: 1, busy: false }
         : {
           all: pages,
+          noteStart,
           before: pages.slice(0, first),
           after: pages.slice(last + 1),
           firstPhysical: first + 1,
@@ -262,7 +273,7 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
     <div className="book-pages">
       <PageStack pages={composed.before} zoom={zoom} onOpen={open} />
       <div ref={liveRef} className="book-pages-live">
-        {renderLive({ firstPhysical: composed.firstPhysical, folioStart: composed.folioStart, author: bookAuthor(placement.book), bookTitle: placement.book.title })}
+        {renderLive({ firstPhysical: composed.firstPhysical, folioStart: composed.folioStart, noteStart: composed.noteStart || 1, author: bookAuthor(placement.book), bookTitle: placement.book.title })}
       </div>
       <PageStack pages={composed.after} zoom={zoom} onOpen={open} />
       {composed.busy ? <div className="book-pages-status" aria-live="polite">Setting the book…</div> : null}

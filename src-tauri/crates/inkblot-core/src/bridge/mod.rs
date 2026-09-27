@@ -91,7 +91,7 @@ pub use print::{
     TypesetVersionKind, SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
     PreviewTypesetVersionCommand, CoverSetAction, CoverSetView, CoverState, EditCoverSetsCommand, SetCoverImageCommand, SetFolderBookOptionsCommand, SetTypesetViewCommand, TypesetView,
     ProofKind, ProofFix, ProofIssue, SetParagraphTypesetCommand, ParagraphTypeset, ShowProofIssueCommand, SetTypesetDisplayCommand,
-    ProjectFont, AddProjectFontCommand, SetTextStyleCommand,
+    ProjectFont, AddProjectFontCommand, SetTextStyleCommand, InsertFootnoteCommand,
     RunningToken, SetAuthorProfileCommand, SetBookCoverCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
     SetEditorModeCommand, SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
     UseSetupForBookCommand, ZoomFit,

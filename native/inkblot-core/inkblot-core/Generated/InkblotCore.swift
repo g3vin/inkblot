@@ -1215,6 +1215,41 @@ public struct TextStyleLook: Codable, Equatable {
 	}
 }
 
+/// Where a note is set: at the foot of the page its mark is on, after its chapter, or
+/// all together at the end of the book.
+public enum NotePlacement: String, Codable, Equatable {
+	case page
+	case chapter
+	case book
+}
+
+/// Notes numbered afresh in each chapter, or on through the book.
+public enum NoteNumbering: String, Codable, Equatable {
+	case perChapter
+	case continuous
+}
+
+/// Note marks as numbers, or as the traditional symbols: * † ‡ § ‖ ¶.
+public enum NoteMarks: String, Codable, Equatable {
+	case numbers
+	case symbols
+}
+
+public struct NotesOptions: Codable, Equatable {
+	public let placement: NotePlacement
+	public let numbering: NoteNumbering
+	public let marks: NoteMarks
+	/// The heading over notes set after a chapter or at the end of the book.
+	public let heading: String
+
+	public init(placement: NotePlacement, numbering: NoteNumbering, marks: NoteMarks, heading: String) {
+		self.placement = placement
+		self.numbering = numbering
+		self.marks = marks
+		self.heading = heading
+	}
+}
+
 /// A folder (or the whole project) compiled as one book. Kept per folder in the
 /// project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
 /// belongs to all of them.
@@ -1259,8 +1294,10 @@ public struct BookSettings: Codable, Equatable {
 	/// How the book sets its named text styles — a letter, a text message, verse — over
 	/// the app's own looks for them, and any styles of its own.
 	public let textStyles: [TextStyleLook]?
+	/// Where the book's notes are set, and how they are numbered.
+	public let notes: NotesOptions?
 
-	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?, digital: DigitalOptions?, textStyles: [TextStyleLook]?) {
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?, digital: DigitalOptions?, textStyles: [TextStyleLook]?, notes: NotesOptions?) {
 		self.folder = folder
 		self.title = title
 		self.author = author
@@ -1281,6 +1318,7 @@ public struct BookSettings: Codable, Equatable {
 		self.activeCover = activeCover
 		self.digital = digital
 		self.textStyles = textStyles
+		self.notes = notes
 	}
 }
 
@@ -1895,6 +1933,7 @@ public enum NativeCommand: Codable, Equatable {
 	case setTypesetDisplay(SetTypesetDisplayCommand)
 	case addProjectFont(AddProjectFontCommand)
 	case setTextStyle(SetTextStyleCommand)
+	case insertFootnote(InsertFootnoteCommand)
 	case setCoverImage(SetCoverImageCommand)
 	case editCoverSets(EditCoverSetsCommand)
 	case saveTypesetVersion(SaveTypesetVersionCommand)
@@ -2018,6 +2057,7 @@ public enum NativeCommand: Codable, Equatable {
 			setTypesetDisplay,
 			addProjectFont,
 			setTextStyle,
+			insertFootnote,
 			setCoverImage,
 			editCoverSets,
 			saveTypesetVersion,
@@ -2485,6 +2525,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setTextStyle(content)
 					return
 				}
+			case .insertFootnote:
+				if let content = try? container.decode(InsertFootnoteCommand.self, forKey: .payload) {
+					self = .insertFootnote(content)
+					return
+				}
 			case .setCoverImage:
 				if let content = try? container.decode(SetCoverImageCommand.self, forKey: .payload) {
 					self = .setCoverImage(content)
@@ -2929,6 +2974,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setTextStyle(let content):
 			try container.encode(CodingKeys.setTextStyle, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .insertFootnote(let content):
+			try container.encode(CodingKeys.insertFootnote, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setCoverImage(let content):
 			try container.encode(CodingKeys.setCoverImage, forKey: .type)
@@ -4319,6 +4367,15 @@ public struct InsertClipboardEntryCommand: Codable, Equatable {
 
 	public init(id: String, target: EditorTarget) {
 		self.id = id
+		self.target = target
+	}
+}
+
+/// Put a footnote at the caret, and open it to be written.
+public struct InsertFootnoteCommand: Codable, Equatable {
+	public let target: EditorTarget
+
+	public init(target: EditorTarget) {
 		self.target = target
 	}
 }

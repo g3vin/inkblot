@@ -740,6 +740,106 @@
   pointer-events: none;
 }
 
+/* ---- footnotes: the marks in the text, and the notes at a page's foot ---- */
+
+@counter-style fn-symbols {
+  system: symbolic;
+  symbols: '*' '†' '‡' '§' '‖' '¶';
+}
+
+.ProseMirror {
+  counter-reset: footnote var(--fn-start, 0);
+}
+
+.footnote-ref {
+  font-size: 0.72em;
+  line-height: 0;
+  vertical-align: super;
+  padding: 0 0.08em;
+  color: var(--accent-color, #0a84ff);
+  cursor: pointer;
+  font-variant-numeric: lining-nums;
+}
+
+.footnote-ref:not([data-mark])::after {
+  counter-increment: footnote;
+  content: counter(footnote);
+}
+
+.fn-symbols .footnote-ref:not([data-mark])::after {
+  content: counter(footnote, fn-symbols);
+}
+
+.footnote-ref.is-empty { opacity: 0.55; }
+.has-print-type .footnote-ref,
+.print-page .footnote-ref { color: inherit; cursor: default; }
+
+.pl-footnotes {
+  position: absolute;
+  box-sizing: border-box;
+  padding-top: 0.9em;
+  font-family: var(--pt-font, inherit);
+  font-size: calc(var(--pt-size, 12pt) * 0.8);
+  line-height: 1.3;
+  text-align: left;
+  text-indent: 0;
+  -webkit-hyphens: manual;
+  hyphens: manual;
+  color: var(--pl-ink, #1b1b1b);
+}
+
+.print-page .pl-footnotes { color: #000000; }
+
+.pl-footnotes::before {
+  content: '';
+  position: absolute;
+  top: 0.4em;
+  left: 0;
+  width: 30%;
+  border-top: 0.5pt solid currentColor;
+}
+
+.pl-footnote {
+  margin: 0;
+}
+
+.pl-footnote-mark {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+  margin-right: 0.3em;
+}
+
+.footnote-editor {
+  position: fixed;
+  z-index: 1000;
+  width: 320px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--pl-paper, #ffffff);
+  color: var(--pl-ink, #1b1b1b);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.footnote-editor textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--pl-faint, rgba(0, 0, 0, 0.3));
+  background: transparent;
+  color: inherit;
+}
+
+.footnote-editor-actions { display: flex; justify-content: space-between; margin-top: 8px; }
+.footnote-editor-actions button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--pl-faint, rgba(0, 0, 0, 0.3)); background: transparent; color: inherit; cursor: pointer; }
+.footnote-editor-actions .is-destructive { color: #d70015; }
+.footnote-editor-text { margin: 0 0 6px; }
+.footnote-editor-hint { opacity: 0.6; font-size: 12px; }
+
 /* ---- the baseline grid, and the proof's marks ---- */
 
 .pl-baseline-grid,

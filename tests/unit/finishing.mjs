@@ -494,6 +494,22 @@ const styledDocx = await buildDocx({
   textStyles: [{ id: 'letter', name: 'Letter', size: 1, italic: true, smallCaps: false, align: 'inherit', indentEm: 2, flush: true, spaceLines: 1, boxed: false }],
   resolveImage: async () => null, modified: new Date(0),
 })
+const notedDocx = await buildDocx({
+  title: 'Notes', setup: wordSetup, chapters: [{ title: 'One', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'It rained.' }, { type: 'footnote', attrs: { id: 'n1', text: 'Or so they said.', mark: '1' } }] }] } }],
+  resolveImage: async () => null, modified: new Date(0),
+})
+ok('a note at its mark is a Word footnote: referenced in the text, written in the footnotes part, which the package lists',
+  readZipEntry(notedDocx, 'word/document.xml').includes('<w:footnoteReference w:id="1"/>') &&
+  readZipEntry(notedDocx, 'word/footnotes.xml').includes('<w:footnote w:id="1"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/>') &&
+  readZipEntry(notedDocx, 'word/footnotes.xml').includes('Or so they said.') &&
+  readZipEntry(notedDocx, '[Content_Types].xml').includes('/word/footnotes.xml') &&
+  readZipEntry(notedDocx, 'word/_rels/document.xml.rels').includes('Target="footnotes.xml"') &&
+  readZipEntry(notedDocx, 'word/settings.xml').includes('<w:footnotePr>'))
+const epubNoted = await buildEpub({ title: 'Notes', chapters: [{ title: 'One', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'It rained.' }, { type: 'footnote', attrs: { id: 'n1', text: 'Or so they said.', mark: '1' } }] }] } }], resolveImage: async () => null, identifier: 'urn:x', modified: new Date(0) })
+const notedXhtml = readZipEntry(epubNoted, 'OEBPS/text/chapter-001.xhtml')
+ok('an EPUB chapter carries its notes as pop-up notes, in well-formed XHTML',
+  notedXhtml.includes('epub:type="noteref"') && notedXhtml.includes('<aside epub:type="footnote"') &&
+  !new DOMParser().parseFromString(notedXhtml, 'application/xhtml+xml').querySelector('parsererror'), notedXhtml)
 ok('a named text style is a Word paragraph style of the same name, and the paragraph is in it',
   readZipEntry(styledDocx, 'word/styles.xml').includes('<w:style w:type="paragraph" w:customStyle="1" w:styleId="Textletter"><w:name w:val="Letter"/>') &&
   readZipEntry(styledDocx, 'word/styles.xml').includes('<w:i/>') &&

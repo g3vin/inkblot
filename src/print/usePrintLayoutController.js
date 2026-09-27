@@ -501,6 +501,11 @@ export default function usePrintLayoutController({
         const tr = ed.state.tr
         if (setParagraphTypeset(tr, range.from, range.to, patch)) ed.view.dispatch(tr)
       }),
+      // A note at the caret, opened to be written.
+      documentSurface.onCommand('insertFootnote', () => {
+        const ed = stateRef.current.activeEditor
+        if (ed && !ed.storage.typesetLock?.locked) ed.chain().focus().insertFootnote().run()
+      }),
       // A named text style on the selected paragraphs, in Write or in Typeset.
       documentSurface.onCommand('setTextStyle', ({ style }) => {
         const ed = stateRef.current.activeEditor

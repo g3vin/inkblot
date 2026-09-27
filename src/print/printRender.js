@@ -25,6 +25,8 @@ import {
 } from './pageSetup'
 import { getPageSizePreset } from './pageSizes'
 import { applyTypography } from './typography'
+import { buildFootnoteArea } from './footnoteArea'
+import { notesBySlot } from './notes'
 
 /** Editing chrome that must never reach paper. */
 const STRIP_SELECTORS = [
@@ -207,6 +209,7 @@ export const renderPages = (sources, {
 
     const { snapshot, result, stride } = source
     const columns = setup.columns
+    const noteSlots = notesBySlot(source.notes || [], result.slotStarts)
     const chapterStarts = new Set(result.chapterStartSlots)
     // A one-page section set down its page: how far, from what it fills.
     let shift = 0
@@ -247,6 +250,19 @@ export const renderPages = (sources, {
         if (shift) win.style.top = `${shift}px`
         clip.appendChild(win)
         page.appendChild(clip)
+      }
+
+      // The notes whose marks this page holds, at its foot.
+      const pageNotes = []
+      for (let c = 0; c < columns && !blank; c += 1) pageNotes.push(...(noteSlots.get(firstSlot + c) || []))
+      if (pageNotes.length) {
+        const area = buildFootnoteArea(pageNotes)
+        Object.assign(area.style, {
+          left: `${left}px`,
+          width: `${columns > 1 ? m.columnWidth : m.contentWidth}px`,
+          bottom: `${m.height - m.contentTop - m.contentHeight}px`,
+        })
+        page.appendChild(area)
       }
 
       const startPos = slots.find((s) => s != null) ?? 0

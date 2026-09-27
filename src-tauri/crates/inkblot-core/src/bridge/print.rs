@@ -743,6 +743,14 @@ pub struct InsertBreakCommand {
     pub kind: PageBreakKind,
 }
 
+/// Put a footnote at the caret, and open it to be written.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsertFootnoteCommand {
+    pub target: EditorTarget,
+}
+
 /// Scroll a page (1-based, as numbered on screen) into view.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

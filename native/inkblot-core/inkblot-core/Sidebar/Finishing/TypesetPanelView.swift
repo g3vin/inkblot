@@ -31,6 +31,7 @@ struct TypesetPanelView: View {
             TextStylesSection()
             ChapterOpeningsSection(unit: LengthUnit(rawValue: unitsRaw) ?? .inches)
             PartsSection()
+            BookSections(.notes)
             PageSetupSections(.headerFooter, .titlePage)
             BookSections(.setup)
             if model.pageLayout.typesetView != .digital { BookSections(.digital) }

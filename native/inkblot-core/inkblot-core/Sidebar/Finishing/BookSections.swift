@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 /// what order, is the Book navigator's; how its chapters open is Chapter Openings'.
 struct BookSections: View {
     enum Kind: Hashable {
-        case info, setup, digital
+        case info, setup, digital, notes
     }
 
     let kinds: [Kind]
@@ -28,6 +28,7 @@ struct BookSections: View {
                 case .info: infoSection(state, book)
                 case .setup: setupSection(state)
                 case .digital: digitalSection()
+                case .notes: notesSection()
                 }
             }
         }
@@ -42,6 +43,35 @@ struct BookSections: View {
                 draft[keyPath: keyPath] = value
                 layout.apply(draft)
             })
+    }
+
+    /* ---------------- notes ---------------- */
+
+    /// Where the book's notes are set, and how they are marked. Notes are written in
+    /// Write (Insert ▸ Footnote, ⌥⌘F); this is where they go.
+    @ViewBuilder
+    private func notesSection() -> some View {
+        FinishingSection("Footnotes & Endnotes", id: FinishingSectionID.notes) {
+            Picker("Set Notes", selection: binding(\.notesPlacement)) {
+                Text("At the Foot of the Page").tag(NotePlacement.page)
+                Text("After Each Chapter").tag(NotePlacement.chapter)
+                Text("At the End of the Book").tag(NotePlacement.book)
+            }
+            Picker("Numbered", selection: binding(\.notesNumbering)) {
+                Text("Afresh in Each Chapter").tag(NoteNumbering.perChapter)
+                Text("On Through the Book").tag(NoteNumbering.continuous)
+            }
+            Picker("Marks", selection: binding(\.notesMarks)) {
+                Text("1 2 3").tag(NoteMarks.numbers)
+                Text("* † ‡").tag(NoteMarks.symbols)
+            }
+            .pickerStyle(.segmented)
+            if (model.pageLayout.book?.notesPlacement ?? .page) != .page {
+                CommitTextField("Heading", text: binding(\.notesHeading), prompt: "Notes")
+            }
+        } footer: {
+            FinishingNote("Put a note in with Insert ▸ Footnote (⌥⌘F) in Write, and click its mark to write it. An e-book sets notes after each chapter, linked both ways; Word gets real footnotes.")
+        }
     }
 
     /* ---------------- the e-book ---------------- */

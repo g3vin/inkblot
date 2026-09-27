@@ -155,6 +155,8 @@ class Writer {
   drawingId = 0
   /** The next paragraph opens flush: after a heading or a scene break. */
   flushNext = false
+  /** Notes at their marks, as Word footnotes, numbered from 1. */
+  footnotes: string[] = []
 
   constructor(readonly setup: PageSetup, readonly type: PrintTypography | undefined) {}
 
@@ -223,6 +225,12 @@ class Writer {
       if (node.type === 'hardBreak') return '<w:r><w:br/></w:r>'
       if (node.type === 'image') return this.drawing(String(node.attrs?.src || ''), node.attrs?.width)
       if (node.type === 'citation') return run(htmlText(node.attrs?.rendered), [], extra)
+      if (node.type === 'footnote') {
+        // Set after the chapter or the book: its mark only, raised.
+        if (node.attrs?.end) return `<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr>${textContent(String(node.attrs?.mark || ''))}</w:r>`
+        this.footnotes.push(String(node.attrs?.text || ''))
+        return `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteReference w:id="${this.footnotes.length}"/></w:r>`
+      }
       return this.inline(node.content, extra)
     }).join('')
   }
@@ -605,6 +613,8 @@ ${heading(6, 1)}
 <w:style w:type="paragraph" w:styleId="SceneBreak"><w:name w:val="Scene Break"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:firstLine="0"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Bibliography"><w:name w:val="Bibliography"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:hanging="720"/><w:jc w:val="left"/></w:pPr></w:style>
+<w:style w:type="paragraph" w:styleId="FootnoteText"><w:name w:val="footnote text"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr><w:rPr><w:sz w:val="${Math.max(16, size - 4)}"/><w:szCs w:val="${Math.max(16, size - 4)}"/></w:rPr></w:style>
+<w:style w:type="character" w:styleId="FootnoteReference"><w:name w:val="footnote reference"/><w:rPr><w:vertAlign w:val="superscript"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Header"><w:name w:val="header"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Footer"><w:name w:val="footer"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>
 ${script ? `${scriptStylesXml(script === 'stageplay')}\n` : ''}${textStyles.length ? `${textStylesXml(textStyles, t)}\n` : ''}<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>
@@ -620,8 +630,16 @@ const numberingXml = (lists: Writer['lists']): string => {
   return `${XML_HEAD}<w:numbering ${NS}>${abstract(0, false)}${abstract(1, true)}${nums.join('')}</w:numbering>`
 }
 
-const settingsXml = (setup: PageSetup, t: PrintTypography | undefined, updateFields: boolean): string => `${XML_HEAD}<w:settings ${NS}>${[
+/** Word's footnotes part: its two separators, then each note. */
+const footnotesXml = (notes: string[]): string => `${XML_HEAD}<w:footnotes ${NS}>${[
+  '<w:footnote w:type="separator" w:id="-1"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:separator/></w:r></w:p></w:footnote>',
+  '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>',
+  ...notes.map((text, i) => `<w:footnote w:id="${i + 1}"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr><w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r>${textContent(` ${text}`)}</w:p></w:footnote>`),
+].join('')}</w:footnotes>`
+
+const settingsXml = (setup: PageSetup, t: PrintTypography | undefined, updateFields: boolean, footnotes = false): string => `${XML_HEAD}<w:settings ${NS}>${[
   setup.mirrorMargins ? '<w:mirrorMargins/>' : '',
+  footnotes ? '<w:footnotePr><w:footnote w:id="-1"/><w:footnote w:id="0"/></w:footnotePr>' : '',
   '<w:defaultTabStop w:val="720"/>',
   t?.hyphenate ? '<w:autoHyphenation/>' : '',
   setup.versoHeader || setup.versoFooter ? '<w:evenAndOddHeaders/>' : '',
@@ -708,6 +726,8 @@ export const buildDocx = async (options: DocxOptions): Promise<Uint8Array> => {
   }).join('')
 
   const document = `${XML_HEAD}<w:document ${NS}><w:body>${body}</w:body></w:document>`
+  const hasNotes = w.footnotes.length > 0
+  if (hasNotes) w.rel(`${REL}/footnotes`, 'footnotes.xml')
   const contentTypes = `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
@@ -718,6 +738,7 @@ export const buildDocx = async (options: DocxOptions): Promise<Uint8Array> => {
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
 <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+${hasNotes ? '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>' : ''}
 ${parts.map((p) => `<Override PartName="/${p.name}" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.${p.name.includes('header') ? 'header' : 'footer'}+xml"/>`).join('\n')}
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
 </Types>`
@@ -741,7 +762,8 @@ ${author ? `<dc:creator>${x(author)}</dc:creator>\n` : ''}<dc:language>${x(langu
     { name: '_rels/.rels', data: rootRels },
     { name: 'word/document.xml', data: document },
     { name: 'word/styles.xml', data: stylesXml(type, language, scriptFormat, options.textStyles || []) },
-    { name: 'word/settings.xml', data: settingsXml(setup, type, Boolean(options.contents)) },
+    { name: 'word/settings.xml', data: settingsXml(setup, type, Boolean(options.contents), hasNotes) },
+    ...(hasNotes ? [{ name: 'word/footnotes.xml', data: footnotesXml(w.footnotes) }] : []),
     { name: 'word/numbering.xml', data: numberingXml(w.lists) },
     { name: 'word/_rels/document.xml.rels', data: docRels },
     { name: 'docProps/core.xml', data: core },
