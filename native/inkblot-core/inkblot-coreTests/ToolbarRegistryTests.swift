@@ -51,6 +51,7 @@ struct ToolbarRegistryTests {
         "inkblot.tabs.split",
         "inkblot.view.editor-mode",
         "inkblot.typeset.view",
+        "inkblot.typeset.edition",
         "inkblot.typeset.spread",
         "inkblot.typeset.proof",
         "inkblot.typeset.grid",

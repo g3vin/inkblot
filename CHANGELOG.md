@@ -125,6 +125,13 @@ Notable changes to Inkblot. The format follows
   a bleed picture prints its PDF with the ⅛″ of bleed KDP and IngramSpark ask for — at
   the top, the bottom and the outside of every page — and the preflight says to choose
   a bleed interior when uploading. Pictures wrapped by the text print as they are shown.
+- **Editions:** a book can have editions — Paperback, Hardcover, Large Print (16 pt,
+  loosely leaded, ragged, unhyphenated) and eBook — each with its own trim, margins,
+  type and cover, sharing the text, design and styles. Choose the edition being typeset
+  in the toolbar or under Typeset › Editions: changes to the page and type are that
+  edition's, and an e-book edition shows as the e-book. Export All Editions writes every
+  print edition's interior and cover PDFs and every e-book's EPUB into a folder. A
+  typeset version can be duplicated as an edition from the typeset history.
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
   differences — and their history rows say what changed ("+2 places · 3 moved ·

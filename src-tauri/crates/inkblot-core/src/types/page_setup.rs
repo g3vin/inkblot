@@ -434,6 +434,43 @@ pub struct BookSettings {
     /// Where the book's notes are set, and how they are numbered.
     #[serde(default)]
     pub notes: NotesOptions,
+    /// The book in other forms — a hardcover, large print, an e-book — each with its own
+    /// page and cover; the contents, design and styles are the book's.
+    #[serde(default)]
+    pub editions: Vec<Edition>,
+    /// The edition being typeset, whose page and cover the book shows; none is the book
+    /// as set up.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_edition: Option<String>,
+}
+
+/// What an edition is, for its preset and what Export All Editions makes of it.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EditionKind {
+    #[default]
+    Paperback,
+    Hardcover,
+    LargePrint,
+    Ebook,
+}
+
+/// One form of the book.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Edition {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub kind: EditionKind,
+    /// Its trim, margins and type; absent, the book's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_setup: Option<PageSetup>,
+    /// The cover version it uses; absent, the book's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_set_id: Option<String>,
 }
 
 /// Where a note is set: at the foot of the page its mark is on, after its chapter, or
