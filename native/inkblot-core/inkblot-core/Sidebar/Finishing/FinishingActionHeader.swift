@@ -300,6 +300,7 @@ enum FinishingSectionID {
     static let proof = "typeset.proof"
     static let textStyles = "typeset.textStyles"
     static let parts = "typeset.parts"
+    static let notes = "typeset.notes"
     static let cover = "output.cover"
     static let pageSize = "page.size"
     static let headerFooter = "page.headerFooter"
@@ -316,7 +317,7 @@ enum FinishingSectionID {
     static let publishing = "publish.publishing"
     static let script = "publish.script"
 
-    static let all = [thisPage, style, digital, proof, textStyles, parts, cover, pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
+    static let all = [thisPage, style, digital, proof, textStyles, parts, notes, cover, pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
 }
 
 /// A Finishing tab: the action header pinned at the top, the tab's settings scrolling

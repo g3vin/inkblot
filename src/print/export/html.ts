@@ -17,7 +17,7 @@ import type { FrontSection } from '../bookMatter'
 import type { TextStyleLook } from '../../types'
 import { textStylesCss } from '../textStyles'
 import { leadingPt } from '../typography'
-import { portableContent } from './portable'
+import { inTextNotes, portableContent } from './portable'
 import type { PMJSON } from './portable'
 
 export interface ExportChapter {
@@ -39,6 +39,45 @@ export const chapterBodyHtml = (content: PMJSON): string => {
   // A page break is an editing affordance (contenteditable, a label); in a file it is
   // only the break.
   return html.replace(/<div([^>]*?)data-page-break="([a-z]+)"[^>]*><\/div>/g, '<div class="page-break page-break-$2"></div>')
+}
+
+/**
+ * A chapter's body with its notes at the marks linked to the notes, set after it — in
+ * an EPUB as the pop-up notes reading systems show (`epub:type="footnote"`), in HTML as
+ * a list with a way back. Notes the book set after the chapter or the book are text
+ * already, and their marks stay plain.
+ */
+export const withLinkedNotes = (body: string, notes: Array<{ id: string; mark: string; text: string }>, { epub = false } = {}): string => {
+  if (!notes.length) return body
+  const safe = (id: string) => id.replace(/[^\w-]/g, '')
+  // Through the DOM: a note's text, in an attribute, may hold anything.
+  const template = new DOMParser().parseFromString(`<!doctype html><html><body>${body}</body></html>`, 'text/html')
+  for (const ref of Array.from(template.body.querySelectorAll('sup[data-footnote]'))) {
+    if (ref.hasAttribute('data-end')) continue
+    const note = notes.find((n) => n.id === ref.getAttribute('data-footnote'))
+    if (!note) continue
+    const n = safe(note.id)
+    const link = template.createElement('a')
+    link.className = 'noteref'
+    link.setAttribute('href', `#fn-${n}`)
+    link.id = `fnref-${n}`
+    if (epub) {
+      link.setAttribute('epub:type', 'noteref')
+      link.setAttribute('role', 'doc-noteref')
+    }
+    const sup = template.createElement('sup')
+    sup.textContent = note.mark
+    link.appendChild(sup)
+    ref.replaceWith(link)
+  }
+  const linked = template.body.innerHTML
+  const list = notes.map((note) => {
+    const n = safe(note.id)
+    return epub
+      ? `<aside epub:type="footnote" role="doc-footnote" id="fn-${n}" class="footnote"><p><a href="#fnref-${n}">${escapeHtml(note.mark)}</a>. ${escapeHtml(note.text)}</p></aside>`
+      : `<li id="fn-${n}" class="footnote">${escapeHtml(note.text)} <a href="#fnref-${n}" aria-label="Back to the text">↩</a></li>`
+  }).join('\n')
+  return epub ? `${linked}\n${list}` : `${linked}\n<section class="footnotes" role="doc-endnotes"><hr/><ol>\n${list}\n</ol></section>`
 }
 
 /** Typography shared by the HTML export and the EPUB stylesheet. */
@@ -90,6 +129,10 @@ p.script-el[data-scene-number]::before { content: attr(data-scene-number) '  '; 
 .fm-source { font-style: normal; text-align: right; }
 .contents ol { list-style: none; padding: 0; }
 .contents li { margin: 0.3em 0; }
+.noteref { text-decoration: none; }
+.footnote-ref, .noteref sup { font-size: 0.72em; line-height: 0; vertical-align: super; }
+.footnotes { font-size: 0.88em; margin-top: 2em; }
+aside.footnote { font-size: 0.88em; }
 `
 
 /** Text with its line breaks kept, escaped: a paragraph per blank line. */
@@ -170,7 +213,7 @@ main hr::after { content: ${JSON.stringify(t.sceneBreak)}; letter-spacing: 0.2em
     frontHtml.push(`<nav class="front-matter contents" aria-label="Contents">\n<h2>Contents</h2>\n<ol>\n${chapters.map((c, i) => (c.inContents === false ? '' : `<li><a href="#chapter-${i + 1}">${escapeHtml(c.title)}</a></li>`)).filter(Boolean).join('\n')}\n</ol>\n</nav>`)
   }
   const body = frontHtml.join('\n') + (frontHtml.length ? '\n' : '') + chapters.map((chapter, i) => (
-    `<section class="chapter" id="chapter-${i + 1}" aria-label="${escapeHtml(chapter.title)}">\n${chapterBodyHtml(chapter.content)}\n</section>`
+    `<section class="chapter" id="chapter-${i + 1}" aria-label="${escapeHtml(chapter.title)}">\n${withLinkedNotes(chapterBodyHtml(chapter.content), inTextNotes(chapter.content))}\n</section>`
   )).join('\n')
   return `<!doctype html>
 <html lang="${escapeHtml(language)}">

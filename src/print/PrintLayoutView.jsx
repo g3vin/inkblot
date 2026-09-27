@@ -35,6 +35,7 @@ import { PAGE_GAP } from './printLayoutConstants'
 import { setCurrentPrintPage } from './printLayoutStore'
 import { nativeOwns } from '../lib/host'
 import TypesetOverlay from './TypesetOverlay'
+import { notesBySlot, pageNotesOf } from './notes'
 import './PrintLayout.css'
 import './PrintTypography.css'
 
@@ -71,6 +72,9 @@ export default function PrintLayoutView({
   showGuides = false,
   // The baseline grid, drawn over each page's text block.
   showGrid = false,
+  // The book's notes: { footnotes: at the page's foot, start: the first note's number,
+  // marks: numbers or symbols }. None sets them at the foot, from 1.
+  notes = null,
   // Where the document's first page falls in its book, in the Typeset view of a whole
   // book: which side it is on, and the folio it carries.
   firstPhysical = 1,
@@ -104,15 +108,20 @@ export default function PrintLayoutView({
     return () => { live = false }
   }, [typeKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The notes, as plain values: the frame must not change unless they do.
+  const atFoot = notes ? Boolean(notes.footnotes) : true
+  const noteStart = notes?.start || 1
+  const noteMarks = notes?.marks || 'numbers'
   const frame = useMemo(() => ({
     slotHeight: metrics.contentHeight,
     stride: slotStride,
     columns: setup.columns,
     minLines: setup.widowOrphanLines,
     grid: baselineGridPx(setup.typography),
+    footnotes: atFoot,
     typeKey,
     revision: fontsLoaded,
-  }), [metrics.contentHeight, slotStride, setup.columns, setup.widowOrphanLines, setup.typography, typeKey, fontsLoaded])
+  }), [metrics.contentHeight, slotStride, setup.columns, setup.widowOrphanLines, setup.typography, typeKey, fontsLoaded, atFoot])
 
   // Hand the plugin its frame; take it back when the view goes.
   useEffect(() => {
@@ -164,6 +173,12 @@ export default function PrintLayoutView({
       : ''
   ), [editor, result, setup]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The notes at each page's foot: those whose marks the page holds.
+  const footnotes = useMemo(() => {
+    if (!editor || editor.isDestroyed || !atFoot) return new Map()
+    return notesBySlot(pageNotesOf(editor.state.doc, noteStart, noteMarks), result.slotStarts)
+  }, [atFoot, editor, noteMarks, noteStart, result])
+
   const pages = useMemo(() => {
     const out = []
     const chapterStarts = new Set(result.chapterStartSlots)
@@ -195,10 +210,11 @@ export default function PrintLayoutView({
         header: runningTextFor(setup, 'header', physical, ctx, flags),
         footer: runningTextFor(setup, 'footer', physical, ctx, flags),
         folio: formatPageNumber(ctx.page, setup.pageNumberFormat),
+        notes: footnotes.get(strip) || null,
       })
     }
     return out
-  }, [author, docTitle, firstPhysical, flowX, folioStart, galley, headings, result, setup, slotStride, stripCount, wordsText])
+  }, [author, docTitle, firstPhysical, flowX, folioStart, footnotes, galley, headings, result, setup, slotStride, stripCount, wordsText])
 
   // Which page is in view, for "Page X of Y".
   useEffect(() => {
@@ -511,6 +527,8 @@ export default function PrintLayoutView({
     '--pl-flow-w': `${galley ? metrics.columnWidth : metrics.contentWidth}px`,
     '--pl-content-top': `${metrics.contentTop}px`,
     '--pl-content-h': `${metrics.contentHeight}px`,
+    // Notes in the text numbered on from the book's before them.
+    '--fn-start': String(noteStart - 1),
   }
 
   const masks = []
@@ -557,7 +575,7 @@ export default function PrintLayoutView({
   return (
     <div className="print-layout">
       <div ref={sizerRef} className="pl-sizer" style={{ width: `${snapToDevicePixel(stageWidth * zoom)}px`, height: `${snapToDevicePixel(stageHeight * zoom)}px` }}>
-        <div className={['pl-stage', ...typographyClasses(setup.typography)].join(' ')} style={stageStyle}>
+        <div className={['pl-stage', ...typographyClasses(setup.typography), noteMarks === 'symbols' ? 'fn-symbols' : ''].filter(Boolean).join(' ')} style={stageStyle}>
           <div className="pl-pages" aria-hidden="true">
             {pages.map((page) => (
               <div
@@ -585,6 +603,16 @@ export default function PrintLayoutView({
                 {galley ? (
                   <div className="pl-slot-label" style={{ left: `${pageLeftMargin(setup, page.physical)}px`, top: `${Math.max(4, metrics.contentTop - 16)}px` }}>
                     Page {page.folio} · column {page.column + 1} of {setup.columns}
+                  </div>
+                ) : null}
+                {page.notes ? (
+                  <div
+                    className="pl-footnotes"
+                    style={{ left: `${pageLeftMargin(setup, page.physical)}px`, width: `${galley ? metrics.columnWidth : metrics.contentWidth}px`, bottom: `${metrics.height - metrics.contentTop - metrics.contentHeight}px` }}
+                  >
+                    {page.notes.map((note) => (
+                      <p key={note.pos} className="pl-footnote"><span className="pl-footnote-mark">{note.mark}</span>{note.text}</p>
+                    ))}
                   </div>
                 ) : null}
                 {showGrid && gridStyle && !page.blank ? (

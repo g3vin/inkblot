@@ -20,11 +20,13 @@ import { setLiveHead } from './ChapterHeadDecorations'
 import { readChapterMeta } from './DocChapterMeta'
 import PrintLayoutView from './PrintLayoutView'
 import TypesetEditText from './TypesetEditText'
+import FootnoteEditor from './FootnoteEditor'
 import { isMatterPath } from './TypesetLock'
 import { useBookPlacement } from './useBookPlacement'
 import { useProof } from './useProof'
 import { compositionOf } from './typography'
 import { applyTextStyleSheet, textStylesOf } from './textStyles'
+import { notesOptionsOf } from './notes'
 import { TypesetToast } from './TypesetOverlay'
 import { readDocPageSetup } from './DocPageSetup'
 import { documentSurface } from '../bridge'
@@ -144,6 +146,12 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     active: Boolean(printLayout && display.proof && !digital && !spread && !showingCover),
     hyphenLimit: compositionOf(pageSetup.typography).hyphenLimitLines,
   })
+  // Where the book sets its notes, and how it marks them.
+  const bookNotes = notesOptionsOf(placement?.book || (projectName && docPath ? getBookForDoc(projectName, docPath) : null))
+  const notesView = useMemo(
+    () => ({ footnotes: bookNotes.placement === 'page', marks: bookNotes.marks }),
+    [bookNotes.placement, bookNotes.marks]
+  )
   const zoom = getPrintZoom(projectName, docPath)
   const onZoomChange = useCallback((z) => setPrintZoom(z, projectName, docPath), [projectName, docPath])
   const author = projectName && docPath ? bookAuthor(getBookForDoc(projectName, docPath)) : ''
@@ -179,6 +187,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     >
       {header}
       <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} printLayout={printLayout} />
+      <FootnoteEditor editor={editor} locked={locked} />
       {showingCover ? (
         <CoverView projectName={projectName} docPath={docPath} folder={placement.folder} setup={pageSetup} />
       ) : digital ? (
@@ -194,7 +203,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           spread={spread}
           showGrid={display.grid}
           setup={pageSetup}
-          renderLive={({ firstPhysical, folioStart, author: bookBy, bookTitle }) => (
+          renderLive={({ firstPhysical, folioStart, noteStart, author: bookBy, bookTitle }) => (
             <PrintLayoutView
               editor={editor}
               pageSetup={pageSetup}
@@ -209,6 +218,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
               folioStart={folioStart}
               typeset={typeset}
               showGrid={display.grid}
+              notes={{ ...notesView, start: noteStart }}
             >
               {pageContent}
             </PrintLayoutView>
@@ -228,6 +238,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           statusHost={scrollEl?.parentElement || null}
           typeset={typeset}
           showGrid={display.grid}
+          notes={notesView}
         >
           {pageContent}
         </PrintLayoutView>

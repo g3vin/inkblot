@@ -113,6 +113,13 @@ Notable changes to Inkblot. The format follows
   In Write a styled paragraph shows only a faint rule at its side.
 - **Parts:** a book's part dividers can have a design of their own — where they start,
   alignment, cases, ornament and size — under Typeset › Parts.
+- **Footnotes and endnotes:** Insert › Footnote (⌥⌘F) puts a note at the caret; click
+  its mark to write it. Under Typeset › Footnotes & Endnotes a book sets its notes at the
+  foot of the page — pagination keeps room for them, with a short rule above — after
+  each chapter, or all together at the end of the book (in its own Notes entry, where it
+  has one), numbered afresh in each chapter or on through the book, as numbers or as
+  * † ‡. Word exports get real footnotes, EPUBs pop-up notes linked both ways, HTML a
+  linked list, Markdown footnote syntax.
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
   differences — and their history rows say what changed ("+2 places · 3 moved ·

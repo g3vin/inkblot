@@ -36,6 +36,7 @@ import { headsToBlocks, mapImageSources, portableContent } from './portable'
 import { digitalContent, ebookCss } from './ebook'
 import { primaryFamily } from '../typography'
 import { textStylesOf } from '../textStyles'
+import { notesOptionsOf, setBookNotes, setDocumentNotes } from '../notes'
 import { loadProjectFonts, projectFontFiles } from '../projectFonts'
 
 const FORMATS = {
@@ -173,14 +174,21 @@ export async function compileExport({ format, projectName, docPath, scope, live,
       raw.filter((s) => s.item.kind === 'chapter' && s.content).map((s) => ({ path: s.path, name: s.name, content: s.content }))
     )
     const byPath = new Map(noted.map((c) => [c.path, c]))
-    sections = compileSections(
-      raw.map((s) => (s.item.kind === 'chapter' && byPath.has(s.path) ? { ...s, content: byPath.get(s.path).content } : s)),
-      book,
-      { author, insertTitles: true }
+    // Numbered and set where the book sets its notes: at a page's foot (a file with no
+    // pages sets them after the chapter, linked), after each chapter, or at the end.
+    sections = setBookNotes(
+      compileSections(
+        raw.map((s) => (s.item.kind === 'chapter' && byPath.has(s.path) ? { ...s, content: byPath.get(s.path).content } : s)),
+        book,
+        { author, insertTitles: true }
+      ),
+      notesOptionsOf(book),
+      (s) => chapterTitleOf(s.content, s.name)
     )
     chapters = sections.filter((s) => s.item.kind === 'chapter' && s.content)
   } else {
-    chapters = await withPrintBibliography(projectName, await loadChapters(projectName, docPath, 'document', live))
+    chapters = (await withPrintBibliography(projectName, await loadChapters(projectName, docPath, 'document', live)))
+      .map((c) => ({ ...c, content: setDocumentNotes(c.content, notesOptionsOf(book)).doc }))
   }
   const { setup } = resolvePageSetup({
     docSetup: (compiled ? null : readDocPageSetup(live(docPath))) || chapters[0]?.content?.attrs?.pageSetup,

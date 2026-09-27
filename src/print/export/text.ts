@@ -7,7 +7,7 @@
  * cells separated by tabs. Lines are wrapped at `wrap` columns when asked (72 is the
  * email convention), and never when not — a form reflows text itself.
  */
-import { portableContent } from './portable'
+import { inTextNotes, portableContent } from './portable'
 import type { PMJSON } from './portable'
 
 export interface TextOptions {
@@ -21,6 +21,7 @@ const inlineText = (nodes: PMJSON[] = []): string => nodes.map((node) => {
   if (node.type === 'hardBreak') return '\n'
   if (node.type === 'image') return '[Image]'
   if (node.type === 'citation') return String(node.attrs?.rendered || '').replace(/<[^>]*>/g, '')
+  if (node.type === 'footnote') return node.attrs?.mark ? `[${node.attrs.mark}]` : ''
   return inlineText(node.content)
 }).join('')
 
@@ -143,5 +144,10 @@ export const toPlainText = (content: PMJSON, options: TextOptions = {}): string 
 
 /** Chapters (and the front matter, as text) joined into one file. */
 export const buildPlainText = (parts: PMJSON[], options: TextOptions = {}): string => (
-  `${parts.map((part) => toPlainText(part, options)).filter(Boolean).join('\n\n\n')}\n`
+  `${parts.map((part) => {
+    const text = toPlainText(part, options)
+    // Notes at their marks, after the part they are in.
+    const notes = inTextNotes(part)
+    return notes.length ? `${text}\n\n${notes.map((n) => `[${n.mark}] ${n.text}`).join('\n')}` : text
+  }).filter(Boolean).join('\n\n\n')}\n`
 )

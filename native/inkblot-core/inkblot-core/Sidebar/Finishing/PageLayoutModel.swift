@@ -289,6 +289,11 @@ final class PageLayoutModel {
         bridge.send(.setPrintZoom(SetPrintZoomCommand(zoom: nil, fit: fit, docPath: docPath)))
     }
 
+    func insertFootnote(target: EditorTarget?) {
+        guard let target else { return }
+        bridge.send(.insertFootnote(InsertFootnoteCommand(target: target)))
+    }
+
     func insertBreak(_ kind: PageBreakKind, target: EditorTarget?) {
         guard let target else { return }
         bridge.send(.insertBreak(InsertBreakCommand(target: target, kind: kind)))
@@ -747,6 +752,11 @@ struct BookDraft: Equatable {
     var digitalInvertOrnaments: Bool
     /// The book's own looks for its named text styles (`textStyles.ts`).
     var textStyles: [TextStyleLook]
+    /// Where the book sets its notes (`notes.ts`), and how it numbers and marks them.
+    var notesPlacement: NotePlacement
+    var notesNumbering: NoteNumbering
+    var notesMarks: NoteMarks
+    var notesHeading: String
 
     init(_ b: BookSettings) {
         folder = b.folder
@@ -792,6 +802,10 @@ struct BookDraft: Equatable {
         digitalPlainSceneBreaks = b.digital?.plainSceneBreaks ?? false
         digitalInvertOrnaments = b.digital?.invertOrnamentsInDark ?? true
         textStyles = b.textStyles ?? []
+        notesPlacement = b.notes?.placement ?? .page
+        notesNumbering = b.notes?.numbering ?? .perChapter
+        notesMarks = b.notes?.marks ?? .numbers
+        notesHeading = b.notes?.heading ?? "Notes"
     }
 
     /// Leave a chapter in or out of the book.
@@ -848,7 +862,9 @@ struct BookDraft: Equatable {
             digital: DigitalOptions(
                 dropCaps: digitalDropCaps, headImages: digitalHeadImages, publisherFont: digitalPublisherFont,
                 plainSceneBreaks: digitalPlainSceneBreaks, invertOrnamentsInDark: digitalInvertOrnaments),
-            textStyles: textStyles)
+            textStyles: textStyles,
+            notes: NotesOptions(placement: notesPlacement, numbering: notesNumbering, marks: notesMarks,
+                                heading: notesHeading.trimmingCharacters(in: .whitespaces).isEmpty ? "Notes" : notesHeading))
     }
 }
 

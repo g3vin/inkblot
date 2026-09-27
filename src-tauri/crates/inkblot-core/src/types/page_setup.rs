@@ -431,6 +431,58 @@ pub struct BookSettings {
     /// the app's own looks for them, and any styles of its own.
     #[serde(default)]
     pub text_styles: Vec<TextStyleLook>,
+    /// Where the book's notes are set, and how they are numbered.
+    #[serde(default)]
+    pub notes: NotesOptions,
+}
+
+/// Where a note is set: at the foot of the page its mark is on, after its chapter, or
+/// all together at the end of the book.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NotePlacement {
+    #[default]
+    Page,
+    Chapter,
+    Book,
+}
+
+/// Notes numbered afresh in each chapter, or on through the book.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NoteNumbering {
+    #[default]
+    PerChapter,
+    Continuous,
+}
+
+/// Note marks as numbers, or as the traditional symbols: * † ‡ § ‖ ¶.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NoteMarks {
+    #[default]
+    Numbers,
+    Symbols,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct NotesOptions {
+    pub placement: NotePlacement,
+    pub numbering: NoteNumbering,
+    pub marks: NoteMarks,
+    /// The heading over notes set after a chapter or at the end of the book.
+    pub heading: String,
+}
+
+impl Default for NotesOptions {
+    fn default() -> Self {
+        Self { placement: NotePlacement::Page, numbering: NoteNumbering::PerChapter, marks: NoteMarks::Numbers, heading: "Notes".into() }
+    }
 }
 
 /// Where a text style sets its lines across the measure; `Inherit` keeps the body's.

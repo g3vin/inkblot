@@ -40,6 +40,7 @@ import { bookAuthor, getAuthorProfile } from './printLayoutStore'
 import { buildTitlePages, textOfContent } from './titlePage'
 import { applyTypography, baselineGridPx, loadTypographyFont, typographyKey } from './typography'
 import { applyTextStyleSheet, textStylesOf } from './textStyles'
+import { notesOptionsOf, pageNotesOf, setBookNotes, setDocumentNotes } from './notes'
 import { countWords } from '../lib/wordCount'
 import { characterName } from '../script/elements'
 import { breakdown, REPORT_TITLES, reportDocument } from '../script/reports'
@@ -89,7 +90,7 @@ const waitForImages = async (root) => {
  * Lay a document out off screen as paginated pages. The caller destroys it once
  * the pages are cut: the clones do not need it.
  */
-const layoutOffscreen = async (content, setup) => {
+const layoutOffscreen = async (content, setup, { footnotes = true } = {}) => {
   const m = pageMetrics(setup)
   const host = document.createElement('div')
   host.className = 'print-layout print-offscreen'
@@ -126,6 +127,7 @@ const layoutOffscreen = async (content, setup) => {
     columns: setup.columns,
     minLines: setup.widowOrphanLines,
     grid: baselineGridPx(setup.typography),
+    footnotes,
     typeKey: typographyKey(setup.typography),
   })
   await waitForImages(mount)
@@ -135,6 +137,7 @@ const layoutOffscreen = async (content, setup) => {
     result,
     stride,
     headings: chapterHeadings(editor.state.doc),
+    notes: footnotes ? pageNotesOf(editor.state.doc) : [],
     destroy: () => {
       editor.destroy()
       host.remove()
@@ -143,10 +146,12 @@ const layoutOffscreen = async (content, setup) => {
 }
 
 /** The live editor as a source, when it is already showing pages in this setup. */
-const liveSource = (editor, setup) => {
+const liveSource = (editor, setup, { footnotes = true } = {}) => {
   if (!editor || editor.isDestroyed) return null
   const state = paginationKey.getState(editor.state)
   if (!state?.frame || !state.result) return null
+  // Laid out with room for notes it is not to have, or without room it needs.
+  if (Boolean(state.frame.footnotes ?? true) !== footnotes) return null
   const m = pageMetrics(setup)
   if (Math.abs(state.frame.slotHeight - m.contentHeight) > 0.5) return null
   // Set in other type, its lines break elsewhere: lay it out afresh.
@@ -156,6 +161,7 @@ const liveSource = (editor, setup) => {
     result: state.result,
     stride: state.frame.stride,
     headings: chapterHeadings(editor.state.doc),
+    notes: footnotes ? pageNotesOf(editor.state.doc) : [],
     destroy: () => {},
   }
 }
@@ -517,6 +523,9 @@ export const preparePrint = async ({
   const author = bookAuthor(book)
   // The book's named text styles, on the pages it lays out.
   if (book) applyTextStyleSheet(textStylesOf(book))
+  // Where its notes go: at the page's foot, pagination keeps room for them.
+  const notesOptions = notesOptionsOf(book)
+  const footnotes = notesOptions.placement === 'page'
   const live = (path) => liveByPath.get(path)?.getJSON() || null
   // A book is its contents in book order: front matter, parts, chapters, back matter.
   // Each chapter is numbered as the book numbers it; a document is as it is.
@@ -536,7 +545,7 @@ export const preparePrint = async ({
       const c = s.item.kind === 'chapter' ? byPath.get(s.path) : null
       return c ? { ...s, content: c.content, original: s.content, printBibliography: c.printBibliography } : { ...s, original: s.content }
     })
-    sections = await withDisplayImages(projectName, compileSections(withNotes, book, { author }))
+    sections = await withDisplayImages(projectName, setBookNotes(compileSections(withNotes, book, { author }), notesOptions, (s) => chapterTitleOf(s.content, s.name)))
     loaded = sections.filter((s) => s.item.kind === 'chapter' && s.content)
   } else {
     loaded = report
@@ -544,6 +553,11 @@ export const preparePrint = async ({
       : range === 'selection'
       ? [selectionChapter(activeEditor, docPath)]
       : await withPrintBibliography(projectName, await loadChapters(projectName, docPath, 'document', live))
+    // A document's notes, numbered and set as its book sets them.
+    loaded = loaded.map((c) => {
+      const { doc, notes } = setDocumentNotes(c.content, notesOptions)
+      return notes.length ? { ...c, content: doc } : c
+    })
   }
   if (!loaded.length && !sections?.some((s) => s.content)) return null
   // What flows as pages: a document's chapter; a book's body and back matter — the
@@ -588,8 +602,8 @@ export const preparePrint = async ({
       // A chapter the book numbered is not what its editor shows: lay it out afresh.
       const original = sections ? chapter.original : loaded[index]?.content
       const changed = chapter.printBibliography || chapter.selection || chapter.report || chapter.content !== original || chapterOnly
-      const live = changed || !chapter.path ? null : liveSource(liveByPath.get(chapter.path), setup)
-      const laid = live || await layoutOffscreen(chapter.content, setup)
+      const live = changed || !chapter.path ? null : liveSource(liveByPath.get(chapter.path), setup, { footnotes })
+      const laid = live || await layoutOffscreen(chapter.content, setup, { footnotes })
       sources.push({
         ...laid,
         setup,

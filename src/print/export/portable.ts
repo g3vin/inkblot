@@ -126,3 +126,19 @@ export const firstHeadingText = (doc: PMJSON): string | null => {
   const collect = (n: PMJSON): string => (n.text || '') + (n.content || []).map(collect).join('')
   return collect(heading).trim() || null
 }
+
+/**
+ * A document's notes still at their marks — set at the page's foot, which a file without
+ * pages has not got — in order, with the mark each has (or is given, from 1).
+ */
+export const inTextNotes = (doc: PMJSON): Array<{ id: string; mark: string; text: string }> => {
+  const out: Array<{ id: string; mark: string; text: string }> = []
+  const walk = (node: PMJSON) => {
+    if (node.type === 'footnote' && !node.attrs?.end) {
+      out.push({ id: String(node.attrs?.id || `n${out.length + 1}`), mark: String(node.attrs?.mark || out.length + 1), text: String(node.attrs?.text || '') })
+    }
+    for (const child of node.content || []) walk(child)
+  }
+  walk(doc)
+  return out
+}

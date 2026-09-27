@@ -29,6 +29,10 @@
  * On a baseline grid (`frame.grid`), every paragraph starts on a whole line from its
  * slot's top: what came before it — a picture, a head — is rounded up to whole lines.
  *
+ * Footnotes: a line whose marks have notes (`line.notes`, their height) takes that much
+ * room — and, the first on its page, the rule over them (`frame.noteGap`) — from the
+ * foot of the slot it lands in, so the notes set there fit below the text.
+ *
  * A script adds rules of its own, carried on the units (measure.ts sets them):
  *   keepWithNext      a scene heading, a character, a parenthetical: never last on a page
  *   keepWithPrevious  a transition: never first on a page — the line before comes over
@@ -46,6 +50,8 @@ export interface LayoutLine {
   bottom: number
   /** Document position of the line's first character: where a line push goes. */
   pos: number
+  /** The height of the notes whose marks are on this line, set at its page's foot. */
+  notes?: number
 }
 
 export interface LayoutUnit {
@@ -89,6 +95,8 @@ export interface LayoutFrame {
   minLines: number
   /** The baseline grid's pitch, px: paragraphs start on whole lines. 0 or absent: none. */
   grid?: number
+  /** The rule over a page's footnotes, and the space around it, px. */
+  noteGap?: number
 }
 
 export interface Push {
@@ -150,6 +158,25 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
 
   const slotTop = (s: number) => s * stride
   const slotBottom = (s: number) => s * stride + slotHeight + (adjust.get(s) || 0)
+
+  // The room each slot's footnotes take at its foot.
+  const noteSpace = new Map<number, number>()
+  const noteGap = frame.noteGap || 0
+  const notesIn = (u: LayoutUnit, from: number, to: number) => {
+    let n = 0
+    const lines = u.lines || []
+    for (let i = from; i < to && i < lines.length; i += 1) n += lines[i].notes || 0
+    return n
+  }
+  /** What the slot's notes take, with `extra` more of them. */
+  const reserved = (s: number, extra = 0) => {
+    const n = (noteSpace.get(s) || 0) + extra
+    return n > 0 ? n + noteGap : 0
+  }
+  const keepNotes = (s: number, u: LayoutUnit, from: number, to: number) => {
+    const n = notesIn(u, from, to)
+    if (n) noteSpace.set(s, (noteSpace.get(s) || 0) + n)
+  }
 
   const pushes: Push[] = []
   const continuations: Continuation[] = []
@@ -295,9 +322,14 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
 
     // Place the unit, splitting a paragraph across as many slots as it needs.
     let firstLine = 0
+    const lineCount = u.lines?.length || 0
     for (;;) {
-      const bottom = slotBottom(slot)
-      if (u.bottom + offset <= bottom + EPS) break
+      // The foot, less the room the notes of what is left of the unit would take here.
+      const bottom = slotBottom(slot) - reserved(slot, notesIn(u, firstLine, lineCount))
+      if (u.bottom + offset <= bottom + EPS) {
+        keepNotes(slot, u, firstLine, lineCount)
+        break
+      }
 
       const lines = u.kind === 'text' && u.split !== 'never' ? u.lines || [] : []
       const remaining = lines.length - firstLine
@@ -322,7 +354,11 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
         }
         // Nowhere a sentence ends and nowhere better to go: break between lines.
         if (k < 0) k = Math.max(firstLine + 1, Math.min(fit, lines.length - 1))
-        if (k >= lines.length) break
+        if (k >= lines.length) {
+          keepNotes(slot, u, firstLine, lineCount)
+          break
+        }
+        keepNotes(slot, u, firstLine, k)
         // The next page opens with the speaker's name, a line above the speech.
         const height = slotTop(slot + 1) + more - (lines[k].top + offset)
         if (height > EPS) {
@@ -338,9 +374,10 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
       }
 
       if (remaining > 1) {
-        // First line that does not fit.
+        // First line that does not fit — with its notes, and those of the lines above it.
+        const foot = slotBottom(slot)
         let j = firstLine
-        while (j < lines.length && lines[j].bottom + offset <= bottom + EPS) j += 1
+        while (j < lines.length && lines[j].bottom + offset <= foot - reserved(slot, notesIn(u, firstLine, j + 1)) + EPS) j += 1
         const atHead = firstLine > 0 || !slotHasContent
         // Orphans: too few lines would be left at the foot.
         if (j - firstLine < minLines && !atHead) {
@@ -353,7 +390,11 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
           j = Math.max(firstLine + minLines, lines.length - minLines)
         }
         if (j <= firstLine) j = firstLine + 1
-        if (j >= lines.length) break
+        if (j >= lines.length) {
+          keepNotes(slot, u, firstLine, lineCount)
+          break
+        }
+        keepNotes(slot, u, firstLine, j)
         const height = slotTop(slot + 1) - (lines[j].top + offset)
         if (height > EPS) {
           pushes.push({ kind: 'line', pos: lines[j].pos, height })
@@ -373,6 +414,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
         markSlot(slot, u.pos)
         continue
       }
+      keepNotes(slot, u, firstLine, lineCount)
       break
     }
     slotHasContent = true

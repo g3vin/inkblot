@@ -32,6 +32,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 
 import type { LayoutLine, LayoutUnit, ManualBreakKind, Push } from './paginate'
 
+const FOOTNOTE = 'footnote'
 const HEADING = 'heading'
 const SCRIPT = 'scriptElement'
 /** A script's lines that are never the last on a page. */
@@ -50,6 +51,8 @@ export interface MeasureContext {
   originOffset: number
   /** Anything else that changes line breaking (the flow width): a new key drops the cache. */
   layoutKey: string
+  /** How tall a note is at the page's foot, when the book sets its notes there. */
+  noteHeight?: ((text: string) => number) | null
 }
 
 /** Sum of pushes at positions ≤ pos (or < pos). */
@@ -255,6 +258,19 @@ export const measureUnits = (ctx: MeasureContext): LayoutUnit[] => {
       })
       return out
     })
+
+    // Notes whose marks are in the paragraph take room at the foot of the page each
+    // mark's line is on.
+    if (ctx.noteHeight) {
+      node.descendants((child, offset) => {
+        if (child.type.name !== FOOTNOTE || child.attrs.end) return true
+        const y = naturalAt(start + offset)
+        let at = lines.findIndex((line) => y < line.bottom - 0.5)
+        if (at < 0) at = lines.length - 1
+        lines[at].notes = (lines[at].notes || 0) + ctx.noteHeight!(String(child.attrs.text || ''))
+        return false
+      })
+    }
 
     units.push({
       kind: 'text',

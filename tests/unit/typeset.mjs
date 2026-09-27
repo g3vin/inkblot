@@ -740,3 +740,90 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   ok('and none takes it off', editor.state.doc.child(0).attrs.styleName == null)
   editor.destroy()
 }
+
+/* ---- footnotes and endnotes ---- */
+
+{
+  const notes = await import(`${C}/print/notes.ts`)
+  const { paginate } = await import(`${C}/print/paginate.ts`)
+  const fn = (id, text) => ({ type: 'footnote', attrs: { id, text } })
+  const para = (...inline) => ({ type: 'paragraph', content: inline })
+  const t = (text) => ({ type: 'text', text })
+  const chapter = (id, ...notesIn) => ({
+    item: { id, kind: 'chapter' }, role: 'body', name: id,
+    content: { type: 'doc', content: [para(t('Words'), ...notesIn)] },
+  })
+  const book = () => [
+    chapter('one', fn('a', 'First.'), fn('b', 'Second.')),
+    chapter('two', fn('c', 'Third.')),
+    { item: { id: 'ack', kind: 'matter' }, role: 'back', name: 'Acknowledgements', content: { type: 'doc', content: [] } },
+  ]
+  const marksOf = (section) => {
+    const out = []
+    const walk = (n) => { if (n.type === 'footnote') out.push(n.attrs.mark); (n.content || []).forEach(walk) }
+    walk(section.content)
+    return out
+  }
+
+  ok('marks are numbers, or the six symbols, doubled after', notes.noteMark(3) === '3' && notes.noteMark(2, 'symbols') === '†' && notes.noteMark(8, 'symbols') === '††')
+  let set = notes.setBookNotes(book(), notes.notesOptionsOf({}))
+  ok('at the page’s foot, each chapter’s notes are numbered afresh, and stay at their marks',
+    marksOf(set[0]).join() === '1,2' && marksOf(set[1]).join() === '1' && set[0].content.content.length === 1 && !set[0].content.content[0].content[1].attrs.end)
+  set = notes.setBookNotes(book(), notes.notesOptionsOf({ notes: { numbering: 'continuous', marks: 'symbols' } }))
+  ok('numbered on through the book, as symbols', marksOf(set[1]).join() === '‡')
+  set = notes.setBookNotes(book(), notes.notesOptionsOf({ notes: { placement: 'chapter', heading: 'Sources' } }))
+  const after = set[0].content.content
+  ok('after each chapter: its marks are references, and its notes follow under the heading',
+    after[0].content[1].attrs.end && after[1].type === 'heading' && after[1].content[0].text === 'Sources' && after[2].content.map((n) => n.text).join('') === '1. First.')
+  set = notes.setBookNotes(book(), notes.notesOptionsOf({ notes: { placement: 'book' } }))
+  const notesAt = set.findIndex((s) => s.item.generated === 'notes')
+  ok('at the end of the book: a Notes section before the back matter, chapter by chapter',
+    notesAt === 2 && set[3].item.id === 'ack' && set[notesAt].content.content.filter((n) => n.type === 'heading' && n.attrs.level === 3).length === 2 && set[0].content.content.length === 1)
+  const withEntry = notes.setBookNotes([...book(), { item: { id: 'g1', kind: 'generated', generated: 'notes' }, role: 'back', name: 'Notes' }], notes.notesOptionsOf({ notes: { placement: 'book' } }))
+  ok('…or in the book’s own Notes entry, where it has one', withEntry.length === 4 && withEntry[3].content?.content[0].content[0].text === 'Notes')
+
+  const bySlot = notes.notesBySlot([{ pos: 5 }, { pos: 150 }, { pos: 260 }], [0, 100, null, 250])
+  ok('a note is set on the page its mark is on', bySlot.get(0).length === 1 && bySlot.get(1)[0].pos === 150 && bySlot.get(3)[0].pos === 260)
+
+  // A 100px page; the third line's note takes 30px, and its rule 10px.
+  const lines = (n, notesAt = {}) => Array.from({ length: n }, (_, i) => ({ top: i * 10, bottom: (i + 1) * 10, pos: 1 + i * 10, ...(notesAt[i] ? { notes: notesAt[i] } : {}) }))
+  const frame = { slotHeight: 100, stride: 150, columns: 1, minLines: 2, noteGap: 10 }
+  let r = paginate([{ kind: 'text', pos: 0, top: 0, bottom: 100, lines: lines(10, { 2: 30 }) }], frame)
+  ok('a page keeps room at its foot for the notes of the lines on it: six lines, not ten, fit over them',
+    r.pushes.length === 1 && r.pushes[0].kind === 'line' && r.pushes[0].pos === 1 + 6 * 10)
+  r = paginate([{ kind: 'text', pos: 0, top: 0, bottom: 100, lines: lines(10) }], frame)
+  ok('…and none without notes', r.pushes.length === 0)
+  r = paginate([{ kind: 'text', pos: 0, top: 0, bottom: 100, lines: lines(10, { 8: 40 }) }], frame)
+  ok('a mark that would not fit with its note goes over with it', r.pushes[0].kind === 'line' && r.pushes[0].pos <= 1 + 8 * 10)
+}
+
+/* ---- a note in the editor, and in the files a book is exported as ---- */
+
+{
+  const { Editor, generateHTML } = await import('@tiptap/core')
+  const { StarterKit } = await import('@tiptap/starter-kit')
+  const { Footnote } = await import(`${C}/print/Footnote.ts`)
+  const { toMarkdown } = await import(`${C}/print/export/markdown.ts`)
+  const { buildPlainText } = await import(`${C}/print/export/text.ts`)
+  const { withLinkedNotes } = await import(`${C}/print/export/html.ts`)
+  const { inTextNotes } = await import(`${C}/print/export/portable.ts`)
+
+  const editor = new Editor({ extensions: [StarterKit, Footnote], content: '<p>It rained.</p>' })
+  editor.chain().setTextSelection(11).insertFootnote('Or so they said > then.').run()
+  const node = editor.state.doc.firstChild.child(1)
+  ok('a note goes in after the words, holding its text', node.type.name === 'footnote' && node.attrs.text === 'Or so they said > then.' && node.attrs.id)
+  const html = editor.getHTML()
+  const again = new Editor({ extensions: [StarterKit, Footnote], content: html })
+  ok('and comes back from its HTML as it was', again.state.doc.firstChild.child(1).attrs.text === 'Or so they said > then.')
+  editor.destroy(); again.destroy()
+
+  const doc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'It rained.' }, { type: 'footnote', attrs: { id: 'n1', text: 'Or so they said.', mark: '1' } }] }] }
+  ok('in Markdown a note is a footnote, defined after the text', toMarkdown(doc) === 'It rained.[^1]\n\n[^1]: Or so they said.\n')
+  ok('in plain text its mark in brackets, the note after', buildPlainText([doc]).includes('It rained.[1]\n\n[1] Or so they said.'))
+  const body = generateHTML(doc, [StarterKit, Footnote])
+  const linked = withLinkedNotes(body, inTextNotes(doc), { epub: true })
+  ok('in an e-book the mark links to a pop-up note, which links back',
+    linked.includes('<a class="noteref" href="#fn-n1" id="fnref-n1" epub:type="noteref" role="doc-noteref"><sup>1</sup></a>') &&
+    linked.includes('<aside epub:type="footnote" role="doc-footnote" id="fn-n1" class="footnote"><p><a href="#fnref-n1">1</a>. Or so they said.</p></aside>'))
+  ok('in HTML, a list of notes after the chapter', withLinkedNotes(body, inTextNotes(doc)).includes('<li id="fn-n1" class="footnote">Or so they said. <a href="#fnref-n1"'))
+}

@@ -958,6 +958,36 @@ export interface TextStyleLook {
 }
 
 /**
+ * Where a note is set: at the foot of the page its mark is on, after its chapter, or
+ * all together at the end of the book.
+ */
+export enum NotePlacement {
+	Page = "page",
+	Chapter = "chapter",
+	Book = "book",
+}
+
+/** Notes numbered afresh in each chapter, or on through the book. */
+export enum NoteNumbering {
+	PerChapter = "perChapter",
+	Continuous = "continuous",
+}
+
+/** Note marks as numbers, or as the traditional symbols: * † ‡ § ‖ ¶. */
+export enum NoteMarks {
+	Numbers = "numbers",
+	Symbols = "symbols",
+}
+
+export interface NotesOptions {
+	placement: NotePlacement;
+	numbering: NoteNumbering;
+	marks: NoteMarks;
+	/** The heading over notes set after a chapter or at the end of the book. */
+	heading: string;
+}
+
+/**
  * A folder (or the whole project) compiled as one book. Kept per folder in the
  * project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
  * belongs to all of them.
@@ -1013,6 +1043,8 @@ export interface BookSettings {
 	 * the app's own looks for them, and any styles of its own.
 	 */
 	textStyles?: TextStyleLook[];
+	/** Where the book's notes are set, and how they are numbered. */
+	notes?: NotesOptions;
 }
 
 /** A book style (`bookStyles.ts`): a coordinated design, applied whole. */
@@ -1472,6 +1504,7 @@ export type NativeCommand =
 	| { type: "setTypesetDisplay", payload: SetTypesetDisplayCommand }
 	| { type: "addProjectFont", payload: AddProjectFontCommand }
 	| { type: "setTextStyle", payload: SetTextStyleCommand }
+	| { type: "insertFootnote", payload: InsertFootnoteCommand }
 	| { type: "setCoverImage", payload: SetCoverImageCommand }
 	| { type: "editCoverSets", payload: EditCoverSetsCommand }
 	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
@@ -2206,6 +2239,11 @@ export interface InsertCitationCommand {
  */
 export interface InsertClipboardEntryCommand {
 	id: string;
+	target: EditorTarget;
+}
+
+/** Put a footnote at the caret, and open it to be written. */
+export interface InsertFootnoteCommand {
 	target: EditorTarget;
 }
 

@@ -603,6 +603,73 @@ for (const [label, setup] of [['Letter', null], ['6 × 9 mirrored', BOOK]]) {
   await page.close()
 }
 
+/* ---------------- 5i. footnotes at the foot of the page ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: false, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 0, noIndentAfterBreak: true,
+  }
+  let s = 7
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647
+  const words = 'the quick brown fox jumps over a lazy dog while writers draft chapters of long novels in quiet rooms'.split(' ')
+  const sentence = (n) => Array.from({ length: n }, () => words[Math.floor(rnd() * words.length)]).join(' ')
+  let html = ''
+  let count = 0
+  for (let i = 0; i < 30; i += 1) {
+    const note = i % 2 === 0 ? `<sup data-footnote="n${i}" data-text="${sentence(12 + (i % 5) * 9)}."></sup>` : ''
+    if (note) count += 1
+    html += `<p>${sentence(40 + (i % 7) * 15)}${note} ${sentence(20)}.</p>`
+  }
+  const page = await open(html, { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(() => {
+    const pages = [...document.querySelectorAll('.pl-page')]
+    const areas = [...document.querySelectorAll('.pl-page .pl-footnotes')]
+    const dom = window.__print.editor.view.dom
+    const lines = []
+    for (const p of dom.querySelectorAll(':scope > p')) {
+      const range = document.createRange()
+      range.selectNodeContents(p)
+      for (const rect of range.getClientRects()) if (rect.height > 4) lines.push(rect)
+    }
+    let overlaps = 0
+    let misplaced = 0
+    for (const area of areas) {
+      const box = area.getBoundingClientRect()
+      const pageBox = area.closest('.pl-page').getBoundingClientRect()
+      overlaps += lines.filter((l) => l.bottom > box.top + 1 && l.top < box.bottom && l.top > pageBox.top && l.bottom < pageBox.bottom).length
+      // Each note is on the page its mark is on.
+      for (const mark of area.querySelectorAll('.pl-footnote-mark')) {
+        const n = Number(mark.textContent)
+        const ref = dom.querySelectorAll('.footnote-ref')[n - 1]
+        const at = ref?.getBoundingClientRect()
+        if (!at || at.top < pageBox.top || at.bottom > pageBox.bottom) misplaced += 1
+      }
+    }
+    const notes = areas.reduce((n, a) => n + a.querySelectorAll('.pl-footnote').length, 0)
+    const inBounds = areas.every((a) => {
+      const box = a.getBoundingClientRect()
+      const pageBox = a.closest('.pl-page').getBoundingClientRect()
+      return box.bottom <= pageBox.bottom + 1 && box.top >= pageBox.top
+    })
+    const marks = areas.flatMap((a) => [...a.querySelectorAll('.pl-footnote-mark')].map((m) => m.textContent))
+    return { pages: pages.length, notes, overlaps, misplaced, inBounds, marks }
+  })
+  ok(`every note is set at the foot of a page (${r.notes} of ${count}, over ${r.pages} pages)`, r.notes === count, JSON.stringify(r))
+  ok('…on the page its mark is on', r.misplaced === 0, JSON.stringify(r))
+  ok('…below the text, with no line under or behind it, and inside the page', r.overlaps === 0 && r.inBounds, JSON.stringify(r))
+  ok('the notes are numbered 1, 2, 3 … down the pages', r.marks.join() === Array.from({ length: count }, (_, i) => i + 1).join(), JSON.stringify(r.marks))
+  const printed = await page.evaluate(async () => {
+    const { editor, preparePrint } = window.__print
+    const prepared = await preparePrint({ projectName: 'x', docPath: 'Harness', scope: 'document', liveEditors: [{ path: 'Harness', editor }] })
+    return prepared.elements.map((pg) => [...pg.querySelectorAll('.pl-footnote-mark')].map((m) => m.textContent).join(','))
+  })
+  const shown = await page.evaluate(() => [...document.querySelectorAll('.pl-page')].map((pg) => [...pg.querySelectorAll('.pl-footnote-mark')].map((m) => m.textContent).join(',')))
+  ok('the printed pages carry the same notes, on the same pages', JSON.stringify(printed) === JSON.stringify(shown), `${JSON.stringify(printed)} / ${JSON.stringify(shown)}`)
+  await page.close()
+}
+
 /* ---------------- 6. a whole manuscript ---------------- */
 
 {

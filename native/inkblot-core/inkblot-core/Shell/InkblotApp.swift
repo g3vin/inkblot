@@ -197,6 +197,11 @@ struct InkblotCommands: Commands {
             Button("Column Break  ⇧⌘↩") { model.pageLayout.insertBreak(.column, target: model.target) }
             Button("Break to Next Right-Hand Page") { model.pageLayout.insertBreak(.recto, target: model.target) }
             Divider()
+            // ⌥⌘F, as Word has it; ⌃⌘F is the system's full screen.
+            Button("Footnote") { model.pageLayout.insertFootnote(target: model.target) }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+                .disabled(model.target == nil || model.pageLayout.mode == .typeset)
+            Divider()
             // References. The page's editor has no use for these chords (⌥⌘C is its code
             // block, ⇧⌘R its align-right), so they reach the menu.
             Button("Add Reference…") { model.sidebar.beginQuickAdd(cite: false) }

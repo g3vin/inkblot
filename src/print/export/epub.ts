@@ -12,9 +12,9 @@
 import { createZip } from './zip'
 import type { ZipEntry } from './zip'
 import type { FrontSection } from '../bookMatter'
-import { chapterBodyHtml, escapeHtml, frontSectionHtml, PROSE_CSS } from './html'
+import { chapterBodyHtml, escapeHtml, frontSectionHtml, PROSE_CSS, withLinkedNotes } from './html'
 import type { ExportChapter } from './html'
-import { collectImageSources, mapImageSources } from './portable'
+import { collectImageSources, inTextNotes, mapImageSources } from './portable'
 import { isRemote } from './images'
 import type { ResolvedImage } from './images'
 
@@ -114,7 +114,7 @@ export const buildEpub = async (options: EpubOptions): Promise<Uint8Array> => {
       const img = images.get(src)
       return img ? `../${img.href}` : ''
     })
-    const body = toXhtmlBody(chapterBodyHtml(content))
+    const body = toXhtmlBody(withLinkedNotes(chapterBodyHtml(content), inTextNotes(content), { epub: true }))
       // An image that could not be packaged would be a broken reference: drop it.
       .replace(/<img[^>]*src=""[^>]*\/>/g, '')
     const id = `chapter-${String(i + 1).padStart(3, '0')}`
