@@ -698,3 +698,45 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   ok('a WOFF is known by its file name', readFontInfo(new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0, 0, 0, 0, 0, 0, 0, 0]), 'EBGaramond-BoldItalic.woff2').family === 'EBGaramond')
   ok('a file name’s style words are its style', familyFromFileName('Crimson_Semibold.otf') === 'Crimson' && styleFromName('Semibold Italic').weight === 600)
 }
+
+/* ---- named text styles ---- */
+
+{
+  const ts = await import(`${C}/print/textStyles.ts`)
+  const { Editor } = await import('@tiptap/core')
+  const { StarterKit } = await import('@tiptap/starter-kit')
+  const { ParagraphTypeset, setParagraphTypeset } = await import(`${C}/print/ParagraphTypeset.ts`)
+  const { TypesetAnchors } = await import(`${C}/print/TypesetAnchors.ts`)
+  const { TYPESET_META } = await import(`${C}/print/TypesetLock.ts`)
+
+  const plain = ts.textStylesOf({})
+  ok('a book has the app’s styles, in the menu’s order', plain[0].id === 'letter' && plain.some((s) => s.id === 'textMessage') && plain.length === ts.BUILTIN_TEXT_STYLES.length)
+  const own = ts.textStylesOf({ textStyles: [{ id: 'letter', italic: true, size: 99 }, { id: 'custom-1', name: 'Radio', smallCaps: true }, { name: 'no id' }] })
+  const letter = own.find((s) => s.id === 'letter')
+  ok('its own look for one of them is kept over the app’s, the rest filled in and held in range',
+    letter.italic && letter.name === 'Letter' && letter.indentEm === 2 && letter.size === 3)
+  ok('and styles of its own follow the app’s; one with no id is dropped',
+    own[own.length - 1].id === 'custom-1' && own[own.length - 1].smallCaps && own.length === ts.BUILTIN_TEXT_STYLES.length + 1)
+
+  const css = ts.textStylesCss(own, '.has-print-type .ProseMirror')
+  ok('each look is the page’s CSS, under the page', /\.has-print-type \.ProseMirror \[data-style="letter"\] \{[^}]*font-style: italic;/.test(css) && css.includes('[data-style="sign"] {') && css.includes('border: 1px solid currentColor'))
+  ok('a run of one style is spaced as one: space before its first, after its last',
+    css.includes('[data-style="letter"]:not([data-style="letter"] + *) { margin-top: calc(var(--pt-leading, 1.4em) * 1); }') &&
+    css.includes('[data-style="letter"]:not(:has(+ [data-style="letter"])) { margin-bottom:'))
+
+  const editor = new Editor({ extensions: [StarterKit, TypesetAnchors, ParagraphTypeset], content: '<p>Dear M,</p><p>Yours.</p><p>After.</p>' })
+  const tr = editor.state.tr
+  const changed = setParagraphTypeset(tr, 1, 17, { styleName: 'letter' })
+  editor.view.dispatch(tr)
+  const [a, b, c] = [0, 1, 2].map((i) => editor.state.doc.child(i))
+  ok('a style is set on each paragraph selected, as typesetting, each anchored',
+    changed === 2 && a.attrs.styleName === 'letter' && b.attrs.styleName === 'letter' && !c.attrs.styleName && a.attrs.typesetId && tr.getMeta(TYPESET_META))
+  ok('and it is in the page’s HTML as the name the CSS looks for', editor.getHTML().includes('<p data-style="letter">Dear M,</p>'))
+  editor.chain().setTextSelection(8).splitBlock().run()
+  ok('Enter in a letter goes on in the letter', editor.state.doc.child(1).attrs.styleName === 'letter')
+  const clear = editor.state.tr
+  setParagraphTypeset(clear, 1, 3, { styleName: null })
+  editor.view.dispatch(clear)
+  ok('and none takes it off', editor.state.doc.child(0).attrs.styleName == null)
+  editor.destroy()
+}

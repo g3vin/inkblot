@@ -558,6 +558,18 @@ pub struct ParagraphTypeset {
     pub keep_together: bool,
     pub keep_with_next: bool,
     pub page_adjust: i32,
+    /// Its named text style, if it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style_name: Option<String>,
+}
+
+/// Give the selected paragraphs a named text style, or none (`style` absent).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTextStyleCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
 }
 
 /// Scroll the pages to a proof mark and select its paragraph.
@@ -1024,6 +1036,9 @@ pub struct PageLayoutState {
     /// The fonts kept in the project.
     #[serde(default)]
     pub project_fonts: Vec<ProjectFont>,
+    /// The book's named text styles, as it sets them: the built-in ones and its own.
+    #[serde(default)]
+    pub text_styles: Vec<crate::types::TextStyleLook>,
     /// The active text document, or none (a canvas, or nothing open).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_path: Option<String>,

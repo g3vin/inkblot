@@ -28,7 +28,9 @@ struct TypesetPanelView: View {
             PageSetupSections(.format, .page)
             PageSetupSections(.typography, .textFlow)
             ProofSection()
+            TextStylesSection()
             ChapterOpeningsSection(unit: LengthUnit(rawValue: unitsRaw) ?? .inches)
+            PartsSection()
             PageSetupSections(.headerFooter, .titlePage)
             BookSections(.setup)
             if model.pageLayout.typesetView != .digital { BookSections(.digital) }

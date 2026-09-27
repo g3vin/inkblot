@@ -580,6 +580,29 @@ for (const [label, setup] of [['Letter', null], ['6 × 9 mirrored', BOOK]]) {
   await page.close()
 }
 
+/* ---------------- 5h. named text styles on the page ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'exact', lineValue: 14, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: false, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 0, noIndentAfterBreak: true,
+  }
+  const page = await open('<p>Before.</p><p data-style="letter">Dear M,</p><p data-style="letter">Yours, A.</p><p>After.</p><p data-style="sign">No Entry</p>', { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(() => {
+    const { editor, applyTextStyleSheet, textStylesOf } = window.__print
+    applyTextStyleSheet(textStylesOf({}))
+    const ps = [...editor.view.dom.querySelectorAll(':scope > p')].map((p) => getComputedStyle(p))
+    return ps.map((c) => ({ ml: parseFloat(c.marginLeft), mt: parseFloat(c.marginTop), mb: parseFloat(c.marginBottom), indent: parseFloat(c.textIndent), border: c.borderTopStyle, variant: c.fontVariantCaps, align: c.textAlign }))
+  })
+  const [before, first, second, after, sign] = r
+  ok('a letter is indented both sides and set flush', first.ml > 20 && second.ml === first.ml && first.indent === 0 && before.ml === 0, JSON.stringify(r))
+  ok('…with a line’s space before its first paragraph and after its last, none between', first.mt > 15 && first.mb === 0 && second.mt === 0 && second.mb > 15, JSON.stringify(r))
+  ok('the paragraph after it starts flush, as after a break', after.indent === 0)
+  ok('a sign is boxed, centred, in small capitals', sign.border === 'solid' && sign.align === 'center' && sign.variant === 'small-caps', JSON.stringify(sign))
+  await page.close()
+}
+
 /* ---------------- 6. a whole manuscript ---------------- */
 
 {

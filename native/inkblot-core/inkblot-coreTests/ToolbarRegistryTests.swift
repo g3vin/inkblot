@@ -57,6 +57,7 @@ struct ToolbarRegistryTests {
         "inkblot.typeset.tighten",
         "inkblot.typeset.loosen",
         "inkblot.typeset.keep-together",
+        "inkblot.typeset.text-style",
         "inkblot.typeset.insert",
         "inkblot.typeset.zoom",
         "inkblot.typeset.print",

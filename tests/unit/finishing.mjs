@@ -489,6 +489,15 @@ const xmlOk = (name) => {
 }
 ok('every part is well-formed XML', wordNames.filter((n) => /\.(xml|rels)$/.test(n)).every(xmlOk))
 const wordDoc = readZipEntry(docx, 'word/document.xml')
+const styledDocx = await buildDocx({
+  title: 'Letters', setup: wordSetup, chapters: [{ title: 'One', content: { type: 'doc', content: [{ type: 'paragraph', attrs: { styleName: 'letter' }, content: [{ type: 'text', text: 'Dear M,' }] }] } }],
+  textStyles: [{ id: 'letter', name: 'Letter', size: 1, italic: true, smallCaps: false, align: 'inherit', indentEm: 2, flush: true, spaceLines: 1, boxed: false }],
+  resolveImage: async () => null, modified: new Date(0),
+})
+ok('a named text style is a Word paragraph style of the same name, and the paragraph is in it',
+  readZipEntry(styledDocx, 'word/styles.xml').includes('<w:style w:type="paragraph" w:customStyle="1" w:styleId="Textletter"><w:name w:val="Letter"/>') &&
+  readZipEntry(styledDocx, 'word/styles.xml').includes('<w:i/>') &&
+  readZipEntry(styledDocx, 'word/document.xml').includes('<w:pStyle w:val="Textletter"/>'))
 const wordRels = readZipEntry(docx, 'word/_rels/document.xml.rels')
 ok('the page is Letter in twips, one-inch margins', wordDoc.includes('<w:pgSz w:w="12240" w:h="15840"/>') && wordDoc.includes('w:top="1440"') && twips(25.4) === 1440)
 ok('front matter, then a section per chapter, the break to a right-hand page starting one of its own',

@@ -427,6 +427,69 @@ pub struct BookSettings {
     /// How the e-book differs from the printed book.
     #[serde(default)]
     pub digital: DigitalOptions,
+    /// How the book sets its named text styles — a letter, a text message, verse — over
+    /// the app's own looks for them, and any styles of its own.
+    #[serde(default)]
+    pub text_styles: Vec<TextStyleLook>,
+}
+
+/// Where a text style sets its lines across the measure; `Inherit` keeps the body's.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TextStyleAlign {
+    #[default]
+    Inherit,
+    Left,
+    Center,
+    Right,
+    Justify,
+}
+
+/// How a named text style looks in a book. A paragraph carries only the style's name
+/// (`styleName`); what the name means is the book's, so a letter looks the same in
+/// every chapter and changes everywhere at once.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TextStyleLook {
+    /// A built-in style's id (`letter`, `verse`, …), or a custom style's own.
+    pub id: String,
+    pub name: String,
+    /// A face of its own; absent sets it in the body's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_family: Option<String>,
+    /// Its type size, as a multiple of the body's.
+    pub size: f64,
+    pub italic: bool,
+    pub small_caps: bool,
+    pub align: TextStyleAlign,
+    /// Indented from both sides, in ems.
+    pub indent_em: f64,
+    /// No first-line indent.
+    pub flush: bool,
+    /// Space above and below a run of it, in lines.
+    pub space_lines: f64,
+    /// A rule around it, as a sign or a notice is set.
+    pub boxed: bool,
+}
+
+impl Default for TextStyleLook {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            font_family: None,
+            size: 1.0,
+            italic: false,
+            small_caps: false,
+            align: TextStyleAlign::Inherit,
+            indent_em: 0.0,
+            flush: false,
+            space_lines: 0.0,
+            boxed: false,
+        }
+    }
 }
 
 /// What an e-book leaves out or sets differently from print. A reading system chooses

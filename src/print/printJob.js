@@ -39,6 +39,7 @@ import { imposeSheets, renderPages, snapshotBlocks } from './printRender'
 import { bookAuthor, getAuthorProfile } from './printLayoutStore'
 import { buildTitlePages, textOfContent } from './titlePage'
 import { applyTypography, baselineGridPx, loadTypographyFont, typographyKey } from './typography'
+import { applyTextStyleSheet, textStylesOf } from './textStyles'
 import { countWords } from '../lib/wordCount'
 import { characterName } from '../script/elements'
 import { breakdown, REPORT_TITLES, reportDocument } from '../script/reports'
@@ -514,6 +515,8 @@ export const preparePrint = async ({
   }
   const compiled = scope !== 'document'
   const author = bookAuthor(book)
+  // The book's named text styles, on the pages it lays out.
+  if (book) applyTextStyleSheet(textStylesOf(book))
   const live = (path) => liveByPath.get(path)?.getJSON() || null
   // A book is its contents in book order: front matter, parts, chapters, back matter.
   // Each chapter is numbered as the book numbers it; a document is as it is.
@@ -571,7 +574,11 @@ export const preparePrint = async ({
     }
     if (!section?.item || section.item.kind === 'chapter') return {}
     const options = pageOptionsOf(section.item)
-    return { startOn: options.start, runningHeads: options.runningHeads, folio: options.folio, position: options.position }
+    // A part with a design of its own starts where the design says.
+    const start = section.item.kind === 'part' && book?.partDesign
+      ? (book.partDesign.chapterBreak === 'newRightPage' ? 'recto' : 'any')
+      : options.start
+    return { startOn: start, runningHeads: options.runningHeads, folio: options.folio, position: options.position }
   }
 
   const sources = []

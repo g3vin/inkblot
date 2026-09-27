@@ -1168,6 +1168,53 @@ public struct DigitalOptions: Codable, Equatable {
 	}
 }
 
+/// Where a text style sets its lines across the measure; `Inherit` keeps the body's.
+public enum TextStyleAlign: String, Codable, Equatable {
+	case inherit
+	case left
+	case center
+	case right
+	case justify
+}
+
+/// How a named text style looks in a book. A paragraph carries only the style's name
+/// (`styleName`); what the name means is the book's, so a letter looks the same in
+/// every chapter and changes everywhere at once.
+public struct TextStyleLook: Codable, Equatable {
+	/// A built-in style's id (`letter`, `verse`, …), or a custom style's own.
+	public let id: String
+	public let name: String
+	/// A face of its own; absent sets it in the body's.
+	public let fontFamily: String?
+	/// Its type size, as a multiple of the body's.
+	public let size: Double
+	public let italic: Bool
+	public let smallCaps: Bool
+	public let align: TextStyleAlign
+	/// Indented from both sides, in ems.
+	public let indentEm: Double
+	/// No first-line indent.
+	public let flush: Bool
+	/// Space above and below a run of it, in lines.
+	public let spaceLines: Double
+	/// A rule around it, as a sign or a notice is set.
+	public let boxed: Bool
+
+	public init(id: String, name: String, fontFamily: String?, size: Double, italic: Bool, smallCaps: Bool, align: TextStyleAlign, indentEm: Double, flush: Bool, spaceLines: Double, boxed: Bool) {
+		self.id = id
+		self.name = name
+		self.fontFamily = fontFamily
+		self.size = size
+		self.italic = italic
+		self.smallCaps = smallCaps
+		self.align = align
+		self.indentEm = indentEm
+		self.flush = flush
+		self.spaceLines = spaceLines
+		self.boxed = boxed
+	}
+}
+
 /// A folder (or the whole project) compiled as one book. Kept per folder in the
 /// project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
 /// belongs to all of them.
@@ -1209,8 +1256,11 @@ public struct BookSettings: Codable, Equatable {
 	public let activeCover: String?
 	/// How the e-book differs from the printed book.
 	public let digital: DigitalOptions?
+	/// How the book sets its named text styles — a letter, a text message, verse — over
+	/// the app's own looks for them, and any styles of its own.
+	public let textStyles: [TextStyleLook]?
 
-	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?, digital: DigitalOptions?) {
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?, digital: DigitalOptions?, textStyles: [TextStyleLook]?) {
 		self.folder = folder
 		self.title = title
 		self.author = author
@@ -1230,6 +1280,7 @@ public struct BookSettings: Codable, Equatable {
 		self.covers = covers
 		self.activeCover = activeCover
 		self.digital = digital
+		self.textStyles = textStyles
 	}
 }
 
@@ -1843,6 +1894,7 @@ public enum NativeCommand: Codable, Equatable {
 	case showProofIssue(ShowProofIssueCommand)
 	case setTypesetDisplay(SetTypesetDisplayCommand)
 	case addProjectFont(AddProjectFontCommand)
+	case setTextStyle(SetTextStyleCommand)
 	case setCoverImage(SetCoverImageCommand)
 	case editCoverSets(EditCoverSetsCommand)
 	case saveTypesetVersion(SaveTypesetVersionCommand)
@@ -1965,6 +2017,7 @@ public enum NativeCommand: Codable, Equatable {
 			showProofIssue,
 			setTypesetDisplay,
 			addProjectFont,
+			setTextStyle,
 			setCoverImage,
 			editCoverSets,
 			saveTypesetVersion,
@@ -2427,6 +2480,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .addProjectFont(content)
 					return
 				}
+			case .setTextStyle:
+				if let content = try? container.decode(SetTextStyleCommand.self, forKey: .payload) {
+					self = .setTextStyle(content)
+					return
+				}
 			case .setCoverImage:
 				if let content = try? container.decode(SetCoverImageCommand.self, forKey: .payload) {
 					self = .setCoverImage(content)
@@ -2868,6 +2926,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .addProjectFont(let content):
 			try container.encode(CodingKeys.addProjectFont, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setTextStyle(let content):
+			try container.encode(CodingKeys.setTextStyle, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setCoverImage(let content):
 			try container.encode(CodingKeys.setCoverImage, forKey: .type)
@@ -5927,12 +5988,15 @@ public struct ParagraphTypeset: Codable, Equatable {
 	public let keepTogether: Bool
 	public let keepWithNext: Bool
 	public let pageAdjust: Int32
+	/// Its named text style, if it has one.
+	public let styleName: String?
 
-	public init(tracking: Int32, keepTogether: Bool, keepWithNext: Bool, pageAdjust: Int32) {
+	public init(tracking: Int32, keepTogether: Bool, keepWithNext: Bool, pageAdjust: Int32, styleName: String?) {
 		self.tracking = tracking
 		self.keepTogether = keepTogether
 		self.keepWithNext = keepWithNext
 		self.pageAdjust = pageAdjust
+		self.styleName = styleName
 	}
 }
 
@@ -6056,6 +6120,8 @@ public struct PageLayoutState: Codable, Equatable {
 	public let paragraph: ParagraphTypeset?
 	/// The fonts kept in the project.
 	public let projectFonts: [ProjectFont]?
+	/// The book's named text styles, as it sets them: the built-in ones and its own.
+	public let textStyles: [TextStyleLook]?
 	/// The active text document, or none (a canvas, or nothing open).
 	public let docPath: String?
 	/// False while the document's editor is not yet there to take an edit. An edit sent
@@ -6111,7 +6177,7 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Production section. None for prose.
 	public let script: ScriptSummary?
 
-	public init(enabled: Bool, mode: EditorMode?, typesetView: TypesetView?, spread: Bool?, showGrid: Bool?, proof: Bool?, proofIssues: [ProofIssue]?, paragraph: ParagraphTypeset?, projectFonts: [ProjectFont]?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, cover: CoverState?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
+	public init(enabled: Bool, mode: EditorMode?, typesetView: TypesetView?, spread: Bool?, showGrid: Bool?, proof: Bool?, proofIssues: [ProofIssue]?, paragraph: ParagraphTypeset?, projectFonts: [ProjectFont]?, textStyles: [TextStyleLook]?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, cover: CoverState?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
 		self.mode = mode
 		self.typesetView = typesetView
@@ -6121,6 +6187,7 @@ public struct PageLayoutState: Codable, Equatable {
 		self.proofIssues = proofIssues
 		self.paragraph = paragraph
 		self.projectFonts = projectFonts
+		self.textStyles = textStyles
 		self.docPath = docPath
 		self.ready = ready
 		self.setup = setup
@@ -7541,6 +7608,15 @@ public struct SetTabOrderCommand: Codable, Equatable {
 
 	public init(tabIds: [String]) {
 		self.tabIds = tabIds
+	}
+}
+
+/// Give the selected paragraphs a named text style, or none (`style` absent).
+public struct SetTextStyleCommand: Codable, Equatable {
+	public let style: String?
+
+	public init(style: String?) {
+		self.style = style
 	}
 }
 

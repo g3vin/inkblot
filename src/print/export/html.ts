@@ -14,6 +14,8 @@ import { normalizePageSetup } from '../pageSetup'
 import type { PageSetup } from '../pageSetup'
 import { PageOrientation } from '../../types'
 import type { FrontSection } from '../bookMatter'
+import type { TextStyleLook } from '../../types'
+import { textStylesCss } from '../textStyles'
 import { leadingPt } from '../typography'
 import { portableContent } from './portable'
 import type { PMJSON } from './portable'
@@ -118,6 +120,7 @@ export const buildHtmlDocument = ({
   setup: setupInput,
   front = [],
   contents = false,
+  textStyles = [],
 }: {
   title: string
   author?: string
@@ -128,6 +131,8 @@ export const buildHtmlDocument = ({
   front?: FrontSection[]
   /** A list of the chapters, linked, after the front matter. */
   contents?: boolean
+  /** The book's named text styles. */
+  textStyles?: TextStyleLook[]
 }): string => {
   const setup = normalizePageSetup(setupInput)
   // Millimetres to three places: enough for any printer, and no float noise in the CSS.
@@ -175,6 +180,7 @@ main hr::after { content: ${JSON.stringify(t.sceneBreak)}; letter-spacing: 0.2em
 <title>${escapeHtml(title)}</title>
 ${author ? `<meta name="author" content="${escapeHtml(author)}">\n` : ''}<meta name="generator" content="Inkblot">
 <style>${PROSE_CSS}${pageCss}${typeCss}
+${textStylesCss(textStyles, 'main')}
 </style>
 </head>
 <body>

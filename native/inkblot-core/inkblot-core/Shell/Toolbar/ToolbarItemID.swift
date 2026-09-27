@@ -97,6 +97,8 @@ enum ToolbarItemID: String, CaseIterable {
     case typesetTighten = "inkblot.typeset.tighten"
     case typesetLoosen = "inkblot.typeset.loosen"
     case typesetKeepTogether = "inkblot.typeset.keep-together"
+    /// A named text style (a letter, verse), in either toolbar.
+    case namedTextStyle = "inkblot.typeset.text-style"
     case typesetInsert = "inkblot.typeset.insert"
     case typesetZoom = "inkblot.typeset.zoom"
     case typesetPrint = "inkblot.typeset.print"

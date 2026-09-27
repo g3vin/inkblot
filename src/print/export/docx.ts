@@ -23,7 +23,7 @@ import { normalizePageSetup, surnameOf, describeWordCount } from '../pageSetup'
 import type { PageSetup } from '../pageSetup'
 import { contactLines } from '../titlePage'
 import { LineSpacing, PageNumberFormat, PageOrientation, PrintAlignment, TitlePageStyle } from '../../types'
-import type { AuthorProfile, PrintTypography, RunningText } from '../../types'
+import type { AuthorProfile, PrintTypography, RunningText, TextStyleLook } from '../../types'
 import type { ExportChapter } from './html'
 import { imageSize, isRemote, toPortableImage } from './images'
 import type { ResolvedImage } from './images'
@@ -45,6 +45,8 @@ export interface DocxOptions {
   /** For a manuscript's title page: contact details and the word count. */
   profile?: Partial<AuthorProfile>
   words?: number
+  /** The book's named text styles, as Word paragraph styles. */
+  textStyles?: TextStyleLook[]
   resolveImage: (src: string) => Promise<ResolvedImage | null>
   modified?: Date
 }
@@ -253,7 +255,8 @@ class Writer {
       case 'paragraph': {
         const flush = this.flushNext
         this.flushNext = false
-        return this.paragraph({ style: ctx.quote ? 'Quote' : undefined, align: attrs.textAlign, flush }, this.inline(node.content))
+        const named = typeof attrs.styleName === 'string' && attrs.styleName ? textStyleId(attrs.styleName) : undefined
+        return this.paragraph({ style: named || (ctx.quote ? 'Quote' : undefined), align: attrs.textAlign, flush: flush && !named }, this.inline(node.content))
       }
       case 'heading': {
         const level = Math.min(6, Math.max(1, Number(attrs.level) || 1))
@@ -550,7 +553,35 @@ const scriptStylesXml = (stage: boolean): string => SCRIPT_STYLES.map((s) => {
   return `<w:style w:type="paragraph" w:customStyle="1" w:styleId="${scriptStyleId(spec.id)}"><w:name w:val="${spec.name}"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr>${p}</w:pPr>${r ? `<w:rPr>${r}</w:rPr>` : ''}</w:style>`
 }).join('\n')
 
-const stylesXml = (t: PrintTypography | undefined, language: string, script: 'screenplay' | 'stageplay' | null = null): string => {
+/** A named text style's Word style id. */
+export const textStyleId = (id: string): string => `Text${id.replace(/[^A-Za-z0-9]/g, '')}`
+
+/** The book's named text styles, as Word paragraph styles over Normal. */
+const textStylesXml = (looks: TextStyleLook[], t: PrintTypography | undefined): string => {
+  const body = t?.fontSizePt || 12
+  const lineTwips = Math.round(body * 20 * 1.2)
+  return looks.map((s) => {
+    const p: string[] = []
+    const space = Math.round(s.spaceLines * lineTwips)
+    if (space) p.push(`<w:spacing w:before="${space}" w:after="${space}"/>`)
+    if (s.boxed) p.push('<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="4" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="4" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="4" w:color="auto"/></w:pBdr>')
+    const indent = Math.round(s.indentEm * body * 20)
+    if (indent || s.flush) p.push(`<w:ind${indent ? ` w:left="${indent}" w:right="${indent}"` : ''}${s.flush ? ' w:firstLine="0"' : ''}/>`)
+    const jc = { left: 'left', center: 'center', right: 'right', justify: 'both' }[String(s.align)]
+    if (jc) p.push(`<w:jc w:val="${jc}"/>`)
+    const r: string[] = []
+    if (s.fontFamily) {
+      const face = x(firstFamily(s.fontFamily))
+      r.push(`<w:rFonts w:ascii="${face}" w:hAnsi="${face}" w:cs="${face}"/>`)
+    }
+    if (s.italic) r.push('<w:i/>')
+    if (s.smallCaps) r.push('<w:smallCaps/>')
+    if (s.size !== 1) r.push(`<w:sz w:val="${Math.round(body * 2 * s.size)}"/><w:szCs w:val="${Math.round(body * 2 * s.size)}"/>`)
+    return `<w:style w:type="paragraph" w:customStyle="1" w:styleId="${textStyleId(s.id)}"><w:name w:val="${x(s.name)}"/><w:basedOn w:val="Normal"/><w:qFormat/>${p.length ? `<w:pPr>${p.join('')}</w:pPr>` : ''}${r.length ? `<w:rPr>${r.join('')}</w:rPr>` : ''}</w:style>`
+  }).join('\n')
+}
+
+const stylesXml = (t: PrintTypography | undefined, language: string, script: 'screenplay' | 'stageplay' | null = null, textStyles: TextStyleLook[] = []): string => {
   const font = t ? firstFamily(t.fontFamily) : 'Georgia'
   const size = Math.round((t?.fontSizePt || 12) * 2)
   const indent = t ? twips(t.firstLineIndentMm) : 0
@@ -576,7 +607,7 @@ ${heading(6, 1)}
 <w:style w:type="paragraph" w:styleId="Bibliography"><w:name w:val="Bibliography"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:hanging="720"/><w:jc w:val="left"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Header"><w:name w:val="header"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Footer"><w:name w:val="footer"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>
-${script ? `${scriptStylesXml(script === 'stageplay')}\n` : ''}<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>
+${script ? `${scriptStylesXml(script === 'stageplay')}\n` : ''}${textStyles.length ? `${textStylesXml(textStyles, t)}\n` : ''}<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>
 </w:styles>`
 }
 
@@ -709,7 +740,7 @@ ${author ? `<dc:creator>${x(author)}</dc:creator>\n` : ''}<dc:language>${x(langu
     { name: '[Content_Types].xml', data: contentTypes },
     { name: '_rels/.rels', data: rootRels },
     { name: 'word/document.xml', data: document },
-    { name: 'word/styles.xml', data: stylesXml(type, language, scriptFormat) },
+    { name: 'word/styles.xml', data: stylesXml(type, language, scriptFormat, options.textStyles || []) },
     { name: 'word/settings.xml', data: settingsXml(setup, type, Boolean(options.contents)) },
     { name: 'word/numbering.xml', data: numberingXml(w.lists) },
     { name: 'word/_rels/document.xml.rels', data: docRels },

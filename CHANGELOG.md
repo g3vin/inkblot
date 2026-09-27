@@ -104,6 +104,15 @@ Notable changes to Inkblot. The format follows
   beside recto. Align to Baseline Grid sets headings, quotations, breaks and pictures to
   whole lines so lines stand level across a spread, and the grid can be drawn over the
   pages.
+- **Named text styles:** a paragraph can be set as a Letter, a Text Message, an Email,
+  Verse, a Block Quote, a Journal Entry, a Sign, Centered or Flush Left (Format › Text
+  Style, or the toolbar), in Write or in Typeset. How each looks is the book's — font,
+  size, italic, small capitals, alignment, indents, space around, a ruled box — set under
+  Typeset › Text Styles, where a book can add styles of its own; it changes every such
+  paragraph at once, on the pages, in the EPUB and HTML, and as Word paragraph styles.
+  In Write a styled paragraph shows only a faint rule at its side.
+- **Parts:** a book's part dividers can have a design of their own — where they start,
+  alignment, cases, ornament and size — under Typeset › Parts.
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
   differences — and their history rows say what changed ("+2 places · 3 moved ·

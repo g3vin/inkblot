@@ -83,6 +83,8 @@ struct TypesetToolbar: CustomizableToolbarContent {
         }
         .defaultCustomization(.hidden)
 
+        ToolbarItem(id: ToolbarItemID.namedTextStyle.id) { TextStyleMenu(model: model) }
+
         ToolbarSpacer(.fixed)
 
         ToolbarItem(id: ToolbarItemID.typesetInsert.id) {

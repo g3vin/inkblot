@@ -69,6 +69,8 @@ struct DocumentToolbar: CustomizableToolbarContent {
 
         ToolbarItem(id: ToolbarItemID.paragraphStyle.id) { ParagraphStyleMenu(model: model) }
             .defaultCustomization(.hidden)
+        ToolbarItem(id: ToolbarItemID.namedTextStyle.id) { TextStyleMenu(model: model) }
+            .defaultCustomization(.hidden)
         ToolbarItem(id: ToolbarItemID.bulletedList.id) {
             ListToggle(model: model, list: .bullet, symbol: "list.bullet", title: "Bulleted List", isOn: \.bulletList)
         }

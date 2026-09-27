@@ -121,6 +121,12 @@ final class PageLayoutModel {
     var proofIssues: [ProofIssue] { state?.proofIssues ?? [] }
     var paragraph: ParagraphTypeset? { state?.paragraph.flatMap { $0 } }
     var projectFonts: [ProjectFont] { state?.projectFonts ?? [] }
+    var textStyles: [TextStyleLook] { state?.textStyles ?? [] }
+
+    /// A named text style on the selected paragraphs, or none.
+    func setTextStyle(_ id: String?) {
+        bridge.send(.setTextStyle(SetTextStyleCommand(style: id)))
+    }
 
     func setDisplay(spread: Bool? = nil, grid: Bool? = nil, proof: Bool? = nil) {
         bridge.send(.setTypesetDisplay(SetTypesetDisplayCommand(spread: spread, grid: grid, proof: proof)))
@@ -739,6 +745,8 @@ struct BookDraft: Equatable {
     var digitalPublisherFont: Bool
     var digitalPlainSceneBreaks: Bool
     var digitalInvertOrnaments: Bool
+    /// The book's own looks for its named text styles (`textStyles.ts`).
+    var textStyles: [TextStyleLook]
 
     init(_ b: BookSettings) {
         folder = b.folder
@@ -783,6 +791,7 @@ struct BookDraft: Equatable {
         digitalPublisherFont = b.digital?.publisherFont ?? true
         digitalPlainSceneBreaks = b.digital?.plainSceneBreaks ?? false
         digitalInvertOrnaments = b.digital?.invertOrnamentsInDark ?? true
+        textStyles = b.textStyles ?? []
     }
 
     /// Leave a chapter in or out of the book.
@@ -838,7 +847,8 @@ struct BookDraft: Equatable {
             activeCover: activeCover,
             digital: DigitalOptions(
                 dropCaps: digitalDropCaps, headImages: digitalHeadImages, publisherFont: digitalPublisherFont,
-                plainSceneBreaks: digitalPlainSceneBreaks, invertOrnamentsInDark: digitalInvertOrnaments))
+                plainSceneBreaks: digitalPlainSceneBreaks, invertOrnamentsInDark: digitalInvertOrnaments),
+            textStyles: textStyles)
     }
 }
 
