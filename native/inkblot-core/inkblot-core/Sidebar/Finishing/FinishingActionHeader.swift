@@ -296,6 +296,7 @@ struct JobStatusLine: View {
 enum FinishingSectionID {
     static let thisPage = "typeset.thisPage"
     static let style = "typeset.style"
+    static let digital = "typeset.digital"
     static let cover = "output.cover"
     static let pageSize = "page.size"
     static let headerFooter = "page.headerFooter"
@@ -312,7 +313,7 @@ enum FinishingSectionID {
     static let publishing = "publish.publishing"
     static let script = "publish.script"
 
-    static let all = [thisPage, style, cover, pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
+    static let all = [thisPage, style, digital, cover, pageSize, headerFooter, typography, titlePage, textFlow, bookInfo, chapters, headings, frontMatter, backMatter, bookSetup, script, publishing, binding]
 }
 
 /// A Finishing tab: the action header pinned at the top, the tab's settings scrolling

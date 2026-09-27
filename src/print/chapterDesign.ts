@@ -8,7 +8,7 @@
  * stored from then on. Covers likewise: a book with one `coverImage` has one version.
  */
 import { ChapterBreak, ChapterNumberStyle, CoverFit, HeadAlignment, HeadCase, OrnamentKind, OrnamentPosition } from '../types'
-import type { BookSettings, ChapterDesign, ChapterNumbering, CoverSet, PageSetup } from '../types'
+import type { BookSettings, ChapterDesign, ChapterNumbering, CoverSet, DigitalOptions, PageSetup } from '../types'
 
 export const DEFAULT_CHAPTER_DESIGN: ChapterDesign = {
   showNumber: false,
@@ -167,5 +167,24 @@ export const withCoverPart = <B extends Partial<BookSettings>>(
   const out: B = { ...book, covers: next, activeCover: active?.id }
   if (active?.front) out.coverImage = active.front
   else delete out.coverImage
+  return out
+}
+
+/** How the e-book differs from print, until the author says otherwise. */
+export const DEFAULT_DIGITAL: DigitalOptions = {
+  dropCaps: true,
+  headImages: true,
+  publisherFont: true,
+  plainSceneBreaks: false,
+  invertOrnamentsInDark: true,
+}
+
+/** A book's e-book options, each a boolean, the defaults filling what is missing. */
+export const digitalOf = (book: Partial<BookSettings> | null | undefined): DigitalOptions => {
+  const stored = (book?.digital && typeof book.digital === 'object' ? book.digital : {}) as Partial<Record<keyof DigitalOptions, unknown>>
+  const out = { ...DEFAULT_DIGITAL }
+  for (const key of Object.keys(DEFAULT_DIGITAL) as Array<keyof DigitalOptions>) {
+    if (typeof stored[key] === 'boolean') out[key] = stored[key] as boolean
+  }
   return out
 }

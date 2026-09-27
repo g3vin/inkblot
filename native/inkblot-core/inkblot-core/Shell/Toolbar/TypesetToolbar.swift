@@ -12,6 +12,17 @@ struct TypesetToolbar: CustomizableToolbarContent {
     var body: some CustomizableToolbarContent {
         ToolbarItem(id: ToolbarItemID.editorMode.id) { EditorModePicker(model: model) }
 
+        ToolbarItem(id: ToolbarItemID.typesetView.id) {
+            let layout = model.pageLayout
+            Picker("View", selection: Binding(get: { layout.typesetView }, set: { layout.setTypesetView($0) })) {
+                Label("Print", systemImage: "book.pages").tag(TypesetView.print)
+                Label("Digital", systemImage: "ipad.and.iphone").tag(TypesetView.digital)
+            }
+            .pickerStyle(.segmented)
+            .help("The printed pages, or the e-book as a reader shows it")
+            .disabled(!layout.hasDocument)
+        }
+
         ToolbarSpacer(.fixed)
 
         ToolbarItem(id: ToolbarItemID.typesetInsert.id) {

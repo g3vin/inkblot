@@ -295,6 +295,10 @@ struct InkblotCommands: Commands {
             }
             .keyboardShortcut("p", modifiers: [.command, .option])
             .disabled(!model.hasProject)
+            Toggle("E-book Preview", isOn: Binding(
+                get: { model.pageLayout.typesetView == .digital },
+                set: { model.pageLayout.setTypesetView($0 ? .digital : .print) }))
+                .disabled(model.pageLayout.mode != .typeset)
             Menu("Page Zoom") {
                 Button("Fit Width") { model.pageLayout.fit(.width) }
                 Button("Fit Page") { model.pageLayout.fit(.page) }

@@ -720,6 +720,135 @@
 .cover-barcode { display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0, 0, 0, 0.5); background: rgba(255, 255, 255, 0.75); color: #555555; font-size: 10px; }
 .cover-note { max-width: 640px; margin: 16px auto 0; text-align: center; opacity: 0.7; }
 
+/* ---- the e-book, as a reader shows it (DigitalPreview.jsx) ---- */
+
+.pane-scroll.is-digital { overflow: hidden; }
+
+.digital-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  background: var(--pl-desk);
+  color: var(--pl-ink);
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+  outline: none;
+}
+
+.digital-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--pl-faint);
+}
+
+.digital-bar select,
+.digital-bar button,
+.digital-footer button,
+.digital-picked button {
+  font: inherit;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--pl-faint);
+  background: var(--pl-paper);
+  color: inherit;
+  cursor: pointer;
+}
+
+.digital-bar button:disabled,
+.digital-footer button:disabled { opacity: 0.4; cursor: default; }
+.digital-size { font-variant-numeric: tabular-nums; }
+.digital-size small { opacity: 0.65; font-size: inherit; }
+.digital-sep { width: 1px; height: 18px; background: var(--pl-faint); }
+.digital-fit { display: flex; gap: 4px; align-items: center; }
+.digital-type { display: flex; gap: 2px; }
+.digital-type button { font-family: Georgia, serif; min-width: 28px; }
+.digital-type button.is-large { font-size: 16px; line-height: 1; }
+
+.digital-segmented { display: inline-flex; border: 1px solid var(--pl-faint); border-radius: 6px; overflow: hidden; }
+.digital-bar .digital-segmented button { border: 0; border-radius: 0; background: transparent; }
+.digital-bar .digital-segmented button.is-on { background: var(--accent-color, #0a84ff); color: #ffffff; }
+
+.digital-more { position: relative; }
+.digital-more summary { cursor: pointer; padding: 3px 9px; border: 1px solid var(--pl-faint); border-radius: 6px; background: var(--pl-paper); list-style: none; }
+.digital-more summary::-webkit-details-marker { display: none; }
+.digital-more-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  min-width: 280px;
+  border-radius: 8px;
+  background: var(--pl-paper);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+.digital-more-panel > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+.digital-checks-toggle.has-warnings::before { content: '●'; color: #e0a100; margin-right: 4px; }
+.digital-checks { margin: 0; padding: 8px 16px 8px 32px; border-bottom: 1px solid var(--pl-faint); background: var(--pl-paper); }
+.digital-checks li { margin: 2px 0; }
+.digital-checks li.is-error { color: #d70015; }
+
+.digital-stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+}
+
+.digital-device {
+  position: relative;
+  flex: none;
+  padding: 12px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: #1c1c1e;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.digital-screen { transform-origin: top left; overflow: hidden; border-radius: 4px; }
+.digital-screen iframe { display: block; border: 0; background: transparent; }
+.digital-status { padding: 24px; color: #777777; }
+
+.digital-handle { position: absolute; z-index: 2; }
+.digital-handle.is-right { top: 25%; bottom: 25%; right: -10px; width: 8px; cursor: ew-resize; border-radius: 4px; background: var(--pl-faint); }
+.digital-handle.is-bottom { left: 25%; right: 25%; bottom: -10px; height: 8px; cursor: ns-resize; border-radius: 4px; background: var(--pl-faint); }
+.digital-handle.is-corner { right: -12px; bottom: -12px; width: 14px; height: 14px; cursor: nwse-resize; border-radius: 3px; background: var(--pl-faint); }
+.digital-handle:hover { background: var(--accent-color, #0a84ff); }
+
+.digital-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.digital-picked {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--pl-paper);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
 /* ---- the pages and sheets that go to paper ---- */
 
 #print-root {

@@ -76,6 +76,17 @@ Notable changes to Inkblot. The format follows
   beside its name, from 1 or from 0, leaving out prologues and hidden chapters. Both are
   in the folder's menu in the tree, and under Typeset › Book.
 
+- **The e-book, as a reader shows it:** Typeset's Print | Digital switch (also View ›
+  E-book Preview) shows the EPUB's own pages in a device-sized viewport — Kindle
+  Paperwhite and Scribe, Kobo Clara, iPhone, Android, iPad and Apple Books on the Mac,
+  or any size dragged to. Page through it as a reader would; try larger type, sepia and
+  night themes, the reader's own font, looser spacing and wider margins; click a page to
+  open it in Print or edit it in Write. The EPUB now carries the book's design — its
+  face, indents, scene breaks, drop cap and chapter heads — and Typeset › E-book sets
+  what it does differently from print: drop caps, chapter pictures, the book's font,
+  plain scene breaks, ornaments kept visible at night. Missing alt text, images over
+  Kindle's limits, an empty book and a cover of the wrong shape are pointed out, in the
+  preview and in the preflight.
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
   differences — and their history rows say what changed ("+2 places · 3 moved ·

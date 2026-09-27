@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 /// what order, is the Book navigator's; how its chapters open is Chapter Openings'.
 struct BookSections: View {
     enum Kind: Hashable {
-        case info, setup
+        case info, setup, digital
     }
 
     let kinds: [Kind]
@@ -27,6 +27,7 @@ struct BookSections: View {
                 switch kind {
                 case .info: infoSection(state, book)
                 case .setup: setupSection(state)
+                case .digital: digitalSection()
                 }
             }
         }
@@ -41,6 +42,33 @@ struct BookSections: View {
                 draft[keyPath: keyPath] = value
                 layout.apply(draft)
             })
+    }
+
+    /* ---------------- the e-book ---------------- */
+
+    /// What the EPUB sets differently from print. Open first while Typeset shows the
+    /// e-book, since that is what it changes.
+    @ViewBuilder
+    private func digitalSection() -> some View {
+        let layout = model.pageLayout
+        FinishingSection("E-book", id: FinishingSectionID.digital) {
+            Toggle("Show the E-book Preview", isOn: Binding(
+                get: { layout.typesetView == .digital },
+                set: { layout.setTypesetView($0 ? .digital : .print) }
+            ))
+            Toggle("Drop Caps", isOn: binding(\.digitalDropCaps))
+                .help("A large first letter on each chapter, as in print. Some readers set them badly at large type sizes.")
+            Toggle("Chapter Pictures", isOn: binding(\.digitalHeadImages))
+                .help("The chapter’s picture and a picture ornament in each chapter’s head")
+            Toggle("The Book’s Font", isOn: binding(\.digitalPublisherFont))
+                .help("Set in the book’s face where the reader lets the book choose; off leaves the reader’s own")
+            Toggle("Plain Scene Breaks", isOn: binding(\.digitalPlainSceneBreaks))
+                .help("Scene breaks as * * *, which every reader’s font has, instead of the book’s ornament")
+            Toggle("Keep Ornaments Visible in Night Mode", isOn: binding(\.digitalInvertOrnaments))
+                .help("Picture ornaments are inverted on a dark page, where dark ink on a clear ground would vanish")
+        } footer: {
+            FinishingNote("A reader chooses the page, the type size and often the font. These are what the book still decides — the EPUB and the preview both follow them.")
+        }
     }
 
     /* ---------------- the book ---------------- */

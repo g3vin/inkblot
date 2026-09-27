@@ -22,12 +22,15 @@ struct TypesetPanelView: View {
                 ThisPageSection(row: row)
             }
             BookSections(.info)
+            // While the e-book is showing, its options are what the panel is for.
+            if model.pageLayout.typesetView == .digital { BookSections(.digital) }
             StyleGallerySection()
             PageSetupSections(.format, .page)
             PageSetupSections(.typography, .textFlow)
             ChapterOpeningsSection(unit: LengthUnit(rawValue: unitsRaw) ?? .inches)
             PageSetupSections(.headerFooter, .titlePage)
             BookSections(.setup)
+            if model.pageLayout.typesetView != .digital { BookSections(.digital) }
             Section {
                 Button {
                     model.showPublish()

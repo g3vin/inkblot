@@ -848,6 +848,36 @@ export interface CoverSet {
 }
 
 /**
+ * What an e-book leaves out or sets differently from print. A reading system chooses
+ * the page, the type size and — often — the font; what the book still decides is
+ * whether its flourishes come with it.
+ */
+export interface DigitalOptions {
+	/**
+	 * A drop cap on each chapter's first letter, as in print. Some readers draw them
+	 * badly at large type sizes.
+	 */
+	dropCaps: boolean;
+	/** The chapter's picture in its head, and a picture ornament. */
+	headImages: boolean;
+	/**
+	 * The book's own font, where the reader lets the book choose; off leaves the
+	 * reader's.
+	 */
+	publisherFont: boolean;
+	/**
+	 * Scene breaks set as `* * *`, which every reader's font has, instead of the
+	 * book's ornament, which some e-readers' fonts lack.
+	 */
+	plainSceneBreaks: boolean;
+	/**
+	 * Pictures that are ornaments (dark on a clear ground) are inverted on a dark
+	 * page, as a reader in night mode would otherwise lose them.
+	 */
+	invertOrnamentsInDark: boolean;
+}
+
+/**
  * A folder (or the whole project) compiled as one book. Kept per folder in the
  * project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
  * belongs to all of them.
@@ -896,6 +926,8 @@ export interface BookSettings {
 	/** The book's covers; `active_cover` is the one print, EPUB and export use. */
 	covers?: CoverSet[];
 	activeCover?: string;
+	/** How the e-book differs from the printed book. */
+	digital?: DigitalOptions;
 }
 
 /** A book style (`bookStyles.ts`): a coordinated design, applied whole. */
@@ -1349,6 +1381,7 @@ export type NativeCommand =
 	| { type: "setChapterMeta", payload: SetChapterMetaCommand }
 	| { type: "setHeadImage", payload: SetHeadImageCommand }
 	| { type: "setFolderBookOptions", payload: SetFolderBookOptionsCommand }
+	| { type: "setTypesetView", payload: SetTypesetViewCommand }
 	| { type: "setCoverImage", payload: SetCoverImageCommand }
 	| { type: "editCoverSets", payload: EditCoverSetsCommand }
 	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
@@ -3041,6 +3074,12 @@ export enum EditorMode {
 	Typeset = "typeset",
 }
 
+/** Typeset's view of the book: its printed pages, or the e-book as a reader shows it. */
+export enum TypesetView {
+	Print = "print",
+	Digital = "digital",
+}
+
 /** Where the setup a document lays out in came from. */
 export enum SetupSource {
 	/** The document's own. */
@@ -3114,6 +3153,8 @@ export interface PageLayoutState {
 	enabled: boolean;
 	/** Write or Typeset, for the whole window. */
 	mode?: EditorMode;
+	/** In Typeset, the printed pages or the e-book. */
+	typesetView?: TypesetView;
 	/** The active text document, or none (a canvas, or nothing open). */
 	docPath?: string;
 	/**
@@ -4098,6 +4139,10 @@ export interface SetTitlebarInsetCommand {
 	leading: number;
 	/** Room at the right end, for the button that reopens a hidden native sidebar. */
 	trailing?: number;
+}
+
+export interface SetTypesetViewCommand {
+	view: TypesetView;
 }
 
 /**

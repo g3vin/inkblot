@@ -434,6 +434,51 @@ for (const [label, setup] of [['Letter', null], ['6 × 9 mirrored', BOOK]]) {
   await page.close()
 }
 
+/* ---------------- 5e. the e-book, as a reader pages it ---------------- */
+
+{
+  const page = await open('<p>x</p>')
+  const r = await page.evaluate(async () => {
+    const { readerCss, DEFAULT_READER, ebookCss } = window.__print
+    const para = (n) => Array.from({ length: n }, (_, i) => `<p>Paragraph ${i} of a chapter long enough to run over several screens of a small reader, as a novel's chapters do.</p>`).join('')
+    const body = [1, 2, 3].map((n) => `<section class="ebook-item" data-item="c${n}"><header class="chapter-head"><h1 class="ch-title">Chapter ${n}</h1></header>${para(40)}</section>`).join('')
+    const results = []
+    for (const [w, h] of [[412, 549], [1024, 720]]) {
+      const frame = document.createElement('iframe')
+      frame.style.cssText = `width:${w}px;height:${h}px;border:0`
+      frame.srcdoc = `<!doctype html><html><head><style>${ebookCss({ typography: null })}</style><style>${readerCss(DEFAULT_READER, w, h)}</style></head><body>${body}</body></html>`
+      document.body.appendChild(frame)
+      await new Promise((resolve) => { frame.onload = resolve })
+      const doc = frame.contentDocument
+      const root = doc.scrollingElement
+      const pages = Math.ceil((root.scrollWidth - 1) / w)
+      // Each chapter opens a page: its left edge is a page's left margin.
+      const starts = [...doc.querySelectorAll('.ebook-item')].map((s) => (s.getBoundingClientRect().left + root.scrollLeft) % w)
+      // No line runs below the page, or into the next.
+      let overflow = 0
+      for (const p of doc.querySelectorAll('p')) {
+        for (const rect of p.getClientRects()) {
+          if (rect.bottom > h + 0.5) overflow += 1
+          const x = (rect.left + root.scrollLeft) % w
+          if (x + rect.width > w + 0.5) overflow += 1
+        }
+      }
+      root.scrollLeft = 2 * w
+      const turned = root.scrollLeft
+      results.push({ w, pages, starts, overflow, turned })
+      frame.remove()
+    }
+    return results
+  })
+  const [phone, wide] = r
+  ok(`a reader's screen pages the book (${phone.pages} pages at 412 × 549)`, phone.pages > 6)
+  ok('each chapter opens a page, at the margin', new Set(phone.starts.map((x) => Math.round(x))).size === 1 && phone.starts[0] > 0 && phone.starts[0] < 60, JSON.stringify(phone.starts))
+  ok('no line runs off a page, down or across', phone.overflow === 0 && wide.overflow === 0, `${phone.overflow}/${wide.overflow}`)
+  ok('a page turn is exactly one screen', phone.turned === 2 * phone.w && wide.turned === 2 * wide.w)
+  ok('a wide screen shows two pages at a time, so it turns fewer screens', wide.pages < phone.pages)
+  await page.close()
+}
+
 /* ---------------- 6. a whole manuscript ---------------- */
 
 {
