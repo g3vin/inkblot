@@ -28,7 +28,7 @@ import {
   setupUsesToken,
   surnameOf,
 } from './pageSetup'
-import { loadTypographyFont, typographyClasses, typographyKey, typographyVars } from './typography'
+import { baselineGridPx, baselineGridStyle, loadTypographyFont, typographyClasses, typographyKey, typographyVars } from './typography'
 import { countEditorWords } from '../lib/wordCount'
 import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, snapToDevicePixel, ZOOM_STEPS } from './zoom'
 import { PAGE_GAP } from './printLayoutConstants'
@@ -69,6 +69,8 @@ export default function PrintLayoutView({
   scrollEl,
   statusHost,
   showGuides = false,
+  // The baseline grid, drawn over each page's text block.
+  showGrid = false,
   // Where the document's first page falls in its book, in the Typeset view of a whole
   // book: which side it is on, and the folio it carries.
   firstPhysical = 1,
@@ -107,9 +109,10 @@ export default function PrintLayoutView({
     stride: slotStride,
     columns: setup.columns,
     minLines: setup.widowOrphanLines,
+    grid: baselineGridPx(setup.typography),
     typeKey,
     revision: fontsLoaded,
-  }), [metrics.contentHeight, slotStride, setup.columns, setup.widowOrphanLines, typeKey, fontsLoaded])
+  }), [metrics.contentHeight, slotStride, setup.columns, setup.widowOrphanLines, setup.typography, typeKey, fontsLoaded])
 
   // Hand the plugin its frame; take it back when the view goes.
   useEffect(() => {
@@ -549,6 +552,7 @@ export default function PrintLayoutView({
     </div>
   )
   const pageCountHost = statusHost?.querySelector(':scope > .pane-status') || null
+  const gridStyle = showGrid && setup.typography ? baselineGridStyle(setup.typography) : null
 
   return (
     <div className="print-layout">
@@ -582,6 +586,12 @@ export default function PrintLayoutView({
                   <div className="pl-slot-label" style={{ left: `${pageLeftMargin(setup, page.physical)}px`, top: `${Math.max(4, metrics.contentTop - 16)}px` }}>
                     Page {page.folio} · column {page.column + 1} of {setup.columns}
                   </div>
+                ) : null}
+                {showGrid && gridStyle && !page.blank ? (
+                  <div
+                    className="pl-baseline-grid"
+                    style={{ ...gridStyle, left: `${pageLeftMargin(setup, page.physical)}px`, top: `${metrics.contentTop}px`, width: `${metrics.contentWidth}px`, height: `${metrics.contentHeight}px` }}
+                  />
                 ) : null}
                 {showGuides ? (
                   <div

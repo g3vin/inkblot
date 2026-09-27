@@ -17,6 +17,9 @@ import { preparePrint } from '../../src/print/printJob'
 import { setLiveHead } from '../../src/print/ChapterHeadDecorations'
 import { readerCss, DEFAULT_READER } from '../../src/print/devicePresets'
 import { ebookCss } from '../../src/print/export/ebook'
+import { analyzeLines, readParagraphLines } from '../../src/print/proofIssues'
+import { setParagraphTypeset } from '../../src/print/ParagraphTypeset'
+import { baselineGridPx } from '../../src/print/typography'
 
 const params = new URLSearchParams(location.search)
 const initialSetup = JSON.parse(params.get('setup') || 'null')
@@ -33,7 +36,7 @@ function Harness() {
       if (initialSetup) created.commands.setPageSetup(initialSetup)
     },
   })
-  window.__print = { editor, paginationKey, computePushes, preparePrint, setZoom, setLiveHead, readerCss, DEFAULT_READER, ebookCss }
+  window.__print = { editor, paginationKey, computePushes, preparePrint, setZoom, setLiveHead, readerCss, DEFAULT_READER, ebookCss, analyzeLines, readParagraphLines, setParagraphTypeset, baselineGridPx }
   const setup = editor?.state.doc.attrs.pageSetup || initialSetup
   // `?typeset=1`: the page's handles, their edits recorded and applied to the document.
   const typeset = params.get('typeset') && editor ? {

@@ -59,6 +59,8 @@ fn typography() -> crate::types::PrintTypography {
         chapter_sink_mm: 25.4,
         no_indent_after_break: true,
         images: Some(crate::types::ImageTypesetting::default()),
+        composition: Some(crate::types::Composition { baseline_grid: true, ..Default::default() }),
+        features: None,
     }
 }
 
@@ -490,6 +492,10 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::SetHeadImage(SetHeadImageCommand { target: HeadImageTarget::Ornament, path: Some("/Users/a/fleuron.png".into()) }),
         NativeCommand::SetFolderBookOptions(SetFolderBookOptionsCommand { folder: "Novel".into(), number_in_tree: Some(true), start_at: Some(0), continuous: None }),
         NativeCommand::SetTypesetView(SetTypesetViewCommand { view: TypesetView::Digital }),
+        NativeCommand::SetParagraphTypeset(SetParagraphTypesetCommand { anchor: Some(anchor()), nudge_tracking: Some(-5), ..Default::default() }),
+        NativeCommand::ShowProofIssue(ShowProofIssueCommand { anchor: anchor() }),
+        NativeCommand::SetTypesetDisplay(SetTypesetDisplayCommand { spread: Some(true), ..Default::default() }),
+        NativeCommand::AddProjectFont(AddProjectFontCommand { path: "/Users/a/Fonts/Garamond.otf".into() }),
         NativeCommand::SetCoverImage(SetCoverImageCommand { set_id: None, part: crate::types::CoverPart::Spine, path: Some("/Users/a/spine.png".into()) }),
         NativeCommand::EditCoverSets(EditCoverSetsCommand { action: CoverSetAction::Rename, id: Some("v1".into()), name: Some("Hardcover".into()), fit: None }),
         NativeCommand::SaveTypesetVersion(SaveTypesetVersionCommand { name: "Sent to KDP".into() }),
@@ -943,6 +949,18 @@ fn every_event() -> Vec<WebviewEvent> {
             enabled: true,
             mode: EditorMode::Typeset,
             typeset_view: TypesetView::Print,
+            spread: false,
+            show_grid: true,
+            proof: true,
+            proof_issues: vec![ProofIssue {
+                id: "widow-12".into(),
+                kind: ProofKind::Widow,
+                page: 3,
+                anchor: TextAnchor::new(120, 136, "and so it ended."),
+                fixes: vec![ProofFix::Tighten, ProofFix::RunLong],
+            }],
+            paragraph: Some(ParagraphTypeset { tracking: -5, ..Default::default() }),
+            project_fonts: vec![ProjectFont { family: "EB Garamond".into(), path: ".assets/fonts/EBGaramond.otf".into(), embeddable: true }],
             doc_path: Some("Manuscript/one".into()),
             setup: page_setup(),
             ready: true,
@@ -1160,6 +1178,10 @@ fn every_command_has_its_documented_wire_name() {
             "setHeadImage",
             "setFolderBookOptions",
             "setTypesetView",
+            "setParagraphTypeset",
+            "showProofIssue",
+            "setTypesetDisplay",
+            "addProjectFont",
             "setCoverImage",
             "editCoverSets",
             "saveTypesetVersion",
@@ -1480,6 +1502,8 @@ fn a_page_setup_carries_its_typography_in_camel_case() {
         chapter_sink_mm: 76.2,
         no_indent_after_break: true,
         images: None,
+        composition: None,
+        features: None,
     });
     setup.title_page = Some(TitlePageOptions { style: TitlePageStyle::Manuscript, show_contact: true, show_word_count: true });
     let wire = serde_json::to_value(&setup).unwrap();

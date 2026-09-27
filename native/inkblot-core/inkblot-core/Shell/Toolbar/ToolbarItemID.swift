@@ -91,6 +91,12 @@ enum ToolbarItemID: String, CaseIterable {
     /// Write | Typeset. In the document toolbar and the typeset one, first in both.
     case editorMode = "inkblot.view.editor-mode"
     case typesetView = "inkblot.typeset.view"
+    case typesetSpread = "inkblot.typeset.spread"
+    case typesetProof = "inkblot.typeset.proof"
+    case typesetGrid = "inkblot.typeset.grid"
+    case typesetTighten = "inkblot.typeset.tighten"
+    case typesetLoosen = "inkblot.typeset.loosen"
+    case typesetKeepTogether = "inkblot.typeset.keep-together"
     case typesetInsert = "inkblot.typeset.insert"
     case typesetZoom = "inkblot.typeset.zoom"
     case typesetPrint = "inkblot.typeset.print"

@@ -19,7 +19,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 
 /** The blocks a typesetter sets something on, and what on each. */
 export const TYPESET_BLOCKS: Record<string, string[]> = {
-  paragraph: ['styleName', 'tracking', 'keepTogether', 'keepWithNext'],
+  paragraph: ['styleName', 'tracking', 'keepTogether', 'keepWithNext', 'pageAdjust'],
   heading: ['keepWithNext'],
   blockquote: ['styleName'],
   image: ['width', 'align', 'layout'],
@@ -30,7 +30,7 @@ export const TYPESET_BLOCKS: Record<string, string[]> = {
  * belonged to the lines it had. A picture keeps everything, as a copy of it would.
  */
 const NOT_INHERITED: Record<string, string[]> = {
-  paragraph: ['tracking', 'keepTogether', 'keepWithNext'],
+  paragraph: ['tracking', 'keepTogether', 'keepWithNext', 'pageAdjust'],
   heading: ['keepWithNext'],
 }
 

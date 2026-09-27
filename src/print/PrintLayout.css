@@ -18,6 +18,7 @@
 .pane-scroll.is-print-layout,
 .print-layout {
   --pl-desk: #d5d6d9;
+  --pl-grid-line: rgba(0, 150, 255, 0.45);
   --pl-paper: #ffffff;
   --pl-ink: #1b1b1b;
   --pl-ink-secondary: #555555;
@@ -719,6 +720,44 @@
 .cover-fold { top: 0; bottom: 0; width: 0; border-left: 1px dashed rgba(0, 0, 0, 0.55); }
 .cover-barcode { display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0, 0, 0, 0.5); background: rgba(255, 255, 255, 0.75); color: #555555; font-size: 10px; }
 .cover-note { max-width: 640px; margin: 16px auto 0; text-align: center; opacity: 0.7; }
+
+/* ---- the baseline grid, and the proof's marks ---- */
+
+.pl-baseline-grid,
+.book-page-grid {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.proof-mark { border-radius: 2px; }
+.proof-mark.is-loose { background: rgba(255, 149, 0, 0.28); }
+.proof-mark.is-widow,
+.proof-mark.is-orphan { background: rgba(255, 59, 48, 0.25); box-shadow: 0 2px 0 rgba(255, 59, 48, 0.8); }
+.proof-mark.is-runt { background: rgba(175, 82, 222, 0.25); box-shadow: 0 2px 0 rgba(175, 82, 222, 0.8); }
+.proof-mark.is-stackedHyphens { background: rgba(255, 204, 0, 0.35); }
+.proof-mark.is-shortPage { background: rgba(0, 122, 255, 0.2); box-shadow: 0 2px 0 rgba(0, 122, 255, 0.7); }
+.proof-mark.is-focused { outline: 2px solid var(--accent-color, #0a84ff); outline-offset: 1px; }
+
+/* ---- facing pages (BookPages.jsx, in spreads) ---- */
+
+.book-spreads {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+}
+
+.book-spread {
+  display: flex;
+  justify-content: center;
+  box-shadow: var(--pl-page-shadow);
+}
+
+.book-spread > .book-page { position: relative; cursor: pointer; }
+.book-spread > .book-page.is-empty { visibility: hidden; }
+.book-spread > .book-page.is-verso { box-shadow: inset -12px 0 16px -14px rgba(0, 0, 0, 0.35); }
+.book-spread > .book-page.is-recto { box-shadow: inset 12px 0 16px -14px rgba(0, 0, 0, 0.35); }
 
 /* ---- the e-book, as a reader shows it (DigitalPreview.jsx) ---- */
 

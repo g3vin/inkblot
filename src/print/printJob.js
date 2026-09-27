@@ -38,7 +38,7 @@ import { PAGE_GAP } from './printLayoutConstants'
 import { imposeSheets, renderPages, snapshotBlocks } from './printRender'
 import { bookAuthor, getAuthorProfile } from './printLayoutStore'
 import { buildTitlePages, textOfContent } from './titlePage'
-import { applyTypography, loadTypographyFont, typographyKey } from './typography'
+import { applyTypography, baselineGridPx, loadTypographyFont, typographyKey } from './typography'
 import { countWords } from '../lib/wordCount'
 import { characterName } from '../script/elements'
 import { breakdown, REPORT_TITLES, reportDocument } from '../script/reports'
@@ -124,6 +124,7 @@ const layoutOffscreen = async (content, setup) => {
     stride,
     columns: setup.columns,
     minLines: setup.widowOrphanLines,
+    grid: baselineGridPx(setup.typography),
     typeKey: typographyKey(setup.typography),
   })
   await waitForImages(mount)

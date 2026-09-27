@@ -52,6 +52,8 @@ import {
   getCurrentPrintPage,
   getDisplayPointsPerInch,
   getEbookIssues,
+  getProofIssues,
+  getTypesetDisplay,
   getEditorMode,
   getTypesetView,
   getLastExport,
@@ -66,6 +68,8 @@ import {
   setDisplayPointsPerInch,
   setEditorMode,
   setTypesetView,
+  setTypesetDisplay,
+  setProofFocus,
   setPrintScope,
   setPrintZoom,
   setSelectedBookItem,
@@ -75,7 +79,10 @@ import {
 } from './printLayoutStore'
 import { preflight, readingMinutes, spineWidthMm, SPINE_TEXT_MIN_PAGES } from './preflight'
 import { decodeDataUri, imageSize } from './export/images'
-import { BOOK_TYPOGRAPHY } from './typography'
+import { BOOK_TYPOGRAPHY, primaryFamily } from './typography'
+import { addProjectFont, loadProjectFonts, onProjectFontsChanged, projectFontFamilies } from './projectFonts'
+import { paragraphTypesetOf, setParagraphTypeset } from './ParagraphTypeset'
+import { readAnchor, resolveAnchor } from '../bridge/anchors'
 import { actualSizeZoom } from './zoom'
 
 /** The tokens a running head or foot can hold, for the inspector's token menu. */
@@ -141,6 +148,44 @@ const placedImages = (editor, setup) => {
   return images
 }
 
+/** The paragraph the caret is in: what the typesetter has set on it. */
+const paragraphAtCaret = (editor) => {
+  const $from = editor?.state.selection.$from
+  if (!$from) return undefined
+  for (let d = $from.depth; d > 0; d -= 1) {
+    if ($from.node(d).type.name === 'paragraph') return paragraphTypesetOf($from.node(d))
+  }
+  return undefined
+}
+
+/** Typeset's display, the proof's findings as anchors, the caret's paragraph, the fonts. */
+const typesetDisplayState = ({ projectName, docPath, editor }) => {
+  const display = getTypesetDisplay(projectName)
+  const found = display.proof && editor ? getProofIssues(docPath) : []
+  return {
+    spread: display.spread,
+    showGrid: display.grid,
+    proof: display.proof,
+    proofIssues: found
+      .map((issue) => {
+        const anchor = readAnchor(editor, issue.from, issue.to)
+        return anchor ? { id: issue.id, kind: issue.kind, page: issue.page, anchor, fixes: issue.fixes } : null
+      })
+      .filter(Boolean),
+    paragraph: paragraphAtCaret(editor),
+    projectFonts: projectFontFamilies(projectName),
+  }
+}
+
+/** A book set in a project font its licence will not let a PDF or an EPUB embed. */
+const fontIssues = (projectName, setup) => {
+  const family = setup?.typography ? primaryFamily(setup.typography.fontFamily) : null
+  const font = family ? projectFontFamilies(projectName).find((f) => f.family === family) : null
+  return font && !font.embeddable
+    ? [{ id: 'font-embedding', severity: 'error', message: `${family}’s licence does not allow it to be embedded, and a printer’s PDF or a store’s EPUB must embed its fonts. Set the book in another face, or get a licence that allows embedding.` }]
+    : []
+}
+
 /**
  * The Publish tab's figures: the pages (as shown, or as last measured), spine, reading
  * time and preflight — for a book with a service chosen, or any document with pages.
@@ -163,6 +208,7 @@ const publishingReport = ({ projectName, docPath, scope, book, setup, editor, pa
       ...preflight({ setup, target, pageCount: pages, images: scope === 'document' ? placedImages(editor, setup) : [] }),
       // The e-book's, once the Digital view has read it.
       ...(getEbookIssues() || []),
+      ...fontIssues(projectName, setup),
     ],
   }
 }
@@ -215,6 +261,7 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     enabled: Boolean(docPath) && isPrintLayoutEnabled(projectName, docPath),
     mode: getEditorMode(projectName),
     typesetView: getTypesetView(projectName),
+    ...typesetDisplayState({ projectName, docPath, editor }),
     docPath: docPath || undefined,
     ready: Boolean(editor),
     setup,
@@ -373,12 +420,16 @@ export default function usePrintLayoutController({
   // Publish on every change to what the Finishing tabs show.
   useEffect(() => {
     publish()
+    // The project's fonts, read once, for the pickers and for the pages to set in.
+    if (projectName) loadProjectFonts(projectName).catch(() => {})
+    const unsubscribeFonts = onProjectFontsChanged(() => publish())
     const unsubscribe = subscribePrintLayoutStore(publish)
     const unsubscribePage = subscribeCurrentPrintPage(publishSoon)
     const ed = activeEditor
     if (ed) ed.on('transaction', publishSoon)
     return () => {
       unsubscribe()
+      unsubscribeFonts()
       unsubscribePage()
       if (ed && !ed.isDestroyed) ed.off('transaction', publishSoon)
     }
@@ -438,6 +489,28 @@ export default function usePrintLayoutController({
     const subscriptions = [
       documentSurface.onCommand('setEditorMode', ({ mode }) => setEditorMode(stateRef.current.projectName, mode)),
       documentSurface.onCommand('setTypesetView', ({ view }) => setTypesetView(stateRef.current.projectName, view)),
+      documentSurface.onCommand('setTypesetDisplay', (patch) => setTypesetDisplay(stateRef.current.projectName, patch)),
+      // A typesetter's fix on a paragraph: the one a proof mark is in, or those selected.
+      documentSurface.onCommand('setParagraphTypeset', ({ anchor, ...patch }) => {
+        const ed = stateRef.current.activeEditor
+        if (!ed) return
+        const range = anchor ? resolveAnchor(ed, anchor) : { from: ed.state.selection.from, to: ed.state.selection.to }
+        if (!range) return
+        const tr = ed.state.tr
+        if (setParagraphTypeset(tr, range.from, range.to, patch)) ed.view.dispatch(tr)
+      }),
+      documentSurface.onCommand('showProofIssue', ({ anchor }) => {
+        const ed = stateRef.current.activeEditor
+        const range = ed ? resolveAnchor(ed, anchor) : null
+        if (!range) return
+        const issue = getProofIssues(stateRef.current.activeTextDoc).find((i) => i.from === range.from)
+        setProofFocus(issue?.id || null)
+        ed.chain().setTextSelection(range).scrollIntoView().run()
+      }),
+      documentSurface.onCommand('addProjectFont', ({ path }) => {
+        const project = stateRef.current.projectName
+        if (project) addProjectFont(project, path).then(() => publish()).catch(failed('Adding the font'))
+      }),
       // The Book navigator: the book's own order and contents, never the file tree's.
       documentSurface.onCommand('moveBookItem', ({ id, before }) => {
         const { project, folder } = currentBook()

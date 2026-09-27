@@ -87,6 +87,23 @@ Notable changes to Inkblot. The format follows
   plain scene breaks, ornaments kept visible at night. Missing alt text, images over
   Kindle's limits, an empty book and a cover of the wrong shape are pointed out, in the
   preview and in the preflight.
+- **Fine typography:** every book's paragraphs are now composed as a whole — even
+  spacing, no word alone on a last line — with punctuation hung into the margin, no more
+  than two hyphens in a row and none in short words, all adjustable under Typeset › Body
+  Text › Fine Typography. OpenType ligatures, old-style figures, kerning and swashes can
+  be turned on or off. Font files can be added to a project (the ＋ beside the font menu):
+  the book sets in them on any Mac and embeds them in its PDF and EPUB, and a font whose
+  licence forbids embedding is pointed out.
+- **Proofing the pages:** Proof (in the typeset toolbar, and Typeset › Proof) marks
+  loose lines, widows, orphans, runts, stacked hyphens and a short last page on the
+  chapter's pages and lists them, each with the fixes a typesetter would use: a touch of
+  tracking, keeping lines together or with the next, running a page a line long or
+  short. The same settings are there for any paragraph the caret is in, and in the
+  toolbar palette. They print only, and are kept in the typeset history.
+- **Spreads and the baseline grid:** Typeset can show the whole book as it opens, verso
+  beside recto. Align to Baseline Grid sets headings, quotations, breaks and pictures to
+  whole lines so lines stand level across a spread, and the grid can be drawn over the
+  pages.
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
   differences — and their history rows say what changed ("+2 places · 3 moved ·

@@ -23,6 +23,66 @@ struct TypesetToolbar: CustomizableToolbarContent {
             .disabled(!layout.hasDocument)
         }
 
+        ToolbarItem(id: ToolbarItemID.typesetSpread.id) {
+            let layout = model.pageLayout
+            Picker("Pages", selection: Binding(get: { layout.spread }, set: { layout.setDisplay(spread: $0) })) {
+                Label("Single Pages", systemImage: "doc").tag(false)
+                Label("Spreads", systemImage: "book").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .help("One page at a time, or the book as it opens: facing pages side by side")
+            .disabled(!layout.hasDocument || layout.typesetView == .digital)
+        }
+
+        ToolbarItem(id: ToolbarItemID.typesetProof.id) {
+            let layout = model.pageLayout
+            Toggle(isOn: Binding(get: { layout.proof }, set: { layout.setDisplay(proof: $0) })) {
+                Label("Proof", systemImage: "checkmark.seal")
+            }
+            .help("Mark loose lines, widows, orphans, runts and stacked hyphens on the pages")
+            .disabled(!layout.hasDocument)
+        }
+
+        ToolbarItem(id: ToolbarItemID.typesetGrid.id) {
+            let layout = model.pageLayout
+            Toggle(isOn: Binding(get: { layout.showGrid }, set: { layout.setDisplay(grid: $0) })) {
+                Label("Baseline Grid", systemImage: "line.3.horizontal")
+            }
+            .help("Show the baseline grid over the text")
+            .disabled(!layout.hasDocument)
+        }
+        .defaultCustomization(.hidden)
+
+        ToolbarItem(id: ToolbarItemID.typesetTighten.id) {
+            Button("Tighten", systemImage: "arrow.right.and.line.vertical.and.arrow.left") {
+                model.pageLayout.setParagraph(nudge: -PageLayoutModel.trackingStep)
+            }
+            .help("Set the paragraph a little tighter, to take a line back")
+            .disabled(model.pageLayout.paragraph == nil)
+        }
+        .defaultCustomization(.hidden)
+
+        ToolbarItem(id: ToolbarItemID.typesetLoosen.id) {
+            Button("Loosen", systemImage: "arrow.left.and.line.vertical.and.arrow.right") {
+                model.pageLayout.setParagraph(nudge: PageLayoutModel.trackingStep)
+            }
+            .help("Set the paragraph a little looser, to push a word over")
+            .disabled(model.pageLayout.paragraph == nil)
+        }
+        .defaultCustomization(.hidden)
+
+        ToolbarItem(id: ToolbarItemID.typesetKeepTogether.id) {
+            let paragraph = model.pageLayout.paragraph
+            Toggle(isOn: Binding(
+                get: { paragraph?.keepTogether ?? false },
+                set: { model.pageLayout.setParagraph(keepTogether: $0) })) {
+                Label("Keep Together", systemImage: "rectangle.compress.vertical")
+            }
+            .help("Never split this paragraph across pages")
+            .disabled(paragraph == nil)
+        }
+        .defaultCustomization(.hidden)
+
         ToolbarSpacer(.fixed)
 
         ToolbarItem(id: ToolbarItemID.typesetInsert.id) {

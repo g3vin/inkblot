@@ -90,6 +90,8 @@ pub use print::{
     OpenBookItemCommand, RemoveBookItemCommand, SetBookItemHiddenCommand, PrintJobKind, PrintJobPhase, PrintJobStatus, PrintRequest, PrintScope, RefreshBookChaptersCommand, TypesetFocus, TypesetHistoryChanged, TypesetVersionRow,
     TypesetVersionKind, SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
     PreviewTypesetVersionCommand, CoverSetAction, CoverSetView, CoverState, EditCoverSetsCommand, SetCoverImageCommand, SetFolderBookOptionsCommand, SetTypesetViewCommand, TypesetView,
+    ProofKind, ProofFix, ProofIssue, SetParagraphTypesetCommand, ParagraphTypeset, ShowProofIssueCommand, SetTypesetDisplayCommand,
+    ProjectFont, AddProjectFontCommand,
     RunningToken, SetAuthorProfileCommand, SetBookCoverCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
     SetEditorModeCommand, SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
     UseSetupForBookCommand, ZoomFit,

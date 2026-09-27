@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::common::{EditorTarget, WritingFormat};
+use super::common::{EditorTarget, TextAnchor, WritingFormat};
 use crate::types::page_setup::{
     AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, CoverFit, CoverPart, RunningText, GeneratedKind, MatterKind, PageOptions, PageSetup,
     PrintTypography,
@@ -476,6 +476,135 @@ pub struct SetTypesetViewCommand {
     pub view: TypesetView,
 }
 
+/* ---------------- proofing the pages ---------------- */
+
+/// What the proof finds wrong with a typeset page, as a typesetter would mark it.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProofKind {
+    /// A justified line spaced out so far its words stand apart.
+    Loose,
+    /// A paragraph's last line alone at the head of a page.
+    Widow,
+    /// A paragraph's first line alone at the foot of a page.
+    Orphan,
+    /// A paragraph ending on a line of one short word.
+    Runt,
+    /// More lines in a row ending in a hyphen than the composition allows.
+    StackedHyphens,
+    /// A chapter's last page with only a line or two on it.
+    ShortPage,
+}
+
+/// A fix the proof offers: each is one of `SetParagraphTypesetCommand`'s.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProofFix {
+    /// Letter-spacing a little tighter, to take a line back.
+    Tighten,
+    /// A little looser, to push one over.
+    Loosen,
+    KeepTogether,
+    KeepWithNext,
+    /// The page runs a line long, to take a widow back.
+    RunLong,
+    /// A line short, to send one over.
+    RunShort,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProofIssue {
+    pub id: String,
+    pub kind: ProofKind,
+    /// The printed page it is on, counted from the chapter's first.
+    pub page: u32,
+    /// The words at fault. A fix is set on the paragraph they are in.
+    pub anchor: TextAnchor,
+    pub fixes: Vec<ProofFix>,
+}
+
+/// Set what the typesetter sets on a paragraph — the one the anchor is in, or those
+/// selected. Each field present is set; `nudge_tracking` adds to what is there.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetParagraphTypesetCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<TextAnchor>,
+    /// Thousandths of an em, −10 to +10.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracking: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nudge_tracking: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keep_together: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keep_with_next: Option<bool>,
+    /// The page the paragraph starts on runs this many lines long (1) or short (−1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_adjust: Option<i32>,
+}
+
+/// What is set on the paragraph the caret is in, for the toolbar and the Proof section.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParagraphTypeset {
+    pub tracking: i32,
+    pub keep_together: bool,
+    pub keep_with_next: bool,
+    pub page_adjust: i32,
+}
+
+/// Scroll the pages to a proof mark and select its paragraph.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShowProofIssueCommand {
+    pub anchor: TextAnchor,
+}
+
+/// How Typeset shows its pages: in spreads, with the baseline grid drawn, with the proof
+/// marks. Each field present is set.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTypesetDisplayCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spread: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof: Option<bool>,
+}
+
+/* ---------------- the project's fonts ---------------- */
+
+/// A font file kept in the project (`.assets/fonts/`), so the book sets — and embeds
+/// in its PDF and EPUB — the same face on any Mac.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectFont {
+    pub family: String,
+    /// Its project path.
+    pub path: String,
+    /// Whether its licence lets it be embedded in a PDF or an EPUB (its `fsType`).
+    pub embeddable: bool,
+}
+
+/// Copy a font file into the project's fonts.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddProjectFontCommand {
+    pub path: String,
+}
+
 /// Show a document as pages, or as the continuous editor: the one named — a pane's own
 /// toggle names the document in it — or else the active one.
 #[typeshare]
@@ -879,6 +1008,22 @@ pub struct PageLayoutState {
     /// In Typeset, the printed pages or the e-book.
     #[serde(default)]
     pub typeset_view: TypesetView,
+    /// Typeset's pages in spreads, the baseline grid drawn, the proof marks shown.
+    #[serde(default)]
+    pub spread: bool,
+    #[serde(default)]
+    pub show_grid: bool,
+    #[serde(default)]
+    pub proof: bool,
+    /// What the proof finds on the chapter open, while it is on.
+    #[serde(default)]
+    pub proof_issues: Vec<ProofIssue>,
+    /// What is set on the paragraph the caret is in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paragraph: Option<ParagraphTypeset>,
+    /// The fonts kept in the project.
+    #[serde(default)]
+    pub project_fonts: Vec<ProjectFont>,
     /// The active text document, or none (a canvas, or nothing open).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_path: Option<String>,

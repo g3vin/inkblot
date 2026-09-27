@@ -22,12 +22,14 @@ import PrintLayoutView from './PrintLayoutView'
 import TypesetEditText from './TypesetEditText'
 import { isMatterPath } from './TypesetLock'
 import { useBookPlacement } from './useBookPlacement'
+import { useProof } from './useProof'
+import { compositionOf } from './typography'
 import { TypesetToast } from './TypesetOverlay'
 import { readDocPageSetup } from './DocPageSetup'
 import { documentSurface } from '../bridge'
 import { assetUrl, isAssetPath, writeAssetFromFile } from '../lib/assets'
 import { useDocPageSetup } from './useDocPageSetup'
-import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, getTypesetView, isPrintLayoutEnabled, isShowingCover, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
+import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, getTypesetDisplay, getTypesetView, isPrintLayoutEnabled, isShowingCover, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
 import { resolvePageSetup } from './pageSetup'
 
 /**
@@ -125,6 +127,17 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
       focus: (sectionId) => documentSurface.publishTypesetFocus({ sectionId }),
     }
   }, [design, editor, headed, placement, printLayout, projectName])
+  // How Typeset shows the pages: in spreads (the whole book, still), with the grid,
+  // with the proof's marks — which are read off the live pages.
+  const display = getTypesetDisplay(projectName)
+  const showingCover = printLayout && placement && isShowingCover()
+  const spread = printLayout && inBook && display.spread && !digital && !showingCover
+  useProof({
+    editor,
+    docPath,
+    active: Boolean(printLayout && display.proof && !digital && !spread && !showingCover),
+    hyphenLimit: compositionOf(pageSetup.typography).hyphenLimitLines,
+  })
   const zoom = getPrintZoom(projectName, docPath)
   const onZoomChange = useCallback((z) => setPrintZoom(z, projectName, docPath), [projectName, docPath])
   const author = projectName && docPath ? bookAuthor(getBookForDoc(projectName, docPath)) : ''
@@ -160,7 +173,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     >
       {header}
       <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} printLayout={printLayout} />
-      {printLayout && placement && isShowingCover() ? (
+      {showingCover ? (
         <CoverView projectName={projectName} docPath={docPath} folder={placement.folder} setup={pageSetup} />
       ) : digital ? (
         <DigitalPreview projectName={projectName} docPath={docPath} editor={editor} placement={inBook ? placement : null} />
@@ -172,6 +185,9 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           placement={placement}
           zoom={zoom}
           scrollEl={scrollEl}
+          spread={spread}
+          showGrid={display.grid}
+          setup={pageSetup}
           renderLive={({ firstPhysical, folioStart, author: bookBy, bookTitle }) => (
             <PrintLayoutView
               editor={editor}
@@ -186,6 +202,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
               firstPhysical={firstPhysical}
               folioStart={folioStart}
               typeset={typeset}
+              showGrid={display.grid}
             >
               {pageContent}
             </PrintLayoutView>
@@ -204,6 +221,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           // The pane, not the scroller: the zoom bar stays put while the pages scroll.
           statusHost={scrollEl?.parentElement || null}
           typeset={typeset}
+          showGrid={display.grid}
         >
           {pageContent}
         </PrintLayoutView>

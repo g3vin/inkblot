@@ -197,7 +197,8 @@ struct FinishingTests {
         draft.typography = TypographyDraft(PrintTypography(
             fontFamily: TypographyDraft.cssFamily("Courier Prime"), fontSizePt: 200, lineSpacing: .double, lineValue: 2,
             firstLineIndentMm: -3, paragraphSpacingPt: 0, alignment: .left, hyphenate: false,
-            sceneBreak: "#", chapterOpening: .plain, chapterSinkMm: 63.5, noIndentAfterBreak: false, images: nil))
+            sceneBreak: "#", chapterOpening: .plain, chapterSinkMm: 63.5, noIndentAfterBreak: false, images: nil,
+            composition: nil, features: nil))
         draft.titlePage = TitlePageDraft(style: .manuscript)
         layout.apply(draft)
 

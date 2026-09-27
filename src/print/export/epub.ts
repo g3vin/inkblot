@@ -43,6 +43,8 @@ export interface EpubOptions {
   contents?: boolean
   /** The book's stylesheet (`ebookCss`); the plain prose rules without one. */
   css?: string | null
+  /** Font files to embed, each declared in the stylesheet for its family. */
+  fonts?: Array<{ family: string; weight: number; style: string; format: string; mime: string; file: string; bytes: Uint8Array }>
   /** Fixed for tests; a fresh urn:uuid otherwise. */
   identifier?: string
   modified?: Date
@@ -180,6 +182,13 @@ ${chapterFiles.map((c, i) => `<navPoint id="nav-${i + 1}" playOrder="${i + 1}"><
 </ncx>
 `
 
+  const fonts = (options.fonts || []).map((font, i) => ({
+    ...font,
+    id: `font-${i + 1}`,
+    href: `fonts/${font.file.replace(/[^\w.-]+/g, '_')}`,
+  }))
+  const fontFaces = fonts.map((f) => `@font-face { font-family: "${f.family.replace(/"/g, '')}"; src: url("${f.href}") format("${f.format}"); font-weight: ${f.weight}; font-style: ${f.style}; }`).join('\n')
+
   const packaged = [...images.values()].filter(Boolean) as Array<{ href: string; mime: string; bytes: Uint8Array }>
   const manifest = [
     '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
@@ -193,6 +202,7 @@ ${chapterFiles.map((c, i) => `<navPoint id="nav-${i + 1}" playOrder="${i + 1}"><
     ...(contentsPage ? ['<item id="contents" href="text/contents.xhtml" media-type="application/xhtml+xml"/>'] : []),
     ...chapterFiles.map((c) => `<item id="${c.id}" href="${c.href}" media-type="application/xhtml+xml"/>`),
     ...packaged.map((img, i) => `<item id="image-${i + 1}" href="${img.href}" media-type="${img.mime}"/>`),
+    ...fonts.map((f) => `<item id="${f.id}" href="${f.href}" media-type="${f.mime}"/>`),
   ]
   const spine = [
     ...(cover ? ['<itemref idref="cover" linear="yes"/>'] : []),
@@ -231,7 +241,7 @@ ${spine.join('\n')}
     { name: 'OEBPS/content.opf', data: opf },
     { name: 'OEBPS/nav.xhtml', data: nav },
     { name: 'OEBPS/toc.ncx', data: ncx },
-    { name: 'OEBPS/styles.css', data: `${options.css || PROSE_CSS}\n.cover { text-align: center; } .cover img { max-height: 100%; }\n` },
+    { name: 'OEBPS/styles.css', data: `${fontFaces ? `${fontFaces}\n` : ''}${options.css || PROSE_CSS}\n.cover { text-align: center; } .cover img { max-height: 100%; }\n` },
     ...(cover && coverPage ? [
       { name: `OEBPS/${coverHref}`, data: cover.bytes, store: true },
       { name: 'OEBPS/text/cover.xhtml', data: coverPage },
@@ -241,6 +251,7 @@ ${spine.join('\n')}
     ...chapterFiles.map((c) => ({ name: `OEBPS/${c.href}`, data: c.xhtml })),
     // Images are already compressed; deflating them again costs time for nothing.
     ...packaged.map((img) => ({ name: `OEBPS/${img.href}`, data: img.bytes, store: true })),
+    ...fonts.map((f) => ({ name: `OEBPS/${f.href}`, data: f.bytes })),
   ]
   return createZip(entries)
 }

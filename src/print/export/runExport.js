@@ -34,6 +34,8 @@ import { buildPlainText } from './text'
 import { serializeFountain } from '../../script/fountain'
 import { headsToBlocks, mapImageSources, portableContent } from './portable'
 import { digitalContent, ebookCss } from './ebook'
+import { primaryFamily } from '../typography'
+import { loadProjectFonts, projectFontFiles } from '../projectFonts'
 
 const FORMATS = {
   pdf: { ext: 'pdf', label: 'PDF' },
@@ -105,6 +107,7 @@ export async function runExport({
 
   const report = (phase, extra = {}) => reportJob({ jobId, kind: 'export', format, phase, ...extra })
   report('preparing')
+  await loadProjectFonts(projectName)
   try {
     await writeExport({ format, path, projectName, docPath, scope, liveByPath, title, book })
   } catch (error) {
@@ -347,6 +350,13 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
   if (format === 'epub') {
     let cover = null
     if (book?.coverImage) cover = await resolveImage(projectName, book.coverImage)
+    // The book's face, when it is one of the project's own and the reader is let see it:
+    // embedded, where its licence allows.
+    const digital = digitalOf(book)
+    const family = setup.typography ? primaryFamily(setup.typography.fontFamily) : null
+    const fonts = family && digital.publisherFont
+      ? (await projectFontFiles(projectName, family)).filter((f) => f.embeddable)
+      : []
     const bytes = await buildEpub({
       title,
       author,
@@ -357,6 +367,7 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
       front,
       contents,
       css,
+      fonts,
     })
     await writeFile(path, bytes)
     return path

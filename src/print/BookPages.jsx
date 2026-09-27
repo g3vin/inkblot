@@ -16,8 +16,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { PAGE_GAP } from './printLayoutConstants'
+import { pageLeftMargin, pageMetrics } from './pageSetup'
 import { preparePrint } from './printJob'
-import { bookAuthor, getPrintScope, getTypesetPreview, usePrintLayoutStore } from './printLayoutStore'
+import { baselineGridStyle } from './typography'
+import { bookAuthor, getPrintScope, getTypesetPreview, setTypesetDisplay, usePrintLayoutStore } from './printLayoutStore'
 import { previewBook, previewContent, TYPESET_PREVIEW_EVENT } from './useTypesetHistory'
 
 /** How long after a change the book is composed again. */
@@ -56,9 +58,63 @@ function PageStack({ pages, zoom, onOpen }) {
   )
 }
 
-export default function BookPages({ projectName, docPath, editor, placement, zoom, scrollEl, renderLive }) {
+/**
+ * The whole book as it opens: the first page alone on the right, then each verso beside
+ * its recto — still pages, copied, so the stacks keep theirs. With the grid, each text
+ * block ruled at the leading.
+ */
+function SpreadStack({ pages, zoom, setup, showGrid, onOpen }) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const host = ref.current
+    if (!host) return
+    const metrics = setup ? pageMetrics(setup) : null
+    const grid = showGrid && setup?.typography ? baselineGridStyle(setup.typography) : null
+    const frameFor = (page, physical) => {
+      const frame = document.createElement('div')
+      frame.className = `book-page ${physical % 2 ? 'is-recto' : 'is-verso'}`
+      if (!page) {
+        frame.classList.add('is-empty')
+        frame.style.width = `${metrics?.width || 0}px`
+        return frame
+      }
+      frame.dataset.item = page.dataset.item || ''
+      frame.appendChild(page.cloneNode(true))
+      if (grid && metrics) {
+        const lines = document.createElement('div')
+        lines.className = 'book-page-grid'
+        Object.assign(lines.style, grid, {
+          left: `${pageLeftMargin(setup, physical)}px`,
+          top: `${metrics.contentTop}px`,
+          width: `${metrics.contentWidth}px`,
+          height: `${metrics.contentHeight}px`,
+        })
+        frame.appendChild(lines)
+      }
+      return frame
+    }
+    const rows = []
+    // Page 1 is a recto: it faces nothing.
+    for (let i = -1; i < pages.length; i += 2) {
+      const row = document.createElement('div')
+      row.className = 'book-spread'
+      row.append(frameFor(pages[i] || null, i + 1), frameFor(pages[i + 1] || null, i + 2))
+      rows.push(row)
+    }
+    host.replaceChildren(...rows)
+  }, [pages, setup, showGrid])
+  const onClick = (event) => {
+    const item = event.target.closest?.('.book-page')?.dataset.item
+    if (item) onOpen(item)
+  }
+  return (
+    <div ref={ref} className="book-spreads print-scope" style={{ zoom, gap: `${PAGE_GAP}px` }} onClick={onClick} role="presentation" />
+  )
+}
+
+export default function BookPages({ projectName, docPath, editor, placement, zoom, scrollEl, spread = false, showGrid = false, setup = null, renderLive }) {
   const version = usePrintLayoutStore()
-  const [composed, setComposed] = useState({ before: [], after: [], firstPhysical: 1, folioStart: null, busy: true })
+  const [composed, setComposed] = useState({ before: [], after: [], all: [], firstPhysical: 1, folioStart: null, busy: true })
   // The current book whole, while comparing it with a version.
   const [composedAll, setComposedAll] = useState(null)
   const runRef = useRef(0)
@@ -112,8 +168,9 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
       // A blank page the book puts before the chapter to open it on a recto is the
       // chapter's own side of the spread: it stays with the pages before.
       setComposed(first < 0
-        ? { before: pages, after: [], firstPhysical: 1, folioStart: null, busy: false }
+        ? { before: pages, after: [], all: pages, firstPhysical: 1, folioStart: null, busy: false }
         : {
+          all: pages,
           before: pages.slice(0, first),
           after: pages.slice(last + 1),
           firstPhysical: first + 1,
@@ -178,6 +235,25 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
             </div>
           ) : null}
         </div>
+      </div>
+    )
+  }
+
+  if (spread) {
+    return (
+      <div className="book-pages is-spreads">
+        <SpreadStack
+          pages={composed.all}
+          zoom={zoom}
+          setup={setup}
+          showGrid={showGrid}
+          onOpen={(id) => {
+            // A page picked in the spreads is worked on as a page.
+            setTypesetDisplay(projectName, { spread: false })
+            open(id)
+          }}
+        />
+        {composed.busy ? <div className="book-pages-status" aria-live="polite">Setting the book…</div> : null}
       </div>
     )
   }

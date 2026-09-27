@@ -27,6 +27,7 @@ struct TypesetPanelView: View {
             StyleGallerySection()
             PageSetupSections(.format, .page)
             PageSetupSections(.typography, .textFlow)
+            ProofSection()
             ChapterOpeningsSection(unit: LengthUnit(rawValue: unitsRaw) ?? .inches)
             PageSetupSections(.headerFooter, .titlePage)
             BookSections(.setup)

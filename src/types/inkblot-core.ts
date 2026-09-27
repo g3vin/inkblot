@@ -101,6 +101,11 @@ export interface AddBookItemCommand {
 	back?: boolean;
 }
 
+/** Copy a font file into the project's fonts. */
+export interface AddProjectFontCommand {
+	path: string;
+}
+
 /**
  * Quick add: a URL, DOI, ISBN, arXiv id or PMID is looked up; anything else is
  * searched for as a title. The source exists at once, `resolving`, attached to the
@@ -582,6 +587,42 @@ export interface ImageTypesetting {
 }
 
 /**
+ * How a paragraph's lines are composed: what a typesetter tunes so a justified page
+ * has even colour, no rivers, and no ladders of hyphens.
+ */
+export interface Composition {
+	/**
+	 * Balance a paragraph's lines as a whole — no short last line, fewer hyphens —
+	 * rather than fill each line as it comes.
+	 */
+	balance: boolean;
+	/** Hang punctuation into the margin, so the text block's edge looks straight. */
+	hangingPunctuation: boolean;
+	/** The most lines in a row that may end in a hyphen. */
+	hyphenLimitLines: number;
+	/** The shortest word that is hyphenated. */
+	hyphenMinWord: number;
+	/**
+	 * Headings, quotations, breaks and pictures take whole lines, so lines stand at
+	 * the same height across a spread and back each other on the leaf.
+	 */
+	baselineGrid: boolean;
+}
+
+/** OpenType features the text is set with, where the font has them. */
+export interface OpenTypeFeatures {
+	/** fi, fl, ff: the ligatures every text face has. */
+	ligatures: boolean;
+	/** ct, st and the like: the ornamental ones. */
+	discretionaryLigatures: boolean;
+	/** Figures that sit in the text like lower-case letters. */
+	oldStyleFigures: boolean;
+	kerning: boolean;
+	/** Swash capitals, in faces that have them. */
+	swashes: boolean;
+}
+
+/**
  * Type for print: set on the page's text in Print Layout, on paper and in the PDF,
  * and carried into a DOCX's styles — never on the continuous editor.
  */
@@ -609,6 +650,10 @@ export interface PrintTypography {
 	noIndentAfterBreak: boolean;
 	/** How pictures in the text are set. Absent sets them as they were placed. */
 	images?: ImageTypesetting;
+	/** How lines are composed. Absent composes as the defaults do — well. */
+	composition?: Composition;
+	/** The font's OpenType features. Absent uses the defaults: ligatures and kerning. */
+	features?: OpenTypeFeatures;
 }
 
 export enum TitlePageStyle {
@@ -1382,6 +1427,10 @@ export type NativeCommand =
 	| { type: "setHeadImage", payload: SetHeadImageCommand }
 	| { type: "setFolderBookOptions", payload: SetFolderBookOptionsCommand }
 	| { type: "setTypesetView", payload: SetTypesetViewCommand }
+	| { type: "setParagraphTypeset", payload: SetParagraphTypesetCommand }
+	| { type: "showProofIssue", payload: ShowProofIssueCommand }
+	| { type: "setTypesetDisplay", payload: SetTypesetDisplayCommand }
+	| { type: "addProjectFont", payload: AddProjectFontCommand }
 	| { type: "setCoverImage", payload: SetCoverImageCommand }
 	| { type: "editCoverSets", payload: EditCoverSetsCommand }
 	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
@@ -3080,6 +3129,66 @@ export enum TypesetView {
 	Digital = "digital",
 }
 
+/** What the proof finds wrong with a typeset page, as a typesetter would mark it. */
+export enum ProofKind {
+	/** A justified line spaced out so far its words stand apart. */
+	Loose = "loose",
+	/** A paragraph's last line alone at the head of a page. */
+	Widow = "widow",
+	/** A paragraph's first line alone at the foot of a page. */
+	Orphan = "orphan",
+	/** A paragraph ending on a line of one short word. */
+	Runt = "runt",
+	/** More lines in a row ending in a hyphen than the composition allows. */
+	StackedHyphens = "stackedHyphens",
+	/** A chapter's last page with only a line or two on it. */
+	ShortPage = "shortPage",
+}
+
+/** A fix the proof offers: each is one of `SetParagraphTypesetCommand`'s. */
+export enum ProofFix {
+	/** Letter-spacing a little tighter, to take a line back. */
+	Tighten = "tighten",
+	/** A little looser, to push one over. */
+	Loosen = "loosen",
+	KeepTogether = "keepTogether",
+	KeepWithNext = "keepWithNext",
+	/** The page runs a line long, to take a widow back. */
+	RunLong = "runLong",
+	/** A line short, to send one over. */
+	RunShort = "runShort",
+}
+
+export interface ProofIssue {
+	id: string;
+	kind: ProofKind;
+	/** The printed page it is on, counted from the chapter's first. */
+	page: number;
+	/** The words at fault. A fix is set on the paragraph they are in. */
+	anchor: TextAnchor;
+	fixes: ProofFix[];
+}
+
+/** What is set on the paragraph the caret is in, for the toolbar and the Proof section. */
+export interface ParagraphTypeset {
+	tracking: number;
+	keepTogether: boolean;
+	keepWithNext: boolean;
+	pageAdjust: number;
+}
+
+/**
+ * A font file kept in the project (`.assets/fonts/`), so the book sets — and embeds
+ * in its PDF and EPUB — the same face on any Mac.
+ */
+export interface ProjectFont {
+	family: string;
+	/** Its project path. */
+	path: string;
+	/** Whether its licence lets it be embedded in a PDF or an EPUB (its `fsType`). */
+	embeddable: boolean;
+}
+
 /** Where the setup a document lays out in came from. */
 export enum SetupSource {
 	/** The document's own. */
@@ -3155,6 +3264,16 @@ export interface PageLayoutState {
 	mode?: EditorMode;
 	/** In Typeset, the printed pages or the e-book. */
 	typesetView?: TypesetView;
+	/** Typeset's pages in spreads, the baseline grid drawn, the proof marks shown. */
+	spread?: boolean;
+	showGrid?: boolean;
+	proof?: boolean;
+	/** What the proof finds on the chapter open, while it is on. */
+	proofIssues?: ProofIssue[];
+	/** What is set on the paragraph the caret is in. */
+	paragraph?: ParagraphTypeset;
+	/** The fonts kept in the project. */
+	projectFonts?: ProjectFont[];
 	/** The active text document, or none (a canvas, or nothing open). */
 	docPath?: string;
 	/**
@@ -4068,6 +4187,21 @@ export interface SetPanelInsetsCommand {
 }
 
 /**
+ * Set what the typesetter sets on a paragraph — the one the anchor is in, or those
+ * selected. Each field present is set; `nudge_tracking` adds to what is there.
+ */
+export interface SetParagraphTypesetCommand {
+	anchor?: TextAnchor;
+	/** Thousandths of an em, −10 to +10. */
+	tracking?: number;
+	nudgeTracking?: number;
+	keepTogether?: boolean;
+	keepWithNext?: boolean;
+	/** The page the paragraph starts on runs this many lines long (1) or short (−1). */
+	pageAdjust?: number;
+}
+
+/**
  * Show a document as pages, or as the continuous editor: the one named — a pane's own
  * toggle names the document in it — or else the active one.
  */
@@ -4141,6 +4275,16 @@ export interface SetTitlebarInsetCommand {
 	trailing?: number;
 }
 
+/**
+ * How Typeset shows its pages: in spreads, with the baseline grid drawn, with the proof
+ * marks. Each field present is set.
+ */
+export interface SetTypesetDisplayCommand {
+	spread?: boolean;
+	grid?: boolean;
+	proof?: boolean;
+}
+
 export interface SetTypesetViewCommand {
 	view: TypesetView;
 }
@@ -4157,6 +4301,11 @@ export interface SetWordCountVisibleCommand {
 export interface SetWritingFormatCommand {
 	target: EditorTarget;
 	format: WritingFormat;
+}
+
+/** Scroll the pages to a proof mark and select its paragraph. */
+export interface ShowProofIssueCommand {
+	anchor: TextAnchor;
 }
 
 export enum SidebarTab {
