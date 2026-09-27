@@ -36,6 +36,7 @@ import { setCurrentPrintPage } from './printLayoutStore'
 import { nativeOwns } from '../lib/host'
 import TypesetOverlay from './TypesetOverlay'
 import { notesBySlot, pageNotesOf } from './notes'
+import { bleedPicturesOf } from './bleed'
 import './PrintLayout.css'
 import './PrintTypography.css'
 
@@ -179,6 +180,11 @@ export default function PrintLayoutView({
     return notesBySlot(pageNotesOf(editor.state.doc, noteStart, noteMarks), result.slotStarts)
   }, [atFoot, editor, noteMarks, noteStart, result])
 
+  // Pictures to the page's edges: each page with one draws it over itself.
+  const bleeds = useMemo(() => (
+    editor && !editor.isDestroyed ? notesBySlot(bleedPicturesOf(editor.view), result.slotStarts) : new Map()
+  ), [editor, result])
+
   const pages = useMemo(() => {
     const out = []
     const chapterStarts = new Set(result.chapterStartSlots)
@@ -211,10 +217,11 @@ export default function PrintLayoutView({
         footer: runningTextFor(setup, 'footer', physical, ctx, flags),
         folio: formatPageNumber(ctx.page, setup.pageNumberFormat),
         notes: footnotes.get(strip) || null,
+        bleed: bleeds.get(strip)?.[0] || null,
       })
     }
     return out
-  }, [author, docTitle, firstPhysical, flowX, folioStart, footnotes, galley, headings, result, setup, slotStride, stripCount, wordsText])
+  }, [author, bleeds, docTitle, firstPhysical, flowX, folioStart, footnotes, galley, headings, result, setup, slotStride, stripCount, wordsText])
 
   // Which page is in view, for "Page X of Y".
   useEffect(() => {
@@ -604,6 +611,9 @@ export default function PrintLayoutView({
                   <div className="pl-slot-label" style={{ left: `${pageLeftMargin(setup, page.physical)}px`, top: `${Math.max(4, metrics.contentTop - 16)}px` }}>
                     Page {page.folio} · column {page.column + 1} of {setup.columns}
                   </div>
+                ) : null}
+                {page.bleed ? (
+                  <img className="pl-bleed-picture" src={page.bleed.src} alt="" style={{ left: 0, top: 0, width: '100%', height: '100%' }} />
                 ) : null}
                 {page.notes ? (
                   <div

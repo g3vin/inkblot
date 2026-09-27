@@ -827,3 +827,33 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
     linked.includes('<aside epub:type="footnote" role="doc-footnote" id="fn-n1" class="footnote"><p><a href="#fnref-n1">1</a>. Or so they said.</p></aside>'))
   ok('in HTML, a list of notes after the chapter', withLinkedNotes(body, inTextNotes(doc)).includes('<li id="fn-n1" class="footnote">Or so they said. <a href="#fnref-n1"'))
 }
+
+/* ---- pictures with a page to themselves, and to its edges ---- */
+
+{
+  const { paginate } = await import(`${C}/print/paginate.ts`)
+  const { withBleed } = await import(`${C}/print/bleed.ts`)
+  const frame = { slotHeight: 100, stride: 150, columns: 1, minLines: 2 }
+  const para = (pos, top, n) => ({ kind: 'text', pos, top, bottom: top + n * 10, lines: Array.from({ length: n }, (_, i) => ({ top: top + i * 10, bottom: top + (i + 1) * 10, pos: pos + 1 + i * 10 })) })
+  const soft = (pos, at) => ({ kind: 'break', pos, top: at, bottom: at, breakKind: 'soft' })
+  let r = paginate([para(0, 0, 3), soft(40, 30), para(40, 30, 1), soft(60, 40), para(60, 40, 2)], frame)
+  ok('a full-page picture starts a page, and what follows starts the next',
+    r.pageCount === 3 && r.slotStarts[1] === 40 && r.slotStarts[2] === 60 && !r.chapterStartSlots.includes(1))
+  r = paginate([soft(0, 0), para(0, 0, 1), soft(20, 10), para(20, 10, 2)], frame)
+  ok('…but one at the head of a page leaves no blank page before it, and none after the last',
+    r.pageCount === 2 && r.slotStarts[0] === 0)
+  r = paginate([para(0, 0, 2), soft(30, 20), para(30, 20, 1), soft(50, 30)], frame)
+  ok('a picture that ends the chapter opens no empty page after it', r.pageCount === 2)
+
+  const page = document.createElement('div')
+  page.className = 'print-page'
+  page.dataset.item = 'c1'
+  Object.assign(page.style, { width: '500px', height: '800px' })
+  const verso = withBleed(page, 2, 12)
+  ok('a page with bleed is larger by the bleed at the top, the bottom and its outside edge',
+    verso.style.width === '512px' && verso.style.height === '824px' && page.style.left === '12px' && page.style.top === '12px' && verso.dataset.item === 'c1')
+  const recto = document.createElement('div')
+  Object.assign(recto.style, { width: '500px', height: '800px' })
+  withBleed(recto, 3, 12)
+  ok('…the left of a verso, the right of a recto', recto.style.left === '0px')
+}

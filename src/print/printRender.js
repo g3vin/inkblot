@@ -161,6 +161,8 @@ export const renderPages = (sources, {
   firstPhysical = 1,
   numberStart,
   numberFormat,
+  // The bleed round each page, px, when the print has pictures to the edge.
+  bleedPx = 0,
 } = {}) => {
   const pages = []
   if (!sources.length) return pages
@@ -210,6 +212,7 @@ export const renderPages = (sources, {
     const { snapshot, result, stride } = source
     const columns = setup.columns
     const noteSlots = notesBySlot(source.notes || [], result.slotStarts)
+    const bleedSlots = notesBySlot(source.bleeds || [], result.slotStarts)
     const chapterStarts = new Set(result.chapterStartSlots)
     // A one-page section set down its page: how far, from what it fills.
     let shift = 0
@@ -230,6 +233,7 @@ export const renderPages = (sources, {
       Object.assign(page.style, { width: `${m.width}px`, height: `${m.height}px` })
       // The type the flow was laid out in, so the cloned lines are set as they were.
       applyTypography(page, setup.typography)
+      page.style.setProperty('--pl-content-h', `${m.contentHeight}px`)
 
       const left = pageLeftMargin(setup, physical)
       for (let c = 0; c < columns && !blank; c += 1) {
@@ -250,6 +254,23 @@ export const renderPages = (sources, {
         if (shift) win.style.top = `${shift}px`
         clip.appendChild(win)
         page.appendChild(clip)
+      }
+
+      // A picture to the edge: over the whole page, and into the bleed past its trim.
+      const bleed = !blank && bleedSlots.get(firstSlot)?.[0]
+      if (bleed) {
+        const img = document.createElement('img')
+        img.className = 'print-bleed-picture'
+        img.src = bleed.src
+        img.alt = ''
+        Object.assign(img.style, {
+          left: `${physical % 2 === 0 ? -bleedPx : 0}px`,
+          top: `${-bleedPx}px`,
+          width: `${m.width + bleedPx}px`,
+          height: `${m.height + bleedPx * 2}px`,
+        })
+        page.appendChild(img)
+        page.dataset.bleed = 'true'
       }
 
       // The notes whose marks this page holds, at its foot.

@@ -120,6 +120,11 @@ Notable changes to Inkblot. The format follows
   has one), numbered afresh in each chapter or on through the book, as numbers or as
   * † ‡. Word exports get real footnotes, EPUBs pop-up notes linked both ways, HTML a
   linked list, Markdown footnote syntax.
+- **Full-page and bleed pictures:** a picture can have a page to itself (Full Page),
+  fitted to the text block, or fill its page past the trimmed edges (Bleed). A book with
+  a bleed picture prints its PDF with the ⅛″ of bleed KDP and IngramSpark ask for — at
+  the top, the bottom and the outside of every page — and the preflight says to choose
+  a bleed interior when uploading. Pictures wrapped by the text print as they are shown.
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
   differences — and their history rows say what changed ("+2 places · 3 moved ·

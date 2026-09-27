@@ -272,6 +272,14 @@ export const measureUnits = (ctx: MeasureContext): LayoutUnit[] => {
       })
     }
 
+    // A picture with a page to itself: the page before ends, and so does its own.
+    let fullPage = false
+    node.descendants((child) => {
+      if (child.type.name === 'image' && (child.attrs.layout === 'page' || child.attrs.layout === 'bleed')) fullPage = true
+      return !fullPage
+    })
+    if (fullPage) units.push({ kind: 'break', pos, top: lines[0].top, bottom: lines[0].top, breakKind: 'soft' })
+
     units.push({
       kind: 'text',
       pos,
@@ -284,6 +292,10 @@ export const measureUnits = (ctx: MeasureContext): LayoutUnit[] => {
       ...(node.attrs.pageAdjust ? { pageAdjust: Number(node.attrs.pageAdjust) || 0 } : {}),
       ...(node.type.name === SCRIPT ? scriptRules(node, pos, lines) : {}),
     })
+    if (fullPage) {
+      const end = lines[lines.length - 1].bottom
+      units.push({ kind: 'break', pos: pos + node.nodeSize, top: end, bottom: end, breakKind: 'soft' })
+    }
   }
 
   /** How a script's line may break (paginate.ts): its element decides. */
