@@ -178,6 +178,18 @@ const typesetDisplayState = ({ projectName, docPath, editor }) => {
   }
 }
 
+/** Pictures to the page's edges put the PDF in bleed, which the printer must be told. */
+const bleedIssues = (editor) => {
+  let bleeds = false
+  editor?.state.doc.descendants((node) => {
+    if (node.type.name === 'image' && node.attrs.layout === 'bleed') bleeds = true
+    return !bleeds
+  })
+  return bleeds
+    ? [{ id: 'interior-bleed', severity: 'note', message: 'A picture runs to the page’s edges, so the PDF is set with ⅛″ of bleed at the top, the bottom and the outside of every page. Choose “Bleed” for the interior when you upload it to KDP or IngramSpark.' }]
+    : []
+}
+
 /** A book set in a project font its licence will not let a PDF or an EPUB embed. */
 const fontIssues = (projectName, setup) => {
   const family = setup?.typography ? primaryFamily(setup.typography.fontFamily) : null
@@ -210,6 +222,7 @@ const publishingReport = ({ projectName, docPath, scope, book, setup, editor, pa
       // The e-book's, once the Digital view has read it.
       ...(getEbookIssues() || []),
       ...fontIssues(projectName, setup),
+      ...bleedIssues(editor),
     ],
   }
 }

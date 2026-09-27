@@ -42,7 +42,8 @@
  *                     the speaker's name and "(CONT'D)" — `continuations` says where
  */
 
-export type ManualBreakKind = 'page' | 'column' | 'recto'
+/** `soft`: a new page, unless the current one is still empty (around a full-page picture). */
+export type ManualBreakKind = 'page' | 'column' | 'recto' | 'soft'
 
 export interface LayoutLine {
   /** Natural top and bottom, in flow px. */
@@ -197,6 +198,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
   /** The slot a forced break moves to, from the current one. */
   const slotAfterBreak = (kind: ManualBreakKind): number => {
     if (kind === 'column') return slot + 1
+    if (kind === 'soft') return slotHasContent ? (Math.floor(slot / columns) + 1) * columns : slot
     const nextPage = Math.floor(slot / columns) + 1
     if (kind === 'page') return nextPage * columns
     // Recto: the next odd physical page, i.e. an even page index.
@@ -278,7 +280,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
     if (forced) {
       const target = slotAfterBreak(forced)
       pushBlockTo(u, target)
-      if (forced !== 'column') chapterStartSlots.push(target)
+      if (forced !== 'column' && forced !== 'soft') chapterStartSlots.push(target)
       forced = null
     } else if (u.top + offset >= slotBottom(slot) - EPS) {
       // It starts in the gap below this slot — after an oversized atom ran past the
@@ -422,7 +424,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
   }
 
   // A trailing manual break still opens its page, so the author sees it.
-  if (forced) {
+  if (forced && forced !== 'soft') {
     const target = slotAfterBreak(forced)
     markSlot(target, null)
     slot = target

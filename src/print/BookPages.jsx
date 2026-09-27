@@ -28,6 +28,14 @@ const COMPOSE_DELAY_MS = 900
 /** The event a click on another entry's page sends; the controller opens it. */
 export const OPEN_BOOK_ITEM_EVENT = 'inkblot:open-book-item'
 
+/** A page as the pages show it: at its trim, without the bleed a printer is sent. */
+const trimmed = (page) => {
+  if (!page.classList.contains('has-bleed')) return page
+  const inner = page.firstElementChild
+  Object.assign(inner.style, { position: 'relative', left: '', top: '', overflow: 'hidden' })
+  return inner
+}
+
 /** Printed pages, shown at the zoom, one under the other. */
 function PageStack({ pages, zoom, onOpen }) {
   const ref = useRef(null)
@@ -142,7 +150,7 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
       liveEditors: [{ path: docPath, editor }],
       mapContent: previewContent(preview.snapshot),
     })
-      .then((prepared) => { if (live) setPreviewPages(prepared?.elements || []) })
+      .then((prepared) => { if (live) setPreviewPages((prepared?.elements || []).map(trimmed)) })
       .catch((error) => console.error('[typeset] previewing failed:', error))
     return () => { live = false }
   }, [preview?.id, preview?.snapshot, projectName, docPath]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -160,7 +168,7 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
         liveEditors: [{ path: docPath, editor }],
       })
       if (run !== runRef.current) return
-      const pages = prepared?.elements || []
+      const pages = (prepared?.elements || []).map(trimmed)
       if (preview?.compare) setComposedAll(pages)
       const first = pages.findIndex((page) => page.dataset.item === itemId)
       // Notes numbered on through the book: the live chapter's first is one past those

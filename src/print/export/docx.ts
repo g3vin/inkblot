@@ -264,7 +264,11 @@ class Writer {
         const flush = this.flushNext
         this.flushNext = false
         const named = typeof attrs.styleName === 'string' && attrs.styleName ? textStyleId(attrs.styleName) : undefined
-        return this.paragraph({ style: named || (ctx.quote ? 'Quote' : undefined), align: attrs.textAlign, flush: flush && !named }, this.inline(node.content))
+        const p = this.paragraph({ style: named || (ctx.quote ? 'Quote' : undefined), align: attrs.textAlign, flush: flush && !named }, this.inline(node.content))
+        // A picture with a page to itself.
+        const fullPage = (node.content || []).some((n) => n.type === 'image' && (n.attrs?.layout === 'page' || n.attrs?.layout === 'bleed'))
+        const pageBreak = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
+        return fullPage ? `${pageBreak}${p}${pageBreak}` : p
       }
       case 'heading': {
         const level = Math.min(6, Math.max(1, Number(attrs.level) || 1))

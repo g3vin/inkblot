@@ -455,3 +455,32 @@
   text-transform: uppercase;
   color: rgba(0, 0, 0, 0.1);
 }
+
+/* ---- a picture with a page to itself (ResizableImage `page`, `bleed`) ---- */
+
+/* Fitted to the text block: as wide as it can be without being taller than it. */
+.has-print-type .ProseMirror .image-node:is(.image-layout-page, .image-layout-bleed) {
+  display: block;
+  width: min(100%, calc((var(--pl-content-h, 600px) - 4px) * var(--img-ratio, 0.7))) !important;
+  margin: 0 auto;
+}
+
+.has-print-type .ProseMirror p:has(> .image-node:is(.image-layout-page, .image-layout-bleed)) {
+  margin: 0;
+  text-indent: 0;
+  line-height: 0;
+}
+
+/* One to the page's edges is drawn by the page itself, over its trim and bleed: in the
+   flow it keeps its place, unseen. */
+.has-print-type .ProseMirror .image-node.image-layout-bleed {
+  visibility: hidden;
+}
+
+.pl-bleed-picture,
+.print-bleed-picture {
+  position: absolute;
+  z-index: 3;
+  object-fit: cover;
+  pointer-events: none;
+}

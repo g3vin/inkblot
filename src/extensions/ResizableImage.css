@@ -29,6 +29,12 @@
   margin: 0.75em 0 0.75em auto;
 }
 
+.image-node.image-layout-page,
+.image-node.image-layout-bleed {
+  display: block;
+  margin: 0.75em auto;
+}
+
 .image-node.image-layout-wrap-left {
   float: left;
   margin: 0.35em 1em 0.75em 0;

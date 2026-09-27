@@ -41,6 +41,7 @@ import { buildTitlePages, textOfContent } from './titlePage'
 import { applyTypography, baselineGridPx, loadTypographyFont, typographyKey } from './typography'
 import { applyTextStyleSheet, textStylesOf } from './textStyles'
 import { notesOptionsOf, pageNotesOf, setBookNotes, setDocumentNotes } from './notes'
+import { bleedPicturesOf, bleedPxFor, withBleed } from './bleed'
 import { countWords } from '../lib/wordCount'
 import { characterName } from '../script/elements'
 import { breakdown, REPORT_TITLES, reportDocument } from '../script/reports'
@@ -138,6 +139,7 @@ const layoutOffscreen = async (content, setup, { footnotes = true } = {}) => {
     stride,
     headings: chapterHeadings(editor.state.doc),
     notes: footnotes ? pageNotesOf(editor.state.doc) : [],
+    bleeds: bleedPicturesOf(editor.view),
     destroy: () => {
       editor.destroy()
       host.remove()
@@ -162,6 +164,7 @@ const liveSource = (editor, setup, { footnotes = true } = {}) => {
     stride: state.frame.stride,
     headings: chapterHeadings(editor.state.doc),
     notes: footnotes ? pageNotesOf(editor.state.doc) : [],
+    bleeds: bleedPicturesOf(editor.view),
     destroy: () => {},
   }
 }
@@ -619,11 +622,14 @@ export const preparePrint = async ({
     const needsWords = setup.titlePage?.showWordCount || setupUsesToken(setup, 'words')
     const words = needsWords ? loaded.reduce((n, c) => n + countWords(textOfContent(c.content)), 0) : 0
     const folios = []
+    // A picture to the edge puts the whole print in bleed, as printers ask.
+    const bleedPx = bound ? 0 : bleedPxFor(sources.some((s) => s.bleeds?.length))
     const body = renderPages(sources, {
       bookTitle,
       author,
       surname: surnameOf(author),
       words,
+      bleedPx,
       onChapterStart: (index, folio) => { folios[index] = folio },
     })
     // Chapters run on into one flow have their own folios: the page each head is on.
@@ -684,6 +690,16 @@ export const preparePrint = async ({
       const ordered = sequence.map(({ sheet, side }) => sheets[sheet * 2 + (side === 'front' ? 0 : 1)])
       if (book.binding.includeGuide) ordered.push(guideSheet(imposition, sheetWidth, sheetHeight, bookTitle))
       return { elements: ordered, widthPx: sheetWidth, heightPx: sheetHeight, jobName: bookTitle, pageCount: pages.length, imposition }
+    }
+    if (bleedPx) {
+      return {
+        elements: pages.map((page, i) => withBleed(page, i + 1, bleedPx)),
+        widthPx: m.width + bleedPx,
+        heightPx: m.height + bleedPx * 2,
+        jobName: bookTitle,
+        pageCount: pages.length,
+        bleed: true,
+      }
     }
     return { elements: pages, widthPx: m.width, heightPx: m.height, jobName: bookTitle, pageCount: pages.length }
   } finally {

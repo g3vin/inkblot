@@ -129,6 +129,7 @@ p.script-el[data-scene-number]::before { content: attr(data-scene-number) '  '; 
 .fm-source { font-style: normal; text-align: right; }
 .contents ol { list-style: none; padding: 0; }
 .contents li { margin: 0.3em 0; }
+[data-layout="page"], [data-layout="bleed"] { display: block; width: 100%; height: auto; break-before: page; break-after: page; page-break-before: always; page-break-after: always; }
 .noteref { text-decoration: none; }
 .footnote-ref, .noteref sup { font-size: 0.72em; line-height: 0; vertical-align: super; }
 .footnotes { font-size: 0.88em; margin-top: 2em; }

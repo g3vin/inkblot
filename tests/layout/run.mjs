@@ -670,6 +670,63 @@ for (const [label, setup] of [['Letter', null], ['6 × 9 mirrored', BOOK]]) {
   await page.close()
 }
 
+/* ---------------- 5j. a picture with a page to itself, and one to its edges ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: false, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 0, noIndentAfterBreak: true,
+  }
+  const svg = (w, h) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="#888"/></svg>`)}`
+  const text = 'the quick brown fox jumps over a lazy dog while writers draft chapters of long novels in quiet rooms '.repeat(6)
+  const html = `<p>${text}</p><p>${text}</p><p><img src="${svg(300, 900)}" data-layout="page"></p><p>After the picture. ${text}</p><p><img src="${svg(400, 300)}" data-layout="bleed"></p><p>The end.</p>`
+  const page = await open(html, { setup: { ...BOOK, typography } })
+  await page.waitForTimeout(400)
+  const r = await page.evaluate(async () => {
+    const { editor, paginationKey, preparePrint } = window.__print
+    const state = paginationKey.getState(editor.state)
+    const pages = [...document.querySelectorAll('.pl-page')].map((pg) => pg.getBoundingClientRect())
+    const pageOf = (rect) => pages.findIndex((p) => rect.top + rect.height / 2 >= p.top && rect.top + rect.height / 2 <= p.bottom)
+    const imgs = [...editor.view.dom.querySelectorAll('.image-node')]
+    const full = imgs[0].getBoundingClientRect()
+    const after = editor.view.dom.querySelectorAll(':scope > p')[3]
+    const range = document.createRange()
+    range.setStart(after.firstChild, 0)
+    range.setEnd(after.firstChild, 5)
+    const afterRect = range.getClientRects()[0]
+    const stage = document.querySelector('.pl-stage')
+    const z = stage.getBoundingClientRect().width / stage.offsetWidth
+    const contentH = parseFloat(getComputedStyle(stage).getPropertyValue('--pl-content-h'))
+    // Anything else on the full-page picture's page?
+    const fullPage = pageOf(full)
+    const others = [...editor.view.dom.querySelectorAll(':scope > p')].filter((p, i) => i !== 2).flatMap((p) => {
+      const rg = document.createRange()
+      rg.selectNodeContents(p)
+      return [...rg.getClientRects()].filter((c) => c.height > 4 && pageOf(c) === fullPage)
+    }).length
+    const prepared = await preparePrint({ projectName: 'x', docPath: 'Harness', scope: 'document', liveEditors: [{ path: 'Harness', editor }] })
+    return {
+      fullPage,
+      afterPage: pageOf(afterRect),
+      others,
+      fits: full.height / z <= contentH + 0.5,
+      tall: full.height / z > contentH * 0.9,
+      livePicture: Boolean(document.querySelector('.pl-page .pl-bleed-picture')),
+      pageCount: state.result.pageCount,
+      printed: prepared.elements.length,
+      bleedPages: prepared.elements.filter((el) => el.querySelector('.print-bleed-picture')).length,
+      sized: prepared.bleed && prepared.widthPx > prepared.elements[0].firstElementChild.offsetWidth - 1,
+    }
+  })
+  ok('a full-page picture has its page to itself', r.others === 0 && r.fullPage > 0, JSON.stringify(r))
+  ok('…fitted to the text block, as tall as it is', r.fits && r.tall, JSON.stringify(r))
+  ok('…and what follows starts the next page', r.afterPage === r.fullPage + 1, JSON.stringify(r))
+  ok('a picture to the edges is drawn by its page, on screen and in print', r.livePicture && r.bleedPages === 1, JSON.stringify(r))
+  ok('…and puts the print in bleed, every page larger by it', r.sized && r.printed === r.pageCount, JSON.stringify(r))
+  await page.close()
+}
+
 /* ---------------- 6. a whole manuscript ---------------- */
 
 {
