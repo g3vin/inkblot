@@ -21,6 +21,14 @@
  *   row    one table row; a table breaks only between rows.
  *   break  a manual page, column or recto break; the next unit starts after it.
  *
+ * A typesetter's own, set on a paragraph (ParagraphTypeset.ts, read by measure.ts):
+ *   keepWithNext      as a heading
+ *   split: 'never'    kept together
+ *   pageAdjust        the slot it starts in runs that many lines long (+) or short (−)
+ *
+ * On a baseline grid (`frame.grid`), every paragraph starts on a whole line from its
+ * slot's top: what came before it — a picture, a head — is rounded up to whole lines.
+ *
  * A script adds rules of its own, carried on the units (measure.ts sets them):
  *   keepWithNext      a scene heading, a character, a parenthetical: never last on a page
  *   keepWithPrevious  a transition: never first on a page — the line before comes over
@@ -60,6 +68,8 @@ export interface LayoutUnit {
   /** Dialogue split across pages is marked (MORE) and CUE (CONT'D). */
   continuation?: { cue: string }
   breakKind?: ManualBreakKind
+  /** The slot this unit starts in runs this many of its lines long, or short. */
+  pageAdjust?: number
 }
 
 /** A speech carried over a page: drawn at the line push at `pos`. */
@@ -77,6 +87,8 @@ export interface LayoutFrame {
   columns: number
   /** Minimum lines of a split paragraph at a page's foot and head. */
   minLines: number
+  /** The baseline grid's pitch, px: paragraphs start on whole lines. 0 or absent: none. */
+  grid?: number
 }
 
 export interface Push {
@@ -132,8 +144,12 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
   const columns = Math.max(1, Math.floor(frame.columns))
   const minLines = Math.max(1, Math.floor(frame.minLines))
 
+  const grid = frame.grid && frame.grid > 1 ? frame.grid : 0
+  // Slots a typesetter ran long or short, by how much.
+  const adjust = new Map<number, number>()
+
   const slotTop = (s: number) => s * stride
-  const slotBottom = (s: number) => s * stride + slotHeight
+  const slotBottom = (s: number) => s * stride + slotHeight + (adjust.get(s) || 0)
 
   const pushes: Push[] = []
   const continuations: Continuation[] = []
@@ -160,13 +176,18 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
     return (nextPage % 2 === 0 ? nextPage : nextPage + 1) * columns
   }
 
+  /** Push a block down; a second push of the same block adds to its first. */
+  const pushBlock = (pos: number, height: number) => {
+    const last = pushes[pushes.length - 1]
+    if (last && last.kind === 'block' && last.pos === pos) last.height += height
+    else pushes.push({ kind: 'block', pos, height })
+    offset += height
+  }
+
   /** Push unit `u` so its content starts at the top of slot `target`. */
   const pushBlockTo = (u: LayoutUnit, target: number) => {
     const height = slotTop(target) - (u.top + offset)
-    if (height > EPS) {
-      pushes.push({ kind: 'block', pos: u.pos, height })
-      offset += height
-    }
+    if (height > EPS) pushBlock(u.pos, height)
     slot = target
     slotHasContent = false
   }
@@ -252,6 +273,25 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
     }
 
     markSlot(slot, u.pos)
+
+    // Run the page long or short — once for the slot, by the first paragraph that asks.
+    if (u.pageAdjust && !adjust.has(slot)) {
+      const line = lineHeightOf(u) || grid
+      adjust.set(slot, Math.max(-1, Math.min(1, u.pageAdjust)) * line)
+    }
+
+    // On the grid, a paragraph starts on the next whole line.
+    if (grid && u.kind === 'text' && slotHasContent) {
+      const off = (u.top + offset - slotTop(slot)) % grid
+      const lift = off > EPS && grid - off > EPS ? grid - off : 0
+      if (lift) {
+        pushBlock(u.pos, lift)
+        if (u.top + offset >= slotBottom(slot) - EPS) {
+          pushBlockTo(u, slot + 1)
+          markSlot(slot, u.pos)
+        }
+      }
+    }
 
     // Place the unit, splitting a paragraph across as many slots as it needs.
     let firstLine = 0

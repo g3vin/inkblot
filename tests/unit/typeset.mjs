@@ -571,3 +571,130 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   const spread = devices.readerCss(devices.DEFAULT_READER, 1024, 720)
   ok('a spread sets two columns to the screen', spread.includes(`column-width: ${(1024 - 72 * 4) / 2}px`))
 }
+
+/* ---- the typesetter's fixes, as pagination honours them ---- */
+
+{
+  const { paginate } = await import(`${C}/print/paginate.ts`)
+  const near = (a, b) => Math.abs(a - b) < 0.01
+  const frame = { slotHeight: 100, stride: 150, columns: 1, minLines: 2 }
+  const para = (pos, top, n, extra = {}) => ({
+    kind: 'text', pos, top, bottom: top + n * 10, ...extra,
+    lines: Array.from({ length: n }, (_, i) => ({ top: top + i * 10, bottom: top + (i + 1) * 10, pos: pos + 1 + i * 10 })),
+  })
+
+  let r = paginate([para(0, 0, 6), para(100, 60, 6, { split: 'never' })], frame)
+  ok('a paragraph kept together goes over whole rather than split', r.pushes.length === 1 && r.pushes[0].kind === 'block' && r.pushes[0].pos === 100)
+
+  r = paginate([para(0, 0, 6), para(100, 60, 3, { keepWithNext: true }), para(200, 90, 4)], frame)
+  ok('one kept with the next goes over with it', r.pushes[0].kind === 'block' && r.pushes[0].pos === 100)
+
+  // Eleven lines: ten fit, and widow control would send two over.
+  r = paginate([para(0, 0, 11, { pageAdjust: 1 })], frame)
+  ok('a page run a line long takes the eleventh line, and nothing goes over', r.pushes.length === 0 && r.pageCount === 1)
+  r = paginate([para(0, 0, 10, { pageAdjust: -1 })], frame)
+  ok('a page run a line short sends lines over that would have fit', r.pushes.length === 1 && r.pushes[0].kind === 'line' && r.pageCount === 2)
+
+  // A picture 25px tall, then a paragraph: on a 10px grid it starts at 30, not 25.
+  r = paginate([para(0, 0, 2), { kind: 'atom', pos: 30, top: 20, bottom: 45 }, para(60, 45, 2)], { ...frame, grid: 10 })
+  ok('on the baseline grid, a paragraph after an odd-sized picture starts on the next whole line',
+    r.pushes.length === 1 && r.pushes[0].pos === 60 && near(r.pushes[0].height, 5))
+  r = paginate([para(0, 0, 9), para(100, 95, 3)], { ...frame, grid: 10 })
+  ok('…and one lifted past the foot starts the next page, in one push', r.pushes.filter((p) => p.pos === 100).length === 1 && near(r.pushes[0].height, 150 - 95))
+}
+
+/* ---- composition: how lines are set ---- */
+
+{
+  const ty = await import(`${C}/print/typography.ts`)
+  const base = ty.normalizeTypography({ fontFamily: 'Palatino', fontSizePt: 11, lineSpacing: 'exact', lineValue: 14, paragraphSpacingPt: 10 })
+  ok('a typography without a composition composes as the defaults: balanced, punctuation hung',
+    ty.typographyClasses(base).includes('pt-balance') && ty.typographyClasses(base).includes('pt-hang') && !ty.typographyClasses(base).includes('pt-grid'))
+  ok('…and one that has none gains none when normalised', !('composition' in base) && !('features' in base))
+  const vars = ty.typographyVars(base)
+  ok('the hyphenation limits and the features are the page’s properties',
+    vars['--pt-hyphen-lines'] === '2' && vars['--pt-hyphen-word'] === '6' && vars['--pt-ligatures'] === 'common-ligatures no-discretionary-ligatures' && vars['--pt-kerning'] === 'normal')
+  const tuned = ty.normalizeTypography({ ...base, composition: { balance: false, hyphenLimitLines: 0, baselineGrid: true }, features: { oldStyleFigures: true, swashes: true, kerning: 'x' } })
+  const tv = ty.typographyVars(tuned)
+  ok('a composition set is kept, filled in: no limit, on the grid',
+    tuned.composition.hangingPunctuation && tv['--pt-hyphen-lines'] === 'no-limit' && ty.typographyClasses(tuned).includes('pt-grid') && !ty.typographyClasses(tuned).includes('pt-balance'))
+  ok('on the grid, the space between paragraphs is whole lines', tv['--pt-para'] === '14pt')
+  ok('features set are set, and a feature not a boolean falls back', tv['--pt-numeric'] === 'oldstyle-nums' && tv['--pt-feature-settings'] === '"swsh" 1' && tv['--pt-kerning'] === 'normal')
+  ok('the grid’s pitch is the leading, in px, and none off the grid',
+    Math.abs(ty.baselineGridPx(tuned) - 14 * 96 / 72) < 0.01 && ty.baselineGridPx(base) === 0)
+}
+
+/* ---- the proof: what a proofreader marks ---- */
+
+{
+  const { analyzeLines } = await import(`${C}/print/proofIssues.ts`)
+  let at = 0
+  const word = (text, left, width, broken = false) => {
+    const w = { text, from: at, to: at + text.length, left, right: left + width, broken }
+    at += text.length + 1
+    return w
+  }
+  const line = (page, words, right = 300) => ({ page, top: 0, left: 0, right, words })
+  const para = (lines, justified = true) => ({ pos: 0, justified, fontSize: 16, lines })
+  const full = (page) => line(page, [word('a', 0, 96), word('b', 100, 96), word('c', 200, 100)])
+
+  const found = (paras) => analyzeLines(paras, { hyphenLimit: 2 }).map((i) => i.kind)
+  ok('a paragraph’s last line alone at a page’s head is a widow', found([para([full(1), full(1), line(2, [word('end.', 0, 40), word('Then', 50, 40)])])]).includes('widow'))
+  ok('its first line alone at the foot is an orphan', found([para([full(1), full(2), line(2, [word('x', 0, 5), word('y', 10, 5)])])]).includes('orphan'))
+  ok('a last line of one short word is a runt', found([para([full(1), line(1, [word('it.', 0, 20)])])]).includes('runt'))
+  ok('…but a long one is not', !found([para([full(1), line(1, [word('extraordinarily.', 0, 120)])])]).includes('runt'))
+  ok('a justified line of three words across the measure is loose',
+    found([para([line(1, [word('a', 0, 20), word('b', 140, 20), word('c', 280, 20)]), full(1)])]).includes('loose'))
+  ok('…but not left-aligned, nor a paragraph’s last line',
+    !found([para([line(1, [word('a', 0, 20), word('b', 140, 20), word('c', 280, 20)]), full(1)], false)]).includes('loose') &&
+    !found([para([full(1), line(1, [word('a', 0, 20), word('b', 140, 20), word('c', 280, 20)])])]).includes('loose'))
+  const hy = (page) => line(page, [word('a', 0, 140), word('hyph', 150, 150, true)])
+  ok('three lines in a row ending in a hyphen are a ladder, where two may',
+    found([para([hy(1), hy(1), hy(1), full(1), line(1, [word('the', 0, 30), word('end', 40, 30)])])]).includes('stackedHyphens') &&
+    !found([para([hy(1), hy(1), full(1), line(1, [word('the', 0, 30), word('end', 40, 30)])])]).includes('stackedHyphens'))
+  const shortPage = analyzeLines([para([full(1), full(1), full(1)]), para([full(1), full(2), line(2, [word('The', 0, 30), word('end.', 40, 40)])])], { hyphenLimit: 2 })
+  const sp = shortPage.find((i) => i.kind === 'shortPage')
+  ok('a chapter ending on a page of two lines has a short last page, fixed by running the page before long',
+    sp && sp.page === 2 && sp.fixes.includes('runLong'))
+}
+
+/* ---- a font file: its family, and whether it may be embedded ---- */
+
+{
+  const { readFontInfo, familyFromFileName, styleFromName } = await import(`${C}/print/fontFile.ts`)
+  // An sfnt with a `name` table (family 1, style 2, typographic family 16) and an OS/2.
+  const build = ({ fsType, weight = 400, family = 'Test Serif', sub = 'Bold Italic' }) => {
+    const strings = [[1, 'Test Serif Bold'], [2, sub], [16, family]]
+    const encoded = strings.map(([, text]) => Buffer.from(text, 'utf16le').swap16())
+    const nameLength = 6 + strings.length * 12 + encoded.reduce((n, b) => n + b.length, 0)
+    const os2Length = 12
+    const tables = 2
+    const headerLength = 12 + tables * 16
+    const buf = Buffer.alloc(headerLength + nameLength + os2Length)
+    buf.writeUInt32BE(0x00010000, 0)
+    buf.writeUInt16BE(tables, 4)
+    const nameAt = headerLength
+    const os2At = headerLength + nameLength
+    buf.write('name', 12, 'ascii'); buf.writeUInt32BE(nameAt, 20); buf.writeUInt32BE(nameLength, 24)
+    buf.write('OS/2', 28, 'ascii'); buf.writeUInt32BE(os2At, 36); buf.writeUInt32BE(os2Length, 40)
+    buf.writeUInt16BE(0, nameAt); buf.writeUInt16BE(strings.length, nameAt + 2); buf.writeUInt16BE(6 + strings.length * 12, nameAt + 4)
+    let offset = 0
+    strings.forEach(([id], i) => {
+      const at = nameAt + 6 + i * 12
+      buf.writeUInt16BE(3, at); buf.writeUInt16BE(1, at + 2); buf.writeUInt16BE(0x409, at + 4); buf.writeUInt16BE(id, at + 6)
+      buf.writeUInt16BE(encoded[i].length, at + 8); buf.writeUInt16BE(offset, at + 10)
+      encoded[i].copy(buf, nameAt + 6 + strings.length * 12 + offset)
+      offset += encoded[i].length
+    })
+    buf.writeUInt16BE(weight, os2At + 4)
+    buf.writeUInt16BE(fsType, os2At + 8)
+    return new Uint8Array(buf)
+  }
+  const free = readFontInfo(build({ fsType: 0, weight: 700 }), 'whatever.ttf')
+  ok('a font file names its family — the typographic one — its weight and slant',
+    free.family === 'Test Serif' && free.weight === 700 && free.style === 'italic' && free.embeddable && free.format === 'truetype')
+  ok('one whose licence is restricted may not be embedded', !readFontInfo(build({ fsType: 2 }), 'x.ttf').embeddable)
+  ok('…while print-and-preview and editable ones may', readFontInfo(build({ fsType: 4 }), 'x.ttf').embeddable && readFontInfo(build({ fsType: 8 }), 'x.ttf').embeddable)
+  ok('a WOFF is known by its file name', readFontInfo(new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0, 0, 0, 0, 0, 0, 0, 0]), 'EBGaramond-BoldItalic.woff2').family === 'EBGaramond')
+  ok('a file name’s style words are its style', familyFromFileName('Crimson_Semibold.otf') === 'Crimson' && styleFromName('Semibold Italic').weight === 600)
+}

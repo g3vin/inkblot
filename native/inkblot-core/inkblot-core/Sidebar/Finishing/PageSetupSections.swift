@@ -39,6 +39,8 @@ struct PageSetupSections: View {
                         TypographySection(
                             setup: setup, unit: units,
                             defaultTypography: model.pageLayout.catalog?.defaultTypography,
+                            projectFonts: model.pageLayout.projectFonts,
+                            addFont: model.pageLayout.addProjectFont,
                             apply: model.pageLayout.apply)
                     case .titlePage:
                         TitlePageSection(setup: setup, apply: model.pageLayout.apply) { editingAuthor = true }

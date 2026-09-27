@@ -118,6 +118,15 @@ public struct AddBookItemCommand: Codable, Equatable {
 	}
 }
 
+/// Copy a font file into the project's fonts.
+public struct AddProjectFontCommand: Codable, Equatable {
+	public let path: String
+
+	public init(path: String) {
+		self.path = path
+	}
+}
+
 /// Quick add: a URL, DOI, ISBN, arXiv id or PMID is looked up; anything else is
 /// searched for as a title. The source exists at once, `resolving`, attached to the
 /// document — the writer does not wait on the network.
@@ -737,6 +746,52 @@ public struct ImageTypesetting: Codable, Equatable {
 	}
 }
 
+/// How a paragraph's lines are composed: what a typesetter tunes so a justified page
+/// has even colour, no rivers, and no ladders of hyphens.
+public struct Composition: Codable, Equatable {
+	/// Balance a paragraph's lines as a whole — no short last line, fewer hyphens —
+	/// rather than fill each line as it comes.
+	public let balance: Bool
+	/// Hang punctuation into the margin, so the text block's edge looks straight.
+	public let hangingPunctuation: Bool
+	/// The most lines in a row that may end in a hyphen.
+	public let hyphenLimitLines: UInt32
+	/// The shortest word that is hyphenated.
+	public let hyphenMinWord: UInt32
+	/// Headings, quotations, breaks and pictures take whole lines, so lines stand at
+	/// the same height across a spread and back each other on the leaf.
+	public let baselineGrid: Bool
+
+	public init(balance: Bool, hangingPunctuation: Bool, hyphenLimitLines: UInt32, hyphenMinWord: UInt32, baselineGrid: Bool) {
+		self.balance = balance
+		self.hangingPunctuation = hangingPunctuation
+		self.hyphenLimitLines = hyphenLimitLines
+		self.hyphenMinWord = hyphenMinWord
+		self.baselineGrid = baselineGrid
+	}
+}
+
+/// OpenType features the text is set with, where the font has them.
+public struct OpenTypeFeatures: Codable, Equatable {
+	/// fi, fl, ff: the ligatures every text face has.
+	public let ligatures: Bool
+	/// ct, st and the like: the ornamental ones.
+	public let discretionaryLigatures: Bool
+	/// Figures that sit in the text like lower-case letters.
+	public let oldStyleFigures: Bool
+	public let kerning: Bool
+	/// Swash capitals, in faces that have them.
+	public let swashes: Bool
+
+	public init(ligatures: Bool, discretionaryLigatures: Bool, oldStyleFigures: Bool, kerning: Bool, swashes: Bool) {
+		self.ligatures = ligatures
+		self.discretionaryLigatures = discretionaryLigatures
+		self.oldStyleFigures = oldStyleFigures
+		self.kerning = kerning
+		self.swashes = swashes
+	}
+}
+
 /// Type for print: set on the page's text in Print Layout, on paper and in the PDF,
 /// and carried into a DOCX's styles — never on the continuous editor.
 public struct PrintTypography: Codable, Equatable {
@@ -761,8 +816,12 @@ public struct PrintTypography: Codable, Equatable {
 	public let noIndentAfterBreak: Bool
 	/// How pictures in the text are set. Absent sets them as they were placed.
 	public let images: ImageTypesetting?
+	/// How lines are composed. Absent composes as the defaults do — well.
+	public let composition: Composition?
+	/// The font's OpenType features. Absent uses the defaults: ligatures and kerning.
+	public let features: OpenTypeFeatures?
 
-	public init(fontFamily: String, fontSizePt: Double, lineSpacing: LineSpacing, lineValue: Double, firstLineIndentMm: Double, paragraphSpacingPt: Double, alignment: PrintAlignment, hyphenate: Bool, sceneBreak: String, chapterOpening: ChapterOpening, chapterSinkMm: Double, noIndentAfterBreak: Bool, images: ImageTypesetting?) {
+	public init(fontFamily: String, fontSizePt: Double, lineSpacing: LineSpacing, lineValue: Double, firstLineIndentMm: Double, paragraphSpacingPt: Double, alignment: PrintAlignment, hyphenate: Bool, sceneBreak: String, chapterOpening: ChapterOpening, chapterSinkMm: Double, noIndentAfterBreak: Bool, images: ImageTypesetting?, composition: Composition?, features: OpenTypeFeatures?) {
 		self.fontFamily = fontFamily
 		self.fontSizePt = fontSizePt
 		self.lineSpacing = lineSpacing
@@ -776,6 +835,8 @@ public struct PrintTypography: Codable, Equatable {
 		self.chapterSinkMm = chapterSinkMm
 		self.noIndentAfterBreak = noIndentAfterBreak
 		self.images = images
+		self.composition = composition
+		self.features = features
 	}
 }
 
@@ -1778,6 +1839,10 @@ public enum NativeCommand: Codable, Equatable {
 	case setHeadImage(SetHeadImageCommand)
 	case setFolderBookOptions(SetFolderBookOptionsCommand)
 	case setTypesetView(SetTypesetViewCommand)
+	case setParagraphTypeset(SetParagraphTypesetCommand)
+	case showProofIssue(ShowProofIssueCommand)
+	case setTypesetDisplay(SetTypesetDisplayCommand)
+	case addProjectFont(AddProjectFontCommand)
 	case setCoverImage(SetCoverImageCommand)
 	case editCoverSets(EditCoverSetsCommand)
 	case saveTypesetVersion(SaveTypesetVersionCommand)
@@ -1896,6 +1961,10 @@ public enum NativeCommand: Codable, Equatable {
 			setHeadImage,
 			setFolderBookOptions,
 			setTypesetView,
+			setParagraphTypeset,
+			showProofIssue,
+			setTypesetDisplay,
+			addProjectFont,
 			setCoverImage,
 			editCoverSets,
 			saveTypesetVersion,
@@ -2338,6 +2407,26 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setTypesetView(content)
 					return
 				}
+			case .setParagraphTypeset:
+				if let content = try? container.decode(SetParagraphTypesetCommand.self, forKey: .payload) {
+					self = .setParagraphTypeset(content)
+					return
+				}
+			case .showProofIssue:
+				if let content = try? container.decode(ShowProofIssueCommand.self, forKey: .payload) {
+					self = .showProofIssue(content)
+					return
+				}
+			case .setTypesetDisplay:
+				if let content = try? container.decode(SetTypesetDisplayCommand.self, forKey: .payload) {
+					self = .setTypesetDisplay(content)
+					return
+				}
+			case .addProjectFont:
+				if let content = try? container.decode(AddProjectFontCommand.self, forKey: .payload) {
+					self = .addProjectFont(content)
+					return
+				}
 			case .setCoverImage:
 				if let content = try? container.decode(SetCoverImageCommand.self, forKey: .payload) {
 					self = .setCoverImage(content)
@@ -2767,6 +2856,18 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setTypesetView(let content):
 			try container.encode(CodingKeys.setTypesetView, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setParagraphTypeset(let content):
+			try container.encode(CodingKeys.setParagraphTypeset, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .showProofIssue(let content):
+			try container.encode(CodingKeys.showProofIssue, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setTypesetDisplay(let content):
+			try container.encode(CodingKeys.setTypesetDisplay, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .addProjectFont(let content):
+			try container.encode(CodingKeys.addProjectFont, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setCoverImage(let content):
 			try container.encode(CodingKeys.setCoverImage, forKey: .type)
@@ -5772,6 +5873,85 @@ public enum TypesetView: String, Codable, Equatable {
 	case digital
 }
 
+/// What the proof finds wrong with a typeset page, as a typesetter would mark it.
+public enum ProofKind: String, Codable, Equatable {
+	/// A justified line spaced out so far its words stand apart.
+	case loose
+	/// A paragraph's last line alone at the head of a page.
+	case widow
+	/// A paragraph's first line alone at the foot of a page.
+	case orphan
+	/// A paragraph ending on a line of one short word.
+	case runt
+	/// More lines in a row ending in a hyphen than the composition allows.
+	case stackedHyphens
+	/// A chapter's last page with only a line or two on it.
+	case shortPage
+}
+
+/// A fix the proof offers: each is one of `SetParagraphTypesetCommand`'s.
+public enum ProofFix: String, Codable, Equatable {
+	/// Letter-spacing a little tighter, to take a line back.
+	case tighten
+	/// A little looser, to push one over.
+	case loosen
+	case keepTogether
+	case keepWithNext
+	/// The page runs a line long, to take a widow back.
+	case runLong
+	/// A line short, to send one over.
+	case runShort
+}
+
+public struct ProofIssue: Codable, Equatable {
+	public let id: String
+	public let kind: ProofKind
+	/// The printed page it is on, counted from the chapter's first.
+	public let page: UInt32
+	/// The words at fault. A fix is set on the paragraph they are in.
+	public let anchor: TextAnchor
+	public let fixes: [ProofFix]
+
+	public init(id: String, kind: ProofKind, page: UInt32, anchor: TextAnchor, fixes: [ProofFix]) {
+		self.id = id
+		self.kind = kind
+		self.page = page
+		self.anchor = anchor
+		self.fixes = fixes
+	}
+}
+
+/// What is set on the paragraph the caret is in, for the toolbar and the Proof section.
+public struct ParagraphTypeset: Codable, Equatable {
+	public let tracking: Int32
+	public let keepTogether: Bool
+	public let keepWithNext: Bool
+	public let pageAdjust: Int32
+
+	public init(tracking: Int32, keepTogether: Bool, keepWithNext: Bool, pageAdjust: Int32) {
+		self.tracking = tracking
+		self.keepTogether = keepTogether
+		self.keepWithNext = keepWithNext
+		self.pageAdjust = pageAdjust
+	}
+}
+
+/// A font file kept in the project (`.assets/fonts/`), so the book sets — and embeds
+/// in its PDF and EPUB — the same face on any Mac.
+public struct ProjectFont: Codable, Equatable {
+	public let family: String
+	/// Its project path.
+	public let path: String
+	/// Whether its licence lets it be embedded in a PDF or an EPUB (its `fsType`).
+	public let embeddable: Bool
+
+	public init(family: String, path: String, embeddable: Bool) {
+		self.family = family
+		self.path = path
+		self.embeddable = embeddable
+	}
+}
+
 /// Where the setup a document lays out in came from.
 public enum SetupSource: String, Codable, Equatable {
 	/// The document's own.
@@ -5866,6 +6046,16 @@ public struct PageLayoutState: Codable, Equatable {
 	public let mode: EditorMode?
 	/// In Typeset, the printed pages or the e-book.
 	public let typesetView: TypesetView?
+	/// Typeset's pages in spreads, the baseline grid drawn, the proof marks shown.
+	public let spread: Bool?
+	public let showGrid: Bool?
+	public let proof: Bool?
+	/// What the proof finds on the chapter open, while it is on.
+	public let proofIssues: [ProofIssue]?
+	/// What is set on the paragraph the caret is in.
+	public let paragraph: ParagraphTypeset?
+	/// The fonts kept in the project.
+	public let projectFonts: [ProjectFont]?
 	/// The active text document, or none (a canvas, or nothing open).
 	public let docPath: String?
 	/// False while the document's editor is not yet there to take an edit. An edit sent
@@ -5921,10 +6111,16 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Production section. None for prose.
 	public let script: ScriptSummary?
 
-	public init(enabled: Bool, mode: EditorMode?, typesetView: TypesetView?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, cover: CoverState?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
+	public init(enabled: Bool, mode: EditorMode?, typesetView: TypesetView?, spread: Bool?, showGrid: Bool?, proof: Bool?, proofIssues: [ProofIssue]?, paragraph: ParagraphTypeset?, projectFonts: [ProjectFont]?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, cover: CoverState?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
 		self.mode = mode
 		self.typesetView = typesetView
+		self.spread = spread
+		self.showGrid = showGrid
+		self.proof = proof
+		self.proofIssues = proofIssues
+		self.paragraph = paragraph
+		self.projectFonts = projectFonts
 		self.docPath = docPath
 		self.ready = ready
 		self.setup = setup
@@ -7238,6 +7434,28 @@ public struct SetPanelInsetsCommand: Codable, Equatable {
 	}
 }
 
+/// Set what the typesetter sets on a paragraph — the one the anchor is in, or those
+/// selected. Each field present is set; `nudge_tracking` adds to what is there.
+public struct SetParagraphTypesetCommand: Codable, Equatable {
+	public let anchor: TextAnchor?
+	/// Thousandths of an em, −10 to +10.
+	public let tracking: Int32?
+	public let nudgeTracking: Int32?
+	public let keepTogether: Bool?
+	public let keepWithNext: Bool?
+	/// The page the paragraph starts on runs this many lines long (1) or short (−1).
+	public let pageAdjust: Int32?
+
+	public init(anchor: TextAnchor?, tracking: Int32?, nudgeTracking: Int32?, keepTogether: Bool?, keepWithNext: Bool?, pageAdjust: Int32?) {
+		self.anchor = anchor
+		self.tracking = tracking
+		self.nudgeTracking = nudgeTracking
+		self.keepTogether = keepTogether
+		self.keepWithNext = keepWithNext
+		self.pageAdjust = pageAdjust
+	}
+}
+
 /// Show a document as pages, or as the continuous editor: the one named — a pane's own
 /// toggle names the document in it — or else the active one.
 public struct SetPrintLayoutCommand: Codable, Equatable {
@@ -7343,6 +7561,20 @@ public struct SetTitlebarInsetCommand: Codable, Equatable {
 	}
 }
 
+/// How Typeset shows its pages: in spreads, with the baseline grid drawn, with the proof
+/// marks. Each field present is set.
+public struct SetTypesetDisplayCommand: Codable, Equatable {
+	public let spread: Bool?
+	public let grid: Bool?
+	public let proof: Bool?
+
+	public init(spread: Bool?, grid: Bool?, proof: Bool?) {
+		self.spread = spread
+		self.grid = grid
+		self.proof = proof
+	}
+}
+
 public struct SetTypesetViewCommand: Codable, Equatable {
 	public let view: TypesetView
 
@@ -7369,6 +7601,15 @@ public struct SetWritingFormatCommand: Codable, Equatable {
 	public init(target: EditorTarget, format: WritingFormat) {
 		self.target = target
 		self.format = format
+	}
+}
+
+/// Scroll the pages to a proof mark and select its paragraph.
+public struct ShowProofIssueCommand: Codable, Equatable {
+	public let anchor: TextAnchor
+
+	public init(anchor: TextAnchor) {
+		self.anchor = anchor
 	}
 }
 

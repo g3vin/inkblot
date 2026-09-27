@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The Typeset tab's Body Text section: the type the text prints in.
 ///
@@ -11,6 +12,9 @@ struct TypographySection: View {
     let setup: PageSetupDraft
     let unit: LengthUnit
     let defaultTypography: PrintTypography?
+    /// Fonts kept in the project, offered first; and a way to add one.
+    var projectFonts: [ProjectFont] = []
+    var addFont: ((URL) -> Void)?
     let apply: (PageSetupDraft) -> Void
 
     var body: some View {
@@ -51,9 +55,22 @@ struct TypographySection: View {
     @ViewBuilder
     private func controls(_ t: TypographyDraft) -> some View {
         LabeledContent("Font") {
-            FontFamilyPopUp(selection: t.primaryFamily) { name in
-                edit { $0.fontFamily = TypographyDraft.cssFamily(name) }
+            HStack(spacing: 6) {
+                FontFamilyPopUp(selection: t.primaryFamily, projectFamilies: projectFonts.map(\.family)) { name in
+                    edit { $0.fontFamily = TypographyDraft.cssFamily(name) }
+                }
+                if let addFont {
+                    Button {
+                        chooseFont(addFont)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .help("Add a font file to the project, so the book sets and embeds it on any Mac")
+                }
             }
+        }
+        if let font = projectFonts.first(where: { $0.family == t.primaryFamily }), !font.embeddable {
+            FinishingCaution(text: "\(font.family)’s licence does not allow embedding. A printer’s PDF and a store’s EPUB must embed their fonts.")
         }
         LabeledContent("Size") {
             HStack(spacing: 4) {
@@ -87,6 +104,30 @@ struct TypographySection: View {
         }
         .pickerStyle(.segmented)
         Toggle("Hyphenate", isOn: binding(\.hyphenate))
+        DisclosureGroup("Fine Typography") {
+            Toggle("Balance Each Paragraph", isOn: binding(\.balance))
+                .help("Set a paragraph’s lines as a whole: even spacing, fewer hyphens, no word alone on the last line")
+            Toggle("Hang Punctuation", isOn: binding(\.hangingPunctuation))
+                .help("Quotation marks and stops sit just outside the text block, so its edges look straight")
+            if t.hyphenate {
+                Stepper(value: binding(\.hyphenLimitLines), in: 0...10) {
+                    LabeledContent("Hyphens in a Row", value: t.hyphenLimitLines == 0 ? "Any" : "\(t.hyphenLimitLines)")
+                }
+                Stepper(value: binding(\.hyphenMinWord), in: 3...20) {
+                    LabeledContent("Hyphenate Words Of", value: "\(t.hyphenMinWord)+ letters")
+                }
+            }
+            Toggle("Align to Baseline Grid", isOn: binding(\.baselineGrid))
+                .help("Headings, quotations, breaks and pictures take whole lines, so lines stand level across a spread and back one another on the leaf")
+        }
+        DisclosureGroup("OpenType") {
+            Toggle("Ligatures", isOn: binding(\.ligatures))
+            Toggle("Discretionary Ligatures", isOn: binding(\.discretionaryLigatures))
+            Toggle("Old-Style Figures", isOn: binding(\.oldStyleFigures))
+                .help("Numbers that sit in the text like lower-case letters, where the font has them")
+            Toggle("Kerning", isOn: binding(\.kerning))
+            Toggle("Swashes", isOn: binding(\.swashes))
+        }
         LengthField("First-Line Indent", millimeters: binding(\.firstLineIndentMm), unit: unit)
         LabeledContent("Space After Paragraph") {
             HStack(spacing: 4) {
@@ -119,11 +160,21 @@ struct TypographySection: View {
 
     static let sceneBreaks = ["* * *", "#", "⁂", "❧", "~", "• • •"]
 
+    private func chooseFont(_ add: @escaping (URL) -> Void) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.font]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose font files to keep in the project"
+        panel.prompt = "Add"
+        if panel.runModal() == .OK { panel.urls.forEach(add) }
+    }
+
     /// Only for bindings to read while the section redraws without type set.
     private static let fallback = PrintTypography(
         fontFamily: "Georgia, serif", fontSizePt: 12, lineSpacing: .single, lineValue: 1,
         firstLineIndentMm: 0, paragraphSpacingPt: 0, alignment: .left, hyphenate: false,
-        sceneBreak: "* * *", chapterOpening: .plain, chapterSinkMm: 0, noIndentAfterBreak: false, images: nil)
+        sceneBreak: "* * *", chapterOpening: .plain, chapterSinkMm: 0, noIndentAfterBreak: false, images: nil,
+        composition: nil, features: nil)
 }
 
 /// The fonts the font menu offers: a few that print well first, then every family
@@ -155,6 +206,8 @@ final class FontFamilies {
 /// selection follows the setup after that.
 struct FontFamilyPopUp: NSViewRepresentable {
     let selection: String
+    /// The project's own fonts, listed first.
+    var projectFamilies: [String] = []
     let choose: (String) -> Void
 
     func makeNSView(context: Context) -> NSPopUpButton {
@@ -169,13 +222,16 @@ struct FontFamilyPopUp: NSViewRepresentable {
     func updateNSView(_ button: NSPopUpButton, context: Context) {
         context.coordinator.parent = self
         let item = { button.menu?.items.first { $0.representedObject as? String == selection } }
-        if item() == nil { button.menu = Self.menu(including: selection) }
+        if item() == nil || context.coordinator.projectFamilies != projectFamilies {
+            context.coordinator.projectFamilies = projectFamilies
+            button.menu = Self.menu(including: selection, project: projectFamilies)
+        }
         button.select(item())
     }
 
     /// The suggested families, each in its own face, then every family — with the setup's
     /// own first when it is not installed, so the menu still names it.
-    private static func menu(including current: String) -> NSMenu {
+    private static func menu(including current: String, project: [String]) -> NSMenu {
         let families = FontFamilies.shared
         let menu = NSMenu()
         func add(_ family: String, face: Bool = false) {
@@ -186,8 +242,13 @@ struct FontFamilyPopUp: NSViewRepresentable {
             }
             menu.addItem(item)
         }
-        if !families.contains(current) {
+        if !families.contains(current) && !project.contains(current) {
             add(current)
+            menu.addItem(.separator())
+        }
+        if !project.isEmpty {
+            menu.addItem(.sectionHeader(title: "In This Project"))
+            project.forEach { add($0) }
             menu.addItem(.separator())
         }
         menu.addItem(.sectionHeader(title: "Suggested"))
@@ -202,6 +263,7 @@ struct FontFamilyPopUp: NSViewRepresentable {
 
     final class Coordinator: NSObject {
         var parent: FontFamilyPopUp
+        var projectFamilies: [String] = []
 
         init(_ parent: FontFamilyPopUp) { self.parent = parent }
 

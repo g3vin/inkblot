@@ -113,6 +113,49 @@ final class PageLayoutModel {
 
     /* ---------------- commands ---------------- */
 
+    /* ---------------- Typeset's display, the proof, the paragraph ---------------- */
+
+    var spread: Bool { state?.spread ?? false }
+    var showGrid: Bool { state?.showGrid ?? false }
+    var proof: Bool { state?.proof ?? false }
+    var proofIssues: [ProofIssue] { state?.proofIssues ?? [] }
+    var paragraph: ParagraphTypeset? { state?.paragraph.flatMap { $0 } }
+    var projectFonts: [ProjectFont] { state?.projectFonts ?? [] }
+
+    func setDisplay(spread: Bool? = nil, grid: Bool? = nil, proof: Bool? = nil) {
+        bridge.send(.setTypesetDisplay(SetTypesetDisplayCommand(spread: spread, grid: grid, proof: proof)))
+    }
+
+    /// Set on the paragraph a proof mark is in, or the paragraphs selected.
+    func setParagraph(_ anchor: TextAnchor? = nil, tracking: Int32? = nil, nudge: Int32? = nil,
+                      keepTogether: Bool? = nil, keepWithNext: Bool? = nil, pageAdjust: Int32? = nil) {
+        bridge.send(.setParagraphTypeset(SetParagraphTypesetCommand(
+            anchor: anchor, tracking: tracking, nudgeTracking: nudge, keepTogether: keepTogether,
+            keepWithNext: keepWithNext, pageAdjust: pageAdjust)))
+    }
+
+    /// Tracking steps: five thousandths of an em a click.
+    static let trackingStep: Int32 = 5
+
+    func fix(_ issue: ProofIssue, _ fix: ProofFix) {
+        switch fix {
+        case .tighten: setParagraph(issue.anchor, nudge: -Self.trackingStep)
+        case .loosen: setParagraph(issue.anchor, nudge: Self.trackingStep)
+        case .keepTogether: setParagraph(issue.anchor, keepTogether: true)
+        case .keepWithNext: setParagraph(issue.anchor, keepWithNext: true)
+        case .runLong: setParagraph(issue.anchor, pageAdjust: 1)
+        case .runShort: setParagraph(issue.anchor, pageAdjust: -1)
+        }
+    }
+
+    func showProofIssue(_ issue: ProofIssue) {
+        bridge.send(.showProofIssue(ShowProofIssueCommand(anchor: issue.anchor)))
+    }
+
+    func addProjectFont(_ url: URL) {
+        bridge.send(.addProjectFont(AddProjectFontCommand(path: url.path)))
+    }
+
     /// Typeset's view: the printed pages, or the e-book as a reader shows it.
     var typesetView: TypesetView { state?.typesetView.flatMap { $0 } ?? .print }
 
@@ -483,6 +526,10 @@ struct TypographyDraft: Equatable {
     var chapterSinkMm: Double
     var noIndentAfterBreak: Bool
     var images: ImageTypesetting?
+    /// Kept as they came until one of their fields is edited: a setup that never set
+    /// them keeps setting nothing.
+    var composition: Composition?
+    var features: OpenTypeFeatures?
 
     init(_ t: PrintTypography) {
         fontFamily = t.fontFamily
@@ -498,6 +545,8 @@ struct TypographyDraft: Equatable {
         chapterSinkMm = t.chapterSinkMm
         noIndentAfterBreak = t.noIndentAfterBreak
         images = t.images
+        composition = t.composition
+        features = t.features
     }
 
     var typography: PrintTypography {
@@ -506,7 +555,54 @@ struct TypographyDraft: Equatable {
             lineValue: lineValue, firstLineIndentMm: max(0, firstLineIndentMm),
             paragraphSpacingPt: max(0, paragraphSpacingPt), alignment: alignment, hyphenate: hyphenate,
             sceneBreak: sceneBreak, chapterOpening: chapterOpening, chapterSinkMm: max(0, chapterSinkMm),
-            noIndentAfterBreak: noIndentAfterBreak, images: images)
+            noIndentAfterBreak: noIndentAfterBreak, images: images,
+            composition: composition, features: features)
+    }
+
+    /* The composition's and the features' fields, each settable (their structs are not). */
+
+    private var comp: Composition { composition ?? .standard }
+    private var feat: OpenTypeFeatures { features ?? .standard }
+
+    var balance: Bool {
+        get { comp.balance }
+        set { composition = Composition(balance: newValue, hangingPunctuation: comp.hangingPunctuation, hyphenLimitLines: comp.hyphenLimitLines, hyphenMinWord: comp.hyphenMinWord, baselineGrid: comp.baselineGrid) }
+    }
+    var hangingPunctuation: Bool {
+        get { comp.hangingPunctuation }
+        set { composition = Composition(balance: comp.balance, hangingPunctuation: newValue, hyphenLimitLines: comp.hyphenLimitLines, hyphenMinWord: comp.hyphenMinWord, baselineGrid: comp.baselineGrid) }
+    }
+    var hyphenLimitLines: Int {
+        get { Int(comp.hyphenLimitLines) }
+        set { composition = Composition(balance: comp.balance, hangingPunctuation: comp.hangingPunctuation, hyphenLimitLines: UInt32(max(0, min(10, newValue))), hyphenMinWord: comp.hyphenMinWord, baselineGrid: comp.baselineGrid) }
+    }
+    var hyphenMinWord: Int {
+        get { Int(comp.hyphenMinWord) }
+        set { composition = Composition(balance: comp.balance, hangingPunctuation: comp.hangingPunctuation, hyphenLimitLines: comp.hyphenLimitLines, hyphenMinWord: UInt32(max(3, min(20, newValue))), baselineGrid: comp.baselineGrid) }
+    }
+    var baselineGrid: Bool {
+        get { comp.baselineGrid }
+        set { composition = Composition(balance: comp.balance, hangingPunctuation: comp.hangingPunctuation, hyphenLimitLines: comp.hyphenLimitLines, hyphenMinWord: comp.hyphenMinWord, baselineGrid: newValue) }
+    }
+    var ligatures: Bool {
+        get { feat.ligatures }
+        set { features = OpenTypeFeatures(ligatures: newValue, discretionaryLigatures: feat.discretionaryLigatures, oldStyleFigures: feat.oldStyleFigures, kerning: feat.kerning, swashes: feat.swashes) }
+    }
+    var discretionaryLigatures: Bool {
+        get { feat.discretionaryLigatures }
+        set { features = OpenTypeFeatures(ligatures: feat.ligatures, discretionaryLigatures: newValue, oldStyleFigures: feat.oldStyleFigures, kerning: feat.kerning, swashes: feat.swashes) }
+    }
+    var oldStyleFigures: Bool {
+        get { feat.oldStyleFigures }
+        set { features = OpenTypeFeatures(ligatures: feat.ligatures, discretionaryLigatures: feat.discretionaryLigatures, oldStyleFigures: newValue, kerning: feat.kerning, swashes: feat.swashes) }
+    }
+    var kerning: Bool {
+        get { feat.kerning }
+        set { features = OpenTypeFeatures(ligatures: feat.ligatures, discretionaryLigatures: feat.discretionaryLigatures, oldStyleFigures: feat.oldStyleFigures, kerning: newValue, swashes: feat.swashes) }
+    }
+    var swashes: Bool {
+        get { feat.swashes }
+        set { features = OpenTypeFeatures(ligatures: feat.ligatures, discretionaryLigatures: feat.discretionaryLigatures, oldStyleFigures: feat.oldStyleFigures, kerning: feat.kerning, swashes: newValue) }
     }
 
     /// The family a CSS list starts with, unquoted: what the font menu shows.
@@ -520,6 +616,15 @@ struct TypographyDraft: Equatable {
         let monospaced = ["courier", "mono", "typewriter", "menlo", "consol"].contains { name.lowercased().contains($0) }
         return "\"\(name)\", \(monospaced ? "Courier, monospace" : "Georgia, serif")"
     }
+}
+
+extension Composition {
+    /// As `typography.ts` composes when a setup says nothing.
+    static let standard = Composition(balance: true, hangingPunctuation: true, hyphenLimitLines: 2, hyphenMinWord: 6, baselineGrid: false)
+}
+
+extension OpenTypeFeatures {
+    static let standard = OpenTypeFeatures(ligatures: true, discretionaryLigatures: false, oldStyleFigures: false, kerning: true, swashes: false)
 }
 
 struct TitlePageDraft: Equatable {

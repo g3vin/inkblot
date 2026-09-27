@@ -299,6 +299,18 @@ struct InkblotCommands: Commands {
                 get: { model.pageLayout.typesetView == .digital },
                 set: { model.pageLayout.setTypesetView($0 ? .digital : .print) }))
                 .disabled(model.pageLayout.mode != .typeset)
+            Toggle("Show Spreads", isOn: Binding(
+                get: { model.pageLayout.spread },
+                set: { model.pageLayout.setDisplay(spread: $0) }))
+                .disabled(model.pageLayout.mode != .typeset)
+            Toggle("Show Baseline Grid", isOn: Binding(
+                get: { model.pageLayout.showGrid },
+                set: { model.pageLayout.setDisplay(grid: $0) }))
+                .disabled(model.pageLayout.mode != .typeset)
+            Toggle("Proof the Pages", isOn: Binding(
+                get: { model.pageLayout.proof },
+                set: { model.pageLayout.setDisplay(proof: $0) }))
+                .disabled(model.pageLayout.mode != .typeset)
             Menu("Page Zoom") {
                 Button("Fit Width") { model.pageLayout.fit(.width) }
                 Button("Fit Page") { model.pageLayout.fit(.page) }

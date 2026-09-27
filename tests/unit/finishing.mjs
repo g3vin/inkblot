@@ -284,8 +284,8 @@ const vars = typo.typographyVars(manuscript.typography)
 ok('the variables carry the size, leading and a quoted scene break',
   vars['--pt-size'] === '12pt' && vars['--pt-leading'] === '27.6pt' && vars['--pt-break'] === '"#"')
 ok('a quote in a scene break is escaped for CSS', typo.typographyVars({ ...manuscript.typography, sceneBreak: 'say "hi"' })['--pt-break'] === '"say \\"hi\\""')
-ok('the book\'s classes switch on drop caps, small caps and flush openings',
-  same(typo.typographyClasses(typo.BOOK_TYPOGRAPHY), ['has-print-type', 'pt-drop-cap', 'pt-small-caps', 'pt-flush-after-break']))
+ok('the book\'s classes switch on drop caps, small caps, flush openings and its composition',
+  same(typo.typographyClasses(typo.BOOK_TYPOGRAPHY), ['has-print-type', 'pt-drop-cap', 'pt-small-caps', 'pt-flush-after-break', 'pt-balance', 'pt-hang']))
 ok('the editor\'s font has no classes', typo.typographyClasses(undefined).length === 0)
 ok('the primary family is unquoted', typo.primaryFamily('"Courier Prime", Courier') === 'Courier Prime')
 
@@ -427,6 +427,20 @@ ok('the EPUB reads front matter, contents, then chapters',
   opfBook.indexOf('idref="front-01"') > 0 &&
   opfBook.indexOf('idref="front-01"') < opfBook.indexOf('idref="contents"') && opfBook.indexOf('idref="contents"') < opfBook.indexOf('idref="chapter-001"') &&
   readZipEntry(epubBook, 'OEBPS/text/front-04.xhtml').includes('epub:type="dedication"'))
+
+const fontBytes = new Uint8Array([0, 1, 0, 0, 0, 0])
+const epubStyled = await buildEpub({
+  title: 'The Book', chapters: [{ title: 'Chapter One', content: titled }], resolveImage: async () => null,
+  css: 'body { font-family: "EB Garamond"; }',
+  fonts: [{ family: 'EB Garamond', weight: 400, style: 'normal', format: 'opentype', mime: 'font/otf', file: 'EB Garamond.otf', bytes: fontBytes }],
+  identifier: 'urn:x', modified: new Date(0),
+})
+const styles = readZipEntry(epubStyled, 'OEBPS/styles.css')
+ok('an EPUB carries the book’s stylesheet, and the font it is set in, declared and listed',
+  styles.startsWith('@font-face { font-family: "EB Garamond"; src: url("fonts/EB_Garamond.otf") format("opentype");') &&
+  styles.includes('body { font-family: "EB Garamond"; }') &&
+  readZipEntry(epubStyled, 'OEBPS/content.opf').includes('<item id="font-1" href="fonts/EB_Garamond.otf" media-type="font/otf"/>') &&
+  listZip(epubStyled).some((e) => e.name === 'OEBPS/fonts/EB_Garamond.otf'))
 
 /* ---------------- Word ---------------- */
 

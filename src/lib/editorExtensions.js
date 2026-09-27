@@ -36,6 +36,8 @@ import { DocPageSetup } from '../print/DocPageSetup'
 import { PageBreak } from '../print/PageBreak'
 import { Pagination } from '../print/PaginationExtension'
 import { TypesetAnchors } from '../print/TypesetAnchors'
+import { ParagraphTypeset } from '../print/ParagraphTypeset'
+import { ProofMarks } from '../print/proofIssues'
 import { TypesetLock } from '../print/TypesetLock'
 import { DocWritingFormat } from '../script/DocWritingFormat'
 import { ScriptElement } from '../script/ScriptElement'
@@ -100,6 +102,10 @@ export const buildEditorExtensions = (starterKit) => [
   TypesetLock,
   // A stable name for each block the typesetter touched (the typeset history).
   TypesetAnchors,
+  // A paragraph's tracking and keeps, set to mend a page.
+  ParagraphTypeset,
+  // The proof's marks on the Typeset pages.
+  ProofMarks,
   // A screenplay's or a play's lines, and which the document is written as.
   ScriptElement,
   DocWritingFormat,

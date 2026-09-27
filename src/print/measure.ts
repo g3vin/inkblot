@@ -262,7 +262,10 @@ export const measureUnits = (ctx: MeasureContext): LayoutUnit[] => {
       top: lines[0].top,
       bottom: lines[lines.length - 1].bottom,
       lines,
-      keepWithNext: node.type.name === HEADING,
+      keepWithNext: node.type.name === HEADING || Boolean(node.attrs.keepWithNext),
+      // What a typesetter set on the paragraph (ParagraphTypeset.ts).
+      ...(node.attrs.keepTogether ? { split: 'never' as const } : {}),
+      ...(node.attrs.pageAdjust ? { pageAdjust: Number(node.attrs.pageAdjust) || 0 } : {}),
       ...(node.type.name === SCRIPT ? scriptRules(node, pos, lines) : {}),
     })
   }

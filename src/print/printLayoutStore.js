@@ -88,6 +88,53 @@ export const setTypesetView = (projectName, view) => {
   emit()
 }
 
+const DISPLAY_PREFIX = 'inkblot-typeset-display:'
+const DISPLAY_DEFAULTS = { spread: false, grid: false, proof: false }
+
+/**
+ * How Typeset shows its pages, per project: in spreads, with the baseline grid drawn,
+ * with the proof's marks. View state — none of it prints.
+ */
+export const getTypesetDisplay = (projectName) => {
+  let stored = null
+  try {
+    stored = projectName ? JSON.parse(getPreference(`${DISPLAY_PREFIX}${projectName}`) || 'null') : null
+  } catch {
+    stored = null
+  }
+  return Object.fromEntries(Object.entries(DISPLAY_DEFAULTS).map(([key, value]) => [key, typeof stored?.[key] === 'boolean' ? stored[key] : value]))
+}
+
+export const setTypesetDisplay = (projectName, patch) => {
+  if (!projectName) return
+  const now = getTypesetDisplay(projectName)
+  const next = { ...now }
+  for (const key of Object.keys(DISPLAY_DEFAULTS)) if (typeof patch?.[key] === 'boolean') next[key] = patch[key]
+  if (JSON.stringify(next) === JSON.stringify(now)) return
+  setPreference(`${DISPLAY_PREFIX}${projectName}`, JSON.stringify(next))
+  emit()
+}
+
+// What the proof found on the document open in Typeset, and the mark picked from the
+// list. Not kept: the proof is read again from the pages whenever they change.
+let proof = { docPath: null, issues: [], focused: null }
+
+export const getProofIssues = (docPath) => (docPath && proof.docPath === docPath ? proof.issues : [])
+export const getProofFocus = () => proof.focused
+
+export const setProofIssues = (docPath, issues) => {
+  const next = Array.isArray(issues) ? issues : []
+  if (proof.docPath === docPath && JSON.stringify(proof.issues) === JSON.stringify(next)) return
+  proof = { docPath, issues: next, focused: next.some((i) => i.id === proof.focused) ? proof.focused : null }
+  emit()
+}
+
+export const setProofFocus = (id) => {
+  if (proof.focused === id) return
+  proof = { ...proof, focused: id || null }
+  emit()
+}
+
 // The e-book's checks, as the Digital view last found them: the Publishing section's
 // preflight lists them beside the print's. Null until the e-book has been read.
 let ebookIssues = null

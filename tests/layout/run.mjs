@@ -479,6 +479,107 @@ for (const [label, setup] of [['Letter', null], ['6 × 9 mirrored', BOOK]]) {
   await page.close()
 }
 
+/* ---------------- 5f. the proof, and a typesetter's fix ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: false, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 0, noIndentAfterBreak: true,
+    // Balanced lines never leave a runt, which is the point; off, to make one.
+    composition: { balance: false, hangingPunctuation: false, hyphenLimitLines: 2, hyphenMinWord: 6, baselineGrid: false },
+  }
+  const page = await open('<p>x</p>', { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(async () => {
+    const { editor, paginationKey, analyzeLines, readParagraphLines, setParagraphTypeset } = window.__print
+    const frame = () => paginationKey.getState(editor.state).frame
+    const lastLine = () => {
+      const [para] = readParagraphLines(editor.view, frame())
+      return para.lines[para.lines.length - 1]
+    }
+    const frameWait = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    // Words until the last line holds one short word alone: a runt.
+    const words = 'the quick brown fox jumps over a lazy dog while writers draft chapters of long novels in quiet rooms'.split(' ')
+    let text = Array.from({ length: 70 }, (_, i) => words[i % words.length]).join(' ')
+    let found = null
+    for (let i = 0; i < 40 && !found; i += 1) {
+      editor.commands.setContent(`<p>${text} it.</p>`)
+      await frameWait()
+      const line = lastLine()
+      if (line.words.length === 1) found = line
+      else text += ` ${words[i % words.length]}`
+    }
+    if (!found) return { made: false }
+    const issues = analyzeLines(readParagraphLines(editor.view, frame()), { hyphenLimit: 2 })
+    const runt = issues.find((i) => i.kind === 'runt')
+    const linesBefore = readParagraphLines(editor.view, frame())[0].lines.length
+    const tr = editor.state.tr
+    setParagraphTypeset(tr, runt.from, runt.to, { nudgeTracking: -10 })
+    editor.view.dispatch(tr)
+    await frameWait()
+    const after = readParagraphLines(editor.view, frame())[0]
+    const node = editor.state.doc.firstChild
+    return {
+      made: true,
+      runt: Boolean(runt),
+      marked: runt?.text === 'it.',
+      linesBefore,
+      linesAfter: after.lines.length,
+      lastWords: after.lines[after.lines.length - 1].words.length,
+      tracking: node.attrs.tracking,
+      anchored: Boolean(node.attrs.typesetId),
+      spacing: getComputedStyle(editor.view.nodeDOM(0)).letterSpacing,
+    }
+  })
+  ok('a paragraph ending in one short word alone is found to end in a runt', r.made && r.runt && r.marked, JSON.stringify(r))
+  ok('tightening it sets its tracking, anchored for the typeset history', r.tracking === -10 && r.anchored && r.spacing !== 'normal', JSON.stringify(r))
+  ok('…and takes the runt back up', r.linesAfter < r.linesBefore || r.lastWords > 1, JSON.stringify(r))
+  await page.close()
+}
+
+/* ---------------- 5g. the baseline grid ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'exact', lineValue: 14, firstLineIndentMm: 5,
+    paragraphSpacingPt: 5, alignment: 'justify', hyphenate: true, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 20, noIndentAfterBreak: true,
+    composition: { baselineGrid: true },
+  }
+  const page = await open(manuscript(24, 3), { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(() => {
+    const { editor, paginationKey, baselineGridPx } = window.__print
+    const { frame } = paginationKey.getState(editor.state)
+    const dom = editor.view.dom
+    const rect = dom.getBoundingClientRect()
+    const scale = rect.width / dom.offsetWidth
+    const origin = parseFloat(getComputedStyle(dom).paddingTop) || 0
+    const grid = baselineGridPx(editor.state.doc.attrs.pageSetup.typography)
+    const off = []
+    // Each paragraph's first line of text — where pagination sets it — not its box,
+    // which a push's spacer opens.
+    for (const p of dom.querySelectorAll(':scope > p')) {
+      const text = document.createTreeWalker(p, NodeFilter.SHOW_TEXT).nextNode()
+      if (!text) continue
+      const range = document.createRange()
+      range.setStart(text, 0)
+      range.setEnd(text, 1)
+      const first = range.getClientRects()[0]
+      if (!first) continue
+      const y = (first.top - rect.top) / scale - origin
+      // A line at a page's very top can measure a hair above it.
+      const inSlot = y - Math.floor((y + 0.5) / frame.stride) * frame.stride
+      // Measured against the page's first line, as pagination sets it.
+      const rem = inSlot % grid
+      off.push(Math.min(rem, grid - rem))
+    }
+    return { grid: frame.grid, pitch: grid, worst: Math.max(...off), count: off.length }
+  })
+  ok(`on the baseline grid, every paragraph starts on a whole line of its page (${r.count} checked, worst ${r.worst.toFixed(2)}px)`,
+    r.grid > 0 && Math.abs(r.grid - r.pitch) < 0.01 && r.worst < 1, JSON.stringify(r))
+  await page.close()
+}
+
 /* ---------------- 6. a whole manuscript ---------------- */
 
 {

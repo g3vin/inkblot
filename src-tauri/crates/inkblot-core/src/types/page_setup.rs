@@ -171,6 +171,60 @@ pub struct PrintTypography {
     /// How pictures in the text are set. Absent sets them as they were placed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub images: Option<ImageTypesetting>,
+    /// How lines are composed. Absent composes as the defaults do — well.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition: Option<Composition>,
+    /// The font's OpenType features. Absent uses the defaults: ligatures and kerning.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub features: Option<OpenTypeFeatures>,
+}
+
+/// How a paragraph's lines are composed: what a typesetter tunes so a justified page
+/// has even colour, no rivers, and no ladders of hyphens.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Composition {
+    /// Balance a paragraph's lines as a whole — no short last line, fewer hyphens —
+    /// rather than fill each line as it comes.
+    pub balance: bool,
+    /// Hang punctuation into the margin, so the text block's edge looks straight.
+    pub hanging_punctuation: bool,
+    /// The most lines in a row that may end in a hyphen.
+    pub hyphen_limit_lines: u32,
+    /// The shortest word that is hyphenated.
+    pub hyphen_min_word: u32,
+    /// Headings, quotations, breaks and pictures take whole lines, so lines stand at
+    /// the same height across a spread and back each other on the leaf.
+    pub baseline_grid: bool,
+}
+
+impl Default for Composition {
+    fn default() -> Self {
+        Self { balance: true, hanging_punctuation: true, hyphen_limit_lines: 2, hyphen_min_word: 6, baseline_grid: false }
+    }
+}
+
+/// OpenType features the text is set with, where the font has them.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct OpenTypeFeatures {
+    /// fi, fl, ff: the ligatures every text face has.
+    pub ligatures: bool,
+    /// ct, st and the like: the ornamental ones.
+    pub discretionary_ligatures: bool,
+    /// Figures that sit in the text like lower-case letters.
+    pub old_style_figures: bool,
+    pub kerning: bool,
+    /// Swash capitals, in faces that have them.
+    pub swashes: bool,
+}
+
+impl Default for OpenTypeFeatures {
+    fn default() -> Self {
+        Self { ligatures: true, discretionary_ligatures: false, old_style_figures: false, kerning: true, swashes: false }
+    }
 }
 
 /// Where a picture in the text sits across the text block.

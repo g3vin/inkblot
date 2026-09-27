@@ -22,6 +22,55 @@
   text-indent: var(--pt-indent);
 }
 
+/* ---- composition: how the lines are set (typography.ts, `compositionOf`) ---- */
+
+.has-print-type .ProseMirror {
+  -webkit-hyphenate-limit-lines: var(--pt-hyphen-lines, 2);
+  hyphenate-limit-lines: var(--pt-hyphen-lines, 2);
+  -webkit-hyphenate-limit-before: var(--pt-hyphen-side, 3);
+  -webkit-hyphenate-limit-after: var(--pt-hyphen-side, 3);
+  hyphenate-limit-chars: var(--pt-hyphen-word, 6) var(--pt-hyphen-side, 3) var(--pt-hyphen-side, 3);
+  font-variant-ligatures: var(--pt-ligatures, common-ligatures);
+  font-variant-numeric: var(--pt-numeric, normal);
+  font-kerning: var(--pt-kerning, normal);
+  font-feature-settings: var(--pt-feature-settings, normal);
+}
+
+/* Each paragraph set as a whole: no lone word on its last line, fewer hyphens. */
+.pt-balance .ProseMirror p {
+  text-wrap-style: pretty;
+  text-wrap: pretty;
+}
+
+/* Quotes and stops hung into the margin, so the text block's edges look straight. */
+.pt-hang .ProseMirror p {
+  hanging-punctuation: first allow-end last;
+}
+
+/* A paragraph a typesetter has tightened or loosened (ParagraphTypeset.ts). */
+.has-print-type .ProseMirror p[data-tracking] {
+  letter-spacing: var(--pt-tracking, 0);
+}
+
+/* ---- the baseline grid: everything takes whole lines ---- */
+
+.pt-grid .ProseMirror :is(h2, h3, h4, h5, h6) {
+  line-height: round(up, 1.2em, var(--pt-leading));
+  margin: var(--pt-leading) 0 0;
+}
+
+.pt-grid .ProseMirror blockquote {
+  margin-top: var(--pt-leading);
+  margin-bottom: var(--pt-leading);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.pt-grid .ProseMirror :is(ul, ol) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 /* A paragraph inside something else — a list, a table, a quote — is not indented. */
 .has-print-type .ProseMirror :is(li, td, th, blockquote) p {
   text-indent: 0;
