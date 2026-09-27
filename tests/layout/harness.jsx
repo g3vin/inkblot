@@ -15,6 +15,8 @@ import PrintLayoutView from '../../src/print/PrintLayoutView'
 import { computePushes, paginationKey } from '../../src/print/PaginationExtension'
 import { preparePrint } from '../../src/print/printJob'
 import { setLiveHead } from '../../src/print/ChapterHeadDecorations'
+import { readerCss, DEFAULT_READER } from '../../src/print/devicePresets'
+import { ebookCss } from '../../src/print/export/ebook'
 
 const params = new URLSearchParams(location.search)
 const initialSetup = JSON.parse(params.get('setup') || 'null')
@@ -31,7 +33,7 @@ function Harness() {
       if (initialSetup) created.commands.setPageSetup(initialSetup)
     },
   })
-  window.__print = { editor, paginationKey, computePushes, preparePrint, setZoom, setLiveHead }
+  window.__print = { editor, paginationKey, computePushes, preparePrint, setZoom, setLiveHead, readerCss, DEFAULT_READER, ebookCss }
   const setup = editor?.state.doc.attrs.pageSetup || initialSetup
   // `?typeset=1`: the page's handles, their edits recorded and applied to the document.
   const typeset = params.get('typeset') && editor ? {

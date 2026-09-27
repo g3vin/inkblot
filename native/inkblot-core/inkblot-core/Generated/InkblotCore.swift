@@ -1079,6 +1079,34 @@ public struct CoverSet: Codable, Equatable {
 	}
 }
 
+/// What an e-book leaves out or sets differently from print. A reading system chooses
+/// the page, the type size and — often — the font; what the book still decides is
+/// whether its flourishes come with it.
+public struct DigitalOptions: Codable, Equatable {
+	/// A drop cap on each chapter's first letter, as in print. Some readers draw them
+	/// badly at large type sizes.
+	public let dropCaps: Bool
+	/// The chapter's picture in its head, and a picture ornament.
+	public let headImages: Bool
+	/// The book's own font, where the reader lets the book choose; off leaves the
+	/// reader's.
+	public let publisherFont: Bool
+	/// Scene breaks set as `* * *`, which every reader's font has, instead of the
+	/// book's ornament, which some e-readers' fonts lack.
+	public let plainSceneBreaks: Bool
+	/// Pictures that are ornaments (dark on a clear ground) are inverted on a dark
+	/// page, as a reader in night mode would otherwise lose them.
+	public let invertOrnamentsInDark: Bool
+
+	public init(dropCaps: Bool, headImages: Bool, publisherFont: Bool, plainSceneBreaks: Bool, invertOrnamentsInDark: Bool) {
+		self.dropCaps = dropCaps
+		self.headImages = headImages
+		self.publisherFont = publisherFont
+		self.plainSceneBreaks = plainSceneBreaks
+		self.invertOrnamentsInDark = invertOrnamentsInDark
+	}
+}
+
 /// A folder (or the whole project) compiled as one book. Kept per folder in the
 /// project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
 /// belongs to all of them.
@@ -1118,8 +1146,10 @@ public struct BookSettings: Codable, Equatable {
 	/// The book's covers; `active_cover` is the one print, EPUB and export use.
 	public let covers: [CoverSet]?
 	public let activeCover: String?
+	/// How the e-book differs from the printed book.
+	public let digital: DigitalOptions?
 
-	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?) {
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?, digital: DigitalOptions?) {
 		self.folder = folder
 		self.title = title
 		self.author = author
@@ -1138,6 +1168,7 @@ public struct BookSettings: Codable, Equatable {
 		self.continuous = continuous
 		self.covers = covers
 		self.activeCover = activeCover
+		self.digital = digital
 	}
 }
 
@@ -1746,6 +1777,7 @@ public enum NativeCommand: Codable, Equatable {
 	case setChapterMeta(SetChapterMetaCommand)
 	case setHeadImage(SetHeadImageCommand)
 	case setFolderBookOptions(SetFolderBookOptionsCommand)
+	case setTypesetView(SetTypesetViewCommand)
 	case setCoverImage(SetCoverImageCommand)
 	case editCoverSets(EditCoverSetsCommand)
 	case saveTypesetVersion(SaveTypesetVersionCommand)
@@ -1863,6 +1895,7 @@ public enum NativeCommand: Codable, Equatable {
 			setChapterMeta,
 			setHeadImage,
 			setFolderBookOptions,
+			setTypesetView,
 			setCoverImage,
 			editCoverSets,
 			saveTypesetVersion,
@@ -2300,6 +2333,11 @@ public enum NativeCommand: Codable, Equatable {
 					self = .setFolderBookOptions(content)
 					return
 				}
+			case .setTypesetView:
+				if let content = try? container.decode(SetTypesetViewCommand.self, forKey: .payload) {
+					self = .setTypesetView(content)
+					return
+				}
 			case .setCoverImage:
 				if let content = try? container.decode(SetCoverImageCommand.self, forKey: .payload) {
 					self = .setCoverImage(content)
@@ -2726,6 +2764,9 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .setFolderBookOptions(let content):
 			try container.encode(CodingKeys.setFolderBookOptions, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .setTypesetView(let content):
+			try container.encode(CodingKeys.setTypesetView, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setCoverImage(let content):
 			try container.encode(CodingKeys.setCoverImage, forKey: .type)
@@ -5725,6 +5766,12 @@ public enum EditorMode: String, Codable, Equatable {
 	case typeset
 }
 
+/// Typeset's view of the book: its printed pages, or the e-book as a reader shows it.
+public enum TypesetView: String, Codable, Equatable {
+	case print
+	case digital
+}
+
 /// Where the setup a document lays out in came from.
 public enum SetupSource: String, Codable, Equatable {
 	/// The document's own.
@@ -5817,6 +5864,8 @@ public struct PageLayoutState: Codable, Equatable {
 	public let enabled: Bool
 	/// Write or Typeset, for the whole window.
 	public let mode: EditorMode?
+	/// In Typeset, the printed pages or the e-book.
+	public let typesetView: TypesetView?
 	/// The active text document, or none (a canvas, or nothing open).
 	public let docPath: String?
 	/// False while the document's editor is not yet there to take an edit. An edit sent
@@ -5872,9 +5921,10 @@ public struct PageLayoutState: Codable, Equatable {
 	/// Production section. None for prose.
 	public let script: ScriptSummary?
 
-	public init(enabled: Bool, mode: EditorMode?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, cover: CoverState?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
+	public init(enabled: Bool, mode: EditorMode?, typesetView: TypesetView?, docPath: String?, ready: Bool, setup: PageSetup, setupSource: SetupSource, hasOwnSetup: Bool, formatId: String?, formatModified: Bool, pageCount: UInt32, currentPage: UInt32, zoom: Double, scope: PrintScope, book: BookSettings, bookSetupActive: Bool, bookChapters: [String], bookItems: [BookRow]?, selectedBookItem: String?, chapterMeta: ChapterMeta?, cover: CoverState?, chapterImageFile: String?, ornamentImageFile: String?, suggestedInsideMarginMm: Double, author: AuthorProfile?, wordCount: UInt32?, coverFile: String?, lastExport: LastExport?, hasSelection: Bool?, publishing: PublishingReport?, script: ScriptSummary?) {
 		self.enabled = enabled
 		self.mode = mode
+		self.typesetView = typesetView
 		self.docPath = docPath
 		self.ready = ready
 		self.setup = setup
@@ -7290,6 +7340,14 @@ public struct SetTitlebarInsetCommand: Codable, Equatable {
 	public init(leading: Double, trailing: Double?) {
 		self.leading = leading
 		self.trailing = trailing
+	}
+}
+
+public struct SetTypesetViewCommand: Codable, Equatable {
+	public let view: TypesetView
+
+	public init(view: TypesetView) {
+		self.view = view
 	}
 }
 

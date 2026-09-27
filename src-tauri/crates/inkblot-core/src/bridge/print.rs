@@ -459,6 +459,23 @@ pub struct SetEditorModeCommand {
     pub mode: EditorMode,
 }
 
+/// Typeset's view of the book: its printed pages, or the e-book as a reader shows it.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TypesetView {
+    #[default]
+    Print,
+    Digital,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTypesetViewCommand {
+    pub view: TypesetView,
+}
+
 /// Show a document as pages, or as the continuous editor: the one named — a pane's own
 /// toggle names the document in it — or else the active one.
 #[typeshare]
@@ -859,6 +876,9 @@ pub struct PageLayoutState {
     /// Write or Typeset, for the whole window.
     #[serde(default)]
     pub mode: EditorMode,
+    /// In Typeset, the printed pages or the e-book.
+    #[serde(default)]
+    pub typeset_view: TypesetView,
     /// The active text document, or none (a canvas, or nothing open).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_path: Option<String>,

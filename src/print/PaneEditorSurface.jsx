@@ -15,6 +15,7 @@ import { EditorContent } from '@tiptap/react'
 import BookPages from './BookPages'
 import ContinuousStack from './ContinuousStack'
 import CoverView from './CoverView'
+import DigitalPreview from './DigitalPreview'
 import { setLiveHead } from './ChapterHeadDecorations'
 import { readChapterMeta } from './DocChapterMeta'
 import PrintLayoutView from './PrintLayoutView'
@@ -26,7 +27,7 @@ import { readDocPageSetup } from './DocPageSetup'
 import { documentSurface } from '../bridge'
 import { assetUrl, isAssetPath, writeAssetFromFile } from '../lib/assets'
 import { useDocPageSetup } from './useDocPageSetup'
-import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, isPrintLayoutEnabled, isShowingCover, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
+import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, getTypesetView, isPrintLayoutEnabled, isShowingCover, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
 import { resolvePageSetup } from './pageSetup'
 
 /**
@@ -69,6 +70,8 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     [ownSetup, bookJson]
   )
   const printLayout = Boolean(editor) && isPrintLayoutEnabled(projectName, docPath)
+  // In Typeset, the e-book as a reader shows it, in place of the pages.
+  const digital = printLayout && getTypesetView(projectName) === 'digital'
   // In Typeset a chapter's prose is locked — it is written in Write — and the book's own
   // pages, its front and back matter, are not: they are only ever edited here.
   const locked = printLayout && !isMatterPath(docPath)
@@ -152,13 +155,15 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
   return (
     <div
       ref={setScroll}
-      className={`pane-scroll${printLayout ? ' is-print-layout' : ''}${locked ? ' is-typeset-locked' : ''}`}
+      className={`pane-scroll${printLayout ? ' is-print-layout' : ''}${locked ? ' is-typeset-locked' : ''}${digital ? ' is-digital' : ''}`}
       tabIndex={printLayout ? -1 : undefined}
     >
       {header}
       <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} printLayout={printLayout} />
       {printLayout && placement && isShowingCover() ? (
         <CoverView projectName={projectName} docPath={docPath} folder={placement.folder} setup={pageSetup} />
+      ) : digital ? (
+        <DigitalPreview projectName={projectName} docPath={docPath} editor={editor} placement={inBook ? placement : null} />
       ) : printLayout && inBook ? (
         <BookPages
           projectName={projectName}

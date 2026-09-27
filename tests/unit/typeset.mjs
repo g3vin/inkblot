@@ -510,3 +510,64 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   ok('deleting the one in use makes the first the cover', book.covers.length === 2 && book.activeCover === 'cover' && book.coverImage === 'old.jpg')
   ok('an action on a version that is not there changes nothing', design.editCovers(book, { action: 'rename', id: 'gone', name: 'X', newId: 'x' }) === book)
 }
+
+/* ---- the e-book: its stylesheet, what it leaves out, its checks, the reader ---- */
+
+{
+  const ebook = await import(`${C}/print/export/ebook.ts`)
+  const design = await import(`${C}/print/chapterDesign.ts`)
+  const devices = await import(`${C}/print/devicePresets.ts`)
+  const { normalizeTypography } = await import(`${C}/print/typography.ts`)
+
+  ok('a book with no e-book options has the defaults', JSON.stringify(design.digitalOf({})) === JSON.stringify(design.DEFAULT_DIGITAL))
+  ok('…and one with some keeps them, and only booleans',
+    design.digitalOf({ digital: { dropCaps: false, headImages: 'no' } }).dropCaps === false && design.digitalOf({ digital: { headImages: 'no' } }).headImages === true)
+
+  const t = normalizeTypography({ fontFamily: 'Palatino', fontSizePt: 11, firstLineIndentMm: 5, alignment: 'justify', hyphenate: true, sceneBreak: '❦', chapterOpening: 'dropCapAndSmallCaps', noIndentAfterBreak: true })
+  const css = ebook.ebookCss({ typography: t })
+  ok('the e-book is set in the book’s face, justified and hyphenated', css.includes('font-family: Palatino;') && css.includes('text-align: justify;') && css.includes('hyphens: auto;'))
+  ok('its indent is the print’s, in ems', /p \{ text-indent: 1\.29em; margin: 0; \}/.test(css))
+  ok('its chapters open with the drop cap and small capitals, as floats a reader can draw',
+    css.includes('.chapter-head + p::first-letter { float: left;') && css.includes('::first-line { font-variant: small-caps;'))
+  ok('its scene breaks are the book’s ornament', css.includes('hr::after { content: "❦";'))
+  ok('the head is drawn as designed', css.includes(".chapter-head[data-title-case='smallCaps'] .ch-title"))
+  const plain = ebook.ebookCss({ typography: t, digital: { ...design.DEFAULT_DIGITAL, dropCaps: false, publisherFont: false, plainSceneBreaks: true, invertOrnamentsInDark: false } })
+  ok('without drop caps, the book’s font or its ornament, the e-book has none of them',
+    !plain.includes('::first-letter') && !plain.includes('font-family: Palatino') && plain.includes('content: "* * *"') && !plain.includes('invert(1)'))
+  ok('ornament pictures are inverted on a dark page unless told not to', css.includes(':root.reader-dark .chapter-head .ch-ornament.is-image img { filter: invert(1); }'))
+
+  const doc = { type: 'doc', content: [
+    { type: 'chapterHead', attrs: { head: { title: 'One', image: '.assets/a.jpg', ornament: 'image', ornamentImage: '.assets/o.png' } } },
+    { type: 'paragraph', content: [{ type: 'image', attrs: { src: '.assets/b.jpg', alt: '' } }] },
+  ] }
+  ok('with its pictures, a chapter is as it was', ebook.digitalContent(doc, design.DEFAULT_DIGITAL) === doc)
+  const bare = ebook.digitalContent(doc, { ...design.DEFAULT_DIGITAL, headImages: false })
+  ok('without, its head has no picture and no picture ornament, and the text keeps its own',
+    !bare.content[0].attrs.head.image && bare.content[0].attrs.head.ornament === 'none' && bare.content[1].content[0].attrs.src === '.assets/b.jpg')
+
+  const images = ebook.ebookImagesOf(doc)
+  ok('the e-book’s pictures are the head’s and the text’s', images.length === 2 && images[1].alt === '')
+  const checks = ebook.ebookChecks({
+    images: [{ src: 'a', alt: '' }, { src: 'b', alt: 'x', bytes: 6 * 1024 * 1024 }, { src: 'c', alt: 'y', width: 3000, height: 2000 }],
+    chapters: 3,
+    cover: { width: 1600, height: 2000 },
+  }).map((c) => c.id)
+  ok('a picture without alt text, one over 5 MB, one over 4 megapixels and a squat cover are each pointed out',
+    ['ebook-alt', 'ebook-image-bytes', 'ebook-image-pixels', 'ebook-cover-shape'].every((id) => checks.includes(id)))
+  ok('a book with no chapters, and no cover, is told so',
+    ebook.ebookChecks({ images: [], chapters: 0, cover: null }).map((c) => c.id).join() === 'ebook-empty,ebook-cover')
+  ok('a well-made e-book passes', ebook.ebookChecks({ images: [{ src: 'a', alt: 'A map' }], chapters: 1, cover: { width: 1600, height: 2560 } }).length === 0)
+
+  ok('a device dragged too small or too large is held to the limits',
+    devices.clampViewport(10, 99999).width === devices.VIEWPORT_MIN.width && devices.clampViewport(10, 99999).height === devices.VIEWPORT_MAX.height)
+  ok('a wide screen held landscape reads as a spread; a phone does not',
+    devices.isSpreadViewport(1024, 720) && !devices.isSpreadViewport(393, 852))
+  ok('reader settings out of range fall back', JSON.stringify(devices.normalizeReader({ scale: 7, theme: 'plaid', margins: 'wide' })) === JSON.stringify({ ...devices.DEFAULT_READER, margins: 'wide' }))
+  const reader = devices.readerCss({ ...devices.DEFAULT_READER, theme: 'night', scale: 1.5, align: 'left', publisherFont: false }, 400, 600)
+  ok('a page is a column one screen wide, less its margins, with the gap making up the rest',
+    reader.includes('column-width: 344px') && reader.includes('column-gap: 56px'))
+  ok('the reader’s theme, size, font and alignment go over the book’s',
+    reader.includes('background: #000000') && reader.includes('font-size: 27px') && reader.includes('Georgia') && reader.includes('text-align: left !important'))
+  const spread = devices.readerCss(devices.DEFAULT_READER, 1024, 720)
+  ok('a spread sets two columns to the screen', spread.includes(`column-width: ${(1024 - 72 * 4) / 2}px`))
+}

@@ -16,7 +16,7 @@ import { bookFolderFor, loadBookSections, loadChapters } from '../compile'
 import { readDocPageSetup } from '../DocPageSetup'
 import { resolvePageSetup } from '../pageSetup'
 import { bookAuthor, getAuthorProfile, getMeasurement, getPrintScope, setLastExport, setMeasurement } from '../printLayoutStore'
-import { activeCoverOf } from '../chapterDesign'
+import { activeCoverOf, digitalOf } from '../chapterDesign'
 import { coverPage } from '../coverWrap'
 import { bookWrap } from '../coverState'
 import { mmToPx } from '../pageSizes'
@@ -33,6 +33,7 @@ import { toMarkdown } from './markdown'
 import { buildPlainText } from './text'
 import { serializeFountain } from '../../script/fountain'
 import { headsToBlocks, mapImageSources, portableContent } from './portable'
+import { digitalContent, ebookCss } from './ebook'
 
 const FORMATS = {
   pdf: { ext: 'pdf', label: 'PDF' },
@@ -105,7 +106,7 @@ export async function runExport({
   const report = (phase, extra = {}) => reportJob({ jobId, kind: 'export', format, phase, ...extra })
   report('preparing')
   try {
-    await writeExport({ format, path, projectName, docPath, scope, liveByPath, compiled, title, book })
+    await writeExport({ format, path, projectName, docPath, scope, liveByPath, title, book })
   } catch (error) {
     report('failed', { message: describeError(error) })
     throw error
@@ -148,11 +149,17 @@ async function exportCoverPdf({ jobId, projectName, docPath, book, liveEditors, 
   })
 }
 
-/** Build a non-PDF export and write it to `path`. */
-async function writeExport({ format, path, projectName, docPath, scope, liveByPath, compiled, title, book }) {
+/**
+ * What an export sets, compiled: a book's pages in order — its own front matter pages,
+ * parts, chapters headed as it numbers them, back matter — each titled for the
+ * contents; a document as it is. HTML and EPUB draw a chapter's head as it is designed;
+ * the other formats set it as a heading and the blocks under it. An e-book leaves out
+ * what the book's digital options say, and comes with its stylesheet — which is what
+ * the Digital preview shows, from this same call.
+ */
+export async function compileExport({ format, projectName, docPath, scope, live, book, title }) {
+  const compiled = scope !== 'document'
   const author = bookAuthor(book)
-  const live = (p) => liveByPath.get(p)?.getJSON() || null
-  // A book is its contents in book order; a document exports as it is.
   let chapters
   let sections = null
   if (compiled) {
@@ -172,21 +179,23 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
     chapters = await withPrintBibliography(projectName, await loadChapters(projectName, docPath, 'document', live))
   }
   const { setup } = resolvePageSetup({
-    docSetup: (compiled ? null : readDocPageSetup(liveByPath.get(docPath)?.state.doc)) || chapters[0]?.content?.attrs?.pageSetup,
+    docSetup: (compiled ? null : readDocPageSetup(live(docPath))) || chapters[0]?.content?.attrs?.pageSetup,
     bookSetup: book?.pageSetup,
     scope,
   })
-  // A book's pages in order — its own front matter pages, parts, chapters headed as it
-  // numbers them, back matter — each titled for the contents; a document as it is.
-  // HTML and EPUB draw a chapter's head as it is designed; the other formats set it as
-  // a heading and the blocks under it.
   const drawsHeads = format === 'html' || format === 'epub'
+  const digital = digitalOf(book)
   const exportChapters = (sections ? sections.filter((s) => s.content) : chapters)
-    .map((chapter) => ({
-      title: chapterTitleOf(chapter.content, chapter.name),
-      content: drawsHeads ? chapter.content : headsToBlocks(chapter.content),
-      inContents: chapter.role !== 'front',
-    }))
+    .map((chapter) => {
+      const content = drawsHeads ? chapter.content : headsToBlocks(chapter.content)
+      return {
+        title: chapterTitleOf(chapter.content, chapter.name),
+        content: format === 'epub' ? digitalContent(content, digital) : content,
+        inContents: chapter.role !== 'front',
+        // Which of the book's entries it is, so a preview can find it.
+        item: chapter.item?.id,
+      }
+    })
   // The pages an export sets from the book itself: the half title and the title page.
   const generated = new Set((sections || []).filter((s) => s.role === 'front').map((s) => s.item.generated).filter(Boolean))
   const front = compiled
@@ -196,6 +205,16 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
     )
     : []
   const contents = compiled && (sections || []).some((s) => s.item.generated === 'contents')
+  const css = format === 'epub' ? ebookCss({ typography: setup.typography, digital }) : null
+  return { compiled, author, chapters, exportChapters, front, contents, setup, css }
+}
+
+/** Build a non-PDF export and write it to `path`. */
+async function writeExport({ format, path, projectName, docPath, scope, liveByPath, title, book }) {
+  const live = (p) => liveByPath.get(p)?.getJSON() || null
+  const { compiled, author, chapters, exportChapters, front, contents, setup, css } = await compileExport({
+    format, projectName, docPath, scope, live, book, title,
+  })
 
   if (format === 'html') {
     // Inline every image, so the file stands alone.
@@ -337,6 +356,7 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
       cover,
       front,
       contents,
+      css,
     })
     await writeFile(path, bytes)
     return path

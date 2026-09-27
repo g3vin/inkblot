@@ -51,7 +51,9 @@ import {
   getBookSettings,
   getCurrentPrintPage,
   getDisplayPointsPerInch,
+  getEbookIssues,
   getEditorMode,
+  getTypesetView,
   getLastExport,
   getMeasurement,
   getPrintScope,
@@ -63,6 +65,7 @@ import {
   setBookSettings,
   setDisplayPointsPerInch,
   setEditorMode,
+  setTypesetView,
   setPrintScope,
   setPrintZoom,
   setSelectedBookItem,
@@ -156,7 +159,11 @@ const publishingReport = ({ projectName, docPath, scope, book, setup, editor, pa
     readingMinutes: readingMinutes(allWords),
     spineWidthMm: pages ? Math.round(spineWidthMm({ pageCount: pages, paper: target.paper, service: serviceFor }) * 100) / 100 : 0,
     spineText: pages >= SPINE_TEXT_MIN_PAGES,
-    issues: preflight({ setup, target, pageCount: pages, images: scope === 'document' ? placedImages(editor, setup) : [] }),
+    issues: [
+      ...preflight({ setup, target, pageCount: pages, images: scope === 'document' ? placedImages(editor, setup) : [] }),
+      // The e-book's, once the Digital view has read it.
+      ...(getEbookIssues() || []),
+    ],
   }
 }
 
@@ -207,6 +214,7 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
   return {
     enabled: Boolean(docPath) && isPrintLayoutEnabled(projectName, docPath),
     mode: getEditorMode(projectName),
+    typesetView: getTypesetView(projectName),
     docPath: docPath || undefined,
     ready: Boolean(editor),
     setup,
@@ -429,6 +437,7 @@ export default function usePrintLayoutController({
   useEffect(() => {
     const subscriptions = [
       documentSurface.onCommand('setEditorMode', ({ mode }) => setEditorMode(stateRef.current.projectName, mode)),
+      documentSurface.onCommand('setTypesetView', ({ view }) => setTypesetView(stateRef.current.projectName, view)),
       // The Book navigator: the book's own order and contents, never the file tree's.
       documentSurface.onCommand('moveBookItem', ({ id, before }) => {
         const { project, folder } = currentBook()

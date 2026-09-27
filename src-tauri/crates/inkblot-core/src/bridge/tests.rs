@@ -137,6 +137,7 @@ fn book() -> crate::types::BookSettings {
             made_for_spine_mm: Some(12.4),
         }],
         active_cover: Some("v1".into()),
+        digital: crate::types::DigitalOptions { drop_caps: false, ..Default::default() },
     }
 }
 
@@ -488,6 +489,7 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::SetHeadImage(SetHeadImageCommand { target: HeadImageTarget::Ornament, path: Some("/Users/a/fleuron.png".into()) }),
         NativeCommand::SetFolderBookOptions(SetFolderBookOptionsCommand { folder: "Novel".into(), number_in_tree: Some(true), start_at: Some(0), continuous: None }),
+        NativeCommand::SetTypesetView(SetTypesetViewCommand { view: TypesetView::Digital }),
         NativeCommand::SetCoverImage(SetCoverImageCommand { set_id: None, part: crate::types::CoverPart::Spine, path: Some("/Users/a/spine.png".into()) }),
         NativeCommand::EditCoverSets(EditCoverSetsCommand { action: CoverSetAction::Rename, id: Some("v1".into()), name: Some("Hardcover".into()), fit: None }),
         NativeCommand::SaveTypesetVersion(SaveTypesetVersionCommand { name: "Sent to KDP".into() }),
@@ -940,6 +942,7 @@ fn every_event() -> Vec<WebviewEvent> {
         WebviewEvent::PageLayoutState(PageLayoutState {
             enabled: true,
             mode: EditorMode::Typeset,
+            typeset_view: TypesetView::Print,
             doc_path: Some("Manuscript/one".into()),
             setup: page_setup(),
             ready: true,
@@ -1156,6 +1159,7 @@ fn every_command_has_its_documented_wire_name() {
             "setChapterMeta",
             "setHeadImage",
             "setFolderBookOptions",
+            "setTypesetView",
             "setCoverImage",
             "editCoverSets",
             "saveTypesetVersion",

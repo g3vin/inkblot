@@ -370,6 +370,44 @@ pub struct BookSettings {
     pub covers: Vec<CoverSet>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_cover: Option<String>,
+    /// How the e-book differs from the printed book.
+    #[serde(default)]
+    pub digital: DigitalOptions,
+}
+
+/// What an e-book leaves out or sets differently from print. A reading system chooses
+/// the page, the type size and — often — the font; what the book still decides is
+/// whether its flourishes come with it.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DigitalOptions {
+    /// A drop cap on each chapter's first letter, as in print. Some readers draw them
+    /// badly at large type sizes.
+    pub drop_caps: bool,
+    /// The chapter's picture in its head, and a picture ornament.
+    pub head_images: bool,
+    /// The book's own font, where the reader lets the book choose; off leaves the
+    /// reader's.
+    pub publisher_font: bool,
+    /// Scene breaks set as `* * *`, which every reader's font has, instead of the
+    /// book's ornament, which some e-readers' fonts lack.
+    pub plain_scene_breaks: bool,
+    /// Pictures that are ornaments (dark on a clear ground) are inverted on a dark
+    /// page, as a reader in night mode would otherwise lose them.
+    pub invert_ornaments_in_dark: bool,
+}
+
+impl Default for DigitalOptions {
+    fn default() -> Self {
+        Self {
+            drop_caps: true,
+            head_images: true,
+            publisher_font: true,
+            plain_scene_breaks: false,
+            invert_ornaments_in_dark: true,
+        }
+    }
 }
 
 /// A print-on-demand service, whose rules a book is checked against.

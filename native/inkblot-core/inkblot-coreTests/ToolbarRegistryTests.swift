@@ -50,6 +50,7 @@ struct ToolbarRegistryTests {
         "inkblot.tabs.new-tab",
         "inkblot.tabs.split",
         "inkblot.view.editor-mode",
+        "inkblot.typeset.view",
         "inkblot.typeset.insert",
         "inkblot.typeset.zoom",
         "inkblot.typeset.print",

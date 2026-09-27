@@ -41,6 +41,8 @@ export interface EpubOptions {
   front?: FrontSection[]
   /** A contents page in the reading order, as well as the reader's own navigation. */
   contents?: boolean
+  /** The book's stylesheet (`ebookCss`); the plain prose rules without one. */
+  css?: string | null
   /** Fixed for tests; a fresh urn:uuid otherwise. */
   identifier?: string
   modified?: Date
@@ -229,7 +231,7 @@ ${spine.join('\n')}
     { name: 'OEBPS/content.opf', data: opf },
     { name: 'OEBPS/nav.xhtml', data: nav },
     { name: 'OEBPS/toc.ncx', data: ncx },
-    { name: 'OEBPS/styles.css', data: `${PROSE_CSS}\n.cover { text-align: center; } .cover img { max-height: 100%; }\n` },
+    { name: 'OEBPS/styles.css', data: `${options.css || PROSE_CSS}\n.cover { text-align: center; } .cover img { max-height: 100%; }\n` },
     ...(cover && coverPage ? [
       { name: `OEBPS/${coverHref}`, data: cover.bytes, store: true },
       { name: 'OEBPS/text/cover.xhtml', data: coverPage },

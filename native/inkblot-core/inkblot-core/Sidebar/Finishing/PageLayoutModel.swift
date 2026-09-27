@@ -113,6 +113,14 @@ final class PageLayoutModel {
 
     /* ---------------- commands ---------------- */
 
+    /// Typeset's view: the printed pages, or the e-book as a reader shows it.
+    var typesetView: TypesetView { state?.typesetView.flatMap { $0 } ?? .print }
+
+    func setTypesetView(_ view: TypesetView) {
+        guard view != typesetView else { return }
+        bridge.send(.setTypesetView(SetTypesetViewCommand(view: view)))
+    }
+
     func setMode(_ mode: EditorMode) {
         guard mode != self.mode else { return }
         bridge.send(.setEditorMode(SetEditorModeCommand(mode: mode)))
@@ -620,6 +628,12 @@ struct BookDraft: Equatable {
     var continuous: Bool
     var covers: [CoverSet]
     var activeCover: String?
+    /// The e-book's differences from print (`DigitalOptions`, whose fields are fixed).
+    var digitalDropCaps: Bool
+    var digitalHeadImages: Bool
+    var digitalPublisherFont: Bool
+    var digitalPlainSceneBreaks: Bool
+    var digitalInvertOrnaments: Bool
 
     init(_ b: BookSettings) {
         folder = b.folder
@@ -659,6 +673,11 @@ struct BookDraft: Equatable {
         continuous = b.continuous ?? false
         covers = b.covers ?? []
         activeCover = b.activeCover
+        digitalDropCaps = b.digital?.dropCaps ?? true
+        digitalHeadImages = b.digital?.headImages ?? true
+        digitalPublisherFont = b.digital?.publisherFont ?? true
+        digitalPlainSceneBreaks = b.digital?.plainSceneBreaks ?? false
+        digitalInvertOrnaments = b.digital?.invertOrnamentsInDark ?? true
     }
 
     /// Leave a chapter in or out of the book.
@@ -711,7 +730,10 @@ struct BookDraft: Equatable {
             items: items,
             continuous: continuous,
             covers: covers,
-            activeCover: activeCover)
+            activeCover: activeCover,
+            digital: DigitalOptions(
+                dropCaps: digitalDropCaps, headImages: digitalHeadImages, publisherFont: digitalPublisherFont,
+                plainSceneBreaks: digitalPlainSceneBreaks, invertOrnamentsInDark: digitalInvertOrnaments))
     }
 }
 

@@ -16,7 +16,7 @@ import { useSyncExternalStore } from 'react'
 
 import { getPreference, setPreference } from '../lib/preferences'
 import { onBooksChanged, storedBook, storeBook } from './bookStore'
-import { coversOf, designFor } from './chapterDesign'
+import { coversOf, designFor, digitalOf } from './chapterDesign'
 import { bookFolderFor } from './compile'
 import { clampZoom } from './zoom'
 import { DEFAULT_SHEETS_PER_SIGNATURE } from './imposition'
@@ -69,6 +69,36 @@ export const isPrintLayoutEnabled = (projectName, docPath) => (
 /** Pages on or off — which, now, is the mode. Kept for the menus and keys that ask. */
 export const setPrintLayoutEnabled = (projectName, _docPath, enabled) => {
   setEditorMode(projectName, enabled ? 'typeset' : 'write')
+}
+
+const VIEW_PREFIX = 'inkblot-typeset-view:'
+export const TYPESET_VIEWS = ['print', 'digital']
+
+/**
+ * Typeset's view, per project: the printed pages, or the e-book as a reader shows it
+ * (`DigitalPreview.jsx`). Write has no views; the one Typeset was left in comes back.
+ */
+export const getTypesetView = (projectName) => (
+  projectName && getPreference(`${VIEW_PREFIX}${projectName}`) === 'digital' ? 'digital' : 'print'
+)
+
+export const setTypesetView = (projectName, view) => {
+  if (!projectName || !TYPESET_VIEWS.includes(view) || getTypesetView(projectName) === view) return
+  setPreference(`${VIEW_PREFIX}${projectName}`, view)
+  emit()
+}
+
+// The e-book's checks, as the Digital view last found them: the Publishing section's
+// preflight lists them beside the print's. Null until the e-book has been read.
+let ebookIssues = null
+
+export const getEbookIssues = () => ebookIssues
+
+export const setEbookIssues = (issues) => {
+  const next = Array.isArray(issues) ? issues : null
+  if (JSON.stringify(next) === JSON.stringify(ebookIssues)) return
+  ebookIssues = next
+  emit()
 }
 
 // Where "Edit Text" left Typeset from, so "Back to Typeset" can return to it. Not kept
@@ -166,6 +196,7 @@ export const getBookSettings = (projectName, folder) => {
     items: Array.isArray(stored.items) ? stored.items.filter((item) => item && typeof item.id === 'string' && item.kind) : [],
     continuous: stored.continuous === true,
     covers,
+    digital: digitalOf(stored),
   }
   if (stored.partDesign) book.partDesign = designFor({ chapterDesign: stored.partDesign })
   // The active cover's front is the book's cover wherever one image is wanted.
