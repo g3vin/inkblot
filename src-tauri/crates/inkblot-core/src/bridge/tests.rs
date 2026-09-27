@@ -140,6 +140,7 @@ fn book() -> crate::types::BookSettings {
         }],
         active_cover: Some("v1".into()),
         digital: crate::types::DigitalOptions { drop_caps: false, ..Default::default() },
+        text_styles: vec![crate::types::TextStyleLook { id: "sign".into(), name: "Sign".into(), small_caps: true, boxed: true, align: crate::types::TextStyleAlign::Center, ..Default::default() }],
     }
 }
 
@@ -496,6 +497,7 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::ShowProofIssue(ShowProofIssueCommand { anchor: anchor() }),
         NativeCommand::SetTypesetDisplay(SetTypesetDisplayCommand { spread: Some(true), ..Default::default() }),
         NativeCommand::AddProjectFont(AddProjectFontCommand { path: "/Users/a/Fonts/Garamond.otf".into() }),
+        NativeCommand::SetTextStyle(SetTextStyleCommand { style: Some("letter".into()) }),
         NativeCommand::SetCoverImage(SetCoverImageCommand { set_id: None, part: crate::types::CoverPart::Spine, path: Some("/Users/a/spine.png".into()) }),
         NativeCommand::EditCoverSets(EditCoverSetsCommand { action: CoverSetAction::Rename, id: Some("v1".into()), name: Some("Hardcover".into()), fit: None }),
         NativeCommand::SaveTypesetVersion(SaveTypesetVersionCommand { name: "Sent to KDP".into() }),
@@ -961,6 +963,7 @@ fn every_event() -> Vec<WebviewEvent> {
             }],
             paragraph: Some(ParagraphTypeset { tracking: -5, ..Default::default() }),
             project_fonts: vec![ProjectFont { family: "EB Garamond".into(), path: ".assets/fonts/EBGaramond.otf".into(), embeddable: true }],
+            text_styles: vec![crate::types::TextStyleLook { id: "letter".into(), name: "Letter".into(), indent_em: 2.0, flush: true, space_lines: 1.0, ..Default::default() }],
             doc_path: Some("Manuscript/one".into()),
             setup: page_setup(),
             ready: true,
@@ -1182,6 +1185,7 @@ fn every_command_has_its_documented_wire_name() {
             "showProofIssue",
             "setTypesetDisplay",
             "addProjectFont",
+            "setTextStyle",
             "setCoverImage",
             "editCoverSets",
             "saveTypesetVersion",

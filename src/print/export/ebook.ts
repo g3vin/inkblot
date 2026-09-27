@@ -12,7 +12,8 @@
  * float, since few reading systems know `initial-letter`.
  */
 import { ChapterOpening, PrintAlignment, PreflightSeverity } from '../../types'
-import type { DigitalOptions, PreflightIssue, PrintTypography } from '../../types'
+import type { DigitalOptions, PreflightIssue, PrintTypography, TextStyleLook } from '../../types'
+import { textStylesCss } from '../textStyles'
 import { DEFAULT_DIGITAL } from '../chapterDesign'
 import { PROSE_CSS } from './html'
 import type { PMJSON } from './portable'
@@ -61,9 +62,12 @@ const HEAD_CSS = `
 export const ebookCss = ({
   typography,
   digital = DEFAULT_DIGITAL,
+  textStyles = [],
 }: {
   typography?: PrintTypography | null
   digital?: DigitalOptions
+  /** The book's named text styles, as classes of the e-book. */
+  textStyles?: TextStyleLook[]
 }): string => {
   const out = [PROSE_CSS, HEAD_CSS]
   const t = typography
@@ -96,6 +100,7 @@ export const ebookCss = ({
     }
     if (smallCaps) out.push('.chapter-head + p::first-line { font-variant: small-caps; letter-spacing: 0.04em; }')
   }
+  if (textStyles.length) out.push(textStylesCss(textStyles))
   if (digital.invertOrnamentsInDark) {
     // The reading system's night theme, and the preview's.
     const inverted = '.chapter-head .ch-ornament.is-image img { filter: invert(1); }'

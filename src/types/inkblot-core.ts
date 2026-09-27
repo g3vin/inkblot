@@ -922,6 +922,41 @@ export interface DigitalOptions {
 	invertOrnamentsInDark: boolean;
 }
 
+/** Where a text style sets its lines across the measure; `Inherit` keeps the body's. */
+export enum TextStyleAlign {
+	Inherit = "inherit",
+	Left = "left",
+	Center = "center",
+	Right = "right",
+	Justify = "justify",
+}
+
+/**
+ * How a named text style looks in a book. A paragraph carries only the style's name
+ * (`styleName`); what the name means is the book's, so a letter looks the same in
+ * every chapter and changes everywhere at once.
+ */
+export interface TextStyleLook {
+	/** A built-in style's id (`letter`, `verse`, …), or a custom style's own. */
+	id: string;
+	name: string;
+	/** A face of its own; absent sets it in the body's. */
+	fontFamily?: string;
+	/** Its type size, as a multiple of the body's. */
+	size: number;
+	italic: boolean;
+	smallCaps: boolean;
+	align: TextStyleAlign;
+	/** Indented from both sides, in ems. */
+	indentEm: number;
+	/** No first-line indent. */
+	flush: boolean;
+	/** Space above and below a run of it, in lines. */
+	spaceLines: number;
+	/** A rule around it, as a sign or a notice is set. */
+	boxed: boolean;
+}
+
 /**
  * A folder (or the whole project) compiled as one book. Kept per folder in the
  * project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
@@ -973,6 +1008,11 @@ export interface BookSettings {
 	activeCover?: string;
 	/** How the e-book differs from the printed book. */
 	digital?: DigitalOptions;
+	/**
+	 * How the book sets its named text styles — a letter, a text message, verse — over
+	 * the app's own looks for them, and any styles of its own.
+	 */
+	textStyles?: TextStyleLook[];
 }
 
 /** A book style (`bookStyles.ts`): a coordinated design, applied whole. */
@@ -1431,6 +1471,7 @@ export type NativeCommand =
 	| { type: "showProofIssue", payload: ShowProofIssueCommand }
 	| { type: "setTypesetDisplay", payload: SetTypesetDisplayCommand }
 	| { type: "addProjectFont", payload: AddProjectFontCommand }
+	| { type: "setTextStyle", payload: SetTextStyleCommand }
 	| { type: "setCoverImage", payload: SetCoverImageCommand }
 	| { type: "editCoverSets", payload: EditCoverSetsCommand }
 	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
@@ -3175,6 +3216,8 @@ export interface ParagraphTypeset {
 	keepTogether: boolean;
 	keepWithNext: boolean;
 	pageAdjust: number;
+	/** Its named text style, if it has one. */
+	styleName?: string;
 }
 
 /**
@@ -3274,6 +3317,8 @@ export interface PageLayoutState {
 	paragraph?: ParagraphTypeset;
 	/** The fonts kept in the project. */
 	projectFonts?: ProjectFont[];
+	/** The book's named text styles, as it sets them: the built-in ones and its own. */
+	textStyles?: TextStyleLook[];
 	/** The active text document, or none (a canvas, or nothing open). */
 	docPath?: string;
 	/**
@@ -4259,6 +4304,11 @@ export interface SetSelectionCommand {
  */
 export interface SetTabOrderCommand {
 	tabIds: string[];
+}
+
+/** Give the selected paragraphs a named text style, or none (`style` absent). */
+export interface SetTextStyleCommand {
+	style?: string;
 }
 
 /**

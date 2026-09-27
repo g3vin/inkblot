@@ -35,7 +35,7 @@ use super::print::{
     EditBookItemCommand, OpenBookItemCommand, ApplyBookStyleCommand, SetChapterMetaCommand, SetHeadImageCommand,
     SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand, PreviewTypesetVersionCommand,
     SetCoverImageCommand, EditCoverSetsCommand, SetFolderBookOptionsCommand, SetTypesetViewCommand,
-    SetParagraphTypesetCommand, ShowProofIssueCommand, SetTypesetDisplayCommand, AddProjectFontCommand,
+    SetParagraphTypesetCommand, ShowProofIssueCommand, SetTypesetDisplayCommand, AddProjectFontCommand, SetTextStyleCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -608,6 +608,7 @@ pub enum NativeCommand {
     ShowProofIssue(ShowProofIssueCommand),
     SetTypesetDisplay(SetTypesetDisplayCommand),
     AddProjectFont(AddProjectFontCommand),
+    SetTextStyle(SetTextStyleCommand),
     SetCoverImage(SetCoverImageCommand),
     EditCoverSets(EditCoverSetsCommand),
     /* The typeset history (`print.rs`). */

@@ -24,6 +24,7 @@ import { isMatterPath } from './TypesetLock'
 import { useBookPlacement } from './useBookPlacement'
 import { useProof } from './useProof'
 import { compositionOf } from './typography'
+import { applyTextStyleSheet, textStylesOf } from './textStyles'
 import { TypesetToast } from './TypesetOverlay'
 import { readDocPageSetup } from './DocPageSetup'
 import { documentSurface } from '../bridge'
@@ -94,6 +95,11 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
       ? { design, label: row.label || null, name: baseName(docPath), imageUrl: (src) => images.get(src) || src }
       : null)
   }, [design, docPath, editor, headed, images, row?.label])
+  // The book's named text styles, as it sets them.
+  const textStylesJson = printLayout && placement ? JSON.stringify(textStylesOf(placement.book)) : ''
+  useEffect(() => {
+    if (textStylesJson) applyTextStyleSheet(JSON.parse(textStylesJson))
+  }, [textStylesJson])
   // What the page's handles change, in Typeset.
   const [toast, setToast] = useState(null)
   const typeset = useMemo(() => {

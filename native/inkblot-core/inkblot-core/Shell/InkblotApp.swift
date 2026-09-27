@@ -248,6 +248,7 @@ struct InkblotCommands: Commands {
                 Text("Stage Play").tag(WritingFormat.stageplay)
             }
             .disabled(model.bridge.toolbar?.target == nil)
+            TextStyleMenu(model: model)
         }
 
         // View ▸ beside Customize Toolbar…: the inspector's two layouts.

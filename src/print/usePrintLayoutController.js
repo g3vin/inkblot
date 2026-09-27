@@ -82,6 +82,7 @@ import { decodeDataUri, imageSize } from './export/images'
 import { BOOK_TYPOGRAPHY, primaryFamily } from './typography'
 import { addProjectFont, loadProjectFonts, onProjectFontsChanged, projectFontFamilies } from './projectFonts'
 import { paragraphTypesetOf, setParagraphTypeset } from './ParagraphTypeset'
+import { textStylesOf } from './textStyles'
 import { readAnchor, resolveAnchor } from '../bridge/anchors'
 import { actualSizeZoom } from './zoom'
 
@@ -262,6 +263,7 @@ export const buildPageLayoutState = ({ projectName, docPath, editor, chapters = 
     mode: getEditorMode(projectName),
     typesetView: getTypesetView(projectName),
     ...typesetDisplayState({ projectName, docPath, editor }),
+    textStyles: textStylesOf(book),
     docPath: docPath || undefined,
     ready: Boolean(editor),
     setup,
@@ -498,6 +500,14 @@ export default function usePrintLayoutController({
         if (!range) return
         const tr = ed.state.tr
         if (setParagraphTypeset(tr, range.from, range.to, patch)) ed.view.dispatch(tr)
+      }),
+      // A named text style on the selected paragraphs, in Write or in Typeset.
+      documentSurface.onCommand('setTextStyle', ({ style }) => {
+        const ed = stateRef.current.activeEditor
+        if (!ed) return
+        const { from, to } = ed.state.selection
+        const tr = ed.state.tr
+        if (setParagraphTypeset(tr, from, to, { styleName: style || null })) ed.view.dispatch(tr)
       }),
       documentSurface.onCommand('showProofIssue', ({ anchor }) => {
         const ed = stateRef.current.activeEditor

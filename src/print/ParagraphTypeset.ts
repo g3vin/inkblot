@@ -8,6 +8,8 @@
  *   keepWithNext  it never ends a page: it goes over with what follows.
  *   pageAdjust    the page it starts on runs a line long (+1) or short (−1) — the
  *                 typesetter's last resort for a widow — which pagination honours.
+ *   styleName     a named text style — a letter, verse (textStyles.ts) — which, unlike
+ *                 the rest, a paragraph split in two keeps in both halves.
  *
  * Print only: the rules that draw them hang off `.has-print-type`, and pagination
  * (measure.ts) reads them only on pages. Typeset attributes, so a block that gets one
@@ -29,6 +31,8 @@ export interface ParagraphTypesetPatch {
   keepTogether?: boolean
   keepWithNext?: boolean
   pageAdjust?: number
+  /** A named style, or null for none. */
+  styleName?: string | null
 }
 
 export const clampTracking = (n: number): number => Math.max(-TRACKING_LIMIT, Math.min(TRACKING_LIMIT, Math.round(n)))
@@ -39,6 +43,7 @@ export const paragraphTypesetOf = (node: PMNode | null | undefined) => ({
   keepTogether: Boolean(node?.attrs?.keepTogether),
   keepWithNext: Boolean(node?.attrs?.keepWithNext),
   pageAdjust: Number(node?.attrs?.pageAdjust) || 0,
+  styleName: typeof node?.attrs?.styleName === 'string' && node.attrs.styleName ? node.attrs.styleName as string : null,
 })
 
 /**
@@ -74,13 +79,14 @@ export const setParagraphTypeset = (tr: Transaction, from: number, to: number, p
     if (patch.keepTogether != null) next.keepTogether = patch.keepTogether
     if (patch.keepWithNext != null) next.keepWithNext = patch.keepWithNext
     if (patch.pageAdjust != null) next.pageAdjust = Math.max(-1, Math.min(1, Math.round(patch.pageAdjust)))
+    if (patch.styleName !== undefined) next.styleName = patch.styleName || null
     const keys = (Object.keys(next) as Array<keyof typeof next>).filter((k) => next[k] !== now[k])
     if (!keys.length) continue
     anchorBlock(tr, pos)
     for (const key of keys) {
       const value = next[key]
       // Nothing set is stored as nothing.
-      tr.setNodeAttribute(pos, key, value === 0 || value === false ? null : value)
+      tr.setNodeAttribute(pos, key, value === 0 || value === false || value === '' ? null : value)
     }
     changed += 1
   }
@@ -98,8 +104,16 @@ export const ParagraphTypeset = Extension.create({
       {
         types: ['paragraph'],
         attributes: {
+          styleName: {
+            default: null,
+            // A letter goes on being a letter after Enter.
+            keepOnSplit: true,
+            parseHTML: (el: HTMLElement) => el.getAttribute('data-style') || null,
+            renderHTML: (attrs: Record<string, unknown>) => (attrs.styleName ? { 'data-style': String(attrs.styleName) } : {}),
+          },
           tracking: {
             default: null,
+            keepOnSplit: false,
             ...jsonOnly,
             renderHTML: (attrs: Record<string, unknown>) => {
               const n = Number(attrs.tracking) || 0
@@ -108,16 +122,19 @@ export const ParagraphTypeset = Extension.create({
           },
           keepTogether: {
             default: null,
+            keepOnSplit: false,
             ...jsonOnly,
             renderHTML: (attrs: Record<string, unknown>) => (attrs.keepTogether ? { 'data-keep-together': '' } : {}),
           },
           keepWithNext: {
             default: null,
+            keepOnSplit: false,
             ...jsonOnly,
             renderHTML: (attrs: Record<string, unknown>) => (attrs.keepWithNext ? { 'data-keep-with-next': '' } : {}),
           },
           pageAdjust: {
             default: null,
+            keepOnSplit: false,
             ...jsonOnly,
             renderHTML: (attrs: Record<string, unknown>) => {
               const n = Number(attrs.pageAdjust) || 0

@@ -35,6 +35,7 @@ import { serializeFountain } from '../../script/fountain'
 import { headsToBlocks, mapImageSources, portableContent } from './portable'
 import { digitalContent, ebookCss } from './ebook'
 import { primaryFamily } from '../typography'
+import { textStylesOf } from '../textStyles'
 import { loadProjectFonts, projectFontFiles } from '../projectFonts'
 
 const FORMATS = {
@@ -208,14 +209,15 @@ export async function compileExport({ format, projectName, docPath, scope, live,
     )
     : []
   const contents = compiled && (sections || []).some((s) => s.item.generated === 'contents')
-  const css = format === 'epub' ? ebookCss({ typography: setup.typography, digital }) : null
-  return { compiled, author, chapters, exportChapters, front, contents, setup, css }
+  const textStyles = textStylesOf(book)
+  const css = format === 'epub' ? ebookCss({ typography: setup.typography, digital, textStyles }) : null
+  return { compiled, author, chapters, exportChapters, front, contents, setup, css, textStyles }
 }
 
 /** Build a non-PDF export and write it to `path`. */
 async function writeExport({ format, path, projectName, docPath, scope, liveByPath, title, book }) {
   const live = (p) => liveByPath.get(p)?.getJSON() || null
-  const { compiled, author, chapters, exportChapters, front, contents, setup, css } = await compileExport({
+  const { compiled, author, chapters, exportChapters, front, contents, setup, css, textStyles } = await compileExport({
     format, projectName, docPath, scope, live, book, title,
   })
 
@@ -244,6 +246,7 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
       setup,
       front,
       contents,
+      textStyles,
     })
     await writeTextFile(path, html)
     return path
@@ -301,6 +304,7 @@ async function writeExport({ format, path, projectName, docPath, scope, liveByPa
       contents,
       profile: getAuthorProfile(),
       words,
+      textStyles,
       resolveImage: (src) => resolveImage(projectName, src),
     })
     await writeFile(path, bytes)
