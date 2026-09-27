@@ -53,6 +53,7 @@ import {
   getDisplayPointsPerInch,
   getEbookIssues,
   getProofIssues,
+  getStoredBook,
   getTypesetDisplay,
   getEditorMode,
   getTypesetView,
@@ -69,6 +70,7 @@ import {
   setEditorMode,
   setTypesetView,
   setTypesetDisplay,
+  setStoredBook,
   setProofFocus,
   setPrintScope,
   setPrintZoom,
@@ -83,6 +85,8 @@ import { BOOK_TYPOGRAPHY, primaryFamily } from './typography'
 import { addProjectFont, loadProjectFonts, onProjectFontsChanged, projectFontFamilies } from './projectFonts'
 import { paragraphTypesetOf, setParagraphTypeset } from './ParagraphTypeset'
 import { textStylesOf } from './textStyles'
+import { activeEditionOf, editEditions, isEbookEdition } from './editions'
+import { typesetEntries } from './typesetHistoryStore'
 import { readAnchor, resolveAnchor } from '../bridge/anchors'
 import { actualSizeZoom } from './zoom'
 
@@ -332,6 +336,7 @@ export default function usePrintLayoutController({
   onExport,
   onMeasure,
   onOpenDoc,
+  onExportAllEditions,
 }) {
   // The editor that holds the active document: the pane it is open in.
   const activeTextDoc = activeDoc && isTextDoc(activeDoc) ? activeDoc : null
@@ -345,9 +350,9 @@ export default function usePrintLayoutController({
     if (docPath === secondaryDoc) return usable(secondaryEditor)
     return null
   }
-  const stateRef = useRef({ projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure, onOpenDoc })
+  const stateRef = useRef({ projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure, onOpenDoc, onExportAllEditions })
   useEffect(() => {
-    stateRef.current = { projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure, onOpenDoc }
+    stateRef.current = { projectName, activeTextDoc, activeEditor, editorFor, onPrint, onExport, onMeasure, onOpenDoc, onExportAllEditions }
   })
   const chaptersRef = useRef({ key: '', chapters: [] })
   const rootRef = useRef({ project: null, root: null })
@@ -514,6 +519,30 @@ export default function usePrintLayoutController({
         const tr = ed.state.tr
         if (setParagraphTypeset(tr, range.from, range.to, patch)) ed.view.dispatch(tr)
       }),
+      // The book's editions: added from a preset, typeset, given a cover, exported.
+      documentSurface.onCommand('editEditions', ({ action, id, name, kind, coverSetId }) => {
+        const { project, folder } = currentBook()
+        if (!project) return
+        const apply = (versionBook = null) => {
+          const stored = getStoredBook(project, folder)
+          const next = editEditions(stored, { action, id, name, kind, coverSetId, versionBook, newId: `ed-${Date.now().toString(36)}` })
+          if (next === stored) return
+          setStoredBook(project, folder, next)
+          // An e-book edition is typeset as the e-book; a print one as pages.
+          if (action === 'activate' || action === 'add' || action === 'duplicate') {
+            const edition = activeEditionOf(next)
+            setTypesetView(project, edition && isEbookEdition(edition) ? 'digital' : 'print')
+          }
+        }
+        if (action !== 'fromTypesetVersion') {
+          apply()
+          return
+        }
+        typesetEntries(project, folder)
+          .then((entries) => apply(entries.find((e) => e.id === id)?.snapshot?.book || null))
+          .catch(failed('Making an edition from that version'))
+      }),
+      documentSurface.onCommand('exportAllEditions', () => stateRef.current.onExportAllEditions?.()),
       // A note at the caret, opened to be written.
       documentSurface.onCommand('insertFootnote', () => {
         const ed = stateRef.current.activeEditor

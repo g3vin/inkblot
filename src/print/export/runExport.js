@@ -7,7 +7,7 @@
  * Swift shell. PDF is not built here: it is the print path saving instead of
  * printing, so a PDF is exactly the pages Print would have produced.
  */
-import { save } from '@tauri-apps/plugin-dialog'
+import { open, save } from '@tauri-apps/plugin-dialog'
 import { mkdir, writeFile, writeTextFile } from '@tauri-apps/plugin-fs'
 
 import { withPrintBibliography } from '../../lib/references/printBibliography'
@@ -15,7 +15,7 @@ import { chapterTitleOf, compileSections, frontMatterSections, paragraphsOf } fr
 import { bookFolderFor, loadBookSections, loadChapters } from '../compile'
 import { readDocPageSetup } from '../DocPageSetup'
 import { resolvePageSetup } from '../pageSetup'
-import { bookAuthor, getAuthorProfile, getMeasurement, getPrintScope, setLastExport, setMeasurement } from '../printLayoutStore'
+import { bookAuthor, getAuthorProfile, getMeasurement, getPrintScope, getStoredBook, setLastExport, setMeasurement } from '../printLayoutStore'
 import { activeCoverOf, digitalOf } from '../chapterDesign'
 import { coverPage } from '../coverWrap'
 import { bookWrap } from '../coverState'
@@ -37,6 +37,7 @@ import { digitalContent, ebookCss } from './ebook'
 import { primaryFamily } from '../typography'
 import { textStylesOf } from '../textStyles'
 import { notesOptionsOf, setBookNotes, setDocumentNotes } from '../notes'
+import { bookForEdition, isEbookEdition } from '../editions'
 import { loadProjectFonts, projectFontFiles } from '../projectFonts'
 
 const FORMATS = {
@@ -119,6 +120,48 @@ export async function runExport({
   report('done', { path })
   remember()
   return path
+}
+
+/**
+ * Every edition of the book, into a folder the author picks: each print edition's
+ * interior PDF and cover PDF, each e-book edition's EPUB — each set as its edition sets
+ * it, whatever edition is being typeset. Resolves with the folder, or null when the
+ * author cancelled; the files written are listed in `written`.
+ */
+export async function runExportAllEditions({ projectName, docPath, scope = 'folder', liveEditors = [], book }) {
+  const editions = Array.isArray(book?.editions) ? book.editions : []
+  if (!projectName || !docPath || !editions.length) throw new Error('The book has no editions yet. Add one under Typeset › Editions.')
+  const dir = await open({ directory: true, title: 'Export All Editions', multiple: false })
+  if (!dir) return null
+  const folder = Array.isArray(dir) ? dir[0] : dir
+  // Each edition over the book as kept, not as the edition being typeset shows it.
+  const stored = { ...book, ...getStoredBook(projectName, bookFolderFor(docPath, scope)) }
+  const before = getMeasurement(projectName, scope, docPath)
+  const written = []
+  try {
+    for (const edition of editions) {
+      const editionBook = bookForEdition(stored, edition)
+      const name = safeFileName(`${book?.title || 'Book'} — ${edition.name}`)
+      const common = { scope, projectName, docPath, liveEditors, book: editionBook }
+      if (isEbookEdition(edition)) {
+        const path = await runExport({ ...common, format: 'epub', path: `${folder}/${name}.epub` })
+        if (path) written.push(path)
+        continue
+      }
+      const pdf = await runExport({ ...common, format: 'pdf', path: `${folder}/${name}.pdf` })
+      if (pdf) written.push(pdf)
+      if (activeCoverOf(editionBook)) {
+        // Its spine is its own page count's.
+        const measured = await measurePrint({ projectName, docPath, scope, liveEditors, book: editionBook })
+        if (measured) setMeasurement(projectName, scope, docPath, measured)
+        const cover = await runExport({ ...common, format: 'coverPdf', path: `${folder}/${name} Cover.pdf` })
+        if (cover) written.push(cover)
+      }
+    }
+  } finally {
+    if (before) setMeasurement(projectName, scope, docPath, before)
+  }
+  return { folder, written }
 }
 
 /**

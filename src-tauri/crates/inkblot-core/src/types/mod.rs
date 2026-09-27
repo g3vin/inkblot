@@ -58,7 +58,7 @@ pub use note::{
 pub use page_setup::{
     AuthorProfile, BackMatter, ChapterMeta, ImageAlign, ImageTypesetting, BindingSettings, BindingType, BookItem, BookItemKind, BookSettings,
     ChapterBreak, ChapterDesign, ChapterNumberStyle, ChapterNumbering, ChapterOpening, ChapterType,
-    CoverFit, CoverPart, CoverSet, Composition, DigitalOptions, OpenTypeFeatures, TextStyleAlign, TextStyleLook, NotePlacement, NoteNumbering, NoteMarks, NotesOptions, DuplexMode, FrontMatter, GeneratedKind, HeadAlignment, HeadCase,
+    CoverFit, CoverPart, CoverSet, Composition, DigitalOptions, OpenTypeFeatures, TextStyleAlign, TextStyleLook, NotePlacement, NoteNumbering, NoteMarks, NotesOptions, Edition, EditionKind, DuplexMode, FrontMatter, GeneratedKind, HeadAlignment, HeadCase,
     MatterKind, OrnamentKind, OrnamentPosition, PageOptions, PagePosition, PageStart,
     LineSpacing, PageMargins, PageNumberFormat, PageOrientation, PageSetup, PaperStock, PrintAlignment, PublishingService,
     PublishingTarget,

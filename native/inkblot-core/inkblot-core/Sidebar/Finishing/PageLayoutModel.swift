@@ -289,6 +289,14 @@ final class PageLayoutModel {
         bridge.send(.setPrintZoom(SetPrintZoomCommand(zoom: nil, fit: fit, docPath: docPath)))
     }
 
+    func editEditions(_ action: EditionAction, id: String? = nil, name: String? = nil, kind: EditionKind? = nil, coverSetId: String? = nil) {
+        bridge.send(.editEditions(EditEditionsCommand(action: action, id: id, name: name, kind: kind, coverSetId: coverSetId)))
+    }
+
+    func exportAllEditions() {
+        bridge.send(.exportAllEditions(ExportAllEditionsCommand()))
+    }
+
     func insertFootnote(target: EditorTarget?) {
         guard let target else { return }
         bridge.send(.insertFootnote(InsertFootnoteCommand(target: target)))
@@ -757,6 +765,10 @@ struct BookDraft: Equatable {
     var notesNumbering: NoteNumbering
     var notesMarks: NoteMarks
     var notesHeading: String
+    /// The book's editions, and the one being typeset (`editions.ts`); edited by
+    /// command, kept here so a save of anything else keeps them.
+    var editions: [Edition]
+    var activeEdition: String?
 
     init(_ b: BookSettings) {
         folder = b.folder
@@ -806,6 +818,8 @@ struct BookDraft: Equatable {
         notesNumbering = b.notes?.numbering ?? .perChapter
         notesMarks = b.notes?.marks ?? .numbers
         notesHeading = b.notes?.heading ?? "Notes"
+        editions = b.editions ?? []
+        activeEdition = b.activeEdition
     }
 
     /// Leave a chapter in or out of the book.
@@ -864,7 +878,9 @@ struct BookDraft: Equatable {
                 plainSceneBreaks: digitalPlainSceneBreaks, invertOrnamentsInDark: digitalInvertOrnaments),
             textStyles: textStyles,
             notes: NotesOptions(placement: notesPlacement, numbering: notesNumbering, marks: notesMarks,
-                                heading: notesHeading.trimmingCharacters(in: .whitespaces).isEmpty ? "Notes" : notesHeading))
+                                heading: notesHeading.trimmingCharacters(in: .whitespaces).isEmpty ? "Notes" : notesHeading),
+            editions: editions,
+            activeEdition: activeEdition)
     }
 }
 

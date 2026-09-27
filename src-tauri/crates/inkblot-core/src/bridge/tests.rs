@@ -141,6 +141,8 @@ fn book() -> crate::types::BookSettings {
         active_cover: Some("v1".into()),
         digital: crate::types::DigitalOptions { drop_caps: false, ..Default::default() },
         notes: crate::types::NotesOptions { placement: crate::types::NotePlacement::Chapter, ..Default::default() },
+        editions: vec![crate::types::Edition { id: "e1".into(), name: "Large Print".into(), kind: crate::types::EditionKind::LargePrint, page_setup: None, cover_set_id: Some("v1".into()) }],
+        active_edition: Some("e1".into()),
         text_styles: vec![crate::types::TextStyleLook { id: "sign".into(), name: "Sign".into(), small_caps: true, boxed: true, align: crate::types::TextStyleAlign::Center, ..Default::default() }],
     }
 }
@@ -500,6 +502,8 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::AddProjectFont(AddProjectFontCommand { path: "/Users/a/Fonts/Garamond.otf".into() }),
         NativeCommand::SetTextStyle(SetTextStyleCommand { style: Some("letter".into()) }),
         NativeCommand::InsertFootnote(InsertFootnoteCommand { target: EditorTarget::Primary }),
+        NativeCommand::EditEditions(EditEditionsCommand { action: EditionAction::Add, id: None, name: None, kind: Some(crate::types::EditionKind::LargePrint), cover_set_id: None }),
+        NativeCommand::ExportAllEditions(ExportAllEditionsCommand {}),
         NativeCommand::SetCoverImage(SetCoverImageCommand { set_id: None, part: crate::types::CoverPart::Spine, path: Some("/Users/a/spine.png".into()) }),
         NativeCommand::EditCoverSets(EditCoverSetsCommand { action: CoverSetAction::Rename, id: Some("v1".into()), name: Some("Hardcover".into()), fit: None }),
         NativeCommand::SaveTypesetVersion(SaveTypesetVersionCommand { name: "Sent to KDP".into() }),
@@ -1189,6 +1193,8 @@ fn every_command_has_its_documented_wire_name() {
             "addProjectFont",
             "setTextStyle",
             "insertFootnote",
+            "editEditions",
+            "exportAllEditions",
             "setCoverImage",
             "editCoverSets",
             "saveTypesetVersion",

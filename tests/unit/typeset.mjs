@@ -857,3 +857,55 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   withBleed(recto, 3, 12)
   ok('…the left of a verso, the right of a recto', recto.style.left === '0px')
 }
+
+/* ---- editions: one book in several forms ---- */
+
+{
+  const ed = await import(`${C}/print/editions.ts`)
+  const store = await import(`${C}/print/printLayoutStore.js`)
+  const { booksSettled } = await import(`${C}/print/bookStore.js`)
+  const { normalizePageSetup } = await import(`${C}/print/pageSetup.ts`)
+  const base = normalizePageSetup({ presetId: 'trade-6x9', widthMm: 152.4, heightMm: 228.6, typography: { fontFamily: 'Palatino', fontSizePt: 11, alignment: 'justify', hyphenate: true, lineSpacing: 'multiple', lineValue: 1.2 } })
+  let book = { title: 'The Book', pageSetup: base, covers: [{ id: 'v1', name: 'Paper' }, { id: 'v2', name: 'Cloth' }], activeCover: 'v1' }
+
+  book = ed.editEditions(book, { action: 'add', kind: 'largePrint', newId: 'lp' })
+  const lp = book.editions[0]
+  ok('a large-print edition is 16 pt, loosely leaded, ragged, unhyphenated, and being typeset',
+    lp.name === 'Large Print' && lp.pageSetup.typography.fontSizePt === 16 && lp.pageSetup.typography.alignment === 'left' && !lp.pageSetup.typography.hyphenate && book.activeEdition === 'lp')
+  ok('…and the book as set up is as it was', book.pageSetup.typography.fontSizePt === 11)
+  book = ed.editEditions(book, { action: 'add', kind: 'hardcover', newId: 'hc' })
+  ok('a hardcover’s inside margin is wider, for its binding', Math.abs(book.editions[1].pageSetup.margins.insideMm - (base.margins.insideMm + 3.175)) < 1e-9)
+  book = ed.editEditions(book, { action: 'add', kind: 'ebook', newId: 'eb' })
+  ok('an e-book edition has no page of its own', !book.editions[2].pageSetup && ed.isEbookEdition(book.editions[2]))
+  book = ed.editEditions(book, { action: 'setCover', id: 'hc', coverSetId: 'v2', newId: 'x' })
+  book = ed.editEditions(book, { action: 'activate', id: 'hc', newId: 'x' })
+  const shown = ed.effectiveBook(book)
+  ok('the book shown is the edition’s: its page and its cover', shown.activeCover === 'v2' && shown.pageSetup === book.editions[1].pageSetup && shown.title === 'The Book')
+
+  // An edit while the hardcover is typeset: its type size, and the title.
+  const edited = ed.routeToEdition(book, { ...shown, title: 'A Book', pageSetup: { ...shown.pageSetup, typography: { ...shown.pageSetup.typography, fontSizePt: 12 } } })
+  ok('a change to the page is the edition’s; the book’s own page and cover stay as they were',
+    edited.editions[1].pageSetup.typography.fontSizePt === 12 && edited.pageSetup.typography.fontSizePt === 11 && edited.activeCover === 'v1')
+  ok('…and a change to the book is the book’s', edited.title === 'A Book')
+  const renamed = ed.routeToEdition(book, { ...shown, title: 'Other' })
+  ok('an edit of nothing on the page leaves an edition with no page of its own without one',
+    !ed.routeToEdition({ ...book, activeEdition: 'eb' }, { ...ed.effectiveBook({ ...book, activeEdition: 'eb' }), title: 'X' }).editions[2].pageSetup && renamed.editions[1].pageSetup === book.editions[1].pageSetup)
+
+  book = ed.editEditions(book, { action: 'duplicate', id: 'lp', newId: 'lp2' })
+  ok('a copy is named as one, and typeset', book.editions.at(-1).name === 'Large Print Copy' && book.activeEdition === 'lp2')
+  book = ed.editEditions(book, { action: 'delete', id: 'lp2', newId: 'x' })
+  ok('deleting the one typeset goes back to the book as set up', !book.activeEdition && book.editions.length === 3)
+  book = ed.editEditions(book, { action: 'fromTypesetVersion', id: 'v9', name: 'Proof 2', versionBook: { pageSetup: { ...base, widthMm: 140 }, activeCover: 'v2' }, newId: 'fv' })
+  ok('an edition can be made from a typeset version: its page and cover', book.editions.at(-1).pageSetup.widthMm === 140 && book.editions.at(-1).coverSetId === 'v2' && book.editions.at(-1).name === 'Proof 2')
+  ok('an edit of an edition that is not there changes nothing', ed.editEditions(book, { action: 'rename', id: 'nope', name: 'X', newId: 'x' }) === book)
+
+  // Through the store: what is shown, and where an edit goes.
+  const P = 'Editions'
+  await booksSettled(P)
+  store.setStoredBook(P, 'Novel', { title: 'Stored', pageSetup: base, editions: [{ id: 'lp', name: 'Large Print', kind: 'largePrint', pageSetup: lp.pageSetup }], activeEdition: 'lp' })
+  const got = store.getBookSettings(P, 'Novel')
+  ok('the store shows the book as the edition typeset sets it', got.pageSetup.typography.fontSizePt === 16 && got.editions.length === 1)
+  store.setBookSettings(P, 'Novel', { ...got, pageSetup: { ...got.pageSetup, typography: { ...got.pageSetup.typography, fontSizePt: 18 } } })
+  ok('and a change to its page is stored as the edition’s',
+    store.getStoredBook(P, 'Novel').pageSetup.typography.fontSizePt === 11 && store.getStoredBook(P, 'Novel').editions[0].pageSetup.typography.fontSizePt === 18 && store.getBookSettings(P, 'Novel').pageSetup.typography.fontSizePt === 18)
+}

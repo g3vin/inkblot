@@ -17,6 +17,7 @@ import { useSyncExternalStore } from 'react'
 import { getPreference, setPreference } from '../lib/preferences'
 import { onBooksChanged, storedBook, storeBook } from './bookStore'
 import { coversOf, designFor, digitalOf } from './chapterDesign'
+import { effectiveBook, routeToEdition } from './editions'
 import { bookFolderFor } from './compile'
 import { clampZoom } from './zoom'
 import { DEFAULT_SHEETS_PER_SIGNATURE } from './imposition'
@@ -222,7 +223,8 @@ onBooksChanged(() => emit())
 
 /** A folder's book settings, with defaults filled in: the folder's name as the title. */
 export const getBookSettings = (projectName, folder) => {
-  const stored = objectOr(storedBook(projectName, folder))
+  // As shown: with the active edition's page and cover over the book's (editions.ts).
+  const stored = effectiveBook(objectOr(storedBook(projectName, folder)))
   const name = (folder || projectName || 'Untitled').split('/').filter(Boolean).pop() || 'Untitled'
   const chapterNumbering = { ...DEFAULT_CHAPTER_NUMBERING, ...objectOr(stored.chapterNumbering) }
   chapterNumbering.startAt = chapterNumbering.startAt === 0 ? 0 : 1
@@ -253,9 +255,21 @@ export const getBookSettings = (projectName, folder) => {
   return book
 }
 
+/** A folder's book as stored — its own page and cover, whatever edition is active. */
+export const getStoredBook = (projectName, folder) => objectOr(storedBook(projectName, folder))
+
+/** Store a book as it is kept, editions and all, with no edition's routing. */
+export const setStoredBook = (projectName, folder, settings) => {
+  const saved = storeBook(projectName, folder, { ...settings, folder: folder || '' })
+  emit()
+  return saved
+}
+
 /** Store a folder's book settings. Resolves when they are saved in the project. */
 export const setBookSettings = (projectName, folder, settings) => {
-  const saved = storeBook(projectName, folder, { ...settings, folder: folder || '' })
+  // An edit while an edition is active is the edition's.
+  const routed = routeToEdition(objectOr(storedBook(projectName, folder)), settings)
+  const saved = storeBook(projectName, folder, { ...routed, folder: folder || '' })
   emit()
   return saved
 }

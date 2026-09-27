@@ -118,6 +118,9 @@ struct TypesetHistoryView: View {
                         newName = row.name ?? ""
                         renaming = row
                     }
+                    Button("Duplicate as Edition") {
+                        model.pageLayout.editEditions(.fromTypesetVersion, id: row.id, name: row.name)
+                    }
                     Button("Delete…", role: .destructive) { pendingDelete = row }
                 } label: { Image(systemName: "ellipsis.circle") }
                     .menuStyle(.borderlessButton)

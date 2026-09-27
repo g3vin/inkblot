@@ -22,6 +22,7 @@ struct TypesetPanelView: View {
                 ThisPageSection(row: row)
             }
             BookSections(.info)
+            EditionsSection()
             // While the e-book is showing, its options are what the panel is for.
             if model.pageLayout.typesetView == .digital { BookSections(.digital) }
             StyleGallerySection()

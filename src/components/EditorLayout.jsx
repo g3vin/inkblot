@@ -22,10 +22,10 @@ import EditorCanvas from './EditorCanvas'
 import usePrintLayoutController from '../print/usePrintLayoutController'
 import PageSetupSheet from '../print/PageSetupSheet'
 import { measurePrint, runPrintJob } from '../print/printJob'
-import { runExport } from '../print/export/runExport'
+import { runExport, runExportAllEditions } from '../print/export/runExport'
 import { importFountainScript } from '../script/importScript'
 import { bookFolderFor } from '../print/compile'
-import { getBookForDoc, getBookSettings, setMeasurement } from '../print/printLayoutStore'
+import { getBookForDoc, getBookSettings, getPrintScope, setMeasurement } from '../print/printLayoutStore'
 import { TYPESET_MILESTONE_EVENT } from '../print/useTypesetHistory'
 
 /** What a format is called in the typeset history: "Exported PDF". */
@@ -494,6 +494,12 @@ export default function EditorLayout(props) {
       runExport({ ...printOptions(scope), format, scope, bound, options, path })
         .then((written) => { if (written) milestone(`Exported ${EXPORT_NAMES[format] || format}`) })
         .catch((error) => console.error('[export] failed:', error))
+    },
+    onExportAllEditions: () => {
+      const scope = getPrintScope(props.projectName) === 'project' ? 'project' : 'folder'
+      runExportAllEditions({ ...printOptions(scope), scope })
+        .then((done) => { if (done?.written?.length) milestone(`Exported ${done.written.length} files for every edition`) })
+        .catch((error) => console.error('[export] every edition failed:', error))
     },
     // A page of the book's own — a dedication — opened from the Book navigator.
     onOpenDoc: (path) => {

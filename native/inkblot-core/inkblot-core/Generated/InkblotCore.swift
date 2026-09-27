@@ -1250,6 +1250,33 @@ public struct NotesOptions: Codable, Equatable {
 	}
 }
 
+/// What an edition is, for its preset and what Export All Editions makes of it.
+public enum EditionKind: String, Codable, Equatable {
+	case paperback
+	case hardcover
+	case largePrint
+	case ebook
+}
+
+/// One form of the book.
+public struct Edition: Codable, Equatable {
+	public let id: String
+	public let name: String
+	public let kind: EditionKind?
+	/// Its trim, margins and type; absent, the book's.
+	public let pageSetup: PageSetup?
+	/// The cover version it uses; absent, the book's.
+	public let coverSetId: String?
+
+	public init(id: String, name: String, kind: EditionKind?, pageSetup: PageSetup?, coverSetId: String?) {
+		self.id = id
+		self.name = name
+		self.kind = kind
+		self.pageSetup = pageSetup
+		self.coverSetId = coverSetId
+	}
+}
+
 /// A folder (or the whole project) compiled as one book. Kept per folder in the
 /// project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
 /// belongs to all of them.
@@ -1296,8 +1323,14 @@ public struct BookSettings: Codable, Equatable {
 	public let textStyles: [TextStyleLook]?
 	/// Where the book's notes are set, and how they are numbered.
 	public let notes: NotesOptions?
+	/// The book in other forms — a hardcover, large print, an e-book — each with its own
+	/// page and cover; the contents, design and styles are the book's.
+	public let editions: [Edition]?
+	/// The edition being typeset, whose page and cover the book shows; none is the book
+	/// as set up.
+	public let activeEdition: String?
 
-	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?, digital: DigitalOptions?, textStyles: [TextStyleLook]?, notes: NotesOptions?) {
+	public init(folder: String, title: String, author: String, language: String, coverImage: String?, pageSetup: PageSetup?, binding: BindingSettings, excluded: [String]?, chapterNumbering: ChapterNumbering?, frontMatter: FrontMatter?, backMatter: BackMatter?, publishing: PublishingTarget?, chapterDesign: ChapterDesign?, partDesign: ChapterDesign?, items: [BookItem]?, continuous: Bool?, covers: [CoverSet]?, activeCover: String?, digital: DigitalOptions?, textStyles: [TextStyleLook]?, notes: NotesOptions?, editions: [Edition]?, activeEdition: String?) {
 		self.folder = folder
 		self.title = title
 		self.author = author
@@ -1319,6 +1352,8 @@ public struct BookSettings: Codable, Equatable {
 		self.digital = digital
 		self.textStyles = textStyles
 		self.notes = notes
+		self.editions = editions
+		self.activeEdition = activeEdition
 	}
 }
 
@@ -1934,6 +1969,8 @@ public enum NativeCommand: Codable, Equatable {
 	case addProjectFont(AddProjectFontCommand)
 	case setTextStyle(SetTextStyleCommand)
 	case insertFootnote(InsertFootnoteCommand)
+	case editEditions(EditEditionsCommand)
+	case exportAllEditions(ExportAllEditionsCommand)
 	case setCoverImage(SetCoverImageCommand)
 	case editCoverSets(EditCoverSetsCommand)
 	case saveTypesetVersion(SaveTypesetVersionCommand)
@@ -2058,6 +2095,8 @@ public enum NativeCommand: Codable, Equatable {
 			addProjectFont,
 			setTextStyle,
 			insertFootnote,
+			editEditions,
+			exportAllEditions,
 			setCoverImage,
 			editCoverSets,
 			saveTypesetVersion,
@@ -2530,6 +2569,16 @@ public enum NativeCommand: Codable, Equatable {
 					self = .insertFootnote(content)
 					return
 				}
+			case .editEditions:
+				if let content = try? container.decode(EditEditionsCommand.self, forKey: .payload) {
+					self = .editEditions(content)
+					return
+				}
+			case .exportAllEditions:
+				if let content = try? container.decode(ExportAllEditionsCommand.self, forKey: .payload) {
+					self = .exportAllEditions(content)
+					return
+				}
 			case .setCoverImage:
 				if let content = try? container.decode(SetCoverImageCommand.self, forKey: .payload) {
 					self = .setCoverImage(content)
@@ -2977,6 +3026,12 @@ public enum NativeCommand: Codable, Equatable {
 			try container.encode(content, forKey: .payload)
 		case .insertFootnote(let content):
 			try container.encode(CodingKeys.insertFootnote, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .editEditions(let content):
+			try container.encode(CodingKeys.editEditions, forKey: .type)
+			try container.encode(content, forKey: .payload)
+		case .exportAllEditions(let content):
+			try container.encode(CodingKeys.exportAllEditions, forKey: .type)
 			try container.encode(content, forKey: .payload)
 		case .setCoverImage(let content):
 			try container.encode(CodingKeys.setCoverImage, forKey: .type)
@@ -3674,6 +3729,37 @@ public struct EditCoverSetsCommand: Codable, Equatable {
 	}
 }
 
+public enum EditionAction: String, Codable, Equatable {
+	/// A new edition from its kind's preset, made active.
+	case add
+	case duplicate
+	case rename
+	case delete
+	/// Typeset it: its page and cover are the book's until another is chosen. `id`
+	/// absent goes back to the book as set up.
+	case activate
+	/// Give it a cover version (`cover_set_id`; absent, the book's).
+	case setCover
+	/// A new edition set as a typeset version was (`id` is the version's).
+	case fromTypesetVersion
+}
+
+public struct EditEditionsCommand: Codable, Equatable {
+	public let action: EditionAction
+	public let id: String?
+	public let name: String?
+	public let kind: EditionKind?
+	public let coverSetId: String?
+
+	public init(action: EditionAction, id: String?, name: String?, kind: EditionKind?, coverSetId: String?) {
+		self.action = action
+		self.id = id
+		self.name = name
+		self.kind = kind
+		self.coverSetId = coverSetId
+	}
+}
+
 /// A step through the editor's own undo history.
 public enum HistoryAction: String, Codable, Equatable {
 	case undo
@@ -4157,6 +4243,12 @@ public struct EventEnvelope: Codable, Equatable {
 
 /// Export the last export again — same format, scope and file — without asking where.
 public struct ExportAgainCommand: Codable, Equatable {
+	public init() {}
+}
+
+/// Export every edition into a folder the author picks: each print edition's interior
+/// PDF and cover PDF, each e-book edition's EPUB.
+public struct ExportAllEditionsCommand: Codable, Equatable {
 	public init() {}
 }
 

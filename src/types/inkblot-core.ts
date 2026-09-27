@@ -987,6 +987,25 @@ export interface NotesOptions {
 	heading: string;
 }
 
+/** What an edition is, for its preset and what Export All Editions makes of it. */
+export enum EditionKind {
+	Paperback = "paperback",
+	Hardcover = "hardcover",
+	LargePrint = "largePrint",
+	Ebook = "ebook",
+}
+
+/** One form of the book. */
+export interface Edition {
+	id: string;
+	name: string;
+	kind?: EditionKind;
+	/** Its trim, margins and type; absent, the book's. */
+	pageSetup?: PageSetup;
+	/** The cover version it uses; absent, the book's. */
+	coverSetId?: string;
+}
+
 /**
  * A folder (or the whole project) compiled as one book. Kept per folder in the
  * project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
@@ -1045,6 +1064,16 @@ export interface BookSettings {
 	textStyles?: TextStyleLook[];
 	/** Where the book's notes are set, and how they are numbered. */
 	notes?: NotesOptions;
+	/**
+	 * The book in other forms — a hardcover, large print, an e-book — each with its own
+	 * page and cover; the contents, design and styles are the book's.
+	 */
+	editions?: Edition[];
+	/**
+	 * The edition being typeset, whose page and cover the book shows; none is the book
+	 * as set up.
+	 */
+	activeEdition?: string;
 }
 
 /** A book style (`bookStyles.ts`): a coordinated design, applied whole. */
@@ -1505,6 +1534,8 @@ export type NativeCommand =
 	| { type: "addProjectFont", payload: AddProjectFontCommand }
 	| { type: "setTextStyle", payload: SetTextStyleCommand }
 	| { type: "insertFootnote", payload: InsertFootnoteCommand }
+	| { type: "editEditions", payload: EditEditionsCommand }
+	| { type: "exportAllEditions", payload: ExportAllEditionsCommand }
 	| { type: "setCoverImage", payload: SetCoverImageCommand }
 	| { type: "editCoverSets", payload: EditCoverSetsCommand }
 	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
@@ -1980,6 +2011,31 @@ export interface EditCoverSetsCommand {
 	fit?: CoverFit;
 }
 
+export enum EditionAction {
+	/** A new edition from its kind's preset, made active. */
+	Add = "add",
+	Duplicate = "duplicate",
+	Rename = "rename",
+	Delete = "delete",
+	/**
+	 * Typeset it: its page and cover are the book's until another is chosen. `id`
+	 * absent goes back to the book as set up.
+	 */
+	Activate = "activate",
+	/** Give it a cover version (`cover_set_id`; absent, the book's). */
+	SetCover = "setCover",
+	/** A new edition set as a typeset version was (`id` is the version's). */
+	FromTypesetVersion = "fromTypesetVersion",
+}
+
+export interface EditEditionsCommand {
+	action: EditionAction;
+	id?: string;
+	name?: string;
+	kind?: EditionKind;
+	coverSetId?: string;
+}
+
 /** A step through the editor's own undo history. */
 export enum HistoryAction {
 	Undo = "undo",
@@ -2074,6 +2130,13 @@ export interface EventEnvelope {
 
 /** Export the last export again — same format, scope and file — without asking where. */
 export interface ExportAgainCommand {
+}
+
+/**
+ * Export every edition into a folder the author picks: each print edition's interior
+ * PDF and cover PDF, each e-book edition's EPUB.
+ */
+export interface ExportAllEditionsCommand {
 }
 
 export enum ExportFormat {

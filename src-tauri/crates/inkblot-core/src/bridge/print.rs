@@ -347,6 +347,48 @@ pub struct EditCoverSetsCommand {
     pub fit: Option<CoverFit>,
 }
 
+/* ---------------- editions ---------------- */
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EditionAction {
+    /// A new edition from its kind's preset, made active.
+    Add,
+    Duplicate,
+    Rename,
+    Delete,
+    /// Typeset it: its page and cover are the book's until another is chosen. `id`
+    /// absent goes back to the book as set up.
+    Activate,
+    /// Give it a cover version (`cover_set_id`; absent, the book's).
+    SetCover,
+    /// A new edition set as a typeset version was (`id` is the version's).
+    FromTypesetVersion,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditEditionsCommand {
+    pub action: EditionAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<crate::types::EditionKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_set_id: Option<String>,
+}
+
+/// Export every edition into a folder the author picks: each print edition's interior
+/// PDF and cover PDF, each e-book edition's EPUB.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportAllEditionsCommand {}
+
 /* ---------------- the typeset history ---------------- */
 
 /// Why a typeset version was kept.

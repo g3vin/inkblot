@@ -36,6 +36,7 @@ use super::print::{
     SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand, PreviewTypesetVersionCommand,
     SetCoverImageCommand, EditCoverSetsCommand, SetFolderBookOptionsCommand, SetTypesetViewCommand,
     SetParagraphTypesetCommand, ShowProofIssueCommand, SetTypesetDisplayCommand, AddProjectFontCommand, SetTextStyleCommand, InsertFootnoteCommand,
+    EditEditionsCommand, ExportAllEditionsCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -610,6 +611,8 @@ pub enum NativeCommand {
     AddProjectFont(AddProjectFontCommand),
     SetTextStyle(SetTextStyleCommand),
     InsertFootnote(InsertFootnoteCommand),
+    EditEditions(EditEditionsCommand),
+    ExportAllEditions(ExportAllEditionsCommand),
     SetCoverImage(SetCoverImageCommand),
     EditCoverSets(EditCoverSetsCommand),
     /* The typeset history (`print.rs`). */

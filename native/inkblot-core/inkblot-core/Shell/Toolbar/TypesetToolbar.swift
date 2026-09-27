@@ -23,6 +23,8 @@ struct TypesetToolbar: CustomizableToolbarContent {
             .disabled(!layout.hasDocument)
         }
 
+        ToolbarItem(id: ToolbarItemID.typesetEdition.id) { EditionPicker(model: model) }
+
         ToolbarItem(id: ToolbarItemID.typesetSpread.id) {
             let layout = model.pageLayout
             Picker("Pages", selection: Binding(get: { layout.spread }, set: { layout.setDisplay(spread: $0) })) {
