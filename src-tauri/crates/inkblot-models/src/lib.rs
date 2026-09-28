@@ -2,10 +2,9 @@
 //!
 //! Synonyms (an ONNX model), rhymes (a pronouncing-dictionary lookup), Kokoro speech
 //! (ONNX), whisper dictation, and the Pinterest scrape's return channel. Nothing here
-//! knows about Tauri or Swift: an engine takes the directory to keep its files in,
-//! reports progress through a callback, and is owned by the caller.
-//! `src-tauri/src/*_commands.rs` wraps these for the Tauri app's `invoke`, and
-//! `inkblot-ffi/src/models.rs` wraps the same engines for the Swift app.
+//! knows about Tauri: an engine takes the directory to keep its files in, reports
+//! progress through a callback, and is owned by the caller. `src-tauri/src/*_commands.rs`
+//! wraps these for the page's `invoke`.
 //!
 //! ## Adding a model
 //!
@@ -17,12 +16,6 @@
 //!    and renames into place, so an interrupted download is never mistaken for a model.
 //! 3. A `src-tauri/src/<name>_commands.rs` wrapper: a `*State` holding the engine in a
 //!    `OnceLock`, registered with `.manage` and `generate_handler!` in `lib.rs`.
-//! 4. The same methods on `InkblotModels` in `inkblot-ffi/src/models.rs` **and** on
-//!    its stand-in `models_unavailable.rs`, with identical signatures and doc comments
-//!    (UniFFI checksums include some doc comments; `build-xcframework.sh` fails if the
-//!    two differ).
-//! 5. A case in the Swift app's `ModelService.swift` answering the same command name,
-//!    emitting the same progress events.
 
 mod download;
 

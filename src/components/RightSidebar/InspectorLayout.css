@@ -1,0 +1,76 @@
+/* The inspector's selector bar and Customize Inspector Layout…. */
+
+.inspector-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.inspector-header > .sidebar-tabs { flex: 1; min-width: 0; }
+
+.inspector-layout-switch {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-circle);
+  height: var(--size-circle);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.inspector-layout-switch:hover { background: var(--control-hover-bg); border-color: transparent; color: var(--text-primary); }
+.inspector-layout-switch[data-layout='finishing'] { background: var(--accent-surface); color: var(--accent-foreground); }
+
+.inspector-editor-hint { margin: 0 0 var(--space-4); font: 12px/1.4 var(--font-ui); color: var(--text-muted); }
+.inspector-editor-columns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+.inspector-editor-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font: 600 12px/1.2 var(--font-ui);
+  color: var(--text-secondary);
+}
+.inspector-editor-rows {
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.inspector-editor-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 30px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font: 13px/1 var(--font-ui);
+  color: var(--text-primary);
+}
+.inspector-editor-row.is-hidden { color: var(--text-muted); }
+.inspector-editor-row.is-last-shown { box-shadow: 0 1px 0 var(--border-muted); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.inspector-editor-row.is-dragging { background: var(--select-bg); }
+.inspector-editor-row input { margin: 0; accent-color: var(--accent-color); }
+.inspector-editor-row-title { flex: 1; }
+.inspector-editor-handle { display: inline-flex; color: var(--text-subtle); cursor: grab; touch-action: none; }
+.inspector-editor-handle:hover { color: var(--text-secondary); }
+
+.inspector-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 160px;
+  padding: var(--space-6);
+  text-align: center;
+  font: 13px/1.4 var(--font-ui);
+  color: var(--text-muted);
+}

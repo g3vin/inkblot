@@ -147,3 +147,71 @@ ok('a folder keeps its name verbatim', at(actOne, { siblings: [actOne] }).label 
 const bare = deriveFileNodeState(chapterOne)
 ok('an empty context is safe', bare.isFolder === false && bare.siblingIndex === -1)
 ok('and draws no indicators', !bare.showInsertSlot && !bare.showInsertAfterLast)
+
+/* ---------------- the filter bar (TreeFilterTests.swift) ---------------- */
+{
+  const { applyTreeFilter, EMPTY_FILTER, folderPaths } = await import('../../src/lib/treeFilter.ts')
+  const file = (path) => ({ type: 'file', name: path.split('/').pop(), path })
+  const folder = (path, children) => ({ type: 'folder', name: path.split('/').pop() ?? '', path, children })
+  const paths = (node) => (node?.children ?? []).flatMap((child) => [child.path, ...paths(child)])
+  const root = folder('', [
+    folder('essays', [file('essays/Draft'), file('essays/Board.canvas'), file('essays/Shire.map')]),
+    folder('empty', []),
+    file('Notes'),
+  ])
+  const filter = (patch, recent = []) => paths(applyTreeFilter(root, { ...EMPTY_FILTER, ...patch }, recent)).join()
+  ok('filter: nothing filtered leaves the tree alone', applyTreeFilter(root, EMPTY_FILTER, []) === root)
+  ok('filter: text keeps matches and the folders they are in', filter({ text: 'draft' }) === 'essays,essays/Draft')
+  ok('filter: a matching folder keeps its contents', filter({ text: 'ess' }) === 'essays,essays/Draft,essays/Board.canvas,essays/Shire.map')
+  ok('filter: canvases', filter({ kind: 'canvases' }) === 'essays,essays/Board.canvas')
+  ok('filter: maps', filter({ kind: 'maps' }) === 'essays,essays/Shire.map')
+  ok('filter: documents', filter({ kind: 'documents' }) === 'essays,essays/Draft,Notes')
+  ok('filter: recent only', filter({ recentOnly: true }, ['Notes']) === 'Notes')
+  ok('filter: case and accents are ignored', filter({ text: 'NÖTES' }) === 'Notes')
+  ok('filter: a filtered tree opens every folder', [...folderPaths(root)].sort().join() === ',empty,essays')
+}
+
+/* ---------------- the manual order (TreeOrderTests.swift) ---------------- */
+{
+  const O = await import('../../src/lib/fileTreeOrder.ts')
+  const file = (path) => ({ type: 'file', name: path.split('/').pop(), path })
+  const folder = (path, children) => ({ type: 'folder', name: path.split('/').pop() ?? '', path, children })
+  const names = (node) => (node.children ?? []).map((child) => child.name)
+  {
+    const order = { '': ['file:c', 'folder:a'] }
+    const tree = O.applyOrderToTree(folder('', [folder('a', []), file('b'), file('c')]), order)
+    ok('order: the stored order sorts, and new entries go last', names(tree).join() === 'c,a,b' && order[''].join() === 'file:c,folder:a,file:b')
+  }
+  {
+    const order = { '': ['file:gone', 'file:b'] }
+    O.applyOrderToTree(folder('', [file('b')]), order)
+    ok('order: gone entries are dropped', order[''].join() === 'file:b')
+  }
+  {
+    const order = { '': ['file:a', 'file:b', 'file:c'] }
+    O.moveInOrder(order, 'file:a', '', '', 2)
+    const first = order[''].join()
+    O.moveInOrder(order, 'file:c', '', '', 0)
+    const second = order[''].join()
+    O.moveInOrder(order, 'file:c', '', '', 3)
+    ok('order: reordering within a folder lands on the line',
+      first === 'file:b,file:a,file:c' && second === 'file:c,file:b,file:a' && order[''].join() === 'file:b,file:a,file:c')
+  }
+  {
+    const order = { '': ['file:a', 'folder:f'], f: ['file:f/x'] }
+    const at = O.moveInOrder(order, 'file:f/a', '', 'f', 0)
+    ok('order: across folders it inserts at the index', at === 0 && order.f.join() === 'file:f/a,file:f/x')
+    ok('order: …or appends', O.moveInOrder(order, 'file:b', 'f', 'f', null) === 2)
+  }
+  {
+    const next = O.remapOrderForFolder({
+      '': ['folder:a', 'folder:ab'],
+      a: ['file:a/x', 'folder:a/sub'],
+      'a/sub': ['file:a/sub/y'],
+      ab: ['file:ab/z'],
+    }, 'a', 'ab/a')
+    ok('order: a moved folder takes its order with it',
+      next[''].join() === 'folder:ab/a,folder:ab' && next['ab/a'].join() === 'file:ab/a/x,folder:ab/a/sub' && next['ab/a/sub'].join() === 'file:ab/a/sub/y')
+    ok('order: a sibling that only shares the prefix is not under it', next.ab.join() === 'file:ab/z')
+  }
+}

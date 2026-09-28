@@ -1,8 +1,7 @@
 //! The built-in story folder presets (Characters, Settings, Outline, Novel).
 //!
 //! Presets give matching folders — and the files inside them — themed icons in the
-//! file tree, matched by folder name (or alias) anywhere in an entry's path. Shared with the
-//! Swift app's native file tree.
+//! file tree, matched by folder name (or alias) anywhere in an entry's path.
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;

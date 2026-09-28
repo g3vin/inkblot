@@ -1,15 +1,14 @@
 //! inkblot-core — Inkblot's domain logic, independent of any shell.
 //!
-//! Nothing here knows about Tauri, web views, React or Swift. The Tauri app links it
-//! directly (`src-tauri/src/*_commands.rs`); the Swift app reaches it through
-//! `inkblot-ffi`. Neither shell has its own copy of the logic.
+//! Nothing here knows about Tauri, web views or React. The Tauri app links it directly
+//! (`src-tauri/src/*_commands.rs`), and the page reaches it through them.
 //!
 //! ## Modules
 //!
 //! | Module | Role |
 //! |---|---|
-//! | `types` | Domain types, generated into TypeScript and Swift by typeshare |
-//! | `bridge` | The shell ↔ document-surface protocol, generated the same way |
+//! | `types` | Domain types, generated into TypeScript by typeshare |
+//! | `bridge` | The chrome ↔ document-surface protocol, generated the same way |
 //! | `store` | All persistence: projects, documents, versions, preferences |
 //! | `search` | The sidebar search engine |
 //! | `version_history` | The version diff engine and history grouping |
@@ -23,9 +22,9 @@
 //!
 //! Anything annotated `#[typeshare]` in `types/` or `bridge/` is the one definition of
 //! that type: `npm run types` (`scripts/generate-types.sh`) writes
-//! `src/types/inkblot-core.ts` and the Swift `InkblotCore.swift`, and
-//! `npm run types:check` fails when they are stale. Doc comments are copied across,
-//! so they are read in all three languages. Never edit the generated files.
+//! `src/types/inkblot-core.ts`, and `npm run types:check` fails when it is stale. Doc
+//! comments are copied across, so they are read in both languages. Never edit the
+//! generated file.
 //!
 //! ## JS parity
 //!

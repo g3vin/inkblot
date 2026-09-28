@@ -53,6 +53,49 @@ export const contentsRowsPerPage = (setup) => {
   return { first: Math.max(1, total - 4), rest: total }
 }
 
+/** A half-title page — the title alone — for the `physical`th page of the print. */
+export const halfTitlePage = (setup, physical, title) => {
+  const m = pageMetrics(setup)
+  const page = newPage(setup, m, 'fm-half-title')
+  const box = textBox(setup, m, physical)
+  page.appendChild(block('fm-center fm-title', title, { left: box.left, width: box.width, top: `${box.top + box.height * 0.3}px` }))
+  return page
+}
+
+/**
+ * The contents' pages, from the `firstPhysical`th page of the print: [{ title, folio,
+ * part }] — a part's row is a heading over its chapters, with no folio of its own.
+ */
+export const contentsPages = (setup, entries, firstPhysical = 1) => {
+  const m = pageMetrics(setup)
+  const { first, rest } = contentsRowsPerPage(setup)
+  const pages = []
+  let index = 0
+  while (index < entries.length || !pages.length) {
+    const page = newPage(setup, m, 'fm-contents')
+    const box = textBox(setup, m, firstPhysical + pages.length)
+    const list = document.createElement('div')
+    list.className = 'fm-contents-list'
+    Object.assign(list.style, { left: box.left, width: box.width, top: `${box.top}px` })
+    if (!pages.length) list.appendChild(block('fm-contents-heading', 'Contents', {}))
+    const rows = pages.length ? rest : first
+    for (const entry of entries.slice(index, index + rows)) {
+      const row = document.createElement('div')
+      row.className = `fm-contents-row${entry.part ? ' is-part' : ''}`
+      row.appendChild(block('fm-contents-title', entry.title, {}))
+      if (!entry.part) {
+        row.appendChild(block('fm-contents-leader', '', {}))
+        row.appendChild(block('fm-contents-folio', entry.folio, {}))
+      }
+      list.appendChild(row)
+    }
+    page.appendChild(list)
+    pages.push(page)
+    index += rows
+  }
+  return pages
+}
+
 /**
  * The front matter's pages, title pages included, in order.
  *
@@ -71,10 +114,7 @@ export const buildFrontMatterPages = ({ setup, book, title, titlePages = [], con
   }
 
   if (front.halfTitle && title) {
-    const page = newPage(setup, m, 'fm-half-title')
-    const box = textBox(setup, m, pages.length + 1)
-    page.appendChild(block('fm-center fm-title', title, { left: box.left, width: box.width, top: `${box.top + box.height * 0.3}px` }))
-    pages.push(page)
+    pages.push(halfTitlePage(setup, pages.length + 1, title))
     if (facing) pages.push(blank())
   }
 
@@ -124,30 +164,7 @@ export const buildFrontMatterPages = ({ setup, book, title, titlePages = [], con
 
   if (contents?.length) {
     toRecto()
-    const { first, rest } = contentsRowsPerPage(setup)
-    let index = 0
-    let pageIndex = 0
-    while (index < contents.length) {
-      const page = newPage(setup, m, 'fm-contents')
-      const box = textBox(setup, m, pages.length + 1)
-      const list = document.createElement('div')
-      list.className = 'fm-contents-list'
-      Object.assign(list.style, { left: box.left, width: box.width, top: `${box.top}px` })
-      if (pageIndex === 0) list.appendChild(block('fm-contents-heading', 'Contents', {}))
-      const rows = pageIndex === 0 ? first : rest
-      for (const entry of contents.slice(index, index + rows)) {
-        const row = document.createElement('div')
-        row.className = 'fm-contents-row'
-        row.appendChild(block('fm-contents-title', entry.title, {}))
-        row.appendChild(block('fm-contents-leader', '', {}))
-        row.appendChild(block('fm-contents-folio', entry.folio, {}))
-        list.appendChild(row)
-      }
-      page.appendChild(list)
-      pages.push(page)
-      index += rows
-      pageIndex += 1
-    }
+    pages.push(...contentsPages(setup, contents, pages.length + 1))
   }
 
   // The body's first page is a recto.

@@ -11,10 +11,8 @@
 //! next open picks up exactly where the last one stopped. Keeping it in the document
 //! rather than beside it is what makes version history bring an archived session back.
 //!
-//! **Why the page owns positions and the shell owns none.** The shell draws the bubbles
-//! (as Liquid Glass — which only a view above the page can be) and hands back the
-//! arrangement; the page finds the sentence by the session's id and rewrites it. No
-//! message here addresses the document.
+//! The page draws the bubbles and finds the sentence again by the session's id when it
+//! writes the arrangement back.
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
@@ -98,56 +96,4 @@ pub struct BubbleSession {
     /// its forms without opening the editor. Its id means nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unsaved: Option<BubbleForm>,
-}
-
-/// Open the bubble editor on a session — new, or reopened from its mark.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BubbleSessionOpened {
-    pub doc_path: String,
-    pub session: BubbleSession,
-}
-
-/// The writer left the bubble editor: write the sentence back.
-///
-/// `archive` decides what stays behind. False keeps the session on the sentence, so it
-/// can be reopened; true takes it off and puts it in the document's archive
-/// (`archive.rs`), from where it can be restored.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CloseBubbleSessionCommand {
-    pub session: BubbleSession,
-    pub archive: bool,
-}
-
-/// Where one open session's chip is in the document, for a shell that draws the chips
-/// itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BubbleChipRect {
-    pub session_id: String,
-    pub left: f64,
-    pub top: f64,
-    pub right: f64,
-    pub bottom: f64,
-    /// Which of the session's pages is showing — its forms, then the unsaved arrangement
-    /// if there is one — and how many there are. Zero pages: it has no forms.
-    #[serde(default)]
-    pub form_page: u32,
-    #[serde(default)]
-    pub form_pages: u32,
-}
-
-/// Every session chip the user can see, and where — the whole list, so it is safe to
-/// coalesce. The page's chips stay where they are, invisible, and go on taking the click
-/// that reopens a session; the shell draws them as Liquid Glass, which only a view above
-/// the page can be.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BubbleChipsChanged {
-    pub chips: Vec<BubbleChipRect>,
 }

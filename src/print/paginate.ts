@@ -21,6 +21,18 @@
  *   row    one table row; a table breaks only between rows.
  *   break  a manual page, column or recto break; the next unit starts after it.
  *
+ * A typesetter's own, set on a paragraph (ParagraphTypeset.ts, read by measure.ts):
+ *   keepWithNext      as a heading
+ *   split: 'never'    kept together
+ *   pageAdjust        the slot it starts in runs that many lines long (+) or short (−)
+ *
+ * On a baseline grid (`frame.grid`), every paragraph starts on a whole line from its
+ * slot's top: what came before it — a picture, a head — is rounded up to whole lines.
+ *
+ * Footnotes: a line whose marks have notes (`line.notes`, their height) takes that much
+ * room — and, the first on its page, the rule over them (`frame.noteGap`) — from the
+ * foot of the slot it lands in, so the notes set there fit below the text.
+ *
  * A script adds rules of its own, carried on the units (measure.ts sets them):
  *   keepWithNext      a scene heading, a character, a parenthetical: never last on a page
  *   keepWithPrevious  a transition: never first on a page — the line before comes over
@@ -30,7 +42,8 @@
  *                     the speaker's name and "(CONT'D)" — `continuations` says where
  */
 
-export type ManualBreakKind = 'page' | 'column' | 'recto'
+/** `soft`: a new page, unless the current one is still empty (around a full-page picture). */
+export type ManualBreakKind = 'page' | 'column' | 'recto' | 'soft'
 
 export interface LayoutLine {
   /** Natural top and bottom, in flow px. */
@@ -38,6 +51,8 @@ export interface LayoutLine {
   bottom: number
   /** Document position of the line's first character: where a line push goes. */
   pos: number
+  /** The height of the notes whose marks are on this line, set at its page's foot. */
+  notes?: number
 }
 
 export interface LayoutUnit {
@@ -60,6 +75,8 @@ export interface LayoutUnit {
   /** Dialogue split across pages is marked (MORE) and CUE (CONT'D). */
   continuation?: { cue: string }
   breakKind?: ManualBreakKind
+  /** The slot this unit starts in runs this many of its lines long, or short. */
+  pageAdjust?: number
 }
 
 /** A speech carried over a page: drawn at the line push at `pos`. */
@@ -77,6 +94,10 @@ export interface LayoutFrame {
   columns: number
   /** Minimum lines of a split paragraph at a page's foot and head. */
   minLines: number
+  /** The baseline grid's pitch, px: paragraphs start on whole lines. 0 or absent: none. */
+  grid?: number
+  /** The rule over a page's footnotes, and the space around it, px. */
+  noteGap?: number
 }
 
 export interface Push {
@@ -132,8 +153,31 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
   const columns = Math.max(1, Math.floor(frame.columns))
   const minLines = Math.max(1, Math.floor(frame.minLines))
 
+  const grid = frame.grid && frame.grid > 1 ? frame.grid : 0
+  // Slots a typesetter ran long or short, by how much.
+  const adjust = new Map<number, number>()
+
   const slotTop = (s: number) => s * stride
-  const slotBottom = (s: number) => s * stride + slotHeight
+  const slotBottom = (s: number) => s * stride + slotHeight + (adjust.get(s) || 0)
+
+  // The room each slot's footnotes take at its foot.
+  const noteSpace = new Map<number, number>()
+  const noteGap = frame.noteGap || 0
+  const notesIn = (u: LayoutUnit, from: number, to: number) => {
+    let n = 0
+    const lines = u.lines || []
+    for (let i = from; i < to && i < lines.length; i += 1) n += lines[i].notes || 0
+    return n
+  }
+  /** What the slot's notes take, with `extra` more of them. */
+  const reserved = (s: number, extra = 0) => {
+    const n = (noteSpace.get(s) || 0) + extra
+    return n > 0 ? n + noteGap : 0
+  }
+  const keepNotes = (s: number, u: LayoutUnit, from: number, to: number) => {
+    const n = notesIn(u, from, to)
+    if (n) noteSpace.set(s, (noteSpace.get(s) || 0) + n)
+  }
 
   const pushes: Push[] = []
   const continuations: Continuation[] = []
@@ -154,19 +198,25 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
   /** The slot a forced break moves to, from the current one. */
   const slotAfterBreak = (kind: ManualBreakKind): number => {
     if (kind === 'column') return slot + 1
+    if (kind === 'soft') return slotHasContent ? (Math.floor(slot / columns) + 1) * columns : slot
     const nextPage = Math.floor(slot / columns) + 1
     if (kind === 'page') return nextPage * columns
     // Recto: the next odd physical page, i.e. an even page index.
     return (nextPage % 2 === 0 ? nextPage : nextPage + 1) * columns
   }
 
+  /** Push a block down; a second push of the same block adds to its first. */
+  const pushBlock = (pos: number, height: number) => {
+    const last = pushes[pushes.length - 1]
+    if (last && last.kind === 'block' && last.pos === pos) last.height += height
+    else pushes.push({ kind: 'block', pos, height })
+    offset += height
+  }
+
   /** Push unit `u` so its content starts at the top of slot `target`. */
   const pushBlockTo = (u: LayoutUnit, target: number) => {
     const height = slotTop(target) - (u.top + offset)
-    if (height > EPS) {
-      pushes.push({ kind: 'block', pos: u.pos, height })
-      offset += height
-    }
+    if (height > EPS) pushBlock(u.pos, height)
     slot = target
     slotHasContent = false
   }
@@ -230,7 +280,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
     if (forced) {
       const target = slotAfterBreak(forced)
       pushBlockTo(u, target)
-      if (forced !== 'column') chapterStartSlots.push(target)
+      if (forced !== 'column' && forced !== 'soft') chapterStartSlots.push(target)
       forced = null
     } else if (u.top + offset >= slotBottom(slot) - EPS) {
       // It starts in the gap below this slot — after an oversized atom ran past the
@@ -253,11 +303,35 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
 
     markSlot(slot, u.pos)
 
+    // Run the page long or short — once for the slot, by the first paragraph that asks.
+    if (u.pageAdjust && !adjust.has(slot)) {
+      const line = lineHeightOf(u) || grid
+      adjust.set(slot, Math.max(-1, Math.min(1, u.pageAdjust)) * line)
+    }
+
+    // On the grid, a paragraph starts on the next whole line.
+    if (grid && u.kind === 'text' && slotHasContent) {
+      const off = (u.top + offset - slotTop(slot)) % grid
+      const lift = off > EPS && grid - off > EPS ? grid - off : 0
+      if (lift) {
+        pushBlock(u.pos, lift)
+        if (u.top + offset >= slotBottom(slot) - EPS) {
+          pushBlockTo(u, slot + 1)
+          markSlot(slot, u.pos)
+        }
+      }
+    }
+
     // Place the unit, splitting a paragraph across as many slots as it needs.
     let firstLine = 0
+    const lineCount = u.lines?.length || 0
     for (;;) {
-      const bottom = slotBottom(slot)
-      if (u.bottom + offset <= bottom + EPS) break
+      // The foot, less the room the notes of what is left of the unit would take here.
+      const bottom = slotBottom(slot) - reserved(slot, notesIn(u, firstLine, lineCount))
+      if (u.bottom + offset <= bottom + EPS) {
+        keepNotes(slot, u, firstLine, lineCount)
+        break
+      }
 
       const lines = u.kind === 'text' && u.split !== 'never' ? u.lines || [] : []
       const remaining = lines.length - firstLine
@@ -282,7 +356,11 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
         }
         // Nowhere a sentence ends and nowhere better to go: break between lines.
         if (k < 0) k = Math.max(firstLine + 1, Math.min(fit, lines.length - 1))
-        if (k >= lines.length) break
+        if (k >= lines.length) {
+          keepNotes(slot, u, firstLine, lineCount)
+          break
+        }
+        keepNotes(slot, u, firstLine, k)
         // The next page opens with the speaker's name, a line above the speech.
         const height = slotTop(slot + 1) + more - (lines[k].top + offset)
         if (height > EPS) {
@@ -298,9 +376,10 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
       }
 
       if (remaining > 1) {
-        // First line that does not fit.
+        // First line that does not fit — with its notes, and those of the lines above it.
+        const foot = slotBottom(slot)
         let j = firstLine
-        while (j < lines.length && lines[j].bottom + offset <= bottom + EPS) j += 1
+        while (j < lines.length && lines[j].bottom + offset <= foot - reserved(slot, notesIn(u, firstLine, j + 1)) + EPS) j += 1
         const atHead = firstLine > 0 || !slotHasContent
         // Orphans: too few lines would be left at the foot.
         if (j - firstLine < minLines && !atHead) {
@@ -313,7 +392,11 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
           j = Math.max(firstLine + minLines, lines.length - minLines)
         }
         if (j <= firstLine) j = firstLine + 1
-        if (j >= lines.length) break
+        if (j >= lines.length) {
+          keepNotes(slot, u, firstLine, lineCount)
+          break
+        }
+        keepNotes(slot, u, firstLine, j)
         const height = slotTop(slot + 1) - (lines[j].top + offset)
         if (height > EPS) {
           pushes.push({ kind: 'line', pos: lines[j].pos, height })
@@ -333,6 +416,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
         markSlot(slot, u.pos)
         continue
       }
+      keepNotes(slot, u, firstLine, lineCount)
       break
     }
     slotHasContent = true
@@ -340,7 +424,7 @@ export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult 
   }
 
   // A trailing manual break still opens its page, so the author sees it.
-  if (forced) {
+  if (forced && forced !== 'soft') {
     const target = slotAfterBreak(forced)
     markSlot(target, null)
     slot = target

@@ -18,3 +18,7 @@ export async function invoke(command, args) {
   if (!handler) throw new Error('invoke() is not available in the headless test harness')
   return handler(command, args)
 }
+
+export function isTauri() {
+  return false
+}

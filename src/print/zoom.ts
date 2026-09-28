@@ -4,7 +4,7 @@
  * Zoom is a scale on the whole stage, so 100% is the CSS definition of real size
  * (1in = 96px) — the convention Word and Pages use. "Actual size" is different: it
  * is the zoom at which an inch on the page is an inch on *this* screen, and needs
- * the display's physical density, which only the native shell knows.
+ * the display's physical density (`setDisplayDensity`).
  */
 
 export const MIN_ZOOM = 0.25

@@ -2,15 +2,13 @@
 //!
 //! Every variant carries a named payload struct rather than an anonymous one. That is
 //! not style: typeshare emits an anonymous struct variant as an inline TypeScript
-//! object and a `NativeCommandFooInner` Swift struct, neither of which anything can
-//! name. A named struct gives all three languages a type per command, which is what
+//! object, which nothing can name. A named struct gives each language a type per
+//! command, which is what
 //! lets a handler be written against one command instead of against the union.
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::archive::ArchiveActionCommand;
-use super::bubble::CloseBubbleSessionCommand;
 use super::references::{
     AddReferenceCommand, ChooseReferenceCandidateCommand, CreateReferenceCommand, InsertBibliographyCommand,
     InsertCitationCommand, ReferenceRef, SetBibliographyOptionsCommand, SetCitationStyleCommand,
@@ -20,17 +18,29 @@ use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind,
 use crate::types::json::JsonValue;
 use super::map::MapCommandRequest;
 use super::sidebar::{
-    AddReplyCommand, ClipboardDropCommand, HighlightNoteCommand, InsertClipboardEntryCommand, NoteRef, RemoveClipboardEntriesCommand,
-    RemoveTilesCommand, RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
-    TileRef, UpdateNoteCommand, VersionActionCommand,
+    AddReplyCommand, ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef,
+    RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
+    ReplaceTileWordCommand, RevealSearchResultCommand, TileRef, UpdateNoteCommand,
+    VersionActionCommand,
 };
 use super::tabs::{CloseSplitCommand, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand, SetTabOrderCommand, TabRef};
 use crate::types::note::Note;
 use super::print::{
-    ApplyFormatCommand, ClearBookSetupCommand, ExportAgainCommand, ExportDocumentCommand, GoToPageCommand,
-    ImportScriptCommand, InsertBreakCommand, MeasureBookCommand, ScriptReportCommand, SetSceneNumbersCommand, PrintDocumentCommand, PrintFinishedCommand, RefreshBookChaptersCommand,
-    SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand, SetPrintLayoutCommand,
-    SetAuthorProfileCommand, SetBookCoverCommand, SetPrintScopeCommand, SetPrintZoomCommand, UseSetupForBookCommand,
+    ApplyFormatCommand, ClearBookSetupCommand, ExportAgainCommand, ExportDocumentCommand,
+    GoToPageCommand, ImportScriptCommand, InsertBreakCommand, MeasureBookCommand,
+    ScriptReportCommand, SetSceneNumbersCommand, PrintDocumentCommand,
+    RefreshBookChaptersCommand, SetBookSettingsCommand, SetDisplayDensityCommand,
+    SetPageSetupCommand, SetPrintLayoutCommand, SetAuthorProfileCommand,
+    SetBookCoverCommand, SetEditorModeCommand, SetPrintScopeCommand, SetPrintZoomCommand,
+    UseSetupForBookCommand, MoveBookItemCommand, SetBookItemHiddenCommand,
+    AddBookItemCommand, RemoveBookItemCommand, EditBookItemCommand, OpenBookItemCommand,
+    ApplyBookStyleCommand, SetChapterMetaCommand, SetHeadImageCommand,
+    SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
+    PreviewTypesetVersionCommand, SetCoverImageCommand, EditCoverSetsCommand,
+    SetFolderBookOptionsCommand, SetTypesetViewCommand, SetParagraphTypesetCommand,
+    ShowProofIssueCommand, SetTypesetDisplayCommand, AddProjectFontCommand,
+    SetTextStyleCommand, InsertFootnoteCommand, EditEditionsCommand,
+    ExportAllEditionsCommand,
 };
 
 /// A command aimed at an editor with nothing else to say.
@@ -312,9 +322,8 @@ pub struct CanvasRestoreCommand {
 /// Insert text at the selection with no formatting of its own — the text takes on the
 /// marks around it.
 ///
-/// This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
-/// webview: `WKWebView` cannot read the clipboard without a user gesture inside the
-/// page, and the menu item is not one.
+/// This is Edit ▸ Paste and Match Style: the clipboard's text, read by whatever the
+/// writer used — the menu item or the toolbar button — and inserted as plain text.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -398,22 +407,6 @@ pub struct DuplicateEntryCommand {
     pub path: String,
 }
 
-/// How much of the page's top-left corner the window's own controls cover.
-///
-/// The shell draws no titlebar row: the page's toolbar is the top of the window, and
-/// the traffic lights float over whatever is beneath them. When the native file tree is
-/// showing they float over it and the page needs no room; when it is hidden they float
-/// over the page's toolbar, which must start after them. Only the shell knows which.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SetTitlebarInsetCommand {
-    pub leading: f64,
-    /// Room at the right end, for the button that reopens a hidden native sidebar.
-    #[serde(default)]
-    pub trailing: f64,
-}
-
 /// Open a project, as picking it on the web landing page would.
 ///
 /// The shell's project picker is its own window; the page still owns everything that
@@ -424,25 +417,6 @@ pub struct SetTitlebarInsetCommand {
 #[serde(rename_all = "camelCase")]
 pub struct OpenProjectCommand {
     pub project_name: String,
-}
-
-/// How much of each side of the page the shell's chrome covers.
-///
-/// The shell's sidebars and window toolbar are translucent and float over the page
-/// rather than beside it: the page runs the whole window, so a canvas carries on
-/// underneath them and a document scrolls up under the toolbar's glass. What must stay
-/// readable — a document's text column, its first line — keeps to the part of the page
-/// they leave uncovered.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SetPanelInsetsCommand {
-    pub leading: f64,
-    pub trailing: f64,
-    /// The window toolbar's band. Absent from an older shell, which kept the page
-    /// below its toolbar, so it defaults to nothing covered.
-    #[serde(default)]
-    pub top: f64,
 }
 
 /// Turn the selection's blocks into paragraphs or headings — the toolbar's Paragraph
@@ -484,8 +458,7 @@ pub struct EditorHistoryCommand {
     pub action: HistoryAction,
 }
 
-/// Open or leave focus mode — the page's, which stays in the page (see
-/// `FocusModeView`). The page answers with `viewOptions`.
+/// Open or leave focus mode. The page answers with `viewOptions`.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -506,8 +479,8 @@ pub struct SetWordCountVisibleCommand {
 ///
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
 /// representation typeshare generates — and here it is also the one we want: it emits
-/// a discriminated union in TypeScript and a real `Codable` enum in Swift, so an
-/// unhandled command is a compile error on both sides rather than a silent no-op.
+/// a discriminated union in TypeScript, so an unhandled command is a compile error
+/// rather than a silent no-op.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
@@ -547,8 +520,6 @@ pub enum NativeCommand {
     UpdateNote(UpdateNoteCommand),
     RemoveNote(NoteRef),
     JumpToNote(NoteRef),
-    /// Highlight the text a note is about while its hover cards are open.
-    HighlightNote(HighlightNoteCommand),
     ClipboardDrop(ClipboardDropCommand),
     RemoveClipboardEntries(RemoveClipboardEntriesCommand),
     InsertClipboardEntry(InsertClipboardEntryCommand),
@@ -559,19 +530,13 @@ pub enum NativeCommand {
     RenameVersion(RenameVersionCommand),
     RevealSearchResult(RevealSearchResultCommand),
     AddReply(AddReplyCommand),
-    SetTitlebarInset(SetTitlebarInsetCommand),
-    SetPanelInsets(SetPanelInsetsCommand),
     OpenProject(OpenProjectCommand),
-    /// Leave the bubble editor and write its sentence back into the document.
-    CloseBubbleSession(CloseBubbleSessionCommand),
     SetBlockType(SetBlockTypeCommand),
     SetWritingFormat(SetWritingFormatCommand),
     ToggleList(ToggleListCommand),
     EditorHistory(EditorHistoryCommand),
     SetFocusMode(SetFocusModeCommand),
     SetWordCountVisible(SetWordCountVisibleCommand),
-    /// Restore or delete something in a document's archive (`archive.rs`).
-    ArchiveAction(ArchiveActionCommand),
     /* References (`references.rs`). */
     AddReference(AddReferenceCommand),
     CreateReference(CreateReferenceCommand),
@@ -584,6 +549,37 @@ pub enum NativeCommand {
     InsertBibliography(InsertBibliographyCommand),
     SetCitationStyle(SetCitationStyleCommand),
     SetBibliographyOptions(SetBibliographyOptionsCommand),
+    SetEditorMode(SetEditorModeCommand),
+    /* The Book navigator (`print.rs`). */
+    MoveBookItem(MoveBookItemCommand),
+    SetBookItemHidden(SetBookItemHiddenCommand),
+    AddBookItem(AddBookItemCommand),
+    RemoveBookItem(RemoveBookItemCommand),
+    EditBookItem(EditBookItemCommand),
+    OpenBookItem(OpenBookItemCommand),
+    /* Chapter openings and book styles (`print.rs`). */
+    ApplyBookStyle(ApplyBookStyleCommand),
+    SetChapterMeta(SetChapterMetaCommand),
+    SetHeadImage(SetHeadImageCommand),
+    /* Covers (`print.rs`). */
+    SetFolderBookOptions(SetFolderBookOptionsCommand),
+    SetTypesetView(SetTypesetViewCommand),
+    SetParagraphTypeset(SetParagraphTypesetCommand),
+    ShowProofIssue(ShowProofIssueCommand),
+    SetTypesetDisplay(SetTypesetDisplayCommand),
+    AddProjectFont(AddProjectFontCommand),
+    SetTextStyle(SetTextStyleCommand),
+    InsertFootnote(InsertFootnoteCommand),
+    EditEditions(EditEditionsCommand),
+    ExportAllEditions(ExportAllEditionsCommand),
+    SetCoverImage(SetCoverImageCommand),
+    EditCoverSets(EditCoverSetsCommand),
+    /* The typeset history (`print.rs`). */
+    SaveTypesetVersion(SaveTypesetVersionCommand),
+    RestoreTypesetVersion(TypesetVersionRef),
+    RenameTypesetVersion(RenameTypesetVersionCommand),
+    DeleteTypesetVersion(TypesetVersionRef),
+    PreviewTypesetVersion(PreviewTypesetVersionCommand),
     SetPrintLayout(SetPrintLayoutCommand),
     SetPageSetup(SetPageSetupCommand),
     SetBookSettings(SetBookSettingsCommand),
@@ -593,7 +589,6 @@ pub enum NativeCommand {
     GoToPage(GoToPageCommand),
     PrintDocument(PrintDocumentCommand),
     ExportDocument(ExportDocumentCommand),
-    PrintFinished(PrintFinishedCommand),
     ApplyFormat(ApplyFormatCommand),
     UseSetupForBook(UseSetupForBookCommand),
     ClearBookSetup(ClearBookSetupCommand),

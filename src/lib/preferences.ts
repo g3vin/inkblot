@@ -1,10 +1,9 @@
 /**
  * preferences.ts — the app's settings, stored on disk under AppData.
  *
- * Not `localStorage`: a `WKWebView` in a Swift app gets its own store, per origin,
- * that no native code can read — so a theme chosen in the webview would be invisible
- * to native chrome, and vice versa. On disk, through `inkblot_core::store::preferences`,
- * both shells read the same values. Never use `localStorage` for app state.
+ * Not `localStorage`: a web view gets its own store, per origin, that no native code
+ * can read. On disk, through `inkblot_core::store::preferences`, the Rust side reads
+ * the same values. Never use `localStorage` for app state.
  *
  * **The API is synchronous.** Every call site reads during render — a `useState`
  * initializer, a node view's constructor — and none of them can await. So the whole
@@ -71,23 +70,6 @@ export async function hydratePreferences(): Promise<void> {
     console.error('[preferences] load failed; starting with defaults:', error)
   }
   hydrated = true
-}
-
-/**
- * Read one scope from disk again, replacing what the cache holds for it.
- *
- * For a scope something other than this page writes: under the Swift shell the native
- * file tree saves the tree's order straight through the core, and the cache filled at
- * boot never hears of it. Only for such a scope — a write of the page's own still on
- * its way to disk would be lost from the cache.
- */
-export async function refreshPreferenceScope(scope: PreferenceScope): Promise<void> {
-  try {
-    const loaded = await invoke<PreferenceSnapshot | null>('preferences_load')
-    cache.set(scope, new Map(Object.entries(loaded?.[scope] || {})))
-  } catch (error) {
-    console.error('[preferences] reload of %s failed; keeping what was read:', scope, error)
-  }
 }
 
 /** Whether the cache has been filled. False in tests and before boot finishes. */

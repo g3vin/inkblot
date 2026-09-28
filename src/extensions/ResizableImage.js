@@ -28,7 +28,9 @@ const DEFAULT_CROP = {
   cropHeight: 1,
 }
 const VALID_ALIGNMENTS = new Set(['left', 'center', 'right'])
-const VALID_LAYOUTS = new Set(['inline', 'block', 'wrap-left', 'wrap-right'])
+// `page` has a page to itself, fitted to the text block; `bleed` fills the page to past
+// its trimmed edges (typeset pages and print only: elsewhere both are a block).
+const VALID_LAYOUTS = new Set(['inline', 'block', 'wrap-left', 'wrap-right', 'page', 'bleed'])
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -354,6 +356,8 @@ const ResizableImage = Image.extend({
         ['block', 'Block'],
         ['wrap-left', 'Wrap L'],
         ['wrap-right', 'Wrap R'],
+        ['page', 'Full Page'],
+        ['bleed', 'Bleed'],
       ].forEach(([value, label]) => {
         const option = document.createElement('option')
         option.value = value
@@ -435,6 +439,8 @@ const ResizableImage = Image.extend({
           isCropping ? 'is-cropping' : '',
         ].filter(Boolean).join(' ')
         container.style.width = `${width || fallbackWidth}px`
+        // Its shape, for a full-page picture fitted to the text block (PrintTypography.css).
+        if (layoutRatio) container.style.setProperty('--img-ratio', String(layoutRatio))
 
         if (layoutRatio) {
           viewport.style.aspectRatio = `${layoutRatio}`

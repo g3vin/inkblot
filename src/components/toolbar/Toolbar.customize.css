@@ -1,0 +1,195 @@
+/**
+ * The toolbar drawn from a layout (ToolbarHost), its display modes, and Customize
+ * Toolbar…'s palette. The items themselves wear Toolbar.css's segmented groups.
+ */
+
+.tb-row { gap: var(--space-2); }
+
+.tb-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.toolbar > .tb-slot.is-flexible { flex: 1 1 var(--space-6); min-width: var(--space-3); }
+
+.tb-space { display: block; width: var(--space-3); height: 1px; }
+.tb-flexible-space { display: block; width: 100%; height: 1px; }
+
+.tb-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.tb-item-label {
+  font: 400 10px/1.1 var(--font-ui);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tb-text {
+  font: 500 12px/1 var(--font-ui);
+  white-space: nowrap;
+}
+
+.tb-zoom-readout {
+  min-width: 36px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.toolbar-group > .tb-menu-button {
+  gap: 2px;
+  color: var(--text-primary);
+}
+
+.tb-caret { opacity: 0.6; }
+
+/* Text Only: buttons hold words, so they size to them. */
+.tb-row[data-display='label'] .toolbar-group > button { padding: 0 var(--space-3); }
+
+/* An item that cannot act stays in its place, dimmed. */
+.tb-item .toolbar-group > button:disabled,
+.tb-item .toolbar-select:disabled,
+.tb-item .toolbar-color[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+.tb-item .toolbar-group > button:disabled:hover { background: transparent; }
+
+/* ---- customizing ---- */
+
+.tb-row.is-customizing .tb-slot {
+  cursor: grab;
+  border-radius: var(--radius-md);
+  outline: 1px dashed var(--border-strong);
+  outline-offset: 2px;
+  animation: tb-wiggle 0.3s ease-in-out infinite alternate;
+}
+.tb-row.is-customizing .tb-slot:nth-child(2n) { animation-delay: -0.15s; }
+.tb-row.is-customizing .tb-slot > * { pointer-events: none; }
+.tb-row.is-customizing .tb-slot.is-spacer { min-width: var(--space-5); min-height: 22px; }
+.tb-row.is-customizing .tb-slot.is-spacer::after {
+  content: '';
+  position: absolute;
+  inset: 4px 2px;
+  border: 1px dashed var(--text-subtle);
+  border-radius: var(--radius-xs);
+}
+
+@keyframes tb-wiggle {
+  from { transform: rotate(-1deg); }
+  to { transform: rotate(1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-row.is-customizing .tb-slot { animation: none; }
+}
+
+.tb-caret-line {
+  position: absolute;
+  left: calc(var(--space-2) / -2 - 1.5px);
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-color);
+}
+.tb-caret-line.is-end { position: static; align-self: stretch; margin: 4px 0; }
+
+.tb-ghost {
+  padding: var(--space-2) var(--space-4);
+  font: 500 12px/1.2 var(--font-ui);
+  color: var(--text-primary);
+}
+body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
+
+/* ---- the palette ---- */
+
+.tb-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-4) var(--space-3);
+  padding: var(--space-2) 0 var(--space-4);
+}
+
+.tb-palette-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tb-palette-item:hover { background: var(--hover-bg); }
+.tb-palette-item.is-used { opacity: 0.35; cursor: default; }
+.tb-palette-item.is-used:hover { background: transparent; }
+
+.tb-palette-preview,
+.tb-palette-defaults-item { pointer-events: none; }
+.tb-palette-preview { display: flex; align-items: center; justify-content: center; min-height: 32px; }
+.tb-palette-label { font: 11px/1.2 var(--font-ui); color: var(--text-secondary); text-align: center; }
+.tb-palette-space {
+  display: block;
+  width: 28px;
+  height: 22px;
+  border: 1px dashed var(--text-subtle);
+  border-radius: var(--radius-xs);
+}
+.tb-palette-space.is-flexible { width: 56px; }
+
+.tb-palette-hint { margin: var(--space-3) 0 var(--space-2); font: 12px/1.3 var(--font-ui); color: var(--text-muted); }
+
+.tb-palette-defaults {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  cursor: grab;
+}
+.tb-palette-defaults-item.is-flexible { flex: 1; }
+
+.tb-palette-show { display: inline-flex; align-items: center; gap: var(--space-3); font: 12px/1 var(--font-ui); color: var(--text-secondary); }
+
+.ui-popover.tb-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 20px);
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+}
+
+/* The timer, running: its clock beside the segment's symbol. */
+.tb-timer { display: inline-flex; align-items: center; gap: 5px; padding: 0 2px; color: var(--accent-foreground); }
+.tb-timer[data-state='paused'] { color: var(--text-muted); }
+.tb-timer-clock { font: 600 12px var(--font-ui); font-variant-numeric: tabular-nums; min-width: 34px; text-align: left; }
+
+/* ---------------- overflow ---------------- */
+
+/* Out of the row's flow, so the row keeps its width, but still measured. */
+.tb-slot[data-overflowed='true'] { position: absolute; visibility: hidden; pointer-events: none; }
+.tb-overflow {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 16px/1 var(--font-ui);
+  cursor: pointer;
+}
+.tb-overflow:hover, .tb-overflow[aria-expanded='true'] { background: var(--hover-bg); color: var(--text-primary); }
+.tb-overflow-popover { padding: var(--space-2); }
+.tb-overflow-list.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); max-width: 360px; height: auto; padding: 0; margin: 0; justify-content: flex-start; }

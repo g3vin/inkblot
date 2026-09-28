@@ -53,10 +53,27 @@
  *          publishes, when it withdraws it, and every click taken back by id
  *   print  Print Layout's pure logic: page sizes and geometry, where pages break,
  *          and signature imposition for binding
+ *   typeset how a book's chapters open, its contents, covers and history, and what an
+ *          old book reads as the first time it is typeset
  *   tabs   document tabs and split view: what closing a tab leaves in each pane, and
- *          the tab bar drawn by the shell, driven over the bridge
- *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
- *          through the real @tauri-apps/api modules
+ *          the tabs as the tab bar reads them, driven over the bridge
+ *   css    the stylesheets keep to the design system: no decorative gradients, the
+ *          one blur token, no prefers-color-scheme duplicates
+ *   ui     the shared controls (src/ui): reorder and placement math, native menus,
+ *          and the controls mounted
+ *   chromeLayout what the toolbars and the inspector hold: the item ids, default sets,
+ *          and every migration a saved layout goes through
+ *   toolbar the toolbars drawn from their layouts: every item renders disabled with no
+ *          state, what a customize drag does, the palette and the display modes
+ *   inspector the inspector's two layouts: Customize Inspector Layout… mounted, and a
+ *          layout that follows the window's mode
+ *   stats  the writing stats: the tracker, the timer, goals, streaks, deadlines,
+ *          reminders, rhythm and the config, on clocks of their own
+ *   statsdom the stats running in the page: the tracker fed by the bridge, the Stats
+ *          tab, the timer capsule and the settings sheet
+ *   tabbar the tab bar: drawn from tabsChanged, commands, shortcuts, names
+ *   book   the Book navigator: the book's rows, commands, where a drop lands
+ *   notegeom where a note's hover card goes
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -75,7 +92,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapnative', 'tabs']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom']
 
 const failures = []
 

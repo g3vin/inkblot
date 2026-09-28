@@ -1,8 +1,0 @@
-# Build products of the Rust core — ./scripts/build-xcframework.sh makes both, and they
-# must come from the same build (see that script), so neither is committed.
-/build/
-/inkblot-core/inkblot-core/Generated/inkblot_ffi.swift
-
-# Xcode per-user state
-xcuserdata/
-*.xcuserstate

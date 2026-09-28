@@ -3,13 +3,13 @@
 //!
 //! **Why most of this is "ask the page".** All five panels show state the page owns —
 //! `notesByDoc`, `clipboardHistory`, `tiles` live in React, and versions live in the
-//! document file the page's autosave rewrites under its own per-document lock. A native
-//! panel that wrote any of it directly would race the page: a note edited in Swift and
-//! autosaved from the page's stale copy a moment later is a lost edit, and a version
-//! renamed through the core's lock while the page's lock is mid-write is a lost version.
-//! So the page publishes (`notesChanged`, `clipboardChanged`, `tilesChanged`,
-//! `versionsChanged`) and the shell edits by command, and the page applies each edit
-//! with the same helpers its own panel used.
+//! document file the page's autosave rewrites under its own per-document lock. A
+//! panel outside the page that wrote any of it directly would race the page: a note
+//! edited there and autosaved from the page's stale copy a moment later is a lost
+//! edit, and a version renamed through the core's lock while the page's lock is
+//! mid-write is a lost version.
+//! So the shell edits by command, and the page applies each edit with the same
+//! helpers its own panel uses.
 //!
 //! **Why notes are edited by patch.** `Note` carries a flattened map of keys this build
 //! does not know about, which typeshare cannot express, so the shell's copy of a note
@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use super::common::{EditorTarget, TextAnchor};
-use crate::types::note::{AudioClip, Note, NoteImage, NotePreviewLayout, NotePreviewSize};
+use crate::types::note::{AudioClip, NoteImage, NotePreviewLayout, NotePreviewSize};
 
 /* ---------------- notes ---------------- */
 
@@ -61,15 +61,6 @@ pub struct AddReplyCommand {
     pub parent_note_id: String,
 }
 
-/// The open hover preview should close: the user clicked somewhere in the document
-/// that is not a note marker. The page is the only one who sees that click.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NotePreviewDismissed {
-    pub note_id: String,
-}
-
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,25 +79,6 @@ pub struct NoteRef {
     pub note_id: String,
 }
 
-/// Which note's hover cards the shell is showing, so the page can highlight the text
-/// the note is about, since the cards do not quote it. `None` clears the highlight.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HighlightNoteCommand {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note_id: Option<String>,
-}
-
-/// A document's notes changed — the whole list, so it is safe to coalesce.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NotesChanged {
-    pub doc_path: String,
-    pub notes: Vec<Note>,
-}
-
 /* ---------------- clipboard ---------------- */
 
 #[typeshare]
@@ -120,14 +92,6 @@ pub struct ClipboardEntry {
     pub doc_name: String,
     #[serde(default)]
     pub timestamp: String,
-}
-
-/// The clipboard history, newest first — the whole list.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ClipboardChanged {
-    pub entries: Vec<ClipboardEntry>,
 }
 
 /// Text dropped on the shell's clipboard panel.
@@ -186,13 +150,6 @@ pub struct WorkbenchTile {
     /// The document it was made in.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc: Option<String>,
-}
-
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TilesChanged {
-    pub tiles: Vec<WorkbenchTile>,
 }
 
 /// Remove tiles. `None` clears the workbench.
@@ -259,14 +216,6 @@ pub struct RenameVersionCommand {
     pub version_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-}
-
-/// A document's history changed on disk. The shell re-reads it through the core.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct VersionsChanged {
-    pub doc_path: String,
 }
 
 /* ---------------- search ---------------- */

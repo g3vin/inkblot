@@ -22,6 +22,55 @@
   text-indent: var(--pt-indent);
 }
 
+/* ---- composition: how the lines are set (typography.ts, `compositionOf`) ---- */
+
+.has-print-type .ProseMirror {
+  -webkit-hyphenate-limit-lines: var(--pt-hyphen-lines, 2);
+  hyphenate-limit-lines: var(--pt-hyphen-lines, 2);
+  -webkit-hyphenate-limit-before: var(--pt-hyphen-side, 3);
+  -webkit-hyphenate-limit-after: var(--pt-hyphen-side, 3);
+  hyphenate-limit-chars: var(--pt-hyphen-word, 6) var(--pt-hyphen-side, 3) var(--pt-hyphen-side, 3);
+  font-variant-ligatures: var(--pt-ligatures, common-ligatures);
+  font-variant-numeric: var(--pt-numeric, normal);
+  font-kerning: var(--pt-kerning, normal);
+  font-feature-settings: var(--pt-feature-settings, normal);
+}
+
+/* Each paragraph set as a whole: no lone word on its last line, fewer hyphens. */
+.pt-balance .ProseMirror p {
+  text-wrap-style: pretty;
+  text-wrap: pretty;
+}
+
+/* Quotes and stops hung into the margin, so the text block's edges look straight. */
+.pt-hang .ProseMirror p {
+  hanging-punctuation: first allow-end last;
+}
+
+/* A paragraph a typesetter has tightened or loosened (ParagraphTypeset.ts). */
+.has-print-type .ProseMirror p[data-tracking] {
+  letter-spacing: var(--pt-tracking, 0);
+}
+
+/* ---- the baseline grid: everything takes whole lines ---- */
+
+.pt-grid .ProseMirror :is(h2, h3, h4, h5, h6) {
+  line-height: round(up, 1.2em, var(--pt-leading));
+  margin: var(--pt-leading) 0 0;
+}
+
+.pt-grid .ProseMirror blockquote {
+  margin-top: var(--pt-leading);
+  margin-bottom: var(--pt-leading);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.pt-grid .ProseMirror :is(ul, ol) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 /* A paragraph inside something else — a list, a table, a quote — is not indented. */
 .has-print-type .ProseMirror :is(li, td, th, blockquote) p {
   text-indent: 0;
@@ -93,6 +142,171 @@
 .pt-small-caps .ProseMirror > p:first-child::first-line {
   font-variant: small-caps;
   letter-spacing: 0.04em;
+}
+
+/* ---- a chapter's head (ChapterHead.js), set as the book's design says ---- */
+
+.chapter-head {
+  display: block;
+  margin: 0 0 calc(var(--pt-leading, 1.5em) * 2);
+  font-family: var(--ch-font, var(--pt-font, inherit));
+  text-align: center;
+  text-indent: 0;
+  -webkit-hyphens: manual;
+  hyphens: manual;
+  break-inside: avoid;
+}
+
+.chapter-head[data-align='left'] { text-align: left; }
+.chapter-head[data-align='right'] { text-align: right; }
+
+.has-print-type .ProseMirror > .chapter-head:first-child,
+.has-print-type .ProseMirror > .page-break + .chapter-head {
+  padding-top: var(--pt-sink);
+}
+
+.chapter-head .ch-number {
+  font-size: var(--ch-number-size, 1em);
+  line-height: 1.3;
+  margin: 0 0 0.6em;
+}
+
+.chapter-head .ch-title,
+.has-print-type .ProseMirror .chapter-head .ch-title {
+  font-family: inherit;
+  font-size: var(--ch-title-size, 1.6em);
+  font-weight: normal;
+  line-height: 1.2;
+  margin: 0;
+  padding: 0;
+  text-align: inherit;
+}
+
+.chapter-head[data-number-case='upper'] .ch-number { text-transform: uppercase; letter-spacing: 0.16em; }
+.chapter-head[data-number-case='smallCaps'] .ch-number { font-variant: small-caps; letter-spacing: 0.1em; }
+.chapter-head[data-number-case='italic'] .ch-number { font-style: italic; }
+.chapter-head[data-title-case='upper'] .ch-title { text-transform: uppercase; letter-spacing: 0.12em; }
+.chapter-head[data-title-case='smallCaps'] .ch-title { font-variant: small-caps; letter-spacing: 0.06em; }
+.chapter-head[data-title-case='italic'] .ch-title { font-style: italic; }
+
+.chapter-head .ch-subtitle {
+  margin: 0.5em 0 0;
+  font-style: italic;
+}
+
+.chapter-head .ch-ornament.is-rule {
+  width: 3em;
+  height: 0;
+  border-top: 0.75pt solid currentColor;
+  margin: 0.9em auto;
+}
+
+.chapter-head[data-align='left'] .ch-ornament.is-rule { margin-left: 0; }
+.chapter-head[data-align='right'] .ch-ornament.is-rule { margin-right: 0; }
+
+.chapter-head .ch-ornament.is-glyph {
+  font-size: 1.4em;
+  line-height: 1.2;
+  margin: 0.4em 0;
+}
+
+.chapter-head .ch-ornament.is-image,
+.chapter-head .ch-image {
+  margin: 0.8em auto;
+}
+
+.chapter-head .ch-ornament.is-image { width: 25%; }
+.chapter-head[data-align='left'] :is(.ch-ornament.is-image, .ch-image) { margin-left: 0; }
+.chapter-head[data-align='right'] :is(.ch-ornament.is-image, .ch-image) { margin-right: 0; }
+
+.chapter-head :is(.ch-ornament, .ch-image) img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chapter-head .ch-epigraph {
+  margin: 1.4em 2em 0;
+  padding: 0;
+  border: 0;
+  font-size: 0.92em;
+  font-style: italic;
+  text-align: left;
+}
+
+.chapter-head .ch-epigraph p { margin: 0; text-indent: 0; }
+.chapter-head .ch-epigraph .ch-epigraph-source { margin-top: 0.4em; text-align: right; font-style: normal; }
+
+.pt-flush-after-break .ProseMirror > .chapter-head + p { text-indent: 0; }
+
+.pt-drop-cap .ProseMirror > .chapter-head + p::first-letter {
+  -webkit-initial-letter: 3;
+  initial-letter: 3;
+  margin-right: 0.08em;
+  font-weight: normal;
+}
+
+.pt-drop-cap .ProseMirror > .chapter-head + p { text-indent: 0; }
+
+.pt-small-caps .ProseMirror > .chapter-head + p::first-line {
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+
+/* The live editor's head (ChapterHeadDecorations.ts): the design around the chapter's
+   real title, as two widgets and the heading between them. */
+.chapter-head.is-live-top { margin-bottom: 0; }
+.chapter-head.is-live-top:empty { display: none; }
+.chapter-head.is-live-bottom { margin-top: 0; padding-top: 0; }
+
+.has-print-type .ProseMirror > h1.ch-live-title,
+.ProseMirror > h1.ch-live-title {
+  margin: 0;
+  padding-top: 0;
+  font-weight: normal;
+  line-height: 1.2;
+}
+
+.chapter-head.is-live-top + h1.ch-live-title { margin-top: 0.1em; }
+
+.chapter-head .ch-editable {
+  outline: none;
+  cursor: text;
+  border-radius: 2px;
+}
+
+.chapter-head .ch-editable:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color, #0a84ff) 45%, transparent);
+}
+
+/* An empty line of the head is a hint in Typeset, and nothing on paper — the widgets
+   never print: a compiled chapter's head is the chapterHead node. */
+.chapter-head .ch-editable[data-empty] { min-height: 0; }
+.chapter-head .ch-editable[data-empty]::before {
+  content: attr(data-placeholder);
+  opacity: 0;
+  font-style: italic;
+  transition: opacity 120ms;
+}
+.chapter-head:hover .ch-editable[data-empty]::before,
+.chapter-head .ch-editable[data-empty]:focus::before { opacity: 0.4; }
+.chapter-head .ch-epigraph:has(.ch-editable[data-empty]:only-child) { margin-top: 0.2em; }
+
+/* ---- pictures in the text, set for print ---- */
+
+.pt-images .ProseMirror img {
+  max-width: var(--pt-image-max, 100%);
+}
+
+.pt-images-center .ProseMirror :is(p, figure) > img:only-child,
+.pt-images-center .ProseMirror .image-wrapper {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pt-images-keep .ProseMirror :is(figure, .image-wrapper, p:has(> img:only-child)) {
+  break-inside: avoid;
 }
 
 /* Running heads and feet in the text's face, no larger than the text. */
@@ -240,4 +454,33 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(0, 0, 0, 0.1);
+}
+
+/* ---- a picture with a page to itself (ResizableImage `page`, `bleed`) ---- */
+
+/* Fitted to the text block: as wide as it can be without being taller than it. */
+.has-print-type .ProseMirror .image-node:is(.image-layout-page, .image-layout-bleed) {
+  display: block;
+  width: min(100%, calc((var(--pl-content-h, 600px) - 4px) * var(--img-ratio, 0.7))) !important;
+  margin: 0 auto;
+}
+
+.has-print-type .ProseMirror p:has(> .image-node:is(.image-layout-page, .image-layout-bleed)) {
+  margin: 0;
+  text-indent: 0;
+  line-height: 0;
+}
+
+/* One to the page's edges is drawn by the page itself, over its trim and bleed: in the
+   flow it keeps its place, unseen. */
+.has-print-type .ProseMirror .image-node.image-layout-bleed {
+  visibility: hidden;
+}
+
+.pl-bleed-picture,
+.print-bleed-picture {
+  position: absolute;
+  z-index: 3;
+  object-fit: cover;
+  pointer-events: none;
 }

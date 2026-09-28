@@ -55,6 +55,57 @@ export interface ActiveMarks {
 	orderedList: boolean;
 }
 
+/** Which page of front or back matter a matter document is. */
+export enum MatterKind {
+	AlsoBy = "alsoBy",
+	Copyright = "copyright",
+	Dedication = "dedication",
+	Epigraph = "epigraph",
+	Foreword = "foreword",
+	Preface = "preface",
+	Introduction = "introduction",
+	Afterword = "afterword",
+	Acknowledgements = "acknowledgements",
+	AboutAuthor = "aboutAuthor",
+	Glossary = "glossary",
+	Excerpt = "excerpt",
+	ReadingGuide = "readingGuide",
+	CallToAction = "callToAction",
+	/** A half title or title page made editable. */
+	HalfTitle = "halfTitle",
+	TitlePage = "titlePage",
+	Custom = "custom",
+}
+
+export enum GeneratedKind {
+	HalfTitle = "halfTitle",
+	TitlePage = "titlePage",
+	Contents = "contents",
+	/** Endnotes gathered at the end of the book. */
+	Notes = "notes",
+	Bibliography = "bibliography",
+}
+
+/**
+ * Add a page of front or back matter (a document, made from its kind's template), a
+ * page the book lays out itself, or a part divider — where the standard order has it.
+ */
+export interface AddBookItemCommand {
+	matter?: MatterKind;
+	generated?: GeneratedKind;
+	/** A part divider, before the entry `before` (or at the end of the chapters). */
+	part?: boolean;
+	before?: string;
+	title?: string;
+	/** For a kind that can go either side (Also By): the back. */
+	back?: boolean;
+}
+
+/** Copy a font file into the project's fonts. */
+export interface AddProjectFontCommand {
+	path: string;
+}
+
 /**
  * Quick add: a URL, DOI, ISBN, arXiv id or PMID is looked up; anything else is
  * searched for as a title. The source exists at once, `resolving`, attached to the
@@ -78,6 +129,11 @@ export interface AddReplyCommand {
 	parentNoteId: string;
 }
 
+/** Apply a book style to the book: its type, its chapter design and its running heads. */
+export interface ApplyBookStyleCommand {
+	id: string;
+}
+
 /**
  * Which setup an edit goes to: the active document's own, or the one every chapter of
  * its book prints in.
@@ -99,8 +155,8 @@ export interface ApplyFormatCommand {
 /**
  * The marks the toolbar can toggle.
  * 
- * A closed set rather than a string: a Swift menu item sending `"bolb"` should not
- * compile, and an enum is what makes that true in all three languages at once.
+ * A closed set rather than a string: a menu item sending `"bolb"` should not compile,
+ * and an enum is what makes that true in both languages at once.
  */
 export enum MarkKind {
 	Bold = "bold",
@@ -112,25 +168,6 @@ export enum MarkKind {
 export interface ApplyMarkCommand {
 	target: EditorTarget;
 	mark: MarkKind;
-}
-
-export enum ArchiveAction {
-	/**
-	 * Put it back. A bubble goes back on its sentence, if the sentence is still in the
-	 * document as it was archived; otherwise it stays in the archive.
-	 */
-	Restore = "restore",
-	/**
-	 * Delete it for good. Version history still has the document from before it was
-	 * archived.
-	 */
-	Delete = "delete",
-}
-
-export interface ArchiveActionCommand {
-	docPath: string;
-	itemId: string;
-	action: ArchiveAction;
 }
 
 /** What an archived item is. */
@@ -222,15 +259,6 @@ export interface ArchivedItem {
 	title: string;
 	/** The session, for a `Bubble`. */
 	bubble?: BubbleSession;
-}
-
-/**
- * A document's archive, newest first — the whole list, sent when the document the
- * writer is in changes and whenever its archive does.
- */
-export interface ArchiveChanged {
-	docPath: string;
-	items: ArchivedItem[];
 }
 
 /** A voice memo attached to a note. */
@@ -349,6 +377,107 @@ export interface BindingSettings {
 	includeGuide: boolean;
 }
 
+/** What an entry in a book's contents is. */
+export enum BookItemKind {
+	/** A manuscript document, by tree path. */
+	Chapter = "chapter",
+	/** A part divider: everything after it, to the next part or the back matter, is in it. */
+	Part = "part",
+	/**
+	 * A page the book has of its own — a dedication, About the Author — kept as a real
+	 * document in the book folder's `.book/`.
+	 */
+	Matter = "matter",
+	/** A page laid out from the book's data: a title page, the contents. */
+	Generated = "generated",
+}
+
+/** What a chapter is, which decides whether it is numbered and what its head says. */
+export enum ChapterType {
+	/** Numbered. */
+	Chapter = "chapter",
+	Prologue = "prologue",
+	Epilogue = "epilogue",
+	Interlude = "interlude",
+	/** Headed by its title alone. */
+	Unnumbered = "unnumbered",
+}
+
+export enum PageStart {
+	/** The next page, whichever side. */
+	Any = "any",
+	Recto = "recto",
+	Verso = "verso",
+}
+
+export enum PagePosition {
+	Top = "top",
+	/** Down the page, as a chapter opens. */
+	Sunk = "sunk",
+	Centered = "centered",
+	Bottom = "bottom",
+}
+
+/** How a page of front or back matter sits: overrides of what its kind does by default. */
+export interface PageOptions {
+	start: PageStart;
+	position: PagePosition;
+	runningHeads: boolean;
+	folio: boolean;
+	/** Show the page's heading (its kind's name, or its title). */
+	heading: boolean;
+}
+
+/** One entry in a book's contents, in book order. */
+export interface BookItem {
+	/** Stable within the book. */
+	id: string;
+	kind: BookItemKind;
+	/** A chapter's tree path, or a matter document's path (`<folder>/.book/…`). */
+	path?: string;
+	/** A part's title, or a name given to a matter page. */
+	title?: string;
+	/** Left out of the Typeset pages, print, export and the continuous document. */
+	hidden?: boolean;
+	matter?: MatterKind;
+	generated?: GeneratedKind;
+	chapterType?: ChapterType;
+	page?: PageOptions;
+}
+
+/** Where in the book an entry is: before the first chapter, among them, or after. */
+export enum BookRowSection {
+	Front = "front",
+	Body = "body",
+	Back = "back",
+}
+
+/**
+ * One entry of a book as the navigator draws it: a `BookItem` with what the page
+ * worked out about it — its number, its label, which part it is in.
+ */
+export interface BookRow {
+	id: string;
+	kind: BookItemKind;
+	title: string;
+	path?: string;
+	hidden: boolean;
+	matter?: MatterKind;
+	generated?: GeneratedKind;
+	chapterType?: ChapterType;
+	/** A numbered chapter's number, or a part's. */
+	number?: number;
+	/** "Chapter One", "Prologue", "Part II" — what its head says. */
+	label?: string;
+	section: BookRowSection;
+	/** The part it is in, by id. */
+	part?: string;
+	/** Its page options, its own over its kind's. */
+	page: PageOptions;
+	/** Printed from text from before matter pages were documents; opening it makes it one. */
+	legacy?: boolean;
+}
+
 export enum PageOrientation {
 	Portrait = "portrait",
 	Landscape = "landscape",
@@ -410,6 +539,61 @@ export enum ChapterOpening {
 	DropCapAndSmallCaps = "dropCapAndSmallCaps",
 }
 
+/** Where a picture in the text sits across the text block. */
+export enum ImageAlign {
+	/** Centred, as a book sets its pictures. */
+	Center = "center",
+	/** Where the writer put it. */
+	AsPlaced = "asPlaced",
+}
+
+/** How the pictures in a book's text are set for print. */
+export interface ImageTypesetting {
+	/** The widest a picture is set, as a percentage of the text block. */
+	maxWidthPct: number;
+	align: ImageAlign;
+	/** A picture never breaks from the caption under it. */
+	keepWithCaption: boolean;
+	/** Pictures that print at fewer dots per inch than this are pointed out. */
+	minDpi: number;
+}
+
+/**
+ * How a paragraph's lines are composed: what a typesetter tunes so a justified page
+ * has even colour, no rivers, and no ladders of hyphens.
+ */
+export interface Composition {
+	/**
+	 * Balance a paragraph's lines as a whole — no short last line, fewer hyphens —
+	 * rather than fill each line as it comes.
+	 */
+	balance: boolean;
+	/** Hang punctuation into the margin, so the text block's edge looks straight. */
+	hangingPunctuation: boolean;
+	/** The most lines in a row that may end in a hyphen. */
+	hyphenLimitLines: number;
+	/** The shortest word that is hyphenated. */
+	hyphenMinWord: number;
+	/**
+	 * Headings, quotations, breaks and pictures take whole lines, so lines stand at
+	 * the same height across a spread and back each other on the leaf.
+	 */
+	baselineGrid: boolean;
+}
+
+/** OpenType features the text is set with, where the font has them. */
+export interface OpenTypeFeatures {
+	/** fi, fl, ff: the ligatures every text face has. */
+	ligatures: boolean;
+	/** ct, st and the like: the ornamental ones. */
+	discretionaryLigatures: boolean;
+	/** Figures that sit in the text like lower-case letters. */
+	oldStyleFigures: boolean;
+	kerning: boolean;
+	/** Swash capitals, in faces that have them. */
+	swashes: boolean;
+}
+
 /**
  * Type for print: set on the page's text in Print Layout, on paper and in the PDF,
  * and carried into a DOCX's styles — never on the continuous editor.
@@ -436,6 +620,12 @@ export interface PrintTypography {
 	chapterSinkMm: number;
 	/** A paragraph after a heading or a scene break starts flush, as books set it. */
 	noIndentAfterBreak: boolean;
+	/** How pictures in the text are set. Absent sets them as they were placed. */
+	images?: ImageTypesetting;
+	/** How lines are composed. Absent composes as the defaults do — well. */
+	composition?: Composition;
+	/** The font's OpenType features. Absent uses the defaults: ligatures and kerning. */
+	features?: OpenTypeFeatures;
 }
 
 export enum TitlePageStyle {
@@ -530,6 +720,10 @@ export interface ChapterNumbering {
 	prefix: string;
 	/** Keep the chapter's own title under its number. */
 	includeTitle: boolean;
+	/** The first chapter's number: 1, or 0 for a book that opens on "Chapter Zero". */
+	startAt: number;
+	/** Show each chapter's number beside it in the file tree. */
+	showInTree: boolean;
 }
 
 /** The pages before the first chapter. Empty text leaves its page out. */
@@ -568,10 +762,226 @@ export interface PublishingTarget {
 	paper: PaperStock;
 }
 
+/** The decoration a chapter head carries. */
+export enum OrnamentKind {
+	None = "none",
+	/** A short rule. */
+	Rule = "rule",
+	/** A typed glyph: `ornament_glyph`. */
+	Glyph = "glyph",
+	/** A picture: `ornament_image`. */
+	Image = "image",
+}
+
+/** Where the ornament, or a chapter's own picture, sits in the head. */
+export enum OrnamentPosition {
+	/** Above the number. */
+	Above = "above",
+	/** Between the number and the title. */
+	Between = "between",
+	/** Below the title. */
+	Below = "below",
+}
+
+export enum HeadAlignment {
+	Left = "left",
+	Center = "center",
+	Right = "right",
+}
+
+/** How a line of a chapter head is set. */
+export enum HeadCase {
+	AsWritten = "asWritten",
+	Upper = "upper",
+	SmallCaps = "smallCaps",
+	Italic = "italic",
+}
+
+/** Where a chapter starts, relative to the one before it. */
+export enum ChapterBreak {
+	NewPage = "newPage",
+	/** A right-hand page, with a blank verso before it when needed. */
+	NewRightPage = "newRightPage",
+	/** Straight on after the chapter before, when its head and two lines fit. */
+	Continue = "continue",
+}
+
 /**
- * A folder (or the whole project) compiled as one book: its chapters are the
- * folder's documents in tree order. Kept per folder in preferences, not in any one
- * document, because it belongs to all of them.
+ * How every chapter of a book opens: what its head shows and how it is set. The same
+ * design heads the chapters in the continuous editor, on the Typeset pages, in print
+ * and in every export — `ChapterHead.js` renders it for all of them.
+ */
+export interface ChapterDesign {
+	/** The number label — "Chapter One" — as `ChapterNumbering` writes it. */
+	showNumber: boolean;
+	showTitle: boolean;
+	showSubtitle: boolean;
+	/** Each chapter's own heading picture, where it has one. */
+	showImage: boolean;
+	ornament: OrnamentKind;
+	ornamentGlyph: string;
+	/** A project-relative image path, or a data URI. */
+	ornamentImage?: string;
+	ornamentPosition: OrnamentPosition;
+	/** The picture's width, as a percentage of the text block. */
+	imageWidthPct: number;
+	alignment: HeadAlignment;
+	numberCase: HeadCase;
+	titleCase: HeadCase;
+	/** A CSS font family list for the head; absent sets it in the body's face. */
+	headingFont?: string;
+	numberSizePt: number;
+	titleSizePt: number;
+	chapterBreak: ChapterBreak;
+	/** The book style (`bookStyles.ts`) this design came from, kept once it is changed. */
+	styleId?: string;
+}
+
+/** How a cover image is fitted to the part of the cover it is for. */
+export enum CoverFit {
+	/** Fill the part, cropping what overflows. */
+	Fill = "fill",
+	Fit = "fit",
+	Stretch = "stretch",
+}
+
+/**
+ * One version of a book's cover. The images are project-relative paths under
+ * `.assets/covers/`; `wrap`, when set, is used instead of the three parts.
+ */
+export interface CoverSet {
+	id: string;
+	name: string;
+	front?: string;
+	back?: string;
+	spine?: string;
+	wrap?: string;
+	fit?: CoverFit;
+	/**
+	 * The spine width, in mm, the spine or wrap image was made for — so a page count
+	 * that has changed since can be pointed out.
+	 */
+	madeForSpineMm?: number;
+}
+
+/**
+ * What an e-book leaves out or sets differently from print. A reading system chooses
+ * the page, the type size and — often — the font; what the book still decides is
+ * whether its flourishes come with it.
+ */
+export interface DigitalOptions {
+	/**
+	 * A drop cap on each chapter's first letter, as in print. Some readers draw them
+	 * badly at large type sizes.
+	 */
+	dropCaps: boolean;
+	/** The chapter's picture in its head, and a picture ornament. */
+	headImages: boolean;
+	/**
+	 * The book's own font, where the reader lets the book choose; off leaves the
+	 * reader's.
+	 */
+	publisherFont: boolean;
+	/**
+	 * Scene breaks set as `* * *`, which every reader's font has, instead of the
+	 * book's ornament, which some e-readers' fonts lack.
+	 */
+	plainSceneBreaks: boolean;
+	/**
+	 * Pictures that are ornaments (dark on a clear ground) are inverted on a dark
+	 * page, as a reader in night mode would otherwise lose them.
+	 */
+	invertOrnamentsInDark: boolean;
+}
+
+/** Where a text style sets its lines across the measure; `Inherit` keeps the body's. */
+export enum TextStyleAlign {
+	Inherit = "inherit",
+	Left = "left",
+	Center = "center",
+	Right = "right",
+	Justify = "justify",
+}
+
+/**
+ * How a named text style looks in a book. A paragraph carries only the style's name
+ * (`styleName`); what the name means is the book's, so a letter looks the same in
+ * every chapter and changes everywhere at once.
+ */
+export interface TextStyleLook {
+	/** A built-in style's id (`letter`, `verse`, …), or a custom style's own. */
+	id: string;
+	name: string;
+	/** A face of its own; absent sets it in the body's. */
+	fontFamily?: string;
+	/** Its type size, as a multiple of the body's. */
+	size: number;
+	italic: boolean;
+	smallCaps: boolean;
+	align: TextStyleAlign;
+	/** Indented from both sides, in ems. */
+	indentEm: number;
+	/** No first-line indent. */
+	flush: boolean;
+	/** Space above and below a run of it, in lines. */
+	spaceLines: number;
+	/** A rule around it, as a sign or a notice is set. */
+	boxed: boolean;
+}
+
+/**
+ * Where a note is set: at the foot of the page its mark is on, after its chapter, or
+ * all together at the end of the book.
+ */
+export enum NotePlacement {
+	Page = "page",
+	Chapter = "chapter",
+	Book = "book",
+}
+
+/** Notes numbered afresh in each chapter, or on through the book. */
+export enum NoteNumbering {
+	PerChapter = "perChapter",
+	Continuous = "continuous",
+}
+
+/** Note marks as numbers, or as the traditional symbols: * † ‡ § ‖ ¶. */
+export enum NoteMarks {
+	Numbers = "numbers",
+	Symbols = "symbols",
+}
+
+export interface NotesOptions {
+	placement: NotePlacement;
+	numbering: NoteNumbering;
+	marks: NoteMarks;
+	/** The heading over notes set after a chapter or at the end of the book. */
+	heading: string;
+}
+
+/** What an edition is, for its preset and what Export All Editions makes of it. */
+export enum EditionKind {
+	Paperback = "paperback",
+	Hardcover = "hardcover",
+	LargePrint = "largePrint",
+	Ebook = "ebook",
+}
+
+/** One form of the book. */
+export interface Edition {
+	id: string;
+	name: string;
+	kind?: EditionKind;
+	/** Its trim, margins and type; absent, the book's. */
+	pageSetup?: PageSetup;
+	/** The cover version it uses; absent, the book's. */
+	coverSetId?: string;
+}
+
+/**
+ * A folder (or the whole project) compiled as one book. Kept per folder in the
+ * project's `.inkblot-books.json` (`bookStore.js`), not in any one document, because it
+ * belongs to all of them.
  */
 export interface BookSettings {
 	/** The folder's tree path; empty for the project root. */
@@ -595,6 +1005,59 @@ export interface BookSettings {
 	backMatter?: BackMatter;
 	/** Where the book is going to be printed, for the Publish tab's checks. */
 	publishing?: PublishingTarget;
+	/**
+	 * How every chapter opens. Absent in a book set up before designs: the page
+	 * derives one from `chapter_numbering` and the setup's recto rule.
+	 */
+	chapterDesign?: ChapterDesign;
+	/** How a part's divider page is set; absent uses the chapter design's. */
+	partDesign?: ChapterDesign;
+	/**
+	 * The book's contents in book order: chapters, parts, front and back matter. Its
+	 * own order — the file tree is never changed by it. Empty until the book is first
+	 * typeset: the chapters are then the folder's documents in tree order, less
+	 * `excluded`, and the matter is `front_matter` and `back_matter`.
+	 */
+	items?: BookItem[];
+	/**
+	 * Opening one of the folder's documents shows the others above and below it, in
+	 * tree order, to scroll straight through.
+	 */
+	continuous?: boolean;
+	/** The book's covers; `active_cover` is the one print, EPUB and export use. */
+	covers?: CoverSet[];
+	activeCover?: string;
+	/** How the e-book differs from the printed book. */
+	digital?: DigitalOptions;
+	/**
+	 * How the book sets its named text styles — a letter, a text message, verse — over
+	 * the app's own looks for them, and any styles of its own.
+	 */
+	textStyles?: TextStyleLook[];
+	/** Where the book's notes are set, and how they are numbered. */
+	notes?: NotesOptions;
+	/**
+	 * The book in other forms — a hardcover, large print, an e-book — each with its own
+	 * page and cover; the contents, design and styles are the book's.
+	 */
+	editions?: Edition[];
+	/**
+	 * The edition being typeset, whose page and cover the book shows; none is the book
+	 * as set up.
+	 */
+	activeEdition?: string;
+}
+
+/** A book style (`bookStyles.ts`): a coordinated design, applied whole. */
+export interface BookStyleOption {
+	id: string;
+	label: string;
+	/** One line: what it looks like, and what it suits. */
+	description: string;
+	typography: PrintTypography;
+	design: ChapterDesign;
+	header: RunningText;
+	versoHeader?: RunningText;
 }
 
 export enum BridgeErrorCode {
@@ -616,40 +1079,6 @@ export enum BridgeErrorCode {
 export interface BridgeError {
 	code: BridgeErrorCode;
 	message: string;
-}
-
-/**
- * Where one open session's chip is in the document, for a shell that draws the chips
- * itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
- */
-export interface BubbleChipRect {
-	sessionId: string;
-	left: number;
-	top: number;
-	right: number;
-	bottom: number;
-	/**
-	 * Which of the session's pages is showing — its forms, then the unsaved arrangement
-	 * if there is one — and how many there are. Zero pages: it has no forms.
-	 */
-	formPage?: number;
-	formPages?: number;
-}
-
-/**
- * Every session chip the user can see, and where — the whole list, so it is safe to
- * coalesce. The page's chips stay where they are, invisible, and go on taking the click
- * that reopens a session; the shell draws them as Liquid Glass, which only a view above
- * the page can be.
- */
-export interface BubbleChipsChanged {
-	chips: BubbleChipRect[];
-}
-
-/** Open the bubble editor on a session — new, or reopened from its mark. */
-export interface BubbleSessionOpened {
-	docPath: string;
-	session: BubbleSession;
 }
 
 /**
@@ -873,6 +1302,18 @@ export interface CanvasToolbarChanged {
 	state?: CanvasToolbarState;
 }
 
+/**
+ * What a chapter's head shows beyond its title, kept on the chapter's own document
+ * (the `chapter` attribute of its TipTap `doc` node), so it travels with it.
+ */
+export interface ChapterMeta {
+	subtitle: string;
+	/** The chapter's own heading picture: a project-relative path, or a data URI. */
+	image?: string;
+	epigraph: string;
+	epigraphSource: string;
+}
+
 export interface ChooseReferenceCandidateCommand {
 	id: string;
 	index: number;
@@ -895,19 +1336,6 @@ export interface CitationStyleSpec {
 export interface ClearBookSetupCommand {
 }
 
-export interface ClipboardEntry {
-	id: string;
-	text: string;
-	/** The document it was copied from, if any. */
-	docName?: string;
-	timestamp?: string;
-}
-
-/** The clipboard history, newest first — the whole list. */
-export interface ClipboardChanged {
-	entries: ClipboardEntry[];
-}
-
 /**
  * Text dropped on the shell's clipboard panel.
  * 
@@ -918,16 +1346,12 @@ export interface ClipboardDropCommand {
 	text: string;
 }
 
-/**
- * The writer left the bubble editor: write the sentence back.
- * 
- * `archive` decides what stays behind. False keeps the session on the sentence, so it
- * can be reopened; true takes it off and puts it in the document's archive
- * (`archive.rs`), from where it can be restored.
- */
-export interface CloseBubbleSessionCommand {
-	session: BubbleSession;
-	archive: boolean;
+export interface ClipboardEntry {
+	id: string;
+	text: string;
+	/** The document it was copied from, if any. */
+	docName?: string;
+	timestamp?: string;
 }
 
 export interface CloseSplitCommand {
@@ -938,8 +1362,8 @@ export interface CloseSplitCommand {
  * 
  * Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
  * representation typeshare generates — and here it is also the one we want: it emits
- * a discriminated union in TypeScript and a real `Codable` enum in Swift, so an
- * unhandled command is a compile error on both sides rather than a silent no-op.
+ * a discriminated union in TypeScript, so an unhandled command is a compile error
+ * rather than a silent no-op.
  */
 export type NativeCommand = 
 	| { type: "applyMark", payload: ApplyMarkCommand }
@@ -977,8 +1401,6 @@ export type NativeCommand =
 	| { type: "updateNote", payload: UpdateNoteCommand }
 	| { type: "removeNote", payload: NoteRef }
 	| { type: "jumpToNote", payload: NoteRef }
-	/** Highlight the text a note is about while its hover cards are open. */
-	| { type: "highlightNote", payload: HighlightNoteCommand }
 	| { type: "clipboardDrop", payload: ClipboardDropCommand }
 	| { type: "removeClipboardEntries", payload: RemoveClipboardEntriesCommand }
 	| { type: "insertClipboardEntry", payload: InsertClipboardEntryCommand }
@@ -989,19 +1411,13 @@ export type NativeCommand =
 	| { type: "renameVersion", payload: RenameVersionCommand }
 	| { type: "revealSearchResult", payload: RevealSearchResultCommand }
 	| { type: "addReply", payload: AddReplyCommand }
-	| { type: "setTitlebarInset", payload: SetTitlebarInsetCommand }
-	| { type: "setPanelInsets", payload: SetPanelInsetsCommand }
 	| { type: "openProject", payload: OpenProjectCommand }
-	/** Leave the bubble editor and write its sentence back into the document. */
-	| { type: "closeBubbleSession", payload: CloseBubbleSessionCommand }
 	| { type: "setBlockType", payload: SetBlockTypeCommand }
 	| { type: "setWritingFormat", payload: SetWritingFormatCommand }
 	| { type: "toggleList", payload: ToggleListCommand }
 	| { type: "editorHistory", payload: EditorHistoryCommand }
 	| { type: "setFocusMode", payload: SetFocusModeCommand }
 	| { type: "setWordCountVisible", payload: SetWordCountVisibleCommand }
-	/** Restore or delete something in a document's archive (`archive.rs`). */
-	| { type: "archiveAction", payload: ArchiveActionCommand }
 	| { type: "addReference", payload: AddReferenceCommand }
 	| { type: "createReference", payload: CreateReferenceCommand }
 	| { type: "updateReference", payload: UpdateReferenceCommand }
@@ -1013,6 +1429,33 @@ export type NativeCommand =
 	| { type: "insertBibliography", payload: InsertBibliographyCommand }
 	| { type: "setCitationStyle", payload: SetCitationStyleCommand }
 	| { type: "setBibliographyOptions", payload: SetBibliographyOptionsCommand }
+	| { type: "setEditorMode", payload: SetEditorModeCommand }
+	| { type: "moveBookItem", payload: MoveBookItemCommand }
+	| { type: "setBookItemHidden", payload: SetBookItemHiddenCommand }
+	| { type: "addBookItem", payload: AddBookItemCommand }
+	| { type: "removeBookItem", payload: RemoveBookItemCommand }
+	| { type: "editBookItem", payload: EditBookItemCommand }
+	| { type: "openBookItem", payload: OpenBookItemCommand }
+	| { type: "applyBookStyle", payload: ApplyBookStyleCommand }
+	| { type: "setChapterMeta", payload: SetChapterMetaCommand }
+	| { type: "setHeadImage", payload: SetHeadImageCommand }
+	| { type: "setFolderBookOptions", payload: SetFolderBookOptionsCommand }
+	| { type: "setTypesetView", payload: SetTypesetViewCommand }
+	| { type: "setParagraphTypeset", payload: SetParagraphTypesetCommand }
+	| { type: "showProofIssue", payload: ShowProofIssueCommand }
+	| { type: "setTypesetDisplay", payload: SetTypesetDisplayCommand }
+	| { type: "addProjectFont", payload: AddProjectFontCommand }
+	| { type: "setTextStyle", payload: SetTextStyleCommand }
+	| { type: "insertFootnote", payload: InsertFootnoteCommand }
+	| { type: "editEditions", payload: EditEditionsCommand }
+	| { type: "exportAllEditions", payload: ExportAllEditionsCommand }
+	| { type: "setCoverImage", payload: SetCoverImageCommand }
+	| { type: "editCoverSets", payload: EditCoverSetsCommand }
+	| { type: "saveTypesetVersion", payload: SaveTypesetVersionCommand }
+	| { type: "restoreTypesetVersion", payload: TypesetVersionRef }
+	| { type: "renameTypesetVersion", payload: RenameTypesetVersionCommand }
+	| { type: "deleteTypesetVersion", payload: TypesetVersionRef }
+	| { type: "previewTypesetVersion", payload: PreviewTypesetVersionCommand }
 	| { type: "setPrintLayout", payload: SetPrintLayoutCommand }
 	| { type: "setPageSetup", payload: SetPageSetupCommand }
 	| { type: "setBookSettings", payload: SetBookSettingsCommand }
@@ -1022,7 +1465,6 @@ export type NativeCommand =
 	| { type: "goToPage", payload: GoToPageCommand }
 	| { type: "printDocument", payload: PrintDocumentCommand }
 	| { type: "exportDocument", payload: ExportDocumentCommand }
-	| { type: "printFinished", payload: PrintFinishedCommand }
 	| { type: "applyFormat", payload: ApplyFormatCommand }
 	| { type: "useSetupForBook", payload: UseSetupForBookCommand }
 	| { type: "clearBookSetup", payload: ClearBookSetupCommand }
@@ -1068,6 +1510,55 @@ export interface Contributor {
 export interface ContributorRoleSpec {
 	id: string;
 	label: string;
+}
+
+/** A cover version as the Cover section draws it: its pictures as files on disk. */
+export interface CoverSetView {
+	id: string;
+	name: string;
+	frontFile?: string;
+	backFile?: string;
+	spineFile?: string;
+	wrapFile?: string;
+	fit: CoverFit;
+}
+
+/** How much a preflight finding matters. */
+export enum PreflightSeverity {
+	/** The service will reject the file. */
+	Error = "error",
+	/** It will print, but not as well as it could. */
+	Warning = "warning",
+	/** Worth knowing. */
+	Note = "note",
+}
+
+/** One thing the preflight found, and how to put it right when the page knows how. */
+export interface PreflightIssue {
+	id: string;
+	severity: PreflightSeverity;
+	message: string;
+	/** The button's title — "Widen the Gutter" — when there is a fix. */
+	fixLabel?: string;
+	/** The setup with the fix made: applied as any other edit to it. */
+	fixedSetup?: PageSetup;
+}
+
+/** A book's covers, the size of its full wrap, and what is wrong with them. */
+export interface CoverState {
+	sets: CoverSetView[];
+	active?: string;
+	trimWidthMm: number;
+	trimHeightMm: number;
+	/** From the page count and the paper; 0 until the pages are counted. */
+	spineWidthMm: number;
+	bleedMm: number;
+	wrapWidthMm: number;
+	wrapHeightMm: number;
+	pageCount: number;
+	checks: PreflightIssue[];
+	/** The cover is what the Typeset view is showing. */
+	showing?: boolean;
 }
 
 /** What kind of entry `createEntry` makes. */
@@ -1298,107 +1789,65 @@ export interface DocumentText {
 	text: string;
 }
 
-/**
- * The drag ended — however it ended.
- * 
- * `handled` is a *report*, not a negotiation: whichever drop target accepted the
- * payload says so when it does, and this event carries the final answer so the source
- * knows whether to remove what it was dragging. Two targets can see the same drop (an
- * editor and the clipboard panel underneath it); the first to claim it wins.
- */
-export interface DragEnded {
-	dragId: string;
-	handled: boolean;
-	clientX?: number;
-	clientY?: number;
-}
-
-/**
- * The pointer moved during a drag.
- * 
- * Carried explicitly because the DOM's own drag events do not reliably give a
- * position. Coalesced to one per frame
- * by the sender, like `notesRemapped`, and for the same reason: only the last one
- * means anything.
- */
-export interface DragMoved {
-	dragId: string;
-	clientX: number;
-	clientY: number;
-}
-
-/**
- * What is being dragged.
- * 
- * A drag in Inkblot often starts in one component and ends in another — the
- * clipboard panel, an editor pane, a canvas — and in the Swift app one end can be
- * native. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
- * hand-off, so nothing about a drag depends on shared state in the webview's
- * `window`. The webview side is `src/bridge/dragHandoff.ts`.
- */
-export enum DragPayloadKind {
-	/** A selection dragged out of an editor. */
-	EditorSelection = "editorSelection",
-	/** An entry dragged out of the clipboard history panel. */
-	ClipboardEntry = "clipboardEntry",
-	/** A document dragged out of the file tree. */
-	Document = "document",
-	/** A note card dragged out of the notes panel. */
-	NoteCard = "noteCard",
-}
-
-/**
- * A place in a document, as the protocol carries it.
- * 
- * A ProseMirror position is an index into a document that every edit invalidates.
- * In one process that is survivable: the holder maps its positions through each
- * transaction's mapping and is never more than a tick out of date. Across a process
- * boundary it is not — native holds a note, a workbench tile, a search result or a
- * read-aloud word, the user types, and the positions native is holding now address
- * different text with no signal that they do.
- * 
- * So nothing in this protocol carries a bare position. Everything carries the text
- * the position was resolved from as well, and the webview re-resolves by that text
- * when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
- * or reports it gone when the text is.
- * 
- * `from` and `to` are **UTF-16 code units**, like every other offset in this
- * codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
- * wrong place in any document containing an emoji.
- */
-export interface TextAnchor {
-	from: number;
-	to: number;
-	/**
-	 * The text `from..to` covered when this anchor was made. The webview falls back
-	 * to searching for it when the positions no longer do.
-	 */
-	text: string;
-}
-
-export interface DragStarted {
-	dragId: string;
-	kind: DragPayloadKind;
-	/** The plain text being dragged, where there is any. */
-	text: string;
-	/** The entry, document or note the drag came from. */
-	sourceId?: string;
-	docPath?: string;
-	/**
-	 * Where in the source document the selection came from, for a drag that will move
-	 * rather than copy.
-	 */
-	anchor?: TextAnchor;
-	/**
-	 * Anything the drop target needs that the fields above do not model — a
-	 * clipboard entry's rich content, a note's color.
-	 */
-	detail?: unknown;
-}
-
 /** Copy a document beside itself as "<name> copy", and open the copy. */
 export interface DuplicateEntryCommand {
 	path: string;
+}
+
+/**
+ * Rename an entry, change what kind of chapter it is, or how its page sits. Each field
+ * present is set; absent ones are left as they are.
+ */
+export interface EditBookItemCommand {
+	id: string;
+	title?: string;
+	chapterType?: ChapterType;
+	page?: PageOptions;
+}
+
+/** What is done to the book's cover versions. */
+export enum CoverSetAction {
+	/** A new, empty version, made active. */
+	Add = "add",
+	Duplicate = "duplicate",
+	Rename = "rename",
+	Delete = "delete",
+	/** Make it the one print, export and the EPUB use. */
+	Activate = "activate",
+	/** How its pictures are fitted to the parts. */
+	SetFit = "setFit",
+}
+
+export interface EditCoverSetsCommand {
+	action: CoverSetAction;
+	id?: string;
+	name?: string;
+	fit?: CoverFit;
+}
+
+export enum EditionAction {
+	/** A new edition from its kind's preset, made active. */
+	Add = "add",
+	Duplicate = "duplicate",
+	Rename = "rename",
+	Delete = "delete",
+	/**
+	 * Typeset it: its page and cover are the book's until another is chosen. `id`
+	 * absent goes back to the book as set up.
+	 */
+	Activate = "activate",
+	/** Give it a cover version (`cover_set_id`; absent, the book's). */
+	SetCover = "setCover",
+	/** A new edition set as a typeset version was (`id` is the version's). */
+	FromTypesetVersion = "fromTypesetVersion",
+}
+
+export interface EditEditionsCommand {
+	action: EditionAction;
+	id?: string;
+	name?: string;
+	kind?: EditionKind;
+	coverSetId?: string;
 }
 
 /** A step through the editor's own undo history. */
@@ -1430,57 +1879,28 @@ export type WebviewEvent =
 	| { type: "toolbarState", payload: ToolbarState }
 	| { type: "selectionContext", payload: SelectionContext }
 	| { type: "docChanged", payload: DocChanged }
-	| { type: "notesRemapped", payload: NotesRemapped }
-	| { type: "noteMarkerHover", payload: NoteMarkerEvent }
-	| { type: "noteMarkerLeave", payload: NoteMarkerEvent }
-	| { type: "noteMarkerPin", payload: NoteMarkerEvent }
 	| { type: "activeEditorChanged", payload: ActiveEditorChanged }
 	| { type: "canvasToolbarChanged", payload: CanvasToolbarChanged }
 	/** The active map's toolbar and inspector (`map.rs`). Coalesced per frame. */
 	| { type: "mapChromeChanged", payload: MapChromeChanged }
-	| { type: "searchMatches", payload: SearchMatches }
-	| { type: "focusModeView", payload: FocusModeView }
 	| { type: "readAloudPayload", payload: ReadAloudPayloadEvent }
-	| { type: "dragStarted", payload: DragStarted }
-	| { type: "dragMoved", payload: DragMoved }
-	| { type: "dragEnded", payload: DragEnded }
 	| { type: "projectChanged", payload: ProjectChanged }
-	| { type: "notesChanged", payload: NotesChanged }
-	| { type: "clipboardChanged", payload: ClipboardChanged }
-	| { type: "tilesChanged", payload: TilesChanged }
-	| { type: "versionsChanged", payload: VersionsChanged }
 	| { type: "showSidebarTab", payload: ShowSidebarTab }
-	/**
-	 * The marker of an open hover preview moved — the document scrolled or reflowed.
-	 * Coalesced to one per frame; it carries the whole rect, so a dropped one is
-	 * superseded by the next.
-	 */
-	| { type: "noteMarkerMoved", payload: NoteMarkerEvent }
-	| { type: "notePreviewDismissed", payload: NotePreviewDismissed }
-	| { type: "noteMarkersChanged", payload: NoteMarkersChanged }
-	/** Open the bubble editor. Sent only to a shell that draws it (`bubble` chrome). */
-	| { type: "bubbleSessionOpened", payload: BubbleSessionOpened }
-	/** Where the chips of sessions left open are, for a shell that draws them. */
-	| { type: "bubbleChipsChanged", payload: BubbleChipsChanged }
 	| { type: "viewOptions", payload: ViewOptions }
-	/** A document's archive, whole (`archive.rs`). */
-	| { type: "archiveChanged", payload: ArchiveChanged }
 	/** The project's sources, whole, for the document in view (`references.rs`). */
 	| { type: "referencesChanged", payload: ReferencesChanged }
 	/** The kinds of source and the styles, sent once when the page mounts. */
 	| { type: "referenceSchema", payload: ReferenceSchema }
 	/** Show a source in the panel. */
 	| { type: "revealReference", payload: RevealReference }
-	/**
-	 * Where the word-count badges are, for a shell that draws them (`wordCount`
-	 * chrome). Coalesced per frame; the total is itself debounced by the page.
-	 */
-	| { type: "wordCountsChanged", payload: WordCountsChanged }
 	| { type: "pageLayoutState", payload: PageLayoutState }
-	| { type: "printRequest", payload: PrintRequest }
 	/** The Finishing tabs' fixed lists, sent once when the page mounts. */
 	| { type: "pageLayoutCatalog", payload: PageLayoutCatalog }
 	| { type: "printJobStatus", payload: PrintJobStatus }
+	/** A Typeset page's handle was picked: show its section in the inspector. */
+	| { type: "typesetFocus", payload: TypesetFocus }
+	/** A book's typeset history, newest first. */
+	| { type: "typesetHistoryChanged", payload: TypesetHistoryChanged }
 	/** The tabs and the split, whole (`tabs.rs`). Coalesced per frame. */
 	| { type: "tabsChanged", payload: TabsChanged };
 
@@ -1491,6 +1911,13 @@ export interface EventEnvelope {
 
 /** Export the last export again — same format, scope and file — without asking where. */
 export interface ExportAgainCommand {
+}
+
+/**
+ * Export every edition into a folder the author picks: each print edition's interior
+ * PDF and cover PDF, each e-book edition's EPUB.
+ */
+export interface ExportAllEditionsCommand {
 }
 
 export enum ExportFormat {
@@ -1508,6 +1935,11 @@ export enum ExportFormat {
 	Fdx = "fdx",
 	/** A report on a script, as a spreadsheet. */
 	Csv = "csv",
+	/**
+	 * The book's cover as one full-wrap PDF — back, spine and front, with bleed — as
+	 * KDP and IngramSpark take it.
+	 */
+	CoverPdf = "coverPdf",
 }
 
 /** What a print or export covers. */
@@ -1565,23 +1997,6 @@ export interface ExportDocumentCommand {
 	options?: PrintOptions;
 }
 
-/**
- * What focus mode is showing.
- * 
- * `FocusModeOverlay` re-derives its view from the full document on every
- * transaction; sent at a keystroke's rate, the text would be the largest payload on
- * the bridge. So the overlay stays in the webview, and this event lets a native shell
- * mirror the *state* — which paragraph, how far through — without receiving the text.
- */
-export interface FocusModeView {
-	active: boolean;
-	docPath: string;
-	/** Index of the paragraph the caret is in. */
-	paragraphIndex: number;
-	paragraphCount: number;
-	wordCount: number;
-}
-
 /** What a format is for, which decides what else the Finishing tabs offer with it. */
 export enum FormatKind {
 	Prose = "prose",
@@ -1602,14 +2017,6 @@ export interface FormatOption {
 /** Scroll a page (1-based, as numbered on screen) into view. */
 export interface GoToPageCommand {
 	page: number;
-}
-
-/**
- * Which note's hover cards the shell is showing, so the page can highlight the text
- * the note is about, since the cards do not quote it. `None` clears the highlight.
- */
-export interface HighlightNoteCommand {
-	noteId?: string;
 }
 
 /**
@@ -1654,13 +2061,17 @@ export interface InsertClipboardEntryCommand {
 	target: EditorTarget;
 }
 
+/** Put a footnote at the caret, and open it to be written. */
+export interface InsertFootnoteCommand {
+	target: EditorTarget;
+}
+
 /**
  * Insert text at the selection with no formatting of its own — the text takes on the
  * marks around it.
  * 
- * This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
- * webview: `WKWebView` cannot read the clipboard without a user gesture inside the
- * page, and the menu item is not one.
+ * This is Edit ▸ Paste and Match Style: the clipboard's text, read by whatever the
+ * writer used — the menu item or the toolbar button — and inserted as plain text.
  */
 export interface InsertPlainTextCommand {
 	target: EditorTarget;
@@ -1672,6 +2083,35 @@ export interface InsertTableCommand {
 	rows: number;
 	cols: number;
 	withHeaderRow: boolean;
+}
+
+/**
+ * A place in a document, as the protocol carries it.
+ * 
+ * A ProseMirror position is an index into a document that every edit invalidates.
+ * In one process that is survivable: the holder maps its positions through each
+ * transaction's mapping and is never more than a tick out of date. Across a process
+ * boundary it is not — native holds a note, a workbench tile, a search result or a
+ * read-aloud word, the user types, and the positions native is holding now address
+ * different text with no signal that they do.
+ * 
+ * So nothing in this protocol carries a bare position. Everything carries the text
+ * the position was resolved from as well, and the webview re-resolves by that text
+ * when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
+ * or reports it gone when the text is.
+ * 
+ * `from` and `to` are **UTF-16 code units**, like every other offset in this
+ * codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
+ * wrong place in any document containing an emoji.
+ */
+export interface TextAnchor {
+	from: number;
+	to: number;
+	/**
+	 * The text `from..to` covered when this anchor was made. The webview falls back
+	 * to searching for it when the positions no longer do.
+	 */
+	text: string;
 }
 
 /**
@@ -2323,6 +2763,15 @@ export interface MapToggleInput {
 export interface MeasureBookCommand {
 }
 
+/**
+ * Move an entry to before another (or to the end, with none). Only the book's order
+ * changes — never the file tree.
+ */
+export interface MoveBookItemCommand {
+	id: string;
+	before?: string;
+}
+
 /** Move a file or folder into another folder. See `RenameEntryCommand`. */
 export interface MoveEntryCommand {
 	path: string;
@@ -2395,46 +2844,6 @@ export interface Note {
 	timestamp: string;
 }
 
-/**
- * The pointer entered, left, or clicked a note marker in the document.
- * 
- * `anchor_rect` is in client coordinates *inside the webview*, so a native shell must
- * offset it by the web view's frame. Nothing here is an object reference: every
- * field survives serialization.
- */
-export interface NoteMarkerEvent {
-	noteId: string;
-	docPath: string;
-	anchorLeft: number;
-	anchorTop: number;
-	anchorRight: number;
-	anchorBottom: number;
-	note?: Note;
-}
-
-/**
- * Where one note marker is, for a shell that draws the markers itself. Client
- * coordinates inside the webview, as `NoteMarkerEvent`'s.
- */
-export interface NoteMarkerRect {
-	noteId: string;
-	color: string;
-	left: number;
-	top: number;
-	right: number;
-	bottom: number;
-}
-
-/**
- * Every note marker the user can see, and where — the whole list, so it is safe to
- * coalesce. Sent when any of them appears, goes, or moves (a scroll, a reflow). The
- * page still owns the markers' hover and click; the shell draws the dots, as Liquid
- * Glass, over the page's invisible ones.
- */
-export interface NoteMarkersChanged {
-	markers: NoteMarkerRect[];
-}
-
 /** The fields of a note the shell can change. `None` leaves a field alone. */
 export interface NotePatch {
 	content?: string;
@@ -2453,49 +2862,15 @@ export interface NotePatch {
 	previewSize?: NotePreviewSize;
 }
 
-/**
- * The open hover preview should close: the user clicked somewhere in the document
- * that is not a note marker. The page is the only one who sees that click.
- */
-export interface NotePreviewDismissed {
-	noteId: string;
-}
-
 /** Remove a note and every reply beneath it, as the page's panel does. */
 export interface NoteRef {
 	docPath: string;
 	noteId: string;
 }
 
-/** A document's notes changed — the whole list, so it is safe to coalesce. */
-export interface NotesChanged {
-	docPath: string;
-	notes: Note[];
-}
-
-/**
- * Note anchors after a remap.
- * 
- * `useEditorNotes` remaps on every transaction — every keystroke in a document with
- * quote notes — and the shell holds those positions. Two things
- * keep that off the bridge's back:
- * 
- * 1. The event is coalesced to one per frame by the sender. Sending per transaction
- * saturates the bridge with nothing new; a caret that moved three times in one
- * frame has one final answer.
- * 2. It carries the **whole** remapped set, never a delta. That is what makes
- * coalescing safe: dropping an intermediate state loses nothing, because the next
- * one is complete. A delta stream would not survive a single dropped message.
- */
-export interface NotesRemapped {
-	docPath: string;
-	notes: Note[];
-	/**
-	 * Notes whose range collapsed to nothing in this remap. They have lost what they
-	 * were about and have been dropped from `notes`; they are named here so a shell
-	 * can tell "deleted" from "never sent".
-	 */
-	droppedNoteIds: string[];
+/** Select an entry: open its document, or show its page, and make it This Page. */
+export interface OpenBookItemCommand {
+	id: string;
 }
 
 /** Open a document in a tab of its own, and show it. */
@@ -2574,6 +2949,93 @@ export interface PageLayoutCatalog {
 	tokens: RunningToken[];
 	/** What "Set Type for Print" starts from. */
 	defaultTypography: PrintTypography;
+	/**
+	 * Whole designs for a book, one click each: its type, how its chapters open, its
+	 * running heads.
+	 */
+	bookStyles?: BookStyleOption[];
+}
+
+/**
+ * The window's mode: writing a draft, or setting it as a book.
+ * 
+ * Write shows every text pane as the continuous editor in the writer's own font, with
+ * the file tree and the drafting panels. Typeset shows every text pane as the pages it
+ * will print on, with the book's navigator in place of the file tree, the typeset
+ * toolbar and panels, and the chapters' prose locked — it is edited in Write, where
+ * proofing happens. The page owns the mode; the shell asks for a change.
+ */
+export enum EditorMode {
+	Write = "write",
+	Typeset = "typeset",
+}
+
+/** Typeset's view of the book: its printed pages, or the e-book as a reader shows it. */
+export enum TypesetView {
+	Print = "print",
+	Digital = "digital",
+}
+
+/** What the proof finds wrong with a typeset page, as a typesetter would mark it. */
+export enum ProofKind {
+	/** A justified line spaced out so far its words stand apart. */
+	Loose = "loose",
+	/** A paragraph's last line alone at the head of a page. */
+	Widow = "widow",
+	/** A paragraph's first line alone at the foot of a page. */
+	Orphan = "orphan",
+	/** A paragraph ending on a line of one short word. */
+	Runt = "runt",
+	/** More lines in a row ending in a hyphen than the composition allows. */
+	StackedHyphens = "stackedHyphens",
+	/** A chapter's last page with only a line or two on it. */
+	ShortPage = "shortPage",
+}
+
+/** A fix the proof offers: each is one of `SetParagraphTypesetCommand`'s. */
+export enum ProofFix {
+	/** Letter-spacing a little tighter, to take a line back. */
+	Tighten = "tighten",
+	/** A little looser, to push one over. */
+	Loosen = "loosen",
+	KeepTogether = "keepTogether",
+	KeepWithNext = "keepWithNext",
+	/** The page runs a line long, to take a widow back. */
+	RunLong = "runLong",
+	/** A line short, to send one over. */
+	RunShort = "runShort",
+}
+
+export interface ProofIssue {
+	id: string;
+	kind: ProofKind;
+	/** The printed page it is on, counted from the chapter's first. */
+	page: number;
+	/** The words at fault. A fix is set on the paragraph they are in. */
+	anchor: TextAnchor;
+	fixes: ProofFix[];
+}
+
+/** What is set on the paragraph the caret is in, for the toolbar and the Proof section. */
+export interface ParagraphTypeset {
+	tracking: number;
+	keepTogether: boolean;
+	keepWithNext: boolean;
+	pageAdjust: number;
+	/** Its named text style, if it has one. */
+	styleName?: string;
+}
+
+/**
+ * A font file kept in the project (`.assets/fonts/`), so the book sets — and embeds
+ * in its PDF and EPUB — the same face on any Mac.
+ */
+export interface ProjectFont {
+	family: string;
+	/** Its project path. */
+	path: string;
+	/** Whether its licence lets it be embedded in a PDF or an EPUB (its `fsType`). */
+	embeddable: boolean;
 }
 
 /** Where the setup a document lays out in came from. */
@@ -2584,27 +3046,6 @@ export enum SetupSource {
 	Book = "book",
 	/** Neither: the default. */
 	Default = "default",
-}
-
-/** How much a preflight finding matters. */
-export enum PreflightSeverity {
-	/** The service will reject the file. */
-	Error = "error",
-	/** It will print, but not as well as it could. */
-	Warning = "warning",
-	/** Worth knowing. */
-	Note = "note",
-}
-
-/** One thing the preflight found, and how to put it right when the page knows how. */
-export interface PreflightIssue {
-	id: string;
-	severity: PreflightSeverity;
-	message: string;
-	/** The button's title — "Widen the Gutter" — when there is a fix. */
-	fixLabel?: string;
-	/** The setup with the fix made: applied as any other edit to it. */
-	fixedSetup?: PageSetup;
 }
 
 /** The Publish tab's figures for what Print covers, at its setup. */
@@ -2668,6 +3109,22 @@ export interface ScriptSummary {
 export interface PageLayoutState {
 	/** Whether the active pane shows pages. */
 	enabled: boolean;
+	/** Write or Typeset, for the whole window. */
+	mode?: EditorMode;
+	/** In Typeset, the printed pages or the e-book. */
+	typesetView?: TypesetView;
+	/** Typeset's pages in spreads, the baseline grid drawn, the proof marks shown. */
+	spread?: boolean;
+	showGrid?: boolean;
+	proof?: boolean;
+	/** What the proof finds on the chapter open, while it is on. */
+	proofIssues?: ProofIssue[];
+	/** What is set on the paragraph the caret is in. */
+	paragraph?: ParagraphTypeset;
+	/** The fonts kept in the project. */
+	projectFonts?: ProjectFont[];
+	/** The book's named text styles, as it sets them: the built-in ones and its own. */
+	textStyles?: TextStyleLook[];
 	/** The active text document, or none (a canvas, or nothing open). */
 	docPath?: string;
 	/**
@@ -2695,6 +3152,20 @@ export interface PageLayoutState {
 	bookSetupActive: boolean;
 	/** The book's chapters, in order: document tree paths. */
 	bookChapters: string[];
+	/** The book's contents in book order, as the Book navigator lists them. */
+	bookItems?: BookRow[];
+	/**
+	 * The entry the navigator has selected, whose page the Typeset tab's This Page
+	 * section shows.
+	 */
+	selectedBookItem?: string;
+	/** The active chapter's head: its subtitle, picture and epigraph. */
+	chapterMeta?: ChapterMeta;
+	/** The book's covers and its wrap. */
+	cover?: CoverState;
+	/** The chapter's picture and the book's ornament picture on disk, for thumbnails. */
+	chapterImageFile?: string;
+	ornamentImageFile?: string;
 	/** A recommended inside margin for a book of this many pages, in mm. */
 	suggestedInsideMarginMm: number;
 	/** Who wrote it: the title page's byline and contact details. */
@@ -2719,24 +3190,12 @@ export interface PageLayoutState {
 }
 
 /**
- * One text pane's status row, for a shell that draws the pane's own Print Layout
- * toggle and zoom at its bottom-right corner, level with its badges. `left` and `right`
- * are the pane's edges; `top` and `bottom` the row's. Client coordinates, as the
- * badges' are.
+ * Show a typeset version's pages in the Typeset view — alone, or beside the current
+ * typeset to compare them. No id stops previewing.
  */
-export interface PaneStatus {
-	pane: Pane;
-	docPath: string;
-	/** Shown as pages. */
-	printLayout: boolean;
-	/** Its zoom as pages (1 = 100%), whether or not it is shown as them. */
-	zoom: number;
-	/** The pointer is over it. A split shows a pane's controls only then. */
-	hovered?: boolean;
-	left: number;
-	top: number;
-	right: number;
-	bottom: number;
+export interface PreviewTypesetVersionCommand {
+	id?: string;
+	compare?: boolean;
 }
 
 /** Print. `bound` imposes the pages for binding, with the book's binding settings. */
@@ -2744,12 +3203,6 @@ export interface PrintDocumentCommand {
 	scope: PrintScope;
 	bound: boolean;
 	options?: PrintOptions;
-}
-
-/** The shell finished (or abandoned) a `PrintRequest`. */
-export interface PrintFinishedCommand {
-	jobId: string;
-	completed: boolean;
 }
 
 /** What a print or export job is. */
@@ -2786,19 +3239,6 @@ export interface PrintJobStatus {
 	message?: string;
 	/** The file written, for an export that is `Done`. */
 	path?: string;
-}
-
-/**
- * Print the web view as it is now, on paper of this size, with no margins and no
- * scaling: the page has laid out exactly what goes on each sheet.
- */
-export interface PrintRequest {
-	jobId: string;
-	jobName: string;
-	paperWidthPt: number;
-	paperHeightPt: number;
-	/** Save as PDF here instead of printing. Absent shows the print panel. */
-	pdfPath?: string;
 }
 
 /**
@@ -3048,6 +3488,15 @@ export interface ReferencesChanged {
 export interface RefreshBookChaptersCommand {
 }
 
+/**
+ * Take a matter page, a generated page or a part out of the book. A matter page's
+ * document is deleted with it (the navigator asks first). A chapter cannot be removed
+ * here — only hidden: it is the manuscript's.
+ */
+export interface RemoveBookItemCommand {
+	id: string;
+}
+
 /** Remove entries from the history. `None` clears it. */
 export interface RemoveClipboardEntriesCommand {
 	ids?: string[];
@@ -3073,6 +3522,11 @@ export interface RenameEntryCommand {
 	isFolder: boolean;
 	/** The bare name. A canvas keeps its `.canvas` suffix whatever this says. */
 	newName: string;
+}
+
+export interface RenameTypesetVersionCommand {
+	id: string;
+	name: string;
 }
 
 /** Name a version, or clear its name with `None`. */
@@ -3151,6 +3605,11 @@ export interface RevealSearchResultCommand {
 	noteId?: string;
 }
 
+/** Keep the book's typeset as it is now, under a name. */
+export interface SaveTypesetVersionCommand {
+	name: string;
+}
+
 /** A breakdown of the active script. */
 export enum ScriptReportKind {
 	/** Who speaks, how often, in which scenes. */
@@ -3213,21 +3672,6 @@ export interface SearchResult {
 	/** The canvas node to select and center. */
 	nodeId?: string;
 	note?: unknown;
-}
-
-/**
- * Search results from inside the open document.
- * 
- * Project-wide search is `inkblot-core`'s job and does not come through here; this is
- * only the part that needs a live document, because a ProseMirror position cannot be
- * computed from a file on disk.
- */
-export interface SearchMatches {
-	query: string;
-	docPath: string;
-	results: SearchResult[];
-	/** Which result is current, as an index into `results`. */
-	activeIndex?: number;
 }
 
 /** The scopes, in the order they appear in the bar. */
@@ -3350,6 +3794,15 @@ export interface SetBookCoverCommand {
 	path?: string;
 }
 
+/**
+ * Hide an entry from the Typeset pages, print, export and the continuous document, or
+ * show it again.
+ */
+export interface SetBookItemHiddenCommand {
+	id: string;
+	hidden: boolean;
+}
+
 /** Replace the settings of the book the active document belongs to. */
 export interface SetBookSettingsCommand {
 	settings: BookSettings;
@@ -3359,6 +3812,11 @@ export interface SetCaretAtDocPosCommand {
 	target: EditorTarget;
 	/** A ProseMirror position in UTF-16 code units. Clamped to the document. */
 	pos: number;
+}
+
+/** Set the active chapter's subtitle, picture and epigraph. */
+export interface SetChapterMetaCommand {
+	meta: ChapterMeta;
 }
 
 export interface SetCitationStyleCommand {
@@ -3394,6 +3852,24 @@ export interface SetContentCommand {
 	isLoad: boolean;
 }
 
+export enum CoverPart {
+	Front = "front",
+	Back = "back",
+	Spine = "spine",
+	/** One image across back, spine and front. */
+	Wrap = "wrap",
+}
+
+/**
+ * A picture for a part of a cover version — the active one, with no id — copied into
+ * the project; none takes the part's picture away.
+ */
+export interface SetCoverImageCommand {
+	setId?: string;
+	part: CoverPart;
+	path?: string;
+}
+
 /**
  * The display's logical density — its width in points over its width in inches —
  * which is what "Actual size" zoom needs and only the shell can measure.
@@ -3402,12 +3878,25 @@ export interface SetDisplayDensityCommand {
 	pointsPerInch: number;
 }
 
-/**
- * Open or leave focus mode — the page's, which stays in the page (see
- * `FocusModeView`). The page answers with `viewOptions`.
- */
+export interface SetEditorModeCommand {
+	mode: EditorMode;
+}
+
+/** Open or leave focus mode. The page answers with `viewOptions`. */
 export interface SetFocusModeCommand {
 	open: boolean;
+}
+
+/**
+ * A folder's book options, from the file tree's menu: numbering its documents in the
+ * tree, where they count from, and scrolling from one into the next. Each field present
+ * is set; the rest of the folder's book is left as it is.
+ */
+export interface SetFolderBookOptionsCommand {
+	folder: string;
+	numberInTree?: boolean;
+	startAt?: number;
+	continuous?: boolean;
 }
 
 export interface SetFontFamilyCommand {
@@ -3427,6 +3916,20 @@ export interface SetFontSizeCommand {
 	 * on the mark and what the toolbar displays.
 	 */
 	size: string;
+}
+
+/** Which picture of a chapter head a file is for. */
+export enum HeadImageTarget {
+	/** The active chapter's own picture. */
+	Chapter = "chapter",
+	/** The ornament every chapter's head carries. */
+	Ornament = "ornament",
+}
+
+/** A picture for a chapter head, copied into the project — or none, to take it away. */
+export interface SetHeadImageCommand {
+	target: HeadImageTarget;
+	path?: string;
 }
 
 /**
@@ -3458,22 +3961,18 @@ export interface SetPageSetupCommand {
 }
 
 /**
- * How much of each side of the page the shell's chrome covers.
- * 
- * The shell's sidebars and window toolbar are translucent and float over the page
- * rather than beside it: the page runs the whole window, so a canvas carries on
- * underneath them and a document scrolls up under the toolbar's glass. What must stay
- * readable — a document's text column, its first line — keeps to the part of the page
- * they leave uncovered.
+ * Set what the typesetter sets on a paragraph — the one the anchor is in, or those
+ * selected. Each field present is set; `nudge_tracking` adds to what is there.
  */
-export interface SetPanelInsetsCommand {
-	leading: number;
-	trailing: number;
-	/**
-	 * The window toolbar's band. Absent from an older shell, which kept the page
-	 * below its toolbar, so it defaults to nothing covered.
-	 */
-	top?: number;
+export interface SetParagraphTypesetCommand {
+	anchor?: TextAnchor;
+	/** Thousandths of an em, −10 to +10. */
+	tracking?: number;
+	nudgeTracking?: number;
+	keepTogether?: boolean;
+	keepWithNext?: boolean;
+	/** The page the paragraph starts on runs this many lines long (1) or short (−1). */
+	pageAdjust?: number;
 }
 
 /**
@@ -3536,18 +4035,23 @@ export interface SetTabOrderCommand {
 	tabIds: string[];
 }
 
+/** Give the selected paragraphs a named text style, or none (`style` absent). */
+export interface SetTextStyleCommand {
+	style?: string;
+}
+
 /**
- * How much of the page's top-left corner the window's own controls cover.
- * 
- * The shell draws no titlebar row: the page's toolbar is the top of the window, and
- * the traffic lights float over whatever is beneath them. When the native file tree is
- * showing they float over it and the page needs no room; when it is hidden they float
- * over the page's toolbar, which must start after them. Only the shell knows which.
+ * How Typeset shows its pages: in spreads, with the baseline grid drawn, with the proof
+ * marks. Each field present is set.
  */
-export interface SetTitlebarInsetCommand {
-	leading: number;
-	/** Room at the right end, for the button that reopens a hidden native sidebar. */
-	trailing?: number;
+export interface SetTypesetDisplayCommand {
+	spread?: boolean;
+	grid?: boolean;
+	proof?: boolean;
+}
+
+export interface SetTypesetViewCommand {
+	view: TypesetView;
 }
 
 /**
@@ -3562,6 +4066,11 @@ export interface SetWordCountVisibleCommand {
 export interface SetWritingFormatCommand {
 	target: EditorTarget;
 	format: WritingFormat;
+}
+
+/** Scroll the pages to a proof mark and select its paragraph. */
+export interface ShowProofIssueCommand {
+	anchor: TextAnchor;
 }
 
 export enum SidebarTab {
@@ -3739,28 +4248,6 @@ export interface TileRef {
 	id: string;
 }
 
-export enum TileKind {
-	Pos = "pos",
-	Synonym = "synonym",
-	Definition = "definition",
-	Rhyme = "rhyme",
-}
-
-/** A language-tool tile, made from a selection by the editor's context menu. */
-export interface WorkbenchTile {
-	/** Always a string on the wire; the page's ids are timestamps. */
-	id: string;
-	type: TileKind;
-	/** The word or sentence the tile is about. */
-	text: string;
-	/** The document it was made in. */
-	doc?: string;
-}
-
-export interface TilesChanged {
-	tiles: WorkbenchTile[];
-}
-
 /**
  * One run of the writing timer: a routine from its start to its end, or to where the
  * writer stopped it. Recorded as it goes, like a session, and kept by `id`.
@@ -3864,6 +4351,58 @@ export interface TreeNode {
 	children?: TreeNode[];
 }
 
+/**
+ * Something on a Typeset page was picked — a margin, a running head, a chapter's
+ * number — and the inspector should show where it is set: the Typeset tab, with that
+ * section open (`FinishingSectionID`).
+ */
+export interface TypesetFocus {
+	sectionId: string;
+}
+
+/** Why a typeset version was kept. */
+export enum TypesetVersionKind {
+	/** A while after the typesetting changed. */
+	Auto = "auto",
+	/** Saved, and named, by the writer. */
+	Named = "named",
+	/** What a print or an export was made from. */
+	Export = "export",
+	/** The typeset as it was just before another was restored. */
+	Restore = "restore",
+}
+
+/** One typeset version of a book, as the History tab lists it. */
+export interface TypesetVersionRow {
+	id: string;
+	/** ISO 8601. */
+	timestamp: string;
+	kind: TypesetVersionKind;
+	name?: string;
+	/** What changed since the version before it, a line a change. */
+	summary: string[];
+}
+
+/**
+ * A book's typeset history, newest first. Published by the page when it changes and
+ * when the book in view does.
+ */
+export interface TypesetHistoryChanged {
+	folder: string;
+	rows: TypesetVersionRow[];
+	/** The version the Typeset view is previewing, if any. */
+	previewing?: string;
+	/** And whether beside the current typeset, to compare. */
+	comparing?: boolean;
+	/** What the last restore could not put back: "2 settings had no paragraph left". */
+	note?: string;
+}
+
+/** A typeset version, by id: to restore, delete, or stop previewing (`id` absent). */
+export interface TypesetVersionRef {
+	id: string;
+}
+
 export interface UpdateNoteCommand {
 	docPath: string;
 	noteId: string;
@@ -3932,11 +4471,6 @@ export interface VersionRow {
 	summary?: string;
 }
 
-/** A document's history changed on disk. The shell re-reads it through the core. */
-export interface VersionsChanged {
-	docPath: string;
-}
-
 /**
  * The page's own view settings that a shell offers as toolbar toggles, pushed whole
  * whenever either changes and once at startup. The page still owns both: the shell
@@ -3947,27 +4481,22 @@ export interface ViewOptions {
 	wordCountVisible: boolean;
 }
 
-/**
- * Where one pane's word-count badge is, and what it says, for a shell that draws the
- * badges itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
- */
-export interface WordCountBadge {
-	text: string;
-	left: number;
-	top: number;
-	right: number;
-	bottom: number;
+export enum TileKind {
+	Pos = "pos",
+	Synonym = "synonym",
+	Definition = "definition",
+	Rhyme = "rhyme",
 }
 
-/**
- * Every word-count badge the user can see, and every text pane's status row — the
- * whole lists, so it is safe to coalesce. The page's badges stay where they are,
- * invisible, to be measured; the shell draws them as Liquid Glass, which only a view
- * above the page can be.
- */
-export interface WordCountsChanged {
-	badges: WordCountBadge[];
-	panes?: PaneStatus[];
+/** A language-tool tile, made from a selection by the editor's context menu. */
+export interface WorkbenchTile {
+	/** Always a string on the wire; the page's ids are timestamps. */
+	id: string;
+	type: TileKind;
+	/** The word or sentence the tile is about. */
+	text: string;
+	/** The document it was made in. */
+	doc?: string;
 }
 
 /**

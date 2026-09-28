@@ -1,20 +1,20 @@
 /**
- * useVisibleBox.js — the part of a map the shell's panels leave uncovered.
+ * useVisibleBox.js — the box a map draws its own overlays in.
  *
  * A box in the surface's own pixels: `left`/`top` from the surface's corner, and its
  * `width`/`height`, with the surface's full size beside them. What the map draws over
- * itself is placed in this box, so under the Swift shell's glass sidebars the scale
- * bar is beside the file tree rather than behind it. Under Tauri it is the surface.
+ * itself — the scale bar, the compass, the title, the timeline — is placed in this box.
+ * `insets` is how much of the window's edges something floating covers; none, today.
  */
-import { useContext, useEffect, useState } from 'react'
-import { PanelInsetsContext } from './panelInsets'
+import { useEffect, useState } from 'react'
+
+const NO_INSETS = Object.freeze({ leading: 0, trailing: 0, top: 0 })
 
 const EMPTY = { left: 0, top: 0, width: 0, height: 0, surfaceWidth: 0, surfaceHeight: 0 }
 
 const same = (a, b) => Object.keys(EMPTY).every((key) => a[key] === b[key])
 
-export function useVisibleBox(surfaceRef) {
-  const insets = useContext(PanelInsetsContext)
+export function useVisibleBox(surfaceRef, insets = NO_INSETS) {
   const [box, setBox] = useState(EMPTY)
 
   useEffect(() => {

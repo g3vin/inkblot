@@ -5,9 +5,14 @@
  * this component adds the pin button, project title, resize handle, and a
  * Cmd+S shortcut that pins/unpins the sidebar while hovering it.
  */
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import FileTree from './FileTree'
 import SFIcon from './SFIcon'
+import BookNavigator from './book/BookNavigator'
+import { Segmented } from '../ui'
+import { useLatestBridgeState } from '../bridge'
+
+const VIEWS = [{ value: 'files', label: 'Files' }, { value: 'book', label: 'Book' }]
 
 // When unpinned, the sidebar peeks open only while the pointer is within this
 // distance of the window's left edge.
@@ -32,6 +37,18 @@ export default function LeftSidebar({
   setCurrentDoc,
   registerRefreshFiles,
 }) {
+  // The project's files, or the book's contents in the book's own order. The mode
+  // chooses — Typeset shows the book — and the switch overrides it until the mode
+  // changes again.
+  const layout = useLatestBridgeState('pageLayoutState', null)
+  const mode = layout?.mode
+  const [view, setView] = useState(mode === 'typeset' ? 'book' : 'files')
+  const [followedMode, setFollowedMode] = useState(mode)
+  if (mode !== followedMode) {
+    setFollowedMode(mode)
+    setView(mode === 'typeset' ? 'book' : 'files')
+  }
+
   const hoveredRef = useRef(false)
   const lastPointerXRef = useRef(null)
 
@@ -101,8 +118,20 @@ export default function LeftSidebar({
           </span>
         ) : null}
       </div>
+      {projectName ? (
+        <Segmented
+          className="left-sidebar-switch"
+          label="Show"
+          value={view}
+          onChange={setView}
+          options={VIEWS}
+          stretch
+        />
+      ) : null}
       <div className="sidebar-content">
-        <FileTree
+        {view === 'book' && projectName ? (
+          <BookNavigator hasProject={Boolean(projectName)} onShowFiles={() => setView('files')} />
+        ) : <FileTree
           projectName={projectName}
           currentDoc={currentDoc}
           secondaryDoc={secondaryDoc}
@@ -116,7 +145,7 @@ export default function LeftSidebar({
             setActiveDoc?.(doc)
             setCurrentDoc(doc)
           }}
-        />
+        />}
       </div>
       <div className="resizer resizer-right" onMouseDown={onResize} />
     </aside>

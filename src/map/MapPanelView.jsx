@@ -2,8 +2,7 @@
  * MapPanelView.jsx — the map inspector as the page draws it, down the right of a map.
  *
  * It draws the form `useMapPanel` builds, and nothing else: every field calls the
- * handler filed under its id, exactly as a click in the Swift app's native panel
- * does. Under a shell that draws the panel itself (`mapChrome`), this is not mounted.
+ * handler filed under its id.
  */
 import SFIcon from '../components/SFIcon'
 import { PinGlyph } from './mapGlyphs'
@@ -258,9 +257,11 @@ export default function MapPanelView({ panel, handlers, onClose }) {
             <SFIcon name="exclamationmark.triangle" size={14} />
           </span>
         ) : null}
-        <button type="button" className="map-tool" title="Hide the inspector" aria-label="Hide the inspector" onClick={onClose}>
-          <SFIcon name="xmark" size={14} />
-        </button>
+        {onClose ? (
+          <button type="button" className="map-tool" title="Hide the inspector" aria-label="Hide the inspector" onClick={onClose}>
+            <SFIcon name="xmark" size={14} />
+          </button>
+        ) : null}
       </div>
       {panel.tabs.length ? (
         <div className="map-row" role="tablist" style={{ padding: '8px 12px 0', gap: 4 }}>

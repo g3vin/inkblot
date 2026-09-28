@@ -46,8 +46,7 @@
         },
       };
       // Straight to Rust. Tauri puts its IPC on the main frame of every webview it
-      // creates, including this one showing pinterest.com; the Swift shell injects
-      // scrape-bridge.js, which allows exactly this one call.
+      // creates, including this one showing pinterest.com.
       window.__TAURI_INTERNALS__.invoke('pinterest_report_scrape', { report: payload });
     } catch {
       // A report that cannot be sent is not worth failing the scrape over: the caller

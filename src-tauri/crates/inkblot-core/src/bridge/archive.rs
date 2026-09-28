@@ -6,8 +6,8 @@
 //! from its sentence — but the archive is meant for anything a writer puts aside, so a
 //! kind brings its own payload field rather than the archive knowing about bubbles.
 //!
-//! The page owns the file, as it owns the document: it publishes a document's archive
-//! (`archiveChanged`) and performs what the shell asks (`archiveAction`).
+//! The page owns the file, as it owns the document, and the History panel reads and
+//! edits it there; these types are the file's shape.
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
@@ -38,35 +38,4 @@ pub struct ArchivedItem {
     /// The session, for a `Bubble`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bubble: Option<BubbleSession>,
-}
-
-/// A document's archive, newest first — the whole list, sent when the document the
-/// writer is in changes and whenever its archive does.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchiveChanged {
-    pub doc_path: String,
-    pub items: Vec<ArchivedItem>,
-}
-
-#[typeshare]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ArchiveAction {
-    /// Put it back. A bubble goes back on its sentence, if the sentence is still in the
-    /// document as it was archived; otherwise it stays in the archive.
-    Restore,
-    /// Delete it for good. Version history still has the document from before it was
-    /// archived.
-    Delete,
-}
-
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchiveActionCommand {
-    pub doc_path: String,
-    pub item_id: String,
-    pub action: ArchiveAction,
 }

@@ -22,6 +22,7 @@ import { debounce } from 'lodash'
 import { saveDocument, getVersions } from '../lib/FileSystem'
 import { isEditorReady } from '../lib/editorUtils'
 import { isTextDoc } from '../lib/docKind'
+import { TYPESET_META } from '../print/TypesetLock'
 
 const AUTOSAVE_DEBOUNCE_MS = 800
 const HISTORY_CHECKPOINT_DEBOUNCE_MS = 15000
@@ -122,9 +123,11 @@ export function useEditorAutosave({
       void saveVersionCheckpoint(editor, currentDoc, 'primary')
     }, HISTORY_CHECKPOINT_DEBOUNCE_MS)
 
-    const handleUpdate = () => {
+    // Typesetting — a paragraph's style, a picture's width — is saved like any edit, but
+    // is the typeset history's, not the text's: only writing moves the text history on.
+    const handleUpdate = ({ transaction } = {}) => {
       handler()
-      checkpointHandler()
+      if (!transaction?.getMeta(TYPESET_META)) checkpointHandler()
     }
 
     const handleCheckpointRequest = (event) => {

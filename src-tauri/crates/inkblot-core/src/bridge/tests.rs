@@ -1,9 +1,9 @@
 //! What these tests are for.
 //!
-//! The generated TypeScript and Swift are checked by `npm run types:check`, which
-//! proves the three languages describe the same *types*. It does not look at a single
-//! byte of JSON. But JSON is what actually crosses the seam, and a Swift shell will be
-//! written against the exact shape below — so the shape is asserted literally here,
+//! The generated TypeScript is checked by `npm run types:check`, which proves both
+//! languages describe the same *types*. It does not look at a single byte of JSON. But
+//! JSON is what actually crosses the seam, and any other shell would be written
+//! against the exact shape below — so the shape is asserted literally here,
 //! not derived from the same serde attributes it is meant to be checking.
 //!
 //! The exhaustive tag tests are the load-bearing ones. Adding a variant without
@@ -58,6 +58,9 @@ fn typography() -> crate::types::PrintTypography {
         chapter_opening: ChapterOpening::DropCap,
         chapter_sink_mm: 25.4,
         no_indent_after_break: true,
+        images: Some(crate::types::ImageTypesetting::default()),
+        composition: Some(crate::types::Composition { baseline_grid: true, ..Default::default() }),
+        features: None,
     }
 }
 
@@ -85,10 +88,62 @@ fn book() -> crate::types::BookSettings {
             style: crate::types::ChapterNumberStyle::Words,
             prefix: "Chapter".into(),
             include_title: true,
+            start_at: 0,
+            show_in_tree: true,
         },
         front_matter: crate::types::FrontMatter { half_title: true, dedication: "For M.".into(), contents: true, ..Default::default() },
         back_matter: crate::types::BackMatter { about_the_author: "A. Writer lives by the sea.".into(), ..Default::default() },
         publishing: crate::types::PublishingTarget { service: crate::types::PublishingService::Kdp, paper: crate::types::PaperStock::Cream },
+        chapter_design: Some(crate::types::ChapterDesign {
+            show_number: true,
+            ornament: crate::types::OrnamentKind::Glyph,
+            ornament_glyph: "❦".into(),
+            chapter_break: crate::types::ChapterBreak::NewRightPage,
+            style_id: Some("classic".into()),
+            ..Default::default()
+        }),
+        part_design: None,
+        items: vec![
+            crate::types::BookItem {
+                id: "d1".into(),
+                kind: crate::types::BookItemKind::Matter,
+                path: Some("Manuscript/.book/dedication-d1".into()),
+                title: None,
+                hidden: false,
+                matter: Some(crate::types::MatterKind::Dedication),
+                generated: None,
+                chapter_type: None,
+                page: Some(crate::types::PageOptions { position: crate::types::PagePosition::Sunk, ..Default::default() }),
+            },
+            crate::types::BookItem {
+                id: "c1".into(),
+                kind: crate::types::BookItemKind::Chapter,
+                path: Some("Manuscript/One".into()),
+                title: None,
+                hidden: true,
+                matter: None,
+                generated: None,
+                chapter_type: Some(crate::types::ChapterType::Prologue),
+                page: None,
+            },
+        ],
+        continuous: true,
+        covers: vec![crate::types::CoverSet {
+            id: "v1".into(),
+            name: "Cover".into(),
+            front: Some(".assets/covers/front.jpg".into()),
+            back: None,
+            spine: None,
+            wrap: None,
+            fit: crate::types::CoverFit::Fill,
+            made_for_spine_mm: Some(12.4),
+        }],
+        active_cover: Some("v1".into()),
+        digital: crate::types::DigitalOptions { drop_caps: false, ..Default::default() },
+        notes: crate::types::NotesOptions { placement: crate::types::NotePlacement::Chapter, ..Default::default() },
+        editions: vec![crate::types::Edition { id: "e1".into(), name: "Large Print".into(), kind: crate::types::EditionKind::LargePrint, page_setup: None, cover_set_id: Some("v1".into()) }],
+        active_edition: Some("e1".into()),
+        text_styles: vec![crate::types::TextStyleLook { id: "sign".into(), name: "Sign".into(), small_caps: true, boxed: true, align: crate::types::TextStyleAlign::Center, ..Default::default() }],
     }
 }
 
@@ -339,7 +394,6 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::RemoveNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
         NativeCommand::JumpToNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
-        NativeCommand::HighlightNote(HighlightNoteCommand { note_id: Some("n1".into()) }),
         NativeCommand::ClipboardDrop(ClipboardDropCommand { text: "moved".into() }),
         NativeCommand::RemoveClipboardEntries(RemoveClipboardEntriesCommand { ids: None }),
         NativeCommand::InsertClipboardEntry(InsertClipboardEntryCommand {
@@ -366,13 +420,7 @@ fn every_command() -> Vec<NativeCommand> {
             note_id: None,
         }),
         NativeCommand::AddReply(AddReplyCommand { doc_path: "one".into(), parent_note_id: "n1".into() }),
-        NativeCommand::SetTitlebarInset(SetTitlebarInsetCommand { leading: 78.0, trailing: 52.0 }),
-        NativeCommand::SetPanelInsets(SetPanelInsetsCommand { leading: 240.0, trailing: 310.0, top: 52.0 }),
         NativeCommand::OpenProject(OpenProjectCommand { project_name: "Novel".into() }),
-        NativeCommand::CloseBubbleSession(CloseBubbleSessionCommand {
-            session: bubble_session(),
-            archive: false,
-        }),
         NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::Heading1 }),
         NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::SceneHeading }),
         NativeCommand::SetWritingFormat(SetWritingFormatCommand { target: EditorTarget::Primary, format: WritingFormat::Screenplay }),
@@ -380,11 +428,6 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::EditorHistory(EditorHistoryCommand { target: EditorTarget::Primary, action: HistoryAction::Undo }),
         NativeCommand::SetFocusMode(SetFocusModeCommand { open: true }),
         NativeCommand::SetWordCountVisible(SetWordCountVisibleCommand { visible: false }),
-        NativeCommand::ArchiveAction(ArchiveActionCommand {
-            doc_path: "a.md".into(),
-            item_id: "x1".into(),
-            action: ArchiveAction::Restore,
-        }),
         NativeCommand::AddReference(AddReferenceCommand {
             id: "r1".into(),
             doc_path: Some("a".into()),
@@ -415,6 +458,47 @@ fn every_command() -> Vec<NativeCommand> {
             doc_path: "a".into(),
             options: bibliography_options(),
         }),
+        NativeCommand::SetEditorMode(SetEditorModeCommand { mode: EditorMode::Typeset }),
+        NativeCommand::MoveBookItem(MoveBookItemCommand { id: "c:Novel/One".into(), before: Some("d1".into()) }),
+        NativeCommand::SetBookItemHidden(SetBookItemHiddenCommand { id: "c:Novel/One".into(), hidden: true }),
+        NativeCommand::AddBookItem(AddBookItemCommand {
+            matter: Some(crate::types::MatterKind::AboutAuthor),
+            generated: None,
+            part: false,
+            before: None,
+            title: None,
+            back: false,
+        }),
+        NativeCommand::RemoveBookItem(RemoveBookItemCommand { id: "d1".into() }),
+        NativeCommand::EditBookItem(EditBookItemCommand {
+            id: "c:Novel/One".into(),
+            title: None,
+            chapter_type: Some(crate::types::ChapterType::Prologue),
+            page: None,
+        }),
+        NativeCommand::OpenBookItem(OpenBookItemCommand { id: "d1".into() }),
+        NativeCommand::ApplyBookStyle(ApplyBookStyleCommand { id: "classic".into() }),
+        NativeCommand::SetChapterMeta(SetChapterMetaCommand {
+            meta: crate::types::ChapterMeta { subtitle: "In which it rains".into(), ..Default::default() },
+        }),
+        NativeCommand::SetHeadImage(SetHeadImageCommand { target: HeadImageTarget::Ornament, path: Some("/Users/a/fleuron.png".into()) }),
+        NativeCommand::SetFolderBookOptions(SetFolderBookOptionsCommand { folder: "Novel".into(), number_in_tree: Some(true), start_at: Some(0), continuous: None }),
+        NativeCommand::SetTypesetView(SetTypesetViewCommand { view: TypesetView::Digital }),
+        NativeCommand::SetParagraphTypeset(SetParagraphTypesetCommand { anchor: Some(anchor()), nudge_tracking: Some(-5), ..Default::default() }),
+        NativeCommand::ShowProofIssue(ShowProofIssueCommand { anchor: anchor() }),
+        NativeCommand::SetTypesetDisplay(SetTypesetDisplayCommand { spread: Some(true), ..Default::default() }),
+        NativeCommand::AddProjectFont(AddProjectFontCommand { path: "/Users/a/Fonts/Garamond.otf".into() }),
+        NativeCommand::SetTextStyle(SetTextStyleCommand { style: Some("letter".into()) }),
+        NativeCommand::InsertFootnote(InsertFootnoteCommand { target: EditorTarget::Primary }),
+        NativeCommand::EditEditions(EditEditionsCommand { action: EditionAction::Add, id: None, name: None, kind: Some(crate::types::EditionKind::LargePrint), cover_set_id: None }),
+        NativeCommand::ExportAllEditions(ExportAllEditionsCommand {}),
+        NativeCommand::SetCoverImage(SetCoverImageCommand { set_id: None, part: crate::types::CoverPart::Spine, path: Some("/Users/a/spine.png".into()) }),
+        NativeCommand::EditCoverSets(EditCoverSetsCommand { action: CoverSetAction::Rename, id: Some("v1".into()), name: Some("Hardcover".into()), fit: None }),
+        NativeCommand::SaveTypesetVersion(SaveTypesetVersionCommand { name: "Sent to KDP".into() }),
+        NativeCommand::RestoreTypesetVersion(TypesetVersionRef { id: "v1".into() }),
+        NativeCommand::RenameTypesetVersion(RenameTypesetVersionCommand { id: "v1".into(), name: "Proof 2".into() }),
+        NativeCommand::DeleteTypesetVersion(TypesetVersionRef { id: "v1".into() }),
+        NativeCommand::PreviewTypesetVersion(PreviewTypesetVersionCommand { id: Some("v1".into()), compare: true }),
         NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true, doc_path: Some("a.md".into()) }),
         NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Book }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
@@ -430,7 +514,6 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false, options: PrintOptions::default() }),
         NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Docx, scope: PrintScope::Folder, bound: false, options: PrintOptions::default() }),
-        NativeCommand::PrintFinished(PrintFinishedCommand { job_id: "p1".into(), completed: true }),
         NativeCommand::ApplyFormat(ApplyFormatCommand { format_id: "manuscript".into(), target: PageSetupTarget::Document }),
         NativeCommand::UseSetupForBook(UseSetupForBookCommand {}),
         NativeCommand::ClearBookSetup(ClearBookSetupCommand {}),
@@ -638,16 +721,6 @@ fn map_chrome() -> MapChromeState {
 }
 
 fn every_event() -> Vec<WebviewEvent> {
-    let marker = NoteMarkerEvent {
-        note_id: "n1".into(),
-        doc_path: "chapters/one.md".into(),
-        anchor_left: 1.0,
-        anchor_top: 2.0,
-        anchor_right: 3.0,
-        anchor_bottom: 4.0,
-        note: None,
-    };
-
     vec![
         WebviewEvent::ToolbarState(ToolbarState {
             target: Some(EditorTarget::Primary),
@@ -681,14 +754,6 @@ fn every_event() -> Vec<WebviewEvent> {
             deleted: 1,
             paste: false,
         }),
-        WebviewEvent::NotesRemapped(NotesRemapped {
-            doc_path: "chapters/one.md".into(),
-            notes: Vec::new(),
-            dropped_note_ids: vec!["n9".into()],
-        }),
-        WebviewEvent::NoteMarkerHover(marker.clone()),
-        WebviewEvent::NoteMarkerLeave(marker.clone()),
-        WebviewEvent::NoteMarkerPin(marker),
         WebviewEvent::ActiveEditorChanged(ActiveEditorChanged {
             target: Some(EditorTarget::Primary),
             doc_path: None,
@@ -712,109 +777,16 @@ fn every_event() -> Vec<WebviewEvent> {
             }),
         }),
         WebviewEvent::MapChromeChanged(MapChromeChanged { state: Some(map_chrome()) }),
-        WebviewEvent::SearchMatches(SearchMatches {
-            query: "hesitated".into(),
-            doc_path: "chapters/one.md".into(),
-            results: Vec::new(),
-            active_index: Some(0),
-        }),
-        WebviewEvent::FocusModeView(FocusModeView {
-            active: true,
-            doc_path: "chapters/one.md".into(),
-            paragraph_index: 2,
-            paragraph_count: 9,
-            word_count: 120,
-        }),
         WebviewEvent::ReadAloudPayload(ReadAloudPayloadEvent {
             doc_path: "chapters/one.md".into(),
             payload: Default::default(),
-        }),
-        WebviewEvent::DragStarted(DragStarted {
-            drag_id: "d1".into(),
-            kind: DragPayloadKind::EditorSelection,
-            text: "she hesitated".into(),
-            source_id: None,
-            doc_path: Some("chapters/one.md".into()),
-            anchor: Some(anchor()),
-            detail: None,
-        }),
-        WebviewEvent::DragMoved(DragMoved {
-            drag_id: "d1".into(),
-            client_x: 5.0,
-            client_y: 6.0,
-        }),
-        WebviewEvent::DragEnded(DragEnded {
-            drag_id: "d1".into(),
-            handled: true,
-            client_x: Some(5.0),
-            client_y: Some(6.0),
         }),
         WebviewEvent::ProjectChanged(ProjectChanged {
             project_name: Some("Novel".into()),
             project_root: Some("/Users/me/Novel".into()),
         }),
-        WebviewEvent::NotesChanged(NotesChanged { doc_path: "one".into(), notes: Vec::new() }),
-        WebviewEvent::ClipboardChanged(ClipboardChanged {
-            entries: vec![ClipboardEntry {
-                id: "c1".into(),
-                text: "copied".into(),
-                doc_name: "one".into(),
-                timestamp: "2026-09-22T12:00:00.000Z".into(),
-            }],
-        }),
-        WebviewEvent::TilesChanged(TilesChanged {
-            tiles: vec![WorkbenchTile {
-                id: "1758556800000".into(),
-                kind: TileKind::Synonym,
-                text: "hesitated".into(),
-                doc: Some("one".into()),
-            }],
-        }),
-        WebviewEvent::VersionsChanged(VersionsChanged { doc_path: "one".into() }),
         WebviewEvent::ShowSidebarTab(ShowSidebarTab { tab: SidebarTab::History }),
-        WebviewEvent::NoteMarkerMoved(NoteMarkerEvent {
-            note_id: "n1".into(),
-            doc_path: "chapters/one.md".into(),
-            anchor_left: 1.0,
-            anchor_top: 2.0,
-            anchor_right: 3.0,
-            anchor_bottom: 4.0,
-            note: None,
-        }),
-        WebviewEvent::NotePreviewDismissed(NotePreviewDismissed { note_id: "n1".into() }),
-        WebviewEvent::NoteMarkersChanged(NoteMarkersChanged {
-            markers: vec![NoteMarkerRect {
-                note_id: "n1".into(),
-                color: "#ffd54f".into(),
-                left: 10.0,
-                top: 20.0,
-                right: 18.0,
-                bottom: 28.0,
-            }],
-        }),
-        WebviewEvent::BubbleSessionOpened(BubbleSessionOpened {
-            doc_path: "chapters/one.md".into(),
-            session: bubble_session(),
-        }),
-        WebviewEvent::BubbleChipsChanged(BubbleChipsChanged {
-            chips: vec![BubbleChipRect {
-                session_id: "b1".into(), left: 1.0, top: 2.0, right: 23.0, bottom: 18.0, form_page: 1, form_pages: 3,
-            }],
-        }),
         WebviewEvent::ViewOptions(ViewOptions { focus_mode: false, word_count_visible: true }),
-        WebviewEvent::WordCountsChanged(WordCountsChanged {
-            badges: vec![WordCountBadge {
-                text: "12 words".into(), left: 600.0, top: 700.0, right: 660.0, bottom: 722.0,
-            }],
-            panes: vec![PaneStatus {
-                pane: Pane::Secondary, doc_path: "a.md".into(), print_layout: true, zoom: 1.25, hovered: true,
-                left: 400.0, top: 700.0, right: 800.0, bottom: 722.0,
-            }],
-        }),
-        WebviewEvent::ArchiveChanged(ArchiveChanged {
-            doc_path: "a.md".into(),
-            items: vec![archived_bubble()],
-        }),
         WebviewEvent::ReferencesChanged(ReferencesChanged {
             doc_path: Some("a".into()),
             style: "apa".into(),
@@ -859,6 +831,21 @@ fn every_event() -> Vec<WebviewEvent> {
         WebviewEvent::RevealReference(RevealReference { id: "r1".into() }),
         WebviewEvent::PageLayoutState(PageLayoutState {
             enabled: true,
+            mode: EditorMode::Typeset,
+            typeset_view: TypesetView::Print,
+            spread: false,
+            show_grid: true,
+            proof: true,
+            proof_issues: vec![ProofIssue {
+                id: "widow-12".into(),
+                kind: ProofKind::Widow,
+                page: 3,
+                anchor: TextAnchor::new(120, 136, "and so it ended."),
+                fixes: vec![ProofFix::Tighten, ProofFix::RunLong],
+            }],
+            paragraph: Some(ParagraphTypeset { tracking: -5, ..Default::default() }),
+            project_fonts: vec![ProjectFont { family: "EB Garamond".into(), path: ".assets/fonts/EBGaramond.otf".into(), embeddable: true }],
+            text_styles: vec![crate::types::TextStyleLook { id: "letter".into(), name: "Letter".into(), indent_em: 2.0, flush: true, space_lines: 1.0, ..Default::default() }],
             doc_path: Some("Manuscript/one".into()),
             setup: page_setup(),
             ready: true,
@@ -873,6 +860,39 @@ fn every_event() -> Vec<WebviewEvent> {
             book: book(),
             book_setup_active: true,
             book_chapters: vec!["Manuscript/one".into(), "Manuscript/two".into()],
+            book_items: vec![BookRow {
+                id: "c:Manuscript/one".into(),
+                kind: crate::types::BookItemKind::Chapter,
+                title: "one".into(),
+                path: Some("Manuscript/one".into()),
+                hidden: false,
+                matter: None,
+                generated: None,
+                chapter_type: None,
+                number: Some(1),
+                label: Some("Chapter One".into()),
+                section: BookRowSection::Body,
+                part: None,
+                page: crate::types::PageOptions::default(),
+                legacy: false,
+            }],
+            selected_book_item: Some("c:Manuscript/one".into()),
+            chapter_meta: Some(crate::types::ChapterMeta { subtitle: "In which it rains".into(), ..Default::default() }),
+            cover: Some(CoverState {
+                sets: vec![],
+                active: None,
+                trim_width_mm: 152.4,
+                trim_height_mm: 228.6,
+                spine_width_mm: 12.4,
+                bleed_mm: 3.175,
+                wrap_width_mm: 323.55,
+                wrap_height_mm: 234.95,
+                page_count: 220,
+                checks: vec![],
+                showing: false,
+            }),
+            chapter_image_file: None,
+            ornament_image_file: None,
             suggested_inside_margin_mm: 12.7,
             author: crate::types::AuthorProfile { byline: "A. Writer".into(), ..Default::default() },
             word_count: 71_400,
@@ -901,13 +921,6 @@ fn every_event() -> Vec<WebviewEvent> {
                 scenes: vec![SceneSummary { number: Some("12A".into()), heading: "INT. KITCHEN - NIGHT".into(), page: 14 }],
             }),
         }),
-        WebviewEvent::PrintRequest(PrintRequest {
-            job_id: "p1".into(),
-            job_name: "The Book".into(),
-            paper_width_pt: 612.0,
-            paper_height_pt: 792.0,
-            pdf_path: None,
-        }),
         WebviewEvent::PageLayoutCatalog(PageLayoutCatalog {
             presets: vec![PageSizeOption { id: "a4".into(), label: "A4".into(), group: "ISO A".into(), width_mm: 210.0, height_mm: 297.0 }],
             formats: vec![FormatOption {
@@ -920,6 +933,7 @@ fn every_event() -> Vec<WebviewEvent> {
             signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
             tokens: vec![RunningToken { token: "{page}".into(), label: "Page Number".into() }],
             default_typography: typography(),
+            book_styles: vec![],
         }),
         WebviewEvent::PrintJobStatus(PrintJobStatus {
             job_id: "p1".into(),
@@ -930,6 +944,20 @@ fn every_event() -> Vec<WebviewEvent> {
             total: Some(14),
             message: None,
             path: None,
+        }),
+        WebviewEvent::TypesetFocus(TypesetFocus { section_id: "page.size".into() }),
+        WebviewEvent::TypesetHistoryChanged(TypesetHistoryChanged {
+            folder: "Novel".into(),
+            rows: vec![TypesetVersionRow {
+                id: "v1".into(),
+                timestamp: "2026-09-26T12:00:00Z".into(),
+                kind: TypesetVersionKind::Export,
+                name: Some("Exported PDF".into()),
+                summary: vec!["Inside margin 19 mm → 22 mm".into()],
+            }],
+            previewing: None,
+            comparing: false,
+            note: None,
         }),
         WebviewEvent::TabsChanged(TabsChanged {
             tabs: vec![
@@ -982,7 +1010,6 @@ fn every_command_has_its_documented_wire_name() {
             "updateNote",
             "removeNote",
             "jumpToNote",
-            "highlightNote",
             "clipboardDrop",
             "removeClipboardEntries",
             "insertClipboardEntry",
@@ -993,10 +1020,7 @@ fn every_command_has_its_documented_wire_name() {
             "renameVersion",
             "revealSearchResult",
             "addReply",
-            "setTitlebarInset",
-            "setPanelInsets",
             "openProject",
-            "closeBubbleSession",
             "setBlockType",
             "setBlockType",
             "setWritingFormat",
@@ -1004,7 +1028,6 @@ fn every_command_has_its_documented_wire_name() {
             "editorHistory",
             "setFocusMode",
             "setWordCountVisible",
-            "archiveAction",
             "addReference",
             "createReference",
             "updateReference",
@@ -1016,6 +1039,33 @@ fn every_command_has_its_documented_wire_name() {
             "insertBibliography",
             "setCitationStyle",
             "setBibliographyOptions",
+            "setEditorMode",
+            "moveBookItem",
+            "setBookItemHidden",
+            "addBookItem",
+            "removeBookItem",
+            "editBookItem",
+            "openBookItem",
+            "applyBookStyle",
+            "setChapterMeta",
+            "setHeadImage",
+            "setFolderBookOptions",
+            "setTypesetView",
+            "setParagraphTypeset",
+            "showProofIssue",
+            "setTypesetDisplay",
+            "addProjectFont",
+            "setTextStyle",
+            "insertFootnote",
+            "editEditions",
+            "exportAllEditions",
+            "setCoverImage",
+            "editCoverSets",
+            "saveTypesetVersion",
+            "restoreTypesetVersion",
+            "renameTypesetVersion",
+            "deleteTypesetVersion",
+            "previewTypesetVersion",
             "setPrintLayout",
             "setPageSetup",
             "setBookSettings",
@@ -1027,7 +1077,6 @@ fn every_command_has_its_documented_wire_name() {
             "printDocument",
             "exportDocument",
             "exportDocument",
-            "printFinished",
             "applyFormat",
             "useSetupForBook",
             "clearBookSetup",
@@ -1062,40 +1111,21 @@ fn every_event_has_its_documented_wire_name() {
             "toolbarState",
             "selectionContext",
             "docChanged",
-            "notesRemapped",
-            "noteMarkerHover",
-            "noteMarkerLeave",
-            "noteMarkerPin",
             "activeEditorChanged",
             "canvasToolbarChanged",
             "mapChromeChanged",
-            "searchMatches",
-            "focusModeView",
             "readAloudPayload",
-            "dragStarted",
-            "dragMoved",
-            "dragEnded",
             "projectChanged",
-            "notesChanged",
-            "clipboardChanged",
-            "tilesChanged",
-            "versionsChanged",
             "showSidebarTab",
-            "noteMarkerMoved",
-            "notePreviewDismissed",
-            "noteMarkersChanged",
-            "bubbleSessionOpened",
-            "bubbleChipsChanged",
             "viewOptions",
-            "wordCountsChanged",
-            "archiveChanged",
             "referencesChanged",
             "referenceSchema",
             "revealReference",
             "pageLayoutState",
-            "printRequest",
             "pageLayoutCatalog",
             "printJobStatus",
+            "typesetFocus",
+            "typesetHistoryChanged",
             "tabsChanged",
         ]
     );
@@ -1326,6 +1356,9 @@ fn a_page_setup_carries_its_typography_in_camel_case() {
         chapter_opening: ChapterOpening::DropCapAndSmallCaps,
         chapter_sink_mm: 76.2,
         no_indent_after_break: true,
+        images: None,
+        composition: None,
+        features: None,
     });
     setup.title_page = Some(TitlePageOptions { style: TitlePageStyle::Manuscript, show_contact: true, show_word_count: true });
     let wire = serde_json::to_value(&setup).unwrap();
@@ -1378,6 +1411,32 @@ fn a_book_saved_before_compiling_reads_with_everything_in() {
     assert_eq!(wire["chapterNumbering"]["style"], "words");
     assert_eq!(wire["frontMatter"]["halfTitle"], true);
     assert_eq!(wire["backMatter"]["aboutTheAuthor"], "A. Writer lives by the sea.");
+}
+
+#[test]
+fn a_book_saved_before_typesetting_reads_with_no_design_contents_or_covers() {
+    let mut old = serde_json::to_value(book()).unwrap();
+    for key in ["chapterDesign", "partDesign", "items", "continuous", "covers", "activeCover"] {
+        old.as_object_mut().unwrap().remove(key);
+    }
+    old["chapterNumbering"].as_object_mut().unwrap().remove("startAt");
+    old["chapterNumbering"].as_object_mut().unwrap().remove("showInTree");
+    let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
+    assert!(read.chapter_design.is_none() && read.items.is_empty() && read.covers.is_empty());
+    assert!(!read.continuous);
+    assert_eq!(read.chapter_numbering.start_at, 1, "an old book counts from one");
+    assert!(!read.chapter_numbering.show_in_tree);
+
+    let wire = serde_json::to_value(book()).unwrap();
+    assert_eq!(wire["chapterDesign"]["chapterBreak"], "newRightPage");
+    assert_eq!(wire["chapterDesign"]["ornament"], "glyph");
+    assert_eq!(wire["items"][0]["matter"], "dedication");
+    assert_eq!(wire["items"][0]["page"]["position"], "sunk");
+    assert_eq!(wire["items"][1]["chapterType"], "prologue");
+    assert_eq!(wire["covers"][0]["madeForSpineMm"], 12.4);
+    let design: crate::types::ChapterDesign = serde_json::from_value(json!({ "showNumber": true })).unwrap();
+    assert!(design.show_title && design.show_number, "a partial design fills the rest in");
+    assert_eq!(design.chapter_break, crate::types::ChapterBreak::NewPage);
 }
 
 #[test]

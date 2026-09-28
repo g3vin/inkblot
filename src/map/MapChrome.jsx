@@ -3,8 +3,7 @@
  * rose and the title cartouche. Each is anchored at a fraction of the view
  * (`style.*.at`), so it stays put while the map moves under it.
  *
- * They are placed in the part of the map nothing else covers (`useVisibleBox`): under
- * the Swift shell the map runs on beneath its glass sidebars and toolbar.
+ * They are placed in the part of the map nothing else covers (`useVisibleBox`).
  *
  * The scale bar is measured, not assumed: it asks the map's space how far apart two
  * points 100 px either side of the view's centre are, so it is right on a calibrated
