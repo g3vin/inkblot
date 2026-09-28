@@ -47,12 +47,15 @@ import { useDocumentArchive } from '../hooks/useDocumentArchive'
 import { useReferences } from '../hooks/useReferences'
 import NoteHoverPreview from './NoteHoverPreview'
 import ToolbarHost from './toolbar/ToolbarHost'
+import IconButton from '../ui/IconButton'
 import { readDisplayMode, TOOLBAR_LAYOUT_CHANGED } from './toolbar/useToolbarLayout'
 import { CUSTOMIZE_INSPECTOR_EVENT, popUpToolbarMenu } from '../hooks/contextMenu/toolbarMenu'
 import InspectorLayoutEditor from './RightSidebar/InspectorLayoutEditor'
 import { setInspectorOpen } from '../lib/inspectorPresence'
 
 const LEFT_SIDEBAR_OUTER_CHROME_WIDTH = 18
+// Room in the titlebar for a sidebar's show button while it is put away.
+const TITLEBAR_TOGGLE_WIDTH = 44
 const RIGHT_SIDEBAR_OUTER_CHROME_WIDTH = 22
 
 // The macOS traffic lights sit inside the left sidebar's top-left corner; their
@@ -150,7 +153,7 @@ export default function EditorLayout(props) {
   const titlebarLeftWidth = nativeFileTree
     ? (nativeWindowChrome ? nativePanelInsets.leading : 86)
     : left.collapsed && !left.peeked
-      ? 86
+      ? 86 + TITLEBAR_TOGGLE_WIDTH
       : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
   const nativeRightSidebar = nativeOwns('rightSidebar')
   const nativeToolbar = nativeOwns('toolbar')
@@ -181,7 +184,7 @@ export default function EditorLayout(props) {
   const titlebarRightWidth = nativeRightSidebar
     ? nativePanelInsets.trailing
     : right.collapsed && !right.peeked
-    ? 0
+    ? TITLEBAR_TOGGLE_WIDTH
     : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
   // On a canvas, the only editor the Toolbar may drive is a card's own editor.
   // Falling back to the pane's TipTap editors would point the Toolbar at an idle
@@ -723,6 +726,18 @@ export default function EditorLayout(props) {
             edited gets the text Toolbar, else a canvas gets its own toolbar
             (portaled in by the active CanvasSurface), else a plain document gets
             the text Toolbar. */}
+        {/* Show Sidebar and Show Inspector, while each is put away — the round
+            buttons in a macOS window's toolbar. The pin in each sidebar puts it away. */}
+        {!nativeFileTree && left.collapsed && !left.peeked ? (
+          <div className="titlebar-toggle is-left">
+            <IconButton symbol="sidebar.left" label="Show Sidebar" size="circle" className="floating-capsule" onClick={left.pin} />
+          </div>
+        ) : null}
+        {!nativeRightSidebar && right.collapsed && !right.peeked ? (
+          <div className="titlebar-toggle is-right">
+            <IconButton symbol="sidebar.right" label="Show Inspector" size="circle" className="floating-capsule" onClick={right.pin} />
+          </div>
+        ) : null}
         <div className="app-titlebar-toolbar">
           {comparing ? (
             <div className="canvas-toolbar-slot" ref={setCompareToolbarSlot} />
