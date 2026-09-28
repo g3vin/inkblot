@@ -9,8 +9,8 @@ const L = await import('../../src/lib/chromeLayout.ts')
 
 /* ---------------- the ids are storage keys ---------------- */
 
-// Copied from ToolbarRegistryTests.expected (the Swift shell's), less the retired
-// inspector toggle, plus the two web-only speech items. Never change or remove one.
+// The ids saved layouts are made of, less the retired
+// inspector toggle, plus the two speech items. Never change or remove one.
 const EXPECTED_IDS = [
   'inkblot.format.font', 'inkblot.format.font-size', 'inkblot.format.text-style', 'inkblot.format.text-color',
   'inkblot.format.highlight', 'inkblot.format.alignment', 'inkblot.format.paragraph-style',
@@ -91,7 +91,7 @@ ok('nothing saved: Write has its defaults', L.tabsOf(layouts, 'drafting').join()
 ok('and Typeset has its own', L.tabsOf(layouts, 'finishing').join() === 'typeset,output,notes,references,history,stats')
 ok('corrupt JSON is the defaults', L.tabsOf(I('][') , 'drafting').length === 6)
 
-// The Swift shell's bare map, from before Stats, Typeset and Print & Export: with no
+// An earlier version's bare map, from before Stats, Typeset and Print & Export: with no
 // known list, those are the ones it never knew about.
 layouts = I(JSON.stringify({ drafting: ['notes', 'clipboard', 'history'], finishing: ['page', 'book', 'publish', 'notes'] }))
 ok('renamed tabs read as what they became, once', L.tabsOf(layouts, 'finishing').slice(0, 2).join() === 'typeset,output')

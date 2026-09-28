@@ -69,7 +69,7 @@ export default function SidebarSearch({
   const inputRef = useRef(null)
   const notesByDocRef = useRef(notesByDoc)
 
-  // Searched a moment after the typing stops (as the Swift panel did), not per key.
+  // Searched a moment after the typing stops, not per key.
   const [deferredQuery, setDeferredQuery] = useState(query)
   useEffect(() => {
     if (!query) { setDeferredQuery(''); return undefined }

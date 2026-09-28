@@ -1,4 +1,4 @@
-//! What a search returns, to the page's search bar and the Swift app's inspector alike.
+//! What a search returns, to the page's search bar.
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;

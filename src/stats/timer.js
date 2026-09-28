@@ -1,6 +1,6 @@
 /**
  * Runs a writing routine: write for this long, break for that long, and so on to
- * the end — or until the writer stops. A port of the Swift app's `WritingTimer`.
+ * the end — or until the writer stops.
  *
  * **Wall-clock deadlines, not a countdown.** A segment with a clock ends at a
  * time, and every question — how long is left, has it ended — is asked of the

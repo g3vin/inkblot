@@ -3,8 +3,7 @@
  *
  * The bubble editor's hit-testing and drop rules, apart from the component so they can
  * be tested without a layout engine. Rects are client rects; `stage` is the editor's
- * own. `native/…/Bubble/BubbleDrop.swift` makes the same decisions for the Swift
- * shell's editor.
+ * own.
  */
 import { clampAside, joinText } from './bubbleText'
 
@@ -207,7 +206,6 @@ export const THROW_REACH = 120
  * Where a bubble released at `point` moving at `velocity` (px/ms) lands, when that is a
  * throw toward an edge: projected `THROW_PROJECTION_MS` on, kept inside the stage, more
  * than `THROW_REACH` away, and near an edge. Otherwise null — it lands where it was let go.
- * (BubbleModel.dragEnded, with SwiftUI's predicted end.)
  */
 export const throwLanding = (stage, point, velocity) => {
   const x = clamp(point.x + velocity.x * THROW_PROJECTION_MS, stage.left, stage.right)

@@ -4,7 +4,7 @@
 //! **Why most of this is "ask the page".** All five panels show state the page owns —
 //! `notesByDoc`, `clipboardHistory`, `tiles` live in React, and versions live in the
 //! document file the page's autosave rewrites under its own per-document lock. A native
-//! panel that wrote any of it directly would race the page: a note edited in Swift and
+//! panel that wrote any of it directly would race the page: a note edited there and
 //! autosaved from the page's stale copy a moment later is a lost edit, and a version
 //! renamed through the core's lock while the page's lock is mid-write is a lost version.
 //! So the page publishes (`notesChanged`, `clipboardChanged`, `tilesChanged`,

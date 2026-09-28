@@ -1,6 +1,5 @@
 /**
- * The Print & Export tab's sections (OutputPanelView, ScriptProductionSection and
- * CoverSection in Swift): a script's production tools, the book checked against a
+ * The Print & Export tab's sections: a script's production tools, the book checked against a
  * print-on-demand service, its covers, and printing sheets to bind by hand.
  */
 import { useEffect, useRef, useState } from 'react'

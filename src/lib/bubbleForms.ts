@@ -11,9 +11,6 @@
  * page after them. Leaving it for a form keeps it (`unsaved`), so coming back finds it
  * as it was; it is only let go once another arrangement becomes the unsaved one, by an
  * edit to a form that is showing. Undo brings back any of it.
- *
- * The Swift shell's `BubbleForms.swift` is the same rules; a session saved in one is
- * reopened in the other.
  */
 import { BubbleMode } from '../types'
 import type { BubbleAside, BubbleForm, BubbleSession, BubbleWord } from '../types'

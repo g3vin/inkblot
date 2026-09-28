@@ -13,9 +13,7 @@
  *     document's archive (`lib/archiveStore.js`) — forms, set-aside words and all. The
  *     History panel's archive can put it back (`restoreArchivedBubble`).
  *
- * Under the Swift shell the editor is native: opening publishes `bubbleSessionOpened`
- * and the shell answers with `closeBubbleSession`. Otherwise `open` is what
- * EditorLayout renders `BubbleEditor` from.
+ * `open` is what EditorLayout renders `BubbleEditor` from.
  *
  * A new session holds a `TextAnchor` for its sentence until it closes; a reopened one is
  * found by its id, which the mark carries, so it survives any edit in between.

@@ -1,7 +1,7 @@
 /**
  * MapInspectorPanel — the Map tab: the active map's panel, drawn from what the map
- * publishes (`mapChromeChanged`) and sent back as map commands, the way the Swift
- * inspector drew it. The same MapPanelView the map floats when the inspector is shut.
+ * publishes (`mapChromeChanged`) and sent back as map commands. The same MapPanelView
+ * the map floats when the inspector is shut.
  */
 import { useMemo } from 'react'
 import { useLatestBridgeState } from '../../bridge'

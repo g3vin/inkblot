@@ -7,8 +7,8 @@
  *      document's style and bibliography options, and what the document has attached
  *      (`setCitationContext`). This runs under either host: a citation pasted into a
  *      document formats whether or not a References panel is drawn.
- *   2. Under the Swift shell, the panel is told everything it shows (`referenceSchema`
- *      once; `referencesChanged` whenever the library, the document, its style or its
+ *   2. The References panel is told everything it shows (`referenceSchema` once;
+ *      `referencesChanged` whenever the library, the document, its style or its
  *      citations change) and its commands are carried out here, since the page owns
  *      the library file as it owns the documents.
  *   3. Quick add: a source is written at once, `resolving`, and filled in when the lookup

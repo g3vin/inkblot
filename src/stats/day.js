@@ -1,7 +1,6 @@
 /**
  * Local calendar days as the stats store keys them: `YYYY-MM-DD`. Weekdays count
- * as the Swift app's did — 1 is Sunday — because goal plans and reminders saved by
- * it store them that way.
+ * from 1 for Sunday, as goal plans and reminders store them.
  */
 
 const pad = (value, width = 2) => String(value).padStart(width, '0')

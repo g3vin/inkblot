@@ -4,7 +4,7 @@
  *
  * The controller is mounted and driven through the app's real bridge (`shellBridge` →
  * `documentSurface`), so every state and command crosses the JSON-copying transport the
- * Swift shell uses.
+ * chrome uses.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'

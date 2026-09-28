@@ -7,37 +7,27 @@ in its header comment. This document covers what spans modules.
 ## The pieces
 
 ```text
- Swift app (native/)                             WKWebView — dist/, unmodified
- ───────────────────                             ─────────────────────────────
- FileTreeSidebar, InspectorView,                 React chrome (panes, editors;
- DocumentToolbar, Bubble/, Notes/,               the sidebars and toolbar when
- PrintLayoutControls, InkblotCommands            not native)
-        │                                                │
-   ShellBridge ◄── bridge protocol (JSON) ──► createNativeHostTransports
-   (Bridge/)          native-host.js             (src/bridge/transport.ts)
-                                                 merged with the in-process
-                                                 React shell
-   TauriHost ◄──── Tauri IPC (JSON) ──────── tauri-shim.js
-   (Web/)        window.__TAURI_INTERNALS__      (the page calls Tauri's API)
-     ├─ ModelService ─► InkblotModels ┐
-     └─ AuxiliaryWindows              ├─ inkblot-ffi (UniFFI) ─► inkblot-core
-   CoreService ─────► InkblotCore ────┘                         inkblot-models
-   AppSchemeHandler: inkblot://app/ (dist) · asset://localhost/ (files on disk)
-
- Tauri app: the same page, the in-process transport only, and
-            src-tauri/src/*_commands.rs ─► inkblot-core, inkblot-models
+ The page (src/)                                       Tauri (src-tauri/)
+ ──────────────────────────────────────────────        ─────────────────────────────
+ The chrome: toolbar, file tree, inspector,            *_commands.rs ─► inkblot-core
+ tab bar, menus, settings, stats                                     └► inkblot-models
+        │                                                     ▲
+   shellBridge ◄── bridge protocol (JSON, in process) ──►     │ invoke()
+        │          (src/bridge/transport.ts)                   │
+   documentSurface: the panes, editors, canvases, maps ────────┘
 ```
 
-- **The page** (`src/`) is the editor and everything around it. It is the same bundle
-  in both apps. It never checks which app it is in at build time. It asks the host at
-  runtime which chrome to draw (`src/lib/host.ts`).
-- **`inkblot-core`** is domain logic with no knowledge of any shell. That covers
-  persistence, search, version history, the canvas model and the bridge protocol
-  types.
-- **`inkblot-models`** holds the on-device models, also shell-independent.
-- **The Tauri app** wraps both crates as `#[tauri::command]`s.
-- **The Swift app** reaches both crates through `inkblot-ffi`. It answers the page's
-  Tauri calls in `TauriHost`, and talks to the page about chrome over the bridge.
+- **The page** (`src/`) is the whole app: the editor and everything around it.
+- **The chrome and the document surface talk through the bridge protocol**, in
+  process. The chrome renders what the surface publishes (`toolbarState`,
+  `tabsChanged`, `pageLayoutState`, `mapChromeChanged`, …) and changes it by command,
+  never by reaching into editor state. See [The chrome](#the-chrome).
+- **`inkblot-core`** is domain logic with no knowledge of any UI. That covers
+  persistence, search, version history, writing stats, the canvas model and the bridge
+  protocol types.
+- **`inkblot-models`** holds the on-device models.
+- **The Tauri app** wraps both crates as `#[tauri::command]`s, which the page calls
+  through `invoke`.
 
 ## Data model
 
@@ -57,7 +47,7 @@ in its header comment. This document covers what spans modules.
   - `citations` is the document's style, attached sources and bibliography options.
     The sources themselves are the project's, in `.inkblot-references.json`, so a
     source cited in three chapters is edited once. Citations are nodes naming sources
-    by id. The page formats everything (citeproc); the shell only draws the panel.
+    by id. The page formats everything (citeproc).
   - Print Layout's page setup is an attribute of the `doc` node, so it rides in
     autosave and every version. `setContent` drops doc attributes, so restores and
     merges go through `setContentKeepingPageSetup`.
@@ -83,7 +73,7 @@ in its header comment. This document covers what spans modules.
   - `file-tree-state.json`
   - `pinterest-cache.json`
 
-  They are not in `localStorage`, which a `WKWebView` keeps where native code cannot
+  They are not in `localStorage`, which the web view keeps where the Rust side cannot
   read it. The page hydrates them before React mounts and reads them synchronously
   afterwards (`src/lib/preferences.ts`). Per-launch values (the project-open id, the
   Pinterest refresh flag) stay in memory. File-tree order and expansion are
@@ -94,16 +84,15 @@ in its header comment. This document covers what spans modules.
 
 ## The bridge protocol
 
-The page and a shell talk through a protocol defined once in Rust
+The chrome and the document surface talk through a protocol defined once in Rust
 (`src-tauri/crates/inkblot-core/src/bridge/`) and generated into TypeScript
-(`src/types/inkblot-core.ts`) and Swift (`Generated/InkblotCore.swift`).
+(`src/types/inkblot-core.ts`).
 
-- `InboundMessage` (shell → page) carries `NativeCommand`s and `BridgeRequest`s.
-- `OutboundMessage` (page → shell) carries `WebviewEvent`s and `BridgeReply`s.
-- Every enum is adjacently tagged (`{ type, payload }`). That makes a discriminated
-  union in TypeScript and a `Codable` enum in Swift, so an unhandled case is a compile
-  error on both sides.
-- **Every request gets a reply**, with an error if necessary. A shell waiting on an
+- `InboundMessage` (chrome → surface) carries `NativeCommand`s and `BridgeRequest`s.
+- `OutboundMessage` (surface → chrome) carries `WebviewEvent`s and `BridgeReply`s.
+- Every enum is adjacently tagged (`{ type, payload }`), which makes a discriminated
+  union in TypeScript, so an unhandled case is a compile error.
+- **Every request gets a reply**, with an error if necessary. A caller waiting on an
   answer that never comes is a hang with no symptom, and the commonest cause is
   ordinary: the user closed the pane.
 - **No message carries a bare ProseMirror position.** A place in a document is a
@@ -115,50 +104,28 @@ The page and a shell talk through a protocol defined once in Rust
 - **High-rate events are coalesced to one per frame.** This is only safe for events
   that carry the whole current state (`notesRemapped`, `toolbarState`), never a delta.
   Check that property before using `createCoalescer`.
-- **The React chrome runs on the protocol too**, through an in-process transport
-  that round-trips every message through JSON. A payload that could not cross a
-  process boundary therefore fails in the test suites.
-- **In the Swift app, the native shell joins the wire beside the React chrome**
-  (`createNativeHostTransports`):
-  - Events go to both shells.
-  - Commands from both are merged and re-sequenced into one stream.
-  - Native request ids are prefixed, so each shell gets its own replies.
-  - This is how some chrome can be native (see [Native chrome](#native-chrome)) while
-    the rest stays in the page.
-- **State stays in the page.** Native chrome renders what the page publishes and
-  changes it by command. For example, `useNativeSidebar` publishes notes and applies
-  `updateNote`. Notes are edited by `NotePatch`, never sent whole: `Note` preserves
-  keys typeshare cannot express, and a whole note sent back would drop them.
-- **The Tauri shim.** The page calls Tauri's API for files, dialogs, menus and windows.
-  In the Swift app, `Web/tauri-shim.js` implements `window.__TAURI_INTERNALS__`:
-  - It keeps callbacks, events and menu trees in the page.
-  - It forwards only what needs the machine to `TauriHost`.
-  - Bytes cross as base64.
-  - `tests/unit/shim.mjs` drives it through the real `@tauri-apps/api`
-    modules.
-- **Structured values cross UniFFI as JSON strings** of the typeshare types. This keeps
-  one definition per type instead of a second, UniFFI-generated one.
+- **The chrome runs on the protocol**, through an in-process transport that
+  round-trips every message through JSON. A payload that could not cross a process
+  boundary therefore fails in the test suites — and a native shell (an iOS app's Swift
+  plugin, say) could be put on the same wire without the page changing.
+- **State stays in the document surface.** The chrome renders what is published and
+  changes it by command. Notes are edited by `NotePatch`, never sent whole: `Note`
+  preserves keys typeshare cannot express, and a whole note sent back would drop them.
+- **Events are not replayed.** A component that mounts after an event was sent reads
+  the last payload with `useLatestBridgeState` / `latestBridgeEvent`.
 
-## Native chrome
+## The chrome
 
-In the Swift app the shell draws most of the chrome, and the page stops drawing each
-part it is told the shell owns (`EditorWebController.nativeChrome`, read by
-`nativeOwns` in `src/lib/host.ts`). State stays in the page throughout.
+Everything is drawn by the page, from what the document surface publishes:
 
 | Part | How |
 |---|---|
-| Window and toolbar | Standard macOS 26 chrome: a regular-height unified toolbar, NavigationSplitView's sidebar toggle, and the inspector toggle as a titlebar accessory in the top-right corner (`InspectorTitlebarToggle`), so it never falls into ». AppKit places the traffic lights and drags the window. |
-| Formatting toolbar | Native and customizable (`Shell/Toolbar/`). `DocumentToolbar` renders the pushed `ToolbarState`; a canvas with no card being edited gets `CanvasToolbar`, from `canvasToolbarChanged`, and its buttons go back as `canvasCommand`s; an active map gets `MapToolbar`, from `mapChromeChanged`, and its buttons go back as `mapCommand`s. The page draws a toolbar row only for a comparison. Right-clicking the band also offers Customize Inspector Layout… (`ToolbarContextMenu`). |
-| Page under the glass | The page runs full width under both sidebars and the toolbar. The shell sends `setPanelInsets` with how much of each side they cover, and the page keeps its text column and a canvas's controls to what is left. During a live window resize neither the insets nor the web view's size are passed on until the drag ends (`EditorWebView`, `ContentView`): SwiftUI lays the column out at trial sizes mid-drag, and the page would render them. |
-| Project picker | `ProjectPicker`, modelled on Xcode's welcome window (⇧⌘1). The page draws nothing with no project open and does not queue commands, so `AppModel.openProject` resends until the page reports the project open. |
-| File tree | An `NSOutlineView` (`ProjectOutline`), because a SwiftUI `List` could not take drops between rows in nested folders. The manual order is the page's `inkblot-order:<project>` preference, read and written through the core (`TreeOrder`). Every change is a command the page performs (`createEntry`, `renameEntry`, …) through `useEntryOperations`. |
-| Inspector | A selector bar (`SidebarTabPicker`) over the Clipboard, Workbench, Notes, References, History, Stats, Typeset and Print & Export panels, with one search bar. While a map is the active document, its Map panel (`MapPanelView`) leads the bar and is chosen for the writer; no layout holds it. Two layouts, drafting and finishing, each a user-chosen set of panels (`InspectorLayout`, Customize Layout…); a two-finger swipe steps through them (`InspectorSwipeCatcher`). `useNativeSidebar` publishes the state and applies the edits; version rows and search come from the core. |
-| Bubble editor | Liquid Glass over the window (`Bubble/`). The page opens a session (`bubbleSessionOpened`) and writes the sentence back on `closeBubbleSession`; the shell holds no positions. `BubbleText`/`BubbleDrop`/`BubbleForms` port `lib/bubbleText.ts`/`bubbleDrop.js`/`bubbleForms.ts`, so change them together. The chips on sentences are the page's own glass, not the shell's: an overlay placed from reported positions trailed every scroll. |
-| Note cards | Liquid Glass (`Notes/`), placed from marker events (`useNativeNotePreviews`). Notes can be dragged from the Notes panel onto a canvas as a URL the page reads off an HTML5 drop (`NoteDrag`). |
-| Tabs and split view | A tab bar over the page column only, drawn in the window as Xcode's editor tabs are (`Shell/Tabs/`), not macOS window tabs: AppKit draws those across the whole window, inspector included, and makes each tab a window of its own, which would mean a page per tab over the same files. It sits in the detail column's `safeAreaBar`, so it counts in the top inset the page is sent. The tabs are `useTabs`'s, published by `useNativeTabs` (`tabsChanged`) and changed by command (`bridge/tabs.rs`). A tab owns its split, as in Safari or Xcode: `useTabs` records the panes' split into the active tab and restores a tab's own on arriving at it. ⌃Tab is caught by a key monitor before the web view, which otherwise takes it as focus navigation. |
-| Word count, Print Layout controls | Glass badges and controls placed from what the page publishes (`WordCountBadges`, `PrintLayoutControls`). The page leaves room for them (`.native-print-controls`). |
-| Models, windows | `ModelService` answers the model commands (synonyms, rhymes, Kokoro, dictation, the Pinterest scrape) from `inkblot-models`. `AuxiliaryWindows` opens detached document and Pinterest windows, each with its own page. |
-| Not native | Context menus (the page's, shown through `WebMenus`), dialogs, preferences, fonts and haptics go through the shim and `TauriHost`. Dictation and Read Aloud have no native toolbar buttons. |
+| Toolbar | Customizable (`components/toolbar/`): four saved layouts — a document's, a canvas's, a map's and Typeset's (`lib/chromeLayout.ts`), with item ids that are storage keys. Each item reads `toolbarState`, `canvasToolbarChanged`, `mapChromeChanged`, `pageLayoutState` or `viewOptions` and sends commands. Items that do not fit go behind ». |
+| Inspector | A selector bar over the panels (Clipboard, Workbench, Notes, References, History, Stats, Typeset, Print & Export, and a map's panel), in two layouts — drafting and finishing — the writer arranges (Customize Layout…). The panels' edits are commands (`useSidebarCommands`). |
+| Tab bar | Floats over the page column (`components/tabs/`), drawn from `tabsChanged` (`useTabsPublisher`) and changed by command. A tab owns its split. |
+| File tree and Book | The left sidebar shows the project's files (with a filter bar, `lib/treeFilter.ts`) or, in Typeset mode, the book's contents from `pageLayoutState.bookItems`. |
+| Stats, timer, settings | `src/stats/`: the tracker, the writing timer and goals, recorded through the `stats_*` Tauri commands; the Stats panel, a floating timer capsule, a Timer menu and the Settings sheet (⌘,). |
+| Floating surfaces | The tab bar, word count, the pages' zoom, the timer and the note cards are the one translucent, blurred surface over the page (`.floating-capsule`); everything else is flat. `tests/unit/css.mjs` keeps it that way. |
 
 ## Print Layout
 
@@ -182,14 +149,13 @@ document or a folder compiled as a book. All of it is in `src/print/`.
   moves itself (`handleVerticalArrow`).
 - **Zoom is a `transform`**, never CSS `zoom`, so line breaks are identical at every
   zoom. A pinch scales the page stack as one composited layer and lays out once when
-  it ends. 100% is CSS real size; Actual Size uses the display density the Swift app
-  sends (`setDisplayDensity`).
+  it ends. 100% is CSS real size; Actual Size uses the display density sent with
+  `setDisplayDensity`.
 - **Top-level blocks are `display: flow-root`**, so a margin that collapses on screen
   collapses the same way on paper.
 - **Printing is the layout cut up, not re-typeset** (`printRender.js`): each page is a
-  window onto the paginated flow. Both apps then run `WKWebView.printOperation` at the
-  exact paper size with zero margins: `Web/WebPrinting.swift` on `printRequest`, and
-  `src-tauri/src/print_commands.rs`. PDF is the same operation, saved.
+  window onto the paginated flow. `src-tauri/src/print_commands.rs` then prints the web
+  view at the exact paper size with zero margins. PDF is the same operation, saved.
 - **Columns** are a single running column while editing; print, PDF and binding set
   them side by side. Live multi-column editing in WebKit was judged unreliable.
 
@@ -206,8 +172,7 @@ as a blank sheet at a scale, a picture (which can be traced to vectors), the Ear
 one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrace`,
 `mapdom`.
 
-- **Kind comes from the suffix only** (`docKind.js`, `doc_kind.rs`, `is_map_doc` over
-  FFI). Code that meant "not a text document" asks `!isTextDoc`, not `isCanvasDoc`: a
+- **Kind comes from the suffix only** (`docKind.js`, `doc_kind.rs`). Code that meant "not a text document" asks `!isTextDoc`, not `isCanvasDoc`: a
   map that reaches `saveDocument` is wiped.
 - **A `.map` that is not a map is never written over.** People named text documents
   `Treasure.map` before maps existed. `loadMapDocument` returns `foreign`, and every
@@ -223,26 +188,22 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   The tracer runs in a module worker and falls back to the main thread if the worker
   will not start under `inkblot://`.
 - **The inspector is a form the page builds** (`useMapPanel`, `inspector/panelBuilder.js`):
-  sections of typed fields named by id (`MapPanel`, `bridge/map.rs`). The page draws it
-  under Tauri (`MapPanelView.jsx`); the Swift app draws it as its inspector's Map panel
-  and sends each edit back as `mapCommand { panel-field | panel-action, id }`. Every
-  figure in it comes from the page's maths, so the shell never interprets a field. Add a
-  field in the builder and both apps have it; add a field *type* in `map.rs` and draw it
-  in both `MapPanelView`s.
-- **What a map draws over itself stays in the page**: the scale bar, compass, title,
-  tool hint and timeline. Under the Swift shell the map runs beneath the glass sidebars
-  and toolbar, so these are placed in the part left uncovered (`useVisibleBox`, from the
-  shell's `setPanelInsets` through `PanelInsetsContext`).
+  sections of typed fields named by id (`MapPanel`, `bridge/map.rs`), drawn by the
+  map's floating panel and the inspector's Map tab (`MapPanelView.jsx`), each edit sent
+  back as `mapCommand { panel-field | panel-action, id }`. Add a field in the builder
+  and both have it; add a field *type* in `map.rs` and draw it in `MapPanelView`.
+- **What a map draws over itself** — the scale bar, compass, title, tool hint and
+  timeline — is placed in `useVisibleBox`.
 - **Rust twins only what Rust uses**: the kind, normalizing and creating maps, word
   counts, links, search matches and version entries. The maths (geometry, geodesy,
-  travel, orbits, calendar) is JS only. Port a module, with parity cases, when native
-  code first needs it.
+  travel, orbits, calendar) is JS only. Port a module, with parity cases, when Rust
+  first needs it.
 
 ## JavaScript and Rust parity
 
 Several domain modules exist twice:
 - JavaScript in `src/lib/`, which the page runs.
-- Rust in `inkblot-core`, which the Swift app and the Tauri commands call.
+- Rust in `inkblot-core`, which the Tauri commands call.
 
 The mirrored modules are `docKind`, `canvasGeometry`, `canvasModel`, `storyStructure`,
 the version-history diff engine, project paths, version storage, search, the Read
@@ -286,8 +247,8 @@ The last two fix bugs the JS still has. Whether to fix the JS too is an open dec
 1. Add a named payload struct and the enum variant.
 2. Add a wire-name test.
 3. Run `npm run types`.
-4. Handle it in `src/bridge/surface.ts` (or a delegate the app registers).
-5. Handle it in Swift.
+4. Handle it in `src/bridge/surface.ts` (or a delegate the app registers), and use it
+   from the chrome.
 
 **A domain type.** Define it in `inkblot-core/src/types/` with `#[typeshare]` and
 `#[serde(rename_all = "camelCase")]`, then run `npm run types`. Keep these limits in
@@ -296,55 +257,38 @@ mind:
   a `Stored*` type in `src/types/index.ts`.
 - It only emits adjacently tagged enums.
 - It does not map `BTreeMap`; use `HashMap`.
-- A `#[serde(default)]` field becomes optional in Swift.
 - Generated string enums don't compare to literals in TypeScript: use
   `TreeNodeType.Folder`, not `'folder'`.
 
 **A Tauri command.** See the header of `src-tauri/src/lib.rs`:
 1. Put the logic in a crate.
 2. Wrap it in a `*_commands.rs` module and register it.
-3. Answer the same command name in the Swift app's `TauriHost` (or `ModelService`).
 
 **A model.** See the header of `inkblot-models/src/lib.rs`:
 1. Write the engine (status, download, inference, and `MODEL_NOT_INSTALLED` when the
    model is missing).
 2. Add the Tauri wrapper.
-3. Add the method to both `inkblot-ffi/src/models.rs` and `models_unavailable.rs`,
-   with identical signatures and doc comments.
-4. Add the `ModelService` case, then run `./scripts/build-xcframework.sh`.
 
-**An FFI export.** See the header of `inkblot-ffi/src/lib.rs`. Then run
-`./scripts/build-xcframework.sh`: the Swift bindings must come from the same build as
-the library.
+**Chrome that mirrors page state.**
+1. The document surface publishes the state as an event (a hook in `src/hooks/`, or
+   `surface.ts`).
+2. It applies a command for every change.
+3. The chrome renders the latest event (`useLatestBridgeState`) and sends commands. It
+   never keeps a second copy of the state.
 
-**Native chrome that mirrors page state.**
-1. The page publishes the state as an event, from a `useNative*` hook in `src/hooks/`.
-2. The page applies commands for every change.
-3. `src/lib/host.ts` gains a `nativeOwns` part, so the page stops drawing its own
-   version when the shell says it draws it.
-4. The Swift side renders the latest event and sends commands. It never keeps a
-   second copy of the state.
+`useTabsPublisher` and the tab bar are the worked example.
 
-`useNativeSidebar` and `useEditorWordCount` (the word-count badges) are the worked
-examples.
-
-**A toolbar item.** The window toolbar is AppKit's customizable toolbar, through
-SwiftUI's `.toolbar(id:)`. A document, a canvas and a map each have their own saved
-layout (`ToolbarID.document`, `ToolbarID.canvas`, `ToolbarID.map`), switched inside one
-toolbar builder on `ContentView` (`WindowToolbar`). Files are in `Shell/Toolbar/`.
-1. Add a `ToolbarItemID` case, `inkblot.<area>.<name>`. Ids are keys in people's saved
-   layouts: never rename or reuse one; a removed item's case stays, deprecated.
-2. Add the `ToolbarItem` to `DocumentToolbar`, `CanvasToolbar`, `MapToolbar`, or
-   `SharedToolbarItems` for all of them. Its place in the builder is its place in the default set and the palette.
-3. Add `.defaultCustomization(.hidden)` unless every new user should see it. Items that
-   belong together are one item holding a `ControlGroup`.
-4. Give it a `Label` with a title and an SF Symbol, and `.help(…)`.
-5. **Disable, never omit.** An `if` around an item pulls the rest of the user's layout
-   along.
-6. If it needs the page, follow the bridge-command recipe. If it has on/off state, the
-   page pushes it: editor facts in `ToolbarState`/`ActiveMarks`, canvas facts in
-   `CanvasToolbarState`, app settings in `ViewOptions`.
-7. Add its id to `ToolbarRegistryTests.expected`.
+**A toolbar item.** See `src/lib/chromeLayout.ts` and `components/toolbar/registry.jsx`.
+1. Add it to `TOOLBAR_ITEMS` with an id `inkblot.<area>.<name>`, a label, an SF Symbol
+   name and its contexts. Ids are keys in people's saved layouts: never rename or reuse
+   one; a removed item's id goes in `RETIRED_TOOLBAR_IDS`.
+2. Add its component to `registry.jsx`, built from `ToolbarControls.jsx`.
+3. Add it to a default set only if every new user should see it.
+4. **Disable, never omit.** An item that returns nothing moves the rest of the layout.
+5. If it has on/off state, the surface publishes it: editor facts in
+   `ToolbarState`/`ActiveMarks`, canvas facts in `CanvasToolbarState`, app settings in
+   `ViewOptions`.
+6. Add its id to the list in `tests/unit/chromeLayout.mjs`.
 
 **A test suite.** See the header of `tests/unit/run.mjs`.
 
@@ -396,133 +340,44 @@ to prove the case can fail.
   Suites don't wait these out. Switching documents flushes both, which is the path
   worth asserting on anyway.
 
-**The Swift window**
-
-- **Any non-customizable toolbar content turns customization off for the whole
-  window.** A plain `.toolbar {}` anywhere, or a second `.toolbar(id:)` even with the
-  same id, and AppKit silently disables Customize Toolbar…. Something fixed goes in the
-  toolbar with `.customizationBehavior(.disabled)`; something pinned to a corner is a
-  titlebar accessory whose `NSHostingView` has `sceneBridgingOptions = []`.
-- **Hand-placed traffic lights do not hold.** AppKit resets them on every titlebar
-  layout, including collapsing a split view column. That is why the window uses a real
-  toolbar.
-- **SwiftUI's inspector crashes once the page column is narrower than it** ("more
-  Update Constraints in Window passes than there are views"). `PaneLimits` in
-  `ContentView` keeps the layout out of that state. Neither limit may read the
-  inspector's own width, which changes on every frame of the show/hide animation, and
-  the width watchers must sit inside `inspectorColumnWidth` /
-  `navigationSplitViewColumnWidth`.
-- **Never change `EditorWebView`'s identity** (an `if` around it, a changing `id`): it
-  reloads the page. Switch things inside modifiers instead.
-- **Reading a menu item's `enabled` through Accessibility is stale.** AppKit validates
-  items when the menu opens; to test a menu item, click it.
-
 **Builds**
 
 - **Never set `MACOSX_DEPLOYMENT_TARGET` in the environment for a Rust build.** It
   reaches the host's proc-macro dylibs, and dyld then refuses to load them ("mis-aligned
-  LINKEDIT string pool"). `build-xcframework.sh` targets the app's OS through
-  `CFLAGS_<triple>` instead. If you set it once, delete the stale
+  LINKEDIT string pool"). If you set it once, delete the stale
   `target/release/deps/*.dylib`.
 - **cmake and `ort-sys` cache their builds.** After changing compiler flags or
   toolchains, run `cargo clean -p whisper-rs-sys --release --target aarch64-apple-darwin`
   or `cargo clean -p ort-sys`.
-- **`uniffi-bindgen --library` must run from `src-tauri/`.** It runs `cargo metadata`
-  in the working directory.
-- **The generated UniFFI bindings are made `nonisolated`** by `build-xcframework.sh`.
-  The app target defaults to the main actor, which would otherwise make every Rust
-  call main-thread-only.
-- **UniFFI already makes its error type `LocalizedError`.** Adding the conformance again
-  is a redeclaration error.
-- **`WKWebView` refuses module scripts from `file://`.** That is why the page is served
-  from the `inkblot://` scheme.
-- **The Swift decoder drops a whole message** when one required field is missing
-  (`try?` per case). `ShellBridge` logs the raw JSON when that happens. Check that log
-  first if the native side seems deaf.
-- **Reset the bridge's sequence counters when a navigation commits**, not when it
-  finishes. The page starts sending as soon as its scripts run.
-- **A `GlassEffectContainer` draws its glass over plain content inside it.** Put
-  `.glassEffect` on the content view, or keep content outside the container.
-
-## Swift app project settings
-
-These differ from Xcode's template on purpose:
-
-- **App sandbox off.** The app reads the Tauri app's data folder
-  (`~/Library/Application Support/com.inkblot.app`, not this bundle's container), and
-  projects can live anywhere on disk.
-- **User script sandboxing off.** The Embed Web Bundle phase has to read `dist/`, and
-  it also copies `src-tauri/resources/minilm-tokenizer.json` into the app.
-- **Platforms:** macOS, iPadOS and iOS. The entitlements file applies to macOS only,
-  and the simulator build excludes x86_64 (the Rust slices are arm64).
-- **`OTHER_LDFLAGS`** lists what the Rust static library needs, because it carries no
-  autolink information:
-  - CoreText, CoreGraphics and libiconv, for font-kit
-  - `-lc++`, Accelerate, Metal and MetalKit, for whisper.cpp and onnxruntime
-  - AudioToolbox and CoreAudio, for cpal
-
-  To regenerate the list, run `cargo rustc -p inkblot-ffi --lib --crate-type staticlib
-  --release -- --print native-static-libs`.
-- The Xcode project, target and Swift module are named `inkblot-core`/`inkblot_core`.
-  That is the app, not the Rust crate of the same name.
 
 ## Known gaps
 
 **Not yet verified by hand**
-- **Parts of the Swift app's native UI** were built without anyone seeing them:
-  detached and Pinterest windows, drops onto a canvas, note drags from the Notes panel,
-  model downloads, a rename of an open document in the native tree, a restore from
-  native History, and a voice memo. Click through them with the Tauri app closed.
-- **The tab bar:** its look in light and dark, a tab's context menu, dragging a tab to
-  reorder it, and dropping a document from the file tree onto the bar. Selecting,
-  ⌘T/⌘W, ⌘1–⌘9, ⌃Tab, the split commands and a tab keeping its split were driven
-  through Accessibility.
-- **Print Layout:** a real print and PDF from both apps, the Swift Page tab, the Tauri
-  Page Setup sheet, a folded 16-page signature, an EPUB in Apple Books or `epubcheck`,
-  and a Pinterest embed in print (a cloned iframe reloads, and may print blank).
-- **Maps:** the map tracer's worker under `inkblot://`, the Earth chunks' first-open
-  latency in WebKit, and the fantasy themes' SVG filter cost at high zoom.
-- **Offline launch.** Launch the bundled Tauri `.app` with the network off, and check
-  that the synonym model loads from AppData and dictation finds its model.
+- **The web chrome in the running app.** It was checked in Chromium and in the unit
+  suites: the tab bar (a tab's context menu, drag to reorder, a document dropped from
+  the file tree), the toolbar's » overflow, the menus (Insert, Format, Timer, View),
+  notifications and the tray title, and the timer's sounds.
+- **Print Layout:** a real print and PDF, the Page Setup sheet, a folded 16-page
+  signature, an EPUB in Apple Books or `epubcheck`, and a Pinterest embed in print (a
+  cloned iframe reloads, and may print blank).
+- **Maps:** the map tracer's worker, the Earth chunks' first-open latency, and the
+  fantasy themes' SVG filter cost at high zoom.
+- **Offline launch.** Launch the bundled `.app` with the network off, and check that
+  the synonym model loads from AppData and dictation finds its model.
 - **Read Aloud's native voice** on a machine with no Python installed.
 - **A Pinterest board scrape** against a live, logged-in session.
 
 **Not built**
-- **Tabs in the Tauri app.** Only the Swift shell draws a tab bar (`nativeOwns('tabBar')`);
-  the Tauri page tracks tabs and splits but shows no way to switch between them.
-- **The Kokoro download.** The page never offers it (`download_kokoro_model` exists in
-  both apps), so native Read Aloud needs the model installed by other means and
-  otherwise falls back to kokoro-js's in-browser WASM build.
-- **Dictation and Read Aloud buttons** in the native toolbar. The page's controls are
-  not shown under the Swift app.
-- **Move Folder Location** from the project picker (no `move_project` over UniFFI).
-- **Toolbar items** still wanted: New Document/Canvas/Folder (the naming sheet is
-  view-local to `FileTreeSidebar`), Bubble, workbench lookups, highlight, theme, and focusing the inspector's search.
-- **A native context menu** built from the `getSelectionContext` request, which would
-  take the page out of the right-click. Today's menus are the page's, shown through
-  `WebMenus`.
+- **The Kokoro download.** The page never offers it (`download_kokoro_model` exists),
+  so native Read Aloud needs the model installed by other means and otherwise falls
+  back to kokoro-js's in-browser WASM build.
+- **Reminders while Inkblot is closed.** The page posts them while it runs; nothing is
+  left with the system to fire later.
+- **Toolbar items** still wanted: New Document/Canvas/Folder, Bubble, workbench
+  lookups, and focusing the inspector's search.
 
-**iPadOS and iOS**
+**iOS and iPadOS**
 
-The iOS build is currently broken. The macOS UI added since the port (print controls,
-inspector layouts, the toolbar context menu, the project picker, the AppKit file tree
-menu) uses macOS-only APIs without `#if os(macOS)` guards. Before that, the app built
-and linked for devices and the simulator but was never run: it needs an iOS 26+
-simulator runtime (`xcodebuild -downloadPlatform iOS`). Also missing:
-- **The models.** `ort` has no iOS library, and whisper.cpp's cmake has not been run
-  for the iOS SDKs. The iOS slices use `models_unavailable.rs`. To enable them, link
-  an onnxruntime built for iOS (`ORT_LIB_LOCATION`) and drop `--no-default-features`
-  for the iOS targets in `build-xcframework.sh`. Rhymes and the scrape channel need no
-  ONNX, so splitting `inkblot-models`' features would bring those first.
-- **Context menus.** A long press shows WebKit's own menu, and the page's
-  `contextmenu` handler never runs.
-- **Save panels, and folders outside the app's container.** A picked folder is lent
-  for a security scope nothing holds open. Projects live in the app's container.
-- **Detached documents side by side.** A detached window is presented over the app,
-  not as a second scene.
-
-**Warnings**
-Four Swift compiler warnings remain:
-- main-actor statics called from nonisolated contexts in `NotesPanelView`,
-  `NotePreviewOverlay` and `ClipboardPanelView`
-- a deprecated `Text` `+` in `HistoryPanelView`
+The plan is Tauri 2's iOS target: the same page, with a small Swift plugin for the few
+controls that should be Liquid Glass. The models are the open question — `ort` has no
+iOS library and whisper.cpp's cmake has not been run for the iOS SDKs.

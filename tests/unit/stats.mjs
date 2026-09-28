@@ -1,7 +1,6 @@
 /**
  * Writing stats (src/stats): the tracker, the timer, goals, streaks, deadlines,
- * reminders, rhythm and the config — ported from the Swift app's StatsTrackerTests,
- * WritingTimerTests and GoalsTests, on clocks of the tests' own.
+ * reminders, rhythm and the config, on clocks of the tests' own.
  */
 import { ok } from './assert.mjs'
 
@@ -289,7 +288,7 @@ const B = R.restSegment
   ok('routines: built-ins are built in', R.BUILT_IN_ROUTINES.every(R.isBuiltIn) && !R.isBuiltIn(R.duplicateRoutine(R.LADDER)))
   const segmentIds = R.BUILT_IN_ROUTINES.flatMap((r) => r.segments.map((s) => s.id))
   ok('routines: built-in segment ids are unique', new Set(segmentIds).size === segmentIds.length)
-  ok('routines: ids match the Swift app’s', R.SPRINT.id === '5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F00'
+  ok('routines: the built-in ids are fixed', R.SPRINT.id === '5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F00'
     && R.POMODORO.segments[7].id === '5C0F1E6B-7A0D-4B8E-8A11-000000001007' && R.POMODORO.segments[7].label === 'Long Break')
   ok('routines: a summary', R.routineSummary(R.POMODORO) === '25 · 5 · 25 · 5 · 25 · 5 · 25 · 15')
 }
@@ -308,12 +307,12 @@ const B = R.restSegment
   ok('config: Start runs the last routine, or a sprint',
     C.defaultRoutine(C.defaultStatsConfig()).id === R.SPRINT.id
     && C.defaultRoutine({ ...C.defaultStatsConfig(), lastRoutineID: R.LADDER.id }).id === R.LADDER.id)
-  // A file the Swift app wrote: Set<Int> weekdays, a nil optional left out.
+  // A file an earlier version wrote: weekdays out of order, a missing value left out.
   const swift = C.parseStatsConfig(JSON.stringify({
     goals: { weekly: Array.from({ length: 7 }, () => ({ targets: [{ id: 'T', metric: 'words', amount: 500 }], requireAll: true, rest: false })), overrides: [] },
     reminders: [{ id: 'R', kind: 'goalNudge', hour: 19, minute: 0, weekdays: [3, 1, 2], message: '', enabled: true }],
   }))
-  ok('config: reads the Swift app’s file', swift.goals.weekly[3].targets[0].amount === 500
+  ok('config: reads an earlier version’s file', swift.goals.weekly[3].targets[0].amount === 500
     && swift.goals.project === null && JSON.stringify(swift.reminders[0].weekdays) === '[1,2,3]')
 }
 

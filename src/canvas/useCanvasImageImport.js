@@ -3,13 +3,10 @@
  *
  * Routes in:
  *   - paste (⌘V) — a normal clipboard event
- *   - dragging a file from Finder, which depends on the shell:
- *       - Tauri handles OS drags natively and swallows the DOM `drop`, so
- *         `dataTransfer.files` is always empty. The paths only arrive through
- *         onDragDropEvent.
- *       - The Swift shell's WKWebView does the opposite: an ordinary HTML5 drop
- *         with `File` objects and no paths, so it takes the paste route.
- *     Each shell only ever fires one of the two, so both are always listening.
+ *   - dragging a file from Finder: Tauri handles OS drags natively and swallows the
+ *     DOM `drop`, so `dataTransfer.files` is always empty and the paths only arrive
+ *     through onDragDropEvent. A web view that delivers an ordinary HTML5 drop, with
+ *     `File` objects and no paths, takes the paste route, so both are listening.
  *
  * All land as JSON Canvas `file` nodes pointing into the project's .assets
  * folder — never base64 inlined.
@@ -144,7 +141,7 @@ export function useCanvasImageImport({
     return () => surface.removeEventListener('paste', onPaste)
   }, [addImageNode, onActivate, projectName, screenToWorldAt, surfaceRef])
 
-  /* ---------------- drag from the OS: the HTML5 route (WKWebView) ---------------- */
+  /* ---------------- drag from the OS: the HTML5 route ---------------- */
 
   useEffect(() => {
     const surface = surfaceRef.current

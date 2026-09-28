@@ -3,8 +3,8 @@
  *
  * The protocol is defined in Rust and its wire format is tested there; what is
  * checked here is the half that has to be *right* rather than merely agreed — the
- * client that sits between a shell and a live ProseMirror document, and the four
- * behaviours a Swift shell depends on without being able to see this file:
+ * client that sits between the chrome and a live ProseMirror document, and the four
+ * behaviours the chrome depends on:
  *
  *   - **a command reaches the right editor, and no editor at all is survivable.** A
  *     shell decides to send before it can know the pane still exists.
@@ -17,7 +17,7 @@
  *     exactly one may handle it, whatever order their listeners run in.
  *
  * Everything runs through the JSON-copying transport, so a payload that could not
- * cross a process boundary fails here rather than only in the Swift app.
+ * cross a process boundary fails here.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'

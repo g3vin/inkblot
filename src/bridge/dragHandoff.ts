@@ -8,10 +8,9 @@
  * the editor needs it to decide whether to show a drop caret. `useEditorDnd`,
  * `ClipboardPanel`, `EditorCanvas` and `Editor` all share the session held here.
  *
- * In the Swift shell the other end of a drag can be native (the clipboard panel is a
- * SwiftUI view), so there is no shared object to park anything on and the hand-off has
- * to be messages. This module is the webview's half: one session at a time, a claim
- * protocol, and every transition reported on the bridge.
+ * The hand-off is messages rather than a shared object, so either end of a drag could
+ * be something other than this page. This module is the page's half: one session at
+ * a time, a claim protocol, and every transition reported on the bridge.
  *
  * **`claim()` is test-and-set.** Two drop targets can see the same drop (an editor
  * and the clipboard panel underneath it). The first caller gets `true` and everyone

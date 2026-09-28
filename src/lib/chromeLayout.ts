@@ -3,9 +3,8 @@
  * arranged them. Pure: the hooks (useToolbarLayout, useInspectorLayout) read and write
  * the preference keys below and normalize through here.
  *
- * Ported from the Swift shell (ToolbarItemID.swift, the four *Toolbar.swift default
- * sets, InspectorLayout.swift), with the same ids and the same migrations, so a layout
- * saved under one reads the same under the other.
+ * The ids and the migrations are those of layouts saved by earlier versions of
+ * Inkblot, so every saved layout still reads.
  *
  * Toolbar item ids are storage keys: **never rename or reuse one.** An item that goes
  * away stays in RETIRED_TOOLBAR_IDS until no saved layout can still name it.
@@ -37,7 +36,7 @@ export type ToolbarItemSpec = {
 
 const ALL: ToolbarContext[] = ['document', 'canvas', 'map', 'typeset']
 
-/** Every toolbar item, in the Swift declaration order (ToolbarItemID.swift). */
+/** Every toolbar item, in the order the palette shows them. */
 export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.format.font', label: 'Font', symbol: 'textformat', contexts: ['document'] },
   { id: 'inkblot.format.font-size', label: 'Font Size', symbol: 'textformat.size', contexts: ['document'] },
@@ -99,8 +98,7 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.typeset.print', label: 'Print', symbol: 'printer', contexts: ['typeset'] },
   { id: 'inkblot.typeset.export', label: 'Export', symbol: 'square.and.arrow.up', contexts: ['typeset'] },
 
-  // Web only: dictation and Read Aloud live in the toolbar here. The Swift shell
-  // skipped ids it did not offer, so these were always safe to store.
+  // Dictation and Read Aloud.
   { id: 'inkblot.speech.dictation', label: 'Dictation', symbol: 'mic', contexts: ['document'] },
   { id: 'inkblot.speech.read-aloud', label: 'Read Aloud', symbol: 'read.aloud', contexts: ['document'] },
 ]
@@ -116,7 +114,7 @@ export function toolbarItemsFor(context: ToolbarContext): ToolbarItemSpec[] {
   return TOOLBAR_ITEMS.filter((item) => item.contexts.includes(context))
 }
 
-/** Each toolbar's default set, from the declaration order in the Swift toolbars. */
+/** Each toolbar's default set. */
 export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
   document: [
     'inkblot.view.editor-mode', SPACE,
@@ -297,7 +295,7 @@ export function normalizeInspectorLayouts(raw: unknown): InspectorLayouts {
   const value = parse(raw) as Partial<InspectorLayouts> & Record<string, unknown> | null
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaultInspectorLayouts()
 
-  // The Swift shell stored a bare { drafting: [...], finishing: [...] } map.
+  // Earlier versions stored a bare { drafting: [...], finishing: [...] } map.
   const stored = (value.layouts && typeof value.layouts === 'object' ? value.layouts : value) as Record<string, unknown>
   const knownRaw = Array.isArray(value.known) ? tabsFrom(value.known) : null
   const known = new Set(knownRaw ?? ARRANGEABLE_TABS.filter((tab) => !ADDED_LATER.includes(tab)))

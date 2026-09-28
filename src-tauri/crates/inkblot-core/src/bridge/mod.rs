@@ -1,15 +1,14 @@
-//! The bridge protocol: what a shell and the document surface say to each other.
+//! The bridge protocol: what the chrome and the document surface say to each other.
 //!
-//! Inkblot's document surface is ProseMirror, and ProseMirror runs in a web view under
-//! every shell. The chrome around it is either React (the Tauri app) or partly native
-//! (the Swift app), and this module is the contract between chrome and surface.
+//! Inkblot's document surface is ProseMirror, in a web view. The chrome around it —
+//! the toolbar, the sidebars, the tab bar, the menus — renders what the surface
+//! publishes and changes it by command, and this module is the contract between them.
 //!
-//! **Why it is defined here, in Rust, rather than in either shell.** Three languages,
-//! one definition, generated outwards (see the crate docs). A protocol that lived in
-//! the TypeScript client would be one Swift could get wrong at runtime;
-//! `npm run types:check` makes that a build failure instead. The React chrome runs on
-//! this protocol too, through the in-process transport in `src/bridge/`, so the test
-//! suites exercise every message the Swift app depends on.
+//! **Why it is defined here, in Rust.** One definition, generated outwards (see the
+//! crate docs), so the Rust side's view of a message cannot drift from the page's;
+//! `npm run types:check` makes that a build failure. The chrome runs on this protocol
+//! through the in-process transport in `src/bridge/`, which copies every message
+//! through JSON, so a native shell could join the wire without the page changing.
 //!
 //! The layout:
 //!
@@ -34,13 +33,12 @@
 //!    every variant.
 //! 2. Re-export it below, and add an instance to `every_command` / `every_event` and
 //!    its wire name to the matching test in `tests.rs`.
-//! 3. `npm run types` to regenerate the TypeScript and Swift.
+//! 3. `npm run types` to regenerate the TypeScript.
 //! 4. Handle it on the webview side: a command in `src/bridge/surface.ts` (or a
 //!    delegate the app registers, for anything that changes what the app is showing);
 //!    an event is published through a `documentSurface.publish…` method.
-//! 5. Handle it in Swift (`native/…/Bridge/ShellBridge.swift` and whichever model owns
-//!    that state). The generated decoder uses `try?` per case, so a payload that
-//!    fails to decode drops the whole message; `ShellBridge` logs the raw JSON.
+//! 5. Use it from the chrome: `shellBridge.send` for a command, `useLatestBridgeState`
+//!    for an event.
 //!
 //! A request (the shell asking and waiting for an answer) goes in `envelope.rs` as a
 //! `BridgeRequest`/`BridgeReply` pair. The surface always replies, with an error if it

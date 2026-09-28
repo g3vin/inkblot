@@ -7,8 +7,8 @@
  * `pageLayoutState` whenever any of it changes. Mounted once, by EditorLayout, which is
  * the component that knows which document and editor are active.
  *
- * The same functions back the web's own menus, so the Tauri app and the Swift shell
- * do exactly the same thing for "Print Layout", "Print…" and "Export".
+ * The same functions back the menus, the toolbar and the Print & Export tab, so each
+ * does exactly the same thing for "Print…" and "Export".
  *
  * **Publishing is cheap and quiet.** The state goes out when it changes, not on every
  * transaction: typing is debounced, and a state identical to the last is skipped. The
@@ -780,7 +780,7 @@ export default function usePrintLayoutController({
     return () => window.removeEventListener(OPEN_BOOK_ITEM_EVENT, onOpenItem)
   }, [currentBook])
 
-  // The web's own menus (App.jsx, and the Swift shell's mirror of them) and keys.
+  // The menus (App.jsx) and keys.
   useEffect(() => {
     const onToggle = (event) => togglePrintLayout(undefined, event?.detail?.docPath)
     const onPrintEvent = (event) => stateRef.current.onPrint?.({ scope: 'document', bound: false, ...(event.detail || {}) })

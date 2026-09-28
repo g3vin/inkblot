@@ -165,8 +165,8 @@ export function useCanvasExternalEvents({
       selectNode(node.id)
     }
 
-    // The same note, dragged natively from the Swift shell's Notes panel: an HTML5
-    // drop carrying its URL, turned into the event above at the drop point.
+    // The same note, dragged as a URL: an HTML5 drop carrying it, turned into the
+    // event above at the drop point.
     const carriesURL = (event) => [...(event.dataTransfer?.types || [])].includes('text/uri-list')
     const onDragOver = (event) => {
       if (!carriesURL(event)) return

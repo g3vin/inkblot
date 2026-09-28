@@ -1,7 +1,7 @@
 /**
  * Writing routines: a sequence of writing and break segments the timer runs
- * through — a Pomodoro, a ladder, a single sprint. Stored as the Swift app stored
- * them (`StatsConfig.routines`), so a routine made there reads here.
+ * through — a Pomodoro, a ladder, a single sprint. The writer's own are kept in the
+ * stats config (`routines`).
  */
 import { newId, formatNumber } from './day.js'
 

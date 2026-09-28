@@ -2,8 +2,8 @@
 //!
 //! Every variant carries a named payload struct rather than an anonymous one. That is
 //! not style: typeshare emits an anonymous struct variant as an inline TypeScript
-//! object and a `NativeCommandFooInner` Swift struct, neither of which anything can
-//! name. A named struct gives all three languages a type per command, which is what
+//! object, which nothing can name. A named struct gives each language a type per
+//! command, which is what
 //! lets a handler be written against one command instead of against the union.
 
 use serde::{Deserialize, Serialize};
@@ -318,9 +318,8 @@ pub struct CanvasRestoreCommand {
 /// Insert text at the selection with no formatting of its own — the text takes on the
 /// marks around it.
 ///
-/// This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
-/// webview: `WKWebView` cannot read the clipboard without a user gesture inside the
-/// page, and the menu item is not one.
+/// This is Edit ▸ Paste and Match Style: the clipboard's text, read by whatever the
+/// writer used — the menu item or the toolbar button — and inserted as plain text.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -512,8 +511,8 @@ pub struct SetWordCountVisibleCommand {
 ///
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
 /// representation typeshare generates — and here it is also the one we want: it emits
-/// a discriminated union in TypeScript and a real `Codable` enum in Swift, so an
-/// unhandled command is a compile error on both sides rather than a silent no-op.
+/// a discriminated union in TypeScript, so an unhandled command is a compile error
+/// rather than a silent no-op.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]

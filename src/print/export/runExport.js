@@ -3,8 +3,7 @@
  * book (a folder or the project, compiled in tree order).
  *
  * Asks where to save with the system save panel, then writes the file through the
- * fs plugin — which both shells provide, so this runs unchanged under Tauri and the
- * Swift shell. PDF is not built here: it is the print path saving instead of
+ * fs plugin. PDF is not built here: it is the print path saving instead of
  * printing, so a PDF is exactly the pages Print would have produced.
  */
 import { open, save } from '@tauri-apps/plugin-dialog'

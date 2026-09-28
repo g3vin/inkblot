@@ -1,7 +1,5 @@
 /**
- * The book's sections of the Typeset tab (ThisPageSection, BookSections,
- * EditionsSection, StyleGallerySection, ProofSection, TextStylesSection,
- * ChapterOpeningsSection and PartsSection in Swift): what is selected in the Book
+ * The book's sections of the Typeset tab: what is selected in the Book
  * navigator, the book itself, its editions and style, the proof, the named text
  * styles, how chapters and parts open, the notes and the e-book.
  */

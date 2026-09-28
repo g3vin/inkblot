@@ -1,7 +1,7 @@
 /**
  * Turns what the page reports into sittings: time with a document open, time
- * typing, words written and deleted, minute by minute. A port of the Swift app's
- * `StatsTracker`, so a session recorded here is the same record it made.
+ * typing, words written and deleted, minute by minute, recorded as
+ * `WritingSession`s through the stats store.
  *
  * **What a session is.** One sitting at one document, from the first moment it is
  * in front of the writer to the last. It ends when the writer moves to another

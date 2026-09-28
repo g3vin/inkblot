@@ -12,8 +12,7 @@
 //! app ships its own permission manifest — which this one does not
 //! (`gen/schemas/acl-manifests.json` has no `__app__` key). **If a `permissions/`
 //! directory is ever added to `src-tauri`, this stops working** and the command must be
-//! granted to that webview explicitly. The Swift app injects `scrape-bridge.js` into
-//! the Pinterest page instead, which exposes this one call and nothing else.
+//! granted to that webview explicitly.
 //!
 //! ## Why it is two commands and not one
 //!
@@ -23,9 +22,6 @@
 //! [`ScrapeChannels::await_report`] waits on it. A report for an id nobody is waiting
 //! for is dropped, which is the correct handling for a script left running by an
 //! abandoned scrape.
-//!
-//! The Swift shell has the same two calls — the shim gives the Pinterest web view the
-//! same `invoke` — and answers them with this same channel, through `inkblot-ffi`.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

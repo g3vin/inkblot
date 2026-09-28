@@ -2,8 +2,7 @@
  * MapPanelView.jsx — the map inspector as the page draws it, down the right of a map.
  *
  * It draws the form `useMapPanel` builds, and nothing else: every field calls the
- * handler filed under its id, exactly as a click in the Swift app's native panel
- * does. Under a shell that draws the panel itself (`mapChrome`), this is not mounted.
+ * handler filed under its id.
  */
 import SFIcon from '../components/SFIcon'
 import { PinGlyph } from './mapGlyphs'
