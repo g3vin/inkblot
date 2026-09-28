@@ -21,6 +21,7 @@ import './Editor.css'
 import ProjectLanding from './ProjectLanding'
 import { useTabs } from '../hooks/useTabs'
 import { useNativeTabs } from '../hooks/useNativeTabs'
+import useTabShortcuts from './tabs/useTabShortcuts.js'
 import { useEntryOperations } from '../hooks/useEntryOperations'
 import { useClipboardHistory } from '../hooks/useClipboardHistory'
 import {
@@ -197,9 +198,11 @@ export default function Editor({
     tabs,
   })
 
-  // The tabs, when the shell shows them as windows.
+  // The tabs, published for the tab bar, and their shortcuts. The Swift shell has its own.
+  useTabShortcuts(!nativeOwns('tabBar'))
   useNativeTabs({
-    enabled: nativeOwns('tabBar'),
+    // Always published: the web tab bar draws from it, as the Swift one did.
+    enabled: true,
     projectName,
     tabs,
     activeTabId,

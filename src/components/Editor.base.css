@@ -1,5 +1,7 @@
 
 .tiptap {
+  /* A document's text is set in the book face; the chrome around it is the UI face. */
+  font-family: Georgia, serif;
   white-space: pre-wrap;
   tab-size: 4;
 }
