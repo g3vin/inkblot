@@ -910,3 +910,25 @@ highlightSpeeches(actorPages, 'John')
 const marked = actorPages.flatMap((p) => [...p.querySelectorAll('.is-highlighted')].map((el) => el.textContent))
 ok('an actor\'s copy marks their speeches, over the page and with an extension, and no one else\'s',
   same(marked, ['JOHN', '(beat)', 'Hello.', 'And more.', 'John (cont\'d)', 'Wait.']), JSON.stringify(marked))
+
+/* Picking a Typeset handle opens and shows the section it belongs to. */
+{
+  const { default: FinishingSection } = await import('../../src/components/RightSidebar/finishing/FinishingSection.jsx')
+  const { writeSectionState } = await import('../../src/ui/sectionState.js')
+  const { documentSurface } = await import('../../src/bridge/index.ts')
+  writeSectionState('page.size', false)
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const sectionRoot = createRoot(host)
+  await act(async () => {
+    sectionRoot.render(React.createElement(FinishingSection, { id: 'page.size', title: 'Page Size' },
+      React.createElement('p', { className: 'size-body' }, 'Letter')))
+  })
+  ok('a collapsed section starts shut', !host.querySelector('.size-body'))
+  await act(async () => { documentSurface.publishTypesetFocus({ sectionId: 'page.margins' }) })
+  ok('another section\'s handle leaves it shut', !host.querySelector('.size-body'))
+  await act(async () => { documentSurface.publishTypesetFocus({ sectionId: 'page.size' }) })
+  ok('its own handle opens it', Boolean(host.querySelector('.size-body')))
+  await act(async () => { sectionRoot.unmount() })
+  host.remove()
+}
