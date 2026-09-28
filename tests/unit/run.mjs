@@ -56,9 +56,7 @@
  *   typeset how a book's chapters open, its contents, covers and history, and what an
  *          old book reads as the first time it is typeset
  *   tabs   document tabs and split view: what closing a tab leaves in each pane, and
- *          the tab bar drawn by the shell, driven over the bridge
- *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
- *          through the real @tauri-apps/api modules
+ *          the tabs as the tab bar reads them, driven over the bridge
  *   css    the stylesheets keep to the design system: no decorative gradients, the
  *          one blur token, no prefers-color-scheme duplicates
  *   ui     the shared controls (src/ui): reorder and placement math, native menus,
@@ -69,6 +67,13 @@
  *          state, what a customize drag does, the palette and the display modes
  *   inspector the inspector's two layouts: Customize Inspector Layout… mounted, and a
  *          layout that follows the window's mode
+ *   stats  the writing stats: the tracker, the timer, goals, streaks, deadlines,
+ *          reminders, rhythm and the config, on clocks of their own
+ *   statsdom the stats running in the page: the tracker fed by the bridge, the Stats
+ *          tab, the timer capsule and the settings sheet
+ *   tabbar the tab bar: drawn from tabsChanged, commands, shortcuts, names
+ *   book   the Book navigator: the book's rows, commands, where a drop lands
+ *   notegeom where a note's hover card goes
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a

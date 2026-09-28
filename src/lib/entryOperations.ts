@@ -15,7 +15,7 @@
  * So there is one implementation that knows about the page's state
  * (`useEntryOperations`, registered by Editor.jsx), and every caller goes through the
  * functions exported here — the React tree, the context menus, the tab menu, a drag in
- * the tree, and the native shell's commands. Until something registers, they fall
+ * the tree, and the entry commands. Until something registers, they fall
  * through to FileSystem.js, which is what the harness and a page with no project want.
  *
  * `remapPath` is the pure part, and the part with the rules worth testing.

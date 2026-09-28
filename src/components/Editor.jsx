@@ -213,7 +213,7 @@ export default function Editor({
     },
   })
 
-  // Rename, move, delete and duplicate — from the tree, a menu, or the native shell —
+  // Rename, move, delete and duplicate — from the tree, a menu, or a command —
   // without the pane's final autosave recreating the old path. See useEntryOperations.
   useEntryOperations({
     projectName,

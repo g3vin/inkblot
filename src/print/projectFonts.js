@@ -86,7 +86,7 @@ export const addProjectFont = async (projectName, sourcePath) => {
   return `${FONTS_DIR}/${name}`
 }
 
-/** The families the project's fonts provide, one entry each, for the Swift picker. */
+/** The families the project's fonts provide, one entry each, for the font pickers. */
 export const projectFontFamilies = (projectName) => {
   const byFamily = new Map()
   for (const font of projectFontsNow(projectName)) {

@@ -17,10 +17,7 @@
  * written back gets capitals wherever a sentence now begins. Capitals that mean something
  * else — "I", "NASA", "McDonald" — are kept. A name at the start of a sentence is the case
  * this gets wrong: nothing here knows "Paris" is a name.
- *
- * `native/…/Bubble/BubbleText.swift` is a port of this file for the Swift shell's editor.
- * Change one and change the other; `BubbleTextTests.swift` and the `bubble` suite hold
- * the same cases.
+
  */
 import { BubbleMode } from '../types'
 import type { BubbleAside, BubbleForm, BubbleSession, BubbleWord } from '../types'

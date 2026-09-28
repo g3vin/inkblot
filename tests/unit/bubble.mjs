@@ -7,8 +7,6 @@
  * comes back out of the document's JSON and HTML exactly as it went in (which is what
  * version history stores), that Archive takes it off and keeps it in the document's archive, the
  * document *before* it does, and that pasting a sentence does not copy its session.
- *
- * `BubbleTextTests.swift` holds the same text cases for the Swift port.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'

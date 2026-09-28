@@ -1,8 +1,7 @@
 /**
  * The writing stats, running: the tracker fed by what the page publishes, the
  * writing timer, and today against the goals — one per window, started by
- * `useStatsRuntime`. The web twin of what the Swift app's `AppModel` and
- * `GoalsModel` did.
+ * `useStatsRuntime`.
  *
  * **Presence.** The tracker asks whether the writer is at Inkblot: the window is
  * visible and focused, and there has been input within the idle cutoff. Input is

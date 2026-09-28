@@ -1,9 +1,8 @@
 //! Writing statistics, reachable from the webview.
 //!
-//! The store is `inkblot_core::store::stats`; this is its Tauri shim, the same calls
-//! `inkblot-ffi` made for the Swift app, under the same names. The page records its
-//! sessions and timer runs here (`useStatsTracker`, `writingTimer`) and the Stats panel
-//! reads them back rolled up by day.
+//! The store is `inkblot_core::store::stats`; this is its Tauri shim. The page records
+//! its sessions and timer runs here (`src/stats/`) and the Stats panel reads them back
+//! rolled up by day.
 
 use std::sync::OnceLock;
 

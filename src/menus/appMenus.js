@@ -1,11 +1,10 @@
 /**
- * The menu bar's items the Swift shell drew (InkblotApp.swift's InkblotCommands),
- * for the web app: Insert, Format, the View menu's mode, pages and split items,
- * Window's tab navigation, Edit ▸ Paste and Match Style, and File's extras.
+ * The menu bar's own items: Insert, Format, the View menu's mode, pages and split
+ * items, Window's tab navigation, Edit ▸ Paste and Match Style, and File's extras.
  *
  * Every item acts at the moment it is chosen on the state the page last published —
- * the toolbar's target, the page layout, the tabs — and sends the command the Swift
- * menu sent. Built once; an item with nothing to act on does nothing.
+ * the toolbar's target, the page layout, the tabs — and sends the command the toolbar
+ * would. Built once; an item with nothing to act on does nothing.
  */
 import { documentSurface, latestBridgeEvent, shellBridge } from '../bridge'
 import { CITE_SOURCE_EVENT } from '../components/RightSidebar/references/citeEvent'

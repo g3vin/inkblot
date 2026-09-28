@@ -383,8 +383,7 @@ pub struct ReadAloudPayloadEvent {
 /// What is being dragged.
 ///
 /// A drag in Inkblot often starts in one component and ends in another — the
-/// clipboard panel, an editor pane, a canvas — and in the Swift app one end can be
-/// native. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
+/// clipboard panel, an editor pane, a canvas. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
 /// hand-off, so nothing about a drag depends on shared state in the webview's
 /// `window`. The webview side is `src/bridge/dragHandoff.ts`.
 #[typeshare]

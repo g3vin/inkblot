@@ -1,9 +1,9 @@
 //! What these tests are for.
 //!
-//! The generated TypeScript and Swift are checked by `npm run types:check`, which
-//! proves the three languages describe the same *types*. It does not look at a single
-//! byte of JSON. But JSON is what actually crosses the seam, and a Swift shell will be
-//! written against the exact shape below — so the shape is asserted literally here,
+//! The generated TypeScript is checked by `npm run types:check`, which proves both
+//! languages describe the same *types*. It does not look at a single byte of JSON. But
+//! JSON is what actually crosses the seam, and any other shell would be written
+//! against the exact shape below — so the shape is asserted literally here,
 //! not derived from the same serde attributes it is meant to be checking.
 //!
 //! The exhaustive tag tests are the load-bearing ones. Adding a variant without

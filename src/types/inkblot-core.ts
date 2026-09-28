@@ -155,8 +155,8 @@ export interface ApplyFormatCommand {
 /**
  * The marks the toolbar can toggle.
  * 
- * A closed set rather than a string: a Swift menu item sending `"bolb"` should not
- * compile, and an enum is what makes that true in all three languages at once.
+ * A closed set rather than a string: a menu item sending `"bolb"` should not compile,
+ * and an enum is what makes that true in both languages at once.
  */
 export enum MarkKind {
 	Bold = "bold",
@@ -1441,8 +1441,8 @@ export interface CloseSplitCommand {
  * 
  * Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
  * representation typeshare generates — and here it is also the one we want: it emits
- * a discriminated union in TypeScript and a real `Codable` enum in Swift, so an
- * unhandled command is a compile error on both sides rather than a silent no-op.
+ * a discriminated union in TypeScript, so an unhandled command is a compile error
+ * rather than a silent no-op.
  */
 export type NativeCommand = 
 	| { type: "applyMark", payload: ApplyMarkCommand }
@@ -1910,8 +1910,7 @@ export interface DragMoved {
  * What is being dragged.
  * 
  * A drag in Inkblot often starts in one component and ends in another — the
- * clipboard panel, an editor pane, a canvas — and in the Swift app one end can be
- * native. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
+ * clipboard panel, an editor pane, a canvas. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
  * hand-off, so nothing about a drag depends on shared state in the webview's
  * `window`. The webview side is `src/bridge/dragHandoff.ts`.
  */
@@ -2314,9 +2313,8 @@ export interface InsertFootnoteCommand {
  * Insert text at the selection with no formatting of its own — the text takes on the
  * marks around it.
  * 
- * This is Edit ▸ Paste and Match Style. The shell reads the pasteboard, not the
- * webview: `WKWebView` cannot read the clipboard without a user gesture inside the
- * page, and the menu item is not one.
+ * This is Edit ▸ Paste and Match Style: the clipboard's text, read by whatever the
+ * writer used — the menu item or the toolbar button — and inserted as plain text.
  */
 export interface InsertPlainTextCommand {
 	target: EditorTarget;

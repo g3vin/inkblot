@@ -1,14 +1,14 @@
 /**
  * Everything the writing stats say out loud: the timer's segments, a goal met, and
- * the reminders to write. The web twin of the Swift app's `TimerAnnouncer`.
+ * the reminders to write.
  *
  * Notifications go through tauri-plugin-notification in the app, and the browser's
  * `Notification` in a plain page. Permission is asked the first time something
  * wants to notify, not at launch: a writer who never uses the timer is never asked.
  *
- * The sounds are the Swift app's names (Glass, Ping, Hero …), made here with Web
- * Audio rather than shipped as files — short chimes in the same spirit, one per
- * name, so a routine saved with a sound keeps a sound of its own.
+ * The sounds are named after macOS's (Glass, Ping, Hero …) and made with Web Audio
+ * rather than shipped as files — short chimes, one per name, so a routine saved with
+ * a sound keeps a sound of its own.
  */
 import { isTauri } from '@tauri-apps/api/core'
 

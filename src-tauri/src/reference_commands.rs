@@ -1,9 +1,8 @@
 //! A GET on the page's behalf, for looking a source up (`references/fetchText.js`).
 //!
 //! The page cannot fetch another origin, so the References panel's lookups — a web
-//! page's metadata, doi.org, Open Library, arXiv, PubMed — come through here, as they
-//! come through `RemoteFetch.swift` under the Swift shell. Only http(s), only GET, and
-//! only so much of the body.
+//! page's metadata, doi.org, Open Library, arXiv, PubMed — come through here. Only
+//! http(s), only GET, and only so much of the body.
 
 use serde::Serialize;
 

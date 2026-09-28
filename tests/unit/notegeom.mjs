@@ -1,6 +1,5 @@
 /**
- * Where a note's hover card goes (lib/notePreviewGeometry.ts) — the layout half of the
- * Swift shell's NotePreviewTests, against the page's own rules.
+ * Where a note's hover card goes (lib/notePreviewGeometry.ts).
  */
 import { ok } from './assert.mjs'
 

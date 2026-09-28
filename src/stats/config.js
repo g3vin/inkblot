@@ -1,7 +1,6 @@
 /**
  * The writer's stats settings: how sittings are measured, the timer, goals,
- * deadlines and reminders. Kept by the core in `stats/config.json` exactly as the
- * Swift app wrote it (`StatsConfig.swift`), so either reads the other's.
+ * deadlines and reminders. Kept by the core in `stats/config.json`, as given.
  *
  * Every field has a default and a missing or broken one reads as it — a file
  * written by an older build is that build's settings with the new ones at their
@@ -135,7 +134,7 @@ export function parseStatsConfig(json) {
   }
 }
 
-/** Swift's encoder omits a nil optional; so does this, so the file stays the same shape. */
+/** A missing value is left out rather than written as null, so the file stays small. */
 export function serializeStatsConfig(config) {
   return JSON.stringify(config, (_key, value) => (value === null ? undefined : value))
 }

@@ -4,9 +4,9 @@
  * Four toolbars (lib/chromeLayout.ts): a document's, a canvas's, a map's and
  * Typeset's. Each item is its own component (registry.jsx) and reads the state the
  * page publishes — `toolbarState`, `canvasToolbarChanged`, `mapChromeChanged`,
- * `pageLayoutState`, `viewOptions` — and sends back commands, the same protocol the
- * Swift shell's toolbar used. So the host needs nothing from the document but the
- * live editor, which the voice controls keep.
+ * `pageLayoutState`, `viewOptions` — and sends back commands over the bridge. So the
+ * host needs nothing from the document but the live editor, which the voice controls
+ * keep.
  *
  * Customize Toolbar… (`inkblot:customize-toolbar`) opens the palette, and while it is
  * open the toolbar's items become tokens that drag to reorder, and off the toolbar to

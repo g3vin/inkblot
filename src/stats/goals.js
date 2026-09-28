@@ -1,7 +1,6 @@
 /**
  * Goals, streaks, deadlines, reminders and rhythm — pure functions over days of
- * figures, ported from the Swift app's `Goals.swift` so a plan saved by either
- * reads the same. Days are `YYYY-MM-DD` keys; weekdays are 1 = Sunday.
+ * figures. Days are `YYYY-MM-DD` keys; weekdays are 1 = Sunday.
  */
 import { addDays, dayDate, dayKey, formatNumber, newId, shiftDay, weekdayOf } from './day.js'
 

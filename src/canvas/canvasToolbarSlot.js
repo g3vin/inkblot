@@ -15,10 +15,9 @@
 import { createContext } from 'react'
 
 /**
- * The slot's value under a shell that draws the canvas toolbar itself (the Swift
- * shell's window toolbar): the canvas publishes its toolbar state over the bridge
- * instead of portaling buttons anywhere. Same rule as an element — present only while
- * the canvas toolbar should be up.
+ * The slot's value while the toolbar draws the canvas's items: the canvas publishes
+ * its toolbar state over the bridge instead of portaling buttons anywhere. Same rule
+ * as an element — present only while the canvas toolbar should be up.
  */
 export const NATIVE_CANVAS_TOOLBAR = 'native'
 

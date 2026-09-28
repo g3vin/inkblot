@@ -1,7 +1,7 @@
 /**
  * createDocument.js — making a new, empty document of a given kind.
  *
- * The file tree, a draft tab and the native shell's "New …" command all create
+ * The file tree, a draft tab and the `createEntry` command all create
  * documents through here. The kind decides two things: the suffix the tree path carries (never whatever the user
  * typed — "plan.canvas" as a document stays a document) and what an empty one holds.
  */
