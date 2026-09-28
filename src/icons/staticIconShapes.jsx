@@ -57,6 +57,7 @@ export const STATIC_ICONS = {
   'arrow.clockwise': <>{path_('M21 12a9 9 0 1 1-3-6.7L21 8')}{path_('M21 3v5h-5')}</>,
   'doc.badge.plus': <>{path_('M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7')}{path_('M14 3v6h6v4')}{line_(18, 16, 18, 22)}{line_(15, 19, 21, 19)}</>,
   photo_frame: <>{rect_(3, 3, 18, 18)}{circle_(9, 9, 2)}{path_('m21 15-5-5L5 21')}</>,
+  bookmark: <>{path_('M6 3h12v18l-6-4-6 4z')}</>,
   'eye': <>{path_('M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z')}{circle_(12, 12, 3)}</>,
 }
 

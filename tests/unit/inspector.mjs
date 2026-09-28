@@ -82,4 +82,36 @@ await act(async () => seen.chooseLayout('finishing'))
 ok('choosing a layout switches the mode', modes.at(-1) === 'typeset')
 off()
 
+/* ---------------- the Typeset history ---------------- */
+
+const { byDay } = await import('../../src/lib/historyDays.js')
+const now = new Date('2026-09-28T15:00:00')
+const days = byDay([
+  { id: 'a', timestamp: '2026-09-28T09:00:00' },
+  { id: 'b', timestamp: '2026-09-28T08:00:00' },
+  { id: 'c', timestamp: '2026-09-27T20:00:00' },
+  { id: 'd', timestamp: '2026-09-01T10:00:00' },
+], now)
+ok('typeset versions by day: Today, Yesterday, then a date', days.map((d) => d.label).slice(0, 2).join() === 'Today,Yesterday' && days.length === 3 && days[0].rows.length === 2)
+
+const { default: TypesetHistoryView } = await import('../../src/components/RightSidebar/TypesetHistoryView.jsx')
+await act(async () => root.render(React.createElement(TypesetHistoryView)))
+ok('with none kept yet, it says how they will be', container.textContent.includes('No Typeset Versions Yet'))
+await act(async () => {
+  documentSurface.publishTypesetHistoryChanged({
+    folder: '',
+    rows: [
+      { id: 'v2', timestamp: new Date().toISOString(), kind: 'named', name: 'Sent to the printer', summary: ['Margins wider', 'Chapter openings drop'] },
+      { id: 'v1', timestamp: new Date().toISOString(), kind: 'auto', summary: [] },
+    ],
+  })
+})
+ok('it lists what the page publishes', container.querySelectorAll('.typeset-history-row').length === 2 && container.textContent.includes('Sent to the printer'))
+ok('with what changed', container.textContent.includes('Margins wider'))
+const typesetCommands = []
+const offPreview = documentSurface.onCommand('previewTypesetVersion', (payload) => typesetCommands.push(payload))
+await act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Compare').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('Compare previews it beside the current typeset', typesetCommands[0]?.id === 'v2' && typesetCommands[0].compare === true)
+offPreview()
+
 await act(async () => root.unmount())
