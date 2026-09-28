@@ -44,17 +44,6 @@
   --bubble-scrim: rgba(236, 240, 245, 0.5);
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) .bubble-editor {
-    --bubble-fill-top: rgba(255, 255, 255, 0.78);
-    --bubble-fill-bottom: rgba(255, 255, 255, 0.42);
-    --bubble-rim: rgba(255, 255, 255, 0.9);
-    --bubble-highlight: rgba(255, 255, 255, 1);
-    --bubble-shadow: 0 10px 26px rgba(17, 24, 39, 0.14), 0 0 0 0.5px rgba(17, 24, 39, 0.08);
-    --bubble-scrim: rgba(236, 240, 245, 0.5);
-  }
-}
-
 @keyframes bubble-editor-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -182,7 +171,7 @@
   margin: 0;
   max-width: 100%;
   text-align: center;
-  font-family: var(--editor-font-family, Georgia, 'Times New Roman', serif);
+  font-family: var(--editor-font-family, var(--font-editor));
   font-size: 19px;
   line-height: 1.5;
   color: var(--text-secondary);
@@ -215,7 +204,7 @@
   padding: 0 18px;
   border-radius: 999px;
   box-sizing: border-box;
-  font-family: var(--editor-font-family, Georgia, 'Times New Roman', serif);
+  font-family: var(--editor-font-family, var(--font-editor));
   font-size: 18px;
   line-height: 1.2;
   color: var(--bubble-text);
@@ -363,7 +352,7 @@
   background: var(--popover-bg);
   border: 1px solid var(--popover-border);
   box-shadow: var(--shadow-popover);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-ui);
   white-space: nowrap;
 }
 

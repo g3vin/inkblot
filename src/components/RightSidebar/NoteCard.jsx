@@ -11,6 +11,7 @@ import SFIcon from '../SFIcon'
 import NoteImageGallery from '../NoteImageGallery'
 import { AudioClipList, AudioRecordButton } from '../AudioNotes'
 import { pickNoteImages, readClipboardImages } from '../../lib/noteImageUtils'
+import { noteColor } from '../../lib/noteUtils'
 
 export default function NoteCard({
   note,
@@ -71,7 +72,7 @@ export default function NoteCard({
       id={`note-${note.id}`}
       className={`note-tile${note.pinned ? ' pinned' : ''}`}
       style={{
-        '--note-color': note.color || '#007aff',
+        '--note-color': noteColor(note.color),
         marginLeft: `${depth * 18}px`,
       }}
       onClick={note.type === 'quote' ? onJump : undefined}

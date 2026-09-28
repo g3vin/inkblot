@@ -60,18 +60,6 @@
   --map-pin: #ff7a66;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .map-surface[data-map-theme='clean'] {
-    --map-ink: #eef1f6;
-    --map-land: #2e3a33;
-    --map-land-edge: #6f8a78;
-    --map-water: #16232e;
-    --map-border: rgba(210, 220, 230, 0.35);
-    --map-route: #f08a6c;
-    --map-pin: #ff7a66;
-  }
-}
-
 .map-surface[data-map-theme='parchment'] {
   --map-paper: #d8c8a2;
   --map-sheet: #efe2c1;

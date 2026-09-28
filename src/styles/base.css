@@ -1,0 +1,117 @@
+/*
+ * base.css — element defaults. Tokens only; see docs/DESIGN.md.
+ */
+
+:root {
+  color: var(--app-fg);
+  background-color: var(--app-bg);
+}
+
+html,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-width: 320px;
+  min-height: 100vh;
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--app-fg);
+  background: var(--app-bg);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+::selection {
+  background: var(--selection-bg);
+}
+
+a {
+  font-weight: var(--weight-medium);
+  color: var(--accent-foreground);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/*
+ * The bare <button>. Legacy feature buttons still lean on its box (radius, padding),
+ * so that stays; its colours are tokens now. New code uses src/ui/Button or
+ * src/ui/IconButton instead of styling a bare button.
+ */
+button {
+  border-radius: var(--radius-md);
+  border: var(--hairline) solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: var(--weight-medium);
+  font-family: inherit;
+  color: inherit;
+  background-color: var(--control-bg);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+button:hover {
+  border-color: var(--border-strong);
+}
+
+button:focus {
+  outline: none;
+}
+
+button:focus-visible,
+[role='button']:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==== pop-up surfaces ====
+ *
+ * Every floating menu, popover and picker shares one chrome (--menu-* in tokens.css).
+ * New menus use src/ui/Menu or src/ui/Popover, which wear it already; this list is the
+ * legacy menus not yet migrated. Only the surface is unified — each keeps its own
+ * position, width and contents.
+ *
+ * :root-prefixed purely for specificity, so these beat the per-component stylesheets
+ * whatever order the bundler emits them in. The canvas toolbar is deliberately NOT
+ * listed: it sits in the titlebar as the editor toolbar's twin.
+ */
+:root .canvas-color-menu,
+:root .file-tree-create-menu,
+:root .file-entry-floating-menu,
+:root .note-floating-menu,
+:root .landing-project-settings-menu,
+:root .conversation-members-menu,
+:root .dictation-popover,
+:root .read-aloud-popover {
+  border: var(--hairline) solid var(--menu-border);
+  border-radius: var(--menu-radius);
+  background: var(--menu-bg);
+  box-shadow: var(--menu-shadow);
+  color: var(--text-primary);
+}

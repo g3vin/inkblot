@@ -2,129 +2,70 @@
  * App.jsx — application root.
  *
  * Owns app-wide chrome and preferences that live above the editor:
- * theme (light/dark/system), accent color, and the word-count badge
+ * theme (light/dark/system), accent colour, and the word-count badge
  * toggle. Wires those preferences into the native Tauri "View" menu
- * and persists them through lib/preferences.ts. Renders the Editor plus the
- * accent-color picker dialog.
+ * and persists them through lib/preferences.ts. Renders the Editor, the
+ * accent-colour dialog, and the command palette (⌘K) with the app-level commands.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { invoke } from '@tauri-apps/api/core'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
-import './App.css'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
 import { documentSurface } from './bridge'
 import { isNativeShell, nativeOwns } from './lib/host'
+import { ACCENT_PRESETS, DEFAULT_ACCENT } from './lib/palette'
+import { applyAccentAttribute, applyThemeAttribute, resolveTheme, watchSystemTheme } from './lib/theme'
+import { useCommands } from './lib/commands'
+import Dialog from './ui/Dialog'
+import Button from './ui/Button'
+import InkPicker from './ui/InkPicker'
+import CommandPalette from './ui/CommandPalette'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
 const WORD_COUNT_BADGE_STORAGE_KEY = 'inkblot-show-word-count-badge'
 
-const ACCENT_PRESETS = [
-  { id: 'sky', label: 'Sky', value: '#7aaef7' },
-  { id: 'mint', label: 'Mint', value: '#58cbb3' },
-  { id: 'coral', label: 'Coral', value: '#ff8c73' },
-  { id: 'rose', label: 'Rose', value: '#f47ca3' },
-  { id: 'gold', label: 'Gold', value: '#f0be57' },
-  { id: 'lagoon', label: 'Lagoon', value: '#47b8d6' },
+const EXPORT_FORMATS = [
+  ['pdf', 'PDF'],
+  ['epub', 'EPUB'],
+  ['docx', 'Word (.docx)'],
+  ['markdown', 'Markdown'],
+  ['html', 'HTML'],
+  ['plainText', 'Plain text'],
+  ['fountain', 'Fountain'],
+  ['fdx', 'Final Draft (.fdx)'],
 ]
 
-const DEFAULT_ACCENT = ACCENT_PRESETS[0].value
+const dispatchAppEvent = (type, detail) => window.dispatchEvent(new CustomEvent(type, { detail }))
 
-/**
- * The OS accent color (System Settings → Appearance on macOS) as `#rrggbb`, or null
- * where the host has none to give. Asked of the host because WebKit's
- * `-apple-system-control-accent` keyword reports stock blue to page content whatever
- * the user picked. Where there is one, the accent is the system's — like every native
- * control beside the page — and the picker is not offered.
- */
-const readSystemAccent = async () => {
-  try {
-    const hex = await invoke('system_accent_color')
-    return typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : null
-  } catch {
-    return null
-  }
-}
-
-/** Coerce any stored/user value to a valid 6-digit hex color, falling back to the default accent. */
-const normalizeAccentColor = (value) => {
-  if (typeof value !== 'string') return DEFAULT_ACCENT
-  const trimmed = value.trim()
-  return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toLowerCase() : DEFAULT_ACCENT
-}
-
-/** Modal dialog for choosing the app accent color (presets + custom picker). */
-function AccentColorPanel({ open, accentColor, onChange, onClose }) {
-  if (!open) return null
-
+/** Choose the accent: one of the curated inks, so every accent suits the palette. */
+function AccentColorDialog({ open, accent, onChange, onClose }) {
   return (
-    <div className="accent-overlay" onClick={onClose}>
-      <div
-        className="accent-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="accent-dialog-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="accent-dialog-header">
-          <div>
-            <p className="accent-dialog-eyebrow">View Menu</p>
-            <h2 id="accent-dialog-title">Accent Color</h2>
-          </div>
-          <button type="button" className="accent-dialog-close" onClick={onClose} aria-label="Close accent picker">
-            ×
-          </button>
-        </div>
-
-        <p className="accent-dialog-copy">
-          Keep the app’s highlights in sync. Pick a chill preset or dial in your own.
-        </p>
-
-        <div className="accent-preview" style={{ '--accent-preview': accentColor }}>
-          <div className="accent-preview-chip" />
-          <div>
-            <div className="accent-preview-label">Current accent</div>
-            <code>{accentColor.toUpperCase()}</code>
-          </div>
-        </div>
-
-        <div className="accent-grid">
-          {ACCENT_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              className={`accent-swatch${accentColor === preset.value ? ' active' : ''}`}
-              style={{ '--swatch-color': preset.value }}
-              onClick={() => onChange(preset.value)}
-              aria-label={`${preset.label} accent`}
-              title={preset.label}
-            >
-              <span className="accent-swatch-dot" />
-              <span className="accent-swatch-label">{preset.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="accent-custom-row">
-          <label className="accent-custom-input">
-            <span>Pick your own</span>
-            <input type="color" value={accentColor} onChange={(event) => onChange(event.target.value)} />
-          </label>
-
-          <button
-            type="button"
-            className="accent-reset-btn"
-            onClick={() => onChange(DEFAULT_ACCENT)}
-            disabled={accentColor === DEFAULT_ACCENT}
-          >
+    <Dialog
+      open={open}
+      onClose={onClose}
+      eyebrow="Appearance"
+      title="Accent colour"
+      description="Tints selections, focus rings and primary buttons. Ink Blue is Inkblot’s own."
+      footer={(
+        <>
+          <Button variant="ghost" onClick={() => onChange(DEFAULT_ACCENT)} disabled={accent === DEFAULT_ACCENT}>
             Reset
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+          <Button variant="primary" onClick={onClose}>Done</Button>
+        </>
+      )}
+    >
+      <InkPicker
+        label="Accent colour"
+        value={accent}
+        onChange={onChange}
+        inks={ACCENT_PRESETS.map((preset) => preset.id)}
+        showLabels
+      />
+    </Dialog>
   )
 }
 
@@ -136,17 +77,12 @@ export default function App() {
   })
   const currentThemeRef = useRef('system')
   const showWordCountBadgeRef = useRef(true)
-  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
+  const [accent, setAccent] = useState(DEFAULT_ACCENT)
   const [isAccentPickerOpen, setIsAccentPickerOpen] = useState(false)
   const [showWordCountBadge, setShowWordCountBadge] = useState(true)
 
   // Resolve 'system' to the OS-reported light/dark preference.
-  const getResolvedTheme = useCallback((theme) => {
-    if (theme !== 'system') return theme
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light'
-  }, [])
+  const getResolvedTheme = useCallback((theme) => resolveTheme(theme), [])
 
   // Keep the native View-menu labels/checkmarks in sync with the active theme.
   const updateMenu = useCallback((theme) => {
@@ -161,38 +97,23 @@ export default function App() {
     }
   }, [getResolvedTheme])
 
-  // Apply a theme to the document root and persist it ('system' clears the override).
+  // Apply a theme ('system' | 'light' | 'dark') and persist it. <html data-theme> always
+  // carries the resolved theme (src/lib/theme.js); 'system' just isn't stored.
   const applyTheme = useCallback((theme) => {
     if (!theme) return
     currentThemeRef.current = theme
-    const root = document.documentElement
-
-    if (theme === 'system') {
-      root.removeAttribute('data-theme')
-      root.style.colorScheme = 'light dark'
-      removePreference(THEME_STORAGE_KEY)
-      updateMenu(theme)
-      return
-    }
-
-    root.setAttribute('data-theme', theme)
-    root.style.colorScheme = theme
-    setPreference(THEME_STORAGE_KEY, theme)
+    applyThemeAttribute(theme)
+    if (theme === 'system') removePreference(THEME_STORAGE_KEY)
+    else setPreference(THEME_STORAGE_KEY, theme)
     updateMenu(theme)
   }, [updateMenu])
 
-  const applyAccentColor = useCallback((nextAccent) => {
-    const normalized = normalizeAccentColor(nextAccent)
-    document.documentElement.style.setProperty('--accent-color', normalized)
-    setPreference(ACCENT_STORAGE_KEY, normalized)
-    setAccentColor(normalized)
-  }, [])
-
-  // The system's accent is not a preference: it is shown, never stored, so the user's
-  // own pick is still there wherever the host has no system accent to give.
-  const followSystemAccent = useCallback((hex) => {
-    document.documentElement.style.setProperty('--accent-color', hex)
-    setAccentColor(hex)
+  // The accent is one of the curated inks (src/lib/palette.ts). A hex saved before the
+  // ink palette maps to its nearest ink.
+  const applyAccent = useCallback((nextAccent) => {
+    const id = applyAccentAttribute(nextAccent)
+    setPreference(ACCENT_STORAGE_KEY, id)
+    setAccent(id)
   }, [])
 
   const applyWordCountBadgeVisibility = useCallback((visible) => {
@@ -232,15 +153,12 @@ export default function App() {
   // On startup: restore persisted preferences, then build the native View menu entries.
   useEffect(() => {
     const stored = getPreference(THEME_STORAGE_KEY) || 'system'
-    const storedAccent = normalizeAccentColor(getPreference(ACCENT_STORAGE_KEY))
+    const storedAccent = getPreference(ACCENT_STORAGE_KEY)
     const storedWordCountBadge = getPreference(WORD_COUNT_BADGE_STORAGE_KEY)
     const showStoredWordCountBadge = storedWordCountBadge !== 'false'
-    applyAccentColor(storedAccent)
+    applyAccent(storedAccent)
     applyTheme(stored)
     applyWordCountBadgeVisibility(showStoredWordCountBadge)
-
-    const systemAccent = readSystemAccent()
-    systemAccent.then((hex) => hex && followSystemAccent(hex))
 
     const setupMenu = async () => {
       const { Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem } = await import('@tauri-apps/api/menu')
@@ -335,16 +253,19 @@ export default function App() {
       }
 
       const themeItems = [toggleItem, systemItem]
-      const accentItems = (await systemAccent)
-        ? []
-        : [
-            await PredefinedMenuItem.new({ item: 'Separator' }),
-            await MenuItem.new({
-              id: 'accent-color-picker',
-              text: 'Accent Color…',
-              action: () => setIsAccentPickerOpen(true),
-            }),
-          ]
+      const accentItems = [
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        await MenuItem.new({
+          id: 'accent-color-picker',
+          text: 'Accent Colour…',
+          action: () => setIsAccentPickerOpen(true),
+        }),
+        await MenuItem.new({
+          id: 'command-palette',
+          text: 'Command Palette…  ⌘K',
+          action: () => dispatchAppEvent('inkblot:command-palette'),
+        }),
+      ]
       const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [printLayoutItem])]
 
       if (viewSubmenu) {
@@ -362,32 +283,44 @@ export default function App() {
     }
 
     setupMenu()
-  }, [applyAccentColor, applyTheme, applyWordCountBadgeVisibility, followSystemAccent, getResolvedTheme, updateMenu])
+  }, [applyAccent, applyTheme, applyWordCountBadgeVisibility, getResolvedTheme, updateMenu])
 
-  // The accent is changed in System Settings, so coming back to the window is when it
-  // may have moved.
-  useEffect(() => {
-    const onFocus = async () => {
-      const systemAccent = await readSystemAccent()
-      if (systemAccent) followSystemAccent(systemAccent)
-    }
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [followSystemAccent])
+  // Follow the OS when the theme is 'system', and keep the menu labels in step.
+  useEffect(() => watchSystemTheme(() => {
+    if (currentThemeRef.current !== 'system') return
+    applyThemeAttribute('system')
+    updateMenu('system')
+  }), [updateMenu])
 
-  // Refresh menu labels when the OS theme flips while in 'system' mode.
-  useEffect(() => {
-    if (!window.matchMedia) return
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = () => {
-      if (currentThemeRef.current === 'system') {
-        updateMenu('system')
-      }
-    }
-
-    media.addEventListener?.('change', handler)
-    return () => media.removeEventListener?.('change', handler)
-  }, [updateMenu])
+  // App-level commands for the palette (⌘K). Features register their own where they live.
+  useCommands(() => [
+    { id: 'view.theme.light', section: 'View', title: 'Use light theme', icon: 'sun', keywords: ['paper', 'appearance', 'mode'], run: () => applyTheme('light') },
+    { id: 'view.theme.dark', section: 'View', title: 'Use dark theme', icon: 'moon', keywords: ['ink', 'appearance', 'mode', 'night'], run: () => applyTheme('dark') },
+    { id: 'view.theme.system', section: 'View', title: 'Match system theme', icon: 'settings', keywords: ['appearance', 'auto'], run: () => applyTheme('system') },
+    { id: 'view.accent', section: 'View', title: 'Change accent colour…', icon: 'palette', keywords: ['color', 'tint', 'highlight'], run: () => setIsAccentPickerOpen(true) },
+    { id: 'view.word-count', section: 'View', title: 'Show or hide word count', icon: 'gauge', keywords: ['words', 'stats', 'badge'], run: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current) },
+    { id: 'print.layout', section: 'Print & export', title: 'Toggle print layout', icon: 'print', shortcut: '⌥⌘P', keywords: ['pages', 'preview', 'book'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
+    { id: 'print.page-setup', section: 'Print & export', title: 'Page setup…', icon: 'sliders', keywords: ['margins', 'trim', 'paper size'], run: () => dispatchAppEvent('inkblot:page-setup') },
+    { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', shortcut: '⌘P', run: () => dispatchAppEvent('inkblot:print', { scope: 'document' }) },
+    { id: 'print.book', section: 'Print & export', title: 'Print book…', icon: 'books', keywords: ['folder', 'manuscript'], run: () => dispatchAppEvent('inkblot:print', { scope: 'folder' }) },
+    ...EXPORT_FORMATS.map(([format, label]) => ({
+      id: `export.document.${format}`,
+      section: 'Print & export',
+      title: `Export as ${label}…`,
+      icon: 'export',
+      keywords: ['save as', 'download', format],
+      run: () => dispatchAppEvent('inkblot:export', { format, scope: 'document' }),
+    })),
+    { id: 'import.fountain', section: 'Document', title: 'Import Fountain script…', icon: 'download', keywords: ['screenplay', 'import'], run: () => dispatchAppEvent('inkblot:import-script') },
+    ...[['prose', 'prose'], ['screenplay', 'a screenplay'], ['stageplay', 'a stage play']].map(([format, label]) => ({
+      id: `document.write-as.${format}`,
+      section: 'Document',
+      title: `Write as ${label}`,
+      icon: format === 'prose' ? 'document' : 'story',
+      keywords: ['format', 'script', format],
+      run: () => dispatchAppEvent('inkblot:writing-format', { format }),
+    })),
+  ], [applyTheme, applyWordCountBadgeVisibility])
 
   // Escape closes the accent picker first; otherwise it exits fullscreen.
   useEffect(() => {
@@ -417,12 +350,13 @@ export default function App() {
   return (
     <>
       <Editor showWordCountBadge={showWordCountBadge} />
-      <AccentColorPanel
+      <AccentColorDialog
         open={isAccentPickerOpen}
-        accentColor={accentColor}
-        onChange={applyAccentColor}
+        accent={accent}
+        onChange={applyAccent}
         onClose={() => setIsAccentPickerOpen(false)}
       />
+      <CommandPalette />
     </>
   )
 }

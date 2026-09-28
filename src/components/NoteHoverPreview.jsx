@@ -16,7 +16,7 @@ import { useNoteCardDrag } from '../hooks/useNoteCardDrag'
 import NoteImageGallery from './NoteImageGallery'
 import AudioNotes from './AudioNotes'
 import { readClipboardImages } from '../lib/noteImageUtils'
-import { collectNoteBranchIds, createFreeNote, touchNote } from '../lib/noteUtils'
+import { collectNoteBranchIds, createFreeNote, noteColor, touchNote } from '../lib/noteUtils'
 import { RESIZE_ICON_PATHS } from '../lib/resizeIcon'
 import {
   NOTE_HIGHLIGHT_EVENT,
@@ -315,7 +315,7 @@ export default function NoteHoverPreview({
       id: `anchor:${rootNote.id}`,
       anchorPoint: getDotPoint(preview.anchorRect),
       toNoteId: rootNote.id,
-      color: rootNote.color || '#007aff',
+      color: noteColor(rootNote.color),
       depth: 0,
     }]
 
@@ -349,7 +349,7 @@ export default function NoteHoverPreview({
           id: `${note.id}:${child.id}`,
           fromNoteId: note.id,
           toNoteId: child.id,
-          color: child.color || note.color || '#007aff',
+          color: noteColor(child.color || note.color),
           depth: depth + 1,
         })
 
@@ -587,7 +587,7 @@ export default function NoteHoverPreview({
   if (!preview || !layout || !rootNote) return null
 
   return (
-    <div className="note-preview-layer" style={{ '--note-color': rootNote.color || '#007aff' }}>
+    <div className="note-preview-layer" style={{ '--note-color': noteColor(rootNote.color) }}>
       <svg
         className="note-preview-string"
         viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
@@ -640,7 +640,7 @@ export default function NoteHoverPreview({
               top: `${renderPosition.y}px`,
               width: `${size.width}px`,
               minHeight: `${size.height}px`,
-              '--note-color': note.color || '#007aff',
+              '--note-color': noteColor(note.color),
               '--note-reveal-delay': `${revealDelay}s`,
             }}
             onPointerDown={(event) => handleDragStart(note.id, event)}

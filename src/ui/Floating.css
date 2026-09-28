@@ -1,0 +1,56 @@
+/* Floating chrome: paper + float shadow everywhere… */
+.ib-floating {
+  border: var(--hairline) solid var(--border-color);
+  background: var(--surface-float);
+  box-shadow: var(--shadow-float);
+  color: var(--text-primary);
+}
+
+/* …and Liquid Glass on iOS/iPadOS only (data-platform is set by src/ui/platform.js). */
+:root[data-platform='ios'] .ib-floating {
+  border-color: var(--glass-rim);
+  background: var(--glass-fill);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+}
+
+.ib-floating-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+}
+
+.ib-floating-toolbar--vertical { flex-direction: column; }
+
+:root[data-platform='ios'] .ib-floating-toolbar { border-radius: var(--radius-pill); padding: var(--space-1) var(--space-2); }
+
+.ib-toolbar-separator {
+  width: var(--hairline);
+  height: 18px;
+  margin: 0 var(--space-1);
+  background: var(--border-color);
+}
+
+.ib-floating-toolbar--vertical .ib-toolbar-separator { width: 18px; height: var(--hairline); margin: var(--space-1) 0; }
+
+.ib-fab {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--accent-foreground);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.ib-fab:hover { transform: translateY(-1px); }
+.ib-fab:active { transform: translateY(0.5px); }
+.ib-fab:focus-visible { outline: none; box-shadow: var(--focus-ring), var(--shadow-float); }

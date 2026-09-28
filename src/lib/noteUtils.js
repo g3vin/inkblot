@@ -8,17 +8,18 @@
  * normalizeNote(s) so downstream code can rely on the shape.
  */
 import { normalizeNoteAudio } from './audioNotes'
+import { DEFAULT_NOTE_INK, NOTE_INKS, inkColor, inkVar, isInkId } from './palette'
 
-export const DEFAULT_NOTE_COLOR = '#ffd54f'
+/**
+ * A note's colour is an ink id from src/lib/palette.ts ('amber'), or — for notes saved
+ * before the ink palette, or given a custom colour — a hex. Draw it with `noteColor`.
+ */
+export const DEFAULT_NOTE_COLOR = DEFAULT_NOTE_INK
 
-export const NOTE_COLOR_OPTIONS = [
-  '#ffd54f',
-  '#ff9aa2',
-  '#9ad0f5',
-  '#9ee493',
-  '#c7a8ff',
-  '#ffb86b',
-]
+export const NOTE_COLOR_OPTIONS = NOTE_INKS
+
+/** A stored note colour → the CSS colour to draw it with. */
+export const noteColor = (value) => inkColor(value, inkVar(DEFAULT_NOTE_INK))
 
 const nowIso = () => new Date().toISOString()
 
@@ -37,6 +38,7 @@ export const formatNoteTimestamp = (value) => {
 const normalizeColor = (value) => {
   if (typeof value !== 'string') return DEFAULT_NOTE_COLOR
   const trimmed = value.trim()
+  if (isInkId(trimmed)) return trimmed
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(trimmed) ? trimmed : DEFAULT_NOTE_COLOR
 }
 
