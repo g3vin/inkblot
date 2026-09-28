@@ -1,0 +1,56 @@
+/* The History tab in Typeset: the book's typeset versions. */
+
+.typeset-history { display: flex; flex-direction: column; height: 100%; min-height: 0; font-family: var(--font-ui); }
+.typeset-history-top { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-2); }
+.typeset-history-save { width: 100%; }
+.typeset-history-naming { display: flex; gap: var(--space-2); }
+.typeset-history-naming input {
+  flex: 1;
+  min-width: 0;
+  height: var(--size-capsule);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: 12px var(--font-ui);
+}
+.typeset-history-previewing { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; color: var(--text-secondary); }
+.typeset-history-previewing span { flex: 1; }
+.typeset-history-note { margin: 0; font-size: 12px; color: var(--status-warning); }
+
+.typeset-history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 var(--space-2) var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.typeset-history-row.is-previewing { border-color: var(--accent-border); background: var(--accent-surface); }
+.typeset-history-row header { display: flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); font-size: 12px; }
+.typeset-history-title { flex: 1; color: var(--text-primary); }
+.typeset-history-title.is-named { font-weight: 600; }
+.typeset-history-time { font-size: 11px; color: var(--text-muted); }
+.typeset-history-summary,
+.typeset-history-more { margin: 0; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.typeset-history-more { color: var(--text-subtle); }
+.typeset-history-actions { display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2); }
+.typeset-history-actions button {
+  margin: 0;
+  padding: 3px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent-foreground);
+  font: 12px var(--font-ui);
+  cursor: pointer;
+}
+.typeset-history-actions button:hover:not(:disabled) { background: var(--hover-bg); border-color: transparent; }
+.typeset-history-actions button:disabled { color: var(--text-muted); cursor: default; }
+.typeset-history-spacer { flex: 1; }
+.typeset-history-footer { margin: 0; padding: var(--space-2) var(--space-3); font-size: 11px; color: var(--text-muted); }
+
+.history-mode-switch { padding: var(--space-3) var(--space-3) 0; }

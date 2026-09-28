@@ -14,6 +14,8 @@ import { createPortal } from 'react-dom'
 import { useReducedMotion } from 'framer-motion'
 import InspectorHeader from './InspectorHeader'
 import MapInspectorPanel from './MapInspectorPanel'
+import TypesetHistoryView from './TypesetHistoryView'
+import Segmented from '../../ui/Segmented'
 import { hasActiveWheelPhase, hasEndedWheelPhase, hasMomentumPhase } from '../../lib/wheelPhase'
 import { sidebarTabsFor } from './sidebarTabsConfig'
 import useInspectorLayout from './useInspectorLayout'
@@ -125,6 +127,7 @@ export default function RightSidebar({
     setTab: setSidebarTab,
   })
   const tabs = useMemo(() => sidebarTabsFor(inspector.tabs), [inspector.tabs])
+  const [historyKind, setHistoryKind] = useState('typeset')
 
   // A map asking for its panel (a label just placed, an item double-clicked) brings
   // the Map tab up.
@@ -776,7 +779,7 @@ export default function RightSidebar({
       )
     }
 
-    return (
+    const textHistory = (
       <HistoryPanel
         versions={versions?.[activeDoc] || []}
         setVersions={setVersions}
@@ -789,6 +792,23 @@ export default function RightSidebar({
         onOpenDocInTab={onOpenDocInTab}
         onOpenCompare={onOpenCompare}
       />
+    )
+    // In Typeset the book's typeset versions are History's first, with the text's a
+    // switch away.
+    if (pageLayout?.mode !== 'typeset') return textHistory
+    return (
+      <div className="history-with-switch">
+        <div className="history-mode-switch">
+          <Segmented
+            value={historyKind}
+            onChange={setHistoryKind}
+            label="History of"
+            stretch
+            options={[{ value: 'typeset', label: 'Typeset' }, { value: 'text', label: 'Text' }]}
+          />
+        </div>
+        {historyKind === 'typeset' ? <TypesetHistoryView /> : textHistory}
+      </div>
     )
   }
 
