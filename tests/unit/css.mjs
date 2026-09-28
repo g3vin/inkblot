@@ -29,6 +29,7 @@ const FUNCTIONAL_GRADIENTS = [
   '.sidebar-list::before',          // lists fading under their sticky header
   '.dictation-inline-draft',        // the sweep over text being dictated
   '.canvas-grid',                   // the canvas grid
+  '.settings-swatch-custom',        // the colour wheel that opens the colour picker
 ]
 
 const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))

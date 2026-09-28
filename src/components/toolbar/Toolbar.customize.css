@@ -167,3 +167,8 @@ body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
   min-width: 0;
   padding: 8px;
 }
+
+/* The timer, running: its clock beside the segment's symbol. */
+.tb-timer { display: inline-flex; align-items: center; gap: 5px; padding: 0 2px; color: var(--accent-foreground); }
+.tb-timer[data-state='paused'] { color: var(--text-muted); }
+.tb-timer-clock { font: 600 12px var(--font-ui); font-variant-numeric: tabular-nums; min-width: 34px; text-align: left; }

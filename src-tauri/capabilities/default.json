@@ -8,6 +8,7 @@
   "permissions": [
     "core:default",
     "core:webview:allow-create-webview-window",
+    "notification:default",
     {
       "identifier": "fs:allow-mkdir",
       "allow": [

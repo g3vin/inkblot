@@ -15,6 +15,7 @@ import { useReducedMotion } from 'framer-motion'
 import InspectorHeader from './InspectorHeader'
 import MapInspectorPanel from './MapInspectorPanel'
 import ReferencesPanel from './references/ReferencesPanel'
+import StatsPanel from '../stats/StatsPanel'
 import { OutputPanel, TypesetPanel } from './finishing/FinishingPanels'
 import TypesetHistoryView from './TypesetHistoryView'
 import Segmented from '../../ui/Segmented'
@@ -771,6 +772,7 @@ export default function RightSidebar({
 
     if (tabId === 'map') return <MapInspectorPanel />
     if (tabId === 'references') return <ReferencesPanel query={panelQuery} />
+    if (tabId === 'stats') return <StatsPanel query={panelQuery} />
     if (tabId === 'typeset') return <TypesetPanel onShowOutput={() => handleSelectTab('output')} />
     if (tabId === 'output') return <OutputPanel />
 

@@ -58,6 +58,17 @@ export const STATIC_ICONS = {
   'doc.badge.plus': <>{path_('M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7')}{path_('M14 3v6h6v4')}{line_(18, 16, 18, 22)}{line_(15, 19, 21, 19)}</>,
   photo_frame: <>{rect_(3, 3, 18, 18)}{circle_(9, 9, 2)}{path_('m21 15-5-5L5 21')}</>,
   bookmark: <>{path_('M6 3h12v18l-6-4-6 4z')}</>,
+  'character.cursor.ibeam': <>{path_('M3 19 7.5 7l4.5 12')}{line_(4.6, 15, 10.4, 15)}{line_(17, 4, 17, 20)}{path_('M15 4h4')}{path_('M15 20h4')}</>,
+  'plus.forwardslash.minus': <>{line_(3, 7, 9, 7)}{line_(6, 4, 6, 10)}{line_(17, 4, 7, 20)}{line_(15, 17, 21, 17)}</>,
+  keyboard: <>{rect_(2, 6, 20, 12)}{path_('M6 10h.01')}{path_('M10 10h.01')}{path_('M14 10h.01')}{path_('M18 10h.01')}{line_(7, 14, 17, 14)}</>,
+  'forward.end': <>{path_('M5 5l10 7-10 7z')}{line_(19, 5, 19, 19)}</>,
+  stop: <>{rect_(5, 5, 14, 14, 2)}</>,
+  'moon.zzz': <>{path_('M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z')}{path_('M15 3h4l-4 4h4')}</>,
+  'cup.and.saucer': <>{path_('M5 8h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z')}{path_('M16 9h1.5a2.5 2.5 0 0 1 0 5H16')}{line_(3, 21, 19, 21)}</>,
+  pencil: <>{path_('m15 5 4 4')}{path_('M21.2 6.8a2.8 2.8 0 0 0-4-4L4 16l-1 5 5-1z')}</>,
+  'arrow.up.right': <>{line_(7, 17, 17, 7)}{path_('M8 7h9v9')}</>,
+  'arrow.down.right': <>{line_(7, 7, 17, 17)}{path_('M17 8v9H8')}</>,
+  'chart.line.downtrend.xyaxis': <>{path_('M3 3v18h18')}{path_('m7 8 4 5 3-2 5 6')}</>,
   'eye': <>{path_('M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z')}{circle_(12, 12, 3)}</>,
 }
 
