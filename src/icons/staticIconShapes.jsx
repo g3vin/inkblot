@@ -69,6 +69,7 @@ export const STATIC_ICONS = {
   'arrow.up.right': <>{line_(7, 17, 17, 7)}{path_('M8 7h9v9')}</>,
   'arrow.down.right': <>{line_(7, 7, 17, 17)}{path_('M17 8v9H8')}</>,
   'chart.line.downtrend.xyaxis': <>{path_('M3 3v18h18')}{path_('m7 8 4 5 3-2 5 6')}</>,
+  'plusminus.circle': <>{circle_(12, 12, 9)}{line_(8, 9.5, 12, 9.5)}{line_(10, 7.5, 10, 11.5)}{line_(12, 15, 16, 15)}</>,
   'eye.slash': <>{path_('M9.9 5.1A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2')}{path_('M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6')}{path_('M14.1 14.2a3 3 0 0 1-4.2-4.3')}{line_(2, 2, 22, 22)}</>,
   'eye': <>{path_('M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z')}{circle_(12, 12, 3)}</>,
 }
