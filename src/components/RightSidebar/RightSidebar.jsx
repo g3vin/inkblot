@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useReducedMotion } from 'framer-motion'
 import InspectorHeader from './InspectorHeader'
+import { hasActiveWheelPhase, hasEndedWheelPhase, hasMomentumPhase } from '../../lib/wheelPhase'
 import { sidebarTabsFor } from './sidebarTabsConfig'
 import useInspectorLayout from './useInspectorLayout'
 import './InspectorLayout.css'
@@ -60,29 +61,6 @@ const EDGE_REVEAL_ZONE_PX = 12
 const SEARCH_OVERLAY_WIDTH = 640
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
-
-// WebKit exposes wheel gesture phase as a bitmask on wheel events
-// (webkitPhase / webkitMomentumPhase); used to tell live finger input
-// from post-release momentum.
-const WHEEL_PHASE_BEGAN = 1
-const WHEEL_PHASE_STATIONARY = 2
-const WHEEL_PHASE_CHANGED = 4
-const WHEEL_PHASE_ENDED = 8
-const WHEEL_PHASE_CANCELLED = 16
-const WHEEL_PHASE_MAY_BEGIN = 32
-
-const hasWheelPhase = (phase, flag) => Number.isFinite(phase) && (phase & flag) === flag
-const hasActiveWheelPhase = (phase) => (
-  hasWheelPhase(phase, WHEEL_PHASE_BEGAN) ||
-  hasWheelPhase(phase, WHEEL_PHASE_STATIONARY) ||
-  hasWheelPhase(phase, WHEEL_PHASE_CHANGED) ||
-  hasWheelPhase(phase, WHEEL_PHASE_MAY_BEGIN)
-)
-const hasMomentumPhase = (phase) => Number.isFinite(phase) && phase !== 0
-const hasEndedWheelPhase = (phase) => (
-  hasWheelPhase(phase, WHEEL_PHASE_ENDED) ||
-  hasWheelPhase(phase, WHEEL_PHASE_CANCELLED)
-)
 
 /** Snap a fractional tab position to an index once 25% of the next tab is revealed. */
 const getThresholdSnapIndex = (rawIndex, direction) => {

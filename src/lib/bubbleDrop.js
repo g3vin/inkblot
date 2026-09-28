@@ -14,7 +14,7 @@ export const EDGE_BAND = 88
 export const EDGE_MARGIN = 18
 /** A set-aside bubble against the top edge rests below the editor's controls. */
 export const TOP_CLEARANCE = 76
-export const ROW_GAP = 10
+export const ROW_GAP = 12
 
 export const findBubble = (present, id) =>
   present.words.find((word) => word.id === id) ?? present.aside.find((word) => word.id === id) ?? null
@@ -194,4 +194,68 @@ export const velocityOf = (samples) => {
   const first = samples.find((sample) => last.t - sample.t <= 90) ?? samples[0]
   const dt = Math.max(1, last.t - first.t)
   return { x: (last.x - first.x) / dt, y: (last.y - first.y) / dt }
+}
+
+/* ---------------- throwing ---------------- */
+
+/** How far ahead a release is projected: where it would come to rest, 0.25s on. */
+export const THROW_PROJECTION_MS = 250
+/** A release whose projection lands this far from the pointer is a throw. */
+export const THROW_REACH = 120
+
+/**
+ * Where a bubble released at `point` moving at `velocity` (px/ms) lands, when that is a
+ * throw toward an edge: projected `THROW_PROJECTION_MS` on, kept inside the stage, more
+ * than `THROW_REACH` away, and near an edge. Otherwise null — it lands where it was let go.
+ * (BubbleModel.dragEnded, with SwiftUI's predicted end.)
+ */
+export const throwLanding = (stage, point, velocity) => {
+  const x = clamp(point.x + velocity.x * THROW_PROJECTION_MS, stage.left, stage.right)
+  const y = clamp(point.y + velocity.y * THROW_PROJECTION_MS, stage.top, stage.bottom)
+  if (Math.hypot(x - point.x, y - point.y) <= THROW_REACH) return null
+  return nearEdge(stage, x, y) ? { x, y } : null
+}
+
+/** The edge a point is nearest, for the glow that shows where a drop sets a bubble aside. */
+export const nearestEdge = (stage, x, y) => {
+  const distances = { left: x - stage.left, right: stage.right - x, top: y - stage.top, bottom: stage.bottom - y }
+  return Object.keys(distances).reduce((best, key) => (distances[key] < distances[best] ? key : best))
+}
+
+/* ---------------- swiping between forms ---------------- */
+
+/** How far two fingers must travel sideways to turn to the next form. */
+export const SWIPE_DISTANCE = 140
+/** Movement before a two-finger gesture is judged sideways or not. */
+export const SWIPE_LOCK = 12
+/** A flick turns the page short of the distance: this fast (px/ms) at the end, this far. */
+export const FLICK_SPEED = 0.45
+export const FLICK_DISTANCE = 36
+/** How far back in a gesture its speed at the end is measured. */
+export const FLICK_WINDOW_MS = 100
+
+/**
+ * Which way the form turns when a sideways swipe ends: +1 to the next form (the fingers
+ * went left), -1 to the previous, 0 not at all. `travel` is how far the fingers went
+ * (negative is leftward); `samples` are `{ t, x }`, x being the travel so far.
+ * (BubbleFormsBar.swift: far enough, or a flick that way.)
+ */
+export const decideFormSwipe = (travel, samples = []) => {
+  if (Math.abs(travel) >= SWIPE_DISTANCE) return travel < 0 ? 1 : -1
+  if (Math.abs(travel) < FLICK_DISTANCE || samples.length < 2) return 0
+  const last = samples[samples.length - 1]
+  const first = samples.find((sample) => last.t - sample.t <= FLICK_WINDOW_MS) ?? samples[0]
+  if (last.t <= first.t) return 0
+  const speed = (last.x - first.x) / (last.t - first.t)
+  if (Math.abs(speed) < FLICK_SPEED || (speed < 0) !== (travel < 0)) return 0
+  return travel < 0 ? 1 : -1
+}
+
+/**
+ * How far the bubbles follow a swipe: less and less the further it goes, and much less
+ * where there is no form that way to turn to.
+ */
+export const swipeOffset = (travel, possible = true) => {
+  const reach = possible ? 220 : 40
+  return Math.sign(travel) * reach * (1 - Math.exp(-Math.abs(travel) / reach))
 }

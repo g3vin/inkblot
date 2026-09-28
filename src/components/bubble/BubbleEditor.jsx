@@ -1,36 +1,36 @@
 /**
  * BubbleEditor.jsx — a sentence taken apart into bubbles, to be put back together.
  *
- * The page's own editor, for the Tauri app; under the Swift shell the same session is
- * drawn natively as Liquid Glass (`native/…/Bubble/`) and this does not mount.
- *
  *   - drag a bubble between two others to move it there
  *   - touch it against another bubble to join the two (with a space), on the side it
  *     touched
- *   - drop it at, or throw it toward, any edge of the window to set it aside; set-aside
- *     bubbles stay where they were put and come back with the session
+ *   - drop it at, or throw it toward, any edge of the window to set it aside (the edge
+ *     it would land against glows); set-aside bubbles stay where they were put and
+ *     come back with the session
  *   - drop it on the bin to delete it
  *   - type anywhere to make a new word; double-click a bubble to edit it
  *   - Sentences / Clauses / Words regroup the whole text — Sentences to reorder a
  *     paragraph — and a selected bubble of several words can be split into its words
+ *   - pinch in over a gap to merge, out over a bubble to split (useBubbleGestures)
  *
  * Punctuation is its own round bubble. The word that begins a sentence is shown with a
  * capital wherever it is moved to; the bubbles store words without one.
  *
- * Pinching on a trackpad merges the two bubbles either side of the gap under the pointer;
- * spreading two fingers over a bubble splits it one level finer.
- *
  * Forms: the arrangement can be saved as a form (⌘S), any number of them, and the bar at
  * the bottom moves between them — its dots, ⌘[ and ⌘], or a two-finger swipe sideways
- * that has to travel well past a scroll's worth before it turns the page
  * (`lib/bubbleForms.ts`). A form showing can be deleted (⌘⌫).
  *
  * Every change is one undo step (⌘Z, ⇧⌘Z). Nothing is written to the document until the
  * editor closes: Done writes the sentence and keeps the session, Archive writes it and
- * puts the session away in the document's archive (History ▸ Archive).
+ * puts the session away in the document's archive (History ▸ Archive). Escape steps back
+ * one thing at a time: out of typing, then off the selection, then out of the editor.
+ *
+ * It covers the whole window, sidebars and toolbar included: portaled to the body, and
+ * `html.bubble-open` takes the toolbar away while it is up.
  */
-import { useEffect, useReducer, useRef, useState } from 'react'
-import { LayoutGroup, MotionConfig, motion } from 'framer-motion'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { LayoutGroup, MotionConfig } from 'framer-motion'
 import {
   applyDrop,
   asidePoint,
@@ -42,9 +42,11 @@ import {
   inside,
   insertion,
   nearEdge,
+  nearestEdge,
+  throwLanding,
   velocityOf,
   without,
-} from '../lib/bubbleDrop'
+} from '../../lib/bubbleDrop'
 import {
   clampAside,
   composeSentence,
@@ -58,7 +60,7 @@ import {
   splitBubbleOnce,
   splitOnce,
   tokenize,
-} from '../lib/bubbleText'
+} from '../../lib/bubbleText'
 import {
   currentForm,
   deleteForm,
@@ -69,32 +71,15 @@ import {
   settleForms,
   showFormPage,
   withFormsState,
-} from '../lib/bubbleForms'
-import { BubbleMode } from '../types'
-import { ArchiveIcon } from './RightSidebar/ArchivePanel'
+} from '../../lib/bubbleForms'
+import BubbleChip from './BubbleChip'
+import BubbleFormsBar, { TrashGlyph } from './BubbleFormsBar'
+import BubbleTopControls from './BubbleTopControls'
+import useBubbleGestures from './useBubbleGestures'
 import './BubbleEditor.css'
 
-/** Sentences first: the widest grouping, for reordering a paragraph. */
-const MODES = [
-  [BubbleMode.Sentences, 'Sentences'],
-  [BubbleMode.Clauses, 'Clauses'],
-  [BubbleMode.Words, 'Words'],
-]
-
 const DRAG_THRESHOLD = 4
-/** px/ms. A release faster than this is a throw, and lands where it was heading. */
-const THROW_SPEED = 0.9
-const THROW_PROJECTION_MS = 240
 const HISTORY_LIMIT = 100
-/** How far two fingers must travel sideways to turn to the next form. */
-const SWIPE_DISTANCE = 150
-/** Movement before a two-finger gesture is judged sideways or not. */
-const SWIPE_LOCK = 12
-/** A pause this long ends a wheel gesture. */
-const SWIPE_IDLE_MS = 200
-
-/** How far the bubbles follow the fingers: less and less, the further they go. */
-const rubberBand = (travel, reach = 220) => Math.sign(travel) * reach * (1 - Math.exp(-Math.abs(travel) / reach))
 
 /* ---------------- state ---------------- */
 
@@ -145,8 +130,9 @@ export default function BubbleEditor({ session, onClose }) {
   // { id, text, left, top, width, height, target } — the bubble under the pointer.
   const [drag, setDrag] = useState(null)
   const [droppedId, setDroppedId] = useState(null)
-  // How far the bubbles are following a sideways swipe, in px.
-  const [swipe, setSwipe] = useState(0)
+  // How far the bubbles are following a sideways swipe, in px, and which way it would
+  // turn were the fingers lifted now (0: it would not).
+  const [swipe, setSwipe] = useState({ offset: 0, armed: 0 })
   const overlayRef = useRef(null)
   const rowRef = useRef(null)
   const asideRef = useRef(null)
@@ -163,126 +149,59 @@ export default function BubbleEditor({ session, onClose }) {
   // A gesture in flight when the editor closes must not leave its listeners behind.
   useEffect(() => () => gestureRef.current?.stop?.(), [])
 
-  // Pinching on a trackpad: in, over the gap between two bubbles of the sentence, merges
-  // them; out, over a bubble of several words, splits it one level finer (`splitOnce`).
-  // One pinch makes one change. WebKit reports a pinch as gesture events, Chromium as a
-  // wheel with ctrlKey; both are taken, and neither is left to zoom the page.
+  // The editor is the window while it is up: the toolbar goes, and nothing behind it
+  // takes a scroll or a click.
   useEffect(() => {
-    const overlay = overlayRef.current
-    if (!overlay) return undefined
-    const bubblesIn = (container) => [...(container?.querySelectorAll('.bubble[data-bubble-id]') ?? [])]
-      .map((element) => ({ id: element.dataset.bubbleId, rect: element.getBoundingClientRect() }))
+    document.documentElement.classList.add('bubble-open')
+    return () => document.documentElement.classList.remove('bubble-open')
+  }, [])
 
-    const pinch = (spreading, x, y) => {
-      if (spreading) {
-        const hit = bubbleAt([...bubblesIn(rowRef.current), ...bubblesIn(asideRef.current)], x, y)
-        if (!hit) return false
-        dispatch({ type: 'update', fn: (present) => {
-          const word = present.words.find((w) => w.id === hit.id) ?? present.aside.find((w) => w.id === hit.id)
-          if (!word || splitOnce(word.text).length < 2) return null
-          return {
-            words: splitBubbleOnce(present.words, hit.id),
-            aside: splitAside(present.aside, hit.id, splitOnce),
-          }
-        } })
-        return true
-      }
-      const row = bubblesIn(rowRef.current)
-      const gap = gapAt(row, x, y)
-      if (gap === -1) return false
-      const first = row[gap].id
-      const second = row[gap + 1].id
+  /* ---------------- pinching and swiping ---------------- */
+
+  const bubblesIn = (container) => [...(container?.querySelectorAll('.bubble[data-bubble-id]') ?? [])]
+    .map((element) => ({ id: element.dataset.bubbleId, rect: element.getBoundingClientRect() }))
+
+  const pinch = useCallback((spreading, x, y) => {
+    if (spreading) {
+      const hit = bubbleAt([...bubblesIn(rowRef.current), ...bubblesIn(asideRef.current)], x, y)
+      if (!hit) return false
       dispatch({ type: 'update', fn: (present) => {
-        const index = present.words.findIndex((word) => word.id === first)
-        if (index === -1 || present.words[index + 1]?.id !== second) return null
-        return { words: mergeAdjacent(present.words, index) }
+        const word = present.words.find((w) => w.id === hit.id) ?? present.aside.find((w) => w.id === hit.id)
+        if (!word || splitOnce(word.text).length < 2) return null
+        return {
+          words: splitBubbleOnce(present.words, hit.id),
+          aside: splitAside(present.aside, hit.id, splitOnce),
+        }
       } })
       return true
     }
-
-    // Chromium: a stream of ctrl-wheel events, in and out; a pause ends the pinch.
-    let travel = 0
-    let spent = false
-    let idle = 0
-    // A sideways two-finger swipe turns to the next or previous form. Judged sideways
-    // only if it starts that way, and it must travel `SWIPE_DISTANCE` — much further than
-    // a stray scroll — with the bubbles following the fingers, resisting, until it does.
-    // One swipe turns one page, however long its momentum carries on.
-    let swipeX = 0
-    let swipeY = 0
-    let swipeAxis = null
-    let swipeSpent = false
-    let swipeIdle = 0
-    const onSwipe = (event) => {
-      window.clearTimeout(swipeIdle)
-      swipeIdle = window.setTimeout(() => {
-        swipeX = 0
-        swipeY = 0
-        swipeAxis = null
-        swipeSpent = false
-        setSwipe(0)
-      }, SWIPE_IDLE_MS)
-      if (swipeAxis === 'y' || swipeSpent) {
-        if (swipeSpent) event.preventDefault()
-        return
-      }
-      // Where the fingers went. Under natural scrolling (WebKit says whether it is on)
-      // a positive deltaX is the fingers moving left, toward the next form.
-      const sign = event.webkitDirectionInvertedFromDevice === false ? 1 : -1
-      swipeX += sign * event.deltaX
-      swipeY += sign * event.deltaY
-      if (!swipeAxis) {
-        if (Math.hypot(swipeX, swipeY) < SWIPE_LOCK) return
-        swipeAxis = Math.abs(swipeX) > 2 * Math.abs(swipeY) ? 'x' : 'y'
-        if (swipeAxis === 'y') return
-      }
-      event.preventDefault()
-      if (Math.abs(swipeX) < SWIPE_DISTANCE) {
-        setSwipe(rubberBand(swipeX))
-        return
-      }
-      swipeSpent = true
-      setSwipe(0)
-      const step = swipeX < 0 ? 1 : -1
-      dispatch({ type: 'update', fn: (present) => showFormPage(present, formPage(present) + step) })
-    }
-
-    const onWheel = (event) => {
-      if (!event.ctrlKey) {
-        onSwipe(event)
-        return
-      }
-      event.preventDefault()
-      window.clearTimeout(idle)
-      idle = window.setTimeout(() => { travel = 0; spent = false }, 220)
-      if (spent) return
-      travel -= event.deltaY
-      if (Math.abs(travel) < 24) return
-      spent = pinch(travel > 0, event.clientX, event.clientY)
-      travel = 0
-    }
-    // WebKit: one gesture, its scale relative to where it began.
-    let gestureSpent = false
-    const onGestureStart = (event) => {
-      event.preventDefault()
-      gestureSpent = false
-    }
-    const onGestureChange = (event) => {
-      event.preventDefault()
-      if (gestureSpent || (event.scale < 1.2 && event.scale > 0.83)) return
-      gestureSpent = pinch(event.scale > 1, event.clientX, event.clientY)
-    }
-    overlay.addEventListener('wheel', onWheel, { passive: false })
-    overlay.addEventListener('gesturestart', onGestureStart)
-    overlay.addEventListener('gesturechange', onGestureChange)
-    return () => {
-      window.clearTimeout(idle)
-      window.clearTimeout(swipeIdle)
-      overlay.removeEventListener('wheel', onWheel)
-      overlay.removeEventListener('gesturestart', onGestureStart)
-      overlay.removeEventListener('gesturechange', onGestureChange)
-    }
+    const row = bubblesIn(rowRef.current)
+    const gap = gapAt(row, x, y)
+    if (gap === -1) return false
+    const first = row[gap].id
+    const second = row[gap + 1].id
+    dispatch({ type: 'update', fn: (present) => {
+      const index = present.words.findIndex((word) => word.id === first)
+      if (index === -1 || present.words[index + 1]?.id !== second) return null
+      return { words: mergeAdjacent(present.words, index) }
+    } })
+    return true
   }, [])
+
+  const presentRef = useRef(history.present)
+  useEffect(() => { presentRef.current = history.present }, [history.present])
+  const canTurn = useCallback((step) => {
+    const present = presentRef.current
+    if (!present.forms?.length) return false
+    const next = formPage(present) + step
+    return next >= 0 && next < formPages(present)
+  }, [])
+  const turn = useCallback((step) => {
+    dispatch({ type: 'update', fn: (present) => showFormPage(present, formPage(present) + step) })
+  }, [])
+  const follow = useCallback((offset, armed) => setSwipe({ offset, armed }), [])
+
+  useBubbleGestures(overlayRef, { onPinch: pinch, onSwipe: follow, onTurn: turn, canTurn, enabled: !drag && !editing })
 
   const close = (archive) => {
     onClose?.(withFormsState(session, history.present), archive)
@@ -313,7 +232,7 @@ export default function BubbleEditor({ session, onClose }) {
     const touched = touchTarget(rect, [...geometry.row, ...geometry.aside])
     if (touched) return { kind: 'join', ...touched }
     if (nearEdge(geometry.stage, x, y)) {
-      return { kind: 'aside', ...asidePoint(geometry.stage, x, y, gesture) }
+      return { kind: 'aside', ...asidePoint(geometry.stage, x, y, gesture), edge: nearestEdge(geometry.stage, x, y) }
     }
     const slot = insertion(geometry, x, y)
     // Back into the slot it came from: nothing would change, so nothing is shown.
@@ -380,15 +299,11 @@ export default function BubbleEditor({ session, onClose }) {
       const x = upEvent.clientX
       const y = upEvent.clientY
       let target = hitTest(gesture, x, y)
-      const velocity = velocityOf(gesture.samples)
-      if (target.kind !== 'trash' && target.kind !== 'join'
-        && Math.hypot(velocity.x, velocity.y) > THROW_SPEED) {
+      // A throw: released moving, and heading for an edge. It lands where it was going.
+      if (target.kind !== 'trash' && target.kind !== 'join') {
         const { stage } = gesture.geometry
-        const landX = clamp(x + velocity.x * THROW_PROJECTION_MS, stage.left, stage.right)
-        const landY = clamp(y + velocity.y * THROW_PROJECTION_MS, stage.top, stage.bottom)
-        if (nearEdge(stage, landX, landY)) {
-          target = { kind: 'aside', ...asidePoint(stage, landX, landY, gesture) }
-        }
+        const landing = throwLanding(stage, { x, y }, velocityOf(gesture.samples))
+        if (landing) target = { kind: 'aside', ...asidePoint(stage, landing.x, landing.y, gesture), edge: nearestEdge(stage, landing.x, landing.y) }
       }
       setDrag(null)
       if (target.kind === 'stay') return
@@ -619,55 +534,34 @@ export default function BubbleEditor({ session, onClose }) {
   /** `shown` is what the bubble says: its text, capitalized if it now begins a sentence. */
   const renderBubble = (word, where, shown = word.text) => {
     const isEditing = editing && !editing.draft && editing.id === word.id
-    const selected = selectedId === word.id
-    const multiword = tokenize(word.text).length > 1
-    const className = [
-      'bubble',
-      isPunctuation(word.text) ? 'is-punctuation' : '',
-      where === 'aside' ? 'is-aside' : '',
-      selected ? 'is-selected' : '',
-      drag?.id === word.id ? 'is-lifted' : '',
-      target?.kind === 'join' && target.id === word.id ? `is-join-target ${target.before ? 'joins-before' : 'joins-after'}` : '',
-      droppedId === word.id ? 'is-dropped' : '',
-      isEditing ? 'is-editing' : '',
-    ].filter(Boolean).join(' ')
-    const style = where === 'aside' ? { left: `${word.x * 100}%`, top: `${word.y * 100}%` } : undefined
-
+    const edit = () => setEditing({ id: word.id, text: word.text, draft: false })
     return (
-      <motion.div
+      <BubbleChip
         key={word.id}
-        layout={droppedId === word.id ? false : 'position'}
-        transition={{ type: 'spring', stiffness: 520, damping: 38 }}
-        className={className}
-        style={style}
-        data-bubble-id={word.id}
+        word={word}
+        where={where}
+        shown={shown}
+        selected={selectedId === word.id}
+        lifted={drag?.id === word.id}
+        joinTarget={target?.kind === 'join' && target.id === word.id ? target : null}
+        dropped={droppedId === word.id}
+        editor={isEditing ? renderEditor(editing) : null}
         onPointerDown={(event) => onBubblePointerDown(event, word)}
-        onDoubleClick={() => setEditing({ id: word.id, text: word.text, draft: false })}
-        role="button"
-        tabIndex={-1}
-        aria-pressed={selected}
-      >
-        {isEditing ? renderEditor(editing) : <span className="bubble-text">{shown}</span>}
-        {selected && !isEditing ? (
-          <div className="bubble-actions" onPointerDown={(event) => event.stopPropagation()}>
-            {multiword ? (
-              <button type="button" onClick={() => splitSelected(word.id)}>Split</button>
-            ) : null}
-            {where === 'aside'
-              ? <button type="button" onClick={() => returnToSentence(word.id)}>Return</button>
-              : <button type="button" onClick={() => setAside(word.id)}>Set aside</button>}
-            <button type="button" onClick={() => setEditing({ id: word.id, text: word.text, draft: false })}>Edit</button>
-            <button type="button" className="is-destructive" onClick={() => removeBubble(word.id)}>Delete</button>
-          </div>
-        ) : null}
-      </motion.div>
+        onEdit={edit}
+        actions={{
+          split: () => splitSelected(word.id),
+          setAside: () => setAside(word.id),
+          returnToSentence: () => returnToSentence(word.id),
+          remove: () => removeBubble(word.id),
+        }}
+      />
     )
   }
 
   // Following the fingers while a swipe is under way; easing back if it stops short.
-  const slide = swipe
-    ? { transform: `translateX(${swipe}px)`, transition: 'none' }
-    : { transition: 'transform 220ms ease-out' }
+  const slide = swipe.offset
+    ? { transform: `translateX(${swipe.offset}px)`, transition: 'none' }
+    : { transition: 'transform 220ms var(--ease-standard)' }
   const shown = displayTexts(words, session?.original)
   const rowItems = words.map((word, index) => renderBubble(word, 'row', shown[index]))
   if (editing?.draft) {
@@ -676,15 +570,17 @@ export default function BubbleEditor({ session, onClose }) {
     ))
   }
 
-  return (
+  return createPortal(
     <MotionConfig reducedMotion="user">
       <div
         ref={overlayRef}
         className={[
           'bubble-editor',
+          'scrim',
           drag ? 'is-dragging' : '',
           target?.kind === 'aside' ? 'is-aside-armed' : '',
         ].filter(Boolean).join(' ')}
+        data-edge={target?.kind === 'aside' ? target.edge : undefined}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
@@ -694,43 +590,7 @@ export default function BubbleEditor({ session, onClose }) {
       >
         <div className="bubble-editor-edges" aria-hidden="true" />
 
-        <div className="bubble-editor-top" onPointerDown={(event) => event.stopPropagation()}>
-          <header className="bubble-editor-bar">
-            <div className="bubble-segmented" role="group" aria-label="Split into">
-              {MODES.map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={mode === value ? 'is-active' : ''}
-                  onClick={() => regroup(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="bubble-editor-button is-icon"
-              onClick={() => close(true)}
-              title="Write the sentence into the document and archive this session — it can be restored from History ▸ Archive"
-              aria-label="Archive"
-            >
-              <ArchiveIcon size={15} />
-            </button>
-          </header>
-          <button
-            type="button"
-            className="bubble-editor-done"
-            onClick={() => close(false)}
-            title="Done — write the sentence into the document and keep this session (⌘↩)"
-            aria-label="Done"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6"
-                strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
+        <BubbleTopControls mode={mode} onMode={regroup} onArchive={() => close(true)} onDone={() => close(false)} />
 
         <LayoutGroup>
           <main className="bubble-stage" style={slide}>
@@ -773,8 +633,9 @@ export default function BubbleEditor({ session, onClose }) {
         ) : null}
 
         {drag ? null : (
-          <FormsBar
+          <BubbleFormsBar
             state={history.present}
+            armed={swipe.armed}
             onShow={showForm}
             onSave={saveAsForm}
             onDelete={deleteShownForm}
@@ -783,95 +644,14 @@ export default function BubbleEditor({ session, onClose }) {
 
         <div
           ref={trashRef}
-          className={`bubble-trash${drag ? ' is-visible' : ''}${target?.kind === 'trash' ? ' is-armed' : ''}`}
+          className={`bubble-trash floating-capsule${drag ? ' is-visible' : ''}${target?.kind === 'trash' ? ' is-armed' : ''}`}
           aria-hidden={!drag}
         >
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <path
-              d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <TrashGlyph size={22} />
         </div>
       </div>
-    </MotionConfig>
-  )
-}
-
-/**
- * The forms, at the bottom: a dot for each page — every saved form, and a ring for the
- * unsaved arrangement — which one is showing, and saving or deleting it.
- */
-function FormsBar({ state, onShow, onSave, onDelete }) {
-  const pages = formPages(state)
-  const page = formPage(state)
-  const current = currentForm(state)
-  const saved = current !== -1
-  const label = saved ? `Form ${current + 1} of ${state.forms.length}` : 'Unsaved'
-
-  return (
-    <div className="bubble-forms" onPointerDown={(event) => event.stopPropagation()}>
-      {state.forms.length ? (
-        <>
-          <div className="bubble-forms-dots" role="tablist" aria-label="Forms">
-            {Array.from({ length: pages }, (_, index) => {
-              const unsaved = index === state.forms.length
-              const name = unsaved ? 'Unsaved' : `Form ${index + 1}`
-              return (
-                <button
-                  key={unsaved ? 'unsaved' : state.forms[index].id}
-                  type="button"
-                  role="tab"
-                  aria-selected={index === page}
-                  aria-label={name}
-                  title={`${name} — swipe sideways with two fingers, or ⌘[ ⌘], to move between forms`}
-                  className={`bubble-forms-dot${index === page ? ' is-current' : ''}${unsaved ? ' is-unsaved' : ''}`}
-                  onClick={() => onShow(index)}
-                />
-              )
-            })}
-          </div>
-          <span className="bubble-forms-label">{label}</span>
-        </>
-      ) : null}
-      {saved ? (
-        <button
-          type="button"
-          className="bubble-forms-icon is-destructive"
-          onClick={onDelete}
-          title="Delete this form (⌘⌫). The bubbles stay as they are."
-          aria-label="Delete Form"
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path
-              d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"
-              fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="bubble-forms-icon"
-          onClick={onSave}
-          title="Save this arrangement as a new form to come back to (⌘S)"
-          aria-label="Save as New Form"
-        >
-          {/* A stack of versions, with one more being added. */}
-          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-            <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="9.5" width="13" height="11" rx="2.5" />
-              <path d="M6 6.5h7.5M18.5 11.5v5" />
-              <path d="M19.5 3v6M16.5 6h6" />
-            </g>
-          </svg>
-        </button>
-      )}
-    </div>
+    </MotionConfig>,
+    document.body,
   )
 }
 
