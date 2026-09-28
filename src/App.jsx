@@ -22,6 +22,7 @@ import TimerCapsule from './components/stats/TimerCapsule.jsx'
 import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
 import { OPEN_SETTINGS, primaryTimerAction } from './stats/timerMenu.js'
 import { allRoutines } from './stats/config.js'
+import { setShowsTabBar, showsTabBar } from './components/tabs/tabBarState.js'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -310,7 +311,16 @@ export default function App() {
               action: () => openSettings('general'),
             }),
           ]
-      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [printLayoutItem])]
+      const tabBarItem = native ? null : await CheckMenuItem.new({
+        id: 'tab-bar-toggle',
+        text: 'Show Tab Bar',
+        checked: showsTabBar(),
+        action: () => {
+          setShowsTabBar(!showsTabBar())
+          tabBarItem.setChecked(showsTabBar())
+        },
+      })
+      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [tabBarItem, printLayoutItem])]
 
       if (viewSubmenu) {
         await viewSubmenu.append([...themeItems, ...accentItems, ...displayItems])

@@ -280,7 +280,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   height: 100%;
-  font-family: 'Georgia', serif;
+  font-family: var(--font-ui);
   overflow: hidden;
   overscroll-behavior: none;
 }

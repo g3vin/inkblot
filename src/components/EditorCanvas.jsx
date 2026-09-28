@@ -43,6 +43,8 @@ import DraftTabPane from './DraftTabPane'
 import FocusModeOverlay from './FocusModeOverlay'
 import VersionComparePane from './VersionComparePane'
 import SFIcon from './SFIcon'
+import DocumentTabBar from './tabs/DocumentTabBar'
+import { useShowsTabBar } from './tabs/tabBarState'
 import PaneEditorSurface from '../print/PaneEditorSurface'
 
 const EMPTY_NOTES = []
@@ -85,6 +87,7 @@ export default function EditorCanvas({
   const secondaryPaneRef = useRef(null)
   const splitContainerRef = useRef(null)
   const [isResizingSplit, setIsResizingSplit] = useState(false)
+  const tabBarShown = useShowsTabBar()
   const [dragCaret, setDragCaret] = useState(null)
   // The pane's live view of notesByDoc. The hooks below run from editor events and
   // debounced timers, so they must read the notes as they are when the save fires,
@@ -605,7 +608,7 @@ export default function EditorCanvas({
   const showDraftPane = draftTabActive && !currentDoc
   // A split pane names its document above it, with a × to close it — unless the shell
   // draws the tabs, whose split tab names both documents, the first pane's first.
-  const paneHeaders = splitView === 'editor' && !nativeOwns('tabBar')
+  const paneHeaders = splitView === 'editor' && !nativeOwns('tabBar') && !tabBarShown
   const primaryPaneOwnsFocus = primaryIsStructured || showDraftPane
 
   // The divider is a track in the split grid, so the two panes are sized by the
@@ -656,6 +659,7 @@ export default function EditorCanvas({
 
   return (
     <div className="middle-section">
+      {nativeOwns('tabBar') ? null : <DocumentTabBar activeDoc={currentDoc} />}
       <div ref={splitContainerRef} className={`editor-container${splitClassName}`} style={splitStyle}>
 
         <div
