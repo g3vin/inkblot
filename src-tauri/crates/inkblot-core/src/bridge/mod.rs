@@ -56,17 +56,19 @@ pub mod print;
 pub mod sidebar;
 pub mod tabs;
 
-pub use archive::{ArchiveAction, ArchiveActionCommand, ArchiveChanged, ArchivedItem, ArchivedKind};
-pub use bubble::{BubbleAside, BubbleChipRect, BubbleChipsChanged, BubbleForm, BubbleMode, BubbleSession, BubbleSessionOpened, BubbleWord, CloseBubbleSessionCommand};
+pub use archive::{ArchivedItem, ArchivedKind};
+pub use bubble::{BubbleAside, BubbleForm, BubbleMode, BubbleSession, BubbleWord};
 pub use command::{
     ApplyMarkCommand, CanvasCommandRequest, CanvasDropDocCommand, CanvasDropNoteCommand,
-    CanvasRestoreCommand, CanvasRevealCommand, DictationCancelCommand, DictationLevelCommand,
-    CreateEntryCommand, DeleteEntryCommand, DictationTranscript, DuplicateEntryCommand, EntryKind,
-    InsertPlainTextCommand, MoveEntryCommand, RenameEntryCommand, SetTitlebarInsetCommand, SetPanelInsetsCommand, InsertTableCommand, OpenProjectCommand, JumpToAnchorCommand, NativeCommand,
-    OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand, SetCaretAtDocPosCommand,
-    SetColorCommand, SetContentCommand, SetFontFamilyCommand, SetFontSizeCommand,
-    SetHighlightCommand, SetSelectionCommand, SyncNotesCommand, TargetOnly,
-    SetBlockTypeCommand, SetWritingFormatCommand, ToggleListCommand, EditorHistoryCommand, SetFocusModeCommand, SetWordCountVisibleCommand,
+    CanvasRestoreCommand, CanvasRevealCommand, DictationCancelCommand,
+    DictationLevelCommand, CreateEntryCommand, DeleteEntryCommand, DictationTranscript,
+    DuplicateEntryCommand, EntryKind, InsertPlainTextCommand, MoveEntryCommand,
+    RenameEntryCommand, InsertTableCommand, OpenProjectCommand, JumpToAnchorCommand,
+    NativeCommand, OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand,
+    SetCaretAtDocPosCommand, SetColorCommand, SetContentCommand, SetFontFamilyCommand,
+    SetFontSizeCommand, SetHighlightCommand, SetSelectionCommand, SyncNotesCommand,
+    TargetOnly, SetBlockTypeCommand, SetWritingFormatCommand, ToggleListCommand,
+    EditorHistoryCommand, SetFocusModeCommand, SetWordCountVisibleCommand,
 };
 pub use references::{
     AddReferenceCommand, BibliographyInclude, BibliographyOptions, ChooseReferenceCandidateCommand,
@@ -77,30 +79,36 @@ pub use references::{
     SetCitationStyleCommand, SetReferenceAttachedCommand, UpdateReferenceCommand,
 };
 pub use print::{
-    ExportAgainCommand, ImportScriptCommand, LastExport, MeasureBookCommand, ReportOutput, SceneNumbering, SceneSummary,
-    ScriptReportCommand, ScriptReportKind, ScriptSummary, SetSceneNumbersCommand, PreflightIssue, PreflightSeverity, PrintOptions, PrintRange,
-    PublishingReport,
-    ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand, ExportFormat, FormatKind,
-    FormatOption, GoToPageCommand, InsertBreakCommand, PageBreakKind, PageLayoutCatalog,
-    PageLayoutState, PageSetupTarget, PageSizeOption, PrintDocumentCommand, PrintFinishedCommand,
-    AddBookItemCommand, ApplyBookStyleCommand, BookStyleOption, HeadImageTarget, SetChapterMetaCommand,
-    SetHeadImageCommand, BookRow, BookRowSection, EditBookItemCommand, EditorMode, MoveBookItemCommand,
-    OpenBookItemCommand, RemoveBookItemCommand, SetBookItemHiddenCommand, PrintJobKind, PrintJobPhase, PrintJobStatus, PrintRequest, PrintScope, RefreshBookChaptersCommand, TypesetFocus, TypesetHistoryChanged, TypesetVersionRow,
-    TypesetVersionKind, SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
-    PreviewTypesetVersionCommand, CoverSetAction, CoverSetView, CoverState, EditCoverSetsCommand, SetCoverImageCommand, SetFolderBookOptionsCommand, SetTypesetViewCommand, TypesetView,
-    ProofKind, ProofFix, ProofIssue, SetParagraphTypesetCommand, ParagraphTypeset, ShowProofIssueCommand, SetTypesetDisplayCommand,
-    ProjectFont, AddProjectFontCommand, SetTextStyleCommand, InsertFootnoteCommand,
-    EditionAction, EditEditionsCommand, ExportAllEditionsCommand,
-    RunningToken, SetAuthorProfileCommand, SetBookCoverCommand, SetBookSettingsCommand, SetDisplayDensityCommand, SetPageSetupCommand,
-    SetEditorModeCommand, SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource, SignatureAdvice,
-    UseSetupForBookCommand, ZoomFit,
+    ExportAgainCommand, ImportScriptCommand, LastExport, MeasureBookCommand, ReportOutput,
+    SceneNumbering, SceneSummary, ScriptReportCommand, ScriptReportKind, ScriptSummary,
+    SetSceneNumbersCommand, PreflightIssue, PreflightSeverity, PrintOptions, PrintRange,
+    PublishingReport, ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand,
+    ExportFormat, FormatKind, FormatOption, GoToPageCommand, InsertBreakCommand,
+    PageBreakKind, PageLayoutCatalog, PageLayoutState, PageSetupTarget, PageSizeOption,
+    PrintDocumentCommand, AddBookItemCommand, ApplyBookStyleCommand, BookStyleOption,
+    HeadImageTarget, SetChapterMetaCommand, SetHeadImageCommand, BookRow, BookRowSection,
+    EditBookItemCommand, EditorMode, MoveBookItemCommand, OpenBookItemCommand,
+    RemoveBookItemCommand, SetBookItemHiddenCommand, PrintJobKind, PrintJobPhase,
+    PrintJobStatus, PrintScope, RefreshBookChaptersCommand, TypesetFocus,
+    TypesetHistoryChanged, TypesetVersionRow, TypesetVersionKind,
+    SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
+    PreviewTypesetVersionCommand, CoverSetAction, CoverSetView, CoverState,
+    EditCoverSetsCommand, SetCoverImageCommand, SetFolderBookOptionsCommand,
+    SetTypesetViewCommand, TypesetView, ProofKind, ProofFix, ProofIssue,
+    SetParagraphTypesetCommand, ParagraphTypeset, ShowProofIssueCommand,
+    SetTypesetDisplayCommand, ProjectFont, AddProjectFontCommand, SetTextStyleCommand,
+    InsertFootnoteCommand, EditionAction, EditEditionsCommand, ExportAllEditionsCommand,
+    RunningToken, SetAuthorProfileCommand, SetBookCoverCommand, SetBookSettingsCommand,
+    SetDisplayDensityCommand, SetPageSetupCommand, SetEditorModeCommand,
+    SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource,
+    SignatureAdvice, UseSetupForBookCommand, ZoomFit,
 };
 pub use sidebar::{
-    AddReplyCommand, HighlightNoteCommand, NotePreviewDismissed, ClipboardChanged, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,
-    NoteRef, NotesChanged, RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
-    ReplaceTileWordCommand, RevealSearchResultCommand, ShowSidebarTab, SidebarTab, TileKind, TileRef,
-    TilesChanged, UpdateNoteCommand, VersionAction, VersionActionCommand, VersionsChanged,
-    WorkbenchTile,
+    AddReplyCommand, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand,
+    NotePatch, NoteRef, RemoveClipboardEntriesCommand, RemoveTilesCommand,
+    RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
+    ShowSidebarTab, SidebarTab, TileKind, TileRef, UpdateNoteCommand, VersionAction,
+    VersionActionCommand, WorkbenchTile,
 };
 pub use map::{
     MapButtonRole, MapButtonRow, MapCalendarMode, MapChoice, MapChoiceInput, MapChromeChanged, MapChromeState,
@@ -117,9 +125,9 @@ pub use envelope::{
     RequestEnvelope,
 };
 pub use event::{
-    ActiveEditorChanged, ActiveMarks, CanvasToolbarChanged, CanvasToolbarState, DocChanged, DragEnded, DragMoved, DragPayloadKind,
-    DragStarted, FocusModeView, NoteMarkerEvent, NoteMarkerRect, NoteMarkersChanged, NotesRemapped, ProjectChanged, ReadAloudPayloadEvent,
-    SearchMatches, SelectionContext, ToolbarState, ViewOptions, WebviewEvent, WordCountBadge, WordCountsChanged, PaneStatus,
+    ActiveEditorChanged, ActiveMarks, CanvasToolbarChanged, CanvasToolbarState, DocChanged,
+    ProjectChanged, ReadAloudPayloadEvent, SelectionContext, ToolbarState, ViewOptions,
+    WebviewEvent,
 };
 pub use tabs::{
     CloseSplitCommand, DocTab, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand,

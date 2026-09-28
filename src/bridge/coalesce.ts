@@ -10,8 +10,7 @@
  * **Only coalesce whole-state events.** Every event this is used for carries its
  * *whole* current state rather than a delta, so dropping an intermediate value loses
  * nothing: the next one is complete. A delta stream coalesced the same way would
- * corrupt silently. Check that property before reaching for this — see the note on
- * `NotesRemapped`.
+ * corrupt silently. Check that property before reaching for this.
  *
  * Pending sends are cancellable, because a frame that fires after its editor is gone
  * would publish state for something that no longer exists.

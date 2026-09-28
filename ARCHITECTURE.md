@@ -102,7 +102,7 @@ The chrome and the document surface talk through a protocol defined once in Rust
   Callers must handle `null`, and a guessed position is always worse. One command,
   `setCaretAtDocPos`, is exempt, and a Rust test keeps it the only one.
 - **High-rate events are coalesced to one per frame.** This is only safe for events
-  that carry the whole current state (`notesRemapped`, `toolbarState`), never a delta.
+  that carry the whole current state (`toolbarState`, `tabsChanged`), never a delta.
   Check that property before using `createCoalescer`.
 - **The chrome runs on the protocol**, through an in-process transport that
   round-trips every message through JSON. A payload that could not cross a process

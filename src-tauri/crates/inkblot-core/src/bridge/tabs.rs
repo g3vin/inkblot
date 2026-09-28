@@ -1,4 +1,4 @@
-//! Document tabs and split view, for a shell that draws the tab bar natively.
+//! Document tabs and split view.
 //!
 //! The rule is the sidebar's (see `sidebar.rs`): the page owns the state and publishes
 //! it whole, and the shell changes it by command. Tabs are `useTabs`'s, and a tab's

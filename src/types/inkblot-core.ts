@@ -170,25 +170,6 @@ export interface ApplyMarkCommand {
 	mark: MarkKind;
 }
 
-export enum ArchiveAction {
-	/**
-	 * Put it back. A bubble goes back on its sentence, if the sentence is still in the
-	 * document as it was archived; otherwise it stays in the archive.
-	 */
-	Restore = "restore",
-	/**
-	 * Delete it for good. Version history still has the document from before it was
-	 * archived.
-	 */
-	Delete = "delete",
-}
-
-export interface ArchiveActionCommand {
-	docPath: string;
-	itemId: string;
-	action: ArchiveAction;
-}
-
 /** What an archived item is. */
 export enum ArchivedKind {
 	/**
@@ -278,15 +259,6 @@ export interface ArchivedItem {
 	title: string;
 	/** The session, for a `Bubble`. */
 	bubble?: BubbleSession;
-}
-
-/**
- * A document's archive, newest first — the whole list, sent when the document the
- * writer is in changes and whenever its archive does.
- */
-export interface ArchiveChanged {
-	docPath: string;
-	items: ArchivedItem[];
 }
 
 /** A voice memo attached to a note. */
@@ -1110,40 +1082,6 @@ export interface BridgeError {
 }
 
 /**
- * Where one open session's chip is in the document, for a shell that draws the chips
- * itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
- */
-export interface BubbleChipRect {
-	sessionId: string;
-	left: number;
-	top: number;
-	right: number;
-	bottom: number;
-	/**
-	 * Which of the session's pages is showing — its forms, then the unsaved arrangement
-	 * if there is one — and how many there are. Zero pages: it has no forms.
-	 */
-	formPage?: number;
-	formPages?: number;
-}
-
-/**
- * Every session chip the user can see, and where — the whole list, so it is safe to
- * coalesce. The page's chips stay where they are, invisible, and go on taking the click
- * that reopens a session; the shell draws them as Liquid Glass, which only a view above
- * the page can be.
- */
-export interface BubbleChipsChanged {
-	chips: BubbleChipRect[];
-}
-
-/** Open the bubble editor on a session — new, or reopened from its mark. */
-export interface BubbleSessionOpened {
-	docPath: string;
-	session: BubbleSession;
-}
-
-/**
  * Run a command on the canvas the user aimed at.
  * 
  * `surface_id` is how a command finds one canvas when split view is showing two. The
@@ -1398,19 +1336,6 @@ export interface CitationStyleSpec {
 export interface ClearBookSetupCommand {
 }
 
-export interface ClipboardEntry {
-	id: string;
-	text: string;
-	/** The document it was copied from, if any. */
-	docName?: string;
-	timestamp?: string;
-}
-
-/** The clipboard history, newest first — the whole list. */
-export interface ClipboardChanged {
-	entries: ClipboardEntry[];
-}
-
 /**
  * Text dropped on the shell's clipboard panel.
  * 
@@ -1421,16 +1346,12 @@ export interface ClipboardDropCommand {
 	text: string;
 }
 
-/**
- * The writer left the bubble editor: write the sentence back.
- * 
- * `archive` decides what stays behind. False keeps the session on the sentence, so it
- * can be reopened; true takes it off and puts it in the document's archive
- * (`archive.rs`), from where it can be restored.
- */
-export interface CloseBubbleSessionCommand {
-	session: BubbleSession;
-	archive: boolean;
+export interface ClipboardEntry {
+	id: string;
+	text: string;
+	/** The document it was copied from, if any. */
+	docName?: string;
+	timestamp?: string;
 }
 
 export interface CloseSplitCommand {
@@ -1480,8 +1401,6 @@ export type NativeCommand =
 	| { type: "updateNote", payload: UpdateNoteCommand }
 	| { type: "removeNote", payload: NoteRef }
 	| { type: "jumpToNote", payload: NoteRef }
-	/** Highlight the text a note is about while its hover cards are open. */
-	| { type: "highlightNote", payload: HighlightNoteCommand }
 	| { type: "clipboardDrop", payload: ClipboardDropCommand }
 	| { type: "removeClipboardEntries", payload: RemoveClipboardEntriesCommand }
 	| { type: "insertClipboardEntry", payload: InsertClipboardEntryCommand }
@@ -1492,19 +1411,13 @@ export type NativeCommand =
 	| { type: "renameVersion", payload: RenameVersionCommand }
 	| { type: "revealSearchResult", payload: RevealSearchResultCommand }
 	| { type: "addReply", payload: AddReplyCommand }
-	| { type: "setTitlebarInset", payload: SetTitlebarInsetCommand }
-	| { type: "setPanelInsets", payload: SetPanelInsetsCommand }
 	| { type: "openProject", payload: OpenProjectCommand }
-	/** Leave the bubble editor and write its sentence back into the document. */
-	| { type: "closeBubbleSession", payload: CloseBubbleSessionCommand }
 	| { type: "setBlockType", payload: SetBlockTypeCommand }
 	| { type: "setWritingFormat", payload: SetWritingFormatCommand }
 	| { type: "toggleList", payload: ToggleListCommand }
 	| { type: "editorHistory", payload: EditorHistoryCommand }
 	| { type: "setFocusMode", payload: SetFocusModeCommand }
 	| { type: "setWordCountVisible", payload: SetWordCountVisibleCommand }
-	/** Restore or delete something in a document's archive (`archive.rs`). */
-	| { type: "archiveAction", payload: ArchiveActionCommand }
 	| { type: "addReference", payload: AddReferenceCommand }
 	| { type: "createReference", payload: CreateReferenceCommand }
 	| { type: "updateReference", payload: UpdateReferenceCommand }
@@ -1552,7 +1465,6 @@ export type NativeCommand =
 	| { type: "goToPage", payload: GoToPageCommand }
 	| { type: "printDocument", payload: PrintDocumentCommand }
 	| { type: "exportDocument", payload: ExportDocumentCommand }
-	| { type: "printFinished", payload: PrintFinishedCommand }
 	| { type: "applyFormat", payload: ApplyFormatCommand }
 	| { type: "useSetupForBook", payload: UseSetupForBookCommand }
 	| { type: "clearBookSetup", payload: ClearBookSetupCommand }
@@ -1877,103 +1789,6 @@ export interface DocumentText {
 	text: string;
 }
 
-/**
- * The drag ended — however it ended.
- * 
- * `handled` is a *report*, not a negotiation: whichever drop target accepted the
- * payload says so when it does, and this event carries the final answer so the source
- * knows whether to remove what it was dragging. Two targets can see the same drop (an
- * editor and the clipboard panel underneath it); the first to claim it wins.
- */
-export interface DragEnded {
-	dragId: string;
-	handled: boolean;
-	clientX?: number;
-	clientY?: number;
-}
-
-/**
- * The pointer moved during a drag.
- * 
- * Carried explicitly because the DOM's own drag events do not reliably give a
- * position. Coalesced to one per frame
- * by the sender, like `notesRemapped`, and for the same reason: only the last one
- * means anything.
- */
-export interface DragMoved {
-	dragId: string;
-	clientX: number;
-	clientY: number;
-}
-
-/**
- * What is being dragged.
- * 
- * A drag in Inkblot often starts in one component and ends in another — the
- * clipboard panel, an editor pane, a canvas. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
- * hand-off, so nothing about a drag depends on shared state in the webview's
- * `window`. The webview side is `src/bridge/dragHandoff.ts`.
- */
-export enum DragPayloadKind {
-	/** A selection dragged out of an editor. */
-	EditorSelection = "editorSelection",
-	/** An entry dragged out of the clipboard history panel. */
-	ClipboardEntry = "clipboardEntry",
-	/** A document dragged out of the file tree. */
-	Document = "document",
-	/** A note card dragged out of the notes panel. */
-	NoteCard = "noteCard",
-}
-
-/**
- * A place in a document, as the protocol carries it.
- * 
- * A ProseMirror position is an index into a document that every edit invalidates.
- * In one process that is survivable: the holder maps its positions through each
- * transaction's mapping and is never more than a tick out of date. Across a process
- * boundary it is not — native holds a note, a workbench tile, a search result or a
- * read-aloud word, the user types, and the positions native is holding now address
- * different text with no signal that they do.
- * 
- * So nothing in this protocol carries a bare position. Everything carries the text
- * the position was resolved from as well, and the webview re-resolves by that text
- * when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
- * or reports it gone when the text is.
- * 
- * `from` and `to` are **UTF-16 code units**, like every other offset in this
- * codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
- * wrong place in any document containing an emoji.
- */
-export interface TextAnchor {
-	from: number;
-	to: number;
-	/**
-	 * The text `from..to` covered when this anchor was made. The webview falls back
-	 * to searching for it when the positions no longer do.
-	 */
-	text: string;
-}
-
-export interface DragStarted {
-	dragId: string;
-	kind: DragPayloadKind;
-	/** The plain text being dragged, where there is any. */
-	text: string;
-	/** The entry, document or note the drag came from. */
-	sourceId?: string;
-	docPath?: string;
-	/**
-	 * Where in the source document the selection came from, for a drag that will move
-	 * rather than copy.
-	 */
-	anchor?: TextAnchor;
-	/**
-	 * Anything the drop target needs that the fields above do not model — a
-	 * clipboard entry's rich content, a note's color.
-	 */
-	detail?: unknown;
-}
-
 /** Copy a document beside itself as "<name> copy", and open the copy. */
 export interface DuplicateEntryCommand {
 	path: string;
@@ -2064,54 +1879,21 @@ export type WebviewEvent =
 	| { type: "toolbarState", payload: ToolbarState }
 	| { type: "selectionContext", payload: SelectionContext }
 	| { type: "docChanged", payload: DocChanged }
-	| { type: "notesRemapped", payload: NotesRemapped }
-	| { type: "noteMarkerHover", payload: NoteMarkerEvent }
-	| { type: "noteMarkerLeave", payload: NoteMarkerEvent }
-	| { type: "noteMarkerPin", payload: NoteMarkerEvent }
 	| { type: "activeEditorChanged", payload: ActiveEditorChanged }
 	| { type: "canvasToolbarChanged", payload: CanvasToolbarChanged }
 	/** The active map's toolbar and inspector (`map.rs`). Coalesced per frame. */
 	| { type: "mapChromeChanged", payload: MapChromeChanged }
-	| { type: "searchMatches", payload: SearchMatches }
-	| { type: "focusModeView", payload: FocusModeView }
 	| { type: "readAloudPayload", payload: ReadAloudPayloadEvent }
-	| { type: "dragStarted", payload: DragStarted }
-	| { type: "dragMoved", payload: DragMoved }
-	| { type: "dragEnded", payload: DragEnded }
 	| { type: "projectChanged", payload: ProjectChanged }
-	| { type: "notesChanged", payload: NotesChanged }
-	| { type: "clipboardChanged", payload: ClipboardChanged }
-	| { type: "tilesChanged", payload: TilesChanged }
-	| { type: "versionsChanged", payload: VersionsChanged }
 	| { type: "showSidebarTab", payload: ShowSidebarTab }
-	/**
-	 * The marker of an open hover preview moved — the document scrolled or reflowed.
-	 * Coalesced to one per frame; it carries the whole rect, so a dropped one is
-	 * superseded by the next.
-	 */
-	| { type: "noteMarkerMoved", payload: NoteMarkerEvent }
-	| { type: "notePreviewDismissed", payload: NotePreviewDismissed }
-	| { type: "noteMarkersChanged", payload: NoteMarkersChanged }
-	/** Open the bubble editor. Sent only to a shell that draws it (`bubble` chrome). */
-	| { type: "bubbleSessionOpened", payload: BubbleSessionOpened }
-	/** Where the chips of sessions left open are, for a shell that draws them. */
-	| { type: "bubbleChipsChanged", payload: BubbleChipsChanged }
 	| { type: "viewOptions", payload: ViewOptions }
-	/** A document's archive, whole (`archive.rs`). */
-	| { type: "archiveChanged", payload: ArchiveChanged }
 	/** The project's sources, whole, for the document in view (`references.rs`). */
 	| { type: "referencesChanged", payload: ReferencesChanged }
 	/** The kinds of source and the styles, sent once when the page mounts. */
 	| { type: "referenceSchema", payload: ReferenceSchema }
 	/** Show a source in the panel. */
 	| { type: "revealReference", payload: RevealReference }
-	/**
-	 * Where the word-count badges are, for a shell that draws them (`wordCount`
-	 * chrome). Coalesced per frame; the total is itself debounced by the page.
-	 */
-	| { type: "wordCountsChanged", payload: WordCountsChanged }
 	| { type: "pageLayoutState", payload: PageLayoutState }
-	| { type: "printRequest", payload: PrintRequest }
 	/** The Finishing tabs' fixed lists, sent once when the page mounts. */
 	| { type: "pageLayoutCatalog", payload: PageLayoutCatalog }
 	| { type: "printJobStatus", payload: PrintJobStatus }
@@ -2215,23 +1997,6 @@ export interface ExportDocumentCommand {
 	options?: PrintOptions;
 }
 
-/**
- * What focus mode is showing.
- * 
- * `FocusModeOverlay` re-derives its view from the full document on every
- * transaction; sent at a keystroke's rate, the text would be the largest payload on
- * the bridge. So the overlay stays in the webview, and this event lets a native shell
- * mirror the *state* — which paragraph, how far through — without receiving the text.
- */
-export interface FocusModeView {
-	active: boolean;
-	docPath: string;
-	/** Index of the paragraph the caret is in. */
-	paragraphIndex: number;
-	paragraphCount: number;
-	wordCount: number;
-}
-
 /** What a format is for, which decides what else the Finishing tabs offer with it. */
 export enum FormatKind {
 	Prose = "prose",
@@ -2252,14 +2017,6 @@ export interface FormatOption {
 /** Scroll a page (1-based, as numbered on screen) into view. */
 export interface GoToPageCommand {
 	page: number;
-}
-
-/**
- * Which note's hover cards the shell is showing, so the page can highlight the text
- * the note is about, since the cards do not quote it. `None` clears the highlight.
- */
-export interface HighlightNoteCommand {
-	noteId?: string;
 }
 
 /**
@@ -2326,6 +2083,35 @@ export interface InsertTableCommand {
 	rows: number;
 	cols: number;
 	withHeaderRow: boolean;
+}
+
+/**
+ * A place in a document, as the protocol carries it.
+ * 
+ * A ProseMirror position is an index into a document that every edit invalidates.
+ * In one process that is survivable: the holder maps its positions through each
+ * transaction's mapping and is never more than a tick out of date. Across a process
+ * boundary it is not — native holds a note, a workbench tile, a search result or a
+ * read-aloud word, the user types, and the positions native is holding now address
+ * different text with no signal that they do.
+ * 
+ * So nothing in this protocol carries a bare position. Everything carries the text
+ * the position was resolved from as well, and the webview re-resolves by that text
+ * when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
+ * or reports it gone when the text is.
+ * 
+ * `from` and `to` are **UTF-16 code units**, like every other offset in this
+ * codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
+ * wrong place in any document containing an emoji.
+ */
+export interface TextAnchor {
+	from: number;
+	to: number;
+	/**
+	 * The text `from..to` covered when this anchor was made. The webview falls back
+	 * to searching for it when the positions no longer do.
+	 */
+	text: string;
 }
 
 /**
@@ -3058,46 +2844,6 @@ export interface Note {
 	timestamp: string;
 }
 
-/**
- * The pointer entered, left, or clicked a note marker in the document.
- * 
- * `anchor_rect` is in client coordinates *inside the webview*, so a native shell must
- * offset it by the web view's frame. Nothing here is an object reference: every
- * field survives serialization.
- */
-export interface NoteMarkerEvent {
-	noteId: string;
-	docPath: string;
-	anchorLeft: number;
-	anchorTop: number;
-	anchorRight: number;
-	anchorBottom: number;
-	note?: Note;
-}
-
-/**
- * Where one note marker is, for a shell that draws the markers itself. Client
- * coordinates inside the webview, as `NoteMarkerEvent`'s.
- */
-export interface NoteMarkerRect {
-	noteId: string;
-	color: string;
-	left: number;
-	top: number;
-	right: number;
-	bottom: number;
-}
-
-/**
- * Every note marker the user can see, and where — the whole list, so it is safe to
- * coalesce. Sent when any of them appears, goes, or moves (a scroll, a reflow). The
- * page still owns the markers' hover and click; the shell draws the dots, as Liquid
- * Glass, over the page's invisible ones.
- */
-export interface NoteMarkersChanged {
-	markers: NoteMarkerRect[];
-}
-
 /** The fields of a note the shell can change. `None` leaves a field alone. */
 export interface NotePatch {
 	content?: string;
@@ -3116,49 +2862,10 @@ export interface NotePatch {
 	previewSize?: NotePreviewSize;
 }
 
-/**
- * The open hover preview should close: the user clicked somewhere in the document
- * that is not a note marker. The page is the only one who sees that click.
- */
-export interface NotePreviewDismissed {
-	noteId: string;
-}
-
 /** Remove a note and every reply beneath it, as the page's panel does. */
 export interface NoteRef {
 	docPath: string;
 	noteId: string;
-}
-
-/** A document's notes changed — the whole list, so it is safe to coalesce. */
-export interface NotesChanged {
-	docPath: string;
-	notes: Note[];
-}
-
-/**
- * Note anchors after a remap.
- * 
- * `useEditorNotes` remaps on every transaction — every keystroke in a document with
- * quote notes — and the shell holds those positions. Two things
- * keep that off the bridge's back:
- * 
- * 1. The event is coalesced to one per frame by the sender. Sending per transaction
- * saturates the bridge with nothing new; a caret that moved three times in one
- * frame has one final answer.
- * 2. It carries the **whole** remapped set, never a delta. That is what makes
- * coalescing safe: dropping an intermediate state loses nothing, because the next
- * one is complete. A delta stream would not survive a single dropped message.
- */
-export interface NotesRemapped {
-	docPath: string;
-	notes: Note[];
-	/**
-	 * Notes whose range collapsed to nothing in this remap. They have lost what they
-	 * were about and have been dropped from `notes`; they are named here so a shell
-	 * can tell "deleted" from "never sent".
-	 */
-	droppedNoteIds: string[];
 }
 
 /** Select an entry: open its document, or show its page, and make it This Page. */
@@ -3483,27 +3190,6 @@ export interface PageLayoutState {
 }
 
 /**
- * One text pane's status row, for a shell that draws the pane's own Print Layout
- * toggle and zoom at its bottom-right corner, level with its badges. `left` and `right`
- * are the pane's edges; `top` and `bottom` the row's. Client coordinates, as the
- * badges' are.
- */
-export interface PaneStatus {
-	pane: Pane;
-	docPath: string;
-	/** Shown as pages. */
-	printLayout: boolean;
-	/** Its zoom as pages (1 = 100%), whether or not it is shown as them. */
-	zoom: number;
-	/** The pointer is over it. A split shows a pane's controls only then. */
-	hovered?: boolean;
-	left: number;
-	top: number;
-	right: number;
-	bottom: number;
-}
-
-/**
  * Show a typeset version's pages in the Typeset view — alone, or beside the current
  * typeset to compare them. No id stops previewing.
  */
@@ -3517,12 +3203,6 @@ export interface PrintDocumentCommand {
 	scope: PrintScope;
 	bound: boolean;
 	options?: PrintOptions;
-}
-
-/** The shell finished (or abandoned) a `PrintRequest`. */
-export interface PrintFinishedCommand {
-	jobId: string;
-	completed: boolean;
 }
 
 /** What a print or export job is. */
@@ -3559,19 +3239,6 @@ export interface PrintJobStatus {
 	message?: string;
 	/** The file written, for an export that is `Done`. */
 	path?: string;
-}
-
-/**
- * Print the web view as it is now, on paper of this size, with no margins and no
- * scaling: the page has laid out exactly what goes on each sheet.
- */
-export interface PrintRequest {
-	jobId: string;
-	jobName: string;
-	paperWidthPt: number;
-	paperHeightPt: number;
-	/** Save as PDF here instead of printing. Absent shows the print panel. */
-	pdfPath?: string;
 }
 
 /**
@@ -4007,21 +3674,6 @@ export interface SearchResult {
 	note?: unknown;
 }
 
-/**
- * Search results from inside the open document.
- * 
- * Project-wide search is `inkblot-core`'s job and does not come through here; this is
- * only the part that needs a live document, because a ProseMirror position cannot be
- * computed from a file on disk.
- */
-export interface SearchMatches {
-	query: string;
-	docPath: string;
-	results: SearchResult[];
-	/** Which result is current, as an index into `results`. */
-	activeIndex?: number;
-}
-
 /** The scopes, in the order they appear in the bar. */
 export enum SearchScope {
 	/**
@@ -4230,10 +3882,7 @@ export interface SetEditorModeCommand {
 	mode: EditorMode;
 }
 
-/**
- * Open or leave focus mode — the page's, which stays in the page (see
- * `FocusModeView`). The page answers with `viewOptions`.
- */
+/** Open or leave focus mode. The page answers with `viewOptions`. */
 export interface SetFocusModeCommand {
 	open: boolean;
 }
@@ -4309,25 +3958,6 @@ export interface SetPageSetupCommand {
 	setup: PageSetup;
 	/** Absent from an older shell, which only ever edited the document. */
 	target?: PageSetupTarget;
-}
-
-/**
- * How much of each side of the page the shell's chrome covers.
- * 
- * The shell's sidebars and window toolbar are translucent and float over the page
- * rather than beside it: the page runs the whole window, so a canvas carries on
- * underneath them and a document scrolls up under the toolbar's glass. What must stay
- * readable — a document's text column, its first line — keeps to the part of the page
- * they leave uncovered.
- */
-export interface SetPanelInsetsCommand {
-	leading: number;
-	trailing: number;
-	/**
-	 * The window toolbar's band. Absent from an older shell, which kept the page
-	 * below its toolbar, so it defaults to nothing covered.
-	 */
-	top?: number;
 }
 
 /**
@@ -4408,20 +4038,6 @@ export interface SetTabOrderCommand {
 /** Give the selected paragraphs a named text style, or none (`style` absent). */
 export interface SetTextStyleCommand {
 	style?: string;
-}
-
-/**
- * How much of the page's top-left corner the window's own controls cover.
- * 
- * The shell draws no titlebar row: the page's toolbar is the top of the window, and
- * the traffic lights float over whatever is beneath them. When the native file tree is
- * showing they float over it and the page needs no room; when it is hidden they float
- * over the page's toolbar, which must start after them. Only the shell knows which.
- */
-export interface SetTitlebarInsetCommand {
-	leading: number;
-	/** Room at the right end, for the button that reopens a hidden native sidebar. */
-	trailing?: number;
 }
 
 /**
@@ -4630,28 +4246,6 @@ export interface TextDocument {
 
 export interface TileRef {
 	id: string;
-}
-
-export enum TileKind {
-	Pos = "pos",
-	Synonym = "synonym",
-	Definition = "definition",
-	Rhyme = "rhyme",
-}
-
-/** A language-tool tile, made from a selection by the editor's context menu. */
-export interface WorkbenchTile {
-	/** Always a string on the wire; the page's ids are timestamps. */
-	id: string;
-	type: TileKind;
-	/** The word or sentence the tile is about. */
-	text: string;
-	/** The document it was made in. */
-	doc?: string;
-}
-
-export interface TilesChanged {
-	tiles: WorkbenchTile[];
 }
 
 /**
@@ -4877,11 +4471,6 @@ export interface VersionRow {
 	summary?: string;
 }
 
-/** A document's history changed on disk. The shell re-reads it through the core. */
-export interface VersionsChanged {
-	docPath: string;
-}
-
 /**
  * The page's own view settings that a shell offers as toolbar toggles, pushed whole
  * whenever either changes and once at startup. The page still owns both: the shell
@@ -4892,27 +4481,22 @@ export interface ViewOptions {
 	wordCountVisible: boolean;
 }
 
-/**
- * Where one pane's word-count badge is, and what it says, for a shell that draws the
- * badges itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
- */
-export interface WordCountBadge {
-	text: string;
-	left: number;
-	top: number;
-	right: number;
-	bottom: number;
+export enum TileKind {
+	Pos = "pos",
+	Synonym = "synonym",
+	Definition = "definition",
+	Rhyme = "rhyme",
 }
 
-/**
- * Every word-count badge the user can see, and every text pane's status row — the
- * whole lists, so it is safe to coalesce. The page's badges stay where they are,
- * invisible, to be measured; the shell draws them as Liquid Glass, which only a view
- * above the page can be.
- */
-export interface WordCountsChanged {
-	badges: WordCountBadge[];
-	panes?: PaneStatus[];
+/** A language-tool tile, made from a selection by the editor's context menu. */
+export interface WorkbenchTile {
+	/** Always a string on the wire; the page's ids are timestamps. */
+	id: string;
+	type: TileKind;
+	/** The word or sentence the tile is about. */
+	text: string;
+	/** The document it was made in. */
+	doc?: string;
 }
 
 /**
