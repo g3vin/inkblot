@@ -94,8 +94,7 @@
   --card-base: var(--floating-over-page-bg);
   --card-edge-base: var(--popover-border);
 
-  /* Over the page, as the Swift shell's glass cards were: the one blurred surface,
-     tinted with the note's colour. */
+  /* Over the page: the one blurred surface, tinted with the note's colour. */
   border: 1px solid var(--card-edge);
   background: var(--card-tint);
   -webkit-backdrop-filter: var(--blur-over-page);
@@ -218,15 +217,6 @@
 
 .note-preview-resize:hover {
   background: color-mix(in srgb, var(--note-color, var(--accent-color)) 26%, transparent);
-}
-
-/* Under the Swift shell the dots are drawn above the page as Liquid Glass
-   (useNativeNotePreviews); the page's stay, invisible, to take the hover and click. */
-.native-note-dots .note-dot,
-.native-note-dots .note-marker:hover .note-dot {
-  opacity: 0;
-  transform: none;
-  box-shadow: none;
 }
 
 .note-branch {

@@ -499,7 +499,7 @@ await saveDocument('Archive Project', 'one.md', { content: { type: 'doc' }, note
 ok('an autosave carries the archive forward', JSON.parse(files.get(docFile)).archive?.length === 1)
 
 // Restoring puts it back on its sentence, where the sentence still is.
-const { restoreArchivedItem } = await import(`${S}/hooks/useDocumentArchive.js`)
+const { restoreArchivedItem } = await import(`${S}/lib/archiveRestore.js`)
 ok('restoring puts the session back on its sentence', restoreArchivedItem(doc, archive[0])
   && findBubbleSession(doc.state.doc, opened.id)?.session.aside[0].text === 'three'
   && doc.state.doc.textBetween(findBubbleSession(doc.state.doc, opened.id).from, findBubbleSession(doc.state.doc, opened.id).to) === 'Four two.')
@@ -675,46 +675,3 @@ ok('Archive hands it back to be archived', closed?.archive === true)
 
 await act(async () => { editorRoot.unmount() })
 ok('closing gives the toolbar back', !document.documentElement.classList.contains('bubble-open'))
-
-/* ---------------- under the Swift shell ---------------- */
-
-// The shell owns the `bubble` chrome: the page draws neither the editor nor the chips.
-const { shellBridge } = await import(`${S}/bridge/index.ts`)
-window.__inkblotNative = { post: () => {}, listen: () => () => {}, chrome: ['bubble'] }
-const heard = { bubbleChipsChanged: [], bubbleSessionOpened: [] }
-for (const type of Object.keys(heard)) shellBridge.on(type, (payload) => heard[type].push(payload))
-const frame = () => act(async () => {
-  await new Promise((resolve) => dom.window.requestAnimationFrame(() => resolve()))
-  await new Promise((resolve) => setTimeout(resolve, 10))
-})
-
-const native = makeEditor('<p>Alpha beta. Gamma delta.</p>')
-let nativeApi = null
-function NativeHarness() {
-  nativeApi = useBubbleSessions({ docPath: 'native.md' })
-  return null
-}
-const nativeRoot = createRoot(document.getElementById('root').appendChild(document.createElement('div')))
-await act(async () => { nativeRoot.render(React.createElement(NativeHarness)) })
-
-native.view.dispatch(native.state.tr.setSelection(TextSelection.create(native.state.doc, 3)))
-await act(async () => { nativeApi.openParagraph(native) })
-const openedNatively = heard.bubbleSessionOpened.at(-1)
-ok('opening goes to the shell, not the page', nativeApi.open === null && openedNatively?.docPath === 'native.md'
-  && same(texts(openedNatively.session.words), ['alpha beta.', 'gamma delta.']))
-const nw = openedNatively.session.words
-await act(async () => {
-  shellBridge.send('closeBubbleSession', { session: { ...openedNatively.session, words: [nw[1], nw[0]] }, archive: false })
-})
-ok('and the shell closing it writes the paragraph', native.state.doc.textContent === 'Gamma delta. Alpha beta.')
-
-// The chips stay the page's: drawn over from reported positions, they trailed the text
-// through every scroll.
-await frame()
-await frame()
-ok('the page draws its own chips, reporting none to the shell',
-  !!native.view.dom.querySelector('.bubble-session-chip') && heard.bubbleChipsChanged.length === 0)
-
-await act(async () => { nativeRoot.unmount() })
-delete window.__inkblotNative
-native.destroy()

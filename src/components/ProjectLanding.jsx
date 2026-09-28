@@ -10,7 +10,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createProject, getProjectRoot, linkProject, listProjects, moveProject } from '../lib/FileSystem'
-import { nativeOwns } from '../lib/host'
 import { Button, Sheet } from '../ui'
 import { popUpNativeMenu } from '../ui/useNativeMenu.js'
 import SFIcon from './SFIcon'
@@ -114,7 +113,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
   }, [selected])
 
   const onDragArea = useCallback((event) => {
-    if (nativeOwns('toolbar') || event.button !== 0 || event.clientY > DRAG_HEIGHT) return
+    if (event.button !== 0 || event.clientY > DRAG_HEIGHT) return
     if (event.target instanceof Element && event.target.closest(DRAG_BLOCKERS)) return
     event.preventDefault()
     getCurrentWindow().startDragging().catch(() => {})

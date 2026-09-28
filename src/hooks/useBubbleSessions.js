@@ -21,9 +21,7 @@
  * found by its id, which the mark carries, so it survives any edit in between.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { documentSurface } from '../bridge'
 import { readAnchor, resolveAnchor } from '../bridge/anchors'
-import { nativeOwns } from '../lib/host'
 import { isEditorReady } from '../lib/editorUtils'
 import { composeSentence, createSession, normalizeSession, reconcileSession } from '../lib/bubbleText'
 import { writeBubbleSession } from '../lib/bubbleWrite'
@@ -106,7 +104,6 @@ export { writeBubbleSession }
 const snippet = (text) => (text.length > 80 ? `${text.slice(0, 79).trimEnd()}…` : text)
 
 export function useBubbleSessions({ docPath, projectName }) {
-  const nativeBubble = nativeOwns('bubble')
   // { editor, session, anchor } — anchor only for a session not yet in the document.
   const [open, setOpen] = useState(null)
   const openRef = useRef(null)
@@ -121,12 +118,8 @@ export function useBubbleSessions({ docPath, projectName }) {
     // The document it is in, for its archive: fixed now, as the writer may switch panes.
     const next = { editor, session, anchor, docPath: docPathRef.current }
     openRef.current = next
-    if (nativeBubble) {
-      documentSurface.publishBubbleSessionOpened({ docPath: docPathRef.current || '', session })
-    } else {
-      setOpen(next)
-    }
-  }, [nativeBubble])
+    setOpen(next)
+  }, [])
 
   const openSession = useCallback((editor, id) => {
     if (!isEditorReady(editor)) return
@@ -212,11 +205,6 @@ export function useBubbleSessions({ docPath, projectName }) {
     window.addEventListener(BUBBLE_OPEN_EVENT, onOpen)
     return () => window.removeEventListener(BUBBLE_OPEN_EVENT, onOpen)
   }, [openSession])
-
-  useEffect(() => {
-    if (!nativeBubble) return undefined
-    return documentSurface.onCommand('closeBubbleSession', ({ session, archive }) => close(session, archive))
-  }, [close, nativeBubble])
 
   return useMemo(
     () => ({ open, openFromSelection, openParagraph, openSession, archiveSession, close }),

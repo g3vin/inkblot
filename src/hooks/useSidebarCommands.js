@@ -1,22 +1,18 @@
 /**
- * useNativeSidebar — the page's side of a right sidebar the shell draws.
+ * useSidebarCommands — the inspector's edits, as commands.
  *
  * The sidebar's state stays here: notes, the clipboard history and workbench tiles are
  * React state, and versions live in the document file this page's autosave rewrites
- * under its own lock. So this does two things, and only while the shell owns the
- * sidebar (`nativeOwns('rightSidebar')`):
- *
- *  - **publishes** that state whenever it changes — whole lists, coalesced per frame
- *  - **applies** the shell's edits with the helpers the React panels use, so a note
- *    edited natively gets the same `touchNote` timestamps, a restore takes the same
- *    safety checkpoint, and a tile finds its word the same way
+ * under its own lock. The panels and the toolbar edit them by command, and this
+ * applies each with the helpers the React panels use, so a note edited from anywhere
+ * gets the same `touchNote` timestamps, a restore takes the same safety checkpoint,
+ * and a tile finds its word the same way.
  *
  * Every handler reads through `latest`, because commands arrive whenever they arrive
  * and must act on the state as it is then, not as it was when the effect ran.
  */
 import { useEffect, useRef } from 'react'
 import { documentSurface, editorRegistry } from '../bridge'
-import { claimEndedSelectionDrag } from '../bridge/recentSelectionDrag'
 import { collectNoteBranchIds, createFreeNote, touchNote } from '../lib/noteUtils'
 import {
   copyVersionAsDocument,
@@ -29,23 +25,7 @@ import {
 import { editorForTile, replaceTileWord, selectTileWord } from '../lib/workbenchActions'
 import { isEditorReady } from '../lib/editorUtils'
 
-/** The page's tile, as the protocol describes one. */
-const toWireTile = (tile) => ({
-  id: String(tile.id),
-  type: ['synonym', 'definition', 'rhyme'].includes(tile.type) ? tile.type : 'pos',
-  text: String(tile.text || ''),
-  ...(tile.doc ? { doc: tile.doc } : {}),
-})
-
-const toWireClipboardEntry = (entry) => ({
-  id: String(entry.id),
-  text: String(entry.text || ''),
-  docName: String(entry.docName || ''),
-  timestamp: String(entry.timestamp || ''),
-})
-
-export function useNativeSidebar({
-  enabled,
+export function useSidebarCommands({
   projectName,
   activeDoc,
   currentDoc,
@@ -75,41 +55,8 @@ export function useNativeSidebar({
     }
   })
 
-  /* ---------------- publishing ---------------- */
-
-  const activeNotes = notesByDoc?.[activeDoc]
-  useEffect(() => {
-    if (!enabled || !activeDoc) return
-    documentSurface.publishNotesChanged({ docPath: activeDoc, notes: activeNotes || [] })
-  }, [enabled, activeDoc, activeNotes])
-
-  useEffect(() => {
-    if (!enabled) return
-    documentSurface.publishClipboardChanged({ entries: (clipboardHistory || []).map(toWireClipboardEntry) })
-  }, [enabled, clipboardHistory])
-
-  useEffect(() => {
-    if (!enabled) return
-    documentSurface.publishTilesChanged({ tiles: (tiles || []).map(toWireTile) })
-  }, [enabled, tiles])
-
-  // FileSystem.js announces every history write on window; the shell re-reads the
-  // history from disk through the core, so all it needs is which document.
-  useEffect(() => {
-    if (!enabled) return undefined
-    const onVersionsChanged = (event) => {
-      const detail = event?.detail || {}
-      if (detail.projectName && detail.projectName !== latest.current.projectName) return
-      if (detail.docName) documentSurface.publishVersionsChanged({ docPath: detail.docName })
-    }
-    window.addEventListener('versions:changed', onVersionsChanged)
-    return () => window.removeEventListener('versions:changed', onVersionsChanged)
-  }, [enabled])
-
   /* ---------------- applying edits ---------------- */
 
-  // Always listening: the web chrome (the toolbar's Snapshot, the inspector panels)
-  // sends the same commands in-process as the shell did over the wire.
   useEffect(() => {
     const state = () => latest.current
 
@@ -171,8 +118,7 @@ export function useNativeSidebar({
 
       /* clipboard */
       documentSurface.onCommand('clipboardDrop', ({ text }) => {
-        const selection = claimEndedSelectionDrag(text)
-        state().onDropToClipboard?.({ text, selection, fromEditorSelection: Boolean(selection) })
+        state().onDropToClipboard?.({ text })
       }),
 
       documentSurface.onCommand('removeClipboardEntries', ({ ids }) => {

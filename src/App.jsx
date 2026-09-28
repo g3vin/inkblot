@@ -16,7 +16,6 @@ import Editor from './components/Editor.jsx'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
 import { resolveTheme, setThemeAttribute } from './lib/theme'
 import { documentSurface } from './bridge'
-import { isNativeShell } from './lib/host'
 import SettingsSheet from './components/settings/SettingsSheet.jsx'
 import TimerCapsule from './components/stats/TimerCapsule.jsx'
 import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
@@ -294,12 +293,8 @@ export default function App() {
         await Submenu.new({ text: 'Export', items: await exportItems('document') }),
         await Submenu.new({ text: 'Export Book', items: await exportItems('folder') }),
       ]
-      // The Swift shell draws File ▸ Print and Export, and View ▸ Print Layout, itself.
-      const native = isNativeShell()
-      if (!native) {
-        if (fileSubmenu) await fileSubmenu.append(fileItems)
-        else await menu.append(await Submenu.new({ text: 'File', items: fileItems.slice(1) }))
-      }
+      if (fileSubmenu) await fileSubmenu.append(fileItems)
+      else await menu.append(await Submenu.new({ text: 'File', items: fileItems.slice(1) }))
 
       const themeItems = [toggleItem, systemItem]
       const accentItems = (await systemAccent)
@@ -312,7 +307,7 @@ export default function App() {
               action: () => openSettings('general'),
             }),
           ]
-      const tabBarItem = native ? null : await CheckMenuItem.new({
+      const tabBarItem = await CheckMenuItem.new({
         id: 'tab-bar-toggle',
         text: 'Show Tab Bar',
         checked: showsTabBar(),
@@ -321,9 +316,9 @@ export default function App() {
           tabBarItem.setChecked(showsTabBar())
         },
       })
-      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [tabBarItem, printLayoutItem])]
+      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, tabBarItem, printLayoutItem]
 
-      const pageItems = native ? [] : await viewItems({ MenuItem, Submenu, PredefinedMenuItem })
+      const pageItems = await viewItems({ MenuItem, Submenu, PredefinedMenuItem })
       if (viewSubmenu) {
         await viewSubmenu.append([...themeItems, ...accentItems, ...displayItems, ...pageItems])
       } else {
@@ -334,25 +329,23 @@ export default function App() {
         await menu.append(viewMenu)
       }
 
-      // Settings…, and the writing timer's menu. The Swift shell has its own.
-      if (!native) {
-        const settingsItem = await MenuItem.new({ id: 'settings', text: 'Settings…', accelerator: 'CmdOrCtrl+,', action: () => openSettings() })
-        const appSubmenu = items[0] instanceof Submenu && !['File', 'Edit', 'View', 'Window', 'Help'].includes(await items[0].text()) ? items[0] : null
-        if (appSubmenu) await appSubmenu.insert([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem], 1)
-        else if (fileSubmenu) await fileSubmenu.append([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem])
-        const api = { MenuItem, Submenu, PredefinedMenuItem, CheckMenuItem }
-        const submenus = await Promise.all(items.map(async (item) => (item instanceof Submenu ? [await item.text(), item] : [null, item])))
-        const named = (name) => submenus.find(([text]) => text === name)?.[1] ?? null
-        const extras = await fileExtraItems(api)
-        if (fileSubmenu) await fileSubmenu.insert(extras, 0)
-        await named('Edit')?.append([await PredefinedMenuItem.new({ item: 'Separator' }), await pasteAndMatchStyleItem(api)])
-        await named('Window')?.insert(await windowTabItems(api), 0)
-        // Insert, Format and Timer before Window, where the Swift shell had them.
-        const added = [await buildInsertMenu(api), await buildFormatMenu(api), await buildTimerMenu(api)]
-        const windowAt = submenus.findIndex(([text]) => text === 'Window')
-        if (windowAt >= 0) await menu.insert(added, windowAt)
-        else await menu.append(added)
-      }
+      // Settings…, the other menus, and the writing timer's.
+      const settingsItem = await MenuItem.new({ id: 'settings', text: 'Settings…', accelerator: 'CmdOrCtrl+,', action: () => openSettings() })
+      const appSubmenu = items[0] instanceof Submenu && !['File', 'Edit', 'View', 'Window', 'Help'].includes(await items[0].text()) ? items[0] : null
+      if (appSubmenu) await appSubmenu.insert([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem], 1)
+      else if (fileSubmenu) await fileSubmenu.append([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem])
+      const api = { MenuItem, Submenu, PredefinedMenuItem, CheckMenuItem }
+      const submenus = await Promise.all(items.map(async (item) => (item instanceof Submenu ? [await item.text(), item] : [null, item])))
+      const named = (name) => submenus.find(([text]) => text === name)?.[1] ?? null
+      const extras = await fileExtraItems(api)
+      if (fileSubmenu) await fileSubmenu.insert(extras, 0)
+      await named('Edit')?.append([await PredefinedMenuItem.new({ item: 'Separator' }), await pasteAndMatchStyleItem(api)])
+      await named('Window')?.insert(await windowTabItems(api), 0)
+      // Insert, Format and Timer before Window, where a Mac app has them.
+      const added = [await buildInsertMenu(api), await buildFormatMenu(api), await buildTimerMenu(api)]
+      const windowAt = submenus.findIndex(([text]) => text === 'Window')
+      if (windowAt >= 0) await menu.insert(added, windowAt)
+      else await menu.append(added)
 
       await menu.setAsAppMenu()
       updateMenu(currentThemeRef.current)
@@ -422,7 +415,7 @@ export default function App() {
     <>
       <Editor showWordCountBadge={showWordCountBadge} />
       <SettingsSheet appearance={appearance} />
-      {isNativeShell() ? null : <TimerCapsule />}
+      <TimerCapsule />
     </>
   )
 }

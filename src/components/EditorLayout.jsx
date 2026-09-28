@@ -15,9 +15,7 @@ import { EditorTarget } from '../types'
 /** A stable identity, so useBridgeState's initial value is not a new object each render. */
 const EMPTY_ACTIVE_EDITOR = {}
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
-import { nativeOwns } from '../lib/host'
-import { useNativeSidebar } from '../hooks/useNativeSidebar'
-import { useNativeNotePreviews } from '../hooks/useNativeNotePreviews'
+import { useSidebarCommands } from '../hooks/useSidebarCommands'
 import EditorCanvas from './EditorCanvas'
 import usePrintLayoutController from '../print/usePrintLayoutController'
 import PageSetupSheet from '../print/PageSetupSheet'
@@ -39,11 +37,9 @@ import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
 import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
-import { PanelInsetsContext } from '../map/panelInsets'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
 import BubbleEditor from './bubble/BubbleEditor'
 import { useBubbleSessions } from '../hooks/useBubbleSessions'
-import { useDocumentArchive } from '../hooks/useDocumentArchive'
 import { useReferences } from '../hooks/useReferences'
 import NoteHoverPreview from './NoteHoverPreview'
 import ToolbarHost from './toolbar/ToolbarHost'
@@ -129,49 +125,16 @@ export default function EditorLayout(props) {
     setActiveDoc,
     setCurrentDoc,
   } = props
-  // Under the Swift shell the file tree and the traffic lights are both outside the
-  // page, so nothing on the left needs room made for it.
-  const nativeFileTree = nativeOwns('fileTree')
-  const nativeWindowChrome = nativeOwns('windowChrome')
-  // The shell's sidebars float over this page instead of beside it, so a canvas runs on
-  // underneath them. The shell says how much of each side they cover; the toolbar and a
-  // document's text keep clear of that.
-  //
-  // The window toolbar floats over the page the same way, and `top` is its band: the
-  // page runs up under it so the toolbar's glass has the document behind it.
-  const [nativePanelInsets, setNativePanelInsets] = useState({ leading: 0, trailing: 0, top: 0 })
-  useEffect(() => {
-    if (!nativeWindowChrome) return undefined
-    return documentSurface.onCommand('setPanelInsets', ({ leading, trailing, top }) => {
-      setNativePanelInsets({
-        leading: Math.max(0, Number(leading) || 0),
-        trailing: Math.max(0, Number(trailing) || 0),
-        top: Math.max(0, Number(top) || 0),
-      })
-    })
-  }, [nativeWindowChrome])
-  const titlebarLeftWidth = nativeFileTree
-    ? (nativeWindowChrome ? nativePanelInsets.leading : 86)
-    : left.collapsed && !left.peeked
-      ? 86 + TITLEBAR_TOGGLE_WIDTH
-      : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
-  const nativeRightSidebar = nativeOwns('rightSidebar')
-  const nativeToolbar = nativeOwns('toolbar')
+  const titlebarLeftWidth = left.collapsed && !left.peeked
+    ? 86 + TITLEBAR_TOGGLE_WIDTH
+    : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
   // The toolbar's Focus Mode item. The mode stays this page's; the toolbar asks for it
   // and lights its button from what is published back.
   useEffect(() => documentSurface.onCommand('setFocusMode', ({ open }) => setFocusModeOpen(Boolean(open))), [])
   useEffect(() => {
     documentSurface.publishViewOptions({ focusMode: focusModeOpen })
   }, [focusModeOpen])
-  const nativeNotePreviews = nativeOwns('notePreviews')
-  useNativeNotePreviews({ enabled: nativeNotePreviews })
   const bubbles = useBubbleSessions({ docPath: activeDoc || currentDoc, projectName: props.projectName })
-  useDocumentArchive({
-    projectName: props.projectName,
-    docPath: activeDoc || currentDoc,
-    // The editor showing a document, for putting something back into it.
-    editorFor: (path) => (path === activeDoc && activeEditor) || (path === currentDoc ? editor : null),
-  })
   // Citations format in every open editor; the References panel is the shell's.
   useReferences({
     projectName: props.projectName,
@@ -181,9 +144,7 @@ export default function EditorLayout(props) {
       { editor: props.secondaryEditor, path: props.secondaryDoc },
     ],
   })
-  const titlebarRightWidth = nativeRightSidebar
-    ? nativePanelInsets.trailing
-    : right.collapsed && !right.peeked
+  const titlebarRightWidth = right.collapsed && !right.peeked
     ? TITLEBAR_TOGGLE_WIDTH
     : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
   // On a canvas, the only editor the Toolbar may drive is a card's own editor.
@@ -240,11 +201,7 @@ export default function EditorLayout(props) {
   // Custom titlebar: a left-click anywhere in the drag strip moves the window,
   // unless it landed on something interactive. Bound to the window rather than
   // the titlebar element so the strip also covers the sidebars beneath it.
-  //
-  // Not under a native toolbar: the window's own toolbar is what drags it then, and
-  // the top of this page is document.
   useEffect(() => {
-    if (nativeToolbar) return undefined
     const handleWindowDragMouseDown = (event) => {
       if (event.button !== 0) return
       if (event.clientY > WINDOW_DRAG_STRIP_HEIGHT) return
@@ -260,17 +217,13 @@ export default function EditorLayout(props) {
 
     window.addEventListener('mousedown', handleWindowDragMouseDown, true)
     return () => window.removeEventListener('mousedown', handleWindowDragMouseDown, true)
-  }, [nativeToolbar])
+  }, [])
 
   // Track (and predict) fullscreen state so the layout can restyle its chrome.
   // macOS reports fullscreen late during the animation, so we also treat
   // near-monitor-sized windows and clicks on the green traffic-light button as
   // fullscreen, then re-sync with the real state once things settle.
-  //
-  // Under a real titlebar none of this applies — and the traffic-light hit box below
-  // would land on the toolbar's first buttons, flipping the chrome on ordinary clicks.
   useEffect(() => {
-    if (nativeWindowChrome) return undefined
     let cancelled = false
     let unlistenResize = null
     let settleTimeout = null
@@ -344,36 +297,31 @@ export default function EditorLayout(props) {
       window.removeEventListener('pointerdown', handleFullscreenButtonPointerDown, true)
       unlistenResize?.()
     }
-  }, [nativeWindowChrome])
+  }, [])
 
   useEffect(() => {
     pendingSearchTargetRef.current = pendingSearchTarget
   }, [pendingSearchTarget])
 
-  // Under the Swift shell the sidebar is native, so "show the notes tab" is a request
-  // to the shell rather than something this page can do.
   const openRightSidebarTab = useCallback((tab) => {
     setSidebarTab(tab)
-    if (nativeRightSidebar) {
-      documentSurface.publishShowSidebarTab({ tab })
-      return
-    }
     openRightSidebar()
-  }, [nativeRightSidebar, setSidebarTab, openRightSidebar])
+  }, [setSidebarTab, openRightSidebar])
 
-  // A panel the page asks for (a citation ⌥-clicked: References) comes up.
-  useBridgeEvent('showSidebarTab', ({ tab }) => { if (!nativeRightSidebar && tab) openRightSidebarTab(tab) })
+  // A panel something asks for (a citation ⌥-clicked: References; the Timer menu: Stats)
+  // comes up.
+  useBridgeEvent('showSidebarTab', ({ tab }) => { if (tab) openRightSidebarTab(tab) })
 
   // The toolbar's panel items: show a panel, or hide the inspector if it is showing.
   const rightOpen = !right.collapsed || right.peeked
   const togglePanel = useCallback((tab) => {
-    if (!nativeRightSidebar && rightOpen && props.sidebarTab === tab) {
+    if (rightOpen && props.sidebarTab === tab) {
       right.collapse()
       return
     }
     openRightSidebarTab(tab)
-  }, [nativeRightSidebar, rightOpen, props.sidebarTab, right, openRightSidebarTab])
-  useEffect(() => { setInspectorOpen(!nativeRightSidebar && rightOpen) }, [nativeRightSidebar, rightOpen])
+  }, [rightOpen, props.sidebarTab, right, openRightSidebarTab])
+  useEffect(() => { setInspectorOpen(rightOpen) }, [rightOpen])
   const toolbarPanel = useMemo(
     () => ({ tab: props.sidebarTab, open: rightOpen, toggle: togglePanel }),
     [props.sidebarTab, rightOpen, togglePanel]
@@ -573,17 +521,15 @@ export default function EditorLayout(props) {
     return () => window.removeEventListener('inkblot:import-script', onImport)
   }, [activeDoc, currentDoc, importOpen, importProject, importRefresh])
 
-  // The page's own Page Setup, for a shell that does not draw one (host.ts).
+  // File ▸ Page Setup….
   const [pageSetupOpen, setPageSetupOpen] = useState(false)
   useEffect(() => {
-    if (nativeOwns('pageSetup')) return undefined
     const open = () => setPageSetupOpen(true)
     window.addEventListener('inkblot:page-setup', open)
     return () => window.removeEventListener('inkblot:page-setup', open)
   }, [])
 
-  useNativeSidebar({
-    enabled: nativeRightSidebar,
+  useSidebarCommands({
     projectName: props.projectName,
     activeDoc,
     currentDoc,
@@ -667,13 +613,6 @@ export default function EditorLayout(props) {
 
   const sidebarResizing = left.resizing || right.resizing
 
-  // Under the Swift shell the formatting toolbar is native, in the window's own
-  // toolbar, and so is a canvas's: it takes the formatting toolbar's place while no
-  // card is being edited (NATIVE_CANVAS_TOOLBAR tells the canvas to publish its state
-  // rather than render it). The page still draws a toolbar row for a version
-  // comparison; otherwise the row collapses to nothing and the document starts right
-  // under the native toolbar.
-  const pageToolbarRow = !nativeToolbar || comparing
   // A canvas never draws its own toolbar: while no card is being edited it publishes
   // its state (NATIVE_CANVAS_TOOLBAR) and the canvas toolbar is drawn from that.
   const canvasToolbarTarget = comparing
@@ -681,19 +620,10 @@ export default function EditorLayout(props) {
     : (activeIsCanvas && !toolbarEditor ? NATIVE_CANVAS_TOOLBAR : null)
 
   // The page's clearance at the top (`--app-titlebar-height`, which documents scroll
-  // under). Under a native toolbar it is the toolbar's band, and a comparison's own row
-  // sits below that band (`--native-toolbar-inset` pads the row down).
-  const pageToolbarStyle = !nativeToolbar
-    ? (toolbarDisplay === 'iconAndLabel' ? { '--app-titlebar-height': '56px' } : undefined)
-    : pageToolbarRow
-      ? {
-          '--native-toolbar-inset': `${nativePanelInsets.top}px`,
-          '--app-titlebar-height': `calc(44px + ${nativePanelInsets.top}px)`,
-        }
-      : { '--app-titlebar-height': `${nativePanelInsets.top}px` }
+  // under): taller when the toolbar shows its labels.
+  const pageToolbarStyle = toolbarDisplay === 'iconAndLabel' ? { '--app-titlebar-height': '56px' } : undefined
 
   return (
-    <PanelInsetsContext.Provider value={nativePanelInsets}>
     <CanvasToolbarSlotContext.Provider value={canvasToolbarTarget}>
     <CompareToolbarSlotContext.Provider value={comparing ? compareToolbarSlot : null}>
     <div
@@ -710,10 +640,10 @@ export default function EditorLayout(props) {
           onClose={() => setPageSetupOpen(false)}
         />
       ) : null}
-      {customizingInspector && !nativeRightSidebar ? (
+      {customizingInspector ? (
         <InspectorLayoutEditor onClose={() => setCustomizingInspector(false)} />
       ) : null}
-      {pageToolbarRow ? <div
+      <div
         onContextMenu={comparing ? undefined : popUpToolbarMenu}
         className="app-titlebar"
         style={{
@@ -728,12 +658,12 @@ export default function EditorLayout(props) {
             the text Toolbar. */}
         {/* Show Sidebar and Show Inspector, while each is put away — the round
             buttons in a macOS window's toolbar. The pin in each sidebar puts it away. */}
-        {!nativeFileTree && left.collapsed && !left.peeked ? (
+        {left.collapsed && !left.peeked ? (
           <div className="titlebar-toggle is-left">
             <IconButton symbol="sidebar.left" label="Show Sidebar" size="circle" className="floating-capsule" onClick={left.pin} />
           </div>
         ) : null}
-        {!nativeRightSidebar && right.collapsed && !right.peeked ? (
+        {right.collapsed && !right.peeked ? (
           <div className="titlebar-toggle is-right">
             <IconButton symbol="sidebar.right" label="Show Inspector" size="circle" className="floating-capsule" onClick={right.pin} />
           </div>
@@ -741,7 +671,7 @@ export default function EditorLayout(props) {
         <div className="app-titlebar-toolbar">
           {comparing ? (
             <div className="canvas-toolbar-slot" ref={setCompareToolbarSlot} />
-          ) : !nativeToolbar && toolbarContext ? (
+          ) : toolbarContext ? (
             <ToolbarHost
               key={toolbarContext}
               context={toolbarContext}
@@ -755,17 +685,11 @@ export default function EditorLayout(props) {
             <div className="toolbar-placeholder" data-tauri-drag-region />
           )}
         </div>
-      </div> : null}
+      </div>
 
-      <div
-        className={`main-layout${activeUnderlays ? ' is-canvas-underlay' : ''}${nativeToolbar ? ' is-under-native-toolbar' : ''}`}
-        style={{
-          '--panel-inset-left': `${nativePanelInsets.leading}px`,
-          '--panel-inset-right': `${nativePanelInsets.trailing}px`,
-        }}
-      >
+      <div className={`main-layout${activeUnderlays ? ' is-canvas-underlay' : ''}`}>
 
-        {nativeFileTree ? null : <LeftSidebar
+        <LeftSidebar
           {...props}
           width={left.width}
           onResize={left.start}
@@ -775,7 +699,7 @@ export default function EditorLayout(props) {
           pinned={left.pinned}
           togglePin={left.togglePin}
           onAutoCollapse={left.collapse}
-        />}
+        />
 
         <EditorCanvas
           {...props}
@@ -783,7 +707,7 @@ export default function EditorLayout(props) {
           onExitFocusMode={() => setFocusModeOpen(false)}
         />
 
-        {nativeRightSidebar ? null : <RightSidebar
+        <RightSidebar
           width={right.width}
           onResize={right.start}
           resizing={right.resizing}
@@ -822,7 +746,7 @@ export default function EditorLayout(props) {
 
           refreshFiles={props.refreshFiles}
           onOpenDocInTab={props.onOpenDocInTab}
-        />}
+        />
 
         {bubbles.open ? (
           <BubbleEditor
@@ -832,17 +756,16 @@ export default function EditorLayout(props) {
           />
         ) : null}
 
-        {nativeNotePreviews ? null : <NoteHoverPreview
+        <NoteHoverPreview
           notesByDoc={props.notesByDoc}
           setNotesForDoc={props.setNotesForDoc}
           projectName={props.projectName}
-        />}
+        />
 
 
       </div>
     </div>
     </CompareToolbarSlotContext.Provider>
     </CanvasToolbarSlotContext.Provider>
-    </PanelInsetsContext.Provider>
   )
 }

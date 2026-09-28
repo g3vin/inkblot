@@ -38,15 +38,6 @@
   flex-direction: row-reverse;
 }
 
-/* Under the Swift shell each text pane's Print Layout toggle and zoom hold its own
-   bottom-right corner (PrintLayoutControls.swift), so every pane's badges keep to its
-   bottom-left, the right pane's included. */
-.native-print-controls .split-active:not(.split-rows) .secondary-pane .pane-status {
-  left: 10px;
-  right: auto;
-  flex-direction: row;
-}
-
 .pane-header-centered {
   display: flex;
   align-items: center;
@@ -78,13 +69,3 @@
   min-height: 100%;
 }
 
-/* Under the Swift shell the badge is drawn natively, as Liquid Glass, over this one —
-   which stays, invisible, to be measured (useEditorWordCount) — at the tab bar's
-   height, as the rest of the bottom row is (FileTreeSidebar.swift). */
-.native-word-count .word-count {
-  opacity: 0;
-  height: 24px;
-  padding: 0 10px;
-  font-size: 12px;
-  border-radius: 12px;
-}
