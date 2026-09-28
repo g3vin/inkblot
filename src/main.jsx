@@ -15,9 +15,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
-import { hydratePreferences } from './lib/preferences'
+import { getPreference, hydratePreferences } from './lib/preferences'
+import { setThemeAttribute } from './lib/theme'
 
 await hydratePreferences()
+setThemeAttribute(getPreference('inkblot-theme'))
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

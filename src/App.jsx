@@ -15,6 +15,7 @@ import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import './App.css'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
+import { resolveTheme, setThemeAttribute } from './lib/theme'
 import { documentSurface } from './bridge'
 import { isNativeShell, nativeOwns } from './lib/host'
 
@@ -141,12 +142,7 @@ export default function App() {
   const [showWordCountBadge, setShowWordCountBadge] = useState(true)
 
   // Resolve 'system' to the OS-reported light/dark preference.
-  const getResolvedTheme = useCallback((theme) => {
-    if (theme !== 'system') return theme
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light'
-  }, [])
+  const getResolvedTheme = useCallback((theme) => resolveTheme(theme), [])
 
   // Keep the native View-menu labels/checkmarks in sync with the active theme.
   const updateMenu = useCallback((theme) => {
@@ -165,19 +161,13 @@ export default function App() {
   const applyTheme = useCallback((theme) => {
     if (!theme) return
     currentThemeRef.current = theme
-    const root = document.documentElement
+    setThemeAttribute(theme)
 
     if (theme === 'system') {
-      root.removeAttribute('data-theme')
-      root.style.colorScheme = 'light dark'
       removePreference(THEME_STORAGE_KEY)
-      updateMenu(theme)
-      return
+    } else {
+      setPreference(THEME_STORAGE_KEY, theme)
     }
-
-    root.setAttribute('data-theme', theme)
-    root.style.colorScheme = theme
-    setPreference(THEME_STORAGE_KEY, theme)
     updateMenu(theme)
   }, [updateMenu])
 
@@ -381,6 +371,7 @@ export default function App() {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = () => {
       if (currentThemeRef.current === 'system') {
+        setThemeAttribute('system')
         updateMenu('system')
       }
     }

@@ -47,23 +47,6 @@
     0 6px 14px rgba(0, 0, 0, 0.35);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) :is(.pane-scroll.is-print-layout, .print-layout:not(.print-offscreen)) {
-    --pl-desk: #27292c;
-    --pl-paper: #0b0b0c;
-    --pl-ink: #e8ebee;
-    --pl-ink-secondary: #aab2ba;
-    --pl-running: #9ea6ae;
-    --pl-faint: rgba(255, 255, 255, 0.3);
-    --pl-blank: rgba(255, 255, 255, 0.25);
-    --pl-header: #c4cad0;
-    --pl-page-shadow:
-      0 0 0 0.5px rgba(0, 0, 0, 0.6),
-      0 2px 6px rgba(0, 0, 0, 0.5),
-      0 6px 14px rgba(0, 0, 0, 0.35);
-  }
-}
-
 /* The scroller itself is the desk, so it runs the pane's full height: up under the
    toolbar's glass (the scroller's titlebar padding), down past the last page, and
    through the rubber band at either end. */
@@ -112,11 +95,7 @@
 }
 
 .print-layout .pl-stage .bubble-session-chip {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 60%),
-    color-mix(in srgb, var(--accent-color) 30%, var(--pl-paper));
+  background: color-mix(in srgb, var(--accent-color) 30%, var(--pl-paper));
 }
 
 /* Mid-zoom the sizer is scaled as one composited layer (PrintLayoutView's zoom), so a
@@ -365,14 +344,13 @@
   height: 32px;
   box-sizing: border-box;
   padding: 0 6px;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--app-bg, #1e1e1e) 72%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
-  backdrop-filter: blur(16px) saturate(1.6);
-  box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.25),
-    0 2px 10px rgba(0, 0, 0, 0.15);
-  font: 500 12px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-pill);
+  background: var(--floating-over-page-bg);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
+  box-shadow: var(--shadow-1);
+  font: 500 12px/1 var(--font-ui);
   color: var(--text-primary, #ddd);
   user-select: none;
 }

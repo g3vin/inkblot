@@ -24,6 +24,7 @@
  */
 import { useEffect } from 'react'
 import { documentSurface } from '../bridge'
+import { NOTE_FALLBACK_COLOR } from '../lib/noteUtils'
 import {
   NOTE_HIGHLIGHT_EVENT,
   NOTE_PREVIEW_ENTER_EVENT,
@@ -89,7 +90,7 @@ const collectMarkers = () => {
     if (!rect) continue
     markers.push({
       noteId: String(marker.dataset.noteId || ''),
-      color: marker.style.getPropertyValue('--note-color') || '#007aff',
+      color: marker.style.getPropertyValue('--note-color') || NOTE_FALLBACK_COLOR,
       left: rect.left,
       top: rect.top,
       right: rect.right,

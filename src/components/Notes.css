@@ -3,7 +3,7 @@
    ============================================================ */
 
 .note-marker {
-  --note-color: #007aff;
+  --note-color: var(--note-fallback-color);
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -20,7 +20,7 @@
   display: inline-block;
   width: 8px;
   height: 8px;
-  background-color: var(--note-color, #007aff);
+  background-color: var(--note-color, var(--note-fallback-color));
   border-radius: 50%;
   margin-left: 2px;
   cursor: pointer;
@@ -95,8 +95,7 @@
   --card-edge-base: var(--popover-border);
 
   border: 1px solid var(--card-edge);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-tint) 96%, var(--app-bg)), var(--card-tint));
+  background: var(--card-tint);
   box-shadow: var(--shadow-popover);
   pointer-events: auto;
   cursor: default;
@@ -282,15 +281,15 @@
 }
 
 .note-range.is-hovered {
-  background-color: color-mix(in srgb, var(--note-color, #007aff) 24%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--note-color, #007aff) 34%, transparent);
+  background-color: color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 24%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 34%, transparent);
 }
 
 .note-range.is-active {
-  background-color: color-mix(in srgb, var(--note-color, #007aff) 32%, transparent);
+  background-color: color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 32%, transparent);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--note-color, #007aff) 44%, transparent),
-    0 6px 16px color-mix(in srgb, var(--note-color, #007aff) 16%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 44%, transparent),
+    0 6px 16px color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 16%, transparent);
 }
 
 .note-anchor {
@@ -303,7 +302,7 @@
  * --card-tint in index.css for the recipe and the reasoning.
  */
 .note-tile {
-  --note-color: #007aff;
+  --note-color: var(--note-fallback-color);
   --card-color: var(--note-color);
   --card-base: var(--tile-color);
   --card-edge-base: var(--sidebar-card-border);
@@ -726,9 +725,9 @@
   width: 188px;
   padding: 10px;
   border-radius: var(--floating-note-radius);
-  border: 1px solid var(--sidebar-floating-border);
-  background: var(--sidebar-floating-bg);
-  box-shadow: var(--sidebar-floating-shadow);
+  border: 1px solid var(--floating-note-border);
+  background: var(--floating-note-bg);
+  box-shadow: var(--floating-note-shadow);
   color: var(--text-primary);
 }
 
