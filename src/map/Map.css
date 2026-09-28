@@ -60,18 +60,6 @@
   --map-pin: #ff7a66;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .map-surface[data-map-theme='clean'] {
-    --map-ink: #eef1f6;
-    --map-land: #2e3a33;
-    --map-land-edge: #6f8a78;
-    --map-water: #16232e;
-    --map-border: rgba(210, 220, 230, 0.35);
-    --map-route: #f08a6c;
-    --map-pin: #ff7a66;
-  }
-}
-
 .map-surface[data-map-theme='parchment'] {
   --map-paper: #d8c8a2;
   --map-sheet: #efe2c1;
@@ -406,8 +394,7 @@
   border-radius: 12px;
   box-shadow: var(--shadow-popover);
   color: var(--map-ui-text);
-  font: 13px/1.35 -apple-system, system-ui, sans-serif;
-  backdrop-filter: blur(18px);
+  font: 13px/1.35 var(--font-ui);
 }
 
 .map-toolbar {
@@ -785,8 +772,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--surface-0) 80%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--scrim-bg);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
 }
 
 .map-setup-card {

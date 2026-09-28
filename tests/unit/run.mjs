@@ -59,6 +59,10 @@
  *          the tab bar drawn by the shell, driven over the bridge
  *   shim   the Tauri IPC shim the Swift shell injects: bytes, events, and menus, driven
  *          through the real @tauri-apps/api modules
+ *   css    the stylesheets keep to the design system: no decorative gradients, the
+ *          one blur token, no prefers-color-scheme duplicates
+ *   ui     the shared controls (src/ui): reorder and placement math, native menus,
+ *          and the controls mounted
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -77,7 +81,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapnative', 'tabs']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapnative', 'tabs', 'css', 'ui']
 
 const failures = []
 

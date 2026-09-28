@@ -485,13 +485,7 @@
   box-sizing: border-box;
   border: 1px dashed var(--accent-border);
   border-radius: 12px;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--accent-color) 20%, transparent),
-      color-mix(in srgb, var(--accent-color) 10%, transparent)
-    );
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent-color) 24%, transparent);
+  background: var(--accent-surface);
 }
 
 .conversation-drag-preview {
