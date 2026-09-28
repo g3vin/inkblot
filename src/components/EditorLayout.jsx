@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { resolveAnchor } from '../bridge/anchors'
-import { documentSurface, useBridgeState } from '../bridge'
+import { documentSurface, useBridgeEvent, useBridgeState, useLatestBridgeState } from '../bridge'
 import { EditorTarget } from '../types'
 
 /** A stable identity, so useBridgeState's initial value is not a new object each render. */
@@ -36,7 +36,6 @@ import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useEditorContextMenu } from '../hooks/useEditorContextMenu'
 import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
-import { useLatestBridgeState } from '../bridge'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
 import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
@@ -358,6 +357,9 @@ export default function EditorLayout(props) {
     }
     openRightSidebar()
   }, [nativeRightSidebar, setSidebarTab, openRightSidebar])
+
+  // A panel the page asks for (a citation ⌥-clicked: References) comes up.
+  useBridgeEvent('showSidebarTab', ({ tab }) => { if (!nativeRightSidebar && tab) openRightSidebarTab(tab) })
 
   // The toolbar's panel items: show a panel, or hide the inspector if it is showing.
   const rightOpen = !right.collapsed || right.peeked

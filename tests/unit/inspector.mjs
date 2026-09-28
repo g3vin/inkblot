@@ -114,4 +114,59 @@ await act(async () => [...container.querySelectorAll('button')].find((b) => b.te
 ok('Compare previews it beside the current typeset', typesetCommands[0]?.id === 'v2' && typesetCommands[0].compare === true)
 offPreview()
 
+/* ---------------- References ---------------- */
+
+const { referencePatch, visibleReferences } = await import('../../src/components/RightSidebar/references/referenceText.js')
+const ref = (id, extra = {}) => ({
+  id, kind: 'book', contributors: [{ role: 'author', family: 'Austen', given: 'Jane' }], fields: { title: `Book ${id}` },
+  annotation: '', note: '', tags: [], status: 'complete', candidates: [], createdAt: '', updatedAt: '', ...extra,
+})
+const viewOf = (reference, extra = {}) => ({ reference, entryHtml: `<i>${reference.fields.title}</i>`, entryText: reference.fields.title, inText: '(Austen)', missingFields: [], usedIn: [], attached: false, cited: false, ...extra })
+
+ok('a patch holds only what changed', JSON.stringify(referencePatch(ref('a'), { fields: { title: 'Book a', publisher: 'Murray ' }, contributors: ref('a').contributors, annotation: '', note: 'check' }))
+  === JSON.stringify({ fields: { publisher: 'Murray' }, note: 'check' }))
+ok('and is nothing when nothing did', referencePatch(ref('a'), { fields: { title: 'Book a' }, contributors: ref('a').contributors, annotation: '', note: '' }) === null)
+ok('an unnamed contributor is dropped', referencePatch(ref('a'), { fields: { title: 'Book a' }, contributors: [...ref('a').contributors, { role: 'editor', family: '', given: '' }], annotation: '', note: '' }) === null)
+
+const refState = {
+  docPath: 'Essay.md', style: 'apa', projectStyle: 'apa',
+  bibliography: { include: 'cited', annotated: false, inPrint: true }, hasBibliography: false,
+  references: [viewOf(ref('a'), { attached: true, cited: true }), viewOf(ref('b'))],
+}
+ok('This Document shows the document’s sources, Project every one',
+  visibleReferences(refState, 'document').length === 1 && visibleReferences(refState, 'project').length === 2)
+
+const { default: ReferencesPanel } = await import('../../src/components/RightSidebar/references/ReferencesPanel.jsx')
+await act(async () => root.render(React.createElement(ReferencesPanel)))
+await act(async () => {
+  documentSurface.publishReferenceSchema({ kinds: [{ id: 'book', label: 'Book', group: 'Books', symbol: 'book', fields: [{ key: 'title', label: 'Title', placeholder: '', input: 'text', required: true }], roles: ['author'] }], roles: [{ id: 'author', label: 'Author' }], styles: [{ id: 'apa', label: 'APA 7th edition', short: 'APA', heading: 'References', notes: false }] })
+  documentSurface.publishReferencesChanged(refState)
+})
+// The list is coalesced to one per frame.
+await act(async () => { await new Promise((resolve) => setTimeout(resolve, 60)) })
+ok('the panel lists what the page publishes, this document’s by default', container.querySelectorAll('.reference-row').length === 1)
+ok('with its formatted entry and its badges', container.querySelector('.reference-entry-text i')?.textContent === 'Book a' && container.textContent.includes('Cited'))
+ok('and the style', container.querySelector('.references-style')?.textContent.includes('APA'))
+await act(async () => [...container.querySelectorAll('[role="radio"]')].find((b) => b.textContent === 'Project').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('Project shows every source', container.querySelectorAll('.reference-row').length === 2)
+
+const refCommands = []
+const offs = ['addReference', 'insertCitation', 'setBibliographyOptions', 'insertBibliography'].map((type) => documentSurface.onCommand(type, (payload) => refCommands.push({ type, payload })))
+const quick = container.querySelector('.references-quick-add input')
+await act(async () => {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+  setter.call(quick, '10.1000/xyz123')
+  quick.dispatchEvent(new Event('input', { bubbles: true }))
+})
+await act(async () => quick.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+ok('Return in the field adds what was typed, to this document', refCommands[0]?.type === 'addReference' && refCommands[0].payload.input === '10.1000/xyz123' && refCommands[0].payload.docPath === 'Essay.md' && refCommands[0].payload.cite === false)
+await act(async () => container.querySelector('.reference-row [aria-label="Cite"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('Cite cites it at the caret', refCommands.at(-1).type === 'insertCitation' && refCommands.at(-1).payload.refIds[0] === 'a')
+await act(async () => container.querySelector('.references-bibliography [aria-label="Annotated"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('the bibliography’s options are the document’s', refCommands.at(-1).type === 'setBibliographyOptions' && refCommands.at(-1).payload.options.annotated === true && refCommands.at(-1).payload.docPath === 'Essay.md')
+offs.forEach((off) => off())
+
+await act(async () => container.querySelector('.reference-entry').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('a click on an entry opens its details, as its kind asks for them', !!container.querySelector('.reference-editor [aria-label="Title"]'))
+
 await act(async () => root.unmount())

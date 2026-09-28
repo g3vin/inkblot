@@ -17,7 +17,6 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { documentSurface } from '../bridge'
-import { nativeOwns } from '../lib/host'
 import { collectCitations, setCitationContext } from '../extensions/Citation'
 import { CITATION_REVEAL_EVENT } from '../extensions/citationPopover'
 import { isTextDoc } from '../lib/docKind'
@@ -89,7 +88,6 @@ export async function lookUp(projectName, id, input) {
 }
 
 export function useReferences({ projectName, activeDoc, panes }) {
-  const native = nativeOwns('rightSidebar')
   const [library, setLibrary] = useState(EMPTY_LIBRARY)
   const [settingsByDoc, setSettingsByDoc] = useState({})
   const [citedByDoc, setCitedByDoc] = useState({})
@@ -196,13 +194,13 @@ export function useReferences({ projectName, activeDoc, panes }) {
 
   /* ---------------- 2. the panel ---------------- */
 
+  // Published always: the References panel draws from these, whichever shell it is in.
   useEffect(() => {
-    if (!native) return
     documentSurface.publishReferenceSchema({ kinds: publishedKinds(), roles: CONTRIBUTOR_ROLES, styles: publishedStyles() })
-  }, [native])
+  }, [])
 
   useEffect(() => {
-    if (!native || !projectName) return undefined
+    if (!projectName) return undefined
     let alive = true
     const settings = (docPath && settingsByDoc[docPath]) || null
     const style = styleSpec(settings?.style || library.defaultStyle).id
@@ -242,7 +240,7 @@ export function useReferences({ projectName, activeDoc, panes }) {
       })
     })
     return () => { alive = false }
-  }, [native, projectName, docPath, library, settingsByDoc, citedByDoc])
+  }, [projectName, docPath, library, settingsByDoc, citedByDoc])
 
   const citeInActive = useCallback((refIds, locator) => {
     const pane = (panesRef.current || []).find((candidate) => candidate.path === docPath) || panesRef.current?.[0]
@@ -318,12 +316,10 @@ export function useReferences({ projectName, activeDoc, panes }) {
     const onReveal = (event) => {
       const id = event?.detail?.refId
       if (!id) return
-      if (native) {
-        documentSurface.publishShowSidebarTab({ tab: 'references' })
-        documentSurface.publishRevealReference({ id })
-      }
+      documentSurface.publishShowSidebarTab({ tab: 'references' })
+      documentSurface.publishRevealReference({ id })
     }
     window.addEventListener(CITATION_REVEAL_EVENT, onReveal)
     return () => window.removeEventListener(CITATION_REVEAL_EVENT, onReveal)
-  }, [native])
+  }, [])
 }
