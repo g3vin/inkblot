@@ -216,6 +216,46 @@ await act(async () => { shellBridge.send('setPrintScope', { scope: 'project' }) 
 await act(async () => { await wait(30) })
 ok('the scope crosses the bridge and switches the book to the project\'s', lastState().scope === 'project' && lastState().book.folder === '')
 await act(async () => { shellBridge.send('setPrintScope', { scope: 'document' }) })
+await act(async () => { await wait(60) })
+
+/* ---------------- the Typeset and Print & Export tabs, drawn from it ---------------- */
+{
+  installGlobals(dom.window, ['KeyboardEvent', 'MouseEvent', 'getComputedStyle'])
+  const { TypesetPanel, OutputPanel } = await import('../../src/components/RightSidebar/finishing/FinishingPanels.jsx')
+  const panelHost = document.body.appendChild(document.createElement('div'))
+  const panelRoot = createRoot(panelHost)
+  let showedOutput = false
+  await act(async () => { panelRoot.render(React.createElement(TypesetPanel, { onShowOutput: () => { showedOutput = true } })) })
+  const titles = () => [...panelHost.querySelectorAll('.ui-section-title')].map((node) => node.textContent)
+  ok('the Typeset tab draws its sections from the published state',
+    ['Book', 'Editions', 'Style', 'Format', 'Page', 'Body Text', 'Proof', 'Chapter Openings', 'Header & Footer', 'Title Page'].every((t) => titles().includes(t)))
+  ok('with no Print and Export in its header', !panelHost.querySelector('.fin-header .ui-button[data-variant="filled"]'))
+  const toggle = (label) => [...panelHost.querySelectorAll('.fin-toggle-row')].find((row) => row.textContent.trim() === label)?.querySelector('input')
+  await act(async () => { toggle('Set Type for Print').click() })
+  await act(async () => { await wait(220) })
+  ok('Set Type for Print sets the document’s type', Boolean(editor.state.doc.attrs.pageSetup?.typography))
+  ok('and the section offers the type’s controls', !!panelHost.querySelector('[aria-label="Line Spacing"]'))
+  const format = panelHost.querySelector('select[aria-label="Format"]')
+  await act(async () => {
+    format.value = 'trade-6x9'
+    format.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await act(async () => { await wait(220) })
+  ok('choosing a format applies it to the document', editor.state.doc.attrs.pageSetup?.presetId === 'trade-6x9')
+  await act(async () => { [...panelHost.querySelectorAll('button')].find((b) => b.textContent.startsWith('Next: Print')).click() })
+  ok('Next goes on to Print & Export', showedOutput)
+
+  await act(async () => { panelRoot.render(React.createElement(OutputPanel)) })
+  ok('Print & Export has Publishing, Cover and Hand Binding',
+    ['Publishing', 'Cover', 'Hand Binding'].every((t) => titles().includes(t)))
+  ok('and Print and Export in its header', !!panelHost.querySelector('.fin-header .ui-button[data-variant="filled"]'))
+  await act(async () => { toggle('Print for Hand Binding').click() })
+  await act(async () => { await wait(60) })
+  ok('Print for Hand Binding turns binding on for the book', store.getBookSettings('P', 'Novel').binding.binding === 'signatures')
+  ok('and the binding’s options appear', !!panelHost.querySelector('select[aria-label="Signature"]'))
+  await act(async () => { panelRoot.unmount() })
+  panelHost.remove()
+}
 
 await act(async () => { root.unmount() })
 editor.destroy()

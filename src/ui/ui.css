@@ -318,3 +318,21 @@
   box-shadow: var(--shadow-2);
   transform: translate(-50%, -50%);
 }
+
+/* ---------------- small icon and link buttons, in panels ---------------- */
+
+.reference-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.reference-icon-button:hover { background: var(--hover-bg); border-color: transparent; color: var(--text-primary); }
+.reference-link { margin: 0 0 0 auto; padding: 0; border: 0; background: none; color: var(--accent-foreground); font: 11px var(--font-ui); cursor: pointer; }
