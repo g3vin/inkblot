@@ -61,6 +61,41 @@ export function useBridgeState<T extends EventType>(
   return box.value as EventPayload<T>
 }
 
+/*
+ * The last payload of every event kind, for a component that mounts after the event
+ * it renders was sent — the toolbar switching to a canvas's items, the inspector
+ * opening on a panel. Events are not replayed to late subscribers, so without this a
+ * control would show its defaults until the state next changed.
+ */
+const latestEvents = new Map<string, unknown>()
+let recordingLatest = false
+const recordLatest = () => {
+  if (recordingLatest) return
+  recordingLatest = true
+  shellBridge.onAny((event) => { latestEvents.set(event.type, (event as { payload?: unknown }).payload) })
+}
+recordLatest()
+
+/** The last payload an event kind carried, if one has been sent. */
+export function latestBridgeEvent<T extends EventType>(type: T): EventPayload<T> | undefined {
+  return latestEvents.get(type) as EventPayload<T> | undefined
+}
+
+/**
+ * `useBridgeState`, starting from the last payload already sent rather than `initial`
+ * when there is one.
+ */
+export function useLatestBridgeState<T extends EventType>(
+  type: T,
+  initial: EventPayload<T>
+): EventPayload<T> {
+  const [box, setBox] = useState<{ value: unknown }>(() => ({
+    value: latestEvents.has(type) ? latestEvents.get(type) : initial,
+  }))
+  useBridgeEvent(type, (payload) => setBox({ value: payload }))
+  return box.value as EventPayload<T>
+}
+
 /**
  * Announce a live editor for a target, for as long as this component is mounted.
  *

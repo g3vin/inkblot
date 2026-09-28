@@ -44,8 +44,8 @@ export function useNativeTabs({
     })
   }, [enabled, tabs, activeTabId])
 
+  // Commands are always answered: the web toolbar and tab bar send them in-process.
   useEffect(() => {
-    if (!enabled) return undefined
     const act = () => latest.current.actions
     const offs = [
       documentSurface.onCommand('selectTab', ({ tabId }) => act().selectTab(tabId)),
@@ -65,5 +65,5 @@ export function useNativeTabs({
       documentSurface.onCommand('closeSplit', () => act().closeSplit()),
     ]
     return () => { for (const off of offs) off() }
-  }, [enabled])
+  }, [])
 }

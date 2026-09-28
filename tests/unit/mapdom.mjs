@@ -27,6 +27,11 @@ const React = (await import('react')).default
 const { act, StrictMode } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const MapPane = (await import('../../src/map/MapPane.jsx')).default
+const ToolbarHost = (await import('../../src/components/toolbar/ToolbarHost.jsx')).default
+const { documentSurface } = await import('../../src/bridge/index.ts')
+const { mapDelegates } = await import('../../src/bridge/mapDelegates.ts')
+// As EditorCanvas installs them: a map command finds its map by surface id.
+documentSurface.setDelegates({ ...mapDelegates })
 const { createEmptyMap, makePin, serializeMap } = await import('../../src/lib/map/mapModel.js')
 const { files } = await import('./stub-fs.mjs')
 
@@ -39,7 +44,9 @@ const path = (rel) => `/appdata/${P}/${rel}.json`
 const mount = async (docPath) => {
   const root = createRoot(document.getElementById('root'))
   await act(async () => {
+    // The map's tools are the titlebar toolbar's, drawn from what the map publishes.
     root.render(React.createElement(StrictMode, null,
+      React.createElement(ToolbarHost, { context: 'map', hasProject: true }),
       React.createElement(MapPane, { projectName: P, docPath, onActivate: () => {}, onOpenDoc: () => {} })))
   })
   await settle()
@@ -65,7 +72,7 @@ const surface = () => document.querySelector('.map-surface')
 ok('the surface mounts', !!surface() && !surface().classList.contains('is-loading'))
 ok('the svg is there', !!document.querySelector('svg.map-svg'))
 ok('both places render', pins().length === 2)
-ok('the tool bar renders', !!document.querySelector('[role="toolbar"][aria-label="Map tools"]'))
+ok('the tool bar renders', !!document.querySelector('[role="toolbar"][data-context="map"]'))
 ok('a finished map does not ask what it is', !document.querySelector('.map-setup'))
 
 /* ---- place a pin with the tool bar ---- */

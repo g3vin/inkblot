@@ -106,10 +106,11 @@ export function useNativeSidebar({
     return () => window.removeEventListener('versions:changed', onVersionsChanged)
   }, [enabled])
 
-  /* ---------------- applying the shell's edits ---------------- */
+  /* ---------------- applying edits ---------------- */
 
+  // Always listening: the web chrome (the toolbar's Snapshot, the inspector panels)
+  // sends the same commands in-process as the shell did over the wire.
   useEffect(() => {
-    if (!enabled) return undefined
     const state = () => latest.current
 
     /** The live editor holding `docPath`, for the actions that need the current text. */
@@ -272,5 +273,5 @@ export function useNativeSidebar({
       }),
     ]
     return () => { for (const off of offs) off() }
-  }, [enabled])
+  }, [])
 }

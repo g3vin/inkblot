@@ -695,7 +695,7 @@ const nativeCommand = (type, payload, seq = nativeSeq++) =>
 }
 
 /* ------------------------------------------------------------------
-   The Toolbar, mounted.
+   The Toolbar, mounted (the document toolbar, drawn from its default layout).
 
    A component nothing mounts can throw on every render while lint, tsc and
    the production build all pass. The Toolbar has no other coverage, so it is
@@ -713,7 +713,7 @@ const nativeCommand = (type, payload, seq = nativeSeq++) =>
   const { act } = await import('react')
   const React = (await import('react')).default
   const { createRoot } = await import('react-dom/client')
-  const Toolbar = (await import(`${C}/components/Toolbar.jsx`)).default
+  const Toolbar = (await import(`${C}/components/toolbar/ToolbarHost.jsx`)).default
   const { documentSurface, editorRegistry } = await import(`${C}/bridge/index.ts`)
 
   const editor = makeEditor()
@@ -726,7 +726,7 @@ const nativeCommand = (type, payload, seq = nativeSeq++) =>
 
   let mountError = null
   try {
-    await act(async () => { root.render(React.createElement(Toolbar, { editor })) })
+    await act(async () => { root.render(React.createElement(Toolbar, { context: 'document', editor, hasProject: true })) })
   } catch (error) {
     mountError = error
   }

@@ -26,11 +26,24 @@ const React = (await import('react')).default
 const { act, StrictMode } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const CanvasSurface = (await import('../../src/canvas/CanvasSurface.jsx')).default
-const { CanvasToolbarSlotContext } = await import('../../src/canvas/canvasToolbarSlot.js')
+const { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } = await import('../../src/canvas/canvasToolbarSlot.js')
+const ToolbarHost = (await import('../../src/components/toolbar/ToolbarHost.jsx')).default
+const { documentSurface } = await import('../../src/bridge/index.ts')
+const { canvasDelegates } = await import('../../src/bridge/canvasDelegates.ts')
+// As EditorCanvas installs them: a canvas command finds its canvas by surface id.
+documentSurface.setDelegates({ ...canvasDelegates })
 const { createEmptyCanvas, makeTextNode } = await import('../../src/lib/canvasModel.js')
 
 import { ok } from './assert.mjs'
-const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 40)) })
+// Two frames and then some: the canvas syncs its zoom to React on one, and the
+// bridge coalesces what it publishes to the next.
+const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 80)) })
+// A wheel gesture is committed once it has been still for 120ms (useCanvasViewport),
+// and what that commits is published on the frame after.
+const settleGesture = async () => {
+  await act(async () => { await new Promise((r) => setTimeout(r, 160)) })
+  await settle()
+}
 
 const state = createEmptyCanvas()
 const card = makeTextNode({ x: 0, y: 0, text: 'hello' })
@@ -39,13 +52,10 @@ state.nodeOrder.push(card.id)
 
 const root = createRoot(document.getElementById('root'))
 
-// The canvas toolbar renders in the titlebar, not over the canvas: CanvasSurface
-// portals it into the element published through CanvasToolbarSlotContext, and
-// renders no toolbar at all when that slot is null. So the slot has to exist here,
-// or every toolbar assertion below reads an absent button.
-const toolbarSlot = document.createElement('div')
-document.body.appendChild(toolbarSlot)
-
+// The canvas toolbar is drawn from what the active canvas publishes: the slot says
+// "publish" (NATIVE_CANVAS_TOOLBAR), and the titlebar's ToolbarHost renders the canvas
+// toolbar from `canvasToolbarChanged` and sends its buttons back as canvas commands.
+// Both are mounted, so every assertion below crosses the bridge the app uses.
 await act(async () => {
   root.render(
     React.createElement(
@@ -53,7 +63,8 @@ await act(async () => {
       null,
       React.createElement(
         CanvasToolbarSlotContext.Provider,
-        { value: toolbarSlot },
+        { value: NATIVE_CANVAS_TOOLBAR },
+        React.createElement(ToolbarHost, { context: 'canvas', hasProject: true }),
         React.createElement(CanvasSurface, {
           projectName: 'P',
           docPath: 'x.canvas',
@@ -69,9 +80,8 @@ await act(async () => {
 await settle()
 
 const surface = () => document.querySelector('.canvas-surface')
-const readout = () => document.querySelector('.canvas-toolbar-zoom')?.textContent
-// CanvasToolbar's controls are bare <button type="button"> elements — they carry an
-// aria-label and a title, but no shared class — so match on the label alone.
+const readout = () => document.querySelector('.tb-zoom-readout')?.textContent
+// The toolbar's controls carry an aria-label, so match on the label alone.
 const button = (label) =>
   [...document.querySelectorAll('button')].find(
     (b) => b.getAttribute('aria-label') === label
@@ -83,13 +93,13 @@ ok('the zoom readout starts at 100%', readout() === '100%')
 /* ---- the readout must actually track the zoom ---- */
 
 await act(async () => {
-  button('Zoom in').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  button('Zoom In').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
 await settle()
 ok('zoom in updates the readout under StrictMode', readout() === '120%')
 
 await act(async () => {
-  button('Zoom out').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  button('Zoom Out').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
 await settle()
 ok('zoom out updates the readout', readout() === '100%')
@@ -102,18 +112,18 @@ const wheel = (init) => {
 }
 
 await act(async () => { surface().dispatchEvent(wheel({ deltaY: -100, ctrlKey: true })) })
-await settle()
+await settleGesture()
 const zoomed = readout()
 ok('ctrl-wheel zooms and moves the readout', zoomed !== '100%')
 
 // A plain wheel pans. It must NOT change the zoom — and it must not stall the
 // readout either, which is the thing the stale-frame bug actually broke.
 await act(async () => { surface().dispatchEvent(wheel({ deltaY: 60 })) })
-await settle()
+await settleGesture()
 ok('a plain wheel pans without changing zoom', readout() === zoomed)
 
 await act(async () => {
-  button('Zoom in').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  button('Zoom In').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
 await settle()
 ok('the readout still responds after many frames', readout() !== zoomed)
@@ -138,15 +148,15 @@ ok('ports render after the resize zones (so they stay grabbable)', firstPort > l
 // connected, so the chrome that advertises those gestures must not be there at all.
 const lockButton = () =>
   [...document.querySelectorAll('button')].find((b) =>
-    (b.getAttribute('aria-label') || '').startsWith('Lock canvas')
+    (b.getAttribute('aria-label') || '').startsWith('Lock for Reading')
   )
 const unlockButton = () =>
   [...document.querySelectorAll('button')].find((b) =>
-    (b.getAttribute('aria-label') || '').startsWith('Unlock canvas')
+    (b.getAttribute('aria-label') || '').startsWith('Unlock Canvas')
   )
 
 ok('the canvas starts unlocked', !!lockButton() && !unlockButton())
-ok('an unlocked canvas offers Add card', !!button('Add card'))
+ok('an unlocked canvas offers Add Card', !!button('Add Card') && !button('Add Card').disabled)
 
 await act(async () => {
   lockButton().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
@@ -159,7 +169,7 @@ ok('read mode removes the resize zones', document.querySelectorAll('.canvas-resi
 ok('read mode removes the connection ports', document.querySelectorAll('.canvas-port').length === 0)
 // The editing tools go away entirely rather than sitting there dead.
 ok('read mode hides Add card', !button('Add card'))
-ok('read mode keeps zoom', !!button('Zoom in'))
+ok('read mode keeps zoom', !!button('Zoom In'))
 
 // A card's scrollable region must be findable by the wheel handler, which is what
 // lets a Pinterest board scroll instead of panning the canvas.
@@ -172,7 +182,7 @@ await act(async () => {
 await settle()
 
 ok('unlocking restores the resize zones', document.querySelectorAll('.canvas-resize-handle').length === 8)
-ok('unlocking restores Add card', !!button('Add card'))
+ok('unlocking restores Add Card', !button('Add Card').disabled)
 
 /* Touch. A finger on the empty canvas pans; the Pencil does what the mouse
    does; a second finger ends the first one's pan, because two fingers are a pinch. */
