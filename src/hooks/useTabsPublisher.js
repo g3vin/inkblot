@@ -1,11 +1,10 @@
 /**
- * useNativeTabs — the page's side of a tab bar the shell draws.
+ * useTabsPublisher — the open tabs, as the tab bar reads them.
  *
- * The tabs stay `useTabs`'s. While the shell owns them (`nativeOwns('tabBar')`) this
- * publishes them, each with its split, whenever any of it changes, and turns the
- * shell's commands back into `useTabs`'s calls: select, close, reorder, a new draft
- * tab, a document in a new tab or a window of its own, and the active tab's split
- * opened, turned or closed.
+ * The tabs stay `useTabs`'s. This publishes them (`tabsChanged`), each with its split,
+ * whenever any of it changes, and turns the tab bar's and the menus' commands back
+ * into `useTabs`'s calls: select, close, reorder, a new draft tab, a document in a
+ * new tab or a window of its own, and the active tab's split opened, turned or closed.
  *
  * Commands name tabs by id. One that names a tab already gone (closed a moment before
  * the command arrived) does nothing, as the calls themselves do.
@@ -24,8 +23,7 @@ const toWireTab = (tab) => {
   }
 }
 
-export function useNativeTabs({
-  enabled,
+export function useTabsPublisher({
   projectName,
   tabs,
   activeTabId,
@@ -37,14 +35,12 @@ export function useNativeTabs({
   })
 
   useEffect(() => {
-    if (!enabled) return
     documentSurface.publishTabsChanged({
       tabs: (tabs || []).map(toWireTab),
       ...(activeTabId ? { activeTabId } : {}),
     })
-  }, [enabled, tabs, activeTabId])
+  }, [tabs, activeTabId])
 
-  // Commands are always answered: the web toolbar and tab bar send them in-process.
   useEffect(() => {
     const act = () => latest.current.actions
     const offs = [

@@ -1,11 +1,10 @@
 /**
- * mapnative — a map under a shell that draws its toolbar and inspector (`mapChrome`).
+ * mapchrome — a map's toolbar and inspector, drawn from what it publishes.
  *
- * The page must stop drawing both, publish them as `mapChromeChanged` while the map
- * is active and withdraw them when it goes, and take every click back by id: a tool
- * chosen, a place picked from the list, a name typed, the way back, a tab, undo. The
- * shell says it draws them the way the Swift app does, through
- * `window.__inkblotNative.chrome`, and talks over the in-process wire.
+ * The map draws neither itself: it publishes them as `mapChromeChanged` while it is
+ * active and withdraws them when it goes, and takes every click back by id — a tool
+ * chosen, a place picked from the list, a name typed, the way back, a tab, undo — over
+ * the in-process wire the toolbar and the inspector's Map tab use.
  *
  * It also pins down the form builder's commit rules, which both inspectors rely on.
  */
@@ -23,14 +22,6 @@ globalThis.ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {
 const rect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 })
 dom.window.Element.prototype.getBoundingClientRect = rect
 dom.window.HTMLElement.prototype.focus = function () {}
-
-/* ---------------- the shell ---------------- */
-
-// Only what `nativeOwns` reads. The suites share one bridge, built in process by
-// whichever imported it first, so the shell's end here is the in-process one: the same
-// protocol, round-tripped through JSON, that the Swift app's messages cross.
-const nativeHost = { chrome: ['mapChrome'], post() {}, listen: () => () => {} }
-dom.window.__inkblotNative = nativeHost
 
 const React = (await import('react')).default
 const { act, StrictMode } = await import('react')
@@ -96,7 +87,6 @@ const command = async (name, detail) => {
 
 ok('the map mounts', !!document.querySelector('.map-surface:not(.is-loading)'))
 ok('the page draws no tool bar', !document.querySelector('[role="toolbar"][aria-label="Map tools"]'))
-ok('the page draws no inspector', !document.querySelector('.map-inspector'))
 
 /* ---------------- it publishes them ---------------- */
 
@@ -186,4 +176,3 @@ ok('a closed map leaves no chrome behind', !chromes().at(-1).state)
 }
 
 stopListening()
-delete dom.window.__inkblotNative

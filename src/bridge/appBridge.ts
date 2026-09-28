@@ -10,22 +10,16 @@
  * view is not in the React tree at all, and both need the same bridge the toolbar is
  * on.
  *
- * **Which transport.** In the Tauri app and the test harness both ends are in this
- * process (`createInProcessTransports`). Inside the Swift shell the transports come
- * from `createNativeHostTransports`, which puts the native shell on the wire *beside*
- * the React chrome: both drive the same surface. This file is the only place that
- * knows which; nothing that imports from here has to.
+ * **Which transport.** Both ends are in this process (`createInProcessTransports`).
+ * This file is the only place that knows; nothing that imports from here has to.
  */
-import { createInProcessTransports, createNativeHostTransports, detectNativeHost } from './transport'
+import { createInProcessTransports } from './transport'
 import { createShellBridge, createSurfaceBridge } from './client'
 import { createEditorRegistry } from './editorRegistry'
 import { createDocumentSurface } from './surface'
 import { setDocChangeSink } from './docChangeSink'
 
-const nativeHost = detectNativeHost()
-const transports = nativeHost
-  ? createNativeHostTransports(nativeHost)
-  : createInProcessTransports()
+const transports = createInProcessTransports()
 
 /** The shell's end. The chrome sends commands and listens for events on this. */
 export const shellBridge = createShellBridge(transports.shell)

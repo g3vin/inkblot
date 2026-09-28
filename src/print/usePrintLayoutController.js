@@ -18,7 +18,6 @@ import { useCallback, useEffect, useRef } from 'react'
 
 import { documentSurface } from '../bridge'
 import { isTextDoc } from '../lib/docKind'
-import { nativeOwns } from '../lib/host'
 import { importAssetFromPath } from '../lib/assets'
 import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { countEditorWords } from '../lib/wordCount'
@@ -430,13 +429,6 @@ export default function usePrintLayoutController({
     documentSurface.publishPageLayoutCatalog(PAGE_LAYOUT_CATALOG)
   }, [])
 
-  // The shell draws the Print Layout button and zoom control; the page leaves room.
-  useEffect(() => {
-    if (!nativeOwns('printControls')) return undefined
-    document.documentElement.classList.add('native-print-controls')
-    return () => document.documentElement.classList.remove('native-print-controls', 'print-layout-active')
-  }, [])
-
   // Publish on every change to what the Finishing tabs show.
   useEffect(() => {
     publish()
@@ -793,12 +785,9 @@ export default function usePrintLayoutController({
     const onToggle = (event) => togglePrintLayout(undefined, event?.detail?.docPath)
     const onPrintEvent = (event) => stateRef.current.onPrint?.({ scope: 'document', bound: false, ...(event.detail || {}) })
     const onExportEvent = (event) => stateRef.current.onExport?.({ scope: 'document', bound: false, ...(event.detail || {}) })
-    // ⌥⌘P toggles pages, as it does in Word; ⌘P prints, which a WKWebView otherwise
-    // ignores. A shell that draws the Finishing tabs puts both in its menus, keys and
-    // all — handling them here as well would print twice.
+    // ⌥⌘P toggles pages, as it does in Word; ⌘P prints.
     const onKeyDown = (event) => {
       if (!event.metaKey || event.ctrlKey || event.shiftKey || event.code !== 'KeyP') return
-      if (nativeOwns('pageSetup')) return
       event.preventDefault()
       if (event.altKey) togglePrintLayout()
       else stateRef.current.onPrint?.({ scope: 'document', bound: false })

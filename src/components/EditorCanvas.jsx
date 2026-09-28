@@ -30,7 +30,6 @@ import { useSurfacePublisher } from '../bridge/useSurfacePublisher'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
-import { nativeOwns } from '../lib/host'
 import CanvasPane from '../canvas/CanvasPane'
 import MapPane from '../map/MapPane'
 import { useEditorAutosave } from '../hooks/useEditorAutosave'
@@ -608,7 +607,7 @@ export default function EditorCanvas({
   const showDraftPane = draftTabActive && !currentDoc
   // A split pane names its document above it, with a × to close it — unless the shell
   // draws the tabs, whose split tab names both documents, the first pane's first.
-  const paneHeaders = splitView === 'editor' && !nativeOwns('tabBar') && !tabBarShown
+  const paneHeaders = splitView === 'editor' && !tabBarShown
   const primaryPaneOwnsFocus = primaryIsStructured || showDraftPane
 
   // The divider is a track in the split grid, so the two panes are sized by the
@@ -659,7 +658,7 @@ export default function EditorCanvas({
 
   return (
     <div className="middle-section">
-      {nativeOwns('tabBar') ? null : <DocumentTabBar activeDoc={currentDoc} />}
+      <DocumentTabBar activeDoc={currentDoc} />
       <div ref={splitContainerRef} className={`editor-container${splitClassName}`} style={splitStyle}>
 
         <div

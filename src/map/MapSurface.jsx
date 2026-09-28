@@ -12,7 +12,6 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { documentSurface } from '../bridge'
-import { nativeOwns } from '../lib/host'
 import { getDocDisplayName, isMapDoc } from '../lib/docKind'
 import { isCharacterDoc } from '../lib/storyStructure'
 import { createProjector } from '../lib/map/mapProjection'
@@ -802,7 +801,6 @@ export default function MapSurface({
    * one — the other pane's map became active — or goes away. Only a change is sent:
    * panning re-renders the map on every frame and changes nothing the chrome shows.
    */
-  const nativeChrome = nativeOwns('mapChrome')
   // Always published: the web toolbar draws the map's tools from it too.
   const publishing = isActive || chromeWhileInactive
   const lastChromeRef = useRef(null)
@@ -869,7 +867,7 @@ export default function MapSurface({
   // The map's own floating panel: only while the window's inspector is shut. With it
   // open the panel is the inspector's Map tab (MapInspectorPanel), from what is published.
   const windowInspector = useInspectorOpen()
-  const pageInspector = !nativeChrome && !windowInspector && inspectorOpen
+  const pageInspector = !windowInspector && inspectorOpen
 
   return (
     <div
@@ -916,7 +914,7 @@ export default function MapSurface({
 
       <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} />
 
-      {!nativeChrome && !windowInspector && !inspectorOpen ? (
+      {!windowInspector && !inspectorOpen ? (
         <button
           type="button"
           className="map-floating map-inspector-toggle"
@@ -931,8 +929,6 @@ export default function MapSurface({
       {hint ? (
         <div
           className="map-floating map-hint"
-          // Under the page's toolbar, or at the top of what the shell's glass leaves.
-          style={nativeChrome ? { top: box.top + 12, left: box.left + box.width / 2 } : undefined}
         >
           {hint}
         </div>

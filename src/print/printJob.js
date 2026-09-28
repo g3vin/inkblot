@@ -9,17 +9,13 @@
  *    same extensions, CSS and width, then paginated synchronously.
  * 3. Cut the pages out (printRender.js) and, for binding, impose them onto sheets.
  * 4. Put them in #print-root, which is all the print stylesheet shows, and ask the
- *    shell to print the web view on paper of exactly that size, with no margins.
- *
- * The Swift shell prints on a `printRequest` event and reports back with a
- * `printFinished` command. The Tauri shell prints through `print_webview`.
+ *    Tauri app to print the web view on paper of exactly that size, with no margins
+ *    (`print_webview`).
  */
 import { invoke } from '@tauri-apps/api/core'
 import { Editor } from '@tiptap/core'
 import { StarterKit } from '@tiptap/starter-kit'
 
-import { documentSurface } from '../bridge'
-import { isNativeShell } from '../lib/host'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { withPrintBibliography } from '../lib/references/printBibliography'
 import { assetUrl, isAssetPath } from '../lib/assets'
@@ -181,13 +177,6 @@ const enqueue = (run) => {
   return job
 }
 
-const pendingFinish = new Map()
-
-documentSurface.onCommand('printFinished', ({ jobId, completed }) => {
-  pendingFinish.get(jobId)?.(completed)
-  pendingFinish.delete(jobId)
-})
-
 const clearPrintRoot = () => {
   document.getElementById(PRINT_ROOT_ID)?.remove()
   document.getElementById(PAGE_STYLE_ID)?.remove()
@@ -207,28 +196,13 @@ const mountPrintRoot = (elements, widthPx, heightPx) => {
   return root
 }
 
-/** Ask the shell to print what #print-root holds. Resolves when the shell is done with it. */
-const requestHostPrint = ({ jobId = newJobId(), jobName, widthPx, heightPx, pdfPath }) => {
-  const request = {
-    jobId,
-    jobName,
-    paperWidthPt: pxToPt(widthPx),
-    paperHeightPt: pxToPt(heightPx),
-    pdfPath: pdfPath || undefined,
-  }
-  if (isNativeShell()) {
-    return new Promise((resolve) => {
-      pendingFinish.set(jobId, resolve)
-      documentSurface.publishPrintRequest(request)
-    })
-  }
-  return invoke('print_webview', {
-    jobName: request.jobName,
-    paperWidthPt: request.paperWidthPt,
-    paperHeightPt: request.paperHeightPt,
-    pdfPath: request.pdfPath ?? null,
-  }).then(() => true)
-}
+/** Print what #print-root holds. Resolves once the print sheet is done with it. */
+const requestHostPrint = ({ jobName, widthPx, heightPx, pdfPath }) => invoke('print_webview', {
+  jobName,
+  paperWidthPt: pxToPt(widthPx),
+  paperHeightPt: pxToPt(heightPx),
+  pdfPath: pdfPath || null,
+}).then(() => true)
 
 const guideSheet = (imposition, widthPx, heightPx, title) => {
   const sheet = document.createElement('div')
@@ -751,13 +725,11 @@ const runJob = ({ jobId = newJobId(), kind, format, pdfPath, prepare }) => enque
       heightPx: prepared.heightPx,
       pdfPath,
     })
-    // The Swift shell says when it is done; the Tauri print sheet does not, so its
-    // print root stays (hidden on screen) until the next job replaces it.
-    if (isNativeShell()) clearPrintRoot()
+    // The print sheet does not say when it is done with the pages, so the print root
+    // stays (hidden on screen) until the next job replaces it.
     report(completed ? 'done' : 'cancelled', completed && pdfPath ? { path: pdfPath } : {})
     return completed
   } catch (error) {
-    if (isNativeShell()) clearPrintRoot()
     report('failed', { message: describeError(error) })
     throw error
   }

@@ -33,7 +33,6 @@ import { countEditorWords } from '../lib/wordCount'
 import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, snapToDevicePixel, ZOOM_STEPS } from './zoom'
 import { PAGE_GAP } from './printLayoutConstants'
 import { setCurrentPrintPage } from './printLayoutStore'
-import { nativeOwns } from '../lib/host'
 import TypesetOverlay from './TypesetOverlay'
 import { notesBySlot, pageNotesOf } from './notes'
 import { bleedPicturesOf } from './bleed'
@@ -544,15 +543,13 @@ export default function PrintLayoutView({
   }
 
   const pageCount = Math.max(result.pageCount, 1)
-  // Beside the word count, in the pane's status row; drawn as glass under the Swift
-  // shell, which measures it with the word count (it is a `.word-count` too).
+  // Beside the word count, in the pane's status row.
   const pageCountBadge = (
     <div className="word-count floating-capsule pl-page-count-badge">
       Page {Math.min(currentPage, pageCount)} of {pageCount}
     </div>
   )
-  // Under the Swift shell the zoom control is native (PrintLayoutControls.swift).
-  const zoomBar = nativeOwns('printControls') ? null : (
+  const zoomBar = (
     <div className="pl-status" role="toolbar" aria-label="Zoom">
       <button type="button" onClick={() => stepZoom(-1)} aria-label="Zoom out" title="Zoom out (⌘−)">−</button>
       <select
@@ -571,9 +568,7 @@ export default function PrintLayoutView({
         {ZOOM_STEPS.map((s) => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}
       </select>
       <button type="button" onClick={() => stepZoom(1)} aria-label="Zoom in" title="Zoom in (⌘+)">+</button>
-      {nativeOwns('pageSetup') ? null : (
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} title="Page Setup">Page Setup…</button>
-      )}
+      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} title="Page Setup">Page Setup…</button>
     </div>
   )
   const pageCountHost = statusHost?.querySelector(':scope > .pane-status') || null

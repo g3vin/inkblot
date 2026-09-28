@@ -1,12 +1,12 @@
 /**
- * The right sidebar, drawn by the shell: what the page publishes, and what it does
- * with the shell's edits.
+ * The inspector's edits, as commands (hooks/useSidebarCommands.js): what the page does
+ * with each.
  *
  * Driven through the app's real bridge (`shellBridge` → `documentSurface`), so every
- * message crosses the JSON-copying transport — a payload the shell could not receive,
- * or a command the page would silently ignore, fails here. The state is the page's own
- * (notes, clipboard, tiles, versions on disk through the stubbed filesystem), and each
- * edit is checked against what the React panel does with it.
+ * message crosses the JSON-copying transport — a command the page would silently
+ * ignore fails here. The state is the page's own (notes, clipboard, tiles, versions on
+ * disk through the stubbed filesystem), and each edit is checked against what the
+ * React panel does with it.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -21,11 +21,8 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const React = (await import('react')).default
 const { act, useState, useCallback } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { useNativeSidebar } = await import('../../src/hooks/useNativeSidebar.js')
-const { useNativeNotePreviews } = await import('../../src/hooks/useNativeNotePreviews.js')
-const { NOTE_PREVIEW_ENTER_EVENT, NOTE_PREVIEW_PIN_EVENT } = await import('../../src/extensions/NoteAnnotation.js')
+const { useSidebarCommands } = await import('../../src/hooks/useSidebarCommands.js')
 const { shellBridge } = await import('../../src/bridge/index.ts')
-const drag = await import('../../src/bridge/recentSelectionDrag.ts')
 const { saveDocument, getVersions } = await import('../../src/lib/FileSystem.js')
 const { appendVersionEntry, buildTextVersionEntry } = await import('../../src/lib/FileSystem.js')
 
@@ -35,26 +32,10 @@ const frame = () => act(async () => {
   await new Promise((resolve) => setTimeout(resolve, 10))
 })
 
-/* ---------------- the ended-drag memory (pure) ---------------- */
-
-drag.rememberEndedSelectionDrag({ text: 'she hesitated', from: 3, to: 16 }, 1000)
-ok('a drop of the same text claims the drag that just ended',
-  drag.claimEndedSelectionDrag('she hesitated', 1500)?.from === 3)
-ok('once — a second drop is an ordinary add', drag.claimEndedSelectionDrag('she hesitated', 1600) === null)
-drag.rememberEndedSelectionDrag({ text: 'she hesitated', from: 3, to: 16 }, 1000)
-ok('different text does not claim it', drag.claimEndedSelectionDrag('something else', 1100) === null)
-drag.rememberEndedSelectionDrag({ text: 'she hesitated', from: 3, to: 16 }, 1000)
-ok('and a stale one is let go', drag.claimEndedSelectionDrag('she hesitated', 9000) === null)
-
 /* ---------------- harness ---------------- */
 
 const P = 'Sidebar'
 const control = { drops: [], searchTargets: [], compares: [] }
-const heard = {
-  notesChanged: [], clipboardChanged: [], tilesChanged: [], versionsChanged: [],
-  noteMarkerHover: [], noteMarkerPin: [], noteMarkerMoved: [], notePreviewDismissed: [],
-}
-for (const type of Object.keys(heard)) shellBridge.on(type, (payload) => heard[type].push(payload))
 
 const initialNotes = [
   { id: 'n1', type: 'quote', anchor: 'the door', content: 'root', color: '#007aff', pinned: false,
@@ -88,8 +69,7 @@ function Harness() {
 
   Object.assign(control, { notesByDoc, clipboardHistory, tiles })
 
-  useNativeSidebar({
-    enabled: true,
+  useSidebarCommands({
     projectName: P,
     activeDoc: 'one',
     currentDoc: 'one',
@@ -109,7 +89,6 @@ function Harness() {
     onOpenDocInTab: () => {},
     openSearchTarget: (target) => control.searchTargets.push(target),
   })
-  useNativeNotePreviews({ enabled: true })
   return null
 }
 
@@ -117,26 +96,16 @@ const root = createRoot(document.getElementById('root'))
 await act(async () => { root.render(React.createElement(Harness)) })
 await frame()
 
-/* ---------------- publishing ---------------- */
-
-ok('the active document\'s notes are published', heard.notesChanged.at(-1)?.notes.length === 3)
-ok('the clipboard history is published', heard.clipboardChanged.at(-1)?.entries[1].text === 'copied twice')
-const wireTiles = heard.tilesChanged.at(-1)?.tiles || []
-ok('tiles are published with string ids — the page\'s are timestamps',
-  wireTiles[0]?.id === '1758556800000' && typeof wireTiles[0]?.id === 'string')
-ok('and an untyped tile is the POS tile it has always rendered as', wireTiles[1]?.type === 'pos')
-
 /* ---------------- notes ---------------- */
 
 await act(async () => {
-  shellBridge.send('updateNote', { docPath: 'one', noteId: 'n1', patch: { content: 'edited natively', pinned: true } })
+  shellBridge.send('updateNote', { docPath: 'one', noteId: 'n1', patch: { content: 'edited by command', pinned: true } })
 })
 await frame()
 const edited = control.notesByDoc.one.find((note) => note.id === 'n1')
-ok('a patch edits the note', edited.content === 'edited natively' && edited.pinned === true)
+ok('a patch edits the note', edited.content === 'edited by command' && edited.pinned === true)
 ok('and touches its timestamp, as the React panel does', edited.updatedAt !== 'a')
-ok('without losing a key the shell cannot see', edited.futureKey === 'kept')
-ok('and the change is published back', heard.notesChanged.at(-1)?.notes.find((n) => n.id === 'n1')?.content === 'edited natively')
+ok('without losing a key it does not know', edited.futureKey === 'kept')
 
 const before = control.notesByDoc.one.find((note) => note.id === 'n3').updatedAt
 await act(async () => {
@@ -155,12 +124,8 @@ ok('jumping to a note goes through the page\'s own search-target path',
 
 /* ---------------- clipboard ---------------- */
 
-drag.rememberEndedSelectionDrag({ text: 'dragged out', from: 5, to: 16, source: 'primary' })
-await act(async () => { shellBridge.send('clipboardDrop', { text: 'dragged out' }) })
-ok('a native drop of the selection being dragged is a move',
-  control.drops.at(-1)?.fromEditorSelection === true && control.drops.at(-1)?.selection?.from === 5)
 await act(async () => { shellBridge.send('clipboardDrop', { text: 'from another app' }) })
-ok('a drop of anything else is an ordinary add', control.drops.at(-1)?.fromEditorSelection === false)
+ok('a dropped text is added to the clipboard', control.drops.at(-1)?.text === 'from another app')
 
 await act(async () => { shellBridge.send('removeClipboardEntries', { ids: ['c1'] }) })
 ok('removing one entry leaves the rest', control.clipboardHistory.map((e) => e.id).join() === 'c2')
@@ -181,7 +146,6 @@ const stored = await appendVersionEntry(P, 'one', buildTextVersionEntry({
   contentHtml: '<p>draft</p>', contentJson: null, auto: true,
 }))
 await frame()
-ok('a history write is announced to the shell', heard.versionsChanged.some((e) => e.docPath === 'one'))
 
 await act(async () => {
   shellBridge.send('renameVersion', { docPath: 'one', versionId: String(stored.id), name: 'First Draft' })
@@ -215,7 +179,7 @@ await act(async () => {
 })
 ok('a canvas match names the node', control.searchTargets.at(-1)?.nodeId === 'card-1')
 
-/* ---------------- glass hover previews ---------------- */
+/* ---------------- hover cards ---------------- */
 
 await act(async () => {
   shellBridge.send('updateNote', { docPath: 'one', noteId: 'n3', patch: { previewLayout: { offsetX: 40, offsetY: -12 } } })
@@ -226,62 +190,9 @@ ok('dragging a hover card stores its layout without touching the note\'s timesta
 
 await act(async () => { shellBridge.send('addReply', { docPath: 'one', parentNoteId: 'n3' }) })
 const reply = control.notesByDoc.one.find((note) => note.parentNoteId === 'n3')
-// Unplaced: a zero layout, which the shell hangs below the parent as it draws it.
-ok('addReply makes an empty free note under the parent, left for the shell to place',
+// Unplaced: a zero layout, which the card hangs below its parent as it draws it.
+ok('addReply makes an empty free note under the parent, placed where it is drawn',
   reply && reply.type === 'free' && reply.content === ''
     && reply.previewLayout.offsetX === 0 && reply.previewLayout.offsetY === 0)
-
-// A marker in the page, where NoteAnnotation would have put one.
-const marker = document.createElement('span')
-marker.className = 'note-marker'
-marker.dataset.noteId = 'n3'
-marker.getBoundingClientRect = () => ({ left: 100, top: 200, right: 108, bottom: 216, width: 8, height: 16 })
-document.body.appendChild(marker)
-
-await act(async () => {
-  window.dispatchEvent(new CustomEvent(NOTE_PREVIEW_ENTER_EVENT, {
-    detail: {
-      note: { ...control.notesByDoc.one.find((note) => note.id === 'n3'), docName: 'one' },
-      anchorRect: { left: 100, top: 200, right: 108, bottom: 216, width: 8, height: 16 },
-      editorView: { not: 'serializable', self: null },
-    },
-  }))
-})
-const hover = heard.noteMarkerHover.at(-1)
-ok('a marker hover reaches the shell with the marker\'s rect',
-  hover?.noteId === 'n3' && hover.docPath === 'one' && hover.anchorLeft === 100 && hover.anchorBottom === 216)
-ok('and without the live EditorView NoteAnnotation still attaches', !('editorView' in hover))
-ok('or the docName it tacks onto the note', hover.note && !('docName' in hover.note))
-
-marker.getBoundingClientRect = () => ({ left: 100, top: 150, right: 108, bottom: 166, width: 8, height: 16 })
-await act(async () => { document.body.dispatchEvent(new dom.window.Event('scroll')) })
-// Two frames: one for the hook's own read of the marker, one for the coalescer.
-await frame()
-await frame()
-ok('scrolling moves the open card\'s anchor', heard.noteMarkerMoved.at(-1)?.anchorTop === 150)
-
-await act(async () => {
-  window.dispatchEvent(new CustomEvent(NOTE_PREVIEW_PIN_EVENT, {
-    detail: { note: { id: 'n3', docName: 'one' }, anchorRect: { left: 100, top: 150, right: 108, bottom: 166, width: 8, height: 16 } },
-  }))
-})
-ok('a click on the marker pins it', heard.noteMarkerPin.at(-1)?.noteId === 'n3')
-
-await act(async () => { marker.dispatchEvent(new dom.window.Event('pointerdown', { bubbles: true })) })
-ok('a press on the marker itself is not a dismissal', heard.notePreviewDismissed.length === 0)
-await act(async () => { document.body.dispatchEvent(new dom.window.Event('pointerdown', { bubbles: true })) })
-ok('a press anywhere else in the page dismisses the card', heard.notePreviewDismissed.at(-1)?.noteId === 'n3')
-
-await act(async () => {
-  window.dispatchEvent(new CustomEvent(NOTE_PREVIEW_ENTER_EVENT, {
-    detail: { note: { id: 'n3', docName: 'one' }, anchorRect: { left: 1, top: 1, right: 2, bottom: 2, width: 1, height: 1 } },
-  }))
-})
-marker.remove()
-const dismissedBefore = heard.notePreviewDismissed.length
-await act(async () => { document.body.dispatchEvent(new dom.window.Event('scroll')) })
-await frame()
-ok('a card whose marker has gone from the page is dismissed',
-  heard.notePreviewDismissed.length === dismissedBefore + 1)
 
 await act(async () => { root.unmount() })
