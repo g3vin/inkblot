@@ -147,3 +147,26 @@ ok('a folder keeps its name verbatim', at(actOne, { siblings: [actOne] }).label 
 const bare = deriveFileNodeState(chapterOne)
 ok('an empty context is safe', bare.isFolder === false && bare.siblingIndex === -1)
 ok('and draws no indicators', !bare.showInsertSlot && !bare.showInsertAfterLast)
+
+/* ---------------- the filter bar (TreeFilterTests.swift) ---------------- */
+{
+  const { applyTreeFilter, EMPTY_FILTER, folderPaths } = await import('../../src/lib/treeFilter.ts')
+  const file = (path) => ({ type: 'file', name: path.split('/').pop(), path })
+  const folder = (path, children) => ({ type: 'folder', name: path.split('/').pop() ?? '', path, children })
+  const paths = (node) => (node?.children ?? []).flatMap((child) => [child.path, ...paths(child)])
+  const root = folder('', [
+    folder('essays', [file('essays/Draft'), file('essays/Board.canvas'), file('essays/Shire.map')]),
+    folder('empty', []),
+    file('Notes'),
+  ])
+  const filter = (patch, recent = []) => paths(applyTreeFilter(root, { ...EMPTY_FILTER, ...patch }, recent)).join()
+  ok('filter: nothing filtered leaves the tree alone', applyTreeFilter(root, EMPTY_FILTER, []) === root)
+  ok('filter: text keeps matches and the folders they are in', filter({ text: 'draft' }) === 'essays,essays/Draft')
+  ok('filter: a matching folder keeps its contents', filter({ text: 'ess' }) === 'essays,essays/Draft,essays/Board.canvas,essays/Shire.map')
+  ok('filter: canvases', filter({ kind: 'canvases' }) === 'essays,essays/Board.canvas')
+  ok('filter: maps', filter({ kind: 'maps' }) === 'essays,essays/Shire.map')
+  ok('filter: documents', filter({ kind: 'documents' }) === 'essays,essays/Draft,Notes')
+  ok('filter: recent only', filter({ recentOnly: true }, ['Notes']) === 'Notes')
+  ok('filter: case and accents are ignored', filter({ text: 'NÖTES' }) === 'Notes')
+  ok('filter: a filtered tree opens every folder', [...folderPaths(root)].sort().join() === ',empty,essays')
+}
