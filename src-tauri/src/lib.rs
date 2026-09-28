@@ -29,6 +29,7 @@ mod preferences_commands;
 mod print_commands;
 mod reference_commands;
 mod rhyme_commands;
+mod stats_commands;
 mod synonym_commands;
 mod webview_commands;
 
@@ -49,6 +50,11 @@ use preferences_commands::{
     preferences_load, preferences_remove, preferences_rename_prefix, preferences_set,
 };
 use rhyme_commands::{download_rhyme_dictionary, get_rhymes, rhyme_dictionary_status, RhymeState};
+use stats_commands::{
+    project_word_counts, stats_config, stats_daily, stats_move_entry, stats_record_session,
+    stats_record_timer_run, stats_rename_entry, stats_rename_project, stats_reset, stats_sessions,
+    stats_set_config, stats_timer_runs, stats_totals,
+};
 use synonym_commands::{download_synonym_model, get_synonyms, synonym_model_status, SynonymState};
 use webview_commands::{eval_webview, get_webview_url, navigate_webview};
 
@@ -103,6 +109,19 @@ pub fn run() {
             pinterest_await_scrape,
             print_commands::print_webview,
             reference_commands::fetch_text,
+            stats_record_session,
+            stats_sessions,
+            stats_daily,
+            stats_totals,
+            stats_rename_entry,
+            stats_move_entry,
+            stats_rename_project,
+            stats_reset,
+            stats_record_timer_run,
+            stats_timer_runs,
+            stats_config,
+            stats_set_config,
+            project_word_counts,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");
