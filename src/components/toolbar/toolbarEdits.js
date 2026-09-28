@@ -37,3 +37,22 @@ const clampIndex = (index, length) => Math.max(0, Math.min(Number.isFinite(index
 
 /** Items the palette dims: those already in the toolbar, which can appear only once. */
 export const inToolbar = (items, id) => !isSpacer(id) && items.includes(id)
+
+/** The » button's width, and the gap before it. */
+const OVERFLOW_ROOM = 36
+
+/**
+ * How many of the toolbar's slots fit, from the front: all of them, or as many as
+ * leave room for the » that holds the rest, as an NSToolbar does. Flexible spaces
+ * give way first — they take no room of their own.
+ */
+export function fittingCount(widths, available, gap) {
+  const total = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, widths.length - 1)
+  if (total <= available) return widths.length
+  let used = 0
+  for (let i = 0; i < widths.length; i += 1) {
+    used += widths[i] + (i ? gap : 0)
+    if (used > available - OVERFLOW_ROOM) return i
+  }
+  return widths.length
+}

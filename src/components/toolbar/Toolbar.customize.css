@@ -172,3 +172,24 @@ body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
 .tb-timer { display: inline-flex; align-items: center; gap: 5px; padding: 0 2px; color: var(--accent-foreground); }
 .tb-timer[data-state='paused'] { color: var(--text-muted); }
 .tb-timer-clock { font: 600 12px var(--font-ui); font-variant-numeric: tabular-nums; min-width: 34px; text-align: left; }
+
+/* ---------------- overflow ---------------- */
+
+/* Out of the row's flow, so the row keeps its width, but still measured. */
+.tb-slot[data-overflowed='true'] { position: absolute; visibility: hidden; pointer-events: none; }
+.tb-overflow {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 16px/1 var(--font-ui);
+  cursor: pointer;
+}
+.tb-overflow:hover, .tb-overflow[aria-expanded='true'] { background: var(--hover-bg); color: var(--text-primary); }
+.tb-overflow-popover { padding: var(--space-2); }
+.tb-overflow-list.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); max-width: 360px; height: auto; padding: 0; margin: 0; justify-content: flex-start; }

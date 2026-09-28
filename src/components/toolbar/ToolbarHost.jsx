@@ -12,7 +12,7 @@
  * open the toolbar's items become tokens that drag to reorder, and off the toolbar to
  * remove.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import '../Toolbar.css'
 import './Toolbar.customize.css'
@@ -23,6 +23,8 @@ import usePointerReorder from '../../ui/usePointerReorder'
 import useToolbarLayout from './useToolbarLayout'
 import { applyToolbarDrop } from './toolbarEdits'
 import ToolbarPalette from './ToolbarPalette'
+import Popover from '../../ui/Popover'
+import { fittingCount } from './toolbarEdits'
 
 export default function ToolbarHost({ context, editor, activeDoc, hasProject, panel, split, timer }) {
   const { items, display, setItems, reset, setDisplay } = useToolbarLayout(context)
@@ -47,6 +49,29 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
       setItems(applyToolbarDrop(items, { source, inside, index }))
     },
   })
+
+  // What fits, measured from the slots' own widths; the rest goes behind ».
+  const [fitting, setFitting] = useState(Infinity)
+  const [overflowOpen, setOverflowOpen] = useState(false)
+  const overflowRef = useRef(null)
+  useLayoutEffect(() => {
+    const row = listRef.current
+    if (!row || customizing) { setFitting(Infinity); return undefined }
+    const measure = () => {
+      const slots = [...row.querySelectorAll(':scope > .tb-slot')]
+      const widths = slots.map((slot) => (slot.classList.contains('is-flexible') ? 0 : slot.offsetWidth))
+      const style = getComputedStyle(row)
+      const gap = parseFloat(style.columnGap) || 0
+      const available = row.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)
+      const next = fittingCount(widths, available, gap)
+      setFitting((was) => (was === next ? was : next))
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(measure)
+    observer.observe(row)
+    return () => observer.disconnect()
+  }, [customizing, items, display, context])
 
   const draggingIndex = drag.dragging && String(drag.dragging).startsWith('t:') ? Number(String(drag.dragging).slice(2)) : null
   const ghostLabel = drag.dragging
@@ -77,6 +102,8 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
           <div
             key={`${id}:${index}`}
             className={`tb-slot${isSpacer(id) ? ' is-spacer' : ''}${id === FLEXIBLE_SPACE ? ' is-flexible' : ''}`}
+            data-overflowed={position >= fitting ? 'true' : undefined}
+            aria-hidden={position >= fitting ? 'true' : undefined}
             data-reorder-id={customizing ? `t:${index}` : undefined}
             onPointerDown={customizing ? (event) => drag.onPointerDown(event, `t:${index}`) : undefined}
             onClickCapture={customizing ? (event) => { event.preventDefault(); event.stopPropagation() } : undefined}
@@ -86,7 +113,28 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
           </div>
         ))}
         {caretAt !== null && caretAt >= shown.length ? <span className="tb-caret-line is-end" aria-hidden="true" /> : null}
+        {fitting < shown.length ? (
+          <button
+            ref={overflowRef}
+            type="button"
+            className="tb-overflow"
+            aria-label="More toolbar items"
+            aria-haspopup="dialog"
+            aria-expanded={overflowOpen}
+            title="More"
+            onClick={() => setOverflowOpen((open) => !open)}
+          >
+            »
+          </button>
+        ) : null}
       </div>
+      <Popover anchorRef={overflowRef} open={overflowOpen && fitting < shown.length} onClose={() => setOverflowOpen(false)} align="end" className="tb-overflow-popover">
+        <div className="toolbar tb-overflow-list" data-display={display} role="toolbar" aria-label="More toolbar items">
+          {shown.slice(fitting).filter(({ id }) => !isSpacer(id)).map(({ id, index }) => (
+            <div key={`${id}:${index}`} className="tb-slot"><ToolbarItem id={id} ctx={ctx} /></div>
+          ))}
+        </div>
+      </Popover>
       {customizing ? (
         <ToolbarPalette
           context={context}
