@@ -48,6 +48,13 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
 2. Fill in the pull request template.
 3. Merge with a merge commit, so the branch's history stays readable, and delete the branch.
 
+## Design
+
+Every user-facing change follows the design language in [docs/DESIGN.md](docs/DESIGN.md):
+build from `src/ui/` and the tokens in `src/styles/tokens.css`, never hard-code a
+colour, font, radius or shadow, and register new actions with the command palette.
+`npm run dev` then `?design` shows every token and component in both themes.
+
 ## Code style
 
 - **Lint clean.** `npm run lint` must report 0 errors and 0 warnings. Format Rust with

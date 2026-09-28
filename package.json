@@ -20,6 +20,7 @@
     "test": "node --experimental-loader ./tests/unit/loader.mjs tests/unit/run.mjs",
     "test:layout": "node tests/layout/run.mjs",
     "lint": "eslint .",
+    "lint:design": "node scripts/lint-design.mjs",
     "typecheck": "tsc --noEmit",
     "parity": "node --experimental-loader ./tests/unit/loader.mjs tests/parity/run.mjs",
     "types": "./scripts/generate-types.sh",

@@ -1,7 +1,7 @@
 /**
  * DesignShowcase.jsx — every token and primitive on one page. Dev only.
  *
- * Open the dev server with `?design` (http://localhost:1420/?design). Use it to check a
+ * Open the dev server with `?design` (http://localhost:5173/?design). Use it to check a
  * change to src/styles or src/ui in both themes before it ships, and as the visual
  * companion to docs/DESIGN.md.
  */

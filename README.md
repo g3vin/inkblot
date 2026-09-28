@@ -80,6 +80,7 @@ Run these before every commit, and the Swift ones as well when you touch `native
 |---|---|---|
 | `npm test` | 28 suites under `tests/unit/`, in jsdom, mounting real components | A component that throws on every render: lint, tsc and the build all pass on it |
 | `npm run lint` | ESLint, including the React Compiler rules. The bar is 0 errors and 0 warnings | A ref written during render |
+| `npm run lint:design` | No new raw colours, fonts, radii or shadows outside `src/styles/tokens.css` (a per-file ratchet; see [docs/DESIGN.md](docs/DESIGN.md#14-guardrails)) | A hard-coded hex that ignores the theme |
 | `npm run typecheck` | `tsc --noEmit` over the TypeScript | |
 | `npm run build` | The Vite production build | Bad dynamic imports, and named imports a module does not export |
 | `npm run parity` | One corpus (about 17,000 cases) through both the JS and the Rust implementation of every mirrored function | Float, rounding and string-semantics drift between JS and Rust |
