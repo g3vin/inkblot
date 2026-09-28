@@ -108,13 +108,13 @@
 .sidebar-search-field {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid var(--sidebar-card-border);
-  background: var(--tile-color);
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  gap: var(--space-3);
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: var(--control-bg);
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
 .sidebar-search-field:focus-within {

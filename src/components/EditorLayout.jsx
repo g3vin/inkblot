@@ -106,8 +106,8 @@ const WINDOW_DRAG_BLOCKER_SELECTOR = [
 ].join(',')
 
 export default function EditorLayout(props) {
-  const left = useResizableSidebar(200, 180, 300, 'left')
-  const right = useResizableSidebar(300, 280, 500, 'right')
+  const left = useResizableSidebar(220, 200, 340, 'left')
+  const right = useResizableSidebar(300, 260, 520, 'right')
   const { setSidebarTab } = props
   // Use splitView/secondaryDoc from props (managed at top-level `Editor`) to avoid
   // shadowing state and keep all parts of the UI in sync.
