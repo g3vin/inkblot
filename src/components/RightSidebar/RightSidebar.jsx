@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useReducedMotion } from 'framer-motion'
 import InspectorHeader from './InspectorHeader'
+import MapInspectorPanel from './MapInspectorPanel'
 import { hasActiveWheelPhase, hasEndedWheelPhase, hasMomentumPhase } from '../../lib/wheelPhase'
 import { sidebarTabsFor } from './sidebarTabsConfig'
 import useInspectorLayout from './useInspectorLayout'
@@ -124,6 +125,17 @@ export default function RightSidebar({
     setTab: setSidebarTab,
   })
   const tabs = useMemo(() => sidebarTabsFor(inspector.tabs), [inspector.tabs])
+
+  // A map asking for its panel (a label just placed, an item double-clicked) brings
+  // the Map tab up.
+  const mapChrome = useLatestBridgeState('mapChromeChanged', null)
+  const revealPanel = mapChrome?.state?.revealPanel ?? 0
+  const lastRevealRef = useRef(revealPanel)
+  useEffect(() => {
+    if (revealPanel === lastRevealRef.current) return
+    lastRevealRef.current = revealPanel
+    if (revealPanel) setSidebarTab('map')
+  }, [revealPanel, setSidebarTab])
   const tabIds = useMemo(() => tabs.map(({ id }) => id), [tabs])
   const activeTabIndex = Math.max(0, tabIds.indexOf(sidebarTab))
 
@@ -751,6 +763,8 @@ export default function RightSidebar({
         />
       )
     }
+
+    if (tabId === 'map') return <MapInspectorPanel />
 
     if (tabId !== 'history') {
       const spec = inspectorTab(tabId)

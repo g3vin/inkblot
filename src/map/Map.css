@@ -18,7 +18,8 @@
   min-height: 0;
 }
 
-.map-surface {
+.map-surface,
+.map-inspector-panel {
   --map-inv-zoom: 1;
   --map-paper: var(--surface-0);
   --map-sheet: var(--surface-1);
@@ -38,7 +39,9 @@
   --map-ui-border: var(--popover-border);
   --map-ui-text: var(--text-primary);
   --map-ui-muted: var(--text-muted);
+}
 
+.map-surface {
   position: relative;
   flex: 1;
   min-height: 0;
@@ -831,3 +834,19 @@
   color: var(--text-muted);
   line-height: 1.5;
 }
+
+/* The map's panel as the inspector's Map tab: the same view, laid in the sidebar. */
+.map-inspector-panel {
+  height: 100%;
+  color: var(--text-primary);
+}
+.map-inspector-panel .map-inspector {
+  position: static;
+  width: auto;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.map-inspector-panel .map-inspector-header [aria-label='Hide the inspector'] { display: none; }

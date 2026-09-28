@@ -28,6 +28,7 @@ import { earthLevelFor } from './mapRender'
 import { MAP_TOOLS, TOOL_HINTS, formatZoom } from './mapOptions'
 import MapPanelView from './MapPanelView'
 import SFIcon from '../components/SFIcon'
+import { useInspectorOpen } from '../lib/inspectorPresence'
 import { useMapPanel } from './inspector/useMapPanel'
 import { runPanelCommand } from './inspector/panelBuilder'
 import MapTimeline from './MapTimeline'
@@ -865,8 +866,10 @@ export default function MapSurface({
   const hint = TOOL_HINTS[tool]
     ? draft?.tool === tool && draft.nodes.length ? TOOL_HINTS[`${tool}-drawing`] || TOOL_HINTS[tool] : TOOL_HINTS[tool]
     : null
-  // The page's inspector, when it draws one: only under Tauri.
-  const pageInspector = !nativeChrome && inspectorOpen
+  // The map's own floating panel: only while the window's inspector is shut. With it
+  // open the panel is the inspector's Map tab (MapInspectorPanel), from what is published.
+  const windowInspector = useInspectorOpen()
+  const pageInspector = !nativeChrome && !windowInspector && inspectorOpen
 
   return (
     <div
@@ -913,7 +916,7 @@ export default function MapSurface({
 
       <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} />
 
-      {!nativeChrome && !inspectorOpen ? (
+      {!nativeChrome && !windowInspector && !inspectorOpen ? (
         <button
           type="button"
           className="map-floating map-inspector-toggle"
