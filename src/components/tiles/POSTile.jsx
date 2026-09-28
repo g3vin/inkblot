@@ -6,19 +6,9 @@
  */
 import React, { useMemo } from 'react'
 import nlp from 'compromise'
+import { POS_INKS } from '../../lib/palette'
 
-const tagColors = {
-  Noun: '#1f77b4',
-  Verb: '#2ca02c',
-  Adjective: '#ff7f0e',
-  Adverb: '#d62728',
-  Number: '#17becf',
-  Pronoun: '#9467bd',
-  Determiner: '#8c564b',
-  Conjunction: '#e377c2',
-  Preposition: '#7f7f7f',
-  Unknown: '#cccccc'
-}
+const tagColors = POS_INKS
 
 /** Collapse compromise's fine-grained tag list into one display category. */
 const normalizeTag = (tags) => {

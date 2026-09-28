@@ -1,0 +1,366 @@
+/*
+ * tokens.css — the Inkblot design language, as CSS custom properties.
+ *
+ * Read docs/DESIGN.md before changing anything here. This is the ONLY file (with
+ * src/lib/palette.ts) allowed to hold raw color, font, radius or shadow values;
+ * everything else in the app refers to these tokens by name.
+ *
+ * Layers, top to bottom:
+ *   1. Scales that don't change with the theme: type, space, radius, motion, sizes.
+ *   2. Theme primitives: the paper/ink neutrals and the eight ink hues, per theme.
+ *   3. Semantic tokens: what a surface, a line of text, a border or a shadow IS.
+ *   4. Recipes: accent derivations, the card wash, the menu surface, glass.
+ *   5. Legacy component aliases, kept only until each surface migrates.
+ *
+ * Themes: `data-theme` on <html> is ALWAYS 'light' or 'dark' — "System" is resolved
+ * in JS (src/lib/theme.js) before first paint — so each theme is written once, and no
+ * stylesheet needs a prefers-color-scheme block.
+ */
+
+/* ============================================================
+   1. Theme-independent scales
+   ============================================================ */
+:root {
+  /* Type families. Inter for chrome; Courier Prime only for accent labels (eyebrows,
+     stats, metadata, empty states, the wordmark); Literata for the writer's words. */
+  --font-ui: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-type: 'Courier Prime', 'Courier New', Courier, monospace;
+  --font-editor: 'Literata Variable', 'Literata', Georgia, 'Times New Roman', serif;
+  /* Screenplay and stage-play pages: Courier by industry convention, so the typewriter
+     face doubles as the script face. */
+  --font-script: 'Courier Prime', 'Courier New', Courier, monospace;
+  --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Type scale (UI). Body copy in chrome is --text-sm; the editor sets its own size. */
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-prose: 1.7;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --tracking-eyebrow: 0.08em;
+
+  /* Space — a 4px grid. */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radius — soft. sm: chips, inputs, small controls. md: buttons, cards, rows.
+     lg: floating panels, popovers, menus, dialogs. pill: tags, switches only. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Sizes — comfortable density. */
+  --control-h: 32px;
+  --control-h-sm: 26px;
+  --row-h: 36px;
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --hairline: 1px;
+
+  /* Motion — subtle and quick. Motion clarifies; it never performs. */
+  --dur-instant: 80ms;
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 240ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
+
+  /* Layers */
+  --z-chrome: 20;
+  --z-panel: 30;
+  --z-popover: 60;
+  --z-dialog: 80;
+  --z-toast: 90;
+  --z-tooltip: 100;
+
+  /* The fade scrim under chrome that overlays the document: solid for the first
+     --scrim-solid-stop of its height, then clear. Text scrolls under and dissolves. */
+  --scrim-solid-stop: 45%;
+  --scrim-extra: 20px;
+
+  font-family: var(--font-ui);
+  line-height: var(--leading-normal);
+  font-weight: var(--weight-regular);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   2 + 3. Themes. Dark ("Ink") is also the pre-JS fallback.
+   ============================================================ */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Neutrals — warm ink. */
+  --paper-0: #161412;
+  --paper-1: #1d1b18;
+  --paper-2: #24211d;
+  --paper-3: #2d2a25;
+  --ink-0: #f2eee6;
+  --ink-1: #d8d2c6;
+  --ink-2: #a69f93;
+  --ink-3: #8a8378;
+
+  /* Brand. Ink Blue is the signature colour; it is not the same thing as the accent
+     (the accent is the user's; the brand is ours). */
+  --brand-ink: #8fa8e6;
+  --brand-ink-strong: #b5c7f0;
+
+  /* The ink palette — one categorical set for notes, canvas cards, tags, map layers
+     and accent presets. Lighter inks, readable on dark paper. */
+  --ink-blue: #8fa8e6;
+  --ink-teal: #7cc6cb;
+  --ink-green: #86c79a;
+  --ink-amber: #e5b85c;
+  --ink-rust: #e89a6a;
+  --ink-red: #e8877b;
+  --ink-violet: #b79ce6;
+  --ink-slate: #a7b0ba;
+  --on-ink: #14120f;
+
+  /* Semantic */
+  --app-bg: var(--paper-0);
+  --app-fg: var(--ink-0);
+  --surface-0: var(--paper-0);
+  --surface-1: var(--paper-1);
+  --surface-2: var(--paper-2);
+  --surface-3: rgba(255, 246, 228, 0.045);
+  --surface-float: var(--paper-2);
+  --surface-hover: rgba(255, 246, 228, 0.06);
+  --surface-active: rgba(255, 246, 228, 0.09);
+  --surface-sunken: #110f0d;
+
+  --text-primary: var(--ink-0);
+  --text-secondary: var(--ink-1);
+  --text-muted: var(--ink-2);
+  --text-subtle: var(--ink-3);
+  --text-placeholder: #8f887d;
+  --text-on-accent: #10131c;
+
+  --border-color: rgba(255, 244, 222, 0.13);
+  --border-muted: rgba(255, 244, 222, 0.08);
+  --border-strong: rgba(255, 244, 222, 0.2);
+  --hairline-color: var(--border-color);
+
+  --overlay-bg: rgba(8, 7, 6, 0.32);
+  --modal-overlay-bg: rgba(8, 7, 6, 0.5);
+  --popover-bg: var(--paper-2);
+  --popover-border: rgba(255, 244, 222, 0.14);
+  --control-bg: rgba(255, 246, 228, 0.05);
+  --control-hover-bg: rgba(255, 246, 228, 0.08);
+
+  --shadow-color: rgba(0, 0, 0, 0.36);
+  --shadow-float:
+    0 0 0 0.5px rgba(0, 0, 0, 0.4),
+    0 2px 6px rgba(0, 0, 0, 0.18),
+    0 12px 28px rgba(0, 0, 0, 0.28);
+  --shadow-dialog:
+    0 0 0 0.5px rgba(0, 0, 0, 0.45),
+    0 24px 60px rgba(0, 0, 0, 0.45);
+  --shadow-soft: var(--shadow-float);
+  --shadow-popover: var(--shadow-float);
+
+  --status-danger: var(--ink-red);
+  --status-warning: var(--ink-amber);
+  --status-success: var(--ink-green);
+  --status-error: var(--status-danger);
+  --status-error-soft: color-mix(in srgb, var(--ink-red) 70%, white);
+
+  --accent-color: var(--ink-blue);
+  --accent-foreground: color-mix(in srgb, var(--accent-color) 80%, white);
+
+  /* Liquid Glass (iOS/iPadOS floating toolbars + FABs only — see src/ui/platform.js). */
+  --glass-fill: rgba(40, 36, 31, 0.52);
+  --glass-rim: rgba(255, 248, 235, 0.16);
+  --glass-highlight: rgba(255, 248, 235, 0.1);
+  --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+
+  /* Legacy aliases that carried theme-specific raw values. */
+  --landing-shadow: none;
+  --sidebar-shell-shadow: var(--shadow-float);
+  --sidebar-control-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.2);
+  --sidebar-card-shadow: none;
+  --sidebar-card-shadow-pinned: 0 0 0 1px var(--border-strong);
+  --sidebar-card-border-hover: var(--border-strong);
+  --sidebar-divider-line: var(--border-strong);
+  --sidebar-card-hover-bg: var(--surface-hover);
+  --sidebar-fade-strong: color-mix(in srgb, var(--app-bg) 78%, transparent);
+  --sidebar-fade-soft: color-mix(in srgb, var(--app-bg) 32%, transparent);
+  --focus-mode-panel: color-mix(in srgb, var(--surface-float) 94%, transparent);
+  --focus-mode-shadow: var(--shadow-float);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* Neutrals — warm paper. */
+  --paper-0: #faf8f4;
+  --paper-1: #f3f0ea;
+  --paper-2: #fffefb;
+  --paper-3: #ebe7df;
+  --ink-0: #1f1c18;
+  --ink-1: #48423a;
+  --ink-2: #6b645a;
+  --ink-3: #7a7368;
+
+  --brand-ink: #2f4a8a;
+  --brand-ink-strong: #22386b;
+
+  /* Deeper inks, readable on paper. */
+  --ink-blue: #2f4a8a;
+  --ink-teal: #25717a;
+  --ink-green: #3b7550;
+  --ink-amber: #94660f;
+  --ink-rust: #a6541f;
+  --ink-red: #a23b32;
+  --ink-violet: #664a98;
+  --ink-slate: #56606b;
+  --on-ink: #ffffff;
+
+  --surface-3: rgba(40, 32, 20, 0.045);
+  --surface-hover: rgba(40, 32, 20, 0.055);
+  --surface-active: rgba(40, 32, 20, 0.09);
+  --surface-sunken: #efebe4;
+
+  --text-placeholder: #857e73;
+  --text-on-accent: #ffffff;
+
+  --border-color: rgba(40, 32, 20, 0.14);
+  --border-muted: rgba(40, 32, 20, 0.08);
+  --border-strong: rgba(40, 32, 20, 0.22);
+
+  --overlay-bg: rgba(40, 32, 20, 0.16);
+  --modal-overlay-bg: rgba(40, 32, 20, 0.24);
+  --popover-border: rgba(40, 32, 20, 0.14);
+  --control-bg: rgba(40, 32, 20, 0.045);
+  --control-hover-bg: rgba(40, 32, 20, 0.075);
+
+  --shadow-color: rgba(40, 32, 20, 0.14);
+  --shadow-float:
+    0 0 0 0.5px rgba(40, 32, 20, 0.12),
+    0 2px 6px rgba(40, 32, 20, 0.06),
+    0 12px 28px rgba(40, 32, 20, 0.1);
+  --shadow-dialog:
+    0 0 0 0.5px rgba(40, 32, 20, 0.14),
+    0 24px 56px rgba(40, 32, 20, 0.16);
+
+  --status-error-soft: color-mix(in srgb, var(--ink-red) 70%, white);
+  --accent-foreground: color-mix(in srgb, var(--accent-color) 85%, black);
+
+  --glass-fill: rgba(255, 253, 248, 0.58);
+  --glass-rim: rgba(255, 255, 255, 0.7);
+  --glass-highlight: rgba(255, 255, 255, 0.55);
+  --glass-shadow: 0 8px 28px rgba(40, 32, 20, 0.14);
+
+  --sidebar-control-shadow: 0 0 0 0.5px rgba(40, 32, 20, 0.1), 0 4px 10px rgba(40, 32, 20, 0.06);
+}
+
+/* ============================================================
+   4. Recipes (resolve per element, so they follow the theme)
+   ============================================================ */
+:root {
+  /* Accent presets: the accent is always one of the ink hues (src/lib/palette.ts),
+     chosen with data-accent on <html>. Ink Blue is the default. */
+  --accent-surface: color-mix(in srgb, var(--accent-color) 16%, transparent);
+  --accent-surface-strong: color-mix(in srgb, var(--accent-color) 26%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent-color) 45%, transparent);
+  --accent-ring: color-mix(in srgb, var(--accent-color) 22%, transparent);
+  --accent-glow: color-mix(in srgb, var(--accent-color) 24%, transparent);
+  --focus-ring: 0 0 0 2px var(--app-bg), 0 0 0 4px var(--accent-border);
+
+  /* Selection */
+  --selection-bg: color-mix(in srgb, var(--accent-color) 28%, transparent);
+
+  /* How a card wears its colour — see the card recipe rule below. */
+  --card-color: var(--accent-color);
+  --card-base: var(--surface-1);
+  --card-edge-base: var(--border-color);
+
+  /* The one pop-up surface. Every menu, popover and picker wears it (src/ui/Menu,
+     src/ui/Popover, and the shared legacy rule in base.css). */
+  --menu-bg: var(--popover-bg);
+  --menu-border: var(--popover-border);
+  --menu-radius: var(--radius-lg);
+  --menu-shadow: var(--shadow-float);
+
+  /* ============================================================
+     5. Legacy component aliases — do not use in new code.
+     Each is deleted when its surface migrates (docs/DESIGN.md → Migration).
+     ============================================================ */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --tile-color: var(--surface-1);
+  --landing-bg: var(--app-bg);
+  --landing-fg: var(--text-primary);
+  --landing-muted: var(--text-subtle);
+  --landing-soft: var(--text-muted);
+  --landing-card: var(--surface-1);
+  --landing-border: var(--border-color);
+  --sidebar-sticky-bg: var(--app-bg);
+  --sidebar-shell-border: var(--border-color);
+  --sidebar-card-border: var(--border-color);
+  --sidebar-floating-border: var(--floating-note-border);
+  --sidebar-floating-bg: var(--floating-note-bg);
+  --sidebar-floating-shadow: var(--floating-note-shadow);
+  --sidebar-fade-solid: var(--app-bg);
+  --focus-mode-bg: var(--app-bg);
+  --focus-mode-fg: var(--text-primary);
+  --focus-mode-muted: color-mix(in srgb, var(--text-primary) 36%, transparent);
+  --focus-mode-border: var(--border-color);
+  --floating-note-radius: var(--radius-lg);
+  --floating-note-border: var(--accent-border);
+  --floating-note-bg: var(--surface-float);
+  --floating-note-shadow: var(--shadow-float);
+  --floating-note-title: var(--accent-foreground);
+  --floating-note-divider: color-mix(in srgb, var(--accent-color) 22%, transparent);
+}
+
+/*
+ * The card recipe — one for every card: notes, note previews, canvas cards, ib-card.
+ * A card sets --card-color (an ink) and, if its surface isn't --surface-1, --card-base.
+ * The colour washes the surface at low strength; the border takes the same hue a few
+ * steps stronger.
+ *
+ * It must be declared ON each card, not only on :root: a custom property's var()s are
+ * resolved where it is declared, so a mix computed on :root would always use :root's
+ * --card-color (the accent) whatever the card sets. A new kind of card joins this list.
+ */
+:root,
+.ib-card--inked,
+.note-tile,
+.note-preview-card,
+.canvas-node-text,
+.canvas-node-file,
+.canvas-node-link {
+  --card-tint: color-mix(in srgb, var(--card-color) 10%, var(--card-base));
+  --card-edge: color-mix(in srgb, var(--card-color) 30%, var(--card-edge-base));
+  --card-edge-hover: color-mix(in srgb, var(--card-color) 45%, var(--card-edge-base));
+}
+
+/* Accent presets. Keep in sync with ACCENT_PRESETS in src/lib/palette.ts. */
+:root[data-accent='teal'] { --accent-color: var(--ink-teal); }
+:root[data-accent='green'] { --accent-color: var(--ink-green); }
+:root[data-accent='amber'] { --accent-color: var(--ink-amber); }
+:root[data-accent='rust'] { --accent-color: var(--ink-rust); }
+:root[data-accent='violet'] { --accent-color: var(--ink-violet); }

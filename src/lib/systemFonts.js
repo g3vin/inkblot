@@ -13,8 +13,18 @@
 import { invoke } from '@tauri-apps/api/core'
 import { getPreference, setPreference } from './preferences'
 
+/**
+ * Fonts bundled with the app (src/styles/fonts.js), so they render on every machine
+ * whether or not the OS has them. Literata is the default writing font.
+ */
+export const BUNDLED_FONTS = ['Literata', 'Inter', 'Courier Prime']
+
+/** The default family for new writing. See docs/DESIGN.md → Typography. */
+export const DEFAULT_EDITOR_FONT = 'Literata'
+
 /** Pinned to the top of the picker so the common choices stay one click away. */
 export const SUGGESTED_FONTS = [
+  ...BUNDLED_FONTS,
   'Georgia',
   'Times New Roman',
   'Helvetica Neue',
@@ -190,7 +200,7 @@ export const loadSystemFonts = () => {
   cachedFontsPromise = invoke('list_system_fonts')
     .then((fonts) => (
       Array.isArray(fonts) && fonts.length > 0
-        ? dedupeSorted(fonts)
+        ? dedupeSorted([...BUNDLED_FONTS, ...fonts])
         : dedupeSorted(FALLBACK_FONTS)
     ))
     .catch(() => dedupeSorted(FALLBACK_FONTS))

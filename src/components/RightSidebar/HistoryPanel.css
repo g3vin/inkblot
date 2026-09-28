@@ -219,7 +219,7 @@
 }
 
 .history-archive-text {
-  font-family: var(--font-serif, Georgia, serif);
+  font-family: var(--font-editor);
   font-size: 13.5px;
   line-height: 1.4;
   color: var(--text-primary);

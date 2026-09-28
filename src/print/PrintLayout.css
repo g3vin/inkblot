@@ -46,23 +46,6 @@
     0 6px 14px rgba(0, 0, 0, 0.35);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) :is(.pane-scroll.is-print-layout, .print-layout:not(.print-offscreen)) {
-    --pl-desk: #27292c;
-    --pl-paper: #0b0b0c;
-    --pl-ink: #e8ebee;
-    --pl-ink-secondary: #aab2ba;
-    --pl-running: #9ea6ae;
-    --pl-faint: rgba(255, 255, 255, 0.3);
-    --pl-blank: rgba(255, 255, 255, 0.25);
-    --pl-header: #c4cad0;
-    --pl-page-shadow:
-      0 0 0 0.5px rgba(0, 0, 0, 0.6),
-      0 2px 6px rgba(0, 0, 0, 0.5),
-      0 6px 14px rgba(0, 0, 0, 0.35);
-  }
-}
-
 /* The scroller itself is the desk, so it runs the pane's full height: up under the
    toolbar's glass (the scroller's titlebar padding), down past the last page, and
    through the rubber band at either end. */

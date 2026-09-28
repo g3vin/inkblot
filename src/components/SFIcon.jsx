@@ -1,322 +1,98 @@
 /**
- * SFIcon.jsx — app-wide icon component.
+ * SFIcon.jsx — legacy adapter: SF-Symbols-style names → src/ui/Icon.
  *
- * Maps SF-Symbols-style names (e.g. "doc.text", "magnifyingglass") onto the
- * animated icons in src/icons. Icons animate when their nearest interactive
- * ancestor (button, file item, tile, …) is hovered or focused, unless the OS
- * prefers reduced motion.
+ * Kept so the ~100 existing call sites keep working while surfaces migrate. New code
+ * imports `Icon` from src/ui and uses its semantic names; when the last SFIcon call
+ * site is gone, delete this file (docs/DESIGN.md → Migration).
  */
-import React, { useEffect, useRef, useState } from 'react'
-import { useReducedMotion } from 'framer-motion'
-import {
-  IconAlignCenter,
-  IconAlignLeft,
-  IconAlignRight,
-  IconArrowDownToDot,
-  IconArrowRightLeft,
-  IconArrowUpFromDot,
-  IconBookOpen,
-  IconBold,
-  IconCanvas,
-  IconCheck,
-  IconChevronDown,
-  IconChevronLeft,
-  IconClipboardList,
-  IconClock,
-  IconCopy,
-  IconFile,
-  IconFilter,
-  IconFolder,
-  IconGitPullRequest,
-  IconGroup,
-  IconGuides,
-  IconUngroup,
-  IconHammer,
-  IconImage,
-  IconItalic,
-  IconList,
-  IconListBullets,
-  IconLock,
-  IconLockOpen,
-  IconMap,
-  IconMapPin,
-  IconCompass,
-  IconCursor,
-  IconRoute,
-  IconRegion,
-  IconType,
-  IconRuler,
-  IconArea,
-  IconCrosshair,
-  IconGlobe,
-  IconOrbit,
-  IconSun,
-  IconDownload,
-  IconCalendar,
-  IconScan,
-  IconMaximize,
-  IconUndo,
-  IconRedo,
-  IconAlert,
-  IconGauge,
-  IconFootprints,
-  IconMenuDots,
-  IconMic,
-  IconFrame,
-  IconMinus,
-  IconPalette,
-  IconPause,
-  IconPlay,
-  IconNotebookPen,
-  IconNotebookText,
-  IconPin,
-  IconPinOff,
-  IconPlus,
-  IconReadAloud,
-  IconSearch,
-  IconSettings,
-  IconSpeech,
-  IconStrikethrough,
-  IconTableGrid,
-  IconTrash,
-  IconUnderline,
-  IconUserRound,
-  IconUsers,
-  IconX,
-} from '../icons'
+import Icon from '../ui/Icon.jsx'
 
-const ICON_HOVER_TRIGGER_SELECTOR = [
-  'button',
-  '[role="button"]',
-  '.file-item',
-  '.tile',
-  '.sidebar-card',
-  '.note-tile',
-  '.panel-header-title',
-  '.file-tree-create-option',
-  '.sidebar-search-field',
-].join(', ')
-
-/** Resolve an SF-Symbols-style name to its icon component (search icon as fallback). */
-const renderIcon = (name, filled, props) => {
-  const normalizedName = name.replace(/\.fill$/, '')
-
-  switch (normalizedName) {
-    case 'pin':
-      return filled ? <IconPin {...props} /> : <IconPinOff {...props} />
-    case 'bold':
-      return <IconBold {...props} />
-    case 'italic':
-      return <IconItalic {...props} />
-    case 'underline':
-      return <IconUnderline {...props} />
-    case 'strikethrough':
-      return <IconStrikethrough {...props} />
-    case 'minus':
-      return <IconMinus {...props} />
-    case 'frame':
-      return <IconFrame {...props} />
-    case 'text.alignleft':
-      return <IconAlignLeft {...props} />
-    case 'text.aligncenter':
-      return <IconAlignCenter {...props} />
-    case 'text.alignright':
-      return <IconAlignRight {...props} />
-    case 'table.grid':
-      return <IconTableGrid {...props} />
-    case 'guides':
-      return <IconGuides {...props} />
-    case 'doc.text':
-      return <IconNotebookPen {...props} />
-    case 'doc':
-      return <IconFile {...props} />
-    case 'canvas':
-      return <IconCanvas {...props} />
-    case 'map':
-      return <IconCompass {...props} />
-    case 'mappin':
-      return <IconMapPin {...props} />
-    case 'cursorarrow':
-      return <IconCursor {...props} />
-    case 'map.route':
-      return <IconRoute {...props} />
-    case 'map.region':
-      return <IconRegion {...props} />
-    case 'map.label':
-      return <IconType {...props} />
-    case 'map.ruler':
-      return <IconRuler {...props} />
-    case 'map.area':
-      return <IconArea {...props} />
-    case 'map.calibrate':
-      return <IconCrosshair {...props} />
-    case 'globe':
-      return <IconGlobe {...props} />
-    case 'map.system':
-      return <IconOrbit {...props} />
-    case 'sun.max':
-      return <IconSun {...props} />
-    case 'square.and.arrow.down':
-      return <IconDownload {...props} />
-    case 'calendar':
-      return <IconCalendar {...props} />
-    case 'map.trace':
-      return <IconScan {...props} />
-    case 'map.fit':
-      return <IconMaximize {...props} />
-    case 'arrow.uturn.backward':
-      return <IconUndo {...props} />
-    case 'arrow.uturn.forward':
-      return <IconRedo {...props} />
-    case 'exclamationmark.triangle':
-      return <IconAlert {...props} />
-    case 'gauge':
-      return <IconGauge {...props} />
-    case 'figure.walk':
-      return <IconFootprints {...props} />
-    case 'rectangle.on.rectangle':
-      return <IconGroup {...props} />
-    case 'rectangle.dashed':
-      return <IconUngroup {...props} />
-    case 'doc.characters':
-      return <IconUserRound {...props} />
-    case 'doc.settings':
-      return <IconMapPin {...props} />
-    case 'doc.outline':
-      return <IconListBullets {...props} />
-    case 'doc.novel':
-      return <IconNotebookText {...props} />
-    case 'lock':
-      return <IconLock {...props} />
-    case 'lock.open':
-      return <IconLockOpen {...props} />
-    case 'photo':
-      return <IconImage {...props} />
-    case 'paintpalette':
-      return <IconPalette {...props} />
-    case 'play':
-      return <IconPlay {...props} />
-    case 'pause':
-      return <IconPause {...props} />
-    case 'plus':
-      return <IconPlus {...props} />
-    case 'gearshape':
-    case 'gear':
-      return <IconSettings {...props} />
-    case 'magnifyingglass':
-    case 'magnifyingglass.circle':
-      return <IconSearch {...props} />
-    case 'doc.on.clipboard':
-      return <IconClipboardList {...props} />
-    case 'hammer':
-      return <IconHammer {...props} />
-    case 'clock':
-      return <IconClock {...props} />
-    case 'chevron.left':
-      return <IconChevronLeft {...props} />
-    case 'chevron.down':
-      return <IconChevronDown {...props} />
-    case 'folder':
-      return <IconFolder {...props} />
-    case 'folder.characters':
-      return <IconUsers {...props} />
-    case 'folder.settings':
-      return <IconMap {...props} />
-    case 'folder.outline':
-      return <IconList {...props} />
-    case 'folder.novel':
-      return <IconBookOpen {...props} />
-    case 'arrow.down.to.dot':
-      return <IconArrowDownToDot {...props} />
-    case 'arrow.up.from.dot':
-      return <IconArrowUpFromDot {...props} />
-    case 'arrow.left.arrow.right':
-      return <IconArrowRightLeft {...props} />
-    case 'git.pullrequest':
-      return <IconGitPullRequest {...props} />
-    case 'line.3.horizontal.decrease.circle':
-      return <IconFilter {...props} />
-    case 'checkmark':
-      return <IconCheck {...props} />
-    case 'doc.on.doc':
-      return <IconCopy {...props} />
-    case 'trash':
-      return <IconTrash {...props} />
-    case 'ellipsis':
-      return <IconMenuDots {...props} />
-    case 'mic':
-    case 'mic.fill':
-      return <IconMic {...props} />
-    case 'read.aloud':
-      return <IconReadAloud {...props} />
-    case 'speech':
-    case 'speech.fill':
-      return <IconSpeech {...props} />
-    case 'xmark':
-      return <IconX {...props} />
-    default:
-      return <IconSearch {...props} />
-  }
+/** SF-style name (without `.fill`) → semantic Icon name. */
+const SF_TO_ICON = {
+  'arrow.down.to.dot': 'merge',
+  'arrow.left.arrow.right': 'move-left-right',
+  'arrow.up.from.dot': 'split',
+  'arrow.uturn.backward': 'undo',
+  'arrow.uturn.forward': 'redo',
+  bold: 'bold',
+  calendar: 'calendar',
+  canvas: 'canvas',
+  checkmark: 'check',
+  'chevron.down': 'chevron-down',
+  'chevron.left': 'chevron-left',
+  clock: 'clock',
+  cursorarrow: 'cursor',
+  doc: 'file',
+  'doc.characters': 'characters',
+  'doc.novel': 'notebook',
+  'doc.on.clipboard': 'clipboard',
+  'doc.on.doc': 'copy',
+  'doc.outline': 'list-bullets',
+  'doc.settings': 'map-pin',
+  'doc.text': 'document',
+  ellipsis: 'more',
+  'exclamationmark.triangle': 'warning',
+  'figure.walk': 'walk',
+  folder: 'folder',
+  'folder.characters': 'users',
+  'folder.novel': 'book',
+  'folder.outline': 'list',
+  'folder.settings': 'map-world',
+  frame: 'frame',
+  gauge: 'gauge',
+  gear: 'settings',
+  gearshape: 'settings',
+  'git.pullrequest': 'compare',
+  globe: 'globe',
+  guides: 'guides',
+  hammer: 'hammer',
+  italic: 'italic',
+  'line.3.horizontal.decrease.circle': 'filter',
+  lock: 'lock',
+  'lock.open': 'unlock',
+  magnifyingglass: 'search',
+  'magnifyingglass.circle': 'search',
+  map: 'map',
+  'map.area': 'map-area',
+  'map.calibrate': 'crosshair',
+  'map.fit': 'fit',
+  'map.label': 'label',
+  'map.region': 'map-area',
+  'map.route': 'map-route',
+  'map.ruler': 'ruler',
+  'map.system': 'orbit',
+  'map.trace': 'map-trace',
+  mappin: 'map-pin',
+  mic: 'dictate',
+  minus: 'minus',
+  paintpalette: 'palette',
+  pause: 'pause',
+  photo: 'image',
+  pin: 'pin',
+  play: 'play',
+  plus: 'add',
+  'read.aloud': 'read-aloud',
+  'rectangle.dashed': 'ungroup',
+  'rectangle.on.rectangle': 'group',
+  speech: 'chat',
+  'square.and.arrow.down': 'download',
+  strikethrough: 'strikethrough',
+  'sun.max': 'sun',
+  'table.grid': 'table',
+  'text.aligncenter': 'align-center',
+  'text.alignleft': 'align-left',
+  'text.alignright': 'align-right',
+  trash: 'delete',
+  underline: 'underline',
+  xmark: 'close',
 }
 
-export default function SFIcon({
-  name,
-  filled = false,
-  className = '',
-  title,
-  size = 16,
-  strokeWidth = 1.1,
-  forceAnimate = false,
-}) {
-  const prefersReducedMotion = useReducedMotion()
-  const wrapperRef = useRef(null)
-  const [ancestorHovered, setAncestorHovered] = useState(false)
-
-  // Watch the nearest interactive ancestor so the icon can play its hover
-  // animation when the whole control (not just the glyph) is hovered/focused.
-  useEffect(() => {
-    const wrapper = wrapperRef.current
-    const trigger = wrapper?.parentElement?.closest(ICON_HOVER_TRIGGER_SELECTOR)
-
-    if (!wrapper || !trigger) return undefined
-
-    const activate = () => setAncestorHovered(true)
-    const deactivate = () => setAncestorHovered(false)
-    const deactivateIfFocusLeft = () => {
-      if (trigger.contains(document.activeElement)) return
-      setAncestorHovered(false)
-    }
-
-    trigger.addEventListener('pointerenter', activate)
-    trigger.addEventListener('pointerleave', deactivate)
-    trigger.addEventListener('focusin', activate)
-    trigger.addEventListener('focusout', deactivateIfFocusLeft)
-
-    const initialStateFrame = window.requestAnimationFrame(() => {
-      setAncestorHovered(trigger.matches(':hover') || trigger.contains(document.activeElement))
-    })
-
-    return () => {
-      window.cancelAnimationFrame(initialStateFrame)
-      trigger.removeEventListener('pointerenter', activate)
-      trigger.removeEventListener('pointerleave', deactivate)
-      trigger.removeEventListener('focusin', activate)
-      trigger.removeEventListener('focusout', deactivateIfFocusLeft)
-    }
-  }, [])
-
-  const iconProps = {
-    className: className || undefined,
-    size,
-    strokeWidth,
-    'aria-hidden': 'true',
-    focusable: 'false',
-    ...(!prefersReducedMotion ? { animate: ancestorHovered || forceAnimate ? 'hover' : 'rest' } : {}),
-  }
-
+export default function SFIcon({ name, filled = false, className = '', title, size = 16 }) {
+  const isFillVariant = /\.fill$/.test(name)
+  const semantic = SF_TO_ICON[name.replace(/\.fill$/, '')] || 'search'
   return (
-    <span ref={wrapperRef} className="sf-icon" aria-hidden="true" title={title}>
-      {renderIcon(name, filled, iconProps)}
+    <span className="sf-icon" aria-hidden="true" title={title}>
+      <Icon name={semantic} size={size} active={filled || isFillVariant} className={className || undefined} />
     </span>
   )
 }

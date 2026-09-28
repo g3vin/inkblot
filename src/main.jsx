@@ -13,14 +13,28 @@
  */
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import './styles/fonts.js'
 import './index.css'
 import App from './App.jsx'
-import { hydratePreferences } from './lib/preferences'
+import { getPreference, hydratePreferences } from './lib/preferences'
+import { applyAccentAttribute, applyThemeAttribute } from './lib/theme'
+import { applyPlatformAttribute } from './ui/platform'
+
+// A theme before anything else paints — the OS's until the saved one is known.
+applyThemeAttribute('system')
+applyPlatformAttribute()
 
 await hydratePreferences()
 
+applyThemeAttribute(getPreference('inkblot-theme') || 'system')
+applyAccentAttribute(getPreference('inkblot-accent-color'))
+
+// Dev only: `?design` renders the design-language showcase instead of the app.
+const showcase = import.meta.env.DEV && new URLSearchParams(window.location.search).has('design')
+const Root = showcase ? (await import('./dev/DesignShowcase.jsx')).default : App
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>,
 )

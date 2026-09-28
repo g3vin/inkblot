@@ -76,19 +76,11 @@
     calc(var(--canvas-grid-y) - 1px);
 }
 
-/* Follows the app's theming: an explicit data-theme wins, otherwise the OS. */
+/* Follows the app's theme (data-theme is always resolved; see src/lib/theme.js). */
 :root[data-theme='dark'] .canvas-surface {
   --canvas-ink: #eef1f6;
   --canvas-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 14px rgba(0, 0, 0, 0.28);
   --canvas-card-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.24), 0 10px 20px rgba(0, 0, 0, 0.36);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .canvas-surface {
-    --canvas-ink: #eef1f6;
-    --canvas-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 14px rgba(0, 0, 0, 0.28);
-    --canvas-card-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.24), 0 10px 20px rgba(0, 0, 0, 0.36);
-  }
 }
 
 .canvas-surface.is-pannable {
@@ -269,7 +261,7 @@
  * The body clips its own content instead.
  *
  * COLOUR comes from the app-wide card recipe (--card-tint / --card-edge in
- * index.css), the same one the notes panel and in-line note previews use: the colour
+ * src/styles/tokens.css), the same one the notes panel and in-line note previews use: the colour
  * washes the whole card softly and the border takes it several shades stronger. A
  * canvas card and a note are the same kind of object, so they should not need two
  * different explanations of what "this card is red" looks like.
