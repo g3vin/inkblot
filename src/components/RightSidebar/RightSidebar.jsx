@@ -12,8 +12,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useReducedMotion } from 'framer-motion'
-import SidebarTabs from './SidebarTabs'
-import { getRightSidebarTabs } from './sidebarTabsConfig'
+import InspectorHeader from './InspectorHeader'
+import { sidebarTabsFor } from './sidebarTabsConfig'
+import useInspectorLayout from './useInspectorLayout'
+import './InspectorLayout.css'
+import { useLatestBridgeState } from '../../bridge'
+import { isMapDoc } from '../../lib/docKind'
+import { inspectorTab } from '../../lib/chromeLayout'
 import Workbench from './Workbench'
 import NotesPanel from '../NotesPanel'
 import HistoryPanel from './HistoryPanel'
@@ -131,7 +136,16 @@ export default function RightSidebar({
   onOpenCompare,
 }) {
   const prefersReducedMotion = useReducedMotion()
-  const tabs = useMemo(() => getRightSidebarTabs(activeDoc), [activeDoc])
+  // The panels are the current layout's — Write's or Typeset's, as the window's mode
+  // is — with the map's first while a map is showing.
+  const pageLayout = useLatestBridgeState('pageLayoutState', null)
+  const inspector = useInspectorLayout({
+    mode: pageLayout?.mode,
+    hasMap: isMapDoc(activeDoc),
+    tab: sidebarTab,
+    setTab: setSidebarTab,
+  })
+  const tabs = useMemo(() => sidebarTabsFor(inspector.tabs), [inspector.tabs])
   const tabIds = useMemo(() => tabs.map(({ id }) => id), [tabs])
   const activeTabIndex = Math.max(0, tabIds.indexOf(sidebarTab))
 
@@ -760,6 +774,16 @@ export default function RightSidebar({
       )
     }
 
+    if (tabId !== 'history') {
+      const spec = inspectorTab(tabId)
+      return (
+        <div className="inspector-placeholder">
+          <SFIcon name={spec?.symbol ?? 'doc'} size={22} />
+          <span>{spec?.title ?? tabId} is on its way to this panel.</span>
+        </div>
+      )
+    }
+
     return (
       <HistoryPanel
         versions={versions?.[activeDoc] || []}
@@ -815,10 +839,12 @@ export default function RightSidebar({
         </button>
       </div>
 
-      <SidebarTabs
+      <InspectorHeader
         tabs={tabs}
         tab={sidebarTab}
         setTab={handleSelectTab}
+        layout={inspector.layout}
+        onChooseLayout={inspector.chooseLayout}
         visualProgress={visualTabProgress}
         gestureActive={gestureActive}
         reducedMotion={prefersReducedMotion}

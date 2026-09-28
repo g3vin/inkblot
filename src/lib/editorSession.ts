@@ -23,10 +23,13 @@ export const CLIPBOARD_PERSIST_KEY = 'inkblot-clipboard-history'
 export const MAX_CLIPBOARD_ENTRIES = 80
 // Search is the sidebar's search bar, not a tab, so a stored 'search' (or any
 // unknown id) restores to the default tab.
-export const RIGHT_SIDEBAR_TAB_IDS = new Set(['clipboard', 'workbench', 'notes', 'history'])
+export const RIGHT_SIDEBAR_TAB_IDS = new Set([
+  'clipboard', 'workbench', 'notes', 'references', 'history', 'typeset', 'output', 'stats', 'map',
+])
 
 /** Which panel the right sidebar is showing. */
-export type RightSidebarTab = 'clipboard' | 'workbench' | 'notes' | 'history'
+export type RightSidebarTab =
+  | 'clipboard' | 'workbench' | 'notes' | 'references' | 'history' | 'typeset' | 'output' | 'stats' | 'map'
 
 /** `'editor'` is the only split there is; `null` is no split. */
 export type SplitView = 'editor' | null

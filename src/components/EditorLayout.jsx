@@ -49,7 +49,8 @@ import { useReferences } from '../hooks/useReferences'
 import NoteHoverPreview from './NoteHoverPreview'
 import ToolbarHost from './toolbar/ToolbarHost'
 import { readDisplayMode, TOOLBAR_LAYOUT_CHANGED } from './toolbar/useToolbarLayout'
-import { popUpToolbarMenu } from '../hooks/contextMenu/toolbarMenu'
+import { CUSTOMIZE_INSPECTOR_EVENT, popUpToolbarMenu } from '../hooks/contextMenu/toolbarMenu'
+import InspectorLayoutEditor from './RightSidebar/InspectorLayoutEditor'
 
 const LEFT_SIDEBAR_OUTER_CHROME_WIDTH = 18
 const RIGHT_SIDEBAR_OUTER_CHROME_WIDTH = 22
@@ -214,6 +215,13 @@ export default function EditorLayout(props) {
       : toolbarEditor
         ? (pageLayoutState?.mode === 'typeset' ? 'typeset' : 'document')
         : null
+  // Customize Inspector Layout…, from the toolbar's menu or the inspector's own.
+  const [customizingInspector, setCustomizingInspector] = useState(false)
+  useEffect(() => {
+    const open = () => setCustomizingInspector(true)
+    window.addEventListener(CUSTOMIZE_INSPECTOR_EVENT, open)
+    return () => window.removeEventListener(CUSTOMIZE_INSPECTOR_EVENT, open)
+  }, [])
   const [toolbarDisplay, setToolbarDisplay] = useState(readDisplayMode)
   useEffect(() => {
     const update = () => setToolbarDisplay(readDisplayMode())
@@ -694,6 +702,9 @@ export default function EditorLayout(props) {
           pageCount={printLayout.pageCount}
           onClose={() => setPageSetupOpen(false)}
         />
+      ) : null}
+      {customizingInspector && !nativeRightSidebar ? (
+        <InspectorLayoutEditor onClose={() => setCustomizingInspector(false)} />
       ) : null}
       {pageToolbarRow ? <div
         onContextMenu={comparing ? undefined : popUpToolbarMenu}
