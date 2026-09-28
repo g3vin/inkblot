@@ -59,6 +59,7 @@
 
 .app-titlebar-toolbar {
   position: relative;
+  grid-row: 1;
   grid-column: 2;
   min-width: 0;
   display: flex;
@@ -150,3 +151,16 @@
   min-height: 0;
 }
 
+
+/* Show Sidebar / Show Inspector, at the inner edge of their grid cells. */
+.titlebar-toggle {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  -webkit-app-region: no-drag;
+}
+.titlebar-toggle.is-left { grid-row: 1; grid-column: 1; justify-content: flex-end; }
+.titlebar-toggle.is-right { grid-row: 1; grid-column: 3; justify-content: flex-start; }
+.titlebar-toggle .ui-button { color: var(--text-secondary); }
+.titlebar-toggle .ui-button:hover { color: var(--text-primary); }
