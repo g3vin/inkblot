@@ -129,3 +129,11 @@ ok('and the toolbar redraws in it', container.querySelector('.tb-row')?.dataset.
 await act(async () => menu[1].action())
 
 await act(async () => root.unmount())
+
+/* ---------------- overflow ---------------- */
+{
+  const { fittingCount } = await import('../../src/components/toolbar/toolbarEdits.js')
+  ok('overflow: everything fits', fittingCount([40, 40, 40], 200, 4) === 3)
+  ok('overflow: what does not fit goes behind », with room for it', fittingCount([40, 40, 40, 40], 120, 4) === 2 && fittingCount([40, 40, 40, 40], 119, 4) === 1)
+  ok('overflow: a flexible space takes no room', fittingCount([40, 0, 40], 90, 4) === 3)
+}
