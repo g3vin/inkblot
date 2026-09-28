@@ -336,12 +336,13 @@
 .pl-status {
   position: absolute;
   right: 10px;
-  bottom: 18px;
+  bottom: 20px;
   z-index: 5;
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 32px;
+  height: 26px;
+  font: 12px var(--font-ui);
   box-sizing: border-box;
   padding: 0 6px;
   border: 1px solid var(--border-muted);
@@ -358,7 +359,7 @@
 /* Side by side, the right pane's status row holds the bottom-right corner; the left
    pane's corner is the middle of the window, so the controls sit higher there. */
 .split-active:not(.split-rows) .pl-status {
-  bottom: 58px;
+  bottom: 54px;
 }
 
 .pl-status button,
@@ -367,8 +368,8 @@
   color: inherit;
   background: transparent;
   border: 0;
-  border-radius: 10px;
-  padding: 4px 7px;
+  border-radius: var(--radius-pill);
+  padding: 2px 7px;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
 }
