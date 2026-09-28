@@ -2,7 +2,7 @@
 //!
 //! The store itself is `inkblot_core::store::preferences`; this is the Tauri shim over
 //! it, plus the one thing the core cannot know — where AppData is. Tauri's path
-//! resolver answers that, and the Swift app points its own store at the same folder.
+//! resolver answers that.
 //!
 //! `preferences_load` returns everything at once, because the webview's facade is
 //! synchronous: it hydrates the whole cache before React mounts, then answers

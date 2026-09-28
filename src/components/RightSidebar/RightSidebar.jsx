@@ -12,8 +12,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useReducedMotion } from 'framer-motion'
-import SidebarTabs from './SidebarTabs'
-import { getRightSidebarTabs } from './sidebarTabsConfig'
+import InspectorHeader from './InspectorHeader'
+import MapInspectorPanel from './MapInspectorPanel'
+import ReferencesPanel from './references/ReferencesPanel'
+import StatsPanel from '../stats/StatsPanel'
+import { OutputPanel, TypesetPanel } from './finishing/FinishingPanels'
+import TypesetHistoryView from './TypesetHistoryView'
+import Segmented from '../../ui/Segmented'
+import { hasActiveWheelPhase, hasEndedWheelPhase, hasMomentumPhase } from '../../lib/wheelPhase'
+import { sidebarTabsFor } from './sidebarTabsConfig'
+import useInspectorLayout from './useInspectorLayout'
+import './InspectorLayout.css'
+import { useLatestBridgeState } from '../../bridge'
+import { isMapDoc } from '../../lib/docKind'
+import { inspectorTab } from '../../lib/chromeLayout'
 import Workbench from './Workbench'
 import NotesPanel from '../NotesPanel'
 import HistoryPanel from './HistoryPanel'
@@ -55,29 +67,6 @@ const EDGE_REVEAL_ZONE_PX = 12
 const SEARCH_OVERLAY_WIDTH = 640
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
-
-// WebKit exposes wheel gesture phase as a bitmask on wheel events
-// (webkitPhase / webkitMomentumPhase); used to tell live finger input
-// from post-release momentum.
-const WHEEL_PHASE_BEGAN = 1
-const WHEEL_PHASE_STATIONARY = 2
-const WHEEL_PHASE_CHANGED = 4
-const WHEEL_PHASE_ENDED = 8
-const WHEEL_PHASE_CANCELLED = 16
-const WHEEL_PHASE_MAY_BEGIN = 32
-
-const hasWheelPhase = (phase, flag) => Number.isFinite(phase) && (phase & flag) === flag
-const hasActiveWheelPhase = (phase) => (
-  hasWheelPhase(phase, WHEEL_PHASE_BEGAN) ||
-  hasWheelPhase(phase, WHEEL_PHASE_STATIONARY) ||
-  hasWheelPhase(phase, WHEEL_PHASE_CHANGED) ||
-  hasWheelPhase(phase, WHEEL_PHASE_MAY_BEGIN)
-)
-const hasMomentumPhase = (phase) => Number.isFinite(phase) && phase !== 0
-const hasEndedWheelPhase = (phase) => (
-  hasWheelPhase(phase, WHEEL_PHASE_ENDED) ||
-  hasWheelPhase(phase, WHEEL_PHASE_CANCELLED)
-)
 
 /** Snap a fractional tab position to an index once 25% of the next tab is revealed. */
 const getThresholdSnapIndex = (rawIndex, direction) => {
@@ -131,7 +120,28 @@ export default function RightSidebar({
   onOpenCompare,
 }) {
   const prefersReducedMotion = useReducedMotion()
-  const tabs = useMemo(() => getRightSidebarTabs(activeDoc), [activeDoc])
+  // The panels are the current layout's — Write's or Typeset's, as the window's mode
+  // is — with the map's first while a map is showing.
+  const pageLayout = useLatestBridgeState('pageLayoutState', null)
+  const inspector = useInspectorLayout({
+    mode: pageLayout?.mode,
+    hasMap: isMapDoc(activeDoc),
+    tab: sidebarTab,
+    setTab: setSidebarTab,
+  })
+  const tabs = useMemo(() => sidebarTabsFor(inspector.tabs), [inspector.tabs])
+  const [historyKind, setHistoryKind] = useState('typeset')
+
+  // A map asking for its panel (a label just placed, an item double-clicked) brings
+  // the Map tab up.
+  const mapChrome = useLatestBridgeState('mapChromeChanged', null)
+  const revealPanel = mapChrome?.state?.revealPanel ?? 0
+  const lastRevealRef = useRef(revealPanel)
+  useEffect(() => {
+    if (revealPanel === lastRevealRef.current) return
+    lastRevealRef.current = revealPanel
+    if (revealPanel) setSidebarTab('map')
+  }, [revealPanel, setSidebarTab])
   const tabIds = useMemo(() => tabs.map(({ id }) => id), [tabs])
   const activeTabIndex = Math.max(0, tabIds.indexOf(sidebarTab))
 
@@ -760,7 +770,23 @@ export default function RightSidebar({
       )
     }
 
-    return (
+    if (tabId === 'map') return <MapInspectorPanel />
+    if (tabId === 'references') return <ReferencesPanel query={panelQuery} />
+    if (tabId === 'stats') return <StatsPanel query={panelQuery} />
+    if (tabId === 'typeset') return <TypesetPanel onShowOutput={() => handleSelectTab('output')} />
+    if (tabId === 'output') return <OutputPanel />
+
+    if (tabId !== 'history') {
+      const spec = inspectorTab(tabId)
+      return (
+        <div className="inspector-placeholder">
+          <SFIcon name={spec?.symbol ?? 'doc'} size={22} />
+          <span>{spec?.title ?? tabId} is on its way to this panel.</span>
+        </div>
+      )
+    }
+
+    const textHistory = (
       <HistoryPanel
         versions={versions?.[activeDoc] || []}
         setVersions={setVersions}
@@ -773,6 +799,23 @@ export default function RightSidebar({
         onOpenDocInTab={onOpenDocInTab}
         onOpenCompare={onOpenCompare}
       />
+    )
+    // In Typeset the book's typeset versions are History's first, with the text's a
+    // switch away.
+    if (pageLayout?.mode !== 'typeset') return textHistory
+    return (
+      <div className="history-with-switch">
+        <div className="history-mode-switch">
+          <Segmented
+            value={historyKind}
+            onChange={setHistoryKind}
+            label="History of"
+            stretch
+            options={[{ value: 'typeset', label: 'Typeset' }, { value: 'text', label: 'Text' }]}
+          />
+        </div>
+        {historyKind === 'typeset' ? <TypesetHistoryView /> : textHistory}
+      </div>
     )
   }
 
@@ -815,10 +858,12 @@ export default function RightSidebar({
         </button>
       </div>
 
-      <SidebarTabs
+      <InspectorHeader
         tabs={tabs}
         tab={sidebarTab}
         setTab={handleSelectTab}
+        layout={inspector.layout}
+        onChooseLayout={inspector.chooseLayout}
         visualProgress={visualTabProgress}
         gestureActive={gestureActive}
         reducedMotion={prefersReducedMotion}

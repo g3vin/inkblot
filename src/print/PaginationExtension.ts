@@ -36,12 +36,15 @@ import type { EditorView } from '@tiptap/pm/view'
 import { measureUnits } from './measure'
 import { paginate } from './paginate'
 import type { Continuation, LayoutFrame, LayoutResult, Push } from './paginate'
+import { noteMeasurer } from './footnoteArea'
 
 export interface PaginationFrame extends LayoutFrame {
   /** Bumped by the caller whenever something outside the document changed layout. */
   revision?: number
   /** The print typography the text is set in (`typographyKey`): a change re-measures every line. */
   typeKey?: string
+  /** The book sets its notes at the foot of each page: room is kept for them. */
+  footnotes?: boolean
 }
 
 export interface PaginationState {
@@ -350,8 +353,11 @@ export const computePushes = (view: EditorView, state: PaginationState): { pushe
   const scale = rect.width / dom.offsetWidth || 1
   const originOffset = parseFloat(getComputedStyle(dom).paddingTop) || 0
   const layoutKey = `${dom.offsetWidth}|${frame.slotHeight}|${frame.typeKey || ''}|${frame.revision || 0}`
-  const units = measureUnits({ view, scale, applied: state.pushes, originOffset, layoutKey })
-  const result = paginate(units, frame)
+  // Footnotes at the page's foot are measured as they will be set there.
+  const notes = frame.footnotes ? noteMeasurer(dom.parentElement || dom, dom.offsetWidth, frame.typeKey || '') : null
+  const noteHeight = notes ? (text: string) => notes.note('00', text) : null
+  const units = measureUnits({ view, scale, applied: state.pushes, originOffset, layoutKey, noteHeight })
+  const result = paginate(units, notes ? { ...frame, noteGap: notes.separator } : frame)
   return { pushes: result.pushes, result }
 }
 

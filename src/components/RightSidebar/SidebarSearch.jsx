@@ -10,9 +10,8 @@
  * other scope switches the bar from filtering to searching: it renders its own
  * results and stops filtering the panel, so the two never fight.
  */
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SFIcon from '../SFIcon'
-import { documentSurface } from '../../bridge'
 import { listProjectTree, loadDocument } from '../../lib/FileSystem'
 import {
   SEARCH_SCOPES,
@@ -26,6 +25,8 @@ import {
   rememberRecentSearch,
   searchProject,
 } from '../../lib/sidebarSearch'
+
+const SEARCH_DEBOUNCE_MS = 180
 
 const MATCH_OPTIONS = [
   { key: 'matchCase', label: 'Aa', title: 'Match case' },
@@ -67,7 +68,13 @@ export default function SidebarSearch({
   const inputRef = useRef(null)
   const notesByDocRef = useRef(notesByDoc)
 
-  const deferredQuery = useDeferredValue(query)
+  // Searched a moment after the typing stops, not per key.
+  const [deferredQuery, setDeferredQuery] = useState(query)
+  useEffect(() => {
+    if (!query) { setDeferredQuery(''); return undefined }
+    const timer = setTimeout(() => setDeferredQuery(query), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [query])
   const matcher = useMemo(
     () => createMatcher(deferredQuery, options),
     [deferredQuery, options],
@@ -214,21 +221,6 @@ export default function SidebarSearch({
     const index = documentResults.findIndex((result) => result.id === selectedResultId)
     return index === -1 ? 0 : index
   }, [documentResults, selectedResultId])
-
-  // The open document's matches, for a shell that marks them (a scrollbar gutter, the
-  // native find bar). Only this scope: project results carry no live positions, and
-  // `inkblot-core` answers those itself. The inline copy is inactive while the overlay
-  // is up, so one search is not published twice.
-  const matchesDocPath = activeDoc || currentDoc || ''
-  useEffect(() => {
-    if (!active || scope !== 'document' || !matchesDocPath) return
-    documentSurface.publishSearchMatches({
-      query: deferredQuery,
-      docPath: matchesDocPath,
-      results: documentResults,
-      activeIndex: selectedIndex === -1 ? undefined : selectedIndex,
-    })
-  }, [active, deferredQuery, documentResults, matchesDocPath, scope, selectedIndex])
 
   /* ---- Actions ---- */
 

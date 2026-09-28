@@ -94,11 +94,11 @@ const BOOK = {
 
 const browser = await webkit.launch()
 
-const open = async (content, { zoom = 1, setup = null } = {}) => {
+const open = async (content, { zoom = 1, setup = null, typeset = false } = {}) => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 960 } })
   page.on('pageerror', (e) => ok(`no page error (${e.message})`, false))
   await page.addInitScript((c) => { window.__content = c }, content)
-  await page.goto(`${base}?zoom=${zoom}&setup=${encodeURIComponent(JSON.stringify(setup))}`)
+  await page.goto(`${base}?zoom=${zoom}&setup=${encodeURIComponent(JSON.stringify(setup))}${typeset ? '&typeset=1' : ''}`)
   await page.waitForFunction(() => window.__print?.editor && window.__print.paginationKey.getState(window.__print.editor.state)?.result, null, { timeout: 30000 })
   await settle(page)
   return page
@@ -296,6 +296,434 @@ for (const [label, setup] of [['Letter', null], ['6 × 9 mirrored', BOOK]]) {
   const expected = Math.ceil(r.pages / 16) * 4 * 2 + 1
   ok(`binding: ${r.pages} pages in 16-page signatures are ${expected - 1} sheet sides and a folding guide`, r.sheets === expected, `${r.sheets}`)
   ok('binding: sheets are landscape Letter', Math.round(r.w) === 1056 && Math.round(r.h) === 816)
+  await page.close()
+}
+
+/* ---------------- 5b. a designed chapter head ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: true, sceneBreak: '* * *', chapterOpening: 'dropCapAndSmallCaps',
+    chapterSinkMm: 40, noIndentAfterBreak: true,
+  }
+  const page = await open(manuscript(8, 7), { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(async () => {
+    const { editor, preparePrint } = window.__print
+    const head = { label: 'Chapter One', title: 'The Road', subtitle: 'In which it rains', ornament: 'glyph', ornamentGlyph: '❦', ornamentPosition: 'below', alignment: 'center', titleSizePt: 20 }
+    const json = editor.getJSON()
+    json.content = [{ type: 'chapterHead', attrs: { head } }, ...json.content.filter((n) => n.type !== 'heading')]
+    editor.commands.setContent(json)
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    const live = document.querySelector('.pl-flow .ProseMirror > .chapter-head')
+    const first = live?.nextElementSibling
+    const sink = live ? parseFloat(getComputedStyle(live).paddingTop) : 0
+    const drop = first ? getComputedStyle(first, '::first-letter').getPropertyValue('initial-letter') || getComputedStyle(first, '::first-letter').getPropertyValue('-webkit-initial-letter') : ''
+    const prepared = await preparePrint({ projectName: 'x', docPath: 'Harness', scope: 'document', liveEditors: [{ path: 'Harness', editor }] })
+    const printed = prepared.elements[0].querySelector('.chapter-head')
+    return {
+      live: Boolean(live),
+      parts: live ? [...live.children].map((el) => el.className) : [],
+      sink,
+      drop,
+      printed: Boolean(printed),
+      printedTitle: printed?.querySelector('.ch-title')?.textContent,
+    }
+  })
+  ok('a chapter head sets its number, title, subtitle and ornament in order', JSON.stringify(r.parts) === JSON.stringify(['ch-number', 'ch-title', 'ch-subtitle', 'ch-ornament is-glyph']), JSON.stringify(r.parts))
+  ok('it sits down its page by the sink (40 mm)', Math.abs(r.sink - 40 * 96 / 25.4) < 1, `${r.sink}`)
+  ok('the paragraph after it opens with a drop cap', /3/.test(r.drop), r.drop)
+  ok('and it prints, as shown', r.printed && r.printedTitle === 'The Road')
+  await page.close()
+}
+
+/* ---------------- 5c. typesetting on the page ---------------- */
+
+{
+  const page = await open(manuscript(6, 9), { setup: BOOK, typeset: true })
+  // Over the first page: its text block's top edge, and the running head.
+  const stage = await page.locator('.pl-stage').boundingBox()
+  await page.mouse.move(stage.x + stage.width / 2, stage.y + 300)
+  await page.waitForSelector('.typeset-overlay .to-edge.is-h')
+  const top = await page.locator('.typeset-overlay .to-edge.is-h').first().boundingBox()
+  const before = await page.evaluate(() => window.__print.editor.state.doc.attrs.pageSetup.margins.topMm)
+  await page.mouse.move(top.x + top.width / 2, top.y + top.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(top.x + top.width / 2, top.y + top.height / 2 + 38, { steps: 6 })
+  const tip = await page.locator('.typeset-overlay .to-tip').textContent().catch(() => '')
+  await page.mouse.up()
+  const r = await page.evaluate(() => ({
+    after: window.__print.editor.state.doc.attrs.pageSetup.margins.topMm,
+    edits: window.__typesetEdits || [],
+    focus: window.__typesetFocus || [],
+  }))
+  ok('dragging the text block’s top edge down widens the top margin, snapped to half a millimetre',
+    r.after > before + 8 && r.after < before + 12 && Math.abs(r.after * 2 - Math.round(r.after * 2)) < 1e-9, `${before} → ${r.after}`)
+  ok('…in one change, when it is let go', r.edits.length === 1 && r.edits[0].label === 'Margins')
+  ok('…showing the value as it goes', /mm · .*″/.test(tip || ''), tip)
+  ok('…and the inspector is shown where margins are set', r.focus.includes('page.size'))
+
+  // The running head: click it, and say something else.
+  await page.mouse.move(stage.x + stage.width / 2, stage.y + 300)
+  const head = await page.locator('.typeset-overlay .to-running.is-header').boundingBox()
+  await page.mouse.click(head.x + head.width / 2, head.y + head.height / 2)
+  await page.waitForSelector('.typeset-overlay .to-popover input')
+  const center = page.locator('.typeset-overlay .to-popover input').nth(1)
+  await center.fill('{title} — {page}')
+  await center.press('Enter')
+  const header = await page.evaluate(() => window.__print.editor.state.doc.attrs.pageSetup.header.center)
+  ok('clicking the running head edits what it says', header === '{title} — {page}', header)
+  await page.close()
+}
+
+/* ---------------- 5d. a chapter's head and a scene break, on the page ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: true, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 30, noIndentAfterBreak: true,
+  }
+  const design = {
+    showNumber: true, showTitle: true, showSubtitle: true, showImage: true, ornament: 'rule', ornamentGlyph: '',
+    ornamentPosition: 'between', imageWidthPct: 40, alignment: 'center', numberCase: 'smallCaps', titleCase: 'asWritten',
+    numberSizePt: 12, titleSizePt: 20, chapterBreak: 'newPage',
+  }
+  const content = `<h1>The Road</h1>${manuscript(4, 11).replace(/<h1>[^<]*<\/h1>/g, '')}<hr><p>After the break.</p>`
+  const page = await browser.newPage({ viewport: { width: 1280, height: 960 } })
+  page.on('pageerror', (e) => ok(`no page error (${e.message})`, false))
+  await page.addInitScript(({ c, d }) => { window.__content = c; window.__design = d }, { c: content, d: design })
+  await page.goto(`${base}?zoom=1&setup=${encodeURIComponent(JSON.stringify({ ...BOOK, typography }))}&typeset=1`)
+  await page.waitForFunction(() => window.__print?.editor && window.__print.paginationKey.getState(window.__print.editor.state)?.result, null, { timeout: 30000 })
+  await page.evaluate((d) => window.__print.setLiveHead(window.__print.editor, { design: d, label: 'Chapter One', name: 'road' }), design)
+  await settle(page)
+  const live = await page.evaluate(() => ({
+    number: document.querySelector('.pl-flow .chapter-head.is-live-top .ch-number')?.textContent,
+    rule: Boolean(document.querySelector('.pl-flow .chapter-head.is-live-top .ch-ornament.is-rule')),
+    title: document.querySelector('.pl-flow .ProseMirror > h1.ch-live-title')?.textContent,
+    subtitle: Boolean(document.querySelector('.pl-flow .chapter-head.is-live-bottom .ch-subtitle[contenteditable]')),
+  }))
+  ok('the live chapter opens with its designed head around its real title',
+    live.number === 'Chapter One' && live.rule && live.title === 'The Road' && live.subtitle, JSON.stringify(live))
+
+  // Its subtitle, typed in place.
+  await page.click('.pl-flow .chapter-head.is-live-bottom .ch-subtitle')
+  await page.keyboard.type('In which it rains')
+  await page.keyboard.press('Enter')
+  const subtitle = await page.evaluate(() => window.__print.editor.state.doc.attrs.chapter?.subtitle)
+  ok('a subtitle is typed in place, and kept with the chapter', subtitle === 'In which it rains', subtitle)
+
+  // Its sink: dragged down.
+  const stage = await page.locator('.pl-stage').boundingBox()
+  await page.mouse.move(stage.x + stage.width / 2, stage.y + 200)
+  const sink = await page.locator('.typeset-overlay .to-sink').boundingBox()
+  await page.mouse.move(sink.x + sink.width / 2, sink.y + sink.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(sink.x + sink.width / 2, sink.y + sink.height / 2 + 38, { steps: 5 })
+  await page.mouse.up()
+  const sunk = await page.evaluate(() => window.__print.editor.state.doc.attrs.pageSetup.typography.chapterSinkMm)
+  ok('dragging the head’s top sets how far down the page it opens', sunk > 38 && sunk < 42, `${sunk}`)
+
+  // A scene break, clicked, and given another glyph.
+  await page.locator('.pl-flow .ProseMirror hr').last().scrollIntoViewIfNeeded()
+  await page.locator('.pl-flow .ProseMirror hr').last().click()
+  await page.waitForSelector('.typeset-overlay .to-popover .to-glyphs')
+  await page.locator('.typeset-overlay .to-popover button', { hasText: '❦' }).click()
+  const glyph = await page.evaluate(() => window.__print.editor.state.doc.attrs.pageSetup.typography.sceneBreak)
+  ok('clicking a scene break chooses its glyph', glyph === '❦', glyph)
+  await page.close()
+}
+
+/* ---------------- 5e. the e-book, as a reader pages it ---------------- */
+
+{
+  const page = await open('<p>x</p>')
+  const r = await page.evaluate(async () => {
+    const { readerCss, DEFAULT_READER, ebookCss } = window.__print
+    const para = (n) => Array.from({ length: n }, (_, i) => `<p>Paragraph ${i} of a chapter long enough to run over several screens of a small reader, as a novel's chapters do.</p>`).join('')
+    const body = [1, 2, 3].map((n) => `<section class="ebook-item" data-item="c${n}"><header class="chapter-head"><h1 class="ch-title">Chapter ${n}</h1></header>${para(40)}</section>`).join('')
+    const results = []
+    for (const [w, h] of [[412, 549], [1024, 720]]) {
+      const frame = document.createElement('iframe')
+      frame.style.cssText = `width:${w}px;height:${h}px;border:0`
+      frame.srcdoc = `<!doctype html><html><head><style>${ebookCss({ typography: null })}</style><style>${readerCss(DEFAULT_READER, w, h)}</style></head><body>${body}</body></html>`
+      document.body.appendChild(frame)
+      await new Promise((resolve) => { frame.onload = resolve })
+      const doc = frame.contentDocument
+      const root = doc.scrollingElement
+      const pages = Math.ceil((root.scrollWidth - 1) / w)
+      // Each chapter opens a page: its left edge is a page's left margin.
+      const starts = [...doc.querySelectorAll('.ebook-item')].map((s) => (s.getBoundingClientRect().left + root.scrollLeft) % w)
+      // No line runs below the page, or into the next.
+      let overflow = 0
+      for (const p of doc.querySelectorAll('p')) {
+        for (const rect of p.getClientRects()) {
+          if (rect.bottom > h + 0.5) overflow += 1
+          const x = (rect.left + root.scrollLeft) % w
+          if (x + rect.width > w + 0.5) overflow += 1
+        }
+      }
+      root.scrollLeft = 2 * w
+      const turned = root.scrollLeft
+      results.push({ w, pages, starts, overflow, turned })
+      frame.remove()
+    }
+    return results
+  })
+  const [phone, wide] = r
+  ok(`a reader's screen pages the book (${phone.pages} pages at 412 × 549)`, phone.pages > 6)
+  ok('each chapter opens a page, at the margin', new Set(phone.starts.map((x) => Math.round(x))).size === 1 && phone.starts[0] > 0 && phone.starts[0] < 60, JSON.stringify(phone.starts))
+  ok('no line runs off a page, down or across', phone.overflow === 0 && wide.overflow === 0, `${phone.overflow}/${wide.overflow}`)
+  ok('a page turn is exactly one screen', phone.turned === 2 * phone.w && wide.turned === 2 * wide.w)
+  ok('a wide screen shows two pages at a time, so it turns fewer screens', wide.pages < phone.pages)
+  await page.close()
+}
+
+/* ---------------- 5f. the proof, and a typesetter's fix ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: false, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 0, noIndentAfterBreak: true,
+    // Balanced lines never leave a runt, which is the point; off, to make one.
+    composition: { balance: false, hangingPunctuation: false, hyphenLimitLines: 2, hyphenMinWord: 6, baselineGrid: false },
+  }
+  const page = await open('<p>x</p>', { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(async () => {
+    const { editor, paginationKey, analyzeLines, readParagraphLines, setParagraphTypeset } = window.__print
+    const frame = () => paginationKey.getState(editor.state).frame
+    const lastLine = () => {
+      const [para] = readParagraphLines(editor.view, frame())
+      return para.lines[para.lines.length - 1]
+    }
+    const frameWait = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    // Words until the last line holds one short word alone: a runt.
+    const words = 'the quick brown fox jumps over a lazy dog while writers draft chapters of long novels in quiet rooms'.split(' ')
+    let text = Array.from({ length: 70 }, (_, i) => words[i % words.length]).join(' ')
+    let found = null
+    for (let i = 0; i < 40 && !found; i += 1) {
+      editor.commands.setContent(`<p>${text} it.</p>`)
+      await frameWait()
+      const line = lastLine()
+      if (line.words.length === 1) found = line
+      else text += ` ${words[i % words.length]}`
+    }
+    if (!found) return { made: false }
+    const issues = analyzeLines(readParagraphLines(editor.view, frame()), { hyphenLimit: 2 })
+    const runt = issues.find((i) => i.kind === 'runt')
+    const linesBefore = readParagraphLines(editor.view, frame())[0].lines.length
+    const tr = editor.state.tr
+    setParagraphTypeset(tr, runt.from, runt.to, { nudgeTracking: -10 })
+    editor.view.dispatch(tr)
+    await frameWait()
+    const after = readParagraphLines(editor.view, frame())[0]
+    const node = editor.state.doc.firstChild
+    return {
+      made: true,
+      runt: Boolean(runt),
+      marked: runt?.text === 'it.',
+      linesBefore,
+      linesAfter: after.lines.length,
+      lastWords: after.lines[after.lines.length - 1].words.length,
+      tracking: node.attrs.tracking,
+      anchored: Boolean(node.attrs.typesetId),
+      spacing: getComputedStyle(editor.view.nodeDOM(0)).letterSpacing,
+    }
+  })
+  ok('a paragraph ending in one short word alone is found to end in a runt', r.made && r.runt && r.marked, JSON.stringify(r))
+  ok('tightening it sets its tracking, anchored for the typeset history', r.tracking === -10 && r.anchored && r.spacing !== 'normal', JSON.stringify(r))
+  ok('…and takes the runt back up', r.linesAfter < r.linesBefore || r.lastWords > 1, JSON.stringify(r))
+  await page.close()
+}
+
+/* ---------------- 5g. the baseline grid ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'exact', lineValue: 14, firstLineIndentMm: 5,
+    paragraphSpacingPt: 5, alignment: 'justify', hyphenate: true, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 20, noIndentAfterBreak: true,
+    composition: { baselineGrid: true },
+  }
+  const page = await open(manuscript(24, 3), { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(() => {
+    const { editor, paginationKey, baselineGridPx } = window.__print
+    const { frame } = paginationKey.getState(editor.state)
+    const dom = editor.view.dom
+    const rect = dom.getBoundingClientRect()
+    const scale = rect.width / dom.offsetWidth
+    const origin = parseFloat(getComputedStyle(dom).paddingTop) || 0
+    const grid = baselineGridPx(editor.state.doc.attrs.pageSetup.typography)
+    const off = []
+    // Each paragraph's first line of text — where pagination sets it — not its box,
+    // which a push's spacer opens.
+    for (const p of dom.querySelectorAll(':scope > p')) {
+      const text = document.createTreeWalker(p, NodeFilter.SHOW_TEXT).nextNode()
+      if (!text) continue
+      const range = document.createRange()
+      range.setStart(text, 0)
+      range.setEnd(text, 1)
+      const first = range.getClientRects()[0]
+      if (!first) continue
+      const y = (first.top - rect.top) / scale - origin
+      // A line at a page's very top can measure a hair above it.
+      const inSlot = y - Math.floor((y + 0.5) / frame.stride) * frame.stride
+      // Measured against the page's first line, as pagination sets it.
+      const rem = inSlot % grid
+      off.push(Math.min(rem, grid - rem))
+    }
+    return { grid: frame.grid, pitch: grid, worst: Math.max(...off), count: off.length }
+  })
+  ok(`on the baseline grid, every paragraph starts on a whole line of its page (${r.count} checked, worst ${r.worst.toFixed(2)}px)`,
+    r.grid > 0 && Math.abs(r.grid - r.pitch) < 0.01 && r.worst < 1, JSON.stringify(r))
+  await page.close()
+}
+
+/* ---------------- 5h. named text styles on the page ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'exact', lineValue: 14, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: false, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 0, noIndentAfterBreak: true,
+  }
+  const page = await open('<p>Before.</p><p data-style="letter">Dear M,</p><p data-style="letter">Yours, A.</p><p>After.</p><p data-style="sign">No Entry</p>', { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(() => {
+    const { editor, applyTextStyleSheet, textStylesOf } = window.__print
+    applyTextStyleSheet(textStylesOf({}))
+    const ps = [...editor.view.dom.querySelectorAll(':scope > p')].map((p) => getComputedStyle(p))
+    return ps.map((c) => ({ ml: parseFloat(c.marginLeft), mt: parseFloat(c.marginTop), mb: parseFloat(c.marginBottom), indent: parseFloat(c.textIndent), border: c.borderTopStyle, variant: c.fontVariantCaps, align: c.textAlign }))
+  })
+  const [before, first, second, after, sign] = r
+  ok('a letter is indented both sides and set flush', first.ml > 20 && second.ml === first.ml && first.indent === 0 && before.ml === 0, JSON.stringify(r))
+  ok('…with a line’s space before its first paragraph and after its last, none between', first.mt > 15 && first.mb === 0 && second.mt === 0 && second.mb > 15, JSON.stringify(r))
+  ok('the paragraph after it starts flush, as after a break', after.indent === 0)
+  ok('a sign is boxed, centred, in small capitals', sign.border === 'solid' && sign.align === 'center' && sign.variant === 'small-caps', JSON.stringify(sign))
+  await page.close()
+}
+
+/* ---------------- 5i. footnotes at the foot of the page ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: false, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 0, noIndentAfterBreak: true,
+  }
+  let s = 7
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647
+  const words = 'the quick brown fox jumps over a lazy dog while writers draft chapters of long novels in quiet rooms'.split(' ')
+  const sentence = (n) => Array.from({ length: n }, () => words[Math.floor(rnd() * words.length)]).join(' ')
+  let html = ''
+  let count = 0
+  for (let i = 0; i < 30; i += 1) {
+    const note = i % 2 === 0 ? `<sup data-footnote="n${i}" data-text="${sentence(12 + (i % 5) * 9)}."></sup>` : ''
+    if (note) count += 1
+    html += `<p>${sentence(40 + (i % 7) * 15)}${note} ${sentence(20)}.</p>`
+  }
+  const page = await open(html, { setup: { ...BOOK, typography } })
+  const r = await page.evaluate(() => {
+    const pages = [...document.querySelectorAll('.pl-page')]
+    const areas = [...document.querySelectorAll('.pl-page .pl-footnotes')]
+    const dom = window.__print.editor.view.dom
+    const lines = []
+    for (const p of dom.querySelectorAll(':scope > p')) {
+      const range = document.createRange()
+      range.selectNodeContents(p)
+      for (const rect of range.getClientRects()) if (rect.height > 4) lines.push(rect)
+    }
+    let overlaps = 0
+    let misplaced = 0
+    for (const area of areas) {
+      const box = area.getBoundingClientRect()
+      const pageBox = area.closest('.pl-page').getBoundingClientRect()
+      overlaps += lines.filter((l) => l.bottom > box.top + 1 && l.top < box.bottom && l.top > pageBox.top && l.bottom < pageBox.bottom).length
+      // Each note is on the page its mark is on.
+      for (const mark of area.querySelectorAll('.pl-footnote-mark')) {
+        const n = Number(mark.textContent)
+        const ref = dom.querySelectorAll('.footnote-ref')[n - 1]
+        const at = ref?.getBoundingClientRect()
+        if (!at || at.top < pageBox.top || at.bottom > pageBox.bottom) misplaced += 1
+      }
+    }
+    const notes = areas.reduce((n, a) => n + a.querySelectorAll('.pl-footnote').length, 0)
+    const inBounds = areas.every((a) => {
+      const box = a.getBoundingClientRect()
+      const pageBox = a.closest('.pl-page').getBoundingClientRect()
+      return box.bottom <= pageBox.bottom + 1 && box.top >= pageBox.top
+    })
+    const marks = areas.flatMap((a) => [...a.querySelectorAll('.pl-footnote-mark')].map((m) => m.textContent))
+    return { pages: pages.length, notes, overlaps, misplaced, inBounds, marks }
+  })
+  ok(`every note is set at the foot of a page (${r.notes} of ${count}, over ${r.pages} pages)`, r.notes === count, JSON.stringify(r))
+  ok('…on the page its mark is on', r.misplaced === 0, JSON.stringify(r))
+  ok('…below the text, with no line under or behind it, and inside the page', r.overlaps === 0 && r.inBounds, JSON.stringify(r))
+  ok('the notes are numbered 1, 2, 3 … down the pages', r.marks.join() === Array.from({ length: count }, (_, i) => i + 1).join(), JSON.stringify(r.marks))
+  const printed = await page.evaluate(async () => {
+    const { editor, preparePrint } = window.__print
+    const prepared = await preparePrint({ projectName: 'x', docPath: 'Harness', scope: 'document', liveEditors: [{ path: 'Harness', editor }] })
+    return prepared.elements.map((pg) => [...pg.querySelectorAll('.pl-footnote-mark')].map((m) => m.textContent).join(','))
+  })
+  const shown = await page.evaluate(() => [...document.querySelectorAll('.pl-page')].map((pg) => [...pg.querySelectorAll('.pl-footnote-mark')].map((m) => m.textContent).join(',')))
+  ok('the printed pages carry the same notes, on the same pages', JSON.stringify(printed) === JSON.stringify(shown), `${JSON.stringify(printed)} / ${JSON.stringify(shown)}`)
+  await page.close()
+}
+
+/* ---------------- 5j. a picture with a page to itself, and one to its edges ---------------- */
+
+{
+  const typography = {
+    fontFamily: 'Georgia, serif', fontSizePt: 11, lineSpacing: 'multiple', lineValue: 1.2, firstLineIndentMm: 5,
+    paragraphSpacingPt: 0, alignment: 'justify', hyphenate: false, sceneBreak: '* * *', chapterOpening: 'plain',
+    chapterSinkMm: 0, noIndentAfterBreak: true,
+  }
+  const svg = (w, h) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="#888"/></svg>`)}`
+  const text = 'the quick brown fox jumps over a lazy dog while writers draft chapters of long novels in quiet rooms '.repeat(6)
+  const html = `<p>${text}</p><p>${text}</p><p><img src="${svg(300, 900)}" data-layout="page"></p><p>After the picture. ${text}</p><p><img src="${svg(400, 300)}" data-layout="bleed"></p><p>The end.</p>`
+  const page = await open(html, { setup: { ...BOOK, typography } })
+  await page.waitForTimeout(400)
+  const r = await page.evaluate(async () => {
+    const { editor, paginationKey, preparePrint } = window.__print
+    const state = paginationKey.getState(editor.state)
+    const pages = [...document.querySelectorAll('.pl-page')].map((pg) => pg.getBoundingClientRect())
+    const pageOf = (rect) => pages.findIndex((p) => rect.top + rect.height / 2 >= p.top && rect.top + rect.height / 2 <= p.bottom)
+    const imgs = [...editor.view.dom.querySelectorAll('.image-node')]
+    const full = imgs[0].getBoundingClientRect()
+    const after = editor.view.dom.querySelectorAll(':scope > p')[3]
+    const range = document.createRange()
+    range.setStart(after.firstChild, 0)
+    range.setEnd(after.firstChild, 5)
+    const afterRect = range.getClientRects()[0]
+    const stage = document.querySelector('.pl-stage')
+    const z = stage.getBoundingClientRect().width / stage.offsetWidth
+    const contentH = parseFloat(getComputedStyle(stage).getPropertyValue('--pl-content-h'))
+    // Anything else on the full-page picture's page?
+    const fullPage = pageOf(full)
+    const others = [...editor.view.dom.querySelectorAll(':scope > p')].filter((p, i) => i !== 2).flatMap((p) => {
+      const rg = document.createRange()
+      rg.selectNodeContents(p)
+      return [...rg.getClientRects()].filter((c) => c.height > 4 && pageOf(c) === fullPage)
+    }).length
+    const prepared = await preparePrint({ projectName: 'x', docPath: 'Harness', scope: 'document', liveEditors: [{ path: 'Harness', editor }] })
+    return {
+      fullPage,
+      afterPage: pageOf(afterRect),
+      others,
+      fits: full.height / z <= contentH + 0.5,
+      tall: full.height / z > contentH * 0.9,
+      livePicture: Boolean(document.querySelector('.pl-page .pl-bleed-picture')),
+      pageCount: state.result.pageCount,
+      printed: prepared.elements.length,
+      bleedPages: prepared.elements.filter((el) => el.querySelector('.print-bleed-picture')).length,
+      sized: prepared.bleed && prepared.widthPx > prepared.elements[0].firstElementChild.offsetWidth - 1,
+    }
+  })
+  ok('a full-page picture has its page to itself', r.others === 0 && r.fullPage > 0, JSON.stringify(r))
+  ok('…fitted to the text block, as tall as it is', r.fits && r.tall, JSON.stringify(r))
+  ok('…and what follows starts the next page', r.afterPage === r.fullPage + 1, JSON.stringify(r))
+  ok('a picture to the edges is drawn by its page, on screen and in print', r.livePicture && r.bleedPages === 1, JSON.stringify(r))
+  ok('…and puts the print in bleed, every page larger by it', r.sized && r.printed === r.pageCount, JSON.stringify(r))
   await page.close()
 }
 

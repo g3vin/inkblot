@@ -423,7 +423,7 @@ export default function DictationControl({ editor }) {
     ]
 
     // The engine's lifecycle is not on the protocol: it is about the microphone, not
-    // about the document, and a native shell owns its own start/stop.
+    // about the document.
     startDictationSource({
       onStarted: (payload) => {
         if (payload?.sessionId) sessionIdRef.current = payload.sessionId

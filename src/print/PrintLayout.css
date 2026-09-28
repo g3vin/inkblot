@@ -18,6 +18,7 @@
 .pane-scroll.is-print-layout,
 .print-layout {
   --pl-desk: #d5d6d9;
+  --pl-grid-line: rgba(0, 150, 255, 0.45);
   --pl-paper: #ffffff;
   --pl-ink: #1b1b1b;
   --pl-ink-secondary: #555555;
@@ -44,23 +45,6 @@
     0 0 0 0.5px rgba(0, 0, 0, 0.6),
     0 2px 6px rgba(0, 0, 0, 0.5),
     0 6px 14px rgba(0, 0, 0, 0.35);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) :is(.pane-scroll.is-print-layout, .print-layout:not(.print-offscreen)) {
-    --pl-desk: #27292c;
-    --pl-paper: #0b0b0c;
-    --pl-ink: #e8ebee;
-    --pl-ink-secondary: #aab2ba;
-    --pl-running: #9ea6ae;
-    --pl-faint: rgba(255, 255, 255, 0.3);
-    --pl-blank: rgba(255, 255, 255, 0.25);
-    --pl-header: #c4cad0;
-    --pl-page-shadow:
-      0 0 0 0.5px rgba(0, 0, 0, 0.6),
-      0 2px 6px rgba(0, 0, 0, 0.5),
-      0 6px 14px rgba(0, 0, 0, 0.35);
-  }
 }
 
 /* The scroller itself is the desk, so it runs the pane's full height: up under the
@@ -111,11 +95,7 @@
 }
 
 .print-layout .pl-stage .bubble-session-chip {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 60%),
-    color-mix(in srgb, var(--accent-color) 30%, var(--pl-paper));
+  background: color-mix(in srgb, var(--accent-color) 30%, var(--pl-paper));
 }
 
 /* Mid-zoom the sizer is scaled as one composited layer (PrintLayoutView's zoom), so a
@@ -346,32 +326,31 @@
 /* ---- the zoom bar and page counter ---- */
 
 /* The page count rides in the pane's status row, beside the word count
-   (WordCountBadge.css). Under the Swift shell it is drawn as glass over this one. */
+   (WordCountBadge.css). */
 .pl-page-count-badge {
   font-variant-numeric: tabular-nums;
 }
 
-/* The zoom bar, bottom-right; under the Swift shell the shell draws its own
-   (PrintLayoutControls.swift) and this one is not rendered. */
+/* The zoom bar, bottom-right. */
 .pl-status {
   position: absolute;
   right: 10px;
-  bottom: 18px;
+  bottom: 20px;
   z-index: 5;
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 32px;
+  height: 26px;
+  font: 12px var(--font-ui);
   box-sizing: border-box;
   padding: 0 6px;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--app-bg, #1e1e1e) 72%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
-  backdrop-filter: blur(16px) saturate(1.6);
-  box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.25),
-    0 2px 10px rgba(0, 0, 0, 0.15);
-  font: 500 12px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-pill);
+  background: var(--floating-over-page-bg);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
+  box-shadow: var(--shadow-1);
+  font: 500 12px/1 var(--font-ui);
   color: var(--text-primary, #ddd);
   user-select: none;
 }
@@ -379,7 +358,7 @@
 /* Side by side, the right pane's status row holds the bottom-right corner; the left
    pane's corner is the middle of the window, so the controls sit higher there. */
 .split-active:not(.split-rows) .pl-status {
-  bottom: 58px;
+  bottom: 54px;
 }
 
 .pl-status button,
@@ -388,8 +367,8 @@
   color: inherit;
   background: transparent;
   border: 0;
-  border-radius: 10px;
-  padding: 4px 7px;
+  border-radius: var(--radius-pill);
+  padding: 2px 7px;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
 }
@@ -417,6 +396,593 @@
 
 .print-offscreen .pl-flow {
   position: relative;
+}
+
+/* ---- typesetting on the page (TypesetOverlay.jsx) ---- */
+
+.typeset-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  --to-accent: var(--accent-color, #0a84ff);
+}
+
+.typeset-overlay > * { position: absolute; pointer-events: auto; }
+.typeset-overlay .to-block { pointer-events: none; border: 1px dashed color-mix(in srgb, var(--to-accent) 55%, transparent); box-sizing: border-box; }
+.typeset-overlay .to-edge { background: transparent; }
+.typeset-overlay .to-edge.is-h { height: 10px; cursor: ns-resize; }
+.typeset-overlay .to-edge.is-v { width: 10px; cursor: ew-resize; }
+.typeset-overlay .to-edge:hover,
+.typeset-overlay.is-dragging .to-edge { background: color-mix(in srgb, var(--to-accent) 22%, transparent); }
+.typeset-overlay .to-running { cursor: ns-resize; border-radius: 3px; }
+.typeset-overlay .to-running:hover { background: color-mix(in srgb, var(--to-accent) 10%, transparent); outline: 1px solid color-mix(in srgb, var(--to-accent) 40%, transparent); }
+.typeset-overlay .to-sink { height: 6px; cursor: ns-resize; border-top: 2px solid transparent; }
+.typeset-overlay .to-sink:hover,
+.typeset-overlay.is-dragging .to-sink { border-top-color: var(--to-accent); }
+.typeset-overlay .to-headdrop { pointer-events: none; }
+.typeset-overlay.is-dragging .to-headdrop,
+.typeset-overlay .to-headdrop:has(~ *:hover) { pointer-events: none; }
+
+.typeset-overlay :is(.to-headbar, .to-imagebar) {
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--pl-paper, #ffffff);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+  opacity: 0;
+  transition: opacity 120ms;
+  font: 12px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.pl-stage:hover .typeset-overlay :is(.to-headbar, .to-imagebar) { opacity: 1; }
+
+.typeset-overlay :is(.to-headbar, .to-imagebar, .to-popover) button,
+.typeset-overlay .to-file {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--pl-ink, #1b1b1b);
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.typeset-overlay :is(.to-headbar, .to-imagebar, .to-popover) button:hover,
+.typeset-overlay .to-file:hover { background: color-mix(in srgb, var(--to-accent) 14%, transparent); }
+.typeset-overlay :is(.to-headbar, .to-popover) button.is-on { background: var(--to-accent); color: #ffffff; }
+.typeset-overlay .to-file input { display: none; }
+.typeset-overlay .to-sep { width: 1px; margin: 3px 2px; background: rgba(0, 0, 0, 0.15); }
+
+.typeset-overlay .to-picture { cursor: grab; outline: 1px dashed transparent; }
+.typeset-overlay .to-picture:hover { outline-color: var(--to-accent); }
+.typeset-overlay .to-picture-corner {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--to-accent);
+  cursor: nwse-resize;
+  opacity: 0;
+}
+.typeset-overlay .to-picture:hover .to-picture-corner { opacity: 1; }
+
+.typeset-overlay .to-tip {
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font: 11px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.typeset-overlay .to-popover {
+  z-index: 4;
+  transform: translateX(-50%);
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--pl-paper, #ffffff);
+  color: var(--pl-ink, #1b1b1b);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.typeset-overlay .to-list { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.typeset-overlay .to-list > button { justify-content: flex-start; }
+.typeset-overlay .to-glyphs { display: grid; grid-template-columns: repeat(5, auto); gap: 2px; }
+.typeset-overlay .to-field { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; }
+.typeset-overlay .to-field input { font: inherit; padding: 2px 4px; border: 1px solid rgba(0, 0, 0, 0.2); border-radius: 4px; background: transparent; color: inherit; }
+.typeset-overlay .to-row { display: flex; align-items: center; gap: 4px; }
+.typeset-overlay .to-tokens { display: flex; flex-wrap: wrap; gap: 4px; opacity: 0.7; }
+
+.typeset-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 56px;
+  z-index: 1000;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 8px 7px 14px;
+  border-radius: 10px;
+  background: rgba(30, 30, 32, 0.92);
+  color: #ffffff;
+  font: 12px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.typeset-toast button {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---- a whole book, in Typeset (BookPages.jsx) ---- */
+
+.book-pages {
+  position: relative;
+  min-height: 100%;
+  padding: 32px 0 96px;
+  box-sizing: border-box;
+  background: var(--pl-desk);
+}
+
+/* The live chapter among the book's pages: no desk of its own, the same gap. */
+.book-pages .print-layout {
+  min-height: 0;
+  padding: 0 24px;
+}
+
+.book-pages-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.book-pages-stack .book-page {
+  box-shadow: var(--pl-page-shadow);
+  cursor: pointer;
+}
+
+.book-pages-stack .book-page .print-page {
+  pointer-events: none;
+}
+
+.book-pages-status {
+  position: sticky;
+  bottom: 12px;
+  width: max-content;
+  margin: 0 auto;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.book-preview-bar {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: max-content;
+  margin: 0 auto 20px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 10px;
+  background: var(--accent-color, #0a84ff);
+  color: #ffffff;
+  font: 12px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.book-preview-bar button {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.book-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.book-compare-label {
+  text-align: center;
+  margin-bottom: 8px;
+  color: var(--pl-ink-secondary, #555555);
+  font: 600 12px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ---- a folder read as one document, in Write (ContinuousStack.jsx) ---- */
+
+.continuous-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: var(--editor-max-width, 720px);
+  margin: 40px auto 18px;
+  padding: 0 24px;
+  color: var(--text-secondary, #6e6e73);
+  font: 600 11px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.continuous-divider::before,
+.continuous-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.continuous-number {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.continuous-live > .continuous-divider:first-child { margin-top: 12px; }
+.continuous-doc { cursor: text; }
+.continuous-doc .continuous-text { outline: none; }
+.continuous-doc:hover .continuous-text { opacity: 0.92; }
+.continuous-placeholder { min-height: 60vh; }
+
+/* ---- the cover (CoverView.jsx) ---- */
+
+.cover-view {
+  container-type: inline-size;
+  min-height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  background: var(--pl-desk);
+  color: var(--pl-ink);
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.cover-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cover-bar span { opacity: 0.7; flex: 1; }
+.cover-bar button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(0, 0, 0, 0.2); background: var(--pl-paper); color: inherit; cursor: pointer; }
+.cover-stage-host { display: flex; justify-content: center; }
+
+.cover-stage {
+  position: relative;
+  background: #ffffff;
+  box-shadow: var(--pl-page-shadow);
+  outline: 2px solid transparent;
+}
+
+.cover-stage.is-over { outline-color: var(--accent-color, #0a84ff); }
+.cover-part { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.cover-part.is-spine { background: rgba(0, 0, 0, 0.03); }
+.cover-part.is-over { background: color-mix(in srgb, var(--accent-color, #0a84ff) 18%, transparent); }
+.cover-picture { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cover-drop { color: #8a8a8e; text-align: center; padding: 8px; }
+.cover-part.is-spine .cover-drop { writing-mode: vertical-rl; }
+.cover-guides { position: absolute; inset: 0; pointer-events: none; }
+.cover-guides > * { position: absolute; box-sizing: border-box; }
+.cover-trim { border: 1px dashed #d0021b; }
+.cover-safe { border: 1px dotted rgba(10, 132, 255, 0.8); }
+.cover-fold { top: 0; bottom: 0; width: 0; border-left: 1px dashed rgba(0, 0, 0, 0.55); }
+.cover-barcode { display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0, 0, 0, 0.5); background: rgba(255, 255, 255, 0.75); color: #555555; font-size: 10px; }
+.cover-note { max-width: 640px; margin: 16px auto 0; text-align: center; opacity: 0.7; }
+
+/* ---- a named text style, in Write: a faint rule at its side, the look left to Typeset ---- */
+
+.ProseMirror p[data-style]:not(.has-print-type *) {
+  position: relative;
+}
+
+.ProseMirror p[data-style]:not(.has-print-type *)::after {
+  content: '';
+  position: absolute;
+  top: 0.15em;
+  bottom: 0.15em;
+  left: -12px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent-color, #0a84ff);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ---- footnotes: the marks in the text, and the notes at a page's foot ---- */
+
+@counter-style fn-symbols {
+  system: symbolic;
+  symbols: '*' '†' '‡' '§' '‖' '¶';
+}
+
+.ProseMirror {
+  counter-reset: footnote var(--fn-start, 0);
+}
+
+.footnote-ref {
+  font-size: 0.72em;
+  line-height: 0;
+  vertical-align: super;
+  padding: 0 0.08em;
+  color: var(--accent-color, #0a84ff);
+  cursor: pointer;
+  font-variant-numeric: lining-nums;
+}
+
+.footnote-ref:not([data-mark])::after {
+  counter-increment: footnote;
+  content: counter(footnote);
+}
+
+.fn-symbols .footnote-ref:not([data-mark])::after {
+  content: counter(footnote, fn-symbols);
+}
+
+.footnote-ref.is-empty { opacity: 0.55; }
+.has-print-type .footnote-ref,
+.print-page .footnote-ref { color: inherit; cursor: default; }
+
+.pl-footnotes {
+  position: absolute;
+  box-sizing: border-box;
+  padding-top: 0.9em;
+  font-family: var(--pt-font, inherit);
+  font-size: calc(var(--pt-size, 12pt) * 0.8);
+  line-height: 1.3;
+  text-align: left;
+  text-indent: 0;
+  -webkit-hyphens: manual;
+  hyphens: manual;
+  color: var(--pl-ink, #1b1b1b);
+}
+
+.print-page .pl-footnotes { color: #000000; }
+
+.pl-footnotes::before {
+  content: '';
+  position: absolute;
+  top: 0.4em;
+  left: 0;
+  width: 30%;
+  border-top: 0.5pt solid currentColor;
+}
+
+.pl-footnote {
+  margin: 0;
+}
+
+.pl-footnote-mark {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+  margin-right: 0.3em;
+}
+
+.footnote-editor {
+  position: fixed;
+  z-index: 1000;
+  width: 320px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--pl-paper, #ffffff);
+  color: var(--pl-ink, #1b1b1b);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.footnote-editor textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--pl-faint, rgba(0, 0, 0, 0.3));
+  background: transparent;
+  color: inherit;
+}
+
+.footnote-editor-actions { display: flex; justify-content: space-between; margin-top: 8px; }
+.footnote-editor-actions button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--pl-faint, rgba(0, 0, 0, 0.3)); background: transparent; color: inherit; cursor: pointer; }
+.footnote-editor-actions .is-destructive { color: #d70015; }
+.footnote-editor-text { margin: 0 0 6px; }
+.footnote-editor-hint { opacity: 0.6; font-size: 12px; }
+
+/* ---- the baseline grid, and the proof's marks ---- */
+
+.pl-baseline-grid,
+.book-page-grid {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.proof-mark { border-radius: 2px; }
+.proof-mark.is-loose { background: rgba(255, 149, 0, 0.28); }
+.proof-mark.is-widow,
+.proof-mark.is-orphan { background: rgba(255, 59, 48, 0.25); box-shadow: 0 2px 0 rgba(255, 59, 48, 0.8); }
+.proof-mark.is-runt { background: rgba(175, 82, 222, 0.25); box-shadow: 0 2px 0 rgba(175, 82, 222, 0.8); }
+.proof-mark.is-stackedHyphens { background: rgba(255, 204, 0, 0.35); }
+.proof-mark.is-shortPage { background: rgba(0, 122, 255, 0.2); box-shadow: 0 2px 0 rgba(0, 122, 255, 0.7); }
+.proof-mark.is-focused { outline: 2px solid var(--accent-color, #0a84ff); outline-offset: 1px; }
+
+/* ---- facing pages (BookPages.jsx, in spreads) ---- */
+
+.book-spreads {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+}
+
+.book-spread {
+  display: flex;
+  justify-content: center;
+  box-shadow: var(--pl-page-shadow);
+}
+
+.book-spread > .book-page { position: relative; cursor: pointer; }
+.book-spread > .book-page.is-empty { visibility: hidden; }
+.book-spread > .book-page.is-verso { box-shadow: inset -12px 0 16px -14px rgba(0, 0, 0, 0.35); }
+.book-spread > .book-page.is-recto { box-shadow: inset 12px 0 16px -14px rgba(0, 0, 0, 0.35); }
+
+/* ---- the e-book, as a reader shows it (DigitalPreview.jsx) ---- */
+
+.pane-scroll.is-digital { overflow: hidden; }
+
+.digital-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  background: var(--pl-desk);
+  color: var(--pl-ink);
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+  outline: none;
+}
+
+.digital-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--pl-faint);
+}
+
+.digital-bar select,
+.digital-bar button,
+.digital-footer button,
+.digital-picked button {
+  font: inherit;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--pl-faint);
+  background: var(--pl-paper);
+  color: inherit;
+  cursor: pointer;
+}
+
+.digital-bar button:disabled,
+.digital-footer button:disabled { opacity: 0.4; cursor: default; }
+.digital-size { font-variant-numeric: tabular-nums; }
+.digital-size small { opacity: 0.65; font-size: inherit; }
+.digital-sep { width: 1px; height: 18px; background: var(--pl-faint); }
+.digital-fit { display: flex; gap: 4px; align-items: center; }
+.digital-type { display: flex; gap: 2px; }
+.digital-type button { font-family: Georgia, serif; min-width: 28px; }
+.digital-type button.is-large { font-size: 16px; line-height: 1; }
+
+.digital-segmented { display: inline-flex; border: 1px solid var(--pl-faint); border-radius: 6px; overflow: hidden; }
+.digital-bar .digital-segmented button { border: 0; border-radius: 0; background: transparent; }
+.digital-bar .digital-segmented button.is-on { background: var(--accent-color, #0a84ff); color: #ffffff; }
+
+.digital-more { position: relative; }
+.digital-more summary { cursor: pointer; padding: 3px 9px; border: 1px solid var(--pl-faint); border-radius: 6px; background: var(--pl-paper); list-style: none; }
+.digital-more summary::-webkit-details-marker { display: none; }
+.digital-more-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  min-width: 280px;
+  border-radius: 8px;
+  background: var(--pl-paper);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+.digital-more-panel > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+.digital-checks-toggle.has-warnings::before { content: '●'; color: #e0a100; margin-right: 4px; }
+.digital-checks { margin: 0; padding: 8px 16px 8px 32px; border-bottom: 1px solid var(--pl-faint); background: var(--pl-paper); }
+.digital-checks li { margin: 2px 0; }
+.digital-checks li.is-error { color: #d70015; }
+
+.digital-stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+}
+
+.digital-device {
+  position: relative;
+  flex: none;
+  padding: 12px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: #1c1c1e;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.digital-screen { transform-origin: top left; overflow: hidden; border-radius: 4px; }
+.digital-screen iframe { display: block; border: 0; background: transparent; }
+.digital-status { padding: 24px; color: #777777; }
+
+.digital-handle { position: absolute; z-index: 2; }
+.digital-handle.is-right { top: 25%; bottom: 25%; right: -10px; width: 8px; cursor: ew-resize; border-radius: 4px; background: var(--pl-faint); }
+.digital-handle.is-bottom { left: 25%; right: 25%; bottom: -10px; height: 8px; cursor: ns-resize; border-radius: 4px; background: var(--pl-faint); }
+.digital-handle.is-corner { right: -12px; bottom: -12px; width: 14px; height: 14px; cursor: nwse-resize; border-radius: 3px; background: var(--pl-faint); }
+.digital-handle:hover { background: var(--accent-color, #0a84ff); }
+
+.digital-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.digital-picked {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--pl-paper);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
 }
 
 /* ---- the pages and sheets that go to paper ---- */
@@ -486,6 +1052,74 @@
 .print-guide pre {
   font: 11px/1.5 Menlo, monospace;
   white-space: pre-wrap;
+}
+
+/* ---------------- Typeset: the prose is locked; the way back to Write ---------------- */
+
+/* A locked chapter keeps its caret (selection still sets type) but not the I-beam's
+   promise that typing will do anything. */
+.is-typeset-locked .ProseMirror {
+  cursor: default;
+  caret-color: transparent;
+}
+
+.is-typeset-locked .ProseMirror > h1:first-child {
+  cursor: text;
+  caret-color: auto;
+}
+
+.typeset-edit-text {
+  position: fixed;
+  z-index: 1000;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--pl-paper, #ffffff);
+  color: var(--text-primary, #1d1d1f);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+  font: 12px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.typeset-edit-text button {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 12px;
+  background: var(--accent-color, #0a84ff);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.typeset-edit-text span {
+  opacity: 0.65;
+}
+
+/* Sticky in the scroller and takes no room, so the text does not move for it. */
+.typeset-return {
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+  height: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.typeset-return-pill {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 14px;
+  background: var(--accent-color, #0a84ff);
+  color: #ffffff;
+  font: 600 12px/1.3 -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
 }
 
 @media print {

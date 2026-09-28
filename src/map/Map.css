@@ -18,7 +18,8 @@
   min-height: 0;
 }
 
-.map-surface {
+.map-surface,
+.map-inspector-panel {
   --map-inv-zoom: 1;
   --map-paper: var(--surface-0);
   --map-sheet: var(--surface-1);
@@ -38,7 +39,9 @@
   --map-ui-border: var(--popover-border);
   --map-ui-text: var(--text-primary);
   --map-ui-muted: var(--text-muted);
+}
 
+.map-surface {
   position: relative;
   flex: 1;
   min-height: 0;
@@ -58,18 +61,6 @@
   --map-border: rgba(210, 220, 230, 0.35);
   --map-route: #f08a6c;
   --map-pin: #ff7a66;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .map-surface[data-map-theme='clean'] {
-    --map-ink: #eef1f6;
-    --map-land: #2e3a33;
-    --map-land-edge: #6f8a78;
-    --map-water: #16232e;
-    --map-border: rgba(210, 220, 230, 0.35);
-    --map-route: #f08a6c;
-    --map-pin: #ff7a66;
-  }
 }
 
 .map-surface[data-map-theme='parchment'] {
@@ -406,25 +397,20 @@
   border-radius: 12px;
   box-shadow: var(--shadow-popover);
   color: var(--map-ui-text);
-  font: 13px/1.35 -apple-system, system-ui, sans-serif;
-  backdrop-filter: blur(18px);
+  font: 13px/1.35 var(--font-ui);
 }
 
-.map-toolbar {
+.map-inspector-toggle {
   top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
+  right: 12px;
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px;
-}
-
-.map-toolbar-sep {
-  width: 1px;
-  align-self: stretch;
-  margin: 4px 4px;
-  background: var(--map-ui-border);
+  justify-content: center;
+  width: var(--size-circle);
+  height: var(--size-circle);
+  padding: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
 }
 
 .map-tool {
@@ -454,16 +440,8 @@
   cursor: default;
 }
 
-.map-zoom-readout {
-  min-width: 46px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  color: var(--map-ui-muted);
-  font-size: 12px;
-}
-
 .map-hint {
-  top: 56px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 12px;
@@ -785,8 +763,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--surface-0) 80%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--scrim-bg);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
 }
 
 .map-setup-card {
@@ -855,3 +834,19 @@
   color: var(--text-muted);
   line-height: 1.5;
 }
+
+/* The map's panel as the inspector's Map tab: the same view, laid in the sidebar. */
+.map-inspector-panel {
+  height: 100%;
+  color: var(--text-primary);
+}
+.map-inspector-panel .map-inspector {
+  position: static;
+  width: auto;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.map-inspector-panel .map-inspector-header [aria-label='Hide the inspector'] { display: none; }

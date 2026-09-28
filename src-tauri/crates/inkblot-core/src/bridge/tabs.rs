@@ -1,12 +1,12 @@
-//! Document tabs and split view, for a shell that draws the tab bar natively.
+//! Document tabs and split view.
 //!
 //! The rule is the sidebar's (see `sidebar.rs`): the page owns the state and publishes
 //! it whole, and the shell changes it by command. Tabs are `useTabs`'s, and a tab's
 //! document is opened by the page's own loader, so a shell that kept its own list would
 //! be a second list to disagree with.
 //!
-//! The Swift app draws the tabs over the page column, as Xcode's editor tabs are
-//! (`DocumentTabBar`). A tab owns its split, as a Safari or Xcode tab does: its
+//! The tab bar floats over the page column, as Xcode's editor tabs do
+//! (`src/components/tabs/`). A tab owns its split, as a Safari or Xcode tab does: its
 //! document, and optionally a second one beside or below it, which comes back when
 //! the tab is selected again.
 //!

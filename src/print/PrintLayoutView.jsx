@@ -28,12 +28,14 @@ import {
   setupUsesToken,
   surnameOf,
 } from './pageSetup'
-import { loadTypographyFont, typographyClasses, typographyKey, typographyVars } from './typography'
+import { baselineGridPx, baselineGridStyle, loadTypographyFont, typographyClasses, typographyKey, typographyVars } from './typography'
 import { countEditorWords } from '../lib/wordCount'
 import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, snapToDevicePixel, ZOOM_STEPS } from './zoom'
 import { PAGE_GAP } from './printLayoutConstants'
 import { setCurrentPrintPage } from './printLayoutStore'
-import { nativeOwns } from '../lib/host'
+import TypesetOverlay from './TypesetOverlay'
+import { notesBySlot, pageNotesOf } from './notes'
+import { bleedPicturesOf } from './bleed'
 import './PrintLayout.css'
 import './PrintTypography.css'
 
@@ -68,6 +70,17 @@ export default function PrintLayoutView({
   scrollEl,
   statusHost,
   showGuides = false,
+  // The baseline grid, drawn over each page's text block.
+  showGrid = false,
+  // The book's notes: { footnotes: at the page's foot, start: the first note's number,
+  // marks: numbers or symbols }. None sets them at the foot, from 1.
+  notes = null,
+  // Where the document's first page falls in its book, in the Typeset view of a whole
+  // book: which side it is on, and the folio it carries.
+  firstPhysical = 1,
+  folioStart = null,
+  // In Typeset: what the page's handles change (TypesetOverlay.jsx), or null for none.
+  typeset = null,
   children,
 }) {
   const setup = useMemo(() => normalizePageSetup(pageSetup), [pageSetup])
@@ -95,14 +108,20 @@ export default function PrintLayoutView({
     return () => { live = false }
   }, [typeKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The notes, as plain values: the frame must not change unless they do.
+  const atFoot = notes ? Boolean(notes.footnotes) : true
+  const noteStart = notes?.start || 1
+  const noteMarks = notes?.marks || 'numbers'
   const frame = useMemo(() => ({
     slotHeight: metrics.contentHeight,
     stride: slotStride,
     columns: setup.columns,
     minLines: setup.widowOrphanLines,
+    grid: baselineGridPx(setup.typography),
+    footnotes: atFoot,
     typeKey,
     revision: fontsLoaded,
-  }), [metrics.contentHeight, slotStride, setup.columns, setup.widowOrphanLines, typeKey, fontsLoaded])
+  }), [metrics.contentHeight, slotStride, setup.columns, setup.widowOrphanLines, setup.typography, typeKey, fontsLoaded, atFoot])
 
   // Hand the plugin its frame; take it back when the view goes.
   useEffect(() => {
@@ -154,19 +173,31 @@ export default function PrintLayoutView({
       : ''
   ), [editor, result, setup]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The notes at each page's foot: those whose marks the page holds.
+  const footnotes = useMemo(() => {
+    if (!editor || editor.isDestroyed || !atFoot) return new Map()
+    return notesBySlot(pageNotesOf(editor.state.doc, noteStart, noteMarks), result.slotStarts)
+  }, [atFoot, editor, noteMarks, noteStart, result])
+
+  // Pictures to the page's edges: each page with one draws it over itself.
+  const bleeds = useMemo(() => (
+    editor && !editor.isDestroyed ? notesBySlot(bleedPicturesOf(editor.view), result.slotStarts) : new Map()
+  ), [editor, result])
+
   const pages = useMemo(() => {
     const out = []
     const chapterStarts = new Set(result.chapterStartSlots)
     for (let strip = 0; strip < stripCount; strip += 1) {
       const pageIndex = galley ? Math.floor(strip / setup.columns) : strip
-      const physical = pageIndex + 1
+      const physical = firstPhysical + pageIndex
       const firstSlot = pageIndex * setup.columns
       const pageSlots = result.slotStarts.slice(firstSlot, firstSlot + setup.columns)
       const blank = pageIndex > 0 && pageSlots.every((s) => s == null)
       const startPos = pageSlots.find((s) => s != null) ?? 0
+      const start = Number.isFinite(folioStart) ? folioStart : setup.pageNumberStart
       const ctx = {
-        page: setup.pageNumberStart + pageIndex,
-        pages: setup.pageNumberStart + Math.max(result.pageCount, 1) - 1,
+        page: start + pageIndex,
+        pages: start + Math.max(result.pageCount, 1) - 1,
         title: docTitle,
         chapter: chapterAt(headings, startPos, docTitle),
         author,
@@ -184,10 +215,12 @@ export default function PrintLayoutView({
         header: runningTextFor(setup, 'header', physical, ctx, flags),
         footer: runningTextFor(setup, 'footer', physical, ctx, flags),
         folio: formatPageNumber(ctx.page, setup.pageNumberFormat),
+        notes: footnotes.get(strip) || null,
+        bleed: bleeds.get(strip)?.[0] || null,
       })
     }
     return out
-  }, [author, docTitle, flowX, galley, headings, result, setup, slotStride, stripCount, wordsText])
+  }, [author, bleeds, docTitle, firstPhysical, flowX, folioStart, footnotes, galley, headings, result, setup, slotStride, stripCount, wordsText])
 
   // Which page is in view, for "Page X of Y".
   useEffect(() => {
@@ -500,6 +533,8 @@ export default function PrintLayoutView({
     '--pl-flow-w': `${galley ? metrics.columnWidth : metrics.contentWidth}px`,
     '--pl-content-top': `${metrics.contentTop}px`,
     '--pl-content-h': `${metrics.contentHeight}px`,
+    // Notes in the text numbered on from the book's before them.
+    '--fn-start': String(noteStart - 1),
   }
 
   const masks = []
@@ -508,15 +543,13 @@ export default function PrintLayoutView({
   }
 
   const pageCount = Math.max(result.pageCount, 1)
-  // Beside the word count, in the pane's status row; drawn as glass under the Swift
-  // shell, which measures it with the word count (it is a `.word-count` too).
+  // Beside the word count, in the pane's status row.
   const pageCountBadge = (
-    <div className="word-count pl-page-count-badge">
+    <div className="word-count floating-capsule pl-page-count-badge">
       Page {Math.min(currentPage, pageCount)} of {pageCount}
     </div>
   )
-  // Under the Swift shell the zoom control is native (PrintLayoutControls.swift).
-  const zoomBar = nativeOwns('printControls') ? null : (
+  const zoomBar = (
     <div className="pl-status" role="toolbar" aria-label="Zoom">
       <button type="button" onClick={() => stepZoom(-1)} aria-label="Zoom out" title="Zoom out (⌘−)">−</button>
       <select
@@ -535,17 +568,16 @@ export default function PrintLayoutView({
         {ZOOM_STEPS.map((s) => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}
       </select>
       <button type="button" onClick={() => stepZoom(1)} aria-label="Zoom in" title="Zoom in (⌘+)">+</button>
-      {nativeOwns('pageSetup') ? null : (
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} title="Page Setup">Page Setup…</button>
-      )}
+      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} title="Page Setup">Page Setup…</button>
     </div>
   )
   const pageCountHost = statusHost?.querySelector(':scope > .pane-status') || null
+  const gridStyle = showGrid && setup.typography ? baselineGridStyle(setup.typography) : null
 
   return (
     <div className="print-layout">
       <div ref={sizerRef} className="pl-sizer" style={{ width: `${snapToDevicePixel(stageWidth * zoom)}px`, height: `${snapToDevicePixel(stageHeight * zoom)}px` }}>
-        <div className={['pl-stage', ...typographyClasses(setup.typography)].join(' ')} style={stageStyle}>
+        <div className={['pl-stage', ...typographyClasses(setup.typography), noteMarks === 'symbols' ? 'fn-symbols' : ''].filter(Boolean).join(' ')} style={stageStyle}>
           <div className="pl-pages" aria-hidden="true">
             {pages.map((page) => (
               <div
@@ -575,6 +607,25 @@ export default function PrintLayoutView({
                     Page {page.folio} · column {page.column + 1} of {setup.columns}
                   </div>
                 ) : null}
+                {page.bleed ? (
+                  <img className="pl-bleed-picture" src={page.bleed.src} alt="" style={{ left: 0, top: 0, width: '100%', height: '100%' }} />
+                ) : null}
+                {page.notes ? (
+                  <div
+                    className="pl-footnotes"
+                    style={{ left: `${pageLeftMargin(setup, page.physical)}px`, width: `${galley ? metrics.columnWidth : metrics.contentWidth}px`, bottom: `${metrics.height - metrics.contentTop - metrics.contentHeight}px` }}
+                  >
+                    {page.notes.map((note) => (
+                      <p key={note.pos} className="pl-footnote"><span className="pl-footnote-mark">{note.mark}</span>{note.text}</p>
+                    ))}
+                  </div>
+                ) : null}
+                {showGrid && gridStyle && !page.blank ? (
+                  <div
+                    className="pl-baseline-grid"
+                    style={{ ...gridStyle, left: `${pageLeftMargin(setup, page.physical)}px`, top: `${metrics.contentTop}px`, width: `${metrics.contentWidth}px`, height: `${metrics.contentHeight}px` }}
+                  />
+                ) : null}
                 {showGuides ? (
                   <div
                     className="pl-guide"
@@ -592,6 +643,9 @@ export default function PrintLayoutView({
               <div key={mask.top} className="pl-mask" style={{ left: '-4000px', right: '-4000px', top: `${mask.top}px`, height: `${mask.height}px` }} />
             ))}
           </div>
+          {typeset && !galley ? (
+            <TypesetOverlay pages={pages} metrics={metrics} setup={setup} zoom={zoom} editor={editor} typeset={typeset} />
+          ) : null}
         </div>
       </div>
       {pageCountHost ? createPortal(pageCountBadge, pageCountHost) : null}

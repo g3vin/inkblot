@@ -2,8 +2,8 @@
 
 Inkblot is proprietary software (see [LICENSE](LICENSE)). These are the working conventions for everyone with access to the repository.
 
-Before changing anything that crosses a boundary (page ↔ shell, JavaScript ↔ Rust,
-Rust ↔ Swift), read [ARCHITECTURE.md](ARCHITECTURE.md).
+Before changing anything that crosses a boundary (chrome ↔ document surface,
+JavaScript ↔ Rust), read [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Branches
 
@@ -35,16 +35,16 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 - **Types:** `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `style`, `build`,
   `ci`, `chore`.
-- **Scopes** name the area: `core`, `models`, `ffi`, `native`, `bridge`, `canvas`,
-  `maps`, `print`, `references`, `notes`, `editor`.
+- **Scopes** name the area: `core`, `models`, `bridge`, `canvas`, `maps`, `print`,
+  `references`, `notes`, `editor`, `stats`, `toolbar`, `inspector`.
 - Put a behaviour change in its own commit, separate from a refactor.
 - A breaking change to the bridge protocol or the on-disk format gets a `BREAKING CHANGE:` footer.
 
 ## Pull requests
 
 1. Rebase on `main` and run the checks in the [README](README.md#checks). CI runs the
-   web, Rust and generated-type checks. The Xcode tests and `npm run test:layout` are
-   local only, so run them yourself when you touch `native/` or `src/print/`.
+   web, Rust and generated-type checks. `npm run test:layout` is local only, so run it
+   yourself when you touch `src/print/`.
 2. Fill in the pull request template.
 3. Merge with a merge commit, so the branch's history stays readable, and delete the branch.
 
@@ -55,9 +55,8 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
 - **Comments describe the code as it is.** Say what the code does and why. Don't
   narrate how it got there, what it used to do, or which bug it fixed; that belongs in
   the commit message.
-- **Generated files are never edited by hand.** `src/types/inkblot-core.ts` and
-  `native/inkblot-core/inkblot-core/Generated/` come from `npm run types` and
-  `./scripts/build-xcframework.sh`.
+- **Generated files are never edited by hand.** `src/types/inkblot-core.ts` comes from
+  `npm run types`.
 - **Mount it or it's untested.** A component with logic worth keeping is mounted by a
   suite in `tests/unit/`.
 - **Mirror both sides.** A function that exists in both JavaScript and Rust gets a

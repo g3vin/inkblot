@@ -1,0 +1,106 @@
+/* The References tab. */
+
+.references-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; font-family: var(--font-ui); }
+
+.references-quick-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) var(--space-3) var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+  color: var(--text-muted);
+}
+.references-quick-add.is-citing { border-color: var(--accent-border); color: var(--accent-foreground); }
+.references-quick-add input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: 12px var(--font-ui);
+}
+
+.references-controls { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); border-bottom: 1px solid var(--border-muted); }
+.references-style { gap: var(--space-1); }
+
+.references-list { flex: 1; min-height: 0; overflow: auto; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+
+.reference-row {
+  padding: var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.reference-row.is-highlighted { background: var(--accent-surface); }
+.reference-row.is-expanded { border-color: var(--accent-border); }
+.reference-row-main { display: flex; align-items: flex-start; gap: var(--space-2); }
+.reference-kind { flex: none; width: 18px; padding-top: 2px; color: var(--text-muted); }
+.reference-entry { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); cursor: pointer; outline: none; }
+.reference-entry-text { font: 13px/1.4 var(--font-serif); color: var(--text-primary); user-select: text; }
+.reference-entry-text .sc { font-variant: small-caps; }
+.reference-resolving { font-size: 12px; color: var(--text-muted); }
+.reference-badges { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.reference-badge { font-size: 10px; color: var(--text-muted); }
+.reference-badge[data-tone='accent'] { color: var(--accent-foreground); }
+.reference-badge[data-tone='warning'] { color: var(--status-warning); }
+.reference-actions { display: flex; gap: 2px; opacity: 0.35; transition: opacity var(--dur-fast); }
+.reference-row:hover .reference-actions,
+.reference-row.is-expanded .reference-actions,
+.reference-row.is-highlighted .reference-actions { opacity: 1; }
+
+
+.reference-editor { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-muted); font-size: 12px; }
+.reference-field { display: flex; flex-direction: column; gap: 3px; }
+.reference-label { display: flex; align-items: center; gap: var(--space-1); font-size: 11px; color: var(--text-muted); }
+.reference-field.is-missing .reference-label { color: var(--status-warning); }
+.reference-editor input,
+.reference-editor textarea,
+.references-panel .reference-person input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 4px var(--space-2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font: 12px/1.4 var(--font-ui);
+  resize: vertical;
+}
+.reference-editor input:focus,
+.reference-editor textarea:focus { outline: 2px solid var(--accent-ring); border-color: var(--accent-border); }
+.reference-hint { margin: 0; font-size: 10px; color: var(--text-subtle); }
+.reference-error { display: flex; align-items: center; gap: var(--space-1); margin: 0; color: var(--status-warning); }
+.reference-extra { display: flex; flex-direction: column; gap: var(--space-2); }
+.reference-extra > .reference-link { margin: 0; align-self: flex-start; }
+.reference-people { display: flex; flex-direction: column; gap: var(--space-2); }
+.reference-people-head { display: flex; align-items: center; justify-content: space-between; }
+.reference-person { display: flex; gap: var(--space-1); }
+.reference-role { flex: none; width: 70px; margin: 0; padding: 0 var(--space-1); border: 0; border-radius: var(--radius-sm); background: var(--control-bg); color: var(--text-secondary); font: 11px var(--font-ui); text-align: left; cursor: pointer; }
+.reference-candidates { display: flex; flex-direction: column; gap: var(--space-1); }
+.reference-candidate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  margin: 0;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--control-bg);
+  color: var(--text-primary);
+  font: 12px var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.reference-candidate:hover { background: var(--control-hover-bg); border-color: transparent; }
+.reference-candidate small { color: var(--text-muted); }
+
+.references-bibliography { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-top: 1px solid var(--border-muted); font-size: 12px; }
+.references-bibliography-head { display: flex; align-items: center; justify-content: space-between; }
+.references-toggle { display: flex; align-items: center; gap: var(--space-3); color: var(--text-secondary); }

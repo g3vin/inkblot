@@ -108,13 +108,13 @@
 .sidebar-search-field {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid var(--sidebar-card-border);
-  background: var(--tile-color);
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  gap: var(--space-3);
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: var(--control-bg);
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
 .sidebar-search-field:focus-within {
@@ -166,9 +166,9 @@
   min-width: 180px;
   padding: 4px;
   border-radius: var(--floating-note-radius);
-  border: 1px solid var(--sidebar-floating-border);
-  background: var(--sidebar-floating-bg);
-  box-shadow: var(--sidebar-floating-shadow);
+  border: 1px solid var(--floating-note-border);
+  background: var(--floating-note-bg);
+  box-shadow: var(--floating-note-shadow);
   color: var(--text-primary);
 }
 
@@ -371,13 +371,7 @@
   min-height: 18px;
   border-radius: 6px;
   border: 1px dashed var(--accent-border);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--accent-color) 20%, transparent),
-      color-mix(in srgb, var(--accent-color) 10%, transparent)
-    );
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent-color) 24%, transparent);
+  background: var(--accent-surface);
 }
 
 .file-tree-drag-ghost {
@@ -392,13 +386,9 @@
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid var(--accent-border);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-color) 18%, transparent), transparent 42%),
-    color-mix(in srgb, var(--popover-bg) 92%, transparent);
+  background: var(--popover-bg);
   color: var(--text-primary);
-  box-shadow: var(--shadow-popover);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-2);
 }
 
 .file-tree-drag-ghost-label {
@@ -473,15 +463,7 @@
   box-sizing: border-box;
   border-radius: 6px;
   border: 1px solid var(--accent-border);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--accent-surface-strong) 84%, rgba(255, 255, 255, 0.08)) 0%,
-      var(--accent-surface-strong) 100%
-    );
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  background: var(--accent-surface-strong);
   pointer-events: none;
   z-index: 0;
 }

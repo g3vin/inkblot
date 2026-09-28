@@ -12,9 +12,9 @@
 import { createZip } from './zip'
 import type { ZipEntry } from './zip'
 import type { FrontSection } from '../bookMatter'
-import { chapterBodyHtml, escapeHtml, frontSectionHtml, PROSE_CSS } from './html'
+import { chapterBodyHtml, escapeHtml, frontSectionHtml, PROSE_CSS, withLinkedNotes } from './html'
 import type { ExportChapter } from './html'
-import { collectImageSources, mapImageSources } from './portable'
+import { collectImageSources, inTextNotes, mapImageSources } from './portable'
 import { isRemote } from './images'
 import type { ResolvedImage } from './images'
 
@@ -41,6 +41,10 @@ export interface EpubOptions {
   front?: FrontSection[]
   /** A contents page in the reading order, as well as the reader's own navigation. */
   contents?: boolean
+  /** The book's stylesheet (`ebookCss`); the plain prose rules without one. */
+  css?: string | null
+  /** Font files to embed, each declared in the stylesheet for its family. */
+  fonts?: Array<{ family: string; weight: number; style: string; format: string; mime: string; file: string; bytes: Uint8Array }>
   /** Fixed for tests; a fresh urn:uuid otherwise. */
   identifier?: string
   modified?: Date
@@ -110,15 +114,18 @@ export const buildEpub = async (options: EpubOptions): Promise<Uint8Array> => {
       const img = images.get(src)
       return img ? `../${img.href}` : ''
     })
-    const body = toXhtmlBody(chapterBodyHtml(content))
+    const body = toXhtmlBody(withLinkedNotes(chapterBodyHtml(content), inTextNotes(content), { epub: true }))
       // An image that could not be packaged would be a broken reference: drop it.
       .replace(/<img[^>]*src=""[^>]*\/>/g, '')
     const id = `chapter-${String(i + 1).padStart(3, '0')}`
+    // A page before the chapters is front matter to a reading system, not a chapter.
+    const type = chapter.inContents === false ? 'frontmatter' : 'chapter'
     return {
       id,
       href: `text/${id}.xhtml`,
       title: chapter.title,
-      xhtml: xhtmlPage(chapter.title, language, `<section epub:type="chapter" id="${id}">\n${body}\n</section>`),
+      inContents: chapter.inContents,
+      xhtml: xhtmlPage(chapter.title, language, `<section epub:type="${type}" id="${id}">\n${body}\n</section>`),
     }
   })
 
@@ -131,7 +138,7 @@ export const buildEpub = async (options: EpubOptions): Promise<Uint8Array> => {
     }
   })
   const contentsPage = options.contents && chapterFiles.length
-    ? xhtmlPage('Contents', language, `<section epub:type="toc" class="contents">\n<h1>Contents</h1>\n<ol>\n${chapterFiles.map((c) => `<li><a href="${c.href.replace('text/', '')}">${escapeHtml(c.title)}</a></li>`).join('\n')}\n</ol>\n</section>`)
+    ? xhtmlPage('Contents', language, `<section epub:type="toc" class="contents">\n<h1>Contents</h1>\n<ol>\n${chapterFiles.filter((c) => c.inContents !== false).map((c) => `<li><a href="${c.href.replace('text/', '')}">${escapeHtml(c.title)}</a></li>`).join('\n')}\n</ol>\n</section>`)
     : null
 
   const cover = options.cover || null
@@ -153,7 +160,7 @@ ${chapterFiles.map((c) => `<li><a href="${c.href}">${escapeHtml(c.title)}</a></l
 </nav>
 <nav epub:type="landmarks" hidden="hidden">
 <ol>
-${cover ? '<li><a epub:type="cover" href="text/cover.xhtml">Cover</a></li>\n' : ''}${contentsPage ? '<li><a epub:type="toc" href="text/contents.xhtml">Contents</a></li>\n' : ''}<li><a epub:type="bodymatter" href="${chapterFiles[0]?.href || ''}">Start</a></li>
+${cover ? '<li><a epub:type="cover" href="text/cover.xhtml">Cover</a></li>\n' : ''}${contentsPage ? '<li><a epub:type="toc" href="text/contents.xhtml">Contents</a></li>\n' : ''}<li><a epub:type="bodymatter" href="${(chapterFiles.find((c) => c.inContents !== false) || chapterFiles[0])?.href || ''}">Start</a></li>
 </ol>
 </nav>
 </body>
@@ -175,6 +182,13 @@ ${chapterFiles.map((c, i) => `<navPoint id="nav-${i + 1}" playOrder="${i + 1}"><
 </ncx>
 `
 
+  const fonts = (options.fonts || []).map((font, i) => ({
+    ...font,
+    id: `font-${i + 1}`,
+    href: `fonts/${font.file.replace(/[^\w.-]+/g, '_')}`,
+  }))
+  const fontFaces = fonts.map((f) => `@font-face { font-family: "${f.family.replace(/"/g, '')}"; src: url("${f.href}") format("${f.format}"); font-weight: ${f.weight}; font-style: ${f.style}; }`).join('\n')
+
   const packaged = [...images.values()].filter(Boolean) as Array<{ href: string; mime: string; bytes: Uint8Array }>
   const manifest = [
     '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
@@ -188,6 +202,7 @@ ${chapterFiles.map((c, i) => `<navPoint id="nav-${i + 1}" playOrder="${i + 1}"><
     ...(contentsPage ? ['<item id="contents" href="text/contents.xhtml" media-type="application/xhtml+xml"/>'] : []),
     ...chapterFiles.map((c) => `<item id="${c.id}" href="${c.href}" media-type="application/xhtml+xml"/>`),
     ...packaged.map((img, i) => `<item id="image-${i + 1}" href="${img.href}" media-type="${img.mime}"/>`),
+    ...fonts.map((f) => `<item id="${f.id}" href="${f.href}" media-type="${f.mime}"/>`),
   ]
   const spine = [
     ...(cover ? ['<itemref idref="cover" linear="yes"/>'] : []),
@@ -226,7 +241,7 @@ ${spine.join('\n')}
     { name: 'OEBPS/content.opf', data: opf },
     { name: 'OEBPS/nav.xhtml', data: nav },
     { name: 'OEBPS/toc.ncx', data: ncx },
-    { name: 'OEBPS/styles.css', data: `${PROSE_CSS}\n.cover { text-align: center; } .cover img { max-height: 100%; }\n` },
+    { name: 'OEBPS/styles.css', data: `${fontFaces ? `${fontFaces}\n` : ''}${options.css || PROSE_CSS}\n.cover { text-align: center; } .cover img { max-height: 100%; }\n` },
     ...(cover && coverPage ? [
       { name: `OEBPS/${coverHref}`, data: cover.bytes, store: true },
       { name: 'OEBPS/text/cover.xhtml', data: coverPage },
@@ -236,6 +251,7 @@ ${spine.join('\n')}
     ...chapterFiles.map((c) => ({ name: `OEBPS/${c.href}`, data: c.xhtml })),
     // Images are already compressed; deflating them again costs time for nothing.
     ...packaged.map((img) => ({ name: `OEBPS/${img.href}`, data: img.bytes, store: true })),
+    ...fonts.map((f) => ({ name: `OEBPS/${f.href}`, data: f.bytes })),
   ]
   return createZip(entries)
 }

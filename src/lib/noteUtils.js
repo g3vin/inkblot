@@ -11,6 +11,9 @@ import { normalizeNoteAudio } from './audioNotes'
 
 export const DEFAULT_NOTE_COLOR = '#ffd54f'
 
+// The colour a note wears when it has none recorded (older notes, bare markers).
+export const NOTE_FALLBACK_COLOR = '#007aff'
+
 export const NOTE_COLOR_OPTIONS = [
   '#ffd54f',
   '#ff9aa2',

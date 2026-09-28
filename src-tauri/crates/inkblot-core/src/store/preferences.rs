@@ -1,8 +1,7 @@
 //! Everything the app remembers between launches that is not a document.
 //!
-//! Not `localStorage`: a `WKWebView` in a Swift app gets its own store, per origin,
-//! that no native code can read. On disk under AppData, both shells reach the same
-//! state; the webview keeps a synchronous facade (`src/lib/preferences.ts`) over a
+//! Not `localStorage`: a web view gets its own store, per origin, that no native code
+//! can read. On disk under AppData, the Rust side reaches the same state; the webview keeps a synchronous facade (`src/lib/preferences.ts`) over a
 //! cache it hydrates once at launch.
 //!
 //! ## Three files, not one

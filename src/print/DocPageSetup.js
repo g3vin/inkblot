@@ -16,6 +16,8 @@
 import { Extension } from '@tiptap/core'
 
 import { normalizePageSetup } from './pageSetup'
+import { TYPESET_META } from './TypesetLock'
+import { chapterTypesetOf } from './typesetHistory'
 
 export const DocPageSetup = Extension.create({
   name: 'docPageSetup',
@@ -39,8 +41,13 @@ export const DocPageSetup = Extension.create({
 
   addCommands() {
     return {
+      // Typesetting, not writing: allowed on a locked chapter, and kept out of the text
+      // history (TypesetLock.ts).
       setPageSetup: (setup) => ({ tr, dispatch }) => {
-        if (dispatch) tr.setDocAttribute('pageSetup', setup ? normalizePageSetup(setup) : null)
+        if (dispatch) {
+          tr.setDocAttribute('pageSetup', setup ? normalizePageSetup(setup) : null)
+          tr.setMeta(TYPESET_META, true)
+        }
         return true
       },
     }
@@ -54,23 +61,34 @@ export const readDocPageSetup = (doc) => doc?.attrs?.pageSetup || null
 export const effectivePageSetup = (doc) => normalizePageSetup(readDocPageSetup(doc))
 
 /**
- * Replace an editor's content without losing its page setup.
+ * Replace an editor's content — a text version restored, a merge — keeping its
+ * typesetting as it is now.
  *
- * `setContent` builds a new doc node, and a new doc node starts with default
- * attributes — so restoring a version stored only as HTML (every entry written
- * before JSON was stamped, and every merge, which is built as HTML) would quietly
- * reset the document to the default page. Content that carries a setup of its own
- * (a JSON version written after this attribute existed) brings it: restoring that
- * version restores its layout too.
+ * The text history and the typeset history are apart (typesetHistory.ts): going back to
+ * an older draft of the words must not take the book's page setup, the chapter's head,
+ * or what was set on its paragraphs and pictures back with it. So the typesetting is
+ * read before and set again after, onto the blocks that still carry the same
+ * `typesetId`. (`setContent` builds a new doc node, which would otherwise start with
+ * default attributes — and a version stored only as HTML has none at all.)
  */
 export const setContentKeepingPageSetup = (editor, content) => {
-  // setContent replaces the doc's children, never its attributes — so a JSON
-  // version's own setup has to be applied explicitly, like the carried one.
-  const own = content && typeof content === 'object' ? content.attrs?.pageSetup || null : null
-  const setup = own || readDocPageSetup(editor.state.doc)
-  const chain = editor.chain().setContent(content)
-  if (setup) chain.setPageSetup(setup)
-  return chain.run()
+  const typeset = chapterTypesetOf(editor.getJSON())
+  const applied = editor.chain().setContent(content).run()
+  const tr = editor.state.tr
+  tr.setDocAttribute('pageSetup', typeset.pageSetup ?? null)
+  tr.setDocAttribute('chapter', typeset.chapter ?? null)
+  // The blocks that are still there get what was set on them.
+  editor.state.doc.descendants((node, pos) => {
+    const id = node.attrs?.typesetId
+    const target = id ? typeset.blocks[id] : null
+    if (!target) return
+    for (const [key, value] of Object.entries(target)) {
+      if (key in node.attrs && node.attrs[key] !== value) tr.setNodeAttribute(pos, key, value)
+    }
+  })
+  tr.setMeta(TYPESET_META, true)
+  editor.view.dispatch(tr)
+  return applied
 }
 
 /** A TipTap JSON document with a page setup attached — for content built from HTML. */

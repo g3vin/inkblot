@@ -7,8 +7,6 @@
  * comes back out of the document's JSON and HTML exactly as it went in (which is what
  * version history stores), that Archive takes it off and keeps it in the document's archive, the
  * document *before* it does, and that pasting a sentence does not copy its session.
- *
- * `BubbleTextTests.swift` holds the same text cases for the Swift port.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -266,6 +264,24 @@ ok('a bubble on another line is not touched', drop.touchTarget(dragged(100, 160,
 const v = drop.velocityOf([{ x: 0, y: 0, t: 0 }, { x: 50, y: 0, t: 50 }, { x: 150, y: 0, t: 100 }])
 ok('velocity over the last moments of a drag', v.x > 1 && v.y === 0)
 
+// A throw lands where it was heading, if that is far enough away and near an edge.
+const stage800 = { left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800 }
+ok('a fast release toward an edge is a throw', same(drop.throwLanding(stage800, { x: 500, y: 400 }, { x: 2, y: 0 }), { x: 1000, y: 400 }))
+ok('a slow one is not: it lands where it was let go', drop.throwLanding(stage800, { x: 500, y: 400 }, { x: 0.3, y: 0 }) === null)
+ok('nor a fast one that stays in the middle', drop.throwLanding(stage800, { x: 200, y: 400 }, { x: 1, y: 0 }) === null)
+ok('the edge a point is nearest', drop.nearestEdge(stage800, 30, 400) === 'left' && drop.nearestEdge(stage800, 500, 790) === 'bottom')
+
+// A swipe between forms turns the page when it ends: far enough, or a flick that way.
+const slow = (to, ms) => [{ t: 0, x: 0 }, { t: ms, x: to }]
+ok('far enough to the left turns to the next form', drop.decideFormSwipe(-150, slow(-150, 1000)) === 1)
+ok('to the right, the previous', drop.decideFormSwipe(150, slow(150, 1000)) === -1)
+ok('short and slow does not turn', drop.decideFormSwipe(-80, slow(-80, 600)) === 0)
+ok('short and quick does: a flick', drop.decideFormSwipe(-60, [{ t: 0, x: -10 }, { t: 50, x: -60 }]) === 1)
+ok('but not a flick back against the way it went', drop.decideFormSwipe(-60, [{ t: 0, x: -90 }, { t: 50, x: -60 }]) === 0)
+ok('nor a twitch', drop.decideFormSwipe(-20, [{ t: 0, x: 0 }, { t: 10, x: -20 }]) === 0)
+ok('the bubbles follow a swipe, less and less', Math.abs(drop.swipeOffset(-400)) < 220 && drop.swipeOffset(-400) < drop.swipeOffset(-100))
+ok('and hardly at all where there is no form to go to', Math.abs(drop.swipeOffset(-400, false)) <= 40)
+
 /* ---------------- the document ---------------- */
 
 const makeEditor = (html) => new Editor({
@@ -481,7 +497,7 @@ await saveDocument('Archive Project', 'one.md', { content: { type: 'doc' }, note
 ok('an autosave carries the archive forward', JSON.parse(files.get(docFile)).archive?.length === 1)
 
 // Restoring puts it back on its sentence, where the sentence still is.
-const { restoreArchivedItem } = await import(`${S}/hooks/useDocumentArchive.js`)
+const { restoreArchivedItem } = await import(`${S}/lib/archiveRestore.js`)
 ok('restoring puts the session back on its sentence', restoreArchivedItem(doc, archive[0])
   && findBubbleSession(doc.state.doc, opened.id)?.session.aside[0].text === 'three'
   && doc.state.doc.textBetween(findBubbleSession(doc.state.doc, opened.id).from, findBubbleSession(doc.state.doc, opened.id).to) === 'Four two.')
@@ -526,7 +542,7 @@ for (const instance of [editor, restored, bold, doc, lone, para]) instance.destr
 
 /* ---------------- the page's editor, mounted ---------------- */
 
-const BubbleEditor = (await import(`${S}/components/BubbleEditor.jsx`)).default
+const BubbleEditor = (await import(`${S}/components/bubble/BubbleEditor.jsx`)).default
 const editorRoot = createRoot(document.getElementById('root').appendChild(document.createElement('div')))
 let closed = null
 const start = text.createSession('She hesitated at the door, then she left.')
@@ -550,6 +566,8 @@ ok('punctuation bubbles are the round ones',
   [...overlay.querySelectorAll('.bubble-row .bubble.is-punctuation .bubble-text')].map((node) => node.textContent).join('') === ',.')
 ok('and the set-aside word where it was left', overlay.querySelector('.bubble-aside-layer .bubble-text')?.textContent === 'quietly')
 ok('it takes the keyboard from the document', document.activeElement === overlay)
+ok('it covers the whole window: portaled to the body', overlay.parentElement === document.body)
+ok('and takes the toolbar away while it is up', document.documentElement.classList.contains('bubble-open'))
 
 await press('n')
 const draft = overlay.querySelector('.bubble.is-draft input')
@@ -622,47 +640,36 @@ ok('Done hands back the arrangement, keeping the session',
 await click(button('Archive'))
 ok('Archive hands it back to be archived', closed?.archive === true)
 
-await act(async () => { editorRoot.unmount() })
-
-/* ---------------- under the Swift shell ---------------- */
-
-// The shell owns the `bubble` chrome: the page draws neither the editor nor the chips.
-const { shellBridge } = await import(`${S}/bridge/index.ts`)
-window.__inkblotNative = { post: () => {}, listen: () => () => {}, chrome: ['bubble'] }
-const heard = { bubbleChipsChanged: [], bubbleSessionOpened: [] }
-for (const type of Object.keys(heard)) shellBridge.on(type, (payload) => heard[type].push(payload))
-const frame = () => act(async () => {
-  await new Promise((resolve) => dom.window.requestAnimationFrame(() => resolve()))
-  await new Promise((resolve) => setTimeout(resolve, 10))
-})
-
-const native = makeEditor('<p>Alpha beta. Gamma delta.</p>')
-let nativeApi = null
-function NativeHarness() {
-  nativeApi = useBubbleSessions({ docPath: 'native.md' })
-  return null
+/* A two-finger swipe sideways, as WebKit sends it, turns to the next form when it ends. */
+{
+  const formsNow = () => [...overlay.querySelectorAll('.bubble-forms-dot')].findIndex((dot) => dot.classList.contains('is-current'))
+  // A saved form, and then a change: the unsaved arrangement is a page after it.
+  await press('s', { metaKey: true })
+  await press('x')
+  await press('Enter')
+  const before = formsNow()
+  ok('a saved form and the unsaved arrangement after it', overlay.querySelectorAll('.bubble-forms-dot').length === 2 && before === 1)
+  const wheel = (deltaX, timeStamp, phase) => act(async () => {
+    const event = new dom.window.WheelEvent('wheel', { deltaX, deltaY: 0, bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'timeStamp', { value: timeStamp })
+    Object.defineProperty(event, 'webkitPhase', { value: phase })
+    Object.defineProperty(event, 'webkitDirectionInvertedFromDevice', { value: true })
+    overlay.dispatchEvent(event)
+  })
+  // Fingers moving right (toward the previous form): positive deltaX under natural scrolling.
+  await wheel(-20, 1000, 1)
+  for (let i = 1; i <= 8; i += 1) await wheel(-20, 1000 + i * 30, 4)
+  ok('mid-swipe, the dot it would land on is lit', !!overlay.querySelector('.bubble-forms-dot.is-armed'))
+  ok('and the page has not turned yet', formsNow() === before)
+  await wheel(0, 1300, 8)
+  ok('lifting the fingers turns it', formsNow() === before - 1)
+  // Momentum after it is not more swiping.
+  const momentum = new dom.window.WheelEvent('wheel', { deltaX: -40, bubbles: true, cancelable: true })
+  Object.defineProperty(momentum, 'webkitMomentumPhase', { value: 4 })
+  Object.defineProperty(momentum, 'webkitPhase', { value: 0 })
+  await act(async () => { overlay.dispatchEvent(momentum) })
+  ok('its momentum is swallowed, not read as another swipe', momentum.defaultPrevented && formsNow() === before - 1)
 }
-const nativeRoot = createRoot(document.getElementById('root').appendChild(document.createElement('div')))
-await act(async () => { nativeRoot.render(React.createElement(NativeHarness)) })
 
-native.view.dispatch(native.state.tr.setSelection(TextSelection.create(native.state.doc, 3)))
-await act(async () => { nativeApi.openParagraph(native) })
-const openedNatively = heard.bubbleSessionOpened.at(-1)
-ok('opening goes to the shell, not the page', nativeApi.open === null && openedNatively?.docPath === 'native.md'
-  && same(texts(openedNatively.session.words), ['alpha beta.', 'gamma delta.']))
-const nw = openedNatively.session.words
-await act(async () => {
-  shellBridge.send('closeBubbleSession', { session: { ...openedNatively.session, words: [nw[1], nw[0]] }, archive: false })
-})
-ok('and the shell closing it writes the paragraph', native.state.doc.textContent === 'Gamma delta. Alpha beta.')
-
-// The chips stay the page's: drawn over from reported positions, they trailed the text
-// through every scroll.
-await frame()
-await frame()
-ok('the page draws its own chips, reporting none to the shell',
-  !!native.view.dom.querySelector('.bubble-session-chip') && heard.bubbleChipsChanged.length === 0)
-
-await act(async () => { nativeRoot.unmount() })
-delete window.__inkblotNative
-native.destroy()
+await act(async () => { editorRoot.unmount() })
+ok('closing gives the toolbar back', !document.documentElement.classList.contains('bubble-open'))

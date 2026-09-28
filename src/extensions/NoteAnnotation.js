@@ -17,6 +17,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { marginHangDecorations } from '../lib/marginHang'
+import { NOTE_FALLBACK_COLOR } from '../lib/noteUtils'
 
 const NOTE_ANNOTATION_PLUGIN_KEY = new PluginKey('noteAnnotation')
 const pendingSyncByEditor = new WeakMap()
@@ -193,7 +194,7 @@ const buildNoteDecorations = (doc, notes = [], docName = null, activeNoteId = nu
     if (note.id === activeNoteId) {
       decorations.push(Decoration.inline(note.from, note.to, {
         class: 'note-range is-active',
-        style: `--note-color: ${note.color || '#007aff'}`,
+        style: `--note-color: ${note.color || NOTE_FALLBACK_COLOR}`,
       }))
     }
 
@@ -205,11 +206,11 @@ const buildNoteDecorations = (doc, notes = [], docName = null, activeNoteId = nu
           const marker = document.createElement('span')
           marker.className = 'note-marker'
           marker.dataset.noteId = note.id
-          marker.style.setProperty('--note-color', note.color || '#007aff')
+          marker.style.setProperty('--note-color', note.color || NOTE_FALLBACK_COLOR)
 
           const dot = document.createElement('span')
           dot.className = 'note-dot'
-          dot.style.backgroundColor = note.color || '#007aff'
+          dot.style.backgroundColor = note.color || NOTE_FALLBACK_COLOR
 
           marker.appendChild(dot)
           marker.onmousedown = (event) => {
