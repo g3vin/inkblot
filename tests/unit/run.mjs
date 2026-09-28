@@ -65,6 +65,8 @@
  *          and the controls mounted
  *   chromeLayout what the toolbars and the inspector hold: the item ids, default sets,
  *          and every migration a saved layout goes through
+ *   toolbar the toolbars drawn from their layouts: every item renders disabled with no
+ *          state, what a customize drag does, the palette and the display modes
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -83,7 +85,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapnative', 'tabs', 'css', 'ui', 'chromeLayout']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'shim', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapnative', 'tabs', 'css', 'ui', 'chromeLayout', 'toolbar']
 
 const failures = []
 

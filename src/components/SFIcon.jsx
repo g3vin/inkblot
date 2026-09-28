@@ -8,6 +8,8 @@
  */
 import React, { useEffect, useRef, useState } from 'react'
 import { useReducedMotion } from 'framer-motion'
+import { StaticIcon } from '../icons/staticIcons.jsx'
+import { hasStaticIcon } from '../icons/staticIconShapes.jsx'
 import {
   IconAlignCenter,
   IconAlignLeft,
@@ -255,7 +257,9 @@ const renderIcon = (name, filled, props) => {
     case 'xmark':
       return <IconX {...props} />
     default:
-      return <IconSearch {...props} />
+      return hasStaticIcon(name)
+        ? <StaticIcon name={name} size={props.size} strokeWidth={Math.max(1.4, (props.strokeWidth || 1.1) * 1.3)} />
+        : <IconSearch {...props} />
   }
 }
 

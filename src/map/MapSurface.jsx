@@ -25,9 +25,9 @@ import { panMapBy, pointsBounds } from '../lib/map/mapViewport'
 import { nearestOnPolyline } from '../lib/map/mapGeometry'
 import MapLayers, { MapDefs } from './MapLayers'
 import { earthLevelFor } from './mapRender'
-import MapToolbar from './MapToolbar'
 import { MAP_TOOLS, TOOL_HINTS, formatZoom } from './mapOptions'
 import MapPanelView from './MapPanelView'
+import SFIcon from '../components/SFIcon'
 import { useMapPanel } from './inspector/useMapPanel'
 import { runPanelCommand } from './inspector/panelBuilder'
 import MapTimeline from './MapTimeline'
@@ -802,7 +802,8 @@ export default function MapSurface({
    * panning re-renders the map on every frame and changes nothing the chrome shows.
    */
   const nativeChrome = nativeOwns('mapChrome')
-  const publishing = nativeChrome && (isActive || chromeWhileInactive)
+  // Always published: the web toolbar draws the map's tools from it too.
+  const publishing = isActive || chromeWhileInactive
   const lastChromeRef = useRef(null)
   useEffect(() => {
     if (!publishing) return undefined
@@ -912,21 +913,17 @@ export default function MapSurface({
 
       <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} />
 
-      {nativeChrome ? null : <MapToolbar
-        map={map}
-        tool={tool}
-        onTool={setTool}
-        zoom={view.viewport.zoom}
-        onZoomIn={view.zoomIn}
-        onZoomOut={view.zoomOut}
-        onFit={fitAll}
-        onUndo={undo}
-        onRedo={redo}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        inspectorOpen={inspectorOpen}
-        onToggleInspector={() => setInspectorOpen((open) => !open)}
-      />}
+      {!nativeChrome && !inspectorOpen ? (
+        <button
+          type="button"
+          className="map-floating map-inspector-toggle"
+          title="Show the inspector"
+          aria-label="Show the inspector"
+          onClick={() => setInspectorOpen(true)}
+        >
+          <SFIcon name="sidebar.right" size={16} />
+        </button>
+      ) : null}
 
       {hint ? (
         <div

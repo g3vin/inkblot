@@ -397,21 +397,17 @@
   font: 13px/1.35 var(--font-ui);
 }
 
-.map-toolbar {
+.map-inspector-toggle {
   top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
+  right: 12px;
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px;
-}
-
-.map-toolbar-sep {
-  width: 1px;
-  align-self: stretch;
-  margin: 4px 4px;
-  background: var(--map-ui-border);
+  justify-content: center;
+  width: var(--size-circle);
+  height: var(--size-circle);
+  padding: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
 }
 
 .map-tool {
@@ -441,16 +437,8 @@
   cursor: default;
 }
 
-.map-zoom-readout {
-  min-width: 46px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  color: var(--map-ui-muted);
-  font-size: 12px;
-}
-
 .map-hint {
-  top: 56px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 12px;

@@ -7,7 +7,7 @@
  * chrome detection, the right-click context menu, "jump to text" for notes
  * and search results, and the Bubble editor.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { resolveAnchor } from '../bridge/anchors'
 import { documentSurface, useBridgeState } from '../bridge'
 import { EditorTarget } from '../types'
@@ -36,6 +36,7 @@ import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useEditorContextMenu } from '../hooks/useEditorContextMenu'
 import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
+import { useLatestBridgeState } from '../bridge'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
 import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
@@ -46,7 +47,9 @@ import { useBubbleSessions } from '../hooks/useBubbleSessions'
 import { useDocumentArchive } from '../hooks/useDocumentArchive'
 import { useReferences } from '../hooks/useReferences'
 import NoteHoverPreview from './NoteHoverPreview'
-import Toolbar from './Toolbar'
+import ToolbarHost from './toolbar/ToolbarHost'
+import { readDisplayMode, TOOLBAR_LAYOUT_CHANGED } from './toolbar/useToolbarLayout'
+import { popUpToolbarMenu } from '../hooks/contextMenu/toolbarMenu'
 
 const LEFT_SIDEBAR_OUTER_CHROME_WIDTH = 18
 const RIGHT_SIDEBAR_OUTER_CHROME_WIDTH = 22
@@ -150,15 +153,12 @@ export default function EditorLayout(props) {
       : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
   const nativeRightSidebar = nativeOwns('rightSidebar')
   const nativeToolbar = nativeOwns('toolbar')
-  // The native toolbar's Focus Mode item. The mode stays this page's; the shell asks
-  // for it and lights its button from what is published back.
+  // The toolbar's Focus Mode item. The mode stays this page's; the toolbar asks for it
+  // and lights its button from what is published back.
+  useEffect(() => documentSurface.onCommand('setFocusMode', ({ open }) => setFocusModeOpen(Boolean(open))), [])
   useEffect(() => {
-    if (!nativeToolbar) return undefined
-    return documentSurface.onCommand('setFocusMode', ({ open }) => setFocusModeOpen(Boolean(open)))
-  }, [nativeToolbar])
-  useEffect(() => {
-    if (nativeToolbar) documentSurface.publishViewOptions({ focusMode: focusModeOpen })
-  }, [nativeToolbar, focusModeOpen])
+    documentSurface.publishViewOptions({ focusMode: focusModeOpen })
+  }, [focusModeOpen])
   const nativeNotePreviews = nativeOwns('notePreviews')
   useNativeNotePreviews({ enabled: nativeNotePreviews })
   const bubbles = useBubbleSessions({ docPath: activeDoc || currentDoc, projectName: props.projectName })
@@ -197,15 +197,29 @@ export default function EditorLayout(props) {
   // whichever is active, or hovering from one to the other would slide the other one
   // under the sidebars and the toolbar and back.
   const activeUnderlays = !isTextDoc(activeDoc || currentDoc) && props.splitView !== 'editor'
-  // The titlebar element the active canvas portals its toolbar into. A ref
-  // callback rather than a ref object, so mounting/unmounting the slot re-renders
-  // the consumers that are waiting for it.
-  const [canvasToolbarSlot, setCanvasToolbarSlot] = useState(null)
   const [compareToolbarSlot, setCompareToolbarSlot] = useState(null)
   const liveActiveEditor = getLiveEditor(activeEditor)
   const toolbarEditor = activeIsCanvas
     ? (activeEditorInfo.target === EditorTarget.CanvasCard ? liveActiveEditor : null)
     : (liveActiveEditor || getLiveEditor(editor) || getLiveEditor(props.secondaryEditor))
+
+  // Which toolbar is up: a canvas's own while no card is being edited, a map's, the
+  // Typeset toolbar for a document in Typeset mode, else the document's.
+  const pageLayoutState = useLatestBridgeState('pageLayoutState', null)
+  const activeIsMap = isMapDoc(activeDoc || currentDoc)
+  const toolbarContext = activeIsCanvas
+    ? (toolbarEditor ? 'document' : 'canvas')
+    : activeIsMap
+      ? 'map'
+      : toolbarEditor
+        ? (pageLayoutState?.mode === 'typeset' ? 'typeset' : 'document')
+        : null
+  const [toolbarDisplay, setToolbarDisplay] = useState(readDisplayMode)
+  useEffect(() => {
+    const update = () => setToolbarDisplay(readDisplayMode())
+    window.addEventListener(TOOLBAR_LAYOUT_CHANGED, update)
+    return () => window.removeEventListener(TOOLBAR_LAYOUT_CHANGED, update)
+  }, [])
 
   // While a comparison is up it owns the titlebar: the editor underneath is hidden,
   // so a formatting toolbar would drive something nobody can see. Handing the canvas
@@ -335,6 +349,20 @@ export default function EditorLayout(props) {
     }
     openRightSidebar()
   }, [nativeRightSidebar, setSidebarTab, openRightSidebar])
+
+  // The toolbar's panel items: show a panel, or hide the inspector if it is showing.
+  const rightOpen = !right.collapsed || right.peeked
+  const togglePanel = useCallback((tab) => {
+    if (!nativeRightSidebar && rightOpen && props.sidebarTab === tab) {
+      right.collapse()
+      return
+    }
+    openRightSidebarTab(tab)
+  }, [nativeRightSidebar, rightOpen, props.sidebarTab, right, openRightSidebarTab])
+  const toolbarPanel = useMemo(
+    () => ({ tab: props.sidebarTab, open: rightOpen, toggle: togglePanel }),
+    [props.sidebarTab, rightOpen, togglePanel]
+  )
 
   const handleContextMenu = useEditorContextMenu({
     editor: props.activeEditor,
@@ -631,17 +659,17 @@ export default function EditorLayout(props) {
   // comparison; otherwise the row collapses to nothing and the document starts right
   // under the native toolbar.
   const pageToolbarRow = !nativeToolbar || comparing
+  // A canvas never draws its own toolbar: while no card is being edited it publishes
+  // its state (NATIVE_CANVAS_TOOLBAR) and the canvas toolbar is drawn from that.
   const canvasToolbarTarget = comparing
     ? null
-    : nativeToolbar
-      ? (activeIsCanvas && !toolbarEditor ? NATIVE_CANVAS_TOOLBAR : null)
-      : canvasToolbarSlot
+    : (activeIsCanvas && !toolbarEditor ? NATIVE_CANVAS_TOOLBAR : null)
 
   // The page's clearance at the top (`--app-titlebar-height`, which documents scroll
   // under). Under a native toolbar it is the toolbar's band, and a comparison's own row
   // sits below that band (`--native-toolbar-inset` pads the row down).
   const pageToolbarStyle = !nativeToolbar
-    ? undefined
+    ? (toolbarDisplay === 'iconAndLabel' ? { '--app-titlebar-height': '56px' } : undefined)
     : pageToolbarRow
       ? {
           '--native-toolbar-inset': `${nativePanelInsets.top}px`,
@@ -668,6 +696,7 @@ export default function EditorLayout(props) {
         />
       ) : null}
       {pageToolbarRow ? <div
+        onContextMenu={comparing ? undefined : popUpToolbarMenu}
         className="app-titlebar"
         style={{
           '--titlebar-left-width': `${titlebarLeftWidth}px`,
@@ -682,10 +711,16 @@ export default function EditorLayout(props) {
         <div className="app-titlebar-toolbar">
           {comparing ? (
             <div className="canvas-toolbar-slot" ref={setCompareToolbarSlot} />
-          ) : toolbarEditor && !nativeToolbar ? (
-            <Toolbar editor={toolbarEditor} />
-          ) : activeIsCanvas ? (
-            <div className="canvas-toolbar-slot" ref={setCanvasToolbarSlot} />
+          ) : !nativeToolbar && toolbarContext ? (
+            <ToolbarHost
+              key={toolbarContext}
+              context={toolbarContext}
+              editor={toolbarEditor}
+              activeDoc={activeDoc || currentDoc}
+              hasProject={Boolean(props.projectName)}
+              panel={toolbarPanel}
+              split={props.splitView === 'editor' ? props.splitOrientation : null}
+            />
           ) : (
             <div className="toolbar-placeholder" data-tauri-drag-region />
           )}

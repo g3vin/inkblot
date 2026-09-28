@@ -9,7 +9,12 @@ import './ui.css'
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export default function Sheet({ open = true, title, onClose, width = 520, footer, className = '', children, labelledBy }) {
+/**
+ * `placement="top"` drops the sheet from under the titlebar and leaves the titlebar
+ * uncovered and live, as Customize Toolbar… needs: its toolbar is what items are
+ * dragged into and out of.
+ */
+export default function Sheet({ open = true, title, onClose, width = 520, footer, className = '', children, labelledBy, placement = 'center' }) {
   const sheetRef = useRef(null)
 
   useEffect(() => {
@@ -43,7 +48,7 @@ export default function Sheet({ open = true, title, onClose, width = 520, footer
   const titleId = labelledBy ?? (title ? 'ui-sheet-title' : undefined)
 
   return createPortal(
-    <div className="ui-sheet-scrim scrim" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.() }}>
+    <div className="ui-sheet-scrim scrim" data-placement={placement} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.() }}>
       <div
         ref={sheetRef}
         role="dialog"

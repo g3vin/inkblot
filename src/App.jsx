@@ -17,7 +17,7 @@ import './App.css'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
 import { resolveTheme, setThemeAttribute } from './lib/theme'
 import { documentSurface } from './bridge'
-import { isNativeShell, nativeOwns } from './lib/host'
+import { isNativeShell } from './lib/host'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -193,14 +193,13 @@ export default function App() {
     menuRefs.current.wordCountItem?.setChecked(nextVisible)
   }, [])
 
-  // The native toolbar's Word Count item: the shell asks, and this stays the setting's
-  // owner — the same path the View menu's checkbox takes.
+  // The toolbar's Word Count item asks, and this stays the setting's owner — the same
+  // path the View menu's checkbox takes.
+  useEffect(() => (
+    documentSurface.onCommand('setWordCountVisible', ({ visible }) => applyWordCountBadgeVisibility(visible))
+  ), [applyWordCountBadgeVisibility])
   useEffect(() => {
-    if (!nativeOwns('toolbar')) return undefined
-    return documentSurface.onCommand('setWordCountVisible', ({ visible }) => applyWordCountBadgeVisibility(visible))
-  }, [applyWordCountBadgeVisibility])
-  useEffect(() => {
-    if (nativeOwns('toolbar')) documentSurface.publishViewOptions({ wordCountVisible: showWordCountBadge })
+    documentSurface.publishViewOptions({ wordCountVisible: showWordCountBadge })
   }, [showWordCountBadge])
 
   // Backend-initiated Pinterest searches (e.g. from a native menu) open the scraper window.

@@ -124,6 +124,17 @@
   animation: ui-fade-in var(--dur-fast) var(--ease-standard);
 }
 
+.ui-sheet-scrim[data-placement='top'] {
+  top: var(--app-titlebar-height, 44px);
+  align-items: flex-start;
+}
+.ui-sheet-scrim[data-placement='top'] .ui-sheet {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  animation-name: ui-sheet-drop;
+}
+@keyframes ui-sheet-drop { from { transform: translateY(-16px); opacity: 0; } }
+
 .ui-sheet {
   display: flex;
   flex-direction: column;
