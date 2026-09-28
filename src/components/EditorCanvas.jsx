@@ -736,7 +736,7 @@ export default function EditorCanvas({
           )}
           {!primaryIsStructured && !showDraftPane ? (
             <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName}>
-              {showWordCountBadge ? <div className="word-count">{formatWordStats(primaryWordStats)}</div> : null}
+              {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(primaryWordStats)}</div> : null}
             </div>
           ) : null}
         </div>
@@ -818,7 +818,7 @@ export default function EditorCanvas({
             )}
             {!secondaryIsStructured ? (
               <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName}>
-                {showWordCountBadge ? <div className="word-count">{formatWordStats(secondaryWordStats)}</div> : null}
+                {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}
               </div>
             ) : null}
           </div>

@@ -547,7 +547,7 @@ export default function PrintLayoutView({
   // Beside the word count, in the pane's status row; drawn as glass under the Swift
   // shell, which measures it with the word count (it is a `.word-count` too).
   const pageCountBadge = (
-    <div className="word-count pl-page-count-badge">
+    <div className="word-count floating-capsule pl-page-count-badge">
       Page {Math.min(currentPage, pageCount)} of {pageCount}
     </div>
   )
