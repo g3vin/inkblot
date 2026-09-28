@@ -12,7 +12,6 @@ import { Fragment as ReactFragment, useCallback, useEffect, useLayoutEffect, use
 import { TextSelection } from '@tiptap/pm/state'
 import { isEditorReady } from '../lib/editorUtils'
 import { getPreference, setPreference } from '../lib/preferences'
-import { documentSurface, editorRegistry } from '../bridge'
 
 const FOCUS_MODE_SETTINGS_KEY = 'inkblot-focus-mode-settings'
 const FOCUS_MODE_WHEEL_SENTENCE_PX = 92
@@ -533,44 +532,6 @@ export default function FocusModeOverlay({ editor, onExit }) {
       window.clearTimeout(wheelResetTimerRef.current)
     }
   }, [])
-
-  // Tell the shell where focus mode is, so native chrome (a progress readout, the
-  // window's title) can follow along, and that it has ended when the overlay closes.
-  useEffect(() => {
-    if (!isEditorReady(editor)) return undefined
-    const docPath = () => {
-      const resolved = editorRegistry.active()
-      return (resolved?.editor === editor ? resolved.docPath : null) ?? ''
-    }
-    const publish = () => {
-      if (!isEditorReady(editor)) return
-      const { doc, selection } = editor.state
-      const text = doc.textBetween(0, doc.content.size, ' ', ' ').trim()
-      documentSurface.publishFocusModeView({
-        active: true,
-        docPath: docPath(),
-        paragraphIndex: selection.$from.index(0),
-        paragraphCount: doc.childCount,
-        wordCount: text ? text.split(/\s+/).length : 0,
-      })
-    }
-    publish()
-    editor.on('selectionUpdate', publish)
-    editor.on('update', publish)
-    return () => {
-      if (!editor.isDestroyed) {
-        editor.off('selectionUpdate', publish)
-        editor.off('update', publish)
-      }
-      documentSurface.publishFocusModeView({
-        active: false,
-        docPath: docPath(),
-        paragraphIndex: 0,
-        paragraphCount: 0,
-        wordCount: 0,
-      })
-    }
-  }, [editor])
 
   // Play the opening animation once, then settle into the normal view.
   useEffect(() => {

@@ -8,10 +8,8 @@
 //! including the size presets, so the list is defined once (pageSizes.ts) — and the
 //! shell answers with the commands below.
 //!
-//! Printing crosses the bridge twice: the shell asks for a print (`PrintDocument`),
-//! the page lays the pages out for paper and asks the shell to run the print
-//! operation on its web view at the paper size it needs (`PrintRequest`), and the
-//! shell reports back (`PrintFinished`) so the page can tear its print DOM down.
+//! Printing is one command (`PrintDocument`): the page lays the pages out for paper
+//! and prints its own web view; `PrintJobStatus` reports how far a job has got.
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
@@ -905,15 +903,6 @@ pub struct LastExport {
     pub path: String,
 }
 
-/// The shell finished (or abandoned) a `PrintRequest`.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintFinishedCommand {
-    pub job_id: String,
-    pub completed: bool,
-}
-
 /* ---------------- events ---------------- */
 
 /// A page size the inspector can offer.
@@ -1284,19 +1273,4 @@ pub struct PrintJobStatus {
     /// The file written, for an export that is `Done`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
-}
-
-/// Print the web view as it is now, on paper of this size, with no margins and no
-/// scaling: the page has laid out exactly what goes on each sheet.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintRequest {
-    pub job_id: String,
-    pub job_name: String,
-    pub paper_width_pt: f64,
-    pub paper_height_pt: f64,
-    /// Save as PDF here instead of printing. Absent shows the print panel.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pdf_path: Option<String>,
 }

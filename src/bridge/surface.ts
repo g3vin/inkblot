@@ -3,15 +3,15 @@
  *
  * `createDocumentSurface` takes a `SurfaceBridge` and an `EditorRegistry` and installs
  * every command and request handler the protocol defines. What comes back is the object
- * the React shell publishes *through*: `publishToolbarState()`, `publishNotesRemapped()`
- * and friends, each coalesced, each typed.
+ * the React shell publishes *through*: `publishToolbarState()`, `publishTabsChanged()`
+ * and friends, each typed, the frequent ones coalesced.
  *
  * **The split between handlers and delegates is the interesting line.** A command that
  * only needs a live editor — every formatting command, the selection commands — is
  * handled here, completely, and needs nothing from the app. A command that changes what
  * the app is *showing* — open a document, replace a pane's content, run a canvas
  * command — cannot be: it needs React state that only the app owns. Those are delegated
- * out, and the delegate list is therefore an exact statement of what a native shell
+ * out, and the delegate list is therefore an exact statement of what the bridge
  * cannot do without the app's cooperation. It is short, and keeping it short is what
  * keeps the seam thin.
  */
@@ -19,10 +19,6 @@ import { EditorTarget, Pane } from '../types'
 import { countEditorWords } from '../lib/wordCount'
 import type {
   ActiveEditorChanged,
-  ArchiveChanged,
-  BubbleChipsChanged,
-  WordCountsChanged,
-  BubbleSessionOpened,
   CanvasCommandRequest,
   CanvasDropDocCommand,
   CanvasDropNoteCommand,
@@ -35,12 +31,7 @@ import type {
   DictationLevelCommand,
   DictationTranscript,
   DocChanged,
-  FocusModeView,
   Note,
-  NoteMarkerEvent,
-  NoteMarkersChanged,
-  NotePreviewDismissed,
-  NotesRemapped,
   OpenDocumentCommand,
   PageLayoutCatalog,
   PageLayoutState,
@@ -50,15 +41,9 @@ import type {
   PrintJobStatus,
   TypesetFocus,
   TypesetHistoryChanged,
-  PrintRequest,
-  ClipboardChanged,
-  NotesChanged,
   ProjectChanged,
   ShowSidebarTab,
-  TilesChanged,
-  VersionsChanged,
   ReadAloudPayloadEvent,
-  SearchMatches,
   SelectionContext,
   SetContentCommand,
   SyncNotesCommand,
@@ -78,7 +63,6 @@ import type { EditorRegistry, ResolvedEditor } from './editorRegistry'
 import { createCoalescer, frameScheduler, type Scheduler } from './coalesce'
 import { TOOLBAR_DEFAULTS, readSelectionContext, readToolbarState } from './readState'
 import * as commands from './commands'
-import { dragHandoff, type DragHandoff } from './dragHandoff'
 
 /** What the surface cannot do alone. Every one of these needs app state. */
 export interface SurfaceDelegates {
@@ -109,7 +93,6 @@ export interface DocumentSurfaceOptions {
    * typing as typing. Injected for the same reason `scheduler` is.
    */
   docChangeScheduler?: Scheduler
-  drag?: DragHandoff
 }
 
 /** How long `docChanged` gathers edits before it sends them. */
@@ -166,11 +149,6 @@ export interface DocumentSurface {
    * and sent as one `docChanged` per window, except a paste, which is sent on its own.
    */
   noteDocTransaction(editor: unknown, transaction: unknown): void
-  /** Push a whole remapped note set. Coalesced per document. */
-  publishNotesRemapped(payload: NotesRemapped): void
-  publishNoteMarker(kind: 'hover' | 'leave' | 'pin', payload: NoteMarkerEvent): void
-  publishSearchMatches(payload: SearchMatches): void
-  publishFocusModeView(payload: FocusModeView): void
   /**
    * The page's view settings a native toolbar offers as toggles. Each is owned by a
    * different component — focus mode by `EditorLayout`, the word count by `App` — so
@@ -180,34 +158,9 @@ export interface DocumentSurface {
   publishReadAloudPayload(payload: ReadAloudPayloadEvent): void
   /** Which project is open. Not coalesced — it changes when the user picks one. */
   publishProjectChanged(payload: ProjectChanged): void
-  /**
-   * The right sidebar's state, for a shell that draws the sidebar itself. Notes, the
-   * clipboard and tiles each carry the whole list, which is what makes coalescing
-   * them to one per frame safe (see `coalesce.ts`) — a keystroke in a note would otherwise
-   * be a message per keystroke.
-   */
-  publishNotesChanged(payload: NotesChanged): void
-  publishClipboardChanged(payload: ClipboardChanged): void
-  publishTilesChanged(payload: TilesChanged): void
-  publishVersionsChanged(payload: VersionsChanged): void
   publishShowSidebarTab(payload: ShowSidebarTab): void
-  /** An open preview's marker moved. Coalesced — each carries the whole rect. */
-  publishNoteMarkerMoved(payload: NoteMarkerEvent): void
-  publishNotePreviewDismissed(payload: NotePreviewDismissed): void
-  /** Every visible note marker, for a shell that draws the dots. Coalesced per frame. */
-  publishNoteMarkersChanged(payload: NoteMarkersChanged): void
-  /** Open the bubble editor, for a shell that draws it. Not coalesced — one per open. */
-  publishBubbleSessionOpened(payload: BubbleSessionOpened): void
-  /** Every visible session chip, for a shell that draws them. Coalesced per frame. */
-  publishBubbleChipsChanged(payload: BubbleChipsChanged): void
-  /** A document's archive, whole. */
-  publishArchiveChanged(payload: ArchiveChanged): void
-  /** Every visible word-count badge, for a shell that draws them. Coalesced per frame. */
-  publishWordCountsChanged(payload: WordCountsChanged): void
   /** Print Layout's state, for the inspector's Page tab. Coalesced — each carries it all. */
   publishPageLayoutState(payload: PageLayoutState): void
-  /** Ask the shell to print the web view at a paper size. Not coalesced: each is a job. */
-  publishPrintRequest(payload: PrintRequest): void
   /** The Finishing tabs' fixed lists — sizes, formats, tokens — once. */
   publishPageLayoutCatalog(payload: PageLayoutCatalog): void
   /** Where a print or export has got to. Not coalesced: the last of a job must arrive. */
@@ -226,11 +179,6 @@ export interface DocumentSurface {
   /** The tabs and the split, whole. Coalesced — a tab switch changes several fields at once. */
   publishTabsChanged(payload: TabsChanged): void
 
-  /** Report a drag over the bridge. The hand-off state itself lives in `dragHandoff`. */
-  publishDragStarted(): void
-  publishDragMoved(x: number, y: number): void
-  publishDragEnded(at?: { x?: number; y?: number }): void
-
   /** Send anything still pending. Called when a pane tears down. */
   flush(): void
   dispose(): void
@@ -242,7 +190,6 @@ export function createDocumentSurface({
   delegates: initialDelegates = {},
   scheduler = frameScheduler,
   docChangeScheduler = docChangeTimer,
-  drag = dragHandoff,
 }: DocumentSurfaceOptions): DocumentSurface {
   let delegates = initialDelegates
   let lastHighlightColor: string = TOOLBAR_DEFAULTS.highlight
@@ -365,51 +312,6 @@ export function createDocumentSurface({
     (context) => bridge.emit('selectionContext', context),
     scheduler
   )
-  // Keyed by document: two panes remap independently, and coalescing them into one slot
-  // would drop one pane's notes every time both changed in the same frame.
-  const notesByDoc = new Map<string, ReturnType<typeof createCoalescer<NotesRemapped>>>()
-  const notesCoalescer = (docPath: string) => {
-    const existing = notesByDoc.get(docPath)
-    if (existing) return existing
-    const created = createCoalescer<NotesRemapped>(
-      (payload) => bridge.emit('notesRemapped', payload),
-      scheduler
-    )
-    notesByDoc.set(docPath, created)
-    return created
-  }
-  const notesChangedByDoc = new Map<string, ReturnType<typeof createCoalescer<NotesChanged>>>()
-  const notesChangedFor = (docPath: string) => {
-    const existing = notesChangedByDoc.get(docPath)
-    if (existing) return existing
-    const created = createCoalescer<NotesChanged>((payload) => bridge.emit('notesChanged', payload), scheduler)
-    notesChangedByDoc.set(docPath, created)
-    return created
-  }
-  const clipboardChanges = createCoalescer<ClipboardChanged>(
-    (payload) => bridge.emit('clipboardChanged', payload),
-    scheduler
-  )
-  const tileChanges = createCoalescer<TilesChanged>(
-    (payload) => bridge.emit('tilesChanged', payload),
-    scheduler
-  )
-  const markerMoves = createCoalescer<NoteMarkerEvent>(
-    (payload) => bridge.emit('noteMarkerMoved', payload),
-    scheduler
-  )
-  const markerLists = createCoalescer<NoteMarkersChanged>(
-    (payload) => bridge.emit('noteMarkersChanged', payload),
-    scheduler
-  )
-  const chipLists = createCoalescer<BubbleChipsChanged>(
-    (payload) => bridge.emit('bubbleChipsChanged', payload),
-    scheduler
-  )
-  const wordCountLists = createCoalescer<WordCountsChanged>(
-    (payload) => bridge.emit('wordCountsChanged', payload),
-    scheduler
-  )
   const pageLayoutChanges = createCoalescer<PageLayoutState>(
     (payload) => bridge.emit('pageLayoutState', payload),
     scheduler
@@ -420,10 +322,6 @@ export function createDocumentSurface({
   )
   const tabChanges = createCoalescer<TabsChanged>(
     (payload) => bridge.emit('tabsChanged', payload),
-    scheduler
-  )
-  const dragMoves = createCoalescer<{ dragId: string; clientX: number; clientY: number }>(
-    (moved) => bridge.emit('dragMoved', moved),
     scheduler
   )
 
@@ -620,37 +518,15 @@ export function createDocumentSurface({
     publishDocChanged(payload) { bridge.emit('docChanged', payload) },
     noteDocTransaction,
 
-    publishNotesRemapped(payload) { notesCoalescer(payload.docPath).push(payload) },
-
-    publishNoteMarker(kind, payload) {
-      const type = kind === 'hover'
-        ? 'noteMarkerHover'
-        : kind === 'leave' ? 'noteMarkerLeave' : 'noteMarkerPin'
-      bridge.emit(type, payload)
-    },
-
-    publishSearchMatches(payload) { bridge.emit('searchMatches', payload) },
-    publishFocusModeView(payload) { bridge.emit('focusModeView', payload) },
     publishViewOptions(patch) {
       viewOptions = { ...viewOptions, ...patch }
       bridge.emit('viewOptions', viewOptions)
     },
     publishReadAloudPayload(payload) { bridge.emit('readAloudPayload', payload) },
     publishProjectChanged(payload) { bridge.emit('projectChanged', payload) },
-    publishNotesChanged(payload) { notesChangedFor(payload.docPath).push(payload) },
-    publishClipboardChanged(payload) { clipboardChanges.push(payload) },
-    publishTilesChanged(payload) { tileChanges.push(payload) },
-    publishVersionsChanged(payload) { bridge.emit('versionsChanged', payload) },
     publishShowSidebarTab(payload) { bridge.emit('showSidebarTab', payload) },
-    publishNoteMarkerMoved(payload) { markerMoves.push(payload) },
-    publishNoteMarkersChanged(payload) { markerLists.push(payload) },
-    publishBubbleSessionOpened(payload) { bridge.emit('bubbleSessionOpened', payload) },
-    publishBubbleChipsChanged(payload) { chipLists.push(payload) },
-    publishArchiveChanged(payload) { bridge.emit('archiveChanged', payload) },
-    publishWordCountsChanged(payload) { wordCountLists.push(payload) },
     publishPageLayoutState(payload) { pageLayoutChanges.push(payload) },
     publishTabsChanged(payload) { tabChanges.push(payload) },
-    publishPrintRequest(payload) { bridge.emit('printRequest', payload) },
     publishPageLayoutCatalog(payload) { bridge.emit('pageLayoutCatalog', payload) },
     publishPrintJobStatus(payload) { bridge.emit('printJobStatus', payload) },
     publishTypesetFocus(payload) { bridge.emit('typesetFocus', payload) },
@@ -658,33 +534,6 @@ export function createDocumentSurface({
     publishReferencesChanged(payload) { referenceLists.push(payload) },
     publishReferenceSchema(payload) { bridge.emit('referenceSchema', payload) },
     publishRevealReference(payload) { bridge.emit('revealReference', payload) },
-    publishNotePreviewDismissed(payload) {
-      // A move queued for a preview that is closing would reopen nothing, but it would
-      // arrive after the dismissal and be one message the shell has to reason about.
-      markerMoves.cancel()
-      referenceLists.cancel()
-      bridge.emit('notePreviewDismissed', payload)
-    },
-
-    publishDragStarted() {
-      const session = drag.current()
-      if (!session) return
-      const { claimed: _claimed, ...started } = session
-      bridge.emit('dragStarted', started)
-    },
-
-    publishDragMoved(x, y) {
-      const moved = drag.moveTo(x, y)
-      if (moved) dragMoves.push(moved)
-    },
-
-    publishDragEnded(at) {
-      // A pending move describes a drag that is over; sending it after the end would
-      // put the two out of order for no benefit.
-      dragMoves.cancel()
-      const ended = drag.end(at)
-      if (ended) bridge.emit('dragEnded', ended)
-    },
 
     flush() {
       for (const target of [...pendingDocChanges.keys()]) sendDocChange(target)
@@ -692,18 +541,9 @@ export function createDocumentSurface({
       canvasToolbar.flush()
       mapChrome.flush()
       selection.flush()
-      dragMoves.flush()
-      clipboardChanges.flush()
-      tileChanges.flush()
-      markerMoves.flush()
-      markerLists.flush()
-      chipLists.flush()
-      wordCountLists.flush()
       pageLayoutChanges.flush()
       tabChanges.flush()
       referenceLists.flush()
-      for (const coalescer of notesByDoc.values()) coalescer.flush()
-      for (const coalescer of notesChangedByDoc.values()) coalescer.flush()
     },
 
     dispose() {
@@ -713,19 +553,8 @@ export function createDocumentSurface({
       canvasToolbar.cancel()
       mapChrome.cancel()
       selection.cancel()
-      dragMoves.cancel()
-      clipboardChanges.cancel()
-      tileChanges.cancel()
-      markerMoves.cancel()
-      markerLists.cancel()
-      chipLists.cancel()
-      wordCountLists.cancel()
       pageLayoutChanges.cancel()
       tabChanges.cancel()
-      for (const coalescer of notesByDoc.values()) coalescer.cancel()
-      for (const coalescer of notesChangedByDoc.values()) coalescer.cancel()
-      notesByDoc.clear()
-      notesChangedByDoc.clear()
       for (const unsubscribe of subscriptions) unsubscribe()
       subscriptions.length = 0
     },

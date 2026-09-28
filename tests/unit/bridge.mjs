@@ -41,7 +41,8 @@ const { createDocumentSurface } = await import(`${C}/bridge/surface.ts`)
 const { createCoalescer, immediateScheduler } = await import(`${C}/bridge/coalesce.ts`)
 const { createDragHandoff } = await import(`${C}/bridge/dragHandoff.ts`)
 const { resolveAnchor, readAnchor, findText } = await import(`${C}/bridge/anchors.ts`)
-const { EditorTarget, MarkKind, Alignment, DragPayloadKind } = await import(`${C}/types/index.ts`)
+const { EditorTarget, MarkKind, Alignment } = await import(`${C}/types/index.ts`)
+const { DragPayloadKind } = await import(`${C}/bridge/dragHandoff.ts`)
 
 /* ------------------------------------------------------------------
    A fake editor.
@@ -364,35 +365,6 @@ function wire({ deferred = false } = {}) {
   ok('and cancel drops it without sending', dropped.length === 0)
 }
 
-/* notesRemapped coalesces per document, not globally. */
-{
-  const transports = createInProcessTransports()
-  const shell = createShellBridge(transports.shell)
-  const bridge = createSurfaceBridge(transports.surface)
-  const registry = createEditorRegistry()
-
-  let pending = []
-  const manual = (callback) => {
-    pending.push(callback)
-    return () => { pending = pending.filter((entry) => entry !== callback) }
-  }
-  const surface = createDocumentSurface({ bridge, registry, scheduler: manual })
-
-  const remaps = []
-  shell.on('notesRemapped', (payload) => remaps.push(payload))
-
-  surface.publishNotesRemapped({ docPath: 'a.md', notes: [], droppedNoteIds: [] })
-  surface.publishNotesRemapped({ docPath: 'b.md', notes: [], droppedNoteIds: [] })
-  surface.publishNotesRemapped({ docPath: 'a.md', notes: [], droppedNoteIds: ['n1'] })
-
-  for (const callback of pending.splice(0)) callback()
-  ok('two documents remapping in one frame both get through', remaps.length === 2)
-  ok('and each carries its own latest state',
-    remaps.find((r) => r.docPath === 'a.md')?.droppedNoteIds.length === 1)
-
-  surface.dispose()
-}
-
 /* ---------------- the drag hand-off (the globals) ---------------- */
 {
   const drag = createDragHandoff()
@@ -419,40 +391,6 @@ function wire({ deferred = false } = {}) {
   const unclaimed = createDragHandoff()
   unclaimed.begin({ kind: DragPayloadKind.EditorSelection, text: 'x' })
   ok('a drag nobody claimed reports handled: false', unclaimed.end().handled === false)
-}
-
-/* The drag crosses the bridge as data. */
-{
-  const transports = createInProcessTransports()
-  const shell = createShellBridge(transports.shell)
-  const bridge = createSurfaceBridge(transports.surface)
-  const registry = createEditorRegistry()
-  const drag = createDragHandoff()
-  const surface = createDocumentSurface({
-    bridge, registry, drag, scheduler: immediateScheduler,
-  })
-
-  const started = []
-  const ended = []
-  shell.on('dragStarted', (payload) => started.push(payload))
-  shell.on('dragEnded', (payload) => ended.push(payload))
-
-  drag.begin({
-    kind: DragPayloadKind.EditorSelection,
-    text: 'she hesitated',
-    docPath: 'ch/one.md',
-    anchor: { from: 4, to: 17, text: 'she hesitated' },
-  })
-  surface.publishDragStarted()
-  ok('a drag reaches the shell with its payload', started[0]?.text === 'she hesitated')
-  ok('and names where in the document it came from', started[0]?.anchor?.from === 4)
-  ok('the internal claim flag does not go on the wire', !('claimed' in started[0]))
-
-  drag.claim()
-  surface.publishDragEnded({ x: 3, y: 4 })
-  ok('the end reports the claim across the bridge', ended[0]?.handled === true)
-
-  surface.dispose()
 }
 
 /* ---------------- anchors ---------------- */

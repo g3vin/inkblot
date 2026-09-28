@@ -12,7 +12,6 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SFIcon from '../SFIcon'
-import { documentSurface } from '../../bridge'
 import { listProjectTree, loadDocument } from '../../lib/FileSystem'
 import {
   SEARCH_SCOPES,
@@ -222,21 +221,6 @@ export default function SidebarSearch({
     const index = documentResults.findIndex((result) => result.id === selectedResultId)
     return index === -1 ? 0 : index
   }, [documentResults, selectedResultId])
-
-  // The open document's matches, for a shell that marks them (a scrollbar gutter, the
-  // native find bar). Only this scope: project results carry no live positions, and
-  // `inkblot-core` answers those itself. The inline copy is inactive while the overlay
-  // is up, so one search is not published twice.
-  const matchesDocPath = activeDoc || currentDoc || ''
-  useEffect(() => {
-    if (!active || scope !== 'document' || !matchesDocPath) return
-    documentSurface.publishSearchMatches({
-      query: deferredQuery,
-      docPath: matchesDocPath,
-      results: documentResults,
-      activeIndex: selectedIndex === -1 ? undefined : selectedIndex,
-    })
-  }, [active, deferredQuery, documentResults, matchesDocPath, scope, selectedIndex])
 
   /* ---- Actions ---- */
 

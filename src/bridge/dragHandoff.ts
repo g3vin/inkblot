@@ -8,17 +8,50 @@
  * the editor needs it to decide whether to show a drop caret. `useEditorDnd`,
  * `ClipboardPanel`, `EditorCanvas` and `Editor` all share the session held here.
  *
- * The hand-off is messages rather than a shared object, so either end of a drag could
- * be something other than this page. This module is the page's half: one session at
- * a time, a claim protocol, and every transition reported on the bridge.
+ * One session at a time, and a claim protocol for the drop.
  *
  * **`claim()` is test-and-set.** Two drop targets can see the same drop (an editor
  * and the clipboard panel underneath it). The first caller gets `true` and everyone
  * after it gets `false`, so which target handles the drop does not depend on the order
  * their listeners happen to run in.
  */
-import { DragPayloadKind } from '../types'
-import type { DragEnded, DragMoved, DragStarted, TextAnchor } from '../types'
+import type { TextAnchor } from '../types'
+
+/** What is being dragged. */
+export enum DragPayloadKind {
+  /** A selection dragged out of an editor. */
+  EditorSelection = 'editorSelection',
+  /** An entry dragged out of the clipboard history panel. */
+  ClipboardEntry = 'clipboardEntry',
+  /** A document dragged out of the file tree. */
+  Document = 'document',
+  /** A note card dragged out of the notes panel. */
+  NoteCard = 'noteCard',
+}
+
+interface DragStarted {
+  dragId: string
+  kind: DragPayloadKind
+  text: string
+  sourceId?: string
+  docPath?: string
+  anchor?: TextAnchor
+  detail?: unknown
+}
+
+export interface DragMoved {
+  dragId: string
+  clientX: number
+  clientY: number
+}
+
+/** How a drag ended. `handled` says whether a drop target claimed the payload. */
+export interface DragEnded {
+  dragId: string
+  handled: boolean
+  clientX?: number
+  clientY?: number
+}
 
 export interface DragOrigin {
   kind: DragPayloadKind
@@ -96,8 +129,7 @@ export function createDragHandoff(): DragHandoff {
       if (!session) return null
       point = { x, y }
       // Deliberately does not announce: a move is not a state change anyone re-renders
-      // for, and it fires at pointer rate. The caller emits `dragMoved` on the bridge,
-      // coalesced to one per frame.
+      // for, and it fires at pointer rate.
       return { dragId: session.dragId, clientX: x, clientY: y }
     },
 
@@ -141,4 +173,3 @@ export function createDragHandoff(): DragHandoff {
  */
 export const dragHandoff = createDragHandoff()
 
-export { DragPayloadKind }
