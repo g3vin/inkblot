@@ -91,11 +91,15 @@
    * stronger.
    */
   --card-color: var(--note-color, var(--accent-color));
-  --card-base: var(--popover-bg);
+  --card-base: var(--floating-over-page-bg);
   --card-edge-base: var(--popover-border);
 
+  /* Over the page, as the Swift shell's glass cards were: the one blurred surface,
+     tinted with the note's colour. */
   border: 1px solid var(--card-edge);
   background: var(--card-tint);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
   box-shadow: var(--shadow-popover);
   pointer-events: auto;
   cursor: default;
