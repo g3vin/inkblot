@@ -51,6 +51,7 @@ import ToolbarHost from './toolbar/ToolbarHost'
 import { readDisplayMode, TOOLBAR_LAYOUT_CHANGED } from './toolbar/useToolbarLayout'
 import { CUSTOMIZE_INSPECTOR_EVENT, popUpToolbarMenu } from '../hooks/contextMenu/toolbarMenu'
 import InspectorLayoutEditor from './RightSidebar/InspectorLayoutEditor'
+import { setInspectorOpen } from '../lib/inspectorPresence'
 
 const LEFT_SIDEBAR_OUTER_CHROME_WIDTH = 18
 const RIGHT_SIDEBAR_OUTER_CHROME_WIDTH = 22
@@ -367,6 +368,7 @@ export default function EditorLayout(props) {
     }
     openRightSidebarTab(tab)
   }, [nativeRightSidebar, rightOpen, props.sidebarTab, right, openRightSidebarTab])
+  useEffect(() => { setInspectorOpen(!nativeRightSidebar && rightOpen) }, [nativeRightSidebar, rightOpen])
   const toolbarPanel = useMemo(
     () => ({ tab: props.sidebarTab, open: rightOpen, toggle: togglePanel }),
     [props.sidebarTab, rightOpen, togglePanel]
