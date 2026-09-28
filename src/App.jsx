@@ -23,6 +23,7 @@ import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
 import { OPEN_SETTINGS, primaryTimerAction } from './stats/timerMenu.js'
 import { allRoutines } from './stats/config.js'
 import { setShowsTabBar, showsTabBar } from './components/tabs/tabBarState.js'
+import { buildFormatMenu, buildInsertMenu, fileExtraItems, pasteAndMatchStyleItem, viewItems, windowTabItems } from './menus/appMenus.js'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -322,12 +323,13 @@ export default function App() {
       })
       const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [tabBarItem, printLayoutItem])]
 
+      const pageItems = native ? [] : await viewItems({ MenuItem, Submenu, PredefinedMenuItem })
       if (viewSubmenu) {
-        await viewSubmenu.append([...themeItems, ...accentItems, ...displayItems])
+        await viewSubmenu.append([...themeItems, ...accentItems, ...displayItems, ...pageItems])
       } else {
         const viewMenu = await Submenu.new({
           text: 'View',
-          items: [...themeItems, ...accentItems, ...displayItems],
+          items: [...themeItems, ...accentItems, ...displayItems, ...pageItems],
         })
         await menu.append(viewMenu)
       }
@@ -338,7 +340,18 @@ export default function App() {
         const appSubmenu = items[0] instanceof Submenu && !['File', 'Edit', 'View', 'Window', 'Help'].includes(await items[0].text()) ? items[0] : null
         if (appSubmenu) await appSubmenu.insert([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem], 1)
         else if (fileSubmenu) await fileSubmenu.append([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem])
-        await menu.append(await buildTimerMenu({ MenuItem, Submenu, PredefinedMenuItem }))
+        const api = { MenuItem, Submenu, PredefinedMenuItem, CheckMenuItem }
+        const submenus = await Promise.all(items.map(async (item) => (item instanceof Submenu ? [await item.text(), item] : [null, item])))
+        const named = (name) => submenus.find(([text]) => text === name)?.[1] ?? null
+        const extras = await fileExtraItems(api)
+        if (fileSubmenu) await fileSubmenu.insert(extras, 0)
+        await named('Edit')?.append([await PredefinedMenuItem.new({ item: 'Separator' }), await pasteAndMatchStyleItem(api)])
+        await named('Window')?.insert(await windowTabItems(api), 0)
+        // Insert, Format and Timer before Window, where the Swift shell had them.
+        const added = [await buildInsertMenu(api), await buildFormatMenu(api), await buildTimerMenu(api)]
+        const windowAt = submenus.findIndex(([text]) => text === 'Window')
+        if (windowAt >= 0) await menu.insert(added, windowAt)
+        else await menu.append(added)
       }
 
       await menu.setAsAppMenu()

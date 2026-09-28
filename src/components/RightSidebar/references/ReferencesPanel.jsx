@@ -48,10 +48,10 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
     requestAnimationFrame(() => listRef.current?.querySelector(`[data-reference-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
   })
 
-  // Insert ▸ Citation…: the field, in cite mode.
+  // Insert ▸ Citation…: the field, in cite mode; Insert ▸ Add Reference…: the field.
   useEffect(() => {
-    const cite = () => {
-      setCiting(true)
+    const cite = (event) => {
+      setCiting(event?.detail?.cite !== false)
       requestAnimationFrame(() => inputRef.current?.focus())
     }
     window.addEventListener(CITE_SOURCE_EVENT, cite)
