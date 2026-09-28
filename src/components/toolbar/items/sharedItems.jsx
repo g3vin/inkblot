@@ -5,6 +5,10 @@
 import { SplitOrientation, VersionAction } from '../../../types'
 import { inspectorTab } from '../../../lib/chromeLayout'
 import { ItemFrame, MenuButton, ToolButton } from '../ToolbarControls'
+import SFIcon from '../../SFIcon'
+import { useStats } from '../../../stats/useStats.js'
+import { timerMenuItems } from '../../../stats/timerMenu.js'
+import { timerClock } from '../../stats/statsText.js'
 
 export function SnapshotItem({ ctx, spec }) {
   return (
@@ -32,19 +36,32 @@ export function PanelItem({ ctx, spec, tab }) {
   )
 }
 
+/**
+ * The writing timer: a menu of routines while none runs, and the running segment's
+ * clock while one does.
+ */
 export function TimerItem({ ctx, spec }) {
-  const timer = ctx.timer
+  const stats = useStats()
+  const timer = stats.timer
+  const active = timer.isActive && timer.segment
+  const clock = active ? timerClock(timer, stats.now()) : null
+  const symbol = !active ? 'timer' : timer.state === 'paused' ? 'pause' : timer.segment.kind === 'write' ? 'pencil' : 'cup.and.saucer'
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton
-        symbol="timer"
-        label={timer?.label || spec.label}
-        title="Writing timer"
+      <MenuButton
+        symbol={symbol}
+        label={spec.label}
+        title={active ? 'The writing timer' : 'Start a writing timer'}
         display={ctx.display}
-        active={Boolean(timer?.running)}
-        disabled={!timer}
-        onClick={() => timer?.toggle?.()}
-      />
+        items={() => timerMenuItems(stats)}
+      >
+        {active ? (
+          <span className="tb-timer" data-state={timer.state}>
+            <SFIcon name={symbol} size={14} />
+            <span className="tb-timer-clock">{clock}</span>
+          </span>
+        ) : undefined}
+      </MenuButton>
     </ItemFrame>
   )
 }

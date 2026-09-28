@@ -7,7 +7,9 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import './ui.css'
 
-const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+// Anything that takes focus from Tab — so not a roving group's inactive members.
+const FOCUSABLE = ['button:not([disabled])', '[href]', 'input:not([disabled])', 'select:not([disabled])', 'textarea:not([disabled])', '[tabindex]']
+  .map((selector) => `${selector}:not([tabindex="-1"])`).join(', ')
 
 /**
  * `placement="top"` drops the sheet from under the titlebar and leaves the titlebar

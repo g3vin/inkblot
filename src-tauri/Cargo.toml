@@ -58,10 +58,11 @@ url = { workspace = true }
 serde = { workspace = true }
 reqwest = { workspace = true }
 
-tauri = { version = "2.10.0", features = ["protocol-asset"] }
+tauri = { version = "2.10.0", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-fs = "2.4.5"
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
 
 # NSHapticFeedbackManager. WKWebView exposes no haptics API, so the trackpad can
 # only be driven from native code.

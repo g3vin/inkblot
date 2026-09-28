@@ -382,6 +382,10 @@ export default function FileTree({
       const { renameProject } = await import('../lib/FileSystem')
       const nextName = await renameProject(path, trimmed)
       if (nextName) {
+        if (nextName !== path) {
+          const { statsService } = await import('../stats/service')
+          statsService.renameProject(path, nextName)
+        }
         migrateProjectTreeState(path, nextName)
         if (projectName === path) {
           onSelectProject?.(nextName)

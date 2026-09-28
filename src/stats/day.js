@@ -75,12 +75,12 @@ export function formatNumber(value) {
   return Math.round(value).toLocaleString()
 }
 
-/** "1h 5m", "12m", "40s". */
+/** "1h 05m", "12m", "40s". */
 export function formatDuration(seconds) {
   const total = Math.max(0, Math.round(seconds))
   const hours = Math.floor(total / 3600)
   const minutes = Math.floor((total % 3600) / 60)
-  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  if (hours > 0) return `${hours}h ${pad(minutes)}m`
   if (minutes > 0) return `${minutes}m`
   return `${total}s`
 }

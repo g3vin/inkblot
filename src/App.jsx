@@ -13,11 +13,15 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
-import './App.css'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
 import { resolveTheme, setThemeAttribute } from './lib/theme'
 import { documentSurface } from './bridge'
 import { isNativeShell } from './lib/host'
+import SettingsSheet from './components/settings/SettingsSheet.jsx'
+import TimerCapsule from './components/stats/TimerCapsule.jsx'
+import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
+import { OPEN_SETTINGS, primaryTimerAction } from './stats/timerMenu.js'
+import { allRoutines } from './stats/config.js'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -57,76 +61,44 @@ const normalizeAccentColor = (value) => {
   return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toLowerCase() : DEFAULT_ACCENT
 }
 
-/** Modal dialog for choosing the app accent color (presets + custom picker). */
-function AccentColorPanel({ open, accentColor, onChange, onClose }) {
-  if (!open) return null
+const openSettings = (pane) => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS, { detail: { pane } }))
 
-  return (
-    <div className="accent-overlay" onClick={onClose}>
-      <div
-        className="accent-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="accent-dialog-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="accent-dialog-header">
-          <div>
-            <p className="accent-dialog-eyebrow">View Menu</p>
-            <h2 id="accent-dialog-title">Accent Color</h2>
-          </div>
-          <button type="button" className="accent-dialog-close" onClick={onClose} aria-label="Close accent picker">
-            ×
-          </button>
-        </div>
-
-        <p className="accent-dialog-copy">
-          Keep the app’s highlights in sync. Pick a chill preset or dial in your own.
-        </p>
-
-        <div className="accent-preview" style={{ '--accent-preview': accentColor }}>
-          <div className="accent-preview-chip" />
-          <div>
-            <div className="accent-preview-label">Current accent</div>
-            <code>{accentColor.toUpperCase()}</code>
-          </div>
-        </div>
-
-        <div className="accent-grid">
-          {ACCENT_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              className={`accent-swatch${accentColor === preset.value ? ' active' : ''}`}
-              style={{ '--swatch-color': preset.value }}
-              onClick={() => onChange(preset.value)}
-              aria-label={`${preset.label} accent`}
-              title={preset.label}
-            >
-              <span className="accent-swatch-dot" />
-              <span className="accent-swatch-label">{preset.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="accent-custom-row">
-          <label className="accent-custom-input">
-            <span>Pick your own</span>
-            <input type="color" value={accentColor} onChange={(event) => onChange(event.target.value)} />
-          </label>
-
-          <button
-            type="button"
-            className="accent-reset-btn"
-            onClick={() => onChange(DEFAULT_ACCENT)}
-            disabled={accentColor === DEFAULT_ACCENT}
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+/**
+ * The menu bar's Timer menu. Its first item says what it does now — Start, Pause,
+ * Resume — and the others enable as the timer's state allows, kept in step with the
+ * stats runtime.
+ */
+async function buildTimerMenu({ MenuItem, Submenu, PredefinedMenuItem }) {
+  const stats = getStatsRuntime()
+  const timer = stats.timer
+  const primary = await MenuItem.new({ id: 'timer-primary', text: primaryTimerAction(stats).text, action: () => primaryTimerAction(stats).action() })
+  const skip = await MenuItem.new({ id: 'timer-skip', text: 'Skip to Next Segment', enabled: false, action: () => timer.skip() })
+  const stop = await MenuItem.new({ id: 'timer-stop', text: 'Stop', enabled: false, action: () => timer.stop() })
+  const routines = await Submenu.new({
+    text: 'Start Routine',
+    items: await Promise.all(allRoutines(stats.config).map((routine) => MenuItem.new({ text: routine.name, action: () => stats.startTimer(routine) }))),
+  })
+  let last = ''
+  stats.subscribe(() => {
+    const text = primaryTimerAction(stats).text
+    const key = `${text}|${timer.state}`
+    if (key === last) return
+    last = key
+    primary.setText(text)
+    skip.setEnabled(timer.state === 'running' || timer.state === 'paused')
+    stop.setEnabled(timer.isActive)
+  })
+  return Submenu.new({
+    text: 'Timer',
+    items: [
+      primary, skip, stop,
+      await PredefinedMenuItem.new({ item: 'Separator' }),
+      routines,
+      await PredefinedMenuItem.new({ item: 'Separator' }),
+      await MenuItem.new({ id: 'timer-show-stats', text: 'Show Stats', action: () => stats.showStats() }),
+      await MenuItem.new({ id: 'timer-edit-routines', text: 'Edit Routines…', action: () => openSettings('timers') }),
+    ],
+  })
 }
 
 export default function App() {
@@ -138,7 +110,9 @@ export default function App() {
   const currentThemeRef = useRef('system')
   const showWordCountBadgeRef = useRef(true)
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
-  const [isAccentPickerOpen, setIsAccentPickerOpen] = useState(false)
+  const [theme, setTheme] = useState('system')
+  const [hasSystemAccent, setHasSystemAccent] = useState(false)
+  useStatsRuntime()
   const [showWordCountBadge, setShowWordCountBadge] = useState(true)
 
   // Resolve 'system' to the OS-reported light/dark preference.
@@ -161,6 +135,7 @@ export default function App() {
   const applyTheme = useCallback((theme) => {
     if (!theme) return
     currentThemeRef.current = theme
+    setTheme(theme)
     setThemeAttribute(theme)
 
     if (theme === 'system') {
@@ -183,6 +158,7 @@ export default function App() {
   const followSystemAccent = useCallback((hex) => {
     document.documentElement.style.setProperty('--accent-color', hex)
     setAccentColor(hex)
+    setHasSystemAccent(true)
   }, [])
 
   const applyWordCountBadgeVisibility = useCallback((visible) => {
@@ -331,7 +307,7 @@ export default function App() {
             await MenuItem.new({
               id: 'accent-color-picker',
               text: 'Accent Color…',
-              action: () => setIsAccentPickerOpen(true),
+              action: () => openSettings('general'),
             }),
           ]
       const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [printLayoutItem])]
@@ -344,6 +320,15 @@ export default function App() {
           items: [...themeItems, ...accentItems, ...displayItems],
         })
         await menu.append(viewMenu)
+      }
+
+      // Settings…, and the writing timer's menu. The Swift shell has its own.
+      if (!native) {
+        const settingsItem = await MenuItem.new({ id: 'settings', text: 'Settings…', accelerator: 'CmdOrCtrl+,', action: () => openSettings() })
+        const appSubmenu = items[0] instanceof Submenu && !['File', 'Edit', 'View', 'Window', 'Help'].includes(await items[0].text()) ? items[0] : null
+        if (appSubmenu) await appSubmenu.insert([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem], 1)
+        else if (fileSubmenu) await fileSubmenu.append([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem])
+        await menu.append(await buildTimerMenu({ MenuItem, Submenu, PredefinedMenuItem }))
       }
 
       await menu.setAsAppMenu()
@@ -379,17 +364,11 @@ export default function App() {
     return () => media.removeEventListener?.('change', handler)
   }, [updateMenu])
 
-  // Escape closes the accent picker first; otherwise it exits fullscreen.
+  // Escape exits fullscreen.
   useEffect(() => {
     const appWindow = getCurrentWindow()
     const onKeyDown = async (e) => {
-      if (e.key !== 'Escape') return
-
-      if (isAccentPickerOpen) {
-        setIsAccentPickerOpen(false)
-        return
-      }
-
+      if (e.key !== 'Escape' || e.defaultPrevented) return
       try {
         const isFullscreen = await appWindow.isFullscreen()
         if (isFullscreen) {
@@ -402,17 +381,25 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isAccentPickerOpen])
+  }, [])
+
+  const appearance = {
+    theme,
+    onTheme: applyTheme,
+    accentColor,
+    onAccent: applyAccentColor,
+    accentPresets: ACCENT_PRESETS,
+    defaultAccent: DEFAULT_ACCENT,
+    systemAccent: hasSystemAccent,
+    wordCount: showWordCountBadge,
+    onWordCount: applyWordCountBadgeVisibility,
+  }
 
   return (
     <>
       <Editor showWordCountBadge={showWordCountBadge} />
-      <AccentColorPanel
-        open={isAccentPickerOpen}
-        accentColor={accentColor}
-        onChange={applyAccentColor}
-        onClose={() => setIsAccentPickerOpen(false)}
-      />
+      <SettingsSheet appearance={appearance} />
+      {isNativeShell() ? null : <TimerCapsule />}
     </>
   )
 }

@@ -60,8 +60,40 @@ export function setEntryOperations(operations: EntryOperations): () => void {
 
 const current = (): EntryOperations => registered ?? onDisk
 
-export const renameEntry: EntryOperations['renameEntry'] = (...args) => current().renameEntry(...args)
-export const moveEntry: EntryOperations['moveEntry'] = (...args) => current().moveEntry(...args)
+/**
+ * Told around a rename or a move, for what keeps history by path outside the page's
+ * state — the writing stats. `willChange` comes first, so a session about the old
+ * path ends before the path goes.
+ */
+export interface EntryObserver {
+  willChange(projectName: string): void
+  renamed(projectName: string, entryPath: string, nextPath: string, type: EntryType): void
+  moved(projectName: string, entryPath: string, targetFolder: string, type: EntryType): void
+}
+
+const observers = new Set<EntryObserver>()
+
+export function observeEntries(observer: EntryObserver): () => void {
+  observers.add(observer)
+  return () => { observers.delete(observer) }
+}
+
+export const renameEntry: EntryOperations['renameEntry'] = async (projectName, entryPath, newName, type = 'file') => {
+  for (const observer of observers) observer.willChange(projectName)
+  const nextPath = await current().renameEntry(projectName, entryPath, newName, type)
+  if (nextPath && nextPath !== entryPath) {
+    for (const observer of observers) observer.renamed(projectName, entryPath, nextPath, type)
+  }
+  return nextPath
+}
+export const moveEntry: EntryOperations['moveEntry'] = async (projectName, entryPath, targetFolder, type = 'file') => {
+  for (const observer of observers) observer.willChange(projectName)
+  const nextPath = await current().moveEntry(projectName, entryPath, targetFolder, type)
+  if (nextPath && nextPath !== entryPath) {
+    for (const observer of observers) observer.moved(projectName, entryPath, targetFolder, type)
+  }
+  return nextPath
+}
 export const deleteEntry: EntryOperations['deleteEntry'] = (...args) => current().deleteEntry(...args)
 export const duplicateEntry: EntryOperations['duplicateEntry'] = (...args) => current().duplicateEntry(...args)
 
