@@ -5,8 +5,7 @@
 //! its real size, so the print must use exactly that paper, no margins and no
 //! scaling, or every page would be shrunk to fit a default Letter page with margins.
 //! So this drives WebKit's own print operation (`-[WKWebView printOperationWithPrintInfo:]`)
-//! with a print info set up for the job — the same thing the Swift shell does in
-//! EditorWebView.swift.
+//! with a print info set up for the job.
 //!
 //! PDF export is the same operation with the "save" disposition: a real multi-page
 //! PDF at the page size, which `createPDF` (one tall page) cannot give.

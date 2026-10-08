@@ -12,11 +12,11 @@
   appearance: none;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   width: 100%;
   min-height: var(--control-h);
   margin: 0;
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -69,10 +69,10 @@
 
 .ib-menu-separator {
   height: var(--hairline);
-  margin: var(--space-1) var(--space-2);
+  margin: var(--space-1) var(--space-3);
   background: var(--border-muted);
 }
 
 .ib-menu-label {
-  padding: var(--space-2) var(--space-2) var(--space-1);
+  padding: var(--space-3) var(--space-3) var(--space-1);
 }

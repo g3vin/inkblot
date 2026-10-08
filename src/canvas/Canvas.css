@@ -1,7 +1,7 @@
 /* ==== Canvas ====
  *
  * The canvas surface and its contents. Everything here consumes the shared
- * tokens from index.css (--surface-*, --text-*, --border-*, --accent-*, and the
+ * tokens from src/styles/tokens.css (--surface-*, --text-*, --border-*, --accent-*, and the
  * --floating-note-* set used for popovers), so light/dark mode needs no work of
  * its own.
  */
@@ -76,7 +76,7 @@
     calc(var(--canvas-grid-y) - 1px);
 }
 
-/* Follows the app's theme (data-theme is always resolved; see src/lib/theme.js). */
+/* Follows the app's theme (data-theme is always light or dark; see lib/theme.ts). */
 :root[data-theme='dark'] .canvas-surface {
   --canvas-ink: #eef1f6;
   --canvas-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 14px rgba(0, 0, 0, 0.28);

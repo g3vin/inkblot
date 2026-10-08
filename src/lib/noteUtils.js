@@ -16,10 +16,14 @@ import { DEFAULT_NOTE_INK, NOTE_INKS, inkColor, inkVar, isInkId } from './palett
  */
 export const DEFAULT_NOTE_COLOR = DEFAULT_NOTE_INK
 
+// The colour a note wears when it has none recorded (older notes, bare markers).
+// Mirrors --note-fallback-color in src/styles/tokens.css.
+export const NOTE_FALLBACK_COLOR = 'blue'
+
 export const NOTE_COLOR_OPTIONS = NOTE_INKS
 
 /** A stored note colour → the CSS colour to draw it with. */
-export const noteColor = (value) => inkColor(value, inkVar(DEFAULT_NOTE_INK))
+export const noteColor = (value) => inkColor(value, inkVar(NOTE_FALLBACK_COLOR))
 
 const nowIso = () => new Date().toISOString()
 

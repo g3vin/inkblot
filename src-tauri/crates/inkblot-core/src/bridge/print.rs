@@ -8,16 +8,17 @@
 //! including the size presets, so the list is defined once (pageSizes.ts) — and the
 //! shell answers with the commands below.
 //!
-//! Printing crosses the bridge twice: the shell asks for a print (`PrintDocument`),
-//! the page lays the pages out for paper and asks the shell to run the print
-//! operation on its web view at the paper size it needs (`PrintRequest`), and the
-//! shell reports back (`PrintFinished`) so the page can tear its print DOM down.
+//! Printing is one command (`PrintDocument`): the page lays the pages out for paper
+//! and prints its own web view; `PrintJobStatus` reports how far a job has got.
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::common::{EditorTarget, WritingFormat};
-use crate::types::page_setup::{AuthorProfile, BookSettings, PageSetup, PrintTypography};
+use super::common::{EditorTarget, TextAnchor, WritingFormat};
+use crate::types::page_setup::{
+    AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, CoverFit, CoverPart, RunningText, GeneratedKind, MatterKind, PageOptions, PageSetup,
+    PrintTypography,
+};
 
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -70,6 +71,9 @@ pub enum ExportFormat {
     Fdx,
     /// A report on a script, as a spreadsheet.
     Csv,
+    /// The book's cover as one full-wrap PDF — back, spine and front, with bleed — as
+    /// KDP and IngramSpark take it.
+    CoverPdf,
 }
 
 /// Which part of what the scope covers is printed.
@@ -108,7 +112,550 @@ pub struct PrintOptions {
     pub highlight_character: String,
 }
 
+/* ---------------- the book's contents ---------------- */
+
+/// Where in the book an entry is: before the first chapter, among them, or after.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BookRowSection {
+    Front,
+    Body,
+    Back,
+}
+
+/// One entry of a book as the navigator draws it: a `BookItem` with what the page
+/// worked out about it — its number, its label, which part it is in.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookRow {
+    pub id: String,
+    pub kind: BookItemKind,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    pub hidden: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matter: Option<MatterKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generated: Option<GeneratedKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_type: Option<ChapterType>,
+    /// A numbered chapter's number, or a part's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number: Option<u32>,
+    /// "Chapter One", "Prologue", "Part II" — what its head says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    pub section: BookRowSection,
+    /// The part it is in, by id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part: Option<String>,
+    /// Its page options, its own over its kind's.
+    pub page: PageOptions,
+    /// Printed from text from before matter pages were documents; opening it makes it one.
+    #[serde(default)]
+    pub legacy: bool,
+}
+
+/// Move an entry to before another (or to the end, with none). Only the book's order
+/// changes — never the file tree.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveBookItemCommand {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+}
+
+/// Hide an entry from the Typeset pages, print, export and the continuous document, or
+/// show it again.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetBookItemHiddenCommand {
+    pub id: String,
+    pub hidden: bool,
+}
+
+/// Add a page of front or back matter (a document, made from its kind's template), a
+/// page the book lays out itself, or a part divider — where the standard order has it.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddBookItemCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matter: Option<MatterKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generated: Option<GeneratedKind>,
+    /// A part divider, before the entry `before` (or at the end of the chapters).
+    #[serde(default)]
+    pub part: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// For a kind that can go either side (Also By): the back.
+    #[serde(default)]
+    pub back: bool,
+}
+
+/// Take a matter page, a generated page or a part out of the book. A matter page's
+/// document is deleted with it (the navigator asks first). A chapter cannot be removed
+/// here — only hidden: it is the manuscript's.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveBookItemCommand {
+    pub id: String,
+}
+
+/// Rename an entry, change what kind of chapter it is, or how its page sits. Each field
+/// present is set; absent ones are left as they are.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditBookItemCommand {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_type: Option<ChapterType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<PageOptions>,
+}
+
+/// Select an entry: open its document, or show its page, and make it This Page.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenBookItemCommand {
+    pub id: String,
+}
+
+/// Something on a Typeset page was picked — a margin, a running head, a chapter's
+/// number — and the inspector should show where it is set: the Typeset tab, with that
+/// section open (`FinishingSectionID`).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesetFocus {
+    pub section_id: String,
+}
+
+/// A folder's book options, from the file tree's menu: numbering its documents in the
+/// tree, where they count from, and scrolling from one into the next. Each field present
+/// is set; the rest of the folder's book is left as it is.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetFolderBookOptionsCommand {
+    pub folder: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number_in_tree: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_at: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuous: Option<bool>,
+}
+
+/* ---------------- covers ---------------- */
+
+/// A cover version as the Cover section draws it: its pictures as files on disk.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverSetView {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub front_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub back_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spine_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrap_file: Option<String>,
+    pub fit: CoverFit,
+}
+
+/// A book's covers, the size of its full wrap, and what is wrong with them.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverState {
+    pub sets: Vec<CoverSetView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active: Option<String>,
+    pub trim_width_mm: f64,
+    pub trim_height_mm: f64,
+    /// From the page count and the paper; 0 until the pages are counted.
+    pub spine_width_mm: f64,
+    pub bleed_mm: f64,
+    pub wrap_width_mm: f64,
+    pub wrap_height_mm: f64,
+    pub page_count: u32,
+    pub checks: Vec<PreflightIssue>,
+    /// The cover is what the Typeset view is showing.
+    #[serde(default)]
+    pub showing: bool,
+}
+
+/// A picture for a part of a cover version — the active one, with no id — copied into
+/// the project; none takes the part's picture away.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCoverImageCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub set_id: Option<String>,
+    pub part: CoverPart,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+/// What is done to the book's cover versions.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CoverSetAction {
+    /// A new, empty version, made active.
+    Add,
+    Duplicate,
+    Rename,
+    Delete,
+    /// Make it the one print, export and the EPUB use.
+    Activate,
+    /// How its pictures are fitted to the parts.
+    SetFit,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditCoverSetsCommand {
+    pub action: CoverSetAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fit: Option<CoverFit>,
+}
+
+/* ---------------- editions ---------------- */
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EditionAction {
+    /// A new edition from its kind's preset, made active.
+    Add,
+    Duplicate,
+    Rename,
+    Delete,
+    /// Typeset it: its page and cover are the book's until another is chosen. `id`
+    /// absent goes back to the book as set up.
+    Activate,
+    /// Give it a cover version (`cover_set_id`; absent, the book's).
+    SetCover,
+    /// A new edition set as a typeset version was (`id` is the version's).
+    FromTypesetVersion,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditEditionsCommand {
+    pub action: EditionAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<crate::types::EditionKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_set_id: Option<String>,
+}
+
+/// Export every edition into a folder the author picks: each print edition's interior
+/// PDF and cover PDF, each e-book edition's EPUB.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportAllEditionsCommand {}
+
+/* ---------------- the typeset history ---------------- */
+
+/// Why a typeset version was kept.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TypesetVersionKind {
+    /// A while after the typesetting changed.
+    Auto,
+    /// Saved, and named, by the writer.
+    Named,
+    /// What a print or an export was made from.
+    Export,
+    /// The typeset as it was just before another was restored.
+    Restore,
+}
+
+/// One typeset version of a book, as the History tab lists it.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesetVersionRow {
+    pub id: String,
+    /// ISO 8601.
+    pub timestamp: String,
+    pub kind: TypesetVersionKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// What changed since the version before it, a line a change.
+    pub summary: Vec<String>,
+}
+
+/// A book's typeset history, newest first. Published by the page when it changes and
+/// when the book in view does.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesetHistoryChanged {
+    pub folder: String,
+    pub rows: Vec<TypesetVersionRow>,
+    /// The version the Typeset view is previewing, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previewing: Option<String>,
+    /// And whether beside the current typeset, to compare.
+    #[serde(default)]
+    pub comparing: bool,
+    /// What the last restore could not put back: "2 settings had no paragraph left".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// Keep the book's typeset as it is now, under a name.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveTypesetVersionCommand {
+    pub name: String,
+}
+
+/// A typeset version, by id: to restore, delete, or stop previewing (`id` absent).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesetVersionRef {
+    pub id: String,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameTypesetVersionCommand {
+    pub id: String,
+    pub name: String,
+}
+
+/// Show a typeset version's pages in the Typeset view — alone, or beside the current
+/// typeset to compare them. No id stops previewing.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewTypesetVersionCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub compare: bool,
+}
+
 /* ---------------- commands ---------------- */
+
+/// The window's mode: writing a draft, or setting it as a book.
+///
+/// Write shows every text pane as the continuous editor in the writer's own font, with
+/// the file tree and the drafting panels. Typeset shows every text pane as the pages it
+/// will print on, with the book's navigator in place of the file tree, the typeset
+/// toolbar and panels, and the chapters' prose locked — it is edited in Write, where
+/// proofing happens. The page owns the mode; the shell asks for a change.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EditorMode {
+    #[default]
+    Write,
+    Typeset,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetEditorModeCommand {
+    pub mode: EditorMode,
+}
+
+/// Typeset's view of the book: its printed pages, or the e-book as a reader shows it.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TypesetView {
+    #[default]
+    Print,
+    Digital,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTypesetViewCommand {
+    pub view: TypesetView,
+}
+
+/* ---------------- proofing the pages ---------------- */
+
+/// What the proof finds wrong with a typeset page, as a typesetter would mark it.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProofKind {
+    /// A justified line spaced out so far its words stand apart.
+    Loose,
+    /// A paragraph's last line alone at the head of a page.
+    Widow,
+    /// A paragraph's first line alone at the foot of a page.
+    Orphan,
+    /// A paragraph ending on a line of one short word.
+    Runt,
+    /// More lines in a row ending in a hyphen than the composition allows.
+    StackedHyphens,
+    /// A chapter's last page with only a line or two on it.
+    ShortPage,
+}
+
+/// A fix the proof offers: each is one of `SetParagraphTypesetCommand`'s.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProofFix {
+    /// Letter-spacing a little tighter, to take a line back.
+    Tighten,
+    /// A little looser, to push one over.
+    Loosen,
+    KeepTogether,
+    KeepWithNext,
+    /// The page runs a line long, to take a widow back.
+    RunLong,
+    /// A line short, to send one over.
+    RunShort,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProofIssue {
+    pub id: String,
+    pub kind: ProofKind,
+    /// The printed page it is on, counted from the chapter's first.
+    pub page: u32,
+    /// The words at fault. A fix is set on the paragraph they are in.
+    pub anchor: TextAnchor,
+    pub fixes: Vec<ProofFix>,
+}
+
+/// Set what the typesetter sets on a paragraph — the one the anchor is in, or those
+/// selected. Each field present is set; `nudge_tracking` adds to what is there.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetParagraphTypesetCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<TextAnchor>,
+    /// Thousandths of an em, −10 to +10.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracking: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nudge_tracking: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keep_together: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keep_with_next: Option<bool>,
+    /// The page the paragraph starts on runs this many lines long (1) or short (−1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_adjust: Option<i32>,
+}
+
+/// What is set on the paragraph the caret is in, for the toolbar and the Proof section.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParagraphTypeset {
+    pub tracking: i32,
+    pub keep_together: bool,
+    pub keep_with_next: bool,
+    pub page_adjust: i32,
+    /// Its named text style, if it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style_name: Option<String>,
+}
+
+/// Give the selected paragraphs a named text style, or none (`style` absent).
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTextStyleCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+}
+
+/// Scroll the pages to a proof mark and select its paragraph.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShowProofIssueCommand {
+    pub anchor: TextAnchor,
+}
+
+/// How Typeset shows its pages: in spreads, with the baseline grid drawn, with the proof
+/// marks. Each field present is set.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTypesetDisplayCommand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spread: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof: Option<bool>,
+}
+
+/* ---------------- the project's fonts ---------------- */
+
+/// A font file kept in the project (`.assets/fonts/`), so the book sets — and embeds
+/// in its PDF and EPUB — the same face on any Mac.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectFont {
+    pub family: String,
+    /// Its project path.
+    pub path: String,
+    /// Whether its licence lets it be embedded in a PDF or an EPUB (its `fsType`).
+    pub embeddable: bool,
+}
+
+/// Copy a font file into the project's fonts.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddProjectFontCommand {
+    pub path: String,
+}
 
 /// Show a document as pages, or as the continuous editor: the one named — a pane's own
 /// toggle names the document in it — or else the active one.
@@ -236,6 +783,14 @@ pub struct InsertBreakCommand {
     pub kind: PageBreakKind,
 }
 
+/// Put a footnote at the caret, and open it to be written.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsertFootnoteCommand {
+    pub target: EditorTarget,
+}
+
 /// Scroll a page (1-based, as numbered on screen) into view.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -348,15 +903,6 @@ pub struct LastExport {
     pub path: String,
 }
 
-/// The shell finished (or abandoned) a `PrintRequest`.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintFinishedCommand {
-    pub job_id: String,
-    pub completed: bool,
-}
-
 /* ---------------- events ---------------- */
 
 /// A page size the inspector can offer.
@@ -439,6 +985,63 @@ pub struct PageLayoutCatalog {
     pub tokens: Vec<RunningToken>,
     /// What "Set Type for Print" starts from.
     pub default_typography: PrintTypography,
+    /// Whole designs for a book, one click each: its type, how its chapters open, its
+    /// running heads.
+    #[serde(default)]
+    pub book_styles: Vec<BookStyleOption>,
+}
+
+/// A book style (`bookStyles.ts`): a coordinated design, applied whole.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookStyleOption {
+    pub id: String,
+    pub label: String,
+    /// One line: what it looks like, and what it suits.
+    pub description: String,
+    pub typography: PrintTypography,
+    pub design: ChapterDesign,
+    pub header: RunningText,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verso_header: Option<RunningText>,
+}
+
+/// Apply a book style to the book: its type, its chapter design and its running heads.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplyBookStyleCommand {
+    pub id: String,
+}
+
+/// Set the active chapter's subtitle, picture and epigraph.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetChapterMetaCommand {
+    pub meta: ChapterMeta,
+}
+
+/// Which picture of a chapter head a file is for.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HeadImageTarget {
+    /// The active chapter's own picture.
+    Chapter,
+    /// The ornament every chapter's head carries.
+    Ornament,
+}
+
+/// A picture for a chapter head, copied into the project — or none, to take it away.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetHeadImageCommand {
+    pub target: HeadImageTarget,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 /// Everything the Finishing tabs show that changes. Published when the active
@@ -450,6 +1053,31 @@ pub struct PageLayoutCatalog {
 pub struct PageLayoutState {
     /// Whether the active pane shows pages.
     pub enabled: bool,
+    /// Write or Typeset, for the whole window.
+    #[serde(default)]
+    pub mode: EditorMode,
+    /// In Typeset, the printed pages or the e-book.
+    #[serde(default)]
+    pub typeset_view: TypesetView,
+    /// Typeset's pages in spreads, the baseline grid drawn, the proof marks shown.
+    #[serde(default)]
+    pub spread: bool,
+    #[serde(default)]
+    pub show_grid: bool,
+    #[serde(default)]
+    pub proof: bool,
+    /// What the proof finds on the chapter open, while it is on.
+    #[serde(default)]
+    pub proof_issues: Vec<ProofIssue>,
+    /// What is set on the paragraph the caret is in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paragraph: Option<ParagraphTypeset>,
+    /// The fonts kept in the project.
+    #[serde(default)]
+    pub project_fonts: Vec<ProjectFont>,
+    /// The book's named text styles, as it sets them: the built-in ones and its own.
+    #[serde(default)]
+    pub text_styles: Vec<crate::types::TextStyleLook>,
     /// The active text document, or none (a canvas, or nothing open).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_path: Option<String>,
@@ -477,6 +1105,24 @@ pub struct PageLayoutState {
     pub book_setup_active: bool,
     /// The book's chapters, in order: document tree paths.
     pub book_chapters: Vec<String>,
+    /// The book's contents in book order, as the Book navigator lists them.
+    #[serde(default)]
+    pub book_items: Vec<BookRow>,
+    /// The entry the navigator has selected, whose page the Typeset tab's This Page
+    /// section shows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_book_item: Option<String>,
+    /// The active chapter's head: its subtitle, picture and epigraph.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_meta: Option<ChapterMeta>,
+    /// The book's covers and its wrap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<CoverState>,
+    /// The chapter's picture and the book's ornament picture on disk, for thumbnails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter_image_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ornament_image_file: Option<String>,
     /// A recommended inside margin for a book of this many pages, in mm.
     pub suggested_inside_margin_mm: f64,
     /// Who wrote it: the title page's byline and contact details.
@@ -627,19 +1273,4 @@ pub struct PrintJobStatus {
     /// The file written, for an export that is `Done`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
-}
-
-/// Print the web view as it is now, on paper of this size, with no margins and no
-/// scaling: the page has laid out exactly what goes on each sheet.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintRequest {
-    pub job_id: String,
-    pub job_name: String,
-    pub paper_width_pt: f64,
-    pub paper_height_pt: f64,
-    /// Save as PDF here instead of printing. Absent shows the print panel.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pdf_path: Option<String>,
 }

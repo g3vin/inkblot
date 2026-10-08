@@ -22,8 +22,8 @@
 .ib-palette-search {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-4);
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
   height: 48px;
   border-bottom: var(--hairline) solid var(--border-muted);
   color: var(--text-muted);
@@ -49,14 +49,14 @@
   padding: var(--space-1);
 }
 
-.ib-palette-section { padding: var(--space-3) var(--space-3) var(--space-1); }
+.ib-palette-section { padding: var(--space-4) var(--space-4) var(--space-1); }
 
 .ib-palette-item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   min-height: var(--row-h);
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-4);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   cursor: pointer;
@@ -74,7 +74,7 @@
 
 .ib-palette-empty {
   margin: 0;
-  padding: var(--space-6) var(--space-4);
+  padding: var(--space-6) var(--space-5);
   text-align: center;
   font-family: var(--font-type);
   color: var(--text-muted);

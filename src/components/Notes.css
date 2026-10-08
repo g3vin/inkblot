@@ -3,7 +3,7 @@
    ============================================================ */
 
 .note-marker {
-  --note-color: #007aff;
+  --note-color: var(--note-fallback-color);
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -20,7 +20,7 @@
   display: inline-block;
   width: 8px;
   height: 8px;
-  background-color: var(--note-color, #007aff);
+  background-color: var(--note-color, var(--note-fallback-color));
   border-radius: 50%;
   margin-left: 2px;
   cursor: pointer;
@@ -91,12 +91,14 @@
    * stronger.
    */
   --card-color: var(--note-color, var(--accent-color));
-  --card-base: var(--popover-bg);
+  --card-base: var(--floating-over-page-bg);
   --card-edge-base: var(--popover-border);
 
+  /* Over the page: the one blurred surface, tinted with the note's colour. */
   border: 1px solid var(--card-edge);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-tint) 96%, var(--app-bg)), var(--card-tint));
+  background: var(--card-tint);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
   box-shadow: var(--shadow-popover);
   pointer-events: auto;
   cursor: default;
@@ -217,15 +219,6 @@
   background: color-mix(in srgb, var(--note-color, var(--accent-color)) 26%, transparent);
 }
 
-/* Under the Swift shell the dots are drawn above the page as Liquid Glass
-   (useNativeNotePreviews); the page's stay, invisible, to take the hover and click. */
-.native-note-dots .note-dot,
-.native-note-dots .note-marker:hover .note-dot {
-  opacity: 0;
-  transform: none;
-  box-shadow: none;
-}
-
 .note-branch {
   display: block;
 }
@@ -282,15 +275,15 @@
 }
 
 .note-range.is-hovered {
-  background-color: color-mix(in srgb, var(--note-color, #007aff) 24%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--note-color, #007aff) 34%, transparent);
+  background-color: color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 24%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 34%, transparent);
 }
 
 .note-range.is-active {
-  background-color: color-mix(in srgb, var(--note-color, #007aff) 32%, transparent);
+  background-color: color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 32%, transparent);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--note-color, #007aff) 44%, transparent),
-    0 6px 16px color-mix(in srgb, var(--note-color, #007aff) 16%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 44%, transparent),
+    0 6px 16px color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 16%, transparent);
 }
 
 .note-anchor {
@@ -300,10 +293,10 @@
 /*
  * A note in the notes panel wears its colour the way every other card in the app
  * does — the whole tile tinted, the border the same hue a few shades stronger. See
- * the card recipe in src/styles/tokens.css for the recipe and the reasoning.
+ * the card recipe in src/styles/tokens.css for the reasoning.
  */
 .note-tile {
-  --note-color: var(--ink-blue);
+  --note-color: var(--note-fallback-color);
   --card-color: var(--note-color);
   --card-base: var(--tile-color);
   --card-edge-base: var(--sidebar-card-border);
@@ -726,9 +719,9 @@
   width: 188px;
   padding: 10px;
   border-radius: var(--floating-note-radius);
-  border: 1px solid var(--sidebar-floating-border);
-  background: var(--sidebar-floating-bg);
-  box-shadow: var(--sidebar-floating-shadow);
+  border: 1px solid var(--floating-note-border);
+  background: var(--floating-note-bg);
+  box-shadow: var(--floating-note-shadow);
   color: var(--text-primary);
 }
 

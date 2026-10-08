@@ -12,7 +12,6 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { documentSurface } from '../bridge'
-import { nativeOwns } from '../lib/host'
 import { getDocDisplayName, isMapDoc } from '../lib/docKind'
 import { isCharacterDoc } from '../lib/storyStructure'
 import { createProjector } from '../lib/map/mapProjection'
@@ -25,9 +24,10 @@ import { panMapBy, pointsBounds } from '../lib/map/mapViewport'
 import { nearestOnPolyline } from '../lib/map/mapGeometry'
 import MapLayers, { MapDefs } from './MapLayers'
 import { earthLevelFor } from './mapRender'
-import MapToolbar from './MapToolbar'
 import { MAP_TOOLS, TOOL_HINTS, formatZoom } from './mapOptions'
 import MapPanelView from './MapPanelView'
+import SFIcon from '../components/SFIcon'
+import { useInspectorOpen } from '../lib/inspectorPresence'
 import { useMapPanel } from './inspector/useMapPanel'
 import { runPanelCommand } from './inspector/panelBuilder'
 import MapTimeline from './MapTimeline'
@@ -801,8 +801,8 @@ export default function MapSurface({
    * one — the other pane's map became active — or goes away. Only a change is sent:
    * panning re-renders the map on every frame and changes nothing the chrome shows.
    */
-  const nativeChrome = nativeOwns('mapChrome')
-  const publishing = nativeChrome && (isActive || chromeWhileInactive)
+  // Always published: the web toolbar draws the map's tools from it too.
+  const publishing = isActive || chromeWhileInactive
   const lastChromeRef = useRef(null)
   useEffect(() => {
     if (!publishing) return undefined
@@ -864,8 +864,10 @@ export default function MapSurface({
   const hint = TOOL_HINTS[tool]
     ? draft?.tool === tool && draft.nodes.length ? TOOL_HINTS[`${tool}-drawing`] || TOOL_HINTS[tool] : TOOL_HINTS[tool]
     : null
-  // The page's inspector, when it draws one: only under Tauri.
-  const pageInspector = !nativeChrome && inspectorOpen
+  // The map's own floating panel: only while the window's inspector is shut. With it
+  // open the panel is the inspector's Map tab (MapInspectorPanel), from what is published.
+  const windowInspector = useInspectorOpen()
+  const pageInspector = !windowInspector && inspectorOpen
 
   return (
     <div
@@ -912,27 +914,21 @@ export default function MapSurface({
 
       <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} />
 
-      {nativeChrome ? null : <MapToolbar
-        map={map}
-        tool={tool}
-        onTool={setTool}
-        zoom={view.viewport.zoom}
-        onZoomIn={view.zoomIn}
-        onZoomOut={view.zoomOut}
-        onFit={fitAll}
-        onUndo={undo}
-        onRedo={redo}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        inspectorOpen={inspectorOpen}
-        onToggleInspector={() => setInspectorOpen((open) => !open)}
-      />}
+      {!windowInspector && !inspectorOpen ? (
+        <button
+          type="button"
+          className="map-floating map-inspector-toggle"
+          title="Show the inspector"
+          aria-label="Show the inspector"
+          onClick={() => setInspectorOpen(true)}
+        >
+          <SFIcon name="sidebar.right" size={16} />
+        </button>
+      ) : null}
 
       {hint ? (
         <div
           className="map-floating map-hint"
-          // Under the page's toolbar, or at the top of what the shell's glass leaves.
-          style={nativeChrome ? { top: box.top + 12, left: box.left + box.width / 2 } : undefined}
         >
           {hint}
         </div>

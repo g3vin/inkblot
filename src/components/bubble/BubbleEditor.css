@@ -1,0 +1,487 @@
+/**
+ * BubbleEditor.css — the bubble editor, and the chip that marks an open session.
+ *
+ * Flat, with one exception the design system allows: the bubbles and bars float over
+ * the page, so they are floating capsules (.floating-capsule, the one blur token), over
+ * the editor's scrim (.scrim). Colours come from the tokens only.
+ */
+
+.bubble-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-primary);
+  outline: none;
+  animation: ui-fade-in var(--dur-fast) var(--ease-standard);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* While it is up the toolbar goes; the window's drag region stays. */
+html.bubble-open .app-titlebar-toolbar { visibility: hidden; }
+
+/* ---------------- the bar ---------------- */
+
+/* The bar and, beside it in its own circle, Done. */
+.bubble-editor-top {
+  position: absolute;
+  top: var(--space-5);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.bubble-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  white-space: nowrap;
+}
+
+.bubble-editor-done {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  /* A dark check: the success green is light in both themes. */
+  color: color-mix(in srgb, var(--status-success) 20%, var(--color-black));
+  background: var(--status-success);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.bubble-editor-done:hover { transform: scale(1.06); border-color: transparent; }
+.bubble-editor-done:focus-visible { outline: 2px solid var(--accent-border); outline-offset: 2px; }
+
+.bubble-editor-button {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: var(--size-circle);
+  height: var(--size-circle);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+.bubble-editor-button:hover { background: var(--hover-bg); color: var(--text-primary); border-color: transparent; }
+.bubble-editor-button:focus-visible { outline: 2px solid var(--accent-border); }
+
+/* ---------------- the sentence ---------------- */
+
+.bubble-stage {
+  position: relative;
+  z-index: 1;
+  width: min(880px, calc(100% - 240px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.bubble-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--size-bubble);
+  width: 100%;
+}
+
+.bubble-row-empty { color: var(--text-muted); font: 14px/1.4 var(--font-ui); }
+
+.bubble-preview {
+  margin: 0;
+  max-width: 100%;
+  text-align: center;
+  font: 19px/1.5 var(--editor-font-family, var(--font-serif));
+  color: var(--text-secondary);
+  user-select: text;
+  -webkit-user-select: text;
+}
+.bubble-preview.is-empty { font: 13px/1.4 var(--font-ui); color: var(--text-muted); }
+
+.bubble-original {
+  margin: calc(var(--space-4) * -1) 0 0;
+  max-width: 100%;
+  text-align: center;
+  font: 12px/1.4 var(--font-ui);
+  color: var(--text-muted);
+}
+
+/* ---------------- a bubble ---------------- */
+
+.bubble {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--size-bubble);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-pill);
+  font: 19px/1.2 var(--editor-font-family, var(--font-serif));
+  color: var(--text-primary);
+  background: var(--floating-over-page-bg);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
+  box-shadow: var(--shadow-1);
+  cursor: grab;
+  touch-action: none;
+  white-space: nowrap;
+  transition:
+    opacity var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    background var(--dur-fast) ease,
+    scale var(--dur-base) var(--ease-standard);
+}
+
+.bubble:hover { border-color: var(--border-strong); }
+
+.bubble.is-selected {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 22%, var(--surface-1));
+}
+
+.bubble.is-lifted { opacity: 0.28; }
+
+/* A join tints both halves of it: the bubble being dragged and the one it touches. */
+.bubble.is-join-target,
+.bubble.is-floating.is-joining {
+  background: color-mix(in srgb, var(--accent-color) 32%, var(--surface-1));
+  border-color: var(--accent-color);
+}
+
+/* `scale`, not `transform`: framer-motion owns the transform for its layout animation. */
+.bubble.is-join-target { scale: 1.08; }
+.bubble.is-join-target.joins-before { box-shadow: inset 4px 0 0 -1px var(--accent-color), var(--shadow-1); }
+.bubble.is-join-target.joins-after { box-shadow: inset -4px 0 0 -1px var(--accent-color), var(--shadow-1); }
+
+.bubble.is-dropped { animation: bubble-pop var(--dur-base) var(--ease-standard); }
+@keyframes bubble-pop { from { transform: scale(0.82); } to { transform: scale(1); } }
+
+.bubble.is-aside {
+  position: absolute;
+  translate: -50% -50%;
+  height: 36px;
+  padding: 0 var(--space-4);
+  font-size: 16px;
+}
+
+/* Punctuation is a round bubble, as tall as the word bubbles. */
+.bubble.is-punctuation {
+  width: var(--size-bubble);
+  min-width: var(--size-bubble);
+  padding: 0;
+  font-weight: 600;
+}
+.bubble.is-aside.is-punctuation { width: 36px; min-width: 36px; }
+
+.bubble.is-floating {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  cursor: grabbing;
+  transform: scale(1.06);
+  box-shadow: var(--shadow-2);
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.bubble.is-floating.is-trashing {
+  transform: scale(0.8);
+  border-color: var(--status-error);
+  background: color-mix(in srgb, var(--status-error) 40%, var(--surface-1));
+}
+
+.bubble.is-editing { cursor: text; padding: 0 var(--space-3); }
+.bubble.is-draft { border-style: dashed; }
+
+.bubble-input {
+  width: auto;
+  min-width: 2ch;
+  border: 0;
+  outline: none;
+  padding: 0 var(--space-1);
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  background: transparent;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* The selected bubble's actions, in a capsule above it. */
+.bubble-actions {
+  position: absolute;
+  bottom: calc(100% + var(--space-3));
+  left: 50%;
+  translate: -50% 0;
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  font: 12px/1 var(--font-ui);
+  white-space: nowrap;
+}
+
+.bubble-actions button {
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 5px var(--space-3);
+  font: inherit;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+.bubble-actions button:hover { color: var(--text-primary); background: var(--hover-bg); border-color: transparent; }
+.bubble-actions button.is-destructive:hover { color: var(--status-error); }
+
+/* ---------------- drop targets ---------------- */
+
+.bubble-aside-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.bubble-aside-layer .bubble { pointer-events: auto; }
+
+/* The edge a drop would set the bubble aside against glows — only that one. */
+.bubble-editor-edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.bubble-editor.is-aside-armed .bubble-editor-edges { opacity: 1; }
+.bubble-editor[data-edge='left'] .bubble-editor-edges { box-shadow: inset 3px 0 0 var(--accent-color), inset 48px 0 48px -32px var(--accent-glow); }
+.bubble-editor[data-edge='right'] .bubble-editor-edges { box-shadow: inset -3px 0 0 var(--accent-color), inset -48px 0 48px -32px var(--accent-glow); }
+.bubble-editor[data-edge='top'] .bubble-editor-edges { box-shadow: inset 0 3px 0 var(--accent-color), inset 0 48px 48px -32px var(--accent-glow); }
+.bubble-editor[data-edge='bottom'] .bubble-editor-edges { box-shadow: inset 0 -3px 0 var(--accent-color), inset 0 -48px 48px -32px var(--accent-glow); }
+
+.bubble-caret {
+  position: absolute;
+  z-index: 4;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-color);
+  pointer-events: none;
+}
+
+.bubble-trash {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: var(--size-trash);
+  height: var(--size-trash);
+  translate: -50% 0;
+  color: var(--text-secondary);
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  pointer-events: none;
+  transition: opacity var(--dur-fast) ease, transform var(--dur-fast) var(--ease-standard), color 120ms ease, background 120ms ease;
+}
+.bubble-trash.is-visible { opacity: 1; transform: none; }
+.bubble-trash.is-armed {
+  color: var(--on-ink);
+  background: var(--status-error);
+  border-color: transparent;
+  transform: scale(1.14);
+}
+
+/* ---------------- forms ---------------- */
+
+.bubble-forms {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  z-index: 3;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  white-space: nowrap;
+  animation: ui-fade-in var(--dur-fast) var(--ease-standard);
+}
+.bubble-forms:not(:has(.bubble-forms-dots)) { padding-left: var(--space-1); }
+
+.bubble-forms-dots { display: flex; align-items: center; gap: var(--space-2); }
+
+.bubble-forms-dot {
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+  cursor: pointer;
+  transition: width var(--dur-fast) var(--ease-standard), background var(--dur-fast) ease;
+}
+.bubble-forms-dot.is-unsaved { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-secondary); }
+.bubble-forms-dot.is-current { width: 20px; background: var(--accent-color); box-shadow: none; }
+.bubble-forms-dot.is-armed { background: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-ring); }
+.bubble-forms-dot:hover { border-color: transparent; }
+.bubble-forms-dot:focus-visible { outline: 2px solid var(--accent-border); outline-offset: 2px; }
+
+.bubble-forms-label {
+  font: 500 12px/1 var(--font-ui);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.bubble-forms-icon {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+.bubble-forms-icon:hover { color: var(--text-primary); background: var(--hover-bg); border-color: transparent; }
+.bubble-forms-icon.is-destructive:hover { color: var(--status-error); }
+.bubble-forms-icon:focus-visible { outline: 2px solid var(--accent-border); }
+
+@media (max-width: 640px) {
+  .bubble-stage { width: calc(100% - 32px); }
+}
+
+/* ---------------- in the document ---------------- */
+
+.ProseMirror .bubble-session {
+  text-decoration: underline dotted color-mix(in srgb, var(--accent-color) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+.bubble-session-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+  /* Centred on the text of its line — the font's height, ascender to descender, which
+     the chip plugin measures (`--bubble-text-extent`, in ems) — not on the line box,
+     whose gap above the text would pull it up. Its top sits at the text's top, then
+     comes down half of what is left. `em` here is the line's font size, inherited. */
+  font-size: inherit;
+  margin: calc((var(--bubble-text-extent, 1.15) * 1em - 16px) / 2) 2px 0 4px;
+  padding: 0 5px;
+  vertical-align: text-top;
+  border-radius: var(--radius-pill);
+  /* Drawn in the page's own text, so it rides the page's scroll exactly. */
+  border: 0.5px solid color-mix(in srgb, var(--accent-color) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-color) 30%, var(--surface-1));
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+/* The 2px it keeps after itself, hung in the margin (lib/marginHang.js). */
+.margin-hang:has(> .bubble-session-chip) {
+  --hang-gap: 2px;
+}
+
+.bubble-session-chip:hover {
+  transform: scale(1.12);
+  background: color-mix(in srgb, var(--accent-color) 42%, var(--surface-1));
+}
+
+.bubble-session-chip-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-foreground);
+}
+
+.bubble-session-chip-dot:nth-child(2) { width: 5px; height: 5px; }
+
+/* With forms: a dot per form, the one showing drawn long, the unsaved one as a ring. */
+.bubble-session-chip.has-forms .bubble-session-chip-dot {
+  width: 4px;
+  height: 4px;
+  opacity: 0.55;
+  transition: width 180ms ease, opacity 180ms ease;
+}
+
+.bubble-session-chip.has-forms .bubble-session-chip-dot.is-unsaved {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--accent-foreground);
+}
+
+.bubble-session-chip.has-forms .bubble-session-chip-dot.is-current {
+  width: 9px;
+  border-radius: var(--radius-pill);
+  opacity: 1;
+}
+
+.bubble-session-chip.has-forms .bubble-session-chip-dot.is-current.is-unsaved {
+  background: var(--accent-foreground);
+  box-shadow: none;
+}
+
+.bubble-session-chip-count {
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A sentence being swiped to another form lights up as the swipe goes on. */
+.bubble-session.is-form-swiping {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent-color) calc(var(--bubble-swipe, 0) * 26%), transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) calc(var(--bubble-swipe, 0) * 26%), transparent);
+}
+
+/* And once it has turned, the new form flashes and fades. */
+.bubble-session.is-form-changed {
+  border-radius: 4px;
+  animation: bubble-form-changed 700ms ease-out;
+}
+
+@keyframes bubble-form-changed {
+  from {
+    background: color-mix(in srgb, var(--accent-color) 30%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 30%, transparent);
+  }
+  to {
+    background: transparent;
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble-session.is-form-changed { animation: none; }
+}

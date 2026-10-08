@@ -92,9 +92,8 @@ export function dispatchCanvasDropNote(surface, { docPath, noteId, clientX, clie
 }
 
 /**
- * A note dragged out of the Swift shell's Notes panel: `inkblot-note://note?doc=…&id=…`
- * (`NoteDrag.swift` writes it), which WebKit hands over as `text/uri-list` on an
- * ordinary drop. Null for anything else.
+ * A note dragged as a URL, `inkblot-note://note?doc=…&id=…`, which WebKit hands over as
+ * `text/uri-list` on an ordinary drop. Null for anything else.
  */
 export function noteDragURL(uriList) {
   for (const line of String(uriList || '').split(/\r?\n/)) {

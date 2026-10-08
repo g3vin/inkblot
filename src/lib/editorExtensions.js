@@ -29,9 +29,17 @@ import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import ResizableImage from '../extensions/ResizableImage'
 import TabIndent from '../extensions/TabIndent'
+import { ChapterHead } from '../print/ChapterHead'
+import { ChapterHeadDecorations } from '../print/ChapterHeadDecorations'
+import { DocChapterMeta } from '../print/DocChapterMeta'
 import { DocPageSetup } from '../print/DocPageSetup'
 import { PageBreak } from '../print/PageBreak'
 import { Pagination } from '../print/PaginationExtension'
+import { TypesetAnchors } from '../print/TypesetAnchors'
+import { ParagraphTypeset } from '../print/ParagraphTypeset'
+import { ProofMarks } from '../print/proofIssues'
+import { Footnote } from '../print/Footnote'
+import { TypesetLock } from '../print/TypesetLock'
 import { DocWritingFormat } from '../script/DocWritingFormat'
 import { ScriptElement } from '../script/ScriptElement'
 
@@ -84,8 +92,23 @@ export const buildEditorExtensions = (starterKit) => [
   Citation,
   Bibliography,
   DocPageSetup,
+  DocChapterMeta,
+  // A compiled chapter's head (bookMatter.ts): never in a document on disk.
+  ChapterHead,
+  // A chapter's designed head, drawn around its real title in Typeset.
+  ChapterHeadDecorations,
   PageBreak,
+  // A note at its mark, set at the page's foot or after the chapter.
+  Footnote,
   Pagination,
+  // A chapter's prose, held while the book is typeset (Typeset mode).
+  TypesetLock,
+  // A stable name for each block the typesetter touched (the typeset history).
+  TypesetAnchors,
+  // A paragraph's tracking and keeps, set to mend a page.
+  ParagraphTypeset,
+  // The proof's marks on the Typeset pages.
+  ProofMarks,
   // A screenplay's or a play's lines, and which the document is written as.
   ScriptElement,
   DocWritingFormat,

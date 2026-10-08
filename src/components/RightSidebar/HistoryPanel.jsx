@@ -41,6 +41,7 @@ import {
   snapshotVersion,
 } from '../../lib/versionActions'
 import SFIcon from '../SFIcon'
+import Segmented from '../../ui/Segmented'
 import ArchivePanel, { ArchiveIcon } from './ArchivePanel'
 import './HistoryPanel.css'
 
@@ -465,14 +466,12 @@ export default function HistoryPanel({
           <SFIcon name="plus" size={12} />
           Snapshot now
         </button>
-        <button
-          className={`panel-action-btn panel-action-btn-small panel-icon-btn${namedOnly ? ' is-active-filter' : ''}`}
-          onClick={() => setNamedOnly((current) => !current)}
-          title={namedOnly ? 'Show all versions' : 'Show only named versions'}
-          aria-pressed={namedOnly}
-        >
-          <SFIcon name="line.3.horizontal.decrease.circle" size={14} />
-        </button>
+        <Segmented
+          value={namedOnly ? 'named' : 'all'}
+          onChange={(value) => setNamedOnly(value === 'named')}
+          label="Which versions"
+          options={[{ value: 'all', label: 'All' }, { value: 'named', label: 'Named' }]}
+        />
         {isStructured ? null : (
           <button
             className="panel-action-btn panel-action-btn-small panel-icon-btn"

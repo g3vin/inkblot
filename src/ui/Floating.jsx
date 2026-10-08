@@ -1,12 +1,12 @@
 /**
  * Floating.jsx — chrome that floats over the document without a panel around it.
  *
- *   FloatingToolbar       a pill of IconButtons (formatting bar, canvas/map tools)
+ *   FloatingToolbar       a strip of IconButtons (formatting bar, canvas/map tools)
  *   FloatingActionButton  one round primary action (new note, dictate)
  *
- * On iOS/iPadOS these two — and only these two — wear Liquid Glass (translucent,
- * blurred, with a specular rim), so they sit comfortably beside the system's own glass.
- * Everywhere else they are paper with the float shadow. See src/ui/platform.js.
+ * Both wear the floating-capsule surface (src/styles/base.css): paper with the float
+ * shadow, and Liquid Glass on iOS/iPadOS only. FloatingCapsule is the same surface
+ * without the toolbar's keyboard behaviour, for readouts (word count, zoom).
  */
 import { forwardRef, useRef } from 'react'
 import { useRovingFocus } from './hooks'
@@ -23,7 +23,7 @@ export function FloatingToolbar({ label, className, children, orientation = 'hor
       role="toolbar"
       aria-label={label}
       aria-orientation={orientation}
-      className={['ib-floating', 'ib-floating-toolbar', `ib-floating-toolbar--${orientation}`, className].filter(Boolean).join(' ')}
+      className={['floating-capsule', 'ib-floating-toolbar', `ib-floating-toolbar--${orientation}`, className].filter(Boolean).join(' ')}
       onKeyDown={onKeyDown}
     >
       {children}
@@ -45,7 +45,7 @@ export const FloatingActionButton = forwardRef(function FloatingActionButton(
         ref={ref}
         type={type}
         aria-label={label}
-        className={['ib-floating', 'ib-fab', className].filter(Boolean).join(' ')}
+        className={['floating-capsule', 'ib-fab', className].filter(Boolean).join(' ')}
         {...rest}
       >
         <Icon name={icon} size={20} />

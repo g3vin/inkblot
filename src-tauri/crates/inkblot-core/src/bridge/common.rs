@@ -90,8 +90,8 @@ impl TextAnchor {
 
 /// The marks the toolbar can toggle.
 ///
-/// A closed set rather than a string: a Swift menu item sending `"bolb"` should not
-/// compile, and an enum is what makes that true in all three languages at once.
+/// A closed set rather than a string: a menu item sending `"bolb"` should not compile,
+/// and an enum is what makes that true in both languages at once.
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

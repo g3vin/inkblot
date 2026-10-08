@@ -1,0 +1,43 @@
+/**
+ * InspectorHeader — the inspector's selector bar: the layout's panels as icons (the
+ * indicator slides with a swipe), a circle that swaps Write's panels for Typeset's,
+ * and on right-click the two layouts and Customize Layout….
+ */
+import SFIcon from '../SFIcon'
+import SidebarTabs from './SidebarTabs'
+import { INSPECTOR_LAYOUT_INFO } from '../../lib/chromeLayout'
+import { popUpNativeMenu } from '../../ui/useNativeMenu'
+import { CUSTOMIZE_INSPECTOR_EVENT } from '../../hooks/contextMenu/toolbarMenu'
+
+export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLayout, visualProgress, gestureActive, reducedMotion }) {
+  const other = layout === 'finishing' ? 'drafting' : 'finishing'
+  const menu = (event) => popUpNativeMenu(event, [
+    { text: 'Write Layout', checked: layout === 'drafting', action: () => onChooseLayout('drafting') },
+    { text: 'Typeset Layout', checked: layout === 'finishing', action: () => onChooseLayout('finishing') },
+    { separator: true },
+    { text: 'Customize Layout…', action: () => window.dispatchEvent(new CustomEvent(CUSTOMIZE_INSPECTOR_EVENT)) },
+  ])
+
+  return (
+    <div className="inspector-header" onContextMenu={menu}>
+      <SidebarTabs
+        tabs={tabs}
+        tab={tab}
+        setTab={setTab}
+        visualProgress={visualProgress}
+        gestureActive={gestureActive}
+        reducedMotion={reducedMotion}
+      />
+      <button
+        type="button"
+        className="inspector-layout-switch"
+        onClick={() => onChooseLayout(other)}
+        title={`${INSPECTOR_LAYOUT_INFO[other].title} panels (switches to ${INSPECTOR_LAYOUT_INFO[other].title})`}
+        aria-label={`Show the ${INSPECTOR_LAYOUT_INFO[other].title} panels`}
+        data-layout={layout}
+      >
+        <SFIcon name={INSPECTOR_LAYOUT_INFO[layout].symbol} size={14} />
+      </button>
+    </div>
+  )
+}

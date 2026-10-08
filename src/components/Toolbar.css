@@ -465,11 +465,7 @@
   width: 3px;
   height: var(--bar-height, 10px);
   border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-color) 72%, white),
-    var(--accent-color)
-  );
+  background: var(--accent-color);
   opacity: 0.78;
   transform-origin: center;
   transition:
@@ -563,11 +559,7 @@
   width: 3px;
   height: var(--bar-height, 8px);
   border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-color) 72%, white),
-    var(--accent-color)
-  );
+  background: var(--accent-color);
   opacity: 0.8;
   transition:
     height 90ms ease-out,

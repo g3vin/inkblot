@@ -23,7 +23,7 @@ import { normalizePageSetup, surnameOf, describeWordCount } from '../pageSetup'
 import type { PageSetup } from '../pageSetup'
 import { contactLines } from '../titlePage'
 import { LineSpacing, PageNumberFormat, PageOrientation, PrintAlignment, TitlePageStyle } from '../../types'
-import type { AuthorProfile, PrintTypography, RunningText } from '../../types'
+import type { AuthorProfile, PrintTypography, RunningText, TextStyleLook } from '../../types'
 import type { ExportChapter } from './html'
 import { imageSize, isRemote, toPortableImage } from './images'
 import type { ResolvedImage } from './images'
@@ -45,6 +45,8 @@ export interface DocxOptions {
   /** For a manuscript's title page: contact details and the word count. */
   profile?: Partial<AuthorProfile>
   words?: number
+  /** The book's named text styles, as Word paragraph styles. */
+  textStyles?: TextStyleLook[]
   resolveImage: (src: string) => Promise<ResolvedImage | null>
   modified?: Date
 }
@@ -153,6 +155,8 @@ class Writer {
   drawingId = 0
   /** The next paragraph opens flush: after a heading or a scene break. */
   flushNext = false
+  /** Notes at their marks, as Word footnotes, numbered from 1. */
+  footnotes: string[] = []
 
   constructor(readonly setup: PageSetup, readonly type: PrintTypography | undefined) {}
 
@@ -221,6 +225,12 @@ class Writer {
       if (node.type === 'hardBreak') return '<w:r><w:br/></w:r>'
       if (node.type === 'image') return this.drawing(String(node.attrs?.src || ''), node.attrs?.width)
       if (node.type === 'citation') return run(htmlText(node.attrs?.rendered), [], extra)
+      if (node.type === 'footnote') {
+        // Set after the chapter or the book: its mark only, raised.
+        if (node.attrs?.end) return `<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr>${textContent(String(node.attrs?.mark || ''))}</w:r>`
+        this.footnotes.push(String(node.attrs?.text || ''))
+        return `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteReference w:id="${this.footnotes.length}"/></w:r>`
+      }
       return this.inline(node.content, extra)
     }).join('')
   }
@@ -253,7 +263,12 @@ class Writer {
       case 'paragraph': {
         const flush = this.flushNext
         this.flushNext = false
-        return this.paragraph({ style: ctx.quote ? 'Quote' : undefined, align: attrs.textAlign, flush }, this.inline(node.content))
+        const named = typeof attrs.styleName === 'string' && attrs.styleName ? textStyleId(attrs.styleName) : undefined
+        const p = this.paragraph({ style: named || (ctx.quote ? 'Quote' : undefined), align: attrs.textAlign, flush: flush && !named }, this.inline(node.content))
+        // A picture with a page to itself.
+        const fullPage = (node.content || []).some((n) => n.type === 'image' && (n.attrs?.layout === 'page' || n.attrs?.layout === 'bleed'))
+        const pageBreak = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
+        return fullPage ? `${pageBreak}${p}${pageBreak}` : p
       }
       case 'heading': {
         const level = Math.min(6, Math.max(1, Number(attrs.level) || 1))
@@ -550,7 +565,35 @@ const scriptStylesXml = (stage: boolean): string => SCRIPT_STYLES.map((s) => {
   return `<w:style w:type="paragraph" w:customStyle="1" w:styleId="${scriptStyleId(spec.id)}"><w:name w:val="${spec.name}"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr>${p}</w:pPr>${r ? `<w:rPr>${r}</w:rPr>` : ''}</w:style>`
 }).join('\n')
 
-const stylesXml = (t: PrintTypography | undefined, language: string, script: 'screenplay' | 'stageplay' | null = null): string => {
+/** A named text style's Word style id. */
+export const textStyleId = (id: string): string => `Text${id.replace(/[^A-Za-z0-9]/g, '')}`
+
+/** The book's named text styles, as Word paragraph styles over Normal. */
+const textStylesXml = (looks: TextStyleLook[], t: PrintTypography | undefined): string => {
+  const body = t?.fontSizePt || 12
+  const lineTwips = Math.round(body * 20 * 1.2)
+  return looks.map((s) => {
+    const p: string[] = []
+    const space = Math.round(s.spaceLines * lineTwips)
+    if (space) p.push(`<w:spacing w:before="${space}" w:after="${space}"/>`)
+    if (s.boxed) p.push('<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="4" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="4" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="4" w:color="auto"/></w:pBdr>')
+    const indent = Math.round(s.indentEm * body * 20)
+    if (indent || s.flush) p.push(`<w:ind${indent ? ` w:left="${indent}" w:right="${indent}"` : ''}${s.flush ? ' w:firstLine="0"' : ''}/>`)
+    const jc = { left: 'left', center: 'center', right: 'right', justify: 'both' }[String(s.align)]
+    if (jc) p.push(`<w:jc w:val="${jc}"/>`)
+    const r: string[] = []
+    if (s.fontFamily) {
+      const face = x(firstFamily(s.fontFamily))
+      r.push(`<w:rFonts w:ascii="${face}" w:hAnsi="${face}" w:cs="${face}"/>`)
+    }
+    if (s.italic) r.push('<w:i/>')
+    if (s.smallCaps) r.push('<w:smallCaps/>')
+    if (s.size !== 1) r.push(`<w:sz w:val="${Math.round(body * 2 * s.size)}"/><w:szCs w:val="${Math.round(body * 2 * s.size)}"/>`)
+    return `<w:style w:type="paragraph" w:customStyle="1" w:styleId="${textStyleId(s.id)}"><w:name w:val="${x(s.name)}"/><w:basedOn w:val="Normal"/><w:qFormat/>${p.length ? `<w:pPr>${p.join('')}</w:pPr>` : ''}${r.length ? `<w:rPr>${r.join('')}</w:rPr>` : ''}</w:style>`
+  }).join('\n')
+}
+
+const stylesXml = (t: PrintTypography | undefined, language: string, script: 'screenplay' | 'stageplay' | null = null, textStyles: TextStyleLook[] = []): string => {
   const font = t ? firstFamily(t.fontFamily) : 'Georgia'
   const size = Math.round((t?.fontSizePt || 12) * 2)
   const indent = t ? twips(t.firstLineIndentMm) : 0
@@ -574,9 +617,11 @@ ${heading(6, 1)}
 <w:style w:type="paragraph" w:styleId="SceneBreak"><w:name w:val="Scene Break"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:firstLine="0"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Bibliography"><w:name w:val="Bibliography"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:hanging="720"/><w:jc w:val="left"/></w:pPr></w:style>
+<w:style w:type="paragraph" w:styleId="FootnoteText"><w:name w:val="footnote text"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr><w:rPr><w:sz w:val="${Math.max(16, size - 4)}"/><w:szCs w:val="${Math.max(16, size - 4)}"/></w:rPr></w:style>
+<w:style w:type="character" w:styleId="FootnoteReference"><w:name w:val="footnote reference"/><w:rPr><w:vertAlign w:val="superscript"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="Header"><w:name w:val="header"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Footer"><w:name w:val="footer"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>
-${script ? `${scriptStylesXml(script === 'stageplay')}\n` : ''}<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>
+${script ? `${scriptStylesXml(script === 'stageplay')}\n` : ''}${textStyles.length ? `${textStylesXml(textStyles, t)}\n` : ''}<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>
 </w:styles>`
 }
 
@@ -589,8 +634,16 @@ const numberingXml = (lists: Writer['lists']): string => {
   return `${XML_HEAD}<w:numbering ${NS}>${abstract(0, false)}${abstract(1, true)}${nums.join('')}</w:numbering>`
 }
 
-const settingsXml = (setup: PageSetup, t: PrintTypography | undefined, updateFields: boolean): string => `${XML_HEAD}<w:settings ${NS}>${[
+/** Word's footnotes part: its two separators, then each note. */
+const footnotesXml = (notes: string[]): string => `${XML_HEAD}<w:footnotes ${NS}>${[
+  '<w:footnote w:type="separator" w:id="-1"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:separator/></w:r></w:p></w:footnote>',
+  '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>',
+  ...notes.map((text, i) => `<w:footnote w:id="${i + 1}"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr><w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r>${textContent(` ${text}`)}</w:p></w:footnote>`),
+].join('')}</w:footnotes>`
+
+const settingsXml = (setup: PageSetup, t: PrintTypography | undefined, updateFields: boolean, footnotes = false): string => `${XML_HEAD}<w:settings ${NS}>${[
   setup.mirrorMargins ? '<w:mirrorMargins/>' : '',
+  footnotes ? '<w:footnotePr><w:footnote w:id="-1"/><w:footnote w:id="0"/></w:footnotePr>' : '',
   '<w:defaultTabStop w:val="720"/>',
   t?.hyphenate ? '<w:autoHyphenation/>' : '',
   setup.versoHeader || setup.versoFooter ? '<w:evenAndOddHeaders/>' : '',
@@ -677,6 +730,8 @@ export const buildDocx = async (options: DocxOptions): Promise<Uint8Array> => {
   }).join('')
 
   const document = `${XML_HEAD}<w:document ${NS}><w:body>${body}</w:body></w:document>`
+  const hasNotes = w.footnotes.length > 0
+  if (hasNotes) w.rel(`${REL}/footnotes`, 'footnotes.xml')
   const contentTypes = `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
@@ -687,6 +742,7 @@ export const buildDocx = async (options: DocxOptions): Promise<Uint8Array> => {
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
 <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+${hasNotes ? '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>' : ''}
 ${parts.map((p) => `<Override PartName="/${p.name}" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.${p.name.includes('header') ? 'header' : 'footer'}+xml"/>`).join('\n')}
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
 </Types>`
@@ -709,8 +765,9 @@ ${author ? `<dc:creator>${x(author)}</dc:creator>\n` : ''}<dc:language>${x(langu
     { name: '[Content_Types].xml', data: contentTypes },
     { name: '_rels/.rels', data: rootRels },
     { name: 'word/document.xml', data: document },
-    { name: 'word/styles.xml', data: stylesXml(type, language, scriptFormat) },
-    { name: 'word/settings.xml', data: settingsXml(setup, type, Boolean(options.contents)) },
+    { name: 'word/styles.xml', data: stylesXml(type, language, scriptFormat, options.textStyles || []) },
+    { name: 'word/settings.xml', data: settingsXml(setup, type, Boolean(options.contents), hasNotes) },
+    ...(hasNotes ? [{ name: 'word/footnotes.xml', data: footnotesXml(w.footnotes) }] : []),
     { name: 'word/numbering.xml', data: numberingXml(w.lists) },
     { name: 'word/_rels/document.xml.rels', data: docRels },
     { name: 'docProps/core.xml', data: core },

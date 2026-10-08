@@ -4,7 +4,7 @@
  *
  * The controller is mounted and driven through the app's real bridge (`shellBridge` →
  * `documentSurface`), so every state and command crosses the JSON-copying transport the
- * Swift shell uses.
+ * chrome uses.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -175,10 +175,16 @@ ok('a zoom naming another document is that document\'s',
 await act(async () => { store.setPrintZoom(0.5, 'P', 'Novel/Left') })
 ok('and leaves the one it did not name as it was', store.getPrintZoom('P', 'Novel/Other') === 2.5 && store.getPrintZoom('P', 'Novel/Left') === 0.5)
 ok('one never zoomed is not moved by either', store.getPrintZoom('P', 'Novel/Unzoomed') === store.getPrintZoom())
-await act(async () => { shellBridge.send('setPrintLayout', { enabled: true, docPath: 'Novel/Other' }) })
-ok('a pane\'s toggle shows its own document as pages, not the active one',
-  store.isPrintLayoutEnabled('P', 'Novel/Other') && !store.isPrintLayoutEnabled('P', 'Novel/Two'))
+await act(async () => { shellBridge.send('setEditorMode', { mode: 'typeset' }) })
+await act(async () => { await wait(30) })
+ok('Typeset mode shows every document as pages, the active one and the rest',
+  store.isPrintLayoutEnabled('P', 'Novel/Other') && store.isPrintLayoutEnabled('P', 'Novel/Two'))
+ok('and the state says so', lastState().mode === 'typeset' && lastState().enabled)
+ok('the mode is the project\'s: another project is still writing', store.getEditorMode('Q') === 'write')
+await act(async () => { shellBridge.send('setEditorMode', { mode: 'nonsense' }) })
+ok('a mode that is not one changes nothing', store.getEditorMode('P') === 'typeset')
 await act(async () => { shellBridge.send('setPrintLayout', { enabled: false, docPath: 'Novel/Other' }) })
+ok('the old Print Layout switch turns Typeset off, for every document', store.getEditorMode('P') === 'write' && !store.isPrintLayoutEnabled('P', 'Novel/Two'))
 await act(async () => { store.setPrintZoom(zoomBefore, 'P', 'Novel/Two') })
 await act(async () => { await wait(160) })
 
@@ -210,6 +216,46 @@ await act(async () => { shellBridge.send('setPrintScope', { scope: 'project' }) 
 await act(async () => { await wait(30) })
 ok('the scope crosses the bridge and switches the book to the project\'s', lastState().scope === 'project' && lastState().book.folder === '')
 await act(async () => { shellBridge.send('setPrintScope', { scope: 'document' }) })
+await act(async () => { await wait(60) })
+
+/* ---------------- the Typeset and Print & Export tabs, drawn from it ---------------- */
+{
+  installGlobals(dom.window, ['KeyboardEvent', 'MouseEvent', 'getComputedStyle'])
+  const { TypesetPanel, OutputPanel } = await import('../../src/components/RightSidebar/finishing/FinishingPanels.jsx')
+  const panelHost = document.body.appendChild(document.createElement('div'))
+  const panelRoot = createRoot(panelHost)
+  let showedOutput = false
+  await act(async () => { panelRoot.render(React.createElement(TypesetPanel, { onShowOutput: () => { showedOutput = true } })) })
+  const titles = () => [...panelHost.querySelectorAll('.ui-section-title')].map((node) => node.textContent)
+  ok('the Typeset tab draws its sections from the published state',
+    ['Book', 'Editions', 'Style', 'Format', 'Page', 'Body Text', 'Proof', 'Chapter Openings', 'Header & Footer', 'Title Page'].every((t) => titles().includes(t)))
+  ok('with no Print and Export in its header', !panelHost.querySelector('.fin-header .ui-button[data-variant="filled"]'))
+  const toggle = (label) => [...panelHost.querySelectorAll('.fin-toggle-row')].find((row) => row.textContent.trim() === label)?.querySelector('input')
+  await act(async () => { toggle('Set Type for Print').click() })
+  await act(async () => { await wait(220) })
+  ok('Set Type for Print sets the document’s type', Boolean(editor.state.doc.attrs.pageSetup?.typography))
+  ok('and the section offers the type’s controls', !!panelHost.querySelector('[aria-label="Line Spacing"]'))
+  const format = panelHost.querySelector('select[aria-label="Format"]')
+  await act(async () => {
+    format.value = 'trade-6x9'
+    format.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await act(async () => { await wait(220) })
+  ok('choosing a format applies it to the document', editor.state.doc.attrs.pageSetup?.presetId === 'trade-6x9')
+  await act(async () => { [...panelHost.querySelectorAll('button')].find((b) => b.textContent.startsWith('Next: Print')).click() })
+  ok('Next goes on to Print & Export', showedOutput)
+
+  await act(async () => { panelRoot.render(React.createElement(OutputPanel)) })
+  ok('Print & Export has Publishing, Cover and Hand Binding',
+    ['Publishing', 'Cover', 'Hand Binding'].every((t) => titles().includes(t)))
+  ok('and Print and Export in its header', !!panelHost.querySelector('.fin-header .ui-button[data-variant="filled"]'))
+  await act(async () => { toggle('Print for Hand Binding').click() })
+  await act(async () => { await wait(60) })
+  ok('Print for Hand Binding turns binding on for the book', store.getBookSettings('P', 'Novel').binding.binding === 'signatures')
+  ok('and the binding’s options appear', !!panelHost.querySelector('select[aria-label="Signature"]'))
+  await act(async () => { panelRoot.unmount() })
+  panelHost.remove()
+}
 
 await act(async () => { root.unmount() })
 editor.destroy()
@@ -278,8 +324,8 @@ const vars = typo.typographyVars(manuscript.typography)
 ok('the variables carry the size, leading and a quoted scene break',
   vars['--pt-size'] === '12pt' && vars['--pt-leading'] === '27.6pt' && vars['--pt-break'] === '"#"')
 ok('a quote in a scene break is escaped for CSS', typo.typographyVars({ ...manuscript.typography, sceneBreak: 'say "hi"' })['--pt-break'] === '"say \\"hi\\""')
-ok('the book\'s classes switch on drop caps, small caps and flush openings',
-  same(typo.typographyClasses(typo.BOOK_TYPOGRAPHY), ['has-print-type', 'pt-drop-cap', 'pt-small-caps', 'pt-flush-after-break']))
+ok('the book\'s classes switch on drop caps, small caps, flush openings and its composition',
+  same(typo.typographyClasses(typo.BOOK_TYPOGRAPHY), ['has-print-type', 'pt-drop-cap', 'pt-small-caps', 'pt-flush-after-break', 'pt-balance', 'pt-hang']))
 ok('the editor\'s font has no classes', typo.typographyClasses(undefined).length === 0)
 ok('the primary family is unquoted', typo.primaryFamily('"Courier Prime", Courier') === 'Courier Prime')
 
@@ -422,6 +468,20 @@ ok('the EPUB reads front matter, contents, then chapters',
   opfBook.indexOf('idref="front-01"') < opfBook.indexOf('idref="contents"') && opfBook.indexOf('idref="contents"') < opfBook.indexOf('idref="chapter-001"') &&
   readZipEntry(epubBook, 'OEBPS/text/front-04.xhtml').includes('epub:type="dedication"'))
 
+const fontBytes = new Uint8Array([0, 1, 0, 0, 0, 0])
+const epubStyled = await buildEpub({
+  title: 'The Book', chapters: [{ title: 'Chapter One', content: titled }], resolveImage: async () => null,
+  css: 'body { font-family: "EB Garamond"; }',
+  fonts: [{ family: 'EB Garamond', weight: 400, style: 'normal', format: 'opentype', mime: 'font/otf', file: 'EB Garamond.otf', bytes: fontBytes }],
+  identifier: 'urn:x', modified: new Date(0),
+})
+const styles = readZipEntry(epubStyled, 'OEBPS/styles.css')
+ok('an EPUB carries the book’s stylesheet, and the font it is set in, declared and listed',
+  styles.startsWith('@font-face { font-family: "EB Garamond"; src: url("fonts/EB_Garamond.otf") format("opentype");') &&
+  styles.includes('body { font-family: "EB Garamond"; }') &&
+  readZipEntry(epubStyled, 'OEBPS/content.opf').includes('<item id="font-1" href="fonts/EB_Garamond.otf" media-type="font/otf"/>') &&
+  listZip(epubStyled).some((e) => e.name === 'OEBPS/fonts/EB_Garamond.otf'))
+
 /* ---------------- Word ---------------- */
 
 const { buildDocx, twips, hexColor } = await import('../../src/print/export/docx.ts')
@@ -469,6 +529,31 @@ const xmlOk = (name) => {
 }
 ok('every part is well-formed XML', wordNames.filter((n) => /\.(xml|rels)$/.test(n)).every(xmlOk))
 const wordDoc = readZipEntry(docx, 'word/document.xml')
+const styledDocx = await buildDocx({
+  title: 'Letters', setup: wordSetup, chapters: [{ title: 'One', content: { type: 'doc', content: [{ type: 'paragraph', attrs: { styleName: 'letter' }, content: [{ type: 'text', text: 'Dear M,' }] }] } }],
+  textStyles: [{ id: 'letter', name: 'Letter', size: 1, italic: true, smallCaps: false, align: 'inherit', indentEm: 2, flush: true, spaceLines: 1, boxed: false }],
+  resolveImage: async () => null, modified: new Date(0),
+})
+const notedDocx = await buildDocx({
+  title: 'Notes', setup: wordSetup, chapters: [{ title: 'One', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'It rained.' }, { type: 'footnote', attrs: { id: 'n1', text: 'Or so they said.', mark: '1' } }] }] } }],
+  resolveImage: async () => null, modified: new Date(0),
+})
+ok('a note at its mark is a Word footnote: referenced in the text, written in the footnotes part, which the package lists',
+  readZipEntry(notedDocx, 'word/document.xml').includes('<w:footnoteReference w:id="1"/>') &&
+  readZipEntry(notedDocx, 'word/footnotes.xml').includes('<w:footnote w:id="1"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/>') &&
+  readZipEntry(notedDocx, 'word/footnotes.xml').includes('Or so they said.') &&
+  readZipEntry(notedDocx, '[Content_Types].xml').includes('/word/footnotes.xml') &&
+  readZipEntry(notedDocx, 'word/_rels/document.xml.rels').includes('Target="footnotes.xml"') &&
+  readZipEntry(notedDocx, 'word/settings.xml').includes('<w:footnotePr>'))
+const epubNoted = await buildEpub({ title: 'Notes', chapters: [{ title: 'One', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'It rained.' }, { type: 'footnote', attrs: { id: 'n1', text: 'Or so they said.', mark: '1' } }] }] } }], resolveImage: async () => null, identifier: 'urn:x', modified: new Date(0) })
+const notedXhtml = readZipEntry(epubNoted, 'OEBPS/text/chapter-001.xhtml')
+ok('an EPUB chapter carries its notes as pop-up notes, in well-formed XHTML',
+  notedXhtml.includes('epub:type="noteref"') && notedXhtml.includes('<aside epub:type="footnote"') &&
+  !new DOMParser().parseFromString(notedXhtml, 'application/xhtml+xml').querySelector('parsererror'), notedXhtml)
+ok('a named text style is a Word paragraph style of the same name, and the paragraph is in it',
+  readZipEntry(styledDocx, 'word/styles.xml').includes('<w:style w:type="paragraph" w:customStyle="1" w:styleId="Textletter"><w:name w:val="Letter"/>') &&
+  readZipEntry(styledDocx, 'word/styles.xml').includes('<w:i/>') &&
+  readZipEntry(styledDocx, 'word/document.xml').includes('<w:pStyle w:val="Textletter"/>'))
 const wordRels = readZipEntry(docx, 'word/_rels/document.xml.rels')
 ok('the page is Letter in twips, one-inch margins', wordDoc.includes('<w:pgSz w:w="12240" w:h="15840"/>') && wordDoc.includes('w:top="1440"') && twips(25.4) === 1440)
 ok('front matter, then a section per chapter, the break to a right-hand page starting one of its own',
@@ -825,3 +910,25 @@ highlightSpeeches(actorPages, 'John')
 const marked = actorPages.flatMap((p) => [...p.querySelectorAll('.is-highlighted')].map((el) => el.textContent))
 ok('an actor\'s copy marks their speeches, over the page and with an extension, and no one else\'s',
   same(marked, ['JOHN', '(beat)', 'Hello.', 'And more.', 'John (cont\'d)', 'Wait.']), JSON.stringify(marked))
+
+/* Picking a Typeset handle opens and shows the section it belongs to. */
+{
+  const { default: FinishingSection } = await import('../../src/components/RightSidebar/finishing/FinishingSection.jsx')
+  const { writeSectionState } = await import('../../src/ui/sectionState.js')
+  const { documentSurface } = await import('../../src/bridge/index.ts')
+  writeSectionState('page.size', false)
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const sectionRoot = createRoot(host)
+  await act(async () => {
+    sectionRoot.render(React.createElement(FinishingSection, { id: 'page.size', title: 'Page Size' },
+      React.createElement('p', { className: 'size-body' }, 'Letter')))
+  })
+  ok('a collapsed section starts shut', !host.querySelector('.size-body'))
+  await act(async () => { documentSurface.publishTypesetFocus({ sectionId: 'page.margins' }) })
+  ok('another section\'s handle leaves it shut', !host.querySelector('.size-body'))
+  await act(async () => { documentSurface.publishTypesetFocus({ sectionId: 'page.size' }) })
+  ok('its own handle opens it', Boolean(host.querySelector('.size-body')))
+  await act(async () => { sectionRoot.unmount() })
+  host.remove()
+}

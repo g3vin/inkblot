@@ -1,11 +1,8 @@
 /**
- * PageSetupSheet.jsx — Page Setup, drawn by the page, for the shell that does not
- * draw its own.
+ * PageSetupSheet.jsx — File ▸ Page Setup….
  *
- * The Swift shell shows page setup natively, in the inspector's Page tab (it owns
- * `pageSetup`; see host.ts). The Tauri app has no inspector, so it gets this sheet,
- * which edits the same two things through the same functions: the document's page
- * setup on its doc node, and its book's settings in preferences.
+ * It edits the same two things the Typeset tab does, through the same functions: the
+ * document's page setup on its doc node, and its book's settings in preferences.
  *
  * Choices apply at once, so the pages behind the sheet reflow as they change; each
  * is one undo step in the document.

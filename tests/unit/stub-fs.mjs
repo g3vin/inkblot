@@ -10,8 +10,28 @@ export async function readTextFile(path) {
   return files.get(p)
 }
 export async function mkdir(path) { dirs.add(String(path)) }
-export async function exists(path) { const p = String(path); return files.has(p) || dirs.has(p) }
-export async function readDir() { return [] }
+// A directory exists when made, or when anything is under it, as `mkdir -p` would leave it.
+export async function exists(path) {
+  const p = String(path)
+  if (files.has(p) || dirs.has(p)) return true
+  const under = `${p.replace(/\/+$/, '')}/`
+  return [...files.keys()].some((key) => key.startsWith(under)) || [...dirs].some((d) => d.startsWith(under))
+}
+// What is directly in a directory: its files, and its subdirectories (made explicitly,
+// or implied by a file under them).
+export async function readDir(path) {
+  const dir = String(path).replace(/\/+$/, '')
+  const names = new Map()
+  const add = (rest, isDirectory) => {
+    const [name, ...deeper] = rest.split('/')
+    if (!name) return
+    const directory = isDirectory || deeper.length > 0
+    if (!names.has(name) || directory) names.set(name, directory)
+  }
+  for (const key of files.keys()) if (key.startsWith(`${dir}/`)) add(key.slice(dir.length + 1), false)
+  for (const d of dirs) if (d.startsWith(`${dir}/`)) add(d.slice(dir.length + 1), true)
+  return [...names].map(([name, isDirectory]) => ({ name, isDirectory, isFile: !isDirectory }))
+}
 // A directory moves or goes with everything under it, as it does on disk — the entry
 // suite renames and deletes folders with documents open inside them.
 const underDir = (dir) => (key) => key.startsWith(`${dir}/`)

@@ -51,6 +51,7 @@
 
 .sidebar-content,
 .sidebar-tabs,
+.left-sidebar-switch,
 .sidebar-resizer,
 .sidebar-topbar,
 .resizer {
@@ -61,6 +62,7 @@
 
 .sidebar.collapsed .sidebar-content,
 .sidebar.collapsed .sidebar-tabs,
+.sidebar.collapsed .left-sidebar-switch,
 .sidebar.collapsed .resizer,
 .sidebar.collapsed .sidebar-topbar {
   opacity: 0;

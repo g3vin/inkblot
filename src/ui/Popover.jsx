@@ -1,40 +1,45 @@
 /**
- * Popover.jsx — a floating surface anchored to a control (or a point).
- *
- * Wears the one pop-up surface (--menu-* tokens). Closes on Escape and outside
- * clicks, and returns focus to the anchor. Use Menu for lists of actions; use Popover
- * for small forms and pickers.
+ * Popover — a flat, opaque surface anchored under (or over) an element, portaled to
+ * the body so no clipping ancestor cuts it. Closes on Escape and on a click outside.
  */
-import { useRef } from 'react'
+import { useLayoutEffect, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useAnchoredPosition, useDismiss } from './hooks'
-import './Popover.css'
+import { placePopover } from './placePopover.js'
+import './ui.css'
 
-export default function Popover({
-  open,
-  onClose,
-  anchorRef,
-  point,
-  placement = 'bottom-start',
-  offset,
-  className,
-  label,
-  role = 'dialog',
-  children,
-  ...rest
-}) {
+export default function Popover({ anchorRef, open, onClose, align = 'start', className = '', children, ...rest }) {
   const ref = useRef(null)
-  const style = useAnchoredPosition(open, ref, { anchorRef, point, placement, offset })
-  useDismiss(open, onClose, anchorRef ? [ref, anchorRef] : [ref])
+  const [position, setPosition] = useState(null)
+
+  useLayoutEffect(() => {
+    if (!open) { setPosition(null); return }
+    const anchor = anchorRef?.current?.getBoundingClientRect()
+    const node = ref.current
+    if (!anchor || !node) return
+    setPosition(placePopover(anchor, { width: node.offsetWidth, height: node.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }, align))
+  }, [open, anchorRef, align])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const onKey = (event) => { if (event.key === 'Escape') onClose?.() }
+    const onDown = (event) => {
+      if (ref.current?.contains(event.target) || anchorRef?.current?.contains(event.target)) return
+      onClose?.()
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('pointerdown', onDown, true)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('pointerdown', onDown, true)
+    }
+  }, [open, onClose, anchorRef])
 
   if (!open) return null
   return createPortal(
     <div
       ref={ref}
-      role={role}
-      aria-label={label}
-      className={['ib-popover', className].filter(Boolean).join(' ')}
-      style={style}
+      className={`ui-popover ${className}`.trim()}
+      style={position ? { left: position.left, top: position.top } : { left: -9999, top: -9999 }}
       {...rest}
     >
       {children}

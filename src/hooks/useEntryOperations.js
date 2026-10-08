@@ -13,7 +13,7 @@
  * document from disk under its new name. That is a real reload, and it is correct:
  * the text on disk is the text the flush just wrote.
  *
- * Also handles `createEntry` and the native shell's entry commands, because they need
+ * Also handles `createEntry` and the entry commands, because they need
  * the same state and the same refresh.
  */
 import { useEffect, useRef } from 'react'
@@ -157,7 +157,7 @@ export function useEntryOperations({
     return setEntryOperations(operations)
   }, [refreshFilesRef, setActiveDoc, setCurrentDoc, setNotesByDoc, setSecondaryDoc, setSplitView, setTabs, setVersionsState])
 
-  /* ---------------- the native shell's commands ---------------- */
+  /* ---------------- the entry commands ---------------- */
 
   useEffect(() => {
     const project = () => stateRef.current.projectName

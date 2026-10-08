@@ -20,7 +20,7 @@
 //! ## How it differs from the JS, and why
 //!
 //! - **The AppData root is injected.** `appDataDir()` is the shell's to know. The Tauri
-//!   app passes what its path resolver reports; the Swift app passes the same folder.
+//!   app passes what its path resolver reports.
 //! - **`versions:changed` is a callback, not a DOM event.** [`ProjectStore::on_versions_changed`]
 //!   takes a listener, which a shell wires to
 //!   whatever it notifies with. Nothing here knows what a `window` is.

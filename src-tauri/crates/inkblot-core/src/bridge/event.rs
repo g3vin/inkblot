@@ -9,21 +9,17 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::archive::ArchiveChanged;
 use super::map::MapChromeChanged;
-use super::bubble::{BubbleChipsChanged, BubbleSessionOpened};
+
 use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
 use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor, WritingFormat};
-use crate::types::json::JsonValue;
-use super::sidebar::{
-    ClipboardChanged, NotePreviewDismissed, NotesChanged, ShowSidebarTab, TilesChanged,
-    VersionsChanged,
-};
+use super::sidebar::{ShowSidebarTab};
 use super::tabs::TabsChanged;
-use crate::types::note::Note;
 use crate::types::read_aloud::ReadAloudPayload;
-use crate::types::search::SearchResult;
-use super::print::{PageLayoutCatalog, PageLayoutState, PrintJobStatus, PrintRequest};
+use super::print::{
+    PageLayoutCatalog, PageLayoutState, PrintJobStatus, TypesetFocus,
+    TypesetHistoryChanged,
+};
 
 /// Which marks are on at the selection.
 #[typeshare]
@@ -143,74 +139,6 @@ pub struct DocChanged {
     pub paste: bool,
 }
 
-/// Note anchors after a remap.
-///
-/// `useEditorNotes` remaps on every transaction — every keystroke in a document with
-/// quote notes — and the shell holds those positions. Two things
-/// keep that off the bridge's back:
-///
-/// 1. The event is coalesced to one per frame by the sender. Sending per transaction
-///    saturates the bridge with nothing new; a caret that moved three times in one
-///    frame has one final answer.
-/// 2. It carries the **whole** remapped set, never a delta. That is what makes
-///    coalescing safe: dropping an intermediate state loses nothing, because the next
-///    one is complete. A delta stream would not survive a single dropped message.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NotesRemapped {
-    pub doc_path: String,
-    pub notes: Vec<Note>,
-    /// Notes whose range collapsed to nothing in this remap. They have lost what they
-    /// were about and have been dropped from `notes`; they are named here so a shell
-    /// can tell "deleted" from "never sent".
-    pub dropped_note_ids: Vec<String>,
-}
-
-/// The pointer entered, left, or clicked a note marker in the document.
-///
-/// `anchor_rect` is in client coordinates *inside the webview*, so a native shell must
-/// offset it by the web view's frame. Nothing here is an object reference: every
-/// field survives serialization.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NoteMarkerEvent {
-    pub note_id: String,
-    pub doc_path: String,
-    pub anchor_left: f64,
-    pub anchor_top: f64,
-    pub anchor_right: f64,
-    pub anchor_bottom: f64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note: Option<Note>,
-}
-
-/// Where one note marker is, for a shell that draws the markers itself. Client
-/// coordinates inside the webview, as `NoteMarkerEvent`'s.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NoteMarkerRect {
-    pub note_id: String,
-    pub color: String,
-    pub left: f64,
-    pub top: f64,
-    pub right: f64,
-    pub bottom: f64,
-}
-
-/// Every note marker the user can see, and where — the whole list, so it is safe to
-/// coalesce. Sent when any of them appears, goes, or moves (a scroll, a reflow). The
-/// page still owns the markers' hover and click; the shell draws the dots, as Liquid
-/// Glass, over the page's invisible ones.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NoteMarkersChanged {
-    pub markers: Vec<NoteMarkerRect>,
-}
-
 /// The active editor election changed.
 ///
 /// The election is driven by mouse movement over a pane, which is a
@@ -271,23 +199,6 @@ pub struct CanvasToolbarState {
     pub record_elapsed_ms: f64,
 }
 
-/// Search results from inside the open document.
-///
-/// Project-wide search is `inkblot-core`'s job and does not come through here; this is
-/// only the part that needs a live document, because a ProseMirror position cannot be
-/// computed from a file on disk.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SearchMatches {
-    pub query: String,
-    pub doc_path: String,
-    pub results: Vec<SearchResult>,
-    /// Which result is current, as an index into `results`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub active_index: Option<u32>,
-}
-
 /// The page's own view settings that a shell offers as toolbar toggles, pushed whole
 /// whenever either changes and once at startup. The page still owns both: the shell
 /// asks with `setFocusMode` / `setWordCountVisible` and lights its buttons from this.
@@ -297,73 +208,6 @@ pub struct SearchMatches {
 pub struct ViewOptions {
     pub focus_mode: bool,
     pub word_count_visible: bool,
-}
-
-/// Where one pane's word-count badge is, and what it says, for a shell that draws the
-/// badges itself. Client coordinates inside the webview, as `NoteMarkerRect`'s.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WordCountBadge {
-    pub text: String,
-    pub left: f64,
-    pub top: f64,
-    pub right: f64,
-    pub bottom: f64,
-}
-
-/// One text pane's status row, for a shell that draws the pane's own Print Layout
-/// toggle and zoom at its bottom-right corner, level with its badges. `left` and `right`
-/// are the pane's edges; `top` and `bottom` the row's. Client coordinates, as the
-/// badges' are.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PaneStatus {
-    pub pane: Pane,
-    pub doc_path: String,
-    /// Shown as pages.
-    pub print_layout: bool,
-    /// Its zoom as pages (1 = 100%), whether or not it is shown as them.
-    pub zoom: f64,
-    /// The pointer is over it. A split shows a pane's controls only then.
-    #[serde(default)]
-    pub hovered: bool,
-    pub left: f64,
-    pub top: f64,
-    pub right: f64,
-    pub bottom: f64,
-}
-
-/// Every word-count badge the user can see, and every text pane's status row — the
-/// whole lists, so it is safe to coalesce. The page's badges stay where they are,
-/// invisible, to be measured; the shell draws them as Liquid Glass, which only a view
-/// above the page can be.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WordCountsChanged {
-    pub badges: Vec<WordCountBadge>,
-    #[serde(default)]
-    pub panes: Vec<PaneStatus>,
-}
-
-/// What focus mode is showing.
-///
-/// `FocusModeOverlay` re-derives its view from the full document on every
-/// transaction; sent at a keystroke's rate, the text would be the largest payload on
-/// the bridge. So the overlay stays in the webview, and this event lets a native shell
-/// mirror the *state* — which paragraph, how far through — without receiving the text.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FocusModeView {
-    pub active: bool,
-    pub doc_path: String,
-    /// Index of the paragraph the caret is in.
-    pub paragraph_index: u32,
-    pub paragraph_count: u32,
-    pub word_count: u32,
 }
 
 /// The readable text of the document and the words resolved out of it.
@@ -378,83 +222,6 @@ pub struct FocusModeView {
 pub struct ReadAloudPayloadEvent {
     pub doc_path: String,
     pub payload: ReadAloudPayload,
-}
-
-/// What is being dragged.
-///
-/// A drag in Inkblot often starts in one component and ends in another — the
-/// clipboard panel, an editor pane, a canvas — and in the Swift app one end can be
-/// native. The drag events (`DragStarted`, `DragMoved`, `DragEnded`) carry the whole
-/// hand-off, so nothing about a drag depends on shared state in the webview's
-/// `window`. The webview side is `src/bridge/dragHandoff.ts`.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum DragPayloadKind {
-    /// A selection dragged out of an editor.
-    EditorSelection,
-    /// An entry dragged out of the clipboard history panel.
-    ClipboardEntry,
-    /// A document dragged out of the file tree.
-    Document,
-    /// A note card dragged out of the notes panel.
-    NoteCard,
-}
-
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DragStarted {
-    pub drag_id: String,
-    pub kind: DragPayloadKind,
-    /// The plain text being dragged, where there is any.
-    pub text: String,
-    /// The entry, document or note the drag came from.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub doc_path: Option<String>,
-    /// Where in the source document the selection came from, for a drag that will move
-    /// rather than copy.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub anchor: Option<TextAnchor>,
-    /// Anything the drop target needs that the fields above do not model — a
-    /// clipboard entry's rich content, a note's color.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub detail: Option<JsonValue>,
-}
-
-/// The pointer moved during a drag.
-///
-/// Carried explicitly because the DOM's own drag events do not reliably give a
-/// position. Coalesced to one per frame
-/// by the sender, like `notesRemapped`, and for the same reason: only the last one
-/// means anything.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DragMoved {
-    pub drag_id: String,
-    pub client_x: f64,
-    pub client_y: f64,
-}
-
-/// The drag ended — however it ended.
-///
-/// `handled` is a *report*, not a negotiation: whichever drop target accepted the
-/// payload says so when it does, and this event carries the final answer so the source
-/// knows whether to remove what it was dragging. Two targets can see the same drop (an
-/// editor and the clipboard panel underneath it); the first to claim it wins.
-#[typeshare]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DragEnded {
-    pub drag_id: String,
-    pub handled: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub client_x: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub client_y: Option<f64>,
 }
 
 /// The project the webview has open changed.
@@ -482,53 +249,28 @@ pub enum WebviewEvent {
     ToolbarState(ToolbarState),
     SelectionContext(SelectionContext),
     DocChanged(DocChanged),
-    NotesRemapped(NotesRemapped),
-    NoteMarkerHover(NoteMarkerEvent),
-    NoteMarkerLeave(NoteMarkerEvent),
-    NoteMarkerPin(NoteMarkerEvent),
     ActiveEditorChanged(ActiveEditorChanged),
     CanvasToolbarChanged(CanvasToolbarChanged),
     /// The active map's toolbar and inspector (`map.rs`). Coalesced per frame.
     MapChromeChanged(MapChromeChanged),
-    SearchMatches(SearchMatches),
-    FocusModeView(FocusModeView),
     ReadAloudPayload(ReadAloudPayloadEvent),
-    DragStarted(DragStarted),
-    DragMoved(DragMoved),
-    DragEnded(DragEnded),
     ProjectChanged(ProjectChanged),
-    NotesChanged(NotesChanged),
-    ClipboardChanged(ClipboardChanged),
-    TilesChanged(TilesChanged),
-    VersionsChanged(VersionsChanged),
     ShowSidebarTab(ShowSidebarTab),
-    /// The marker of an open hover preview moved — the document scrolled or reflowed.
-    /// Coalesced to one per frame; it carries the whole rect, so a dropped one is
-    /// superseded by the next.
-    NoteMarkerMoved(NoteMarkerEvent),
-    NotePreviewDismissed(NotePreviewDismissed),
-    NoteMarkersChanged(NoteMarkersChanged),
-    /// Open the bubble editor. Sent only to a shell that draws it (`bubble` chrome).
-    BubbleSessionOpened(BubbleSessionOpened),
-    /// Where the chips of sessions left open are, for a shell that draws them.
-    BubbleChipsChanged(BubbleChipsChanged),
     ViewOptions(ViewOptions),
-    /// A document's archive, whole (`archive.rs`).
-    ArchiveChanged(ArchiveChanged),
     /// The project's sources, whole, for the document in view (`references.rs`).
     ReferencesChanged(ReferencesChanged),
     /// The kinds of source and the styles, sent once when the page mounts.
     ReferenceSchema(ReferenceSchema),
     /// Show a source in the panel.
     RevealReference(RevealReference),
-    /// Where the word-count badges are, for a shell that draws them (`wordCount`
-    /// chrome). Coalesced per frame; the total is itself debounced by the page.
-    WordCountsChanged(WordCountsChanged),
     PageLayoutState(PageLayoutState),
-    PrintRequest(PrintRequest),
     /// The Finishing tabs' fixed lists, sent once when the page mounts.
     PageLayoutCatalog(PageLayoutCatalog),
     PrintJobStatus(PrintJobStatus),
+    /// A Typeset page's handle was picked: show its section in the inspector.
+    TypesetFocus(TypesetFocus),
+    /// A book's typeset history, newest first.
+    TypesetHistoryChanged(TypesetHistoryChanged),
     /// The tabs and the split, whole (`tabs.rs`). Coalesced per frame.
     TabsChanged(TabsChanged),
 }

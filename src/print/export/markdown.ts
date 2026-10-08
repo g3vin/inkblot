@@ -91,6 +91,7 @@ const bibliographyMarkdown = (attrs: Record<string, unknown> = {}): string => {
 const inline = (nodes: PMJSON[] = [], options: MarkdownOptions): string => nodes.map((node) => {
   if (node.type === 'text') return wrapMarks(node.text || '', node.marks)
   if (node.type === 'citation') return citationMarkdown(String(node.attrs?.rendered || ''))
+  if (node.type === 'footnote') return node.attrs?.end ? `<sup>${node.attrs?.mark || ''}</sup>` : `[^${noteLabel(node)}]`
   if (node.type === 'hardBreak') return '  \n'
   if (node.type === 'image') {
     const src = String(node.attrs?.src || '')
@@ -187,4 +188,20 @@ const blocks = (nodes: PMJSON[] = [], options: MarkdownOptions, separator = '\n\
   return out
 }
 
-export const toMarkdown = (doc: PMJSON, options: MarkdownOptions = {}): string => `${blocks(doc.content, options).trimEnd()}\n`
+/** A note's label in Markdown's footnote syntax: its mark, where it has a word-safe one. */
+const noteLabel = (node: PMJSON): string => {
+  const mark = String(node.attrs?.mark || '')
+  return /^[\w-]+$/.test(mark) ? mark : String(node.attrs?.id || mark || 'note')
+}
+
+export const toMarkdown = (doc: PMJSON, options: MarkdownOptions = {}): string => {
+  // Notes at their marks become Markdown footnotes, defined after the text.
+  const notes: string[] = []
+  const walk = (node: PMJSON) => {
+    if (node.type === 'footnote' && !node.attrs?.end) notes.push(`[^${noteLabel(node)}]: ${String(node.attrs?.text || '').replace(/\n+/g, ' ')}`)
+    for (const child of node.content || []) walk(child)
+  }
+  walk(doc)
+  const body = blocks(doc.content, options).trimEnd()
+  return `${body}${notes.length ? `\n\n${notes.join('\n')}` : ''}\n`
+}

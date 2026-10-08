@@ -1,19 +1,14 @@
 
 .tiptap {
+  /* A document's text is set in the book face; the chrome around it is the UI face. */
+  font-family: var(--editor-font-family, var(--font-editor));
   white-space: pre-wrap;
   tab-size: 4;
 }
 
 .read-aloud-word-highlight {
   border-radius: 0.34em;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 224, 113, 0.18) 0%,
-      rgba(255, 196, 57, 0.44) 68%,
-      rgba(255, 171, 26, 0.36) 100%
-    );
-  box-shadow: 0 0 0 2px rgba(255, 202, 75, 0.16);
+  background: color-mix(in srgb, var(--status-warning) 38%, transparent);
   color: inherit;
   pointer-events: none;
 }

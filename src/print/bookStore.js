@@ -17,6 +17,7 @@ import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 
 import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { getPreference } from '../lib/preferences'
+import { relocateTypesetHistory } from './typesetHistoryStore'
 
 export const BOOKS_FILE = '.inkblot-books.json'
 const LEGACY_PREFIX = 'inkblot-book:'
@@ -100,6 +101,8 @@ export const booksSettled = async (projectName) => {
  */
 export const relocateBooks = async (projectName, fromRel, toRel, { folder = false, copy = false } = {}) => {
   if (!projectName || !fromRel) return
+  // The typeset history follows too: it is kept by book, and names chapters by path.
+  await relocateTypesetHistory(projectName, fromRel, toRel, { folder, copy })
   const entry = entryFor(projectName)
   await entry.loaded
   const moved = (path) => (folder ? path === fromRel || path.startsWith(`${fromRel}/`) : path === fromRel)
@@ -113,6 +116,14 @@ export const relocateBooks = async (projectName, fromRel, toRel, { folder = fals
       touched = true
       const kept = copy ? excluded : excluded.filter((p) => !moved(p))
       next = { ...book, excluded: toRel ? [...kept, ...excluded.filter(moved).map(to)] : kept }
+    }
+    // The book's own order of its contents: a chapter, a part's folder, a page of its
+    // matter (in the folder's `.book/`) follows its document. A copy leaves the book as
+    // it is; a delete takes the entry out when the tree next reconciles it.
+    const items = Array.isArray(book?.items) ? book.items : []
+    if (!copy && toRel && items.some((item) => item?.path && moved(item.path))) {
+      touched = true
+      next = { ...next, items: items.map((item) => (item?.path && moved(item.path) ? { ...item, path: to(item.path) } : item)) }
     }
     if (folder && moved(key)) {
       touched = true

@@ -16,11 +16,12 @@ import { useSyncExternalStore } from 'react'
 
 import { getPreference, setPreference } from '../lib/preferences'
 import { onBooksChanged, storedBook, storeBook } from './bookStore'
+import { coversOf, designFor, digitalOf } from './chapterDesign'
+import { effectiveBook, routeToEdition } from './editions'
 import { bookFolderFor } from './compile'
 import { clampZoom } from './zoom'
 import { DEFAULT_SHEETS_PER_SIGNATURE } from './imposition'
 
-const ENABLED_PREFIX = 'inkblot-print-layout:'
 const ZOOM_KEY = 'inkblot-print-zoom'
 const SCOPE_PREFIX = 'inkblot-print-scope:'
 const AUTHOR_KEY = 'inkblot-author-profile'
@@ -39,16 +40,124 @@ const subscribe = (listener) => {
   return () => listeners.delete(listener)
 }
 
-const docKey = (projectName, docPath) => `${ENABLED_PREFIX}${projectName || ''}/${docPath || ''}`
 const zoomKey = (projectName, docPath) => `${ZOOM_KEY}:${projectName}/${docPath}`
 
-export const isPrintLayoutEnabled = (projectName, docPath) => (
-  Boolean(projectName && docPath) && getPreference(docKey(projectName, docPath)) === 'true'
+/* ---------------- the window's mode ---------------- */
+
+const MODE_PREFIX = 'inkblot-editor-mode:'
+export const EDITOR_MODES = ['write', 'typeset']
+
+/**
+ * Write or Typeset, per project: the mode it was left in. Typeset shows every text
+ * pane as its pages and locks the chapters' prose; Write is the continuous editor. It
+ * replaced a per-document Print Layout switch, whose old preferences are not read.
+ */
+export const getEditorMode = (projectName) => (
+  projectName && getPreference(`${MODE_PREFIX}${projectName}`) === 'typeset' ? 'typeset' : 'write'
 )
 
-export const setPrintLayoutEnabled = (projectName, docPath, enabled) => {
-  if (!projectName || !docPath) return
-  setPreference(docKey(projectName, docPath), enabled ? 'true' : 'false')
+export const setEditorMode = (projectName, mode) => {
+  if (!projectName || !EDITOR_MODES.includes(mode) || getEditorMode(projectName) === mode) return
+  setPreference(`${MODE_PREFIX}${projectName}`, mode)
+  emit()
+}
+
+/** Whether a document shows as pages: every one does, in Typeset. */
+export const isPrintLayoutEnabled = (projectName, docPath) => (
+  Boolean(projectName && docPath) && getEditorMode(projectName) === 'typeset'
+)
+
+/** Pages on or off — which, now, is the mode. Kept for the menus and keys that ask. */
+export const setPrintLayoutEnabled = (projectName, _docPath, enabled) => {
+  setEditorMode(projectName, enabled ? 'typeset' : 'write')
+}
+
+const VIEW_PREFIX = 'inkblot-typeset-view:'
+export const TYPESET_VIEWS = ['print', 'digital']
+
+/**
+ * Typeset's view, per project: the printed pages, or the e-book as a reader shows it
+ * (`DigitalPreview.jsx`). Write has no views; the one Typeset was left in comes back.
+ */
+export const getTypesetView = (projectName) => (
+  projectName && getPreference(`${VIEW_PREFIX}${projectName}`) === 'digital' ? 'digital' : 'print'
+)
+
+export const setTypesetView = (projectName, view) => {
+  if (!projectName || !TYPESET_VIEWS.includes(view) || getTypesetView(projectName) === view) return
+  setPreference(`${VIEW_PREFIX}${projectName}`, view)
+  emit()
+}
+
+const DISPLAY_PREFIX = 'inkblot-typeset-display:'
+const DISPLAY_DEFAULTS = { spread: false, grid: false, proof: false }
+
+/**
+ * How Typeset shows its pages, per project: in spreads, with the baseline grid drawn,
+ * with the proof's marks. View state — none of it prints.
+ */
+export const getTypesetDisplay = (projectName) => {
+  let stored = null
+  try {
+    stored = projectName ? JSON.parse(getPreference(`${DISPLAY_PREFIX}${projectName}`) || 'null') : null
+  } catch {
+    stored = null
+  }
+  return Object.fromEntries(Object.entries(DISPLAY_DEFAULTS).map(([key, value]) => [key, typeof stored?.[key] === 'boolean' ? stored[key] : value]))
+}
+
+export const setTypesetDisplay = (projectName, patch) => {
+  if (!projectName) return
+  const now = getTypesetDisplay(projectName)
+  const next = { ...now }
+  for (const key of Object.keys(DISPLAY_DEFAULTS)) if (typeof patch?.[key] === 'boolean') next[key] = patch[key]
+  if (JSON.stringify(next) === JSON.stringify(now)) return
+  setPreference(`${DISPLAY_PREFIX}${projectName}`, JSON.stringify(next))
+  emit()
+}
+
+// What the proof found on the document open in Typeset, and the mark picked from the
+// list. Not kept: the proof is read again from the pages whenever they change.
+let proof = { docPath: null, issues: [], focused: null }
+
+export const getProofIssues = (docPath) => (docPath && proof.docPath === docPath ? proof.issues : [])
+export const getProofFocus = () => proof.focused
+
+export const setProofIssues = (docPath, issues) => {
+  const next = Array.isArray(issues) ? issues : []
+  if (proof.docPath === docPath && JSON.stringify(proof.issues) === JSON.stringify(next)) return
+  proof = { docPath, issues: next, focused: next.some((i) => i.id === proof.focused) ? proof.focused : null }
+  emit()
+}
+
+export const setProofFocus = (id) => {
+  if (proof.focused === id) return
+  proof = { ...proof, focused: id || null }
+  emit()
+}
+
+// The e-book's checks, as the Digital view last found them: the Publishing section's
+// preflight lists them beside the print's. Null until the e-book has been read.
+let ebookIssues = null
+
+export const getEbookIssues = () => ebookIssues
+
+export const setEbookIssues = (issues) => {
+  const next = Array.isArray(issues) ? issues : null
+  if (JSON.stringify(next) === JSON.stringify(ebookIssues)) return
+  ebookIssues = next
+  emit()
+}
+
+// Where "Edit Text" left Typeset from, so "Back to Typeset" can return to it. Not kept
+// across launches: it is a round trip, not a setting.
+let typesetReturn = null
+
+/** `{ docPath, pos }` while a Typeset → Write round trip is open, else null. */
+export const getTypesetReturn = () => typesetReturn
+
+export const setTypesetReturn = (value) => {
+  typesetReturn = value && value.docPath ? { docPath: value.docPath, pos: value.pos ?? null } : null
   emit()
 }
 
@@ -93,7 +202,7 @@ export const DEFAULT_BINDING = {
   includeGuide: true,
 }
 
-export const DEFAULT_CHAPTER_NUMBERING = { style: 'none', prefix: 'Chapter', includeTitle: true }
+export const DEFAULT_CHAPTER_NUMBERING = { style: 'none', prefix: 'Chapter', includeTitle: true, startAt: 1, showInTree: false }
 
 export const DEFAULT_FRONT_MATTER = {
   halfTitle: false,
@@ -114,9 +223,14 @@ onBooksChanged(() => emit())
 
 /** A folder's book settings, with defaults filled in: the folder's name as the title. */
 export const getBookSettings = (projectName, folder) => {
-  const stored = objectOr(storedBook(projectName, folder))
+  // As shown: with the active edition's page and cover over the book's (editions.ts).
+  const stored = effectiveBook(objectOr(storedBook(projectName, folder)))
   const name = (folder || projectName || 'Untitled').split('/').filter(Boolean).pop() || 'Untitled'
-  return {
+  const chapterNumbering = { ...DEFAULT_CHAPTER_NUMBERING, ...objectOr(stored.chapterNumbering) }
+  chapterNumbering.startAt = chapterNumbering.startAt === 0 ? 0 : 1
+  const { covers, activeCover } = coversOf(stored)
+  const cover = covers.find((c) => c.id === activeCover)
+  const book = {
     folder: folder || '',
     title: name,
     author: '',
@@ -124,15 +238,38 @@ export const getBookSettings = (projectName, folder) => {
     ...stored,
     binding: { ...DEFAULT_BINDING, ...objectOr(stored.binding) },
     excluded: Array.isArray(stored.excluded) ? stored.excluded.filter((p) => typeof p === 'string') : [],
-    chapterNumbering: { ...DEFAULT_CHAPTER_NUMBERING, ...objectOr(stored.chapterNumbering) },
+    chapterNumbering,
     frontMatter: { ...DEFAULT_FRONT_MATTER, ...objectOr(stored.frontMatter) },
     backMatter: { ...DEFAULT_BACK_MATTER, ...objectOr(stored.backMatter) },
+    chapterDesign: designFor({ chapterDesign: stored.chapterDesign, chapterNumbering }, stored.pageSetup),
+    items: Array.isArray(stored.items) ? stored.items.filter((item) => item && typeof item.id === 'string' && item.kind) : [],
+    continuous: stored.continuous === true,
+    covers,
+    digital: digitalOf(stored),
   }
+  if (stored.partDesign) book.partDesign = designFor({ chapterDesign: stored.partDesign })
+  // The active cover's front is the book's cover wherever one image is wanted.
+  if (activeCover) book.activeCover = activeCover
+  if (cover?.front) book.coverImage = cover.front
+  else delete book.coverImage
+  return book
+}
+
+/** A folder's book as stored — its own page and cover, whatever edition is active. */
+export const getStoredBook = (projectName, folder) => objectOr(storedBook(projectName, folder))
+
+/** Store a book as it is kept, editions and all, with no edition's routing. */
+export const setStoredBook = (projectName, folder, settings) => {
+  const saved = storeBook(projectName, folder, { ...settings, folder: folder || '' })
+  emit()
+  return saved
 }
 
 /** Store a folder's book settings. Resolves when they are saved in the project. */
 export const setBookSettings = (projectName, folder, settings) => {
-  const saved = storeBook(projectName, folder, { ...settings, folder: folder || '' })
+  // An edit while an edition is active is the edition's.
+  const routed = routeToEdition(objectOr(storedBook(projectName, folder)), settings)
+  const saved = storeBook(projectName, folder, { ...routed, folder: folder || '' })
   emit()
   return saved
 }
@@ -190,6 +327,49 @@ export const bookFolderForScope = (projectName, docPath) => (
 export const getBookForDoc = (projectName, docPath) => (
   getBookSettings(projectName, bookFolderForScope(projectName, docPath))
 )
+
+/* ---------------- the Book navigator's selection ---------------- */
+
+// Which entry of the book the navigator has selected, by project: for a page the book
+// lays out (a title page, the contents) there is no document to be "the active one".
+// Not kept across launches.
+const selectedItems = new Map()
+
+export const getSelectedBookItem = (projectName) => selectedItems.get(projectName || '') || null
+
+export const setSelectedBookItem = (projectName, id) => {
+  if (getSelectedBookItem(projectName) === (id || null)) return
+  if (id) selectedItems.set(projectName || '', id)
+  else selectedItems.delete(projectName || '')
+  emit()
+}
+
+/* ---------------- the cover, in view ---------------- */
+
+// Whether the Typeset view shows the book's cover (chosen in the Book navigator) in
+// place of its pages. Not kept across launches.
+let showingCover = false
+
+export const isShowingCover = () => showingCover
+
+export const setShowingCover = (showing) => {
+  if (showingCover === Boolean(showing)) return
+  showingCover = Boolean(showing)
+  emit()
+}
+
+/* ---------------- a typeset version, previewed ---------------- */
+
+// `{ id, compare, snapshot }` while the Typeset view shows a typeset version's pages;
+// null otherwise. Not kept across launches.
+let typesetPreview = null
+
+export const getTypesetPreview = () => typesetPreview
+
+export const setTypesetPreview = (preview) => {
+  typesetPreview = preview && preview.snapshot ? preview : null
+  emit()
+}
 
 /* ---------------- the last export ---------------- */
 

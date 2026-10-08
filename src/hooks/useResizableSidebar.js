@@ -9,18 +9,34 @@
  * itself decides when a peek ends (see onAutoCollapse usage).
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { getPreference, setPreference } from '../lib/preferences'
 
 // Matches --sidebar-floating-offset: the gap between the window edge and the
 // sidebar shell, which sits between the cursor and the width being dragged.
 const FLOATING_OFFSET = 8
 
+/** Where a sidebar's width and whether it is pinned are kept: inkblot.sidebar.left / right. */
+export const sidebarKey = (side) => `inkblot.sidebar.${side}`
+
+/** The saved width and pin, within [min, max]; the defaults for anything unreadable. */
+export function readSidebar(side, initial, min, max) {
+  try {
+    const saved = JSON.parse(getPreference(sidebarKey(side)) || 'null')
+    const width = Number.isFinite(saved?.width) ? Math.min(max, Math.max(min, saved.width)) : initial
+    return { width, pinned: saved?.pinned !== false }
+  } catch {
+    return { width: initial, pinned: true }
+  }
+}
+
 export function useResizableSidebar(initial, min, max, side = 'left') {
-  const [width, setWidth] = useState(initial)
+  const [saved] = useState(() => readSidebar(side, initial, min, max))
+  const [width, setWidth] = useState(saved.pinned ? saved.width : 0)
   const [resizing, setResizing] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
-  const [pinned, setPinned] = useState(true)
+  const [collapsed, setCollapsed] = useState(!saved.pinned)
+  const [pinned, setPinned] = useState(saved.pinned)
   const [peeked, setPeeked] = useState(false)
-  const lastWidthRef = useRef(initial)
+  const lastWidthRef = useRef(saved.width)
   const lastClientXRef = useRef(null)
   const draggingRef = useRef(false)
 
@@ -147,6 +163,13 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
     window.addEventListener('mousemove', onEdgeHover)
     return () => window.removeEventListener('mousemove', onEdgeHover)
   }, [collapsed, pinned, side, min])
+
+  // Kept once a drag ends or the pin changes, not on every pixel of a drag.
+  useEffect(() => {
+    if (resizing) return
+    const next = JSON.stringify({ width: Math.round(lastWidthRef.current || initial), pinned })
+    if (getPreference(sidebarKey(side)) !== next) setPreference(sidebarKey(side), next)
+  }, [resizing, pinned, side, initial, width])
 
   const displayWidth = collapsed && !peeked ? 0 : width
 

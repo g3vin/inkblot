@@ -3,8 +3,7 @@
  *
  * The mirror of `readState.ts`: formatting, alignment, tables, selection and text
  * insertion, each driven by a command struct off the bridge rather than by a click
- * next to the editor. Every toolbar and menu — the page's and the native shell's —
- * reaches the editor through these.
+ * next to the editor. Every toolbar and menu reaches the editor through these.
  *
  * Each function takes the resolved editor, because resolving a target is the registry's
  * job and doing it twice is how the two disagree.

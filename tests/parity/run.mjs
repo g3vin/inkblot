@@ -8,7 +8,7 @@
  * `{ fn, args }` rows to the Rust `parity` binary and asserts the two agree.
  *
  * Why it exists: domain logic is implemented twice, in src/lib/ (what the webview
- * runs) and in `inkblot-core` (what the Swift app and the Tauri commands call). Two
+ * runs) and in `inkblot-core` (what the Tauri commands call). Two
  * implementations of the same function is a drift risk, and "I read both and they
  * look the same" is not a check. This is.
  *

@@ -1,13 +1,13 @@
 /**
- * Field.jsx — form controls: Field (label + hint wrapper), Input, TextArea, Select,
- * Checkbox, Switch and SegmentedControl.
+ * Field.jsx — form fields for dialogs and sheets: Field (label + hint wrapper), Input,
+ * TextArea and Checkbox. For on/off use Toggle, for a choice of a few use Segmented, and
+ * for a list use SelectMenu (FormRow.jsx, Segmented.jsx); inspector rows use FormRow.
  *
  * Labels sit above controls, in sentence case. A hint says what a setting DOES in
  * plain words; publishing terms belong in hints only inside advanced tools.
  */
-import { forwardRef, useId, useRef } from 'react'
+import { forwardRef, useId } from 'react'
 import Icon from './Icon'
-import { useRovingFocus } from './hooks'
 import './Field.css'
 
 export function Field({ label, hint, error, htmlFor, children, className }) {
@@ -33,20 +33,6 @@ export const TextArea = forwardRef(function TextArea({ className, ...rest }, ref
   return <textarea ref={ref} className={['ib-textarea', className].filter(Boolean).join(' ')} {...rest} />
 })
 
-/** A native <select>, styled: the OS picker is the most familiar one there is. */
-export const Select = forwardRef(function Select({ options = [], className, children, ...rest }, ref) {
-  return (
-    <span className={['ib-select-wrap', className].filter(Boolean).join(' ')}>
-      <select ref={ref} className="ib-select" {...rest}>
-        {children || options.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>
-        ))}
-      </select>
-      <Icon name="chevron-down" className="ib-select-caret" />
-    </span>
-  )
-})
-
 export function Checkbox({ checked, onChange, label, disabled, id: idProp }) {
   const autoId = useId()
   const id = idProp || autoId
@@ -57,50 +43,5 @@ export function Checkbox({ checked, onChange, label, disabled, id: idProp }) {
       <span className="ib-check-box" aria-hidden="true"><Icon name="check" size={12} /></span>
       {label ? <span className="ib-check-label">{label}</span> : null}
     </label>
-  )
-}
-
-export function Switch({ checked, onChange, label, disabled, id: idProp }) {
-  const autoId = useId()
-  const id = idProp || autoId
-  return (
-    <label className="ib-switch" htmlFor={id}>
-      {label ? <span className="ib-switch-label">{label}</span> : null}
-      <input id={id} type="checkbox" role="switch" className="ib-switch-input" checked={checked} disabled={disabled}
-        onChange={(event) => onChange?.(event.target.checked)} />
-      <span className="ib-switch-track" aria-hidden="true"><span className="ib-switch-thumb" /></span>
-    </label>
-  )
-}
-
-/**
- * A small set of mutually exclusive options shown side by side (2–4 short labels).
- * @param {{ value: string, onChange: (v: string) => void, label: string,
- *   options: { value: string, label: string, icon?: string }[] }} props
- */
-export function SegmentedControl({ value, onChange, options, label, size = 'md' }) {
-  const ref = useRef(null)
-  const onKeyDown = useRovingFocus(ref, '[role="radio"]', { orientation: 'horizontal', typeahead: false })
-  return (
-    <div ref={ref} role="radiogroup" aria-label={label} className={`ib-segmented ib-segmented--${size}`} onKeyDown={onKeyDown}>
-      {options.map((option) => {
-        const selected = option.value === value
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            tabIndex={selected ? 0 : -1}
-            className="ib-segment"
-            onClick={() => onChange?.(option.value)}
-            onFocus={() => { if (!selected) onChange?.(option.value) }}
-          >
-            {option.icon ? <Icon name={option.icon} active={selected} /> : null}
-            {option.label}
-          </button>
-        )
-      })}
-    </div>
   )
 }

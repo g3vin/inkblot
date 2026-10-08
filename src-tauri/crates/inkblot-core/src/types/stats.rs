@@ -1,6 +1,6 @@
 //! Writing statistics: what a sitting at a document was, and what they add up to.
 //!
-//! Recorded by a shell (the Swift app's `StatsTracker`), stored by
+//! Recorded by the page's tracker (`src/stats/tracker.js`), stored by
 //! [`crate::store::stats`], and read back rolled up by day. A session is kept as it
 //! happened, minute by minute, so that every figure a stats view shows — a day, an
 //! hour of the week, a streak — is derived from the same record and cannot disagree

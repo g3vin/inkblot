@@ -13,8 +13,8 @@
  *   5. Legacy component aliases, kept only until each surface migrates.
  *
  * Themes: `data-theme` on <html> is ALWAYS 'light' or 'dark' — "System" is resolved
- * in JS (src/lib/theme.js) before first paint — so each theme is written once, and no
- * stylesheet needs a prefers-color-scheme block.
+ * in JS (src/lib/theme.ts) before first paint — so each theme is written once, and no
+ * stylesheet needs a OS media-query block.
  */
 
 /* ============================================================
@@ -30,6 +30,9 @@
      face doubles as the script face. */
   --font-script: 'Courier Prime', 'Courier New', Courier, monospace;
   --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Older names, kept because existing stylesheets use them. */
+  --font-serif: var(--font-editor);
+  --font-mono: var(--font-code);
 
   /* Type scale (UI). Body copy in chrome is --text-sm; the editor sets its own size. */
   --text-2xs: 10px;
@@ -48,29 +51,37 @@
   --weight-semibold: 600;
   --tracking-eyebrow: 0.08em;
 
-  /* Space — a 4px grid. */
+  /* Space — on a 4px grid, with one 6px half-step for tight chrome. */
   --space-0: 0;
   --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Radius — soft. sm: chips, inputs, small controls. md: buttons, cards, rows.
-     lg: floating panels, popovers, menus, dialogs. pill: tags, switches only. */
+  /* Radius — soft: 4 / 8 / 12. sm (and xs): chips, inputs, small controls.
+     md: buttons, cards, rows. lg (and card): floating panels, capsules, popovers,
+     menus, dialogs. pill: tags and toggles only. */
+  --radius-xs: 4px;
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-card: 12px;
   --radius-pill: 999px;
 
   /* Sizes — comfortable density. */
   --control-h: 32px;
   --control-h-sm: 26px;
   --row-h: 36px;
+  --size-capsule: 26px;
+  --size-circle: 28px;
+  --size-toolbar: 36px;
+  --size-bubble: 42px;
+  --size-trash: 56px;
   --icon-sm: 16px;
   --icon-md: 20px;
   --hairline: 1px;
@@ -82,6 +93,11 @@
   --dur-slow: 240ms;
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
+  --ease-standard: var(--ease-out);
+
+  /* The one blur in the app: Liquid Glass on iOS/iPadOS floating chrome
+     (tests/unit/css.mjs allows no other backdrop-filter value). */
+  --blur-over-page: blur(20px) saturate(160%);
 
   /* Layers */
   --z-chrome: 20;
@@ -288,6 +304,16 @@
   --accent-ring: color-mix(in srgb, var(--accent-color) 22%, transparent);
   --accent-glow: color-mix(in srgb, var(--accent-color) 24%, transparent);
   --focus-ring: 0 0 0 2px var(--app-bg), 0 0 0 4px var(--accent-border);
+
+  /* Fills and shadows by older names, used across the inspector, toolbar and settings. */
+  --hover-bg: var(--surface-hover);
+  --select-bg: var(--surface-active);
+  --scrim-bg: var(--modal-overlay-bg);
+  --floating-over-page-bg: var(--surface-float);
+  --shadow-1: var(--shadow-float);
+  --shadow-2: var(--shadow-float);
+  --shadow-3: var(--shadow-dialog);
+  --note-fallback-color: var(--ink-blue); /* NOTE_FALLBACK_COLOR in lib/noteUtils.js */
 
   /* Selection */
   --selection-bg: color-mix(in srgb, var(--accent-color) 28%, transparent);

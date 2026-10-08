@@ -1,5 +1,17 @@
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>Print Layout harness</title></head>
+<head>
+<meta charset="utf-8"><title>Print Layout harness</title>
+<script>
+  // No shell here: what the page asks the host for (a project's references for a
+  // bibliography, preferences) is answered with nothing, as a new project would.
+  window.__TAURI_INTERNALS__ = {
+    invoke: async () => null,
+    transformCallback: () => 0,
+    convertFileSrc: (path) => path,
+    metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
+  }
+</script>
+</head>
 <body style="margin:0"><div id="root"></div><script type="module" src="./harness.jsx"></script></body>
 </html>

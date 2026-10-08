@@ -73,6 +73,34 @@ export const applyOrderToTree = <T extends TreeNode | null | undefined>(node: T,
   }
 }
 
+/**
+ * Move `itemId` within the order, from one folder's list to another's (or the same
+ * one), at `index` — the drop line's index among the rows as they were, so moving
+ * down past itself counts itself out — or at the end with none. Returns where it
+ * landed. Writes to `order`, as `applyOrderToTree` does.
+ */
+export const moveInOrder = (
+  order: OrderMap,
+  itemId: string,
+  fromFolder: string | undefined,
+  toFolder: string | undefined,
+  index?: number | null,
+): number => {
+  const fromKey = fromFolder || ''
+  const toKey = toFolder || ''
+  const fromList = [...(order[fromKey] || [])]
+  const fromIndex = fromList.indexOf(itemId)
+  order[fromKey] = fromList.filter(id => id !== itemId)
+
+  const toList = [...(order[toKey] || [])].filter(id => id !== itemId)
+  let requested = typeof index === 'number' ? index : toList.length
+  if (fromKey === toKey && typeof index === 'number' && fromIndex !== -1 && fromIndex < index) requested -= 1
+  const at = Math.max(0, Math.min(requested, toList.length))
+  toList.splice(at, 0, itemId)
+  order[toKey] = toList
+  return at
+}
+
 /** Rewrite order keys/ids after a folder moves or is renamed (fromPath → toPath). */
 export const remapOrderForFolder = (orderState: OrderMap, fromPath: string, toPath: string): OrderMap => {
   const next: OrderMap = {}

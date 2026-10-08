@@ -16,9 +16,10 @@ new feature from its first commit.
 
 For anyone short on time, human or agent. The rest of this document explains each one.
 
-1. **Build from `src/ui/`.** Use `Button`, `IconButton`, `Menu`, `Popover`, `Dialog`,
-   `Field`/`Input`, `Panel`, `Card`, `EmptyState`, `InkPicker` and the others. Don't
-   restyle a bare `<button>` or write a new modal.
+1. **Build from `src/ui/`.** Use `Button`, `IconButton`, `Segmented`, `Menu`, `Popover`,
+   `Sheet`, `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`, `Panel`,
+   `Card`, `EmptyState`, `InkPicker` and the others. Don't restyle a bare `<button>` or
+   write a new modal.
 2. **Never hard-code a design value.** Colours, fonts, radii, shadows, durations and
    spacing come from tokens (`var(--…)`). `npm run lint:design` fails on a new raw
    colour, font or radius.
@@ -36,8 +37,9 @@ For anyone short on time, human or agent. The rest of this document explains eac
    "More" menu, an inspector panel, and always the ⌘K command palette. Register every
    new action with `useCommands`.
 8. **Plain, warm words.** Sentence case, verb first, no jargon outside advanced tools.
-9. **Glass only on iOS/iPadOS, and only on `FloatingToolbar` and
-   `FloatingActionButton`.**
+9. **Glass only on iOS/iPadOS, and only on floating chrome over the page** (the
+   `.floating-capsule` surface: `FloatingToolbar`, `FloatingActionButton`,
+   `FloatingCapsule`).
 10. **Both themes, AA contrast, keyboard reachable, reduced motion honoured.** Every
     time.
 
@@ -183,7 +185,7 @@ in `tokens.css`.
 There are three choices: **Light** (paper), **Dark** (ink) and **System**.
 
 `<html data-theme>` is **always** `light` or `dark`. "System" is resolved in JS
-(`src/lib/theme.js`) before first paint, and re-resolved when the OS changes. So:
+(`src/lib/theme.ts`) before first paint, and re-resolved when the OS changes. So:
 
 - Write each theme's values **once**, in `tokens.css`, under
   `:root[data-theme='light']` / `[data-theme='dark']`.
@@ -191,7 +193,7 @@ There are three choices: **Light** (paper), **Dark** (ink) and **System**.
 - A component rarely needs theme-specific CSS, because the tokens already switch. If one
   does, scope it with `:root[data-theme='dark'] .thing { … }` and use tokens inside.
 - The accent is `data-accent` on `<html>` (absent means Ink Blue), set by
-  `applyAccentAttribute()`.
+  `setAccentAttribute()`.
 
 ---
 
@@ -262,21 +264,31 @@ and `.ib-prose` (any element that shows the writer's text).
 
 ## 7. Space, shape, depth, motion
 
-**Space** is on a 4px grid: `--space-1` (4) through `--space-12` (48). Lay out
-siblings with flex/grid and `gap`, not margins.
+**Space** is on a 4px grid with one 6px half-step for tight chrome:
+
+| Token | px | | Token | px |
+|---|---|---|---|---|
+| `--space-1` | 4 | | `--space-5` | 16 |
+| `--space-2` | 6 | | `--space-6` | 24 |
+| `--space-3` | 8 | | `--space-8` | 32 |
+| `--space-4` | 12 | | `--space-10` / `--space-12` | 40 / 48 |
+
+Lay out siblings with flex/grid and `gap`, not margins.
 
 **Density is comfortable.** Controls are `--control-h` (32px), small controls
-`--control-h-sm` (26px) and list rows `--row-h` (36px). Don't go smaller. Beginners and
-touch users need the target.
+`--control-h-sm` (26px) and list rows `--row-h` (36px). The shared `Button` sizes are
+`--size-capsule` (26px, inline and inspector controls), `--size-circle` (28px, round
+icon buttons) and `--size-toolbar` (36px). Don't go smaller. Beginners and touch users
+need the target.
 
 **Radius is soft:**
 
 | Token | px | For |
 |---|---|---|
-| `--radius-sm` | 4 | Inputs, chips, small controls, menu items |
-| `--radius-md` | 8 | Buttons, cards, rows |
-| `--radius-lg` | 12 | Floating panels, popovers, menus, dialogs |
-| `--radius-pill` | 999 | Tags and switches **only** |
+| `--radius-xs`, `--radius-sm` | 4 | Inputs, selects, chips, small controls, menu items |
+| `--radius-md` | 8 | Buttons, segmented controls, steppers, cards, rows |
+| `--radius-lg`, `--radius-card` | 12 | Floating panels and capsules, popovers, menus, dialogs, sheets |
+| `--radius-pill` | 999 | Tags and toggles **only** (and round icon buttons) |
 
 **Depth.** Only floating things cast shadows: panels, menus, popovers and floating
 toolbars use `--shadow-float`, and dialogs use `--shadow-dialog`. Everything inside a
@@ -284,7 +296,7 @@ surface is separated by hairlines and tonal shifts, never by shadow.
 
 **Motion is subtle and quick.** Use `--dur-fast` (120ms) for hovers and small state
 changes, `--dur-base` (180ms) for popovers, dialogs and panels, and `--dur-slow` (240ms)
-for sheets. The easing is `--ease-out`. There is no bounce or overshoot, and no looping
+for sheets. The easing is `--ease-out` (`--ease-standard` is the same curve). There is no bounce or overshoot, and no looping
 or attention-seeking animation. Motion explains where something came from and never
 decorates. `prefers-reduced-motion` is honoured globally (`base.css`); framer-motion
 components also check `useReducedMotion()`.
@@ -313,30 +325,34 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 
 | Component | Use it for | Notes |
 |---|---|---|
-| `Button` | Any text action | `primary` (at most one per view), `secondary` (default), `ghost` (dense chrome, rows), `danger` (destructive: confirm or offer undo). Sizes `md`/`sm`. Optional `icon` |
-| `IconButton` | Icon-only actions | `label` is required and becomes the tooltip. `shortcut` shows in the tooltip. `active` for toggles |
-| `Tooltip` | Naming a control | Short, no period, after a 500ms delay. Never holds anything a user must read to succeed |
+| `Button` | Any text action | `variant`: `filled` (the one primary action per view), `tinted` (a normal action that needs weight), `plain` (default: quiet actions in chrome and rows), `destructive` (confirm or offer undo). `size`: `capsule` (default), `circle`, `toolbar` |
+| `IconButton` | Icon-only actions | `label` is required and becomes the tooltip and accessible name. Glyph from `icon` (semantic name, preferred) or `symbol` (SF-style name). `display` shows the label under or instead of the icon in customisable toolbars. `filled` + `aria-pressed` for toggles |
+| `Tooltip` | Naming a control in a richer way than `title` | Short, no period, after a 500ms delay, with an optional shortcut. Never holds anything a user must read to succeed |
 | `Kbd` | Showing a shortcut | Courier Prime |
-| `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | Lists of actions, "More" overflow menus, context menus | Arrow keys, typeahead and Escape built in. `danger` items go last, after a separator |
-| `Popover` | Small forms and pickers anchored to a control | Same surface as a menu |
+| `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in. `danger` items go last, after a separator |
+| `useNativeMenu`, `popUpNativeMenu` | Context menus and menus a native window menu would show | The OS menu, built from the same items |
+| `Popover` | Small forms and pickers anchored to a control | Same surface as a menu. `align` start/end |
 | `Dialog` | A decision, or a small setting | Eyebrow + title + description, then the body, then the footer (secondary left, primary right) |
-| `Sheet` | Longer settings (page setup, export) | Slides from the right |
-| `Field` + `Input` / `TextArea` / `Select` | Forms | Label above, hint below. Errors say how to fix |
-| `Checkbox`, `Switch` | On/off | `Switch` applies immediately; `Checkbox` is part of a form that's submitted |
-| `SegmentedControl` | 2–4 exclusive, short options | Otherwise use `Select` |
+| `Sheet` | Larger settings and editors (Settings, Customize Toolbar, page setup) | Centred, or dropped from under the titlebar with `placement="top"` |
+| `Section` | A collapsible group in an inspector panel | Remembers open/closed per `id` |
+| `FormRow` + `Toggle` / `Stepper` / `SelectMenu` | Inspector and settings rows | Label left, control right; `stacked` for wide controls. `Toggle` applies immediately |
+| `Field` + `Input` / `TextArea`, `Checkbox` | Forms in dialogs | Label above, hint below. Errors say how to fix |
+| `Segmented` | 2–4 exclusive, short options | Otherwise use `SelectMenu` |
 | `Tabs` | Views within a panel | Underline style |
 | `Panel`, `PanelHeader`, `PanelBody` | Floating side panels | Header title is an eyebrow |
 | `FadeScrim` | Chrome over the document | See §6 |
 | `Card` | A bordered block in a panel | `ink` applies the card recipe |
 | `Tag` | Small categorical labels | Takes an ink |
 | `EmptyState` | Any list or panel with nothing in it | Typewritten line, plain hint, at most one action |
-| `InkPicker` | **Every** colour choice | Notes, cards, accent. Don't build another swatch row |
-| `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips (formatting, canvas, map) | Glass on iOS |
+| `InkPicker` | **Every** colour choice | Notes, cards, accent (Settings → General). Don't build another swatch row |
+| `FloatingCapsule` | A readout floating over the page (word count, zoom, tab bar) | The floating-capsule surface; glass on iOS |
+| `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips (formatting, canvas, map) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS |
 | `FloatingActionButton` | One round primary action over the document | Glass on iOS |
+| `usePointerReorder` | Drag-to-reorder lists (toolbar items, inspector layout) | |
 | `CommandPalette` | Mounted once in `App` | Features register commands; they don't render this |
 
 Behaviour hooks (`src/ui/hooks.js`) are `useDismiss`, `useFocusTrap`, `useRovingFocus`
-and `useAnchoredPosition`. Use them when building anything floating or list-like
+and `useAnchoredPosition` (`placePopover.js` is the placement maths `Popover` uses). Use them when building anything floating or list-like
 instead of re-implementing focus handling.
 
 **If a component doesn't exist yet,** build it in `src/ui/` from tokens, add it to the
@@ -417,13 +433,16 @@ Plain and warm. Write like a knowledgeable friend in the studio.
 One design everywhere: the Tauri desktop app (macOS) and the iOS/iPadOS app render the
 same bundle with the same tokens and components.
 
-**The single exception is Liquid Glass on iOS/iPadOS**, applied only to
-`FloatingToolbar` and `FloatingActionButton`. There they become translucent and
-blurred, with a specular rim (`--glass-*` tokens), so they sit comfortably beside the
-system's own glass. `src/ui/platform.js` sets `data-platform="ios"` on `<html>`, and
-`Floating.css` does the rest.
+**The single exception is Liquid Glass on iOS/iPadOS**, applied only to floating chrome
+over the page: the `.floating-capsule` surface that `FloatingToolbar`,
+`FloatingActionButton` and `FloatingCapsule` wear. There it becomes translucent and
+blurred (`var(--blur-over-page)`), with a specular rim (`--glass-*` tokens), so it sits
+comfortably beside the system's own glass. `src/ui/platform.js` sets
+`data-platform="ios"` on `<html>`, and the `.floating-capsule` rules in
+`src/styles/base.css` do the rest. Everywhere else the capsule is opaque paper with the
+float shadow.
 
-Don't extend glass to panels, menus, dialogs or anything else, and don't add
+Don't extend glass to panels, menus, dialogs, sheets or scrims, and don't add
 per-platform styling elsewhere. Touch targets are already comfortable (32px minimum;
 FABs are 44px).
 
@@ -450,6 +469,11 @@ FABs are 44px).
   at zero. When you migrate a surface, run
   `npm run lint:design -- --update-baseline` to lock in the lower count. `--list` prints
   every finding.
+- **`tests/unit/css.mjs`** (in `npm test`) keeps surfaces flat: a gradient only where it
+  does a job (listed by selector: the titlebar fade, `FadeScrim`, the canvas grid, …),
+  every `backdrop-filter` is `var(--blur-over-page)`, no OS colour-scheme media queries,
+  and the radius scale is 4/8/12. **`tests/unit/icons.mjs`** checks that every SF-style
+  icon name in `src/` resolves to a registered icon.
 - **The showcase** (`?design` in dev) shows every token and component in both themes.
   Check your change there and in the real surface, in light *and* dark.
 - **Review checklist for any UI change:**
@@ -468,10 +492,15 @@ FABs are 44px).
 The foundation is in place: tokens, fonts, icons, palette, primitives and the command
 palette. Existing surfaces are moved onto it one PR at a time, in this order:
 
-1. App shell: titlebar/toolbar, tabs, left sidebar and file tree, project landing
-2. Editor: formatting toolbar reduced to essentials + "More", context menus
-3. Right sidebar: workbench tiles, history, clipboard, archive, search
-4. Notes and the bubble editor
+1. App shell: titlebar and the customisable toolbars (`components/toolbar/`), tab bar
+   (`components/tabs/`), left sidebar, file tree and Book navigator (`components/tree/`,
+   `components/book/`), the project picker / welcome window
+2. Editor: the default toolbar set reduced to essentials, with the rest behind the
+   toolbar's » overflow; context menus
+3. Inspector: workbench tiles, history, clipboard, archive, search, references, map,
+   Typeset and Print & Export panels (`components/RightSidebar/`)
+4. Settings and stats (`components/settings/`, `components/stats/`), notes and the
+   bubble editor (`components/bubble/`)
 5. Canvas
 6. Map
 7. Print Layout and page setup
@@ -491,7 +520,8 @@ palette. Existing surfaces are moved onto it one PR at a time, in this order:
 
 - The component aliases at the bottom of `tokens.css` (`--landing-*`, `--sidebar-*`,
   `--focus-mode-*`, `--floating-note-*`, `--tile-color`, `--color-white/black`).
-- `src/components/SFIcon.jsx`, the SF-name alias onto `Icon`.
+- `src/components/SFIcon.jsx` and `src/components/sfIconNames.js`, the SF-name alias
+  onto `Icon` (also behind `IconButton`'s `symbol` prop).
 - The shared legacy menu rule at the bottom of `base.css`.
 - The bare-`<button>` defaults in `base.css`.
 
