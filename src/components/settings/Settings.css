@@ -67,14 +67,6 @@
   background: transparent; color: var(--text-secondary);
   font: 600 11px var(--font-ui); cursor: pointer;
 }
-.settings-weekdays button[aria-pressed='true'] { background: var(--accent-color); border-color: var(--accent-color); color: var(--color-white); }
+.settings-weekdays button[aria-pressed='true'] { background: var(--accent-color); border-color: var(--accent-color); color: var(--text-on-accent); }
 
 .settings-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.settings-swatch {
-  position: relative; width: 22px; height: 22px; padding: 0;
-  border: 2px solid transparent; border-radius: 50%;
-  background: var(--swatch); cursor: pointer; overflow: hidden;
-}
-.settings-swatch[aria-pressed='true'] { border-color: var(--text-primary); }
-.settings-swatch-custom { background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); }
-.settings-swatch-custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }

@@ -18,7 +18,7 @@
 
 .ProseMirror.is-script {
   --script-line: 1em;
-  font-family: "Courier Prime", "Courier New", Courier, monospace;
+  font-family: var(--font-script);
   font-size: 12pt;
   line-height: 1;
 }
@@ -145,7 +145,7 @@
 .pg-continued :is(.pg-more, .pg-contd) {
   position: absolute;
   left: 12ch;
-  font-family: "Courier Prime", "Courier New", Courier, monospace;
+  font-family: var(--font-script);
   font-size: 12pt;
   line-height: 1;
   white-space: nowrap;

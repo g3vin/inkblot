@@ -20,6 +20,7 @@
     "test": "node --experimental-loader ./tests/unit/loader.mjs tests/unit/run.mjs",
     "test:layout": "node tests/layout/run.mjs",
     "lint": "eslint .",
+    "lint:design": "node scripts/lint-design.mjs",
     "typecheck": "tsc --noEmit",
     "parity": "node --experimental-loader ./tests/unit/loader.mjs tests/parity/run.mjs",
     "types": "./scripts/generate-types.sh",
@@ -27,6 +28,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource/courier-prime": "^5.3.0",
+    "@fontsource/literata": "^5.3.0",
+    "@phosphor-icons/react": "^2.1.10",
     "@tauri-apps/api": "2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",

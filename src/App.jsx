@@ -2,19 +2,21 @@
  * App.jsx — application root.
  *
  * Owns app-wide chrome and preferences that live above the editor:
- * theme (light/dark/system), accent color, and the word-count badge
- * toggle. Wires those preferences into the native Tauri "View" menu
- * and persists them through lib/preferences.ts. Renders the Editor plus the
- * accent-color picker dialog.
+ * theme (light/dark/system), accent colour (an ink from lib/palette.ts), and the
+ * word-count badge toggle. Wires those preferences into the native Tauri menus and
+ * persists them through lib/preferences.ts. Renders the Editor, the Settings sheet,
+ * the timer capsule, and the command palette (⌘K) with the app-level commands.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { invoke } from '@tauri-apps/api/core'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
-import { resolveTheme, setThemeAttribute } from './lib/theme'
+import { resolveTheme, setAccentAttribute, setThemeAttribute, watchSystemTheme } from './lib/theme'
+import { ACCENT_PRESETS, DEFAULT_ACCENT } from './lib/palette'
+import { useCommands } from './lib/commands'
+import CommandPalette from './ui/CommandPalette.jsx'
 import { documentSurface } from './bridge'
 import SettingsSheet from './components/settings/SettingsSheet.jsx'
 import TimerCapsule from './components/stats/TimerCapsule.jsx'
@@ -28,39 +30,18 @@ const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
 const WORD_COUNT_BADGE_STORAGE_KEY = 'inkblot-show-word-count-badge'
 
-const ACCENT_PRESETS = [
-  { id: 'sky', label: 'Sky', value: '#7aaef7' },
-  { id: 'mint', label: 'Mint', value: '#58cbb3' },
-  { id: 'coral', label: 'Coral', value: '#ff8c73' },
-  { id: 'rose', label: 'Rose', value: '#f47ca3' },
-  { id: 'gold', label: 'Gold', value: '#f0be57' },
-  { id: 'lagoon', label: 'Lagoon', value: '#47b8d6' },
+const EXPORT_FORMATS = [
+  ['pdf', 'PDF'],
+  ['epub', 'EPUB'],
+  ['docx', 'Word (.docx)'],
+  ['markdown', 'Markdown'],
+  ['html', 'HTML'],
+  ['plainText', 'Plain text'],
+  ['fountain', 'Fountain'],
+  ['fdx', 'Final Draft (.fdx)'],
 ]
 
-const DEFAULT_ACCENT = ACCENT_PRESETS[0].value
-
-/**
- * The OS accent color (System Settings → Appearance on macOS) as `#rrggbb`, or null
- * where the host has none to give. Asked of the host because WebKit's
- * `-apple-system-control-accent` keyword reports stock blue to page content whatever
- * the user picked. Where there is one, the accent is the system's — like every native
- * control beside the page — and the picker is not offered.
- */
-const readSystemAccent = async () => {
-  try {
-    const hex = await invoke('system_accent_color')
-    return typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : null
-  } catch {
-    return null
-  }
-}
-
-/** Coerce any stored/user value to a valid 6-digit hex color, falling back to the default accent. */
-const normalizeAccentColor = (value) => {
-  if (typeof value !== 'string') return DEFAULT_ACCENT
-  const trimmed = value.trim()
-  return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toLowerCase() : DEFAULT_ACCENT
-}
+const dispatchAppEvent = (type, detail) => window.dispatchEvent(new CustomEvent(type, { detail }))
 
 const openSettings = (pane) => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS, { detail: { pane } }))
 
@@ -110,9 +91,8 @@ export default function App() {
   })
   const currentThemeRef = useRef('system')
   const showWordCountBadgeRef = useRef(true)
-  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
+  const [accent, setAccent] = useState(DEFAULT_ACCENT)
   const [theme, setTheme] = useState('system')
-  const [hasSystemAccent, setHasSystemAccent] = useState(false)
   useStatsRuntime()
   const [showWordCountBadge, setShowWordCountBadge] = useState(true)
 
@@ -147,19 +127,12 @@ export default function App() {
     updateMenu(theme)
   }, [updateMenu])
 
-  const applyAccentColor = useCallback((nextAccent) => {
-    const normalized = normalizeAccentColor(nextAccent)
-    document.documentElement.style.setProperty('--accent-color', normalized)
-    setPreference(ACCENT_STORAGE_KEY, normalized)
-    setAccentColor(normalized)
-  }, [])
-
-  // The system's accent is not a preference: it is shown, never stored, so the user's
-  // own pick is still there wherever the host has no system accent to give.
-  const followSystemAccent = useCallback((hex) => {
-    document.documentElement.style.setProperty('--accent-color', hex)
-    setAccentColor(hex)
-    setHasSystemAccent(true)
+  // The accent is one of the curated inks (lib/palette.ts), so every accent suits the
+  // palette. A hex saved before the ink palette maps to its nearest ink.
+  const applyAccent = useCallback((nextAccent) => {
+    const id = setAccentAttribute(nextAccent)
+    setPreference(ACCENT_STORAGE_KEY, id)
+    setAccent(id)
   }, [])
 
   const applyWordCountBadgeVisibility = useCallback((visible) => {
@@ -198,15 +171,12 @@ export default function App() {
   // On startup: restore persisted preferences, then build the native View menu entries.
   useEffect(() => {
     const stored = getPreference(THEME_STORAGE_KEY) || 'system'
-    const storedAccent = normalizeAccentColor(getPreference(ACCENT_STORAGE_KEY))
+    const storedAccent = getPreference(ACCENT_STORAGE_KEY)
     const storedWordCountBadge = getPreference(WORD_COUNT_BADGE_STORAGE_KEY)
     const showStoredWordCountBadge = storedWordCountBadge !== 'false'
-    applyAccentColor(storedAccent)
+    applyAccent(storedAccent)
     applyTheme(stored)
     applyWordCountBadgeVisibility(showStoredWordCountBadge)
-
-    const systemAccent = readSystemAccent()
-    systemAccent.then((hex) => hex && followSystemAccent(hex))
 
     const setupMenu = async () => {
       const { Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem } = await import('@tauri-apps/api/menu')
@@ -297,16 +267,19 @@ export default function App() {
       else await menu.append(await Submenu.new({ text: 'File', items: fileItems.slice(1) }))
 
       const themeItems = [toggleItem, systemItem]
-      const accentItems = (await systemAccent)
-        ? []
-        : [
-            await PredefinedMenuItem.new({ item: 'Separator' }),
-            await MenuItem.new({
-              id: 'accent-color-picker',
-              text: 'Accent Color…',
-              action: () => openSettings('general'),
-            }),
-          ]
+      const accentItems = [
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        await MenuItem.new({
+          id: 'accent-color-picker',
+          text: 'Accent Colour…',
+          action: () => openSettings('general'),
+        }),
+        await MenuItem.new({
+          id: 'command-palette',
+          text: 'Command Palette…  ⌘K',
+          action: () => dispatchAppEvent('inkblot:command-palette'),
+        }),
+      ]
       const tabBarItem = await CheckMenuItem.new({
         id: 'tab-bar-toggle',
         text: 'Show Tab Bar',
@@ -352,33 +325,48 @@ export default function App() {
     }
 
     setupMenu()
-  }, [applyAccentColor, applyTheme, applyWordCountBadgeVisibility, followSystemAccent, getResolvedTheme, updateMenu])
+  }, [applyAccent, applyTheme, applyWordCountBadgeVisibility, getResolvedTheme, updateMenu])
 
-  // The accent is changed in System Settings, so coming back to the window is when it
-  // may have moved.
-  useEffect(() => {
-    const onFocus = async () => {
-      const systemAccent = await readSystemAccent()
-      if (systemAccent) followSystemAccent(systemAccent)
-    }
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [followSystemAccent])
+  // Follow the OS when the theme is 'system', and keep the menu labels in step.
+  useEffect(() => watchSystemTheme(() => {
+    if (currentThemeRef.current !== 'system') return
+    setThemeAttribute('system')
+    updateMenu('system')
+  }), [updateMenu])
 
-  // Refresh menu labels when the OS theme flips while in 'system' mode.
-  useEffect(() => {
-    if (!window.matchMedia) return
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = () => {
-      if (currentThemeRef.current === 'system') {
-        setThemeAttribute('system')
-        updateMenu('system')
-      }
-    }
-
-    media.addEventListener?.('change', handler)
-    return () => media.removeEventListener?.('change', handler)
-  }, [updateMenu])
+  // App-level commands for the palette (⌘K). Features register their own where they live.
+  useCommands(() => [
+    { id: 'app.settings', section: 'App', title: 'Open settings', icon: 'settings', shortcut: '⌘,', keywords: ['preferences', 'options'], run: () => openSettings() },
+    { id: 'view.theme.light', section: 'View', title: 'Use light theme', icon: 'sun', keywords: ['paper', 'appearance', 'mode'], run: () => applyTheme('light') },
+    { id: 'view.theme.dark', section: 'View', title: 'Use dark theme', icon: 'moon', keywords: ['ink', 'appearance', 'mode', 'night'], run: () => applyTheme('dark') },
+    { id: 'view.theme.system', section: 'View', title: 'Match system theme', icon: 'settings', keywords: ['appearance', 'auto'], run: () => applyTheme('system') },
+    { id: 'view.accent', section: 'View', title: 'Change accent colour…', icon: 'palette', keywords: ['color', 'tint', 'highlight'], run: () => openSettings('general') },
+    { id: 'view.word-count', section: 'View', title: 'Show or hide word count', icon: 'gauge', keywords: ['words', 'stats', 'badge'], run: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current) },
+    { id: 'view.tab-bar', section: 'View', title: 'Show or hide tab bar', icon: 'sidebar', keywords: ['tabs'], run: () => setShowsTabBar(!showsTabBar()) },
+    { id: 'timer.stats', section: 'Writing', title: 'Show writing stats', icon: 'chart', keywords: ['words', 'goals', 'progress'], run: () => getStatsRuntime().showStats() },
+    { id: 'timer.routines', section: 'Writing', title: 'Edit timer routines…', icon: 'timer', keywords: ['pomodoro', 'sprint'], run: () => openSettings('timers') },
+    { id: 'print.layout', section: 'Print & export', title: 'Toggle print layout', icon: 'print', shortcut: '⌥⌘P', keywords: ['pages', 'preview', 'book', 'typeset'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
+    { id: 'print.page-setup', section: 'Print & export', title: 'Page setup…', icon: 'sliders', keywords: ['margins', 'trim', 'paper size'], run: () => dispatchAppEvent('inkblot:page-setup') },
+    { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', shortcut: '⌘P', run: () => dispatchAppEvent('inkblot:print', { scope: 'document' }) },
+    { id: 'print.book', section: 'Print & export', title: 'Print book…', icon: 'books', keywords: ['folder', 'manuscript'], run: () => dispatchAppEvent('inkblot:print', { scope: 'folder' }) },
+    ...EXPORT_FORMATS.map(([format, label]) => ({
+      id: `export.document.${format}`,
+      section: 'Print & export',
+      title: `Export as ${label}…`,
+      icon: 'export',
+      keywords: ['save as', 'download', format],
+      run: () => dispatchAppEvent('inkblot:export', { format, scope: 'document' }),
+    })),
+    { id: 'import.fountain', section: 'Document', title: 'Import Fountain script…', icon: 'download', keywords: ['screenplay', 'import'], run: () => dispatchAppEvent('inkblot:import-script') },
+    ...[['prose', 'prose'], ['screenplay', 'a screenplay'], ['stageplay', 'a stage play']].map(([format, label]) => ({
+      id: `document.write-as.${format}`,
+      section: 'Document',
+      title: `Write as ${label}`,
+      icon: format === 'prose' ? 'document' : 'story',
+      keywords: ['format', 'script', format],
+      run: () => dispatchAppEvent('inkblot:writing-format', { format }),
+    })),
+  ], [applyTheme, applyWordCountBadgeVisibility])
 
   // Escape exits fullscreen.
   useEffect(() => {
@@ -402,11 +390,10 @@ export default function App() {
   const appearance = {
     theme,
     onTheme: applyTheme,
-    accentColor,
-    onAccent: applyAccentColor,
+    accent,
+    onAccent: applyAccent,
     accentPresets: ACCENT_PRESETS,
     defaultAccent: DEFAULT_ACCENT,
-    systemAccent: hasSystemAccent,
     wordCount: showWordCountBadge,
     onWordCount: applyWordCountBadgeVisibility,
   }
@@ -416,6 +403,7 @@ export default function App() {
       <Editor showWordCountBadge={showWordCountBadge} />
       <SettingsSheet appearance={appearance} />
       <TimerCapsule />
+      <CommandPalette />
     </>
   )
 }

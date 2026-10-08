@@ -1,13 +1,28 @@
-/** The shared controls. Every new piece of chrome is built from these. */
+/**
+ * src/ui — Inkblot's component library. Every new piece of chrome is built from these;
+ * docs/DESIGN.md says when to use each, and ?design (dev only) shows them all.
+ */
+export { default as Icon } from './Icon.jsx'
+export { Mark, Wordmark, AppIcon } from './Brand.jsx'
+export { ICONS } from './icons.js'
 export { default as Button } from './Button.jsx'
 export { default as IconButton } from './IconButton.jsx'
+export { default as Tooltip } from './Tooltip.jsx'
+export { default as Kbd } from './Kbd.jsx'
 export { default as Segmented } from './Segmented.jsx'
 export { default as FloatingCapsule } from './FloatingCapsule.jsx'
+export { FloatingToolbar, ToolbarSeparator, FloatingActionButton } from './Floating.jsx'
 export { default as Sheet } from './Sheet.jsx'
+export { default as Dialog } from './Dialog.jsx'
 export { default as Popover } from './Popover.jsx'
 export { placePopover } from './placePopover.js'
+export { default as Menu, MenuItem, MenuLabel, MenuSeparator } from './Menu.jsx'
 export { default as Section } from './Section.jsx'
 export { SECTIONS_KEY, readSectionStates, writeSectionState } from './sectionState.js'
 export { FormRow, Toggle, Stepper, SelectMenu } from './FormRow.jsx'
+export { Field, Input, TextArea, Checkbox } from './Field.jsx'
+export { Panel, PanelHeader, PanelBody, FadeScrim, Card, Tag, EmptyState, Tabs } from './Surfaces.jsx'
+export { default as InkPicker } from './InkPicker.jsx'
+export { default as CommandPalette } from './CommandPalette.jsx'
 export { default as useNativeMenu, popUpNativeMenu } from './useNativeMenu.js'
 export { default as usePointerReorder, insertionIndex, moveTo } from './usePointerReorder.js'

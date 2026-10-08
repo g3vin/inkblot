@@ -13,7 +13,7 @@ import { createProject, getProjectRoot, linkProject, listProjects, moveProject }
 import { Button, Sheet } from '../ui'
 import { popUpNativeMenu } from '../ui/useNativeMenu.js'
 import SFIcon from './SFIcon'
-import logoUrl from '../assets/inkblot-logo.png'
+import { AppIcon, Wordmark } from '../ui/Brand.jsx'
 import './ProjectLanding.css'
 
 const DRAG_HEIGHT = 52
@@ -170,8 +170,8 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
     <div className="landing-page picker" onMouseDownCapture={onDragArea} data-tauri-drag-region>
       <div className="picker-column">
         <header className="picker-header">
-          <img className="picker-logo" src={logoUrl} alt="" width="98" height="98" />
-          <h1>Inkblot</h1>
+          <AppIcon className="picker-logo" size={98} label="" />
+          <h1 className="picker-wordmark"><Wordmark height={30} /></h1>
           {version ? <p>Version {version}</p> : null}
         </header>
 

@@ -12,8 +12,10 @@ import {
   collectNoteBranchIds,
   NOTE_COLOR_OPTIONS,
   compareNotes,
+  noteColor,
   touchNote,
 } from '../lib/noteUtils'
+import { resolveInkHex } from '../lib/palette'
 
 const getPopupPosition = (x, y) => ({
   left: Math.max(12, Math.min(x - 92, window.innerWidth - 204)),
@@ -321,17 +323,17 @@ export default function NotesPanel({
               <button
                 key={color}
                 className="note-color-swatch"
-                style={{ '--swatch-color': color }}
+                style={{ '--swatch-color': noteColor(color) }}
                 onClick={() => handleApplyColor(color)}
                 aria-label={`Use ${color} for note`}
-                title={color}
+                title={color[0].toUpperCase() + color.slice(1)}
               />
             ))}
             <label className="note-color-custom" title="Custom color">
               <span>Custom</span>
               <input
                 type="color"
-                defaultValue={activeColorValue}
+                defaultValue={resolveInkHex(activeColorValue)}
                 onChange={(event) => handleApplyColor(event.target.value)}
               />
             </label>
@@ -357,7 +359,7 @@ export default function NotesPanel({
           className={`note-drag-ghost${dragGhost.overCanvas ? ' is-over-canvas' : ''}`}
           style={{
             transform: `translate3d(${dragGhost.x + 12}px, ${dragGhost.y + 12}px, 0)`,
-            '--note-color': dragGhost.note?.color,
+            '--note-color': noteColor(dragGhost.note?.color),
           }}
         >
           {dragGhost.note?.anchor || dragGhost.note?.content || 'Note'}

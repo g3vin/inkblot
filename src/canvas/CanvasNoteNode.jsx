@@ -13,7 +13,7 @@
  * a whole note thread travels to the canvas as one card.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { touchNote, createFreeNote, collectNoteBranchIds } from '../lib/noteUtils'
+import { touchNote, createFreeNote, collectNoteBranchIds, noteColor } from '../lib/noteUtils'
 import { getDocDisplayName } from '../lib/docKind'
 import { useCanvasNotes } from './useCanvasNotes'
 import { filePathToDocPath } from './useDocPreview'
@@ -62,7 +62,7 @@ function NoteBody({ note, depth, projectName, onChange, onChangeAudio, onChangeI
   return (
     <div
       className="canvas-note-item"
-      style={{ '--note-depth': depth, '--note-color': note.color }}
+      style={{ '--note-depth': depth, '--note-color': noteColor(note.color) }}
     >
       {note.type === 'quote' && note.anchor ? (
         <blockquote className="canvas-note-anchor">{note.anchor}</blockquote>
@@ -207,7 +207,7 @@ export default function CanvasNoteNode({ node }) {
   const root = thread[0].note
 
   return (
-    <div className="canvas-note" style={{ '--note-color': root.color }}>
+    <div className="canvas-note" style={{ '--note-color': noteColor(root.color) }}>
       <div className="canvas-note-header">
         <span className="canvas-note-source">{getDocDisplayName(docPath)}</span>
         <span className="canvas-note-kind">{root.type === 'quote' ? 'note' : 'free note'}</span>

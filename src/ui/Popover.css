@@ -1,0 +1,25 @@
+/* The one pop-up surface: Popover, Menu, CommandPalette. */
+.ib-popover,
+.ib-menu {
+  z-index: var(--z-popover);
+  box-sizing: border-box;
+  border: var(--hairline) solid var(--menu-border);
+  border-radius: var(--menu-radius);
+  background: var(--menu-bg);
+  box-shadow: var(--menu-shadow);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  animation: ib-float-in var(--dur-fast) var(--ease-out);
+}
+
+.ib-popover {
+  padding: var(--space-4);
+  min-width: 200px;
+  max-width: min(360px, calc(100vw - 16px));
+}
+
+@keyframes ib-float-in {
+  from { opacity: 0; transform: translateY(-2px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}

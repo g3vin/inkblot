@@ -20,7 +20,7 @@ import { readSelectionAnchor } from './anchors'
 export const TOOLBAR_DEFAULTS = {
   color: '#000000',
   highlight: '#ffff00',
-  font: 'Georgia',
+  font: 'Literata',
   fontSize: '18px',
 } as const
 
