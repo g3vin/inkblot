@@ -2,8 +2,7 @@
  * fileTreeState.js — per-project tree order and expansion, persisted locally.
  *
  * Stored in the app's preferences rather than in the project, so it does not travel with a
- * project and is invisible to anything outside this webview. Worth remembering:
- * a native shell cannot read any of this.
+ * project.
  */
 import { getPreference, setPreference, renamePreferencePrefix } from './preferences'
 const ORDER_PREFIX = 'inkblot-order:'

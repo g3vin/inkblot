@@ -51,17 +51,18 @@ tauri-build = { version = "2.5.4", features = [] }
 serde_json = { workspace = true }
 inkblot-core = { path = "crates/inkblot-core" }
 # The synonym model, Kokoro, whisper dictation and the scrape channel. The
-# `*_commands.rs` modules are the Tauri glue over it; inkblot-ffi is the Swift glue.
+# `*_commands.rs` modules are the Tauri glue over it.
 inkblot-models = { path = "crates/inkblot-models", features = ["metal"] }
 url = { workspace = true }
 # reference_commands.rs: fetching a source's page for the References panel.
 serde = { workspace = true }
 reqwest = { workspace = true }
 
-tauri = { version = "2.10.0", features = ["protocol-asset"] }
+tauri = { version = "2.10.0", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-fs = "2.4.5"
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
 
 # NSHapticFeedbackManager. WKWebView exposes no haptics API, so the trackpad can
 # only be driven from native code.

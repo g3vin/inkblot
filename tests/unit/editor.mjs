@@ -75,6 +75,7 @@ function Harness() {
   const [splitView, setSplitView] = useState(null)
   const [activeDoc, setActiveDoc] = useState('one')
   const [notesByDoc, setNotesByDoc] = useState({})
+  control.currentDoc = currentDoc
 
   const setNotesForDoc = useCallback((docName, notes) => {
     setNotesByDoc((current) => ({ ...current, [docName]: notes }))
@@ -133,7 +134,15 @@ await act(async () => {
 })
 await settle()
 
-const paneText = () => document.querySelector('.primary-pane .editor')?.textContent || ''
+// The document's text as the pane shows it — less a chapter's designed head, which
+// Typeset draws around the text as decorations and is not part of it.
+const paneText = () => {
+  const editor = document.querySelector('.primary-pane .editor')
+  if (!editor) return ''
+  const copy = editor.cloneNode(true)
+  copy.querySelectorAll('.chapter-head').forEach((el) => el.remove())
+  return copy.textContent || ''
+}
 const wordCount = () => document.querySelector('.primary-pane .word-count')?.textContent || ''
 
 /* ---------------- It mounts at all ---------------- */
@@ -242,13 +251,6 @@ await settle()
 // A quote note holds ProseMirror positions, and every edit invalidates them. The
 // remap runs on each transaction; if it stops, notes drift onto the wrong words
 // with no error anywhere.
-//
-// The shell holds those positions too, so each remap is also
-// published on the bridge. Listening here rather than in bridge.mjs is the point:
-// that suite proves the protocol works, this one proves the app is actually wired to
-// it — a publish call deleted from useEditorNotes would pass every test there.
-const remaps = []
-shellBridge.on('notesRemapped', (payload) => remaps.push(payload))
 const text = control.editor.getText()
 const quoteStart = text.indexOf('first') + 1
 await act(async () => {
@@ -281,14 +283,6 @@ await act(async () => {
 await settle()
 ok('a note whose range is deleted is dropped', (control.notesByDoc.one || []).length === 0)
 
-// The bridge half of the same two edits.
-ok('a remap is published to the shell, not just to React state', remaps.length > 0)
-ok('and it names the document it was about',
-  remaps.every((remap) => remap.docPath === 'one'))
-ok('the shifted note reached the shell with its new positions',
-  remaps.some((remap) => remap.notes.some((note) => note.from === quoteStart + 7)))
-ok('and a note that lost its text is reported as dropped, not merely absent',
-  remaps.some((remap) => remap.droppedNoteIds.includes('q1')))
 
 /* ---------------- Split view ---------------- */
 
@@ -339,6 +333,9 @@ ok('…with the live editor inside the page stage', !!document.querySelector('.p
 ok('…the same editor instance, with the same text', control.editor === editorBefore && paneText() === textBefore)
 ok('…a page count beside the word count', /Page 1 of \d+/.test(document.querySelector('.primary-pane .pane-status .pl-page-count-badge')?.textContent || ''))
 ok('…and a zoom bar', !!document.querySelector('.primary-pane .pl-status'))
+ok('in Typeset, a chapter of a book is shown among the book\'s pages', !!document.querySelector('.primary-pane .book-pages .book-pages-live .pl-stage'))
+ok('…opening with its designed head, drawn around its live text', !!document.querySelector('.primary-pane .pl-flow .ProseMirror > .chapter-head.is-live-top') &&
+  !!document.querySelector('.primary-pane .pl-flow .ProseMirror .chapter-head.is-live-bottom'))
 
 await act(async () => {
   control.editor.commands.setPageSetup(bookPageSetup('trade-6x9'))
@@ -361,6 +358,24 @@ ok('the page setup is saved with the document', withSetup?.content?.attrs?.pageS
 await act(async () => { control.setCurrentDoc('one') })
 await settle()
 ok('…and is back when the document is reopened', readDocPageSetup(control.editor.state.doc)?.mirrorMargins === true)
+
+/* ---------------- A folder read as one document ---------------- */
+
+await act(async () => { printStore.setBookSettings(P, '', { ...printStore.getBookSettings(P, ''), continuous: true }) })
+await settle()
+await settle()
+const neighbours = () => [...document.querySelectorAll('.primary-pane .continuous-stack .continuous-doc')]
+ok('a folder read as one shows its next document below the one open',
+  neighbours().some((s) => s.dataset.path === 'two') && !!document.querySelector('.primary-pane .continuous-live .ProseMirror'))
+ok('…drawn from what it says', neighbours().find((s) => s.dataset.path === 'two')?.textContent.includes('the second chapter'))
+await act(async () => { neighbours().find((s) => s.dataset.path === 'two').dispatchEvent(new window.MouseEvent('click', { bubbles: true })) })
+await settle()
+ok('clicking into it opens it, the one left drawn above',
+  control.currentDoc === 'two' && neighbours().some((s) => s.dataset.path === 'one'))
+await act(async () => { control.setCurrentDoc('one') })
+await act(async () => { printStore.setBookSettings(P, '', { ...printStore.getBookSettings(P, ''), continuous: false }) })
+await settle()
+ok('read as separate documents again, there are no neighbours', !document.querySelector('.primary-pane .continuous-stack'))
 
 /* ---------------- Unmount ---------------- */
 

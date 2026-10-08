@@ -2,9 +2,8 @@
  * panelBuilder.js — the map inspector described as a form rather than drawn.
  *
  * The inspector is built once, as data (`MapPanel` in `bridge/map.rs`): sections of
- * typed fields, each named by an id. Two things draw it — `MapPanelView.jsx` here,
- * and the Swift app's inspector, natively — and both send an edit back the same way,
- * by id. The closures that do the edits never leave the page: the builder files each
+ * typed fields, each named by an id. `MapPanelView.jsx` draws it — floating on the
+ * map, or in the inspector's Map tab — and sends each edit back by id. The closures that do the edits never leave the page: the builder files each
  * one under its field's id in `handlers`, and `runPanelCommand` finds it there.
  *
  * Every field comes out as `{ type, payload }`, the protocol's own shape, so a built

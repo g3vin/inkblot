@@ -1,8 +1,7 @@
 /**
  * dictationSource.ts — the speech engine's side of the dictation protocol.
  *
- * The speech engine emits `dictation://*` events (the Tauri app's commands, or the
- * Swift shell's `ModelService`, which emits the same events through the shim). This
+ * The speech engine emits `dictation://*` events (the Tauri app's commands). This
  * turns them into the protocol's `dictationPartial` / `dictationFinal` /
  * `dictationLevel` / `dictationCancel` commands — the same messages a shell that owned
  * the microphone itself would send — so `DictationControl` only ever sees the protocol.

@@ -25,6 +25,8 @@ import {
 } from './pageSetup'
 import { getPageSizePreset } from './pageSizes'
 import { applyTypography } from './typography'
+import { buildFootnoteArea } from './footnoteArea'
+import { notesBySlot } from './notes'
 
 /** Editing chrome that must never reach paper. */
 const STRIP_SELECTORS = [
@@ -134,17 +136,40 @@ const renderWindow = (snapshot, from, to, bleed) => {
 
 /**
  * Pages for a set of laid-out sources (one per chapter). Returns page elements at
- * the page size, with continuous numbering, and blank versos wherever a chapter
- * must open on a recto.
+ * the page size, with continuous numbering, and blank pages wherever a source must
+ * open on a recto (or a verso).
  *
- * source: { snapshot, result, setup, stride, title, chapterTitleAt(pos) }
+ * source: { snapshot, result, setup, stride, title, chapterTitleAt(pos) }, and, for a
+ *   book's section, how it sits:
+ *     startOn       'any' | 'recto' | 'verso' — absent, the setup's chapter rule
+ *     runningHeads  false: no header on its pages
+ *     folio         false: no footer (where the folio is) either
+ *     position      'top' | 'sunk' | 'centered' | 'bottom' — a one-page section's place
+ *                   down its page, as a dedication sits a third of the way down
+ *   or a page the book lays out itself: { fixed(physical) → page elements }.
  * `onChapterStart(index, folio)` is told the folio each source's first page carries,
- * for a table of contents.
+ * for a table of contents. `firstPhysical` is the first page's place in the whole
+ * print (which side it is on); `numberStart` and `numberFormat` number the pages —
+ * front matter in roman, from one, before a body in arabic.
  */
-export const renderPages = (sources, { bookTitle = '', author = '', surname, words = 0, onChapterStart } = {}) => {
+export const renderPages = (sources, {
+  bookTitle = '',
+  author = '',
+  surname,
+  words = 0,
+  onChapterStart,
+  firstPhysical = 1,
+  numberStart,
+  numberFormat,
+  // The bleed round each page, px, when the print has pictures to the edge.
+  bleedPx = 0,
+} = {}) => {
   const pages = []
   if (!sources.length) return pages
-  const setup = normalizePageSetup(sources[0].setup)
+  const setup = normalizePageSetup(sources.find((s) => s.setup)?.setup)
+  const folioStart = Number.isFinite(numberStart) ? numberStart : setup.pageNumberStart
+  const folioFormat = numberFormat || setup.pageNumberFormat
+  const facing = Boolean(setup.mirrorMargins)
   const m = pageMetrics(setup)
   // The window onto the flow reaches a little past the text block, so an italic's
   // overhang or a descender is not shaved off. Half the margin is always safe: the
@@ -153,7 +178,8 @@ export const renderPages = (sources, { bookTitle = '', author = '', surname, wor
   const bleedX = setup.columns > 1
     ? m.columnGap / 2
     : Math.min(24, pageLeftMargin(setup, 1) / 2, pageLeftMargin(setup, 2) / 2)
-  const totalPages = sources.reduce((n, s) => n + Math.max(1, s.result?.pageCount || 1), 0)
+  const totalPages = sources.reduce((n, s) => n + (s.fixed ? 1 : Math.max(1, s.result?.pageCount || 1)), 0)
+  const physicalOf = (index) => firstPhysical + index
 
   const blankPage = () => {
     const page = document.createElement('div')
@@ -165,14 +191,40 @@ export const renderPages = (sources, { bookTitle = '', author = '', surname, wor
   const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
 
   sources.forEach((source, chapterIndex) => {
+    // A section that must open on one side, on a book with two: a blank page first
+    // when the next is the other side. Absent a rule of its own, a chapter after the
+    // first opens on a recto when the setup says chapters do.
+    const startOn = source.startOn || (chapterIndex > 0 && setup.chapterStartsOnRecto ? 'recto' : 'any')
+    const nextIsRecto = physicalOf(pages.length) % 2 === 1
+    if ((facing || setup.chapterStartsOnRecto) && ((startOn === 'recto' && !nextIsRecto) || (startOn === 'verso' && nextIsRecto))) {
+      pages.push(blankPage())
+    }
+    if (source.fixed) {
+      const fixed = source.fixed(physicalOf(pages.length))
+      fixed.forEach((page, i) => {
+        if (i === 0) onChapterStart?.(chapterIndex, '')
+        if (source.itemId) page.dataset.item = source.itemId
+        pages.push(page)
+      })
+      return
+    }
+
     const { snapshot, result, stride } = source
     const columns = setup.columns
+    const noteSlots = notesBySlot(source.notes || [], result.slotStarts)
+    const bleedSlots = notesBySlot(source.bleeds || [], result.slotStarts)
     const chapterStarts = new Set(result.chapterStartSlots)
-    // A chapter after the first starts on a new page — on a recto, if asked.
-    if (chapterIndex > 0 && setup.chapterStartsOnRecto && pages.length % 2 === 1) pages.push(blankPage())
+    // A one-page section set down its page: how far, from what it fills.
+    let shift = 0
+    if (source.position && source.position !== 'top' && result.pageCount <= 1) {
+      const used = snapshot.blocks.reduce((max, b) => Math.max(max, b.top + b.height), m.contentTop) - m.contentTop
+      const room = Math.max(0, m.contentHeight - used)
+      const sink = mmToPx(setup.typography?.chapterSinkMm ?? 0) || m.contentHeight / 3
+      shift = source.position === 'bottom' ? room : source.position === 'centered' ? room / 2 : Math.min(room, sink)
+    }
 
     for (let p = 0; p < Math.max(1, result.pageCount); p += 1) {
-      const physical = pages.length + 1
+      const physical = physicalOf(pages.length)
       const firstSlot = p * columns
       const slots = result.slotStarts.slice(firstSlot, firstSlot + columns)
       const blank = p > 0 && slots.every((s) => s == null)
@@ -181,6 +233,7 @@ export const renderPages = (sources, { bookTitle = '', author = '', surname, wor
       Object.assign(page.style, { width: `${m.width}px`, height: `${m.height}px` })
       // The type the flow was laid out in, so the cloned lines are set as they were.
       applyTypography(page, setup.typography)
+      page.style.setProperty('--pl-content-h', `${m.contentHeight}px`)
 
       const left = pageLeftMargin(setup, physical)
       for (let c = 0; c < columns && !blank; c += 1) {
@@ -198,14 +251,45 @@ export const renderPages = (sources, { bookTitle = '', author = '', surname, wor
         })
         const win = renderWindow(snapshot, from - bleedY, from + m.contentHeight + bleedY, 0)
         win.style.left = `${bleedX}px`
+        if (shift) win.style.top = `${shift}px`
         clip.appendChild(win)
         page.appendChild(clip)
       }
 
+      // A picture to the edge: over the whole page, and into the bleed past its trim.
+      const bleed = !blank && bleedSlots.get(firstSlot)?.[0]
+      if (bleed) {
+        const img = document.createElement('img')
+        img.className = 'print-bleed-picture'
+        img.src = bleed.src
+        img.alt = ''
+        Object.assign(img.style, {
+          left: `${physical % 2 === 0 ? -bleedPx : 0}px`,
+          top: `${-bleedPx}px`,
+          width: `${m.width + bleedPx}px`,
+          height: `${m.height + bleedPx * 2}px`,
+        })
+        page.appendChild(img)
+        page.dataset.bleed = 'true'
+      }
+
+      // The notes whose marks this page holds, at its foot.
+      const pageNotes = []
+      for (let c = 0; c < columns && !blank; c += 1) pageNotes.push(...(noteSlots.get(firstSlot + c) || []))
+      if (pageNotes.length) {
+        const area = buildFootnoteArea(pageNotes)
+        Object.assign(area.style, {
+          left: `${left}px`,
+          width: `${columns > 1 ? m.columnWidth : m.contentWidth}px`,
+          bottom: `${m.height - m.contentTop - m.contentHeight}px`,
+        })
+        page.appendChild(area)
+      }
+
       const startPos = slots.find((s) => s != null) ?? 0
       const ctx = {
-        page: setup.pageNumberStart + physical - 1,
-        pages: setup.pageNumberStart + totalPages - 1,
+        page: folioStart + pages.length,
+        pages: folioStart + totalPages - 1,
         title: bookTitle || source.title,
         chapter: source.chapterTitleAt?.(startPos) || source.title,
         author,
@@ -214,8 +298,9 @@ export const renderPages = (sources, { bookTitle = '', author = '', surname, wor
         date,
       }
       const flags = { chapterFirstPage: chapterStarts.has(firstSlot), blank }
-      const header = runningTextFor(setup, 'header', physical, ctx, flags)
-      const footer = runningTextFor(setup, 'footer', physical, ctx, flags)
+      const pageSetup = numberFormat ? { ...setup, pageNumberFormat: folioFormat } : setup
+      const header = source.runningHeads === false ? null : runningTextFor(pageSetup, 'header', physical, ctx, flags)
+      const footer = source.folio === false && source.runningHeads === false ? null : runningTextFor(pageSetup, 'footer', physical, ctx, flags)
       if (header) {
         page.appendChild(makeRunning(header, 'is-header', {
           left: `${left}px`, width: `${m.contentWidth}px`, top: `${m.headerTop}px`, height: `${Math.max(0, m.contentTop - m.headerTop)}px`,
@@ -226,12 +311,14 @@ export const renderPages = (sources, { bookTitle = '', author = '', surname, wor
           left: `${left}px`, width: `${m.contentWidth}px`, top: `${m.contentTop + m.contentHeight}px`, height: `${Math.max(0, m.footerBottom - m.contentTop - m.contentHeight)}px`,
         }))
       }
-      page.dataset.folio = formatPageNumber(ctx.page, setup.pageNumberFormat)
+      page.dataset.folio = formatPageNumber(ctx.page, folioFormat)
       // For narrowing a print afterwards: the printed number, and where in its
       // chapter the page starts.
       page.dataset.page = String(ctx.page)
       page.dataset.chapter = String(chapterIndex)
       page.dataset.pos = String(startPos)
+      // Which entry of the book the page is of, for the Typeset view to open it.
+      if (source.itemId) page.dataset.item = source.itemId
       if (p === 0) onChapterStart?.(chapterIndex, page.dataset.folio)
       pages.push(page)
     }

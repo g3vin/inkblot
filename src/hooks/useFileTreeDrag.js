@@ -10,7 +10,8 @@ import { useCallback, useEffect } from 'react'
 import { moveEntry } from '../lib/entryOperations'
 import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
 import { dispatchMapDropDoc, mapSurfaceAt } from '../map/mapEvents'
-import { getParentPath, remapOrderForFolder } from '../lib/fileTreeOrder'
+import { getParentPath, moveInOrder, remapOrderForFolder } from '../lib/fileTreeOrder'
+import { shellBridge } from '../bridge'
 
 export function useFileTreeDrag({
   dragInsert,
@@ -34,28 +35,7 @@ export function useFileTreeDrag({
 
   const moveOrderItem = useCallback((itemId, fromFolder, toFolder, targetIndex) => {
     updateOrder(orderState => {
-      const fromKey = fromFolder || ''
-      const toKey = toFolder || ''
-
-      const fromList = [...(orderState[fromKey] || [])]
-      const fromIndex = fromList.indexOf(itemId)
-      const filtered = fromList.filter(id => id !== itemId)
-      orderState[fromKey] = filtered
-
-      const toList = [...(orderState[toKey] || [])].filter(id => id !== itemId)
-      let requestedIndex = typeof targetIndex === 'number'
-        ? targetIndex
-        : toList.length
-
-      if (fromKey === toKey && typeof targetIndex === 'number' && fromIndex !== -1 && fromIndex < targetIndex) {
-        requestedIndex -= 1
-      }
-
-      const insertIndex = Math.max(0, Math.min(requestedIndex, toList.length))
-
-      toList.splice(insertIndex, 0, itemId)
-      orderState[toKey] = toList
-
+      moveInOrder(orderState, itemId, fromFolder, toFolder, targetIndex)
       return orderState
     })
   }, [updateOrder])
@@ -234,6 +214,11 @@ export function useFileTreeDrag({
       // Canvases are droppable too (they render as a minimap and open on
       // double-click); the surface itself refuses a canvas dropped onto ITSELF.
       if (point && drag.type === 'file') {
+        // Onto the tab bar: the document in a tab of its own.
+        if (document.elementFromPoint(point.x, point.y)?.closest('.document-tab-bar')) {
+          shellBridge.send('openDocInTab', { docPath: drag.path })
+          return
+        }
         const surface = canvasSurfaceAt(point.x, point.y)
         if (surface) {
           dispatchCanvasDropDoc(surface, {

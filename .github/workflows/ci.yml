@@ -33,8 +33,7 @@ jobs:
 
   rust:
     name: Rust (build, tests, parity, generated types)
-    # macOS: the crates link CoreText, Metal and Accelerate, and the Swift half of
-    # `types:check` needs swiftc.
+    # macOS: the crates link CoreText, Metal and Accelerate.
     runs-on: macos-latest
     timeout-minutes: 60
     steps:

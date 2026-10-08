@@ -1,9 +1,8 @@
 /**
  * printJobStatus.js — where a print or export has got to, for whoever shows it.
  *
- * Every status goes to the shell as a `printJobStatus` event — the Swift Finishing tabs
- * show it under Print and Export — and as an `inkblot:print-job` window event, for the
- * page's own chrome under Tauri. A job's statuses share its id; the last is `done`,
+ * Every status goes out as a `printJobStatus` event — the Print & Export tab shows it —
+ * and as an `inkblot:print-job` window event, for the Page Setup sheet. A job's statuses share its id; the last is `done`,
  * `failed` or `cancelled`, and a failure says what went wrong rather than only
  * reaching the console.
  */

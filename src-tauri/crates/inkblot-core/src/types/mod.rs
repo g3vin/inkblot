@@ -1,6 +1,6 @@
-//! The domain types, defined once here and generated into TypeScript and Swift by
-//! `typeshare` (see `scripts/generate-types.sh`). Nothing hand-writes the generated
-//! files — they are the mechanism that stops three languages drifting apart.
+//! The domain types, defined once here and generated into TypeScript by `typeshare`
+//! (see `scripts/generate-types.sh`). Nothing hand-writes the generated file — it is
+//! the mechanism that stops the two languages drifting apart.
 //!
 //! | Module | Types |
 //! |---|---|
@@ -56,8 +56,10 @@ pub use note::{
     NOTE_COLOR_OPTIONS,
 };
 pub use page_setup::{
-    AuthorProfile, BackMatter, BindingSettings, BindingType, BookSettings, ChapterNumberStyle,
-    ChapterNumbering, ChapterOpening, DuplexMode, FrontMatter,
+    AuthorProfile, BackMatter, ChapterMeta, ImageAlign, ImageTypesetting, BindingSettings, BindingType, BookItem, BookItemKind, BookSettings,
+    ChapterBreak, ChapterDesign, ChapterNumberStyle, ChapterNumbering, ChapterOpening, ChapterType,
+    CoverFit, CoverPart, CoverSet, Composition, DigitalOptions, OpenTypeFeatures, TextStyleAlign, TextStyleLook, NotePlacement, NoteNumbering, NoteMarks, NotesOptions, Edition, EditionKind, DuplexMode, FrontMatter, GeneratedKind, HeadAlignment, HeadCase,
+    MatterKind, OrnamentKind, OrnamentPosition, PageOptions, PagePosition, PageStart,
     LineSpacing, PageMargins, PageNumberFormat, PageOrientation, PageSetup, PaperStock, PrintAlignment, PublishingService,
     PublishingTarget,
     PrintTypography, RunningText, SheetFit, TitlePageOptions, TitlePageStyle,

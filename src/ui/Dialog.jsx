@@ -1,9 +1,11 @@
 /**
- * Dialog.jsx — a modal: Dialog (centred) and Sheet (slides from the right edge).
+ * Dialog.jsx — a centred modal for a decision or a small setting, with an eyebrow,
+ * title, description and close button. (Sheet.jsx is the plainer modal the settings
+ * and customize screens use.)
  *
  *   <Dialog open onClose={close} eyebrow="Appearance" title="Accent colour"
  *     description="Tints selections, focus rings and primary buttons."
- *     footer={<Button variant="primary" onClick={close}>Done</Button>}>
+ *     footer={<Button variant="filled" onClick={close}>Done</Button>}>
  *     …
  *   </Dialog>
  *
@@ -60,7 +62,7 @@ function Modal({ open, onClose, variant, eyebrow, title, description, footer, wi
               {title ? <h2 id={titleId} className="ib-title">{title}</h2> : null}
               {description ? <p id={descId} className="ib-dialog-description">{description}</p> : null}
             </div>
-            <IconButton icon="close" label="Close" size="sm" onClick={onClose} />
+            <IconButton icon="close" label="Close" size="circle" onClick={onClose} />
           </header>
         )}
         <div className="ib-dialog-body">{children}</div>
@@ -73,8 +75,4 @@ function Modal({ open, onClose, variant, eyebrow, title, description, footer, wi
 
 export default function Dialog(props) {
   return <Modal {...props} variant="center" />
-}
-
-export function Sheet(props) {
-  return <Modal {...props} variant="sheet" />
 }

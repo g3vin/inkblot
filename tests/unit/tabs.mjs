@@ -1,12 +1,12 @@
 /**
- * Document tabs and split view: the tab operations, and tabs shown by the shell.
+ * Document tabs and split view: the tab operations, and the tabs as the tab bar reads them.
  *
  * A tab owns its split. The operations are pure (`editorSession.ts`) and checked
  * directly, because what selecting or closing a tab leaves in each pane is invisible
  * when subtly wrong until the wrong document is being written in. Then the real
- * `useTabs` and `useNativeTabs` are mounted and driven through the app's bridge
+ * `useTabs` and `useTabsPublisher` are mounted and driven through the app's bridge
  * (`shellBridge` → `documentSurface`), so every command and the published state cross
- * the JSON-copying transport the Swift shell is on.
+ * the JSON-copying transport the tab bar is on.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -25,7 +25,7 @@ const {
   closeTabIn, ensureTabsForOpenDocs, normalizeTabs, orderTabsIn, recordSplitIn, selectTabIn,
 } = await import('../../src/lib/editorSession.ts')
 const { useTabs } = await import('../../src/hooks/useTabs.js')
-const { useNativeTabs } = await import('../../src/hooks/useNativeTabs.js')
+const { useTabsPublisher } = await import('../../src/hooks/useTabsPublisher.js')
 const { shellBridge } = await import('../../src/bridge/index.ts')
 
 import { ok } from './assert.mjs'
@@ -100,7 +100,7 @@ ok('no tab, nothing recorded', recordSplitIn(tabs, null, { secondaryDoc: 'Z', sp
 /* ---------------- order ---------------- */
 
 const order = (list) => list.map((t) => t.id).join('')
-ok('the shell\'s order is taken', order(orderTabsIn(tabs, ['c', 'a', 'b'])) === 'cab')
+ok('the tab bar\'s order is taken', order(orderTabsIn(tabs, ['c', 'a', 'b'])) === 'cab')
 ok('tabs it does not name keep their order after', order(orderTabsIn(tabs, ['c'])) === 'cab')
 ok('ids of tabs that are gone are ignored', order(orderTabsIn(tabs, ['zz', 'b'])) === 'bac')
 ok('the same order returns the same list', orderTabsIn(tabs, ['a', 'b', 'c']) === tabs)
@@ -119,7 +119,7 @@ ok('a bad orientation is dropped', restored[2].secondaryDoc === null && !('split
 ok('the split\'s document gets no tab of its own',
   ensureTabsForOpenDocs([tab('a', 'A')], { currentDoc: 'A', secondaryDoc: 'N', activeTabId: 'a' }).length === 1)
 
-/* ---------------- the shell's tabs, over the bridge ---------------- */
+/* ---------------- the tabs, over the bridge ---------------- */
 
 const heard = []
 shellBridge.on('tabsChanged', (payload) => heard.push(payload))
@@ -151,7 +151,7 @@ function Harness() {
     setActiveDoc, setActiveTabId, setCurrentDoc, setSecondaryDoc,
     setSplitOrientation, setSplitRatioState, setSplitView, setTabs, tabs,
   })
-  useNativeTabs({ enabled: true, projectName: 'P', tabs, activeTabId, actions: { ...actions } })
+  useTabsPublisher({ projectName: 'P', tabs, activeTabId, actions: { ...actions } })
   return null
 }
 

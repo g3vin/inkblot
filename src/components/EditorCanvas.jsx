@@ -30,7 +30,6 @@ import { useSurfacePublisher } from '../bridge/useSurfacePublisher'
 import { buildEditorExtensions } from '../lib/editorExtensions'
 import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
-import { nativeOwns } from '../lib/host'
 import CanvasPane from '../canvas/CanvasPane'
 import MapPane from '../map/MapPane'
 import { useEditorAutosave } from '../hooks/useEditorAutosave'
@@ -43,6 +42,8 @@ import DraftTabPane from './DraftTabPane'
 import FocusModeOverlay from './FocusModeOverlay'
 import VersionComparePane from './VersionComparePane'
 import SFIcon from './SFIcon'
+import DocumentTabBar from './tabs/DocumentTabBar'
+import { useShowsTabBar } from './tabs/tabBarState'
 import PaneEditorSurface from '../print/PaneEditorSurface'
 
 const EMPTY_NOTES = []
@@ -85,6 +86,7 @@ export default function EditorCanvas({
   const secondaryPaneRef = useRef(null)
   const splitContainerRef = useRef(null)
   const [isResizingSplit, setIsResizingSplit] = useState(false)
+  const tabBarShown = useShowsTabBar()
   const [dragCaret, setDragCaret] = useState(null)
   // The pane's live view of notesByDoc. The hooks below run from editor events and
   // debounced timers, so they must read the notes as they are when the save fires,
@@ -605,7 +607,7 @@ export default function EditorCanvas({
   const showDraftPane = draftTabActive && !currentDoc
   // A split pane names its document above it, with a × to close it — unless the shell
   // draws the tabs, whose split tab names both documents, the first pane's first.
-  const paneHeaders = splitView === 'editor' && !nativeOwns('tabBar')
+  const paneHeaders = splitView === 'editor' && !tabBarShown
   const primaryPaneOwnsFocus = primaryIsStructured || showDraftPane
 
   // The divider is a track in the split grid, so the two panes are sized by the
@@ -656,6 +658,7 @@ export default function EditorCanvas({
 
   return (
     <div className="middle-section">
+      <DocumentTabBar activeDoc={currentDoc} />
       <div ref={splitContainerRef} className={`editor-container${splitClassName}`} style={splitStyle}>
 
         <div
@@ -721,6 +724,7 @@ export default function EditorCanvas({
               editor={liveEditor}
               projectName={projectName}
               docPath={currentDoc}
+              onOpenDoc={(path) => openDocFromCanvas('primary', path)}
               header={paneHeaders ? (
                 <div className="pane-header pane-header-centered">
                   <span>{currentDoc}</span>
@@ -731,7 +735,7 @@ export default function EditorCanvas({
           )}
           {!primaryIsStructured && !showDraftPane ? (
             <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName}>
-              {showWordCountBadge ? <div className="word-count">{formatWordStats(primaryWordStats)}</div> : null}
+              {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(primaryWordStats)}</div> : null}
             </div>
           ) : null}
         </div>
@@ -802,6 +806,7 @@ export default function EditorCanvas({
                 editor={liveSecondaryEditor}
                 projectName={projectName}
                 docPath={secondaryDoc}
+                onOpenDoc={(path) => openDocFromCanvas('secondary', path)}
                 header={paneHeaders ? (
                   <div className="pane-header split-header pane-header-centered">
                     <span>{secondaryDoc}</span>
@@ -812,7 +817,7 @@ export default function EditorCanvas({
             )}
             {!secondaryIsStructured ? (
               <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName}>
-                {showWordCountBadge ? <div className="word-count">{formatWordStats(secondaryWordStats)}</div> : null}
+                {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}
               </div>
             ) : null}
           </div>

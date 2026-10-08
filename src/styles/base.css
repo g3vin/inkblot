@@ -90,6 +90,32 @@ a:focus-visible {
   }
 }
 
+/*
+ * A floating capsule over the page (the tab bar, word count, zoom, the bubble editor's
+ * bars, floating toolbars and action buttons): paper with the float shadow. On
+ * iOS/iPadOS — and only there — it becomes Liquid Glass (src/ui/platform.js).
+ */
+.floating-capsule {
+  background: var(--floating-over-page-bg);
+  border: var(--hairline) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+:root[data-platform='ios'] .floating-capsule {
+  background: var(--glass-fill);
+  border-color: var(--glass-rim);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
+}
+
+/* The veil behind a sheet or the bubble editor. */
+.scrim {
+  background: var(--scrim-bg);
+}
+
 /* ==== pop-up surfaces ====
  *
  * Every floating menu, popover and picker shares one chrome (--menu-* in tokens.css).

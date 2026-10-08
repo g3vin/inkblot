@@ -20,7 +20,8 @@ import './Editor.css'
 
 import ProjectLanding from './ProjectLanding'
 import { useTabs } from '../hooks/useTabs'
-import { useNativeTabs } from '../hooks/useNativeTabs'
+import { useTabsPublisher } from '../hooks/useTabsPublisher'
+import useTabShortcuts from './tabs/useTabShortcuts.js'
 import { useEntryOperations } from '../hooks/useEntryOperations'
 import { useClipboardHistory } from '../hooks/useClipboardHistory'
 import {
@@ -36,8 +37,6 @@ import { setPreference, setSessionValue } from '../lib/preferences'
 import { setOpenProject, clearOpenProject } from '../lib/projectContext'
 import { dragHandoff, documentSurface, DragPayloadKind } from '../bridge'
 import { getProjectRoot } from '../lib/projectPaths'
-import { nativeOwns } from '../lib/host'
-import { rememberEndedSelectionDrag } from '../bridge/recentSelectionDrag'
 
 /** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
@@ -197,9 +196,9 @@ export default function Editor({
     tabs,
   })
 
-  // The tabs, when the shell shows them as windows.
-  useNativeTabs({
-    enabled: nativeOwns('tabBar'),
+  // The tabs, published for the tab bar, and their shortcuts.
+  useTabShortcuts()
+  useTabsPublisher({
     projectName,
     tabs,
     activeTabId,
@@ -214,7 +213,7 @@ export default function Editor({
     },
   })
 
-  // Rename, move, delete and duplicate — from the tree, a menu, or the native shell —
+  // Rename, move, delete and duplicate — from the tree, a menu, or a command —
   // without the pane's final autosave recreating the old path. See useEntryOperations.
   useEntryOperations({
     projectName,
@@ -526,10 +525,6 @@ export default function Editor({
         return
       }
 
-      // Under the Swift shell the clipboard panel is native, and its drop arrives as a
-      // bridge command after this dragend has let go. Hold the selection for it.
-      if (nativeOwns('rightSidebar')) rememberEndedSelectionDrag(draggedSelection)
-
       try {
         window.dispatchEvent(new CustomEvent('inkblot:editor-selection-dragend', {
           detail: {
@@ -664,8 +659,6 @@ export default function Editor({
   }, [activeEditor, editor, secondaryEditor])
 
   if (!projectName) {
-    // Under the Swift shell the picker is a window of its own (`ProjectPicker.swift`).
-    if (nativeOwns('projectPicker')) return null
     return (
       <ProjectLanding
         projectSessions={projectSessions}

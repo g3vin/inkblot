@@ -2,7 +2,7 @@
 //!
 //! `map::model` normalizes on `serde_json::Value` so that every key it does not model
 //! survives a round-trip; these types describe the keys it *does* model, for the
-//! TypeScript and Swift that read a map. Every item also carries unknown keys, which
+//! TypeScript that reads a map. Every item also carries unknown keys, which
 //! typeshare cannot express — the hand-written `Stored*` façade in
 //! `src/types/index.ts` adds the index signature, as it does for canvas nodes.
 //!

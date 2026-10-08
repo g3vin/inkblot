@@ -21,6 +21,9 @@ import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import SFIcon from './SFIcon'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
+import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
+import { noteOpened, recentDocs } from '../lib/recentDocs'
+import TreeFilterBar from './tree/TreeFilterBar'
 import {
   STORY_FOLDER_PRESETS,
   getStoryFolderAncestor,
@@ -66,6 +69,8 @@ export default function FileTree({
   const [projects, setProjects] = useState([])
   const [tree, setTree] = useState({ type: 'folder', name: '', path: '', children: [] })
   const [expanded, setExpanded] = useState(new Set(['']))
+  const [filter, setFilter] = useState(EMPTY_FILTER)
+  const filtering = isFilterActive(filter)
   const [order, setOrder] = useState({})
   const [isAddingEntry, setIsAddingEntry] = useState(false)
   const [newEntryName, setNewEntryName] = useState('')
@@ -382,6 +387,10 @@ export default function FileTree({
       const { renameProject } = await import('../lib/FileSystem')
       const nextName = await renameProject(path, trimmed)
       if (nextName) {
+        if (nextName !== path) {
+          const { statsService } = await import('../stats/service')
+          statsService.renameProject(path, nextName)
+        }
         migrateProjectTreeState(path, nextName)
         if (projectName === path) {
           onSelectProject?.(nextName)
@@ -509,7 +518,7 @@ export default function FileTree({
       dragInsert,
       dragOverPath,
       dragSourceId,
-      expanded,
+      expanded: shownExpanded,
       isAddingEntry,
       newEntryParent,
       renamingEntry,
@@ -546,7 +555,8 @@ export default function FileTree({
               return
             }
             e.preventDefault()
-            if (e.button !== 0) return
+            // A filtered tree hides siblings, so there is nowhere certain to drop.
+            if (e.button !== 0 || filtering) return
             manualDragRef.current = {
               path: node.path,
               type: node.type,
@@ -656,6 +666,25 @@ export default function FileTree({
     const result = applyOrderToTree(tree, { ...order })
     return result
   }, [tree, order])
+
+  // The filter bar's view of the tree, fully open while it filters.
+  const shownRoot = useMemo(
+    () => (filtering ? applyTreeFilter(orderedRoot, filter, recentDocs(projectName)) : orderedRoot),
+    [filtering, orderedRoot, filter, projectName],
+  )
+  const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
+
+  // What the clock button filters to: documents as they are opened.
+  useEffect(() => { noteOpened(projectName, activeDoc) }, [projectName, activeDoc])
+
+  // Expand or collapse every folder: all open unless all already are.
+  const toggleAllFolders = useCallback(() => {
+    const all = folderPaths(orderedRoot)
+    const allOpen = [...all].every((path) => expandedRef.current.has(path))
+    const next = allOpen ? new Set(['']) : all
+    expandedRef.current = next
+    setExpanded(next)
+  }, [orderedRoot])
 
   // Contextual create button: while a document inside a story-preset folder is
   // open, offer a sibling of the same kind ("New Character" in Characters/…).
@@ -847,17 +876,20 @@ export default function FileTree({
         <>
           <MotionDiv className="file-list" layout>
             {isAddingEntry && newEntryParent === '' && renderNewEntryInput()}
-            {(orderedRoot.children || []).length === 0 ? (
-              <div className="file-tree-empty">No files yet.</div>
+            {(shownRoot.children || []).length === 0 ? (
+              <div className="file-tree-empty">
+                {!filtering ? 'No files yet.' : filter.recentOnly && !recentDocs(projectName).length ? 'No Recent Files' : 'No Matching Files'}
+              </div>
             ) : (
               <AnimatePresence initial={false}>
-                {(orderedRoot.children || []).map(child => renderNode(child, 0, orderedRoot.children || []))}
+                {(shownRoot.children || []).map(child => renderNode(child, 0, shownRoot.children || []))}
                 {dragInsert && dragInsert.parentPath === '' && dragInsert.index === (orderedRoot.children || []).length
                   ? renderDropSlot(TREE_ROOT_INDENT)
                   : null}
               </AnimatePresence>
             )}
           </MotionDiv>
+          <TreeFilterBar filter={filter} onChange={setFilter} onToggleFolders={toggleAllFolders} />
         </>
       )}
 

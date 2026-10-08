@@ -10,7 +10,6 @@
  *     .canvas-world   one transformed layer; everything inside is world coords
  */
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { debounce } from 'lodash'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from './canvasToolbarSlot'
 import { documentSurface } from '../bridge'
@@ -39,7 +38,6 @@ import { filePathToDocPath } from './useDocPreview'
 import CanvasNode from './CanvasNode'
 import CanvasEdges from './CanvasEdges'
 import CanvasEdgeLabels from './CanvasEdgeLabels'
-import CanvasToolbar from './CanvasToolbar'
 
 const VIEWPORT_SAVE_DEBOUNCE_MS = 1200
 
@@ -491,14 +489,6 @@ export default function CanvasSurface({
     return screenToWorldAt(rect.left + rect.width / 2, rect.top + rect.height / 2)
   }, [screenToWorldAt, surfaceRef])
 
-  const handleAddCard = useCallback(() => {
-    addTextNodeAt(viewCenter(), { edit: true })
-  }, [addTextNodeAt, viewCenter])
-
-  const handleAddImage = useCallback(() => {
-    void importImageAt(viewCenter())
-  }, [importImageAt, viewCenter])
-
   /* ---------------- voice memos ---------------- */
 
   /**
@@ -724,41 +714,6 @@ export default function CanvasSurface({
         ) : null}
       </div>
 
-      {/* The toolbar renders in the titlebar, not over the canvas. The slot is
-          null unless this is the active pane's canvas and no card is being
-          edited — when one is, the text Toolbar takes the titlebar instead. */}
-      {isActive && toolbarSlot && !nativeToolbar ? createPortal(
-        <CanvasToolbar
-          zoom={zoom}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          hasSelection={hasSelection}
-          canGroup={canGroup}
-          canUngroup={canUngroup}
-          onAddCard={handleAddCard}
-          onAddImage={handleAddImage}
-          locked={locked}
-          onToggleLocked={toggleLocked}
-          alignmentGuides={snapPrefs.guides}
-          snapToGrid={snapPrefs.grid}
-          onToggleAlignmentGuides={() => toggleSnapPref('guides')}
-          onToggleSnapToGrid={() => toggleSnapPref('grid')}
-          canRecord={recorder.supported}
-          isRecording={recorder.recording}
-          recordElapsed={recorder.elapsed}
-          onToggleRecording={handleToggleRecording}
-          onGroup={groupSelection}
-          onUngroup={ungroupSelection}
-          onApplyColor={applyColor}
-          onUndo={undo}
-          onRedo={redo}
-          onZoomIn={zoomIn}
-          onZoomOut={zoomOut}
-          onResetZoom={resetZoom}
-          onZoomToFit={handleZoomToFit}
-        />,
-        toolbarSlot,
-      ) : null}
     </div>
   )
 }

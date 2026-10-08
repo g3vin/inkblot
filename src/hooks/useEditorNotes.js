@@ -22,7 +22,6 @@
  */
 import { useEffect } from 'react'
 
-import { documentSurface } from '../bridge'
 import { syncEditorNotes } from '../extensions/NoteAnnotation'
 import { isEditorReady } from '../lib/editorUtils'
 
@@ -120,18 +119,6 @@ export function useEditorNotes({
       }
 
       setNotesForDoc(currentDoc, updated)
-
-      // A note whose range collapsed has lost what it was about and is gone from
-      // `updated`. Naming it separately is what lets the shell tell "deleted" apart
-      // from "never sent" without diffing two sets it may only have half of.
-      const survivingIds = new Set(updated.map(note => note.id))
-      documentSurface.publishNotesRemapped({
-        docPath: currentDoc,
-        notes: updated,
-        droppedNoteIds: existingNotes
-          .filter(note => note.type === 'quote' && !survivingIds.has(note.id))
-          .map(note => note.id),
-      })
     }
 
     editor.on('transaction', handler)

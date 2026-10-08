@@ -1,33 +1,36 @@
 /**
- * IconButton.jsx — a button that is only an icon.
+ * IconButton — an SF-style icon with a label that is always given: it is the tooltip
+ * and the accessible name, and it is shown as text when the toolbar's display mode
+ * asks for it ('iconAndLabel' under the icon, 'label' alone).
  *
- * `label` is required: it is the accessible name AND the tooltip, so a beginner can
- * always find out what an icon does by pointing at it. `shortcut` adds the key hint
- * to the tooltip. `active` shows a toggled-on state (Fill icon + accent wash).
+ * The glyph is either `icon`, a semantic name from src/ui/icons.js (preferred in new
+ * code), or `symbol`, an SF-style name routed through the SFIcon adapter.
  */
 import { forwardRef } from 'react'
-import Icon from './Icon'
-import Tooltip from './Tooltip'
-import './Button.css'
+import SFIcon from '../components/SFIcon.jsx'
+import Icon from './Icon.jsx'
+import Button from './Button.jsx'
 
 const IconButton = forwardRef(function IconButton(
-  { icon, label, shortcut, active, size = 'md', tooltip = true, className, type = 'button', ...rest },
+  { symbol, icon, label, display = 'icon', size = 'toolbar', iconSize = 16, filled = false, className = '', title, children, ...rest },
   ref,
 ) {
-  const classes = ['ib-icon-button', size === 'sm' && 'ib-icon-button--sm', className].filter(Boolean).join(' ')
-  const button = (
-    <button
+  return (
+    <Button
       ref={ref}
-      type={type}
-      className={classes}
+      size={size}
+      className={`ui-icon-button ${className}`.trim()}
+      data-display={display}
       aria-label={label}
-      aria-pressed={active === undefined ? undefined : Boolean(active)}
+      title={title ?? label}
       {...rest}
     >
-      <Icon name={icon} size={size === 'sm' ? 16 : 20} active={Boolean(active)} />
-    </button>
+      {icon ? <span className="ui-icon-button-icon"><Icon name={icon} size={iconSize} active={filled} /></span> : null}
+      {!icon && symbol ? <span className="ui-icon-button-icon"><SFIcon name={symbol} size={iconSize} filled={filled} /></span> : null}
+      {children}
+      {display !== 'icon' ? <span className="ui-icon-button-label">{label}</span> : null}
+    </Button>
   )
-  return tooltip ? <Tooltip content={label} shortcut={shortcut}>{button}</Tooltip> : button
 })
 
 export default IconButton

@@ -1,20 +1,15 @@
 /**
- * Right-sidebar tab registry (order defines swipe/tab order).
+ * Right-sidebar tabs: every panel the inspector can show, as the header draws it.
+ * Which of them a layout shows, and in what order, is the user's
+ * (lib/chromeLayout.ts, useInspectorLayout).
  *
  * There is no Search tab: search is the bar above the panels, on every tab.
  */
-export const RIGHT_SIDEBAR_TABS = [
-  { id: 'clipboard', icon: 'doc.on.clipboard', label: 'Clipboard' },
-  { id: 'workbench', icon: 'hammer', label: 'Workbench' },
-  { id: 'notes', icon: 'doc.text', label: 'Notes' },
-  { id: 'history', icon: 'clock', label: 'History' },
-]
+import { INSPECTOR_TABS } from '../../lib/chromeLayout'
 
-/**
- * The tabs available for a given document. Every document gets the same strip:
- * text documents and canvases both keep version history now (text embeds it in
- * the document file, canvases keep a `.versions/` sidecar), so History applies
- * everywhere — and a constant strip keeps the tabs from re-spacing as you move
- * between documents.
- */
-export const getRightSidebarTabs = () => RIGHT_SIDEBAR_TABS
+export const RIGHT_SIDEBAR_TABS = INSPECTOR_TABS.map(({ id, symbol, title }) => ({ id, icon: symbol, label: title }))
+
+const BY_ID = new Map(RIGHT_SIDEBAR_TABS.map((tab) => [tab.id, tab]))
+
+/** The header's tabs for a list of ids, in that order. */
+export const sidebarTabsFor = (ids) => ids.map((id) => BY_ID.get(id)).filter(Boolean)

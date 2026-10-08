@@ -3,9 +3,8 @@
  *
  * Defined once, here, and published to every shell in the catalog
  * (`PageLayoutCatalog.formats`); a shell applies one by id (`applyFormat`) and the page
- * builds it. So "Trade Paperback 6 × 9" is the same setup in the Swift inspector, the
- * Tauri sheet and the tests — which is not what happened when each shell had its own
- * "Set Up as a Book".
+ * builds it. So "Trade Paperback 6 × 9" is the same setup in the Typeset tab, the Page
+ * Setup sheet and the tests.
  *
  * A setup remembers the format it was made from (`formatId`), so after the author
  * changes a margin the inspector can still say what it started as: "(modified)".

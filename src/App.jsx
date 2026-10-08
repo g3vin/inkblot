@@ -2,10 +2,10 @@
  * App.jsx — application root.
  *
  * Owns app-wide chrome and preferences that live above the editor:
- * theme (light/dark/system), accent colour, and the word-count badge
- * toggle. Wires those preferences into the native Tauri "View" menu
- * and persists them through lib/preferences.ts. Renders the Editor, the
- * accent-colour dialog, and the command palette (⌘K) with the app-level commands.
+ * theme (light/dark/system), accent colour (an ink from lib/palette.ts), and the
+ * word-count badge toggle. Wires those preferences into the native Tauri menus and
+ * persists them through lib/preferences.ts. Renders the Editor, the Settings sheet,
+ * the timer capsule, and the command palette (⌘K) with the app-level commands.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
@@ -13,15 +13,18 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
-import { documentSurface } from './bridge'
-import { isNativeShell, nativeOwns } from './lib/host'
+import { resolveTheme, setAccentAttribute, setThemeAttribute, watchSystemTheme } from './lib/theme'
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from './lib/palette'
-import { applyAccentAttribute, applyThemeAttribute, resolveTheme, watchSystemTheme } from './lib/theme'
 import { useCommands } from './lib/commands'
-import Dialog from './ui/Dialog'
-import Button from './ui/Button'
-import InkPicker from './ui/InkPicker'
-import CommandPalette from './ui/CommandPalette'
+import CommandPalette from './ui/CommandPalette.jsx'
+import { documentSurface } from './bridge'
+import SettingsSheet from './components/settings/SettingsSheet.jsx'
+import TimerCapsule from './components/stats/TimerCapsule.jsx'
+import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
+import { OPEN_SETTINGS, primaryTimerAction } from './stats/timerMenu.js'
+import { allRoutines } from './stats/config.js'
+import { setShowsTabBar, showsTabBar } from './components/tabs/tabBarState.js'
+import { buildFormatMenu, buildInsertMenu, fileExtraItems, pasteAndMatchStyleItem, viewItems, windowTabItems } from './menus/appMenus.js'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -40,33 +43,44 @@ const EXPORT_FORMATS = [
 
 const dispatchAppEvent = (type, detail) => window.dispatchEvent(new CustomEvent(type, { detail }))
 
-/** Choose the accent: one of the curated inks, so every accent suits the palette. */
-function AccentColorDialog({ open, accent, onChange, onClose }) {
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      eyebrow="Appearance"
-      title="Accent colour"
-      description="Tints selections, focus rings and primary buttons. Ink Blue is Inkblot’s own."
-      footer={(
-        <>
-          <Button variant="ghost" onClick={() => onChange(DEFAULT_ACCENT)} disabled={accent === DEFAULT_ACCENT}>
-            Reset
-          </Button>
-          <Button variant="primary" onClick={onClose}>Done</Button>
-        </>
-      )}
-    >
-      <InkPicker
-        label="Accent colour"
-        value={accent}
-        onChange={onChange}
-        inks={ACCENT_PRESETS.map((preset) => preset.id)}
-        showLabels
-      />
-    </Dialog>
-  )
+const openSettings = (pane) => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS, { detail: { pane } }))
+
+/**
+ * The menu bar's Timer menu. Its first item says what it does now — Start, Pause,
+ * Resume — and the others enable as the timer's state allows, kept in step with the
+ * stats runtime.
+ */
+async function buildTimerMenu({ MenuItem, Submenu, PredefinedMenuItem }) {
+  const stats = getStatsRuntime()
+  const timer = stats.timer
+  const primary = await MenuItem.new({ id: 'timer-primary', text: primaryTimerAction(stats).text, action: () => primaryTimerAction(stats).action() })
+  const skip = await MenuItem.new({ id: 'timer-skip', text: 'Skip to Next Segment', enabled: false, action: () => timer.skip() })
+  const stop = await MenuItem.new({ id: 'timer-stop', text: 'Stop', enabled: false, action: () => timer.stop() })
+  const routines = await Submenu.new({
+    text: 'Start Routine',
+    items: await Promise.all(allRoutines(stats.config).map((routine) => MenuItem.new({ text: routine.name, action: () => stats.startTimer(routine) }))),
+  })
+  let last = ''
+  stats.subscribe(() => {
+    const text = primaryTimerAction(stats).text
+    const key = `${text}|${timer.state}`
+    if (key === last) return
+    last = key
+    primary.setText(text)
+    skip.setEnabled(timer.state === 'running' || timer.state === 'paused')
+    stop.setEnabled(timer.isActive)
+  })
+  return Submenu.new({
+    text: 'Timer',
+    items: [
+      primary, skip, stop,
+      await PredefinedMenuItem.new({ item: 'Separator' }),
+      routines,
+      await PredefinedMenuItem.new({ item: 'Separator' }),
+      await MenuItem.new({ id: 'timer-show-stats', text: 'Show Stats', action: () => stats.showStats() }),
+      await MenuItem.new({ id: 'timer-edit-routines', text: 'Edit Routines…', action: () => openSettings('timers') }),
+    ],
+  })
 }
 
 export default function App() {
@@ -78,7 +92,8 @@ export default function App() {
   const currentThemeRef = useRef('system')
   const showWordCountBadgeRef = useRef(true)
   const [accent, setAccent] = useState(DEFAULT_ACCENT)
-  const [isAccentPickerOpen, setIsAccentPickerOpen] = useState(false)
+  const [theme, setTheme] = useState('system')
+  useStatsRuntime()
   const [showWordCountBadge, setShowWordCountBadge] = useState(true)
 
   // Resolve 'system' to the OS-reported light/dark preference.
@@ -97,21 +112,25 @@ export default function App() {
     }
   }, [getResolvedTheme])
 
-  // Apply a theme ('system' | 'light' | 'dark') and persist it. <html data-theme> always
-  // carries the resolved theme (src/lib/theme.js); 'system' just isn't stored.
+  // Apply a theme to the document root and persist it ('system' clears the override).
   const applyTheme = useCallback((theme) => {
     if (!theme) return
     currentThemeRef.current = theme
-    applyThemeAttribute(theme)
-    if (theme === 'system') removePreference(THEME_STORAGE_KEY)
-    else setPreference(THEME_STORAGE_KEY, theme)
+    setTheme(theme)
+    setThemeAttribute(theme)
+
+    if (theme === 'system') {
+      removePreference(THEME_STORAGE_KEY)
+    } else {
+      setPreference(THEME_STORAGE_KEY, theme)
+    }
     updateMenu(theme)
   }, [updateMenu])
 
-  // The accent is one of the curated inks (src/lib/palette.ts). A hex saved before the
-  // ink palette maps to its nearest ink.
+  // The accent is one of the curated inks (lib/palette.ts), so every accent suits the
+  // palette. A hex saved before the ink palette maps to its nearest ink.
   const applyAccent = useCallback((nextAccent) => {
-    const id = applyAccentAttribute(nextAccent)
+    const id = setAccentAttribute(nextAccent)
     setPreference(ACCENT_STORAGE_KEY, id)
     setAccent(id)
   }, [])
@@ -124,14 +143,13 @@ export default function App() {
     menuRefs.current.wordCountItem?.setChecked(nextVisible)
   }, [])
 
-  // The native toolbar's Word Count item: the shell asks, and this stays the setting's
-  // owner — the same path the View menu's checkbox takes.
+  // The toolbar's Word Count item asks, and this stays the setting's owner — the same
+  // path the View menu's checkbox takes.
+  useEffect(() => (
+    documentSurface.onCommand('setWordCountVisible', ({ visible }) => applyWordCountBadgeVisibility(visible))
+  ), [applyWordCountBadgeVisibility])
   useEffect(() => {
-    if (!nativeOwns('toolbar')) return undefined
-    return documentSurface.onCommand('setWordCountVisible', ({ visible }) => applyWordCountBadgeVisibility(visible))
-  }, [applyWordCountBadgeVisibility])
-  useEffect(() => {
-    if (nativeOwns('toolbar')) documentSurface.publishViewOptions({ wordCountVisible: showWordCountBadge })
+    documentSurface.publishViewOptions({ wordCountVisible: showWordCountBadge })
   }, [showWordCountBadge])
 
   // Backend-initiated Pinterest searches (e.g. from a native menu) open the scraper window.
@@ -245,12 +263,8 @@ export default function App() {
         await Submenu.new({ text: 'Export', items: await exportItems('document') }),
         await Submenu.new({ text: 'Export Book', items: await exportItems('folder') }),
       ]
-      // The Swift shell draws File ▸ Print and Export, and View ▸ Print Layout, itself.
-      const native = isNativeShell()
-      if (!native) {
-        if (fileSubmenu) await fileSubmenu.append(fileItems)
-        else await menu.append(await Submenu.new({ text: 'File', items: fileItems.slice(1) }))
-      }
+      if (fileSubmenu) await fileSubmenu.append(fileItems)
+      else await menu.append(await Submenu.new({ text: 'File', items: fileItems.slice(1) }))
 
       const themeItems = [toggleItem, systemItem]
       const accentItems = [
@@ -258,7 +272,7 @@ export default function App() {
         await MenuItem.new({
           id: 'accent-color-picker',
           text: 'Accent Colour…',
-          action: () => setIsAccentPickerOpen(true),
+          action: () => openSettings('general'),
         }),
         await MenuItem.new({
           id: 'command-palette',
@@ -266,17 +280,45 @@ export default function App() {
           action: () => dispatchAppEvent('inkblot:command-palette'),
         }),
       ]
-      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, ...(native ? [] : [printLayoutItem])]
+      const tabBarItem = await CheckMenuItem.new({
+        id: 'tab-bar-toggle',
+        text: 'Show Tab Bar',
+        checked: showsTabBar(),
+        action: () => {
+          setShowsTabBar(!showsTabBar())
+          tabBarItem.setChecked(showsTabBar())
+        },
+      })
+      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, tabBarItem, printLayoutItem]
 
+      const pageItems = await viewItems({ MenuItem, Submenu, PredefinedMenuItem })
       if (viewSubmenu) {
-        await viewSubmenu.append([...themeItems, ...accentItems, ...displayItems])
+        await viewSubmenu.append([...themeItems, ...accentItems, ...displayItems, ...pageItems])
       } else {
         const viewMenu = await Submenu.new({
           text: 'View',
-          items: [...themeItems, ...accentItems, ...displayItems],
+          items: [...themeItems, ...accentItems, ...displayItems, ...pageItems],
         })
         await menu.append(viewMenu)
       }
+
+      // Settings…, the other menus, and the writing timer's.
+      const settingsItem = await MenuItem.new({ id: 'settings', text: 'Settings…', accelerator: 'CmdOrCtrl+,', action: () => openSettings() })
+      const appSubmenu = items[0] instanceof Submenu && !['File', 'Edit', 'View', 'Window', 'Help'].includes(await items[0].text()) ? items[0] : null
+      if (appSubmenu) await appSubmenu.insert([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem], 1)
+      else if (fileSubmenu) await fileSubmenu.append([await PredefinedMenuItem.new({ item: 'Separator' }), settingsItem])
+      const api = { MenuItem, Submenu, PredefinedMenuItem, CheckMenuItem }
+      const submenus = await Promise.all(items.map(async (item) => (item instanceof Submenu ? [await item.text(), item] : [null, item])))
+      const named = (name) => submenus.find(([text]) => text === name)?.[1] ?? null
+      const extras = await fileExtraItems(api)
+      if (fileSubmenu) await fileSubmenu.insert(extras, 0)
+      await named('Edit')?.append([await PredefinedMenuItem.new({ item: 'Separator' }), await pasteAndMatchStyleItem(api)])
+      await named('Window')?.insert(await windowTabItems(api), 0)
+      // Insert, Format and Timer before Window, where a Mac app has them.
+      const added = [await buildInsertMenu(api), await buildFormatMenu(api), await buildTimerMenu(api)]
+      const windowAt = submenus.findIndex(([text]) => text === 'Window')
+      if (windowAt >= 0) await menu.insert(added, windowAt)
+      else await menu.append(added)
 
       await menu.setAsAppMenu()
       updateMenu(currentThemeRef.current)
@@ -288,18 +330,22 @@ export default function App() {
   // Follow the OS when the theme is 'system', and keep the menu labels in step.
   useEffect(() => watchSystemTheme(() => {
     if (currentThemeRef.current !== 'system') return
-    applyThemeAttribute('system')
+    setThemeAttribute('system')
     updateMenu('system')
   }), [updateMenu])
 
   // App-level commands for the palette (⌘K). Features register their own where they live.
   useCommands(() => [
+    { id: 'app.settings', section: 'App', title: 'Open settings', icon: 'settings', shortcut: '⌘,', keywords: ['preferences', 'options'], run: () => openSettings() },
     { id: 'view.theme.light', section: 'View', title: 'Use light theme', icon: 'sun', keywords: ['paper', 'appearance', 'mode'], run: () => applyTheme('light') },
     { id: 'view.theme.dark', section: 'View', title: 'Use dark theme', icon: 'moon', keywords: ['ink', 'appearance', 'mode', 'night'], run: () => applyTheme('dark') },
     { id: 'view.theme.system', section: 'View', title: 'Match system theme', icon: 'settings', keywords: ['appearance', 'auto'], run: () => applyTheme('system') },
-    { id: 'view.accent', section: 'View', title: 'Change accent colour…', icon: 'palette', keywords: ['color', 'tint', 'highlight'], run: () => setIsAccentPickerOpen(true) },
+    { id: 'view.accent', section: 'View', title: 'Change accent colour…', icon: 'palette', keywords: ['color', 'tint', 'highlight'], run: () => openSettings('general') },
     { id: 'view.word-count', section: 'View', title: 'Show or hide word count', icon: 'gauge', keywords: ['words', 'stats', 'badge'], run: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current) },
-    { id: 'print.layout', section: 'Print & export', title: 'Toggle print layout', icon: 'print', shortcut: '⌥⌘P', keywords: ['pages', 'preview', 'book'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
+    { id: 'view.tab-bar', section: 'View', title: 'Show or hide tab bar', icon: 'sidebar', keywords: ['tabs'], run: () => setShowsTabBar(!showsTabBar()) },
+    { id: 'timer.stats', section: 'Writing', title: 'Show writing stats', icon: 'chart', keywords: ['words', 'goals', 'progress'], run: () => getStatsRuntime().showStats() },
+    { id: 'timer.routines', section: 'Writing', title: 'Edit timer routines…', icon: 'timer', keywords: ['pomodoro', 'sprint'], run: () => openSettings('timers') },
+    { id: 'print.layout', section: 'Print & export', title: 'Toggle print layout', icon: 'print', shortcut: '⌥⌘P', keywords: ['pages', 'preview', 'book', 'typeset'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
     { id: 'print.page-setup', section: 'Print & export', title: 'Page setup…', icon: 'sliders', keywords: ['margins', 'trim', 'paper size'], run: () => dispatchAppEvent('inkblot:page-setup') },
     { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', shortcut: '⌘P', run: () => dispatchAppEvent('inkblot:print', { scope: 'document' }) },
     { id: 'print.book', section: 'Print & export', title: 'Print book…', icon: 'books', keywords: ['folder', 'manuscript'], run: () => dispatchAppEvent('inkblot:print', { scope: 'folder' }) },
@@ -322,17 +368,11 @@ export default function App() {
     })),
   ], [applyTheme, applyWordCountBadgeVisibility])
 
-  // Escape closes the accent picker first; otherwise it exits fullscreen.
+  // Escape exits fullscreen.
   useEffect(() => {
     const appWindow = getCurrentWindow()
     const onKeyDown = async (e) => {
-      if (e.key !== 'Escape') return
-
-      if (isAccentPickerOpen) {
-        setIsAccentPickerOpen(false)
-        return
-      }
-
+      if (e.key !== 'Escape' || e.defaultPrevented) return
       try {
         const isFullscreen = await appWindow.isFullscreen()
         if (isFullscreen) {
@@ -345,17 +385,24 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isAccentPickerOpen])
+  }, [])
+
+  const appearance = {
+    theme,
+    onTheme: applyTheme,
+    accent,
+    onAccent: applyAccent,
+    accentPresets: ACCENT_PRESETS,
+    defaultAccent: DEFAULT_ACCENT,
+    wordCount: showWordCountBadge,
+    onWordCount: applyWordCountBadgeVisibility,
+  }
 
   return (
     <>
       <Editor showWordCountBadge={showWordCountBadge} />
-      <AccentColorDialog
-        open={isAccentPickerOpen}
-        accent={accent}
-        onChange={applyAccent}
-        onClose={() => setIsAccentPickerOpen(false)}
-      />
+      <SettingsSheet appearance={appearance} />
+      <TimerCapsule />
       <CommandPalette />
     </>
   )

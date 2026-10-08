@@ -6,8 +6,7 @@
 //!   - `node.inkblotTipTap`, a card's TipTap document
 //!   - the unknown keys another JSON Canvas app wrote (see `CanvasNode::extra`)
 //!
-//! Typeshare maps this alias to `unknown` in TypeScript and `AnyCodable` in Swift (see
-//! `typeshare.toml`); the Swift app defines `AnyCodable` in `Support/AnyCodable.swift`.
+//! Typeshare maps this alias to `unknown` in TypeScript (see `typeshare.toml`).
 
 /// Arbitrary JSON we carry but never interpret.
 pub type JsonValue = serde_json::Value;

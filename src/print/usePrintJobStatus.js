@@ -1,13 +1,13 @@
 /**
  * usePrintJobStatus.js — the latest print or export's status, as a line to show.
  *
- * For the page's own chrome (the Tauri Page Setup sheet); the Swift Finishing tabs get
- * the same statuses over the bridge. A finished job's line stays a few seconds and
+ * For the Page Setup sheet; the Print & Export tab gets the same statuses over the
+ * bridge. A finished job's line stays a few seconds and
  * then goes; a failure stays until the next job, so it is read.
  */
 import { useEffect, useState } from 'react'
 
-const FORMAT_LABELS = { pdf: 'PDF', epub: 'EPUB', markdown: 'Markdown', html: 'HTML', docx: 'Word', plainText: 'Plain Text', fountain: 'Fountain', fdx: 'Final Draft', csv: 'Report' }
+const FORMAT_LABELS = { pdf: 'PDF', epub: 'EPUB', markdown: 'Markdown', html: 'HTML', docx: 'Word', plainText: 'Plain Text', fountain: 'Fountain', fdx: 'Final Draft', csv: 'Report', coverPdf: 'Cover PDF' }
 const DONE_LINGER_MS = 6000
 
 const fileName = (path) => (path || '').split(/[/\\]/).pop()

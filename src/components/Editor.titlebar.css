@@ -16,9 +16,7 @@
     var(--titlebar-right-width, 0px);
   align-items: stretch;
   height: var(--app-titlebar-height);
-  /* Under a native window toolbar the row sits below the toolbar's band. */
   box-sizing: border-box;
-  padding-top: var(--native-toolbar-inset, 0px);
   flex: none;
   min-height: var(--app-titlebar-height);
   background: transparent;
@@ -59,6 +57,7 @@
 
 .app-titlebar-toolbar {
   position: relative;
+  grid-row: 1;
   grid-column: 2;
   min-width: 0;
   display: flex;
@@ -122,24 +121,6 @@
   right: 0;
 }
 
-/*
- * Under a native window toolbar a canvas runs up under its glass too: it pans, so
- * nothing is lost there, and the toolbar's buttons float over the board.
- */
-.main-layout.is-canvas-underlay.is-under-native-toolbar > .middle-section {
-  padding-top: 0;
-}
-
-/*
- * Under the Swift shell the sidebars are native, translucent, and float over this page
- * (--panel-inset-* is how much of each side they cover). A canvas runs on underneath
- * them; a document keeps its column in the part they leave uncovered.
- */
-.main-layout:not(.is-canvas-underlay) > .middle-section {
-  padding-left: var(--panel-inset-left, 0px);
-  padding-right: var(--panel-inset-right, 0px);
-}
-
 .editor-page-wrapper.is-focus-mode .app-titlebar,
 .editor-page-wrapper.is-focus-mode .left-sidebar,
 .editor-page-wrapper.is-focus-mode .right-sidebar {
@@ -150,3 +131,16 @@
   min-height: 0;
 }
 
+
+/* Show Sidebar / Show Inspector, at the inner edge of their grid cells. */
+.titlebar-toggle {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  -webkit-app-region: no-drag;
+}
+.titlebar-toggle.is-left { grid-row: 1; grid-column: 1; justify-content: flex-end; }
+.titlebar-toggle.is-right { grid-row: 1; grid-column: 3; justify-content: flex-start; }
+.titlebar-toggle .ui-button { color: var(--text-secondary); }
+.titlebar-toggle .ui-button:hover { color: var(--text-primary); }

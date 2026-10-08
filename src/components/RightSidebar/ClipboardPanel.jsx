@@ -7,8 +7,7 @@
  *
  * This panel and the editor are the two ends of one drag, and they meet on
  * `bridge/dragHandoff`. A drop both of them can see is *claimed*, so which one handles
- * it does not depend on the order their listeners run in. The Swift shell draws its
- * own clipboard panel and reaches the same session over the bridge.
+ * it does not depend on the order their listeners run in.
  */
 import { useEffect, useRef, useState } from 'react'
 import { dragHandoff, DragPayloadKind } from '../../bridge'

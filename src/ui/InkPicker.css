@@ -1,7 +1,7 @@
 .ib-ink-picker {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .ib-ink-picker.has-labels {
@@ -13,7 +13,7 @@
   appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   margin: 0;
   padding: 2px;
   border: var(--hairline) solid transparent;
@@ -26,7 +26,7 @@
 }
 
 .has-labels .ib-ink-swatch {
-  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1);
   border-color: var(--border-muted);
   border-radius: var(--radius-md);
 }
