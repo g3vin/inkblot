@@ -10,6 +10,7 @@ import { ACCENT_PRESETS, INKS, inkVar } from '../lib/palette'
 import { setAccentAttribute, setThemeAttribute } from '../lib/theme'
 import { useCommands } from '../lib/commands'
 import {
+  AppIcon, Mark, Wordmark,
   Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
   FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, InkPicker, Input, Kbd, Menu, MenuItem,
   MenuLabel, MenuSeparator, Panel, PanelBody, PanelHeader, Popover, Section, Segmented, SelectMenu, Sheet,
@@ -64,7 +65,7 @@ export default function DesignShowcase() {
       <header className="ds-topbar">
         <FadeScrim height={64} />
         <div className="ds-topbar-inner">
-          <span className="ds-wordmark">inkblot</span>
+          <span className="ds-wordmark"><Wordmark height={20} /></span>
           <span className="ib-meta">design language · v1</span>
           <span className="ds-spacer" />
           <Segmented label="Theme" value={theme} onChange={switchTheme}
@@ -92,6 +93,16 @@ export default function DesignShowcase() {
             signature, never its voice.
           </p>
         </div>
+
+        <ShowcaseSection title="Brand · mark, wordmark, app icon">
+          <div className="ds-row ds-brand">
+            <div className="ds-brand-tile"><Mark size={96} /></div>
+            <div className="ds-brand-tile"><Wordmark height={44} /></div>
+            <AppIcon size={96} />
+            <AppIcon size={32} />
+            <AppIcon size={16} />
+          </div>
+        </ShowcaseSection>
 
         <ShowcaseSection title="Colour · ink palette">
           <div className="ds-swatches">

@@ -37,10 +37,12 @@ For anyone short on time, human or agent. The rest of this document explains eac
    "More" menu, an inspector panel, and always the ⌘K command palette. Register every
    new action with `useCommands`.
 8. **Plain, warm words.** Sentence case, verb first, no jargon outside advanced tools.
-9. **Glass only on iOS/iPadOS, and only on floating chrome over the page** (the
+9. **The logo is black on white** (`Mark`, `Wordmark`, `AppIcon` in `src/ui`), never
+   recoloured or redrawn.
+10. **Glass only on iOS/iPadOS, and only on floating chrome over the page** (the
    `.floating-capsule` surface: `FloatingToolbar`, `FloatingActionButton`,
    `FloatingCapsule`).
-10. **Both themes, AA contrast, keyboard reachable, reduced motion honoured.** Every
+11. **Both themes, AA contrast, keyboard reachable, reduced motion honoured.** Every
     time.
 
 ---
@@ -75,30 +77,47 @@ capitalised like any other name.
 whimsical, nostalgic or themed. We never use paper textures, typewriter sound effects
 or coffee stains.
 
-**The mark.** A lowercase *i* whose dot is ink. The stem is in the page's ink colour and
-the dot is in Ink Blue, so the mark works on paper and on ink unchanged. The three
-concepts under review are in [`docs/brand/concepts/`](brand/concepts/). Once one is
-chosen, it lives at `src/assets/brand/`, and this section records its clear space and
-minimum size.
+**The mark.** A lowercase *i* whose dot is an ink spray: a rounded stem, and above it
+a splash with fingers and droplets flung up and to the right. The spray isn't drawn by
+hand. It comes from a simplified model of an ink drop hitting paper
+([`docs/brand/generator/`](brand/generator/)): impact angle, rim fingering and
+satellite droplets. Regenerate it there and never redraw it by hand.
 
-**The wordmark.** The mark stands in for the first letter, followed by "nkblot" in
-Courier Prime Bold.
+**The wordmark.** The mark's own *i* (the same rounded stem and spray), set at Courier
+Prime Bold's x-height and spacing, followed by "nkblot" in Courier Prime Bold. The *i*
+is never Courier's own letterform: the mark and the wordmark must match.
 
-**Colour on backgrounds.**
+**The app icon.** The black mark on a white rounded tile. The stem sits on the tile's
+vertical centre line and the ink is optically centred (a hair above the middle). The
+same artwork is the favicon and the desktop and iOS icons.
 
-| Background | Stem | Dot |
+**Colour.** The logo is **black on white**, in every theme.
+
+| Where | Mark / wordmark | Behind it |
 |---|---|---|
-| Paper (light theme) | `--ink-0` | `--brand-ink` (Ink Blue, `#2F4A8A`) |
-| Ink (dark theme) | `--ink-0` | `--brand-ink` (Ink Blue, `#8FA8E6`) |
-| Ink Blue (app icon) | Paper | Paper |
+| App icon, favicon, any brand tile | `--brand-mark` (black) | `--brand-tile` (white) |
+| On paper (light theme) | `--brand-mark` or `--text-primary` | the page |
+| On ink (dark theme) | `--text-primary` (the page's ink colour) | the page |
 
-**Brand vs accent.** `--brand-ink` is Inkblot's colour and never changes. `--accent-color`
-is the writer's choice: Ink Blue by default, or one of five other inks. Brand moments
-(the mark, the landing page, the wordmark) use `--brand-ink`. Interactive states
-(selection, focus, primary buttons, the active tab) use `--accent-color`.
+The logo never takes Ink Blue, another ink or the accent. Ink Blue (`--brand-ink`) is
+the interface's colour: the default accent, links, focus.
 
-**Don't** recolour the mark in other inks, add effects (shadows, gradients, glass),
-stretch it, or set the wordmark in any face other than Courier Prime.
+**In code.** Use `Mark`, `Wordmark` and `AppIcon` from `src/ui` (`Brand.jsx`). They
+draw inline in `currentColor`, so they follow the surface. Standalone files are in
+`src/assets/brand/` (`mark.svg`, `wordmark.svg`, `app-icon.svg`) and
+`public/favicon.svg`.
+
+**Clear space and size.** Keep clear space of at least the spray's width around the
+mark (half the wordmark's height around the wordmark). The mark is legible from 16px
+and the wordmark from 72px wide; below that, use the mark alone.
+
+**Brand vs accent.** The logo is black and white. `--accent-color` is the writer's
+choice: Ink Blue by default, or one of five other inks. It marks interactive states
+(selection, focus, primary buttons, the active tab).
+
+**Don't** recolour the logo, add effects (shadows, gradients, glass), stretch it,
+redraw the spray, swap the wordmark's *i* for a typed letter, or set the name in any
+face other than Courier Prime.
 
 ---
 
@@ -325,6 +344,7 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 
 | Component | Use it for | Notes |
 |---|---|---|
+| `Mark`, `Wordmark`, `AppIcon` | The logo, wherever the brand appears | Black on white; see §2. Draw in `currentColor` |
 | `Button` | Any text action | `variant`: `filled` (the one primary action per view), `tinted` (a normal action that needs weight), `plain` (default: quiet actions in chrome and rows), `destructive` (confirm or offer undo). `size`: `capsule` (default), `circle`, `toolbar` |
 | `IconButton` | Icon-only actions | `label` is required and becomes the tooltip and accessible name. Glyph from `icon` (semantic name, preferred) or `symbol` (SF-style name). `display` shows the label under or instead of the icon in customisable toolbars. `filled` + `aria-pressed` for toggles |
 | `Tooltip` | Naming a control in a richer way than `title` | Short, no period, after a 500ms delay, with an optional shortcut. Never holds anything a user must read to succeed |

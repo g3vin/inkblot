@@ -23,10 +23,19 @@
 }
 
 .ds-wordmark {
-  font-family: var(--font-type);
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--brand-ink);
+  display: inline-flex;
+  color: var(--text-primary);
+}
+
+.ds-brand { align-items: flex-end; }
+
+.ds-brand-tile {
+  display: flex;
+  align-items: center;
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--brand-tile);
+  color: var(--brand-mark);
 }
 
 .ds-spacer { flex: 1; }

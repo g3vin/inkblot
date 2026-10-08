@@ -110,6 +110,10 @@
   /* The fade scrim under chrome that overlays the document: solid for the first
      --scrim-solid-stop of its height, then clear. Text scrolls under and dissolves. */
   --scrim-solid-stop: 45%;
+
+  /* The logo is black on white in every theme (docs/DESIGN.md → Brand). */
+  --brand-mark: #000000;
+  --brand-tile: #ffffff;
   --scrim-extra: 20px;
 
   font-family: var(--font-ui);

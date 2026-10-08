@@ -27,9 +27,9 @@
   width: 98px;
   height: 98px;
   border-radius: 22px;
-  object-fit: cover;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.18), inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-float);
 }
+.picker-wordmark { display: flex; justify-content: center; color: var(--text-primary); }
 .picker-header h1 { margin: 12px 0 0; font-size: 20px; font-weight: 700; }
 .picker-header p { margin: 0; font-size: 14px; color: var(--text-secondary); }
 

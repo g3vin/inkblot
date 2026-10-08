@@ -4,7 +4,7 @@ Where the Quiet Studio design language stands, and what to do next. Read
 [DESIGN.md](DESIGN.md) first: it holds the rules. This file holds the state of the
 work. Update it as you go, and delete each item when it's done.
 
-_Last updated: 2026-10-08, when PR g3vin/inkblot#63 was merged into `main`._
+_Last updated: 2026-10-08, with PR g3vin/inkblot#63 (design language + logo)._
 
 ---
 
@@ -53,35 +53,30 @@ _Last updated: 2026-10-08, when PR g3vin/inkblot#63 was merged into `main`._
 
 ---
 
-## Open decision: the logo
+## The logo (done)
 
-The user has **not yet picked** the new mark. There are three concepts of a lowercase
-"i" whose dot is ink:
+The user chose **B3 "Spray"**: a lowercase *i* whose dot is an ink spray, black on white.
 
-| Concept | File | Character |
-|---|---|---|
-| A — Rorschach dot | `docs/brand/concepts/a-rorschach.svg` | Mirrored blot; closest to today's logo |
-| B — Splash dot | `docs/brand/concepts/b-splash.svg` | Splash with droplets; most energetic |
-| C — Drop dot | `docs/brand/concepts/c-drop.svg` | One falling drop; simplest at small sizes |
-
-Review page: https://claude.ai/artifact/CtPnxNt6gS5opV8faWKAE9 (each concept at 16–128px,
-on paper and on ink, as an app icon and in the wordmark).
-
-**Once the user chooses:**
-
-1. Put the chosen mark in `src/assets/brand/mark.svg`.
-2. Make `src/assets/brand/wordmark.svg`: the mark followed by "nkblot" in Courier Prime
-   Bold, as outlines. In SVGs, the stem uses `--mark-stem`/`--ink-0` and the dot
-   `--mark-dot`/`--brand-ink`.
-3. Add `public/favicon.svg` and link it from `index.html`.
-4. Replace the old PNG logo on the welcome window: `src/components/ProjectLanding.jsx`
-   imports `src-tauri/icons/icon.png`.
-5. Regenerate the app icons. Render a 1024px PNG (paper mark on an Ink Blue rounded
-   square), then run `npx tauri icon <png>`.
-6. Fill in DESIGN.md §2 with clear space (the dot's width on every side), minimum size
-   (16px mark, 72px wordmark) and the colour table.
-7. Delete `docs/brand/concepts/` once the files are in `src/assets/brand/`, or keep only
-   the chosen one.
+- **Generator:** `docs/brand/generator/` rebuilds it. `splash.py` models the ink impact:
+  impact-angle ellipse, rim fingering, downstream bias and droplets that pinch off.
+  `generate.py` writes `src/ui/brandPaths.js`, `src/assets/brand/*.svg` and
+  `public/favicon.svg`.
+- **Wordmark:** it uses the mark's own *i* (the user asked that the logos match),
+  sized to Courier Prime Bold's x-height, with the font's letter spacing rather than
+  its monospace cell.
+- **App icon:** the stem is on the centre line, and the ink is optically centred.
+- **Desktop and iOS icons:** `src-tauri/icons/` was regenerated with `npx tauri icon`
+  from `src-tauri/icons/source/`.
+  - `icon-macos-1024.png`: a Big Sur–style inset tile, transparent around it.
+  - `icon-ios-1024.png`: full-bleed and opaque. The iOS set comes from this one.
+- **Regenerating after a change:**
+  1. Run `generate.py`.
+  2. Rasterise `app-icon.svg` into the two 1024px sources (a headless browser
+     screenshot at 1024×1024; the macOS one inset 100px, with corners at 0.225 of the
+     tile).
+  3. Run `npx tauri icon` on each and copy `ios/` from the iOS run.
+- **Remaining:** check the icons on a real Mac and iPhone. The Android launcher icons
+  came from the macOS source (an inset tile), so revisit them if Android ships.
 
 ---
 
