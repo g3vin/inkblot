@@ -144,8 +144,8 @@ textarea.fin-input { resize: vertical; }
   padding: var(--space-2);
   border: 0.5px solid var(--border-color);
   border-radius: var(--radius-xs);
-  background: #fff;
-  color: #1b1b1b;
+  background: var(--print-paper);
+  color: var(--print-ink);
 }
 .fin-style-card.is-current .fin-style-page { border: 2px solid var(--accent-color); }
 .fin-style-rule { display: block; width: 18px; height: 0.5px; background: currentColor; }
@@ -159,12 +159,12 @@ textarea.fin-input { resize: vertical; }
 .fin-proof-fixes { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 
 .fin-thumb { width: 40px; height: 28px; object-fit: contain; }
-.fin-cover-thumb { width: 34px; height: 48px; object-fit: cover; border-radius: 2px; box-shadow: var(--shadow-1); }
+.fin-cover-thumb { width: 34px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); box-shadow: var(--shadow-1); }
 .fin-cover-strip { display: flex; gap: var(--space-3); overflow-x: auto; padding: var(--space-1) 0; }
 .fin-cover-card { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; margin: 0; padding: 0; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
 .fin-cover-card:hover { border-color: transparent; }
 .fin-cover-card img,
-.fin-cover-blank { width: 44px; height: 64px; object-fit: cover; border-radius: 2px; border: 0.5px solid var(--border-color); display: grid; place-items: center; background: var(--control-bg); }
+.fin-cover-blank { width: 44px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); border: 0.5px solid var(--border-color); display: grid; place-items: center; background: var(--control-bg); }
 .fin-cover-card.is-current img,
 .fin-cover-card.is-current .fin-cover-blank { border: 2px solid var(--accent-color); }
 .fin-cover-name { font-size: 11px; max-width: 64px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

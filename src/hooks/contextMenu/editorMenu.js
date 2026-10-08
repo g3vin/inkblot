@@ -5,6 +5,7 @@
  * and split-view actions land underneath it.
  */
 import { createQuoteNote } from '../../lib/noteUtils'
+import { DEFAULT_HIGHLIGHT_COLOR } from '../../lib/palette'
 import { bubbleSessionAt, sessionForms, showSessionForm } from '../../extensions/BubbleSession'
 import { paragraphForBubble, selectionForBubble } from '../useBubbleSessions'
 
@@ -137,7 +138,7 @@ export async function editorMenu(ctx) {
           action: () => {
             try {
               const highlightColor =
-                editor.storage.lastHighlightColor || '#ffff00'
+                editor.storage.lastHighlightColor || DEFAULT_HIGHLIGHT_COLOR
               editor.chain().focus().setHighlight({ color: highlightColor }).run()
             } catch (err) {
               console.warn('Failed to apply highlight:', err)

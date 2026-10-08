@@ -14,6 +14,7 @@ import { getDocDisplayName } from '../lib/docKind'
 import { loadMapDocument } from '../lib/map/mapFileSystem'
 import MapSurface from './MapSurface'
 import './Map.css'
+import './mapThemes.css'
 
 export default function MapPane({
   projectName,

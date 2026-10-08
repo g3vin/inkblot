@@ -29,7 +29,7 @@
   margin-bottom: var(--sidebar-floating-offset);
 
   box-shadow: var(--sidebar-shell-shadow);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
 
   /* Solid window background: on a canvas (which runs under the floating
      sidebars) the panel fully occludes the dots rather than letting them
@@ -103,7 +103,7 @@
   color: var(--text-subtle);
   font-size: 10px;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: inline-flex;
   align-items: center;

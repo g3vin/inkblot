@@ -24,6 +24,7 @@ import { useAssetUrl } from '../canvas/useAssetUrl'
 import { PinGlyph } from './mapGlyphs'
 import { initials, labelNeedsFlip, linePath, ringsPath, travelerColor, travelerName } from './mapRender'
 import { inkColor } from '../lib/palette'
+import { MAP_DEFAULT_COLORS } from '../lib/map/mapColors'
 
 const DASHES = { solid: null, dashed: '10 6', dotted: '1 6', inked: null, rough: null }
 
@@ -125,7 +126,7 @@ function SystemGround({ map, projector, selection }) {
     if (body.kind === 'barycenter') continue
     const at = projector.toWorld(positions.get(body.id) || [0, 0])
     const isStar = body.kind === 'star'
-    const color = body.color || (isStar ? temperatureToColor(body.star?.temperatureK ?? 5772) : '#9aa7b8')
+    const color = body.color || (isStar ? temperatureToColor(body.star?.temperatureK ?? 5772) : MAP_DEFAULT_COLORS.body)
     const radius = isStar ? 11 : body.kind === 'moon' ? 3.5 : body.kind === 'station' ? 3 : body.kind === 'dwarf' ? 3.5 : 6
     const blackHole = isStar && body.star?.spectral === 'BH'
     discs.push(
@@ -137,8 +138,8 @@ function SystemGround({ map, projector, selection }) {
         transform={`translate(${at[0]} ${at[1]})`}
       >
         <g className="map-mark">
-          {isStar ? <circle r={radius * 2.4} fill={blackHole ? 'none' : color} opacity={0.18} stroke={blackHole ? '#ffb86b' : 'none'} strokeWidth={blackHole ? 3 : 0} /> : null}
-          <circle className="map-body-disc" r={radius} fill={blackHole ? '#000' : color} stroke={blackHole ? '#ffb86b' : 'none'} strokeWidth={blackHole ? 1.5 : 0} />
+          {isStar ? <circle r={radius * 2.4} fill={blackHole ? 'none' : color} opacity={0.18} stroke={blackHole ? MAP_DEFAULT_COLORS.blackHoleRim : 'none'} strokeWidth={blackHole ? 3 : 0} /> : null}
+          <circle className="map-body-disc" r={radius} fill={blackHole ? MAP_DEFAULT_COLORS.blackHole : color} stroke={blackHole ? MAP_DEFAULT_COLORS.blackHoleRim : 'none'} strokeWidth={blackHole ? 1.5 : 0} />
           <text className="map-body-name" x={radius + 5} y={4}>{body.name}</text>
         </g>
       </g>
@@ -339,7 +340,7 @@ function TravelerLayer({ map, projector, space, day, schedules, selection }) {
             >
               <g className="map-mark">
                 <circle className="map-traveler-dot" r={selected ? 11 : 9} fill={color} />
-                <text y={4} textAnchor="middle" fontSize={9} fontWeight={700} fill="#fff" pointerEvents="none">
+                <text y={4} textAnchor="middle" fontSize={9} fontWeight={700} fill={MAP_DEFAULT_COLORS.travelerLabel} pointerEvents="none">
                   {initials(travelerName(traveler))}
                 </text>
                 <text className="map-traveler-name" y={-14} textAnchor="middle" fill={color}>

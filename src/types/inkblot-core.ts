@@ -4691,7 +4691,7 @@ export interface VersionRow {
 	name?: string;
 	auto: boolean;
 	sessionId?: string;
-	/** `hsl(…)`, the same hue the page's timeline gives this session. */
+	/** `var(--ink-…)`, the same ink the page's timeline gives this session. */
 	sessionColor: string;
 	delta: WordDelta;
 	/**

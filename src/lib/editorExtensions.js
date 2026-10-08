@@ -84,7 +84,7 @@ export const buildEditorExtensions = (starterKit) => [
   // ends on its own lines (ScriptElement.ts).
   starterKit.configure({ trailingNode: { notAfter: ['scriptElement'] } }),
   Dropcursor.configure({
-    color: 'rgba(84, 165, 255, 0.95)',
+    color: 'var(--accent-color)',
     width: 2,
   }),
   NoteAnnotation,

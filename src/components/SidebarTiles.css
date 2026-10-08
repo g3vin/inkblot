@@ -12,7 +12,7 @@
 .tile {
   background-color: var(--tile-color);
   border: 1px solid var(--sidebar-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 12px;
   margin-bottom: 0;
   position: relative;
@@ -45,7 +45,7 @@
 
   font-size: 11px;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -59,7 +59,7 @@
   border: 1px solid var(--border-strong);
   color: var(--text-secondary);
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   cursor: pointer;
 }

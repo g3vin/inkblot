@@ -25,7 +25,7 @@
   padding: 0 10px;
   font: 12px var(--font-ui);
   font-variant-numeric: tabular-nums;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-lg);
   color: var(--text-primary);
   pointer-events: none;
 }

@@ -111,6 +111,24 @@
      --scrim-solid-stop of its height, then clear. Text scrolls under and dissolves. */
   --scrim-solid-stop: 45%;
 
+  /* The printed page, in every theme: page previews, Print Layout's sheets and
+     thumbnails show the book as it will print, not as the app is themed. */
+  --print-paper: #ffffff;
+  --print-ink: #1b1b1b;
+  --print-ink-secondary: #555555;
+  --print-ink-muted: #8a9099;
+  --print-faint: rgba(0, 0, 0, 0.3);
+  --print-blank: rgba(0, 0, 0, 0.25);
+  /* The shading in a spread's gutter, and the bezel of the e-reader preview. */
+  --page-gutter-shade: rgba(0, 0, 0, 0.35);
+  --device-bezel: #1c1c1e;
+  --print-highlight: #fff0a0;
+
+  /* Chrome drawn over a photo (the crop frame): fixed, whatever the theme, because
+     the image underneath is. */
+  --on-image: #ffffff;
+  --on-image-shade: rgba(0, 0, 0, 0.34);
+
   /* The logo is black on white in every theme (docs/DESIGN.md → Brand). */
   --brand-mark: #000000;
   --brand-tile: #ffffff;
@@ -200,6 +218,10 @@
     0 24px 60px rgba(0, 0, 0, 0.45);
   --shadow-soft: var(--shadow-float);
   --shadow-popover: var(--shadow-float);
+  /* Canvas cards sit in the world, so their blur scales with the zoom: tighter than
+     --shadow-float, for the same look at a fraction of the repaint cost. */
+  --shadow-canvas-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 14px rgba(0, 0, 0, 0.28);
+  --shadow-canvas-card-hover: 0 1px 2px rgba(0, 0, 0, 0.24), 0 10px 20px rgba(0, 0, 0, 0.36);
 
   --status-danger: var(--ink-red);
   --status-warning: var(--ink-amber);
@@ -209,6 +231,19 @@
 
   --accent-color: var(--ink-blue);
   --accent-foreground: color-mix(in srgb, var(--accent-color) 80%, white);
+
+  /* The page in Print Layout, on screen: a near-black sheet with light ink, on a desk
+     a step lighter than the window. What goes to the printer is always --print-*. */
+  --page-desk: var(--paper-3);
+  --page-paper: #0f0e0c;
+  --page-ink: var(--ink-0);
+  --page-ink-secondary: var(--ink-2);
+  --page-faint: rgba(255, 246, 228, 0.3);
+  --page-blank: rgba(255, 246, 228, 0.25);
+  --page-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 6px 14px rgba(0, 0, 0, 0.35);
 
   /* Liquid Glass (iOS/iPadOS floating toolbars + FABs only — see src/ui/platform.js). */
   --glass-fill: rgba(40, 36, 31, 0.52);
@@ -284,9 +319,23 @@
   --shadow-dialog:
     0 0 0 0.5px rgba(40, 32, 20, 0.14),
     0 24px 56px rgba(40, 32, 20, 0.16);
+  --shadow-canvas-card: 0 1px 2px rgba(40, 32, 20, 0.06), 0 6px 14px rgba(40, 32, 20, 0.1);
+  --shadow-canvas-card-hover: 0 1px 2px rgba(40, 32, 20, 0.08), 0 10px 20px rgba(40, 32, 20, 0.14);
 
   --status-error-soft: color-mix(in srgb, var(--ink-red) 70%, white);
   --accent-foreground: color-mix(in srgb, var(--accent-color) 85%, black);
+
+  /* White paper on a warm grey desk, a shade darker than the sidebars. */
+  --page-desk: #dcd8d0;
+  --page-paper: var(--print-paper);
+  --page-ink: var(--print-ink);
+  --page-ink-secondary: var(--print-ink-secondary);
+  --page-faint: var(--print-faint);
+  --page-blank: var(--print-blank);
+  --page-shadow:
+    0 0 0 0.5px rgba(40, 32, 20, 0.18),
+    0 2px 6px rgba(40, 32, 20, 0.16),
+    0 6px 14px rgba(40, 32, 20, 0.1);
 
   --glass-fill: rgba(255, 253, 248, 0.58);
   --glass-rim: rgba(255, 255, 255, 0.7);
