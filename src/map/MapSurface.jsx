@@ -26,7 +26,7 @@ import MapLayers, { MapDefs } from './MapLayers'
 import { earthLevelFor } from './mapRender'
 import { MAP_TOOLS, TOOL_HINTS, formatZoom } from './mapOptions'
 import MapPanelView from './MapPanelView'
-import SFIcon from '../components/SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { useInspectorOpen } from '../lib/inspectorPresence'
 import { useMapPanel } from './inspector/useMapPanel'
 import { runPanelCommand } from './inspector/panelBuilder'
@@ -994,7 +994,7 @@ export default function MapSurface({
           aria-label="Show the inspector"
           onClick={() => setInspectorOpen(true)}
         >
-          <SFIcon name="sidebar.right" size={16} />
+          <Icon name="sidebar" />
         </button>
       ) : null}
 

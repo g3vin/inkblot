@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { shellBridge } from '../../../bridge'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import { displayName, isOrganization, referencePatch } from './referenceText'
 
 const COMMIT_DELAY_MS = 450
@@ -116,7 +116,7 @@ export default function ReferenceEditor({ view, schema }) {
         commit()
       }}
     >
-      {reference.error ? <p className="reference-error"><SFIcon name="exclamationmark.triangle" size={12} /> {reference.error}</p> : null}
+      {reference.error ? <p className="reference-error"><Icon name="warning" /> {reference.error}</p> : null}
 
       {reference.candidates?.length ? (
         <div className="reference-candidates">
@@ -150,7 +150,7 @@ export default function ReferenceEditor({ view, schema }) {
         <div className="reference-people-head">
           <span className="reference-label">Contributors</span>
           <button type="button" className="reference-icon-button" aria-label="Add a contributor" title="Add an author, editor or other contributor" onClick={addPerson}>
-            <SFIcon name="plus" size={12} />
+            <Icon name="add" />
           </button>
         </div>
         {draft.contributors.map((person, index) => (
@@ -174,7 +174,7 @@ export default function ReferenceEditor({ view, schema }) {
           <label key={spec.key} className={`reference-field${missing ? ' is-missing' : ''}`}>
             <span className="reference-label">
               {spec.label}
-              {missing ? <SFIcon name="exclamationmark.triangle" size={10} /> : null}
+              {missing ? <Icon name="warning" /> : null}
               {spec.input === 'date' && spec.key === 'accessed' ? (
                 <button type="button" className="reference-link" onClick={(event) => { event.preventDefault(); setField(spec.key, today()) }}>Today</button>
               ) : null}

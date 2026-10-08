@@ -9,7 +9,7 @@ import { FormRow, Segmented } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
 import { DEFAULT_CHAPTER_DESIGN } from '../../../print/chapterDesign'
 import { chapterLabel } from '../../../print/bookMatter'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import FinishingSection from './FinishingSection'
 import FontSelect from './FontSelect'
 import { Caution, CommitNumber, CommitText, LengthRow, Note, PickerRow, ToggleRow } from './controls'
@@ -152,7 +152,7 @@ export function NotesSection({ layout }) {
 
 /* ---------------- editions ---------------- */
 
-const EDITION_SYMBOLS = { paperback: 'book', hardcover: 'books.vertical', largePrint: 'textformat.size', ebook: 'ipad.and.iphone' }
+const EDITION_ICONS = { paperback: 'book', hardcover: 'books', largePrint: 'type-style', ebook: 'devices' }
 
 export function EditionsSection({ layout }) {
   const { book, state } = layout
@@ -177,7 +177,7 @@ export function EditionsSection({ layout }) {
       <PickerRow label="Typesetting" value={active ?? ''} onChange={(id) => layout.editEditions('activate', id ? { id } : {})} options={[{ value: '', label: 'The Book as Set Up' }, ...editions.map((e) => ({ value: e.id, label: e.name }))]} />
       {editions.map((edition) => (
         <div key={edition.id} className="fin-list-row">
-          <SFIcon name={EDITION_SYMBOLS[edition.kind ?? 'paperback']} size={14} />
+          <Icon name={EDITION_ICONS[edition.kind ?? 'paperback']} />
           {renaming === edition.id ? (
             <CommitText value={edition.name} label="Edition name" onCommit={(name) => { layout.editEditions('rename', { id: edition.id, name }); setRenaming(null) }} />
           ) : <span className={`fin-grow${edition.id === active ? ' is-strong' : ''}`}>{edition.name}</span>}
@@ -206,12 +206,12 @@ export function EditionsSection({ layout }) {
               { text: 'Delete', action: () => layout.editEditions('delete', { id: edition.id }) },
             ])}
           >
-            <SFIcon name="ellipsis" size={13} />
+            <Icon name="more" />
           </button>
         </div>
       ))}
-      <button type="button" className="fin-button" onClick={add}><SFIcon name="plus" size={11} /> Add an Edition</button>
-      {editions.length ? <button type="button" className="fin-button" onClick={layout.exportAllEditions}><SFIcon name="square.and.arrow.up" size={11} /> Export All Editions…</button> : null}
+      <button type="button" className="fin-button" onClick={add}><Icon name="add" /> Add an Edition</button>
+      {editions.length ? <button type="button" className="fin-button" onClick={layout.exportAllEditions}><Icon name="export" /> Export All Editions…</button> : null}
     </FinishingSection>
   )
 }
@@ -270,7 +270,7 @@ export function ProofSection({ layout }) {
       {state.proof ? (state.spread || state.typesetView === 'digital' ? (
         <Note>The proof reads the chapter’s own pages: show them one at a time, in Print.</Note>
       ) : issues.length === 0 ? (
-        <p className="fin-ok"><SFIcon name="checkmark" size={12} /> Nothing to fix on this chapter’s pages.</p>
+        <p className="fin-ok"><Icon name="check" /> Nothing to fix on this chapter’s pages.</p>
       ) : issues.map((issue) => (
         <div key={issue.id} className="fin-proof-issue" data-kind={issue.kind} role="button" tabIndex={0} title="Show it on the page" onClick={() => layout.showProofIssue(issue)} onKeyDown={(event) => { if (event.key === 'Enter') layout.showProofIssue(issue) }}>
           <strong>{PROOF_NAMES[issue.kind]} · page {issue.page}</strong>
@@ -327,7 +327,7 @@ export function TextStylesSection({ layout }) {
         return (
           <div key={look.id} className="fin-group">
             <button type="button" className="fin-disclosure" aria-expanded={open === look.id} onClick={() => setOpen(open === look.id ? null : look.id)}>
-              <SFIcon name="chevron.down" size={9} />
+              <Icon name="chevron-down" />
               <span style={{ fontStyle: look.italic ? 'italic' : undefined, fontVariant: look.smallCaps ? 'small-caps' : undefined }}>{look.name}</span>
               {state.paragraph?.styleName === look.id ? <span className="fin-muted" title="The caret is in one">· here</span> : null}
             </button>
@@ -359,7 +359,7 @@ export function TextStylesSection({ layout }) {
           setOpen(id)
         }}
       >
-        <SFIcon name="plus" size={11} /> Add a Style
+        <Icon name="add" /> Add a Style
       </button>
     </FinishingSection>
   )
@@ -422,7 +422,7 @@ export function ChapterOpeningsSection({ layout }) {
       {design.ornament === 'glyph' ? (
         <FormRow label="Glyph">
           <CommitText className="fin-centered" value={design.ornamentGlyph} placeholder="❦" label="Glyph" onCommit={(ornamentGlyph) => edit({ ornamentGlyph })} />
-          <button type="button" className="reference-icon-button" aria-label="Glyphs" onClick={(event) => popUpNativeMenu(event, HEAD_GLYPHS.map((glyph) => ({ text: glyph, action: () => edit({ ornamentGlyph: glyph }) })))}><SFIcon name="chevron.down" size={10} /></button>
+          <button type="button" className="reference-icon-button" aria-label="Glyphs" onClick={(event) => popUpNativeMenu(event, HEAD_GLYPHS.map((glyph) => ({ text: glyph, action: () => edit({ ornamentGlyph: glyph }) })))}><Icon name="chevron-down" /></button>
         </FormRow>
       ) : null}
       {design.ornament === 'image' ? (

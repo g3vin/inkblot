@@ -14,7 +14,7 @@ import EditorLayout from './EditorLayout'
 import { loadDocument, listProjects, documentExists } from '../lib/FileSystem'
 import { readDetachedTarget } from '../lib/docWindow'
 import { normalizeNotes } from '../lib/noteUtils'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 
 import './Editor.css'
 

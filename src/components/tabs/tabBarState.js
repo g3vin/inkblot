@@ -36,11 +36,11 @@ export function tabName(docPath) {
   return leaf
 }
 
-export function tabSymbol(docPath) {
-  if (!docPath) return 'plus'
-  if (docPath.endsWith('.canvas')) return 'rectangle.on.rectangle'
+export function tabIcon(docPath) {
+  if (!docPath) return 'add'
+  if (docPath.endsWith('.canvas')) return 'group'
   if (docPath.endsWith('.map')) return 'map'
-  return 'doc.text'
+  return 'document'
 }
 
 const folderOf = (docPath) => {

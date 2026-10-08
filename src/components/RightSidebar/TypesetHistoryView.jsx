@@ -16,15 +16,15 @@ import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { EditionAction, TypesetVersionKind } from '../../types'
 import { Button } from '../../ui'
 import { popUpNativeMenu } from '../../ui/useNativeMenu'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import './TypesetHistory.css'
 import { byDay } from '../../lib/historyDays'
 
-const SYMBOLS = {
+const ICONS = {
   [TypesetVersionKind.Auto]: 'clock',
   [TypesetVersionKind.Named]: 'bookmark',
-  [TypesetVersionKind.Export]: 'printer',
-  [TypesetVersionKind.Restore]: 'arrow.uturn.backward',
+  [TypesetVersionKind.Export]: 'print',
+  [TypesetVersionKind.Restore]: 'undo',
 }
 
 const time = (iso) => {
@@ -79,7 +79,7 @@ export default function TypesetHistoryView() {
           </form>
         ) : (
           <Button variant="tinted" className="typeset-history-save" onClick={() => setNaming({ id: null, name: '' })} title="Keep the book’s typesetting as it is now, under a name">
-            <SFIcon name="plus" size={12} /> Save Typeset Version…
+            <Icon name="add" /> Save Typeset Version…
           </Button>
         )}
         {history.previewing ? (
@@ -102,7 +102,7 @@ export default function TypesetHistoryView() {
                 return (
                   <article key={row.id} className={`typeset-history-row${previewing ? ' is-previewing' : ''}`} data-kind={row.kind}>
                     <header>
-                      <SFIcon name={SYMBOLS[row.kind] ?? 'clock'} size={13} />
+                      <Icon name={ICONS[row.kind] ?? 'clock'} />
                       <span className={`typeset-history-title${row.name ? ' is-named' : ''}`}>{row.name ?? time(row.timestamp)}</span>
                       {row.name ? <span className="typeset-history-time">{time(row.timestamp)}</span> : null}
                     </header>
@@ -113,7 +113,7 @@ export default function TypesetHistoryView() {
                       <button type="button" onClick={() => send('previewTypesetVersion', { id: row.id, compare: true })}>Compare</button>
                       <button type="button" onClick={() => restore(row)}>Restore…</button>
                       <span className="typeset-history-spacer" />
-                      <button type="button" aria-label="More" onClick={(event) => menu(event, row)}><SFIcon name="ellipsis" size={14} /></button>
+                      <button type="button" aria-label="More" onClick={(event) => menu(event, row)}><Icon name="more" /></button>
                     </div>
                   </article>
                 )
@@ -123,7 +123,7 @@ export default function TypesetHistoryView() {
         </div>
       ) : (
         <div className="inspector-placeholder">
-          <SFIcon name="textformat" size={22} />
+          <Icon name="type-style" size={20} />
           <strong>No Typeset Versions Yet</strong>
           <span>A version is kept as you typeset the book, and each time it is printed or exported.</span>
         </div>

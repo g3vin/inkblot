@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import FileTree from './FileTree'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import BookNavigator from './book/BookNavigator'
 import { Segmented } from '../ui'
 import { useLatestBridgeState } from '../bridge'
@@ -110,7 +110,7 @@ export default function LeftSidebar({
           title={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
           aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
         >
-          <SFIcon name="pin" filled={pinned} />
+          <Icon name="pin" active={pinned} />
         </button>
         {projectName ? (
           <span className="panel-header-label left-sidebar-project-title" title={projectName}>

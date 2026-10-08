@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import {
   loadDictationModel,
   startDictation,
@@ -550,7 +550,7 @@ export default function DictationControl({ editor }) {
         aria-label={live ? 'Stop dictation' : 'Start dictation'}
         title={buttonTitle}
       >
-        <SFIcon name="mic" size={16} />
+        <Icon name="dictate" />
         {active ? (
           <span className="dictation-button-wave" aria-hidden="true">
             {barLevels.slice(0, 4).map((barLevel, index) => (

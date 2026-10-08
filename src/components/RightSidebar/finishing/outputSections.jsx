@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FormRow, Popover, Button } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import FinishingSection from './FinishingSection'
 import { Caution, LengthRow, Note, PickerRow, ToggleRow } from './controls'
 import { choosePath, fileUrl, readingTime } from './finishingText'
@@ -37,7 +37,7 @@ export function ScriptProductionSection({ layout, script }) {
         options={[{ value: '', label: 'No One' }, ...script.characters.map((name) => ({ value: name, label: name.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w+/g, (w) => w.toLowerCase()) }))]}
       />
       <FormRow label="Reports">
-        <button type="button" className="fin-button" onClick={(event) => popUpNativeMenu(event, [report('characters'), report('scenes'), report('locations')])}>Report <SFIcon name="chevron.down" size={9} /></button>
+        <button type="button" className="fin-button" onClick={(event) => popUpNativeMenu(event, [report('characters'), report('scenes'), report('locations')])}>Report <Icon name="chevron-down" /></button>
       </FormRow>
       <FormRow label="Sides">
         <button ref={sidesRef} type="button" className="fin-button" disabled={!script.scenes.length} onClick={() => setSides(true)}>Print Sides…</button>
@@ -84,7 +84,7 @@ function SidesPicker({ scenes, onPrint }) {
 
 /* ---------------- publishing ---------------- */
 
-const SEVERITY_SYMBOLS = { error: 'xmark', warning: 'exclamationmark.triangle', note: 'number' }
+const SEVERITY_ICONS = { error: 'close', warning: 'warning', note: 'number' }
 
 export function PublishingSection({ layout }) {
   const { state, book, unit } = layout
@@ -132,12 +132,12 @@ export function PublishingSection({ layout }) {
       ) : null}
       {publishing.service !== 'none' ? (issues.length ? issues.map((issue) => (
         <div key={issue.id} className="fin-preflight" data-severity={issue.severity}>
-          <span className="fin-preflight-icon"><SFIcon name={SEVERITY_SYMBOLS[issue.severity] ?? 'number'} size={12} /></span>
+          <span className="fin-preflight-icon"><Icon name={SEVERITY_ICONS[issue.severity] ?? 'number'} /></span>
           <span className="fin-grow">{issue.message}</span>
           {issue.fixLabel && issue.fixedSetup ? <button type="button" className="fin-button is-small" onClick={() => layout.fixPreflight(issue)}>{issue.fixLabel}</button> : null}
         </div>
       )) : (
-        <p className="fin-ok"><SFIcon name="checkmark.seal" size={12} /> {report?.pageCount > 0 ? 'Ready for the printer.' : 'The setup passes. Count the pages to check the rest.'}</p>
+        <p className="fin-ok"><Icon name="verified" /> {report?.pageCount > 0 ? 'Ready for the printer.' : 'The setup passes. Count the pages to check the rest.'}</p>
       )) : null}
     </FinishingSection>
   )
@@ -173,7 +173,7 @@ export function CoverSection({ layout }) {
                 { text: 'Delete…', action: () => { if (window.confirm?.(`Delete the cover “${set.name}”? Its pictures stay in the project.`) ?? true) layout.editCovers('delete', { id: set.id }) } },
               ])}
             >
-              {set.frontFile || set.wrapFile ? <img src={fileUrl(set.frontFile ?? set.wrapFile)} alt="" /> : <span className="fin-cover-blank"><SFIcon name="book" size={16} /></span>}
+              {set.frontFile || set.wrapFile ? <img src={fileUrl(set.frontFile ?? set.wrapFile)} alt="" /> : <span className="fin-cover-blank"><Icon name="book" /></span>}
               {renaming === set.id ? (
                 <input
                   autoFocus

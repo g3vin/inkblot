@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FormRow, Segmented } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import FinishingSection from './FinishingSection'
 import FontSelect from './FontSelect'
 import { Caution, CommitNumber, CommitText, LengthInput, LengthRow, Note, NumberRow, PickerRow, ToggleRow } from './controls'
@@ -26,7 +26,7 @@ export function FormatSection({ layout }) {
   const modified = !editsBook || state.setupSource === 'book' ? state.formatModified : false
   return (
     <FinishingSection id={SECTION.format} title="Format">
-      {editsBook ? <p className="fin-banner"><SFIcon name="books.vertical" size={12} /> Editing the setup every chapter of the book prints in.</p> : null}
+      {editsBook ? <p className="fin-banner"><Icon name="books" /> Editing the setup every chapter of the book prints in.</p> : null}
       <PickerRow
         label="Format"
         value={current?.id ?? 'custom'}
@@ -198,7 +198,7 @@ function RunningTextEditor({ title, value, onCommit, tokens, resolve }) {
       <div className="fin-running-head">
         <span className="fin-label">{title}</span>
         <button type="button" className="reference-icon-button" aria-label="Insert a token" title="Insert a page number, the title, the chapter or the author" onClick={insert}>
-          <SFIcon name="plus" size={12} />
+          <Icon name="add" />
         </button>
       </div>
       <div className="fin-running-fields">
@@ -264,7 +264,7 @@ export function TextFlowSection({ layout, toolbarTarget, send }) {
       />
       <ToggleRow label="Chapters Start on a Right-Hand Page" checked={setup.chapterStartsOnRecto} onChange={(on) => layout.applySetup({ chapterStartsOnRecto: on })} />
       <FormRow label="Insert">
-        <button type="button" className="fin-button" disabled={!toolbarTarget} onClick={insertBreak}>Break <SFIcon name="chevron.down" size={9} /></button>
+        <button type="button" className="fin-button" disabled={!toolbarTarget} onClick={insertBreak}>Break <Icon name="chevron-down" /></button>
       </FormRow>
     </FinishingSection>
   )
@@ -307,7 +307,7 @@ export function TypographySection({ layout }) {
         <>
           <FormRow label="Font">
             <FontSelect value={t.fontFamily} projectFamilies={projectFonts.map((f) => f.family)} onChange={(name) => edit({ fontFamily: cssFamily(name) })} />
-            <button type="button" className="reference-icon-button" aria-label="Add a font file" title="Add a font file to the project, so the book sets and embeds it on any computer" onClick={addFont}><SFIcon name="plus" size={12} /></button>
+            <button type="button" className="reference-icon-button" aria-label="Add a font file" title="Add a font file to the project, so the book sets and embeds it on any computer" onClick={addFont}><Icon name="add" /></button>
           </FormRow>
           {current && !current.embeddable ? <Caution>{current.family}’s licence does not allow embedding. A printer’s PDF and a store’s EPUB must embed their fonts.</Caution> : null}
           <FormRow label="Size"><span className="fin-length"><CommitNumber value={t.fontSizePt} digits={1} min={5} max={72} label="Size" onCommit={(fontSizePt) => edit({ fontSizePt })} /><span className="fin-unit">pt</span></span></FormRow>
@@ -326,7 +326,7 @@ export function TypographySection({ layout }) {
             <Segmented value={t.alignment} onChange={(alignment) => edit({ alignment })} label="Alignment" options={[{ value: 'left', label: 'Left' }, { value: 'justify', label: 'Justified' }]} />
           </FormRow>
           <ToggleRow label="Hyphenate" checked={t.hyphenate} onChange={(hyphenate) => edit({ hyphenate })} />
-          <button type="button" className="fin-disclosure" aria-expanded={fine} onClick={() => setFine(!fine)}><SFIcon name="chevron.down" size={9} /> Fine Typography</button>
+          <button type="button" className="fin-disclosure" aria-expanded={fine} onClick={() => setFine(!fine)}><Icon name="chevron-down" /> Fine Typography</button>
           {fine ? (
             <div className="fin-group">
               <ToggleRow label="Balance Each Paragraph" title="Set a paragraph’s lines as a whole: even spacing, fewer hyphens, no word alone on the last line" checked={comp.balance} onChange={(balance) => editComposition({ balance })} />
@@ -340,7 +340,7 @@ export function TypographySection({ layout }) {
               <ToggleRow label="Align to Baseline Grid" title="Headings, quotations, breaks and pictures take whole lines, so lines stand level across a spread" checked={comp.baselineGrid} onChange={(baselineGrid) => editComposition({ baselineGrid })} />
             </div>
           ) : null}
-          <button type="button" className="fin-disclosure" aria-expanded={open} onClick={() => setOpen(!open)}><SFIcon name="chevron.down" size={9} /> OpenType</button>
+          <button type="button" className="fin-disclosure" aria-expanded={open} onClick={() => setOpen(!open)}><Icon name="chevron-down" /> OpenType</button>
           {open ? (
             <div className="fin-group">
               <ToggleRow label="Ligatures" checked={feat.ligatures} onChange={(ligatures) => editFeatures({ ligatures })} />
@@ -355,7 +355,7 @@ export function TypographySection({ layout }) {
           <ToggleRow label="No Indent After a Heading or Break" checked={t.noIndentAfterBreak} onChange={(noIndentAfterBreak) => edit({ noIndentAfterBreak })} />
           <FormRow label="Scene Break">
             <CommitText className="fin-centered" value={t.sceneBreak} placeholder="* * *" label="Scene Break" onCommit={(sceneBreak) => edit({ sceneBreak })} />
-            <button type="button" className="reference-icon-button" aria-label="Common scene breaks" onClick={(event) => popUpNativeMenu(event, SCENE_BREAKS.map((glyph) => ({ text: glyph, action: () => edit({ sceneBreak: glyph }) })))}><SFIcon name="chevron.down" size={10} /></button>
+            <button type="button" className="reference-icon-button" aria-label="Common scene breaks" onClick={(event) => popUpNativeMenu(event, SCENE_BREAKS.map((glyph) => ({ text: glyph, action: () => edit({ sceneBreak: glyph }) })))}><Icon name="chevron-down" /></button>
           </FormRow>
         </>
       ) : null}

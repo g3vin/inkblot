@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { Button, FormRow, IconButton, SelectMenu, Stepper, Toggle } from '../../ui'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { GOAL_METRICS, METRIC_INFO, goalFor, goalSummary, goalTarget, newDeadline } from '../../stats/goals.js'
 import { dayDate, dayKey, formatNumber, newId, orderedWeekdays, weekdayName } from '../../stats/day.js'
 import useProjects from './useProjects.js'
@@ -27,7 +27,7 @@ export function DayGoalEditor({ goal, onChange }) {
               <SelectMenu label="Measure" value={target.metric} options={METRIC_OPTIONS} onChange={(metric) => setTarget(target.id, { metric })} />
               <Stepper label="Amount" value={target.amount} min={1} max={100000} step={target.metric === 'words' || target.metric === 'netWords' ? 50 : 1} unit={METRIC_INFO[target.metric].unit}
                 onChange={(amount) => setTarget(target.id, { amount })} />
-              <IconButton symbol="minus" label="Remove Target" size="capsule" iconSize={12} onClick={() => change({ targets: goal.targets.filter((t) => t.id !== target.id) })} />
+              <IconButton icon="minus" label="Remove Target" size="capsule" onClick={() => change({ targets: goal.targets.filter((t) => t.id !== target.id) })} />
             </div>
           ))}
           <div className="settings-actions">
@@ -51,7 +51,7 @@ function Disclosure({ title, value, open, onToggle, children }) {
   return (
     <div className="settings-disclosure" data-open={open}>
       <button type="button" className="settings-disclosure-head" aria-expanded={open} onClick={onToggle}>
-        <SFIcon name="chevron.right" size={10} className="settings-chevron" />
+        <Icon name="chevron-right" className="settings-chevron" />
         <span className="settings-disclosure-title">{title}</span>
         <span className="settings-disclosure-value">{value}</span>
       </button>
@@ -144,7 +144,7 @@ export default function GoalsPane({ stats }) {
             const deadline = newDeadline(stats.tracker.project ?? projects[0] ?? '', dayKey(new Date()))
             save({ ...config, deadlines: [...config.deadlines, deadline] })
             setEditing(deadline.id)
-          }}><SFIcon name="calendar" size={12} />Add Deadline</Button>
+          }}><Icon name="calendar" />Add Deadline</Button>
         </div>
         <p className="settings-footer">Inkblot works out each writing day’s share from the words left and the days left, and when you’ll finish at your recent pace.</p>
       </section>

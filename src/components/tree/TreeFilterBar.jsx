@@ -4,7 +4,7 @@
  * match, and buttons for recent files and expanding every folder.
  */
 import { useRef } from 'react'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
 import { TREE_KINDS } from '../../lib/treeFilter'
 import './TreeFilterBar.css'
@@ -26,7 +26,7 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
             TREE_KINDS.map(({ value, label }) => ({ text: label, checked: filter.kind === value, action: () => set({ kind: value }) })))
         }}
       >
-        <SFIcon name="line.3.horizontal.decrease.circle" size={13} />
+        <Icon name="filter" />
       </button>
       <input
         ref={inputRef}
@@ -39,7 +39,7 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
       />
       {filter.text ? (
         <button type="button" className="tree-filter-button" aria-label="Clear Filter" title="Clear Filter" onClick={() => set({ text: '' })}>
-          <SFIcon name="xmark" size={10} />
+          <Icon name="close" />
         </button>
       ) : null}
       <button
@@ -51,10 +51,10 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
         title="Show Only Recent Files"
         onClick={() => set({ recentOnly: !filter.recentOnly })}
       >
-        <SFIcon name="clock" size={13} />
+        <Icon name="clock" />
       </button>
       <button type="button" className="tree-filter-button" aria-label="Expand or Collapse All Folders" title="Expand or Collapse All Folders" onClick={onToggleFolders}>
-        <SFIcon name="plusminus.circle" size={13} />
+        <Icon name="plus-minus" />
       </button>
     </div>
   )

@@ -90,7 +90,7 @@ function mapTabSections(ui, props, { newUnit, setNewUnit, trace, exporter }) {
       ui.stat('The sheet spans', formatDistance(map.background.width * space.kmPerUnit, map.scale.displayUnit, map)),
       ui.choice('scale.unit', 'Measure in', map.scale.displayUnit, mapUnits(map).map((unit) => ({ value: unit.id, label: unit.name })), (displayUnit) => patchScale({ displayUnit })),
       ui.number('scale.pixel', 'One pixel is', Number((space.kmPerUnit * 1000).toPrecision(4)), (metres) => patchScale({ kmPerUnit: metres / 1000, calibration: null }), { min: 0.000001, suffix: 'm' }),
-      ui.buttonField('scale.calibrate', 'Set from two points…', () => onTool('calibrate'), { symbol: 'ruler' }),
+      ui.buttonField('scale.calibrate', 'Set from two points…', () => onTool('calibrate'), { icon: 'ruler' }),
       map.scale.calibration ? ui.note(`Set from two points ${map.scale.calibration.distance} ${map.scale.calibration.unit} apart.`) : null,
       ui.group('scale.units', 'Units of your world', [
         ...map.scale.customUnits.map((unit) => ui.stat(unit.name, `${unit.km} km`)),

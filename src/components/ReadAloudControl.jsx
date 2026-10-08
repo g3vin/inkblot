@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { clearReadAloudHighlight, setReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import {
   DEFAULT_READ_ALOUD_VOICE,
@@ -676,7 +676,7 @@ export default function ReadAloudControl({ editor }) {
         aria-label="Read aloud options"
         title="Read aloud"
       >
-        <SFIcon name="read.aloud" size={16} />
+        <Icon name="read-aloud" />
       </button>
       {popover}
     </div>

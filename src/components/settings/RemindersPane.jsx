@@ -34,7 +34,7 @@ function ReminderRow({ reminder, onChange, onDelete }) {
             if (Number.isFinite(hour) && Number.isFinite(minute)) change({ hour, minute })
           }}
         />
-        <IconButton symbol="trash" label="Delete Reminder" size="capsule" iconSize={12} onClick={onDelete} />
+        <IconButton icon="delete" label="Delete Reminder" size="capsule" onClick={onDelete} />
       </div>
       <WeekdayToggles value={reminder.weekdays} onChange={(weekdays) => change({ weekdays })} />
       <input className="settings-input" aria-label="Message" placeholder="Inkblot’s own words" value={reminder.message} onChange={(event) => change({ message: event.target.value })} />
