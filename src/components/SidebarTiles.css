@@ -150,7 +150,8 @@
 }
 
 
-.main-layout:not(.is-canvas-underlay) .map-pane {
+.main-layout:not(.is-canvas-underlay) .map-pane,
+.main-layout:not(.is-canvas-underlay) .timeline-pane {
   box-sizing: border-box;
   padding-top: var(--app-titlebar-height);
 }

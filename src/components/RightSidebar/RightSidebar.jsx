@@ -29,6 +29,7 @@ import { inspectorTab } from '../../lib/chromeLayout'
 import Workbench from './Workbench'
 import NotesPanel from '../NotesPanel'
 import HistoryPanel from './HistoryPanel'
+import TimelineSidebarPanel from '../../timeline/TimelineSidebarPanel'
 import SidebarSearch from './SidebarSearch'
 import ClipboardPanel from './ClipboardPanel'
 import SFIcon from '../SFIcon'
@@ -775,6 +776,16 @@ export default function RightSidebar({
     if (tabId === 'stats') return <StatsPanel query={panelQuery} />
     if (tabId === 'typeset') return <TypesetPanel onShowOutput={() => handleSelectTab('output')} />
     if (tabId === 'output') return <OutputPanel />
+
+    if (tabId === 'timeline') {
+      return (
+        <TimelineSidebarPanel
+          projectName={projectName}
+          docPath={activeDoc}
+          editor={activeDoc === secondaryDoc && activeDoc !== currentDoc ? secondaryEditor : editor}
+        />
+      )
+    }
 
     if (tabId !== 'history') {
       const spec = inspectorTab(tabId)

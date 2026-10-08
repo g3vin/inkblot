@@ -7,6 +7,7 @@
 import SFIcon from '../components/SFIcon'
 import { PinGlyph } from './mapGlyphs'
 import { CheckField, ColorField, Field, NumberField, Section, SelectField, Stat, TextField } from './inspector/fields'
+import { inkColor } from '../lib/palette'
 
 const buttonClass = (button) =>
   `map-button${button.role === 'primary' ? ' is-primary' : button.role === 'destructive' ? ' is-danger' : ''}`
@@ -43,7 +44,7 @@ function selectOptions(options) {
 }
 
 const Swatch = ({ color, round = true }) => (
-  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: round ? 5 : 2, background: color, marginRight: 6 }} />
+  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: round ? 5 : 2, background: inkColor(color), marginRight: 6 }} />
 )
 
 function DateField({ field, commit }) {

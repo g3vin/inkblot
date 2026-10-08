@@ -13,16 +13,21 @@ import {
   makeFileNode,
   makeLinkNode,
   makeNoteNode,
+  makeTimelineEventNode,
   DEFAULT_FILE_NODE_SIZE,
+  DEFAULT_TIMELINE_EVENT_NODE_SIZE,
   DEFAULT_LINK_NODE_SIZE,
   DEFAULT_NOTE_NODE_SIZE,
 } from '../lib/canvasModel'
 import { normalizePinterestBoardUrl } from '../lib/pinterestBoard'
 import { docPathToFilePath } from './useDocPreview'
+import { commitTimelineEdit } from '../lib/timeline/timelineEdits'
+import { addLink } from '../lib/timeline/timelineModel'
 import {
   CANVAS_COMMAND_EVENT,
   CANVAS_DROP_DOC_EVENT,
   CANVAS_DROP_NOTE_EVENT,
+  CANVAS_DROP_TIMELINE_EVENT,
   CANVAS_RESTORE_EVENT,
   CANVAS_REVEAL_EVENT,
   dispatchCanvasDropNote,
@@ -38,6 +43,7 @@ export function useCanvasExternalEvents({
   deleteSelection,
   dispatch,
   docPath,
+  projectName,
   groupSelection,
   handleToggleRecording,
   handleZoomToFit,
@@ -190,6 +196,32 @@ export function useCanvasExternalEvents({
       surface.removeEventListener('drop', onDrop)
     }
   }, [dispatch, onActivate, screenToWorldAt, selectNode, surfaceRef])
+
+  /* ---------------- timeline events dropped from a timeline view ---------------- */
+
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface) return undefined
+
+    const onDropEvent = (event) => {
+      const { eventId, clientX, clientY } = event.detail || {}
+      if (!eventId) return
+      onActivate?.()
+      const point = screenToWorldAt(clientX, clientY)
+      const node = makeTimelineEventNode({
+        eventId,
+        x: point.x - DEFAULT_TIMELINE_EVENT_NODE_SIZE.width / 2,
+        y: point.y - DEFAULT_TIMELINE_EVENT_NODE_SIZE.height / 2,
+      })
+      dispatch({ type: 'nodes/add', nodes: [node] })
+      selectNode(node.id)
+      // The event lists the card among what it is linked to.
+      if (projectName) void commitTimelineEdit(projectName, 'Put event on canvas', (tl) => addLink(tl, eventId, { kind: 'canvas', path: docPath, node: node.id }))
+    }
+
+    surface.addEventListener(CANVAS_DROP_TIMELINE_EVENT, onDropEvent)
+    return () => surface.removeEventListener(CANVAS_DROP_TIMELINE_EVENT, onDropEvent)
+  }, [dispatch, docPath, onActivate, projectName, screenToWorldAt, selectNode, surfaceRef])
 
   /* ---------------- commands from the native context menu ---------------- */
 

@@ -1,7 +1,8 @@
 //! Which kind of document a tree path refers to.
 //!
 //! Canvases live on disk as `<name>.canvas.json`, so their tree path is
-//! `Folder/name.canvas`; maps likewise as `<name>.map.json` → `Folder/name.map`.
+//! `Folder/name.canvas`; maps likewise as `<name>.map.json` → `Folder/name.map`, and
+//! timeline views as `<name>.timeline.json` → `Folder/name.timeline`.
 //! Every path→file mapping appends `.json` to the tree path, so structured documents
 //! travel through save/load/rename/move/delete unchanged, and the document kind is a
 //! pure function of the path — no file read required.
@@ -15,12 +16,14 @@ use crate::types::DocKind;
 
 pub const CANVAS_SUFFIX: &str = ".canvas";
 pub const MAP_SUFFIX: &str = ".map";
+pub const TIMELINE_SUFFIX: &str = ".timeline";
 
 /// The suffix a kind carries on its tree path; a text document carries none.
 fn kind_suffix(kind: DocKind) -> Option<&'static str> {
     match kind {
         DocKind::Canvas => Some(CANVAS_SUFFIX),
         DocKind::Map => Some(MAP_SUFFIX),
+        DocKind::Timeline => Some(TIMELINE_SUFFIX),
         DocKind::Text => None,
     }
 }
@@ -30,6 +33,7 @@ pub fn doc_kind_name(kind: DocKind) -> &'static str {
     match kind {
         DocKind::Canvas => "canvas",
         DocKind::Map => "map",
+        DocKind::Timeline => "timeline",
         DocKind::Text => "text document",
     }
 }
@@ -40,6 +44,8 @@ pub fn get_doc_kind(path: &str) -> DocKind {
         DocKind::Canvas
     } else if path.ends_with(MAP_SUFFIX) {
         DocKind::Map
+    } else if path.ends_with(TIMELINE_SUFFIX) {
+        DocKind::Timeline
     } else {
         DocKind::Text
     }
@@ -51,6 +57,11 @@ pub fn is_canvas_doc(path: &str) -> bool {
 
 pub fn is_map_doc(path: &str) -> bool {
     matches!(get_doc_kind(path), DocKind::Map)
+}
+
+/// A timeline view: how one document shows the project's chronology (`types::timeline`).
+pub fn is_timeline_doc(path: &str) -> bool {
+    matches!(get_doc_kind(path), DocKind::Timeline)
 }
 
 /// A rich-text document — the only kind the text save path, autosave, print and word
@@ -113,6 +124,8 @@ mod tests {
         assert_eq!(get_doc_kind("World/Aria.map"), DocKind::Map);
         assert_eq!(get_doc_kind("x.canvas.map"), DocKind::Map);
         assert_eq!(get_doc_kind("x.map.canvas"), DocKind::Canvas);
+        assert_eq!(get_doc_kind("Plot/Main.timeline"), DocKind::Timeline);
+        assert_eq!(get_doc_kind("Plot/Main.timeline.backup"), DocKind::Text);
     }
 
     #[test]
@@ -133,12 +146,15 @@ mod tests {
         assert_eq!(strip_doc_suffix("Aria.map"), "Aria");
         assert_eq!(strip_doc_suffix("board.canvas"), "board");
         assert_eq!(strip_doc_suffix("x.canvas.map"), "x.canvas");
+        assert_eq!(with_doc_suffix("Main", DocKind::Timeline), "Main.timeline");
+        assert_eq!(strip_doc_suffix("Main.timeline"), "Main");
     }
 
     #[test]
     fn display_name_takes_the_last_non_empty_segment() {
         assert_eq!(get_doc_display_name("A//B/board.canvas"), "board");
         assert_eq!(get_doc_display_name("World/Aria.map"), "Aria");
+        assert_eq!(get_doc_display_name("Plot/Main.timeline"), "Main");
         assert_eq!(get_doc_display_name("board"), "board");
         assert_eq!(get_doc_display_name("A/B/"), "B");
         assert_eq!(get_doc_display_name(""), "");

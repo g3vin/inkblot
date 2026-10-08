@@ -15,6 +15,7 @@
 export const CANVAS_COMMAND_EVENT = 'canvas:command'
 export const CANVAS_DROP_DOC_EVENT = 'canvas:drop-doc'
 export const CANVAS_DROP_NOTE_EVENT = 'canvas:drop-note'
+export const CANVAS_DROP_TIMELINE_EVENT = 'canvas:drop-timeline-event'
 export const CANVAS_REVEAL_EVENT = 'canvas:reveal-node'
 export const CANVAS_RESTORE_EVENT = 'canvas:restore-version'
 
@@ -88,6 +89,13 @@ export function dispatchCanvasDropNote(surface, { docPath, noteId, clientX, clie
   surface.dispatchEvent(
     new CustomEvent(CANVAS_DROP_NOTE_EVENT, { detail: { docPath, noteId, clientX, clientY } })
   )
+  return true
+}
+
+/** Drop a timeline event onto a canvas, as a card that shows it live. */
+export function dispatchCanvasDropTimelineEvent(surface, { eventId, clientX, clientY }) {
+  if (!surface || !eventId) return false
+  surface.dispatchEvent(new CustomEvent(CANVAS_DROP_TIMELINE_EVENT, { detail: { eventId, clientX, clientY } }))
   return true
 }
 

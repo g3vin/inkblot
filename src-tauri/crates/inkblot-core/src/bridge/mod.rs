@@ -18,6 +18,7 @@
 //!   -> event      WebviewEvent     (webview -> shell)
 //!   -> sidebar    the inspector's notes, clipboard, tiles and versions
 //!   -> tabs       the tab bar and split view
+//!   -> timeline   a timeline view's chrome, passages attached to events, the time lens
 //!   -> envelope   what goes on the wire, plus the request/reply pair
 //! ```
 //!
@@ -55,6 +56,7 @@ pub mod references;
 pub mod print;
 pub mod sidebar;
 pub mod tabs;
+pub mod timeline;
 
 pub use archive::{ArchivedItem, ArchivedKind};
 pub use bubble::{BubbleAside, BubbleForm, BubbleMode, BubbleSession, BubbleWord};
@@ -117,6 +119,11 @@ pub use map::{
     MapPanelTab, MapShapePreview, MapStatRow,
     MapTableCell, MapTableRowView, MapTableView, MapTextInput, MapToggleInput,
     MapTool,
+};
+pub use timeline::{
+    AttachTimelineEventCommand, JumpToTimelinePassageCommand, RevealTimelineEventCommand, SetTimeLensCommand,
+    SetTimelineRangeEditingCommand, TimelineChromeChanged, TimelineChromeState, TimelineCommandRequest,
+    TimelineCursorChanged, TimelineRangesChanged,
 };
 pub use common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 pub use envelope::{

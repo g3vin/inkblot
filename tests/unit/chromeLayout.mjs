@@ -87,16 +87,16 @@ ok('adding: nothing it already has', L.adding(['a'], ['a'], ['a']).join('') === 
 
 const I = (raw) => L.normalizeInspectorLayouts(raw)
 let layouts = I(null)
-ok('nothing saved: Write has its defaults', L.tabsOf(layouts, 'drafting').join() === 'clipboard,workbench,notes,references,history,stats')
+ok('nothing saved: Write has its defaults', L.tabsOf(layouts, 'drafting').join() === 'clipboard,workbench,notes,timeline,references,history,stats')
 ok('and Typeset has its own', L.tabsOf(layouts, 'finishing').join() === 'typeset,output,notes,references,history,stats')
-ok('corrupt JSON is the defaults', L.tabsOf(I('][') , 'drafting').length === 6)
+ok('corrupt JSON is the defaults', L.tabsOf(I('][') , 'drafting').length === 7)
 
 // An earlier version's bare map, from before Stats, Typeset and Print & Export: with no
 // known list, those are the ones it never knew about.
 layouts = I(JSON.stringify({ drafting: ['notes', 'clipboard', 'history'], finishing: ['page', 'book', 'publish', 'notes'] }))
 ok('renamed tabs read as what they became, once', L.tabsOf(layouts, 'finishing').slice(0, 2).join() === 'typeset,output')
 ok('a tab added later arrives after the one it follows by default',
-  L.tabsOf(layouts, 'drafting').join() === 'notes,clipboard,history,stats')
+  L.tabsOf(layouts, 'drafting').join() === 'notes,timeline,clipboard,history,stats')
 ok('a layout that has it by default gets it once', L.tabsOf(layouts, 'finishing').filter((t) => t === 'stats').length === 1)
 
 layouts = I(JSON.stringify({ layouts: { drafting: ['notes'] }, known: L.ARRANGEABLE_TABS }))
@@ -106,7 +106,7 @@ layouts = I(JSON.stringify({ layouts: { drafting: ['map', 'nonsense', 'notes', '
 ok('the map, unknown tabs and repeats are dropped', L.tabsOf(layouts, 'drafting').join() === 'notes')
 
 layouts = I(JSON.stringify({ layouts: { drafting: [] }, known: L.ARRANGEABLE_TABS }))
-ok('an empty layout falls back to its defaults', L.tabsOf(layouts, 'drafting').length === 6)
+ok('an empty layout falls back to its defaults', L.tabsOf(layouts, 'drafting').length === 7)
 
 layouts = I(JSON.stringify({ layouts: {}, known: L.ARRANGEABLE_TABS, last: { drafting: 'notes', finishing: 'bogus' } }))
 ok('the last tab per layout reads back, and a bad one is dropped', layouts.last.drafting === 'notes' && !layouts.last.finishing)
@@ -117,7 +117,7 @@ ok('a round trip keeps a hidden tab hidden', !L.tabsOf(round, 'drafting').includ
 /* ---------------- Customize Layout… ---------------- */
 
 layouts = I(null)
-ok('rows: shown in order, then the rest', L.rowsFor(layouts, 'drafting').join() === 'clipboard,workbench,notes,references,history,stats,typeset,output')
+ok('rows: shown in order, then the rest', L.rowsFor(layouts, 'drafting').join() === 'clipboard,workbench,notes,timeline,references,history,stats,typeset,output')
 
 layouts = L.setTabShown(layouts, 'drafting', 'output', true)
 ok('a newly shown tab goes last', L.tabsOf(layouts, 'drafting').at(-1) === 'output')
@@ -127,13 +127,13 @@ only = L.setTabShown(only, 'drafting', 'notes', false)
 ok('the last tab cannot be hidden', L.tabsOf(only, 'drafting').join() === 'notes')
 
 layouts = L.moveTab(I(null), 'drafting', 0, 3)
-ok('a move reorders the shown tabs', L.tabsOf(layouts, 'drafting').join() === 'workbench,notes,clipboard,references,history,stats')
+ok('a move reorders the shown tabs', L.tabsOf(layouts, 'drafting').join() === 'workbench,notes,clipboard,timeline,references,history,stats')
 
-layouts = L.moveTab(I(null), 'drafting', 0, 8)
+layouts = L.moveTab(I(null), 'drafting', 0, 9)
 ok('a shown tab dragged among the hidden ones stays ahead of them',
-  L.tabsOf(layouts, 'drafting').join() === 'workbench,notes,references,history,stats,clipboard')
+  L.tabsOf(layouts, 'drafting').join() === 'workbench,notes,timeline,references,history,stats,clipboard')
 
-layouts = L.moveTab(I(null), 'drafting', 7, 0)
+layouts = L.moveTab(I(null), 'drafting', 8, 0)
 ok('a hidden row does not become shown by moving', !L.tabsOf(layouts, 'drafting').includes('output'))
 
 layouts = L.restoreInspectorDefaults(L.setTabShown(I(null), 'drafting', 'clipboard', false), 'drafting')
