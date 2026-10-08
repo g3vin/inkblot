@@ -53,7 +53,7 @@ pub use map::{
 };
 pub use note::{
     AudioClip, Note, NoteImage, NotePreviewLayout, NotePreviewSize, NoteType, DEFAULT_NOTE_COLOR,
-    NOTE_COLOR_OPTIONS,
+    INK_IDS, NOTE_COLOR_OPTIONS,
 };
 pub use page_setup::{
     AuthorProfile, BackMatter, ChapterMeta, ImageAlign, ImageTypesetting, BindingSettings, BindingType, BookItem, BookItemKind, BookSettings,

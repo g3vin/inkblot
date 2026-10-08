@@ -16,11 +16,18 @@ use typeshare::typeshare;
 
 use super::json::JsonMap;
 
-pub const DEFAULT_NOTE_COLOR: &str = "#ffd54f";
+/// A note's colour is an ink id from the ink palette (`src/lib/palette.ts`), or a hex
+/// (notes saved before the palette, or given a custom colour). `DEFAULT_NOTE_INK`.
+pub const DEFAULT_NOTE_COLOR: &str = "amber";
 
-/// `NOTE_COLOR_OPTIONS` in noteUtils.js.
-pub const NOTE_COLOR_OPTIONS: [&str; 6] = [
-    "#ffd54f", "#ff9aa2", "#9ad0f5", "#9ee493", "#c7a8ff", "#ffb86b",
+/// `NOTE_COLOR_OPTIONS` in noteUtils.js (`NOTE_INKS` in palette.ts).
+pub const NOTE_COLOR_OPTIONS: [&str; 8] = [
+    "amber", "red", "blue", "green", "violet", "rust", "teal", "slate",
+];
+
+/// The ink ids (`InkId` in palette.ts).
+pub const INK_IDS: [&str; 8] = [
+    "blue", "teal", "green", "amber", "rust", "red", "violet", "slate",
 ];
 
 #[typeshare]

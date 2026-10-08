@@ -28,13 +28,13 @@ use serde_json::{Map, Value};
 use crate::canvas_geometry::{node_rect, nodes_bounds, pad_rect, rect_contains};
 use crate::types::{
     CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState, EdgeSide,
-    JsonMap, Rect, Viewport,
+    JsonMap, Rect, Viewport, INK_IDS,
 };
 
 pub const CANVAS_FORMAT_VERSION: u32 = 1;
 
-/// A JSON Canvas color preset. A node may also carry any hex color, which passes
-/// through untouched.
+/// A JSON Canvas color preset. The spec's ids '1'–'6' are drawn in the ink palette
+/// (`src/lib/palette.ts`), as a CSS variable that follows the theme.
 pub struct CanvasColorPreset {
     pub id: &'static str,
     pub label: &'static str,
@@ -45,36 +45,80 @@ pub const CANVAS_COLOR_PRESETS: [CanvasColorPreset; 6] = [
     CanvasColorPreset {
         id: "1",
         label: "Red",
-        value: "#e5534b",
+        value: "var(--ink-red)",
     },
     CanvasColorPreset {
         id: "2",
-        label: "Orange",
-        value: "#e8873c",
+        label: "Rust",
+        value: "var(--ink-rust)",
     },
     CanvasColorPreset {
         id: "3",
-        label: "Yellow",
-        value: "#e0b341",
+        label: "Amber",
+        value: "var(--ink-amber)",
     },
     CanvasColorPreset {
         id: "4",
         label: "Green",
-        value: "#4fb477",
+        value: "var(--ink-green)",
     },
     CanvasColorPreset {
         id: "5",
-        label: "Cyan",
-        value: "#3fa9c4",
+        label: "Teal",
+        value: "var(--ink-teal)",
     },
     CanvasColorPreset {
         id: "6",
-        label: "Purple",
-        value: "#a07cd4",
+        label: "Violet",
+        value: "var(--ink-violet)",
     },
 ];
 
-/// Resolve a spec color ('1'–'6' or '#rrggbb') to a CSS color.
+/// Hex values written by palettes before the ink palette, and the ink that took each
+/// one's place (`LEGACY_HEX_TO_INK` in `src/lib/palette.ts`). Lower-case keys.
+const LEGACY_HEX_TO_INK: [(&str, &str); 19] = [
+    ("#ffd54f", "amber"),
+    ("#ff9aa2", "red"),
+    ("#9ad0f5", "blue"),
+    ("#9ee493", "green"),
+    ("#c7a8ff", "violet"),
+    ("#ffb86b", "rust"),
+    ("#007aff", "blue"),
+    ("#e5534b", "red"),
+    ("#e8873c", "rust"),
+    ("#e0b341", "amber"),
+    ("#4fb477", "green"),
+    ("#3fa9c4", "teal"),
+    ("#a07cd4", "violet"),
+    ("#7aaef7", "blue"),
+    ("#58cbb3", "teal"),
+    ("#ff8c73", "rust"),
+    ("#f47ca3", "red"),
+    ("#f0be57", "amber"),
+    ("#47b8d6", "teal"),
+];
+
+/// Any stored colour → a CSS colour, as `inkColor` in `src/lib/palette.ts`: an ink id
+/// or a hex from an earlier palette draws as its ink, any other colour passes through
+/// trimmed, and a blank one is Ink Blue.
+pub fn ink_color(value: &str) -> String {
+    if INK_IDS.contains(&value) {
+        return format!("var(--ink-{value})");
+    }
+    // JS `trim` also strips U+FEFF, which Rust's `char::is_whitespace` does not.
+    let trimmed = value.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
+    let lower = trimmed.to_lowercase();
+    if let Some((_, ink)) = LEGACY_HEX_TO_INK.iter().find(|(hex, _)| *hex == lower) {
+        return format!("var(--ink-{ink})");
+    }
+    if trimmed.is_empty() {
+        "var(--ink-blue)".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Resolve a spec color ('1'–'6', an ink id, or any CSS color) to a CSS color.
 ///
 /// Unset resolves to `--canvas-ink` — near-white in dark mode, near-black in light —
 /// NOT the accent color. An uncolored card or arrow is the neutral default state, and
@@ -89,7 +133,7 @@ pub fn resolve_canvas_color(color: Option<&str>) -> String {
         .iter()
         .find(|preset| preset.id == color)
         .map(|preset| preset.value.to_string())
-        .unwrap_or_else(|| color.to_string())
+        .unwrap_or_else(|| ink_color(color))
 }
 
 /// A node's width and height.

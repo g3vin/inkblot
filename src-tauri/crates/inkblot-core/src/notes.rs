@@ -23,7 +23,7 @@ use serde_json::Value;
 
 use crate::types::{
     AudioClip, JsonMap, Note, NoteImage, NotePreviewLayout, NotePreviewSize, NoteType,
-    DEFAULT_NOTE_COLOR,
+    DEFAULT_NOTE_COLOR, INK_IDS,
 };
 
 /// `#rgb` or `#rrggbb`, case-insensitive. Anything else falls back to the default.
@@ -81,9 +81,15 @@ fn is_iso8601(text: &str) -> bool {
     ISO.is_match(text)
 }
 
+/// An ink id or a 3/6-digit hex, trimmed; anything else is the default ink.
 fn normalize_color(raw: &Value) -> String {
-    match raw.get("color").and_then(Value::as_str) {
-        Some(text) if HEX_COLOR.is_match(text.trim()) => text.trim().to_string(),
+    // JS `trim` also strips U+FEFF, which Rust's `char::is_whitespace` does not.
+    let trimmed = raw
+        .get("color")
+        .and_then(Value::as_str)
+        .map(|text| text.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}'));
+    match trimmed {
+        Some(text) if INK_IDS.contains(&text) || HEX_COLOR.is_match(text) => text.to_string(),
         _ => DEFAULT_NOTE_COLOR.to_string(),
     }
 }
