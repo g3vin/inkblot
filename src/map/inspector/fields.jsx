@@ -6,6 +6,7 @@
  * ("1.") never reaches the map.
  */
 import { useEffect, useRef, useState } from 'react'
+import { resolveInkHex } from '../../lib/palette'
 
 export function Field({ label, children, title }) {
   return (
@@ -138,7 +139,7 @@ export function ColorField({ label, value, fallback = '#c0392b', onChange }) {
   return (
     <Field label={label}>
       <span className="map-row">
-        <input type="color" value={value || fallback} onChange={(event) => onChange(event.target.value)} />
+        <input type="color" value={resolveInkHex(value || fallback, resolveInkHex(fallback))} onChange={(event) => onChange(event.target.value)} />
         {value ? (
           <button type="button" className="map-button" onClick={() => onChange(null)}>Reset</button>
         ) : null}

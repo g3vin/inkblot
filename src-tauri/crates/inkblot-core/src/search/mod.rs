@@ -16,7 +16,7 @@ pub mod matcher;
 
 use serde_json::Value;
 
-use crate::doc_kind::{is_canvas_doc, is_map_doc};
+use crate::doc_kind::{is_canvas_doc, is_map_doc, is_timeline_doc};
 use crate::js_string::{js_trim, utf16_len, utf16_slice};
 use crate::store::{ProjectStore, StoreError};
 use crate::types::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
@@ -469,6 +469,11 @@ pub fn search_project(
                 &entry.path,
                 MAX_RESULTS_PER_DOCUMENT,
             ));
+            continue;
+        }
+
+        // A timeline view holds no text of its own: its events are the project's.
+        if is_timeline_doc(&entry.path) {
             continue;
         }
 

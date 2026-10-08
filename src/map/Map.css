@@ -348,7 +348,7 @@
 }
 
 .map-traveler-name {
-  font: 600 11px/1 -apple-system, system-ui, sans-serif;
+  font: 600 11px/1 var(--font-ui);
   paint-order: stroke;
   stroke: var(--map-sheet);
   stroke-width: 3px;
@@ -641,7 +641,7 @@
   z-index: 3;
   pointer-events: none;
   color: var(--map-ink);
-  font: 600 11px/1 -apple-system, system-ui, sans-serif;
+  font: 600 11px/1 var(--font-ui);
 }
 
 .map-compass {
@@ -850,3 +850,18 @@
   background: transparent;
 }
 .map-inspector-panel .map-inspector-header [aria-label='Hide the inspector'] { display: none; }
+
+/* ---------------- timeline events at their places ---------------- */
+
+.map-timeline-event {
+  --event: var(--map-accent);
+  pointer-events: none;
+}
+
+.map-timeline-event-text {
+  font: 600 11px/1 var(--font-ui);
+  fill: var(--event);
+  stroke: var(--map-paper);
+  stroke-width: 3px;
+  paint-order: stroke;
+}

@@ -32,11 +32,16 @@ import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
 import CanvasPane from '../canvas/CanvasPane'
 import MapPane from '../map/MapPane'
+import TimelinePane from '../timeline/TimelinePane'
+import TimeLensBar from '../timeline/TimeLensBar'
+import { createTimelineDelegates } from '../timeline/timelineDelegates'
+import { getStoryCursor, subscribeStoryCursor } from '../lib/timeline/storyCursor'
 import { useEditorAutosave } from '../hooks/useEditorAutosave'
 import { useEditorDnd } from '../hooks/useEditorDnd'
 import { useEditorDocCache } from '../hooks/useEditorDocCache'
 import { useEditorDocLoader } from '../hooks/useEditorDocLoader'
 import { useEditorNotes } from '../hooks/useEditorNotes'
+import { useEditorTimeline } from '../hooks/useEditorTimeline'
 import { formatWordStats, useEditorWordCount } from '../hooks/useEditorWordCount'
 import DraftTabPane from './DraftTabPane'
 import FocusModeOverlay from './FocusModeOverlay'
@@ -480,6 +485,17 @@ export default function EditorCanvas({
     splitView,
   })
 
+  // Passages attached to timeline events: drawn from the chronology, saved with the text.
+  useEditorTimeline({
+    projectName,
+    currentDoc,
+    editor,
+    secondaryDoc,
+    secondaryEditor,
+    splitView,
+    docCache,
+  })
+
   /* ---------------- Render ---------------- */
 
   const closeSecondary = () => {
@@ -534,6 +550,14 @@ export default function EditorCanvas({
     activatePane(docPath, null)
   }, [activatePane, setCurrentDoc, setSecondaryDoc])
 
+  // A timeline opens what it links to beside itself, so it stays in view: in the other
+  // pane of a split, or in a split it opens.
+  const openDocBesideTimeline = useCallback((timelinePane, docPath) => {
+    if (!docPath) return
+    if (splitView !== 'editor') setSplitView?.('editor')
+    openDocFromCanvas(timelinePane === 'primary' ? 'secondary' : 'primary', docPath)
+  }, [openDocFromCanvas, setSplitView, splitView])
+
   // The commands the surface cannot serve alone. The canvas ones need nothing from
   // React — they resolve a surface id and dispatch what the canvas already listens
   // for — so they are a module. `openDocument` needs app state, and is the same swap
@@ -544,9 +568,22 @@ export default function EditorCanvas({
     documentSurface.setDelegates({
       ...canvasDelegates,
       ...mapDelegates,
+      ...createTimelineDelegates({ projectName, openDoc: (path) => openDocFromCanvas('primary', path) }),
       openDocument: ({ path, pane }) => openDocFromCanvas(pane, path),
     })
-  }, [openDocFromCanvas])
+  }, [openDocFromCanvas, projectName])
+
+  // The time lens's switches, for a shell's menus to tick.
+  useEffect(() => {
+    if (!projectName) return undefined
+    const publish = (cursor) => documentSurface.publishTimelineCursor({
+      lensOn: Boolean(cursor.lens.on),
+      lensEditing: Boolean(cursor.lens.editing),
+      editingRanges: Boolean(cursor.editingRanges),
+    })
+    publish(getStoryCursor(projectName))
+    return subscribeStoryCursor(projectName, publish)
+  }, [projectName])
 
   const liveEditor = isEditorReady(editor) ? editor : null
   const liveSecondaryEditor = isEditorReady(secondaryEditor) ? secondaryEditor : null
@@ -719,18 +756,33 @@ export default function EditorCanvas({
               // that is a map too, whose panel it then is.
               chromeWhileInactive={secondaryKind !== 'map'}
             />
+          ) : primaryKind === 'timeline' ? (
+            <TimelinePane
+              projectName={projectName}
+              docPath={currentDoc}
+              onActivate={() => activatePane(currentDoc, null)}
+              onOpenDoc={(docPath) => openDocBesideTimeline('primary', docPath)}
+              showHeader={paneHeaders}
+              onClose={closePrimary}
+              isActive={activeDoc === currentDoc}
+            />
           ) : (
             <PaneEditorSurface
               editor={liveEditor}
               projectName={projectName}
               docPath={currentDoc}
               onOpenDoc={(path) => openDocFromCanvas('primary', path)}
-              header={paneHeaders ? (
-                <div className="pane-header pane-header-centered">
-                  <span>{currentDoc}</span>
-                  <button onClick={closePrimary}>×</button>
-                </div>
-              ) : null}
+              header={(
+                <>
+                  {paneHeaders ? (
+                    <div className="pane-header pane-header-centered">
+                      <span>{currentDoc}</span>
+                      <button onClick={closePrimary}>×</button>
+                    </div>
+                  ) : null}
+                  <TimeLensBar projectName={projectName} />
+                </>
+              )}
             />
           )}
           {!primaryIsStructured && !showDraftPane ? (
@@ -801,18 +853,33 @@ export default function EditorCanvas({
                 isActive={activeDoc === secondaryDoc}
                 chromeWhileInactive={primaryKind !== 'map'}
               />
+            ) : secondaryKind === 'timeline' ? (
+              <TimelinePane
+                projectName={projectName}
+                docPath={secondaryDoc}
+                onActivate={() => activatePane(secondaryDoc, null)}
+                onOpenDoc={(docPath) => openDocBesideTimeline('secondary', docPath)}
+                showHeader={paneHeaders}
+                onClose={closeSecondary}
+                isActive={activeDoc === secondaryDoc}
+              />
             ) : (
               <PaneEditorSurface
                 editor={liveSecondaryEditor}
                 projectName={projectName}
                 docPath={secondaryDoc}
                 onOpenDoc={(path) => openDocFromCanvas('secondary', path)}
-                header={paneHeaders ? (
-                  <div className="pane-header split-header pane-header-centered">
-                    <span>{secondaryDoc}</span>
-                    <button onClick={closeSecondary}>×</button>
-                  </div>
-                ) : null}
+                header={(
+                  <>
+                    {paneHeaders ? (
+                      <div className="pane-header split-header pane-header-centered">
+                        <span>{secondaryDoc}</span>
+                        <button onClick={closeSecondary}>×</button>
+                      </div>
+                    ) : null}
+                    <TimeLensBar projectName={projectName} />
+                  </>
+                )}
               />
             )}
             {!secondaryIsStructured ? (

@@ -122,6 +122,30 @@ async function writeDocumentUnlocked(projectName, docName, data) {
  * go through saveCanvasDocument (canvasFileSystem.js) instead.
  */
 /**
+ * Replace only a document's timeline passages (TimelineAnchors.js), keeping its content,
+ * notes and history. Attaching a passage, or dragging where one starts, changes no
+ * text, so the text autosave never hears of it; this writes it on its own.
+ */
+export async function saveDocumentTimeline(projectName, docName, ranges) {
+  if (!isTextDoc(docName)) return false
+  return withDocLock(projectName, docName, async () => {
+    try {
+      const existing = await loadDocument(projectName, docName)
+      if (!existing) return false
+      const { timeline: _previous, ...rest } = existing
+      await writeDocumentUnlocked(projectName, docName, {
+        ...rest,
+        ...(Array.isArray(ranges) && ranges.length ? { timeline: ranges } : {}),
+      })
+      return true
+    } catch (error) {
+      console.error('Failed to save document timeline passages:', error)
+      return false
+    }
+  })
+}
+
+/**
  * Replace only a document's `notes`, preserving its content and version history.
  *
  * This exists for note cards on a canvas. Notes normally ride along with a document
@@ -153,6 +177,11 @@ export async function saveDocumentNotes(projectName, docName, notes) {
       return false
     }
   })
+}
+
+const timelineRangesFor = (docData, existing) => {
+  const ranges = Array.isArray(docData.timeline) ? docData.timeline : existing?.timeline
+  return Array.isArray(ranges) && ranges.length ? { timeline: ranges } : {}
 }
 
 export async function saveDocument(projectName, docName, docData) {
@@ -207,6 +236,9 @@ export async function saveDocument(projectName, docName, docData) {
           ...(Array.isArray(existing?.archive) && existing.archive.length ? { archive: existing.archive } : {}),
           // So is the document's part of the references (`referenceStore.js`).
           ...(existing?.citations && typeof existing.citations === 'object' ? { citations: existing.citations } : {}),
+          // Passages attached to timeline events (TimelineAnchors.js): the editor's own
+          // when it passes them, otherwise whatever the file had.
+          ...timelineRangesFor(docData, existing),
         })
       )
 

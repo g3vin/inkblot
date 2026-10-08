@@ -39,6 +39,11 @@ import MapDraft from './MapDraft'
 import { useMapDocument } from './useMapDocument'
 import { useMapViewport } from './useMapViewport'
 import { useProjectDocs, useStoryCalendar } from './useMapProject'
+import { useStoryTimeline } from '../timeline/useStoryTimeline'
+import { eventCovers, setEventTime } from '../lib/timeline/timelineModel'
+import { getStoryCursor, setStoryDay, subscribeStoryCursor } from '../lib/timeline/storyCursor'
+import { peekStoryTimeline, replaceStoryTimeline } from '../lib/timeline/timelineStore'
+import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
 import {
   MAP_COMMAND_EVENT,
   MAP_DROP_DOC_EVENT,
@@ -746,14 +751,80 @@ export default function MapSurface({
 
   /* ---------------- the day ---------------- */
 
+  // The day is the project's "now" (storyCursor.js): scrubbing here moves every timeline
+  // view and every other map, and they move this one.
+  const cursorSource = `map:${docPath}`
   const changeDay = useCallback(
     (next) => {
       setDay(next)
       dayRef.current = next
       saveViewRef.current?.()
+      setStoryDay(projectName, next, cursorSource)
     },
-    []
+    [cursorSource, projectName]
   )
+  useEffect(() => {
+    const follow = (cursor, source) => {
+      if (source === cursorSource || !Number.isFinite(cursor.day) || cursor.day === dayRef.current) return
+      setDay(cursor.day)
+      dayRef.current = cursor.day
+    }
+    follow(getStoryCursor(projectName), null)
+    return subscribeStoryCursor(projectName, follow)
+  }, [cursorSource, projectName])
+
+  /* ---------------- the chronology ---------------- */
+
+  // Timeline events placed at this map's pins, drawn while the day is inside them.
+  const timeline = useStoryTimeline(projectName)
+  const timelineEvents = useMemo(() => {
+    if (!timeline) return []
+    const laneColor = new Map(timeline.lanes.map((lane) => [lane.id, lane.color]))
+    return timeline.events
+      .filter((event) => event.place?.map === docPath && eventCovers(event, day))
+      .map((event) => ({ id: event.id, title: event.title, pin: event.place.pin, color: event.color || laneColor.get(event.laneId) || null }))
+  }, [day, docPath, timeline])
+
+  // A leg moved from a timeline view: this map owns its document, so it makes the edit.
+  useEffect(() => {
+    const onSetLeg = (event) => {
+      const { projectName: from, docPath: target, travelerId, legId, departDay } = event.detail || {}
+      if (from !== projectName || target !== docPath) return
+      const traveler = mapRef.current.travelers.find((item) => item.id === travelerId)
+      if (!traveler?.legs.some((leg) => leg.id === legId)) return
+      event.detail.claimed = true
+      dispatch({
+        type: 'items/patch',
+        collection: 'travelers',
+        patches: { [travelerId]: { legs: traveler.legs.map((leg) => (leg.id === legId ? { ...leg, departDay } : leg)) } },
+      })
+    }
+    window.addEventListener(MAP_SET_LEG_EVENT, onSetLeg)
+    return () => window.removeEventListener(MAP_SET_LEG_EVENT, onSetLeg)
+  }, [dispatch, docPath, mapRef, projectName])
+
+  // A leg moved here: events linked to it leave when it now leaves.
+  useEffect(() => {
+    const current = peekStoryTimeline(projectName)
+    if (!current) return
+    const departures = new Map()
+    for (const schedule of schedules) {
+      for (const interval of schedule.intervals) {
+        if (interval.kind === 'travel') departures.set(`${schedule.travelerId}|${interval.legId}`, interval.from)
+      }
+    }
+    const moves = []
+    for (const event of current.events) {
+      for (const link of event.links) {
+        if (link.kind !== 'mapLeg' || link.map !== docPath) continue
+        const depart = departures.get(`${link.traveler}|${link.leg}`)
+        if (Number.isFinite(depart) && depart !== event.start) moves.push({ id: event.id, depart, length: event.end === null ? null : event.end - event.start })
+      }
+    }
+    if (!moves.length) return
+    void replaceStoryTimeline(projectName, (tl) =>
+      moves.reduce((acc, move) => setEventTime(acc, move.id, move.depart, move.length === null ? null : move.depart + move.length), tl))
+  }, [docPath, projectName, schedules])
 
   /* ---------------- the inspector ---------------- */
 
@@ -898,6 +969,7 @@ export default function MapSurface({
             projectName={projectName}
             idPrefix={idPrefix}
             earthLevel={earthLevel}
+            timelineEvents={timelineEvents}
           />
           <MapDraft
             map={map}

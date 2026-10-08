@@ -532,6 +532,7 @@ export default function CanvasSurface({
     deleteSelection,
     dispatch,
     docPath,
+    projectName,
     groupSelection,
     handleToggleRecording,
     handleZoomToFit,

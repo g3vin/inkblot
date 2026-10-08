@@ -293,12 +293,14 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         "stripCanvasSuffix" => json!(doc_kind::strip_canvas_suffix(&text()?)),
         "getDocDisplayName" => json!(doc_kind::get_doc_display_name(&text()?)),
         "isMapDoc" => json!(doc_kind::is_map_doc(&text()?)),
+        "isTimelineDoc" => json!(doc_kind::is_timeline_doc(&text()?)),
         "isTextDoc" => json!(doc_kind::is_text_doc(&text()?)),
         "stripDocSuffix" => json!(doc_kind::strip_doc_suffix(&text()?)),
         "withDocSuffix" => {
             let kind = match args.get(1).and_then(Value::as_str) {
                 Some("canvas") => Some(DocKind::Canvas),
                 Some("map") => Some(DocKind::Map),
+                Some("timeline") => Some(DocKind::Timeline),
                 _ => None,
             };
             let name = text()?;

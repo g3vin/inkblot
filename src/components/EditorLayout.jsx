@@ -33,7 +33,7 @@ import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useEditorContextMenu } from '../hooks/useEditorContextMenu'
-import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
+import { isCanvasDoc, isMapDoc, isTextDoc, isTimelineDoc } from '../lib/docKind'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
 import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
@@ -160,8 +160,9 @@ export default function EditorLayout(props) {
   // A canvas or a map pans instead of scrolling, and runs on under the sidebars — when
   // it has the editor to itself. In a split both panes keep the document's column
   // whichever is active, or hovering from one to the other would slide the other one
-  // under the sidebars and the toolbar and back.
-  const activeUnderlays = !isTextDoc(activeDoc || currentDoc) && props.splitView !== 'editor'
+  // under the sidebars and the toolbar and back. A timeline view does not pan freely —
+  // its lane names, axis and toolbar are pinned to its edges — so it keeps the column.
+  const activeUnderlays = !isTextDoc(activeDoc || currentDoc) && !isTimelineDoc(activeDoc || currentDoc) && props.splitView !== 'editor'
   const [compareToolbarSlot, setCompareToolbarSlot] = useState(null)
   const liveActiveEditor = getLiveEditor(activeEditor)
   const toolbarEditor = activeIsCanvas

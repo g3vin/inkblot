@@ -291,15 +291,20 @@ impl ProjectStore {
                 "notes": body.notes,
                 "versions": versions,
             });
-            // The archive and the citation settings live in this file too, owned by
-            // their own stores (`archiveStore.js`, `referenceStore.js`), and are carried
-            // forward the way the JS save does.
+            // The archive, the citation settings and the timeline passages live in this
+            // file too, owned by their own stores (`archiveStore.js`, `referenceStore.js`,
+            // `TimelineAnchors.js`), and are carried forward the way the JS save does.
             if let (Some(existing), Some(fields)) = (existing.as_ref(), document.as_object_mut()) {
                 if let Some(archive) = existing.get("archive").filter(|a| a.as_array().is_some_and(|a| !a.is_empty())) {
                     fields.insert("archive".to_string(), archive.clone());
                 }
                 if let Some(citations) = existing.get("citations").filter(|c| c.is_object()) {
                     fields.insert("citations".to_string(), citations.clone());
+                }
+                // So are the passages attached to timeline events, which the page's editor
+                // writes (`saveDocumentTimeline`).
+                if let Some(timeline) = existing.get("timeline").filter(|t| t.as_array().is_some_and(|t| !t.is_empty())) {
+                    fields.insert("timeline".to_string(), timeline.clone());
                 }
             }
             std::fs::write(&file_path, serde_json::to_string(&document)?)?;

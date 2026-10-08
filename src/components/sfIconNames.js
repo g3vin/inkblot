@@ -142,6 +142,7 @@ export const SF_TO_ICON = {
   textformat: 'type-style',
   'textformat.alt': 'label',
   'textformat.size': 'type-style',
+  timeline: 'timeline',
   timer: 'timer',
   trash: 'delete',
   underline: 'underline',
