@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
 import Icon from '../ui/Icon.jsx'
+import { useCommands } from '../lib/commands'
 import {
   loadDictationModel,
   startDictation,
@@ -533,6 +534,16 @@ export default function DictationControl({ editor }) {
   const loading = status === 'loading'
   const finishing = status === 'finishing'
   const active = live || loading || finishing
+
+  useCommands(() => [{
+    id: 'speech.dictation',
+    section: 'Writing',
+    title: active ? 'Stop dictation' : 'Start dictation',
+    icon: 'dictate',
+    keywords: ['voice', 'speak', 'microphone', 'transcribe'],
+    when: () => Boolean(editor),
+    run: toggle,
+  }], [active, editor, toggle])
   const buttonTitle = error || (
     live
       ? 'Stop dictation'

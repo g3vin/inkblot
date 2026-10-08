@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '../ui/Icon.jsx'
+import { useCommands } from '../lib/commands'
 import { clearReadAloudHighlight, setReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import {
   DEFAULT_READ_ALOUD_VOICE,
@@ -579,6 +580,16 @@ export default function ReadAloudControl({ editor }) {
   }, [cleanupAudio, clearWordHighlight, editor, playAudioChunk, playSystemSpeechChunk, voice])
 
   const active = status === 'loading' || status === 'playing'
+
+  useCommands(() => [{
+    id: 'speech.read-aloud',
+    section: 'Writing',
+    title: active ? 'Stop reading aloud' : 'Read aloud',
+    icon: 'read-aloud',
+    keywords: ['speak', 'listen', 'voice', 'text to speech'],
+    when: () => Boolean(editor),
+    run: active ? stop : read,
+  }], [active, editor, read, stop])
   const selectedVoice = READ_ALOUD_VOICES.find((option) => option.id === voice)
   const popover = open ? createPortal(
     <div

@@ -107,7 +107,7 @@ export default function SidebarSearch({
     if (!active && !isOverlay) return undefined
 
     const onKeyDown = (event) => {
-      if (!isOverlay && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+      if (!isOverlay && (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'f') {
         event.preventDefault()
         expand()
         inputRef.current?.select()
@@ -387,8 +387,8 @@ export default function SidebarSearch({
               type="button"
               className="sidebar-search-center"
               onClick={() => onOpenOverlay?.(rootRef.current?.getBoundingClientRect())}
-              aria-label="Open search in the center of the screen"
-              title="Open search in center (⌘K)"
+              aria-label="Search the whole project"
+              title="Search the whole project (⇧⌘F)"
             >
               <Icon name="frame" />
             </button>

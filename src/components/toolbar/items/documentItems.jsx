@@ -6,6 +6,7 @@
  * itself to an editor elected since. The voice controls are the exception, and keep
  * the live editor (see DictationControl, ReadAloudControl).
  */
+import { runCommand } from '../../../lib/commands'
 import { useEffect, useState } from 'react'
 import DictationControl from '../../DictationControl'
 import ReadAloudControl from '../../ReadAloudControl'
@@ -252,6 +253,15 @@ export function ConversationItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton icon="chat" label="Insert Conversation" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => sendTo(ctx, 'insertConversationTile')} />
+    </ItemFrame>
+  )
+}
+
+/** Runs the `notes.add` command (EditorLayout), as ⌥⌘N and the palette do. */
+export function AddNoteItem({ ctx, spec }) {
+  return (
+    <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
+      <ToolButton icon="note" label="Add Note" title="Add a note (⌥⌘N)" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => { void runCommand('notes.add') }} />
     </ItemFrame>
   )
 }

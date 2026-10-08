@@ -352,7 +352,7 @@
   color: var(--accent-color);
 }
 
-/* ---- Centered search overlay (⌘K) ----
+/* ---- Centered search overlay (⇧⌘F) ----
    The same search bar, flown to the middle of the screen. */
 
 /* No scrim and no blur: the card floats over the workspace and you keep reading
