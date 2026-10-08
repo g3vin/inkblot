@@ -35,7 +35,7 @@ const ids = L.TOOLBAR_ITEMS.map((item) => item.id)
 ok('the item ids are the ones layouts were saved under', JSON.stringify(ids) === JSON.stringify(EXPECTED_IDS))
 ok('no two items share an id', new Set(ids).size === ids.length)
 ok('every id is namespaced', ids.every((id) => id.startsWith('inkblot.')))
-ok('every item has a label and a symbol', L.TOOLBAR_ITEMS.every((item) => item.label && item.symbol && item.contexts.length))
+ok('every item has a label and an icon', L.TOOLBAR_ITEMS.every((item) => item.label && item.icon && item.contexts.length))
 ok('the toolbars save apart', new Set(L.TOOLBAR_CONTEXTS.map(L.toolbarLayoutKey)).size === 4)
 
 for (const context of L.TOOLBAR_CONTEXTS) {

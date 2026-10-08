@@ -8,7 +8,7 @@
  * caption, so nothing depends on colour alone.
  */
 import { useMemo, useState } from 'react'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { classifyDay, goalFor, METRIC_INFO } from '../../stats/goals.js'
 import { dayDate, dayKey, addDays, formatDuration, formatNumber, hourRange, orderedWeekdays, weekdayName, weekdayOf } from '../../stats/day.js'
 import { compact, mediumDate, shortDate } from './statsText.js'
@@ -38,7 +38,7 @@ export function GoalRings({ status }) {
                 transform="rotate(-90 24 24)"
               />
             </svg>
-            <SFIcon name={target.met ? 'checkmark' : METRIC_INFO[target.target.metric].icon} size={14} />
+            <Icon name={target.met ? 'check' : METRIC_INFO[target.target.metric].icon} />
           </span>
           <span className="stats-ring-value">{formatNumber(Math.floor(target.value))} / {formatNumber(target.target.amount)}</span>
           <span className="stats-ring-label">{METRIC_INFO[target.target.metric].title}</span>

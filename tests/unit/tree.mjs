@@ -75,7 +75,7 @@ ok('a plain document has no icon', at(chapterOne).iconName === null)
 ok('a canvas does', at(board).iconName === 'canvas')
 ok('a closed folder is an outline', at(actOne, { siblings: [actOne] }).iconName === 'folder')
 ok('an open folder is filled',
-  at(actOne, { siblings: [actOne], expanded: new Set(['Act One']) }).iconName === 'folder.fill')
+  at(actOne, { siblings: [actOne], expanded: new Set(['Act One']) }).iconName === 'folder-open')
 
 // The icon fills to mark the active document. A folder's is already solid when open,
 // so filling it again would make an expanded folder look selected.

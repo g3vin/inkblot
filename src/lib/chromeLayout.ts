@@ -29,8 +29,8 @@ export const INSPECTOR_LAYOUTS_KEY = 'inkblot.inspector.layouts'
 export type ToolbarItemSpec = {
   id: string
   label: string
-  /** An SF Symbol name; SFIcon draws the ones it has. */
-  symbol: string
+  /** A semantic icon name (src/ui/icons.js). */
+  icon: string
   contexts: ToolbarContext[]
 }
 
@@ -38,69 +38,69 @@ const ALL: ToolbarContext[] = ['document', 'canvas', 'map', 'typeset']
 
 /** Every toolbar item, in the order the palette shows them. */
 export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
-  { id: 'inkblot.format.font', label: 'Font', symbol: 'textformat', contexts: ['document'] },
-  { id: 'inkblot.format.font-size', label: 'Font Size', symbol: 'textformat.size', contexts: ['document'] },
-  { id: 'inkblot.format.text-style', label: 'Text Style', symbol: 'bold.italic.underline', contexts: ['document'] },
-  { id: 'inkblot.format.text-color', label: 'Text Color', symbol: 'character', contexts: ['document'] },
-  { id: 'inkblot.format.highlight', label: 'Highlight', symbol: 'highlighter', contexts: ['document'] },
-  { id: 'inkblot.format.alignment', label: 'Alignment', symbol: 'text.alignleft', contexts: ['document'] },
-  { id: 'inkblot.format.paragraph-style', label: 'Paragraph Style', symbol: 'paragraphsign', contexts: ['document'] },
-  { id: 'inkblot.format.bulleted-list', label: 'Bulleted List', symbol: 'list.bullet', contexts: ['document'] },
-  { id: 'inkblot.format.numbered-list', label: 'Numbered List', symbol: 'list.number', contexts: ['document'] },
-  { id: 'inkblot.insert.table', label: 'Table', symbol: 'table.grid', contexts: ['document'] },
-  { id: 'inkblot.insert.conversation', label: 'Conversation', symbol: 'speech', contexts: ['document'] },
-  { id: 'inkblot.edit.undo-redo', label: 'Undo/Redo', symbol: 'arrow.uturn.backward', contexts: ['document'] },
-  { id: 'inkblot.edit.paste-and-match-style', label: 'Paste and Match Style', symbol: 'doc.on.clipboard', contexts: ['document'] },
-  { id: 'inkblot.view.focus-mode', label: 'Focus Mode', symbol: 'scope', contexts: ['document'] },
-  { id: 'inkblot.view.word-count', label: 'Word Count', symbol: 'number', contexts: ['document'] },
+  { id: 'inkblot.format.font', label: 'Font', icon: 'type-style', contexts: ['document'] },
+  { id: 'inkblot.format.font-size', label: 'Font Size', icon: 'type-style', contexts: ['document'] },
+  { id: 'inkblot.format.text-style', label: 'Text Style', icon: 'type-style', contexts: ['document'] },
+  { id: 'inkblot.format.text-color', label: 'Text Color', icon: 'label', contexts: ['document'] },
+  { id: 'inkblot.format.highlight', label: 'Highlight', icon: 'highlight', contexts: ['document'] },
+  { id: 'inkblot.format.alignment', label: 'Alignment', icon: 'align-left', contexts: ['document'] },
+  { id: 'inkblot.format.paragraph-style', label: 'Paragraph Style', icon: 'paragraph', contexts: ['document'] },
+  { id: 'inkblot.format.bulleted-list', label: 'Bulleted List', icon: 'list-bullets', contexts: ['document'] },
+  { id: 'inkblot.format.numbered-list', label: 'Numbered List', icon: 'list-numbers', contexts: ['document'] },
+  { id: 'inkblot.insert.table', label: 'Table', icon: 'table', contexts: ['document'] },
+  { id: 'inkblot.insert.conversation', label: 'Conversation', icon: 'chat', contexts: ['document'] },
+  { id: 'inkblot.edit.undo-redo', label: 'Undo/Redo', icon: 'undo', contexts: ['document'] },
+  { id: 'inkblot.edit.paste-and-match-style', label: 'Paste and Match Style', icon: 'clipboard', contexts: ['document'] },
+  { id: 'inkblot.view.focus-mode', label: 'Focus Mode', icon: 'crosshair', contexts: ['document'] },
+  { id: 'inkblot.view.word-count', label: 'Word Count', icon: 'number', contexts: ['document'] },
 
-  { id: 'inkblot.canvas.lock', label: 'Lock', symbol: 'lock', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.add-card', label: 'Add Card', symbol: 'plus', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.add-image', label: 'Add Image', symbol: 'photo', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.record-memo', label: 'Record Memo', symbol: 'mic', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.color', label: 'Color', symbol: 'paintpalette', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.group', label: 'Group', symbol: 'rectangle.dashed', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.undo-redo', label: 'Undo/Redo', symbol: 'arrow.uturn.backward', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.alignment-guides', label: 'Alignment Guides', symbol: 'guides', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.snap-to-grid', label: 'Snap to Grid', symbol: 'table.grid', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.zoom', label: 'Zoom', symbol: 'magnifyingglass', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.delete', label: 'Delete', symbol: 'trash', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.lock', label: 'Lock', icon: 'lock', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.add-card', label: 'Add Card', icon: 'add', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.add-image', label: 'Add Image', icon: 'image', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.record-memo', label: 'Record Memo', icon: 'dictate', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.color', label: 'Color', icon: 'palette', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.group', label: 'Group', icon: 'ungroup', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.undo-redo', label: 'Undo/Redo', icon: 'undo', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.alignment-guides', label: 'Alignment Guides', icon: 'guides', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.snap-to-grid', label: 'Snap to Grid', icon: 'table', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.zoom', label: 'Zoom', icon: 'search', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.delete', label: 'Delete', icon: 'delete', contexts: ['canvas'] },
 
-  { id: 'inkblot.map.drawing-tools', label: 'Drawing Tools', symbol: 'map.route', contexts: ['map'] },
-  { id: 'inkblot.map.measure-tools', label: 'Measure Tools', symbol: 'map.ruler', contexts: ['map'] },
-  { id: 'inkblot.map.undo-redo', label: 'Undo/Redo', symbol: 'arrow.uturn.backward', contexts: ['map'] },
-  { id: 'inkblot.map.zoom', label: 'Zoom', symbol: 'magnifyingglass', contexts: ['map'] },
-  { id: 'inkblot.map.delete', label: 'Delete', symbol: 'trash', contexts: ['map'] },
+  { id: 'inkblot.map.drawing-tools', label: 'Drawing Tools', icon: 'map-route', contexts: ['map'] },
+  { id: 'inkblot.map.measure-tools', label: 'Measure Tools', icon: 'ruler', contexts: ['map'] },
+  { id: 'inkblot.map.undo-redo', label: 'Undo/Redo', icon: 'undo', contexts: ['map'] },
+  { id: 'inkblot.map.zoom', label: 'Zoom', icon: 'search', contexts: ['map'] },
+  { id: 'inkblot.map.delete', label: 'Delete', icon: 'delete', contexts: ['map'] },
 
-  { id: 'inkblot.history.snapshot', label: 'Snapshot Now', symbol: 'clock', contexts: ALL },
-  { id: 'inkblot.panel.clipboard', label: 'Clipboard', symbol: 'doc.on.clipboard', contexts: ALL },
-  { id: 'inkblot.panel.workbench', label: 'Workbench', symbol: 'hammer', contexts: ALL },
-  { id: 'inkblot.panel.notes', label: 'Notes', symbol: 'note.text', contexts: ALL },
-  { id: 'inkblot.panel.history', label: 'History', symbol: 'clock', contexts: ALL },
-  { id: 'inkblot.panel.references', label: 'References', symbol: 'books.vertical', contexts: ALL },
-  { id: 'inkblot.panel.stats', label: 'Stats', symbol: 'chart.bar.xaxis', contexts: ALL },
-  { id: 'inkblot.timer', label: 'Timer', symbol: 'timer', contexts: ALL },
-  { id: 'inkblot.tabs.new-tab', label: 'New Tab', symbol: 'plus.square.on.square', contexts: ALL },
-  { id: 'inkblot.tabs.split', label: 'Split', symbol: 'rectangle.split.2x1', contexts: ALL },
+  { id: 'inkblot.history.snapshot', label: 'Snapshot Now', icon: 'clock', contexts: ALL },
+  { id: 'inkblot.panel.clipboard', label: 'Clipboard', icon: 'clipboard', contexts: ALL },
+  { id: 'inkblot.panel.workbench', label: 'Workbench', icon: 'hammer', contexts: ALL },
+  { id: 'inkblot.panel.notes', label: 'Notes', icon: 'note', contexts: ALL },
+  { id: 'inkblot.panel.history', label: 'History', icon: 'history', contexts: ALL },
+  { id: 'inkblot.panel.references', label: 'References', icon: 'books', contexts: ALL },
+  { id: 'inkblot.panel.stats', label: 'Stats', icon: 'chart', contexts: ALL },
+  { id: 'inkblot.timer', label: 'Timer', icon: 'timer', contexts: ALL },
+  { id: 'inkblot.tabs.new-tab', label: 'New Tab', icon: 'copy', contexts: ALL },
+  { id: 'inkblot.tabs.split', label: 'Split', icon: 'split-columns', contexts: ALL },
 
-  { id: 'inkblot.view.editor-mode', label: 'Mode', symbol: 'pencil.line', contexts: ['document', 'typeset'] },
-  { id: 'inkblot.typeset.view', label: 'View', symbol: 'book.pages', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.edition', label: 'Edition', symbol: 'books.vertical', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.spread', label: 'Spreads', symbol: 'book', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.proof', label: 'Proof', symbol: 'checkmark.seal', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.grid', label: 'Baseline Grid', symbol: 'line.3.horizontal', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.tighten', label: 'Tighten', symbol: 'arrow.right.and.line.vertical.and.arrow.left', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.loosen', label: 'Loosen', symbol: 'arrow.left.and.line.vertical.and.arrow.right', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.keep-together', label: 'Keep Together', symbol: 'rectangle.compress.vertical', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.text-style', label: 'Style', symbol: 'textformat.alt', contexts: ['document', 'typeset'] },
-  { id: 'inkblot.typeset.insert', label: 'Insert', symbol: 'rectangle.split.1x2', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.zoom', label: 'Zoom', symbol: 'magnifyingglass', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.print', label: 'Print', symbol: 'printer', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.export', label: 'Export', symbol: 'square.and.arrow.up', contexts: ['typeset'] },
+  { id: 'inkblot.view.editor-mode', label: 'Mode', icon: 'write', contexts: ['document', 'typeset'] },
+  { id: 'inkblot.typeset.view', label: 'View', icon: 'book-pages', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.edition', label: 'Edition', icon: 'books', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.spread', label: 'Spreads', icon: 'book', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.proof', label: 'Proof', icon: 'verified', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.grid', label: 'Baseline Grid', icon: 'list', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.tighten', label: 'Tighten', icon: 'collapse-width', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.loosen', label: 'Loosen', icon: 'expand-width', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.keep-together', label: 'Keep Together', icon: 'compress-height', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.text-style', label: 'Style', icon: 'label', contexts: ['document', 'typeset'] },
+  { id: 'inkblot.typeset.insert', label: 'Insert', icon: 'split-rows', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.zoom', label: 'Zoom', icon: 'search', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.print', label: 'Print', icon: 'print', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.export', label: 'Export', icon: 'export', contexts: ['typeset'] },
 
   // Dictation and Read Aloud.
-  { id: 'inkblot.speech.dictation', label: 'Dictation', symbol: 'mic', contexts: ['document'] },
-  { id: 'inkblot.speech.read-aloud', label: 'Read Aloud', symbol: 'read.aloud', contexts: ['document'] },
+  { id: 'inkblot.speech.dictation', label: 'Dictation', icon: 'dictate', contexts: ['document'] },
+  { id: 'inkblot.speech.read-aloud', label: 'Read Aloud', icon: 'read-aloud', contexts: ['document'] },
 ]
 
 /** Ids saved layouts may still name, which are dropped as they are read. */
@@ -223,27 +223,27 @@ export type InspectorTab = 'clipboard' | 'workbench' | 'notes' | 'timeline' | 'r
 export type InspectorLayoutKind = 'drafting' | 'finishing'
 export const INSPECTOR_LAYOUT_KINDS: InspectorLayoutKind[] = ['drafting', 'finishing']
 
-export type InspectorTabSpec = { id: InspectorTab; title: string; symbol: string }
+export type InspectorTabSpec = { id: InspectorTab; title: string; icon: string }
 
 /** Every panel, in SidebarModel.Tab order. The map's is not one a layout holds. */
 export const INSPECTOR_TABS: InspectorTabSpec[] = [
-  { id: 'clipboard', title: 'Clipboard', symbol: 'doc.on.clipboard' },
-  { id: 'workbench', title: 'Workbench', symbol: 'hammer' },
-  { id: 'notes', title: 'Notes', symbol: 'note.text' },
-  { id: 'timeline', title: 'Timeline', symbol: 'timeline' },
-  { id: 'references', title: 'References', symbol: 'books.vertical' },
-  { id: 'history', title: 'History', symbol: 'clock' },
-  { id: 'typeset', title: 'Typeset', symbol: 'textformat' },
-  { id: 'output', title: 'Print & Export', symbol: 'printer' },
-  { id: 'stats', title: 'Stats', symbol: 'chart.bar.xaxis' },
-  { id: 'map', title: 'Map', symbol: 'map' },
+  { id: 'clipboard', title: 'Clipboard', icon: 'clipboard' },
+  { id: 'workbench', title: 'Workbench', icon: 'hammer' },
+  { id: 'notes', title: 'Notes', icon: 'note' },
+  { id: 'timeline', title: 'Timeline', icon: 'timeline' },
+  { id: 'references', title: 'References', icon: 'books' },
+  { id: 'history', title: 'History', icon: 'history' },
+  { id: 'typeset', title: 'Typeset', icon: 'type-style' },
+  { id: 'output', title: 'Print & Export', icon: 'print' },
+  { id: 'stats', title: 'Stats', icon: 'chart' },
+  { id: 'map', title: 'Map', icon: 'map' },
 ]
 export const inspectorTab = (id: string) => INSPECTOR_TABS.find((tab) => tab.id === id)
 export const ARRANGEABLE_TABS = INSPECTOR_TABS.map((tab) => tab.id).filter((id) => id !== 'map')
 
-export const INSPECTOR_LAYOUT_INFO: Record<InspectorLayoutKind, { title: string; symbol: string; mode: 'write' | 'typeset' }> = {
-  drafting: { title: 'Write', symbol: 'pencil.line', mode: 'write' },
-  finishing: { title: 'Typeset', symbol: 'textformat', mode: 'typeset' },
+export const INSPECTOR_LAYOUT_INFO: Record<InspectorLayoutKind, { title: string; icon: string; mode: 'write' | 'typeset' }> = {
+  drafting: { title: 'Write', icon: 'write', mode: 'write' },
+  finishing: { title: 'Typeset', icon: 'type-style', mode: 'typeset' },
 }
 
 export const DEFAULT_INSPECTOR_TABS: Record<InspectorLayoutKind, InspectorTab[]> = {

@@ -18,7 +18,7 @@ import {
 } from '../lib/FileSystem'
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
@@ -595,11 +595,7 @@ export default function FileTree({
           }}
         >
           {hasEntryIcon ? (
-            <SFIcon
-              name={iconName}
-              filled={iconFilled}
-              className="file-item-icon"
-            />
+            <Icon name={iconName} active={iconFilled} className="file-item-icon" />
           ) : null}
           {isRenaming ? (
             renderRenameInput({ marginLeft: hasEntryIcon ? 4 : 0, minWidth: 80 })
@@ -724,7 +720,7 @@ export default function FileTree({
               title="New document"
               aria-label="New document"
             >
-              <SFIcon name="doc" />
+              <Icon name="file" />
             </button>
             <button
               className="file-tree-action"
@@ -732,7 +728,7 @@ export default function FileTree({
               title="New canvas"
               aria-label="New canvas"
             >
-              <SFIcon name="canvas" />
+              <Icon name="canvas" />
             </button>
             <button
               className="file-tree-action"
@@ -740,7 +736,7 @@ export default function FileTree({
               title="New map"
               aria-label="New map"
             >
-              <SFIcon name="map" />
+              <Icon name="map" />
             </button>
             <button
               className="file-tree-action"
@@ -756,7 +752,7 @@ export default function FileTree({
               title="New folder"
               aria-label="New folder"
             >
-              <SFIcon name="folder" />
+              <Icon name="folder" />
             </button>
             <button
               className="file-tree-action"
@@ -765,7 +761,7 @@ export default function FileTree({
               aria-label="Other"
               aria-expanded={isCreateMenuOpen}
             >
-              <SFIcon name="ellipsis" />
+              <Icon name="more" />
             </button>
 
             {storyFolderContext ? (
@@ -775,7 +771,7 @@ export default function FileTree({
                 title={`New ${storyFolderContext.preset.entryLabel}`}
                 aria-label={`New ${storyFolderContext.preset.entryLabel}`}
               >
-                <SFIcon name={storyFolderContext.preset.fileIcon} />
+                <Icon name={storyFolderContext.preset.fileIcon} />
               </button>
             ) : null}
 
@@ -789,7 +785,7 @@ export default function FileTree({
                       void createStoryFolder(preset.key, '')
                     }}
                   >
-                    <SFIcon name={preset.folderIcon} className="file-tree-create-icon" />
+                    <Icon name={preset.folderIcon} className="file-tree-create-icon" />
                     <span>{preset.menuLabel}</span>
                   </button>
                 ))}
@@ -805,7 +801,7 @@ export default function FileTree({
               aria-label="New project"
               title="New project"
             >
-              <SFIcon name="plus" />
+              <Icon name="add" />
             </button>
           </>
         )}
@@ -839,7 +835,7 @@ export default function FileTree({
                 onClick={chooseNewProjectLocation}
                 title={newProjectLocation || 'Stored in the app’s default location'}
               >
-                <SFIcon name="folder" className="new-project-location-icon" />
+                <Icon name="folder" className="new-project-location-icon" />
                 <span className="new-project-location-label">
                   {newProjectLocation
                     ? newProjectLocation.split('/').filter(Boolean).pop()
@@ -868,7 +864,7 @@ export default function FileTree({
                       handleSelectProject(project)
                     }}
                   >
-                    <SFIcon name="folder" className="file-item-icon" />
+                    <Icon name="folder" className="file-item-icon" />
                     {isRenamingProject ? (
                       renderRenameInput({ marginLeft: 4, minWidth: 80 })
                     ) : (
@@ -919,11 +915,7 @@ export default function FileTree({
             }}
           >
             {dragPreview.iconName ? (
-              <SFIcon
-                name={dragPreview.iconName}
-                filled={dragPreview.iconFilled}
-                className="file-item-icon"
-              />
+              <Icon name={dragPreview.iconName} active={dragPreview.iconFilled} className="file-item-icon" />
             ) : null}
             <span className="file-tree-drag-ghost-label">{dragPreview.name}</span>
           </MotionDiv>

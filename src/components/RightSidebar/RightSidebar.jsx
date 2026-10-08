@@ -32,7 +32,7 @@ import HistoryPanel from './HistoryPanel'
 import TimelineSidebarPanel from '../../timeline/TimelineSidebarPanel'
 import SidebarSearch from './SidebarSearch'
 import ClipboardPanel from './ClipboardPanel'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { isFilterScope } from '../../lib/sidebarSearch'
 import { HAPTIC_ALIGNMENT, HAPTIC_LEVEL, performHaptic } from '../../lib/haptics'
 
@@ -791,7 +791,7 @@ export default function RightSidebar({
       const spec = inspectorTab(tabId)
       return (
         <div className="inspector-placeholder">
-          <SFIcon name={spec?.symbol ?? 'doc'} size={22} />
+          <Icon name={spec?.icon ?? 'file'} size={20} />
           <span>{spec?.title ?? tabId} is on its way to this panel.</span>
         </div>
       )
@@ -865,7 +865,7 @@ export default function RightSidebar({
           title={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
           aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
         >
-          <SFIcon name="pin" filled={pinned} />
+          <Icon name="pin" active={pinned} />
         </button>
       </div>
 

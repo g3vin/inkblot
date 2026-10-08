@@ -40,7 +40,7 @@ import {
   restoreVersion,
   snapshotVersion,
 } from '../../lib/versionActions'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import Segmented from '../../ui/Segmented'
 import ArchivePanel, { ArchiveIcon } from './ArchivePanel'
 import './HistoryPanel.css'
@@ -312,7 +312,7 @@ export default function HistoryPanel({
                 void handleRestore(entry)
               }}
             >
-              <SFIcon name="clock" size={13} />
+              <Icon name="clock" />
             </button>
             <button
               className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
@@ -322,7 +322,7 @@ export default function HistoryPanel({
                 onOpenCompare?.(docName, id, 'current')
               }}
             >
-              <SFIcon name="git.pullrequest" size={13} />
+              <Icon name="compare" />
             </button>
             <button
               className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
@@ -333,7 +333,7 @@ export default function HistoryPanel({
                 void handleMakeCopy(entry)
               }}
             >
-              <SFIcon name="doc.on.doc" size={13} />
+              <Icon name="copy" />
             </button>
             <button
               className={`panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn${confirmDeleteId === id ? ' history-btn-danger' : ''}`}
@@ -344,7 +344,7 @@ export default function HistoryPanel({
                 void handleDelete(entry)
               }}
             >
-              <SFIcon name="trash" size={13} />
+              <Icon name="delete" />
             </button>
           </div>
         </div>
@@ -409,7 +409,7 @@ export default function HistoryPanel({
           title={expanded ? 'Collapse this editing burst' : 'Show every checkpoint in this burst'}
         >
           <span className={`history-group-chevron${expanded ? ' is-open' : ''}`}>
-            <SFIcon name="chevron.down" size={12} />
+            <Icon name="chevron-down" />
           </span>
           <span
             className="history-session-dot"
@@ -463,7 +463,7 @@ export default function HistoryPanel({
           disabled={busy || (!isStructured && !editor)}
           title="Save the current state as a version you can name"
         >
-          <SFIcon name="plus" size={12} />
+          <Icon name="add" />
           Snapshot now
         </button>
         <Segmented

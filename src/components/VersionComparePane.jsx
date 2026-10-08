@@ -62,7 +62,7 @@ import {
 import { dispatchCanvasRestore } from '../canvas/canvasEvents'
 import { dispatchMapRestore } from '../map/mapEvents'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import './VersionComparePane.css'
 
 const CURRENT = 'current'
@@ -155,7 +155,7 @@ function ChoicePicker({ value, onChange, allowBoth = false }) {
       aria-label={`Keep the ${side} side`}
       onClick={() => toggle(side)}
     >
-      {on ? <SFIcon name="checkmark" size={11} /> : null}
+      {on ? <Icon name="check" /> : null}
       {on ? 'Keeping' : 'Keep'} {side}
     </button>
   )
@@ -568,7 +568,7 @@ export default function VersionComparePane({
             aria-label="Swap sides"
             title="Swap sides"
           >
-            <SFIcon name="arrow.left.arrow.right" />
+            <Icon name="move-left-right" />
           </button>
           <select
             className="toolbar-select toolbar-select-version"
@@ -590,7 +590,7 @@ export default function VersionComparePane({
             aria-label="Merge"
             title="Choose, difference by difference, which side to keep"
           >
-            <SFIcon name="git.pullrequest" />
+            <Icon name="compare" />
           </button>
           {mergeMode ? (
             <>
@@ -623,7 +623,7 @@ export default function VersionComparePane({
             aria-label="Close comparison"
             title="Close comparison (Esc)"
           >
-            <SFIcon name="xmark" />
+            <Icon name="close" />
           </button>
         </div>
       </div>

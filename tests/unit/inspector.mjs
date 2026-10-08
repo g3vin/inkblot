@@ -139,7 +139,7 @@ ok('This Document shows the document’s sources, Project every one',
 const { default: ReferencesPanel } = await import('../../src/components/RightSidebar/references/ReferencesPanel.jsx')
 await act(async () => root.render(React.createElement(ReferencesPanel)))
 await act(async () => {
-  documentSurface.publishReferenceSchema({ kinds: [{ id: 'book', label: 'Book', group: 'Books', symbol: 'book', fields: [{ key: 'title', label: 'Title', placeholder: '', input: 'text', required: true }], roles: ['author'] }], roles: [{ id: 'author', label: 'Author' }], styles: [{ id: 'apa', label: 'APA 7th edition', short: 'APA', heading: 'References', notes: false }] })
+  documentSurface.publishReferenceSchema({ kinds: [{ id: 'book', label: 'Book', group: 'Books', icon: 'book', fields: [{ key: 'title', label: 'Title', placeholder: '', input: 'text', required: true }], roles: ['author'] }], roles: [{ id: 'author', label: 'Author' }], styles: [{ id: 'apa', label: 'APA 7th edition', short: 'APA', heading: 'References', notes: false }] })
   documentSurface.publishReferencesChanged(refState)
 })
 // The list is coalesced to one per frame.

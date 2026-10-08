@@ -5,7 +5,7 @@
  * end, the recap takes its place (TimerRecapView in MenuBarAndRecap.swift).
  */
 import { Button, FloatingCapsule, IconButton, Sheet } from '../../ui'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { useStats } from '../../stats/useStats.js'
 import { segmentTitle } from '../../stats/routines.js'
 import { formatDuration, formatNumber } from '../../stats/day.js'
@@ -27,7 +27,7 @@ function Recap({ stats, run }) {
       )}
     >
       <div className="stats-recap-body">
-        <span className="stats-recap-seal"><SFIcon name="checkmark.seal" size={40} /></span>
+        <span className="stats-recap-seal"><Icon name="verified" size={20} /></span>
         <p className="stats-muted">{formatDuration(run.writeSecs)} of writing, {formatDuration(run.breakSecs)} of breaks</p>
         <div className="stats-recap-figures">
           <span><strong>{formatNumber(run.wordsWritten)}</strong><small>words</small></span>
@@ -36,11 +36,11 @@ function Recap({ stats, run }) {
         </div>
         {status.met != null ? (
           <p className="stats-muted stats-inline">
-            <SFIcon name={status.met ? 'checkmark' : 'target'} size={12} />
+            <Icon name={status.met ? 'check' : 'target'} />
             {status.met ? 'Today’s goal is met.' : status.remainingText ? `${capitalize(status.remainingText)} today.` : ''}
           </p>
         ) : null}
-        {streak.current > 0 ? <p className="stats-muted stats-inline"><SFIcon name="flame" size={12} />{streak.current}-day streak</p> : null}
+        {streak.current > 0 ? <p className="stats-muted stats-inline"><Icon name="streak" />{streak.current}-day streak</p> : null}
       </div>
     </Sheet>
   )
@@ -56,19 +56,19 @@ export default function TimerCapsule() {
   return (
     <FloatingCapsule className="timer-capsule" data-state={timer.state} data-kind={segment.kind} role="timer" aria-label={`${segmentTitle(segment)}, ${timerClock(timer, stats.now())}`}>
       <button type="button" className="timer-capsule-face" onClick={() => stats.showStats()} title="Show in Stats">
-        <SFIcon name={segment.kind === 'write' ? 'pencil' : 'cup.and.saucer'} size={13} />
+        <Icon name={segment.kind === 'write' ? 'edit' : 'break'} />
         <span className="timer-capsule-title">{segmentTitle(segment)}</span>
         <span className="timer-capsule-clock">{timerClock(timer, stats.now())}</span>
       </button>
       {timer.state === 'waiting' ? (
-        <IconButton symbol="play" label={`Start ${segmentTitle(segment)}`} size="capsule" iconSize={13} onClick={() => timer.proceed()} />
+        <IconButton icon="play" label={`Start ${segmentTitle(segment)}`} size="capsule" onClick={() => timer.proceed()} />
       ) : (
         <>
-          <IconButton symbol={timer.state === 'paused' ? 'play' : 'pause'} label={timer.state === 'paused' ? 'Resume' : 'Pause'} size="capsule" iconSize={13} onClick={() => timer.toggle()} />
-          <IconButton symbol="forward.end" label="Skip to Next Segment" size="capsule" iconSize={13} onClick={() => timer.skip()} />
+          <IconButton icon={timer.state === 'paused' ? 'play' : 'pause'} label={timer.state === 'paused' ? 'Resume' : 'Pause'} size="capsule" onClick={() => timer.toggle()} />
+          <IconButton icon="skip" label="Skip to Next Segment" size="capsule" onClick={() => timer.skip()} />
         </>
       )}
-      <IconButton symbol="stop" label="Stop" size="capsule" iconSize={13} onClick={() => timer.stop()} />
+      <IconButton icon="stop" label="Stop" size="capsule" onClick={() => timer.stop()} />
       {progress != null ? <span className="timer-capsule-progress" style={{ transform: `scaleX(${progress})` }} /> : null}
     </FloatingCapsule>
   )

@@ -12,7 +12,7 @@ import { Button, Popover, Segmented, Sheet } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
 import { exportMenuItems } from '../../toolbar/items/exportMenu'
 import { describeJob } from '../../../print/usePrintJobStatus'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import { isDefaultPrint, printSummary } from './usePageLayout'
 import { UNITS } from './units'
 import { SECTION_IDS } from './sectionIds'
@@ -55,7 +55,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
           options={[{ value: 'document', label: 'This Document' }, { value: 'book', label: 'Book' }]}
         />
         <button type="button" className="reference-icon-button" aria-label="Options" title="Units and view options" onClick={optionsMenu}>
-          <SFIcon name="ellipsis" size={14} />
+          <Icon name="more" />
         </button>
       </div>
 
@@ -78,7 +78,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
             title="Print options: pages, the current chapter, the selection, a watermark"
             onClick={() => setOptions((open) => !open)}
           >
-            <SFIcon name="line.3.horizontal.decrease.circle" size={15} />
+            <Icon name="filter" />
           </button>
           <Button
             variant="tinted"
@@ -86,7 +86,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
             disabled={!layout.hasDocument || running(layout.job)}
             onClick={(event) => popUpNativeMenu(event, exportMenuItems(ctx, { bindable }))}
           >
-            Export <SFIcon name="chevron.down" size={9} />
+            Export <Icon name="chevron-down" />
           </Button>
           <Popover anchorRef={optionsRef} open={options} onClose={() => setOptions(false)} align="end" className="fin-print-options">
             <PrintOptions layout={layout} onPrint={() => { setOptions(false); layout.print(scope) }} />
@@ -102,7 +102,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
             {layout.job.phase === 'done' && layout.job.path ? (
               <button type="button" className="reference-link" onClick={() => import('@tauri-apps/plugin-opener').then(({ revealItemInDir }) => revealItemInDir(layout.job.path)).catch(() => {})}>Show in Finder</button>
             ) : null}
-            {layout.job.phase === 'failed' ? <button type="button" className="reference-icon-button" aria-label="Dismiss" onClick={layout.dismissJob}><SFIcon name="xmark" size={11} /></button> : null}
+            {layout.job.phase === 'failed' ? <button type="button" className="reference-icon-button" aria-label="Dismiss" onClick={layout.dismissJob}><Icon name="close" /></button> : null}
           </div>
         ) : printSummary(layout.printOptions) ? (
           <div className="fin-job is-options">

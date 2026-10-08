@@ -14,7 +14,7 @@
 import { LIGHT_KMH } from './mapUnits'
 
 export const BUILTIN_TRANSPORTS = [
-  { id: 'walk', name: 'Walking', kmh: 5, hoursPerDay: 8, medium: 'land', fractionC: null, icon: 'figure.walk' },
+  { id: 'walk', name: 'Walking', kmh: 5, hoursPerDay: 8, medium: 'land', fractionC: null, icon: 'walk' },
   { id: 'horse', name: 'Horseback', kmh: 8, hoursPerDay: 8, medium: 'land', fractionC: null },
   { id: 'gallop', name: 'Hard riding (relays)', kmh: 15, hoursPerDay: 12, medium: 'land', fractionC: null },
   { id: 'cart', name: 'Cart or wagon', kmh: 4, hoursPerDay: 8, medium: 'land', fractionC: null },

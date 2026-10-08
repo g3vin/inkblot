@@ -346,7 +346,7 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 |---|---|---|
 | `Mark`, `Wordmark`, `AppIcon` | The logo, wherever the brand appears | Black on white; see §2. Draw in `currentColor` |
 | `Button` | Any text action | `variant`: `filled` (the one primary action per view), `tinted` (a normal action that needs weight), `plain` (default: quiet actions in chrome and rows), `destructive` (confirm or offer undo). `size`: `capsule` (default), `circle`, `toolbar` |
-| `IconButton` | Icon-only actions | `label` is required and becomes the tooltip and accessible name. Glyph from `icon` (semantic name, preferred) or `symbol` (SF-style name). `display` shows the label under or instead of the icon in customisable toolbars. `filled` + `aria-pressed` for toggles |
+| `IconButton` | Icon-only actions | `label` is required and becomes the tooltip and accessible name. Glyph from `icon`, a semantic name. `display` shows the label under or instead of the icon in customisable toolbars. `filled` + `aria-pressed` for toggles |
 | `Tooltip` | Naming a control in a richer way than `title` | Short, no period, after a 500ms delay, with an optional shortcut. Never holds anything a user must read to succeed |
 | `Kbd` | Showing a shortcut | Courier Prime |
 | `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in. `danger` items go last, after a separator |
@@ -492,8 +492,8 @@ FABs are 44px).
 - **`tests/unit/css.mjs`** (in `npm test`) keeps surfaces flat: a gradient only where it
   does a job (listed by selector: the titlebar fade, `FadeScrim`, the canvas grid, …),
   every `backdrop-filter` is `var(--blur-over-page)`, no OS colour-scheme media queries,
-  and the radius scale is 4/8/12. **`tests/unit/icons.mjs`** checks that every SF-style
-  icon name in `src/` resolves to a registered icon.
+  and the radius scale is 4/8/12. **`tests/unit/icons.mjs`** checks that every icon
+  name in `src/` is registered.
 - **The showcase** (`?design` in dev) shows every token and component in both themes.
   Check your change there and in the real surface, in light *and* dark.
 - **Review checklist for any UI change:**
@@ -531,7 +531,7 @@ palette. Existing surfaces are moved onto it one PR at a time, in this order:
 **Migrating a surface:**
 
 - Replace ad-hoc buttons, menus and dialogs with `src/ui` components.
-- Replace literals with tokens, and replace `SFIcon` with `Icon` and semantic names.
+- Replace literals with tokens, and draw icons with `Icon` and semantic names.
 - Rewrite copy to §11.
 - Register the surface's actions with `useCommands`.
 - Lower its `lint:design` baseline.
@@ -540,8 +540,6 @@ palette. Existing surfaces are moved onto it one PR at a time, in this order:
 
 - The component aliases at the bottom of `tokens.css` (`--landing-*`, `--sidebar-*`,
   `--focus-mode-*`, `--floating-note-*`, `--tile-color`, `--color-white/black`).
-- `src/components/SFIcon.jsx` and `src/components/sfIconNames.js`, the SF-name alias
-  onto `Icon` (also behind `IconButton`'s `symbol` prop).
 - The shared legacy menu rule at the bottom of `base.css`.
 - The bare-`<button>` defaults in `base.css`.
 

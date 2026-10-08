@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { FormRow } from '../../../ui'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import { fromMm, roundTo, toMm, UNITS } from './units'
 
 /** Text applied when committed, not per keystroke. */
@@ -95,7 +95,7 @@ export function Note({ children }) {
 }
 
 export function Caution({ children }) {
-  return <p className="fin-caution"><SFIcon name="exclamationmark.triangle" size={12} /> {children}</p>
+  return <p className="fin-caution"><Icon name="warning" /> {children}</p>
 }
 
 /** A <select> in a row. `options`: [{ value, label }] or [{ label, options }]. */

@@ -7,7 +7,7 @@
  * calendar.
  */
 import { useEffect, useRef, useState } from 'react'
-import SFIcon from '../components/SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { formatDay } from '../lib/map/calendar'
 
 /** The shortest step of playback: 30 a second, less a little for frame jitter. */
@@ -100,7 +100,7 @@ export default function MapTimeline({ day, onDay, extent, calendar, conflicts, i
     >
       <div className="map-timeline-row">
         <button type="button" className="map-tool" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause' : 'Play'}>
-          <SFIcon name={playing ? 'pause' : 'play'} size={16} />
+          <Icon name={playing ? 'pause' : 'play'} />
         </button>
         <span className="map-timeline-date">{formatDay(calendar, day, { withTime: day % 1 !== 0 })}</span>
         <div className="map-timeline-track">

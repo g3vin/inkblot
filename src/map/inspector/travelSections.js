@@ -118,10 +118,10 @@ export function travelerSections(ui, { map, traveler, index, schedule, conflicts
           const legs = [...traveler.legs]
           legs.splice(legIndex - 1, 0, legs.splice(legIndex, 1)[0])
           setLegs(legs)
-        }, { disabled: legIndex === 0, symbol: 'arrow.up', help: 'Move earlier' }),
+        }, { disabled: legIndex === 0, icon: 'arrow-up', help: 'Move earlier' }),
         ui.button(`${prefix}.remove`, '×', () => setLegs(traveler.legs.filter((candidate) => candidate.id !== leg.id)), {
           role: 'destructive',
-          symbol: 'xmark',
+          icon: 'close',
           help: 'Remove this leg',
         }),
       ],

@@ -5,7 +5,7 @@
  * be hidden. Every change is saved as it is made.
  */
 import { useRef } from 'react'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { Button, Sheet } from '../../ui'
 import usePointerReorder from '../../ui/usePointerReorder'
 import { popUpNativeMenu } from '../../ui/useNativeMenu'
@@ -34,7 +34,7 @@ function LayoutColumn({ layout, layouts, setShown, move }) {
 
   return (
     <section className="inspector-editor-column" aria-label={`${info.title} panels`}>
-      <h3 className="inspector-editor-title"><SFIcon name={info.symbol} size={14} /> {info.title}</h3>
+      <h3 className="inspector-editor-title"><Icon name={info.icon} /> {info.title}</h3>
       <ul ref={listRef} className="inspector-editor-rows">
         {rows.map((tab) => {
           const spec = inspectorTab(tab)
@@ -55,7 +55,7 @@ function LayoutColumn({ layout, layouts, setShown, move }) {
                 title={onlyOne ? 'A layout shows at least one panel' : undefined}
                 onChange={(event) => setShown(layout, tab, event.target.checked)}
               />
-              <SFIcon name={spec.symbol} size={14} />
+              <Icon name={spec.icon} />
               <span className="inspector-editor-row-title">{spec.title}</span>
               {isShown ? (
                 <span
@@ -63,7 +63,7 @@ function LayoutColumn({ layout, layouts, setShown, move }) {
                   aria-label={`Drag to reorder ${spec.title}`}
                   onPointerDown={(event) => drag.onPointerDown(event, tab)}
                 >
-                  <SFIcon name="line.3.horizontal" size={14} />
+                  <Icon name="list" />
                 </span>
               ) : null}
             </li>

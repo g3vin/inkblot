@@ -7,7 +7,7 @@
  */
 import { INSPECTOR_TABS } from '../../lib/chromeLayout'
 
-export const RIGHT_SIDEBAR_TABS = INSPECTOR_TABS.map(({ id, symbol, title }) => ({ id, icon: symbol, label: title }))
+export const RIGHT_SIDEBAR_TABS = INSPECTOR_TABS.map(({ id, icon, title }) => ({ id, icon, label: title }))
 
 const BY_ID = new Map(RIGHT_SIDEBAR_TABS.map((tab) => [tab.id, tab]))
 

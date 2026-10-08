@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from 'react'
 import { IconButton, Section, Segmented, SelectMenu } from '../../ui'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { getPreference, setPreference } from '../../lib/preferences'
 import { latestBridgeEvent } from '../../bridge'
 import { useStats } from '../../stats/useStats.js'
@@ -108,7 +108,7 @@ export default function StatsPanel({ query = '' }) {
       <header className="stats-header">
         <div className="stats-header-row">
           <Segmented value={page} onChange={setPage} options={PAGES} label="Page" stretch />
-          <IconButton symbol="gearshape" label="Stats Settings" onClick={() => openSettings('goals')} />
+          <IconButton icon="settings" label="Stats Settings" onClick={() => openSettings('goals')} />
         </div>
         <Segmented value={chosen} onChange={setChosen} options={SCOPES} label="Scope" stretch />
         <p className="stats-note">{caption}</p>
@@ -263,7 +263,7 @@ function InsightsSections({ stats, scope }) {
           <span className="stats-grow" />
           {insights.weekChange ? (
             <span className="stats-change" title="Against the seven days before">
-              <SFIcon name={insights.thisWeekWords >= insights.lastWeekWords ? 'arrow.up.right' : 'arrow.down.right'} size={11} />{insights.weekChange}
+              <Icon name={insights.thisWeekWords >= insights.lastWeekWords ? 'arrow-up-right' : 'arrow-down-right'} />{insights.weekChange}
             </span>
           ) : null}
         </div>

@@ -61,7 +61,7 @@
  *          one blur token, no prefers-color-scheme duplicates
  *   ui     the shared controls (src/ui): reorder and placement math, native menus,
  *          and the controls mounted
- *   icons  every SF-style icon name in src/ resolves to a registered Phosphor icon
+ *   icons  every icon name in src/ is registered in src/ui/icons.js
  *   chromeLayout what the toolbars and the inspector hold: the item ids, default sets,
  *          and every migration a saved layout goes through
  *   toolbar the toolbars drawn from their layouts: every item renders disabled with no

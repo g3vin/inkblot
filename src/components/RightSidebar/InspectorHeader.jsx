@@ -3,7 +3,7 @@
  * indicator slides with a swipe), a circle that swaps Write's panels for Typeset's,
  * and on right-click the two layouts and Customize Layout….
  */
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import SidebarTabs from './SidebarTabs'
 import { INSPECTOR_LAYOUT_INFO } from '../../lib/chromeLayout'
 import { popUpNativeMenu } from '../../ui/useNativeMenu'
@@ -36,7 +36,7 @@ export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLay
         aria-label={`Show the ${INSPECTOR_LAYOUT_INFO[other].title} panels`}
         data-layout={layout}
       >
-        <SFIcon name={INSPECTOR_LAYOUT_INFO[layout].symbol} size={14} />
+        <Icon name={INSPECTOR_LAYOUT_INFO[layout].icon} />
       </button>
     </div>
   )

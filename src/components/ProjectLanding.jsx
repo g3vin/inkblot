@@ -12,7 +12,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createProject, getProjectRoot, linkProject, listProjects, moveProject } from '../lib/FileSystem'
 import { Button, Sheet } from '../ui'
 import { popUpNativeMenu } from '../ui/useNativeMenu.js'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { AppIcon, Wordmark } from '../ui/Brand.jsx'
 import './ProjectLanding.css'
 
@@ -67,7 +67,7 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
           onChange={(event) => { setName(event.target.value); setError('') }}
         />
         <button type="button" className="picker-location" onClick={choose} title={location || 'Stored in the app’s own folder'}>
-          <SFIcon name="folder" size={13} />
+          <Icon name="folder" />
           <span>{location ? location : 'In Inkblot’s own folder'}</span>
           <strong>Change…</strong>
         </button>
@@ -188,7 +188,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
                 { text: 'New Project in Folder…', action: () => setCreating('folder') },
               ])}
             >
-              <SFIcon name="chevron.down" size={11} />
+              <Icon name="chevron-down" />
             </button>
           </span>
         </div>
@@ -228,7 +228,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
                 ])
               }}
             >
-              <span className="picker-row-icon"><SFIcon name="folder" size={22} /></span>
+              <span className="picker-row-icon"><Icon name="folder" size={20} /></span>
               <span className="picker-row-text">
                 <strong>{name}</strong>
                 <small>{locationOf(roots[name], home)}</small>

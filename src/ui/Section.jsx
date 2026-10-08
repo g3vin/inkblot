@@ -3,7 +3,7 @@
  * section id under inkblot.inspector.sections, so a panel reopens as it was left.
  */
 import { useCallback, useState } from 'react'
-import SFIcon from '../components/SFIcon.jsx'
+import Icon from './Icon.jsx'
 import { readSectionStates, writeSectionState } from './sectionState.js'
 import './ui.css'
 
@@ -23,7 +23,7 @@ export default function Section({ id, title, accessory, defaultOpen = true, clas
   return (
     <section className={`ui-section ${className}`.trim()} data-open={open} data-section={id}>
       <button type="button" className="ui-section-header" aria-expanded={open} onClick={toggle}>
-        <span className="ui-section-chevron"><SFIcon name="chevron.down" size={10} /></span>
+        <span className="ui-section-chevron"><Icon name="chevron-down" /></span>
         <span className="ui-section-title">{title}</span>
         {accessory ? <span className="ui-section-accessory">{accessory}</span> : null}
       </button>

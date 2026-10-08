@@ -17,7 +17,7 @@ import { shellBridge, useBridgeEvent, useLatestBridgeState } from '../../../brid
 import { BibliographyInclude } from '../../../types'
 import { Segmented, Toggle } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import ReferenceEditor from './ReferenceEditor'
 import { badgesFor, newReferenceId, referenceTitle, sourceUrl, visibleReferences } from './referenceText'
 import { CITE_SOURCE_EVENT } from './citeEvent'
@@ -128,7 +128,7 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
   return (
     <div className="sidebar-panel references-panel">
       <div className={`references-quick-add${citing ? ' is-citing' : ''}`}>
-        <SFIcon name={citing ? 'quote.bubble' : 'plus.magnifyingglass'} size={14} />
+        <Icon name={citing ? 'comment' : 'zoom-in'} />
         <input
           ref={inputRef}
           value={input}
@@ -146,16 +146,16 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
           }}
         />
         {input ? (
-          <button type="button" className="reference-icon-button" aria-label="Clear" onClick={() => setInput('')}><SFIcon name="xmark" size={12} /></button>
+          <button type="button" className="reference-icon-button" aria-label="Clear" onClick={() => setInput('')}><Icon name="close" /></button>
         ) : null}
         <button type="button" className="reference-icon-button" aria-label="Enter a source by hand" title="Enter a source by hand" onClick={newSource}>
-          <SFIcon name="pencil.line" size={14} />
+          <Icon name="write" />
         </button>
       </div>
 
       <div className="references-controls">
         <button type="button" className="references-style ui-button" data-variant="tinted" data-size="capsule" onClick={styleMenu} title="Citation style">
-          <SFIcon name="textformat" size={12} /> {currentStyle?.short ?? 'Style'}
+          <Icon name="type-style" /> {currentStyle?.short ?? 'Style'}
         </button>
         <Segmented
           value={scope}
@@ -183,7 +183,7 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
           />
         )) : (
           <div className="inspector-placeholder">
-            <SFIcon name="books.vertical" size={22} />
+            <Icon name="books" size={20} />
             <strong>{emptyTitle}</strong>
             <span>{emptyMessage}</span>
           </div>
@@ -197,7 +197,7 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
 
 function ReferenceRow({ view, schema, scope, docPath, highlighted, expanded, onToggle, onCite }) {
   const { reference } = view
-  const symbol = schema?.kinds.find((kind) => kind.id === reference.kind)?.symbol ?? 'doc'
+  const icon = schema?.kinds.find((kind) => kind.id === reference.kind)?.icon ?? 'file'
   const resolving = reference.status === 'resolving' && (!view.entryHtml || !referenceTitle(reference))
   const url = sourceUrl(reference)
 
@@ -233,7 +233,7 @@ function ReferenceRow({ view, schema, scope, docPath, highlighted, expanded, onT
       onDragStart={(event) => event.dataTransfer.setData('text/plain', view.inText || referenceTitle(reference))}
     >
       <div className="reference-row-main">
-        <span className="reference-kind"><SFIcon name={symbol} size={14} /></span>
+        <span className="reference-kind"><Icon name={icon} /></span>
         <div className="reference-entry" onClick={onToggle} onDoubleClick={onCite} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') onToggle() }}>
           {resolving ? (
             <span className="reference-resolving">Looking up {reference.origin?.input ?? 'source'}…</span>
@@ -249,10 +249,10 @@ function ReferenceRow({ view, schema, scope, docPath, highlighted, expanded, onT
         </div>
         <div className="reference-actions">
           <button type="button" className="reference-icon-button" aria-label="Cite" title="Cite at the caret (or double-click the source)" onClick={onCite}>
-            <SFIcon name="quote.bubble" size={13} />
+            <Icon name="comment" />
           </button>
           <button type="button" className="reference-icon-button" aria-label="More" onClick={menu}>
-            <SFIcon name="ellipsis" size={13} />
+            <Icon name="more" />
           </button>
         </div>
       </div>

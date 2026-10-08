@@ -18,8 +18,8 @@ import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { FloatingCapsule, IconButton, usePointerReorder } from '../../ui'
 import { moveTo } from '../../ui/usePointerReorder.js'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
-import SFIcon from '../SFIcon'
-import { adjacentTab, needsTabBar, tabSymbol, tabName, tabTitle, useShowsTabBar } from './tabBarState.js'
+import Icon from '../../ui/Icon.jsx'
+import { adjacentTab, needsTabBar, tabIcon, tabName, tabTitle, useShowsTabBar } from './tabBarState.js'
 import './DocumentTabBar.css'
 
 const send = (type, payload) => shellBridge.send(type, payload)
@@ -109,14 +109,14 @@ export default function DocumentTabBar({ activeDoc }) {
                   tabIndex={-1}
                   onClick={(event) => { event.stopPropagation(); send('closeTab', { tabId: tab.id }) }}
                 >
-                  <SFIcon name="xmark" size={8} />
+                  <Icon name="close" />
                 </button>
-                <SFIcon name={tabSymbol(tab.docPath)} size={12} />
+                <Icon name={tabIcon(tab.docPath)} />
                 <span className="document-tab-name">{title}</span>
                 {second ? (
                   <>
                     <span className="document-tab-divider" aria-hidden="true">|</span>
-                    <SFIcon name={tabSymbol(tab.secondaryDoc)} size={12} />
+                    <Icon name={tabIcon(tab.secondaryDoc)} />
                     <span className="document-tab-name">{second}</span>
                   </>
                 ) : null}
@@ -126,10 +126,10 @@ export default function DocumentTabBar({ activeDoc }) {
           {insertIndex === tabs.length ? <span className="document-tab-insert" aria-hidden="true" /> : null}
         </div>
       </FloatingCapsule>
-      <IconButton symbol="plus" label="New Tab" title="Open a new tab (⌘T)" size="circle" className="floating-capsule document-tab-new" onClick={() => send('newTab', {})} />
+      <IconButton icon="add" label="New Tab" title="Open a new tab (⌘T)" size="circle" className="floating-capsule document-tab-new" onClick={() => send('newTab', {})} />
       {dragged && ghost ? (
         <FloatingCapsule className="document-tab-ghost" style={{ left: ghost.x, top: ghost.y }} aria-hidden="true">
-          <SFIcon name={tabSymbol(dragged.docPath)} size={12} />{tabTitle(dragged, tabs)}
+          <Icon name={tabIcon(dragged.docPath)} />{tabTitle(dragged, tabs)}
         </FloatingCapsule>
       ) : null}
     </div>

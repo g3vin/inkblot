@@ -4,7 +4,7 @@
  * It draws the form `useMapPanel` builds, and nothing else: every field calls the
  * handler filed under its id.
  */
-import SFIcon from '../components/SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { PinGlyph } from './mapGlyphs'
 import { CheckField, ColorField, Field, NumberField, Section, SelectField, Stat, TextField } from './inspector/fields'
 import { inkColor } from '../lib/palette'
@@ -249,18 +249,18 @@ export default function MapPanelView({ panel, handlers, onClose }) {
       <div className="map-inspector-header">
         {panel.canGoBack ? (
           <button type="button" className="map-tool" style={{ marginLeft: 0 }} title="Back to the map" aria-label="Back to the map" onClick={() => handlers.get('@back')?.()}>
-            <SFIcon name="chevron.left" size={14} />
+            <Icon name="chevron-left" />
           </button>
         ) : null}
         <span>{panel.title}</span>
         {panel.problems ? (
           <span title={`${panel.problems} problem${panel.problems === 1 ? '' : 's'} in the journeys`} style={{ color: 'var(--status-warning)' }}>
-            <SFIcon name="exclamationmark.triangle" size={14} />
+            <Icon name="warning" />
           </span>
         ) : null}
         {onClose ? (
           <button type="button" className="map-tool" title="Hide the inspector" aria-label="Hide the inspector" onClick={onClose}>
-            <SFIcon name="xmark" size={14} />
+            <Icon name="close" />
           </button>
         ) : null}
       </div>

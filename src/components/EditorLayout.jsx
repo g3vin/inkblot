@@ -661,12 +661,12 @@ export default function EditorLayout(props) {
             buttons in a macOS window's toolbar. The pin in each sidebar puts it away. */}
         {left.collapsed && !left.peeked ? (
           <div className="titlebar-toggle is-left">
-            <IconButton symbol="sidebar.left" label="Show Sidebar" size="circle" className="floating-capsule" onClick={left.pin} />
+            <IconButton icon="sidebar" label="Show Sidebar" size="circle" className="floating-capsule" onClick={left.pin} />
           </div>
         ) : null}
         {right.collapsed && !right.peeked ? (
           <div className="titlebar-toggle is-right">
-            <IconButton symbol="sidebar.right" label="Show Inspector" size="circle" className="floating-capsule" onClick={right.pin} />
+            <IconButton icon="sidebar" label="Show Inspector" size="circle" className="floating-capsule" onClick={right.pin} />
           </div>
         ) : null}
         <div className="app-titlebar-toolbar">
