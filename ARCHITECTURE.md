@@ -317,7 +317,9 @@ mind:
    icon name (`src/ui/icons.js`) and its contexts. Ids are keys in people's saved layouts: never rename or reuse
    one; a removed item's id goes in `RETIRED_TOOLBAR_IDS`.
 2. Add its component to `registry.jsx`, built from `ToolbarControls.jsx`.
-3. Add it to a default set only if every new user should see it.
+3. Add it to a default set only if new users should have it: before `MORE` if nearly
+   everyone needs it (docs/DESIGN.md → Progressive disclosure), otherwise after it,
+   behind ». Register its action with `useCommands` too, so ⌘K finds it.
 4. **Disable, never omit.** An item that returns nothing moves the rest of the layout.
 5. If it has on/off state, the surface publishes it: editor facts in
    `ToolbarState`/`ActiveMarks`, canvas facts in `CanvasToolbarState`, app settings in

@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { resolveAnchor } from '../bridge/anchors'
-import { documentSurface, useBridgeEvent, useBridgeState, useLatestBridgeState } from '../bridge'
+import { documentSurface, shellBridge, useBridgeEvent, useBridgeState, useLatestBridgeState } from '../bridge'
 import { EditorTarget } from '../types'
 
 /** A stable identity, so useBridgeState's initial value is not a new object each render. */
@@ -48,6 +48,9 @@ import { readDisplayMode, TOOLBAR_LAYOUT_CHANGED } from './toolbar/useToolbarLay
 import { CUSTOMIZE_INSPECTOR_EVENT, popUpToolbarMenu } from '../hooks/contextMenu/toolbarMenu'
 import InspectorLayoutEditor from './RightSidebar/InspectorLayoutEditor'
 import { setInspectorOpen } from '../lib/inspectorPresence'
+import { useCommands } from '../lib/commands'
+import { createFreeNote, createQuoteNote } from '../lib/noteUtils'
+import { requestDraftKind } from '../lib/draftDocument'
 
 const LEFT_SIDEBAR_OUTER_CHROME_WIDTH = 18
 // Room in the titlebar for a sidebar's show button while it is put away.
@@ -327,6 +330,53 @@ export default function EditorLayout(props) {
     () => ({ tab: props.sidebarTab, open: rightOpen, toggle: togglePanel }),
     [props.sidebarTab, rightOpen, togglePanel]
   )
+
+  // A note on the selection, or a free one with nothing selected (⌥⌘N, the toolbar's
+  // Add Note, the command palette).
+  const { setNotes } = props
+  const addNote = useCallback(() => {
+    const live = getLiveEditor(props.activeEditor)
+    const selection = live?.state.selection
+    const note = selection && !selection.empty
+      ? createQuoteNote({ from: selection.from, to: selection.to, anchor: live.state.doc.textBetween(selection.from, selection.to) })
+      : createFreeNote()
+    setNotes?.((notes) => [note, ...notes])
+    openRightSidebarTab('notes')
+  }, [props.activeEditor, setNotes, openRightSidebarTab])
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (!(event.metaKey || event.ctrlKey) || !event.altKey || event.shiftKey || event.code !== 'KeyN') return
+      if (!isTextDoc(activeDoc || currentDoc)) return
+      event.preventDefault()
+      addNote()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [addNote, activeDoc, currentDoc])
+
+  const leftShown = !left.collapsed || left.peeked
+  const activeIsText = isTextDoc(activeDoc || currentDoc)
+  const editorMode = pageLayoutState?.mode
+  const split = props.splitView
+  useCommands(() => {
+    const send = (type, payload = {}) => shellBridge.send(type, payload)
+    const newOf = (kind) => () => { requestDraftKind(kind); send('newTab') }
+    return [
+      { id: 'document.new', section: 'Document', title: 'New document…', icon: 'new-document', shortcut: '⌘T', keywords: ['create', 'chapter', 'page', 'file'], when: () => Boolean(props.projectName), run: newOf('doc') },
+      { id: 'canvas.new', section: 'Document', title: 'New canvas…', icon: 'canvas', keywords: ['create', 'board', 'cards'], when: () => Boolean(props.projectName), run: newOf('canvas') },
+      { id: 'map.new', section: 'Document', title: 'New map…', icon: 'map', keywords: ['create', 'world', 'places'], when: () => Boolean(props.projectName), run: newOf('map') },
+      { id: 'notes.add', section: 'Notes', title: 'Add note', icon: 'note', shortcut: '⌥⌘N', keywords: ['comment', 'annotate'], when: () => activeIsText, run: addNote },
+      { id: 'view.focus-mode', section: 'View', title: focusModeOpen ? 'Leave focus mode' : 'Enter focus mode', icon: 'crosshair', keywords: ['distraction free', 'zen', 'full screen'], when: () => activeIsText, run: () => setFocusModeOpen((open) => !open) },
+      { id: 'view.sidebar', section: 'View', title: leftShown ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', keywords: ['files', 'file tree', 'left panel'], run: () => (leftShown ? left.collapse() : left.pin()) },
+      { id: 'view.inspector', section: 'View', title: rightOpen ? 'Hide inspector' : 'Show inspector', icon: 'sidebar', keywords: ['right panel', 'panels'], run: () => (rightOpen ? right.collapse() : right.pin()) },
+      { id: 'view.split.right', section: 'View', title: 'Split right', icon: 'split-columns', keywords: ['side by side', 'two documents'], when: () => split !== 'editor', run: () => send('openInSplit', { orientation: 'columns' }) },
+      { id: 'view.split.down', section: 'View', title: 'Split down', icon: 'split-rows', keywords: ['above and below', 'two documents'], when: () => split !== 'editor', run: () => send('openInSplit', { orientation: 'rows' }) },
+      { id: 'view.split.close', section: 'View', title: 'Close split', icon: 'close', when: () => split === 'editor', run: () => send('closeSplit') },
+      { id: 'history.open', section: 'Document', title: 'Show version history', icon: 'history', keywords: ['versions', 'snapshots', 'restore', 'undo'], run: () => openRightSidebarTab('history') },
+      { id: 'view.typeset', section: 'Print & export', title: editorMode === 'typeset' ? 'Back to Write' : 'Typeset the book', icon: editorMode === 'typeset' ? 'write' : 'type-style', keywords: ['pages', 'layout', 'print', 'book', 'write'], when: () => activeIsText, run: () => send('setEditorMode', { mode: editorMode === 'typeset' ? 'write' : 'typeset' }) },
+    ]
+  }, [props.projectName, activeIsText, addNote, focusModeOpen, leftShown, rightOpen, left, right, split, editorMode, openRightSidebarTab])
 
   const handleContextMenu = useEditorContextMenu({
     editor: props.activeEditor,

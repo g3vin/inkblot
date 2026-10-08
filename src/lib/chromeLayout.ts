@@ -21,6 +21,12 @@ export const TOOLBAR_DISPLAY_MODES: ToolbarDisplayMode[] = ['iconAndLabel', 'ico
 export const SPACE = 'space'
 export const FLEXIBLE_SPACE = 'flexible-space'
 export const isSpacer = (id: string) => id === SPACE || id === FLEXIBLE_SPACE
+/**
+ * Everything after this marker lives behind the toolbar's » overflow, however wide
+ * the window is: the surface keeps the essentials (docs/DESIGN.md → Progressive
+ * disclosure). At most one per toolbar; it is shown only while customizing.
+ */
+export const MORE = 'more'
 
 export const toolbarLayoutKey = (context: ToolbarContext) => `inkblot.toolbar.layout.${context}`
 export const TOOLBAR_DISPLAY_MODE_KEY = 'inkblot.toolbar.displayMode'
@@ -49,6 +55,7 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.format.numbered-list', label: 'Numbered List', icon: 'list-numbers', contexts: ['document'] },
   { id: 'inkblot.insert.table', label: 'Table', icon: 'table', contexts: ['document'] },
   { id: 'inkblot.insert.conversation', label: 'Conversation', icon: 'chat', contexts: ['document'] },
+  { id: 'inkblot.insert.note', label: 'Add Note', icon: 'note', contexts: ['document'] },
   { id: 'inkblot.edit.undo-redo', label: 'Undo/Redo', icon: 'undo', contexts: ['document'] },
   { id: 'inkblot.edit.paste-and-match-style', label: 'Paste and Match Style', icon: 'clipboard', contexts: ['document'] },
   { id: 'inkblot.view.focus-mode', label: 'Focus Mode', icon: 'crosshair', contexts: ['document'] },
@@ -116,12 +123,15 @@ export function toolbarItemsFor(context: ToolbarContext): ToolbarItemSpec[] {
 
 /** Each toolbar's default set. */
 export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
+  // The essentials on the surface; the rest one click away, behind ».
   document: [
     'inkblot.view.editor-mode', SPACE,
-    'inkblot.format.font', 'inkblot.format.font-size', SPACE,
-    'inkblot.format.text-style', SPACE,
-    'inkblot.format.text-color', 'inkblot.format.highlight', 'inkblot.format.alignment', SPACE,
-    'inkblot.insert.table', 'inkblot.insert.conversation', FLEXIBLE_SPACE,
+    'inkblot.format.text-style', 'inkblot.format.paragraph-style', SPACE,
+    'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', SPACE,
+    'inkblot.insert.note', 'inkblot.edit.undo-redo', MORE,
+    'inkblot.format.font', 'inkblot.format.font-size',
+    'inkblot.format.text-color', 'inkblot.format.highlight', 'inkblot.format.alignment',
+    'inkblot.insert.table', 'inkblot.insert.conversation',
     'inkblot.speech.dictation', 'inkblot.speech.read-aloud',
   ],
   canvas: [
@@ -147,7 +157,7 @@ export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
 
 export type ToolbarLayout = { version: 1; items: string[]; known: string[] }
 
-const defaultIds = (context: ToolbarContext) => DEFAULT_TOOLBARS[context].filter((id) => !isSpacer(id))
+const defaultIds = (context: ToolbarContext) => DEFAULT_TOOLBARS[context].filter((id) => !isSpacer(id) && id !== MORE)
 
 export function defaultToolbarLayout(context: ToolbarContext): ToolbarLayout {
   return { version: 1, items: [...DEFAULT_TOOLBARS[context]], known: toolbarItemsFor(context).map((item) => item.id) }
@@ -195,14 +205,14 @@ export function normalizeToolbar(context: ToolbarContext, raw: unknown): Toolbar
   const items = stored.items.filter((id): id is string => {
     if (typeof id !== 'string') return false
     if (isSpacer(id)) return true
-    if (!offered.has(id) || seen.has(id)) return false
+    if ((id !== MORE && !offered.has(id)) || seen.has(id)) return false
     seen.add(id)
     return true
   })
   // Collapse runs of spacers and trim them from the ends.
   const tidy = items.filter((id, i) => !(isSpacer(id) && (i === 0 || isSpacer(items[i - 1]))))
-  while (tidy.length && isSpacer(tidy[tidy.length - 1])) tidy.pop()
-  if (!tidy.some((id) => !isSpacer(id))) return defaultToolbarLayout(context)
+  while (tidy.length && (isSpacer(tidy[tidy.length - 1]) || tidy[tidy.length - 1] === MORE)) tidy.pop()
+  if (!tidy.some((id) => !isSpacer(id) && id !== MORE)) return defaultToolbarLayout(context)
 
   const known = Array.isArray(stored.known) ? new Set(stored.known) : null
   const newDefaults = known ? defaultIds(context).filter((id) => !known.has(id)) : []

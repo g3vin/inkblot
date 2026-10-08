@@ -34,3 +34,16 @@ export async function createDraftDocument(projectName, name, kind) {
   await createDocumentOfKind(projectName, path, kind)
   return path
 }
+
+// The kind a new tab's chooser starts on, when a command asked for one ("New canvas…").
+let requestedKind = null
+
+/** Ask the next draft tab to start on `kind`. */
+export const requestDraftKind = (kind) => { requestedKind = kind }
+
+/** The kind asked for, once; then the chooser's default again. */
+export const takeDraftKind = () => {
+  const kind = requestedKind
+  requestedKind = null
+  return kind
+}
