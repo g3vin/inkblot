@@ -37,6 +37,8 @@ speaks. The short version:
 - Liquid Glass appears on iOS/iPadOS only, and only on floating chrome over the page
   (the `.floating-capsule` surface: `FloatingToolbar`, `FloatingActionButton`,
   `FloatingCapsule`).
+- The logo is `Mark` / `Wordmark` / `AppIcon` from `src/ui`: black on white, never
+  recoloured or redrawn (regenerate it with `docs/brand/generator/`).
 - Both themes, AA contrast, keyboard access and reduced motion, every time.
 
 Check UI work with `npm run lint:design` (it must pass) and in the showcase
@@ -47,7 +49,7 @@ around it locally.
 ## Work in progress
 
 The design language is being rolled out surface by surface. Before continuing that work
-(the logo, migrating a surface, retiring legacy code), read
+(migrating a surface, retiring legacy code), read
 [docs/design-handoff.md](docs/design-handoff.md) for the current state and next steps.
 
 ## Checks
