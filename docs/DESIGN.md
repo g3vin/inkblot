@@ -347,6 +347,7 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `Mark`, `Wordmark`, `AppIcon` | The logo, wherever the brand appears | Black on white; see §2. Draw in `currentColor` |
 | `Button` | Any text action | `variant`: `filled` (the one primary action per view), `tinted` (a normal action that needs weight), `plain` (default: quiet actions in chrome and rows), `destructive` (confirm or offer undo). `size`: `capsule` (default), `circle`, `toolbar` |
 | `IconButton` | Icon-only actions | `label` is required and becomes the tooltip and accessible name. Glyph from `icon`, a semantic name. `display` shows the label under or instead of the icon in customisable toolbars. `filled` + `aria-pressed` for toggles |
+| `iconElement` | An icon in code that builds DOM by hand (TipTap node views) | `iconElement('add')` returns the same glyph `Icon` draws, as an `<svg>` element |
 | `Tooltip` | Naming a control in a richer way than `title` | Short, no period, after a 500ms delay, with an optional shortcut. Never holds anything a user must read to succeed |
 | `Kbd` | Showing a shortcut | Courier Prime |
 | `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in. `danger` items go last, after a separator |

@@ -1,51 +1,20 @@
 /**
  * conversationWidgets.js — the small DOM controls the node view builds by hand.
  *
- * The node view is imperative DOM, not React, so its buttons, colour wells and
- * text fields are constructed here rather than rendered.
+ * The node view is imperative DOM, not React, so its buttons, selects and text
+ * fields are constructed here rather than rendered. Icons come from src/ui.
  */
-export const makeAniconSvg = (name, size = 14) => {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  svg.setAttribute('width', String(size))
-  svg.setAttribute('height', String(size))
-  svg.setAttribute('viewBox', '0 0 24 24')
-  svg.setAttribute('fill', 'none')
-  svg.setAttribute('stroke', 'currentColor')
-  svg.setAttribute('stroke-width', '2')
-  svg.setAttribute('stroke-linecap', 'round')
-  svg.setAttribute('stroke-linejoin', 'round')
-  svg.setAttribute('aria-hidden', 'true')
-  svg.classList.add('conversation-tool-icon', `conversation-tool-icon-${name}`)
+import iconElement from '../ui/iconElement.js'
 
-  const paths = name === 'plus'
-    ? ['M5 12h14', 'M12 5v14']
-    : name === 'edit'
-      ? [
-        'M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z',
-        'm15 5 4 4',
-      ]
-      : ['M18 6 6 18', 'm6 6 12 12']
-
-  paths.forEach((d) => {
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-    path.setAttribute('d', d)
-    svg.appendChild(path)
-  })
-
-  return svg
-}
-
+const BUTTON_ICONS = { '+': 'add', x: 'close', Edit: 'edit' }
 export const makeButton = (label, title, onClick, className = '') => {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = ['conversation-tool-button', className].filter(Boolean).join(' ')
-  const isPlus = label === '+' || label.startsWith('+ ')
-  const isX = label === 'x'
-  const isEdit = label === 'Edit'
-  if (isPlus || isX || isEdit) {
-    button.classList.add('has-anicon')
-    button.appendChild(makeAniconSvg(isPlus ? 'plus' : isEdit ? 'edit' : 'x'))
+  const icon = label.startsWith('+ ') ? 'add' : BUTTON_ICONS[label]
+  if (icon) {
+    button.classList.add('has-icon')
+    button.appendChild(iconElement(icon))
     if (label.startsWith('+ ')) {
       const text = document.createElement('span')
       text.textContent = label.slice(2)
@@ -69,21 +38,23 @@ export const makeButton = (label, title, onClick, className = '') => {
   return button
 }
 
-export const makeColorInput = (label, value, onInput) => {
-  const wrapper = document.createElement('label')
-  wrapper.className = 'conversation-color-control'
-  wrapper.title = label
-  wrapper.contentEditable = 'false'
-
-  const swatch = document.createElement('input')
-  swatch.type = 'color'
-  swatch.value = value
-  swatch.setAttribute('aria-label', label)
-  swatch.addEventListener('pointerdown', event => event.stopPropagation())
-  swatch.addEventListener('input', () => onInput(swatch.value))
-
-  wrapper.appendChild(swatch)
-  return wrapper
+/** A native select dressed as the shared SelectMenu (src/ui), for node-view toolbars. */
+export const makeSelect = (label, value, options, onChange) => {
+  const select = document.createElement('select')
+  select.className = 'ui-select'
+  select.setAttribute('aria-label', label)
+  select.title = label
+  select.contentEditable = 'false'
+  options.forEach(({ value: optionValue, label: optionLabel }) => {
+    const option = document.createElement('option')
+    option.value = optionValue
+    option.textContent = optionLabel
+    select.appendChild(option)
+  })
+  select.value = value
+  select.addEventListener('pointerdown', event => event.stopPropagation())
+  select.addEventListener('change', () => onChange(select.value))
+  return select
 }
 
 export const makeTextInput = (value, label, onInput, controlId = '') => {
