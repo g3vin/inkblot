@@ -97,7 +97,8 @@ const VIEWPORTS = [
   { x: NaN, y: Infinity, zoom: 'big' },
 ]
 
-const COLORS = ['1', '2', '3', '4', '5', '6', '7', '0', '#abcdef', '', null, 'rebeccapurple', 1, 6, true]
+const COLORS = ['1', '2', '3', '4', '5', '6', '7', '0', '#abcdef', '', null, 'rebeccapurple', 1, 6, true,
+  'teal', 'slate', ' teal', '#e5534b', '#E5534B', ' #ffd54f ', '#007aff', '  ', '\uFEFF#abc\uFEFF']
 
 const MOVING = [[], ['a'], ['c'], ['g1'], ['a', 'b'], ['g1', 'c'], ['nowhere'], ['a', 'a']]
 
