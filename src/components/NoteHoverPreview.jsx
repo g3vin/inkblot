@@ -17,7 +17,6 @@ import NoteImageGallery from './NoteImageGallery'
 import AudioNotes from './AudioNotes'
 import { readClipboardImages } from '../lib/noteImageUtils'
 import { collectNoteBranchIds, createFreeNote, noteColor, touchNote } from '../lib/noteUtils'
-import { RESIZE_ICON_PATHS } from '../lib/resizeIcon'
 import {
   NOTE_HIGHLIGHT_EVENT,
   NOTE_PREVIEW_ENTER_EVENT,
@@ -766,21 +765,7 @@ export default function NoteHoverPreview({
               aria-label="Resize note"
               title="Resize note"
             >
-              <svg
-                className="resize-corner-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                {RESIZE_ICON_PATHS.map(path => <path key={path} d={path} />)}
-              </svg>
+              <Icon name="resize" className="resize-corner-icon" />
             </button>
           </article>
         )

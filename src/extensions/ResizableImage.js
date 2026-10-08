@@ -11,13 +11,13 @@
  */
 import { Image } from '@tiptap/extension-image'
 import { NodeSelection } from '@tiptap/pm/state'
-import {
-  ICON_ARROW_RIGHT_LEFT_PATHS,
-  ICON_ARROW_UP_DOWN_PATHS,
-  createFrameIconElement,
-  createResizeIconElement,
-  createSvgIconElement,
-} from '../lib/resizeIcon'
+import iconElement from '../ui/iconElement.js'
+
+const resizeIcon = () => {
+  const icon = iconElement('resize')
+  icon.classList.add('resize-corner-icon')
+  return icon
+}
 
 const MIN_WIDTH = 80
 const MIN_CROP_SIZE = 0.08
@@ -238,7 +238,7 @@ const ResizableImage = Image.extend({
       resizeHandle.className = 'image-resize-handle'
       resizeHandle.style.display = 'none'
       resizeHandle.contentEditable = 'false'
-      resizeHandle.appendChild(createResizeIconElement())
+      resizeHandle.appendChild(resizeIcon())
 
       const selectImage = () => {
         const pos = typeof getPos === 'function' ? getPos() : null
@@ -316,7 +316,7 @@ const ResizableImage = Image.extend({
         return button
       }
 
-      const cropButton = makeToolButton(createFrameIconElement(), 'Crop image', () => setCropMode(!isCropping))
+      const cropButton = makeToolButton(iconElement('crop'), 'Crop image', () => setCropMode(!isCropping))
       cropButton.dataset.action = 'crop'
       const applyCropButton = makeToolButton('Apply', 'Apply crop', applyCrop, 'image-crop-action')
       const cancelCropButton = makeToolButton('Cancel', 'Cancel crop', () => setCropMode(false), 'image-crop-action')
@@ -329,7 +329,7 @@ const ResizableImage = Image.extend({
         commitAttributes({ rotation: normalizeRotation(currentNode.attrs.rotation + 90) })
       })
       const flipHorizontalButton = makeToolButton(
-        createSvgIconElement(ICON_ARROW_RIGHT_LEFT_PATHS, 16, 'image-tool-icon image-tool-icon-flip-horizontal'),
+        iconElement('flip-horizontal'),
         'Flip horizontally',
         () => {
           commitAttributes({ flipX: !currentNode.attrs.flipX })
@@ -338,7 +338,7 @@ const ResizableImage = Image.extend({
       flipHorizontalButton.dataset.action = 'flip-x'
 
       const flipVerticalButton = makeToolButton(
-        createSvgIconElement(ICON_ARROW_UP_DOWN_PATHS, 16, 'image-tool-icon image-tool-icon-flip-vertical'),
+        iconElement('flip-vertical'),
         'Flip vertically',
         () => {
           commitAttributes({ flipY: !currentNode.attrs.flipY })

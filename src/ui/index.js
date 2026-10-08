@@ -3,6 +3,7 @@
  * docs/DESIGN.md says when to use each, and ?design (dev only) shows them all.
  */
 export { default as Icon } from './Icon.jsx'
+export { default as iconElement } from './iconElement.js'
 export { Mark, Wordmark, AppIcon } from './Brand.jsx'
 export { ICONS } from './icons.js'
 export { default as Button } from './Button.jsx'

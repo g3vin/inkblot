@@ -18,6 +18,7 @@ import {
   normalizeMessages,
   parseNumber,
 } from './conversationModel'
+import { conversationLook } from './conversationStyles'
 
 export const escapeHtml = (value = '') => String(value)
   .replaceAll('&', '&amp;')
@@ -39,8 +40,6 @@ export const messageRowsHtml = (attrs) => {
       (!attrs.groupChat || isOutgoing || previous.name === message.name)
     const sameAsNext = next?.sender === message.sender &&
       (!attrs.groupChat || isOutgoing || next.name === message.name)
-    const bubbleColor = isOutgoing ? attrs.outgoingColor : attrs.incomingColor
-    const textColor = isOutgoing ? attrs.outgoingTextColor : attrs.incomingTextColor
     const showAvatar = attrs.groupChat && !isOutgoing
     const avatarSrc = showAvatar ? getAvatar(message.name) : ''
     const classes = [
@@ -55,7 +54,7 @@ export const messageRowsHtml = (attrs) => {
         ${attrs.groupChat && !isOutgoing && !sameAsPrevious ? `<div class="conversation-snapshot-name">${escapeHtml(message.name)}</div>` : ''}
         <div class="conversation-snapshot-line ${showAvatar ? 'has-avatar' : ''}">
           ${showAvatar ? `<span class="conversation-snapshot-avatar">${avatarSrc ? `<img src="${escapeHtml(avatarSrc)}" alt="" />` : escapeHtml(getInitials(message.name))}</span>` : ''}
-          <div class="conversation-snapshot-bubble" style="background:${escapeHtml(bubbleColor)};color:${escapeHtml(textColor)};">
+          <div class="conversation-snapshot-bubble">
             ${message.imageSrc ? `<img src="${escapeHtml(message.imageSrc)}" alt="" />` : ''}
             ${message.text ? `<div>${escapeHtml(message.text).replaceAll('\n', '<br />')}</div>` : ''}
           </div>
@@ -107,28 +106,32 @@ export const buildSnapshot = (attrs, measuredHeight = null) => {
     110,
     2200
   )
+  // The image is its own document, so the look is written in as values, not variables.
+  const look = conversationLook(attrs)
   const html = `
     <div xmlns="http://www.w3.org/1999/xhtml">
       <style>
-        .conversation-snapshot{box-sizing:border-box;width:${width}px;height:${height}px;padding:14px 0;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;background:transparent;overflow:hidden;}
+        .conversation-snapshot{box-sizing:border-box;width:${width}px;height:${height}px;padding:14px 0;font-family:${look.font};background:transparent;overflow:hidden;}
         .conversation-snapshot-row{box-sizing:border-box;display:flex;flex-direction:column;margin:3px 0;max-width:78%;font-size:15px;line-height:1.28;}
         .conversation-snapshot-row.is-outgoing{align-items:flex-end;margin-left:auto;}
         .conversation-snapshot-row.is-incoming{align-items:flex-start;margin-right:auto;}
         .conversation-snapshot-line{box-sizing:border-box;display:flex;align-items:flex-end;gap:6px;max-width:100%;}
         .conversation-snapshot-line.has-avatar .conversation-snapshot-bubble{max-width:calc(100% - 34px);}
-        .conversation-snapshot-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;width:28px;height:28px;border-radius:50%;overflow:hidden;background:#d7dbe0;color:#58606b;font-size:10px;font-weight:750;}
+        .conversation-snapshot-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;width:28px;height:28px;border-radius:50%;overflow:hidden;background:${look.avatar};color:${look.avatarText};font-size:10px;font-weight:750;}
         .conversation-snapshot-avatar img{width:100%;height:100%;object-fit:cover;}
-        .conversation-snapshot-bubble{box-sizing:border-box;max-width:100%;padding:8px 12px;border-radius:18px;overflow:hidden;white-space:pre-wrap;word-break:break-word;}
+        .conversation-snapshot-bubble{box-sizing:border-box;max-width:100%;padding:8px 12px;border-radius:${look.radius}px;overflow:hidden;white-space:pre-wrap;word-break:break-word;}
+        .conversation-snapshot-row.is-outgoing .conversation-snapshot-bubble{background:${look.outgoing};color:${look.outgoingText};}
+        .conversation-snapshot-row.is-incoming .conversation-snapshot-bubble{background:${look.incoming};color:${look.incomingText};}
         .conversation-snapshot-row.continues-before .conversation-snapshot-bubble{margin-top:1px;}
-        .conversation-snapshot-row.continues-after.is-outgoing .conversation-snapshot-bubble{border-bottom-right-radius:6px;}
-        .conversation-snapshot-row.continues-before.is-outgoing .conversation-snapshot-bubble{border-top-right-radius:6px;}
-        .conversation-snapshot-row.continues-after.is-incoming .conversation-snapshot-bubble{border-bottom-left-radius:6px;}
-        .conversation-snapshot-row.continues-before.is-incoming .conversation-snapshot-bubble{border-top-left-radius:6px;}
-        .conversation-snapshot-bubble img{display:block;width:100%;max-height:260px;object-fit:cover;margin:-3px -7px 6px;border-radius:13px;}
-        .conversation-snapshot-name{margin:6px 0 2px 12px;color:#7a7f87;font-size:11px;font-weight:650;}
-        .conversation-snapshot-time{margin:3px 10px 3px;color:#8d939c;font-size:10px;line-height:1.2;}
-        .conversation-snapshot-receipt{margin:5px 10px 9px;color:#8d939c;font-size:10px;line-height:1.2;}
-        .conversation-snapshot-receipt.is-error{color:#ff3b30;}
+        .conversation-snapshot-row.continues-after.is-outgoing .conversation-snapshot-bubble{border-bottom-right-radius:${look.tail}px;}
+        .conversation-snapshot-row.continues-before.is-outgoing .conversation-snapshot-bubble{border-top-right-radius:${look.tail}px;}
+        .conversation-snapshot-row.continues-after.is-incoming .conversation-snapshot-bubble{border-bottom-left-radius:${look.tail}px;}
+        .conversation-snapshot-row.continues-before.is-incoming .conversation-snapshot-bubble{border-top-left-radius:${look.tail}px;}
+        .conversation-snapshot-bubble img{display:block;width:100%;max-height:260px;object-fit:cover;margin:-3px -7px 6px;border-radius:${Math.max(0, look.radius - 5)}px;}
+        .conversation-snapshot-name{margin:6px 0 2px 12px;color:${look.meta};font-size:11px;font-weight:650;}
+        .conversation-snapshot-time{margin:3px 10px 3px;color:${look.meta};font-size:10px;line-height:1.2;}
+        .conversation-snapshot-receipt{margin:5px 10px 9px;color:${look.meta};font-size:10px;line-height:1.2;}
+        .conversation-snapshot-receipt.is-error{color:${look.error};}
       </style>
       <div class="conversation-snapshot">
         ${messageRowsHtml(attrs)}
