@@ -11,7 +11,7 @@ const DEFAULT_TOOLBAR_STATE = {
   target: undefined,
   color: '#000000',
   highlight: '#ffff00',
-  font: 'Georgia',
+  font: 'Literata',
   fontSize: '18px',
   alignment: 'left',
   activeMarks: { bold: false, italic: false, underline: false, strike: false, table: false },

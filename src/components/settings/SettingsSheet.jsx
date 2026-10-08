@@ -6,7 +6,7 @@
  * Every change is saved as it is made.
  */
 import { useEffect, useState } from 'react'
-import { Button, FormRow, Segmented, Sheet, Toggle } from '../../ui'
+import { Button, FormRow, InkPicker, Segmented, Sheet, Toggle } from '../../ui'
 import SFIcon from '../SFIcon'
 import { useStats } from '../../stats/useStats.js'
 import { OPEN_SETTINGS } from '../../stats/timerMenu.js'
@@ -27,36 +27,19 @@ const PANES = [
 const THEMES = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'system', label: 'System' }]
 
 function GeneralPane({ appearance }) {
-  const { theme, onTheme, accentColor, onAccent, accentPresets, defaultAccent, systemAccent, wordCount, onWordCount } = appearance
+  const { theme, onTheme, accent, onAccent, accentPresets, defaultAccent, wordCount, onWordCount } = appearance
   return (
     <>
       <section className="settings-group">
         <h3>Appearance</h3>
         <FormRow label="Theme"><Segmented label="Theme" value={theme} onChange={onTheme} options={THEMES} /></FormRow>
-        {systemAccent ? (
-          <p className="settings-footer">The accent colour follows your system’s.</p>
-        ) : (
-          <FormRow label="Accent colour" stacked>
-            <div className="settings-swatches">
-              {accentPresets.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  className="settings-swatch"
-                  aria-pressed={accentColor === preset.value}
-                  aria-label={`${preset.label} accent`}
-                  title={preset.label}
-                  style={{ '--swatch': preset.value }}
-                  onClick={() => onAccent(preset.value)}
-                />
-              ))}
-              <label className="settings-swatch settings-swatch-custom" title="Pick your own">
-                <input type="color" aria-label="Pick your own accent colour" value={accentColor} onChange={(event) => onAccent(event.target.value)} />
-              </label>
-              <Button size="capsule" disabled={accentColor === defaultAccent} onClick={() => onAccent(defaultAccent)}>Reset</Button>
-            </div>
-          </FormRow>
-        )}
+        <FormRow label="Accent colour" stacked>
+          <div className="settings-swatches">
+            <InkPicker label="Accent colour" value={accent} onChange={onAccent} inks={accentPresets.map((preset) => preset.id)} />
+            <Button size="capsule" disabled={accent === defaultAccent} onClick={() => onAccent(defaultAccent)}>Reset</Button>
+          </div>
+        </FormRow>
+        <p className="settings-footer">Tints selections, focus rings and primary buttons. Ink Blue is Inkblot’s own.</p>
       </section>
       <section className="settings-group">
         <FormRow label="Show word count"><Toggle label="Show word count" checked={wordCount} onChange={onWordCount} /></FormRow>

@@ -1,5 +1,5 @@
 /**
- * The stylesheets keep to the design system (src/index.css).
+ * The stylesheets keep to the design system (src/styles/tokens.css, docs/DESIGN.md).
  *
  *   - Surfaces are flat: a gradient is allowed only where it does a job (a fade at a
  *     scroll edge, a mask, a grid, the dictation sweep), listed below by selector.
@@ -29,7 +29,7 @@ const FUNCTIONAL_GRADIENTS = [
   '.sidebar-list::before',          // lists fading under their sticky header
   '.dictation-inline-draft',        // the sweep over text being dictated
   '.canvas-grid',                   // the canvas grid
-  '.settings-swatch-custom',        // the colour wheel that opens the colour picker
+  '.ib-fade-scrim',                 // content fading under chrome that overlays it (src/ui FadeScrim)
 ]
 
 const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
@@ -83,7 +83,9 @@ for (const problem of blurProblems) console.log(`      blur: ${problem}`)
 ok('every backdrop-filter is var(--blur-over-page)', blurProblems.length === 0)
 
 console.log(`      ${radiusLiterals} border-radius literals left to bring onto --radius-*`)
-ok('the radius scale is defined', /--radius-card:\s*18px/.test(readFileSync(join(src, 'index.css'), 'utf8')))
+const tokens = readFileSync(join(src, 'styles/tokens.css'), 'utf8')
+ok('the radius scale is defined (soft: 4 / 8 / 12)',
+  /--radius-sm:\s*4px/.test(tokens) && /--radius-md:\s*8px/.test(tokens) && /--radius-lg:\s*12px/.test(tokens) && /--radius-card:\s*12px/.test(tokens))
 
 const index = readFileSync(join(src, 'index.css'), 'utf8')
 ok('no prefers-color-scheme duplicates: data-theme is always set',

@@ -98,7 +98,7 @@
 
 .sidebar-pos-badge {
   font-size: 9px;
-  color: var(--color-white);
+  color: var(--on-ink);
   padding: 2px 5px;
   border-radius: 999px;
   text-transform: uppercase;

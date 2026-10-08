@@ -1,7 +1,7 @@
 /* ==== Canvas ====
  *
  * The canvas surface and its contents. Everything here consumes the shared
- * tokens from index.css (--surface-*, --text-*, --border-*, --accent-*, and the
+ * tokens from src/styles/tokens.css (--surface-*, --text-*, --border-*, --accent-*, and the
  * --floating-note-* set used for popovers), so light/dark mode needs no work of
  * its own.
  */
@@ -261,7 +261,7 @@
  * The body clips its own content instead.
  *
  * COLOUR comes from the app-wide card recipe (--card-tint / --card-edge in
- * index.css), the same one the notes panel and in-line note previews use: the colour
+ * src/styles/tokens.css), the same one the notes panel and in-line note previews use: the colour
  * washes the whole card softly and the border takes it several shades stronger. A
  * canvas card and a note are the same kind of object, so they should not need two
  * different explanations of what "this card is red" looks like.

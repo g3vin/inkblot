@@ -1,0 +1,17 @@
+.ib-kbd {
+  display: inline-flex;
+  align-items: center;
+  min-width: 1.4em;
+  height: 1.6em;
+  padding: 0 var(--space-1);
+  box-sizing: border-box;
+  justify-content: center;
+  border: var(--hairline) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-family: var(--font-type);
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+}

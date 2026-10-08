@@ -86,7 +86,7 @@
   padding: 12px 14px 14px;
   border-radius: 18px;
   /*
-   * Same recipe as every other card (see --card-tint in index.css): the whole surface
+   * Same recipe as every other card (the card recipe in src/styles/tokens.css): the whole surface
    * carries the note's colour softly, and the border carries it several shades
    * stronger.
    */
@@ -293,7 +293,7 @@
 /*
  * A note in the notes panel wears its colour the way every other card in the app
  * does — the whole tile tinted, the border the same hue a few shades stronger. See
- * --card-tint in index.css for the recipe and the reasoning.
+ * the card recipe in src/styles/tokens.css for the reasoning.
  */
 .note-tile {
   --note-color: var(--note-fallback-color);

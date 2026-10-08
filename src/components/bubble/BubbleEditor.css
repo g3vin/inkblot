@@ -306,7 +306,7 @@ html.bubble-open .app-titlebar-toolbar { visibility: hidden; }
 }
 .bubble-trash.is-visible { opacity: 1; transform: none; }
 .bubble-trash.is-armed {
-  color: var(--color-white);
+  color: var(--on-ink);
   background: var(--status-error);
   border-color: transparent;
   transform: scale(1.14);
