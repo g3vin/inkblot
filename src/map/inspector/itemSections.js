@@ -14,6 +14,7 @@ import { STAR_PRESETS, massToLuminosity, starPreset, temperatureToColor } from '
 import { bodyMass, orbitPeriod } from '../../lib/map/orbits'
 import { newBody } from '../../lib/map/systemPresets'
 import { PIN_ICONS, unitFor } from '../mapOptions'
+import { MAP_DEFAULT_COLORS } from '../../lib/map/mapColors'
 
 const HATCH_LABELS = { none: 'None', diagonal: 'Diagonal lines', cross: 'Cross-hatch', dots: 'Dots', waves: 'Waves', mountains: 'Mountains' }
 const DASH_LABELS = { solid: 'Solid', dashed: 'Dashed', dotted: 'Dotted', inked: 'Inked (hand-drawn)', rough: 'Rough (sketchy)' }
@@ -69,7 +70,7 @@ export function pinSections(ui, { map, pin, space, day, docs, missing, patch, on
     ]),
     ui.section('marker', 'Marker', [
       ui.markers('pin.icon', pin.icon, pin.color, PIN_ICONS.map((icon) => ({ value: icon.id, label: icon.label })), (icon) => patch({ icon })),
-      ui.color('pin.color', 'Colour', pin.color, '#c0392b', (color) => patch({ color })),
+      ui.color('pin.color', 'Colour', pin.color, MAP_DEFAULT_COLORS.pin, (color) => patch({ color })),
       map.mapKind === 'system'
         ? ui.choice(
             'pin.body',
@@ -117,7 +118,7 @@ export function routeSections(ui, { map, route, space, day, patch, onDelete, onA
       ui.note('Drag a stop to move it (onto a place to route through it); drag a faint midpoint to add one; double-click the line to add a stop there.'),
     ]),
     ui.section('line', 'Line', [
-      ui.color('route.stroke', 'Colour', route.style.stroke, '#b3462f', (stroke) => patch({ style: { ...route.style, stroke } })),
+      ui.color('route.stroke', 'Colour', route.style.stroke, MAP_DEFAULT_COLORS.route, (stroke) => patch({ style: { ...route.style, stroke } })),
       ui.number('route.width', 'Width', route.style.width, (width) => patch({ style: { ...route.style, width } }), { min: 0.5, max: 20, step: 0.5, suffix: 'px' }),
       ui.choice('route.dash', 'Style', route.style.dash, LINE_DASHES.map((dash) => ({ value: dash, label: DASH_LABELS[dash] })), (dash) => patch({ style: { ...route.style, dash } })),
       ui.toggle('route.arrow', 'Arrow at end', route.style.arrow, (arrow) => patch({ style: { ...route.style, arrow } })),
@@ -154,8 +155,8 @@ export function regionSections(ui, { map, region, space, patch, onDelete, onAddL
       terrain ? ui.note(`Travel across it is slowed or sped by the ${terrain.name.toLowerCase()} terrain (edit terrains under Travel).`) : null,
     ]),
     ui.section('look', 'Look', [
-      ui.color('region.fill', 'Fill', region.fill, terrain?.fill || '#6d9c5a', (fill) => patch({ fill })),
-      ui.color('region.stroke', 'Edge', region.stroke, region.fill || terrain?.fill || '#6d9c5a', (stroke) => patch({ stroke })),
+      ui.color('region.fill', 'Fill', region.fill, terrain?.fill || MAP_DEFAULT_COLORS.region, (fill) => patch({ fill })),
+      ui.color('region.stroke', 'Edge', region.stroke, region.fill || terrain?.fill || MAP_DEFAULT_COLORS.region, (stroke) => patch({ stroke })),
       ui.choice('region.hatch', 'Hatching', region.hatch, HATCHES.map((hatch) => ({ value: hatch, label: HATCH_LABELS[hatch] })), (hatch) => patch({ hatch })),
       ui.buttonField('region.label', 'Label it', onAddLabel),
     ]),
@@ -239,7 +240,7 @@ export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focu
         (parent) => patchBody({ parent: parent || null })
       ),
       body.kind !== 'star' && body.kind !== 'barycenter' && body.kind !== 'belt'
-        ? ui.color('body.color', 'Colour', body.color, '#9aa7b8', (color) => patchBody({ color }))
+        ? ui.color('body.color', 'Colour', body.color, MAP_DEFAULT_COLORS.body, (color) => patchBody({ color }))
         : null,
       ui.buttonField('body.focus', focused ? 'Stop following' : 'Centre the view on it', onFocus),
     ]),

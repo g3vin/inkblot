@@ -52,7 +52,7 @@ html.bubble-open .document-tab-bar { visibility: hidden; }
   max-width: 220px;
   height: 20px;
   padding: 0 24px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   font: 12px var(--font-ui);
   cursor: default;
@@ -72,7 +72,7 @@ html.bubble-open .document-tab-bar { visibility: hidden; }
   top: 2px;
   bottom: 2px;
   width: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: var(--accent-color);
 }
 .document-tab-insert { position: relative; left: 0; flex: 0 0 2px; }

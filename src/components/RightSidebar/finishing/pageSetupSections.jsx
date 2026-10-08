@@ -139,9 +139,9 @@ function MarginDiagram({ setup }) {
   for (let y = text.y + 2; y < text.y + text.h - 1; y += 3.5) lines.push(y)
   return (
     <svg className="fin-margin-diagram" viewBox={`0 0 ${box.w} ${box.h}`} width={box.w} height={box.h} role="img" aria-label="Page margins">
-      <rect x={page.x} y={page.y} width={page.w} height={page.h} fill="#fff" stroke="currentColor" strokeOpacity="0.5" strokeWidth="0.5" />
+      <rect x={page.x} y={page.y} width={page.w} height={page.h} fill="var(--print-paper)" stroke="currentColor" strokeOpacity="0.5" strokeWidth="0.5" />
       {m.gutterMm > 0 ? <rect x={page.x + m.insideMm * scale} y={page.y} width={m.gutterMm * scale} height={page.h} fill="var(--accent-color)" fillOpacity="0.25" /> : null}
-      {lines.map((y) => <rect key={y} x={text.x} y={y} width={text.w} height={1} fill="#8a9099" />)}
+      {lines.map((y) => <rect key={y} x={text.x} y={y} width={text.w} height={1} fill="var(--print-ink-muted)" />)}
     </svg>
   )
 }

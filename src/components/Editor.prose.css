@@ -32,7 +32,7 @@
 .editor .ProseMirror td {
   position: relative;
   min-width: 80px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 76%, #ffffff 10%);
+  border: 1px solid var(--border-color);
   padding: 8px 10px;
   vertical-align: top;
 }

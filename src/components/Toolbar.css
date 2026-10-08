@@ -60,7 +60,7 @@
   height: 28px;
   padding: 3px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
 }
 
@@ -86,7 +86,7 @@
   min-height: 22px;
   padding: 0 5px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: transparent;
   box-shadow: none;
   font-size: 11px;
@@ -117,7 +117,7 @@
   min-height: 22px;
   padding: 0 4px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-primary);
   font-size: 11px;
@@ -161,7 +161,7 @@
   gap: 1px;
   width: 26px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 120ms ease;
 }
@@ -189,8 +189,8 @@
 .toolbar-color-bar {
   width: 16px;
   height: 3px;
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--border-color);
   pointer-events: none;
 }
 
@@ -223,7 +223,7 @@
   min-height: 28px;
   padding: 0 5px 0 7px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--text-primary);
   font-size: 11px;
@@ -250,7 +250,7 @@
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--floating-note-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--floating-note-bg);
   box-shadow: var(--floating-note-shadow);
   pointer-events: auto;
@@ -265,7 +265,7 @@
   height: 24px;
   padding: 0 5px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: transparent;
   box-shadow: none;
   color: var(--text-primary);
@@ -292,7 +292,7 @@
   min-width: 28px;
   min-height: 24px;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: none;
   gap: 6px;
   overflow: hidden;
@@ -332,7 +332,7 @@
   width: 2px;
   height: var(--bar-height, 6px);
   max-height: 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: currentColor;
   opacity: 0.74;
   transform-origin: center;
@@ -414,19 +414,19 @@
 .dictation-live-dot {
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--status-success);
-  box-shadow: 0 0 0 4px rgba(109, 240, 168, 0.12);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-success) 14%, transparent);
 }
 
 .dictation-popover.loading .dictation-live-dot {
   background: var(--status-warning);
-  box-shadow: 0 0 0 4px rgba(255, 213, 79, 0.13);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-warning) 14%, transparent);
 }
 
 .dictation-popover.error .dictation-live-dot {
   background: var(--status-error);
-  box-shadow: 0 0 0 4px rgba(255, 143, 143, 0.13);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-danger) 14%, transparent);
 }
 
 .dictation-close-btn {
@@ -436,7 +436,7 @@
   min-height: 22px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--text-muted);
   display: inline-flex;
@@ -457,14 +457,14 @@
   gap: 3px;
   min-width: 36px;
   padding: 0 0 0 1px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
 }
 
 .dictation-wave-bar {
   width: 3px;
   height: var(--bar-height, 10px);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-color);
   opacity: 0.78;
   transform-origin: center;
@@ -489,7 +489,7 @@
   min-width: 28px;
   min-height: 24px;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: none;
 }
 
@@ -499,7 +499,7 @@
 
 .read-aloud-btn.error {
   color: var(--status-error-soft);
-  border-color: rgba(255, 143, 143, 0.48);
+  border-color: color-mix(in srgb, var(--status-danger) 48%, transparent);
 }
 
 .read-aloud-popover {
@@ -550,7 +550,7 @@
   gap: 3px;
   min-width: 54px;
   padding: 3px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--control-bg);
 }
@@ -558,7 +558,7 @@
 .read-aloud-wave-bar {
   width: 3px;
   height: var(--bar-height, 8px);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-color);
   opacity: 0.8;
   transition:
@@ -585,7 +585,7 @@
   width: 100%;
   height: 38px;
   padding: 0 11px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--control-bg);
   color: var(--text-primary);
@@ -607,7 +607,7 @@
 .read-aloud-status {
   min-height: 36px;
   padding: 9px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--control-bg);
   color: var(--text-primary);
@@ -624,7 +624,7 @@
   min-height: 36px;
   margin-top: 10px;
   border: 1px solid var(--accent-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--accent-surface-strong);
   color: var(--accent-foreground);
   font-size: 12px;
@@ -642,7 +642,7 @@
   max-height: 112px;
   overflow: auto;
   padding: 10px 11px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--control-bg);
   color: var(--text-primary);
@@ -660,9 +660,9 @@
   right: 18px;
   bottom: 16px;
   padding: 8px 10px;
-  border-radius: 12px;
-  background: rgba(109, 240, 168, 0.14);
-  color: #d8ffe8;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--status-success) 14%, var(--surface-float));
+  color: var(--text-primary);
   font-size: 13px;
   line-height: 1.35;
   pointer-events: none;

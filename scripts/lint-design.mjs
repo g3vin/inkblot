@@ -28,10 +28,18 @@ const ALLOWED = new Set([
   'src/styles/tokens.css', // the one place raw values live
   'src/lib/palette.ts', // legacy hex → ink mapping
 ])
-// Files that must not be checked: generated, vendored, or not UI. The print modules
-// in TypeScript draw the printed page and e-book themes — document content, whose
-// colours are the book's, not the app's.
-const IGNORED = [/^src\/types\//, /^src\/print\/export\//, /^src\/print\/[^/]+\.ts$/, /\.d\.ts$/]
+// Files that must not be checked: generated, vendored, or not UI, and content. The
+// print modules in TypeScript draw the printed page and e-book themes, and the map's
+// world data (src/lib/map/) and themes (mapThemes.css) are the map's own colours:
+// document content, whose colours are the writer's, not the app's.
+const IGNORED = [
+  /^src\/types\//,
+  /^src\/print\/export\//,
+  /^src\/print\/[^/]+\.ts$/,
+  /^src\/lib\/map\//,
+  /^src\/map\/mapThemes\.css$/,
+  /\.d\.ts$/,
+]
 
 const args = new Set(process.argv.slice(2))
 

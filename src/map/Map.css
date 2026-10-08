@@ -5,9 +5,8 @@
  * stay sharp at any zoom. Marks that must hold their size on screen — pins,
  * handles, travellers — sit in a `.map-mark` group that scales by --map-inv-zoom.
  *
- * Themes are sets of custom properties on [data-map-theme]. `clean` follows the
- * app's light/dark tokens; parchment, ink and night are fixed palettes, because a
- * map drawn on parchment should not turn dark when the OS does.
+ * Themes are sets of custom properties on [data-map-theme], in mapThemes.css: they
+ * are the map's own colours (content, like a printed page), not the app's chrome.
  */
 
 .map-pane {
@@ -23,18 +22,9 @@
   --map-inv-zoom: 1;
   --map-paper: var(--surface-0);
   --map-sheet: var(--surface-1);
-  --map-ink: #1b1f27;
   --map-ink-soft: color-mix(in srgb, var(--map-ink) 55%, transparent);
-  --map-land: #e7e3d6;
-  --map-land-edge: #9c937e;
-  --map-water: #cfe1ee;
-  --map-border: rgba(80, 70, 60, 0.45);
   --map-grid: color-mix(in srgb, var(--map-ink) 12%, transparent);
-  --map-route: #b3462f;
-  --map-pin: #c0392b;
-  --map-region: #6d9c5a;
   --map-accent: var(--accent-color);
-  --map-label-font: 'Iowan Old Style', 'Palatino', Georgia, serif;
   --map-ui-bg: var(--popover-bg);
   --map-ui-border: var(--popover-border);
   --map-ui-text: var(--text-primary);
@@ -51,56 +41,6 @@
   user-select: none;
   background: var(--map-paper);
   color: var(--map-ink);
-}
-
-:root[data-theme='dark'] .map-surface[data-map-theme='clean'] {
-  --map-ink: #eef1f6;
-  --map-land: #2e3a33;
-  --map-land-edge: #6f8a78;
-  --map-water: #16232e;
-  --map-border: rgba(210, 220, 230, 0.35);
-  --map-route: #f08a6c;
-  --map-pin: #ff7a66;
-}
-
-.map-surface[data-map-theme='parchment'] {
-  --map-paper: #d8c8a2;
-  --map-sheet: #efe2c1;
-  --map-ink: #3b2a1a;
-  --map-land: #e8d7ad;
-  --map-land-edge: #6b4f2e;
-  --map-water: #b9c9bf;
-  --map-border: rgba(90, 60, 30, 0.55);
-  --map-route: #7a2e1d;
-  --map-pin: #8c2f1f;
-  --map-region: #7c8b4f;
-}
-
-.map-surface[data-map-theme='ink'] {
-  --map-paper: #f4f1ea;
-  --map-sheet: #fbfaf6;
-  --map-ink: #121212;
-  --map-land: #fbfaf6;
-  --map-land-edge: #121212;
-  --map-water: #fbfaf6;
-  --map-border: rgba(18, 18, 18, 0.7);
-  --map-route: #121212;
-  --map-pin: #121212;
-  --map-region: #121212;
-}
-
-.map-surface[data-map-theme='night'] {
-  --map-paper: #0b1020;
-  --map-sheet: #111833;
-  --map-ink: #dbe4ff;
-  --map-land: #1c2747;
-  --map-land-edge: #7f9cff;
-  --map-water: #0b1020;
-  --map-border: rgba(127, 156, 255, 0.45);
-  --map-route: #ffcf6e;
-  --map-pin: #ffcf6e;
-  --map-region: #7f9cff;
-  --map-label-font: 'Avenir Next', 'Helvetica Neue', sans-serif;
 }
 
 .map-surface.is-loading {
@@ -364,7 +304,7 @@
 
 .map-habitable {
   fill: none;
-  stroke: rgba(80, 200, 120, 0.25);
+  stroke: color-mix(in srgb, var(--ink-green) 30%, transparent);
   vector-effect: non-scaling-stroke;
 }
 
@@ -394,7 +334,7 @@
   z-index: 4;
   background: var(--map-ui-bg);
   border: 1px solid var(--map-ui-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-popover);
   color: var(--map-ui-text);
   font: 13px/1.35 var(--font-ui);
@@ -420,7 +360,7 @@
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--map-ui-text);
   cursor: pointer;
@@ -524,7 +464,7 @@
   box-sizing: border-box;
   padding: 5px 7px;
   border: 1px solid var(--map-ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--map-ui-text);
   font: inherit;
@@ -535,7 +475,7 @@
   height: 24px;
   padding: 0;
   border: 1px solid var(--map-ui-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: none;
 }
 
@@ -549,7 +489,7 @@
 .map-button {
   padding: 5px 10px;
   border: 1px solid var(--map-ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--map-ui-text);
   font: inherit;
@@ -563,7 +503,7 @@
 .map-button.is-primary {
   background: var(--accent-color);
   border-color: transparent;
-  color: #fff;
+  color: var(--text-on-accent);
 }
 
 .map-button.is-danger {
@@ -596,7 +536,7 @@
 .map-warning {
   margin: 6px 0;
   padding: 6px 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--status-warning) 16%, transparent);
   color: var(--map-ui-text);
   font-size: 12px;
@@ -612,7 +552,7 @@
   padding: 8px;
   margin: 6px 0;
   border: 1px solid var(--map-ui-border);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
 }
 
@@ -741,7 +681,7 @@
   width: 3px;
   height: 7px;
   margin-left: -1px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--status-error);
   pointer-events: none;
 }
@@ -749,7 +689,7 @@
 .map-timeline-speed {
   padding: 3px 4px;
   border: 1px solid var(--map-ui-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--map-ui-text);
   font: inherit;
@@ -792,7 +732,7 @@
   gap: 6px;
   padding: 14px;
   border: 1px solid var(--map-ui-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--control-bg);
   color: var(--map-ui-text);
   text-align: left;

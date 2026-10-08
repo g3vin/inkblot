@@ -12,6 +12,7 @@ import { createSpace } from '../lib/map/mapSpace'
 import { buildSchedules } from '../lib/map/timeline'
 import MapLayers, { MapDefs } from './MapLayers'
 import './Map.css'
+import './mapThemes.css'
 
 export default function MapThumbnail({ projectName, docPath }) {
   const idPrefix = `thumb${useId().replace(/[^a-zA-Z0-9]/g, '')}`

@@ -8,9 +8,9 @@
  * is one undo step in the document.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 
 import { getPreference, setPreference } from '../lib/preferences'
+import { Button, FormRow, Input, Section, Segmented, SelectMenu, Sheet, Toggle } from '../ui'
 import { applyFormat, FORMAT_PRESETS, formatOf, writingFormatOf } from './formats'
 import { SIGNATURE_GUIDANCE } from './imposition'
 import { normalizePageSetup, resolvePageSetup, suggestedInsideMarginMm } from './pageSetup'
@@ -33,46 +33,81 @@ const round = (v, unit) => {
   return Math.round(v * 10 ** places) / 10 ** places
 }
 
+const blurOnEnter = (event) => { if (event.key === 'Enter') event.currentTarget.blur() }
+
+/** A text or number field that commits when it loses focus (or on Enter). */
+function Commit({ value, onCommit, ...rest }) {
+  return (
+    <Input
+      key={String(value)}
+      size="sm"
+      defaultValue={value}
+      onBlur={(event) => { if (event.target.value !== String(value)) onCommit(event.target.value) }}
+      onKeyDown={blurOnEnter}
+      {...rest}
+    />
+  )
+}
+
 function Length({ label, mm, unit, onChange }) {
   return (
-    <label className="pss-field">
-      <span>{label}</span>
-      <input
+    <FormRow label={label}>
+      <Commit
         type="number"
         step="any"
         min="0"
-        key={`${unit}:${mm}`}
-        defaultValue={round(fromMm(mm, unit), unit)}
-        onBlur={(event) => {
-          const value = Number.parseFloat(event.target.value)
+        aria-label={label}
+        className="pss-number"
+        value={round(fromMm(mm, unit), unit)}
+        onCommit={(raw) => {
+          const value = Number.parseFloat(raw)
           if (Number.isFinite(value)) onChange(toMm(value, unit))
         }}
-        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
       />
-      <em>{unit}</em>
-    </label>
+      <span className="pss-unit ib-meta">{unit}</span>
+    </FormRow>
   )
 }
 
 function Running({ label, value, onChange }) {
-  const commit = (key) => (event) => {
-    if (event.target.value !== value[key]) onChange({ ...value, [key]: event.target.value })
-  }
   return (
-    <div className="pss-running">
-      <span>{label}</span>
-      {['left', 'center', 'right'].map((key) => (
-        <input
-          key={`${key}:${value[key]}`}
-          defaultValue={value[key]}
-          placeholder={key[0].toUpperCase() + key.slice(1)}
-          onBlur={commit(key)}
-          onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
-        />
-      ))}
-    </div>
+    <FormRow label={label} stacked>
+      <div className="pss-running">
+        {['left', 'center', 'right'].map((key) => (
+          <Commit
+            key={key}
+            value={value[key]}
+            aria-label={`${label}, ${key}`}
+            placeholder={key[0].toUpperCase() + key.slice(1)}
+            onCommit={(next) => onChange({ ...value, [key]: next })}
+          />
+        ))}
+      </div>
+    </FormRow>
   )
 }
+
+function Switch({ label, checked, onChange }) {
+  return (
+    <FormRow label={label}>
+      <Toggle label={label} checked={checked} onChange={onChange} />
+    </FormRow>
+  )
+}
+
+const UNITS = [
+  { value: 'in', label: 'Inches' },
+  { value: 'mm', label: 'Millimetres' },
+  { value: 'cm', label: 'Centimetres' },
+  { value: 'pt', label: 'Points' },
+]
+
+const EXPORTS = [
+  { value: 'pdf', label: 'PDF' },
+  { value: 'epub', label: 'EPUB' },
+  { value: 'markdown', label: 'Markdown' },
+  { value: 'html', label: 'HTML' },
+]
 
 export default function PageSetupSheet({ editor, projectName, docPath, pageCount = 0, onClose }) {
   usePrintLayoutStore()
@@ -97,12 +132,6 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
     setPreference(UNIT_KEY, unit)
   }, [unit])
 
-  useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') onClose?.() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const applyBook = (patch) => setBookSettings(projectName, folder, { ...book, ...patch })
   const replace = (next) => {
     if (target === 'book') applyBook({ pageSetup: normalizePageSetup(next) })
@@ -112,14 +141,28 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
   const applyMargins = (patch) => apply({ margins: { ...setup.margins, ...patch } })
   const applyBinding = (patch) => applyBook({ binding: { ...book.binding, ...patch } })
 
-  const groups = useMemo(() => {
+  const sizeOptions = useMemo(() => {
     const out = new Map()
     for (const preset of PAGE_SIZE_PRESETS) {
       if (!out.has(preset.group)) out.set(preset.group, [])
-      out.get(preset.group).push(preset)
+      out.get(preset.group).push({ value: preset.id, label: preset.label })
     }
-    return [...out.entries()]
+    return [
+      ...[...out.entries()].map(([group, options]) => ({ label: PAGE_SIZE_GROUP_LABELS[group], options })),
+      { value: 'custom', label: 'Custom' },
+    ]
   }, [])
+
+  const formatOptions = useMemo(() => [
+    ...[...new Set(FORMAT_PRESETS.map((f) => f.group))].map((group) => ({
+      label: group,
+      options: FORMAT_PRESETS.filter((f) => f.group === group).map((f) => ({
+        value: f.id,
+        label: `${f.label}${f.id === formatId && modified ? ' (modified)' : ''}`,
+      })),
+    })),
+    ...(formatId ? [] : [{ value: 'custom', label: 'Custom' }]),
+  ], [formatId, modified])
 
   const setSize = (widthMm, heightMm) => {
     const match = matchPageSizePreset(widthMm, heightMm)
@@ -128,356 +171,337 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
   const inside = setup.margins.insideMm + setup.margins.gutterMm
   const suggested = suggestedInsideMarginMm(Math.max(1, pageCount))
   const versoDiffers = Boolean(setup.versoHeader || setup.versoFooter)
+  const exportOptions = book.binding.binding !== 'none' && scope !== 'document'
+    ? [...EXPORTS, { value: 'pdf:bound', label: 'PDF for binding' }]
+    : EXPORTS
+  const typography = setup.typography
+  const applyType = (patch) => apply({ typography: { ...typography, ...patch } })
 
-  return createPortal(
-    <div className="pss-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.() }}>
-      <div className="pss-sheet" role="dialog" aria-label="Page Setup">
-        <header>
-          <h2>Page Setup</h2>
-          <select value={unit} onChange={(event) => setUnit(event.target.value)} aria-label="Units">
-            <option value="in">Inches</option>
-            <option value="mm">Millimeters</option>
-            <option value="cm">Centimeters</option>
-            <option value="pt">Points</option>
-          </select>
-          <button type="button" onClick={onClose}>Done</button>
-        </header>
-
-        <div className="pss-actions">
-          <div className="pss-segmented" role="radiogroup" aria-label="Print">
-            {[['document', 'This Document'], ['folder', 'Book'], ['project', 'Whole Project']].map(([value, label]) => (
-              <button key={value} type="button" className={scope === value ? 'is-on' : ''} onClick={() => setPrintScope(projectName, value)}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <button type="button" className="pss-primary" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:print', { detail: { scope } }))}>Print…</button>
-          <select
+  return (
+    <Sheet
+      title="Page setup"
+      onClose={onClose}
+      width={440}
+      className="pss-sheet"
+      footer={(
+        <>
+          <SelectMenu label="Units" value={unit} onChange={setUnit} options={UNITS} />
+          <span className="ui-sheet-footer-spacer" />
+          <Button variant="filled" onClick={onClose}>Done</Button>
+        </>
+      )}
+    >
+      <div className="pss-actions">
+        <Segmented
+          label="Print"
+          value={scope}
+          onChange={(value) => setPrintScope(projectName, value)}
+          stretch
+          options={[
+            { value: 'document', label: 'This document' },
+            { value: 'folder', label: 'Book' },
+            { value: 'project', label: 'Whole project' },
+          ]}
+        />
+        <div className="pss-action-row">
+          <Button variant="tinted" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:print', { detail: { scope } }))}>Print…</Button>
+          <SelectMenu
+            label="Export"
             value=""
-            aria-label="Export"
-            onChange={(event) => {
-              const [format, bound] = event.target.value.split(':')
+            onChange={(value) => {
+              const [format, bound] = value.split(':')
               if (format) window.dispatchEvent(new CustomEvent('inkblot:export', { detail: { format, scope, bound: bound === 'bound' } }))
             }}
-          >
-            <option value="" hidden>Export…</option>
-            <option value="pdf">PDF</option>
-            <option value="epub">EPUB</option>
-            <option value="markdown">Markdown</option>
-            <option value="html">HTML</option>
-            {book.binding.binding !== 'none' && scope !== 'document' ? <option value="pdf:bound">PDF for Binding</option> : null}
-          </select>
-          {job ? <span className={`pss-job is-${job.phase}`} role="status">{job.text}</span> : null}
+            options={[{ value: '', label: 'Export…', disabled: true }, ...exportOptions]}
+          />
         </div>
-
-        <div className="pss-body">
-          <section>
-            <h3>Format</h3>
-            <div className="pss-segmented" role="radiogroup" aria-label="Edit">
-              <button type="button" className={target === 'document' ? 'is-on' : ''} onClick={() => setTarget('document')}>This Document</button>
-              <button type="button" className={target === 'book' ? 'is-on' : ''} onClick={() => setTarget('book')}>Whole Book</button>
-            </div>
-            {target === 'book' ? <p className="pss-note">Editing the setup every chapter of the book prints in.</p> : null}
-            <label className="pss-field wide">
-              <span>Format</span>
-              <select
-                value={formatId || 'custom'}
-                onChange={(event) => {
-                  const next = applyFormat(event.target.value)
-                  if (next) replace(next)
-                  // A script's format makes the document a script.
-                  const writing = writingFormatOf(event.target.value)
-                  if (writing && next) editor?.commands.setWritingFormat(writing)
-                }}
-              >
-                {[...new Set(FORMAT_PRESETS.map((f) => f.group))].map((group) => (
-                  <optgroup key={group} label={group}>
-                    {FORMAT_PRESETS.filter((f) => f.group === group).map((f) => (
-                      <option key={f.id} value={f.id}>{f.label}{f.id === formatId && modified ? ' (modified)' : ''}</option>
-                    ))}
-                  </optgroup>
-                ))}
-                {formatId ? null : <option value="custom">Custom</option>}
-              </select>
-            </label>
-            {target === 'document' && book.pageSetup ? (
-              <p className="pss-note">This book prints every chapter in its own setup, so what is set here shows on screen and when this document is printed alone.</p>
-            ) : null}
-          </section>
-
-          <section>
-            <h3>Page</h3>
-            <label className="pss-field wide">
-              <span>Size</span>
-              <select
-                value={setup.presetId}
-                onChange={(event) => {
-                  const preset = PAGE_SIZE_PRESETS.find((p) => p.id === event.target.value)
-                  if (preset) apply({ presetId: preset.id, widthMm: preset.widthMm, heightMm: preset.heightMm })
-                }}
-              >
-                {groups.map(([group, presets]) => (
-                  <optgroup key={group} label={PAGE_SIZE_GROUP_LABELS[group]}>
-                    {presets.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                  </optgroup>
-                ))}
-                <option value="custom">Custom</option>
-              </select>
-            </label>
-            <div className="pss-row">
-              <Length label="Width" mm={setup.widthMm} unit={unit} onChange={(v) => setSize(v, setup.heightMm)} />
-              <Length label="Height" mm={setup.heightMm} unit={unit} onChange={(v) => setSize(setup.widthMm, v)} />
-            </div>
-            <div className="pss-segmented" role="radiogroup" aria-label="Orientation">
-              {['portrait', 'landscape'].map((o) => (
-                <button key={o} type="button" className={setup.orientation === o ? 'is-on' : ''} onClick={() => apply({ orientation: o })}>
-                  {o === 'portrait' ? 'Portrait' : 'Landscape'}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h3>Margins</h3>
-            <div className="pss-row">
-              <Length label="Top" mm={setup.margins.topMm} unit={unit} onChange={(v) => applyMargins({ topMm: v })} />
-              <Length label="Bottom" mm={setup.margins.bottomMm} unit={unit} onChange={(v) => applyMargins({ bottomMm: v })} />
-            </div>
-            <div className="pss-row">
-              <Length label={setup.mirrorMargins ? 'Inside' : 'Left'} mm={setup.margins.insideMm} unit={unit} onChange={(v) => applyMargins({ insideMm: v })} />
-              <Length label={setup.mirrorMargins ? 'Outside' : 'Right'} mm={setup.margins.outsideMm} unit={unit} onChange={(v) => applyMargins({ outsideMm: v })} />
-            </div>
-            <div className="pss-row">
-              <Length label="Gutter" mm={setup.margins.gutterMm} unit={unit} onChange={(v) => applyMargins({ gutterMm: v })} />
-              <label className="pss-check">
-                <input type="checkbox" checked={setup.mirrorMargins} onChange={(event) => apply({ mirrorMargins: event.target.checked })} />
-                Mirror margins
-              </label>
-            </div>
-            {pageCount > 0 && inside + 0.05 < suggested ? (
-              <p className="pss-warn">
-                For {pageCount} pages, binders suggest at least {round(fromMm(suggested, unit), unit)} {unit} inside.{' '}
-                <button type="button" className="pss-link" onClick={() => applyMargins({ gutterMm: Math.max(0, suggested - setup.margins.insideMm) })}>Use it</button>
-              </p>
-            ) : null}
-          </section>
-
-          <section>
-            <h3>Columns</h3>
-            <div className="pss-row">
-              <label className="pss-field">
-                <span>Columns</span>
-                <select value={setup.columns} onChange={(event) => apply({ columns: Number(event.target.value) })}>
-                  <option value={1}>1</option>
-                  <option value={2}>2</option>
-                  <option value={3}>3</option>
-                </select>
-              </label>
-              {setup.columns > 1 ? <Length label="Gap" mm={setup.columnGapMm} unit={unit} onChange={(v) => apply({ columnGapMm: v })} /> : null}
-            </div>
-            {setup.columns > 1 ? <p className="pss-note">Pages are edited as a single running column; Print, PDF and binding set the columns side by side.</p> : null}
-          </section>
-
-          <section>
-            <h3>Typography</h3>
-            <label className="pss-check">
-              <input
-                type="checkbox"
-                checked={Boolean(setup.typography)}
-                onChange={(event) => apply({ typography: event.target.checked ? { ...BOOK_TYPOGRAPHY } : undefined })}
-              />
-              Set type for print
-            </label>
-            {setup.typography ? (() => {
-              const t = setup.typography
-              const applyType = (patch) => apply({ typography: { ...t, ...patch } })
-              return (
-                <>
-                  <label className="pss-field wide">
-                    <span>Font</span>
-                    <input key={`f:${t.fontFamily}`} defaultValue={t.fontFamily} onBlur={(event) => applyType({ fontFamily: event.target.value })} />
-                  </label>
-                  <div className="pss-row">
-                    <label className="pss-field">
-                      <span>Size</span>
-                      <input type="number" min="5" max="72" step="0.5" key={`s:${t.fontSizePt}`} defaultValue={t.fontSizePt} onBlur={(event) => applyType({ fontSizePt: Number(event.target.value) || t.fontSizePt })} />
-                      <em>pt</em>
-                    </label>
-                    <label className="pss-field">
-                      <span>Spacing</span>
-                      <select value={t.lineSpacing} onChange={(event) => applyType({ lineSpacing: event.target.value })}>
-                        <option value="single">Single</option>
-                        <option value="oneAndAHalf">1.5 lines</option>
-                        <option value="double">Double</option>
-                        <option value="multiple">Multiple</option>
-                        <option value="exact">Exactly</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div className="pss-row">
-                    <Length label="Indent" mm={t.firstLineIndentMm} unit={unit} onChange={(v) => applyType({ firstLineIndentMm: v })} />
-                    <label className="pss-field">
-                      <span>Scene break</span>
-                      <input key={`b:${t.sceneBreak}`} defaultValue={t.sceneBreak} onBlur={(event) => applyType({ sceneBreak: event.target.value })} />
-                    </label>
-                  </div>
-                  <div className="pss-segmented" role="radiogroup" aria-label="Alignment">
-                    {[['left', 'Ragged Right'], ['justify', 'Justified']].map(([value, label]) => (
-                      <button key={value} type="button" className={t.alignment === value ? 'is-on' : ''} onClick={() => applyType({ alignment: value })}>{label}</button>
-                    ))}
-                  </div>
-                  <p className="pss-note">Type for print shows in Print Layout and on paper; the editor keeps your writing font.</p>
-                </>
-              )
-            })() : null}
-            <label className="pss-check">
-              <input
-                type="checkbox"
-                checked={Boolean(setup.titlePage)}
-                onChange={(event) => apply({ titlePage: event.target.checked ? { style: 'book', showContact: false, showWordCount: false } : undefined })}
-              />
-              Add a title page when printing
-            </label>
-          </section>
-
-          <section>
-            <h3>Header &amp; Footer</h3>
-            <Running label={versoDiffers ? 'Header, right' : 'Header'} value={setup.header} onChange={(header) => apply({ header })} />
-            <Running label={versoDiffers ? 'Footer, right' : 'Footer'} value={setup.footer} onChange={(footer) => apply({ footer })} />
-            <label className="pss-check">
-              <input
-                type="checkbox"
-                checked={versoDiffers}
-                onChange={(event) => apply(event.target.checked
-                  ? { versoHeader: { ...setup.header }, versoFooter: { ...setup.footer } }
-                  : { versoHeader: undefined, versoFooter: undefined })}
-              />
-              Different on left-hand pages
-            </label>
-            {versoDiffers ? (
-              <>
-                <Running label="Header, left" value={setup.versoHeader || setup.header} onChange={(versoHeader) => apply({ versoHeader })} />
-                <Running label="Footer, left" value={setup.versoFooter || setup.footer} onChange={(versoFooter) => apply({ versoFooter })} />
-              </>
-            ) : null}
-            <label className="pss-check">
-              <input type="checkbox" checked={setup.differentFirstPage} onChange={(event) => apply({ differentFirstPage: event.target.checked })} />
-              None on a chapter&apos;s first page
-            </label>
-            <div className="pss-row">
-              <label className="pss-field">
-                <span>Numbers</span>
-                <select value={setup.pageNumberFormat} onChange={(event) => apply({ pageNumberFormat: event.target.value })}>
-                  <option value="arabic">1, 2, 3</option>
-                  <option value="lowerRoman">i, ii, iii</option>
-                  <option value="upperRoman">I, II, III</option>
-                </select>
-              </label>
-              <label className="pss-field">
-                <span>Start at</span>
-                <input type="number" min="0" key={setup.pageNumberStart} defaultValue={setup.pageNumberStart} onBlur={(event) => apply({ pageNumberStart: Number(event.target.value) || 0 })} />
-              </label>
-            </div>
-            <p className="pss-note">Use {'{page}'}, {'{pages}'}, {'{title}'}, {'{chapter}'} and {'{author}'}. The chapter is the most recent Heading 1.</p>
-          </section>
-
-          <section>
-            <h3>Text flow</h3>
-            <label className="pss-field wide">
-              <span>Widow &amp; orphan control</span>
-              <select value={setup.widowOrphanLines} onChange={(event) => apply({ widowOrphanLines: Number(event.target.value) })}>
-                <option value={1}>Off</option>
-                <option value={2}>At least 2 lines</option>
-                <option value={3}>At least 3 lines</option>
-              </select>
-            </label>
-            <label className="pss-check">
-              <input type="checkbox" checked={setup.chapterStartsOnRecto} onChange={(event) => apply({ chapterStartsOnRecto: event.target.checked })} />
-              Chapters open on a right-hand page
-            </label>
-          </section>
-
-          <section>
-            <h3>Book</h3>
-            <label className="pss-field wide"><span>Title</span><input key={`t:${book.title}`} defaultValue={book.title} onBlur={(event) => applyBook({ title: event.target.value })} /></label>
-            <label className="pss-field wide"><span>Author</span><input key={`a:${book.author}`} defaultValue={book.author} onBlur={(event) => applyBook({ author: event.target.value })} /></label>
-            <label className="pss-field wide"><span>Language</span><input key={`l:${book.language}`} defaultValue={book.language} onBlur={(event) => applyBook({ language: event.target.value })} /></label>
-            <p className="pss-note">{scope === 'project' ? 'The book is the whole project' : 'A book is this document\u2019s folder'}, its documents in file-tree order.</p>
-          </section>
-
-          <section>
-            <h3>Binding</h3>
-            <label className="pss-check">
-              <input
-                type="checkbox"
-                checked={book.binding.binding !== 'none'}
-                onChange={(event) => applyBinding({ binding: event.target.checked ? 'signatures' : 'none' })}
-              />
-              Print for hand binding
-            </label>
-            {book.binding.binding !== 'none' ? (
-              <label className="pss-field wide">
-                <span>Binding</span>
-                <select value={book.binding.binding} onChange={(event) => applyBinding({ binding: event.target.value })}>
-                  <option value="signatures">Sewn signatures</option>
-                  <option value="saddle">Saddle stitch (booklet)</option>
-                  <option value="perfect">Perfect bound</option>
-                </select>
-              </label>
-            ) : null}
-            {book.binding.binding === 'signatures' ? (
-              <>
-                <label className="pss-field wide">
-                  <span>Signature</span>
-                  <select value={book.binding.sheetsPerSignature} onChange={(event) => applyBinding({ sheetsPerSignature: Number(event.target.value) })}>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n} sheet{n > 1 ? 's' : ''} · {n * 4} pages</option>)}
-                  </select>
-                </label>
-                <ul className="pss-advice">
-                  {SIGNATURE_GUIDANCE.map((g) => <li key={g.sheets} className={g.sheets === book.binding.sheetsPerSignature ? 'is-on' : ''}>{g.label}</li>)}
-                </ul>
-              </>
-            ) : null}
-            {book.binding.binding !== 'none' ? (
-              <>
-                <div className="pss-row">
-                  <label className="pss-field">
-                    <span>Sheet</span>
-                    <select value={book.binding.sheetPresetId} onChange={(event) => applyBinding({ sheetPresetId: event.target.value })}>
-                      {['letter', 'a4', 'legal', 'tabloid', 'a3'].map((id) => <option key={id} value={id}>{PAGE_SIZE_PRESETS.find((p) => p.id === id)?.label}</option>)}
-                    </select>
-                  </label>
-                  <label className="pss-field">
-                    <span>Pages</span>
-                    <select value={book.binding.sheetFit} onChange={(event) => applyBinding({ sheetFit: event.target.value })}>
-                      <option value="actualSize">Actual size</option>
-                      <option value="fit">Scale to fit</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="pss-row">
-                  <label className="pss-field">
-                    <span>Duplex</span>
-                    <select value={book.binding.duplex} onChange={(event) => applyBinding({ duplex: event.target.value })}>
-                      <option value="automatic">Printer does both sides</option>
-                      <option value="manual">Manual: fronts, then backs</option>
-                    </select>
-                  </label>
-                  <label className="pss-field">
-                    <span>Paper</span>
-                    <input type="number" step="0.01" min="0" key={`p:${book.binding.paperThicknessMm}`} defaultValue={book.binding.paperThicknessMm} onBlur={(event) => applyBinding({ paperThicknessMm: Number(event.target.value) || 0 })} />
-                    <em>mm</em>
-                  </label>
-                </div>
-                <label className="pss-check"><input type="checkbox" checked={book.binding.cropMarks} onChange={(event) => applyBinding({ cropMarks: event.target.checked })} /> Crop and fold marks</label>
-                <label className="pss-check"><input type="checkbox" checked={book.binding.includeGuide} onChange={(event) => applyBinding({ includeGuide: event.target.checked })} /> Print a folding guide</label>
-              </>
-            ) : null}
-          </section>
-        </div>
-
+        {job ? <p className={`pss-job ib-hint is-${job.phase}`} role="status">{job.text}</p> : null}
       </div>
-    </div>,
-    document.body
+
+      <Section id="page-setup.format" title="Format">
+        <Segmented
+          label="Edit"
+          value={target}
+          onChange={setTarget}
+          stretch
+          options={[{ value: 'document', label: 'This document' }, { value: 'book', label: 'Whole book' }]}
+        />
+        {target === 'book' ? <p className="ib-hint">Editing the setup every chapter of the book prints in.</p> : null}
+        <FormRow label="Format">
+          <SelectMenu
+            label="Format"
+            value={formatId || 'custom'}
+            options={formatOptions}
+            onChange={(value) => {
+              const next = applyFormat(value)
+              if (next) replace(next)
+              // A script's format makes the document a script.
+              const writing = writingFormatOf(value)
+              if (writing && next) editor?.commands.setWritingFormat(writing)
+            }}
+          />
+        </FormRow>
+        {target === 'document' && book.pageSetup ? (
+          <p className="ib-hint">This book prints every chapter in its own setup, so what is set here shows on screen and when this document is printed alone.</p>
+        ) : null}
+      </Section>
+
+      <Section id="page-setup.page" title="Page">
+        <FormRow label="Size">
+          <SelectMenu
+            label="Size"
+            value={setup.presetId}
+            options={sizeOptions}
+            onChange={(value) => {
+              const preset = PAGE_SIZE_PRESETS.find((p) => p.id === value)
+              if (preset) apply({ presetId: preset.id, widthMm: preset.widthMm, heightMm: preset.heightMm })
+            }}
+          />
+        </FormRow>
+        <Length label="Width" mm={setup.widthMm} unit={unit} onChange={(v) => setSize(v, setup.heightMm)} />
+        <Length label="Height" mm={setup.heightMm} unit={unit} onChange={(v) => setSize(setup.widthMm, v)} />
+        <FormRow label="Orientation">
+          <Segmented
+            label="Orientation"
+            value={setup.orientation}
+            onChange={(orientation) => apply({ orientation })}
+            options={[{ value: 'portrait', label: 'Portrait' }, { value: 'landscape', label: 'Landscape' }]}
+          />
+        </FormRow>
+      </Section>
+
+      <Section id="page-setup.margins" title="Margins">
+        <Length label="Top" mm={setup.margins.topMm} unit={unit} onChange={(v) => applyMargins({ topMm: v })} />
+        <Length label="Bottom" mm={setup.margins.bottomMm} unit={unit} onChange={(v) => applyMargins({ bottomMm: v })} />
+        <Length label={setup.mirrorMargins ? 'Inside' : 'Left'} mm={setup.margins.insideMm} unit={unit} onChange={(v) => applyMargins({ insideMm: v })} />
+        <Length label={setup.mirrorMargins ? 'Outside' : 'Right'} mm={setup.margins.outsideMm} unit={unit} onChange={(v) => applyMargins({ outsideMm: v })} />
+        <Length label="Gutter" mm={setup.margins.gutterMm} unit={unit} onChange={(v) => applyMargins({ gutterMm: v })} />
+        <Switch label="Mirror margins" checked={setup.mirrorMargins} onChange={(mirrorMargins) => apply({ mirrorMargins })} />
+        {pageCount > 0 && inside + 0.05 < suggested ? (
+          <p className="pss-warn ib-hint">
+            For {pageCount} pages, binders suggest at least {round(fromMm(suggested, unit), unit)} {unit} inside.{' '}
+            <Button variant="plain" onClick={() => applyMargins({ gutterMm: Math.max(0, suggested - setup.margins.insideMm) })}>Use it</Button>
+          </p>
+        ) : null}
+      </Section>
+
+      <Section id="page-setup.columns" title="Columns">
+        <FormRow label="Columns">
+          <SelectMenu
+            label="Columns"
+            value={String(setup.columns)}
+            onChange={(value) => apply({ columns: Number(value) })}
+            options={[1, 2, 3].map((n) => ({ value: String(n), label: String(n) }))}
+          />
+        </FormRow>
+        {setup.columns > 1 ? <Length label="Gap" mm={setup.columnGapMm} unit={unit} onChange={(v) => apply({ columnGapMm: v })} /> : null}
+        {setup.columns > 1 ? <p className="ib-hint">Pages are edited as a single running column; Print, PDF and binding set the columns side by side.</p> : null}
+      </Section>
+
+      <Section id="page-setup.typography" title="Typography">
+        <Switch
+          label="Set type for print"
+          checked={Boolean(typography)}
+          onChange={(on) => apply({ typography: on ? { ...BOOK_TYPOGRAPHY } : undefined })}
+        />
+        {typography ? (
+          <>
+            <FormRow label="Font">
+              <Commit aria-label="Font" value={typography.fontFamily} onCommit={(fontFamily) => applyType({ fontFamily })} />
+            </FormRow>
+            <FormRow label="Size">
+              <Commit
+                type="number"
+                min="5"
+                max="72"
+                step="0.5"
+                aria-label="Size"
+                className="pss-number"
+                value={typography.fontSizePt}
+                onCommit={(raw) => applyType({ fontSizePt: Number(raw) || typography.fontSizePt })}
+              />
+              <span className="pss-unit ib-meta">pt</span>
+            </FormRow>
+            <FormRow label="Spacing">
+              <SelectMenu
+                label="Spacing"
+                value={typography.lineSpacing}
+                onChange={(lineSpacing) => applyType({ lineSpacing })}
+                options={[
+                  { value: 'single', label: 'Single' },
+                  { value: 'oneAndAHalf', label: '1.5 lines' },
+                  { value: 'double', label: 'Double' },
+                  { value: 'multiple', label: 'Multiple' },
+                  { value: 'exact', label: 'Exactly' },
+                ]}
+              />
+            </FormRow>
+            <Length label="Indent" mm={typography.firstLineIndentMm} unit={unit} onChange={(v) => applyType({ firstLineIndentMm: v })} />
+            <FormRow label="Scene break">
+              <Commit aria-label="Scene break" value={typography.sceneBreak} onCommit={(sceneBreak) => applyType({ sceneBreak })} />
+            </FormRow>
+            <FormRow label="Alignment">
+              <Segmented
+                label="Alignment"
+                value={typography.alignment}
+                onChange={(alignment) => applyType({ alignment })}
+                options={[{ value: 'left', label: 'Ragged right' }, { value: 'justify', label: 'Justified' }]}
+              />
+            </FormRow>
+            <p className="ib-hint">Type for print shows in Print Layout and on paper; the editor keeps your writing font.</p>
+          </>
+        ) : null}
+        <Switch
+          label="Add a title page when printing"
+          checked={Boolean(setup.titlePage)}
+          onChange={(on) => apply({ titlePage: on ? { style: 'book', showContact: false, showWordCount: false } : undefined })}
+        />
+      </Section>
+
+      <Section id="page-setup.running" title="Header and footer">
+        <Running label={versoDiffers ? 'Header, right' : 'Header'} value={setup.header} onChange={(header) => apply({ header })} />
+        <Running label={versoDiffers ? 'Footer, right' : 'Footer'} value={setup.footer} onChange={(footer) => apply({ footer })} />
+        <Switch
+          label="Different on left-hand pages"
+          checked={versoDiffers}
+          onChange={(on) => apply(on
+            ? { versoHeader: { ...setup.header }, versoFooter: { ...setup.footer } }
+            : { versoHeader: undefined, versoFooter: undefined })}
+        />
+        {versoDiffers ? (
+          <>
+            <Running label="Header, left" value={setup.versoHeader || setup.header} onChange={(versoHeader) => apply({ versoHeader })} />
+            <Running label="Footer, left" value={setup.versoFooter || setup.footer} onChange={(versoFooter) => apply({ versoFooter })} />
+          </>
+        ) : null}
+        <Switch label="None on a chapter's first page" checked={setup.differentFirstPage} onChange={(differentFirstPage) => apply({ differentFirstPage })} />
+        <FormRow label="Numbers">
+          <SelectMenu
+            label="Numbers"
+            value={setup.pageNumberFormat}
+            onChange={(pageNumberFormat) => apply({ pageNumberFormat })}
+            options={[
+              { value: 'arabic', label: '1, 2, 3' },
+              { value: 'lowerRoman', label: 'i, ii, iii' },
+              { value: 'upperRoman', label: 'I, II, III' },
+            ]}
+          />
+        </FormRow>
+        <FormRow label="Start at">
+          <Commit
+            type="number"
+            min="0"
+            aria-label="Start at"
+            className="pss-number"
+            value={setup.pageNumberStart}
+            onCommit={(raw) => apply({ pageNumberStart: Number(raw) || 0 })}
+          />
+        </FormRow>
+        <p className="ib-hint">Use {'{page}'}, {'{pages}'}, {'{title}'}, {'{chapter}'} and {'{author}'}. The chapter is the most recent Heading 1.</p>
+      </Section>
+
+      <Section id="page-setup.flow" title="Text flow">
+        <FormRow label="Widows and orphans">
+          <SelectMenu
+            label="Widows and orphans"
+            value={String(setup.widowOrphanLines)}
+            onChange={(value) => apply({ widowOrphanLines: Number(value) })}
+            options={[
+              { value: '1', label: 'Off' },
+              { value: '2', label: 'At least 2 lines' },
+              { value: '3', label: 'At least 3 lines' },
+            ]}
+          />
+        </FormRow>
+        <p className="ib-hint">Keeps a paragraph from leaving a single line alone at the top or bottom of a page.</p>
+        <Switch label="Chapters open on a right-hand page" checked={setup.chapterStartsOnRecto} onChange={(chapterStartsOnRecto) => apply({ chapterStartsOnRecto })} />
+      </Section>
+
+      <Section id="page-setup.book" title="Book">
+        <FormRow label="Title"><Commit aria-label="Title" value={book.title} onCommit={(title) => applyBook({ title })} /></FormRow>
+        <FormRow label="Author"><Commit aria-label="Author" value={book.author} onCommit={(author) => applyBook({ author })} /></FormRow>
+        <FormRow label="Language"><Commit aria-label="Language" value={book.language} onCommit={(language) => applyBook({ language })} /></FormRow>
+        <p className="ib-hint">{scope === 'project' ? 'The book is the whole project' : 'A book is this document\u2019s folder'}, its documents in file-tree order.</p>
+      </Section>
+
+      <Section id="page-setup.binding" title="Binding">
+        <Switch
+          label="Print for hand binding"
+          checked={book.binding.binding !== 'none'}
+          onChange={(on) => applyBinding({ binding: on ? 'signatures' : 'none' })}
+        />
+        {book.binding.binding !== 'none' ? (
+          <FormRow label="Binding">
+            <SelectMenu
+              label="Binding"
+              value={book.binding.binding}
+              onChange={(binding) => applyBinding({ binding })}
+              options={[
+                { value: 'signatures', label: 'Sewn signatures' },
+                { value: 'saddle', label: 'Saddle stitch (booklet)' },
+                { value: 'perfect', label: 'Perfect bound' },
+              ]}
+            />
+          </FormRow>
+        ) : null}
+        {book.binding.binding === 'signatures' ? (
+          <>
+            <FormRow label="Signature">
+              <SelectMenu
+                label="Signature"
+                value={String(book.binding.sheetsPerSignature)}
+                onChange={(value) => applyBinding({ sheetsPerSignature: Number(value) })}
+                options={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ value: String(n), label: `${n} sheet${n > 1 ? 's' : ''} · ${n * 4} pages` }))}
+              />
+            </FormRow>
+            <ul className="pss-advice ib-hint">
+              {SIGNATURE_GUIDANCE.map((g) => <li key={g.sheets} className={g.sheets === book.binding.sheetsPerSignature ? 'is-on' : ''}>{g.label}</li>)}
+            </ul>
+          </>
+        ) : null}
+        {book.binding.binding !== 'none' ? (
+          <>
+            <FormRow label="Sheet">
+              <SelectMenu
+                label="Sheet"
+                value={book.binding.sheetPresetId}
+                onChange={(sheetPresetId) => applyBinding({ sheetPresetId })}
+                options={['letter', 'a4', 'legal', 'tabloid', 'a3'].map((id) => ({ value: id, label: PAGE_SIZE_PRESETS.find((p) => p.id === id)?.label }))}
+              />
+            </FormRow>
+            <FormRow label="Pages">
+              <SelectMenu
+                label="Pages"
+                value={book.binding.sheetFit}
+                onChange={(sheetFit) => applyBinding({ sheetFit })}
+                options={[{ value: 'actualSize', label: 'Actual size' }, { value: 'fit', label: 'Scale to fit' }]}
+              />
+            </FormRow>
+            <FormRow label="Duplex">
+              <SelectMenu
+                label="Duplex"
+                value={book.binding.duplex}
+                onChange={(duplex) => applyBinding({ duplex })}
+                options={[{ value: 'automatic', label: 'Printer does both sides' }, { value: 'manual', label: 'Manual: fronts, then backs' }]}
+              />
+            </FormRow>
+            <FormRow label="Paper">
+              <Commit
+                type="number"
+                step="0.01"
+                min="0"
+                aria-label="Paper thickness"
+                className="pss-number"
+                value={book.binding.paperThicknessMm}
+                onCommit={(raw) => applyBinding({ paperThicknessMm: Number(raw) || 0 })}
+              />
+              <span className="pss-unit ib-meta">mm</span>
+            </FormRow>
+            <Switch label="Crop and fold marks" checked={book.binding.cropMarks} onChange={(cropMarks) => applyBinding({ cropMarks })} />
+            <Switch label="Print a folding guide" checked={book.binding.includeGuide} onChange={(includeGuide) => applyBinding({ includeGuide })} />
+          </>
+        ) : null}
+      </Section>
+    </Sheet>
   )
 }
