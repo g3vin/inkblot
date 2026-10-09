@@ -10,10 +10,8 @@ import { Color } from '@tiptap/extension-color'
 import { FontFamily } from '@tiptap/extension-font-family'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { Highlight } from '@tiptap/extension-highlight'
-import { Table } from '@tiptap/extension-table'
-import { TableCell } from '@tiptap/extension-table-cell'
-import { TableHeader } from '@tiptap/extension-table-header'
 import { TableRow } from '@tiptap/extension-table-row'
+import { StyledTable, StyledTableCell, StyledTableHeader } from '../extensions/TableStyles'
 import { getSchema } from '@tiptap/core'
 
 import { Bibliography } from '../extensions/Bibliography'
@@ -65,10 +63,11 @@ const sharedExtensions = () => [
     types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
   }),
   Highlight.configure({ multicolor: true }),
-  Table.configure({ resizable: true }),
+  // Cell fills and the table's borders on top of the stock table (TableStyles.js).
+  StyledTable.configure({ resizable: true }),
   TableRow,
-  TableHeader,
-  TableCell,
+  StyledTableHeader,
+  StyledTableCell,
   ResizableImage.configure({
     inline: true,
     allowBase64: true,

@@ -19,6 +19,7 @@ import { textStylesCss } from '../textStyles'
 import { leadingPt } from '../typography'
 import { inTextNotes, portableContent } from './portable'
 import type { PMJSON } from './portable'
+import { TABLE_STYLES_CSS } from './tableStyles'
 
 export interface ExportChapter {
   title: string
@@ -96,6 +97,7 @@ table { border-collapse: collapse; width: 100%; margin: 1em 0; }
 th, td { border: 1px solid #bbb; padding: 6px 8px; vertical-align: top; }
 th { background: #f0f0f0; }
 th p, td p { margin: 0; }
+${TABLE_STYLES_CSS}
 mark { background: #fff59d; }
 hr { border: 0; border-top: 1px solid #ccc; margin: 2em 0; }
 .page-break { break-after: page; page-break-after: always; height: 0; }
