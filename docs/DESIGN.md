@@ -393,7 +393,10 @@ of these levels, and is always also in the command palette:
 1. **On the surface.** Only what almost every writer needs almost every session: bold,
    italic, headings, lists, add note, undo. The default toolbar stays short.
 2. **One click away.** A "More" `Menu` at the end of the toolbar or panel, and the
-   right-click context menu. Put the less-frequent but still general tools here.
+   right-click context menu. Put the less-frequent but still general tools here. In a
+   customisable toolbar, the `MORE` marker (`src/lib/chromeLayout.ts`) splits the
+   layout: items before it sit on the surface, items after it live behind ». Writers
+   move the marker in Customize toolbar.
 3. **In an inspector panel.** Deep, stateful tools a professional keeps open: history,
    references, print setup, script reports, map layers.
 4. **Always: the command palette (⌘K).** Every action, searchable by name and by the
@@ -488,12 +491,16 @@ FABs are 44px).
 ## 14. Guardrails
 
 - **`npm run lint:design`** (in CI) flags raw colours (including those inside shadows
-  and gradients), font families and px radii outside `tokens.css` and `palette.ts`. The code base predates the design
-  language, so existing findings are baselined per file in
-  `scripts/design-baseline.json`. A file may never gain findings, and a new file starts
-  at zero. When you migrate a surface, run
-  `npm run lint:design -- --update-baseline` to lock in the lower count. `--list` prints
-  every finding.
+  and gradients), font families and px radii outside `tokens.css` and `palette.ts`. The
+  app is at zero findings, and `scripts/design-baseline.json` is empty, so any new raw
+  value fails. `--list` prints every finding.
+- **Content is exempt, chrome is not.** A few files describe things the writer makes
+  rather than the app's chrome, and keep their own literal values: exported and
+  printed files (`src/print/export/`, the page model in `src/print/*.ts`), map worlds
+  and map themes (`src/lib/map/`, `src/map/mapThemes.css`), the conversation tile's
+  looks (`src/extensions/conversationStyles.ts`) and generated types (`src/types/`).
+  The list lives in `IGNORED` in `scripts/lint-design.mjs`. Add to it only for content
+  of that kind, never to get chrome past the check.
 - **`tests/unit/css.mjs`** (in `npm test`) keeps surfaces flat: a gradient only where it
   does a job (listed by selector: the titlebar fade, `FadeScrim`, the canvas grid, …),
   every `backdrop-filter` is `var(--blur-over-page)`, no OS colour-scheme media queries,
@@ -514,39 +521,21 @@ FABs are 44px).
 
 ## 15. Migration
 
-The foundation is in place: tokens, fonts, icons, palette, primitives and the command
-palette. Existing surfaces are moved onto it one PR at a time, in this order:
+Every surface is on the design language: tokens, `src/ui` primitives, `Icon` with
+semantic names, sentence-case copy and commands in the palette. The legacy layer is
+gone: the component aliases in `tokens.css`, the shared menu rule and bare-`<button>`
+defaults in `base.css` (the bare button is now a reset), `SFIcon` and its name table,
+and the `system_accent_color` command.
 
-1. App shell: titlebar and the customisable toolbars (`components/toolbar/`), tab bar
-   (`components/tabs/`), left sidebar, file tree and Book navigator (`components/tree/`,
-   `components/book/`), the project picker / welcome window
-2. Editor: the default toolbar set reduced to essentials, with the rest behind the
-   toolbar's » overflow; context menus
-3. Inspector: workbench tiles, history, clipboard, archive, search, references, map,
-   Typeset and Print & Export panels (`components/RightSidebar/`)
-4. Settings and stats (`components/settings/`, `components/stats/`), notes and the
-   bubble editor (`components/bubble/`)
-5. Canvas
-6. Map
-7. Print Layout and page setup
-8. Script
-9. Extensions: conversation tile (with its Brand / iMessage / Generic style switch),
-   citations, image tools
+The conversation tile has a Brand / iMessage / Generic style switch, stored as the
+node's `style` attribute. New tiles start in Brand; tiles saved before the switch read
+as iMessage so they look as they did.
 
-**Migrating a surface:**
+**When you touch older code:**
 
-- Replace ad-hoc buttons, menus and dialogs with `src/ui` components.
-- Replace literals with tokens, and draw icons with `Icon` and semantic names.
-- Rewrite copy to §11.
-- Register the surface's actions with `useCommands`.
-- Lower its `lint:design` baseline.
-
-**Legacy to remove as surfaces migrate:**
-
-- The component aliases at the bottom of `tokens.css` (`--landing-*`, `--sidebar-*`,
-  `--focus-mode-*`, `--floating-note-*`, `--tile-color`, `--color-white/black`).
-- The shared legacy menu rule at the bottom of `base.css`.
-- The bare-`<button>` defaults in `base.css`.
+- Replace a one-off button, menu or dialog you meet with its `src/ui` component.
+- Keep new values on tokens. `lint:design` holds the line at zero.
+- Write new copy to §11 and register new actions with `useCommands`.
 
 ---
 
