@@ -55,25 +55,38 @@ _Last updated: 2026-10-08, with PR g3vin/inkblot#63 (design language + logo)._
 
 ## The logo (done)
 
-The user chose **B3 "Spray"**: a lowercase *i* whose dot is an ink spray, black on white.
+The user chose the **"ib" monogram** in a brand review held in October 2026. It
+replaces the earlier *i*-plus-spray mark, which read as the "info" glyph at small
+sizes. It's "ib" in Literata ExtraBold, with the *i*'s dot replaced by an ink splash,
+black on white.
 
 - **Generator:** `docs/brand/generator/` rebuilds it. `splash.py` models the ink impact:
   impact-angle ellipse, rim fingering, downstream bias and droplets that pinch off.
-  `generate.py` writes `src/ui/brandPaths.js`, `src/assets/brand/*.svg` and
-  `public/favicon.svg`.
-- **Wordmark:** it uses the mark's own *i* (the user asked that the logos match),
-  sized to Courier Prime Bold's x-height, with the font's letter spacing rather than
-  its monospace cell.
-- **App icon:** the stem is on the centre line, and the ink is optically centred.
+  `generate.py` sets the letters from the font outlines and swaps each *i*'s dot for
+  the splash. It writes `src/ui/brandPaths.js`, `src/assets/brand/*.svg` and
+  `public/favicon.svg`. Its settings (`MARK`, `WORDMARK_DOT`, `ICON_SIZE`,
+  `ICON_CENTRE`) are the decisions from the review, so change them only on purpose.
+- **Settings the user picked:**
+  - The splash is large and sits close to the stem (`dot_width` 360, `dot_gap` 40).
+  - The monogram keeps its tight *i*–*b* spacing (`kern` −40). The splash moves left
+    (`dot_dx` −45) to clear the *b*, because widening the spacing loosened the
+    monogram.
+  - The mark fills 41 of the 64-unit tile.
+- **Wordmark:** "inkblot" in Courier Prime Bold with the same splash for its dot
+  (`dot_width` 330, `dot_gap` 55). The splash adds height, so `Wordmark` call sites
+  use about 1.3× their old `height` to keep the letters the same size.
+- **App icon:** optically centred. The point halfway between the ink's box centre and
+  its centre of weight sits at (32, 31.6), because the heavy letters sit low and the
+  splash high.
 - **Desktop and iOS icons:** `src-tauri/icons/` was regenerated with `npx tauri icon`
   from `src-tauri/icons/source/`.
   - `icon-macos-1024.png`: a Big Sur–style inset tile, transparent around it.
   - `icon-ios-1024.png`: full-bleed and opaque. The iOS set comes from this one.
 - **Regenerating after a change:**
   1. Run `generate.py`.
-  2. Rasterise `app-icon.svg` into the two 1024px sources (a headless browser
-     screenshot at 1024×1024; the macOS one inset 100px, with corners at 0.225 of the
-     tile).
+  2. Rasterise `app-icon.svg` into the two 1024px sources. The macOS one is inset
+     100px with corners at 0.225 of the tile; the iOS one is full-bleed and opaque.
+     Use `rsvg-convert` (librsvg) or a headless browser screenshot.
   3. Run `npx tauri icon` on each and copy `ios/` from the iOS run.
 - **Remaining:** check the icons on a real Mac and iPhone. The Android launcher icons
   came from the macOS source (an inset tile), so revisit them if Android ships.
