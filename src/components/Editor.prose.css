@@ -53,6 +53,46 @@
   min-height: 1.35em;
 }
 
+/* A cell's fill (TableStyles.js): a wash of its ink, as a card is washed. */
+.editor .ProseMirror :is(td, th)[data-fill] {
+  background: color-mix(in srgb, var(--cell-ink) 16%, var(--app-bg));
+}
+.editor .ProseMirror :is(td, th)[data-fill='blue'] { --cell-ink: var(--ink-blue); }
+.editor .ProseMirror :is(td, th)[data-fill='teal'] { --cell-ink: var(--ink-teal); }
+.editor .ProseMirror :is(td, th)[data-fill='green'] { --cell-ink: var(--ink-green); }
+.editor .ProseMirror :is(td, th)[data-fill='amber'] { --cell-ink: var(--ink-amber); }
+.editor .ProseMirror :is(td, th)[data-fill='rust'] { --cell-ink: var(--ink-rust); }
+.editor .ProseMirror :is(td, th)[data-fill='red'] { --cell-ink: var(--ink-red); }
+.editor .ProseMirror :is(td, th)[data-fill='violet'] { --cell-ink: var(--ink-violet); }
+.editor .ProseMirror :is(td, th)[data-fill='slate'] { --cell-ink: var(--ink-slate); }
+
+/* The table's borders (TableStyles.js, on the node view's wrapper). A border the
+   table does not draw is a faint dashed guide while writing, and nothing in print. */
+.editor .ProseMirror .tableWrapper[data-borders] :is(td, th) {
+  border-style: dashed;
+  border-color: var(--border-muted);
+}
+.editor .ProseMirror .tableWrapper[data-borders='outer'] table {
+  outline: 1px solid var(--border-color);
+  outline-offset: -1px;
+}
+.editor .ProseMirror .tableWrapper[data-borders='inner'] :is(td, th) {
+  border-style: solid;
+  border-color: var(--border-color);
+}
+.editor .ProseMirror .tableWrapper[data-borders='inner'] tr:first-child > * { border-top: 1px dashed var(--border-muted); }
+.editor .ProseMirror .tableWrapper[data-borders='inner'] tr:last-child > * { border-bottom: 1px dashed var(--border-muted); }
+.editor .ProseMirror .tableWrapper[data-borders='inner'] tr > :first-child { border-left: 1px dashed var(--border-muted); }
+.editor .ProseMirror .tableWrapper[data-borders='inner'] tr > :last-child { border-right: 1px dashed var(--border-muted); }
+
+@media print {
+  .editor .ProseMirror .tableWrapper:is([data-borders='none'], [data-borders='outer']) :is(td, th) { border-color: transparent; }
+  .editor .ProseMirror .tableWrapper[data-borders='inner'] tr:first-child > * { border-top-color: transparent; }
+  .editor .ProseMirror .tableWrapper[data-borders='inner'] tr:last-child > * { border-bottom-color: transparent; }
+  .editor .ProseMirror .tableWrapper[data-borders='inner'] tr > :first-child { border-left-color: transparent; }
+  .editor .ProseMirror .tableWrapper[data-borders='inner'] tr > :last-child { border-right-color: transparent; }
+}
+
 .editor .ProseMirror .selectedCell::after {
   content: '';
   position: absolute;

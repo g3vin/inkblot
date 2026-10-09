@@ -29,6 +29,7 @@ import { imageSize, isRemote, toPortableImage } from './images'
 import type { ResolvedImage } from './images'
 import { collectImageSources, portableContent } from './portable'
 import type { PMJSON } from './portable'
+import { fillHex, tableEdges } from './tableStyles'
 import { escapeXml as x } from './xml'
 import { createZip } from './zip'
 
@@ -329,6 +330,11 @@ class Writer {
   }
 
   table(node: PMJSON): string {
+    // A cell's fill (TableStyles.js), or a header's grey.
+    const shading = (cell: PMJSON) => {
+      const fill = fillHex(cell.attrs?.fill) ?? (cell.type === 'tableHeader' ? 'F0F0F0' : null)
+      return fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : ''
+    }
     const rows = node.content || []
     const firstRow = rows[0]?.content || []
     const columns = Math.max(1, firstRow.reduce((n, cell) => n + (Number(cell.attrs?.colspan) || 1), 0))
@@ -370,7 +376,7 @@ class Writer {
           `<w:tcW w:w="${width}" w:type="dxa"/>`,
           span > 1 ? `<w:gridSpan w:val="${span}"/>` : '',
           rowspan > 1 ? '<w:vMerge w:val="restart"/>' : '',
-          cell.type === 'tableHeader' ? '<w:shd w:val="clear" w:color="auto" w:fill="F0F0F0"/>' : '',
+          shading(cell),
         ].join('')
         if (rowspan > 1) covering.set(col, { rows: rowspan - 1, span })
         const saved = this.flushNext
@@ -385,7 +391,11 @@ class Writer {
       continueMerges()
       return `<w:tr>${header ? '<w:trPr><w:tblHeader/></w:trPr>' : ''}${cells.join('')}</w:tr>`
     }).join('')
-    const border = (side: string) => `<w:${side} w:val="single" w:sz="4" w:space="0" w:color="BBBBBB"/>`
+    // The edges the table draws (TableStyles.js); the rest are none.
+    const edges = tableEdges(node.attrs?.borders)
+    const border = (side: string) => (side.startsWith('inside') ? edges.inner : edges.outer)
+      ? `<w:${side} w:val="single" w:sz="4" w:space="0" w:color="BBBBBB"/>`
+      : `<w:${side} w:val="nil"/>`
     return `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(border).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="100" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${grid.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${rowXml}</w:tbl><w:p/>`
   }
 

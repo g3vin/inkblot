@@ -51,6 +51,7 @@ import DocumentTabBar from './tabs/DocumentTabBar'
 import { useShowsTabBar } from './tabs/tabBarState'
 import PaneEditorSurface from '../print/PaneEditorSurface'
 import DocLockBadge from './DocLockBadge'
+import TableToolbar from './TableToolbar'
 import { lockReason, useLocks } from '../lib/docLocks'
 import { setEditorLock } from '../extensions/DocumentLock'
 
@@ -806,6 +807,9 @@ export default function EditorCanvas({
               <DocLockBadge projectName={projectName} docPath={currentDoc} />
             </div>
           ) : null}
+          {!primaryIsStructured && !showDraftPane ? (
+            <TableToolbar editor={liveEditor} />
+          ) : null}
         </div>
 
         {splitView === 'editor' && (
@@ -904,6 +908,9 @@ export default function EditorCanvas({
                 {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}
                 <DocLockBadge projectName={projectName} docPath={secondaryDoc} />
               </div>
+            ) : null}
+            {!secondaryIsStructured ? (
+              <TableToolbar editor={liveSecondaryEditor} />
             ) : null}
           </div>
         )}

@@ -1,0 +1,13 @@
+/* The table toolbar: a floating strip over the table's top edge (TableToolbar.jsx). */
+.table-toolbar {
+  position: fixed;
+  z-index: var(--z-chrome);
+}
+
+.table-fill-popover {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
