@@ -48,9 +48,9 @@ around it locally.
 
 ## Work in progress
 
-The design language is being rolled out surface by surface. Before continuing that work
-(migrating a surface, retiring legacy code), read
-[docs/design-handoff.md](docs/design-handoff.md) for the current state and next steps.
+Every surface is on the design language. What's left (the logo check on real devices,
+moving bare buttons onto `src/ui`) and the gotchas are in
+[docs/design-handoff.md](docs/design-handoff.md). Read it before design-system work.
 
 ## Checks
 

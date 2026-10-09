@@ -618,7 +618,7 @@
   width: 84px;
   height: 22px;
   border: 1px solid var(--border-muted);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   padding: 0 7px;
   background: color-mix(in srgb, var(--surface-1) 86%, transparent);
   color: var(--text-primary);
