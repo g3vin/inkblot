@@ -9,7 +9,7 @@
  * attached to a NOTE is a different thing and lives on that note (see AudioNotes).
  */
 import { useRef, useState } from 'react'
-import SFIcon from '../components/SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { formatDuration } from '../lib/audioNotes'
 import { useAssetUrl } from './useAssetUrl'
 
@@ -51,7 +51,7 @@ export default function CanvasAudioNode({ node, projectName }) {
         aria-label={playing ? 'Pause' : 'Play'}
         title={playing ? 'Pause' : 'Play'}
       >
-        <SFIcon name={playing ? 'pause' : 'play'} size={16} />
+        <Icon name={playing ? 'pause' : 'play'} />
       </button>
 
       <div className="canvas-audio-body">

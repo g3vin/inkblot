@@ -5,8 +5,8 @@
  */
 import { useRef, useState } from 'react'
 import { formatDuration } from '../../../lib/audioNotes'
-import { CANVAS_COLOR_PRESETS, resolveCanvasColor } from '../../../lib/canvasModel'
-import Popover from '../../../ui/Popover'
+import { CANVAS_PRESET_INKS } from '../../../lib/palette'
+import { Button, InkPicker, Popover } from '../../../ui'
 import { Glyph, ItemFrame, MenuButton, ToolButton } from '../ToolbarControls'
 
 const command = (ctx, name, detail) => {
@@ -21,8 +21,8 @@ export function CanvasLockItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton
-        symbol={locked ? 'lock' : 'lock.open'}
-        label={locked ? 'Unlock Canvas' : 'Lock for Reading'}
+        icon={locked ? 'lock' : 'unlock'}
+        label={locked ? 'Unlock canvas' : 'Lock for reading'}
         title={locked ? 'Editing locked — press L to edit' : 'Lock for reading (L)'}
         display={ctx.display}
         active={locked}
@@ -36,7 +36,7 @@ export function CanvasLockItem({ ctx, spec }) {
 export function CanvasAddCardItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="plus" label={spec.label} display={ctx.display} disabled={!editing(ctx)} onClick={() => command(ctx, 'add-card')} />
+      <ToolButton icon="add" label={spec.label} display={ctx.display} disabled={!editing(ctx)} onClick={() => command(ctx, 'add-card')} />
     </ItemFrame>
   )
 }
@@ -44,7 +44,7 @@ export function CanvasAddCardItem({ ctx, spec }) {
 export function CanvasAddImageItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="photo" label={spec.label} display={ctx.display} disabled={!editing(ctx)} onClick={() => command(ctx, 'add-image')} />
+      <ToolButton icon="image" label={spec.label} display={ctx.display} disabled={!editing(ctx)} onClick={() => command(ctx, 'add-image')} />
     </ItemFrame>
   )
 }
@@ -56,7 +56,7 @@ export function CanvasRecordMemoItem({ ctx, spec }) {
       <button
         type="button"
         className={`canvas-toolbar-record${recording ? ' is-recording' : ''}`}
-        aria-label={recording ? 'Stop Recording' : 'Record a Voice Memo'}
+        aria-label={recording ? 'Stop recording' : 'Record a voice memo'}
         title={recording ? 'Stop recording' : 'Record a voice memo'}
         disabled={!editing(ctx) || !ctx.canvas?.canRecord}
         onClick={() => command(ctx, 'record-memo')}
@@ -66,11 +66,13 @@ export function CanvasRecordMemoItem({ ctx, spec }) {
             <span className="audio-record-dot" aria-hidden="true" />
             <span className="canvas-toolbar-record-time">{formatDuration(ctx.canvas.recordElapsedMs || 0)}</span>
           </>
-        ) : <Glyph symbol="mic" label={spec.label} display={ctx.display} />}
+        ) : <Glyph icon="dictate" label={spec.label} display={ctx.display} />}
       </button>
     </ItemFrame>
   )
 }
+
+const PRESET_FOR_INK = Object.fromEntries(Object.entries(CANVAS_PRESET_INKS).map(([preset, ink]) => [ink, preset]))
 
 export function CanvasColorItem({ ctx, spec }) {
   const [open, setOpen] = useState(false)
@@ -90,13 +92,12 @@ export function CanvasColorItem({ ctx, spec }) {
         disabled={!editing(ctx) || !ctx.canvas?.hasSelection}
         onClick={() => setOpen((was) => !was)}
       >
-        <Glyph symbol="paintpalette" label={spec.label} display={ctx.display} />
+        <Glyph icon="palette" label={spec.label} display={ctx.display} />
       </button>
-      <Popover anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} align="center" className="tb-swatches" role="menu">
-        {CANVAS_COLOR_PRESETS.map((preset) => (
-          <button key={preset.id} type="button" className="canvas-color-swatch" style={{ background: preset.value }} onClick={() => apply(preset.id)} aria-label={preset.label} title={preset.label} />
-        ))}
-        <button type="button" className="canvas-color-swatch canvas-color-swatch-none" style={{ background: resolveCanvasColor(null) }} onClick={() => apply(null)} aria-label="Default Color" title="Default" />
+      <Popover anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} align="center" className="tb-canvas-colors">
+        {/* JSON Canvas stores its six presets as '1'–'6'; each is one of the inks. */}
+        <InkPicker label="Card colour" value={null} inks={Object.values(CANVAS_PRESET_INKS)} onChange={(ink) => apply(PRESET_FOR_INK[ink])} />
+        <Button onClick={() => apply(null)}>No colour</Button>
       </Popover>
     </ItemFrame>
   )
@@ -109,7 +110,7 @@ export function CanvasGroupItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton
-        symbol="rectangle.dashed"
+        icon="ungroup"
         label={ungroup ? 'Ungroup' : 'Group'}
         title={ungroup ? 'Ungroup (⌘⇧G)' : 'Group (⌘G)'}
         display={ctx.display}
@@ -124,8 +125,8 @@ export function CanvasUndoRedoItem({ ctx, spec }) {
   const c = ctx.canvas
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="arrow.uturn.backward" label="Undo" title="Undo (⌘Z)" display={ctx.display} disabled={!editing(ctx) || !c.canUndo} onClick={() => command(ctx, 'undo')} />
-      <ToolButton symbol="arrow.uturn.forward" label="Redo" title="Redo (⇧⌘Z)" display={ctx.display} disabled={!editing(ctx) || !c.canRedo} onClick={() => command(ctx, 'redo')} />
+      <ToolButton icon="undo" label="Undo" title="Undo (⌘Z)" display={ctx.display} disabled={!editing(ctx) || !c.canUndo} onClick={() => command(ctx, 'undo')} />
+      <ToolButton icon="redo" label="Redo" title="Redo (⇧⌘Z)" display={ctx.display} disabled={!editing(ctx) || !c.canRedo} onClick={() => command(ctx, 'redo')} />
     </ItemFrame>
   )
 }
@@ -133,7 +134,7 @@ export function CanvasUndoRedoItem({ ctx, spec }) {
 export function CanvasGuidesItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="guides" label={spec.label} display={ctx.display} active={Boolean(ctx.canvas?.alignmentGuides)} disabled={!editing(ctx)} onClick={() => command(ctx, 'toggle-guides')} />
+      <ToolButton icon="guides" label={spec.label} display={ctx.display} active={Boolean(ctx.canvas?.alignmentGuides)} disabled={!editing(ctx)} onClick={() => command(ctx, 'toggle-guides')} />
     </ItemFrame>
   )
 }
@@ -141,7 +142,7 @@ export function CanvasGuidesItem({ ctx, spec }) {
 export function CanvasSnapItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="square.grid.2x2" label={spec.label} display={ctx.display} active={Boolean(ctx.canvas?.snapToGrid)} disabled={!editing(ctx)} onClick={() => command(ctx, 'toggle-grid')} />
+      <ToolButton icon="grid" label={spec.label} display={ctx.display} active={Boolean(ctx.canvas?.snapToGrid)} disabled={!editing(ctx)} onClick={() => command(ctx, 'toggle-grid')} />
     </ItemFrame>
   )
 }
@@ -151,19 +152,19 @@ export function CanvasZoomItem({ ctx, spec }) {
   const disabled = !ctx.canvas
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="minus.magnifyingglass" label="Zoom Out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
+      <ToolButton icon="zoom-out" label="Zoom out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
       <MenuButton
         label="Zoom"
         display={ctx.display}
         disabled={disabled}
         items={[
-          { text: 'Zoom to Fit', accelerator: undefined, action: () => command(ctx, 'zoom-to-fit') },
-          { text: 'Actual Size', action: () => command(ctx, 'reset-zoom') },
+          { text: 'Zoom to fit', accelerator: undefined, action: () => command(ctx, 'zoom-to-fit') },
+          { text: 'Actual size', action: () => command(ctx, 'reset-zoom') },
         ]}
       >
         <span className="tb-text tb-zoom-readout">{Math.round(zoom * 100)}%</span>
       </MenuButton>
-      <ToolButton symbol="plus.magnifyingglass" label="Zoom In" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />
+      <ToolButton icon="zoom-in" label="Zoom in" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />
     </ItemFrame>
   )
 }
@@ -171,7 +172,7 @@ export function CanvasZoomItem({ ctx, spec }) {
 export function CanvasDeleteItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="trash" label={spec.label} title="Delete (⌫)" display={ctx.display} disabled={!editing(ctx) || !ctx.canvas?.hasSelection} onClick={() => command(ctx, 'delete')} />
+      <ToolButton icon="delete" label={spec.label} title="Delete (⌫)" display={ctx.display} disabled={!editing(ctx) || !ctx.canvas?.hasSelection} onClick={() => command(ctx, 'delete')} />
     </ItemFrame>
   )
 }

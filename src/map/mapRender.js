@@ -8,6 +8,7 @@ import { geoArea } from 'd3-geo'
 import { getDocDisplayName } from '../lib/docKind'
 import { pathData } from '../lib/map/mapGeometry'
 import { measuredLine } from '../lib/map/mapSpace'
+import { TRAVELER_COLORS } from '../lib/map/mapColors'
 
 /** A polyline in stored coordinates → an SVG path in world coordinates. */
 export function linePath(projector, space, points) {
@@ -40,8 +41,6 @@ export const labelNeedsFlip = (worldPoints) =>
 /** Pick the Earth's detail for a zoom: coarse for the world, finer once zoomed in. */
 export const earthLevelFor = (earth, zoom) =>
   earth?.detail === '110m' || earth?.detail === '50m' ? earth.detail : zoom >= 2.5 ? '50m' : '110m'
-
-const TRAVELER_COLORS = ['#2f7dd1', '#d1532f', '#2f9d6a', '#8a4fd1', '#d19a2f', '#d12f7d', '#2fb3c2']
 
 export const travelerColor = (traveler, index) => traveler.color || TRAVELER_COLORS[index % TRAVELER_COLORS.length]
 

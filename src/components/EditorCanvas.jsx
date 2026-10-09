@@ -46,7 +46,7 @@ import { formatWordStats, useEditorWordCount } from '../hooks/useEditorWordCount
 import DraftTabPane from './DraftTabPane'
 import FocusModeOverlay from './FocusModeOverlay'
 import VersionComparePane from './VersionComparePane'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import DocumentTabBar from './tabs/DocumentTabBar'
 import { useShowsTabBar } from './tabs/tabBarState'
 import PaneEditorSurface from '../print/PaneEditorSurface'
@@ -619,7 +619,7 @@ export default function EditorCanvas({
                 aria-label="Create new document"
                 title="Create new document"
               >
-                <SFIcon name="plus" />
+                <Icon name="add" />
               </button>
             )}
           </div>

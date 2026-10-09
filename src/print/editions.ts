@@ -19,7 +19,7 @@ type Book = Partial<BookSettings> & Record<string, unknown>
 export const EDITION_NAMES: Record<EditionKind, string> = {
   [EditionKind.Paperback]: 'Paperback',
   [EditionKind.Hardcover]: 'Hardcover',
-  [EditionKind.LargePrint]: 'Large Print',
+  [EditionKind.LargePrint]: 'Large print',
   [EditionKind.Ebook]: 'eBook',
 }
 
@@ -141,7 +141,7 @@ export const editEditions = <B extends Book>(book: B, edit: EditionEdit): B => {
     case 'duplicate': {
       const from = find(edit.id)
       if (!from) return book
-      const copy: Edition = { ...clone(from), id: edit.newId, name: uniqueName(`${from.name} Copy`, editions) }
+      const copy: Edition = { ...clone(from), id: edit.newId, name: uniqueName(`${from.name} copy`, editions) }
       return withEditions([...editions, copy], copy.id)
     }
     case 'rename': {
@@ -168,7 +168,7 @@ export const editEditions = <B extends Book>(book: B, edit: EditionEdit): B => {
       if (!version) return book
       const edition: Edition = {
         id: edit.newId,
-        name: uniqueName(edit.name || 'From a Typeset Version', editions),
+        name: uniqueName(edit.name || 'From a typeset version', editions),
         kind: EditionKind.Paperback,
         ...(version.pageSetup ? { pageSetup: clone(version.pageSetup) as PageSetup } : {}),
         ...(typeof version.activeCover === 'string' ? { coverSetId: version.activeCover } : {}),

@@ -33,19 +33,19 @@
 }
 
 .sidebar-card-eyebrow--thesaurus {
-  color: #63a5ff;
+  color: var(--ink-blue);
 }
 
 .sidebar-card-eyebrow--dictionary {
-  color: #e7c35f;
+  color: var(--ink-amber);
 }
 
 .sidebar-card-eyebrow--rhyme {
-  color: #f0a45d;
+  color: var(--ink-rust);
 }
 
 .sidebar-card-eyebrow--pos {
-  color: #ef9353;
+  color: var(--ink-violet);
 }
 
 .sidebar-card-title {
@@ -68,7 +68,7 @@
 
 .synonym-btn-antonym {
   color: var(--status-error);
-  border-color: rgba(255, 143, 143, 0.55);
+  border-color: color-mix(in srgb, var(--status-danger) 55%, transparent);
   background: transparent;
 }
 
@@ -100,7 +100,7 @@
   font-size: 9px;
   color: var(--on-ink);
   padding: 2px 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   text-transform: uppercase;
 }
 

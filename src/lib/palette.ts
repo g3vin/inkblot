@@ -143,3 +143,10 @@ export const POS_INKS: Readonly<Record<string, string>> = {
   Preposition: 'var(--text-muted)',
   Unknown: 'var(--text-subtle)',
 }
+
+/**
+ * The writer's text colour and highlighter, as stored in the document's marks. They are
+ * the document's own colours (like a printed page's), so they stay literal.
+ */
+export const DEFAULT_TEXT_COLOR = '#000000'
+export const DEFAULT_HIGHLIGHT_COLOR = '#ffff00'

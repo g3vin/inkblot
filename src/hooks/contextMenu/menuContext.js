@@ -64,18 +64,18 @@ export async function createMenuContext(e, props) {
   }
 
   const buildCopyPathSubmenu = async (docPath) => Submenu.new({
-    text: 'Copy Path',
+    text: 'Copy path',
     items: [
       await MenuItem.new({
-        text: 'Copy Name',
+        text: 'Copy name',
         action: () => copyText(getDocDisplayName(docPath)),
       }),
       await MenuItem.new({
-        text: 'Copy Project Path',
+        text: 'Copy project path',
         action: () => copyText(docPath),
       }),
       await MenuItem.new({
-        text: 'Copy Absolute Path',
+        text: 'Copy absolute path',
         action: async () => copyText(await getEntryFilePath(projectName, docPath, 'file')),
       }),
     ],
@@ -104,7 +104,7 @@ export async function createMenuContext(e, props) {
 
     const moveItems = destinations.length
       ? await Promise.all(destinations.map(folderPath => MenuItem.new({
-        text: folderPath || 'Project Root',
+        text: folderPath || 'Project root',
         action: async () => {
           await moveEntry(projectName, docPath, folderPath, 'file')
           await refreshFiles?.()
@@ -112,7 +112,7 @@ export async function createMenuContext(e, props) {
       })))
       : [await MenuItem.new({ text: 'No other folders', enabled: false })]
 
-    return Submenu.new({ text: 'Move File to…', items: moveItems })
+    return Submenu.new({ text: 'Move file to…', items: moveItems })
   }
 
   const fileTree = e.target.closest('.file-tree')

@@ -6,7 +6,7 @@
  * `setupPending`; this is where it becomes one of those.
  */
 import { useState } from 'react'
-import SFIcon from '../components/SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { IMAGE_EXTENSIONS_LIST, assetUrl, importAssetFromPath, measureImage } from '../lib/assets'
 import { PROJECTION_NAMES } from '../lib/map/mapProjection'
 import { SYSTEM_PRESETS, presetBodies } from '../lib/map/systemPresets'
@@ -57,22 +57,22 @@ export default function MapSetup({ projectName, onDone }) {
 
         <div className="map-setup-grid">
           <button type="button" className="map-setup-option" onClick={() => setStep('blank')}>
-            <SFIcon name="map" size={22} />
+            <Icon name="map" size={20} />
             <strong>A blank sheet</strong>
             <small>Draw a world of your own: coasts, regions, roads.</small>
           </button>
           <button type="button" className="map-setup-option" onClick={chooseImage}>
-            <SFIcon name="photo" size={22} />
+            <Icon name="image" size={20} />
             <strong>From a picture</strong>
             <small>A drawn or scanned map. Trace it into outlines later.</small>
           </button>
           <button type="button" className="map-setup-option" onClick={() => setStep('earth')}>
-            <SFIcon name="globe" size={22} />
+            <Icon name="globe" size={20} />
             <strong>The Earth</strong>
             <small>Real coastlines and countries, offline.</small>
           </button>
           <button type="button" className="map-setup-option" onClick={() => setStep('system')}>
-            <SFIcon name="map.system" size={22} />
+            <Icon name="orbit" size={20} />
             <strong>A star system</strong>
             <small>Stars, planets and moons that move with your story.</small>
           </button>

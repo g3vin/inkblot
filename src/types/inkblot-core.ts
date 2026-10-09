@@ -2231,8 +2231,8 @@ export interface MapPanelButton {
 	label: string;
 	role: MapButtonRole;
 	disabled: boolean;
-	/** An SF Symbol name, for a button that shows one. */
-	symbol?: string;
+	/** A semantic icon name (src/ui/icons.js), for a button that shows one. */
+	icon?: string;
 	help?: string;
 }
 
@@ -3444,8 +3444,8 @@ export interface ReferenceKindSpec {
 	label: string;
 	/** Which part of the "new source" menu it is listed in. */
 	group: string;
-	/** An SF Symbol. */
-	symbol: string;
+	/** A semantic icon name (src/ui/icons.js). */
+	icon: string;
 	fields: ReferenceFieldSpec[];
 	/** The contributor roles it offers, first one the default (`author`, `editor`…). */
 	roles: string[];
@@ -4691,7 +4691,7 @@ export interface VersionRow {
 	name?: string;
 	auto: boolean;
 	sessionId?: string;
-	/** `hsl(…)`, the same hue the page's timeline gives this session. */
+	/** `var(--ink-…)`, the same ink the page's timeline gives this session. */
 	sessionColor: string;
 	delta: WordDelta;
 	/**

@@ -16,7 +16,7 @@ import { createEmptyTimelineView } from './timeline/timelineModel'
 
 /** The kinds a user can create, as the UI lists them. */
 export const DOCUMENT_KINDS = [
-  { id: 'doc', label: 'Document', icon: 'doc.text', hint: 'A page for writing' },
+  { id: 'file', label: 'Document', icon: 'document', hint: 'A page for writing' },
   { id: 'canvas', label: 'Canvas', icon: 'canvas', hint: 'An open board for cards' },
   { id: 'map', label: 'Map', icon: 'map', hint: 'Places, routes and journeys' },
   { id: 'timeline', label: 'Timeline', icon: 'timeline', hint: 'When everything happens' },

@@ -15,7 +15,7 @@ const EXPECTED_IDS = [
   'inkblot.format.font', 'inkblot.format.font-size', 'inkblot.format.text-style', 'inkblot.format.text-color',
   'inkblot.format.highlight', 'inkblot.format.alignment', 'inkblot.format.paragraph-style',
   'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', 'inkblot.insert.table',
-  'inkblot.insert.conversation', 'inkblot.edit.undo-redo', 'inkblot.edit.paste-and-match-style',
+  'inkblot.insert.conversation', 'inkblot.insert.note', 'inkblot.edit.undo-redo', 'inkblot.edit.paste-and-match-style',
   'inkblot.view.focus-mode', 'inkblot.view.word-count',
   'inkblot.canvas.lock', 'inkblot.canvas.add-card', 'inkblot.canvas.add-image', 'inkblot.canvas.record-memo',
   'inkblot.canvas.color', 'inkblot.canvas.group', 'inkblot.canvas.undo-redo', 'inkblot.canvas.alignment-guides',
@@ -35,12 +35,12 @@ const ids = L.TOOLBAR_ITEMS.map((item) => item.id)
 ok('the item ids are the ones layouts were saved under', JSON.stringify(ids) === JSON.stringify(EXPECTED_IDS))
 ok('no two items share an id', new Set(ids).size === ids.length)
 ok('every id is namespaced', ids.every((id) => id.startsWith('inkblot.')))
-ok('every item has a label and a symbol', L.TOOLBAR_ITEMS.every((item) => item.label && item.symbol && item.contexts.length))
+ok('every item has a label and an icon', L.TOOLBAR_ITEMS.every((item) => item.label && item.icon && item.contexts.length))
 ok('the toolbars save apart', new Set(L.TOOLBAR_CONTEXTS.map(L.toolbarLayoutKey)).size === 4)
 
 for (const context of L.TOOLBAR_CONTEXTS) {
   const offered = new Set(L.toolbarItemsFor(context).map((item) => item.id))
-  ok(`the ${context} default set is made of its own items`, L.DEFAULT_TOOLBARS[context].every((id) => L.isSpacer(id) || offered.has(id)))
+  ok(`the ${context} default set is made of its own items`, L.DEFAULT_TOOLBARS[context].every((id) => L.isSpacer(id) || id === L.MORE || offered.has(id)))
   ok(`the ${context} palette offers the shared items`, offered.has('inkblot.timer') && offered.has('inkblot.panel.notes'))
 }
 ok('delete is palette-only on a canvas', !L.DEFAULT_TOOLBARS.canvas.includes('inkblot.canvas.delete'))
@@ -73,6 +73,19 @@ ok('a palette-only item added since is never put in', !read.items.includes('inkb
 
 read = doc(JSON.stringify({ items: ['inkblot.format.font'], known: ids }))
 ok('a default item the user took out stays out', read.items.join() === 'inkblot.format.font')
+
+/* ---------------- the More marker ---------------- */
+
+const surface = L.DEFAULT_TOOLBARS.document.slice(0, L.DEFAULT_TOOLBARS.document.indexOf(L.MORE)).filter((id) => !L.isSpacer(id))
+ok('the document toolbar shows only the essentials before More',
+  surface.join() === 'inkblot.view.editor-mode,inkblot.format.text-style,inkblot.format.paragraph-style,inkblot.format.bulleted-list,inkblot.format.numbered-list,inkblot.insert.note,inkblot.edit.undo-redo')
+read = doc(JSON.stringify({ items: ['inkblot.format.font', 'more', 'inkblot.format.highlight', 'more'], known: ids }))
+ok('More is kept, once', read.items.join() === 'inkblot.format.font,more,inkblot.format.highlight')
+read = doc(JSON.stringify({ items: ['inkblot.format.font', 'more'], known: ids }))
+ok('a More with nothing after it is dropped', read.items.join() === 'inkblot.format.font')
+ok('More alone is the default set', doc(JSON.stringify({ items: ['more'] })).items.join() === defaults)
+read = doc(JSON.stringify({ items: ['inkblot.format.font', 'inkblot.insert.conversation'], known: ids.filter((id) => id !== 'inkblot.insert.note') }))
+ok('Add Note reaches a layout saved before it existed', read.items.includes('inkblot.insert.note'))
 
 ok('a display mode reads back', L.normalizeDisplayMode('label') === 'label')
 ok('an unknown display mode is icon only', L.normalizeDisplayMode('huge') === 'icon' && L.normalizeDisplayMode(null) === 'icon')

@@ -10,10 +10,10 @@ import WeekdayToggles from './WeekdayToggles.jsx'
 const hourLabel = (hour) => new Date(2023, 0, 1, hour).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 const HOURS = Array.from({ length: 24 }, (_, hour) => ({ value: String(hour), label: hourLabel(hour) }))
 const ADD = [
-  { value: '', label: 'Add Reminder…', disabled: true },
-  { value: 'write', label: 'Time to Write' },
-  { value: 'goalNudge', label: 'Goal Not Met Yet' },
-  { value: 'streakAtRisk', label: 'Streak at Risk' },
+  { value: '', label: 'Add reminder…', disabled: true },
+  { value: 'write', label: 'Time to write' },
+  { value: 'goalNudge', label: 'Goal not met yet' },
+  { value: 'streakAtRisk', label: 'Streak at risk' },
 ]
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -34,7 +34,7 @@ function ReminderRow({ reminder, onChange, onDelete }) {
             if (Number.isFinite(hour) && Number.isFinite(minute)) change({ hour, minute })
           }}
         />
-        <IconButton symbol="trash" label="Delete Reminder" size="capsule" iconSize={12} onClick={onDelete} />
+        <IconButton icon="delete" label="Delete reminder" size="capsule" onClick={onDelete} />
       </div>
       <WeekdayToggles value={reminder.weekdays} onChange={(weekdays) => change({ weekdays })} />
       <input className="settings-input" aria-label="Message" placeholder="Inkblot’s own words" value={reminder.message} onChange={(event) => change({ message: event.target.value })} />
@@ -59,7 +59,7 @@ export default function RemindersPane({ stats }) {
           />
         ))}
         <div className="settings-actions">
-          <SelectMenu label="Add Reminder" value="" options={ADD} onChange={(kind) => {
+          <SelectMenu label="Add reminder" value="" options={ADD} onChange={(kind) => {
             if (!kind) return
             save({ ...config, reminders: [...config.reminders, newReminder(kind)] })
             requestNotificationPermission()

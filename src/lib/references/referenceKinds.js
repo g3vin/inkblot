@@ -51,17 +51,17 @@ export const CONTRIBUTOR_ROLES = [
   { id: 'curator', label: 'Curator' },
 ]
 
-const kind = (id, label, group, symbol, csl, roles, fields, defaults = {}) => ({ id, label, group, symbol, csl, roles, fields, defaults })
+const kind = (id, label, group, icon, csl, roles, fields, defaults = {}) => ({ id, label, group, icon, csl, roles, fields, defaults })
 
 export const REFERENCE_KINDS = [
   /* ---------------- web ---------------- */
   kind('webpage', 'Web page', 'Web', 'globe', 'webpage', ['author', 'editor'], [
     TITLE, req(text('container-title', 'Website name')), PUBLISHER, ISSUED, req(URL_FIELD), ACCESSED,
   ]),
-  kind('blogPost', 'Blog post', 'Web', 'text.bubble', 'post-weblog', ['author'], [
+  kind('blogPost', 'Blog post', 'Web', 'comment', 'post-weblog', ['author'], [
     TITLE, req(text('container-title', 'Blog name')), req(ISSUED), req(URL_FIELD), ACCESSED,
   ]),
-  kind('socialPost', 'Social media post', 'Web', 'bubble.left.and.text.bubble.right', 'post', ['author'], [
+  kind('socialPost', 'Social media post', 'Web', 'chats', 'post', ['author'], [
     req(text('title', 'Post text', 'The first 20 words of the post')), req(text('container-title', 'Platform', 'Instagram, X, Reddit…')),
     GENRE, req(ISSUED), req(URL_FIELD), ACCESSED,
   ]),
@@ -77,52 +77,52 @@ export const REFERENCE_KINDS = [
   ], { genre: 'Press release' }),
 
   /* ---------------- books ---------------- */
-  kind('book', 'Book', 'Books', 'book.closed', 'book', ['author', 'editor', 'translator'], [
+  kind('book', 'Book', 'Books', 'book-closed', 'book', ['author', 'editor', 'translator'], [
     TITLE, EDITION, VOLUME, text('collection-title', 'Series'), req(PUBLISHER), PLACE, req(ISSUED),
     ISBN, DOI, URL_FIELD, text('number-of-pages', 'Number of pages'),
   ]),
-  kind('editedBook', 'Edited book', 'Books', 'books.vertical', 'book', ['editor', 'author', 'translator'], [
+  kind('editedBook', 'Edited book', 'Books', 'books', 'book', ['editor', 'author', 'translator'], [
     TITLE, EDITION, VOLUME, req(PUBLISHER), PLACE, req(ISSUED), ISBN, DOI, URL_FIELD,
   ]),
-  kind('ebook', 'E-book', 'Books', 'book.pages', 'book', ['author', 'editor', 'translator'], [
+  kind('ebook', 'E-book', 'Books', 'book-pages', 'book', ['author', 'editor', 'translator'], [
     TITLE, EDITION, req(PUBLISHER), req(ISSUED), text('medium', 'Format', 'Kindle, EPUB'), ISBN, DOI, URL_FIELD,
   ]),
   kind('chapter', 'Book chapter', 'Books', 'book', 'chapter', ['author', 'editor', 'container-author', 'translator'], [
     req(text('title', 'Chapter title')), req(text('container-title', 'Book title')), req(PAGES), EDITION,
     req(PUBLISHER), PLACE, req(ISSUED), ISBN, DOI,
   ]),
-  kind('encyclopediaEntry', 'Encyclopedia or dictionary entry', 'Books', 'character.book.closed', 'entry-encyclopedia', ['author', 'editor'], [
+  kind('encyclopediaEntry', 'Encyclopedia or dictionary entry', 'Books', 'dictionary', 'entry-encyclopedia', ['author', 'editor'], [
     req(text('title', 'Entry')), req(text('container-title', 'Encyclopedia or dictionary')), EDITION, PUBLISHER,
     ISSUED, URL_FIELD, ACCESSED,
   ]),
 
   /* ---------------- academic ---------------- */
-  kind('journalArticle', 'Journal article', 'Academic', 'doc.text', 'article-journal', ['author'], [
+  kind('journalArticle', 'Journal article', 'Academic', 'document', 'article-journal', ['author'], [
     TITLE, req(text('container-title', 'Journal')), req(VOLUME), ISSUE, req(PAGES), req(ISSUED), DOI, URL_FIELD, ABSTRACT,
   ]),
-  kind('conferencePaper', 'Conference paper', 'Academic', 'person.3', 'paper-conference', ['author', 'editor'], [
+  kind('conferencePaper', 'Conference paper', 'Academic', 'users', 'paper-conference', ['author', 'editor'], [
     TITLE, text('container-title', 'Proceedings title'), req(text('event-title', 'Conference')), text('event-place', 'Conference location'),
     PAGES, PUBLISHER, req(ISSUED), DOI, URL_FIELD,
   ]),
-  kind('thesis', 'Thesis or dissertation', 'Academic', 'graduationcap', 'thesis', ['author'], [
+  kind('thesis', 'Thesis or dissertation', 'Academic', 'graduation', 'thesis', ['author'], [
     TITLE, req(text('genre', 'Type', 'Doctoral dissertation, Master’s thesis')), req(text('publisher', 'University')),
     PLACE, req(ISSUED), text('number', 'Publication number'), text('archive', 'Database', 'ProQuest Dissertations & Theses'), URL_FIELD,
   ]),
-  kind('report', 'Report', 'Academic', 'doc.richtext', 'report', ['author', 'editor'], [
+  kind('report', 'Report', 'Academic', 'article', 'report', ['author', 'editor'], [
     TITLE, text('number', 'Report number'), req(text('publisher', 'Institution')), PLACE, req(ISSUED), DOI, URL_FIELD,
   ]),
-  kind('governmentDocument', 'Government document', 'Academic', 'building.columns', 'report', ['author'], [
+  kind('governmentDocument', 'Government document', 'Academic', 'government', 'report', ['author'], [
     TITLE, req(text('publisher', 'Agency')), text('number', 'Document number'), PLACE, req(ISSUED), URL_FIELD, ACCESSED,
   ]),
-  kind('preprint', 'Preprint', 'Academic', 'doc.badge.clock', 'article', ['author'], [
+  kind('preprint', 'Preprint', 'Academic', 'file-clock', 'article', ['author'], [
     TITLE, req(text('publisher', 'Repository', 'arXiv, SSRN, bioRxiv')), text('number', 'Identifier'), req(ISSUED), DOI, URL_FIELD,
   ]),
-  kind('dataset', 'Dataset', 'Academic', 'tablecells', 'dataset', ['author'], [
+  kind('dataset', 'Dataset', 'Academic', 'table', 'dataset', ['author'], [
     TITLE, req(text('publisher', 'Publisher or repository')), text('version', 'Version'), MEDIUM, req(ISSUED), DOI, URL_FIELD, ACCESSED,
   ]),
 
   /* ---------------- media ---------------- */
-  kind('video', 'Online video', 'Media', 'play.rectangle', 'motion_picture', ['author', 'director'], [
+  kind('video', 'Online video', 'Media', 'video', 'motion_picture', ['author', 'director'], [
     TITLE, req(text('container-title', 'Platform', 'YouTube, Vimeo')), text('dimensions', 'Length', '12:34'),
     req(ISSUED), req(URL_FIELD), ACCESSED,
   ], { medium: 'Video' }),
@@ -133,14 +133,14 @@ export const REFERENCE_KINDS = [
     req(text('title', 'Episode title')), req(text('container-title', 'Series')), text('volume', 'Season'), text('number', 'Episode'),
     req(text('publisher', 'Network or studio')), req(ISSUED), URL_FIELD,
   ], { genre: 'TV series episode' }),
-  kind('podcast', 'Podcast episode', 'Media', 'mic', 'broadcast', ['host', 'guest', 'executive-producer'], [
+  kind('podcast', 'Podcast episode', 'Media', 'dictate', 'broadcast', ['host', 'guest', 'executive-producer'], [
     req(text('title', 'Episode title')), req(text('container-title', 'Podcast')), text('number', 'Episode'),
     text('publisher', 'Production company'), req(ISSUED), URL_FIELD,
   ], { genre: 'Audio podcast episode' }),
-  kind('music', 'Song or album', 'Media', 'music.note', 'song', ['composer', 'performer', 'author'], [
+  kind('music', 'Song or album', 'Media', 'music', 'song', ['composer', 'performer', 'author'], [
     TITLE, text('container-title', 'Album'), req(text('publisher', 'Label')), req(ISSUED), MEDIUM, URL_FIELD,
   ]),
-  kind('artwork', 'Artwork or image', 'Media', 'photo.artframe', 'graphic', ['author', 'illustrator', 'curator'], [
+  kind('artwork', 'Artwork or image', 'Media', 'artwork', 'graphic', ['author', 'illustrator', 'curator'], [
     TITLE, ISSUED, text('medium', 'Medium', 'Oil on canvas'), text('dimensions', 'Dimensions'), text('archive', 'Museum or collection'),
     text('archive-place', 'Location'), URL_FIELD, ACCESSED,
   ]),
@@ -149,34 +149,34 @@ export const REFERENCE_KINDS = [
   ]),
 
   /* ---------------- legal ---------------- */
-  kind('legalCase', 'Court case', 'Legal', 'scalemass', 'legal_case', ['author'], [
+  kind('legalCase', 'Court case', 'Legal', 'scales', 'legal_case', ['author'], [
     req(text('title', 'Case name', 'Brown v. Board of Education')), text('container-title', 'Reporter', 'U.S.'), VOLUME,
     text('page', 'First page'), req(text('authority', 'Court')), text('number', 'Docket number'), req(ISSUED), URL_FIELD,
   ]),
-  kind('statute', 'Statute or bill', 'Legal', 'text.book.closed', 'legislation', ['author'], [
+  kind('statute', 'Statute or bill', 'Legal', 'statute', 'legislation', ['author'], [
     TITLE, text('container-title', 'Code', 'U.S.C.'), text('section', 'Section'), text('number', 'Public law number'), req(ISSUED), URL_FIELD,
   ]),
-  kind('patent', 'Patent', 'Legal', 'lightbulb', 'patent', ['author'], [
+  kind('patent', 'Patent', 'Legal', 'idea', 'patent', ['author'], [
     TITLE, req(text('number', 'Patent number')), req(text('authority', 'Issued by', 'U.S. Patent and Trademark Office')), req(ISSUED), URL_FIELD,
   ]),
-  kind('standard', 'Standard', 'Legal', 'checkmark.seal', 'standard', ['author'], [
+  kind('standard', 'Standard', 'Legal', 'verified', 'standard', ['author'], [
     TITLE, req(text('number', 'Standard number', 'ISO 8601:2019')), req(text('publisher', 'Organization')), req(ISSUED), URL_FIELD,
   ]),
 
   /* ---------------- other ---------------- */
-  kind('software', 'Software', 'Other', 'app.badge', 'software', ['author'], [
+  kind('software', 'Software', 'Other', 'app', 'software', ['author'], [
     TITLE, text('version', 'Version'), PUBLISHER, req(ISSUED), text('medium', 'Platform'), req(URL_FIELD), DOI,
   ]),
-  kind('interview', 'Interview', 'Other', 'person.2.wave.2', 'interview', ['author', 'interviewer'], [
+  kind('interview', 'Interview', 'Other', 'interview', 'interview', ['author', 'interviewer'], [
     text('title', 'Title'), text('container-title', 'Published in'), MEDIUM, req(ISSUED), URL_FIELD,
   ], { medium: 'Interview' }),
-  kind('speech', 'Speech or lecture', 'Other', 'person.wave.2', 'speech', ['author'], [
+  kind('speech', 'Speech or lecture', 'Other', 'speech', 'speech', ['author'], [
     TITLE, req(text('event-title', 'Event')), text('event-place', 'Place'), GENRE, req(ISSUED), URL_FIELD,
   ], { genre: 'Lecture' }),
   kind('personalCommunication', 'Personal communication or email', 'Other', 'envelope', 'personal_communication', ['author', 'recipient'], [
     text('title', 'Subject'), text('genre', 'Type', 'Email, letter, conversation'), req(ISSUED),
   ], { genre: 'Email' }),
-  kind('manuscript', 'Archival document or manuscript', 'Other', 'archivebox', 'manuscript', ['author'], [
+  kind('manuscript', 'Archival document or manuscript', 'Other', 'archive', 'manuscript', ['author'], [
     TITLE, GENRE, ISSUED, req(text('archive', 'Archive')), text('archive_location', 'Location in archive', 'Box 3, Folder 12'),
     text('archive-place', 'Archive location'), URL_FIELD,
   ]),
@@ -231,6 +231,6 @@ export const missingFields = (kindId, fields = {}) => kindSpec(kindId).fields
   .map((field) => field.key)
 
 /** The schema as the shell receives it (`ReferenceSchema`), styles added by the caller. */
-export const publishedKinds = () => REFERENCE_KINDS.map(({ id, label, group, symbol, roles, fields }) => ({
-  id, label, group, symbol, roles, fields,
+export const publishedKinds = () => REFERENCE_KINDS.map(({ id, label, group, icon, roles, fields }) => ({
+  id, label, group, icon, roles, fields,
 }))

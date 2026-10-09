@@ -77,19 +77,23 @@ capitalised like any other name.
 whimsical, nostalgic or themed. We never use paper textures, typewriter sound effects
 or coffee stains.
 
-**The mark.** A lowercase *i* whose dot is an ink spray: a rounded stem, and above it
-a splash with fingers and droplets flung up and to the right. The spray isn't drawn by
-hand. It comes from a simplified model of an ink drop hitting paper
+**The mark.** The monogram "ib" in Literata ExtraBold (the editor's face), set tight,
+with the *i*'s dot replaced by an ink splash: a round blot with a few droplets flung up
+and to the right. The splash sits just above the stem, nudged a little left so it
+clears the *b*'s ascender. Neither part is drawn by hand. The letters are the font's
+outlines, and the splash comes from a simplified model of an ink drop hitting paper
 ([`docs/brand/generator/`](brand/generator/)): impact angle, rim fingering and
 satellite droplets. Regenerate it there and never redraw it by hand.
 
-**The wordmark.** The mark's own *i* (the same rounded stem and spray), set at Courier
-Prime Bold's x-height and spacing, followed by "nkblot" in Courier Prime Bold. The *i*
-is never Courier's own letterform: the mark and the wordmark must match.
+**The wordmark.** "inkblot" in Courier Prime Bold, its *i* dotted with the same
+splash. The mark and the wordmark share that splash, so never swap it for Courier's
+own round dot.
 
-**The app icon.** The black mark on a white rounded tile. The stem sits on the tile's
-vertical centre line and the ink is optically centred (a hair above the middle). The
-same artwork is the favicon and the desktop and iOS icons.
+**The app icon.** The black mark on a white rounded tile, filling about two thirds of
+it. It is centred optically, not by its box: the heavy letters sit low and the light
+splash high, so the generator places the point halfway between the ink's box centre
+and its centre of weight a hair above the tile's middle. The same artwork is the
+favicon and the desktop and iOS icons.
 
 **Colour.** The logo is **black on white**, in every theme.
 
@@ -107,7 +111,7 @@ draw inline in `currentColor`, so they follow the surface. Standalone files are 
 `src/assets/brand/` (`mark.svg`, `wordmark.svg`, `app-icon.svg`) and
 `public/favicon.svg`.
 
-**Clear space and size.** Keep clear space of at least the spray's width around the
+**Clear space and size.** Keep clear space of at least the splash's width around the
 mark (half the wordmark's height around the wordmark). The mark is legible from 16px
 and the wordmark from 72px wide; below that, use the mark alone.
 
@@ -116,8 +120,8 @@ choice: Ink Blue by default, or one of five other inks. It marks interactive sta
 (selection, focus, primary buttons, the active tab).
 
 **Don't** recolour the logo, add effects (shadows, gradients, glass), stretch it,
-redraw the spray, swap the wordmark's *i* for a typed letter, or set the name in any
-face other than Courier Prime.
+redraw the splash, give either *i* a plain round dot, re-space the monogram, or set
+the name in any face other than Courier Prime.
 
 ---
 
@@ -346,7 +350,8 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 |---|---|---|
 | `Mark`, `Wordmark`, `AppIcon` | The logo, wherever the brand appears | Black on white; see §2. Draw in `currentColor` |
 | `Button` | Any text action | `variant`: `filled` (the one primary action per view), `tinted` (a normal action that needs weight), `plain` (default: quiet actions in chrome and rows), `destructive` (confirm or offer undo). `size`: `capsule` (default), `circle`, `toolbar` |
-| `IconButton` | Icon-only actions | `label` is required and becomes the tooltip and accessible name. Glyph from `icon` (semantic name, preferred) or `symbol` (SF-style name). `display` shows the label under or instead of the icon in customisable toolbars. `filled` + `aria-pressed` for toggles |
+| `IconButton` | Icon-only actions | `label` is required and becomes the tooltip and accessible name. Glyph from `icon`, a semantic name. `display` shows the label under or instead of the icon in customisable toolbars. `filled` + `aria-pressed` for toggles |
+| `iconElement` | An icon in code that builds DOM by hand (TipTap node views) | `iconElement('add')` returns the same glyph `Icon` draws, as an `<svg>` element |
 | `Tooltip` | Naming a control in a richer way than `title` | Short, no period, after a 500ms delay, with an optional shortcut. Never holds anything a user must read to succeed |
 | `Kbd` | Showing a shortcut | Courier Prime |
 | `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in. `danger` items go last, after a separator |
@@ -388,7 +393,10 @@ of these levels, and is always also in the command palette:
 1. **On the surface.** Only what almost every writer needs almost every session: bold,
    italic, headings, lists, add note, undo. The default toolbar stays short.
 2. **One click away.** A "More" `Menu` at the end of the toolbar or panel, and the
-   right-click context menu. Put the less-frequent but still general tools here.
+   right-click context menu. Put the less-frequent but still general tools here. In a
+   customisable toolbar, the `MORE` marker (`src/lib/chromeLayout.ts`) splits the
+   layout: items before it sit on the surface, items after it live behind ». Writers
+   move the marker in Customize toolbar.
 3. **In an inspector panel.** Deep, stateful tools a professional keeps open: history,
    references, print setup, script reports, map layers.
 4. **Always: the command palette (⌘K).** Every action, searchable by name and by the
@@ -483,17 +491,21 @@ FABs are 44px).
 ## 14. Guardrails
 
 - **`npm run lint:design`** (in CI) flags raw colours (including those inside shadows
-  and gradients), font families and px radii outside `tokens.css` and `palette.ts`. The code base predates the design
-  language, so existing findings are baselined per file in
-  `scripts/design-baseline.json`. A file may never gain findings, and a new file starts
-  at zero. When you migrate a surface, run
-  `npm run lint:design -- --update-baseline` to lock in the lower count. `--list` prints
-  every finding.
+  and gradients), font families and px radii outside `tokens.css` and `palette.ts`. The
+  app is at zero findings, and `scripts/design-baseline.json` is empty, so any new raw
+  value fails. `--list` prints every finding.
+- **Content is exempt, chrome is not.** A few files describe things the writer makes
+  rather than the app's chrome, and keep their own literal values: exported and
+  printed files (`src/print/export/`, the page model in `src/print/*.ts`), map worlds
+  and map themes (`src/lib/map/`, `src/map/mapThemes.css`), the conversation tile's
+  looks (`src/extensions/conversationStyles.ts`) and generated types (`src/types/`).
+  The list lives in `IGNORED` in `scripts/lint-design.mjs`. Add to it only for content
+  of that kind, never to get chrome past the check.
 - **`tests/unit/css.mjs`** (in `npm test`) keeps surfaces flat: a gradient only where it
   does a job (listed by selector: the titlebar fade, `FadeScrim`, the canvas grid, …),
   every `backdrop-filter` is `var(--blur-over-page)`, no OS colour-scheme media queries,
-  and the radius scale is 4/8/12. **`tests/unit/icons.mjs`** checks that every SF-style
-  icon name in `src/` resolves to a registered icon.
+  and the radius scale is 4/8/12. **`tests/unit/icons.mjs`** checks that every icon
+  name in `src/` is registered.
 - **The showcase** (`?design` in dev) shows every token and component in both themes.
   Check your change there and in the real surface, in light *and* dark.
 - **Review checklist for any UI change:**
@@ -509,41 +521,21 @@ FABs are 44px).
 
 ## 15. Migration
 
-The foundation is in place: tokens, fonts, icons, palette, primitives and the command
-palette. Existing surfaces are moved onto it one PR at a time, in this order:
+Every surface is on the design language: tokens, `src/ui` primitives, `Icon` with
+semantic names, sentence-case copy and commands in the palette. The legacy layer is
+gone: the component aliases in `tokens.css`, the shared menu rule and bare-`<button>`
+defaults in `base.css` (the bare button is now a reset), `SFIcon` and its name table,
+and the `system_accent_color` command.
 
-1. App shell: titlebar and the customisable toolbars (`components/toolbar/`), tab bar
-   (`components/tabs/`), left sidebar, file tree and Book navigator (`components/tree/`,
-   `components/book/`), the project picker / welcome window
-2. Editor: the default toolbar set reduced to essentials, with the rest behind the
-   toolbar's » overflow; context menus
-3. Inspector: workbench tiles, history, clipboard, archive, search, references, map,
-   Typeset and Print & Export panels (`components/RightSidebar/`)
-4. Settings and stats (`components/settings/`, `components/stats/`), notes and the
-   bubble editor (`components/bubble/`)
-5. Canvas
-6. Map
-7. Print Layout and page setup
-8. Script
-9. Extensions: conversation tile (with its Brand / iMessage / Generic style switch),
-   citations, image tools
+The conversation tile has a Brand / iMessage / Generic style switch, stored as the
+node's `style` attribute. New tiles start in Brand; tiles saved before the switch read
+as iMessage so they look as they did.
 
-**Migrating a surface:**
+**When you touch older code:**
 
-- Replace ad-hoc buttons, menus and dialogs with `src/ui` components.
-- Replace literals with tokens, and replace `SFIcon` with `Icon` and semantic names.
-- Rewrite copy to §11.
-- Register the surface's actions with `useCommands`.
-- Lower its `lint:design` baseline.
-
-**Legacy to remove as surfaces migrate:**
-
-- The component aliases at the bottom of `tokens.css` (`--landing-*`, `--sidebar-*`,
-  `--focus-mode-*`, `--floating-note-*`, `--tile-color`, `--color-white/black`).
-- `src/components/SFIcon.jsx` and `src/components/sfIconNames.js`, the SF-name alias
-  onto `Icon` (also behind `IconButton`'s `symbol` prop).
-- The shared legacy menu rule at the bottom of `base.css`.
-- The bare-`<button>` defaults in `base.css`.
+- Replace a one-off button, menu or dialog you meet with its `src/ui` component.
+- Keep new values on tokens. `lint:design` holds the line at zero.
+- Write new copy to §11 and register new actions with `useCommands`.
 
 ---
 

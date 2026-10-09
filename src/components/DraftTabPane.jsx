@@ -8,12 +8,12 @@
  * on its own. Once created, the tab adopts the new document (see Editor.jsx).
  */
 import { useState } from 'react'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { DOCUMENT_KINDS as KINDS } from '../lib/createDocument'
-import { createDraftDocument, DraftRefusal } from '../lib/draftDocument'
+import { createDraftDocument, DraftRefusal, takeDraftKind } from '../lib/draftDocument'
 
 export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
-  const [kind, setKind] = useState('doc')
+  const [kind, setKind] = useState(() => takeDraftKind() ?? 'doc')
   const [name, setName] = useState('')
   const [status, setStatus] = useState('')
   const [creating, setCreating] = useState(false)
@@ -54,7 +54,7 @@ export default function DraftTabPane({ projectName, onCreated, refreshFiles }) {
               }}
               aria-pressed={kind === option.id}
             >
-              <SFIcon name={option.icon} size={22} strokeWidth={1.2} />
+              <Icon name={option.icon} size={20} />
               <span className="draft-pane-kind-label">{option.label}</span>
               <span className="draft-pane-kind-hint">{option.hint}</span>
             </button>

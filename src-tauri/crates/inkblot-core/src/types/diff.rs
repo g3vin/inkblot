@@ -148,7 +148,7 @@ pub struct VersionRow {
     pub auto: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
-    /// `hsl(…)`, the same hue the page's timeline gives this session.
+    /// `var(--ink-…)`, the same ink the page's timeline gives this session.
     pub session_color: String,
     pub delta: WordDelta,
     /// A text version's change against its predecessor, trimmed to a readable snippet:

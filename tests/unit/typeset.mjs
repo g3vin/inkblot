@@ -503,7 +503,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   book = design.editCovers(book, { action: 'add', newId: 'n1' })
   ok('a new version joins the book’s old cover, and is the one in use', book.covers.length === 2 && book.activeCover === 'n1' && !book.coverImage)
   book = design.editCovers(book, { action: 'duplicate', id: 'cover', newId: 'n2' })
-  ok('a copy is named as one', book.covers.find((c) => c.id === 'n2').name === 'Cover Copy' && book.coverImage === 'old.jpg')
+  ok('a copy is named as one', book.covers.find((c) => c.id === 'n2').name === 'Cover copy' && book.coverImage === 'old.jpg')
   book = design.editCovers(book, { action: 'rename', id: 'n2', name: 'Hardcover', newId: 'x' })
   book = design.editCovers(book, { action: 'setFit', id: 'n2', fit: 'stretch', newId: 'x' })
   book = design.editCovers(book, { action: 'delete', id: 'n2', newId: 'x' })
@@ -871,7 +871,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   book = ed.editEditions(book, { action: 'add', kind: 'largePrint', newId: 'lp' })
   const lp = book.editions[0]
   ok('a large-print edition is 16 pt, loosely leaded, ragged, unhyphenated, and being typeset',
-    lp.name === 'Large Print' && lp.pageSetup.typography.fontSizePt === 16 && lp.pageSetup.typography.alignment === 'left' && !lp.pageSetup.typography.hyphenate && book.activeEdition === 'lp')
+    lp.name === 'Large print' && lp.pageSetup.typography.fontSizePt === 16 && lp.pageSetup.typography.alignment === 'left' && !lp.pageSetup.typography.hyphenate && book.activeEdition === 'lp')
   ok('…and the book as set up is as it was', book.pageSetup.typography.fontSizePt === 11)
   book = ed.editEditions(book, { action: 'add', kind: 'hardcover', newId: 'hc' })
   ok('a hardcover’s inside margin is wider, for its binding', Math.abs(book.editions[1].pageSetup.margins.insideMm - (base.margins.insideMm + 3.175)) < 1e-9)
@@ -892,7 +892,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
     !ed.routeToEdition({ ...book, activeEdition: 'eb' }, { ...ed.effectiveBook({ ...book, activeEdition: 'eb' }), title: 'X' }).editions[2].pageSetup && renamed.editions[1].pageSetup === book.editions[1].pageSetup)
 
   book = ed.editEditions(book, { action: 'duplicate', id: 'lp', newId: 'lp2' })
-  ok('a copy is named as one, and typeset', book.editions.at(-1).name === 'Large Print Copy' && book.activeEdition === 'lp2')
+  ok('a copy is named as one, and typeset', book.editions.at(-1).name === 'Large print copy' && book.activeEdition === 'lp2')
   book = ed.editEditions(book, { action: 'delete', id: 'lp2', newId: 'x' })
   ok('deleting the one typeset goes back to the book as set up', !book.activeEdition && book.editions.length === 3)
   book = ed.editEditions(book, { action: 'fromTypesetVersion', id: 'v9', name: 'Proof 2', versionBook: { pageSetup: { ...base, widthMm: 140 }, activeCover: 'v2' }, newId: 'fv' })
@@ -902,7 +902,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   // Through the store: what is shown, and where an edit goes.
   const P = 'Editions'
   await booksSettled(P)
-  store.setStoredBook(P, 'Novel', { title: 'Stored', pageSetup: base, editions: [{ id: 'lp', name: 'Large Print', kind: 'largePrint', pageSetup: lp.pageSetup }], activeEdition: 'lp' })
+  store.setStoredBook(P, 'Novel', { title: 'Stored', pageSetup: base, editions: [{ id: 'lp', name: 'Large print', kind: 'largePrint', pageSetup: lp.pageSetup }], activeEdition: 'lp' })
   const got = store.getBookSettings(P, 'Novel')
   ok('the store shows the book as the edition typeset sets it', got.pageSetup.typography.fontSizePt === 16 && got.editions.length === 1)
   store.setBookSettings(P, 'Novel', { ...got, pageSetup: { ...got.pageSetup, typography: { ...got.pageSetup.typography, fontSizePt: 18 } } })

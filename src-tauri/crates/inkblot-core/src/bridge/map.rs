@@ -281,9 +281,9 @@ pub struct MapPanelButton {
     pub label: String,
     pub role: MapButtonRole,
     pub disabled: bool,
-    /// An SF Symbol name, for a button that shows one.
+    /// A semantic icon name (src/ui/icons.js), for a button that shows one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub symbol: Option<String>,
+    pub icon: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub help: Option<String>,
 }

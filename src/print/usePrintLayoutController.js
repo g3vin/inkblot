@@ -91,14 +91,14 @@ import { actualSizeZoom } from './zoom'
 
 /** The tokens a running head or foot can hold, for the inspector's token menu. */
 export const RUNNING_TOKENS = [
-  { token: '{page}', label: 'Page Number' },
-  { token: '{pages}', label: 'Page Count' },
+  { token: '{page}', label: 'Page number' },
+  { token: '{pages}', label: 'Page count' },
   { token: '{title}', label: 'Title' },
   { token: '{chapter}', label: 'Chapter' },
   { token: '{author}', label: 'Author' },
-  { token: '{surname}', label: 'Author’s Surname' },
-  { token: '{words}', label: 'Word Count' },
-  { token: '{date}', label: 'Today’s Date' },
+  { token: '{surname}', label: 'Author’s surname' },
+  { token: '{words}', label: 'Word count' },
+  { token: '{date}', label: 'Today’s date' },
 ]
 
 export const PAGE_LAYOUT_CATALOG = {

@@ -22,12 +22,12 @@ export function timerMenuItems(stats) {
   const timer = stats.timer
   return [
     primaryTimerAction(stats),
-    { text: 'Skip to Next Segment', enabled: timer.state === 'running' || timer.state === 'paused', action: () => timer.skip() },
+    { text: 'Skip to next segment', enabled: timer.state === 'running' || timer.state === 'paused', action: () => timer.skip() },
     { text: 'Stop', enabled: timer.isActive, action: () => timer.stop() },
     { separator: true },
-    { text: 'Start Routine', items: allRoutines(stats.config).map((routine) => ({ text: routine.name, action: () => stats.startTimer(routine) })) },
+    { text: 'Start routine', items: allRoutines(stats.config).map((routine) => ({ text: routine.name, action: () => stats.startTimer(routine) })) },
     { separator: true },
-    { text: 'Show in Stats', action: () => stats.showStats() },
-    { text: 'Edit Routines…', action: () => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS, { detail: { pane: 'timers' } })) },
+    { text: 'Show in stats', action: () => stats.showStats() },
+    { text: 'Edit routines…', action: () => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS, { detail: { pane: 'timers' } })) },
   ]
 }

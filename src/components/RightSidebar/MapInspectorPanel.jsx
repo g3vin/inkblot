@@ -7,7 +7,7 @@ import { useMemo } from 'react'
 import { useLatestBridgeState } from '../../bridge'
 import { mapPanelCommands } from '../../map/mapPanelCommands'
 import MapPanelView from '../../map/MapPanelView'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 
 const NO_MAP = {}
 
@@ -19,7 +19,7 @@ export default function MapInspectorPanel() {
   if (!state?.panel) {
     return (
       <div className="inspector-placeholder">
-        <SFIcon name="map" size={22} />
+        <Icon name="map" size={20} />
         <span>Open a map to see its places, routes and layers here.</span>
       </div>
     )

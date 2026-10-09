@@ -12,15 +12,15 @@
 }
 
 .clipboard-panel.drop-active {
-  outline: 1px dashed #4b87bb;
+  outline: 1px dashed var(--accent-border);
   outline-offset: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .clipboard-panel.drop-active .clipboard-list {
-  outline: 1px dashed #4b87bb;
+  outline: 1px dashed var(--accent-border);
   outline-offset: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .clipboard-list {
@@ -43,8 +43,8 @@
   justify-content: center;
   text-align: center;
   padding: 16px;
-  border: 1px dashed rgba(75, 135, 187, 0.22);
-  border-radius: 12px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
 }
 
 .clipboard-item {

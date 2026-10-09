@@ -121,7 +121,7 @@
 /* The empty line the cursor is on says what it is (ScriptElement.ts sets the label). */
 .ProseMirror.is-script .script-el[data-placeholder]::before {
   content: attr(data-placeholder);
-  color: var(--text-tertiary, #9a9a9a);
+  color: var(--text-subtle);
   pointer-events: none;
   float: left;
   height: 0;
@@ -129,7 +129,7 @@
 
 /* SmartType's offer: the rest of a name or a heading, in grey, until it is taken. */
 .script-ghost {
-  color: var(--text-tertiary, #9a9a9a);
+  color: var(--text-subtle);
   pointer-events: none;
 }
 
@@ -193,7 +193,7 @@
 /* ---- an actor's copy (printJob.js): one character's speeches marked, name and lines ---- */
 
 .script-el.is-highlighted {
-  background: #fff0a0;
+  background: var(--print-highlight);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }

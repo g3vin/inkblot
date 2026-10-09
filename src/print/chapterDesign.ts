@@ -125,7 +125,7 @@ export const editCovers = <B extends Partial<BookSettings>>(
   switch (action) {
     case 'add': return withCovers(book, [...covers, { id: newId, name: unique(name?.trim() || 'Cover'), fit: CoverFit.Fill }], newId)
     case 'duplicate':
-      return target ? withCovers(book, [...covers, { ...target, id: newId, name: unique(`${target.name} Copy`) }], newId) : book
+      return target ? withCovers(book, [...covers, { ...target, id: newId, name: unique(`${target.name} copy`) }], newId) : book
     case 'rename':
       return target && name?.trim() ? withCovers(book, covers.map((c) => (c === target ? { ...c, name: name.trim() } : c)), activeCover) : book
     case 'delete': {

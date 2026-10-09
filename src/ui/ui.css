@@ -3,6 +3,14 @@
  * comes from src/index.css, so a control looks the same wherever it is used.
  */
 
+/* ---------- Icon ---------- */
+
+.ib-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+
 /* ---------- Button ---------- */
 
 .ui-button {

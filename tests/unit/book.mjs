@@ -25,7 +25,7 @@ ok('a drop past the end has nothing after it', moveTarget(['a', 'b', 'c'], 'a', 
 const menu = addMenu([{ id: 'x', generated: 'contents' }])
 ok('the + menu offers a generated page once', menu[0].items.find((i) => i.text === 'Contents').enabled === false && menu[0].items.find((i) => i.text === 'Title Page').enabled === true)
 ok('a chapter’s menu has its type; a page of the book’s own can be renamed',
-  rowMenu({ id: 'c', kind: 'chapter', hidden: false }, {}).some((i) => i.text === 'Chapter Type')
+  rowMenu({ id: 'c', kind: 'chapter', hidden: false }, {}).some((i) => i.text === 'Chapter type')
   && rowMenu({ id: 'm', kind: 'matter', hidden: false }, {}).some((i) => i.text === 'Rename…'))
 
 const commands = []
@@ -47,7 +47,7 @@ await act(async () => {
   await wait(40)
 })
 const text = document.body.textContent
-ok('the sections, in the book’s order', text.indexOf('Front Matter') < text.indexOf('Dedication') && text.indexOf('Chapters') < text.indexOf('Chapter 1') && text.indexOf('Back Matter') < text.indexOf('Acknowledgements'))
+ok('the sections, in the book’s order', text.indexOf('Front matter') < text.indexOf('Dedication') && text.indexOf('Chapters') < text.indexOf('Chapter 1') && text.indexOf('Back matter') < text.indexOf('Acknowledgements'))
 ok('the book is named at the foot', text.includes('The Novel'))
 const rows = [...document.querySelectorAll('.book-row[data-reorder-id]')]
 ok('the selected row is marked', rows.find((r) => r.dataset.reorderId === 'ch1').getAttribute('aria-selected') === 'true')

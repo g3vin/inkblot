@@ -26,18 +26,18 @@ export async function canvasMenu(ctx) {
       })
 
     items.push(
-      await MenuItem.new({ text: 'Add Card', action: () => run('add-card') }),
-      await MenuItem.new({ text: 'Add Image…', action: () => run('add-image') }),
-      await MenuItem.new({ text: 'Record Voice Memo', action: () => run('record-memo') }),
-      await MenuItem.new({ text: 'Group Selection', action: () => run('group') }),
+      await MenuItem.new({ text: 'Add card', action: () => run('add-card') }),
+      await MenuItem.new({ text: 'Add image…', action: () => run('add-image') }),
+      await MenuItem.new({ text: 'Record voice memo', action: () => run('record-memo') }),
+      await MenuItem.new({ text: 'Group selection', action: () => run('group') }),
       await MenuItem.new({ text: 'Ungroup', action: () => run('ungroup') })
     )
 
     if (onNode) {
       items.push(
         await PredefinedMenuItem.new({ item: 'Separator' }),
-        await MenuItem.new({ text: 'Bring to Front', accelerator: 'CmdOrCtrl+Shift+]', action: () => run('bring-to-front') }),
-        await MenuItem.new({ text: 'Send to Back', accelerator: 'CmdOrCtrl+Shift+[', action: () => run('send-to-back') }),
+        await MenuItem.new({ text: 'Bring to front', accelerator: 'CmdOrCtrl+Shift+]', action: () => run('bring-to-front') }),
+        await MenuItem.new({ text: 'Send to back', accelerator: 'CmdOrCtrl+Shift+[', action: () => run('send-to-back') }),
         await PredefinedMenuItem.new({ item: 'Separator' }),
         await MenuItem.new({ text: 'Delete', action: () => run('delete') })
       )
@@ -45,8 +45,8 @@ export async function canvasMenu(ctx) {
 
     items.push(
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      await MenuItem.new({ text: 'Zoom to Fit', action: () => run('zoom-to-fit') }),
-      await MenuItem.new({ text: 'Toggle Read Mode', action: () => run('toggle-lock') })
+      await MenuItem.new({ text: 'Zoom to fit', action: () => run('zoom-to-fit') }),
+      await MenuItem.new({ text: 'Toggle read mode', action: () => run('toggle-lock') })
     )
 
     const canvasMenu = await Menu.new({ items })

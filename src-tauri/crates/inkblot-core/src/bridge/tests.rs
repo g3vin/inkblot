@@ -644,7 +644,7 @@ fn map_button(id: &str, label: &str) -> MapPanelButton {
         label: label.into(),
         role: MapButtonRole::Normal,
         disabled: false,
-        symbol: None,
+        icon: None,
         help: None,
     }
 }
@@ -847,7 +847,7 @@ fn every_event() -> Vec<WebviewEvent> {
                 id: "book".into(),
                 label: "Book".into(),
                 group: "Books".into(),
-                symbol: "book.closed".into(),
+                icon: "book-closed".into(),
                 fields: vec![ReferenceFieldSpec {
                     key: "title".into(),
                     label: "Title".into(),

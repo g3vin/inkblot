@@ -24,14 +24,14 @@
   border-radius: 50%;
   margin-left: 2px;
   cursor: pointer;
-  border: 0.1px solid #444;
+  border: var(--hairline) solid var(--border-strong);
   box-shadow: none;
   transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
 }
 
 .note-marker:hover .note-dot {
   transform: scale(1.5);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 0 2px var(--app-bg);
 }
 
 .note-preview-layer {
@@ -62,7 +62,7 @@
 }
 
 .note-preview-string-path {
-  stroke: var(--note-color, #7aaef7);
+  stroke: var(--note-color, var(--note-fallback-color));
   stroke-width: 2.2;
   stroke-dasharray: 1000;
   stroke-dashoffset: 1000;
@@ -84,22 +84,20 @@
   width: 260px;
   min-height: 88px;
   padding: 12px 14px 14px;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   /*
    * Same recipe as every other card (the card recipe in src/styles/tokens.css): the whole surface
    * carries the note's colour softly, and the border carries it several shades
    * stronger.
    */
-  --card-color: var(--note-color, var(--accent-color));
+  --card-color: var(--note-color, var(--note-fallback-color));
   --card-base: var(--floating-over-page-bg);
   --card-edge-base: var(--popover-border);
 
-  /* Over the page: the one blurred surface, tinted with the note's colour. */
+  /* Floating over the page: opaque, washed with the note's colour. */
   border: 1px solid var(--card-edge);
   background: var(--card-tint);
-  -webkit-backdrop-filter: var(--blur-over-page);
-  backdrop-filter: var(--blur-over-page);
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--shadow-float);
   pointer-events: auto;
   cursor: default;
   color: var(--text-primary);
@@ -107,22 +105,22 @@
   touch-action: none;
   pointer-events: auto;
   opacity: 0;
-  transform: translateY(-8px) scale(0.94);
-  animation: note-card-pop 220ms cubic-bezier(0.2, 0.8, 0.2, 1.18) forwards;
+  transform: translateY(-4px);
+  animation: note-card-pop var(--dur-base) var(--ease-out) forwards;
   animation-delay: var(--note-reveal-delay, 0s);
 }
 
 @keyframes note-card-pop {
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 .note-preview-card.locked {
   box-shadow:
     var(--shadow-popover),
-    0 0 0 1px color-mix(in srgb, var(--note-color, #7aaef7) 18%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 18%, transparent);
 }
 
 .note-preview-header {
@@ -139,7 +137,7 @@
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--control-bg);
   color: var(--text-muted);
   cursor: pointer;
@@ -171,6 +169,7 @@
 
 .note-preview-textarea {
   min-height: 22px;
+  font-family: var(--font-editor);
   padding-right: 4px;
   margin-bottom: 8px;
   color: var(--text-primary);
@@ -207,16 +206,15 @@
   width: 18px;
   height: 18px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--note-color, var(--accent-color)) 42%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--note-color, var(--accent-color)) 18%, transparent);
-  color: color-mix(in srgb, var(--note-color, var(--accent-color)) 74%, white);
-  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--card-tint);
+  color: var(--note-color, var(--note-fallback-color));
   cursor: nwse-resize;
 }
 
 .note-preview-resize:hover {
-  background: color-mix(in srgb, var(--note-color, var(--accent-color)) 26%, transparent);
+  background: color-mix(in srgb, var(--note-color, var(--note-fallback-color)) 26%, transparent);
 }
 
 .note-branch {
@@ -241,22 +239,25 @@
   min-width: 160px;
   max-width: 220px;
   padding: 8px 11px;
-  border-radius: 12px;
-  background: var(--tile-color);
-  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  /* The card recipe (tokens.css), in the note's colour, like the note itself. */
+  --card-color: var(--note-color, var(--note-fallback-color));
+  --card-base: var(--surface-float);
+  background: var(--card-tint);
+  border: 1px solid var(--card-edge);
   color: var(--text-primary);
   font-size: 12px;
   line-height: 1.35;
   white-space: normal;
   max-height: 120px;
   overflow: auto;
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-float);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transform: translateY(-50%) scale(0.22);
   transform-origin: 12px center;
-  transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 180ms;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out), visibility 0s linear var(--dur-base);
 }
 
 .note-marker.has-preview:hover .note-dot-preview {
@@ -268,7 +269,7 @@
 }
 
 .note-range {
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   transition: background-color 140ms ease, box-shadow 140ms ease;
@@ -298,17 +299,17 @@
 .note-tile {
   --note-color: var(--note-fallback-color);
   --card-color: var(--note-color);
-  --card-base: var(--tile-color);
-  --card-edge-base: var(--sidebar-card-border);
+  --card-base: var(--surface-1);
+  --card-edge-base: var(--border-color);
 
   border: 1px solid var(--card-edge);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 12px;
   margin-bottom: 0;
   position: relative;
   cursor: pointer;
   background: var(--card-tint);
-  box-shadow: var(--sidebar-card-shadow);
+  box-shadow: none;
 }
 
 .note-tile:hover {
@@ -319,7 +320,7 @@
 }
 
 .note-tile.pinned {
-  box-shadow: var(--sidebar-card-shadow-pinned);
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 
 .note-actions {
@@ -341,7 +342,7 @@
   border: 0;
   color: var(--text-subtle);
   cursor: pointer;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   line-height: 1;
   transition: color 160ms ease, background 160ms ease;
 }
@@ -381,6 +382,7 @@
   border: none;
   color: var(--text-primary);
   padding: 0;
+  font-family: var(--font-editor);
   font-size: 13px;
   outline: none;
 
@@ -405,7 +407,7 @@
 .note-image-card {
   position: relative;
   margin: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-muted);
   background: var(--control-bg);
@@ -428,7 +430,7 @@
   height: 22px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--popover-bg) 72%, transparent);
   color: var(--text-primary);
   display: inline-flex;
@@ -483,7 +485,7 @@
   gap: 6px;
   padding: 2px 6px 2px 2px;
   border: 1px solid var(--card-edge, var(--border-muted));
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: var(--card-tint, var(--surface-3));
 }
 
@@ -531,7 +533,7 @@
   gap: 4px;
   padding: 2px 7px;
   border: 1px solid var(--border-muted);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--text-secondary);
   font-size: 10px;
@@ -598,7 +600,7 @@
   max-width: 220px;
   padding: 6px 10px;
   border: 1px solid var(--card-edge, var(--border-color));
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--card-tint, var(--surface-1));
   box-shadow: var(--shadow-popover);
   color: var(--text-secondary);
@@ -659,12 +661,18 @@
   color: var(--text-primary);
 }
 
+.note-color-menu {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
 .note-color-chip {
   width: 18px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--note-color);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px var(--border-muted);
 }
 
 .notes-toolbar {
@@ -693,7 +701,7 @@
   height: 24px;
   padding: 0 7px 0 9px;
   gap: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: transparent;
 }
 
@@ -710,64 +718,14 @@
 }
 
 .notes-filter-btn.active {
-  color: var(--accent-color, #7aaef7);
+  color: var(--accent-color);
 }
 
-.note-floating-menu {
-  position: fixed;
-  z-index: 60;
-  width: 188px;
-  padding: 10px;
-  border-radius: var(--floating-note-radius);
-  border: 1px solid var(--floating-note-border);
-  background: var(--floating-note-bg);
-  box-shadow: var(--floating-note-shadow);
-  color: var(--text-primary);
-}
 
-.note-floating-title {
-  font-size: 11px;
-  color: var(--floating-note-title);
-  font-weight: 700;
-  margin-bottom: 10px;
-}
 
-.note-color-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 
-.note-color-swatch {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: var(--swatch-color);
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
-}
 
-.note-color-custom {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
 
-.note-color-custom input {
-  width: 34px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  cursor: pointer;
-}
 
 .note-filter-options {
   display: flex;
@@ -783,7 +741,7 @@
   gap: 10px;
   padding: 8px 9px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--text-primary);
   text-align: left;

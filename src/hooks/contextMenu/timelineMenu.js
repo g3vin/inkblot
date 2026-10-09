@@ -39,7 +39,7 @@ export async function timelineMenu(ctx) {
       await attachSelectionToEvent({ editor, projectName, docPath, eventId })
     }
     const submenuItems = [
-      await MenuItem.new({ text: 'New Event from Selection', action: attach(null) }),
+      await MenuItem.new({ text: 'New event from selection', action: attach(null) }),
     ]
     if (choices.length) {
       submenuItems.push(await PredefinedMenuItem.new({ item: 'Separator' }))
@@ -47,7 +47,7 @@ export async function timelineMenu(ctx) {
         submenuItems.push(await MenuItem.new({ text: truncate(event.title || 'Untitled', 48), action: attach(event.id) }))
       }
     }
-    out.push(await Submenu.new({ text: 'Attach to Timeline Event', items: submenuItems }))
+    out.push(await Submenu.new({ text: 'Attach to timeline event', items: submenuItems }))
   }
 
   for (const range of under.slice(0, 3)) {
@@ -68,11 +68,11 @@ export async function timelineMenu(ctx) {
   const cursor = getStoryCursor(projectName)
   out.push(
     await MenuItem.new({
-      text: cursor.lens.on ? 'Hide Time Lens' : 'Show Time Lens',
+      text: cursor.lens.on ? 'Hide time lens' : 'Show time lens',
       action: () => setTimeLens(projectName, { on: !cursor.lens.on }, 'editor'),
     }),
     await MenuItem.new({
-      text: cursor.editingRanges ? 'Stop Editing Timeline Passages' : 'Edit Timeline Passages',
+      text: cursor.editingRanges ? 'Stop editing timeline passages' : 'Edit timeline passages',
       action: () => setRangeEditing(projectName, !cursor.editingRanges, 'editor'),
     }),
   )

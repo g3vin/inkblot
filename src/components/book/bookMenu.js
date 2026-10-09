@@ -30,7 +30,7 @@ export const BACK_MATTER = [
   { label: 'Newsletter / Call to Action', matter: 'callToAction' },
 ]
 
-export const SECTION_TITLES = { front: 'Front Matter', body: 'Chapters', back: 'Back Matter' }
+export const SECTION_TITLES = { front: 'Front matter', body: 'Chapters', back: 'Back matter' }
 
 export const CHAPTER_TYPES = [
   ['chapter', 'Chapter'], ['prologue', 'Prologue'], ['epilogue', 'Epilogue'], ['interlude', 'Interlude'], ['unnumbered', 'Unnumbered'],
@@ -47,11 +47,11 @@ export function addMenu(rows) {
   const has = (entry) => entry.generated && rows.some((row) => row.generated === entry.generated)
   const item = (entry) => ({ text: entry.label, enabled: !has(entry), action: () => addEntry(entry) })
   return [
-    { text: 'Front Matter', items: FRONT_MATTER.map(item) },
-    { text: 'Back Matter', items: BACK_MATTER.map(item) },
+    { text: 'Front matter', items: FRONT_MATTER.map(item) },
+    { text: 'Back matter', items: BACK_MATTER.map(item) },
     { separator: true },
-    { text: 'Part Divider', action: () => send('addBookItem', { part: true, title: 'Part', back: false }) },
-    { text: 'Blank Page of the Book’s Own', action: () => addEntry({ matter: 'custom' }) },
+    { text: 'Part divider', action: () => send('addBookItem', { part: true, title: 'Part', back: false }) },
+    { text: 'Blank page of the book’s own', action: () => addEntry({ matter: 'custom' }) },
   ]
 }
 
@@ -64,12 +64,12 @@ export function rowMenu(row, actions) {
   ]
   if (row.kind === 'chapter') {
     items.push(
-      { text: 'Chapter Type', items: CHAPTER_TYPES.map(([type, label]) => ({
+      { text: 'Chapter type', items: CHAPTER_TYPES.map(([type, label]) => ({
         text: label, checked: (row.chapterType ?? 'chapter') === type, action: () => send('editBookItem', { id: row.id, chapterType: type }),
       })) },
       { separator: true },
-      { text: 'Open in Write Mode', action: () => actions.onWrite(row) },
-      { text: 'Reveal in File Tree', action: () => actions.onReveal(row) },
+      { text: 'Open in Write mode', action: () => actions.onWrite(row) },
+      { text: 'Reveal in file tree', action: () => actions.onReveal(row) },
     )
   } else {
     items.push(
@@ -77,7 +77,7 @@ export function rowMenu(row, actions) {
       { text: 'Remove from the Book…', action: () => actions.onRemove(row) },
     )
   }
-  items.push({ separator: true }, { text: 'Add a Part Before', action: () => send('addBookItem', { part: true, before: row.id, title: 'Part', back: false }) })
+  items.push({ separator: true }, { text: 'Add a part before', action: () => send('addBookItem', { part: true, before: row.id, title: 'Part', back: false }) })
   return items
 }
 

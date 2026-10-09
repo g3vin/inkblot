@@ -14,7 +14,7 @@
  * so this needs `projectName` to resolve them for playback.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { assetUrl } from '../lib/assets'
 import { formatDuration } from '../lib/audioNotes'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
@@ -53,7 +53,7 @@ function AudioClip({ clip, projectName, onRemove }) {
         aria-label={playing ? 'Pause' : 'Play'}
         title={playing ? 'Pause' : 'Play'}
       >
-        <SFIcon name={playing ? 'pause' : 'play'} size={11} />
+        <Icon name={playing ? 'pause' : 'play'} />
       </button>
 
       <span className="audio-clip-time">{formatDuration(clip.durationMs)}</span>
@@ -68,7 +68,7 @@ function AudioClip({ clip, projectName, onRemove }) {
         aria-label="Delete voice memo"
         title="Delete voice memo"
       >
-        <SFIcon name="xmark" size={10} />
+        <Icon name="close" />
       </button>
 
       {url ? (
@@ -147,7 +147,7 @@ export function AudioRecordButton({ audio = [], projectName, onChange, iconOnly 
           <span className="audio-record-time">{formatDuration(elapsed)}</span>
         </>
       ) : (
-        <SFIcon name="mic" size={12} />
+        <Icon name="dictate" />
       )}
     </button>
   )

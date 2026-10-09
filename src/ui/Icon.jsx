@@ -5,6 +5,7 @@
  * toolbars, 20px in primary toolbars and empty states. See docs/DESIGN.md → Iconography.
  */
 import { ICONS } from './icons'
+import './ui.css'
 
 /**
  * @param {object} props

@@ -272,11 +272,11 @@
 .chapter-head .ch-editable {
   outline: none;
   cursor: text;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .chapter-head .ch-editable:focus {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color, #0a84ff) 45%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 45%, transparent);
 }
 
 /* An empty line of the head is a hint in Typeset, and nothing on paper — the widgets
@@ -321,7 +321,7 @@
   font-family: var(--pt-font, Georgia, 'Times New Roman', serif);
   font-size: var(--pt-size, 12pt);
   line-height: 1.3;
-  color: #1b1b1b;
+  color: var(--print-ink);
 }
 
 .print-title-page .tp-block {
@@ -359,7 +359,7 @@
   font-family: var(--pt-font, Georgia, 'Times New Roman', serif);
   font-size: var(--pt-size, 12pt);
   line-height: 1.4;
-  color: #1b1b1b;
+  color: var(--print-ink);
 }
 
 .print-matter > div {
@@ -449,11 +449,11 @@
 .print-watermark span {
   transform: rotate(-45deg);
   white-space: nowrap;
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: var(--font-ui);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.1);
+  color: color-mix(in srgb, var(--print-ink) 10%, transparent);
 }
 
 /* ---- a picture with a page to itself (ResizableImage `page`, `bleed`) ---- */

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ARCHIVE_CHANGED_EVENT, getArchive, removeArchivedItem } from '../../lib/archiveStore'
 import { formatFullTimestamp } from '../../lib/versionHistory'
 import { restoreArchivedItem } from '../../lib/archiveRestore'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 
 const KIND_LABELS = { bubble: 'Bubble' }
 
@@ -61,7 +61,7 @@ export default function ArchivePanel({ projectName, docName, editor, onBack }) {
           onClick={onBack}
           title="Back to the document's versions"
         >
-          <SFIcon name="chevron.left" size={12} />
+          <Icon name="chevron-left" />
           History
         </button>
         <span className="history-archive-title">Archive</span>
@@ -97,7 +97,7 @@ export default function ArchivePanel({ projectName, docName, editor, onBack }) {
                   title="Delete it for good"
                   aria-label="Delete"
                 >
-                  <SFIcon name="trash" size={13} />
+                  <Icon name="delete" />
                 </button>
               </div>
             </div>

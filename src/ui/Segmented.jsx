@@ -4,11 +4,11 @@
  *
  *   <Segmented value={mode} onChange={setMode} options={[
  *     { value: 'all', label: 'All' },
- *     { value: 'named', label: 'Named', symbol: 'tag' },
+ *     { value: 'named', label: 'Named', icon: 'tag' },
  *   ]} />
  */
 import { useRef } from 'react'
-import SFIcon from '../components/SFIcon.jsx'
+import Icon from './Icon.jsx'
 import './ui.css'
 
 export default function Segmented({
@@ -62,8 +62,8 @@ export default function Segmented({
             className="ui-segment"
             onClick={() => onChange?.(option.value)}
           >
-            {option.symbol ? <SFIcon name={option.symbol} size={14} /> : null}
-            {iconOnly && option.symbol ? null : <span>{option.label}</span>}
+            {option.icon ? <Icon name={option.icon} /> : null}
+            {iconOnly && option.icon ? null : <span>{option.label}</span>}
           </button>
         )
       })}

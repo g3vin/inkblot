@@ -2,7 +2,7 @@
  * SidebarTabs.jsx — the right sidebar's tab strip. The active-tab indicator
  * tracks fractional swipe progress so it slides with the gesture.
  */
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { RIGHT_SIDEBAR_TABS } from './sidebarTabsConfig'
 
 const TAB_GAP_PX = 4
@@ -59,7 +59,7 @@ export default function SidebarTabs({
             title={label}
             aria-pressed={selected}
           >
-            <SFIcon name={icon} filled={active} forceAnimate={gestureActive && active} />
+            <Icon name={icon} active={active} />
           </button>
         )
       })}

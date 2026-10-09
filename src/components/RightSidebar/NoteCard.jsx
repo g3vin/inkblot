@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import NoteImageGallery from '../NoteImageGallery'
 import { AudioClipList, AudioRecordButton } from '../AudioNotes'
 import { pickNoteImages, readClipboardImages } from '../../lib/noteImageUtils'
@@ -88,7 +88,7 @@ export default function NoteCard({
             aria-label={note.collapsedChildren ? 'Expand branch' : 'Collapse branch'}
             title={note.collapsedChildren ? 'Expand branch' : 'Collapse branch'}
           >
-            <SFIcon name="arrow.up.from.dot" />
+            <Icon name="split" />
           </button>
         ) : null}
 
@@ -101,7 +101,7 @@ export default function NoteCard({
           aria-label="Change note color"
           title="Change note color"
         >
-          <SFIcon name="paintpalette" />
+          <Icon name="palette" />
         </button>
 
         <button
@@ -113,7 +113,7 @@ export default function NoteCard({
           aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
           title={note.pinned ? 'Unpin note' : 'Pin note'}
         >
-          <SFIcon name="pin" filled={note.pinned} />
+          <Icon name="pin" active={note.pinned} />
         </button>
 
         <button
@@ -126,7 +126,7 @@ export default function NoteCard({
           aria-label="Delete note"
           title="Delete note"
         >
-          <SFIcon name="xmark" />
+          <Icon name="close" />
         </button>
       </div>
 
@@ -201,7 +201,7 @@ export default function NoteCard({
               aria-label="Add image"
               title="Add image"
             >
-              <SFIcon name="photo" size={12} />
+              <Icon name="image" />
             </button>
           </div>
         ) : null}

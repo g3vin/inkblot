@@ -18,8 +18,8 @@ import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { FloatingCapsule, IconButton, usePointerReorder } from '../../ui'
 import { moveTo } from '../../ui/usePointerReorder.js'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
-import SFIcon from '../SFIcon'
-import { adjacentTab, needsTabBar, tabSymbol, tabName, tabTitle, useShowsTabBar } from './tabBarState.js'
+import Icon from '../../ui/Icon.jsx'
+import { adjacentTab, needsTabBar, tabIcon, tabName, tabTitle, useShowsTabBar } from './tabBarState.js'
 import './DocumentTabBar.css'
 
 const send = (type, payload) => shellBridge.send(type, payload)
@@ -29,16 +29,16 @@ function tabMenu(tab, tabs, activeDoc) {
   const canSplit = Boolean(tab.docPath && tab.docPath !== activeDoc)
   const index = tabs.findIndex((t) => t.id === tab.id)
   return [
-    { text: 'Open in Split Right', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'columns' }) },
-    { text: 'Open in Split Below', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'rows' }) },
-    { text: 'Move to New Window', enabled: Boolean(tab.docPath), action: () => {
+    { text: 'Open in split right', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'columns' }) },
+    { text: 'Open in split below', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'rows' }) },
+    { text: 'Move to new window', enabled: Boolean(tab.docPath), action: () => {
       send('openDocInWindow', { docPath: tab.docPath })
       send('closeTab', { tabId: tab.id })
     } },
     { separator: true },
-    { text: 'Close Tab', action: () => send('closeTab', { tabId: tab.id }) },
-    { text: 'Close Other Tabs', enabled: tabs.length > 1, action: () => tabs.forEach((t) => t.id !== tab.id && send('closeTab', { tabId: t.id })) },
-    { text: 'Close Tabs to the Right', enabled: index < tabs.length - 1, action: () => tabs.slice(index + 1).forEach((t) => send('closeTab', { tabId: t.id })) },
+    { text: 'Close tab', action: () => send('closeTab', { tabId: tab.id }) },
+    { text: 'Close other tabs', enabled: tabs.length > 1, action: () => tabs.forEach((t) => t.id !== tab.id && send('closeTab', { tabId: t.id })) },
+    { text: 'Close tabs to the right', enabled: index < tabs.length - 1, action: () => tabs.slice(index + 1).forEach((t) => send('closeTab', { tabId: t.id })) },
   ]
 }
 
@@ -105,18 +105,18 @@ export default function DocumentTabBar({ activeDoc }) {
                   type="button"
                   className="document-tab-close"
                   aria-label={`Close ${title}`}
-                  title="Close Tab"
+                  title="Close tab"
                   tabIndex={-1}
                   onClick={(event) => { event.stopPropagation(); send('closeTab', { tabId: tab.id }) }}
                 >
-                  <SFIcon name="xmark" size={8} />
+                  <Icon name="close" />
                 </button>
-                <SFIcon name={tabSymbol(tab.docPath)} size={12} />
+                <Icon name={tabIcon(tab.docPath)} />
                 <span className="document-tab-name">{title}</span>
                 {second ? (
                   <>
                     <span className="document-tab-divider" aria-hidden="true">|</span>
-                    <SFIcon name={tabSymbol(tab.secondaryDoc)} size={12} />
+                    <Icon name={tabIcon(tab.secondaryDoc)} />
                     <span className="document-tab-name">{second}</span>
                   </>
                 ) : null}
@@ -126,10 +126,10 @@ export default function DocumentTabBar({ activeDoc }) {
           {insertIndex === tabs.length ? <span className="document-tab-insert" aria-hidden="true" /> : null}
         </div>
       </FloatingCapsule>
-      <IconButton symbol="plus" label="New Tab" title="Open a new tab (⌘T)" size="circle" className="floating-capsule document-tab-new" onClick={() => send('newTab', {})} />
+      <IconButton icon="add" label="New tab" title="Open a new tab (⌘T)" size="circle" className="floating-capsule document-tab-new" onClick={() => send('newTab', {})} />
       {dragged && ghost ? (
         <FloatingCapsule className="document-tab-ghost" style={{ left: ghost.x, top: ghost.y }} aria-hidden="true">
-          <SFIcon name={tabSymbol(dragged.docPath)} size={12} />{tabTitle(dragged, tabs)}
+          <Icon name={tabIcon(dragged.docPath)} />{tabTitle(dragged, tabs)}
         </FloatingCapsule>
       ) : null}
     </div>

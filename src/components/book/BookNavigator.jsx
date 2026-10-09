@@ -14,7 +14,7 @@ import { useRef, useState } from 'react'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { Button, Sheet, usePointerReorder } from '../../ui'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { SECTION_TITLES, addMenu, moveTarget, rowMenu } from './bookMenu.js'
 import './BookNavigator.css'
 
@@ -22,11 +22,11 @@ const send = (type, payload) => shellBridge.send(type, payload)
 
 function Leading({ row }) {
   if (row.kind === 'chapter') {
-    return row.number != null ? <span className="book-row-number">{row.number}</span> : <SFIcon name="doc.text" size={12} />
+    return row.number != null ? <span className="book-row-number">{row.number}</span> : <Icon name="document" />
   }
   if (row.kind === 'part') return <span className="book-row-part">{row.label ? row.label.replace('Part ', '') : '§'}</span>
-  if (row.kind === 'matter') return <SFIcon name={row.legacy ? 'text.alignleft' : 'note.text'} size={12} />
-  return <SFIcon name="gearshape" size={12} />
+  if (row.kind === 'matter') return <Icon name={row.legacy ? 'align-left' : 'file-text'} />
+  return <Icon name="settings" />
 }
 
 function CoverRow({ cover, selected, onOpen }) {
@@ -34,7 +34,7 @@ function CoverRow({ cover, selected, onOpen }) {
   const needsLook = cover?.checks?.some((check) => check.severity === 'warning' || check.severity === 'error')
   return (
     <button type="button" className="book-row book-cover-row" aria-selected={selected} onClick={onOpen}>
-      <span className="book-row-leading"><SFIcon name="book" size={14} /></span>
+      <span className="book-row-leading"><Icon name="book" /></span>
       <span className="book-row-text">
         <span>Cover</span>
         {cover?.sets?.length > 1 && active ? <small>{active.name} · {cover.sets.length} versions</small>
@@ -67,8 +67,8 @@ export default function BookNavigator({ hasProject, onShowFiles }) {
   if (!state || !hasProject) {
     return (
       <div className="book-empty">
-        <SFIcon name="book" size={22} />
-        <strong>No Project Open</strong>
+        <Icon name="book" size={20} />
+        <strong>No project open</strong>
         <span>Choose a project in the window.</span>
       </div>
     )
@@ -76,8 +76,8 @@ export default function BookNavigator({ hasProject, onShowFiles }) {
   if (!rows.length) {
     return (
       <div className="book-empty">
-        <SFIcon name="book" size={22} />
-        <strong>No Chapters Yet</strong>
+        <Icon name="book" size={20} />
+        <strong>No chapters yet</strong>
         <span>A book is a folder’s documents. Open one of them to typeset its book.</span>
       </div>
     )
@@ -133,7 +133,7 @@ export default function BookNavigator({ hasProject, onShowFiles }) {
                     title={row.hidden ? 'Show in the book' : 'Hide from the book: left out of the pages, print, export and the continuous document'}
                     onClick={(event) => { event.stopPropagation(); send('setBookItemHidden', { id: row.id, hidden: !row.hidden }) }}
                   >
-                    <SFIcon name={row.hidden ? 'eye.slash' : 'eye'} size={12} />
+                    <Icon name={row.hidden ? 'hide' : 'focus'} />
                   </button>
                 </div>
               )
@@ -153,7 +153,7 @@ export default function BookNavigator({ hasProject, onShowFiles }) {
             popUpNativeMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.top }, addMenu(rows))
           }}
         >
-          <SFIcon name="plus" size={13} />
+          <Icon name="add" />
         </button>
         <span className="floating-capsule book-title" title={state.book?.folder ? `The book in “${state.book.folder}”` : 'The whole project, as one book'}>
           {state.book?.title || 'Untitled'}

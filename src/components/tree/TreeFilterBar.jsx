@@ -4,7 +4,7 @@
  * match, and buttons for recent files and expanding every folder.
  */
 import { useRef } from 'react'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
 import { TREE_KINDS } from '../../lib/treeFilter'
 import './TreeFilterBar.css'
@@ -18,15 +18,15 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
         type="button"
         className="tree-filter-button"
         data-on={filter.kind !== 'all'}
-        aria-label="Filter Options"
-        title="Filter Options"
+        aria-label="Filter options"
+        title="Filter options"
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect()
           popUpNativeMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.top },
             TREE_KINDS.map(({ value, label }) => ({ text: label, checked: filter.kind === value, action: () => set({ kind: value }) })))
         }}
       >
-        <SFIcon name="line.3.horizontal.decrease.circle" size={13} />
+        <Icon name="filter" />
       </button>
       <input
         ref={inputRef}
@@ -38,8 +38,8 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
         onKeyDown={(event) => { if (event.key === 'Escape') set({ text: '' }) }}
       />
       {filter.text ? (
-        <button type="button" className="tree-filter-button" aria-label="Clear Filter" title="Clear Filter" onClick={() => set({ text: '' })}>
-          <SFIcon name="xmark" size={10} />
+        <button type="button" className="tree-filter-button" aria-label="Clear filter" title="Clear filter" onClick={() => set({ text: '' })}>
+          <Icon name="close" />
         </button>
       ) : null}
       <button
@@ -47,14 +47,14 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
         className="tree-filter-button"
         data-on={filter.recentOnly}
         aria-pressed={filter.recentOnly}
-        aria-label="Show Only Recent Files"
-        title="Show Only Recent Files"
+        aria-label="Show only recent files"
+        title="Show only recent files"
         onClick={() => set({ recentOnly: !filter.recentOnly })}
       >
-        <SFIcon name="clock" size={13} />
+        <Icon name="clock" />
       </button>
-      <button type="button" className="tree-filter-button" aria-label="Expand or Collapse All Folders" title="Expand or Collapse All Folders" onClick={onToggleFolders}>
-        <SFIcon name="plusminus.circle" size={13} />
+      <button type="button" className="tree-filter-button" aria-label="Expand or collapse all folders" title="Expand or collapse all folders" onClick={onToggleFolders}>
+        <Icon name="plus-minus" />
       </button>
     </div>
   )

@@ -12,6 +12,7 @@ import { newId, pinLabel } from '../../lib/map/mapModel'
 import { travelerColor, travelerName } from '../mapRender'
 import { describeConflict, unitFor } from '../mapOptions'
 import { docChoices } from './itemSections'
+import { MAP_DEFAULT_COLORS } from '../../lib/map/mapColors'
 
 const GREGORIAN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
@@ -118,10 +119,10 @@ export function travelerSections(ui, { map, traveler, index, schedule, conflicts
           const legs = [...traveler.legs]
           legs.splice(legIndex - 1, 0, legs.splice(legIndex, 1)[0])
           setLegs(legs)
-        }, { disabled: legIndex === 0, symbol: 'arrow.up', help: 'Move earlier' }),
+        }, { disabled: legIndex === 0, icon: 'arrow-up', help: 'Move earlier' }),
         ui.button(`${prefix}.remove`, '×', () => setLegs(traveler.legs.filter((candidate) => candidate.id !== leg.id)), {
           role: 'destructive',
-          symbol: 'xmark',
+          icon: 'close',
           help: 'Remove this leg',
         }),
       ],
@@ -324,12 +325,12 @@ export function travelSections(ui, { map, space, day, dispatch, matrix: matrixSt
               patchTerrain(terrain.id, { multipliers })
             }, { min: 0, max: 10, step: 0.05, suffix: '×', allowEmpty: true })
           ),
-          ui.color(`${prefix}.fill`, 'Colour', terrain.fill, '#8a9a5b', (fill) => patchTerrain(terrain.id, { fill })),
+          ui.color(`${prefix}.fill`, 'Colour', terrain.fill, MAP_DEFAULT_COLORS.terrain, (fill) => patchTerrain(terrain.id, { fill })),
           ui.buttonField(`${prefix}.remove`, 'Remove', () => setTerrains(map.terrains.filter((candidate) => candidate.id !== terrain.id)), { role: 'destructive' }),
-        ], { swatch: terrain.fill || '#888', collapsible: true })
+        ], { swatch: terrain.fill || MAP_DEFAULT_COLORS.terrainSwatch, collapsible: true })
       }),
     ], [
-      ui.button('terrain.add', 'Add', () => setTerrains([...map.terrains, { id: newId(), name: 'New terrain', multipliers: { '*land': 0.5 }, fill: '#8a9a5b', hatch: 'none' }])),
+      ui.button('terrain.add', 'Add', () => setTerrains([...map.terrains, { id: newId(), name: 'New terrain', multipliers: { '*land': 0.5 }, fill: MAP_DEFAULT_COLORS.terrain, hatch: 'none' }])),
     ]))
   }
   return sections

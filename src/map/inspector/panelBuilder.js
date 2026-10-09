@@ -20,8 +20,8 @@ const clamp = (value, min, max) => {
 }
 
 /** A button as the protocol has it (`MapPanelButton`). */
-const buttonOf = (id, label, { role = 'normal', disabled = false, symbol, help } = {}) => ({
-  id, label, role, disabled: Boolean(disabled), symbol, help,
+const buttonOf = (id, label, { role = 'normal', disabled = false, icon, help } = {}) => ({
+  id, label, role, disabled: Boolean(disabled), icon, help,
 })
 
 export function createPanelBuilder() {

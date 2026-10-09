@@ -13,6 +13,7 @@
  * All pure (DOMParser aside) — nothing here touches the filesystem or React.
  */
 import { countMapWords } from './map/mapModel'
+import { INKS, inkVar } from './palette'
 
 /* ============================================================
    Editing sessions
@@ -39,8 +40,7 @@ export const sessionColor = (sessionId) => {
   for (let i = 0; i < str.length; i++) {
     hash = (hash * 31 + str.charCodeAt(i)) | 0
   }
-  const hue = Math.abs(hash) % 360
-  return `hsl(${hue}, 55%, 55%)`
+  return inkVar(INKS[Math.abs(hash) % INKS.length].id)
 }
 
 /* ============================================================

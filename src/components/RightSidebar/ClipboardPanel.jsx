@@ -11,7 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { dragHandoff, DragPayloadKind } from '../../bridge'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 
 const formatTimestamp = (iso) => {
   if (!iso) return ''
@@ -300,7 +300,7 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
                   title={copiedId === entry.id ? 'Copied' : 'Copy'}
                   aria-label={copiedId === entry.id ? 'Copied' : 'Copy'}
                 >
-                  <SFIcon name={copiedId === entry.id ? 'checkmark' : 'doc.on.doc'} />
+                  <Icon name={copiedId === entry.id ? 'check' : 'copy'} />
                 </button>
               </div>
             </div>
