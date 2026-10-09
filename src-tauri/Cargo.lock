@@ -2320,6 +2320,7 @@ dependencies = [
 name = "inkblot"
 version = "0.1.0"
 dependencies = [
+ "block2",
  "inkblot-core",
  "inkblot-models",
  "objc2",

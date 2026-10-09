@@ -68,3 +68,5 @@ tauri-plugin-notification = "2"
 # only be driven from native code.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
+# trackpad.rs: the NSEvent monitor's handler is a block.
+block2 = "0.6"

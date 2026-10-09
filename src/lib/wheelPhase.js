@@ -5,7 +5,14 @@
  * momentum that carries on after the fingers lift as another (webkitMomentumPhase).
  * The inspector's swipe and the bubble editor's form swipe both need to know which is
  * which: a swipe turns one page, however far its momentum would carry it.
+ *
+ * WKWebView, though, gives the page neither: its wheel events carry no phase at all.
+ * In the app the phases come from AppKit instead (src-tauri/src/trackpad.rs), as a
+ * `trackpad-phase` event when the fingers go down, lift, and the coast begins. Where
+ * neither source exists (a browser), there is nothing to know and callers fall back
+ * on timing.
  */
+import { listen } from '@tauri-apps/api/event'
 
 export const WHEEL_PHASE_BEGAN = 1
 export const WHEEL_PHASE_STATIONARY = 2
@@ -36,8 +43,55 @@ export const wheelPhases = (event) => ({
   momentum: event.webkitMomentumPhase ?? event.momentumPhase,
 })
 
+/* ---- the trackpad's phases, from AppKit ---- */
+
+/** 'touching' (fingers down), 'coasting' (momentum after a lift) or 'idle'. */
+let trackpadState = 'idle'
+let trackpadKnown = false
+const phaseListeners = new Set()
+
+const onNativePhase = (name) => {
+  trackpadKnown = true
+  if (name === 'began') trackpadState = 'touching'
+  else if (name === 'momentum') trackpadState = 'coasting'
+  else if (name === 'ended') trackpadState = 'idle'
+  phaseListeners.forEach((listener) => listener(name))
+}
+
+let listening = false
+const listenForPhases = () => {
+  if (listening) return
+  listening = true
+  try {
+    // Outside the app there is no one to listen to; that is not an error.
+    Promise.resolve(listen('trackpad-phase', (event) => onNativePhase(event.payload))).catch(() => {})
+  } catch {
+    // Not in the app.
+  }
+}
+
+/**
+ * Hear the fingers go down (`'began'`), lift (`'ended'`) and the coast begin
+ * (`'momentum'`). Returns the unsubscribe. Silent outside the app.
+ */
+export const onTrackpadPhase = (listener) => {
+  listenForPhases()
+  phaseListeners.add(listener)
+  return () => { phaseListeners.delete(listener) }
+}
+
+/** Whether the app has reported a phase yet — i.e. a lift will be heard, not guessed. */
+export const knowsTrackpadPhases = () => trackpadKnown
+
+/** For tests: what the app would say. */
+export const simulateTrackpadPhase = onNativePhase
+
 /** Momentum after the fingers lifted, rather than the fingers themselves. */
 export const isMomentumWheel = (event) => {
+  listenForPhases()
   const { phase, momentum } = wheelPhases(event)
-  return hasMomentumPhase(momentum) && !hasActiveWheelPhase(phase)
+  if (Number.isFinite(phase) || Number.isFinite(momentum)) {
+    return hasMomentumPhase(momentum) && !hasActiveWheelPhase(phase)
+  }
+  return trackpadState === 'coasting'
 }

@@ -28,6 +28,7 @@ mod reference_commands;
 mod rhyme_commands;
 mod stats_commands;
 mod synonym_commands;
+mod trackpad;
 mod webview_commands;
 
 use core_commands::{list_system_fonts, scrape_pinterest_html};
@@ -73,6 +74,10 @@ pub fn run() {
         .manage(SynonymState::default())
         .manage(RhymeState::default())
         .manage(ScrapeChannels::default())
+        .setup(|app| {
+            trackpad::install(app.handle());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             navigate_webview,
             get_webview_url,
