@@ -11,7 +11,7 @@
  * results and stops filtering the panel, so the two never fight.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { listProjectTree, loadDocument } from '../../lib/FileSystem'
 import {
   SEARCH_SCOPES,
@@ -107,7 +107,7 @@ export default function SidebarSearch({
     if (!active && !isOverlay) return undefined
 
     const onKeyDown = (event) => {
-      if (!isOverlay && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+      if (!isOverlay && (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'f') {
         event.preventDefault()
         expand()
         inputRef.current?.select()
@@ -332,7 +332,7 @@ export default function SidebarSearch({
       className={`sidebar-search${expanded ? ' is-expanded' : ''}${isOverlay ? ' is-overlay' : ''}`}
     >
       <label className="sidebar-search-field" aria-label="Search">
-        <SFIcon name="magnifyingglass" className="sidebar-search-icon" />
+        <Icon name="search" className="sidebar-search-icon" />
         <input
           ref={inputRef}
           className="sidebar-search-input"
@@ -365,7 +365,7 @@ export default function SidebarSearch({
             aria-label="Clear search"
             title="Clear search"
           >
-            <SFIcon name="xmark" />
+            <Icon name="close" />
           </button>
         ) : null}
 
@@ -387,10 +387,10 @@ export default function SidebarSearch({
               type="button"
               className="sidebar-search-center"
               onClick={() => onOpenOverlay?.(rootRef.current?.getBoundingClientRect())}
-              aria-label="Open search in the center of the screen"
-              title="Open search in center (⌘K)"
+              aria-label="Search the whole project"
+              title="Search the whole project (⇧⌘F)"
             >
-              <SFIcon name="frame" size={13} />
+              <Icon name="frame" />
             </button>
             <button
               type="button"
@@ -400,7 +400,7 @@ export default function SidebarSearch({
               aria-label={expanded ? 'Hide search options' : 'Show search options'}
               title={expanded ? 'Hide search options' : 'Show search options'}
             >
-              <SFIcon name="chevron.down" size={12} />
+              <Icon name="chevron-down" />
             </button>
           </>
         )}
@@ -490,7 +490,7 @@ export default function SidebarSearch({
                   title="Previous match (Shift+Enter)"
                   aria-label="Previous match"
                 >
-                  <SFIcon name="arrow.up.from.dot" />
+                  <Icon name="split" />
                 </button>
                 <button
                   type="button"
@@ -500,7 +500,7 @@ export default function SidebarSearch({
                   title="Next match (Enter)"
                   aria-label="Next match"
                 >
-                  <SFIcon name="arrow.down.to.dot" />
+                  <Icon name="merge" />
                 </button>
               </div>
             </div>
@@ -520,7 +520,7 @@ export default function SidebarSearch({
                       className="sidebar-search-suggestion"
                       onClick={() => chooseScope(entry.value)}
                     >
-                      <SFIcon name="magnifyingglass" />
+                      <Icon name="search" />
                       <span className="sidebar-search-suggestion-label">{entry.label}</span>
                       <span className="sidebar-search-suggestion-hint">{entry.hint}</span>
                     </button>
@@ -548,7 +548,7 @@ export default function SidebarSearch({
                         className="sidebar-search-recent"
                         onClick={() => { setQuery(entry); inputRef.current?.focus() }}
                       >
-                        <SFIcon name="clock" />
+                        <Icon name="clock" />
                         <span>{entry}</span>
                       </button>
                     ))}

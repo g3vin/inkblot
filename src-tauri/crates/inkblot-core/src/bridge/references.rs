@@ -58,8 +58,8 @@ pub struct ReferenceKindSpec {
     pub label: String,
     /// Which part of the "new source" menu it is listed in.
     pub group: String,
-    /// An SF Symbol.
-    pub symbol: String,
+    /// A semantic icon name (src/ui/icons.js).
+    pub icon: String,
     pub fields: Vec<ReferenceFieldSpec>,
     /// The contributor roles it offers, first one the default (`author`, `editor`…).
     pub roles: Vec<String>,

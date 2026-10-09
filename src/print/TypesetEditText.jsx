@@ -84,7 +84,7 @@ export default function TypesetEditText({ editor, projectName, docPath, printLay
       ) : null}
       {offer ? createPortal(
         <div className="typeset-edit-text" style={{ left: `${offer.x}px`, top: `${offer.y + 14}px` }} role="dialog">
-          <button type="button" onClick={editText}>Edit Text</button>
+          <button type="button" onClick={editText}>Edit text</button>
           <span>The prose is edited in Write mode.</span>
         </div>,
         document.body

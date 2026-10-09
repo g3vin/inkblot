@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Button, FormRow, InkPicker, Segmented, Sheet, Toggle } from '../../ui'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { useStats } from '../../stats/useStats.js'
 import { OPEN_SETTINGS } from '../../stats/timerMenu.js'
 import WritingPane from './WritingPane.jsx'
@@ -17,11 +17,11 @@ import RemindersPane from './RemindersPane.jsx'
 import './Settings.css'
 
 const PANES = [
-  { id: 'general', title: 'General', symbol: 'gearshape' },
-  { id: 'writing', title: 'Writing', symbol: 'chart.bar.xaxis' },
-  { id: 'goals', title: 'Goals', symbol: 'target' },
-  { id: 'timers', title: 'Timers', symbol: 'timer' },
-  { id: 'reminders', title: 'Reminders', symbol: 'bell' },
+  { id: 'general', title: 'General', icon: 'settings' },
+  { id: 'writing', title: 'Writing', icon: 'chart' },
+  { id: 'goals', title: 'Goals', icon: 'target' },
+  { id: 'timers', title: 'Timers', icon: 'timer' },
+  { id: 'reminders', title: 'Reminders', icon: 'bell' },
 ]
 
 const THEMES = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'system', label: 'System' }]
@@ -96,7 +96,7 @@ export default function SettingsSheet({ appearance }) {
                 requestAnimationFrame(() => nav?.querySelector('[aria-current="page"]')?.focus())
               }}
             >
-              <SFIcon name={item.symbol} size={14} />{item.title}
+              <Icon name={item.icon} />{item.title}
             </button>
           ))}
         </nav>

@@ -13,13 +13,14 @@
 import { Alignment, BlockType, WritingFormat } from '../types'
 import type { ActiveMarks, SelectionContext, ToolbarState, EditorTarget } from '../types'
 import { isEditorReady } from '../lib/editorUtils'
+import { DEFAULT_HIGHLIGHT_COLOR, DEFAULT_TEXT_COLOR } from '../lib/palette'
 import { fromCssFontFamily } from '../lib/systemFonts'
 import { readSelectionAnchor } from './anchors'
 
 /** What `readToolbarState` falls back to, spelled once. */
 export const TOOLBAR_DEFAULTS = {
-  color: '#000000',
-  highlight: '#ffff00',
+  color: DEFAULT_TEXT_COLOR,
+  highlight: DEFAULT_HIGHLIGHT_COLOR,
   font: 'Literata',
   fontSize: '18px',
 } as const

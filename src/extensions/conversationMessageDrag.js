@@ -190,6 +190,12 @@ export function createMessageDragController({ commitAttributes, getAttrs, messag
     previewEl.style.height = `${rect.height}px`
     previewEl.style.maxWidth = 'none'
     previewEl.style.margin = '0'
+    // The preview leaves the tile for the body, so it takes the tile's look along.
+    const tile = row.closest('.conversation-node')
+    if (tile instanceof HTMLElement) {
+      Array.from(tile.style).filter(name => name.startsWith('--conv-'))
+        .forEach(name => previewEl.style.setProperty(name, tile.style.getPropertyValue(name)))
+    }
     document.body.appendChild(previewEl)
     messageDragPreview = previewEl
     updateMessageDragPreview(clientX, clientY)

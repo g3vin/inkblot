@@ -28,7 +28,7 @@ export interface FilterNode {
 export const EMPTY_FILTER: TreeFilter = { text: '', kind: 'all', recentOnly: false }
 
 export const TREE_KINDS: { value: TreeKind; label: string }[] = [
-  { value: 'all', label: 'All Files' },
+  { value: 'all', label: 'All files' },
   { value: 'documents', label: 'Documents' },
   { value: 'canvases', label: 'Canvases' },
   { value: 'maps', label: 'Maps' },

@@ -128,7 +128,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
           .then((image) => {
             const current = readChapterMeta(editor.state.doc) || { subtitle: '', epigraph: '', epigraphSource: '' }
             editor.commands.setChapterMeta({ ...current, image })
-            if (design && !design.showImage) editBook((b) => ({ ...b, chapterDesign: { ...b.chapterDesign, showImage: true } }), 'Chapter Picture')
+            if (design && !design.showImage) editBook((b) => ({ ...b, chapterDesign: { ...b.chapterDesign, showImage: true } }), 'Chapter picture')
           })
           .catch((error) => console.error('[typeset] the picture could not be added:', error))
       },

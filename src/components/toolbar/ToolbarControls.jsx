@@ -9,7 +9,7 @@
  * Buttons sit in a `.toolbar-group` (Toolbar.css), the segmented capsule the
  * formatting toolbar has always used.
  */
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { popUpNativeMenu } from '../../ui/useNativeMenu'
 
 export function ItemFrame({ id, label, display, grouped = true, className = '', children }) {
@@ -21,12 +21,12 @@ export function ItemFrame({ id, label, display, grouped = true, className = '', 
   )
 }
 
-export function Glyph({ symbol, label, display, filled = false, size = 16 }) {
+export function Glyph({ icon, label, display, filled = false, size = 16 }) {
   if (display === 'label') return <span className="tb-text">{label}</span>
-  return <SFIcon name={symbol} filled={filled} size={size} />
+  return <Icon name={icon} active={filled} size={size} />
 }
 
-export function ToolButton({ symbol, label, title, display, active, disabled, onClick, filled, className = '' }) {
+export function ToolButton({ icon, label, title, display, active, disabled, onClick, filled, className = '' }) {
   return (
     <button
       type="button"
@@ -37,13 +37,13 @@ export function ToolButton({ symbol, label, title, display, active, disabled, on
       disabled={disabled}
       onClick={onClick}
     >
-      <Glyph symbol={symbol} label={label} display={display} filled={filled ?? active} />
+      <Glyph icon={icon} label={label} display={display} filled={filled ?? active} />
     </button>
   )
 }
 
 /** `items` is a list for useNativeMenu, or a function returning one (built on click). */
-export function MenuButton({ symbol, label, title, display, disabled, items, children }) {
+export function MenuButton({ icon, label, title, display, disabled, items, children }) {
   return (
     <button
       type="button"
@@ -58,8 +58,8 @@ export function MenuButton({ symbol, label, title, display, disabled, items, chi
         void popUpNativeMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.bottom }, list)
       }}
     >
-      {children ?? <Glyph symbol={symbol} label={label} display={display} />}
-      <SFIcon name="chevron.down" size={9} className="tb-caret" />
+      {children ?? <Glyph icon={icon} label={label} display={display} />}
+      <Icon name="chevron-down" className="tb-caret" />
     </button>
   )
 }

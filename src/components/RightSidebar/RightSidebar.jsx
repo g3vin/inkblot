@@ -32,9 +32,10 @@ import HistoryPanel from './HistoryPanel'
 import TimelineSidebarPanel from '../../timeline/TimelineSidebarPanel'
 import SidebarSearch from './SidebarSearch'
 import ClipboardPanel from './ClipboardPanel'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { isFilterScope } from '../../lib/sidebarSearch'
 import { HAPTIC_ALIGNMENT, HAPTIC_LEVEL, performHaptic } from '../../lib/haptics'
+import { useCommands } from '../../lib/commands'
 
 const SWIPE_PIXELS_PER_TAB = 220
 const SWIPE_INTENT_THRESHOLD_PX = 1.5
@@ -219,7 +220,8 @@ export default function RightSidebar({
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return
+      // ⌘⇧F: ⌘K is the command palette's, and ⌘F the panel's own search bar.
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.key.toLowerCase() !== 'f') return
       event.preventDefault()
 
       if (searchOverlay) closeSearchOverlay()
@@ -229,6 +231,16 @@ export default function RightSidebar({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [closeSearchOverlay, openSearchOverlay, searchOverlay])
+
+  useCommands(() => [{
+    id: 'search.project',
+    section: 'Search',
+    title: 'Search the project…',
+    icon: 'search',
+    shortcut: '⇧⌘F',
+    keywords: ['find', 'look up', 'everywhere', 'notes', 'documents'],
+    run: openSearchOverlay,
+  }], [openSearchOverlay])
 
   const clearSettleTimer = useCallback(() => {
     if (settleTimerRef.current) {
@@ -791,7 +803,7 @@ export default function RightSidebar({
       const spec = inspectorTab(tabId)
       return (
         <div className="inspector-placeholder">
-          <SFIcon name={spec?.symbol ?? 'doc'} size={22} />
+          <Icon name={spec?.icon ?? 'file'} size={20} />
           <span>{spec?.title ?? tabId} is on its way to this panel.</span>
         </div>
       )
@@ -865,7 +877,7 @@ export default function RightSidebar({
           title={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
           aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
         >
-          <SFIcon name="pin" filled={pinned} />
+          <Icon name="pin" active={pinned} />
         </button>
       </div>
 

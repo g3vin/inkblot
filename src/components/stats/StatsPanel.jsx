@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from 'react'
 import { IconButton, Section, Segmented, SelectMenu } from '../../ui'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { getPreference, setPreference } from '../../lib/preferences'
 import { latestBridgeEvent } from '../../bridge'
 import { useStats } from '../../stats/useStats.js'
@@ -26,7 +26,7 @@ import './Stats.css'
 
 const PAGES = [{ value: 'today', label: 'Today' }, { value: 'history', label: 'History' }, { value: 'insights', label: 'Insights' }]
 const SCOPES = [{ value: 'document', label: 'Document' }, { value: 'project', label: 'Project' }, { value: 'all', label: 'All' }]
-const METRICS = [{ value: 'words', label: 'Words' }, { value: 'typing', label: 'Time Typing' }, { value: 'open', label: 'Time Open' }]
+const METRICS = [{ value: 'words', label: 'Words' }, { value: 'typing', label: 'Time typing' }, { value: 'open', label: 'Time open' }]
 const RANGES = [{ value: '7', label: '7 days' }, { value: '30', label: '30 days' }, { value: '90', label: '90 days' }]
 const INSIGHT_DAYS = 90
 
@@ -108,7 +108,7 @@ export default function StatsPanel({ query = '' }) {
       <header className="stats-header">
         <div className="stats-header-row">
           <Segmented value={page} onChange={setPage} options={PAGES} label="Page" stretch />
-          <IconButton symbol="gearshape" label="Stats Settings" onClick={() => openSettings('goals')} />
+          <IconButton icon="settings" label="Stats settings" onClick={() => openSettings('goals')} />
         </div>
         <Segmented value={chosen} onChange={setChosen} options={SCOPES} label="Scope" stretch />
         <p className="stats-note">{caption}</p>
@@ -119,7 +119,7 @@ export default function StatsPanel({ query = '' }) {
             <Section id="stats.timer" title="Timer"><TimerSection stats={stats} /></Section>
             <GoalsSection stats={stats} />
             <DeadlinesSection stats={stats} project={tracker.project} />
-            <Section id="stats.session" title="This Session">
+            <Section id="stats.session" title="This session">
               {session ? (
                 <SessionRows stats={stats} query={query} />
               ) : <p className="stats-muted">Start typing to begin a session.</p>}
@@ -204,7 +204,7 @@ function TotalsSection({ stats, kind, snapshot, pending, query }) {
   const skipped = runs.reduce((sum, run) => sum + (run.sprintsSkipped ?? 0), 0)
   const runWords = runs.reduce((sum, run) => sum + (run.wordsWritten ?? 0), 0)
   return (
-    <Section id="stats.totals" title="All Time">
+    <Section id="stats.totals" title="All time">
       {length ? <Row query={query} label={kind === 'document' ? 'Length' : 'Project length'} value={`${formatNumber(length.words)} words`} detail={`${formatNumber(length.chars)} characters`} /> : null}
       <Row query={query} label="Words written" value={formatNumber(written)} />
       <Row query={query} label="Words deleted" value={formatNumber(totals.wordsDeleted + pending.deleted)} />
@@ -256,26 +256,26 @@ function InsightsSections({ stats, scope }) {
   const sentence = parts.length ? `${capitalize(parts.join(', and '))}.` : 'Nothing written in the last seven days yet.'
   return (
     <>
-      <Section id="stats.week" title="This Week">
+      <Section id="stats.week" title="This week">
         <div className="stats-week">
           <span className="stats-big">{formatNumber(insights.thisWeekWords)}</span>
           <span className="stats-muted">words</span>
           <span className="stats-grow" />
           {insights.weekChange ? (
             <span className="stats-change" title="Against the seven days before">
-              <SFIcon name={insights.thisWeekWords >= insights.lastWeekWords ? 'arrow.up.right' : 'arrow.down.right'} size={11} />{insights.weekChange}
+              <Icon name={insights.thisWeekWords >= insights.lastWeekWords ? 'arrow-up-right' : 'arrow-down-right'} />{insights.weekChange}
             </span>
           ) : null}
         </div>
         <p className="stats-muted">{sentence}</p>
       </Section>
-      <Section id="stats.rhythm" title="When You Write">
+      <Section id="stats.rhythm" title="When you Write">
         {insights.bestHour != null ? <Row label="Best time" value={hourRange(insights.bestHour)} /> : null}
         {insights.bestWeekday != null ? <Row label="Best day" value={weekdayName(insights.bestWeekday)} /> : null}
         <HourGrid grid={insights.grid} />
         <p className="stats-note">Time typing by hour and weekday, over the last {INSIGHT_DAYS} days.</p>
       </Section>
-      <Section id="stats.habits" title="How You Write">
+      <Section id="stats.habits" title="How you Write">
         <Row label="Flow sessions" value={formatNumber(insights.flowSessions)} detail={`of ${formatNumber(insights.sessions)} sessions`}
           help={`Sessions with at least ${stats.config.flowMinutes} minutes of typing in a row, each minute mostly typing.`} />
         <Row label="Longest flow" value={insights.longestFlowMinutes ? `${insights.longestFlowMinutes} min` : '—'} />

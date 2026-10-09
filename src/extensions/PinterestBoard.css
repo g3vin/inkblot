@@ -11,7 +11,7 @@
   margin: 14px 0;
   padding: 10px;
   border: 1px solid var(--border-color);
-  border-radius: var(--floating-note-radius, 16px);
+  border-radius: var(--radius-lg);
   background: var(--surface-1);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
@@ -89,7 +89,7 @@
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 1px 2px var(--shadow-color);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
@@ -121,7 +121,7 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 0;
   background: transparent;
   color: var(--text-subtle);

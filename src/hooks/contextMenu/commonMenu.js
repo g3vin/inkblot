@@ -36,7 +36,7 @@ export async function commonMenu(ctx) {
     items.push(
       await PredefinedMenuItem.new({ item: 'Separator' }),
       await MenuItem.new({
-        text: 'Close Document',
+        text: 'Close document',
         action: () => {
           if (docToClose && docToClose === secondaryDoc) {
             setSecondaryDoc?.(null)

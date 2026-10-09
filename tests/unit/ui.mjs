@@ -61,7 +61,7 @@ const made = []
 const fake = (kind) => ({ new: async (opts) => { made.push({ kind, ...opts }); return { kind, ...opts } } })
 const api = { Menu: fake('Menu'), MenuItem: fake('MenuItem'), CheckMenuItem: fake('CheckMenuItem'), PredefinedMenuItem: fake('Predefined'), Submenu: fake('Submenu') }
 const menu = await buildNativeMenu([
-  { text: 'Icon Only', checked: true, action: () => {} },
+  { text: 'Icon only', checked: true, action: () => {} },
   { separator: true },
   null,
   { text: 'More', items: [{ text: 'Inner', enabled: false }] },

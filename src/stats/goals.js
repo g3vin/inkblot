@@ -11,10 +11,10 @@ import { addDays, dayDate, dayKey, formatNumber, newId, shiftDay, weekdayOf } fr
 export const GOAL_METRICS = ['words', 'netWords', 'typingMinutes', 'openMinutes', 'sessions', 'sprints']
 
 export const METRIC_INFO = {
-  words: { title: 'Words written', unit: 'words', icon: 'character.cursor.ibeam', defaultAmount: 1000 },
-  netWords: { title: 'Net words', unit: 'words', icon: 'plus.forwardslash.minus', defaultAmount: 1000 },
+  words: { title: 'Words written', unit: 'words', icon: 'text-cursor', defaultAmount: 1000 },
+  netWords: { title: 'Net words', unit: 'words', icon: 'plus-minus', defaultAmount: 1000 },
   typingMinutes: { title: 'Time typing', unit: 'min', icon: 'keyboard', defaultAmount: 45 },
-  openMinutes: { title: 'Time open', unit: 'min', icon: 'doc.text', defaultAmount: 60 },
+  openMinutes: { title: 'Time open', unit: 'min', icon: 'document', defaultAmount: 60 },
   sessions: { title: 'Sessions', unit: 'sessions', icon: 'clock', defaultAmount: 2 },
   sprints: { title: 'Sprints', unit: 'sprints', icon: 'timer', defaultAmount: 3 },
 }

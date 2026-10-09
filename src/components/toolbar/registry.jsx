@@ -30,6 +30,7 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.format.numbered-list': D.NumberedListItem,
   'inkblot.insert.table': D.TableItem,
   'inkblot.insert.conversation': D.ConversationItem,
+  'inkblot.insert.note': D.AddNoteItem,
   'inkblot.edit.undo-redo': D.UndoRedoItem,
   'inkblot.edit.paste-and-match-style': D.PasteAndMatchStyleItem,
   'inkblot.view.focus-mode': D.FocusModeItem,

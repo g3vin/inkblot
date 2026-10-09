@@ -5,7 +5,7 @@
  * (children via parentNoteId), with search filtering, pin/collapse toggles,
  * per-note color picking, image attachments, and jump-to-anchor.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import NoteCard from './RightSidebar/NoteCard'
 import { canvasSurfaceAt, dispatchCanvasDropNote } from '../canvas/canvasEvents'
 import {
@@ -15,12 +15,8 @@ import {
   noteColor,
   touchNote,
 } from '../lib/noteUtils'
-import { resolveInkHex } from '../lib/palette'
-
-const getPopupPosition = (x, y) => ({
-  left: Math.max(12, Math.min(x - 92, window.innerWidth - 204)),
-  top: Math.max(12, Math.min(y + 12, window.innerHeight - 180)),
-})
+import { isInkId, legacyInkFor } from '../lib/palette'
+import { InkPicker, Popover } from '../ui'
 
 /**
  * Drag a note onto an open canvas.
@@ -132,7 +128,7 @@ export default function NotesPanel({
   const [dragGhost, setDragGhost] = useState(null)
   const startNoteDrag = useNoteCanvasDrag(docName, setDragGhost)
   const [colorPicker, setColorPicker] = useState(null)
-  const colorPickerRef = useRef(null)
+  const colorAnchorRef = useRef(null)
 
   const closeMenus = useCallback(() => {
     setColorPicker(null)
@@ -194,8 +190,8 @@ export default function NotesPanel({
   }, [updateNote])
 
   const handleOpenColorPicker = useCallback((event, noteId) => {
-    const { left, top } = getPopupPosition(event.clientX, event.clientY)
-    setColorPicker({ mode: 'edit', noteId, left, top })
+    colorAnchorRef.current = event.currentTarget
+    setColorPicker({ noteId })
   }, [])
 
   const handleApplyColor = useCallback((color) => {
@@ -214,19 +210,6 @@ export default function NotesPanel({
     },
     [jumpToText]
   )
-
-  useEffect(() => {
-    const handlePointerDown = (event) => {
-      if (colorPickerRef.current?.contains(event.target)) {
-        return
-      }
-
-      closeMenus()
-    }
-
-    window.addEventListener('pointerdown', handlePointerDown)
-    return () => window.removeEventListener('pointerdown', handlePointerDown)
-  }, [closeMenus])
 
   const queryText = query.trim().toLowerCase()
 
@@ -305,41 +288,15 @@ export default function NotesPanel({
     )
   }
 
-  const activeColorValue = colorPicker?.mode === 'edit'
-    ? notes.find(note => note.id === colorPicker.noteId)?.color || NOTE_COLOR_OPTIONS[0]
-    : NOTE_COLOR_OPTIONS[0]
+  const pickedColor = colorPicker ? notes.find(note => note.id === colorPicker.noteId)?.color : null
+  const pickedInk = isInkId(pickedColor) ? pickedColor : legacyInkFor(pickedColor) ?? NOTE_COLOR_OPTIONS[0]
 
   return (
     <div className="sidebar-panel notes-panel">
-      {colorPicker && (
-        <div
-          ref={colorPickerRef}
-          className="note-floating-menu note-color-menu"
-          style={{ left: `${colorPicker.left}px`, top: `${colorPicker.top}px` }}
-        >
-          <div className="note-floating-title">Note color</div>
-          <div className="note-color-options">
-            {NOTE_COLOR_OPTIONS.map(color => (
-              <button
-                key={color}
-                className="note-color-swatch"
-                style={{ '--swatch-color': noteColor(color) }}
-                onClick={() => handleApplyColor(color)}
-                aria-label={`Use ${color} for note`}
-                title={color[0].toUpperCase() + color.slice(1)}
-              />
-            ))}
-            <label className="note-color-custom" title="Custom color">
-              <span>Custom</span>
-              <input
-                type="color"
-                defaultValue={resolveInkHex(activeColorValue)}
-                onChange={(event) => handleApplyColor(event.target.value)}
-              />
-            </label>
-          </div>
-        </div>
-      )}
+      <Popover anchorRef={colorAnchorRef} open={Boolean(colorPicker)} onClose={closeMenus} className="note-color-menu">
+        <div className="ib-eyebrow">Note colour</div>
+        <InkPicker label="Note colour" value={pickedInk} inks={NOTE_COLOR_OPTIONS} onChange={handleApplyColor} />
+      </Popover>
 
       <div className="notes-list">
         {noteTree.length === 0 ? (

@@ -154,7 +154,7 @@ export const BOOK_STYLES: BookStyleOption[] = [
   },
   {
     id: 'large-print',
-    label: 'Large Print',
+    label: 'Large print',
     description: 'Seventeen-point Palatino, generously spaced, ragged right and unhyphenated, for readers who need it.',
     typography: type({
       fontSizePt: 17,

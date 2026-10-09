@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { resolveInkHex } from '../../lib/palette'
+import { MAP_DEFAULT_COLORS } from '../../lib/map/mapColors'
 
 export function Field({ label, children, title }) {
   return (
@@ -135,7 +136,7 @@ export function CheckField({ label, checked, onChange }) {
   )
 }
 
-export function ColorField({ label, value, fallback = '#c0392b', onChange }) {
+export function ColorField({ label, value, fallback = MAP_DEFAULT_COLORS.pin, onChange }) {
   return (
     <Field label={label}>
       <span className="map-row">

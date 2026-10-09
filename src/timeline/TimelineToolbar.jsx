@@ -5,12 +5,12 @@
  * Swift shell (`timelineChrome`) it is not drawn: the window's toolbar becomes the
  * timeline's (`TimelineToolbar.swift`).
  */
-import SFIcon from '../components/SFIcon'
+import { Icon, Segmented } from '../ui'
 
 const TIMELINE_SCALE_OPTIONS = [
-  { id: 'time', label: 'By date', help: 'The chronology along the calendar' },
-  { id: 'sequence', label: 'In order', help: 'The chronology, every event one step apart' },
-  { id: 'manuscript', label: 'Manuscript', help: 'Passages in reading order, joined to when they happen' },
+  { value: 'time', label: 'By date', title: 'The chronology along the calendar' },
+  { value: 'sequence', label: 'In order', title: 'The chronology, every event one step apart' },
+  { value: 'manuscript', label: 'Manuscript', title: 'Passages in reading order, joined to when they happen' },
 ]
 
 export default function TimelineToolbar({
@@ -19,40 +19,26 @@ export default function TimelineToolbar({
   return (
     <div className="timeline-toolbar" role="toolbar" aria-label="Timeline">
       <button type="button" className="map-tool" title="Add an event" aria-label="Add an event" onClick={onAdd}>
-        <SFIcon name="plus" size={16} />
+        <Icon name="add" />
       </button>
       <span className="map-toolbar-sep" />
-      <div className="timeline-segmented" role="radiogroup" aria-label="Show as">
-        {TIMELINE_SCALE_OPTIONS.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            role="radio"
-            aria-checked={scale === option.id}
-            className={scale === option.id ? 'is-active' : ''}
-            title={option.help}
-            onClick={() => onScale(option.id)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      <Segmented label="Show as" value={scale} onChange={onScale} options={TIMELINE_SCALE_OPTIONS} />
       <span className="map-toolbar-sep" />
       <button type="button" className="map-tool" title="Undo (⌘Z)" aria-label="Undo" disabled={!canUndo} onClick={onUndo}>
-        <SFIcon name="arrow.uturn.backward" size={16} />
+        <Icon name="undo" />
       </button>
       <button type="button" className="map-tool" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!canRedo} onClick={onRedo}>
-        <SFIcon name="arrow.uturn.forward" size={16} />
+        <Icon name="redo" />
       </button>
       <span className="map-toolbar-sep" />
       <button type="button" className="map-tool" title="Zoom out (⌘−)" aria-label="Zoom out" onClick={onZoomOut}>
-        <SFIcon name="minus" size={16} />
+        <Icon name="zoom-out" />
       </button>
       <button type="button" className="map-tool" title="Zoom in (⌘+)" aria-label="Zoom in" onClick={onZoomIn}>
-        <SFIcon name="plus" size={16} />
+        <Icon name="zoom-in" />
       </button>
       <button type="button" className="map-tool" title="Show everything (⌘0)" aria-label="Show everything" onClick={onFit}>
-        <SFIcon name="map.fit" size={16} />
+        <Icon name="fit" />
       </button>
       <span className="map-toolbar-sep" />
       <button
@@ -63,7 +49,7 @@ export default function TimelineToolbar({
         aria-pressed={lensOn}
         onClick={onLens}
       >
-        <SFIcon name="timeline" size={16} />
+        <Icon name="timeline" />
       </button>
       <button
         type="button"
@@ -73,7 +59,7 @@ export default function TimelineToolbar({
         aria-pressed={inspectorOpen}
         onClick={onToggleInspector}
       >
-        <SFIcon name="gearshape" size={16} />
+        <Icon name="sidebar" />
       </button>
     </div>
   )

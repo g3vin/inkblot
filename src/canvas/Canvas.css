@@ -1,9 +1,8 @@
 /* ==== Canvas ====
  *
  * The canvas surface and its contents. Everything here consumes the shared
- * tokens from src/styles/tokens.css (--surface-*, --text-*, --border-*, --accent-*, and the
- * --floating-note-* set used for popovers), so light/dark mode needs no work of
- * its own.
+ * tokens from src/styles/tokens.css (--surface-*, --text-*, --border-*, --accent-*,
+ * --menu-* for popovers), so light/dark mode needs no work of its own.
  */
 
 .canvas-pane {
@@ -29,12 +28,7 @@
    * one said nothing. resolveCanvasColor() returns var(--canvas-ink) for an unset
    * colour, so this token is the single place the neutral default is defined.
    */
-  --canvas-ink: #1b1f27;
-  /* Card shadows sit in the world, so their blur scales with the zoom — at 400% the
-     app's 28–40px popover shadow is a 160px blur on every card, repainted each time
-     the canvas moves. Tighter here, for the same look at a fraction of the cost. */
-  --canvas-card-shadow: 0 1px 2px rgba(17, 24, 39, 0.06), 0 6px 14px rgba(17, 24, 39, 0.1);
-  --canvas-card-shadow-hover: 0 1px 2px rgba(17, 24, 39, 0.08), 0 10px 20px rgba(17, 24, 39, 0.14);
+  --canvas-ink: var(--text-primary);
 
   position: relative;
   flex: 1;
@@ -74,13 +68,6 @@
   background-position:
     calc(var(--canvas-grid-x) - 1px)
     calc(var(--canvas-grid-y) - 1px);
-}
-
-/* Follows the app's theme (data-theme is always light or dark; see lib/theme.ts). */
-:root[data-theme='dark'] .canvas-surface {
-  --canvas-ink: #eef1f6;
-  --canvas-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 14px rgba(0, 0, 0, 0.28);
-  --canvas-card-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.24), 0 10px 20px rgba(0, 0, 0, 0.36);
 }
 
 .canvas-surface.is-pannable {
@@ -191,51 +178,7 @@
   background: transparent;
 }
 
-/* ---- color picker ----
-   Portaled to the body and positioned from the button's measured rect: the
-   toolbar scrolls and the titlebar clips, so it cannot be laid out inside them. */
-
-.canvas-color-menu {
-  position: fixed;
-  transform: translateX(-50%);
-  z-index: 95;
-  display: grid;
-  grid-template-columns: repeat(4, 20px);
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid var(--popover-border);
-  border-radius: 10px;
-  background: var(--popover-bg);
-  box-shadow: var(--shadow-popover);
-}
-
-.canvas-color-swatch {
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--border-muted);
-  border-radius: 50%;
-  padding: 0;
-  cursor: pointer;
-  transition: transform 0.12s ease;
-}
-
-.canvas-color-swatch:hover {
-  transform: scale(1.15);
-}
-
 /* The "no color" swatch reads as an outline rather than a filled dot. */
-.canvas-color-swatch-none {
-  position: relative;
-  background: transparent !important;
-}
-
-.canvas-color-swatch-none::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: var(--accent-color);
-}
 
 /* ---- nodes ---- */
 
@@ -273,16 +216,16 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--card-edge);
-  border-radius: var(--floating-note-radius, 16px);
+  border-radius: var(--radius-lg);
   background: var(--card-tint);
-  box-shadow: var(--canvas-card-shadow);
+  box-shadow: var(--shadow-canvas-card);
   cursor: default;
   transition: box-shadow 0.14s ease, border-color 0.14s ease;
 }
 
 .canvas-node-text:hover,
 .canvas-node-file:hover {
-  box-shadow: var(--canvas-card-shadow-hover);
+  box-shadow: var(--shadow-canvas-card-hover);
   border-color: var(--card-edge-hover);
 }
 
@@ -436,7 +379,7 @@
   pointer-events: none;
   font-size: 12px;
   /* Fade the cut-off bottom, so a crop reads as "there is more" and not as a bug. */
-  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
 }
 
 .canvas-doc-empty {
@@ -451,7 +394,7 @@
 .canvas-doc-kind {
   flex: none;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-3);
   color: var(--text-subtle);
   font-size: 10px;
@@ -602,7 +545,7 @@
 .canvas-note-actions button {
   padding: 2px 7px;
   border: 1px solid var(--border-muted);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--text-subtle);
   font-size: 10px;
@@ -633,14 +576,14 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--card-edge);
-  border-radius: var(--floating-note-radius, 16px);
+  border-radius: var(--radius-lg);
   background: var(--card-tint);
-  box-shadow: var(--canvas-card-shadow);
+  box-shadow: var(--shadow-canvas-card);
   transition: box-shadow 0.14s ease, border-color 0.14s ease;
 }
 
 .canvas-node-link:hover {
-  box-shadow: var(--canvas-card-shadow-hover);
+  box-shadow: var(--shadow-canvas-card-hover);
   border-color: var(--card-edge-hover);
 }
 
@@ -678,7 +621,7 @@
   flex: none;
   padding: 3px 9px;
   border: 1px solid var(--border-color);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--text-secondary);
   font-size: 11px;
@@ -762,7 +705,7 @@
 
 .canvas-node-group {
   border: 2px solid var(--node-color);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--node-color) 7%, transparent);
 }
 
@@ -777,7 +720,7 @@
   top: -24px;
   left: 0;
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--node-color);
   color: var(--surface-0);
   font-size: 12px;
@@ -967,7 +910,7 @@
   max-width: 180px;
   padding: 2px 7px;
   border: 1px solid var(--border-muted);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--surface-1);
   color: var(--text-secondary);
   font-size: 11px;
@@ -1120,7 +1063,7 @@
   flex: 1;
   min-width: 0;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-3);
   cursor: pointer;
 }

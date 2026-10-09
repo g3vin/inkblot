@@ -3,15 +3,15 @@
  * as itself, to drag into the toolbar; the default set to drag in whole; and how the
  * toolbar shows its items.
  */
-import { DEFAULT_TOOLBARS, FLEXIBLE_SPACE, SPACE, toolbarItemsFor } from '../../lib/chromeLayout'
+import { DEFAULT_TOOLBARS, FLEXIBLE_SPACE, MORE, SPACE, toolbarItemsFor } from '../../lib/chromeLayout'
 import { Button, SelectMenu, Sheet } from '../../ui'
 import ToolbarItem from './ToolbarItem'
 import { inToolbar } from './toolbarEdits'
 
 const DISPLAY_OPTIONS = [
-  { value: 'iconAndLabel', label: 'Icon and Text' },
-  { value: 'icon', label: 'Icon Only' },
-  { value: 'label', label: 'Text Only' },
+  { value: 'iconAndLabel', label: 'Icon and text' },
+  { value: 'icon', label: 'Icon only' },
+  { value: 'label', label: 'Text only' },
 ]
 
 const CONTEXT_TITLES = { document: 'the document toolbar', canvas: 'the canvas toolbar', map: 'the map toolbar', typeset: 'the Typeset toolbar' }
@@ -20,7 +20,8 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
   const offered = [
     ...toolbarItemsFor(context).map((spec) => ({ id: spec.id, label: spec.label })),
     { id: SPACE, label: 'Space' },
-    { id: FLEXIBLE_SPACE, label: 'Flexible Space' },
+    { id: FLEXIBLE_SPACE, label: 'Flexible space' },
+    { id: MORE, label: 'More menu' },
   ]
   // Items are previews: drawn by their real components, inert, and as they look when
   // they can act — a palette of disabled items would show nothing of what they are.
@@ -39,7 +40,7 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
 
   return (
     <Sheet
-      title={`Drag your favorite items into ${CONTEXT_TITLES[context] ?? 'the toolbar'}…`}
+      title={`Drag the items you use into ${CONTEXT_TITLES[context] ?? 'the toolbar'}`}
       width={720}
       placement="top"
       onClose={onClose}
@@ -50,7 +51,7 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
             Show
             <SelectMenu value={display} onChange={onDisplay} options={DISPLAY_OPTIONS} label="Show" />
           </label>
-          <Button variant="plain" onClick={onReset}>Restore Default Set</Button>
+          <Button variant="plain" onClick={onReset}>Restore default set</Button>
           <span className="ui-sheet-footer-spacer" />
           <Button variant="filled" onClick={onClose}>Done</Button>
         </>
@@ -75,7 +76,7 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
           )
         })}
       </div>
-      <p className="tb-palette-hint">…or drag the default set into the toolbar.</p>
+      <p className="tb-palette-hint">Items after More sit behind » in the toolbar. Or drag the default set in whole.</p>
       <div
         className="tb-palette-defaults"
         title="Drag the default set into the toolbar"

@@ -38,7 +38,7 @@
   right: var(--space-2);
   top: -1px;
   height: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: var(--accent-color);
 }
 .book-insert-end { position: relative; display: block; left: 0; right: 0; }

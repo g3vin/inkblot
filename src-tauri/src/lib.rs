@@ -17,7 +17,6 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager};
 
-mod accent_commands;
 mod core_commands;
 mod dictation_commands;
 mod haptics_commands;
@@ -31,7 +30,6 @@ mod stats_commands;
 mod synonym_commands;
 mod webview_commands;
 
-use accent_commands::system_accent_color;
 use core_commands::{list_system_fonts, scrape_pinterest_html};
 use dictation_commands::{
     cancel_dictation_session, dictation_status, load_dictation_model, start_dictation_session,
@@ -82,7 +80,6 @@ pub fn run() {
             scrape_pinterest_html,
             list_system_fonts,
             perform_haptic,
-            system_accent_color,
             get_synonyms,
             synonym_model_status,
             download_synonym_model,

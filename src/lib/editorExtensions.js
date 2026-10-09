@@ -7,7 +7,6 @@
  */
 import { StarterKit } from '@tiptap/starter-kit'
 import { Color } from '@tiptap/extension-color'
-import { Dropcursor } from '@tiptap/extension-dropcursor'
 import { FontFamily } from '@tiptap/extension-font-family'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { Highlight } from '@tiptap/extension-highlight'
@@ -82,10 +81,9 @@ const sharedExtensions = () => [
 export const buildEditorExtensions = (starterKit) => [
   // The empty paragraph the editor keeps last would be prose in a script: a script
   // ends on its own lines (ScriptElement.ts).
-  starterKit.configure({ trailingNode: { notAfter: ['scriptElement'] } }),
-  Dropcursor.configure({
-    color: 'rgba(84, 165, 255, 0.95)',
-    width: 2,
+  starterKit.configure({
+    trailingNode: { notAfter: ['scriptElement'] },
+    dropcursor: { color: 'var(--accent-color)', width: 2 },
   }),
   NoteAnnotation,
   TimelineAnchors,

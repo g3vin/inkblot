@@ -59,10 +59,10 @@ export function deriveFileNodeState(node, context = {}) {
   const kind = isFolder ? null : getDocKind(node.path)
   const isCanvas = kind === 'canvas'
   const iconName = isFolder
-    ? (storyPreset?.folderIcon || (isExpanded ? 'folder.fill' : 'folder'))
+    ? (storyPreset?.folderIcon || (isExpanded ? 'folder-open' : 'folder'))
     : (isCanvas ? 'canvas' : kind === 'map' ? 'map' : kind === 'timeline' ? 'timeline' : null)
   const hasEntryIcon = Boolean(iconName)
-  // Only a document's icon fills in — a folder's is already solid when open.
+  // Only a document's icon fills in; an open folder shows its open glyph instead.
   const iconFilled = !isFolder && isActive && hasEntryIcon
 
   const showInlineInput =

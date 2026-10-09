@@ -4,20 +4,21 @@
  */
 import { useCallback, useMemo } from 'react'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
+import { DEFAULT_HIGHLIGHT_COLOR, DEFAULT_TEXT_COLOR } from '../../lib/palette'
 
 export const CUSTOMIZE_TOOLBAR_EVENT = 'inkblot:customize-toolbar'
 
 const DEFAULT_TOOLBAR_STATE = {
   target: undefined,
-  color: '#000000',
-  highlight: '#ffff00',
+  color: DEFAULT_TEXT_COLOR,
+  highlight: DEFAULT_HIGHLIGHT_COLOR,
   font: 'Literata',
   fontSize: '18px',
   alignment: 'left',
   activeMarks: { bold: false, italic: false, underline: false, strike: false, table: false },
   canUndo: false,
   canRedo: false,
-  lastHighlightColor: '#ffff00',
+  lastHighlightColor: DEFAULT_HIGHLIGHT_COLOR,
 }
 const NO_CANVAS = {}
 const NO_MAP = {}

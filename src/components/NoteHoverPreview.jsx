@@ -11,13 +11,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { useNoteCardDrag } from '../hooks/useNoteCardDrag'
 import NoteImageGallery from './NoteImageGallery'
 import AudioNotes from './AudioNotes'
 import { readClipboardImages } from '../lib/noteImageUtils'
 import { collectNoteBranchIds, createFreeNote, noteColor, touchNote } from '../lib/noteUtils'
-import { RESIZE_ICON_PATHS } from '../lib/resizeIcon'
 import {
   NOTE_HIGHLIGHT_EVENT,
   NOTE_PREVIEW_ENTER_EVENT,
@@ -630,7 +629,7 @@ export default function NoteHoverPreview({
 
       {layout.nodes.map(({ note, position, size, childCount, revealDelay }) => {
         const renderPosition = elasticPositions[note.id] || position
-        const addIconName = childCount > 0 ? 'git.pullrequest' : 'arrow.down.to.dot'
+        const addIconName = childCount > 0 ? 'compare' : 'merge'
         return (
           <article
             key={note.id}
@@ -659,7 +658,7 @@ export default function NoteHoverPreview({
                 aria-label="Move note"
                 title="Move note"
               >
-                <SFIcon name="ellipsis" size={14} />
+                <Icon name="more" />
               </button>
 
               {note.id === rootNote.id ? (
@@ -670,7 +669,7 @@ export default function NoteHoverPreview({
                   aria-label="Close note preview"
                   title="Close note preview"
                 >
-                  <SFIcon name="xmark" size={12} />
+                  <Icon name="close" />
                 </button>
               ) : <span className="note-preview-spacer" />}
             </div>
@@ -725,7 +724,7 @@ export default function NoteHoverPreview({
                   aria-label="Delete note branch"
                   title="Delete note branch"
                 >
-                  <SFIcon name="trash" size={14} />
+                  <Icon name="delete" />
                 </button>
 
                 {childCount > 0 ? (
@@ -739,7 +738,7 @@ export default function NoteHoverPreview({
                     aria-label={note.collapsedChildren ? 'Expand branch' : 'Collapse branch'}
                     title={note.collapsedChildren ? 'Expand branch' : 'Collapse branch'}
                   >
-                    <SFIcon name="arrow.up.from.dot" size={14} />
+                    <Icon name="split" />
                   </button>
                 ) : null}
 
@@ -753,7 +752,7 @@ export default function NoteHoverPreview({
                   aria-label="Add connected note"
                   title="Add connected note"
                 >
-                  <SFIcon name={addIconName} size={14} />
+                  <Icon name={addIconName} />
                 </button>
               </div>
             </div>
@@ -766,21 +765,7 @@ export default function NoteHoverPreview({
               aria-label="Resize note"
               title="Resize note"
             >
-              <svg
-                className="resize-corner-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                {RESIZE_ICON_PATHS.map(path => <path key={path} d={path} />)}
-              </svg>
+              <Icon name="resize" className="resize-corner-icon" />
             </button>
           </article>
         )

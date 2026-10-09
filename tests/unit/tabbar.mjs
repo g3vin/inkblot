@@ -23,7 +23,7 @@ const { default: useTabShortcuts } = await import('../../src/components/tabs/use
 /* ---------------- names ---------------- */
 
 ok('a canvas is named without its suffix', T.tabName('Boards/Plot.canvas') === 'Plot')
-ok('a draft is a new tab', T.tabName(null) === 'New Tab')
+ok('a draft is a new tab', T.tabName(null) === 'New tab')
 const clash = [{ id: 'a', docPath: 'Part One/Notes' }, { id: 'b', docPath: 'Part Two/Notes' }, { id: 'c', docPath: 'Chapter' }]
 ok('two tabs of one name show their folders', T.tabTitle(clash[0], clash) === 'Notes — Part One' && T.tabTitle(clash[2], clash) === 'Chapter')
 ok('one tab needs no bar', !T.needsTabBar([{ id: 'a' }]) && T.needsTabBar([{ id: 'a', split: 'columns' }]) && T.needsTabBar(clash))

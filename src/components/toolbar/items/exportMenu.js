@@ -17,14 +17,14 @@ export function exportMenuItems(ctx, { bindable = false } = {}) {
     { separator: true },
     { text: 'Markdown…', action: () => exportAs(ExportFormat.Markdown) },
     { text: 'HTML…', action: () => exportAs(ExportFormat.Html) },
-    { text: 'Plain Text…', action: () => exportAs(ExportFormat.PlainText) },
+    { text: 'Plain text…', action: () => exportAs(ExportFormat.PlainText) },
     script ? { separator: true } : null,
     script ? { text: 'Fountain…', action: () => exportAs(ExportFormat.Fountain) } : null,
     script ? { text: 'Final Draft (.fdx)…', action: () => exportAs(ExportFormat.Fdx) } : null,
     bindable ? { separator: true } : null,
-    bindable ? { text: 'PDF for Binding…', action: () => exportAs(ExportFormat.Pdf, { bound: true }) } : null,
+    bindable ? { text: 'PDF for binding…', action: () => exportAs(ExportFormat.Pdf, { bound: true }) } : null,
     { separator: true },
-    { text: 'Cover PDF (Full Wrap)…', action: () => ctx.send('exportDocument', { format: ExportFormat.CoverPdf, scope: scope === PrintScope.Document ? PrintScope.Folder : scope }) },
-    layout.book?.editions?.length ? { text: 'All Editions…', action: () => ctx.send('exportAllEditions', {}) } : null,
+    { text: 'Cover PDF (full wrap)…', action: () => ctx.send('exportDocument', { format: ExportFormat.CoverPdf, scope: scope === PrintScope.Document ? PrintScope.Folder : scope }) },
+    layout.book?.editions?.length ? { text: 'All editions…', action: () => ctx.send('exportAllEditions', {}) } : null,
   ]
 }
