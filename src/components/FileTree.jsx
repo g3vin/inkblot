@@ -25,6 +25,7 @@ import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
 import { noteOpened, recentDocs } from '../lib/recentDocs'
+import { lockReason, refreshLocks, useLocks } from '../lib/docLocks'
 import TreeFilterBar from './tree/TreeFilterBar'
 import {
   STORY_FOLDER_PRESETS,
@@ -71,6 +72,7 @@ export default function FileTree({
   footerSlot,
 }) {
   const prefersReducedMotion = useReducedMotion()
+  const locks = useLocks()
   const [view, setView] = useState('files')
   const [projects, setProjects] = useState([])
   const [tree, setTree] = useState({ type: 'folder', name: '', path: '', children: [] })
@@ -117,6 +119,8 @@ export default function FileTree({
     orderRef.current = nextOrder
     setOrder(nextOrder)
     setTree(orderedTree)
+    // Whatever changed the tree may have moved, copied or removed something locked.
+    void refreshLocks(projectName)
   }, [projectName])
 
   useEffect(() => {
@@ -518,6 +522,9 @@ export default function FileTree({
       siblings,
       splitView,
     })
+    // Locked itself, or inside a locked folder (docLocks.ts), which marks it more quietly.
+    const lock = lockReason(node.path, locks)
+    const lockInherited = lock?.by === 'folder' && lock.folder !== node.path
 
     return (
       <MotionDiv
@@ -592,6 +599,13 @@ export default function FileTree({
           ) : (
             <span className="file-item-label">{label}</span>
           )}
+          {lock && !isRenaming ? (
+            <Icon
+              name="lock"
+              label={lockInherited ? `Locked with “${lock.folder.split('/').pop()}”` : 'Locked'}
+              className={`file-item-lock${lockInherited ? ' is-inherited' : ''}`}
+            />
+          ) : null}
 
           <AnimatePresence initial={false}>
             {showFolderDivider ? (

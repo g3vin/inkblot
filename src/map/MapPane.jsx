@@ -11,6 +11,8 @@
  */
 import { useEffect, useState } from 'react'
 import { getDocDisplayName } from '../lib/docKind'
+import { useLockReason } from '../lib/docLocks'
+import DocLockBadge from '../components/DocLockBadge'
 import { loadMapDocument } from '../lib/map/mapFileSystem'
 import MapSurface from './MapSurface'
 import './Map.css'
@@ -26,6 +28,7 @@ export default function MapPane({
   isActive = true,
   chromeWhileInactive = false,
 }) {
+  const locked = useLockReason(docPath) !== null
   const [loaded, setLoaded] = useState(null)
 
   useEffect(() => {
@@ -61,6 +64,7 @@ export default function MapPane({
       ) : loaded ? (
         <MapSurface
           key={docPath}
+          locked={locked}
           projectName={projectName}
           docPath={docPath}
           initialMap={loaded.map}
@@ -73,6 +77,7 @@ export default function MapPane({
       ) : (
         <div className="map-surface is-loading" />
       )}
+      <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} />
     </div>
   )
 }

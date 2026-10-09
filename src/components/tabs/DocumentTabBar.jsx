@@ -9,6 +9,7 @@
  * page does not have. Click a tab to show it; the ✕ that appears on hover closes it.
  * Drag a tab to reorder, or a document from the file tree onto the bar to open it in
  * a tab. A tab holding a split names both its documents, the first pane's first.
+ * A locked document (docLocks.ts) wears a lock, and its menu locks and unlocks it.
  *
  * ⌘T opens a new tab, ⌘W closes the one showing, ⌘1–⌘9 pick one, and ⌃Tab / ⌃⇧Tab
  * go round them.
@@ -19,15 +20,17 @@ import { FloatingCapsule, IconButton, usePointerReorder } from '../../ui'
 import { moveTo } from '../../ui/usePointerReorder.js'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
 import Icon from '../../ui/Icon.jsx'
+import { lockReason, toggleDocumentLock, useLocks } from '../../lib/docLocks'
 import { adjacentTab, needsTabBar, tabIcon, tabName, tabTitle, useShowsTabBar } from './tabBarState.js'
 import './DocumentTabBar.css'
 
 const send = (type, payload) => shellBridge.send(type, payload)
 const NO_TABS = { tabs: [] }
 
-function tabMenu(tab, tabs, activeDoc) {
+function tabMenu(tab, tabs, activeDoc, locks) {
   const canSplit = Boolean(tab.docPath && tab.docPath !== activeDoc)
   const index = tabs.findIndex((t) => t.id === tab.id)
+  const lock = lockReason(tab.docPath, locks)
   return [
     { text: 'Open in split right', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'columns' }) },
     { text: 'Open in split below', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'rows' }) },
@@ -35,6 +38,10 @@ function tabMenu(tab, tabs, activeDoc) {
       send('openDocInWindow', { docPath: tab.docPath })
       send('closeTab', { tabId: tab.id })
     } },
+    { separator: true },
+    lock?.by === 'folder'
+      ? { text: `Locked with “${lock.folder.split('/').pop()}”`, enabled: false }
+      : { text: lock ? 'Unlock document' : 'Lock document', enabled: Boolean(tab.docPath), action: () => toggleDocumentLock(tab.docPath) },
     { separator: true },
     { text: 'Close tab', action: () => send('closeTab', { tabId: tab.id }) },
     { text: 'Close other tabs', enabled: tabs.length > 1, action: () => tabs.forEach((t) => t.id !== tab.id && send('closeTab', { tabId: t.id })) },
@@ -45,6 +52,7 @@ function tabMenu(tab, tabs, activeDoc) {
 export default function DocumentTabBar({ activeDoc }) {
   const state = useLatestBridgeState('tabsChanged', NO_TABS)
   const shown = useShowsTabBar()
+  const locks = useLocks()
   const listRef = useRef(null)
   const tabs = state?.tabs ?? []
   const activeTabId = state?.activeTabId
@@ -99,7 +107,7 @@ export default function DocumentTabBar({ activeDoc }) {
                   }
                   if (event.key === 'Delete' || event.key === 'Backspace') send('closeTab', { tabId: tab.id })
                 }}
-                onContextMenu={(event) => popUpNativeMenu(event, tabMenu(tab, tabs, activeDoc))}
+                onContextMenu={(event) => popUpNativeMenu(event, tabMenu(tab, tabs, activeDoc, locks))}
               >
                 <button
                   type="button"
@@ -113,11 +121,13 @@ export default function DocumentTabBar({ activeDoc }) {
                 </button>
                 <Icon name={tabIcon(tab.docPath)} />
                 <span className="document-tab-name">{title}</span>
+                {lockReason(tab.docPath, locks) ? <Icon name="lock" className="document-tab-lock" label="Locked" /> : null}
                 {second ? (
                   <>
                     <span className="document-tab-divider" aria-hidden="true">|</span>
                     <Icon name={tabIcon(tab.secondaryDoc)} />
                     <span className="document-tab-name">{second}</span>
+                    {lockReason(tab.secondaryDoc, locks) ? <Icon name="lock" className="document-tab-lock" label="Locked" /> : null}
                   </>
                 ) : null}
               </div>

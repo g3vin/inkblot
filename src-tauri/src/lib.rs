@@ -31,7 +31,7 @@ mod synonym_commands;
 mod trackpad;
 mod webview_commands;
 
-use core_commands::{list_system_fonts, scrape_pinterest_html};
+use core_commands::{list_system_fonts, project_locks, scrape_pinterest_html};
 use dictation_commands::{
     cancel_dictation_session, dictation_status, load_dictation_model, start_dictation_session,
     stop_dictation_session, AppDictationState,
@@ -84,6 +84,7 @@ pub fn run() {
             eval_webview,
             scrape_pinterest_html,
             list_system_fonts,
+            project_locks,
             perform_haptic,
             get_synonyms,
             synonym_model_status,

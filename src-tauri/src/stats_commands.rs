@@ -28,7 +28,7 @@ fn stats(app_handle: &AppHandle) -> Result<&'static StatsStore, String> {
 }
 
 /// For counting a project's words from disk: read only, so its session id locks nothing.
-fn projects(app_handle: &AppHandle) -> Result<&'static ProjectStore, String> {
+pub(crate) fn projects(app_handle: &AppHandle) -> Result<&'static ProjectStore, String> {
     if let Some(store) = PROJECTS.get() {
         return Ok(store);
     }

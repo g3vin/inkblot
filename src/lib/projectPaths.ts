@@ -10,6 +10,8 @@ import { CANVAS_SUFFIX } from './docKind'
 import { getProjectLocation } from './projectLocations'
 
 export const ORDER_FILE = '.inkblot-order.json'
+/** Inside a folder: `{ "locked": true }` when the writer has locked it (docLocks.ts). */
+export const FOLDER_FILE = '.inkblot-folder.json'
 
 /**
  * A path as a caller hands it over. Absent and empty are both ordinary here —

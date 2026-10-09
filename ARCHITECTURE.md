@@ -42,7 +42,7 @@ in its header comment. This document covers what spans modules.
 - **A timeline view is the fourth**, `<name>.timeline.json`. It holds how the project's
   one chronology is shown, never events. See [Timeline](#timeline).
 - **Text documents** are `<path>.json`: `{ content, notes, versions?, archive?,
-  citations?, timeline? }`. `timeline` is the passages attached to timeline events.
+  citations?, timeline?, locked? }`. `timeline` is the passages attached to timeline events.
   - `archive` holds bubble sessions the writer archived (`bridge/archive.rs`). A
     session still open lives in the text as a `bubbleSession` mark whose attributes
     are the whole session, so version history restores it.
@@ -53,6 +53,12 @@ in its header comment. This document covers what spans modules.
   - Print Layout's page setup is an attribute of the `doc` node, so it rides in
     autosave and every version. `setContent` drops doc attributes, so restores and
     merges go through `setContentKeepingPageSetup`.
+- **Locks** (`docLocks.ts`). Any document can carry `locked: true`, and every save
+  keeps it (`keepLock` in FileSystem.js, and the Rust save). A locked folder holds a
+  `.inkblot-folder.json` marker, so the lock moves with it. The panes freeze the
+  content (the `DocumentLock` extension, the canvas and map reducers' dispatch, the
+  timeline's commit); notes still change. The page reads a project's locks through
+  `project_locks`, a Rust scan that reads only the flag.
 - **Version history.**
   - Text versions store both HTML (for diffing and preview) and ProseMirror JSON (for
     restore).

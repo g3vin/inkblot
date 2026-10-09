@@ -15,6 +15,9 @@
  *
  * Under a shell that draws the toolbar and inspector (`timelineChrome`), they are
  * published instead of drawn, and come back as `timelineCommand`s by id.
+ *
+ * A locked view (docLocks.ts) still pans, zooms and filters, but saves none of it, and
+ * changes no events: commits, undo and redo are refused, and a drag springs back.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getDocDisplayName } from '../lib/docKind'
@@ -26,7 +29,8 @@ import { commitTimelineEdit } from '../lib/timeline/timelineEdits'
 import { TIMELINE_DOC_MOVED_EVENT, movedPath } from '../lib/timeline/timelineLinks'
 import { saveTimelineView } from '../lib/timeline/timelineFileSystem'
 import { TIMELINE_RANGES_CHANGED_EVENT } from '../lib/timeline/timelineRanges'
-import { redoStoryTimeline, STORY_TIMELINE_CHANGED_EVENT, timelineHistoryState, undoStoryTimeline } from '../lib/timeline/timelineStore'
+import { cancelTimelinePreview, redoStoryTimeline, STORY_TIMELINE_CHANGED_EVENT, timelineHistoryState, undoStoryTimeline } from '../lib/timeline/timelineStore'
+import { noteLockedEdit } from '../lib/docLocks'
 import { boundViewport, MAX_PX_PER_DAY, MIN_PX_PER_DAY, snapUnit } from '../lib/timeline/timelineScale'
 import { requestMapReveal } from '../map/mapEvents'
 import MapPanelView from '../map/MapPanelView'
@@ -57,6 +61,7 @@ export default function TimelineSurface({
   onActivate,
   onOpenDoc,
   isActive = true,
+  locked = false,
 }) {
   const surfaceRef = useRef(null)
   const plotRef = useRef(null)
@@ -87,10 +92,10 @@ export default function TimelineSurface({
     setView((current) => {
       const next = normalizeTimelineView({ ...current, ...patch })
       clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => saveTimelineView(projectName, docPath, next), 400)
+      if (!locked) saveTimer.current = setTimeout(() => saveTimelineView(projectName, docPath, next), 400)
       return next
     })
-  }, [docPath, projectName])
+  }, [docPath, locked, projectName])
   useEffect(() => () => clearTimeout(saveTimer.current), [])
 
   // A participant renamed elsewhere: follow it here too, or the next save writes it back.
@@ -229,7 +234,13 @@ export default function TimelineSurface({
 
   /* ---------------- editing ---------------- */
 
-  const commit = useCallback((label, edit, effects) => commitTimelineEdit(projectName, label, edit, effects), [projectName])
+  const refuse = useCallback(() => {
+    cancelTimelinePreview(projectName)
+    noteLockedEdit(docPath)
+  }, [docPath, projectName])
+  const commit = useCallback((label, edit, effects) => (
+    locked ? refuse() : commitTimelineEdit(projectName, label, edit, effects)
+  ), [locked, projectName, refuse])
 
   /** A sensible day for something newly dated: the cursor, or the middle of the view. */
   const suggestDay = useCallback((eventId) => {
@@ -288,8 +299,8 @@ export default function TimelineSurface({
       : moveEventBetween(tl, event.id, sequence[target].id))
   }, [axis, calendar, commit, selection, timeline, vp.px])
 
-  const undo = useCallback(() => undoStoryTimeline(projectName).then(refreshMaps), [projectName, refreshMaps])
-  const redo = useCallback(() => redoStoryTimeline(projectName).then(refreshMaps), [projectName, refreshMaps])
+  const undo = useCallback(() => (locked ? refuse() : undoStoryTimeline(projectName).then(refreshMaps)), [locked, projectName, refreshMaps, refuse])
+  const redo = useCallback(() => (locked ? refuse() : redoStoryTimeline(projectName).then(refreshMaps)), [locked, projectName, refreshMaps, refuse])
 
   const openLink = useCallback((link) => {
     if (link.kind === 'pin') {

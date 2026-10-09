@@ -26,6 +26,7 @@ import {
 } from '../lib/canvasModel'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 import { useCanvasViewport } from './useCanvasViewport'
+import { noteLockedEdit } from '../lib/docLocks'
 import { useCanvasDocument } from './useCanvasDocument'
 import { useCanvasSelection } from './useCanvasSelection'
 import { loadSnapPrefs, saveSnapPrefs, useCanvasDrag } from './useCanvasDrag'
@@ -50,6 +51,7 @@ export default function CanvasSurface({
   onOpenDoc,
   setActiveEditor,
   isActive = true,
+  docLocked = false,
 }) {
   const toolbarSlot = useContext(CanvasToolbarSlotContext)
   const stateRef = useRef(initialState)
@@ -64,16 +66,23 @@ export default function CanvasSurface({
    * contents, because the wheel is handed to whatever is under it instead of being
    * swallowed to pan. Nothing can be dragged, resized, selected, or created.
    *
+   * A locked document (docLocks.ts) is always in read mode; otherwise it is the writer's
+   * toggle, for this sitting only.
+   *
    * The ref is what the (native, non-React) wheel listener reads; the state is what
    * the UI renders from.
    */
-  const [locked, setLocked] = useState(false)
+  const [readMode, setReadMode] = useState(false)
+  const locked = readMode || docLocked
   const lockedRef = useRef(locked)
   useEffect(() => {
     lockedRef.current = locked
   }, [locked])
 
-  const toggleLocked = useCallback(() => setLocked((current) => !current), [])
+  const toggleLocked = useCallback(() => {
+    if (docLocked) noteLockedEdit(docPath)
+    else setReadMode((current) => !current)
+  }, [docLocked, docPath])
 
   // Panning is not an edit: it saves on its own slow debounce and never enters
   // the undo history. Edits save separately, in useCanvasDocument.
@@ -141,6 +150,7 @@ export default function CanvasSurface({
     docPath,
     initialState,
     viewportRef,
+    locked: docLocked,
   })
 
   useEffect(() => {

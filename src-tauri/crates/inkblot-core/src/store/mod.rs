@@ -44,6 +44,7 @@ pub mod versions;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::doc_kind::{doc_kind_name, get_doc_kind, is_map_doc, is_text_doc, strip_doc_suffix, with_doc_suffix};
@@ -53,7 +54,7 @@ use doc_lock::DocLocks;
 use locations::ProjectLocations;
 use paths::{
     file_path_for, folder_path_for, join_path, normalize_path, parent_of, strip_trailing_slash,
-    versions_sidecar_path, ORDER_FILE,
+    versions_sidecar_path, FOLDER_FILE, ORDER_FILE,
 };
 use versions::{push_version_entry, NewTextVersion};
 
@@ -305,6 +306,11 @@ impl ProjectStore {
                 // writes (`saveDocumentTimeline`).
                 if let Some(timeline) = existing.get("timeline").filter(|t| t.as_array().is_some_and(|t| !t.is_empty())) {
                     fields.insert("timeline".to_string(), timeline.clone());
+                }
+                // So is the writer's lock (`docLocks.ts`); the page keeps the text
+                // from changing, the save only keeps the flag.
+                if is_locked(existing) {
+                    fields.insert("locked".to_string(), Value::Bool(true));
                 }
             }
             std::fs::write(&file_path, serde_json::to_string(&document)?)?;
@@ -946,6 +952,19 @@ impl ProjectStore {
         Ok(Some(next_path.to_string()))
     }
 
+    /// Every document and folder a writer has locked (`src/lib/docLocks.ts`). A
+    /// document is locked by its own `locked` flag and a folder by the marker file
+    /// inside it, so both travel with the project. Only the flag is read out of each
+    /// document.
+    pub fn locked_entries(&self, project_name: &str) -> LockedEntries {
+        let root = self.project_root(project_name);
+        let mut found = LockedEntries::default();
+        for child in self.list_project_tree(project_name).children.iter().flatten() {
+            collect_locked(&root, child, &mut found);
+        }
+        found
+    }
+
     /// A project's full folder and file tree. Dotfiles and the order file are excluded.
     pub fn list_project_tree(&self, project_name: &str) -> TreeNode {
         let root = self.project_root(project_name);
@@ -955,6 +974,43 @@ impl ProjectStore {
             path: String::new(),
             children: Some(read_directory(&root, "")),
         }
+    }
+}
+
+/// What [`ProjectStore::locked_entries`] finds, by tree path.
+#[derive(Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LockedEntries {
+    pub documents: Vec<String>,
+    pub folders: Vec<String>,
+}
+
+/// The one key a lock scan reads out of a document; serde skips the rest.
+#[derive(Deserialize)]
+struct LockFlag {
+    #[serde(default)]
+    locked: bool,
+}
+
+fn is_locked(doc: &Value) -> bool {
+    doc.get("locked").and_then(Value::as_bool).unwrap_or(false)
+}
+
+fn collect_locked(root: &str, node: &TreeNode, found: &mut LockedEntries) {
+    let path = join_path(&[root, &node.path]);
+    if node.node_type == TreeNodeType::Folder {
+        if read_json(&join_path(&[&path, FOLDER_FILE])).is_some_and(|marker| is_locked(&marker)) {
+            found.folders.push(node.path.clone());
+        }
+        for child in node.children.iter().flatten() {
+            collect_locked(root, child, found);
+        }
+    } else if std::fs::read_to_string(format!("{path}.json"))
+        .ok()
+        .and_then(|raw| serde_json::from_str::<LockFlag>(&raw).ok())
+        .is_some_and(|flag| flag.locked)
+    {
+        found.documents.push(node.path.clone());
     }
 }
 

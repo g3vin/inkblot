@@ -3,7 +3,9 @@
  *
  * Storage layout:
  *   <projectRoot>/                      one directory per project
- *   <projectRoot>/<path/to/doc>.json    { content, notes, versions?, archive? }
+ *   <projectRoot>/<path/to/doc>.json    { content, notes, versions?, archive?, locked? }
+ *   <projectRoot>/<folder>/.inkblot-folder.json
+ *                                       { locked: true } on a locked folder (docLocks.ts)
  *   <projectRoot>/.versions/…           canvas version sidecars (a canvas file is
  *                                       spec-shaped JSON Canvas, so its history
  *                                       cannot ride inside it); also read as the
@@ -33,6 +35,7 @@ import {
 import { getDocKind, isTextDoc, stripDocSuffix, withDocSuffix } from './docKind'
 import { EDIT_SESSION_ID } from './versionHistory'
 import {
+  FOLDER_FILE,
   ORDER_FILE,
   appDataRoot,
   getProjectRoot,
@@ -84,8 +87,22 @@ import {
 export async function writeDocumentRaw(projectName, docName, data) {
   // Under the document's lock like every other write to it, so something that needs
   // the last write to have landed — a rename, see entryOperations.ts — can wait for it.
-  return withDocLock(projectName, docName, () => writeDocumentUnlocked(projectName, docName, data))
+  return withDocLock(projectName, docName, async () => {
+    const existing = await loadDocument(projectName, docName)
+    await writeDocumentUnlocked(projectName, docName, keepLock(data, existing))
+  })
 }
+
+/**
+ * The writer's lock (docLocks.ts) rides in the document's own file, and no saver
+ * knows about it: each write keeps the flag the file already had. Only
+ * setDocumentLockFlag changes it.
+ */
+const keepLock = (data, existing) => (
+  existing?.locked === true && data && typeof data === 'object' && !('locked' in data)
+    ? { ...data, locked: true }
+    : data
+)
 
 /**
  * writeDocumentRaw, but only when `accepts(existing)` says the file there now may be
@@ -97,7 +114,7 @@ export async function writeDocumentRawIf(projectName, docName, data, accepts) {
   return withDocLock(projectName, docName, async () => {
     const existing = await loadDocument(projectName, docName)
     if (!accepts(existing)) return false
-    await writeDocumentUnlocked(projectName, docName, data)
+    await writeDocumentUnlocked(projectName, docName, keepLock(data, existing))
     return true
   })
 }
@@ -239,6 +256,8 @@ export async function saveDocument(projectName, docName, docData) {
           // Passages attached to timeline events (TimelineAnchors.js): the editor's own
           // when it passes them, otherwise whatever the file had.
           ...timelineRangesFor(docData, existing),
+          // And the writer's lock (docLocks.ts).
+          ...(existing?.locked === true ? { locked: true } : {}),
         })
       )
 
@@ -277,6 +296,46 @@ export async function createDocumentFromVersion(projectName, docName, version, l
   } catch (e) {
     console.error('[createDocumentFromVersion] failed:', e)
     return null
+  }
+}
+
+/**
+ * Lock or unlock a document (docLocks.ts): `locked: true` in its own file, so the lock
+ * travels with it. Resolves to false when there is no such document.
+ */
+export async function setDocumentLockFlag(projectName, docName, locked) {
+  return withDocLock(projectName, docName, async () => {
+    const existing = await loadDocument(projectName, docName)
+    if (!existing || typeof existing !== 'object') return false
+    const { locked: _previous, ...rest } = existing
+    await writeDocumentUnlocked(projectName, docName, locked ? { ...rest, locked: true } : rest)
+    return true
+  })
+}
+
+/** Lock or unlock a folder: a marker file inside it, which moves with the folder. */
+export async function setFolderLockFlag(projectName, folderPath, locked) {
+  try {
+    const root = await getProjectRoot(projectName)
+    const markerPath = joinPath(root, folderPath, FOLDER_FILE)
+    if (locked) await writeTextFile(markerPath, JSON.stringify({ locked: true }))
+    else if (await exists(markerPath)) await remove(markerPath)
+    return true
+  } catch (error) {
+    console.error('Failed to change the folder lock:', error)
+    return false
+  }
+}
+
+/** Whether a folder holds the locked marker. */
+export async function readFolderLockFlag(projectName, folderPath) {
+  try {
+    const root = await getProjectRoot(projectName)
+    const markerPath = joinPath(root, folderPath, FOLDER_FILE)
+    if (!(await exists(markerPath))) return false
+    return JSON.parse(await readTextFile(markerPath))?.locked === true
+  } catch {
+    return false
   }
 }
 

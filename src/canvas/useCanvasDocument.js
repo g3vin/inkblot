@@ -6,6 +6,9 @@
  * treats text documents — switching away from a canvas mid-debounce must not
  * lose the edit. Checkpoints ride a much slower debounce, exactly like text
  * documents' history checkpoints, and land in the canvas's `.versions/` sidecar.
+ *
+ * A locked canvas (docLocks.ts) takes no edits: they are dropped here, before the
+ * reducer, so nothing changes, saves or enters the history.
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { debounce } from 'lodash'
@@ -13,6 +16,7 @@ import { saveCanvasDocument } from '../lib/canvasFileSystem'
 import { appendCanvasVersion } from '../lib/FileSystem'
 import { serializeCanvas } from '../lib/canvasModel'
 import { canRedo, canUndo, createHistory, historyReducer } from './canvasReducer'
+import { noteLockedEdit } from '../lib/docLocks'
 
 const SAVE_DEBOUNCE_MS = 800
 // Matches HISTORY_CHECKPOINT_DEBOUNCE_MS for text documents in EditorCanvas.
@@ -21,9 +25,20 @@ const VERSION_CHECKPOINT_DEBOUNCE_MS = 15000
 // continuously; this breaks a long coalesced run into sensible undo steps.
 const COALESCE_IDLE_MS = 600
 
-export function useCanvasDocument({ projectName, docPath, initialState, viewportRef }) {
+export function useCanvasDocument({ projectName, docPath, initialState, viewportRef, locked = false }) {
   const [history, dispatch] = useReducer(historyReducer, initialState, createHistory)
   const state = history.present
+  const lockedRef = useRef(locked)
+  useEffect(() => {
+    lockedRef.current = locked
+  }, [locked])
+
+  // Whether the lock refuses `action`, saying so when it does.
+  const refused = useCallback((action) => {
+    if (!lockedRef.current || action?.meta?.upkeep) return false
+    noteLockedEdit(docPath)
+    return true
+  }, [docPath])
 
   /* ---------------- autosave ---------------- */
 
@@ -78,18 +93,19 @@ export function useCanvasDocument({ projectName, docPath, initialState, viewport
 
   const run = useCallback(
     (action) => {
+      if (refused(action)) return
       dispatch(action)
       if (action.meta?.coalesce) clearCoalesce()
     },
-    [clearCoalesce]
+    [clearCoalesce, refused]
   )
 
   useEffect(() => () => clearCoalesce.cancel(), [clearCoalesce])
 
   /* ---------------- undo / redo ---------------- */
 
-  const undo = useCallback(() => dispatch({ type: 'history/undo' }), [])
-  const redo = useCallback(() => dispatch({ type: 'history/redo' }), [])
+  const undo = useCallback(() => run({ type: 'history/undo' }), [run])
+  const redo = useCallback(() => run({ type: 'history/redo' }), [run])
 
   return {
     state,
