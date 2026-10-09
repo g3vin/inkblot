@@ -26,9 +26,10 @@ import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
 import { noteOpened, recentDocs } from '../lib/recentDocs'
 import { lockReason, refreshLocks, useLocks } from '../lib/docLocks'
+import { openFolderPresets, useFolderPresets } from '../lib/folderPresets'
+import { inkColor } from '../lib/palette'
 import TreeFilterBar from './tree/TreeFilterBar'
 import {
-  STORY_FOLDER_PRESETS,
   getStoryFolderAncestor,
   getStoryFolderPresetByKey,
 } from '../lib/storyStructure'
@@ -73,6 +74,7 @@ export default function FileTree({
 }) {
   const prefersReducedMotion = useReducedMotion()
   const locks = useLocks()
+  const presets = useFolderPresets()
   const [view, setView] = useState('files')
   const [projects, setProjects] = useState([])
   const [tree, setTree] = useState({ type: 'folder', name: '', path: '', children: [] })
@@ -236,7 +238,7 @@ export default function FileTree({
   }, [updateOrder])
 
   const createStoryFolder = useCallback(async (presetKey, parent = '') => {
-    const preset = getStoryFolderPresetByKey(presetKey)
+    const preset = getStoryFolderPresetByKey(presetKey, presets)
     if (!preset || !projectName) return
 
     const path = parent ? `${parent}/${preset.name}` : preset.name
@@ -245,7 +247,7 @@ export default function FileTree({
     setIsAddingEntry(false)
     await refreshTree()
     expandPath(path)
-  }, [ensureOrderItem, expandPath, projectName, refreshTree])
+  }, [ensureOrderItem, expandPath, presets, projectName, refreshTree])
 
   // Listen for new entry or rename events
   useEffect(() => {
@@ -492,6 +494,7 @@ export default function FileTree({
       dragName,
       hasEntryIcon,
       iconFilled,
+      iconInk,
       iconName,
       isDragOver,
       isDragSource,
@@ -517,6 +520,7 @@ export default function FileTree({
       expanded: shownExpanded,
       isAddingEntry,
       newEntryParent,
+      presets,
       renamingEntry,
       secondaryDoc,
       siblings,
@@ -592,7 +596,7 @@ export default function FileTree({
           }}
         >
           {hasEntryIcon ? (
-            <Icon name={iconName} active={iconFilled} className="file-item-icon" />
+            <Icon name={iconName} active={iconFilled} className="file-item-icon" style={iconInk ? { color: inkColor(iconInk) } : undefined} />
           ) : null}
           {isRenaming ? (
             renderRenameInput({ marginLeft: hasEntryIcon ? 4 : 0, minWidth: 80 })
@@ -691,8 +695,8 @@ export default function FileTree({
   // Contextual create button: while a document inside a story-preset folder is
   // open, offer a sibling of the same kind ("New Character" in Characters/…).
   const storyFolderContext = useMemo(
-    () => getStoryFolderAncestor(activeDoc || currentDoc || ''),
-    [activeDoc, currentDoc]
+    () => getStoryFolderAncestor(activeDoc || currentDoc || '', presets),
+    [activeDoc, currentDoc, presets]
   )
 
   useEffect(() => {
@@ -718,10 +722,14 @@ export default function FileTree({
         : null,
       {
         text: 'New story folder',
-        items: STORY_FOLDER_PRESETS.map((preset) => ({
-          text: preset.name,
-          action: () => { void createStoryFolder(preset.key, '') },
-        })),
+        items: [
+          ...presets.map((preset) => ({
+            text: preset.name,
+            action: () => { void createStoryFolder(preset.key, '') },
+          })),
+          { separator: true },
+          { text: 'Edit folder types…', action: () => openFolderPresets() },
+        ],
       },
     ])
   }

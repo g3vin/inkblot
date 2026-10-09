@@ -52,6 +52,8 @@ import { useCommands } from '../lib/commands'
 import { createFreeNote, createQuoteNote } from '../lib/noteUtils'
 import { requestDraftKind } from '../lib/draftDocument'
 import { requestFind } from '../lib/sidebarSearch'
+import { refreshFolderPresets } from '../lib/folderPresets'
+import FolderPresetsSheet from './FolderPresetsSheet'
 import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason } from '../lib/docLocks'
 
 const LEFT_SIDEBAR_OUTER_CHROME_WIDTH = 18
@@ -355,8 +357,10 @@ export default function EditorLayout(props) {
   }, [props.activeEditor])
 
   // The project's locks (docLocks.ts), read when it opens; the file tree re-reads them.
+  // And its own folder types (folderPresets.ts).
   useEffect(() => {
     void refreshLocks(props.projectName)
+    void refreshFolderPresets(props.projectName)
   }, [props.projectName])
   const lockTarget = activeDoc || currentDoc
   const lock = useLockReason(lockTarget)
@@ -710,6 +714,7 @@ export default function EditorLayout(props) {
       {customizingInspector ? (
         <InspectorLayoutEditor onClose={() => setCustomizingInspector(false)} />
       ) : null}
+      <FolderPresetsSheet projectName={props.projectName} />
       <div
         onContextMenu={comparing ? undefined : popUpToolbarMenu}
         className="app-titlebar"

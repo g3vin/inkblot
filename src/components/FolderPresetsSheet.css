@@ -1,0 +1,17 @@
+/* Folder types (FolderPresetsSheet.jsx): the list, and the form for one. */
+.folder-preset-list { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+.folder-preset-list ul { align-self: stretch; margin: 0; padding: 0; list-style: none; }
+.folder-preset-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  min-height: var(--row-h); border-bottom: 1px solid var(--border-muted);
+  font-size: var(--text-sm); color: var(--text-primary);
+}
+.folder-preset-row:last-child { border-bottom: 0; }
+.folder-preset-name { flex: 1; min-width: 0; }
+
+.folder-preset-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.folder-preset-suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.folder-preset-suggestions .ui-button { gap: var(--space-1); }
+.folder-preset-icons { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.folder-preset-icon[aria-checked='true'] { background: var(--select-bg); color: var(--accent-foreground); }
+.folder-preset-actions { display: flex; justify-content: space-between; }

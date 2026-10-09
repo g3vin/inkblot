@@ -7,7 +7,7 @@
  */
 import { deleteProject, getProjectRoot, moveProject } from '../../lib/FileSystem'
 import { deleteEntry, duplicateEntry } from '../../lib/entryOperations'
-import { STORY_FOLDER_PRESETS } from '../../lib/storyStructure'
+import { allFolderPresets, openFolderPresets } from '../../lib/folderPresets'
 import { openDocumentWindow } from '../../lib/docWindow'
 import { lockReason, setDocumentLocked, setFolderLocked } from '../../lib/docLocks'
 
@@ -307,7 +307,8 @@ export async function fileTreeMenu(ctx) {
       })
     )
 
-    for (const preset of STORY_FOLDER_PRESETS) {
+    // The built-in story folders and the writer's own folder types (folderPresets.ts).
+    for (const preset of allFolderPresets()) {
       items.push(
         await MenuItem.new({
           text: `New ${preset.menuLabel}`,
@@ -321,6 +322,7 @@ export async function fileTreeMenu(ctx) {
         })
       )
     }
+    items.push(await MenuItem.new({ text: 'Edit folder types…', action: () => openFolderPresets() }))
   }
 
   if (isFileTreeArea && treeView !== 'projects') {
