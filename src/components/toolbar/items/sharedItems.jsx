@@ -84,9 +84,9 @@ export function SplitItem({ ctx, spec }) {
         display={ctx.display}
         disabled={!ctx.hasProject}
         items={() => [
-          { text: 'Split Right', enabled: split !== 'columns', action: () => ctx.send('openInSplit', { orientation: SplitOrientation.Columns }) },
-          { text: 'Split Down', enabled: split !== 'rows', action: () => ctx.send('openInSplit', { orientation: SplitOrientation.Rows }) },
-          { text: 'Close Split', enabled: Boolean(split), action: () => ctx.send('closeSplit', {}) },
+          { text: 'Split right', enabled: split !== 'columns', action: () => ctx.send('openInSplit', { orientation: SplitOrientation.Columns }) },
+          { text: 'Split down', enabled: split !== 'rows', action: () => ctx.send('openInSplit', { orientation: SplitOrientation.Rows }) },
+          { text: 'Close split', enabled: Boolean(split), action: () => ctx.send('closeSplit', {}) },
         ]}
       />
     </ItemFrame>

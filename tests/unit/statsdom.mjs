@@ -82,7 +82,7 @@ await act(async () => {
 await act(async () => { await wait(30) })
 
 const text = () => document.body.textContent
-ok('the panel shows the live session', text().includes('This Session') && /Words written\s*12/.test(text()))
+ok('the panel shows the live session', text().includes('This session') && /Words written\s*12/.test(text()))
 ok('the panel names the scope', text().includes('This document: Chapter 1'))
 ok('no goal yet offers to set one', text().includes('No goal for today.'))
 
@@ -116,7 +116,7 @@ await act(async () => {
 ok('a setting is saved as it is made', parseStatsConfig(savedConfig).idleCutoff === 600 && stats.tracker.config.idleCutoff === 600)
 const goalsTab = [...document.querySelectorAll('.settings-nav button')].find((b) => b.textContent.includes('Goals'))
 await act(async () => { goalsTab.click(); await wait(10) })
-ok('the goals pane lists the week', text().includes('Each Week') && text().includes('Particular Days'))
+ok('the goals pane lists the week', text().includes('Each week') && text().includes('Particular days'))
 
 /* ---------------- a rename takes the history ---------------- */
 

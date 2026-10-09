@@ -16,7 +16,7 @@ import { bookSpine, bookWrap } from './coverState'
 import { getBookSettings, setBookSettings, setShowingCover, usePrintLayoutStore } from './printLayoutStore'
 
 const PARTS = ['back', 'spine', 'front']
-const LABELS = { back: 'Back', spine: 'Spine', front: 'Front', wrap: 'The Whole Wrap' }
+const LABELS = { back: 'Back', spine: 'Spine', front: 'Front', wrap: 'The whole wrap' }
 
 export default function CoverView({ projectName, docPath, folder, setup }) {
   usePrintLayoutStore()

@@ -48,11 +48,11 @@ export default function BubbleFormsBar({ state, armed = 0, onShow, onSave, onDel
         </>
       ) : null}
       {saved ? (
-        <button type="button" className="bubble-forms-icon is-destructive" onClick={onDelete} title="Delete this form (⌘⌫). The bubbles stay as they are." aria-label="Delete Form">
+        <button type="button" className="bubble-forms-icon is-destructive" onClick={onDelete} title="Delete this form (⌘⌫). The bubbles stay as they are." aria-label="Delete form">
           <TrashGlyph />
         </button>
       ) : (
-        <button type="button" className="bubble-forms-icon" onClick={onSave} title="Save this arrangement as a new form to come back to (⌘S)" aria-label="Save as New Form">
+        <button type="button" className="bubble-forms-icon" onClick={onSave} title="Save this arrangement as a new form to come back to (⌘S)" aria-label="Save as new form">
           {/* A stack of versions, with one more being added. */}
           <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
             <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

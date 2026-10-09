@@ -30,7 +30,7 @@ function NoDocument() {
   return (
     <div className="inspector-placeholder">
       <Icon name="document" size={20} />
-      <strong>No Document</strong>
+      <strong>No document</strong>
       <span>Open a document to set up its pages, print it, or export it.</span>
     </div>
   )

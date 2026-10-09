@@ -22,7 +22,7 @@ export interface ElementSpec {
 }
 
 export const SCREENPLAY_ELEMENTS: ElementSpec[] = [
-  { id: 'sceneHeading', label: 'Scene Heading', upper: true },
+  { id: 'sceneHeading', label: 'Scene heading', upper: true },
   { id: 'action', label: 'Action', upper: false },
   { id: 'character', label: 'Character', upper: true },
   { id: 'parenthetical', label: 'Parenthetical', upper: false },
@@ -35,7 +35,7 @@ export const SCREENPLAY_ELEMENTS: ElementSpec[] = [
 export const STAGEPLAY_ELEMENTS: ElementSpec[] = [
   { id: 'actHeading', label: 'Act', upper: true },
   { id: 'sceneTitle', label: 'Scene', upper: true },
-  { id: 'stageDirection', label: 'Stage Direction', upper: false },
+  { id: 'stageDirection', label: 'Stage direction', upper: false },
   { id: 'stageCharacter', label: 'Character', upper: true },
   { id: 'parenthetical', label: 'Parenthetical', upper: false },
   { id: 'stageDialogue', label: 'Dialogue', upper: false },

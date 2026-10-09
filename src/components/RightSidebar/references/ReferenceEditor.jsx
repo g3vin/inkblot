@@ -72,13 +72,13 @@ export default function ReferenceEditor({ view, schema }) {
       ...allRoles.map((role) => ({ text: roleLabel(role), checked: person.role === role, action: () => setPerson(index, { ...person, role }) })),
       { separator: true },
       {
-        text: isOrganization(person) ? 'A Person' : 'An Organization',
+        text: isOrganization(person) ? 'A person' : 'An organization',
         action: () => setPerson(index, isOrganization(person)
           ? { role: person.role, family: person.literal ?? '', given: '' }
           : { role: person.role, literal: displayName(person) }),
       },
       index > 0 ? {
-        text: 'Move Up',
+        text: 'Move up',
         action: () => {
           const next = [...draft.contributors]
           ;[next[index - 1], next[index]] = [next[index], next[index - 1]]

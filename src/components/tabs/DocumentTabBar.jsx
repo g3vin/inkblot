@@ -29,16 +29,16 @@ function tabMenu(tab, tabs, activeDoc) {
   const canSplit = Boolean(tab.docPath && tab.docPath !== activeDoc)
   const index = tabs.findIndex((t) => t.id === tab.id)
   return [
-    { text: 'Open in Split Right', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'columns' }) },
-    { text: 'Open in Split Below', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'rows' }) },
-    { text: 'Move to New Window', enabled: Boolean(tab.docPath), action: () => {
+    { text: 'Open in split right', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'columns' }) },
+    { text: 'Open in split below', enabled: canSplit, action: () => send('openInSplit', { docPath: tab.docPath, orientation: 'rows' }) },
+    { text: 'Move to new window', enabled: Boolean(tab.docPath), action: () => {
       send('openDocInWindow', { docPath: tab.docPath })
       send('closeTab', { tabId: tab.id })
     } },
     { separator: true },
-    { text: 'Close Tab', action: () => send('closeTab', { tabId: tab.id }) },
-    { text: 'Close Other Tabs', enabled: tabs.length > 1, action: () => tabs.forEach((t) => t.id !== tab.id && send('closeTab', { tabId: t.id })) },
-    { text: 'Close Tabs to the Right', enabled: index < tabs.length - 1, action: () => tabs.slice(index + 1).forEach((t) => send('closeTab', { tabId: t.id })) },
+    { text: 'Close tab', action: () => send('closeTab', { tabId: tab.id }) },
+    { text: 'Close other tabs', enabled: tabs.length > 1, action: () => tabs.forEach((t) => t.id !== tab.id && send('closeTab', { tabId: t.id })) },
+    { text: 'Close tabs to the right', enabled: index < tabs.length - 1, action: () => tabs.slice(index + 1).forEach((t) => send('closeTab', { tabId: t.id })) },
   ]
 }
 
@@ -105,7 +105,7 @@ export default function DocumentTabBar({ activeDoc }) {
                   type="button"
                   className="document-tab-close"
                   aria-label={`Close ${title}`}
-                  title="Close Tab"
+                  title="Close tab"
                   tabIndex={-1}
                   onClick={(event) => { event.stopPropagation(); send('closeTab', { tabId: tab.id }) }}
                 >
@@ -126,7 +126,7 @@ export default function DocumentTabBar({ activeDoc }) {
           {insertIndex === tabs.length ? <span className="document-tab-insert" aria-hidden="true" /> : null}
         </div>
       </FloatingCapsule>
-      <IconButton icon="add" label="New Tab" title="Open a new tab (⌘T)" size="circle" className="floating-capsule document-tab-new" onClick={() => send('newTab', {})} />
+      <IconButton icon="add" label="New tab" title="Open a new tab (⌘T)" size="circle" className="floating-capsule document-tab-new" onClick={() => send('newTab', {})} />
       {dragged && ghost ? (
         <FloatingCapsule className="document-tab-ghost" style={{ left: ghost.x, top: ghost.y }} aria-hidden="true">
           <Icon name={tabIcon(dragged.docPath)} />{tabTitle(dragged, tabs)}

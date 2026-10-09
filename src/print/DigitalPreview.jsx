@@ -479,8 +479,8 @@ export default function DigitalPreview({ projectName, docPath, editor, placement
       {picked ? (
         <div className="digital-picked" role="dialog" aria-label="Open this page">
           <span>{picked.title || 'This page'}</span>
-          {pickedIsChapter ? <button type="button" onClick={() => openPicked(true)}>Edit in Write Mode</button> : null}
-          <button type="button" onClick={() => openPicked(false)}>Show in Print</button>
+          {pickedIsChapter ? <button type="button" onClick={() => openPicked(true)}>Edit in Write mode</button> : null}
+          <button type="button" onClick={() => openPicked(false)}>Show in print layout</button>
           <button type="button" onClick={() => setPicked(null)} aria-label="Close">×</button>
         </div>
       ) : null}

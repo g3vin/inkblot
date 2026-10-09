@@ -22,7 +22,7 @@ export function CanvasLockItem({ ctx, spec }) {
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton
         icon={locked ? 'lock' : 'unlock'}
-        label={locked ? 'Unlock Canvas' : 'Lock for Reading'}
+        label={locked ? 'Unlock canvas' : 'Lock for reading'}
         title={locked ? 'Editing locked — press L to edit' : 'Lock for reading (L)'}
         display={ctx.display}
         active={locked}
@@ -56,7 +56,7 @@ export function CanvasRecordMemoItem({ ctx, spec }) {
       <button
         type="button"
         className={`canvas-toolbar-record${recording ? ' is-recording' : ''}`}
-        aria-label={recording ? 'Stop Recording' : 'Record a Voice Memo'}
+        aria-label={recording ? 'Stop recording' : 'Record a voice memo'}
         title={recording ? 'Stop recording' : 'Record a voice memo'}
         disabled={!editing(ctx) || !ctx.canvas?.canRecord}
         onClick={() => command(ctx, 'record-memo')}
@@ -152,19 +152,19 @@ export function CanvasZoomItem({ ctx, spec }) {
   const disabled = !ctx.canvas
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton icon="zoom-out" label="Zoom Out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
+      <ToolButton icon="zoom-out" label="Zoom out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
       <MenuButton
         label="Zoom"
         display={ctx.display}
         disabled={disabled}
         items={[
-          { text: 'Zoom to Fit', accelerator: undefined, action: () => command(ctx, 'zoom-to-fit') },
-          { text: 'Actual Size', action: () => command(ctx, 'reset-zoom') },
+          { text: 'Zoom to fit', accelerator: undefined, action: () => command(ctx, 'zoom-to-fit') },
+          { text: 'Actual size', action: () => command(ctx, 'reset-zoom') },
         ]}
       >
         <span className="tb-text tb-zoom-readout">{Math.round(zoom * 100)}%</span>
       </MenuButton>
-      <ToolButton icon="zoom-in" label="Zoom In" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />
+      <ToolButton icon="zoom-in" label="Zoom in" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />
     </ItemFrame>
   )
 }

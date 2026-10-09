@@ -341,7 +341,7 @@ const ConversationTile = Node.create({
       }
 
       const addGroupMember = () => {
-        const baseName = 'New Person'
+        const baseName = 'New person'
         const existingNames = new Set(currentAttrs.groupMembers.map(member => member.name))
         let name = baseName
         let count = 2
@@ -715,7 +715,7 @@ const ConversationTile = Node.create({
 
         const imageLabel = document.createElement('label')
         imageLabel.className = 'conversation-attach-image conversation-bubble-attach'
-        imageLabel.textContent = 'Attach Image'
+        imageLabel.textContent = 'Attach image'
         imageLabel.setAttribute('aria-label', 'Attach image')
         imageLabel.addEventListener('pointerdown', event => event.stopPropagation())
         const imageInput = document.createElement('input')

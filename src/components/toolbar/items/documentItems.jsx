@@ -167,9 +167,9 @@ export function HighlightItem({ ctx, spec }) {
 }
 
 const ALIGNMENTS = [
-  { value: Alignment.Left, icon: 'align-left', label: 'Align Left' },
-  { value: Alignment.Center, icon: 'align-center', label: 'Align Center' },
-  { value: Alignment.Right, icon: 'align-right', label: 'Align Right' },
+  { value: Alignment.Left, icon: 'align-left', label: 'Align left' },
+  { value: Alignment.Center, icon: 'align-center', label: 'Align center' },
+  { value: Alignment.Right, icon: 'align-right', label: 'Align right' },
 ]
 
 export function AlignmentItem({ ctx, spec }) {
@@ -198,7 +198,7 @@ export function ParagraphStyleItem({ ctx, spec }) {
   const { toolbar } = ctx
   const format = toolbar.writingFormat || WritingFormat.Prose
   const options = blockOptions(format)
-  const title = format === WritingFormat.Prose ? 'Paragraph Style' : 'Script Element'
+  const title = format === WritingFormat.Prose ? 'Paragraph style' : 'Script element'
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <select
@@ -239,7 +239,7 @@ export function TableItem({ ctx, spec }) {
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton
         icon="table"
-        label="Insert Table"
+        label="Insert table"
         display={ctx.display}
         active={Boolean(ctx.toolbar.activeMarks?.table)}
         disabled={!ctx.toolbar.target}
@@ -252,7 +252,7 @@ export function TableItem({ ctx, spec }) {
 export function ConversationItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton icon="chat" label="Insert Conversation" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => sendTo(ctx, 'insertConversationTile')} />
+      <ToolButton icon="chat" label="Insert conversation" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => sendTo(ctx, 'insertConversationTile')} />
     </ItemFrame>
   )
 }
@@ -261,7 +261,7 @@ export function ConversationItem({ ctx, spec }) {
 export function AddNoteItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton icon="note" label="Add Note" title="Add a note (⌥⌘N)" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => { void runCommand('notes.add') }} />
+      <ToolButton icon="note" label="Add note" title="Add a note (⌥⌘N)" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => { void runCommand('notes.add') }} />
     </ItemFrame>
   )
 }
@@ -282,7 +282,7 @@ export function PasteAndMatchStyleItem({ ctx, spec }) {
       <ToolButton
         icon={spec.icon}
         label={spec.label}
-        title="Paste and Match Style (⌥⇧⌘V)"
+        title="Paste and match style (⌥⇧⌘V)"
         display={ctx.display}
         disabled={!ctx.toolbar.target}
         onClick={async () => {
@@ -302,7 +302,7 @@ export function FocusModeItem({ ctx, spec }) {
   const on = Boolean(ctx.view.focusMode)
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton icon="crosshair" label={spec.label} title={on ? 'Leave Focus Mode' : 'Focus Mode'} display={ctx.display} active={on} disabled={!ctx.toolbar.target && !on} onClick={() => ctx.send('setFocusMode', { open: !on })} />
+      <ToolButton icon="crosshair" label={spec.label} title={on ? 'Leave focus mode' : 'Focus mode'} display={ctx.display} active={on} disabled={!ctx.toolbar.target && !on} onClick={() => ctx.send('setFocusMode', { open: !on })} />
     </ItemFrame>
   )
 }

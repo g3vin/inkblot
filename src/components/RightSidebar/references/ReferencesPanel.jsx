@@ -120,7 +120,7 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
     },
   ])
 
-  const emptyTitle = input ? 'No Matching Sources' : !state ? 'No Project Open' : scope === 'document' && docPath ? 'No Sources in This Document' : 'No Sources Yet'
+  const emptyTitle = input ? 'No matching sources' : !state ? 'No project open' : scope === 'document' && docPath ? 'No sources in this document' : 'No sources yet'
   const emptyMessage = input
     ? (citing ? `Press Return to add “${input}” and cite it.` : 'Press Return to look it up and add it.')
     : state ? 'Paste a link, DOI or ISBN above, or type a title. Sources you add here belong to the document you are in.' : ''
@@ -203,15 +203,15 @@ function ReferenceRow({ view, schema, scope, docPath, highlighted, expanded, onT
 
   const menu = (event) => popUpNativeMenu(event, [
     { text: 'Cite', action: onCite },
-    { text: expanded ? 'Done Editing' : 'Edit', action: onToggle },
+    { text: expanded ? 'Done editing' : 'Edit', action: onToggle },
     { separator: true },
-    url ? { text: 'Open Source', action: () => import('@tauri-apps/plugin-opener').then(({ openUrl }) => openUrl(url)).catch(() => window.open(url)) } : null,
-    { text: 'Copy Entry', enabled: Boolean(view.entryText), action: () => navigator.clipboard?.writeText(view.entryText) },
-    { text: 'Copy In-Text Citation', enabled: Boolean(view.inText), action: () => navigator.clipboard?.writeText(view.inText) },
+    url ? { text: 'Open source', action: () => import('@tauri-apps/plugin-opener').then(({ openUrl }) => openUrl(url)).catch(() => window.open(url)) } : null,
+    { text: 'Copy entry', enabled: Boolean(view.entryText), action: () => navigator.clipboard?.writeText(view.entryText) },
+    { text: 'Copy in-text citation', enabled: Boolean(view.inText), action: () => navigator.clipboard?.writeText(view.inText) },
     docPath ? { separator: true } : null,
-    docPath && view.attached ? { text: 'Remove from This Document', enabled: !view.cited, action: () => send('setReferenceAttached', { docPath, id: reference.id, attached: false }) } : null,
-    docPath && !view.attached ? { text: 'Add to This Document', action: () => send('setReferenceAttached', { docPath, id: reference.id, attached: true }) } : null,
-    reference.origin?.input ? { text: 'Look Up Again', action: () => send('retryReferenceLookup', { id: reference.id }) } : null,
+    docPath && view.attached ? { text: 'Remove from this document', enabled: !view.cited, action: () => send('setReferenceAttached', { docPath, id: reference.id, attached: false }) } : null,
+    docPath && !view.attached ? { text: 'Add to this document', action: () => send('setReferenceAttached', { docPath, id: reference.id, attached: true }) } : null,
+    reference.origin?.input ? { text: 'Look up again', action: () => send('retryReferenceLookup', { id: reference.id }) } : null,
     { separator: true },
     {
       text: 'Delete…',
@@ -276,7 +276,7 @@ function BibliographyFooter({ state }) {
           onClick={() => send('insertBibliography', {})}
           title={state.hasBibliography ? 'Move the live bibliography to the end of the document' : 'Add a live bibliography at the end of the document — it updates as you cite'}
         >
-          {state.hasBibliography ? 'Move to End' : 'Insert at End'}
+          {state.hasBibliography ? 'Move to end' : 'Insert at end'}
         </button>
       </div>
       <select className="ui-select" value={options.include} aria-label="List" onChange={(event) => set({ include: event.target.value })}>

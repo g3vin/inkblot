@@ -22,7 +22,7 @@ const safeName = (name) => String(name || '').replace(/[/\\:*?"<>|]+/g, '-').tri
 export async function importFountainScript({ projectName, nearDoc }) {
   if (!projectName) return null
   const picked = await open({
-    title: 'Import Fountain Script',
+    title: 'Import Fountain script',
     multiple: false,
     directory: false,
     filters: [{ name: 'Fountain', extensions: ['fountain', 'spmd', 'txt'] }],

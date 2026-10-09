@@ -772,8 +772,8 @@ export default function FileTree({
               <button
                 className="file-tree-action file-tree-action-smart"
                 onClick={() => beginNewEntry('file', storyFolderContext.path)}
-                title={`New ${storyFolderContext.preset.entryLabel}`}
-                aria-label={`New ${storyFolderContext.preset.entryLabel}`}
+                title={`New ${storyFolderContext.preset.entryLabel.toLowerCase()}`}
+                aria-label={`New ${storyFolderContext.preset.entryLabel.toLowerCase()}`}
               >
                 <Icon name={storyFolderContext.preset.fileIcon} />
               </button>
@@ -880,7 +880,7 @@ export default function FileTree({
             {isAddingEntry && newEntryParent === '' && renderNewEntryInput()}
             {(shownRoot.children || []).length === 0 ? (
               <div className="file-tree-empty">
-                {!filtering ? 'No files yet.' : filter.recentOnly && !recentDocs(projectName).length ? 'No Recent Files' : 'No Matching Files'}
+                {!filtering ? 'No files yet.' : filter.recentOnly && !recentDocs(projectName).length ? 'No recent files' : 'No matching files'}
               </div>
             ) : (
               <AnimatePresence initial={false}>

@@ -122,7 +122,7 @@ export const preflight = ({ setup: input, target, pageCount, images = [] }: {
       id: 'mirror',
       severity: PreflightSeverity.Warning,
       message: 'A printed book has facing pages: the inside margin should be on the binding side of each.',
-      fixLabel: 'Use Facing Pages',
+      fixLabel: 'Use facing pages',
       fixedSetup: fixed((s) => ({ ...s, mirrorMargins: true })),
     })
   }
@@ -135,7 +135,7 @@ export const preflight = ({ setup: input, target, pageCount, images = [] }: {
         id: 'gutter',
         severity: PreflightSeverity.Error,
         message: `At ${pageCount} pages, ${name} needs an inside margin of at least ${fmtIn(needed / INCH)}; this one is ${fmtIn(inside / INCH)}.`,
-        fixLabel: 'Widen the Gutter',
+        fixLabel: 'Widen the gutter',
         fixedSetup: fixed((s) => ({ ...s, margins: { ...s.margins, gutterMm: Math.round((needed - s.margins.insideMm) * 1000) / 1000 } })),
       })
     }

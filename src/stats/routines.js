@@ -66,7 +66,7 @@ function builtIn(id, name, segments, repeats = 1) {
 export const SPRINT = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F00', 'Sprint', [writeSegment(25)])
 export const POMODORO = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F10', 'Pomodoro', [
   writeSegment(25), restSegment(5), writeSegment(25), restSegment(5),
-  writeSegment(25), restSegment(5), writeSegment(25), restSegment(15, { label: 'Long Break' }),
+  writeSegment(25), restSegment(5), writeSegment(25), restSegment(15, { label: 'Long break' }),
 ])
 export const LADDER = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F20', 'Ladder', [
   writeSegment(60), restSegment(10), writeSegment(30), restSegment(10), writeSegment(20),
@@ -105,7 +105,7 @@ export function duplicateRoutine(routine, name) {
   return {
     ...routine,
     id: newId(),
-    name: name ?? `${routine.name} Copy`,
+    name: name ?? `${routine.name} copy`,
     segments: routine.segments.map((segment) => ({ ...segment, id: newId() })),
   }
 }

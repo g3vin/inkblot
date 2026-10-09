@@ -30,7 +30,7 @@ export const needsTabBar = (tabs) => (tabs?.length ?? 0) > 1 || Boolean(tabs?.[0
 
 /** The file's own name, without the kind suffix routing reads. */
 export function tabName(docPath) {
-  if (!docPath) return 'New Tab'
+  if (!docPath) return 'New tab'
   const leaf = docPath.split('/').pop() ?? docPath
   for (const suffix of ['.canvas', '.map']) if (leaf.endsWith(suffix)) return leaf.slice(0, -suffix.length)
   return leaf

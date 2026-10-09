@@ -37,13 +37,13 @@ export function ThisPageSection({ layout, row }) {
     <FinishingSection id={SECTION.thisPage} title={`This Page: ${row.title}`} note={ROW_NOTES[row.kind]}>
       {row.kind === 'chapter' ? (
         <>
-          <PickerRow label="Chapter Type" value={row.chapterType ?? 'chapter'} onChange={(chapterType) => send('editBookItem', { id: row.id, chapterType })} options={CHAPTER_TYPES.map(([value, label]) => ({ value, label }))} />
+          <PickerRow label="Chapter type" value={row.chapterType ?? 'chapter'} onChange={(chapterType) => send('editBookItem', { id: row.id, chapterType })} options={CHAPTER_TYPES.map(([value, label]) => ({ value, label }))} />
           {row.label ? <FormRow label="Heading"><span className="fin-value">{row.label}</span></FormRow> : null}
           {row.path && row.path === state.docPath ? (
             <>
               <FormRow label="Subtitle" stacked><CommitText value={meta.subtitle} placeholder="In which…" label="Subtitle" onCommit={(subtitle) => setMeta({ subtitle })} /></FormRow>
               <FormRow label="Epigraph" stacked><CommitText multiline value={meta.epigraph} label="Epigraph" onCommit={(epigraph) => setMeta({ epigraph })} /></FormRow>
-              {meta.epigraph ? <FormRow label="Epigraph By" stacked><CommitText value={meta.epigraphSource} placeholder="Who said it" label="Epigraph by" onCommit={(epigraphSource) => setMeta({ epigraphSource })} /></FormRow> : null}
+              {meta.epigraph ? <FormRow label="Epigraph by" stacked><CommitText value={meta.epigraphSource} placeholder="Who said it" label="Epigraph by" onCommit={(epigraphSource) => setMeta({ epigraphSource })} /></FormRow> : null}
               <FormRow label="Picture">
                 {state.chapterImageFile ? <img className="fin-thumb" src={fileUrl(state.chapterImageFile)} alt="" /> : null}
                 <button type="button" className="fin-button" onClick={async () => { const path = await choosePath({ title: 'Choose a picture for this chapter’s head' }); if (path) layout.setHeadImage('chapter', path) }}>{meta.image ? 'Change…' : 'Choose…'}</button>
@@ -54,10 +54,10 @@ export function ThisPageSection({ layout, row }) {
         </>
       ) : (
         <>
-          <PickerRow label="Starts On" value={row.page.start} onChange={(start) => page({ start })} options={[{ value: 'any', label: 'The Next Page' }, { value: 'recto', label: 'A Right-Hand Page' }, { value: 'verso', label: 'A Left-Hand Page' }]} />
-          <PickerRow label="Sits" value={row.page.position} onChange={(position) => page({ position })} options={[{ value: 'top', label: 'At the Top' }, { value: 'sunk', label: 'Down the Page' }, { value: 'centered', label: 'In the Middle' }, { value: 'bottom', label: 'At the Foot' }]} />
-          <ToggleRow label="Running Heads" checked={row.page.runningHeads} onChange={(runningHeads) => page({ runningHeads })} />
-          <ToggleRow label="Page Number" checked={row.page.folio} onChange={(folio) => page({ folio })} />
+          <PickerRow label="Starts on" value={row.page.start} onChange={(start) => page({ start })} options={[{ value: 'any', label: 'The next page' }, { value: 'recto', label: 'A right-hand page' }, { value: 'verso', label: 'A left-hand page' }]} />
+          <PickerRow label="Sits" value={row.page.position} onChange={(position) => page({ position })} options={[{ value: 'top', label: 'At the top' }, { value: 'sunk', label: 'Down the page' }, { value: 'centered', label: 'In the middle' }, { value: 'bottom', label: 'At the foot' }]} />
+          <ToggleRow label="Running heads" checked={row.page.runningHeads} onChange={(runningHeads) => page({ runningHeads })} />
+          <ToggleRow label="Page number" checked={row.page.folio} onChange={(folio) => page({ folio })} />
         </>
       )}
       {row.hidden ? (
@@ -74,7 +74,7 @@ export function ThisPageSection({ layout, row }) {
 
 const folderLabel = (folder) => {
   const name = String(folder || '').split('/').filter(Boolean).pop()
-  return name ? `The “${name}” Folder` : 'The Project’s Top Folder'
+  return name ? `The “${name}” Folder` : 'The project’s top folder'
 }
 
 const numbering = (book) => ({ style: 'none', prefix: 'Chapter', includeTitle: true, startAt: 1, showInTree: false, ...(book.chapterNumbering || {}) })
@@ -84,15 +84,15 @@ export function BookInfoSection({ layout }) {
   const active = state.cover?.sets?.find((set) => set.id === state.cover?.active)
   return (
     <FinishingSection id={SECTION.bookInfo} title="Book" note="The title and author go on the running heads, the EPUB and the PDF. The language is what an e-reader reads it in; the cover is the EPUB’s.">
-      <PickerRow label="Contains" value={state.scope === 'project' ? 'project' : 'folder'} onChange={layout.setScope} options={[{ value: 'folder', label: folderLabel(book.folder) }, { value: 'project', label: 'The Whole Project' }]} />
+      <PickerRow label="Contains" value={state.scope === 'project' ? 'project' : 'folder'} onChange={layout.setScope} options={[{ value: 'folder', label: folderLabel(book.folder) }, { value: 'project', label: 'The whole project' }]} />
       <FormRow label="Title"><CommitText value={book.title} label="Title" onCommit={(title) => layout.applyBook({ title })} /></FormRow>
       <FormRow label="Author"><CommitText value={book.author} placeholder="Your name" label="Author" onCommit={(author) => layout.applyBook({ author })} /></FormRow>
       <FormRow label="Language"><CommitText value={book.language} placeholder="en-US" label="Language" onCommit={(language) => layout.applyBook({ language })} /></FormRow>
-      <ToggleRow label="Read as One Document" title="In Write, the folder’s documents follow one another" checked={book.continuous} onChange={(continuous) => layout.applyBook({ continuous })} />
-      <ToggleRow label="Number Documents in the File Tree" title="Each chapter’s number beside its name in the file tree" checked={numbering(book).showInTree} onChange={(showInTree) => layout.applyBook({ chapterNumbering: { ...numbering(book), showInTree } })} />
+      <ToggleRow label="Read as one document" title="In Write, the folder’s documents follow one another" checked={book.continuous} onChange={(continuous) => layout.applyBook({ continuous })} />
+      <ToggleRow label="Number documents in the file tree" title="Each chapter’s number beside its name in the file tree" checked={numbering(book).showInTree} onChange={(showInTree) => layout.applyBook({ chapterNumbering: { ...numbering(book), showInTree } })} />
       <FormRow label="Cover">
         {active?.frontFile ? <img className="fin-cover-thumb" src={fileUrl(active.frontFile)} alt="The cover" /> : null}
-        <button type="button" className="fin-button" onClick={layout.showCover}>Show the Cover</button>
+        <button type="button" className="fin-button" onClick={layout.showCover}>Show the cover</button>
       </FormRow>
     </FinishingSection>
   )
@@ -102,17 +102,17 @@ export function BookSetupSection({ layout }) {
   const { state, catalog } = layout
   const format = catalog?.formats?.find((f) => f.id === state.book?.pageSetup?.formatId)
   return (
-    <FinishingSection id={SECTION.bookSetup} title="Page Setup">
+    <FinishingSection id={SECTION.bookSetup} title="Page setup">
       {state.bookSetupActive ? (
         <>
           <FormRow label="Every chapter prints in"><span className="fin-value">{format?.label ?? 'The book’s own setup'}</span></FormRow>
-          <button type="button" className="fin-button" onClick={() => { if (state.scope === 'document') layout.setScope('folder') }}>Edit the Book’s Setup</button>
-          <button type="button" className="fin-button is-destructive" onClick={layout.clearBookSetup}>Let Each Chapter Use Its Own</button>
+          <button type="button" className="fin-button" onClick={() => { if (state.scope === 'document') layout.setScope('folder') }}>Edit the book’s setup</button>
+          <button type="button" className="fin-button is-destructive" onClick={layout.clearBookSetup}>Let each chapter use its own</button>
         </>
       ) : (
         <>
           <Note>Each chapter shows its own setup on screen; printed as a book, every chapter takes the first chapter’s. Give the book a setup of its own to print them all alike.</Note>
-          <button type="button" className="fin-button" disabled={!state.docPath} onClick={layout.useSetupForBook}>Use This Document’s Setup for the Book</button>
+          <button type="button" className="fin-button" disabled={!state.docPath} onClick={layout.useSetupForBook}>Use this document’s setup for the book</button>
         </>
       )}
     </FinishingSection>
@@ -127,12 +127,12 @@ export function DigitalSection({ layout }) {
   const set = (patch) => layout.applyBook({ digital: { ...digital, ...patch } })
   return (
     <FinishingSection id={SECTION.digital} title="E-book" note="A reader chooses the page, the type size and often the font. These are what the book still decides — the EPUB and the preview both follow them.">
-      <ToggleRow label="Show the E-book Preview" checked={state.typesetView === 'digital'} onChange={(on) => layout.setTypesetView(on ? 'digital' : 'print')} />
-      <ToggleRow label="Drop Caps" title="A large first letter on each chapter, as in print" checked={digital.dropCaps} onChange={(dropCaps) => set({ dropCaps })} />
-      <ToggleRow label="Chapter Pictures" title="The chapter’s picture and a picture ornament in each chapter’s head" checked={digital.headImages} onChange={(headImages) => set({ headImages })} />
-      <ToggleRow label="The Book’s Font" title="Set in the book’s face where the reader lets the book choose" checked={digital.publisherFont} onChange={(publisherFont) => set({ publisherFont })} />
-      <ToggleRow label="Plain Scene Breaks" title="Scene breaks as * * *, which every reader’s font has" checked={digital.plainSceneBreaks} onChange={(plainSceneBreaks) => set({ plainSceneBreaks })} />
-      <ToggleRow label="Keep Ornaments Visible in Night Mode" title="Picture ornaments are inverted on a dark page" checked={digital.invertOrnamentsInDark} onChange={(invertOrnamentsInDark) => set({ invertOrnamentsInDark })} />
+      <ToggleRow label="Show the E-book preview" checked={state.typesetView === 'digital'} onChange={(on) => layout.setTypesetView(on ? 'digital' : 'print')} />
+      <ToggleRow label="Drop caps" title="A large first letter on each chapter, as in print" checked={digital.dropCaps} onChange={(dropCaps) => set({ dropCaps })} />
+      <ToggleRow label="Chapter pictures" title="The chapter’s picture and a picture ornament in each chapter’s head" checked={digital.headImages} onChange={(headImages) => set({ headImages })} />
+      <ToggleRow label="The book’s font" title="Set in the book’s face where the reader lets the book choose" checked={digital.publisherFont} onChange={(publisherFont) => set({ publisherFont })} />
+      <ToggleRow label="Plain scene breaks" title="Scene breaks as * * *, which every reader’s font has" checked={digital.plainSceneBreaks} onChange={(plainSceneBreaks) => set({ plainSceneBreaks })} />
+      <ToggleRow label="Keep ornaments visible in night mode" title="Picture ornaments are inverted on a dark page" checked={digital.invertOrnamentsInDark} onChange={(invertOrnamentsInDark) => set({ invertOrnamentsInDark })} />
     </FinishingSection>
   )
 }
@@ -141,9 +141,9 @@ export function NotesSection({ layout }) {
   const notes = { placement: 'page', numbering: 'perChapter', marks: 'numbers', heading: 'Notes', ...(layout.book.notes || {}) }
   const set = (patch) => layout.applyBook({ notes: { ...notes, ...patch } })
   return (
-    <FinishingSection id={SECTION.notes} title="Footnotes & Endnotes" note="Put a note in with Insert ▸ Footnote in Write, and click its mark to write it. An e-book sets notes after each chapter, linked both ways; Word gets real footnotes.">
-      <PickerRow label="Set Notes" value={notes.placement} onChange={(placement) => set({ placement })} options={[{ value: 'page', label: 'At the Foot of the Page' }, { value: 'chapter', label: 'After Each Chapter' }, { value: 'book', label: 'At the End of the Book' }]} />
-      <PickerRow label="Numbered" value={notes.numbering} onChange={(numbering) => set({ numbering })} options={[{ value: 'perChapter', label: 'Afresh in Each Chapter' }, { value: 'continuous', label: 'On Through the Book' }]} />
+    <FinishingSection id={SECTION.notes} title="Footnotes & endnotes" note="Put a note in with Insert ▸ Footnote in Write, and click its mark to write it. An e-book sets notes after each chapter, linked both ways; Word gets real footnotes.">
+      <PickerRow label="Set Notes" value={notes.placement} onChange={(placement) => set({ placement })} options={[{ value: 'page', label: 'At the foot of the page' }, { value: 'chapter', label: 'After each chapter' }, { value: 'book', label: 'At the end of the book' }]} />
+      <PickerRow label="Numbered" value={notes.numbering} onChange={(numbering) => set({ numbering })} options={[{ value: 'perChapter', label: 'Afresh in each chapter' }, { value: 'continuous', label: 'On through the book' }]} />
       <FormRow label="Marks"><Segmented value={notes.marks} onChange={(marks) => set({ marks })} label="Marks" options={[{ value: 'numbers', label: '1 2 3' }, { value: 'symbols', label: '* † ‡' }]} /></FormRow>
       {notes.placement !== 'page' ? <FormRow label="Heading"><CommitText value={notes.heading} placeholder="Notes" label="Notes heading" onCommit={(heading) => set({ heading: heading.trim() || 'Notes' })} /></FormRow> : null}
     </FinishingSection>
@@ -163,7 +163,7 @@ export function EditionsSection({ layout }) {
   const add = (event) => popUpNativeMenu(event, [
     { text: 'Paperback', action: () => layout.editEditions('add', { kind: 'paperback' }) },
     { text: 'Hardcover', action: () => layout.editEditions('add', { kind: 'hardcover' }) },
-    { text: 'Large Print', action: () => layout.editEditions('add', { kind: 'largePrint' }) },
+    { text: 'Large print', action: () => layout.editEditions('add', { kind: 'largePrint' }) },
     { text: 'eBook', action: () => layout.editEditions('add', { kind: 'ebook' }) },
   ])
   return (
@@ -174,7 +174,7 @@ export function EditionsSection({ layout }) {
         ? 'Changes to the page and the type are the edition’s being typeset. Export All Editions writes each print edition’s interior and cover PDFs, and each e-book’s EPUB.'
         : 'Add a hardcover, a large-print or an e-book edition: each keeps its own trim, margins, type and cover; the text and design stay one.'}
     >
-      <PickerRow label="Typesetting" value={active ?? ''} onChange={(id) => layout.editEditions('activate', id ? { id } : {})} options={[{ value: '', label: 'The Book as Set Up' }, ...editions.map((e) => ({ value: e.id, label: e.name }))]} />
+      <PickerRow label="Typesetting" value={active ?? ''} onChange={(id) => layout.editEditions('activate', id ? { id } : {})} options={[{ value: '', label: 'The book as set up' }, ...editions.map((e) => ({ value: e.id, label: e.name }))]} />
       {editions.map((edition) => (
         <div key={edition.id} className="fin-list-row">
           <Icon name={EDITION_ICONS[edition.kind ?? 'paperback']} />
@@ -187,12 +187,12 @@ export function EditionsSection({ layout }) {
               className="fin-button is-small"
               title="The cover this edition prints and exports with"
               onClick={(event) => popUpNativeMenu(event, [
-                { text: 'The Book’s Cover', action: () => layout.editEditions('setCover', { id: edition.id }) },
+                { text: 'The book’s cover', action: () => layout.editEditions('setCover', { id: edition.id }) },
                 { separator: true },
                 ...sets.map((set) => ({ text: set.name, checked: set.id === edition.coverSetId, action: () => layout.editEditions('setCover', { id: edition.id, coverSetId: set.id }) })),
               ])}
             >
-              {sets.find((set) => set.id === edition.coverSetId)?.name ?? 'Book’s Cover'}
+              {sets.find((set) => set.id === edition.coverSetId)?.name ?? 'Book’s cover'}
             </button>
           ) : null}
           <button
@@ -210,8 +210,8 @@ export function EditionsSection({ layout }) {
           </button>
         </div>
       ))}
-      <button type="button" className="fin-button" onClick={add}><Icon name="add" /> Add an Edition</button>
-      {editions.length ? <button type="button" className="fin-button" onClick={layout.exportAllEditions}><Icon name="export" /> Export All Editions…</button> : null}
+      <button type="button" className="fin-button" onClick={add}><Icon name="add" /> Add an edition</button>
+      {editions.length ? <button type="button" className="fin-button" onClick={layout.exportAllEditions}><Icon name="export" /> Export all editions…</button> : null}
     </FinishingSection>
   )
 }
@@ -257,8 +257,8 @@ export function StyleGallerySection({ layout }) {
 
 /* ---------------- proof ---------------- */
 
-const PROOF_NAMES = { loose: 'Loose Line', widow: 'Widow', orphan: 'Orphan', runt: 'Runt', stackedHyphens: 'Stacked Hyphens', shortPage: 'Short Last Page' }
-const FIX_NAMES = { tighten: 'Tighten', loosen: 'Loosen', keepTogether: 'Keep Together', keepWithNext: 'Keep with Next', runLong: 'Run Page Long', runShort: 'Run Page Short' }
+const PROOF_NAMES = { loose: 'Loose line', widow: 'Widow', orphan: 'Orphan', runt: 'Runt', stackedHyphens: 'Stacked hyphens', shortPage: 'Short last page' }
+const FIX_NAMES = { tighten: 'Tighten', loosen: 'Loosen', keepTogether: 'Keep together', keepWithNext: 'Keep with next', runLong: 'Run page long', runShort: 'Run page short' }
 
 export function ProofSection({ layout }) {
   const { state } = layout
@@ -266,7 +266,7 @@ export function ProofSection({ layout }) {
   const paragraph = state.paragraph
   return (
     <FinishingSection id={SECTION.proof} title="Proof" note="Fixes change how lines fall, never the words, and print only. Each is in the typeset history.">
-      <ToggleRow label="Mark Problems on the Pages" checked={state.proof} onChange={(proof) => layout.setDisplay({ proof })} />
+      <ToggleRow label="Mark problems on the pages" checked={state.proof} onChange={(proof) => layout.setDisplay({ proof })} />
       {state.proof ? (state.spread || state.typesetView === 'digital' ? (
         <Note>The proof reads the chapter’s own pages: show them one at a time, in Print.</Note>
       ) : issues.length === 0 ? (
@@ -287,9 +287,9 @@ export function ProofSection({ layout }) {
             <span className="fin-tabular">{paragraph.tracking === 0 ? '0' : `${paragraph.tracking > 0 ? '+' : ''}${paragraph.tracking}`}</span>
             <button type="button" className="fin-button is-small" aria-label="Looser" disabled={paragraph.tracking >= 10} onClick={() => layout.setParagraph({ nudgeTracking: 5 })}>+</button>
           </FormRow>
-          <ToggleRow label="Keep Lines Together" checked={paragraph.keepTogether} onChange={(keepTogether) => layout.setParagraph({ keepTogether })} />
-          <ToggleRow label="Keep with Next" checked={paragraph.keepWithNext} onChange={(keepWithNext) => layout.setParagraph({ keepWithNext })} />
-          <PickerRow label="Its Page Runs" value={String(paragraph.pageAdjust)} onChange={(v) => layout.setParagraph({ pageAdjust: Number(v) })} options={[{ value: '-1', label: 'A Line Short' }, { value: '0', label: 'As Set' }, { value: '1', label: 'A Line Long' }]} />
+          <ToggleRow label="Keep lines together" checked={paragraph.keepTogether} onChange={(keepTogether) => layout.setParagraph({ keepTogether })} />
+          <ToggleRow label="Keep with next" checked={paragraph.keepWithNext} onChange={(keepWithNext) => layout.setParagraph({ keepWithNext })} />
+          <PickerRow label="Its page runs" value={String(paragraph.pageAdjust)} onChange={(v) => layout.setParagraph({ pageAdjust: Number(v) })} options={[{ value: '-1', label: 'A line short' }, { value: '0', label: 'As set' }, { value: '1', label: 'A line long' }]} />
         </>
       ) : null}
     </FinishingSection>
@@ -320,7 +320,7 @@ export function TextStylesSection({ layout }) {
     if (open === id) setOpen(null)
   }
   return (
-    <FinishingSection id={SECTION.textStyles} title="Text Styles" note="Give a paragraph a style from Format ▸ Text Style. In Write it shows as a faint rule beside the text; here it is set as the book sets it.">
+    <FinishingSection id={SECTION.textStyles} title="Text styles" note="Give a paragraph a style from Format ▸ Text Style. In Write it shows as a faint rule beside the text; here it is set as the book sets it.">
       {looks.map((look) => {
         const builtin = BUILTIN_STYLES.has(look.id)
         const set = (patch) => save({ ...look, ...patch })
@@ -334,17 +334,17 @@ export function TextStylesSection({ layout }) {
             {open === look.id ? (
               <>
                 {builtin ? null : <FormRow label="Name"><CommitText value={look.name} label="Style name" onCommit={(name) => set({ name })} /></FormRow>}
-                <ToggleRow label="Its Own Font" checked={Boolean(look.fontFamily)} onChange={(on) => set({ fontFamily: on ? cssFamily('Helvetica Neue') : undefined })} />
+                <ToggleRow label="Its own font" checked={Boolean(look.fontFamily)} onChange={(on) => set({ fontFamily: on ? cssFamily('Helvetica Neue') : undefined })} />
                 {look.fontFamily ? <FormRow label="Font"><FontSelect value={look.fontFamily} onChange={(name) => set({ fontFamily: cssFamily(name) })} /></FormRow> : null}
                 <FormRow label="Size"><span className="fin-length"><CommitNumber value={Math.round(look.size * 100)} digits={0} min={50} max={300} label="Size" onCommit={(pct) => set({ size: pct / 100 })} /><span className="fin-unit">%</span></span></FormRow>
                 <ToggleRow label="Italic" checked={look.italic} onChange={(italic) => set({ italic })} />
-                <ToggleRow label="Small Capitals" checked={look.smallCaps} onChange={(smallCaps) => set({ smallCaps })} />
-                <PickerRow label="Alignment" value={look.align} onChange={(align) => set({ align })} options={[{ value: 'inherit', label: 'As the Text' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Centered' }, { value: 'right', label: 'Right' }, { value: 'justify', label: 'Justified' }]} />
-                <FormRow label="Indent Both Sides"><span className="fin-length"><CommitNumber value={look.indentEm} digits={1} min={0} max={12} label="Indent" onCommit={(indentEm) => set({ indentEm })} /><span className="fin-unit">em</span></span></FormRow>
-                <ToggleRow label="No First-Line Indent" checked={look.flush} onChange={(flush) => set({ flush })} />
-                <FormRow label="Space Around"><span className="fin-length"><CommitNumber value={look.spaceLines} digits={1} min={0} max={4} label="Space around" onCommit={(spaceLines) => set({ spaceLines })} /><span className="fin-unit">lines</span></span></FormRow>
-                <ToggleRow label="Ruled Box" checked={look.boxed} onChange={(boxed) => set({ boxed })} />
-                <button type="button" className={`fin-button${builtin ? '' : ' is-destructive'}`} onClick={() => remove(look.id)}>{builtin ? 'Reset to the App’s Look' : 'Delete Style'}</button>
+                <ToggleRow label="Small capitals" checked={look.smallCaps} onChange={(smallCaps) => set({ smallCaps })} />
+                <PickerRow label="Alignment" value={look.align} onChange={(align) => set({ align })} options={[{ value: 'inherit', label: 'As the text' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Centered' }, { value: 'right', label: 'Right' }, { value: 'justify', label: 'Justified' }]} />
+                <FormRow label="Indent both sides"><span className="fin-length"><CommitNumber value={look.indentEm} digits={1} min={0} max={12} label="Indent" onCommit={(indentEm) => set({ indentEm })} /><span className="fin-unit">em</span></span></FormRow>
+                <ToggleRow label="No first-line indent" checked={look.flush} onChange={(flush) => set({ flush })} />
+                <FormRow label="Space around"><span className="fin-length"><CommitNumber value={look.spaceLines} digits={1} min={0} max={4} label="Space around" onCommit={(spaceLines) => set({ spaceLines })} /><span className="fin-unit">lines</span></span></FormRow>
+                <ToggleRow label="Ruled box" checked={look.boxed} onChange={(boxed) => set({ boxed })} />
+                <button type="button" className={`fin-button${builtin ? '' : ' is-destructive'}`} onClick={() => remove(look.id)}>{builtin ? 'Reset to the app’s look' : 'Delete style'}</button>
               </>
             ) : null}
           </div>
@@ -355,7 +355,7 @@ export function TextStylesSection({ layout }) {
         className="fin-button"
         onClick={() => {
           const id = `custom-${Math.random().toString(16).slice(2, 10)}`
-          save({ id, name: 'New Style', size: 1, italic: false, smallCaps: false, align: 'inherit', indentEm: 0, flush: false, spaceLines: 1, boxed: false })
+          save({ id, name: 'New style', size: 1, italic: false, smallCaps: false, align: 'inherit', indentEm: 0, flush: false, spaceLines: 1, boxed: false })
           setOpen(id)
         }}
       >
@@ -367,7 +367,7 @@ export function TextStylesSection({ layout }) {
 
 /* ---------------- chapter openings and parts ---------------- */
 
-const CASES = [{ value: 'asWritten', label: 'As Written' }, { value: 'upper', label: 'Capitals' }, { value: 'smallCaps', label: 'Small Capitals' }, { value: 'italic', label: 'Italic' }]
+const CASES = [{ value: 'asWritten', label: 'As written' }, { value: 'upper', label: 'Capitals' }, { value: 'smallCaps', label: 'Small capitals' }, { value: 'italic', label: 'Italic' }]
 const ALIGNS = [{ value: 'left', label: 'Left' }, { value: 'center', label: 'Centre' }, { value: 'right', label: 'Right' }]
 
 const clampDesign = (d) => ({
@@ -390,8 +390,8 @@ export function ChapterOpeningsSection({ layout }) {
   const editType = (patch) => layout.applySetup({ typography: { ...t, ...patch } })
   const example = chapterLabel(num.startAt === 0 ? 0 : 3, num) ?? ''
   return (
-    <FinishingSection id={SECTION.headings} title="Chapter Openings" note="Every chapter opens this way, in the Typeset pages, in print and in every export. A chapter’s own subtitle, picture and epigraph are under This Page.">
-      <PickerRow label="Chapters Start" value={design.chapterBreak} onChange={(chapterBreak) => edit({ chapterBreak })} options={[{ value: 'newPage', label: 'On a New Page' }, { value: 'newRightPage', label: 'On a Right-Hand Page' }, { value: 'continue', label: 'Straight On, Where There’s Room' }]} />
+    <FinishingSection id={SECTION.headings} title="Chapter openings" note="Every chapter opens this way, in the Typeset pages, in print and in every export. A chapter’s own subtitle, picture and epigraph are under This Page.">
+      <PickerRow label="Chapters start" value={design.chapterBreak} onChange={(chapterBreak) => edit({ chapterBreak })} options={[{ value: 'newPage', label: 'On a new page' }, { value: 'newRightPage', label: 'On a right-hand page' }, { value: 'continue', label: 'Straight on, where there’s room' }]} />
       <ToggleRow
         label="Number"
         checked={design.showNumber}
@@ -404,21 +404,21 @@ export function ChapterOpeningsSection({ layout }) {
       />
       {design.showNumber ? (
         <>
-          <PickerRow label="Numbered" value={num.style} onChange={(style) => layout.applyBook({ chapterNumbering: { ...num, style } })} options={[{ value: 'words', label: 'One, Two, Three' }, { value: 'numerals', label: '1, 2, 3' }, { value: 'roman', label: 'I, II, III' }]} />
-          <FormRow label="Before the Number"><CommitText value={num.prefix} placeholder="Chapter" label="Before the number" onCommit={(prefix) => layout.applyBook({ chapterNumbering: { ...num, prefix } })} /></FormRow>
+          <PickerRow label="Numbered" value={num.style} onChange={(style) => layout.applyBook({ chapterNumbering: { ...num, style } })} options={[{ value: 'words', label: 'One, two, three' }, { value: 'numerals', label: '1, 2, 3' }, { value: 'roman', label: 'I, II, III' }]} />
+          <FormRow label="Before the number"><CommitText value={num.prefix} placeholder="Chapter" label="Before the number" onCommit={(prefix) => layout.applyBook({ chapterNumbering: { ...num, prefix } })} /></FormRow>
           <FormRow label="First Chapter"><Segmented value={String(num.startAt === 0 ? 0 : 1)} onChange={(v) => layout.applyBook({ chapterNumbering: { ...num, startAt: Number(v) } })} label="First chapter" options={[{ value: '1', label: '1' }, { value: '0', label: '0' }]} /></FormRow>
           <FormRow label="Heading"><span className="fin-value fin-serif">{example}</span></FormRow>
         </>
       ) : null}
       <ToggleRow label="Title" checked={design.showTitle} onChange={(showTitle) => edit({ showTitle })} />
       <ToggleRow label="Subtitle" checked={design.showSubtitle} onChange={(showSubtitle) => edit({ showSubtitle })} />
-      <ToggleRow label="Each Chapter’s Picture" checked={design.showImage} onChange={(showImage) => edit({ showImage })} />
+      <ToggleRow label="Each chapter’s picture" checked={design.showImage} onChange={(showImage) => edit({ showImage })} />
       <FormRow label="Alignment"><Segmented value={design.alignment} onChange={(alignment) => edit({ alignment })} label="Alignment" options={ALIGNS} /></FormRow>
-      {design.showNumber ? (<><PickerRow label="Number Set In" value={design.numberCase} onChange={(numberCase) => edit({ numberCase })} options={CASES} /><PointsRow label="Number Size" value={design.numberSizePt} onCommit={(numberSizePt) => edit({ numberSizePt })} /></>) : null}
-      {design.showTitle ? (<><PickerRow label="Title Set In" value={design.titleCase} onChange={(titleCase) => edit({ titleCase })} options={CASES} /><PointsRow label="Title Size" value={design.titleSizePt} onCommit={(titleSizePt) => edit({ titleSizePt })} /></>) : null}
-      <ToggleRow label="A Face of Its Own" checked={Boolean(design.headingFont)} onChange={(on) => edit({ headingFont: on ? (t?.fontFamily ?? 'Georgia, serif') : undefined })} />
-      {design.headingFont ? <FormRow label="Heading Face"><FontSelect value={design.headingFont} onChange={(name) => edit({ headingFont: cssFamily(name) })} /></FormRow> : null}
-      <PickerRow label="Ornament" value={design.ornament} onChange={(ornament) => edit({ ornament })} options={[{ value: 'none', label: 'None' }, { value: 'rule', label: 'A Rule' }, { value: 'glyph', label: 'A Glyph' }, { value: 'image', label: 'A Picture' }]} />
+      {design.showNumber ? (<><PickerRow label="Number set in" value={design.numberCase} onChange={(numberCase) => edit({ numberCase })} options={CASES} /><PointsRow label="Number size" value={design.numberSizePt} onCommit={(numberSizePt) => edit({ numberSizePt })} /></>) : null}
+      {design.showTitle ? (<><PickerRow label="Title set in" value={design.titleCase} onChange={(titleCase) => edit({ titleCase })} options={CASES} /><PointsRow label="Title size" value={design.titleSizePt} onCommit={(titleSizePt) => edit({ titleSizePt })} /></>) : null}
+      <ToggleRow label="A face of its own" checked={Boolean(design.headingFont)} onChange={(on) => edit({ headingFont: on ? (t?.fontFamily ?? 'Georgia, serif') : undefined })} />
+      {design.headingFont ? <FormRow label="Heading face"><FontSelect value={design.headingFont} onChange={(name) => edit({ headingFont: cssFamily(name) })} /></FormRow> : null}
+      <PickerRow label="Ornament" value={design.ornament} onChange={(ornament) => edit({ ornament })} options={[{ value: 'none', label: 'None' }, { value: 'rule', label: 'A rule' }, { value: 'glyph', label: 'A glyph' }, { value: 'image', label: 'A picture' }]} />
       {design.ornament === 'glyph' ? (
         <FormRow label="Glyph">
           <CommitText className="fin-centered" value={design.ornamentGlyph} placeholder="❦" label="Glyph" onCommit={(ornamentGlyph) => edit({ ornamentGlyph })} />
@@ -434,14 +434,14 @@ export function ChapterOpeningsSection({ layout }) {
       ) : null}
       {design.ornament !== 'none' || design.showImage ? (
         <>
-          <PickerRow label="Ornament and Picture" value={design.ornamentPosition} onChange={(ornamentPosition) => edit({ ornamentPosition })} options={[{ value: 'above', label: 'Above the Number' }, { value: 'between', label: 'Between Number and Title' }, { value: 'below', label: 'Below the Title' }]} />
-          <FormRow label="Picture Width"><span className="fin-length"><CommitNumber value={design.imageWidthPct} digits={0} min={5} max={100} label="Picture width" onCommit={(imageWidthPct) => edit({ imageWidthPct })} /><span className="fin-unit">%</span></span></FormRow>
+          <PickerRow label="Ornament and picture" value={design.ornamentPosition} onChange={(ornamentPosition) => edit({ ornamentPosition })} options={[{ value: 'above', label: 'Above the number' }, { value: 'between', label: 'Between number and title' }, { value: 'below', label: 'Below the title' }]} />
+          <FormRow label="Picture width"><span className="fin-length"><CommitNumber value={design.imageWidthPct} digits={0} min={5} max={100} label="Picture width" onCommit={(imageWidthPct) => edit({ imageWidthPct })} /><span className="fin-unit">%</span></span></FormRow>
         </>
       ) : null}
       {t ? (
         <>
-          <PickerRow label="First Paragraph" value={t.chapterOpening} onChange={(chapterOpening) => editType({ chapterOpening })} options={[{ value: 'plain', label: 'Plain' }, { value: 'dropCap', label: 'Drop Cap' }, { value: 'smallCaps', label: 'Small Caps' }, { value: 'dropCapAndSmallCaps', label: 'Drop Cap & Small Caps' }]} />
-          <LengthRow label="Head Down the Page" mm={t.chapterSinkMm} unit={unit} onCommit={(chapterSinkMm) => editType({ chapterSinkMm })} />
+          <PickerRow label="First paragraph" value={t.chapterOpening} onChange={(chapterOpening) => editType({ chapterOpening })} options={[{ value: 'plain', label: 'Plain' }, { value: 'dropCap', label: 'Drop cap' }, { value: 'smallCaps', label: 'Small caps' }, { value: 'dropCapAndSmallCaps', label: 'Drop cap & small caps' }]} />
+          <LengthRow label="Head down the page" mm={t.chapterSinkMm} unit={unit} onCommit={(chapterSinkMm) => editType({ chapterSinkMm })} />
         </>
       ) : <Note>Set type for print, under Body Text, for a drop cap and to set how far down the page each chapter opens.</Note>}
     </FinishingSection>
@@ -455,7 +455,7 @@ export function PartsSection({ layout }) {
   return (
     <FinishingSection id={SECTION.parts} title="Parts" note="Add a part from the Book navigator’s + menu. Parts are numbered “Part One”, “Part Two” in the chapters’ style, and listed in the contents.">
       <ToggleRow
-        label="A Design of Their Own"
+        label="A design of their own"
         checked={Boolean(part)}
         onChange={(on) => {
           const chapter = { ...DEFAULT_CHAPTER_DESIGN, ...(book.chapterDesign || {}) }
@@ -464,13 +464,13 @@ export function PartsSection({ layout }) {
       />
       {part ? (
         <>
-          <PickerRow label="Parts Start" value={part.chapterBreak} onChange={(chapterBreak) => edit({ chapterBreak })} options={[{ value: 'newPage', label: 'On a New Page' }, { value: 'newRightPage', label: 'On a Right-Hand Page' }]} />
+          <PickerRow label="Parts start" value={part.chapterBreak} onChange={(chapterBreak) => edit({ chapterBreak })} options={[{ value: 'newPage', label: 'On a new page' }, { value: 'newRightPage', label: 'On a right-hand page' }]} />
           <FormRow label="Alignment"><Segmented value={part.alignment} onChange={(alignment) => edit({ alignment })} label="Alignment" options={ALIGNS} /></FormRow>
-          <PickerRow label="Number Set In" value={part.numberCase} onChange={(numberCase) => edit({ numberCase })} options={CASES} />
-          <PickerRow label="Title Set In" value={part.titleCase} onChange={(titleCase) => edit({ titleCase })} options={CASES} />
-          <PickerRow label="Ornament" value={part.ornament === 'image' ? 'none' : part.ornament} onChange={(ornament) => edit({ ornament })} options={[{ value: 'none', label: 'None' }, { value: 'rule', label: 'A Rule' }, { value: 'glyph', label: 'A Glyph' }]} />
+          <PickerRow label="Number set in" value={part.numberCase} onChange={(numberCase) => edit({ numberCase })} options={CASES} />
+          <PickerRow label="Title set in" value={part.titleCase} onChange={(titleCase) => edit({ titleCase })} options={CASES} />
+          <PickerRow label="Ornament" value={part.ornament === 'image' ? 'none' : part.ornament} onChange={(ornament) => edit({ ornament })} options={[{ value: 'none', label: 'None' }, { value: 'rule', label: 'A rule' }, { value: 'glyph', label: 'A glyph' }]} />
           {part.ornament === 'glyph' ? <FormRow label="Glyph"><CommitText className="fin-centered" value={part.ornamentGlyph} placeholder="❦" label="Glyph" onCommit={(ornamentGlyph) => edit({ ornamentGlyph })} /></FormRow> : null}
-          <PointsRow label="Title Size" value={part.titleSizePt} onCommit={(titleSizePt) => edit({ titleSizePt: Math.min(72, Math.max(10, titleSizePt)) })} />
+          <PointsRow label="Title size" value={part.titleSizePt} onCommit={(titleSizePt) => edit({ titleSizePt: Math.min(72, Math.max(10, titleSizePt)) })} />
         </>
       ) : null}
     </FinishingSection>
