@@ -77,19 +77,23 @@ capitalised like any other name.
 whimsical, nostalgic or themed. We never use paper textures, typewriter sound effects
 or coffee stains.
 
-**The mark.** A lowercase *i* whose dot is an ink spray: a rounded stem, and above it
-a splash with fingers and droplets flung up and to the right. The spray isn't drawn by
-hand. It comes from a simplified model of an ink drop hitting paper
+**The mark.** The monogram "ib" in Literata ExtraBold (the editor's face), set tight,
+with the *i*'s dot replaced by an ink splash: a round blot with a few droplets flung up
+and to the right. The splash sits just above the stem, nudged a little left so it
+clears the *b*'s ascender. Neither part is drawn by hand. The letters are the font's
+outlines, and the splash comes from a simplified model of an ink drop hitting paper
 ([`docs/brand/generator/`](brand/generator/)): impact angle, rim fingering and
 satellite droplets. Regenerate it there and never redraw it by hand.
 
-**The wordmark.** The mark's own *i* (the same rounded stem and spray), set at Courier
-Prime Bold's x-height and spacing, followed by "nkblot" in Courier Prime Bold. The *i*
-is never Courier's own letterform: the mark and the wordmark must match.
+**The wordmark.** "inkblot" in Courier Prime Bold, its *i* dotted with the same
+splash. The mark and the wordmark share that splash, so never swap it for Courier's
+own round dot.
 
-**The app icon.** The black mark on a white rounded tile. The stem sits on the tile's
-vertical centre line and the ink is optically centred (a hair above the middle). The
-same artwork is the favicon and the desktop and iOS icons.
+**The app icon.** The black mark on a white rounded tile, filling about two thirds of
+it. It is centred optically, not by its box: the heavy letters sit low and the light
+splash high, so the generator places the point halfway between the ink's box centre
+and its centre of weight a hair above the tile's middle. The same artwork is the
+favicon and the desktop and iOS icons.
 
 **Colour.** The logo is **black on white**, in every theme.
 
@@ -107,7 +111,7 @@ draw inline in `currentColor`, so they follow the surface. Standalone files are 
 `src/assets/brand/` (`mark.svg`, `wordmark.svg`, `app-icon.svg`) and
 `public/favicon.svg`.
 
-**Clear space and size.** Keep clear space of at least the spray's width around the
+**Clear space and size.** Keep clear space of at least the splash's width around the
 mark (half the wordmark's height around the wordmark). The mark is legible from 16px
 and the wordmark from 72px wide; below that, use the mark alone.
 
@@ -116,8 +120,8 @@ choice: Ink Blue by default, or one of five other inks. It marks interactive sta
 (selection, focus, primary buttons, the active tab).
 
 **Don't** recolour the logo, add effects (shadows, gradients, glass), stretch it,
-redraw the spray, swap the wordmark's *i* for a typed letter, or set the name in any
-face other than Courier Prime.
+redraw the splash, give either *i* a plain round dot, re-space the monogram, or set
+the name in any face other than Courier Prime.
 
 ---
 

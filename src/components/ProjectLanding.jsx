@@ -171,7 +171,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
       <div className="picker-column">
         <header className="picker-header">
           <AppIcon className="picker-logo" size={98} label="" />
-          <h1 className="picker-wordmark"><Wordmark height={30} /></h1>
+          <h1 className="picker-wordmark"><Wordmark height={40} /></h1>
           {version ? <p>Version {version}</p> : null}
         </header>
 

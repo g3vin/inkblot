@@ -65,7 +65,7 @@ export default function DesignShowcase() {
       <header className="ds-topbar">
         <FadeScrim height={64} />
         <div className="ds-topbar-inner">
-          <span className="ds-wordmark"><Wordmark height={20} /></span>
+          <span className="ds-wordmark"><Wordmark height={26} /></span>
           <span className="ib-meta">design language · v1</span>
           <span className="ds-spacer" />
           <Segmented label="Theme" value={theme} onChange={switchTheme}
