@@ -393,10 +393,11 @@ of these levels, and is always also in the command palette:
 1. **On the surface.** Only what almost every writer needs almost every session: bold,
    italic, headings, lists, add note, undo. The default toolbar stays short.
 2. **One click away.** A "More" `Menu` at the end of the toolbar or panel, and the
-   right-click context menu. Put the less-frequent but still general tools here. In a
-   customisable toolbar, the `MORE` marker (`src/lib/chromeLayout.ts`) splits the
-   layout: items before it sit on the surface, items after it live behind ». Writers
-   move the marker in Customize toolbar.
+   right-click context menu. Put the less-frequent but still general tools here. A
+   customisable toolbar shows every item that fits and puts the rest behind », so its
+   default set leads with the essentials. Writers who want a shorter surface place
+   the `MORE` marker (`src/lib/chromeLayout.ts`) in Customize toolbar: items after it
+   live behind » however wide the window is.
 3. **In an inspector panel.** Deep, stateful tools a professional keeps open: history,
    references, print setup, script reports, map layers.
 4. **Always: the command palette (⌘K).** Every action, searchable by name and by the

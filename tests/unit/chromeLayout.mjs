@@ -76,8 +76,9 @@ ok('a default item the user took out stays out', read.items.join() === 'inkblot.
 
 /* ---------------- the More marker ---------------- */
 
-const surface = L.DEFAULT_TOOLBARS.document.slice(0, L.DEFAULT_TOOLBARS.document.indexOf(L.MORE)).filter((id) => !L.isSpacer(id))
-ok('the document toolbar shows only the essentials before More',
+ok('no default set hides items behind More', L.TOOLBAR_CONTEXTS.every((context) => !L.DEFAULT_TOOLBARS[context].includes(L.MORE)))
+const surface = L.DEFAULT_TOOLBARS.document.filter((id) => !L.isSpacer(id)).slice(0, 7)
+ok('the document toolbar leads with the essentials',
   surface.join() === 'inkblot.view.editor-mode,inkblot.format.text-style,inkblot.format.paragraph-style,inkblot.format.bulleted-list,inkblot.format.numbered-list,inkblot.insert.note,inkblot.edit.undo-redo')
 read = doc(JSON.stringify({ items: ['inkblot.format.font', 'more', 'inkblot.format.highlight', 'more'], known: ids }))
 ok('More is kept, once', read.items.join() === 'inkblot.format.font,more,inkblot.format.highlight')
