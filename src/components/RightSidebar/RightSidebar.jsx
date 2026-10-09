@@ -29,7 +29,7 @@ import TimelineSidebarPanel from '../../timeline/TimelineSidebarPanel'
 import SidebarSearch from './SidebarSearch'
 import ClipboardPanel from './ClipboardPanel'
 import Icon from '../../ui/Icon.jsx'
-import { isFilterScope } from '../../lib/sidebarSearch'
+import { FIND_EVENT, isFilterScope } from '../../lib/sidebarSearch'
 import { useCommands } from '../../lib/commands'
 
 /** How the panels glide to rest once a swipe lets go, or a tab is clicked. */
@@ -164,29 +164,28 @@ export default function RightSidebar({
 
   const closeSearchOverlay = useCallback(() => setSearchOverlay(null), [])
 
+  // ⌘F (`search.find`): find in the document, starting from what is selected. The bar
+  // opens here when the sidebar is on screen, and in the middle when it is not.
   useEffect(() => {
-    const onKeyDown = (event) => {
-      // ⌘⇧F: ⌘K is the command palette's, and ⌘F the panel's own search bar.
-      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.key.toLowerCase() !== 'f') return
-      event.preventDefault()
-
-      if (searchOverlay) closeSearchOverlay()
-      else openSearchOverlay()
+    const onFind = (event) => {
+      const query = event.detail?.query
+      if (query) setSearchQuery(query)
+      setSearchScope((current) => (isFilterScope(current) ? 'document' : current))
+      if (collapsed && !peeked && !searchOverlay) openSearchOverlay()
     }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [closeSearchOverlay, openSearchOverlay, searchOverlay])
+    window.addEventListener(FIND_EVENT, onFind)
+    return () => window.removeEventListener(FIND_EVENT, onFind)
+  }, [collapsed, openSearchOverlay, peeked, searchOverlay])
 
   useCommands(() => [{
     id: 'search.project',
     section: 'Search',
-    title: 'Search the project…',
+    title: searchOverlay ? 'Close project search' : 'Search the project…',
     icon: 'search',
-    shortcut: '⇧⌘F',
+    keys: 'Mod+Shift+F',
     keywords: ['find', 'look up', 'everywhere', 'notes', 'documents'],
-    run: openSearchOverlay,
-  }], [openSearchOverlay])
+    run: searchOverlay ? closeSearchOverlay : openSearchOverlay,
+  }], [closeSearchOverlay, openSearchOverlay, searchOverlay])
 
   const { jumpTo } = swipe
   const handleSelectTab = useCallback((nextTab) => {

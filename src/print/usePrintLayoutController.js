@@ -780,18 +780,11 @@ export default function usePrintLayoutController({
     return () => window.removeEventListener(OPEN_BOOK_ITEM_EVENT, onOpenItem)
   }, [currentBook])
 
-  // The menus (App.jsx) and keys.
+  // The menus and the commands (App.jsx; ⌘P and ⌥⌘P are theirs).
   useEffect(() => {
     const onToggle = (event) => togglePrintLayout(undefined, event?.detail?.docPath)
     const onPrintEvent = (event) => stateRef.current.onPrint?.({ scope: 'document', bound: false, ...(event.detail || {}) })
     const onExportEvent = (event) => stateRef.current.onExport?.({ scope: 'document', bound: false, ...(event.detail || {}) })
-    // ⌥⌘P toggles pages, as it does in Word; ⌘P prints.
-    const onKeyDown = (event) => {
-      if (!event.metaKey || event.ctrlKey || event.shiftKey || event.code !== 'KeyP') return
-      event.preventDefault()
-      if (event.altKey) togglePrintLayout()
-      else stateRef.current.onPrint?.({ scope: 'document', bound: false })
-    }
     // File ▸ Write As, in a shell whose menus are the page's (DocWritingFormat.js).
     const onWritingFormat = (event) => {
       stateRef.current.activeEditor?.chain().focus().setWritingFormat(event.detail?.format).run()
@@ -800,13 +793,11 @@ export default function usePrintLayoutController({
     window.addEventListener('inkblot:print-layout-toggle', onToggle)
     window.addEventListener('inkblot:print', onPrintEvent)
     window.addEventListener('inkblot:export', onExportEvent)
-    window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('inkblot:writing-format', onWritingFormat)
       window.removeEventListener('inkblot:print-layout-toggle', onToggle)
       window.removeEventListener('inkblot:print', onPrintEvent)
       window.removeEventListener('inkblot:export', onExportEvent)
-      window.removeEventListener('keydown', onKeyDown)
     }
   }, [togglePrintLayout])
 

@@ -70,3 +70,13 @@
 .settings-weekdays button[aria-pressed='true'] { background: var(--accent-color); border-color: var(--accent-color); color: var(--text-on-accent); }
 
 .settings-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* Shortcuts: a row per command, its keys at the right; a warning under one that clashes. */
+.settings-shortcuts { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.settings-shortcut { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-1) 0; border-bottom: 1px solid var(--border-muted); }
+.settings-shortcut:last-child { border-bottom: 0; }
+.settings-shortcut-row { display: flex; align-items: center; gap: var(--space-1); min-height: var(--size-capsule); }
+.settings-shortcut-title { flex: 1; min-width: 0; font-size: var(--text-sm); color: var(--text-primary); }
+.settings-shortcut-keys { min-width: 96px; justify-content: center; }
+.settings-shortcut[data-recording='true'] .settings-shortcut-keys { color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-border); }
+.settings-shortcut-conflict { display: flex; align-items: center; gap: var(--space-1); margin: 0; font-size: var(--text-xs); color: var(--status-warning); }

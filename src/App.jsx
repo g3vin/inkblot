@@ -16,6 +16,7 @@ import { getPreference, setPreference, removePreference } from './lib/preference
 import { resolveTheme, setAccentAttribute, setThemeAttribute, watchSystemTheme } from './lib/theme'
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from './lib/palette'
 import { useCommands } from './lib/commands'
+import { useKeybindings } from './lib/keybindings'
 import CommandPalette from './ui/CommandPalette.jsx'
 import { documentSurface } from './bridge'
 import SettingsSheet from './components/settings/SettingsSheet.jsx'
@@ -334,9 +335,12 @@ export default function App() {
     updateMenu('system')
   }), [updateMenu])
 
+  // The shortcuts: every bound key runs its command (keybindings.ts).
+  useKeybindings()
+
   // App-level commands for the palette (⌘K). Features register their own where they live.
   useCommands(() => [
-    { id: 'app.settings', section: 'App', title: 'Open settings', icon: 'settings', shortcut: '⌘,', keywords: ['preferences', 'options'], run: () => openSettings() },
+    { id: 'app.settings', section: 'App', title: 'Open settings', icon: 'settings', keys: 'Mod+,', keywords: ['preferences', 'options'], run: () => openSettings() },
     { id: 'view.theme.light', section: 'View', title: 'Use light theme', icon: 'sun', keywords: ['paper', 'appearance', 'mode'], run: () => applyTheme('light') },
     { id: 'view.theme.dark', section: 'View', title: 'Use dark theme', icon: 'moon', keywords: ['ink', 'appearance', 'mode', 'night'], run: () => applyTheme('dark') },
     { id: 'view.theme.system', section: 'View', title: 'Match system theme', icon: 'settings', keywords: ['appearance', 'auto'], run: () => applyTheme('system') },
@@ -345,9 +349,9 @@ export default function App() {
     { id: 'view.tab-bar', section: 'View', title: 'Show or hide tab bar', icon: 'sidebar', keywords: ['tabs'], run: () => setShowsTabBar(!showsTabBar()) },
     { id: 'timer.stats', section: 'Writing', title: 'Show writing stats', icon: 'chart', keywords: ['words', 'goals', 'progress'], run: () => getStatsRuntime().showStats() },
     { id: 'timer.routines', section: 'Writing', title: 'Edit timer routines…', icon: 'timer', keywords: ['pomodoro', 'sprint'], run: () => openSettings('timers') },
-    { id: 'print.layout', section: 'Print & export', title: 'Toggle print layout', icon: 'print', shortcut: '⌥⌘P', keywords: ['pages', 'preview', 'book', 'typeset'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
+    { id: 'print.layout', section: 'Print & export', title: 'Toggle print layout', icon: 'print', keys: 'Mod+Alt+P', keywords: ['pages', 'preview', 'book', 'typeset'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
     { id: 'print.page-setup', section: 'Print & export', title: 'Page setup…', icon: 'sliders', keywords: ['margins', 'trim', 'paper size'], run: () => dispatchAppEvent('inkblot:page-setup') },
-    { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', shortcut: '⌘P', run: () => dispatchAppEvent('inkblot:print', { scope: 'document' }) },
+    { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', keys: 'Mod+P', run: () => dispatchAppEvent('inkblot:print', { scope: 'document' }) },
     { id: 'print.book', section: 'Print & export', title: 'Print book…', icon: 'books', keywords: ['folder', 'manuscript'], run: () => dispatchAppEvent('inkblot:print', { scope: 'folder' }) },
     ...EXPORT_FORMATS.map(([format, label]) => ({
       id: `export.document.${format}`,

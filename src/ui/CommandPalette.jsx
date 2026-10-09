@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { runCommand, scoreCommand, useCommandList } from '../lib/commands'
+import { shortcutLabel, useKeybindingOverrides } from '../lib/keybindings'
 import { useFocusTrap } from './hooks'
 import Icon from './Icon'
 import Kbd from './Kbd'
@@ -39,6 +40,7 @@ export default function CommandPalette() {
 
 function PaletteDialog({ onClose }) {
   const commands = useCommandList()
+  const keybindings = useKeybindingOverrides()
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const ref = useRef(null)
@@ -115,7 +117,7 @@ function PaletteDialog({ onClose }) {
                   <span className="ib-palette-item-icon">{command.icon ? <Icon name={command.icon} /> : null}</span>
                   <span className="ib-palette-item-title">{command.title}</span>
                   {query.trim() ? <span className="ib-meta">{command.section}</span> : null}
-                  {command.shortcut ? <Kbd>{command.shortcut}</Kbd> : null}
+                  {shortcutLabel(command, keybindings) ? <Kbd>{shortcutLabel(command, keybindings)}</Kbd> : null}
                 </div>
               </div>
             )
