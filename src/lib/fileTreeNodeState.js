@@ -19,13 +19,14 @@
  */
 import { getDocDisplayName, getDocKind } from './docKind'
 import { getParentPath } from './fileTreeOrder'
-import { getStoryFolderPresetForEntry } from './storyStructure'
+import { STORY_FOLDER_PRESETS, getStoryFolderPresetForEntry } from './storyStructure'
 
 /**
  * @param node     a tree entry: { type: 'file' | 'folder', name, path, children? }
  * @param context  the tree's current selection, editing and drag state, plus the
  *                 `siblings` array this node sits in (needed for its index, which
- *                 is what the drop indicators are positioned against)
+ *                 is what the drop indicators are positioned against), and the
+ *                 folder `presets` (the built-ins and the writer's, folderPresets.ts)
  */
 export function deriveFileNodeState(node, context = {}) {
   const {
@@ -37,6 +38,7 @@ export function deriveFileNodeState(node, context = {}) {
     expanded = new Set(),
     isAddingEntry = false,
     newEntryParent = '',
+    presets = STORY_FOLDER_PRESETS,
     renamingEntry = null,
     secondaryDoc = null,
     siblings = [],
@@ -55,7 +57,7 @@ export function deriveFileNodeState(node, context = {}) {
   const isActive = activeDoc ? activeDoc === node.path : isPrimary
   const isSecondary = splitView === 'editor' && secondaryDoc === node.path
 
-  const storyPreset = getStoryFolderPresetForEntry(node.path, node.type)
+  const storyPreset = getStoryFolderPresetForEntry(node.path, node.type, presets)
   const kind = isFolder ? null : getDocKind(node.path)
   const isCanvas = kind === 'canvas'
   const iconName = isFolder
@@ -93,6 +95,8 @@ export function deriveFileNodeState(node, context = {}) {
     dragName: getDocDisplayName(node.name),
     hasEntryIcon,
     iconFilled,
+    // A writer's own folder type colours its folder's icon.
+    iconInk: isFolder ? storyPreset?.ink ?? null : null,
     iconName,
     isActive,
     isCanvas,
