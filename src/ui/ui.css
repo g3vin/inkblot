@@ -63,6 +63,13 @@
 .ui-button[data-variant='destructive'] { background: color-mix(in srgb, var(--status-error) 18%, transparent); color: var(--status-error); }
 .ui-button[data-variant='destructive']:not(:disabled):hover { background: color-mix(in srgb, var(--status-error) 28%, transparent); }
 
+/* A button that is itself a floating capsule (the tab bar's +, the file tree's +) keeps
+   the capsule's paper and hairline: .ui-button's reset loads later and would clear them. */
+.ui-button.floating-capsule {
+  background: var(--floating-over-page-bg);
+  border-color: var(--border-color);
+}
+
 /* An icon button's label: under the icon, beside it, or alone (the toolbar's display mode). */
 .ui-icon-button { flex-direction: column; gap: 2px; }
 .ui-icon-button-label { font-size: 11px; font-weight: 400; color: var(--text-secondary); }

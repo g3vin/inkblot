@@ -188,22 +188,46 @@
   overscroll-behavior: contain;
 }
 
+/* Files and Book, side by side on the inspector's panel track. The content (which
+   clips) runs out through the shell's 8px to the panel's edge, as the right sidebar's
+   does, so a view slides out of sight there rather than at the padding; each pane
+   puts the 10px inset back. */
+.left-sidebar .sidebar-content.has-views {
+  margin-inline: -8px;
+  padding-inline: 0;
+}
+
+/* The file tree's + and filter, held at the sidebar's foot under both views. The 2px
+   adds to the shell's 8 to sit them 16px in, as the inspector's search sits. */
+.left-sidebar-footer {
+  flex: 0 0 auto;
+  margin-inline: 2px;
+}
+
+/* Each view was a flex child of .sidebar-content; a pane is one in its place. */
+.left-sidebar-pane {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding-inline: 10px;
+}
+
 .right-sidebar .sidebar-content {
   margin-inline: -10px;
   padding: 0;
   overflow: hidden;
 }
 
-.right-sidebar-global-header {
+.right-sidebar-search {
   position: relative;
   z-index: 14;
   display: flex;
   align-items: center;
   flex: 0 0 auto;
   min-width: 0;
-  width: 100%;
   box-sizing: border-box;
-  margin: 0 0 12px;
+  /* 16px in from the panel's edges, as the file tree's filter sits. */
+  margin: var(--space-2);
 }
 
 .right-sidebar-global-title {
@@ -230,7 +254,7 @@
   white-space: nowrap;
 }
 
-.right-sidebar-global-header .sidebar-search {
+.right-sidebar-search .sidebar-search {
   flex: 1 1 auto;
   min-width: 0;
   box-sizing: border-box;
@@ -239,8 +263,8 @@
 }
 
 /* visibility, not display: the bar keeps its space (and stays unfocusable) while
-   the centered overlay is standing in for it, so nothing below shifts. */
-.right-sidebar-global-header.is-search-detached .sidebar-search {
+   the centered overlay is standing in for it, so nothing above shifts. */
+.right-sidebar-search.is-search-detached .sidebar-search {
   visibility: hidden;
 }
 

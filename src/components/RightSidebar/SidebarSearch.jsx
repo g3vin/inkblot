@@ -1,7 +1,8 @@
 /**
  * SidebarSearch.jsx — the right sidebar's one search bar, on every panel.
  *
- * Collapsed it is a filter box. Focused, it expands downward into the whole search
+ * It sits at the foot of the panels, a capsule like the file tree's filter. Collapsed
+ * it is a filter box. Focused, it opens upward into the whole search
  * surface: scopes, match options, find-and-replace, results, and — while the query is
  * empty — what you probably want to search from where you are standing.
  *
@@ -329,7 +330,7 @@ export default function SidebarSearch({
   return (
     <div
       ref={rootRef}
-      className={`sidebar-search${expanded ? ' is-expanded' : ''}${isOverlay ? ' is-overlay' : ''}`}
+      className={`sidebar-search${expanded ? ' is-expanded' : ''}${isOverlay ? ' is-overlay' : ' floating-capsule'}`}
     >
       <label className="sidebar-search-field" aria-label="Search">
         <Icon name="search" className="sidebar-search-icon" />
@@ -400,7 +401,8 @@ export default function SidebarSearch({
               aria-label={expanded ? 'Hide search options' : 'Show search options'}
               title={expanded ? 'Hide search options' : 'Show search options'}
             >
-              <Icon name="chevron-down" />
+              {/* The drawer opens upward from the foot of the sidebar. */}
+              <Icon name="chevron-up" />
             </button>
           </>
         )}

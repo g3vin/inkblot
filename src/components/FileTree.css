@@ -57,7 +57,6 @@
   padding: 0 4px;
 }
 
-.file-tree-action,
 .file-tree-add {
   background: transparent;
   color: var(--text-subtle);
@@ -71,23 +70,6 @@
   justify-content: center;
   line-height: 0;
   flex-shrink: 0;
-}
-
-/* Anchors the "Other" menu, so it opens under the row rather than the button. */
-.file-tree-actions {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-}
-
-/* The contextual "New Character"/"New Chapter" button — held to the far end so
-   it appearing and disappearing never shifts the fixed four. */
-.file-tree-action-smart {
-  margin-left: auto;
-  color: var(--accent-foreground);
 }
 
 .new-file-input {
@@ -407,8 +389,12 @@
   border-bottom: 1px solid var(--border-color);
   background: var(--surface-1);
   box-shadow: var(--shadow-float);
-  padding: 4px;
-  min-height: 36px;
+  /* A fixed 30px, a third shorter than it was (45), and the same in both sidebars
+     whatever holds it. The 4px side padding is what SidebarTabs sizes the
+     indicator against. */
+  box-sizing: border-box;
+  height: 30px;
+  padding: 3px 4px;
   margin-bottom: 8px;
   border-radius: var(--radius-md);
   isolation: isolate;
@@ -416,30 +402,41 @@
 
 .sidebar-tabs-indicator {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
+  top: 3px;
+  bottom: 3px;
   left: 4px;
   box-sizing: border-box;
   border-radius: var(--radius-md);
   border: 1px solid var(--accent-border);
   background: var(--accent-surface-strong);
-  pointer-events: none;
   z-index: 0;
+  /* Grab it and drag it to another tab (SidebarTabs). It sits under the active tab,
+     whose button lets the pointer through to it. */
+  cursor: grab;
+  touch-action: none;
 }
 
-.right-sidebar .sidebar-tabs {
-  overflow: hidden;
+.sidebar-tabs.is-grabbing,
+.sidebar-tabs.is-grabbing .sidebar-tabs-indicator {
+  cursor: grabbing;
+}
+
+.right-sidebar .sidebar-tabs,
+.left-sidebar .sidebar-tabs {
+  /* Not clipped: the pill, dragged or swiped past the first or last tab, stays
+     drawn over the padding (SidebarTabs caps how far it goes). */
   border-bottom-color: transparent;
   box-shadow: none;
 }
 
-.right-sidebar .sidebar-tabs-indicator {
+.right-sidebar .sidebar-tabs-indicator,
+.left-sidebar .sidebar-tabs-indicator {
   box-shadow: none;
 }
 
 .sidebar-tabs button {
-  min-height: 28px;
-  padding: 4px;
+  min-height: 0;
+  padding: 0 4px;
   font-size: 11px;
   cursor: pointer;
   position: relative;

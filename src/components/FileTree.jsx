@@ -9,6 +9,7 @@
  * window events (new-entry, refresh-projects, folders-visibility, …).
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   listProjects,
@@ -19,7 +20,7 @@ import {
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import Icon from '../ui/Icon.jsx'
-import { Menu, MenuItem, MenuLabel } from '../ui'
+import { IconButton, popUpNativeMenu } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
@@ -64,6 +65,10 @@ export default function FileTree({
   onSelectDoc,
   onSelectProject,
   registerRefreshFiles,
+  // Where the + and the filter go: under the list when not given; into this element
+  // when given (the left sidebar keeps them at its foot, still while Files and Book
+  // swipe past above); nowhere when null (the book has the foot).
+  footerSlot,
 }) {
   const prefersReducedMotion = useReducedMotion()
   const [view, setView] = useState('files')
@@ -82,15 +87,12 @@ export default function FileTree({
   const [isAddingProject, setIsAddingProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectLocation, setNewProjectLocation] = useState(null)
-  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
-  const createMenuAnchorRef = useRef(null)
   const [dragOverPath, setDragOverPath] = useState(null)
   const [dragInsert, setDragInsert] = useState(null)
   const [dragOverFolder, setDragOverFolder] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragPreview, setDragPreview] = useState(null)
   const [dragSourceId, setDragSourceId] = useState(null)
-  const createMenuRef = useRef(null)
   const manualDragRef = useRef(null)
   const manualDragActiveRef = useRef(false)
   const dragInsertRef = useRef(null)
@@ -215,7 +217,6 @@ export default function FileTree({
     setNewEntryParent(parent)
     setNewEntryName('')
     setIsAddingEntry(true)
-    setIsCreateMenuOpen(false)
     // The name box renders among the folder's children, which only exist while
     // the folder is open.
     if (parent) expandPath(parent)
@@ -238,7 +239,6 @@ export default function FileTree({
     await createFolder(projectName, path)
     ensureOrderItem(parent || '', `folder:${path}`)
     setIsAddingEntry(false)
-    setIsCreateMenuOpen(false)
     await refreshTree()
     expandPath(path)
   }, [ensureOrderItem, expandPath, projectName, refreshTree])
@@ -257,7 +257,6 @@ export default function FileTree({
         setRenameValue(stripDocSuffix(detail.name))
         setIsAddingEntry(false)
         setIsAddingProject(false)
-        setIsCreateMenuOpen(false)
         return
       }
       if (detail.presetKey) {
@@ -269,17 +268,6 @@ export default function FileTree({
     window.addEventListener('filetree:new-entry', handler)
     return () => window.removeEventListener('filetree:new-entry', handler)
   }, [beginNewEntry, createStoryFolder])
-
-  useEffect(() => {
-    const handlePointerDown = (event) => {
-      if (!createMenuRef.current?.contains(event.target)) {
-        setIsCreateMenuOpen(false)
-      }
-    }
-
-    window.addEventListener('pointerdown', handlePointerDown)
-    return () => window.removeEventListener('pointerdown', handlePointerDown)
-  }, [])
 
   const confirmNewEntry = async () => {
     if (!newEntryName.trim()) return
@@ -699,6 +687,46 @@ export default function FileTree({
     if (splitView === 'editor' && secondaryDoc) expandPath(getParentPath(secondaryDoc))
   }, [projectName, currentDoc, secondaryDoc, splitView, expandPath])
 
+  // Everything that can be added at the top of the project, as a native menu: the
+  // kinds, then a sibling for the story folder being written in ("New character"),
+  // then the story folders.
+  const openNewMenu = (event) => {
+    const contextLabel = storyFolderContext?.preset.entryLabel.toLowerCase()
+    popUpNativeMenu(event, [
+      { text: 'New document', action: () => beginNewEntry('file', '') },
+      { text: 'New canvas', action: () => beginNewEntry('canvas', '') },
+      { text: 'New map', action: () => beginNewEntry('map', '') },
+      { text: 'New timeline', action: () => beginNewEntry('timeline', '') },
+      { text: 'New folder', action: () => beginNewEntry('folder', '') },
+      { separator: true },
+      storyFolderContext
+        ? { text: `New ${contextLabel}`, action: () => beginNewEntry('file', storyFolderContext.path) }
+        : null,
+      {
+        text: 'New story folder',
+        items: STORY_FOLDER_PRESETS.map((preset) => ({
+          text: preset.name,
+          action: () => { void createStoryFolder(preset.key, '') },
+        })),
+      },
+    ])
+  }
+
+  const footer = (
+    <div className="file-tree-footer">
+      <IconButton
+        icon="add"
+        label="New…"
+        title="Add a document, canvas, map, timeline or folder"
+        size="circle"
+        className="floating-capsule file-tree-new"
+        aria-haspopup="menu"
+        onClick={openNewMenu}
+      />
+      <TreeFilterBar filter={filter} onChange={setFilter} onToggleFolders={toggleAllFolders} />
+    </div>
+  )
+
   return (
     <div
       className={`file-tree${isDragging ? ' dragging' : ''}`}
@@ -713,95 +741,20 @@ export default function FileTree({
       }}
       onDrop={(e) => handleDrop(e, null, '')}
     >
-      <div className="file-tree-header">
-        {view === 'files' ? (
-          <div className="file-tree-actions" ref={createMenuRef}>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('file', '')}
-              title="New document"
-              aria-label="New document"
-            >
-              <Icon name="file" />
-            </button>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('canvas', '')}
-              title="New canvas"
-              aria-label="New canvas"
-            >
-              <Icon name="canvas" />
-            </button>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('map', '')}
-              title="New map"
-              aria-label="New map"
-            >
-              <Icon name="map" />
-            </button>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('timeline', '')}
-              title="New timeline"
-              aria-label="New timeline"
-            >
-              <Icon name="timeline" />
-            </button>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('folder', '')}
-              title="New folder"
-              aria-label="New folder"
-            >
-              <Icon name="folder" />
-            </button>
-            <button
-              ref={createMenuAnchorRef}
-              className="file-tree-action"
-              onClick={() => setIsCreateMenuOpen(open => !open)}
-              title="New story folder…"
-              aria-label="New story folder"
-              aria-haspopup="menu"
-              aria-expanded={isCreateMenuOpen}
-            >
-              <Icon name="more" />
-            </button>
-
-            {storyFolderContext ? (
-              <button
-                className="file-tree-action file-tree-action-smart"
-                onClick={() => beginNewEntry('file', storyFolderContext.path)}
-                title={`New ${storyFolderContext.preset.entryLabel.toLowerCase()}`}
-                aria-label={`New ${storyFolderContext.preset.entryLabel.toLowerCase()}`}
-              >
-                <Icon name={storyFolderContext.preset.fileIcon} />
-              </button>
-            ) : null}
-
-            <Menu open={isCreateMenuOpen} onClose={() => setIsCreateMenuOpen(false)} anchorRef={createMenuAnchorRef} placement="bottom-end" label="New story folder">
-              <MenuLabel>New story folder</MenuLabel>
-              {STORY_FOLDER_PRESETS.map(preset => (
-                <MenuItem key={preset.key} icon={preset.folderIcon} onSelect={() => { void createStoryFolder(preset.key, '') }}>
-                  {preset.name}
-                </MenuItem>
-              ))}
-            </Menu>
-          </div>
-        ) : (
-          <>
-            <span className="file-tree-title">Projects</span>
-            <button
-              className="file-tree-add"
-              onClick={() => setIsAddingProject(true)}
-              aria-label="New project"
-              title="New project"
-            >
-              <Icon name="add" />
-            </button>
-          </>
-        )}
-      </div>
+      {/* A project's files add from the + beside the filter; the projects list from here. */}
+      {view === 'projects' ? (
+        <div className="file-tree-header">
+          <span className="file-tree-title">Projects</span>
+          <button
+            className="file-tree-add"
+            onClick={() => setIsAddingProject(true)}
+            aria-label="New project"
+            title="New project"
+          >
+            <Icon name="add" />
+          </button>
+        </div>
+      ) : null}
 
       {view === 'projects' && (
         <>
@@ -891,7 +844,7 @@ export default function FileTree({
               </AnimatePresence>
             )}
           </MotionDiv>
-          <TreeFilterBar filter={filter} onChange={setFilter} onToggleFolders={toggleAllFolders} />
+          {footerSlot === undefined ? footer : footerSlot ? createPortal(footer, footerSlot) : null}
         </>
       )}
 

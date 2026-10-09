@@ -48,7 +48,8 @@ await act(async () => {
 })
 const text = document.body.textContent
 ok('the sections, in the book’s order', text.indexOf('Front matter') < text.indexOf('Dedication') && text.indexOf('Chapters') < text.indexOf('Chapter 1') && text.indexOf('Back matter') < text.indexOf('Acknowledgements'))
-ok('the book is named at the foot', text.includes('The Novel'))
+ok('the book is named at the foot, in its filter', document.querySelector('.tree-filter-input')?.placeholder === 'Filter The Novel')
+ok('with no folder or recent buttons: they are the files’', !document.querySelector('[aria-label="Show only recent files"]'))
 const rows = [...document.querySelectorAll('.book-row[data-reorder-id]')]
 ok('the selected row is marked', rows.find((r) => r.dataset.reorderId === 'ch1').getAttribute('aria-selected') === 'true')
 ok('a hidden row is marked', rows.find((r) => r.dataset.reorderId === 'ch2').dataset.hidden === 'true')
@@ -58,5 +59,21 @@ await act(async () => { rows.find((r) => r.dataset.reorderId === 'ch2').querySel
 ok('the eye shows a hidden row again', commands.at(-1)?.type === 'setBookItemHidden' && commands.at(-1).payload.hidden === false)
 await act(async () => { document.querySelector('.book-cover-row').click() })
 ok('the cover opens as a row', commands.at(-1)?.payload.id === 'cover')
+
+// The filter narrows the rows, and holds dragging off while it does.
+const filterInput = document.querySelector('.tree-filter-input')
+const typeFilter = (value) => act(async () => {
+  Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(filterInput, value)
+  filterInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+})
+await typeFilter('chap')
+const shownIds = () => [...document.querySelectorAll('.book-row[data-reorder-id]')].map((r) => r.dataset.reorderId)
+ok('filtering narrows the book to the matching rows', shownIds().join() === 'ch1,ch2' && !document.body.textContent.includes('Front matter'))
+await typeFilter('one')
+ok('a row’s label matches too', shownIds().join() === 'ch1')
+await typeFilter('zzz')
+ok('and saying so when nothing does', document.body.textContent.includes('No matching chapters'))
+await typeFilter('')
+ok('clearing it brings the whole book back', shownIds().length === 4)
 
 await act(async () => { root.unmount() })

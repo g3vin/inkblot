@@ -66,32 +66,6 @@
 .book-row:hover .book-row-eye, .book-row[data-hidden='true'] .book-row-eye, .book-row-eye:focus-visible { opacity: 1; }
 .book-row-eye:hover { background: var(--hover-bg); color: var(--text-primary); }
 
-.book-bar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); }
-.book-add {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 50%;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-.book-title {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 var(--space-4);
-  font-size: 12px;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .book-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); flex: 1; padding: var(--space-6); text-align: center; font-size: 12px; color: var(--text-secondary); }
 .book-empty strong { font-size: 13px; color: var(--text-primary); }
 .book-note { margin: 0; font-size: 12px; color: var(--text-secondary); }
@@ -107,4 +81,6 @@
   font: 13px var(--font-ui);
 }
 
-.left-sidebar-switch { box-sizing: border-box; width: calc(100% - 2 * var(--space-3)); margin: 0 var(--space-3) var(--space-2); }
+/* 10px in from the panel's edges (the shell's 8 and 2 more), as the inspector's selector sits. */
+.left-sidebar-switch { box-sizing: border-box; margin: 0 2px var(--space-2); }
+.left-sidebar-switch > .sidebar-tabs { margin-bottom: 0; }
