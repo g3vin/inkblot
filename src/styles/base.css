@@ -45,27 +45,21 @@ a:hover {
 }
 
 /*
- * The bare <button>. Legacy feature buttons still lean on its box (radius, padding),
- * so that stays; its colours are tokens now. New code uses src/ui/Button or
- * src/ui/IconButton instead of styling a bare button.
+ * The bare <button> is a reset: no padding, no fill, an invisible hairline (so a
+ * component can show a border by colour alone) and the surrounding font at the UI's
+ * medium weight. Controls get their look from src/ui (Button, IconButton, Segmented, …)
+ * or from the component's own stylesheet.
  */
 button {
-  border-radius: var(--radius-md);
+  padding: 0;
   border: var(--hairline) solid transparent;
-  padding: 0.6em 1.2em;
+  border-radius: var(--radius-md);
+  font-family: inherit;
   font-size: 1em;
   font-weight: var(--weight-medium);
-  font-family: inherit;
   color: inherit;
-  background-color: var(--control-bg);
+  background: none;
   cursor: pointer;
-  transition:
-    border-color var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out);
-}
-
-button:hover {
-  border-color: var(--border-strong);
 }
 
 button:focus {
