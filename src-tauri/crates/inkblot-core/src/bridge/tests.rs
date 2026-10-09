@@ -548,7 +548,7 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::SetTabOrder(SetTabOrderCommand { tab_ids: vec!["tab-2".into(), "tab-1".into()] }),
         NativeCommand::NewTab(NewTabCommand {}),
         NativeCommand::OpenDocInTab(OpenDocInTabCommand { doc_path: "Act One/Scene".into() }),
-        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand { doc_path: "Act One/Scene".into() }),
+        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand { doc_path: "Act One/Scene".into(), at: None }),
         NativeCommand::OpenInSplit(OpenInSplitCommand { doc_path: Some("Notes".into()), orientation: SplitOrientation::Columns }),
         NativeCommand::CloseSplit(CloseSplitCommand {}),
         NativeCommand::MeasureBook(MeasureBookCommand {}),
@@ -1521,4 +1521,22 @@ fn a_map_tool_and_its_chrome_speak_camel_case() {
     assert_eq!(value["panel"]["sections"][0]["fields"][0]["payload"]["focusKey"], json!(0));
     // A panel with no tab chosen says nothing about one.
     assert!(value["panel"].get("tab").is_none());
+}
+
+#[test]
+fn a_tab_dragged_out_says_where_its_window_goes() {
+    let dropped: NativeCommand = serde_json::from_value(serde_json::json!({
+        "type": "openDocInWindow",
+        "payload": { "docPath": "Act One/Scene", "at": { "x": 640, "y": -20 } },
+    }))
+    .unwrap();
+    assert_eq!(
+        dropped,
+        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand {
+            doc_path: "Act One/Scene".into(),
+            at: Some(ScreenPoint { x: 640, y: -20 }),
+        })
+    );
+    let menu = serde_json::to_value(NativeCommand::OpenDocInWindow(OpenDocInWindowCommand { doc_path: "A".into(), at: None })).unwrap();
+    assert_eq!(menu, serde_json::json!({ "type": "openDocInWindow", "payload": { "docPath": "A" } }));
 }

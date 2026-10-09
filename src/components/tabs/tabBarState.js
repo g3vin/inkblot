@@ -69,3 +69,8 @@ export function adjacentTab(tabs, activeId, offset) {
   const from = Math.max(0, tabs.findIndex((tab) => tab.id === activeId))
   return tabs[((from + offset) % tabs.length + tabs.length) % tabs.length]
 }
+
+/** Whether a point in the page lies outside the window altogether: a tab let go there pops out. */
+export const outsideWindow = (point, width = window.innerWidth, height = window.innerHeight) => Boolean(point) && (
+  point.x < 0 || point.y < 0 || point.x > width || point.y > height
+)

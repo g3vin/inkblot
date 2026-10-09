@@ -3,7 +3,8 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": [
-    "main"
+    "main",
+    "doc-*"
   ],
   "permissions": [
     "core:default",
@@ -159,6 +160,8 @@
     "core:window:allow-set-focus",
     "core:window:allow-show",
     "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "core:window:allow-set-always-on-top",
     "dialog:allow-confirm",
     "dialog:allow-open",
     "dialog:allow-save",

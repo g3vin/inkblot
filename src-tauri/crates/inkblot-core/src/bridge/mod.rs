@@ -138,7 +138,7 @@ pub use event::{
 };
 pub use tabs::{
     CloseSplitCommand, DocTab, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand,
-    SetTabOrderCommand, SplitOrientation, TabRef, TabsChanged,
+    ScreenPoint, SetTabOrderCommand, SplitOrientation, TabRef, TabsChanged,
 };
 
 #[cfg(test)]
