@@ -746,7 +746,7 @@ export default function FileTree({
               title="New timeline"
               aria-label="New timeline"
             >
-              <SFIcon name="timeline" />
+              <Icon name="timeline" />
             </button>
             <button
               className="file-tree-action"
