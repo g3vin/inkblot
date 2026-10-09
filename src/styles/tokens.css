@@ -84,6 +84,9 @@
   --icon-sm: 16px;
   --icon-md: 20px;
   --hairline: 1px;
+  /* Inlay: the width of the channel engraved around a panel's own control
+     (src/ui/Inlay.jsx). Its light is per theme, below. */
+  --inlay-kerf: 3px;
 
   /* Motion — subtle and quick. Motion clarifies; it never performs. */
   --dur-instant: 80ms;
@@ -212,6 +215,16 @@
     0 0 0 0.5px rgba(0, 0, 0, 0.4),
     0 2px 6px rgba(0, 0, 0, 0.18),
     0 12px 28px rgba(0, 0, 0, 0.28);
+  /* An Inlay's channel (src/ui/Inlay.jsx), lit from above: the floor is the paper
+     mixed toward --inlay-shade by --inlay-depth, the top wall is in shade, the bottom
+     lip catches the light, and the piece casts onto the floor and catches the light
+     along its own top edge. */
+  --inlay-shade: #000;
+  --inlay-depth: 38%;
+  --inlay-wall: inset 0 1px 1.5px rgba(0, 0, 0, 0.6);
+  --inlay-lip: inset 0 -0.5px 0 rgba(255, 244, 222, 0.09);
+  --inlay-cast: 0 1px 1.5px rgba(0, 0, 0, 0.6);
+  --inlay-bevel: inset 0 0.5px 0 rgba(255, 244, 222, 0.07);
   --shadow-dialog:
     0 0 0 0.5px rgba(0, 0, 0, 0.45),
     0 24px 60px rgba(0, 0, 0, 0.45);
@@ -301,6 +314,12 @@
     0 0 0 0.5px rgba(40, 32, 20, 0.12),
     0 2px 6px rgba(40, 32, 20, 0.06),
     0 12px 28px rgba(40, 32, 20, 0.1);
+  --inlay-shade: rgb(40, 32, 20);
+  --inlay-depth: 9%;
+  --inlay-wall: inset 0 1px 1.5px rgba(40, 32, 20, 0.24);
+  --inlay-lip: inset 0 -0.5px 0 rgba(255, 255, 255, 0.9);
+  --inlay-cast: 0 1px 1.5px rgba(40, 32, 20, 0.24);
+  --inlay-bevel: inset 0 0.5px 0 rgba(255, 255, 255, 0.8);
   --shadow-dialog:
     0 0 0 0.5px rgba(40, 32, 20, 0.14),
     0 24px 56px rgba(40, 32, 20, 0.16);

@@ -423,7 +423,7 @@ export default function RightSidebar({
 
   return (
     <aside
-      className={`sidebar right-sidebar${collapsed && !peeked ? ' collapsed' : ''}${peeked ? ' is-peeked' : ''}${resizing ? ' is-resizing' : ''}`}
+      className={`sidebar ib-sheet right-sidebar${collapsed && !peeked ? ' collapsed' : ''}${peeked ? ' is-peeked' : ''}${resizing ? ' is-resizing' : ''}`}
       style={{ width }}
       ref={sidebarRef}
       onMouseEnter={handleSidebarMouseEnter}

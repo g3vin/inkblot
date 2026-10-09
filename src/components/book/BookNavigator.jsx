@@ -16,7 +16,7 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
-import { Button, IconButton, Sheet, usePointerReorder } from '../../ui'
+import { Button, IconButton, Inlay, InlaySlot, Sheet, usePointerReorder } from '../../ui'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
 import Icon from '../../ui/Icon.jsx'
 import { SECTION_TITLES, addMenu, moveTarget, rowMenu } from './bookMenu.js'
@@ -106,23 +106,24 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
   const shows = (text) => !needle || String(text ?? '').toLowerCase().includes(needle)
   const shownRows = rows.filter((row) => shows(row.title) || shows(row.label))
   const footer = (
-    <div className="file-tree-footer">
-      <IconButton
-        icon="add"
-        label="Add to the book"
-        title="Add front matter, back matter or a part"
-        size="circle"
-        className="floating-capsule"
-        aria-haspopup="menu"
-        onClick={(event) => popUpNativeMenu(event, addMenu(rows))}
-      />
+    <InlaySlot className="file-tree-footer">
+      <Inlay round>
+        <IconButton
+          icon="add"
+          label="Add to the book"
+          title="Add front matter, back matter or a part"
+          size="circle"
+          aria-haspopup="menu"
+          onClick={(event) => popUpNativeMenu(event, addMenu(rows))}
+        />
+      </Inlay>
       <TreeFilterBar
         filter={{ ...EMPTY_FILTER, text: query }}
         onChange={(next) => setQuery(next.text)}
         filesOnly={false}
         placeholder={`Filter ${state.book?.title || 'the book'}`}
       />
-    </div>
+    </InlaySlot>
   )
 
   return (

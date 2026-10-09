@@ -416,10 +416,6 @@
   top: 3px;
   bottom: 3px;
   left: 4px;
-  box-sizing: border-box;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--accent-border);
-  background: var(--accent-surface-strong);
   z-index: 0;
   /* Grab it and drag it to another tab (SidebarTabs). It sits under the active tab,
      whose button lets the pointer through to it. */
@@ -427,22 +423,69 @@
   touch-action: none;
 }
 
+/* What is drawn. Held or swiped, it lifts out of the strip and grows past its
+   edges, as macOS's segmented controls do, and shrinks back as it lands. It grows
+   by its insets rather than a scale, so the border keeps its weight. */
+.sidebar-tabs-indicator-pill {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-surface-strong);
+  transition:
+    inset var(--sidebar-tabs-grow-duration, 260ms) var(--sidebar-tabs-grow-easing, ease),
+    box-shadow 160ms ease;
+}
+
+.sidebar-tabs-indicator.is-lifted .sidebar-tabs-indicator-pill {
+  inset: -4px -5px;
+  box-shadow: var(--shadow-float);
+}
+
 .sidebar-tabs.is-grabbing,
 .sidebar-tabs.is-grabbing .sidebar-tabs-indicator {
   cursor: grabbing;
 }
 
+/* In the sidebars the strip is engraved into the panel, as its Inlays are
+   (src/ui/Inlay.jsx): the strip is the channel, with the tabs and the indicator on
+   its floor. A kerf all round, and pills, so the indicator's ends are concentric
+   with the channel's. Not clipped: the pill, dragged or swiped past the first
+   or last tab, stays drawn over the padding (SidebarTabs caps how far it goes). */
 .right-sidebar .sidebar-tabs,
 .left-sidebar .sidebar-tabs {
-  /* Not clipped: the pill, dragged or swiped past the first or last tab, stays
-     drawn over the padding (SidebarTabs caps how far it goes). */
-  border-bottom-color: transparent;
-  box-shadow: none;
+  padding: var(--inlay-kerf);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--inlay-floor);
+  box-shadow: var(--inlay-wall), var(--inlay-lip);
 }
 
 .right-sidebar .sidebar-tabs-indicator,
 .left-sidebar .sidebar-tabs-indicator {
-  box-shadow: none;
+  top: var(--inlay-kerf);
+  bottom: var(--inlay-kerf);
+  left: var(--inlay-kerf);
+}
+
+/* The indicator keeps its clear accent tint, sitting in the channel. */
+.right-sidebar .sidebar-tabs-indicator-pill,
+.left-sidebar .sidebar-tabs-indicator-pill {
+  border-radius: var(--radius-pill);
+}
+
+.right-sidebar .sidebar-tabs button,
+.left-sidebar .sidebar-tabs button {
+  border: 0;
+  border-radius: var(--radius-pill);
+}
+
+/* On the floor, a hover only darkens it a little: the paper is for the active tab. */
+.right-sidebar .sidebar-tabs button:hover,
+.left-sidebar .sidebar-tabs button:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
 }
 
 .sidebar-tabs button {

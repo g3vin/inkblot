@@ -273,6 +273,29 @@ and `.ib-prose` (any element that shows the writer's text).
   and `--shadow-float`, inset `--space-3` from the window edge. Every panel can be hidden
   with a toggle and a shortcut, and hidden panels leave the document full width. Use
   `Panel` / `PanelHeader` / `PanelBody`.
+- **Inlay: a panel's own controls are engraved into it, not floated on it.** A panel
+  is one sheet of paper. Its filter, search and + are pieces left standing inside a
+  channel cut around them, a kerf wide (`--inlay-kerf`, 3px), as an engraver cuts a
+  plate. Light falls from above, as for every shadow: the channel's floor is the
+  panel's paper a step darker (`--inlay-shade` by `--inlay-depth`), its top wall is in
+  shade (`--inlay-wall`), its bottom lip catches the light (`--inlay-lip`), and the
+  piece casts onto the floor (`--inlay-cast`) and catches the light along its own top
+  edge (`--inlay-bevel`). No hairlines: the light draws the edges. **Focus runs ink
+  into the channel** (intaglio: the ink sits in the cut). The inked channel is the
+  focus ring, so controls inside an Inlay draw none of their own. The piece is a
+  pill, so its ends and its channel's are concentric (`round` marks a single round
+  button, which also settles onto the floor when pressed). Use `Inlay` in any panel. It takes its paper from the
+  shell's `--sheet-bg`, which an `ib-sheet` shell sets (the sidebars and `Panel` do).
+  Controls that sit side by side share one long channel: put them in an `InlaySlot`,
+  which lays them out a kerf apart, each still its own piece (the + and the filter
+  under the file tree). Only the focused piece inks, inside the long channel. Keep it
+  to the panel's utility controls, one or two channels per panel. Never put a
+  `floating-capsule` inside a panel. Menus, popovers and drawers that open from an
+  inlay still float. When a piece is lifted out (sidebar search becoming the centred
+  overlay), hide it with `visibility`: its pocket stays empty until it returns.
+  A sidebar's tab strip is engraved the same way, turned inside out: the strip is the
+  channel (`--inlay-floor`), and the tabs and the active-tab indicator (its clear
+  accent tint, a pill, concentric with the channel) sit on its floor.
 - **The fade scrim.** Chrome that overlays the document (the toolbar, a bottom bar)
   sits on a gradient from solid `--app-bg` to transparent, so text scrolling underneath
   dissolves instead of hitting a hard line. Use `FadeScrim` (or the existing
@@ -315,7 +338,8 @@ need the target.
 
 **Depth.** Only floating things cast shadows: panels, menus, popovers and floating
 toolbars use `--shadow-float`, and dialogs use `--shadow-dialog`. Everything inside a
-surface is separated by hairlines and tonal shifts, never by shadow.
+surface is separated by hairlines and tonal shifts, never by shadow. The one exception
+is an Inlay's channel (§6), the only place inside a panel with a shadow or a highlight.
 
 **Motion is subtle and quick.** Use `--dur-fast` (120ms) for hovers and small state
 changes, `--dur-base` (180ms) for popovers, dialogs and panels, and `--dur-slow` (240ms)
@@ -364,7 +388,8 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `Field` + `Input` / `TextArea`, `Checkbox` | Forms in dialogs | Label above, hint below. Errors say how to fix |
 | `Segmented` | 2–4 exclusive, short options | Otherwise use `SelectMenu` |
 | `Tabs` | Views within a panel | Underline style |
-| `Panel`, `PanelHeader`, `PanelBody` | Floating side panels | Header title is an eyebrow |
+| `Panel`, `PanelHeader`, `PanelBody` | Floating side panels | Header title is an eyebrow. An `ib-sheet`, so Inlays take its paper |
+| `Inlay`, `InlaySlot` | A panel's own filter, search or + | Engraved into the panel, not floated on it. Focus inks the channel. A slot is one channel round a row of pieces. See §6 |
 | `FadeScrim` | Chrome over the document | See §6 |
 | `Card` | A bordered block in a panel | `ink` applies the card recipe |
 | `Tag` | Small categorical labels | Takes an ink |

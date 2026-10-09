@@ -20,7 +20,7 @@ import {
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import Icon from '../ui/Icon.jsx'
-import { IconButton, popUpNativeMenu } from '../ui'
+import { IconButton, Inlay, InlaySlot, popUpNativeMenu } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
@@ -735,18 +735,20 @@ export default function FileTree({
   }
 
   const footer = (
-    <div className="file-tree-footer">
-      <IconButton
-        icon="add"
-        label="New…"
-        title="Add a document, canvas, map, timeline or folder"
-        size="circle"
-        className="floating-capsule file-tree-new"
-        aria-haspopup="menu"
-        onClick={openNewMenu}
-      />
+    <InlaySlot className="file-tree-footer">
+      <Inlay round>
+        <IconButton
+          icon="add"
+          label="New…"
+          title="Add a document, canvas, map, timeline or folder"
+          size="circle"
+          className="file-tree-new"
+          aria-haspopup="menu"
+          onClick={openNewMenu}
+        />
+      </Inlay>
       <TreeFilterBar filter={filter} onChange={setFilter} onToggleFolders={toggleAllFolders} />
-    </div>
+    </InlaySlot>
   )
 
   return (
