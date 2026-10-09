@@ -56,8 +56,7 @@ html.bubble-open .app-titlebar-toolbar { visibility: hidden; }
   padding: 0;
   border: 0;
   border-radius: var(--radius-md);
-  /* A dark check: the success green is light in both themes. */
-  color: color-mix(in srgb, var(--status-success) 20%, var(--color-black));
+  color: var(--on-ink);
   background: var(--status-success);
   box-shadow: var(--shadow-1);
   cursor: pointer;

@@ -23,12 +23,12 @@
     border-color 160ms ease,
     border-radius 160ms ease;
 
-  border: 1px solid var(--sidebar-shell-border);
+  border: 1px solid var(--border-color);
   padding: 8px;
   margin-top: var(--sidebar-floating-offset);
   margin-bottom: var(--sidebar-floating-offset);
 
-  box-shadow: var(--sidebar-shell-shadow);
+  box-shadow: var(--shadow-float);
   border-radius: var(--radius-lg);
 
   /* Solid window background: on a canvas (which runs under the floating

@@ -6,7 +6,7 @@
  * not be lost, and the page should not re-lay the book per character.
  */
 import { useEffect, useRef, useState } from 'react'
-import { FormRow } from '../../../ui'
+import { FormRow, Toggle } from '../../../ui'
 import Icon from '../../../ui/Icon.jsx'
 import { fromMm, roundTo, toMm, UNITS } from './units'
 
@@ -113,9 +113,10 @@ export function PickerRow({ label, value, onChange, options, disabled }) {
 
 export function ToggleRow({ label, checked, onChange, disabled, title }) {
   return (
-    <label className="fin-toggle-row" title={title}>
-      <span>{label}</span>
-      <input type="checkbox" className="fin-switch" checked={Boolean(checked)} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
-    </label>
+    <div title={title}>
+      <FormRow label={label}>
+        <Toggle label={label} checked={Boolean(checked)} disabled={disabled} onChange={onChange} />
+      </FormRow>
+    </div>
   )
 }

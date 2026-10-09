@@ -10,7 +10,6 @@
  *   2. Theme primitives: the paper/ink neutrals and the eight ink hues, per theme.
  *   3. Semantic tokens: what a surface, a line of text, a border or a shadow IS.
  *   4. Recipes: accent derivations, the card wash, the menu surface, glass.
- *   5. Legacy component aliases, kept only until each surface migrates.
  *
  * Themes: `data-theme` on <html> is ALWAYS 'light' or 'dark' — "System" is resolved
  * in JS (src/lib/theme.ts) before first paint — so each theme is written once, and no
@@ -250,20 +249,6 @@
   --glass-rim: rgba(255, 248, 235, 0.16);
   --glass-highlight: rgba(255, 248, 235, 0.1);
   --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-
-  /* Legacy aliases that carried theme-specific raw values. */
-  --landing-shadow: none;
-  --sidebar-shell-shadow: var(--shadow-float);
-  --sidebar-control-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.2);
-  --sidebar-card-shadow: none;
-  --sidebar-card-shadow-pinned: 0 0 0 1px var(--border-strong);
-  --sidebar-card-border-hover: var(--border-strong);
-  --sidebar-divider-line: var(--border-strong);
-  --sidebar-card-hover-bg: var(--surface-hover);
-  --sidebar-fade-strong: color-mix(in srgb, var(--app-bg) 78%, transparent);
-  --sidebar-fade-soft: color-mix(in srgb, var(--app-bg) 32%, transparent);
-  --focus-mode-panel: color-mix(in srgb, var(--surface-float) 94%, transparent);
-  --focus-mode-shadow: var(--shadow-float);
 }
 
 :root[data-theme='light'] {
@@ -342,7 +327,6 @@
   --glass-highlight: rgba(255, 255, 255, 0.55);
   --glass-shadow: 0 8px 28px rgba(40, 32, 20, 0.14);
 
-  --sidebar-control-shadow: 0 0 0 0.5px rgba(40, 32, 20, 0.1), 0 4px 10px rgba(40, 32, 20, 0.06);
 }
 
 /* ============================================================
@@ -377,42 +361,11 @@
   --card-edge-base: var(--border-color);
 
   /* The one pop-up surface. Every menu, popover and picker wears it (src/ui/Menu,
-     src/ui/Popover, and the shared legacy rule in base.css). */
+     src/ui/Popover, and the few hand-built pop-ups in node views). */
   --menu-bg: var(--popover-bg);
   --menu-border: var(--popover-border);
   --menu-radius: var(--radius-lg);
   --menu-shadow: var(--shadow-float);
-
-  /* ============================================================
-     5. Legacy component aliases — do not use in new code.
-     Each is deleted when its surface migrates (docs/DESIGN.md → Migration).
-     ============================================================ */
-  --color-white: #ffffff;
-  --color-black: #000000;
-  --tile-color: var(--surface-1);
-  --landing-bg: var(--app-bg);
-  --landing-fg: var(--text-primary);
-  --landing-muted: var(--text-subtle);
-  --landing-soft: var(--text-muted);
-  --landing-card: var(--surface-1);
-  --landing-border: var(--border-color);
-  --sidebar-sticky-bg: var(--app-bg);
-  --sidebar-shell-border: var(--border-color);
-  --sidebar-card-border: var(--border-color);
-  --sidebar-floating-border: var(--floating-note-border);
-  --sidebar-floating-bg: var(--floating-note-bg);
-  --sidebar-floating-shadow: var(--floating-note-shadow);
-  --sidebar-fade-solid: var(--app-bg);
-  --focus-mode-bg: var(--app-bg);
-  --focus-mode-fg: var(--text-primary);
-  --focus-mode-muted: color-mix(in srgb, var(--text-primary) 36%, transparent);
-  --focus-mode-border: var(--border-color);
-  --floating-note-radius: var(--radius-lg);
-  --floating-note-border: var(--accent-border);
-  --floating-note-bg: var(--surface-float);
-  --floating-note-shadow: var(--shadow-float);
-  --floating-note-title: var(--accent-foreground);
-  --floating-note-divider: color-mix(in srgb, var(--accent-color) 22%, transparent);
 }
 
 /*
@@ -429,6 +382,7 @@
 .ib-card--inked,
 .note-tile,
 .note-preview-card,
+.note-dot-preview,
 .canvas-node-text,
 .canvas-node-file,
 .canvas-node-link {

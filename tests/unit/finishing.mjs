@@ -230,7 +230,7 @@ await act(async () => { await wait(60) })
   ok('the Typeset tab draws its sections from the published state',
     ['Book', 'Editions', 'Style', 'Format', 'Page', 'Body Text', 'Proof', 'Chapter Openings', 'Header & Footer', 'Title Page'].every((t) => titles().includes(t)))
   ok('with no Print and Export in its header', !panelHost.querySelector('.fin-header .ui-button[data-variant="filled"]'))
-  const toggle = (label) => [...panelHost.querySelectorAll('.fin-toggle-row')].find((row) => row.textContent.trim() === label)?.querySelector('input')
+  const toggle = (label) => panelHost.querySelector(`[role="switch"][aria-label="${label}"]`)
   await act(async () => { toggle('Set Type for Print').click() })
   await act(async () => { await wait(220) })
   ok('Set Type for Print sets the document’s type', Boolean(editor.state.doc.attrs.pageSetup?.typography))

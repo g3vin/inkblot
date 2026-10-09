@@ -19,6 +19,7 @@ import {
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import Icon from '../ui/Icon.jsx'
+import { Menu, MenuItem, MenuLabel } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
@@ -82,6 +83,7 @@ export default function FileTree({
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectLocation, setNewProjectLocation] = useState(null)
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
+  const createMenuAnchorRef = useRef(null)
   const [dragOverPath, setDragOverPath] = useState(null)
   const [dragInsert, setDragInsert] = useState(null)
   const [dragOverFolder, setDragOverFolder] = useState(null)
@@ -755,10 +757,12 @@ export default function FileTree({
               <Icon name="folder" />
             </button>
             <button
+              ref={createMenuAnchorRef}
               className="file-tree-action"
               onClick={() => setIsCreateMenuOpen(open => !open)}
-              title="Other…"
-              aria-label="Other"
+              title="New story folder…"
+              aria-label="New story folder"
+              aria-haspopup="menu"
               aria-expanded={isCreateMenuOpen}
             >
               <Icon name="more" />
@@ -775,22 +779,14 @@ export default function FileTree({
               </button>
             ) : null}
 
-            {isCreateMenuOpen && (
-              <div className="file-tree-create-menu">
-                {STORY_FOLDER_PRESETS.map(preset => (
-                  <button
-                    key={preset.key}
-                    className="file-tree-create-option"
-                    onClick={() => {
-                      void createStoryFolder(preset.key, '')
-                    }}
-                  >
-                    <Icon name={preset.folderIcon} className="file-tree-create-icon" />
-                    <span>{preset.menuLabel}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <Menu open={isCreateMenuOpen} onClose={() => setIsCreateMenuOpen(false)} anchorRef={createMenuAnchorRef} placement="bottom-end" label="New story folder">
+              <MenuLabel>New story folder</MenuLabel>
+              {STORY_FOLDER_PRESETS.map(preset => (
+                <MenuItem key={preset.key} icon={preset.folderIcon} onSelect={() => { void createStoryFolder(preset.key, '') }}>
+                  {preset.name}
+                </MenuItem>
+              ))}
+            </Menu>
           </div>
         ) : (
           <>

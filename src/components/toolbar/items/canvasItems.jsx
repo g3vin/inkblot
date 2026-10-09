@@ -5,8 +5,8 @@
  */
 import { useRef, useState } from 'react'
 import { formatDuration } from '../../../lib/audioNotes'
-import { CANVAS_COLOR_PRESETS, resolveCanvasColor } from '../../../lib/canvasModel'
-import Popover from '../../../ui/Popover'
+import { CANVAS_PRESET_INKS } from '../../../lib/palette'
+import { Button, InkPicker, Popover } from '../../../ui'
 import { Glyph, ItemFrame, MenuButton, ToolButton } from '../ToolbarControls'
 
 const command = (ctx, name, detail) => {
@@ -72,6 +72,8 @@ export function CanvasRecordMemoItem({ ctx, spec }) {
   )
 }
 
+const PRESET_FOR_INK = Object.fromEntries(Object.entries(CANVAS_PRESET_INKS).map(([preset, ink]) => [ink, preset]))
+
 export function CanvasColorItem({ ctx, spec }) {
   const [open, setOpen] = useState(false)
   const anchorRef = useRef(null)
@@ -92,11 +94,10 @@ export function CanvasColorItem({ ctx, spec }) {
       >
         <Glyph icon="palette" label={spec.label} display={ctx.display} />
       </button>
-      <Popover anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} align="center" className="tb-swatches" role="menu">
-        {CANVAS_COLOR_PRESETS.map((preset) => (
-          <button key={preset.id} type="button" className="canvas-color-swatch" style={{ background: preset.value }} onClick={() => apply(preset.id)} aria-label={preset.label} title={preset.label} />
-        ))}
-        <button type="button" className="canvas-color-swatch canvas-color-swatch-none" style={{ background: resolveCanvasColor(null) }} onClick={() => apply(null)} aria-label="Default Color" title="Default" />
+      <Popover anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} align="center" className="tb-canvas-colors">
+        {/* JSON Canvas stores its six presets as '1'–'6'; each is one of the inks. */}
+        <InkPicker label="Card colour" value={null} inks={Object.values(CANVAS_PRESET_INKS)} onChange={(ink) => apply(PRESET_FOR_INK[ink])} />
+        <Button onClick={() => apply(null)}>No colour</Button>
       </Popover>
     </ItemFrame>
   )

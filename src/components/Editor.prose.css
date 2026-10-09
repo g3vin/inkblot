@@ -44,7 +44,7 @@
 }
 
 .editor .ProseMirror td {
-  background: color-mix(in srgb, var(--tile-color) 88%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
 }
 
 .editor .ProseMirror th p,

@@ -11,7 +11,7 @@
   margin: 14px 0;
   padding: 10px;
   border: 1px solid var(--border-color);
-  border-radius: var(--floating-note-radius, 16px);
+  border-radius: var(--radius-lg);
   background: var(--surface-1);
   box-shadow: var(--shadow-soft);
   overflow: hidden;

@@ -156,7 +156,7 @@ export function HighlightItem({ ctx, spec }) {
       ctx={ctx}
       spec={spec}
       value={draft ?? ctx.toolbar.highlight}
-      glyph="highlighter"
+      glyph="highlight"
       onBlur={() => setDraft(null)}
       onChange={(e) => {
         setDraft(e.target.value)

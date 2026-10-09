@@ -24,7 +24,7 @@
   padding: 14px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--accent-border);
-  background: var(--floating-note-bg);
+  background: var(--surface-float);
   box-shadow: var(--shadow-popover);
   animation: sidebar-search-open 140ms ease-out both;
 }
@@ -138,9 +138,9 @@
   min-width: 0;
   height: 30px;
   padding: 0 10px;
-  border: 1px solid var(--sidebar-card-border);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  background: var(--tile-color);
+  background: var(--surface-1);
   color: var(--text-primary);
   font-size: 13px;
   outline: none;
@@ -425,7 +425,7 @@
   flex-direction: column;
   gap: 0;
   border-radius: var(--radius-lg);
-  background: var(--floating-note-bg);
+  background: var(--surface-float);
   border: 1px solid var(--accent-border);
   box-shadow: var(--shadow-popover);
   overflow: hidden;

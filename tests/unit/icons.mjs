@@ -22,12 +22,12 @@ const files = (dir) => readdirSync(dir).flatMap((name) => {
 })
 
 const NAME = `['"]([a-z][a-z0-9-]*)['"]`
-// Where an icon name is written: <Icon name="…">, an `icon` prop or field (either side
-// of a ternary), and the file-tree presets' fileIcon / folderIcon.
+// Where an icon name is written: <Icon name="…">, an `icon` or `glyph` prop or field
+// (either side of a ternary), and the file-tree presets' fileIcon / folderIcon.
 const PATTERNS = [
   new RegExp(`<Icon\\b[^>]*?\\bname=\\{?\\s*${NAME}`, 'g'),
   new RegExp(`<Icon\\b[^>]*?\\bname=\\{[^}]*?\\?\\s*${NAME}\\s*:\\s*${NAME}`, 'g'),
-  new RegExp(`\\b(?:icon|fileIcon|folderIcon)\\s*[:=]\\s*\\{?\\s*${NAME}`, 'g'),
+  new RegExp(`\\b(?:icon|glyph|fileIcon|folderIcon)\\s*[:=]\\s*\\{?\\s*${NAME}`, 'g'),
   new RegExp(`\\bicon=\\{[^}]*?\\?\\s*${NAME}\\s*:\\s*${NAME}`, 'g'),
 ]
 
