@@ -519,12 +519,12 @@ export default function TimelineSurface({
             {!timeline.events.length ? (
               <div className="timeline-empty">
                 <p>No events yet.</p>
-                <p>Double-click anywhere to add one, or select text in a chapter and choose <em>Attach to Timeline Event</em>.</p>
+                <p>Double-click anywhere to add one, or select text in a chapter and choose <em>Attach to timeline event</em>.</p>
               </div>
             ) : scale === 'manuscript' && !threads.length ? (
               <div className="timeline-empty">
                 <p>No passages are attached to events yet.</p>
-                <p>Select text in a chapter and choose <em>Attach to Timeline Event</em> — each passage then appears here in reading order, joined to when it happens.</p>
+                <p>Select text in a chapter and choose <em>Attach to timeline event</em> — each passage then appears here in reading order, joined to when it happens.</p>
               </div>
             ) : null}
           </>

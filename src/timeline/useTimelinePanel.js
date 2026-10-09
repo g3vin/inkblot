@@ -109,7 +109,7 @@ function eventSections(ui, props, form, setForm) {
     ]),
 
     ui.section('links', 'Linked', [
-      !event.links.length ? ui.note('Select text in a document and choose Attach to Timeline Event to link a passage. Canvas cards and notes can be attached from their own menus.') : null,
+      !event.links.length ? ui.note('Select text in a document and choose “Attach to timeline event” to link a passage. Canvas cards and notes can be attached from their own menus.') : null,
       journeys.some((journey) => journey.intervals.some((interval) => interval.kind === 'travel'))
         ? ui.choice('links.leg', 'Leaves with', '', [
           { value: '', label: 'Choose a journey leg…' },

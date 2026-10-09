@@ -366,6 +366,7 @@ export default function EditorLayout(props) {
       { id: 'document.new', section: 'Document', title: 'New document…', icon: 'new-document', shortcut: '⌘T', keywords: ['create', 'chapter', 'page', 'file'], when: () => Boolean(props.projectName), run: newOf('doc') },
       { id: 'canvas.new', section: 'Document', title: 'New canvas…', icon: 'canvas', keywords: ['create', 'board', 'cards'], when: () => Boolean(props.projectName), run: newOf('canvas') },
       { id: 'map.new', section: 'Document', title: 'New map…', icon: 'map', keywords: ['create', 'world', 'places'], when: () => Boolean(props.projectName), run: newOf('map') },
+      { id: 'timeline.new', section: 'Document', title: 'New timeline…', icon: 'timeline', keywords: ['create', 'chronology', 'events', 'dates'], when: () => Boolean(props.projectName), run: newOf('timeline') },
       { id: 'notes.add', section: 'Notes', title: 'Add note', icon: 'note', shortcut: '⌥⌘N', keywords: ['comment', 'annotate'], when: () => activeIsText, run: addNote },
       { id: 'view.focus-mode', section: 'View', title: focusModeOpen ? 'Leave focus mode' : 'Enter focus mode', icon: 'crosshair', keywords: ['distraction free', 'zen', 'full screen'], when: () => activeIsText, run: () => setFocusModeOpen((open) => !open) },
       { id: 'view.sidebar', section: 'View', title: leftShown ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', keywords: ['files', 'file tree', 'left panel'], run: () => (leftShown ? left.collapse() : left.pin()) },

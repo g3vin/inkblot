@@ -58,30 +58,6 @@
   z-index: 5;
 }
 
-.timeline-segmented {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
-}
-
-.timeline-segmented button {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.timeline-segmented button.is-active {
-  background: var(--surface-1);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-1);
-}
-
 /* The page's inspector sits under the toolbar, not over it. */
 .timeline-surface .map-inspector {
   top: 56px;
