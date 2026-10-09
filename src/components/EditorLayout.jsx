@@ -51,6 +51,7 @@ import { setInspectorOpen } from '../lib/inspectorPresence'
 import { useCommands } from '../lib/commands'
 import { createFreeNote, createQuoteNote } from '../lib/noteUtils'
 import { requestDraftKind } from '../lib/draftDocument'
+import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason } from '../lib/docLocks'
 
 const LEFT_SIDEBAR_OUTER_CHROME_WIDTH = 18
 // Room in the titlebar for a sidebar's show button while it is put away.
@@ -355,6 +356,13 @@ export default function EditorLayout(props) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [addNote, activeDoc, currentDoc])
 
+  // The project's locks (docLocks.ts), read when it opens; the file tree re-reads them.
+  useEffect(() => {
+    void refreshLocks(props.projectName)
+  }, [props.projectName])
+  const lockTarget = activeDoc || currentDoc
+  const lock = useLockReason(lockTarget)
+
   const leftShown = !left.collapsed || left.peeked
   const activeIsText = isTextDoc(activeDoc || currentDoc)
   const editorMode = pageLayoutState?.mode
@@ -374,10 +382,13 @@ export default function EditorLayout(props) {
       { id: 'view.split.right', section: 'View', title: 'Split right', icon: 'split-columns', keywords: ['side by side', 'two documents'], when: () => split !== 'editor', run: () => send('openInSplit', { orientation: 'columns' }) },
       { id: 'view.split.down', section: 'View', title: 'Split down', icon: 'split-rows', keywords: ['above and below', 'two documents'], when: () => split !== 'editor', run: () => send('openInSplit', { orientation: 'rows' }) },
       { id: 'view.split.close', section: 'View', title: 'Close split', icon: 'close', when: () => split === 'editor', run: () => send('closeSplit') },
+      lock?.by === 'folder'
+        ? { id: 'document.lock', section: 'Document', title: `Unlock folder “${lock.folder.split('/').pop()}”`, icon: 'unlock', keywords: ['read only', 'edit', 'lock'], run: () => setFolderLocked(props.projectName, lock.folder, false) }
+        : { id: 'document.lock', section: 'Document', title: lock ? 'Unlock document' : 'Lock document', icon: lock ? 'unlock' : 'lock', keywords: ['read only', 'freeze', 'protect', 'edit'], when: () => Boolean(props.projectName && lockTarget), run: () => setDocumentLocked(props.projectName, lockTarget, !lock) },
       { id: 'history.open', section: 'Document', title: 'Show version history', icon: 'history', keywords: ['versions', 'snapshots', 'restore', 'undo'], run: () => openRightSidebarTab('history') },
       { id: 'view.typeset', section: 'Print & export', title: editorMode === 'typeset' ? 'Back to Write' : 'Typeset the book', icon: editorMode === 'typeset' ? 'write' : 'type-style', keywords: ['pages', 'layout', 'print', 'book', 'write'], when: () => activeIsText, run: () => send('setEditorMode', { mode: editorMode === 'typeset' ? 'write' : 'typeset' }) },
     ]
-  }, [props.projectName, activeIsText, addNote, focusModeOpen, leftShown, rightOpen, left, right, split, editorMode, openRightSidebarTab])
+  }, [props.projectName, activeIsText, addNote, focusModeOpen, leftShown, rightOpen, left, right, split, editorMode, openRightSidebarTab, lock, lockTarget])
 
   const handleContextMenu = useEditorContextMenu({
     editor: props.activeEditor,

@@ -725,3 +725,80 @@ fn deleting_a_project_takes_its_directory_and_its_registry_entry() {
     // And again, on a project that is already gone.
     store.delete_project("Cloud").unwrap();
 }
+
+#[test]
+fn an_autosave_keeps_a_document_locked() {
+    let app_data = TempDir::new();
+    let store = store(&app_data);
+    store.create_project("Novel", None).unwrap();
+
+    store
+        .write_document_raw(
+            "Novel",
+            "Chapter One",
+            &json!({ "content": [1], "notes": [], "locked": true }),
+        )
+        .unwrap();
+    let version = VersionRequest {
+        content_html: Some("<p>2</p>".into()),
+        content_json: None,
+        name: None,
+        auto: true,
+    };
+    store
+        .save_document(
+            "Novel",
+            "Chapter One",
+            &body(json!([2]), json!([{ "id": "n" }])),
+            Some(version),
+        )
+        .unwrap();
+
+    let document = store
+        .load_document("Novel", "Chapter One")
+        .unwrap()
+        .unwrap();
+    assert_eq!(document["notes"], json!([{ "id": "n" }]));
+    assert_eq!(document["locked"], json!(true));
+}
+
+#[test]
+fn locked_entries_finds_flagged_documents_and_marked_folders() {
+    let app_data = TempDir::new();
+    let store = store(&app_data);
+    store.create_project("Novel", None).unwrap();
+
+    store
+        .write_document_raw("Novel", "Open", &json!({ "content": [], "notes": [] }))
+        .unwrap();
+    store
+        .write_document_raw(
+            "Novel",
+            "Shut",
+            &json!({ "content": [], "notes": [], "locked": true }),
+        )
+        .unwrap();
+    store
+        .write_document_raw("Novel", "Odd", &json!({ "content": [], "locked": "yes" }))
+        .unwrap();
+    store
+        .write_document_raw(
+            "Novel",
+            "Drafts/Board.canvas",
+            &json!({ "nodes": [], "edges": [], "locked": true }),
+        )
+        .unwrap();
+    let root = store.project_root("Novel");
+    std::fs::write(
+        format!("{root}/Drafts/{}", paths::FOLDER_FILE),
+        r#"{"locked":true}"#,
+    )
+    .unwrap();
+
+    let found = store.locked_entries("Novel");
+    assert_eq!(
+        found.documents,
+        vec!["Drafts/Board.canvas".to_string(), "Shut".to_string()]
+    );
+    assert_eq!(found.folders, vec!["Drafts".to_string()]);
+}

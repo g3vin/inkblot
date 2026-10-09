@@ -50,6 +50,9 @@ import Icon from '../ui/Icon.jsx'
 import DocumentTabBar from './tabs/DocumentTabBar'
 import { useShowsTabBar } from './tabs/tabBarState'
 import PaneEditorSurface from '../print/PaneEditorSurface'
+import DocLockBadge from './DocLockBadge'
+import { lockReason, useLocks } from '../lib/docLocks'
+import { setEditorLock } from '../extensions/DocumentLock'
 
 const EMPTY_NOTES = []
 
@@ -587,6 +590,17 @@ export default function EditorCanvas({
 
   const liveEditor = isEditorReady(editor) ? editor : null
   const liveSecondaryEditor = isEditorReady(secondaryEditor) ? secondaryEditor : null
+
+  // A locked document's text is frozen (docLocks.ts); each editor is told what it holds.
+  const locks = useLocks()
+  const primaryLocked = isTextDoc(currentDoc) && lockReason(currentDoc, locks) !== null
+  const secondaryLocked = isTextDoc(secondaryDoc) && lockReason(secondaryDoc, locks) !== null
+  useEffect(() => {
+    setEditorLock(liveEditor, currentDoc, primaryLocked)
+  }, [currentDoc, liveEditor, primaryLocked])
+  useEffect(() => {
+    setEditorLock(liveSecondaryEditor, secondaryDoc, secondaryLocked)
+  }, [liveSecondaryEditor, secondaryDoc, secondaryLocked])
   const liveActiveEditor = isEditorReady(activeEditor) ? activeEditor : null
   const focusModeEditor = liveActiveEditor || liveEditor || liveSecondaryEditor
 
@@ -701,6 +715,7 @@ export default function EditorCanvas({
         <div
           ref={primaryPaneRef}
           className="pane primary-pane"
+          data-locked={primaryLocked}
           // A canvas owns its own wheel/pointer handling and stops propagation, so
           // it activates its pane itself rather than through these editor handlers.
           // A draft pane has no document either, and its form must keep focus —
@@ -788,6 +803,7 @@ export default function EditorCanvas({
           {!primaryIsStructured && !showDraftPane ? (
             <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName}>
               {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(primaryWordStats)}</div> : null}
+              <DocLockBadge projectName={projectName} docPath={currentDoc} />
             </div>
           ) : null}
         </div>
@@ -810,6 +826,7 @@ export default function EditorCanvas({
           <div
             ref={secondaryPaneRef}
             className="pane secondary-pane"
+            data-locked={secondaryLocked}
             onFocus={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
             onMouseEnter={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
             onWheel={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
@@ -885,6 +902,7 @@ export default function EditorCanvas({
             {!secondaryIsStructured ? (
               <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName}>
                 {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}
+                <DocLockBadge projectName={projectName} docPath={secondaryDoc} />
               </div>
             ) : null}
           </div>

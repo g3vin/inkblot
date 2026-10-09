@@ -82,6 +82,8 @@
  *          files, and passages kept on their words in a real editor and on disk
  *   spaceswipe the sidebars' swipe between panels: one panel per flick, several when
  *          held, and the momentum after a lift swallowed
+ *   locks  locked documents and folders: the flag kept through every save, folder
+ *          markers, the editor and the canvas and map refusing edits, the badge
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -100,7 +102,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'icons', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'icons', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks']
 
 const failures = []
 

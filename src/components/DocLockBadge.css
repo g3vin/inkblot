@@ -1,0 +1,45 @@
+/* The lock badge: a floating capsule like the word count, which it sits beside. */
+.doc-lock-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 26px;
+  box-sizing: border-box;
+  padding: 0 var(--space-1) 0 var(--space-3);
+  font: var(--text-xs) var(--font-ui);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  pointer-events: auto;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.doc-lock-badge:not(:has(.doc-lock-unlock)) {
+  padding-right: var(--space-3);
+}
+
+/* A refused edit: the badge takes the accent for a moment. */
+.doc-lock-badge[data-nudged='true'] {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.doc-lock-badge .doc-lock-unlock {
+  height: 20px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+/* Canvases, maps and timelines have no status row: the badge floats at the pane's foot. */
+.doc-lock-badge.is-floating {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+/* No caret in a locked document: typing would do nothing. Selecting still works,
+   so a note can be added. */
+.pane[data-locked='true'] .ProseMirror {
+  caret-color: transparent;
+}

@@ -7,12 +7,16 @@
  * Two things are saved without being edits: the viewport, and the story day the
  * timeline was left on. Neither enters undo history — undoing a pin move must not
  * yank the timeline back — so both live in refs and are folded in at save time.
+ *
+ * A locked map (docLocks.ts) takes no edits: they are dropped here, before the
+ * reducer. Its view and day still save, as they are not edits.
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { debounce } from 'lodash'
 import { appendMapVersion, saveMapDocument } from '../lib/map/mapFileSystem'
 import { serializeMap } from '../lib/map/mapModel'
 import { canRedo, canUndo, createHistory, historyReducer } from './mapReducer'
+import { noteLockedEdit } from '../lib/docLocks'
 
 const SAVE_DEBOUNCE_MS = 800
 const VERSION_CHECKPOINT_DEBOUNCE_MS = 15000
@@ -21,9 +25,13 @@ const COALESCE_IDLE_MS = 600
 const withDay = (map, day) =>
   Number.isFinite(day) && day !== map.timeline?.day ? { ...map, timeline: { ...map.timeline, day } } : map
 
-export function useMapDocument({ projectName, docPath, initialMap, viewportRef, dayRef }) {
+export function useMapDocument({ projectName, docPath, initialMap, viewportRef, dayRef, locked = false }) {
   const [history, dispatch] = useReducer(historyReducer, initialMap, createHistory)
   const map = history.present
+  const lockedRef = useRef(locked)
+  useEffect(() => {
+    lockedRef.current = locked
+  }, [locked])
   const mapRef = useRef(map)
   useEffect(() => {
     mapRef.current = map
@@ -82,14 +90,18 @@ export function useMapDocument({ projectName, docPath, initialMap, viewportRef, 
 
   const run = useCallback(
     (action) => {
+      if (lockedRef.current && !action.meta?.upkeep) {
+        noteLockedEdit(docPath)
+        return
+      }
       dispatch(action)
       if (action.meta?.coalesce) clearCoalesce()
     },
-    [clearCoalesce]
+    [clearCoalesce, docPath]
   )
 
-  const undo = useCallback(() => dispatch({ type: 'history/undo' }), [])
-  const redo = useCallback(() => dispatch({ type: 'history/redo' }), [])
+  const undo = useCallback(() => run({ type: 'history/undo' }), [run])
+  const redo = useCallback(() => run({ type: 'history/redo' }), [run])
 
   return {
     map,

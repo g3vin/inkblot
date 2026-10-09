@@ -7,6 +7,8 @@
  */
 import { useEffect, useState } from 'react'
 import { getDocDisplayName } from '../lib/docKind'
+import { useLockReason } from '../lib/docLocks'
+import DocLockBadge from '../components/DocLockBadge'
 import { loadTimelineView } from '../lib/timeline/timelineFileSystem'
 import TimelineSurface from './TimelineSurface'
 import '../map/Map.css'
@@ -21,6 +23,7 @@ export default function TimelinePane({
   onClose,
   isActive = true,
 }) {
+  const locked = useLockReason(docPath) !== null
   const [loaded, setLoaded] = useState(null)
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export default function TimelinePane({
       ) : loaded ? (
         <TimelineSurface
           key={docPath}
+          locked={locked}
           projectName={projectName}
           docPath={docPath}
           initialView={loaded.view}
@@ -66,6 +70,7 @@ export default function TimelinePane({
       ) : (
         <div className="timeline-surface is-loading" />
       )}
+      <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} />
     </div>
   )
 }

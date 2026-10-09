@@ -76,6 +76,7 @@ export default function MapSurface({
   onOpenDoc,
   isActive = true,
   chromeWhileInactive = false,
+  locked = false,
 }) {
   const idPrefix = `map${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const [day, setDay] = useState(() => initialMap.timeline?.day || 0)
@@ -104,6 +105,7 @@ export default function MapSurface({
     initialMap,
     viewportRef: view.viewportRef,
     dayRef,
+    locked,
   })
   const saveViewRef = useRef(saveView)
   useEffect(() => {
@@ -644,7 +646,7 @@ export default function MapSurface({
       const { projectName: movedIn, entryPath, nextPath, type } = event.detail || {}
       if (movedIn !== projectName) return
       const { map: next, changed } = rewriteMapDocRefs(mapRef.current, entryPath, nextPath, type)
-      if (changed) dispatch({ type: 'doc/replace', map: next })
+      if (changed) dispatch({ type: 'doc/replace', map: next, meta: { upkeep: true } })
       void docs.refresh()
     }
     window.addEventListener(MAP_DOC_MOVED_EVENT, onMoved)

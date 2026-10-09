@@ -9,6 +9,7 @@ import { deleteProject, getProjectRoot, moveProject } from '../../lib/FileSystem
 import { deleteEntry, duplicateEntry } from '../../lib/entryOperations'
 import { STORY_FOLDER_PRESETS } from '../../lib/storyStructure'
 import { openDocumentWindow } from '../../lib/docWindow'
+import { lockReason, setDocumentLocked, setFolderLocked } from '../../lib/docLocks'
 
 export async function fileTreeMenu(ctx) {
   const {
@@ -135,6 +136,15 @@ export async function fileTreeMenu(ctx) {
     const isFile = entryType === 'file'
     const isFolder = entryType === 'folder'
     const entryName = entryPath.split('/').filter(Boolean).pop()
+    // Locked itself, or inside a locked folder, which is unlocked from the folder.
+    const lock = lockReason(entryPath)
+    const heldByFolder = lock?.by === 'folder' && lock.folder !== entryPath
+    const lockItem = () => MenuItem.new(heldByFolder
+      ? { text: `Locked with “${lock.folder.split('/').pop()}”`, enabled: false }
+      : {
+          text: `${lock ? 'Unlock' : 'Lock'}${isFolder ? ' folder' : ''}`,
+          action: () => (isFolder ? setFolderLocked : setDocumentLocked)(projectName, entryPath, !lock),
+        })
 
     // A file's menu is the whole story for that document, so it returns on its
     // own rather than trailing the editor's text actions behind it.
@@ -167,6 +177,7 @@ export async function fileTreeMenu(ctx) {
           },
         }),
         await buildMoveToSubmenu(entryPath),
+        await lockItem(),
         await PredefinedMenuItem.new({ item: 'Separator' }),
 
         await buildCopyPathSubmenu(entryPath),
@@ -233,6 +244,8 @@ export async function fileTreeMenu(ctx) {
           },
         })
       )
+
+      items.push(await lockItem())
 
       items.push(
         await MenuItem.new({

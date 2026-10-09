@@ -246,6 +246,17 @@
   white-space: nowrap;
 }
 
+/* A locked entry (docLocks.ts); inside a locked folder, more quietly. */
+.file-item-lock {
+  flex: none;
+  margin-left: var(--space-1);
+  color: var(--text-muted);
+}
+
+.file-item-lock.is-inherited {
+  color: var(--text-subtle);
+}
+
 .file-item.folder {
   font-weight: 600;
 }

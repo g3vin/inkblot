@@ -79,6 +79,7 @@ html.bubble-open .document-tab-bar { visibility: hidden; }
 
 .document-tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .document-tab-divider { color: var(--text-muted); }
+.document-tab-lock { flex: none; color: var(--text-muted); }
 
 .document-tab-close {
   position: absolute;

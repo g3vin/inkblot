@@ -14,6 +14,8 @@
 import { useEffect, useState } from 'react'
 import { loadCanvasDocument } from '../lib/canvasFileSystem'
 import { getDocDisplayName } from '../lib/docKind'
+import { useLockReason } from '../lib/docLocks'
+import DocLockBadge from '../components/DocLockBadge'
 import { CanvasNotesProvider } from './CanvasNotesContext'
 import CanvasSurface from './CanvasSurface'
 import './Canvas.css'
@@ -31,6 +33,7 @@ export default function CanvasPane({
   openDocs,
   isActive = true,
 }) {
+  const locked = useLockReason(docPath) !== null
   const [doc, setDoc] = useState(null)
 
   useEffect(() => {
@@ -68,6 +71,7 @@ export default function CanvasPane({
         >
           <CanvasSurface
             key={docPath}
+            docLocked={locked}
             projectName={projectName}
             docPath={docPath}
             initialState={doc.state}
@@ -81,6 +85,7 @@ export default function CanvasPane({
       ) : (
         <div className="canvas-surface" />
       )}
+      <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} />
     </div>
   )
 }

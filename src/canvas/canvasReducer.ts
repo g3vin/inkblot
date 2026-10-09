@@ -49,6 +49,8 @@ export interface ActionMeta {
   silent?: boolean
   /** Edits sharing a key collapse into the one history entry they started. */
   coalesce?: string | null
+  /** Not the writer's edit (a linked document moved), so a locked document takes it too. */
+  upkeep?: boolean
 }
 
 /** Every action that changes the document. */
