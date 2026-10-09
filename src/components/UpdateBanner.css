@@ -1,0 +1,26 @@
+/* After an update: a floating card at the top of the window (UpdateBanner.jsx). */
+.update-banner {
+  position: fixed;
+  top: calc(var(--app-titlebar-height, 44px) + var(--space-4));
+  left: 50%;
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(420px, calc(100vw - 2 * var(--space-5)));
+  padding: var(--space-4) var(--space-5);
+  transform: translateX(-50%);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--surface-float);
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+}
+
+.update-banner-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.update-banner-head p, .update-banner-head h2 { margin: 0; }
+.update-banner-group h3 { margin: 0 0 var(--space-1); }
+.update-banner-group ul { margin: 0; padding-left: var(--space-5); font-size: var(--text-sm); line-height: 1.5; color: var(--text-secondary); }
+.update-banner .ib-body { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.update-banner-link { align-self: flex-start; }

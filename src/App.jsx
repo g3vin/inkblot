@@ -17,6 +17,7 @@ import { resolveTheme, setAccentAttribute, setThemeAttribute, watchSystemTheme }
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from './lib/palette'
 import { useCommands } from './lib/commands'
 import { useKeybindings } from './lib/keybindings'
+import UpdateBanner from './components/UpdateBanner'
 import CommandPalette from './ui/CommandPalette.jsx'
 import { documentSurface } from './bridge'
 import SettingsSheet from './components/settings/SettingsSheet.jsx'
@@ -408,6 +409,7 @@ export default function App() {
       <SettingsSheet appearance={appearance} />
       <TimerCapsule />
       <CommandPalette />
+      <UpdateBanner />
     </>
   )
 }
