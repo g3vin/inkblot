@@ -1,7 +1,8 @@
 /**
- * SettingsSheet — Inkblot ▸ Settings… (⌘,): the look of the app, and the writing
+ * SettingsSheet — Inkblot ▸ Settings… (⌘,): the look of the app, the writing
  * stats — how sittings are measured, goals, the timer's routines and the reminders
- * (InkblotSettingsView.swift, with the page's own View-menu settings beside them).
+ * (InkblotSettingsView.swift, with the page's own View-menu settings beside them) —
+ * and the keyboard shortcuts.
  *
  * Every change is saved as it is made.
  */
@@ -14,6 +15,7 @@ import WritingPane from './WritingPane.jsx'
 import GoalsPane from './GoalsPane.jsx'
 import TimersPane from './TimersPane.jsx'
 import RemindersPane from './RemindersPane.jsx'
+import ShortcutsPane from './ShortcutsPane.jsx'
 import './Settings.css'
 
 const PANES = [
@@ -22,6 +24,7 @@ const PANES = [
   { id: 'goals', title: 'Goals', icon: 'target' },
   { id: 'timers', title: 'Timers', icon: 'timer' },
   { id: 'reminders', title: 'Reminders', icon: 'bell' },
+  { id: 'shortcuts', title: 'Shortcuts', icon: 'keyboard' },
 ]
 
 const THEMES = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'system', label: 'System' }]
@@ -59,18 +62,8 @@ export default function SettingsSheet({ appearance }) {
       setPane(PANES.some((p) => p.id === event.detail?.pane) ? event.detail.pane : 'general')
       setOpen(true)
     }
-    const onKey = (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === ',') {
-        event.preventDefault()
-        setOpen(true)
-      }
-    }
     window.addEventListener(OPEN_SETTINGS, show)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener(OPEN_SETTINGS, show)
-      window.removeEventListener('keydown', onKey)
-    }
+    return () => window.removeEventListener(OPEN_SETTINGS, show)
   }, [])
 
   if (!open) return null
@@ -106,6 +99,7 @@ export default function SettingsSheet({ appearance }) {
           {pane === 'goals' ? <GoalsPane stats={stats} /> : null}
           {pane === 'timers' ? <TimersPane stats={stats} /> : null}
           {pane === 'reminders' ? <RemindersPane stats={stats} /> : null}
+          {pane === 'shortcuts' ? <ShortcutsPane /> : null}
         </div>
       </div>
     </Sheet>

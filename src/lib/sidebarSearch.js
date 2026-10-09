@@ -39,6 +39,10 @@ export const SEARCH_SCOPES = [
 
 export const isFilterScope = (scope) => scope === 'panel'
 
+/** `detail: { query }` — ⌘F: open the inspector's search, finding `query` if there is one. */
+export const FIND_EVENT = 'inkblot:find'
+export const requestFind = (query = '') => window.dispatchEvent(new CustomEvent(FIND_EVENT, { detail: { query } }))
+
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /**

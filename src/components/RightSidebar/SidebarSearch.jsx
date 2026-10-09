@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../ui/Icon.jsx'
 import { listProjectTree, loadDocument } from '../../lib/FileSystem'
 import {
+  FIND_EVENT,
   SEARCH_SCOPES,
   clearRecentSearches,
   collectEditorMatches,
@@ -102,19 +103,18 @@ export default function SidebarSearch({
     inputRef.current?.select()
   }, [isOverlay])
 
-  // Cmd+F opens the inline bar; Escape closes whichever surface is up. The
-  // overlay owns Escape while it is open, so the inline copy sits it out.
+  // ⌘F (FIND_EVENT) opens the bar, its query selected once it shows what was asked
+  // for. Escape closes whichever surface is up. The overlay owns both while it is
+  // open, so the inline copy sits them out.
   useEffect(() => {
     if (!active && !isOverlay) return undefined
 
-    const onKeyDown = (event) => {
-      if (!isOverlay && (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'f') {
-        event.preventDefault()
-        expand()
-        inputRef.current?.select()
-        return
-      }
+    const onFind = () => {
+      expand()
+      requestAnimationFrame(() => inputRef.current?.select())
+    }
 
+    const onKeyDown = (event) => {
       if (event.key !== 'Escape') return
 
       if (isOverlay) {
@@ -128,8 +128,12 @@ export default function SidebarSearch({
       }
     }
 
+    window.addEventListener(FIND_EVENT, onFind)
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener(FIND_EVENT, onFind)
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [active, collapse, expand, expanded, isOverlay, onCloseOverlay])
 
   useEffect(() => {

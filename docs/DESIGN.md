@@ -412,7 +412,7 @@ useCommands(() => [{
   title: 'Add note',                // sentence case, verb first
   section: 'Notes',
   icon: 'note',
-  shortcut: '⌥⌘N',                  // displayed; bind it where it already lives
+  keys: 'Mod+Alt+N',                // the default shortcut; writers can rebind it
   keywords: ['comment', 'annotate'],
   when: () => Boolean(selection),   // hide when it can't run
   run: addNote,
