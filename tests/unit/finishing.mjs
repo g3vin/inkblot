@@ -228,13 +228,13 @@ await act(async () => { await wait(60) })
   await act(async () => { panelRoot.render(React.createElement(TypesetPanel, { onShowOutput: () => { showedOutput = true } })) })
   const titles = () => [...panelHost.querySelectorAll('.ui-section-title')].map((node) => node.textContent)
   ok('the Typeset tab draws its sections from the published state',
-    ['Book', 'Editions', 'Style', 'Format', 'Page', 'Body Text', 'Proof', 'Chapter Openings', 'Header & Footer', 'Title Page'].every((t) => titles().includes(t)))
+    ['Book', 'Editions', 'Style', 'Format', 'Page', 'Body text', 'Proof', 'Chapter openings', 'Header & footer', 'Title page'].every((t) => titles().includes(t)))
   ok('with no Print and Export in its header', !panelHost.querySelector('.fin-header .ui-button[data-variant="filled"]'))
   const toggle = (label) => panelHost.querySelector(`[role="switch"][aria-label="${label}"]`)
-  await act(async () => { toggle('Set Type for Print').click() })
+  await act(async () => { toggle('Set type for print').click() })
   await act(async () => { await wait(220) })
   ok('Set Type for Print sets the document’s type', Boolean(editor.state.doc.attrs.pageSetup?.typography))
-  ok('and the section offers the type’s controls', !!panelHost.querySelector('[aria-label="Line Spacing"]'))
+  ok('and the section offers the type’s controls', !!panelHost.querySelector('[aria-label="Line spacing"]'))
   const format = panelHost.querySelector('select[aria-label="Format"]')
   await act(async () => {
     format.value = 'trade-6x9'
@@ -247,9 +247,9 @@ await act(async () => { await wait(60) })
 
   await act(async () => { panelRoot.render(React.createElement(OutputPanel)) })
   ok('Print & Export has Publishing, Cover and Hand Binding',
-    ['Publishing', 'Cover', 'Hand Binding'].every((t) => titles().includes(t)))
+    ['Publishing', 'Cover', 'Hand binding'].every((t) => titles().includes(t)))
   ok('and Print and Export in its header', !!panelHost.querySelector('.fin-header .ui-button[data-variant="filled"]'))
-  await act(async () => { toggle('Print for Hand Binding').click() })
+  await act(async () => { toggle('Print for hand binding').click() })
   await act(async () => { await wait(60) })
   ok('Print for Hand Binding turns binding on for the book', store.getBookSettings('P', 'Novel').binding.binding === 'signatures')
   ok('and the binding’s options appear', !!panelHost.querySelector('select[aria-label="Signature"]'))

@@ -68,7 +68,7 @@ export default function BookNavigator({ hasProject, onShowFiles }) {
     return (
       <div className="book-empty">
         <Icon name="book" size={20} />
-        <strong>No Project Open</strong>
+        <strong>No project open</strong>
         <span>Choose a project in the window.</span>
       </div>
     )
@@ -77,7 +77,7 @@ export default function BookNavigator({ hasProject, onShowFiles }) {
     return (
       <div className="book-empty">
         <Icon name="book" size={20} />
-        <strong>No Chapters Yet</strong>
+        <strong>No chapters yet</strong>
         <span>A book is a folder’s documents. Open one of them to typeset its book.</span>
       </div>
     )

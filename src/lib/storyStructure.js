@@ -8,7 +8,7 @@ export const STORY_FOLDER_PRESETS = [
   {
     key: 'characters',
     name: 'Characters',
-    menuLabel: 'Character Folder',
+    menuLabel: 'Character folder',
     // What one document inside the folder is, for the file tree's contextual
     // "New …" button.
     entryLabel: 'Character',
@@ -19,7 +19,7 @@ export const STORY_FOLDER_PRESETS = [
   {
     key: 'settings',
     name: 'Settings',
-    menuLabel: 'Setting Folder',
+    menuLabel: 'Setting folder',
     entryLabel: 'Setting',
     folderIcon: 'map-world',
     fileIcon: 'map-pin',
@@ -28,8 +28,8 @@ export const STORY_FOLDER_PRESETS = [
   {
     key: 'outline',
     name: 'Outline',
-    menuLabel: 'Outline Folder',
-    entryLabel: 'Outline Entry',
+    menuLabel: 'Outline folder',
+    entryLabel: 'Outline entry',
     folderIcon: 'list',
     fileIcon: 'list-bullets',
     aliases: [],
@@ -37,7 +37,7 @@ export const STORY_FOLDER_PRESETS = [
   {
     key: 'novel',
     name: 'Novel',
-    menuLabel: 'Novel Folder',
+    menuLabel: 'Novel folder',
     entryLabel: 'Chapter',
     folderIcon: 'book',
     fileIcon: 'notebook',

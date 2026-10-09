@@ -93,13 +93,13 @@ ok('the zoom readout starts at 100%', readout() === '100%')
 /* ---- the readout must actually track the zoom ---- */
 
 await act(async () => {
-  button('Zoom In').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  button('Zoom in').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
 await settle()
 ok('zoom in updates the readout under StrictMode', readout() === '120%')
 
 await act(async () => {
-  button('Zoom Out').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  button('Zoom out').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
 await settle()
 ok('zoom out updates the readout', readout() === '100%')
@@ -123,7 +123,7 @@ await settleGesture()
 ok('a plain wheel pans without changing zoom', readout() === zoomed)
 
 await act(async () => {
-  button('Zoom In').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  button('Zoom in').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
 await settle()
 ok('the readout still responds after many frames', readout() !== zoomed)
@@ -148,15 +148,15 @@ ok('ports render after the resize zones (so they stay grabbable)', firstPort > l
 // connected, so the chrome that advertises those gestures must not be there at all.
 const lockButton = () =>
   [...document.querySelectorAll('button')].find((b) =>
-    (b.getAttribute('aria-label') || '').startsWith('Lock for Reading')
+    (b.getAttribute('aria-label') || '').startsWith('Lock for reading')
   )
 const unlockButton = () =>
   [...document.querySelectorAll('button')].find((b) =>
-    (b.getAttribute('aria-label') || '').startsWith('Unlock Canvas')
+    (b.getAttribute('aria-label') || '').startsWith('Unlock canvas')
   )
 
 ok('the canvas starts unlocked', !!lockButton() && !unlockButton())
-ok('an unlocked canvas offers Add Card', !!button('Add Card') && !button('Add Card').disabled)
+ok('an unlocked canvas offers Add Card', !!button('Add card') && !button('Add card').disabled)
 
 await act(async () => {
   lockButton().dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
@@ -167,9 +167,9 @@ ok('the lock toggles to unlock', !!unlockButton())
 ok('read mode marks the surface', surface().classList.contains('is-locked'))
 ok('read mode removes the resize zones', document.querySelectorAll('.canvas-resize-handle').length === 0)
 ok('read mode removes the connection ports', document.querySelectorAll('.canvas-port').length === 0)
-// The editing tools go away entirely rather than sitting there dead.
-ok('read mode hides Add card', !button('Add card'))
-ok('read mode keeps zoom', !!button('Zoom In'))
+// The editing tools stay in place, disabled, so the toolbar doesn't shift.
+ok('read mode disables Add card', button('Add card')?.disabled === true)
+ok('read mode keeps zoom', !!button('Zoom in'))
 
 // A card's scrollable region must be findable by the wheel handler, which is what
 // lets a Pinterest board scroll instead of panning the canvas.
@@ -182,7 +182,7 @@ await act(async () => {
 await settle()
 
 ok('unlocking restores the resize zones', document.querySelectorAll('.canvas-resize-handle').length === 8)
-ok('unlocking restores Add Card', !button('Add Card').disabled)
+ok('unlocking restores Add Card', !button('Add card').disabled)
 
 /* Touch. A finger on the empty canvas pans; the Pencil does what the mouse
    does; a second finger ends the first one's pan, because two fingers are a pinch. */

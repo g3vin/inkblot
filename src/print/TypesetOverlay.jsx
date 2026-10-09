@@ -205,7 +205,7 @@ export default function TypesetOverlay({ pages, metrics, setup, zoom, editor, ty
       section: 'page.headerFooter',
       start,
       compute: (dx, dy, e) => Math.max(0, round(start + (sign * dy) / PX_PER_MM, !e.shiftKey)),
-      commit: (value) => typeset.editSetup({ ...setup, [key]: value }, which === 'header' ? 'Running Head' : 'Folio'),
+      commit: (value) => typeset.editSetup({ ...setup, [key]: value }, which === 'header' ? 'Running head' : 'Folio'),
     })
   }
 
@@ -217,7 +217,7 @@ export default function TypesetOverlay({ pages, metrics, setup, zoom, editor, ty
       section: 'book.headings',
       start,
       compute: (dx, dy, e) => Math.max(0, round(start + dy / PX_PER_MM, !e.shiftKey)),
-      commit: (value) => typeset.editSetup({ ...setup, typography: { ...setup.typography, chapterSinkMm: value } }, 'Chapter Head Position'),
+      commit: (value) => typeset.editSetup({ ...setup, typography: { ...setup.typography, chapterSinkMm: value } }, 'Chapter head position'),
     })
   }
 
@@ -232,7 +232,7 @@ export default function TypesetOverlay({ pages, metrics, setup, zoom, editor, ty
         section: 'book.headings',
         start,
         compute: (dx) => Math.min(100, Math.max(5, Math.round(start + (dx * 2 * 100) / width))),
-        commit: (value) => typeset.editDesign({ imageWidthPct: value }, 'Picture Size'),
+        commit: (value) => typeset.editDesign({ imageWidthPct: value }, 'Picture size'),
       })
       return
     }
@@ -355,7 +355,7 @@ export default function TypesetOverlay({ pages, metrics, setup, zoom, editor, ty
           <div className="to-headbar" style={{ left: headBox.x + headBox.w / 2, top: headBox.y + headBox.sink - 30 }}>
             {['left', 'center', 'right'].map((align) => (
               <button key={align} type="button" className={typeset.design.alignment === align ? 'is-on' : ''} title={`Set the head ${align}`}
-                onClick={() => { typeset.focus('book.headings'); typeset.editDesign({ alignment: align }, 'Head Alignment') }}>
+                onClick={() => { typeset.focus('book.headings'); typeset.editDesign({ alignment: align }, 'Head alignment') }}>
                 {align === 'left' ? '⇤' : align === 'center' ? '⇔' : '⇥'}
               </button>
             ))}
@@ -427,7 +427,7 @@ function Popover({ popover, setup, typeset, close }) {
         <div className="to-glyphs">
           {GLYPHS.map((glyph) => (
             <button key={glyph || 'blank'} type="button" className={setup.typography?.sceneBreak === glyph ? 'is-on' : ''}
-              onClick={() => { typeset.editSetup({ ...setup, typography: { ...setup.typography, sceneBreak: glyph } }, 'Scene Break'); close() }}>
+              onClick={() => { typeset.editSetup({ ...setup, typography: { ...setup.typography, sceneBreak: glyph } }, 'Scene break'); close() }}>
               {glyph || 'Blank line'}
             </button>
           ))}
@@ -435,12 +435,12 @@ function Popover({ popover, setup, typeset, close }) {
       )
     }
     if (popover.kind === 'opening') {
-      const options = [['plain', 'Plain'], ['dropCap', 'Drop Cap'], ['smallCaps', 'Small Caps'], ['dropCapAndSmallCaps', 'Drop Cap & Small Caps']]
+      const options = [['plain', 'Plain'], ['dropCap', 'Drop cap'], ['smallCaps', 'Small caps'], ['dropCapAndSmallCaps', 'Drop cap & small caps']]
       return (
         <div className="to-list">
           {options.map(([value, label]) => (
             <button key={value} type="button" className={setup.typography?.chapterOpening === value ? 'is-on' : ''}
-              onClick={() => { typeset.editSetup({ ...setup, typography: { ...setup.typography, chapterOpening: value } }, 'Chapter Opening'); close() }}>
+              onClick={() => { typeset.editSetup({ ...setup, typography: { ...setup.typography, chapterOpening: value } }, 'Chapter opening'); close() }}>
               {label}
             </button>
           ))}
@@ -449,14 +449,14 @@ function Popover({ popover, setup, typeset, close }) {
     }
     if (popover.kind === 'number') {
       const numbering = typeset.numbering || {}
-      const styles = [['words', 'One, Two'], ['numerals', '1, 2'], ['roman', 'I, II'], ['none', 'No number']]
+      const styles = [['words', 'One, two'], ['numerals', '1, 2'], ['roman', 'I, II'], ['none', 'No number']]
       return (
         <div className="to-list">
           {styles.map(([value, label]) => (
             <button key={value} type="button" className={(value === 'none' ? !typeset.design.showNumber : typeset.design.showNumber && numbering.style === value) ? 'is-on' : ''}
               onClick={() => {
-                if (value === 'none') typeset.editDesign({ showNumber: false }, 'Chapter Number')
-                else typeset.editBook((book) => ({ ...book, chapterNumbering: { ...book.chapterNumbering, style: value }, chapterDesign: { ...book.chapterDesign, showNumber: true } }), 'Chapter Number')
+                if (value === 'none') typeset.editDesign({ showNumber: false }, 'Chapter number')
+                else typeset.editBook((book) => ({ ...book, chapterNumbering: { ...book.chapterNumbering, style: value }, chapterDesign: { ...book.chapterDesign, showNumber: true } }), 'Chapter number')
                 close()
               }}>
               {label}
@@ -464,13 +464,13 @@ function Popover({ popover, setup, typeset, close }) {
           ))}
           <label className="to-field">Before it
             <input defaultValue={numbering.prefix ?? 'Chapter'} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-              onBlur={(e) => typeset.editBook((book) => ({ ...book, chapterNumbering: { ...book.chapterNumbering, prefix: e.target.value } }), 'Chapter Number')} />
+              onBlur={(e) => typeset.editBook((book) => ({ ...book, chapterNumbering: { ...book.chapterNumbering, prefix: e.target.value } }), 'Chapter number')} />
           </label>
           <div className="to-row">
             First chapter
             {[1, 0].map((n) => (
               <button key={n} type="button" className={(numbering.startAt ?? 1) === n ? 'is-on' : ''}
-                onClick={() => typeset.editBook((book) => ({ ...book, chapterNumbering: { ...book.chapterNumbering, startAt: n } }), 'Chapter Number')}>
+                onClick={() => typeset.editBook((book) => ({ ...book, chapterNumbering: { ...book.chapterNumbering, startAt: n } }), 'Chapter number')}>
                 {n}
               </button>
             ))}
@@ -502,7 +502,7 @@ function Popover({ popover, setup, typeset, close }) {
     // A running head or foot: what its three places say.
     const key = popover.verso ? (popover.which === 'header' ? 'versoHeader' : 'versoFooter') : popover.which
     const text = setup[key] || { left: '', center: '', right: '' }
-    const set = (slot, value) => typeset.editSetup({ ...setup, [key]: { ...text, [slot]: value } }, popover.which === 'header' ? 'Running Head' : 'Folio')
+    const set = (slot, value) => typeset.editSetup({ ...setup, [key]: { ...text, [slot]: value } }, popover.which === 'header' ? 'Running head' : 'Folio')
     return (
       <div className="to-list to-running-editor">
         <strong>{popover.which === 'header' ? 'Running head' : 'Foot'}{popover.verso ? ', left-hand pages' : ''}</strong>

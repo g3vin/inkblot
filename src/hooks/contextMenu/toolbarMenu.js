@@ -11,12 +11,12 @@ export const CUSTOMIZE_INSPECTOR_EVENT = 'inkblot:customize-inspector'
 
 export function toolbarMenuItems(display = readDisplayMode()) {
   return [
-    { text: 'Icon and Text', checked: display === 'iconAndLabel', action: () => writeDisplayMode('iconAndLabel') },
-    { text: 'Icon Only', checked: display === 'icon', action: () => writeDisplayMode('icon') },
-    { text: 'Text Only', checked: display === 'label', action: () => writeDisplayMode('label') },
+    { text: 'Icon and text', checked: display === 'iconAndLabel', action: () => writeDisplayMode('iconAndLabel') },
+    { text: 'Icon only', checked: display === 'icon', action: () => writeDisplayMode('icon') },
+    { text: 'Text only', checked: display === 'label', action: () => writeDisplayMode('label') },
     { separator: true },
-    { text: 'Customize Toolbar…', action: () => window.dispatchEvent(new CustomEvent(CUSTOMIZE_TOOLBAR_EVENT)) },
-    { text: 'Customize Inspector Layout…', action: () => window.dispatchEvent(new CustomEvent(CUSTOMIZE_INSPECTOR_EVENT)) },
+    { text: 'Customize toolbar…', action: () => window.dispatchEvent(new CustomEvent(CUSTOMIZE_TOOLBAR_EVENT)) },
+    { text: 'Customize inspector layout…', action: () => window.dispatchEvent(new CustomEvent(CUSTOMIZE_INSPECTOR_EVENT)) },
   ]
 }
 

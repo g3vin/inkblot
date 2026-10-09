@@ -105,7 +105,7 @@ export const FORMAT_PRESETS: FormatPreset[] = [
   },
   {
     id: 'manuscript',
-    label: 'Standard Manuscript',
+    label: 'Standard manuscript',
     group: GROUP_SUBMISSION,
     summary: 'What agents, editors and magazines ask for: Courier 12 pt, double-spaced, one-inch margins, a title page with your contact details and word count.',
     kind: FormatKind.Prose,
@@ -113,7 +113,7 @@ export const FORMAT_PRESETS: FormatPreset[] = [
   },
   {
     id: 'manuscript-times',
-    label: 'Standard Manuscript, Times',
+    label: 'Standard manuscript, Times',
     group: GROUP_SUBMISSION,
     summary: 'The same manuscript in Times New Roman, which many publishers now prefer.',
     kind: FormatKind.Prose,
@@ -121,7 +121,7 @@ export const FORMAT_PRESETS: FormatPreset[] = [
   },
   {
     id: 'manuscript-a4',
-    label: 'Standard Manuscript, A4',
+    label: 'Standard manuscript, A4',
     group: GROUP_SUBMISSION,
     summary: 'The standard manuscript on A4, for submissions outside North America.',
     kind: FormatKind.Prose,
@@ -129,7 +129,7 @@ export const FORMAT_PRESETS: FormatPreset[] = [
   },
   {
     id: 'trade-6x9',
-    label: 'Trade Paperback 6 × 9 in',
+    label: 'Trade paperback 6 × 9 in',
     group: GROUP_BOOK,
     summary: 'The common US novel size: mirrored margins, running heads, chapters opening on the right.',
     kind: FormatKind.Prose,
@@ -161,7 +161,7 @@ export const FORMAT_PRESETS: FormatPreset[] = [
   },
   {
     id: 'mass-market',
-    label: 'Mass-Market Paperback',
+    label: 'Mass-market paperback',
     group: GROUP_BOOK,
     summary: 'The pocket paperback, 4.25 × 6.87 in: genre fiction on the rack.',
     kind: FormatKind.Prose,
@@ -173,7 +173,7 @@ export const FORMAT_PRESETS: FormatPreset[] = [
   },
   {
     id: 'a5-novel',
-    label: 'A5 Novel',
+    label: 'A5 novel',
     group: GROUP_BOOK,
     summary: 'A book on A5, which any home printer can make two to a sheet of A4.',
     kind: FormatKind.Prose,
@@ -197,7 +197,7 @@ export const FORMAT_PRESETS: FormatPreset[] = [
   },
   {
     id: 'stageplay',
-    label: 'Stage Play',
+    label: 'Stage play',
     group: GROUP_SCRIPT,
     summary: 'A play as theatres and publishers read it: names centred, directions indented and in italics.',
     kind: FormatKind.StagePlay,

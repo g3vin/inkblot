@@ -12,10 +12,10 @@ import { CUSTOMIZE_INSPECTOR_EVENT } from '../../hooks/contextMenu/toolbarMenu'
 export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLayout, visualProgress, gestureActive, reducedMotion }) {
   const other = layout === 'finishing' ? 'drafting' : 'finishing'
   const menu = (event) => popUpNativeMenu(event, [
-    { text: 'Write Layout', checked: layout === 'drafting', action: () => onChooseLayout('drafting') },
-    { text: 'Typeset Layout', checked: layout === 'finishing', action: () => onChooseLayout('finishing') },
+    { text: 'Write layout', checked: layout === 'drafting', action: () => onChooseLayout('drafting') },
+    { text: 'Typeset layout', checked: layout === 'finishing', action: () => onChooseLayout('finishing') },
     { separator: true },
-    { text: 'Customize Layout…', action: () => window.dispatchEvent(new CustomEvent(CUSTOMIZE_INSPECTOR_EVENT)) },
+    { text: 'Customize layout…', action: () => window.dispatchEvent(new CustomEvent(CUSTOMIZE_INSPECTOR_EVENT)) },
   ])
 
   return (

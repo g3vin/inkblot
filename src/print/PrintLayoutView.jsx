@@ -568,7 +568,7 @@ export default function PrintLayoutView({
         {ZOOM_STEPS.map((s) => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}
       </select>
       <button type="button" onClick={() => stepZoom(1)} aria-label="Zoom in" title="Zoom in (⌘+)">+</button>
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} title="Page Setup">Page Setup…</button>
+      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} title="Page setup">Page setup…</button>
     </div>
   )
   const pageCountHost = statusHost?.querySelector(':scope > .pane-status') || null

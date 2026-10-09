@@ -39,7 +39,7 @@ export async function fileTreeMenu(ctx) {
     if (projectNameToDelete) {
       items.push(
         await MenuItem.new({
-          text: 'Rename Project',
+          text: 'Rename project',
           action: async () => {
             window.dispatchEvent(
               new CustomEvent('filetree:new-entry', {
@@ -57,7 +57,7 @@ export async function fileTreeMenu(ctx) {
 
       items.push(
         await MenuItem.new({
-          text: 'Move Project…',
+          text: 'Move project…',
           action: async () => {
             try {
               const { open } = await import('@tauri-apps/plugin-dialog')
@@ -75,7 +75,7 @@ export async function fileTreeMenu(ctx) {
                   result?.error === 'target-exists'
                     ? 'A folder with that project name already exists there.'
                     : 'Could not move the project.'
-                await message(reason, { title: 'Move Project', kind: 'error' })
+                await message(reason, { title: 'Move project', kind: 'error' })
                 return
               }
               window.dispatchEvent(new CustomEvent('filetree:refresh-projects'))
@@ -104,7 +104,7 @@ export async function fileTreeMenu(ctx) {
 
       items.push(
         await MenuItem.new({
-          text: 'Delete Project',
+          text: 'Delete project',
           action: async () => {
             const ok = await confirmDelete(`Delete project "${projectNameToDelete}"?`)
             if (ok) {
@@ -121,7 +121,7 @@ export async function fileTreeMenu(ctx) {
   if (fileTree && treeView === 'projects') {
     items.push(
       await MenuItem.new({
-        text: 'New Project',
+        text: 'New project',
         action: async () => {
           window.dispatchEvent(new CustomEvent('filetree:new-project'))
         },
@@ -141,19 +141,19 @@ export async function fileTreeMenu(ctx) {
     if (isFile) {
       const fileItems = [
         await MenuItem.new({
-          text: 'Open in New Tab',
+          text: 'Open in new tab',
           action: () => onOpenDocInTab?.(entryPath),
         }),
         await MenuItem.new({
-          text: 'Open to the Right',
+          text: 'Open to the right',
           action: () => onOpenDocInSplit?.(entryPath, 'columns'),
         }),
         await MenuItem.new({
-          text: 'Open Below',
+          text: 'Open below',
           action: () => onOpenDocInSplit?.(entryPath, 'rows'),
         }),
         await MenuItem.new({
-          text: 'Open in New Window',
+          text: 'Open in new window',
           action: () => openDocumentWindow(projectName, entryPath),
         }),
         await PredefinedMenuItem.new({ item: 'Separator' }),
@@ -173,7 +173,7 @@ export async function fileTreeMenu(ctx) {
         await PredefinedMenuItem.new({ item: 'Separator' }),
 
         await MenuItem.new({
-          text: 'Open Version History',
+          text: 'Open version history',
           action: () => {
             setCurrentDoc?.(entryPath)
             openRightSidebarTab?.('history')
@@ -210,7 +210,7 @@ export async function fileTreeMenu(ctx) {
     if (isFolder) {
       items.push(
         await MenuItem.new({
-          text: 'New File in Folder',
+          text: 'New file in folder',
           action: () => {
             window.dispatchEvent(
               new CustomEvent('filetree:new-entry', {
@@ -223,7 +223,7 @@ export async function fileTreeMenu(ctx) {
 
       items.push(
         await MenuItem.new({
-          text: 'New Folder in Folder',
+          text: 'New folder in folder',
           action: () => {
             window.dispatchEvent(
               new CustomEvent('filetree:new-entry', {
@@ -244,14 +244,14 @@ export async function fileTreeMenu(ctx) {
 
     items.push(
       await MenuItem.new({
-        text: isFolder ? 'Rename Folder' : 'Rename File',
+        text: isFolder ? 'Rename folder' : 'Rename file',
         action: () => beginRename(entryPath, entryType, entryName, entryParent),
       })
     )
 
     items.push(
       await MenuItem.new({
-        text: isFolder ? 'Delete Folder' : 'Delete File',
+        text: isFolder ? 'Delete folder' : 'Delete file',
         action: async () => {
           const ok = await confirmDelete(`Delete "${entryName}"?`)
           if (ok) {
@@ -270,7 +270,7 @@ export async function fileTreeMenu(ctx) {
   if ((isFileTreeArea || isFileListArea) && treeView !== 'projects' && !fileItem && !isProjectItem) {
     items.push(
       await MenuItem.new({
-        text: 'New File',
+        text: 'New file',
         action: async () => {
           window.dispatchEvent(
             new CustomEvent('filetree:new-entry', {
@@ -283,7 +283,7 @@ export async function fileTreeMenu(ctx) {
 
     items.push(
       await MenuItem.new({
-        text: 'New Folder',
+        text: 'New folder',
         action: async () => {
           window.dispatchEvent(
             new CustomEvent('filetree:new-entry', {
@@ -313,7 +313,7 @@ export async function fileTreeMenu(ctx) {
   if (isFileTreeArea && treeView !== 'projects') {
     items.push(
       await MenuItem.new({
-        text: 'Expand All Folders',
+        text: 'Expand all folders',
         action: () => {
           window.dispatchEvent(
             new CustomEvent('filetree:folders-visibility', {
@@ -323,7 +323,7 @@ export async function fileTreeMenu(ctx) {
         },
       }),
       await MenuItem.new({
-        text: 'Collapse All Folders',
+        text: 'Collapse all folders',
         action: () => {
           window.dispatchEvent(
             new CustomEvent('filetree:folders-visibility', {

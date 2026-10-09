@@ -27,7 +27,7 @@ import { getBookForDoc, getBookSettings, getPrintScope, setMeasurement } from '.
 import { TYPESET_MILESTONE_EVENT } from '../print/useTypesetHistory'
 
 /** What a format is called in the typeset history: "Exported PDF". */
-const EXPORT_NAMES = { pdf: 'PDF', epub: 'EPUB', docx: 'Word', html: 'HTML', markdown: 'Markdown', plainText: 'Plain Text', fountain: 'Fountain', fdx: 'Final Draft' }
+const EXPORT_NAMES = { pdf: 'PDF', epub: 'EPUB', docx: 'Word', html: 'HTML', markdown: 'Markdown', plainText: 'Plain text', fountain: 'Fountain', fdx: 'Final Draft' }
 const milestone = (label) => window.dispatchEvent(new CustomEvent(TYPESET_MILESTONE_EVENT, { detail: { label } }))
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
@@ -711,12 +711,12 @@ export default function EditorLayout(props) {
             buttons in a macOS window's toolbar. The pin in each sidebar puts it away. */}
         {left.collapsed && !left.peeked ? (
           <div className="titlebar-toggle is-left">
-            <IconButton icon="sidebar" label="Show Sidebar" size="circle" className="floating-capsule" onClick={left.pin} />
+            <IconButton icon="sidebar" label="Show sidebar" size="circle" className="floating-capsule" onClick={left.pin} />
           </div>
         ) : null}
         {right.collapsed && !right.peeked ? (
           <div className="titlebar-toggle is-right">
-            <IconButton icon="sidebar" label="Show Inspector" size="circle" className="floating-capsule" onClick={right.pin} />
+            <IconButton icon="sidebar" label="Show inspector" size="circle" className="floating-capsule" onClick={right.pin} />
           </div>
         ) : null}
         <div className="app-titlebar-toolbar">

@@ -21,7 +21,7 @@ function Recap({ stats, run }) {
     <Sheet title={`${run.routine.name} complete`} onClose={close} width={380} className="stats-recap"
       footer={(
         <>
-          <Button onClick={() => { close(); stats.startTimer(run.routine) }}>Run Again</Button>
+          <Button onClick={() => { close(); stats.startTimer(run.routine) }}>Run again</Button>
           <Button variant="filled" onClick={close}>Done</Button>
         </>
       )}
@@ -55,7 +55,7 @@ export default function TimerCapsule() {
   const progress = timer.state === 'waiting' ? null : timer.progress(stats.now())
   return (
     <FloatingCapsule className="timer-capsule" data-state={timer.state} data-kind={segment.kind} role="timer" aria-label={`${segmentTitle(segment)}, ${timerClock(timer, stats.now())}`}>
-      <button type="button" className="timer-capsule-face" onClick={() => stats.showStats()} title="Show in Stats">
+      <button type="button" className="timer-capsule-face" onClick={() => stats.showStats()} title="Show in stats">
         <Icon name={segment.kind === 'write' ? 'edit' : 'break'} />
         <span className="timer-capsule-title">{segmentTitle(segment)}</span>
         <span className="timer-capsule-clock">{timerClock(timer, stats.now())}</span>
@@ -65,7 +65,7 @@ export default function TimerCapsule() {
       ) : (
         <>
           <IconButton icon={timer.state === 'paused' ? 'play' : 'pause'} label={timer.state === 'paused' ? 'Resume' : 'Pause'} size="capsule" onClick={() => timer.toggle()} />
-          <IconButton icon="skip" label="Skip to Next Segment" size="capsule" onClick={() => timer.skip()} />
+          <IconButton icon="skip" label="Skip to next segment" size="capsule" onClick={() => timer.skip()} />
         </>
       )}
       <IconButton icon="stop" label="Stop" size="capsule" onClick={() => timer.stop()} />

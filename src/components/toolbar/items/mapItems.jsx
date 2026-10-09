@@ -47,11 +47,11 @@ export function MapZoomItem({ ctx, spec }) {
   const disabled = !live(ctx)
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton icon="zoom-out" label="Zoom Out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
-      <MenuButton label="Zoom" display={ctx.display} disabled={disabled} items={[{ text: 'Zoom to Fit', action: () => command(ctx, 'zoom-to-fit') }]}>
+      <ToolButton icon="zoom-out" label="Zoom out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
+      <MenuButton label="Zoom" display={ctx.display} disabled={disabled} items={[{ text: 'Zoom to fit', action: () => command(ctx, 'zoom-to-fit') }]}>
         <span className="tb-text tb-zoom-readout">{ctx.map?.zoomLabel ?? '100%'}</span>
       </MenuButton>
-      <ToolButton icon="zoom-in" label="Zoom In" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />
+      <ToolButton icon="zoom-in" label="Zoom in" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />
     </ItemFrame>
   )
 }

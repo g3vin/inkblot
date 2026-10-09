@@ -18,8 +18,8 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
         type="button"
         className="tree-filter-button"
         data-on={filter.kind !== 'all'}
-        aria-label="Filter Options"
-        title="Filter Options"
+        aria-label="Filter options"
+        title="Filter options"
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect()
           popUpNativeMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.top },
@@ -38,7 +38,7 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
         onKeyDown={(event) => { if (event.key === 'Escape') set({ text: '' }) }}
       />
       {filter.text ? (
-        <button type="button" className="tree-filter-button" aria-label="Clear Filter" title="Clear Filter" onClick={() => set({ text: '' })}>
+        <button type="button" className="tree-filter-button" aria-label="Clear filter" title="Clear filter" onClick={() => set({ text: '' })}>
           <Icon name="close" />
         </button>
       ) : null}
@@ -47,13 +47,13 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders }) {
         className="tree-filter-button"
         data-on={filter.recentOnly}
         aria-pressed={filter.recentOnly}
-        aria-label="Show Only Recent Files"
-        title="Show Only Recent Files"
+        aria-label="Show only recent files"
+        title="Show only recent files"
         onClick={() => set({ recentOnly: !filter.recentOnly })}
       >
         <Icon name="clock" />
       </button>
-      <button type="button" className="tree-filter-button" aria-label="Expand or Collapse All Folders" title="Expand or Collapse All Folders" onClick={onToggleFolders}>
+      <button type="button" className="tree-filter-button" aria-label="Expand or collapse all folders" title="Expand or collapse all folders" onClick={onToggleFolders}>
         <Icon name="plus-minus" />
       </button>
     </div>

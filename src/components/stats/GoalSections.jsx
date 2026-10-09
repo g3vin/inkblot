@@ -32,13 +32,13 @@ export function GoalsSection({ stats }) {
   return (
     <Section
       id="stats.goal"
-      title="Today’s Goal"
+      title="Today’s goal"
       accessory={status.met === true ? <span className="stats-met" data-just={stats.metJustNow}><Icon name="verified" />Met</span> : null}
     >
       {goal.rest ? (
         <p className="stats-muted stats-inline"><Icon name="rest" />Rest day. Nothing is asked of today.</p>
       ) : status.targets.length === 0 ? (
-        <p className="stats-muted">No goal for today. <button type="button" className="reference-link" onClick={() => openSettings('goals')}>Set Goals…</button></p>
+        <p className="stats-muted">No goal for today. <button type="button" className="reference-link" onClick={() => openSettings('goals')}>Set goals…</button></p>
       ) : (
         <>
           <GoalRings status={status} />

@@ -54,10 +54,10 @@ async function buildTimerMenu({ MenuItem, Submenu, PredefinedMenuItem }) {
   const stats = getStatsRuntime()
   const timer = stats.timer
   const primary = await MenuItem.new({ id: 'timer-primary', text: primaryTimerAction(stats).text, action: () => primaryTimerAction(stats).action() })
-  const skip = await MenuItem.new({ id: 'timer-skip', text: 'Skip to Next Segment', enabled: false, action: () => timer.skip() })
+  const skip = await MenuItem.new({ id: 'timer-skip', text: 'Skip to next segment', enabled: false, action: () => timer.skip() })
   const stop = await MenuItem.new({ id: 'timer-stop', text: 'Stop', enabled: false, action: () => timer.stop() })
   const routines = await Submenu.new({
-    text: 'Start Routine',
+    text: 'Start routine',
     items: await Promise.all(allRoutines(stats.config).map((routine) => MenuItem.new({ text: routine.name, action: () => stats.startTimer(routine) }))),
   })
   let last = ''
@@ -77,8 +77,8 @@ async function buildTimerMenu({ MenuItem, Submenu, PredefinedMenuItem }) {
       await PredefinedMenuItem.new({ item: 'Separator' }),
       routines,
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      await MenuItem.new({ id: 'timer-show-stats', text: 'Show Stats', action: () => stats.showStats() }),
-      await MenuItem.new({ id: 'timer-edit-routines', text: 'Edit Routines…', action: () => openSettings('timers') }),
+      await MenuItem.new({ id: 'timer-show-stats', text: 'Show stats', action: () => stats.showStats() }),
+      await MenuItem.new({ id: 'timer-edit-routines', text: 'Edit routines…', action: () => openSettings('timers') }),
     ],
   })
 }
@@ -102,7 +102,7 @@ export default function App() {
   // Keep the native View-menu labels/checkmarks in sync with the active theme.
   const updateMenu = useCallback((theme) => {
     const resolved = getResolvedTheme(theme)
-    const toggleLabel = resolved === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'
+    const toggleLabel = resolved === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
 
     if (menuRefs.current.toggleItem) {
       menuRefs.current.toggleItem.setText(toggleLabel)
@@ -199,7 +199,7 @@ export default function App() {
 
       const toggleItem = await MenuItem.new({
         id: 'theme-toggle',
-        text: 'Switch to Dark',
+        text: 'Switch to dark mode',
         action: () => {
           const resolved = getResolvedTheme(currentThemeRef.current)
           applyTheme(resolved === 'dark' ? 'light' : 'dark')
@@ -215,7 +215,7 @@ export default function App() {
 
       const wordCountItem = await CheckMenuItem.new({
         id: 'word-count-badge-toggle',
-        text: 'Show Word Count',
+        text: 'Show word count',
         checked: showWordCountBadgeRef.current,
         action: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current),
       })
@@ -229,13 +229,13 @@ export default function App() {
       const printEvent = (type, detail) => () => window.dispatchEvent(new CustomEvent(type, { detail }))
       const printLayoutItem = await MenuItem.new({
         id: 'print-layout-toggle',
-        text: 'Print Layout  ⌥⌘P',
+        text: 'Print layout  ⌥⌘P',
         action: printEvent('inkblot:print-layout-toggle'),
       })
       const exportItems = (scope, labelSuffix = '') => Promise.all([
         MenuItem.new({ id: `export-pdf-${scope}`, text: `PDF${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'pdf', scope }) }),
         ...(scope === 'folder'
-          ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for Binding…', action: printEvent('inkblot:export', { format: 'pdf', scope, bound: true }) })]
+          ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for binding…', action: printEvent('inkblot:export', { format: 'pdf', scope, bound: true }) })]
           : []),
         MenuItem.new({ id: `export-epub-${scope}`, text: `EPUB${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'epub', scope }) }),
         MenuItem.new({ id: `export-docx-${scope}`, text: `Word (.docx)${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'docx', scope }) }),
@@ -248,18 +248,18 @@ export default function App() {
       ])
       const fileItems = [
         await PredefinedMenuItem.new({ item: 'Separator' }),
-        await MenuItem.new({ id: 'page-setup', text: 'Page Setup…', action: printEvent('inkblot:page-setup') }),
+        await MenuItem.new({ id: 'page-setup', text: 'Page setup…', action: printEvent('inkblot:page-setup') }),
         await Submenu.new({
-          text: 'Write As',
-          items: await Promise.all([['prose', 'Prose'], ['screenplay', 'Screenplay'], ['stageplay', 'Stage Play']].map(([format, text]) => (
+          text: 'Write as',
+          items: await Promise.all([['prose', 'Prose'], ['screenplay', 'Screenplay'], ['stageplay', 'Stage play']].map(([format, text]) => (
             MenuItem.new({ id: `write-as-${format}`, text, action: printEvent('inkblot:writing-format', { format }) })
           ))),
         }),
         await MenuItem.new({ id: 'print-document', text: 'Print…  ⌘P', action: printEvent('inkblot:print', { scope: 'document' }) }),
         await MenuItem.new({ id: 'print-book', text: 'Print Book…', action: printEvent('inkblot:print', { scope: 'folder' }) }),
-        await MenuItem.new({ id: 'print-book-bound', text: 'Print Book for Binding…', action: printEvent('inkblot:print', { scope: 'folder', bound: true }) }),
+        await MenuItem.new({ id: 'print-book-bound', text: 'Print book for binding…', action: printEvent('inkblot:print', { scope: 'folder', bound: true }) }),
         await PredefinedMenuItem.new({ item: 'Separator' }),
-        await MenuItem.new({ id: 'import-fountain', text: 'Import Fountain Script…', action: printEvent('inkblot:import-script') }),
+        await MenuItem.new({ id: 'import-fountain', text: 'Import Fountain script…', action: printEvent('inkblot:import-script') }),
         await Submenu.new({ text: 'Export', items: await exportItems('document') }),
         await Submenu.new({ text: 'Export Book', items: await exportItems('folder') }),
       ]
@@ -271,18 +271,18 @@ export default function App() {
         await PredefinedMenuItem.new({ item: 'Separator' }),
         await MenuItem.new({
           id: 'accent-color-picker',
-          text: 'Accent Colour…',
+          text: 'Accent colour…',
           action: () => openSettings('general'),
         }),
         await MenuItem.new({
           id: 'command-palette',
-          text: 'Command Palette…  ⌘K',
+          text: 'Command palette…  ⌘K',
           action: () => dispatchAppEvent('inkblot:command-palette'),
         }),
       ]
       const tabBarItem = await CheckMenuItem.new({
         id: 'tab-bar-toggle',
-        text: 'Show Tab Bar',
+        text: 'Show tab bar',
         checked: showsTabBar(),
         action: () => {
           setShowsTabBar(!showsTabBar())

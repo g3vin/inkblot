@@ -78,7 +78,7 @@ export default function InspectorLayoutEditor({ onClose }) {
   const { layouts, setShown, move, restore } = useInspectorLayouts()
   return (
     <Sheet
-      title="Customize Inspector Layout"
+      title="Customize inspector layout"
       width={560}
       onClose={onClose}
       className="inspector-editor"
@@ -87,7 +87,7 @@ export default function InspectorLayoutEditor({ onClose }) {
           <Button
             variant="plain"
             onClick={(event) => popUpNativeMenu(event, [
-              { text: 'Both Layouts', action: () => restore('both') },
+              { text: 'Both layouts', action: () => restore('both') },
               { text: 'Write', action: () => restore('drafting') },
               { text: 'Typeset', action: () => restore('finishing') },
             ])}

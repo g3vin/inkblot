@@ -32,10 +32,10 @@ export default function FinishingHeader({ layout, showsActions = true }) {
 
   const optionsMenu = (event) => popUpNativeMenu(event, [
     { text: 'Units', items: Object.entries(UNITS).map(([id, unit]) => ({ text: unit.label, checked: layout.unit === id, action: () => layout.setUnit(id) })) },
-    { text: 'Author Details…', action: () => setAuthor(true) },
+    { text: 'Author details…', action: () => setAuthor(true) },
     { separator: true },
-    { text: 'Expand All Sections', action: () => { SECTION_IDS.forEach((id) => writeSectionState(id, true)); window.dispatchEvent(new CustomEvent('inkblot:finishing-sections')) } },
-    { text: 'Collapse All Sections', action: () => { SECTION_IDS.forEach((id) => writeSectionState(id, false)); window.dispatchEvent(new CustomEvent('inkblot:finishing-sections')) } },
+    { text: 'Expand all sections', action: () => { SECTION_IDS.forEach((id) => writeSectionState(id, true)); window.dispatchEvent(new CustomEvent('inkblot:finishing-sections')) } },
+    { text: 'Collapse all sections', action: () => { SECTION_IDS.forEach((id) => writeSectionState(id, false)); window.dispatchEvent(new CustomEvent('inkblot:finishing-sections')) } },
   ])
 
   const ctx = { layout: state, send: (type, payload) => {
@@ -52,7 +52,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
           onChange={(value) => layout.setScope(value === 'document' ? 'document' : (scope === 'project' ? 'project' : 'folder'))}
           label="Work on"
           stretch
-          options={[{ value: 'document', label: 'This Document' }, { value: 'book', label: 'Book' }]}
+          options={[{ value: 'document', label: 'This document' }, { value: 'book', label: 'Book' }]}
         />
         <button type="button" className="reference-icon-button" aria-label="Options" title="Units and view options" onClick={optionsMenu}>
           <Icon name="more" />
@@ -66,7 +66,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
             className="fin-grow"
             disabled={!layout.hasDocument || running(layout.job)}
             onClick={() => layout.print(scope)}
-            onContextMenu={bindable ? (event) => popUpNativeMenu(event, [{ text: 'Print for Binding…', action: () => layout.print(scope, true) }]) : undefined}
+            onContextMenu={bindable ? (event) => popUpNativeMenu(event, [{ text: 'Print for binding…', action: () => layout.print(scope, true) }]) : undefined}
           >
             Print…
           </Button>
@@ -74,7 +74,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
             ref={optionsRef}
             type="button"
             className={`reference-icon-button${isDefaultPrint(layout.printOptions) ? '' : ' is-on'}`}
-            aria-label="Print Options"
+            aria-label="Print options"
             title="Print options: pages, the current chapter, the selection, a watermark"
             onClick={() => setOptions((open) => !open)}
           >
@@ -143,8 +143,8 @@ function PrintOptions({ layout, onPrint }) {
         <span>Print</span>
         <select className="ui-select" value={draft.range} onChange={(event) => layout.setPrintOptions({ range: event.target.value })}>
           <option value="all">Everything</option>
-          <option value="currentChapter">The Current Chapter</option>
-          <option value="selection" disabled={!layout.state?.hasSelection}>The Selection</option>
+          <option value="currentChapter">The current chapter</option>
+          <option value="selection" disabled={!layout.state?.hasSelection}>The selection</option>
         </select>
       </label>
       <label className="fin-field">
@@ -186,14 +186,14 @@ export function AuthorSheet({ profile, onSave, onClose }) {
   )
   return (
     <Sheet
-      title="Author Details"
+      title="Author details"
       width={420}
       onClose={onClose}
       footer={<><span className="ui-sheet-footer-spacer" /><Button onClick={onClose}>Cancel</Button><Button variant="filled" onClick={() => { onSave(draft); onClose() }}>Save</Button></>}
     >
       <div className="fin-form">
         {field('byline', 'Byline', 'The name on the cover')}
-        {field('legalName', 'Legal Name', 'If different, for contracts')}
+        {field('legalName', 'Legal name', 'If different, for contracts')}
         {field('address', 'Address', 'Street, city, postcode', true)}
         {field('email', 'Email')}
         {field('phone', 'Phone')}

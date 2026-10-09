@@ -44,7 +44,7 @@ export default function TypesetHistoryView() {
 
   const menu = (event, row) => popUpNativeMenu(event, [
     { text: 'Name…', action: () => setNaming({ id: row.id, name: row.name ?? '' }) },
-    { text: 'Duplicate as Edition', action: () => send('editEditions', { action: EditionAction.FromTypesetVersion, id: row.id, name: row.name }) },
+    { text: 'Duplicate as edition', action: () => send('editEditions', { action: EditionAction.FromTypesetVersion, id: row.id, name: row.name }) },
     { separator: true },
     { text: 'Delete…', action: () => { if (ask('Delete this typeset version?')) send('deleteTypesetVersion', { id: row.id }) } },
   ])
@@ -124,7 +124,7 @@ export default function TypesetHistoryView() {
       ) : (
         <div className="inspector-placeholder">
           <Icon name="type-style" size={20} />
-          <strong>No Typeset Versions Yet</strong>
+          <strong>No typeset versions yet</strong>
           <span>A version is kept as you typeset the book, and each time it is printed or exported.</span>
         </div>
       )}

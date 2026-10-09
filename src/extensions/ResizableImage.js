@@ -356,7 +356,7 @@ const ResizableImage = Image.extend({
         ['block', 'Block'],
         ['wrap-left', 'Wrap L'],
         ['wrap-right', 'Wrap R'],
-        ['page', 'Full Page'],
+        ['page', 'Full page'],
         ['bleed', 'Bleed'],
       ].forEach(([value, label]) => {
         const option = document.createElement('option')

@@ -78,7 +78,7 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
     ? (() => {
         const id = draggingIndex !== null ? items[draggingIndex] : String(drag.dragging).slice(2)
         if (id === SPACE) return 'Space'
-        if (id === FLEXIBLE_SPACE) return 'Flexible Space'
+        if (id === FLEXIBLE_SPACE) return 'Flexible space'
         if (id === MORE) return 'More'
         if (id === 'defaults') return 'Default set'
         return toolbarItem(id)?.label ?? id

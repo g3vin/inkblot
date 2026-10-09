@@ -27,10 +27,10 @@ fn preset(
 /// `STORY_FOLDER_PRESETS`, in declaration order — which is the order the menu shows.
 pub fn story_folder_presets() -> Vec<StoryFolderPreset> {
     vec![
-        preset("characters", "Characters", "Character Folder", "Character", ("users", "characters"), &[]),
-        preset("settings", "Settings", "Setting Folder", "Setting", ("map-world", "map-pin"), &["Locations", "Places"]),
-        preset("outline", "Outline", "Outline Folder", "Outline Entry", ("list", "list-bullets"), &[]),
-        preset("novel", "Novel", "Novel Folder", "Chapter", ("book", "notebook"), &["Book"]),
+        preset("characters", "Characters", "Character folder", "Character", ("users", "characters"), &[]),
+        preset("settings", "Settings", "Setting folder", "Setting", ("map-world", "map-pin"), &["Locations", "Places"]),
+        preset("outline", "Outline", "Outline folder", "Outline entry", ("list", "list-bullets"), &[]),
+        preset("novel", "Novel", "Novel folder", "Chapter", ("book", "notebook"), &["Book"]),
     ]
 }
 

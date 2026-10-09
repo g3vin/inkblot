@@ -27,14 +27,14 @@ export function DayGoalEditor({ goal, onChange }) {
               <SelectMenu label="Measure" value={target.metric} options={METRIC_OPTIONS} onChange={(metric) => setTarget(target.id, { metric })} />
               <Stepper label="Amount" value={target.amount} min={1} max={100000} step={target.metric === 'words' || target.metric === 'netWords' ? 50 : 1} unit={METRIC_INFO[target.metric].unit}
                 onChange={(amount) => setTarget(target.id, { amount })} />
-              <IconButton icon="minus" label="Remove Target" size="capsule" onClick={() => change({ targets: goal.targets.filter((t) => t.id !== target.id) })} />
+              <IconButton icon="minus" label="Remove target" size="capsule" onClick={() => change({ targets: goal.targets.filter((t) => t.id !== target.id) })} />
             </div>
           ))}
           <div className="settings-actions">
             <SelectMenu
-              label="Add Target"
+              label="Add target"
               value=""
-              options={[{ value: '', label: 'Add Target…', disabled: true }, ...METRIC_OPTIONS]}
+              options={[{ value: '', label: 'Add target…', disabled: true }, ...METRIC_OPTIONS]}
               onChange={(metric) => metric && change({ targets: [...goal.targets, goalTarget(metric)] })}
             />
             {goal.targets.length > 1 ? (
@@ -85,24 +85,24 @@ export default function GoalsPane({ stats }) {
       </section>
 
       <section className="settings-group">
-        <h3>Each Week</h3>
+        <h3>Each week</h3>
         {orderedWeekdays().map((weekday) => (
           <Disclosure key={weekday} title={weekdayName(weekday)} value={goalSummary(plan.weekly[weekday - 1])}
             open={editing === `w${weekday}`} onToggle={() => setEditing(editing === `w${weekday}` ? null : `w${weekday}`)}>
             <DayGoalEditor goal={plan.weekly[weekday - 1]} onChange={(goal) => setWeekday(weekday, goal)} />
-            <Button size="capsule" onClick={() => copyToEveryDay(weekday)}>Apply to Every Day</Button>
+            <Button size="capsule" onClick={() => copyToEveryDay(weekday)}>Apply to every day</Button>
           </Disclosure>
         ))}
         <p className="settings-footer">A day can ask for several things — all of them, or any one. A rest day neither counts toward a streak nor breaks it.</p>
       </section>
 
       <section className="settings-group">
-        <h3>Particular Days</h3>
+        <h3>Particular days</h3>
         {overrides.map((override) => (
           <Disclosure key={override.id} title={dayDate(override.day)?.toLocaleDateString(undefined, { dateStyle: 'full' }) ?? override.day}
             value={goalSummary(override.goal)} open={editing === override.id} onToggle={() => setEditing(editing === override.id ? null : override.id)}>
             <DayGoalEditor goal={override.goal} onChange={(goal) => setPlan({ overrides: plan.overrides.map((o) => (o.id === override.id ? { ...o, goal } : o)) })} />
-            <Button variant="destructive" onClick={() => setPlan({ overrides: plan.overrides.filter((o) => o.id !== override.id) })}>Remove This Day</Button>
+            <Button variant="destructive" onClick={() => setPlan({ overrides: plan.overrides.filter((o) => o.id !== override.id) })}>Remove this day</Button>
           </Disclosure>
         ))}
         <div className="settings-actions">
@@ -110,13 +110,13 @@ export default function GoalsPane({ stats }) {
           <Button onClick={() => {
             if (!newDay || plan.overrides.some((o) => o.day === newDay)) return
             setPlan({ overrides: [...plan.overrides, { id: newId(), day: newDay, goal: structuredClone(goalFor(plan, newDay)) }] })
-          }}>Add Day</Button>
+          }}>Add day</Button>
         </div>
         <p className="settings-footer">A day here asks for its own goal instead of its weekday’s — a holiday off, a push before a deadline.</p>
       </section>
 
       <section className="settings-group">
-        <h3>Streaks and Flow</h3>
+        <h3>Streaks and flow</h3>
         <FormRow label="Freezes a month"><Stepper label="Freezes a month" value={config.streakFreezesPerMonth} min={0} max={10} onChange={(v) => save({ ...config, streakFreezesPerMonth: v })} /></FormRow>
         <FormRow label="Celebrate when the day’s goal is met"><Toggle label="Celebrate when the day’s goal is met" checked={config.celebrateGoals} onChange={(v) => save({ ...config, celebrateGoals: v })} /></FormRow>
         <FormRow label="Flow is typing for"><Stepper label="Flow minutes" value={config.flowMinutes} min={5} max={90} step={5} unit="min" onChange={(v) => save({ ...config, flowMinutes: v })} /></FormRow>
@@ -136,7 +136,7 @@ export default function GoalsPane({ stats }) {
             <FormRow label="Due"><input type="date" className="settings-input" aria-label="Due" value={deadline.due} onChange={(event) => event.target.value && setDeadline(deadline.id, { due: event.target.value })} /></FormRow>
             <FormRow label="Writing days"><WeekdayToggles value={deadline.writingDays} onChange={(writingDays) => setDeadline(deadline.id, { writingDays })} /></FormRow>
             <FormRow label="Show the day’s share on the Today page"><Toggle label="Show the day’s share" checked={deadline.feedsDailyGoal} onChange={(feedsDailyGoal) => setDeadline(deadline.id, { feedsDailyGoal })} /></FormRow>
-            <Button variant="destructive" onClick={() => save({ ...config, deadlines: config.deadlines.filter((d) => d.id !== deadline.id) })}>Remove Deadline</Button>
+            <Button variant="destructive" onClick={() => save({ ...config, deadlines: config.deadlines.filter((d) => d.id !== deadline.id) })}>Remove deadline</Button>
           </Disclosure>
         ))}
         <div className="settings-actions">
@@ -144,7 +144,7 @@ export default function GoalsPane({ stats }) {
             const deadline = newDeadline(stats.tracker.project ?? projects[0] ?? '', dayKey(new Date()))
             save({ ...config, deadlines: [...config.deadlines, deadline] })
             setEditing(deadline.id)
-          }}><Icon name="calendar" />Add Deadline</Button>
+          }}><Icon name="calendar" />Add deadline</Button>
         </div>
         <p className="settings-footer">Inkblot works out each writing day’s share from the words left and the days left, and when you’ll finish at your recent pace.</p>
       </section>

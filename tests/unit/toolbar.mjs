@@ -66,9 +66,9 @@ for (const display of L.TOOLBAR_DISPLAY_MODES) {
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.format.font', ctx: { ...empty, display: 'icon' } })))
 ok('with no live editor an item is disabled, not gone', container.querySelector('select')?.disabled === true)
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.format.text-style', ctx: { ...empty, display: 'iconAndLabel' } })))
-ok('Icon and Text puts the label under the item', container.querySelector('.tb-item-label')?.textContent === 'Text Style')
+ok('Icon and Text puts the label under the item', container.querySelector('.tb-item-label')?.textContent === 'Text style')
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.insert.table', ctx: { ...empty, display: 'label' } })))
-ok('Text Only draws the label instead of the icon', container.querySelector('button')?.textContent === 'Insert Table' && !container.querySelector('svg'))
+ok('Text Only draws the label instead of the icon', container.querySelector('button')?.textContent === 'Insert table' && !container.querySelector('svg'))
 
 const sent = []
 const live = { ...empty, display: 'icon', toolbar: { ...empty.toolbar, target: 'primary' }, send: (type, payload) => sent.push({ type, payload }) }
@@ -124,9 +124,9 @@ await act(async () => document.querySelector('.tb-palette .ui-button[data-varian
 ok('Done closes it', !document.querySelector('.tb-palette'))
 
 const menu = toolbarMenuItems('icon')
-ok('the right-click menu offers the three display modes', menu.slice(0, 3).map((item) => item.text).join() === 'Icon and Text,Icon Only,Text Only')
+ok('the right-click menu offers the three display modes', menu.slice(0, 3).map((item) => item.text).join() === 'Icon and text,Icon only,Text only')
 ok('with the current one checked', menu[1].checked === true && menu[0].checked === false)
-ok('and both Customize items', menu.some((item) => item.text === 'Customize Toolbar…') && menu.some((item) => item.text === 'Customize Inspector Layout…'))
+ok('and both Customize items', menu.some((item) => item.text === 'Customize toolbar…') && menu.some((item) => item.text === 'Customize inspector layout…'))
 await act(async () => menu[0].action())
 ok('choosing a display mode saves it', readDisplayMode() === 'iconAndLabel' && prefs.getPreference(L.TOOLBAR_DISPLAY_MODE_KEY) === 'iconAndLabel')
 ok('and the toolbar redraws in it', container.querySelector('.tb-row')?.dataset.display === 'iconAndLabel')

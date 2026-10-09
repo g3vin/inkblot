@@ -21,26 +21,26 @@ export function ScriptProductionSection({ layout, script }) {
     text: kind[0].toUpperCase() + kind.slice(1),
     items: [
       { text: 'Print…', action: () => layout.scriptReport(kind, 'print') },
-      { text: 'Save as Spreadsheet (CSV)…', action: () => layout.scriptReport(kind, 'csv') },
+      { text: 'Save as spreadsheet (CSV)…', action: () => layout.scriptReport(kind, 'csv') },
     ],
   })
   const scenes = script.scenes.length === 1 ? '1 scene' : `${script.scenes.length} scenes`
   const cast = script.characters.length === 1 ? '1 speaking part' : `${script.characters.length} speaking parts`
   return (
-    <FinishingSection id={SECTION.script} title="Script Production" note={`${scenes}, ${cast}.`}>
-      <PickerRow label="Scene Numbers" value={script.sceneNumbers} onChange={layout.setSceneNumbers} options={[{ value: 'off', label: 'None' }, { value: 'on', label: 'Numbered' }, { value: 'locked', label: 'Locked' }]} />
+    <FinishingSection id={SECTION.script} title="Script production" note={`${scenes}, ${cast}.`}>
+      <PickerRow label="Scene numbers" value={script.sceneNumbers} onChange={layout.setSceneNumbers} options={[{ value: 'off', label: 'None' }, { value: 'on', label: 'Numbered' }, { value: 'locked', label: 'Locked' }]} />
       {script.sceneNumbers === 'locked' ? <Caution>A scene added now takes a letter — 12A between 12 and 13 — so pages already sent out keep their numbers.</Caution> : null}
       <PickerRow
         label="Highlight"
         value={layout.printOptions.highlightCharacter}
         onChange={(highlightCharacter) => layout.setPrintOptions({ highlightCharacter })}
-        options={[{ value: '', label: 'No One' }, ...script.characters.map((name) => ({ value: name, label: name.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w+/g, (w) => w.toLowerCase()) }))]}
+        options={[{ value: '', label: 'No one' }, ...script.characters.map((name) => ({ value: name, label: name.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w+/g, (w) => w.toLowerCase()) }))]}
       />
       <FormRow label="Reports">
         <button type="button" className="fin-button" onClick={(event) => popUpNativeMenu(event, [report('characters'), report('scenes'), report('locations')])}>Report <Icon name="chevron-down" /></button>
       </FormRow>
       <FormRow label="Sides">
-        <button ref={sidesRef} type="button" className="fin-button" disabled={!script.scenes.length} onClick={() => setSides(true)}>Print Sides…</button>
+        <button ref={sidesRef} type="button" className="fin-button" disabled={!script.scenes.length} onClick={() => setSides(true)}>Print sides…</button>
         <Popover anchorRef={sidesRef} open={sides} onClose={() => setSides(false)} align="end" className="fin-sides">
           <SidesPicker scenes={script.scenes} onPrint={(chosen) => { setSides(false); layout.printSides(chosen) }} />
         </Popover>
@@ -59,7 +59,7 @@ function SidesPicker({ scenes, onPrint }) {
   })
   return (
     <div className="fin-sides-body">
-      <strong>Print Sides</strong>
+      <strong>Print sides</strong>
       <p className="fin-note">The pages the chosen scenes are on, numbered as in the whole script.</p>
       <ul className="fin-sides-list">
         {scenes.map((scene, index) => (
@@ -74,7 +74,7 @@ function SidesPicker({ scenes, onPrint }) {
         ))}
       </ul>
       <div className="fin-header-row">
-        <Button onClick={() => setChosen(chosen.size === scenes.length ? new Set() : new Set(scenes.map((_, i) => i)))}>{chosen.size === scenes.length ? 'Choose None' : 'Choose All'}</Button>
+        <Button onClick={() => setChosen(chosen.size === scenes.length ? new Set() : new Set(scenes.map((_, i) => i)))}>{chosen.size === scenes.length ? 'Choose none' : 'Choose all'}</Button>
         <span className="fin-grow" />
         <Button variant="filled" disabled={!chosen.size} onClick={() => onPrint([...chosen].sort((a, b) => a - b))}>Print…</Button>
       </div>
@@ -106,7 +106,7 @@ export function PublishingSection({ layout }) {
       title="Publishing"
       note={state.scope === 'document' ? 'For this document. Choose Book in the header to check the whole book.' : 'For the whole book, at its page setup. Count the pages after changing the text or the setup.'}
     >
-      <PickerRow label="Printed By" value={publishing.service} onChange={(service) => set({ service })} options={[{ value: 'none', label: 'Not Chosen' }, { value: 'kdp', label: 'Amazon KDP' }, { value: 'ingramSpark', label: 'IngramSpark' }]} />
+      <PickerRow label="Printed by" value={publishing.service} onChange={(service) => set({ service })} options={[{ value: 'none', label: 'Not chosen' }, { value: 'kdp', label: 'Amazon KDP' }, { value: 'ingramSpark', label: 'IngramSpark' }]} />
       <PickerRow label="Paper" value={publishing.paper} onChange={(paper) => set({ paper })} options={[{ value: 'cream', label: 'Cream' }, { value: 'white', label: 'White' }, { value: 'color', label: 'Colour' }]} />
       <FormRow label="Pages">
         {report?.pageCount > 0 ? <span className="fin-tabular">{report.pageCount}{report.measured ? '' : ' on screen'}</span> : <span className="fin-muted">Not counted</span>}
@@ -119,7 +119,7 @@ export function PublishingSection({ layout }) {
       {report?.words > 0 ? (
         <>
           <FormRow label="Words"><span className="fin-tabular">{report.words.toLocaleString()}</span></FormRow>
-          <FormRow label="Reading Time"><span>{readingTime(Math.round(report.readingMinutes))}</span></FormRow>
+          <FormRow label="Reading time"><span>{readingTime(Math.round(report.readingMinutes))}</span></FormRow>
         </>
       ) : null}
       {report?.pageCount > 0 ? (
@@ -145,7 +145,7 @@ export function PublishingSection({ layout }) {
 
 /* ---------------- the cover ---------------- */
 
-const PARTS = [['front', 'Front', 'frontFile'], ['back', 'Back', 'backFile'], ['spine', 'Spine', 'spineFile'], ['wrap', 'Whole Wrap', 'wrapFile']]
+const PARTS = [['front', 'Front', 'frontFile'], ['back', 'Back', 'backFile'], ['spine', 'Spine', 'spineFile'], ['wrap', 'Whole wrap', 'wrapFile']]
 
 export function CoverSection({ layout }) {
   const cover = layout.state.cover
@@ -190,7 +190,7 @@ export function CoverSection({ layout }) {
         </div>
       ) : null}
       <div className="fin-header-row">
-        <button type="button" className="fin-button is-small" onClick={() => layout.editCovers('add')}>New Version</button>
+        <button type="button" className="fin-button is-small" onClick={() => layout.editCovers('add')}>New version</button>
         {active ? <button type="button" className="fin-button is-small" onClick={() => layout.editCovers('duplicate', { id: active.id })}>Duplicate</button> : null}
         {active ? <button type="button" className="fin-button is-small" onClick={() => setRenaming(active.id)}>Rename…</button> : null}
       </div>
@@ -203,20 +203,20 @@ export function CoverSection({ layout }) {
               {active[key] ? <button type="button" className="fin-button is-small is-destructive" onClick={() => layout.setCoverImage(part, null)}>Remove</button> : null}
             </FormRow>
           ))}
-          <PickerRow label="Fit" value={active.fit} onChange={(fit) => layout.editCovers('setFit', { id: active.id, fit })} options={[{ value: 'fill', label: 'Fill, Cropping' }, { value: 'fit', label: 'Fit Inside' }, { value: 'stretch', label: 'Stretch' }]} />
+          <PickerRow label="Fit" value={active.fit} onChange={(fit) => layout.editCovers('setFit', { id: active.id, fit })} options={[{ value: 'fill', label: 'Fill, cropping' }, { value: 'fit', label: 'Fit inside' }, { value: 'stretch', label: 'Stretch' }]} />
         </>
-      ) : <button type="button" className="fin-button" onClick={() => choose('front')}>Choose a Front…</button>}
+      ) : <button type="button" className="fin-button" onClick={() => choose('front')}>Choose a front…</button>}
       {cover ? (
         <>
-          <FormRow label="Full Wrap"><span className="fin-tabular fin-muted">{cover.wrapWidthMm.toFixed(1)} × {cover.wrapHeightMm.toFixed(1)} mm</span></FormRow>
+          <FormRow label="Full wrap"><span className="fin-tabular fin-muted">{cover.wrapWidthMm.toFixed(1)} × {cover.wrapHeightMm.toFixed(1)} mm</span></FormRow>
           <FormRow label="Spine"><span className="fin-tabular fin-muted">{cover.pageCount > 0 ? `${cover.spineWidthMm.toFixed(1)} mm · ${cover.pageCount} pages` : 'Count the pages'}</span></FormRow>
           {(cover.checks ?? []).map((issue) => (issue.severity === 'note' ? <Note key={issue.id}>{issue.message}</Note> : <Caution key={issue.id}>{issue.message}</Caution>))}
         </>
       ) : null}
       <div className="fin-header-row">
-        <button type="button" className="fin-button" onClick={layout.showCover}>Show the Cover</button>
+        <button type="button" className="fin-button" onClick={layout.showCover}>Show the cover</button>
         <span className="fin-grow" />
-        <button type="button" className="fin-button" disabled={!active} onClick={() => layout.exportAs('coverPdf', exportScope)}>Export Cover PDF…</button>
+        <button type="button" className="fin-button" disabled={!active} onClick={() => layout.exportAs('coverPdf', exportScope)}>Export cover PDF…</button>
       </div>
     </FinishingSection>
   )
@@ -235,15 +235,15 @@ export function BindingSection({ layout }) {
   return (
     <FinishingSection
       id={SECTION.binding}
-      title="Hand Binding"
+      title="Hand binding"
       note={on
         ? 'Printed double-sided (flip on the short edge), folded and nested, the sheets read in order. Paper thickness moves inner pages toward the spine to allow for creep.'
         : 'Lays the book’s pages out on sheets to fold, nest and sew or staple — for making a book at home.'}
     >
-      <ToggleRow label="Print for Hand Binding" checked={on} onChange={(yes) => set({ binding: yes ? 'signatures' : 'none' })} />
+      <ToggleRow label="Print for hand binding" checked={on} onChange={(yes) => set({ binding: yes ? 'signatures' : 'none' })} />
       {on ? (
         <>
-          <PickerRow label="Binding" value={binding.binding} onChange={(value) => set({ binding: value })} options={[{ value: 'signatures', label: 'Sewn Signatures' }, { value: 'saddle', label: 'Saddle Stitch (Booklet)' }, { value: 'perfect', label: 'Perfect Bound' }]} />
+          <PickerRow label="Binding" value={binding.binding} onChange={(value) => set({ binding: value })} options={[{ value: 'signatures', label: 'Sewn signatures' }, { value: 'saddle', label: 'Saddle stitch (booklet)' }, { value: 'perfect', label: 'Perfect bound' }]} />
           {binding.binding === 'signatures' ? (
             <>
               <PickerRow label="Signature" value={String(binding.sheetsPerSignature)} onChange={(v) => set({ sheetsPerSignature: Number(v) })} options={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ value: String(n), label: `${n} sheet${n === 1 ? '' : 's'} · ${n * 4} pages` }))} />
@@ -251,13 +251,13 @@ export function BindingSection({ layout }) {
             </>
           ) : null}
           <PickerRow label="Sheet" value={binding.sheetPresetId} onChange={(sheetPresetId) => set({ sheetPresetId })} options={['letter', 'a4', 'legal', 'tabloid', 'a3'].map((id) => ({ value: id, label: presets.find((p) => p.id === id)?.label ?? id }))} />
-          <PickerRow label="Pages on the Sheet" value={binding.sheetFit} onChange={(sheetFit) => set({ sheetFit })} options={[{ value: 'actualSize', label: 'Actual Size, with Crop Marks' }, { value: 'fit', label: 'Scaled to Fit' }]} />
-          <PickerRow label="Double-Sided" value={binding.duplex} onChange={(duplex) => set({ duplex })} options={[{ value: 'automatic', label: 'Printer Does Both Sides' }, { value: 'manual', label: 'By Hand: Fronts, Then Backs' }]} />
-          <LengthRow label="Paper Thickness" mm={binding.paperThicknessMm} unit={unit} digits={unit === 'in' ? 4 : 2} onCommit={(paperThicknessMm) => set({ paperThicknessMm })} />
-          <ToggleRow label="Crop and Fold Marks" checked={binding.cropMarks} onChange={(cropMarks) => set({ cropMarks })} />
-          <ToggleRow label="Add a Folding Guide" checked={binding.includeGuide} onChange={(includeGuide) => set({ includeGuide })} />
+          <PickerRow label="Pages on the sheet" value={binding.sheetFit} onChange={(sheetFit) => set({ sheetFit })} options={[{ value: 'actualSize', label: 'Actual size, with crop marks' }, { value: 'fit', label: 'Scaled to fit' }]} />
+          <PickerRow label="Double-Sided" value={binding.duplex} onChange={(duplex) => set({ duplex })} options={[{ value: 'automatic', label: 'Printer does both sides' }, { value: 'manual', label: 'By hand: fronts, then backs' }]} />
+          <LengthRow label="Paper thickness" mm={binding.paperThicknessMm} unit={unit} digits={unit === 'in' ? 4 : 2} onCommit={(paperThicknessMm) => set({ paperThicknessMm })} />
+          <ToggleRow label="Crop and fold marks" checked={binding.cropMarks} onChange={(cropMarks) => set({ cropMarks })} />
+          <ToggleRow label="Add a folding guide" checked={binding.includeGuide} onChange={(includeGuide) => set({ includeGuide })} />
           <div className="fin-header-row">
-            <button type="button" className="fin-button" onClick={() => layout.print(scope, true)}>Print for Binding…</button>
+            <button type="button" className="fin-button" onClick={() => layout.print(scope, true)}>Print for binding…</button>
             <button type="button" className="fin-button" onClick={() => layout.exportAs('pdf', scope, true)}>Export PDF…</button>
           </div>
         </>
