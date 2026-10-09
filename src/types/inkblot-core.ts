@@ -2911,12 +2911,23 @@ export interface OpenDocInTabCommand {
 	docPath: string;
 }
 
+/** A point on the screen, in logical pixels. */
+export interface ScreenPoint {
+	x: number;
+	y: number;
+}
+
 /**
- * Open a document in a detached window of its own (a tab's Move to New Window). The
- * page opens it as "Open in New Window" does.
+ * Open a document in a detached window of its own (a tab's Move to New Window, or a
+ * tab dragged out of the window). The page opens it as "Open in New Window" does.
  */
 export interface OpenDocInWindowCommand {
 	docPath: string;
+	/**
+	 * Where the window's top-left corner goes on screen: where a dragged-out tab was
+	 * let go. Without it the window opens where windows open.
+	 */
+	at?: ScreenPoint;
 }
 
 export interface OpenDocumentCommand {

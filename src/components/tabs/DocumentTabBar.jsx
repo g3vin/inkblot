@@ -7,8 +7,9 @@
  * The tabs are the page's (`useTabs`, published as `tabsChanged`); this keeps no
  * list of its own and changes them only by command, so it never shows a state the
  * page does not have. Click a tab to show it; the ✕ that appears on hover closes it.
- * Drag a tab to reorder, or a document from the file tree onto the bar to open it in
- * a tab. A tab holding a split names both its documents, the first pane's first.
+ * Drag a tab to reorder, or out of the window to open its document in a window of
+ * its own where it is let go; drag a document from the file tree onto the bar to open
+ * it in a tab. A tab holding a split names both its documents, the first pane's first.
  * A locked document (docLocks.ts) wears a lock, and its menu locks and unlocks it.
  *
  * ⌘T opens a new tab, ⌘W closes the one showing, ⌘1–⌘9 pick one, and ⌃Tab / ⌃⇧Tab
@@ -21,11 +22,17 @@ import { moveTo } from '../../ui/usePointerReorder.js'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
 import Icon from '../../ui/Icon.jsx'
 import { lockReason, toggleDocumentLock, useLocks } from '../../lib/docLocks'
-import { adjacentTab, needsTabBar, tabIcon, tabName, tabTitle, useShowsTabBar } from './tabBarState.js'
+import { adjacentTab, needsTabBar, outsideWindow, tabIcon, tabName, tabTitle, useShowsTabBar } from './tabBarState.js'
 import './DocumentTabBar.css'
 
 const send = (type, payload) => shellBridge.send(type, payload)
 const NO_TABS = { tabs: [] }
+
+/** Where on screen a window dropped at `point` goes: its corner a little up and left of it. */
+const screenPointFor = (point) => ({
+  x: Math.round((window.screenX || 0) + point.x - 80),
+  y: Math.round((window.screenY || 0) + point.y - 20),
+})
 
 function tabMenu(tab, tabs, activeDoc, locks) {
   const canSplit = Boolean(tab.docPath && tab.docPath !== activeDoc)
@@ -61,7 +68,15 @@ export default function DocumentTabBar({ activeDoc }) {
     listRef,
     itemSelector: '[data-reorder-id]',
     axis: 'x',
-    onDrop: ({ id, index, inside }) => {
+    onDrop: ({ id, index, inside, point }) => {
+      // Let go outside the window: the document pops out into a window of its own.
+      if (!inside && outsideWindow(point)) {
+        const tab = tabs.find((t) => t.id === id)
+        if (!tab?.docPath) return
+        send('openDocInWindow', { docPath: tab.docPath, at: screenPointFor(point) })
+        send('closeTab', { tabId: id })
+        return
+      }
       if (!inside || index == null) return
       const order = moveTo(ids, id, index)
       if (order.join() !== ids.join()) send('setTabOrder', { tabIds: order })

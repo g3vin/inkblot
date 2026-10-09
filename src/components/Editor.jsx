@@ -37,6 +37,8 @@ import { setPreference, setSessionValue } from '../lib/preferences'
 import { setOpenProject, clearOpenProject } from '../lib/projectContext'
 import { dragHandoff, documentSurface, DragPayloadKind } from '../bridge'
 import { getProjectRoot } from '../lib/projectPaths'
+import { useWindowPop } from '../hooks/useWindowPop'
+import DetachedWindowBar from './DetachedWindowBar'
 
 /** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
@@ -198,6 +200,15 @@ export default function Editor({
 
   // The tabs, published for the tab bar, and their shortcuts.
   useTabShortcuts()
+  // Documents popping out into windows of their own and back (docWindow.js).
+  const windowPop = useWindowPop({
+    detached: Boolean(detachedTarget),
+    projectName,
+    currentDoc,
+    setCurrentDoc,
+    openDocInTab,
+    openProject,
+  })
   useTabsPublisher({
     projectName,
     tabs,
@@ -669,6 +680,7 @@ export default function Editor({
   }
 
   return (
+    <>
       <EditorLayout
         splitView={splitView}
         setSplitView={setSplitView}
@@ -724,5 +736,9 @@ export default function Editor({
         refreshFiles={() => refreshFilesRef.current?.()}
         registerRefreshFiles={(fn) => { refreshFilesRef.current = fn }}
       />
+      {detachedTarget ? (
+        <DetachedWindowBar onTop={windowPop.onTop} onKeepOnTop={windowPop.keepOnTop} onDock={windowPop.dock} />
+      ) : null}
+    </>
   )
 }

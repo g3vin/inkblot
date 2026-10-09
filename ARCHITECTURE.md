@@ -399,6 +399,10 @@ to prove the case can fail.
   suites: the tab bar (a tab's context menu, drag to reorder, a document dropped from
   the file tree), the toolbar's » overflow, the menus (Insert, Format, Timer, View),
   notifications and the tray title, and the timer's sounds.
+- **Windows of their own:** a tab dragged out of the window, Move back to the main
+  window, and Keep on top, in the running app (the `windows` suite drives the real
+  Tauri modules against a stand-in IPC). Detached windows (`doc-*`) share the main
+  window's capability.
 - **Print Layout:** a real print and PDF, the Page Setup sheet, a folded 16-page
   signature, an EPUB in Apple Books or `epubcheck`, and a Pinterest embed in print (a
   cloned iframe reloads, and may print blank).
