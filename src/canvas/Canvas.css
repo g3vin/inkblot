@@ -1,9 +1,8 @@
 /* ==== Canvas ====
  *
  * The canvas surface and its contents. Everything here consumes the shared
- * tokens from src/styles/tokens.css (--surface-*, --text-*, --border-*, --accent-*, and the
- * --floating-note-* set used for popovers), so light/dark mode needs no work of
- * its own.
+ * tokens from src/styles/tokens.css (--surface-*, --text-*, --border-*, --accent-*,
+ * --menu-* for popovers), so light/dark mode needs no work of its own.
  */
 
 .canvas-pane {
@@ -179,51 +178,7 @@
   background: transparent;
 }
 
-/* ---- color picker ----
-   Portaled to the body and positioned from the button's measured rect: the
-   toolbar scrolls and the titlebar clips, so it cannot be laid out inside them. */
-
-.canvas-color-menu {
-  position: fixed;
-  transform: translateX(-50%);
-  z-index: 95;
-  display: grid;
-  grid-template-columns: repeat(4, 20px);
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid var(--popover-border);
-  border-radius: var(--radius-lg);
-  background: var(--popover-bg);
-  box-shadow: var(--shadow-popover);
-}
-
-.canvas-color-swatch {
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--border-muted);
-  border-radius: 50%;
-  padding: 0;
-  cursor: pointer;
-  transition: transform 0.12s ease;
-}
-
-.canvas-color-swatch:hover {
-  transform: scale(1.15);
-}
-
 /* The "no color" swatch reads as an outline rather than a filled dot. */
-.canvas-color-swatch-none {
-  position: relative;
-  background: transparent !important;
-}
-
-.canvas-color-swatch-none::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: var(--accent-color);
-}
 
 /* ---- nodes ---- */
 
@@ -261,7 +216,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--card-edge);
-  border-radius: var(--floating-note-radius, 16px);
+  border-radius: var(--radius-lg);
   background: var(--card-tint);
   box-shadow: var(--shadow-canvas-card);
   cursor: default;
@@ -621,7 +576,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--card-edge);
-  border-radius: var(--floating-note-radius, 16px);
+  border-radius: var(--radius-lg);
   background: var(--card-tint);
   box-shadow: var(--shadow-canvas-card);
   transition: box-shadow 0.14s ease, border-color 0.14s ease;

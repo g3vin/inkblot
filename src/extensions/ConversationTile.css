@@ -120,7 +120,7 @@
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-md);
   padding: 0 7px;
-  background: color-mix(in srgb, var(--tile-color) 82%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
   color: var(--text-primary);
   font-size: 11px;
   outline: none;
@@ -198,7 +198,7 @@
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-md);
   padding: 0 7px;
-  background: color-mix(in srgb, var(--tile-color) 86%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 86%, transparent);
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 650;
@@ -620,7 +620,7 @@
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-pill);
   padding: 0 7px;
-  background: color-mix(in srgb, var(--tile-color) 86%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 86%, transparent);
   color: var(--text-primary);
   font-size: 10px;
   outline: none;
@@ -761,7 +761,7 @@
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-md);
   padding: 0 6px;
-  background: color-mix(in srgb, var(--tile-color) 86%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 86%, transparent);
   color: var(--text-primary);
   font-size: 11px;
   outline: none;
@@ -781,7 +781,7 @@
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-md);
   padding: 0 7px;
-  background: color-mix(in srgb, var(--tile-color) 86%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 86%, transparent);
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1;

@@ -205,81 +205,6 @@
   cursor: pointer;
 }
 
-/* ---- Alignment dropdown ---- */
-
-.toolbar-align {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.toolbar-align-trigger {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  height: 28px;
-  min-height: 28px;
-  padding: 0 5px 0 7px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--control-bg);
-  color: var(--text-primary);
-  font-size: 11px;
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.toolbar-align-trigger:hover,
-.toolbar-align-trigger.open {
-  background: var(--accent-surface);
-  color: var(--accent-foreground);
-}
-
-.toolbar-align-caret {
-  opacity: 0.6;
-}
-
-.toolbar-align-menu {
-  position: fixed;
-  top: var(--align-menu-top, 52px);
-  left: var(--align-menu-left, 16px);
-  z-index: 95;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--floating-note-border);
-  border-radius: var(--radius-lg);
-  background: var(--floating-note-bg);
-  box-shadow: var(--floating-note-shadow);
-  pointer-events: auto;
-  animation: dictation-pop 140ms ease-out both;
-}
-
-.toolbar-align-menu > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 24px;
-  padding: 0 5px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-primary);
-}
-
-.toolbar-align-menu > button:hover {
-  background: var(--surface-active);
-}
-
-.toolbar-align-menu > button.active {
-  background: var(--accent-surface-strong);
-  color: var(--accent-foreground);
-}
-
 .dictation-control {
   position: relative;
   display: inline-flex;
@@ -345,24 +270,6 @@
   opacity: 0.38;
 }
 
-.dictation-popover {
-  position: fixed;
-  top: var(--dictation-popover-top, 52px);
-  right: var(--dictation-popover-right, 16px);
-  width: min(320px, calc(100vw - 24px));
-  padding: 10px;
-  border-radius: var(--floating-note-radius);
-  border: 1px solid var(--floating-note-border);
-  background: var(--floating-note-bg);
-  box-shadow: var(--floating-note-shadow);
-  color: var(--text-primary);
-  pointer-events: auto;
-  z-index: 90;
-  transform: translate(var(--dictation-popover-x, 0), var(--dictation-popover-y, 0));
-  animation: dictation-pop 180ms ease-out both;
-  user-select: none;
-}
-
 @keyframes dictation-pop {
   from {
     opacity: 0;
@@ -376,105 +283,6 @@
     opacity: 1;
     transform: translate(var(--dictation-popover-x, 0), var(--dictation-popover-y, 0)) scale(1);
   }
-}
-
-.dictation-popover-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 30px;
-  margin-bottom: 10px;
-  cursor: grab;
-  touch-action: none;
-}
-
-.dictation-popover-header:active {
-  cursor: grabbing;
-}
-
-.dictation-status-cluster {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.dictation-menu-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  color: var(--floating-note-title);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.dictation-live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-pill);
-  background: var(--status-success);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-success) 14%, transparent);
-}
-
-.dictation-popover.loading .dictation-live-dot {
-  background: var(--status-warning);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-warning) 14%, transparent);
-}
-
-.dictation-popover.error .dictation-live-dot {
-  background: var(--status-error);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-danger) 14%, transparent);
-}
-
-.dictation-close-btn {
-  width: 22px;
-  height: 22px;
-  min-width: 22px;
-  min-height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: none;
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dictation-close-btn:hover {
-  color: var(--text-primary);
-  background: var(--surface-active);
-}
-
-.dictation-wave {
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 3px;
-  min-width: 36px;
-  padding: 0 0 0 1px;
-  border-radius: var(--radius-pill);
-  background: transparent;
-}
-
-.dictation-wave-bar {
-  width: 3px;
-  height: var(--bar-height, 10px);
-  border-radius: var(--radius-pill);
-  background: var(--accent-color);
-  opacity: 0.78;
-  transform-origin: center;
-  transition:
-    height 90ms ease-out,
-    opacity 140ms ease;
-}
-
-.dictation-popover:not(.listening) .dictation-wave-bar {
-  opacity: 0.34;
 }
 
 .read-aloud-control {
@@ -508,11 +316,11 @@
   right: var(--read-aloud-popover-right, 16px);
   width: min(320px, calc(100vw - 24px));
   padding: 10px;
-  border-radius: var(--floating-note-radius);
-  border: 1px solid var(--floating-note-border);
-  background: var(--floating-note-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--menu-border);
+  background: var(--surface-float);
   color: var(--text-primary);
-  box-shadow: var(--floating-note-shadow);
+  box-shadow: var(--shadow-float);
   pointer-events: auto;
   z-index: 90;
   animation: dictation-pop 180ms ease-out both;
@@ -532,7 +340,7 @@
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--floating-note-title);
+  color: var(--accent-foreground);
 }
 
 .read-aloud-subtitle {
@@ -635,38 +443,6 @@
 
 .read-aloud-action:hover {
   background: var(--accent-surface);
-}
-
-.dictation-preview {
-  min-height: 46px;
-  max-height: 112px;
-  overflow: auto;
-  padding: 10px 11px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-color);
-  background: var(--control-bg);
-  color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.dictation-popover.error .dictation-preview {
-  color: var(--status-error-soft);
-}
-
-.dictation-flight {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 16px;
-  padding: 8px 10px;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--status-success) 14%, var(--surface-float));
-  color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.35;
-  pointer-events: none;
-  animation: dictation-flight 380ms ease-in forwards;
 }
 
 @keyframes dictation-flight {

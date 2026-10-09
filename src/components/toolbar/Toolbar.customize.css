@@ -160,14 +160,6 @@ body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
 
 .tb-palette-show { display: inline-flex; align-items: center; gap: var(--space-3); font: 12px/1 var(--font-ui); color: var(--text-secondary); }
 
-.ui-popover.tb-swatches {
-  display: grid;
-  grid-template-columns: repeat(4, 20px);
-  gap: 6px;
-  min-width: 0;
-  padding: 8px;
-}
-
 /* The timer, running: its clock beside the segment's symbol. */
 .tb-timer { display: inline-flex; align-items: center; gap: 5px; padding: 0 2px; color: var(--accent-foreground); }
 .tb-timer[data-state='paused'] { color: var(--text-muted); }
@@ -207,3 +199,6 @@ body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
   white-space: nowrap;
 }
 .tb-row:not(.is-customizing) .tb-slot:has(> .tb-more-marker) { display: none; }
+
+/* The canvas toolbar's colour popover: the ink row, then "No colour". */
+.tb-canvas-colors { display: grid; gap: var(--space-3); justify-items: start; padding: var(--space-3); }

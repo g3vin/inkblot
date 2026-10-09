@@ -21,10 +21,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  background: var(--tile-color);
+  background: var(--surface-1);
   border-bottom: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  box-shadow: var(--sidebar-control-shadow);
+  box-shadow: var(--shadow-float);
   padding: 4px;
   min-height: 36px;
   margin: 0 0 8px;
@@ -158,47 +158,6 @@
   border-color: var(--accent-border);
 }
 
-.file-tree-create-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 20;
-  min-width: 180px;
-  padding: 4px;
-  border-radius: var(--floating-note-radius);
-  border: 1px solid var(--floating-note-border);
-  background: var(--floating-note-bg);
-  box-shadow: var(--floating-note-shadow);
-  color: var(--text-primary);
-}
-
-.file-tree-create-option {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 15px;
-  line-height: 1.2;
-  text-align: left;
-  cursor: pointer;
-}
-
-.file-tree-create-option:hover {
-  background: var(--accent-surface);
-  color: var(--accent-foreground);
-}
-
-.file-tree-create-icon {
-  width: 13px;
-  height: 13px;
-  flex: 0 0 auto;
-}
-
 .file-item {
   min-height: 23px;
   padding: 2px 6px;
@@ -317,7 +276,7 @@
   position: sticky;
   top: var(--folder-sticky-top, 0);
   z-index: calc(12 + var(--folder-sticky-depth, 0));
-  background: var(--sidebar-sticky-bg);
+  background: var(--app-bg);
   box-shadow: none;
 }
 
@@ -417,7 +376,7 @@
 .folder-open-divider {
   width: 100%;
   height: 1px;
-  background: var(--sidebar-divider-line);
+  background: var(--border-strong);
   transform-origin: left center;
 }
 
@@ -446,8 +405,8 @@
   grid-template-columns: repeat(var(--sidebar-tab-count, 4), minmax(0, 1fr));
   gap: 4px;
   border-bottom: 1px solid var(--border-color);
-  background: var(--tile-color);
-  box-shadow: var(--sidebar-control-shadow);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-float);
   padding: 4px;
   min-height: 36px;
   margin-bottom: 8px;
@@ -517,5 +476,4 @@
 .sidebar-tabs.is-gesture-active button {
   pointer-events: none;
 }
-
 

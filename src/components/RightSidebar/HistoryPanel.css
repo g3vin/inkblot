@@ -155,7 +155,7 @@
 
 .history-group-row:hover {
   background: var(--surface-hover);
-  border-color: var(--sidebar-card-border-hover);
+  border-color: var(--border-strong);
 }
 
 .history-group-chevron {

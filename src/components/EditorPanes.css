@@ -160,9 +160,9 @@
   z-index: 5;
   background: linear-gradient(
     to bottom,
-    var(--sidebar-fade-solid) 0%,
-    var(--sidebar-fade-strong) 42%,
-    var(--sidebar-fade-soft) 76%,
+    var(--app-bg) 0%,
+    color-mix(in srgb, var(--app-bg) 78%, transparent) 42%,
+    color-mix(in srgb, var(--app-bg) 32%, transparent) 76%,
     transparent 100%
   );
 }
