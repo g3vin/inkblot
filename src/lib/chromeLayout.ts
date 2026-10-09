@@ -23,8 +23,9 @@ export const FLEXIBLE_SPACE = 'flexible-space'
 export const isSpacer = (id: string) => id === SPACE || id === FLEXIBLE_SPACE
 /**
  * Everything after this marker lives behind the toolbar's » overflow, however wide
- * the window is: the surface keeps the essentials (docs/DESIGN.md → Progressive
- * disclosure). At most one per toolbar; it is shown only while customizing.
+ * the window is. No default set uses it: writers place it in Customize toolbar
+ * (docs/DESIGN.md → Progressive disclosure). At most one per toolbar; it is shown
+ * only while customizing.
  */
 export const MORE = 'more'
 
@@ -123,12 +124,12 @@ export function toolbarItemsFor(context: ToolbarContext): ToolbarItemSpec[] {
 
 /** Each toolbar's default set. */
 export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
-  // The essentials on the surface; the rest one click away, behind ».
+  // The essentials first, so they are the last to go behind » when the window narrows.
   document: [
     'inkblot.view.editor-mode', SPACE,
     'inkblot.format.text-style', 'inkblot.format.paragraph-style', SPACE,
     'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', SPACE,
-    'inkblot.insert.note', 'inkblot.edit.undo-redo', MORE,
+    'inkblot.insert.note', 'inkblot.edit.undo-redo', SPACE,
     'inkblot.format.font', 'inkblot.format.font-size',
     'inkblot.format.text-color', 'inkblot.format.highlight', 'inkblot.format.alignment',
     'inkblot.insert.table', 'inkblot.insert.conversation',
