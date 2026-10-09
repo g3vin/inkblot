@@ -1,5 +1,5 @@
 /* ============================================================
-   Sidebar search (the bar above every right-sidebar panel)
+   Sidebar search (the bar under every right-sidebar panel)
    ============================================================ */
 
 .sidebar-search {
@@ -352,6 +352,58 @@
   color: var(--accent-color);
 }
 
+/* ---- In the sidebar: a capsule like the file tree's filter (TreeFilterBar.css) ----
+   The capsule's surface is the root's (.floating-capsule); the field inside is bare. */
+
+.right-sidebar-search .sidebar-search:focus-within { box-shadow: 0 0 0 2px var(--accent-ring); }
+
+.right-sidebar-search .sidebar-search-field {
+  gap: 2px;
+  height: 26px;
+  min-height: 0;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  font: 12px var(--font-ui);
+}
+.right-sidebar-search .sidebar-search-field:focus-within { border-color: transparent; box-shadow: none; }
+
+.right-sidebar-search .sidebar-search-input {
+  height: 100%;
+  padding: 0 var(--space-1);
+  font-size: 12px;
+  line-height: normal;
+}
+
+.right-sidebar-search .sidebar-search-icon { opacity: 1; color: var(--text-secondary); }
+
+.right-sidebar-search .sidebar-search-clear,
+.right-sidebar-search .sidebar-search-toggle,
+.right-sidebar-search .sidebar-search-center {
+  width: 20px;
+  height: 20px;
+  color: var(--text-secondary);
+}
+
+/* At the foot of the sidebar the drawer opens upward, over the panel. */
+.right-sidebar-search .sidebar-search-drawer {
+  top: auto;
+  bottom: calc(100% + 6px);
+  animation-name: sidebar-search-open-up;
+}
+
+@keyframes sidebar-search-open-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ---- Centered search overlay (⇧⌘F) ----
    The same search bar, flown to the middle of the screen. */
 
@@ -413,7 +465,8 @@
 @media (prefers-reduced-motion: reduce) {
   .search-overlay,
   .search-overlay-card,
-  .search-overlay-card.is-flying {
+  .search-overlay-card.is-flying,
+  .sidebar-search-drawer {
     animation: none;
   }
 }

@@ -9,6 +9,15 @@
   font: 12px var(--font-ui);
   cursor: text;
 }
+/* The file tree's footer: the + that adds to the project, then the filter. */
+.file-tree-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) var(--space-2) var(--space-3);
+}
+.file-tree-footer > .tree-filter { flex: 1; min-width: 0; margin: 0; }
 .tree-filter:focus-within { box-shadow: 0 0 0 2px var(--accent-ring); }
 .tree-filter-input {
   flex: 1;
@@ -36,3 +45,5 @@
 }
 .tree-filter-button:hover { background: var(--hover-bg); color: var(--text-primary); }
 .tree-filter-button[data-on='true'] { color: var(--accent-foreground); }
+/* The book's filter has no menu: the glyph alone, where the menu button would be. */
+.tree-filter-glyph { flex: none; margin: 0 2px; color: var(--text-secondary); }

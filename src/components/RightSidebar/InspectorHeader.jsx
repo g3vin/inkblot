@@ -9,7 +9,7 @@ import { INSPECTOR_LAYOUT_INFO } from '../../lib/chromeLayout'
 import { popUpNativeMenu } from '../../ui/useNativeMenu'
 import { CUSTOMIZE_INSPECTOR_EVENT } from '../../hooks/contextMenu/toolbarMenu'
 
-export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLayout, visualProgress, gestureActive, reducedMotion }) {
+export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLayout, visualProgress, gestureActive, reducedMotion, onIndicatorDrag, onIndicatorDrop }) {
   const other = layout === 'finishing' ? 'drafting' : 'finishing'
   const menu = (event) => popUpNativeMenu(event, [
     { text: 'Write layout', checked: layout === 'drafting', action: () => onChooseLayout('drafting') },
@@ -27,6 +27,8 @@ export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLay
         visualProgress={visualProgress}
         gestureActive={gestureActive}
         reducedMotion={reducedMotion}
+        onIndicatorDrag={onIndicatorDrag}
+        onIndicatorDrop={onIndicatorDrop}
       />
       <button
         type="button"
