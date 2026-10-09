@@ -352,10 +352,8 @@
   color: var(--accent-color);
 }
 
-/* ---- In the sidebar: a capsule like the file tree's filter (TreeFilterBar.css) ----
-   The capsule's surface is the root's (.floating-capsule); the field inside is bare. */
-
-.right-sidebar-search .sidebar-search:focus-within { box-shadow: 0 0 0 2px var(--accent-ring); }
+/* ---- In the sidebar: inlaid like the file tree's filter (TreeFilterBar.css) ----
+   The piece's surface is the root's (.ib-inlay); the field inside is bare. */
 
 .right-sidebar-search .sidebar-search-field {
   gap: 2px;

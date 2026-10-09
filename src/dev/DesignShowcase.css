@@ -168,3 +168,58 @@
 }
 
 .ds .ib-panel .ib-card { margin-bottom: var(--space-4); }
+
+/* The panel's own controls: inlaid (one slot, engraved into the panel) or floating, to
+   compare. The slot lays the inlaid row out itself. */
+.ds-panel-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.ds-panel-footer.ib-inlay-slot { gap: var(--inlay-kerf); }
+
+.ds-filter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--size-capsule);
+  padding: 0 var(--space-3);
+  color: var(--text-secondary);
+}
+
+.ds-filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--text-sm) var(--font-ui);
+}
+
+/* Inlay states, side by side on a sidebar's paper. Focus can only show on one control
+   at a time, so the inked state is drawn as a still. */
+.ds-inlay-sheet {
+  --sheet-bg: var(--app-bg);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.ds-inlay-state .ds-panel-footer { margin: var(--space-2) 0 var(--space-3); }
+
+.ds-inlay-state .ib-inlay.ds-inked::before {
+  content: '';
+  background: var(--accent-color);
+  box-shadow: var(--inlay-wall);
+}
+
+.ds-inlay-state .ds-lifted { visibility: hidden; }

@@ -12,7 +12,7 @@ import { useCommands } from '../lib/commands'
 import {
   AppIcon, Mark, Wordmark,
   Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
-  FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, InkPicker, Input, Kbd, Menu, MenuItem,
+  FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, Input, Kbd, Menu, MenuItem,
   MenuLabel, MenuSeparator, Panel, PanelBody, PanelHeader, Popover, Section, Segmented, SelectMenu, Sheet,
   Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
 } from '../ui'
@@ -48,6 +48,7 @@ export default function DesignShowcase() {
   const [menu, setMenu] = useState(false)
   const [popover, setPopover] = useState(false)
   const [panel, setPanel] = useState(true)
+  const [inlaid, setInlaid] = useState('inlay')
   const menuRef = useRef(null)
   const popRef = useRef(null)
 
@@ -248,6 +249,22 @@ export default function DesignShowcase() {
           </div>
         </ShowcaseSection>
 
+        <ShowcaseSection title="Inlay · engraved into a panel">
+          <div className="ds-inlay-sheet ib-sheet">
+            {[['At rest', ''], ['Focused (ink in the channel)', 'ds-inked'], ['Lifted out (an empty pocket)', 'ds-lifted']].map(([caption, state]) => (
+              <div key={caption} className="ds-inlay-state">
+                <InlaySlot className="ds-panel-footer">
+                  <Inlay round><IconButton icon="add" label="Add note" size="circle" /></Inlay>
+                  <Inlay className={['ds-filter', state].filter(Boolean).join(' ')}>
+                    <Icon name="filter" /><input aria-label="Filter notes" placeholder="Filter" tabIndex={-1} />
+                  </Inlay>
+                </InlaySlot>
+                <p className="ib-meta">{caption}</p>
+              </div>
+            ))}
+          </div>
+        </ShowcaseSection>
+
         <ShowcaseSection title="Icons · Phosphor Light / Fill">
           <div className="ds-icons">
             {Object.keys(ICONS).sort().map((name) => (
@@ -283,7 +300,20 @@ export default function DesignShowcase() {
         <PanelBody>
           <Card ink="amber"><p className="ib-meta">Chapter one</p><p className="ib-prose ds-card-text">Tools float; the page stays.</p></Card>
           <EmptyState icon="history" title="No versions yet." hint="Name a version to keep it forever." />
+          <Segmented label="Panel controls" value={inlaid} onChange={setInlaid}
+            options={[{ value: 'inlay', label: 'Inlaid' }, { value: 'capsule', label: 'Floating' }]} />
         </PanelBody>
+        {inlaid === 'inlay' ? (
+          <InlaySlot className="ds-panel-footer">
+            <Inlay round><IconButton icon="add" label="Add note" size="circle" /></Inlay>
+            <Inlay className="ds-filter"><Icon name="filter" /><input aria-label="Filter notes" placeholder="Filter" /></Inlay>
+          </InlaySlot>
+        ) : (
+          <div className="ds-panel-footer">
+            <IconButton icon="add" label="Add note" size="circle" className="floating-capsule" />
+            <div className="ds-filter floating-capsule"><Icon name="filter" /><input aria-label="Filter notes" placeholder="Filter" /></div>
+          </div>
+        )}
       </Panel>
 
       <Dialog open={dialog} onClose={() => setDialog(false)} eyebrow="Document" title="Delete this chapter?"

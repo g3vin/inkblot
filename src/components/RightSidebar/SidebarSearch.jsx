@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../ui/Icon.jsx'
+import { Inlay } from '../../ui/Inlay.jsx'
 import { listProjectTree, loadDocument } from '../../lib/FileSystem'
 import {
   FIND_EVENT,
@@ -331,10 +332,14 @@ export default function SidebarSearch({
     ? `${selectedIndex + 1} of ${documentResults.length}`
     : hasQuery ? 'No matches' : ''
 
+  // In the sidebar the bar is carved out of the panel; the overlay is its own card.
+  // While the overlay is up, the bar's pocket stays empty: the piece has been lifted out.
+  const Root = isOverlay ? 'div' : Inlay
+
   return (
-    <div
+    <Root
       ref={rootRef}
-      className={`sidebar-search${expanded ? ' is-expanded' : ''}${isOverlay ? ' is-overlay' : ' floating-capsule'}`}
+      className={`sidebar-search${expanded ? ' is-expanded' : ''}${isOverlay ? ' is-overlay' : ''}`}
     >
       <label className="sidebar-search-field" aria-label="Search">
         <Icon name="search" className="sidebar-search-icon" />
@@ -598,6 +603,6 @@ export default function SidebarSearch({
           ) : null}
         </div>
       ) : null}
-    </div>
+    </Root>
   )
 }

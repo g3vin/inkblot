@@ -2,10 +2,12 @@
  * TreeFilterBar — the field under the file tree, as Xcode's navigator has under its
  * lists (FileTreeSidebar.swift's FilterBar): a menu of what to show, the text to
  * match, and buttons for recent files and expanding every folder. The book's
- * contents use it too, as the text alone (`filesOnly={false}`).
+ * contents use it too, as the text alone (`filesOnly={false}`). It is engraved into
+ * the sidebar, not floated on it (src/ui/Inlay.jsx).
  */
 import { useRef } from 'react'
 import Icon from '../../ui/Icon.jsx'
+import { Inlay } from '../../ui/Inlay.jsx'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
 import { TREE_KINDS } from '../../lib/treeFilter'
 import './TreeFilterBar.css'
@@ -14,7 +16,7 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders, files
   const inputRef = useRef(null)
   const set = (patch) => onChange({ ...filter, ...patch })
   return (
-    <div className="tree-filter floating-capsule" onClick={(event) => { if (event.target === event.currentTarget) inputRef.current?.focus() }}>
+    <Inlay className="tree-filter" onClick={(event) => { if (event.target === event.currentTarget) inputRef.current?.focus() }}>
       {filesOnly ? (
         <button
           type="button"
@@ -63,6 +65,6 @@ export default function TreeFilterBar({ filter, onChange, onToggleFolders, files
           </button>
         </>
       ) : null}
-    </div>
+    </Inlay>
   )
 }

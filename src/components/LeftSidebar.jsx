@@ -164,7 +164,7 @@ export default function LeftSidebar({
 
   return (
     <aside
-      className={`sidebar left-sidebar${collapsed && !peeked ? ' collapsed' : ''}${peeked ? ' is-peeked' : ''}${resizing ? ' is-resizing' : ''}`}
+      className={`sidebar ib-sheet left-sidebar${collapsed && !peeked ? ' collapsed' : ''}${peeked ? ' is-peeked' : ''}${resizing ? ' is-resizing' : ''}`}
       style={{ width }}
       ref={sidebarRef}
       onMouseEnter={handleMouseEnter}

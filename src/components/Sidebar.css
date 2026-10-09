@@ -33,8 +33,9 @@
 
   /* Solid window background: on a canvas (which runs under the floating
      sidebars) the panel fully occludes the dots rather than letting them
-     show through. */
-  background: var(--app-bg);
+     show through. It is also the paper every Inlay is cut from
+     (src/ui/Inlay.jsx). */
+  --sheet-bg: var(--app-bg);
 }
 
 .sidebar.is-resizing {

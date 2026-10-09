@@ -9,7 +9,7 @@
   box-sizing: border-box;
   border: var(--hairline) solid var(--border-color);
   border-radius: var(--radius-lg);
-  background: var(--surface-float);
+  --sheet-bg: var(--surface-float);
   box-shadow: var(--shadow-float);
   color: var(--text-primary);
   overflow: hidden;
@@ -47,6 +47,87 @@
   overflow-y: auto;
   padding: 0 var(--space-4) var(--space-4);
 }
+
+/* A shell whose surface is the panel's paper (the sidebars, Panel). */
+.ib-sheet {
+  /* The floor of anything engraved into this paper: an Inlay's channel, or a strip
+     that is a channel itself (the sidebars' tabs). */
+  --inlay-floor: color-mix(in srgb, var(--sheet-bg, var(--surface-float)), var(--inlay-shade) var(--inlay-depth));
+  background: var(--sheet-bg, var(--surface-float));
+}
+
+/*
+ * Inlay — a panel's own controls are engraved into it, not floated on it. Each piece
+ * is its own stacking context and paints two layers behind its contents: ::before is
+ * the channel, a kerf out from the piece (floor, shaded top wall, lit bottom lip), and
+ * ::after is the piece's paper, casting a little shadow onto the floor. Light falls
+ * from above, as it does for --shadow-float. Focus runs ink into the channel.
+ */
+.ib-inlay,
+.ib-inlay-slot {
+  /* A pill: every piece is one short line (a field, a button), so its ends and its
+     channel's are concentric semicircles. */
+  --inlay-radius: var(--radius-pill);
+  --inlay-paper: var(--sheet-bg, var(--surface-float));
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  border-radius: var(--inlay-radius);
+}
+
+/* One long channel around a row of pieces, a kerf apart. The slot itself is bare. */
+.ib-inlay-slot {
+  display: flex;
+  align-items: center;
+  gap: var(--inlay-kerf);
+}
+
+/* The channel, concentric with the piece. */
+.ib-inlay::before,
+.ib-inlay-slot::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: calc(-1 * var(--inlay-kerf));
+  border-radius: calc(var(--inlay-radius) + var(--inlay-kerf));
+  background: color-mix(in srgb, var(--inlay-paper), var(--inlay-shade) var(--inlay-depth));
+  box-shadow: var(--inlay-wall), var(--inlay-lip);
+  pointer-events: none;
+  transition: background-color var(--dur-fast) ease;
+  /* The channel is the sheet's, not the piece's: it stays when a hidden piece has been
+     lifted out, an empty pocket until it returns. */
+  visibility: visible;
+}
+
+/* The piece's paper, over the floor. */
+.ib-inlay::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--inlay-paper);
+  box-shadow: var(--inlay-cast), var(--inlay-bevel);
+  pointer-events: none;
+  transition: box-shadow var(--dur-instant) ease;
+}
+
+/* In a slot the pieces share the slot's channel. */
+.ib-inlay-slot > .ib-inlay::before { content: none; }
+
+/* Focus: ink runs into the channel. In a slot, only the focused piece's own channel
+   inks, inside the long one. The ink is the focus ring, so the controls inside draw
+   none of their own. */
+.ib-inlay:has(:focus-visible)::before,
+.ib-inlay-slot > .ib-inlay:has(:focus-visible)::before {
+  content: '';
+  background: var(--accent-color);
+  box-shadow: var(--inlay-wall);
+}
+.ib-inlay :focus-visible { outline: none; box-shadow: none; }
+
+/* Pressed: the piece settles onto the floor. */
+.ib-inlay--round:active::after { box-shadow: none; }
 
 /* FadeScrim — text dissolves under chrome. */
 .ib-fade-scrim {

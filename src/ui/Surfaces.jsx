@@ -29,7 +29,7 @@ export function Panel({ open = true, side = 'right', width = 300, label, classNa
         <motion.aside
           key="panel"
           aria-label={label}
-          className={['ib-panel', `ib-panel--${side}`, className].filter(Boolean).join(' ')}
+          className={['ib-panel', 'ib-sheet', `ib-panel--${side}`, className].filter(Boolean).join(' ')}
           style={{ width, ...style }}
           initial={reduce ? false : { opacity: 0, x: offset }}
           animate={{ opacity: 1, x: 0 }}

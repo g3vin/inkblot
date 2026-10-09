@@ -23,6 +23,7 @@ export { SECTIONS_KEY, readSectionStates, writeSectionState } from './sectionSta
 export { FormRow, Toggle, Stepper, SelectMenu } from './FormRow.jsx'
 export { Field, Input, TextArea, Checkbox } from './Field.jsx'
 export { Panel, PanelHeader, PanelBody, FadeScrim, Card, Tag, EmptyState, Tabs } from './Surfaces.jsx'
+export { Inlay, InlaySlot } from './Inlay.jsx'
 export { default as InkPicker } from './InkPicker.jsx'
 export { default as CommandPalette } from './CommandPalette.jsx'
 export { default as useNativeMenu, popUpNativeMenu } from './useNativeMenu.js'
