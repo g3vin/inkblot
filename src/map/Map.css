@@ -767,12 +767,12 @@
 
 .map-setup-groups {
   display: grid;
-  gap: 14px;
-  margin-top: 16px;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
 }
 
 .map-setup-group .map-setup-choices {
-  margin-top: 6px;
+  margin-top: var(--space-2);
 }
 
 .map-foreign {
