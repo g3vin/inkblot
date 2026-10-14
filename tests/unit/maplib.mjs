@@ -413,3 +413,59 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('roughen reads pathData\'s spaced form and keeps subpaths', parsePath(roughenPath('M0 0L10 0M20 0L30 0', ROUGH_STYLE, 1)).length === 2)
   ok('roughen of nothing is nothing', roughenPath('', ROUGH_STYLE, 1) === '')
 }
+
+/* ---------------- maps in three dimensions (format 2) ---------------- */
+
+{
+  const { readPoint, GALAXY_TYPES } = await import('../../src/lib/map/mapModel.js')
+  const { orbitOffset } = await import('../../src/lib/map/orbits.js')
+  const { KM_PER_LIGHT_YEAR, formatLightTime } = await import('../../src/lib/map/mapUnits.js')
+
+  // A file from before the third dimension opens unchanged, and saves as format 2.
+  const old = normalizeMap({ formatVersion: 1, mapKind: 'earth', earth: { projection: 'orthographic' }, pins: [{ id: 'p', at: [2, 51] }] })
+  ok('an old file reads as format 2', old.formatVersion === 2)
+  ok('an old globe opens as the globe, an old flat map flat', old.earth.view === 'globe' && normalizeMap({ mapKind: 'earth' }).earth.view === 'flat')
+  ok('its points stay two-dimensional', old.pins[0].at.length === 2)
+  ok('and nothing new is on it', old.layers.length === 0 && old.views.length === 0 && old.pins[0].from === null && old.pins[0].layer === null)
+
+  ok('a point keeps a height', readPoint([1, 2, 3]).join() === '1,2,3')
+  ok('a height that is not a number drops, the point stays', readPoint([1, 2, 'z']).join() === '1,2')
+  ok('anything past the height drops', readPoint([1, 2, 3, 4]).join() === '1,2,3')
+
+  for (const kind of ['planet', 'galaxy', 'universe', 'model']) {
+    ok(`a ${kind} map can be made`, createEmptyMap(kind).mapKind === kind)
+  }
+  ok('a galaxy is one of the known shapes', GALAXY_TYPES.includes(normalizeMap({ galaxy: { type: 'blob' } }).galaxy.type))
+  const surface = normalizeMap({ mapKind: 'planet', surface: { radiusKm: 3389.5, look: { seaLevel: 3 } } }).surface
+  ok('a planet keeps its size and clamps its sea', surface.radiusKm === 3389.5 && surface.look.seaLevel === 1)
+
+  // Distances at every level.
+  const mars = createSpace({ mapKind: 'planet', surface: { radiusKm: 3389.5 } })
+  const earth = createSpace({ mapKind: 'earth' })
+  const pole = [[0, 0], [0, 90]]
+  ok('a quarter of the way round Mars is a quarter of Mars', near(mars.distanceKm(...pole), (Math.PI / 2) * 3389.5, 1e-6))
+  ok('the same quarter on the Earth is longer by the ratio of their sizes', near(earth.distanceKm(...pole) / mars.distanceKm(...pole), 6371.0088 / 3389.5, 1e-9))
+  const galaxy = createSpace({ mapKind: 'galaxy' })
+  ok('a galaxy measures in light-years, in three dimensions', near(galaxy.distanceKm([0, 0, 0], [3, 0, 4]), 5 * KM_PER_LIGHT_YEAR, 1))
+  ok('from Sol to Alpha Centauri, light takes four years and a bit', /^4\.\d+ years$/.test(formatLightTime(4.37 * KM_PER_LIGHT_YEAR)))
+  ok('a ruler across a galaxy reads in light-years', /ly$/.test(formatDistance(4.37 * KM_PER_LIGHT_YEAR, 'auto')))
+  ok('across the universe, in millions', /Mly$/.test(formatDistance(2.5e6 * KM_PER_LIGHT_YEAR, 'auto')))
+  const model = createSpace({ mapKind: 'model', model: { metresPerUnit: 2 } })
+  ok('a model measures in its own metres', near(model.distanceKm([0, 0, 0], [0, 10, 0]), 0.02, 1e-12))
+
+  // Orbits out of the plane.
+  const flat = { id: 'p', orbit: { aAU: 1, e: 0.2, periapsisDeg: 30, meanAnomalyDeg: 10, periodDays: 365, retrograde: false } }
+  const bodies = new Map([['p', flat]])
+  const before = orbitOffset(flat, bodies, 40)
+  ok('an orbit in the plane stays in it', before[2] === 0)
+  const tilted = { ...flat, orbit: { ...flat.orbit, inclinationDeg: 30 } }
+  const after = orbitOffset(tilted, new Map([['p', tilted]]), 40)
+  ok('a tilted orbit leaves the plane', Math.abs(after[2]) > 0.01)
+  ok('and keeps its distance from what it orbits', near(Math.hypot(...before), Math.hypot(...after), 1e-12))
+
+  // Linked maps: a body's surface follows its map's moves.
+  const system = normalizeMap({ mapKind: 'system', system: { bodies: [{ id: 'e', surface: 'Worlds/Earth.map' }] } })
+  ok('a body’s surface counts as a link', mapDocRefs(system).includes('Worlds/Earth.map'))
+  const moved = rewriteMapDocRefs(system, 'Worlds', 'Places', 'folder')
+  ok('and follows its folder when it moves', moved.changed && moved.map.system.bodies[0].surface === 'Places/Earth.map')
+}

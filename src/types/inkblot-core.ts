@@ -2206,6 +2206,22 @@ export interface MapOrbit {
 	/** Overrides the period Kepler's third law gives. */
 	periodDays?: number | null;
 	retrograde: boolean;
+	/** Tilt of the orbit out of the system's plane. */
+	inclinationDeg: number;
+	/** Where the orbit crosses the plane going up. */
+	ascendingNodeDeg: number;
+}
+
+/** An N-body body's start: position (AU) and velocity (AU a day) on day 0. */
+export interface MapBodyState {
+	pos: number[];
+	vel: number[];
+}
+
+export interface MapRings {
+	innerKm: number;
+	outerKm: number;
+	color?: string | null;
 }
 
 export interface MapBody {
@@ -2217,6 +2233,13 @@ export interface MapBody {
 	radiusKm?: number | null;
 	color?: string | null;
 	orbit?: MapOrbit | null;
+	/** Where it starts when the system is N-body rather than Kepler. */
+	state?: MapBodyState | null;
+	axialTiltDeg: number;
+	rotationHours?: number | null;
+	rings?: MapRings | null;
+	/** The planet or model map this body opens into. */
+	surface?: string | null;
 }
 
 export enum MapButtonRole {
@@ -2341,7 +2364,15 @@ export enum MapKind {
 	Blank = "blank",
 	Image = "image",
 	Earth = "earth",
+	/** A planet or a star of the writer's own: a globe of `surface`. */
+	Planet = "planet",
 	System = "system",
+	/** Star systems placed in a galaxy, in light-years. */
+	Galaxy = "galaxy",
+	/** Galaxies placed in a universe, in megaparsecs. */
+	Universe = "universe",
+	/** A 3D model (a station, a ship) to look around and pin. */
+	Model = "model",
 }
 
 export interface MapChromeState {
@@ -2471,6 +2502,12 @@ export interface MapEarth {
 	borders: boolean;
 	/** `auto`, `110m` or `50m`. */
 	detail: string;
+	/** `globe` (the zoomable globe) or `flat` (`projection`). */
+	view: string;
+	/** `map`, `satellite` or `hybrid`; anything but `map` is fetched online. */
+	imagery: string;
+	/** Mountains raised in 3D on the globe (online elevation). */
+	terrain3d: boolean;
 }
 
 export interface MapScale {
@@ -2484,15 +2521,86 @@ export interface MapScale {
 	customUnits: MapCustomUnit[];
 }
 
+/** What a planet's or star's ground looks like. */
+export interface MapSurfaceLook {
+	/** `generated`, `texture`, `gas`, `ice` or `star`. */
+	kind: string;
+	/** Every generated surface is its seed's own. */
+	seed: number;
+	/** 0–1: how much of a generated world is under water. */
+	seaLevel: number;
+	/** 0–1: how rugged its land is. */
+	roughness: number;
+	palette: string;
+	/** An equirectangular picture in `.assets/`, for `texture`. */
+	texture?: string | null;
+	/** A star's surface temperature, which sets its colour. */
+	temperatureK: number;
+}
+
+/** A planet or star map's globe. */
+export interface MapSurface {
+	radiusKm: number;
+	axialTiltDeg: number;
+	dayHours: number;
+	look: MapSurfaceLook;
+	/** Regions drawn as land raise the generated ground. */
+	terrainFromRegions: boolean;
+	atmosphere: boolean;
+}
+
 export interface MapSystemDisplay {
 	/** `linear` or `log`. */
 	radial: string;
 	pxPerAU: number;
 }
 
+export interface MapSystemPlane {
+	tiltDeg: number;
+	headingDeg: number;
+}
+
+export interface MapNbody {
+	stepDays: number;
+	softeningAU: number;
+	/** How far ahead the simulation runs. */
+	horizonDays: number;
+}
+
 export interface MapSystem {
 	bodies: MapBody[];
 	display: MapSystemDisplay;
+	/** How the system's plane sits in its galaxy. */
+	plane: MapSystemPlane;
+	/** `kepler` (nested orbits) or `nbody` (bodies pulling on each other). */
+	dynamics: string;
+	nbody: MapNbody;
+}
+
+export interface MapGalaxy {
+	/**
+	 * A Hubble class (`E0`…`E7`, `S0`, `Sa`…`Sd`, `SBa`…`SBd`) or `ring`, `irregular`,
+	 * `dwarf`, `peculiar`.
+	 */
+	type: string;
+	seed: number;
+	radiusLy: number;
+	thicknessLy: number;
+	/** Shape settings the writer pinned; the seed decides the rest. */
+	params: Record<string, unknown>;
+}
+
+export interface MapUniverse {
+	seed: number;
+	extentMpc: number;
+}
+
+export interface MapModel {
+	/** A `.glb` in `.assets/`. */
+	asset?: string | null;
+	metresPerUnit: number;
+	/** `y` or `z`: which way is up in the model's file. */
+	up: string;
 }
 
 export interface MapPin {
@@ -2506,6 +2614,16 @@ export interface MapPin {
 	body?: string | null;
 	icon: string;
 	color?: string | null;
+	/** The layer it is on. */
+	layer?: string | null;
+	/** The story day it appears; null: always there. */
+	from?: number | null;
+	/** The story day it goes; null: never. */
+	until?: number | null;
+	/** A timeline event `from` follows. */
+	fromEvent?: string | null;
+	/** A timeline event `until` follows. */
+	untilEvent?: string | null;
 }
 
 /**
@@ -2532,6 +2650,16 @@ export interface MapRoute {
 	/** `linear` or `catmullRom`. */
 	smooth: string;
 	style: MapLineStyle;
+	/** The layer it is on. */
+	layer?: string | null;
+	/** The story day it appears; null: always there. */
+	from?: number | null;
+	/** The story day it goes; null: never. */
+	until?: number | null;
+	/** A timeline event `from` follows. */
+	fromEvent?: string | null;
+	/** A timeline event `until` follows. */
+	untilEvent?: string | null;
 }
 
 export interface MapRegion {
@@ -2544,6 +2672,16 @@ export interface MapRegion {
 	fill?: string | null;
 	hatch: string;
 	stroke?: string | null;
+	/** The layer it is on. */
+	layer?: string | null;
+	/** The story day it appears; null: always there. */
+	from?: number | null;
+	/** The story day it goes; null: never. */
+	until?: number | null;
+	/** A timeline event `from` follows. */
+	fromEvent?: string | null;
+	/** A timeline event `until` follows. */
+	untilEvent?: string | null;
 }
 
 export interface MapTerrain {
@@ -2570,6 +2708,16 @@ export interface MapLabel {
 	font: string;
 	minZoom: number;
 	maxZoom?: number | null;
+	/** The layer it is on. */
+	layer?: string | null;
+	/** The story day it appears; null: always there. */
+	from?: number | null;
+	/** The story day it goes; null: never. */
+	until?: number | null;
+	/** A timeline event `from` follows. */
+	fromEvent?: string | null;
+	/** A timeline event `until` follows. */
+	untilEvent?: string | null;
 }
 
 export enum TransportMedium {
@@ -2616,6 +2764,21 @@ export interface MapTraveler {
 	legs: MapLeg[];
 }
 
+export interface MapLayer {
+	id: string;
+	name: string;
+	visible: boolean;
+	locked: boolean;
+}
+
+/** A saved view: the camera (as its view kind wrote it) and, optionally, a day. */
+export interface MapView {
+	id: string;
+	name: string;
+	camera: Record<string, unknown>;
+	day?: number | null;
+}
+
 export interface MapTimeline {
 	/** The story day the map shows, a float; day 0 is the story's epoch. */
 	day: number;
@@ -2633,6 +2796,9 @@ export interface MapStyle {
 	compass: MapCompass;
 	scaleBar: MapOrnament;
 	cartouche: MapCartouche;
+	legend: MapOrnament;
+	/** How a 3D map is drawn: `cinematic`, `atlas` or `ink`. */
+	look: string;
 }
 
 export interface MapViewport {
@@ -2653,7 +2819,11 @@ export interface MapFile {
 	scale: MapScale;
 	background: MapBackground;
 	earth: MapEarth;
+	surface: MapSurface;
 	system: MapSystem;
+	galaxy: MapGalaxy;
+	universe: MapUniverse;
+	model: MapModel;
 	pins: MapPin[];
 	routes: MapRoute[];
 	regions: MapRegion[];
@@ -2662,6 +2832,8 @@ export interface MapFile {
 	/** Custom transports; one sharing a built-in's id replaces it on this map. */
 	transports: MapTransport[];
 	travelers: MapTraveler[];
+	layers: MapLayer[];
+	views: MapView[];
 	timeline: MapTimeline;
 	style: MapStyle;
 	viewport: MapViewport;

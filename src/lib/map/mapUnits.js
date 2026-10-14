@@ -5,14 +5,16 @@
  * days; a unit is only a way of writing one down. A map can add its own units
  * (a league of its world, a day's ride) in `scale.customUnits`.
  *
- * `toKm`, `fromKm` and the tables are mirrored in `inkblot_core::map::units`. The
- * `format*` functions are display only and stay here — JS's `toFixed` and Rust's
- * `{:.n}` round ties differently, and a label is not worth a twin.
+ * From a town to a universe: metres and miles, AU in a star system, light-years
+ * and parsecs in a galaxy, megaparsecs between galaxies.
  */
 
 export const KM_PER_AU = 149597870.7
 export const KM_PER_LIGHT_YEAR = 9460730472580.8
 export const KM_PER_PARSEC = 30856775814913.67
+export const KM_PER_KILOPARSEC = KM_PER_PARSEC * 1e3
+export const KM_PER_MEGAPARSEC = KM_PER_PARSEC * 1e6
+export const KM_PER_MEGA_LIGHT_YEAR = KM_PER_LIGHT_YEAR * 1e6
 /** The speed of light, in km/h. */
 export const LIGHT_KMH = 1079252848.8
 
@@ -26,7 +28,13 @@ export const BUILTIN_UNITS = [
   { id: 'AU', name: 'astronomical units', short: 'AU', km: KM_PER_AU },
   { id: 'ly', name: 'light-years', short: 'ly', km: KM_PER_LIGHT_YEAR },
   { id: 'pc', name: 'parsecs', short: 'pc', km: KM_PER_PARSEC },
+  { id: 'kpc', name: 'kiloparsecs', short: 'kpc', km: KM_PER_KILOPARSEC },
+  { id: 'Mly', name: 'million light-years', short: 'Mly', km: KM_PER_MEGA_LIGHT_YEAR },
+  { id: 'Mpc', name: 'megaparsecs', short: 'Mpc', km: KM_PER_MEGAPARSEC },
 ]
+
+/** Units that only make sense between stars and galaxies, not on a world's ground. */
+export const ASTRONOMICAL_UNITS = new Set(['AU', 'ly', 'pc', 'kpc', 'Mly', 'Mpc'])
 
 /** Every unit a map can use: built-ins, then its own (which win on a shared id). */
 export function mapUnits(map) {
@@ -65,13 +73,18 @@ export function formatNumber(value) {
 
 /**
  * A distance in `unitId`. With `unitId` 'auto' the unit follows the size — metres to
- * kilometres to AU to light-years — which is what a star-system ruler wants.
+ * kilometres to AU to light-years to millions of them — which is what a ruler in
+ * space wants.
  */
 export function formatDistance(km, unitId = 'km', map = null) {
   let unit = unitId
   if (unit === 'auto') {
     const abs = Math.abs(km)
-    unit = abs < 1 ? 'm' : abs < 0.05 * KM_PER_AU ? 'km' : abs < 0.2 * KM_PER_LIGHT_YEAR ? 'AU' : 'ly'
+    unit = abs < 1 ? 'm'
+      : abs < 0.05 * KM_PER_AU ? 'km'
+        : abs < 0.2 * KM_PER_LIGHT_YEAR ? 'AU'
+          : abs < 1e6 * KM_PER_LIGHT_YEAR ? 'ly'
+            : 'Mly'
   }
   const found = mapUnits(map).find((candidate) => candidate.id === unit)
   const short = found?.short || unit
@@ -87,6 +100,9 @@ export function formatArea(km2, unitId = 'km', map = null) {
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
 
+/** How long light takes to cross `km`, the way a writer would say it: "8 minutes", "4.2 years". */
+export const formatLightTime = (km) => formatDuration(km / LIGHT_KMH / 24)
+
 /**
  * A duration given in days, the way a writer would say it: "3 days 4 hours",
  * "5 hours 20 minutes", "2.4 years".
@@ -94,6 +110,7 @@ const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
 export function formatDuration(days) {
   if (!Number.isFinite(days)) return 'never — the way is impassable'
   const abs = Math.abs(days)
+  if (abs >= 365.25 * 2e6) return `${formatNumber(days / 365.25e6)} million years`
   if (abs >= 365.25 * 2) return `${formatNumber(days / 365.25)} years`
   if (abs >= 60) return `${formatNumber(days / 30.44)} months`
   let wholeDays = Math.floor(abs)
