@@ -280,6 +280,8 @@ pub struct MapSystemDisplay {
     pub radial: String,
     #[serde(rename = "pxPerAU")]
     pub px_per_au: f64,
+    /// `3d` or `flat`.
+    pub view: String,
 }
 
 #[typeshare]

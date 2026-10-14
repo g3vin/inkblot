@@ -42,7 +42,7 @@ export function useMapCommands({ active, mapKind, setTool, zoomIn, zoomOut, fitA
       { id: 'map.inspector', section: 'Map', title: 'Show the map’s settings', icon: 'sidebar', keywords: ['inspector', 'panel', 'scale', 'style', 'travel', 'journeys'], run: showInspector },
       // The View menu, each choice by name.
       // A choice already made is not offered again; an on/off is always offered.
-      ...viewMenu.filter((entry) => VIEW_COMMAND_TITLES[entry.id] && !entry.disabled && !(entry.checked && /\.(view|projection|imagery)\./.test(entry.id))).map((entry) => ({
+      ...viewMenu.filter((entry) => VIEW_COMMAND_TITLES[entry.id] && !entry.disabled && !(entry.checked && /\.(view|projection|imagery|radial)\./.test(entry.id))).map((entry) => ({
         id: `map.view.${entry.id}`,
         section: 'Map',
         title: VIEW_COMMAND_TITLES[entry.id][0],

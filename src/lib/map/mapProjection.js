@@ -85,6 +85,14 @@ const radialOut = (r, mode, pxPerAU) =>
 const radialIn = (d, mode, pxPerAU) =>
   mode === 'linear' ? d / pxPerAU : LOG_R0 * (Math.exp((d / pxPerAU) * LOG_NORM) - 1)
 
+/**
+ * How far from the centre a body `r` AU out is drawn, in "drawn AU" (1 per AU on a
+ * linear scale): the same squeeze as the flat view, for the 3D one.
+ */
+export const systemRadius = (r, display) => radialOut(r, display?.radial, 1)
+/** The inverse: the true distance (AU) of a body drawn `d` drawn-AU out. */
+export const systemRadiusInverse = (d, display) => radialIn(d, display?.radial, 1)
+
 /** AU (y up, around `center`) → world (y down). */
 export function systemToWorld(point, display, center = [0, 0]) {
   const pxPerAU = display?.pxPerAU > 0 ? display.pxPerAU : DEFAULT_PX_PER_AU

@@ -574,3 +574,31 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('a Cepheid brightens and fades', Math.max(...pulses) > 1.1 && Math.min(...pulses) < 0.9)
   ok('a steady star does not', variableAt(starFields(STAR_PRESETS[4]), 3).brightness === 1)
 }
+
+/* ---------------- a star system in 3D ---------------- */
+
+{
+  const { systemToScene, sceneToSystem, readSpaceCamera, DEFAULT_SPACE_CAMERA } = await import('../../src/map/space/spaceMath.js')
+  const { viewMenuFor, viewOptionEdit } = await import('../../src/map/mapViewMenu.js')
+  const display = { radial: 'log', pxPerAU: 100 }
+  // Seen from straight above, the 3D layout is the flat map's: scene x is the page's
+  // x, scene z is the page's y (down), at 1 drawn-AU per pxPerAU world units.
+  const samePlace = [[1, 0], [0.4, -2.5], [-30, 12]].every((point) => {
+    const scene = systemToScene([point[0], point[1], 0], display)
+    const flat = systemToWorld(point, display)
+    return Math.abs(scene[0] * 100 - flat[0]) < 1e-9 && Math.abs(scene[2] * 100 - flat[1]) < 1e-9 && scene[1] === 0
+  })
+  ok('face-on, the 3D system is laid out as the flat map', samePlace)
+  const back = sceneToSystem(systemToScene([3, -4, 1.5], display), display)
+  ok('scene and system points convert both ways', Math.hypot(back[0] - 3, back[1] + 4, back[2] - 1.5) < 1e-9)
+  ok('above the plane is up in the scene', systemToScene([0, 0, 2], { radial: 'linear' })[1] === 2)
+  ok('a malformed camera falls back to the default', readSpaceCamera({ center: [0, 0], zoom: 3 }).fov === DEFAULT_SPACE_CAMERA.fov)
+  ok('a saved camera is kept', readSpaceCamera({ position: [1, 2, 3], target: [0, 0, 0], fov: 50 }).position[2] === 3)
+
+  const system = normalizeMap({ mapKind: 'system', system: { display: { view: '3d' } } })
+  ok('a system offers 3D and flat', viewMenuFor(system).find((entry) => entry.id === 'system.view.3d').checked)
+  ok('an old system opens flat', normalizeMap({ mapKind: 'system' }).system.display.view === 'flat')
+  const edit = viewOptionEdit(system, 'system.radial.linear')
+  ok('distances to scale is an edit to the system', edit.section === 'system' && edit.patch.display.radial === 'linear' && edit.patch.display.view === '3d')
+  ok('a 3D view that could not start offers flat only', viewMenuFor(system, { spaceAvailable: false }).find((entry) => entry.id === 'system.view.3d').disabled)
+}

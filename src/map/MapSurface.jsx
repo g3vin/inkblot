@@ -39,6 +39,7 @@ import MapDraft from './MapDraft'
 import { useMapDocument } from './useMapDocument'
 import { useMapViewport } from './useMapViewport'
 import { useGlobeView } from './useGlobeView'
+import { useSpaceView } from './useSpaceView'
 import { useProjectDocs, useStoryCalendar } from './useMapProject'
 import { useStoryTimeline } from '../timeline/useStoryTimeline'
 import { eventCovers, setEventTime } from '../lib/timeline/timelineModel'
@@ -48,7 +49,7 @@ import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
 import { openStoryCalendarSettings } from '../lib/map/storyCalendarStore'
 import ExportMapDialog from './ExportMapDialog'
 import OnlineMapsDialog from './OnlineMapsDialog'
-import { choosesOnline, viewMenuFor, viewOptionPatch } from './mapViewMenu'
+import { choosesOnline, viewMenuFor, viewOptionEdit } from './mapViewMenu'
 import { readOnlineMaps, saveOnlineMaps } from '../lib/map/onlineMaps'
 import { useMapCommands } from './useMapCommands'
 import {
@@ -69,6 +70,7 @@ const SNAP_PX = 14
 
 // MapLibre and the globe: loaded the first time a map is shown as a globe.
 const GlobeView = lazy(() => import('./GlobeView'))
+const SpaceView = lazy(() => import('./space/SpaceView'))
 
 const DRAWING_TOOLS = new Set(['route', 'region', 'ruler', 'area', 'calibrate'])
 
@@ -111,20 +113,30 @@ export default function MapSurface({
   // A View choice that fetches online, waiting for the writer to allow online maps.
   const [onlineAsk, setOnlineAsk] = useState(null)
 
-  // The Earth as a globe is drawn by MapLibre, and moved by it; every other map (and
-  // the Earth laid flat) by the SVG view. Both answer to the same calls.
+  // The Earth as a globe is drawn by MapLibre, and moved by it; a star system in 3D
+  // by three.js; every other map (and either laid flat) by the SVG view. All three
+  // answer to the same calls. A map has one camera, the globe's or the scene's.
   const [globeFailed, setGlobeFailed] = useState(false)
+  const [spaceFailed, setSpaceFailed] = useState(false)
   const wantsGlobe = initialMap.mapKind === 'earth'
+  const wantsSpace = initialMap.mapKind === 'system'
   const flatView = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.(), enabled: true })
   const cameraRef = useRef(initialMap.camera || null)
+  const onCameraChange = (camera) => {
+    cameraRef.current = camera
+    saveViewRef.current?.()
+  }
   const globeView = useGlobeView({
     surfaceRef: flatView.surfaceRef,
-    initialCamera: initialMap.camera,
-    onCameraChange: (camera) => {
-      cameraRef.current = camera
-      saveViewRef.current?.()
-    },
+    initialCamera: wantsGlobe ? initialMap.camera : null,
+    onCameraChange,
     enabled: wantsGlobe,
+  })
+  const spaceView = useSpaceView({
+    surfaceRef: flatView.surfaceRef,
+    initialCamera: wantsSpace ? initialMap.camera : null,
+    onCameraChange,
+    enabled: wantsSpace,
   })
   const { map, mapRef, dispatch, undo, redo, saveView, canUndo, canRedo } = useMapDocument({
     projectName,
@@ -136,7 +148,9 @@ export default function MapSurface({
     locked,
   })
   const isGlobe = map.mapKind === 'earth' && map.earth.view === 'globe' && !globeFailed
-  const view = isGlobe ? globeView : flatView
+  const isSpace = map.mapKind === 'system' && map.system.display.view === '3d' && !spaceFailed
+  const view = isGlobe ? globeView : isSpace ? spaceView : flatView
+  const viewKind = isGlobe ? 'globe' : isSpace ? 'space' : 'flat'
   const box = useVisibleBox(view.surfaceRef)
   const saveViewRef = useRef(saveView)
   useEffect(() => {
@@ -160,7 +174,7 @@ export default function MapSurface({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [map.mapKind, map.earth, map.system, map.background.width, map.background.height, frameDay, focusBody]
   )
-  const projector = isGlobe ? globeView.projector : flatProjector
+  const projector = isGlobe ? globeView.projector : isSpace ? spaceView.projector : flatProjector
   // A space reads only its kind, its scale and its bodies: an edit to a pin keeps it,
   // and with it the orbital positions it has cached.
   const space = useMemo(
@@ -246,17 +260,17 @@ export default function MapSurface({
 
   /* ---------------- how the map is shown (the View menu) ---------------- */
 
-  const viewMenu = useMemo(() => viewMenuFor(map, { globeAvailable: !globeFailed }), [globeFailed, map])
+  const viewMenu = useMemo(() => viewMenuFor(map, { globeAvailable: !globeFailed, spaceAvailable: !spaceFailed }), [globeFailed, map, spaceFailed])
   const applyViewOption = useCallback(
     (id, { allowed = false } = {}) => {
       const current = mapRef.current
-      const patch = viewOptionPatch(current, id)
-      if (!patch) return
+      const edit = viewOptionEdit(current, id)
+      if (!edit) return
       if (!allowed && choosesOnline(current, id) && !readOnlineMaps().enabled) {
         setOnlineAsk(id)
         return
       }
-      dispatch({ type: 'section/patch', section: 'earth', patch })
+      dispatch({ type: 'section/patch', section: edit.section, patch: edit.patch })
     },
     [dispatch, mapRef]
   )
@@ -295,14 +309,14 @@ export default function MapSurface({
     if (!v || (v.x === 0 && v.y === 0 && v.zoom === 1)) requestAnimationFrame(() => fitAll())
   }, [fitAll, initialViewport])
 
-  // Laid flat from the globe, the map is framed afresh: the flat view's last framing
-  // belongs to a projection it may no longer have.
-  const wasGlobe = useRef(isGlobe)
+  // Laid flat from the globe or the 3D view, the map is framed afresh: the flat
+  // view's last framing belongs to a projection it may no longer have.
+  const lastViewKind = useRef(viewKind)
   useEffect(() => {
-    if (wasGlobe.current === isGlobe) return
-    wasGlobe.current = isGlobe
-    if (!isGlobe) requestAnimationFrame(() => fitAll())
-  }, [fitAll, isGlobe])
+    if (lastViewKind.current === viewKind) return
+    lastViewKind.current = viewKind
+    if (viewKind === 'flat') requestAnimationFrame(() => fitAll())
+  }, [fitAll, viewKind])
 
   /* ---------------- editing helpers ---------------- */
 
@@ -1000,7 +1014,7 @@ export default function MapSurface({
   // Runs only when something the chrome shows changed: the panel is memoized, so a
   // pan (which re-renders the map) publishes nothing.
   // On the globe, how far in from the whole Earth (MapLibre zoom levels are doublings).
-  const chromeZoom = isGlobe ? 2 ** ((globeView.camera.zoom || 0) - 1.4) : view.viewport.zoom
+  const chromeZoom = isGlobe ? 2 ** ((globeView.camera.zoom || 0) - 1.4) : isSpace ? 16 / Math.max(1e-6, spaceView.camera.distance || 16) : view.viewport.zoom
   useEffect(() => {
     if (!publishing) return
     const surfaceId = view.surfaceRef.current?.dataset.surfaceId
@@ -1062,7 +1076,7 @@ export default function MapSurface({
   return (
     <div
       ref={view.surfaceRef}
-      className={`map-surface${isPanning ? ' is-panning' : ''}${isActive ? ' is-active' : ''}${isGlobe ? ' is-globe' : ''}`}
+      className={`map-surface${isPanning ? ' is-panning' : ''}${isActive ? ' is-active' : ''}${isGlobe ? ' is-globe' : ''}${isSpace ? ' is-space' : ''}`}
       data-map-theme={map.style.theme}
       data-tool={tool}
       tabIndex={0}
@@ -1086,11 +1100,24 @@ export default function MapSurface({
           />
         </Suspense>
       ) : null}
+      {isSpace ? (
+        <Suspense fallback={<div className="map-space is-loading" />}>
+          <SpaceView
+            view={spaceView}
+            map={map}
+            space={space}
+            day={day}
+            focusBody={focusBody}
+            skySeed={docPath}
+            onError={() => setSpaceFailed(true)}
+          />
+        </Suspense>
+      ) : null}
 
       <svg className="map-svg" xmlns="http://www.w3.org/2000/svg">
         <MapDefs idPrefix={idPrefix} />
         {/* A new group when the view changes: the flat view's transform must not stay on the globe's overlay. */}
-        <g ref={view.worldRef} key={isGlobe ? 'globe' : 'flat'}>
+        <g ref={view.worldRef} key={viewKind}>
           <MapLayers
             map={map}
             projector={projector}

@@ -837,11 +837,11 @@
   background: var(--map-water);
 }
 
-.map-surface.is-globe .map-svg {
+.map-surface:is(.is-globe, .is-space) .map-svg {
   pointer-events: none;
 }
 
-.map-surface.is-globe .map-svg :is([data-map-item], [data-map-handle]) {
+.map-surface:is(.is-globe, .is-space) .map-svg :is([data-map-item], [data-map-handle]) {
   pointer-events: auto;
 }
 
@@ -852,4 +852,40 @@
 .map-surface.is-globe .maplibregl-ctrl-attrib {
   font-family: var(--font-ui);
   font-size: var(--text-xs);
+}
+
+/* ---------------- a system in 3D (space/SpaceView) ---------------- */
+
+/* three.js draws the bodies, orbits and sky; the SVG over it carries their names,
+   a target to click on each, and the places and handles. */
+.map-surface .map-space {
+  position: absolute;
+  inset: 0;
+  background: var(--map-space);
+}
+
+.map-space-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.map-surface.is-space:not([data-tool='select']):not([data-tool='pan']) .map-space-canvas {
+  cursor: crosshair;
+}
+
+.map-body-target {
+  fill: transparent;
+  stroke: none;
+}
+
+.map-body-3d .map-body-name {
+  paint-order: stroke;
+  stroke: var(--map-halo);
+  stroke-width: 3px;
+}
+
+.map-body-3d.is-selected .map-body-target {
+  stroke: var(--map-accent);
+  stroke-width: 1.5;
 }

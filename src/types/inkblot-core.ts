@@ -2571,6 +2571,8 @@ export interface MapSystemDisplay {
 	/** `linear` or `log`. */
 	radial: string;
 	pxPerAU: number;
+	/** `3d` or `flat`. */
+	view: string;
 }
 
 export interface MapSystemPlane {

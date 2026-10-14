@@ -70,3 +70,15 @@
   --map-label-font: 'Avenir Next', 'Helvetica Neue', sans-serif;
 }
 
+
+/* A star system in 3D (the Cinematic look) is drawn against space whatever the
+   theme, so what is written over it is light. */
+.map-surface.is-space {
+  --map-ink: #e3e9f7;
+  --map-ink-soft: rgba(227, 233, 247, 0.6);
+  --map-route: #ffcf6e;
+  --map-pin: #ffcf6e;
+  --map-region: #7f9cff;
+  --map-halo: rgba(3, 5, 11, 0.85);
+  --map-space: #03050b;
+}

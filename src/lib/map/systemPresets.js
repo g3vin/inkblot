@@ -144,7 +144,8 @@ function xray() {
   // A blue supergiant pouring itself onto a black hole through a hot stream.
   return [
     ...pair('pair', null, ['donor', 'Cygnus', 'B8Ia'], ['hole', 'The Maw', 'BH'], 0.2, 0, {
-      a: { massSun: 21, star: { ...starFields(starPreset('B8Ia')), feeds: 'hole' } },
+      // Cygnus X-1's companion: a supergiant, but one that fits inside its orbit.
+      a: { massSun: 21, radiusKm: 20 * 695700, star: { ...starFields(starPreset('B8Ia')), feeds: 'hole' } },
     }),
   ]
 }
@@ -336,7 +337,7 @@ export function presetSystem(presetId, { seed = 1, perturb = 0 } = {}) {
   const nbody = preset.dynamics === 'nbody'
   return {
     bodies: preset.build({ seed, perturb }),
-    display: { radial: nbody ? 'linear' : 'log', pxPerAU: nbody ? 160 : 100 },
+    display: { radial: nbody ? 'linear' : 'log', pxPerAU: nbody ? 160 : 100, view: '3d' },
     dynamics: nbody ? 'nbody' : 'kepler',
     ...(nbody ? { nbody: { stepDays: preset.stepDays || 0.25, softeningAU: preset.stable ? 0.001 : 0.01, horizonDays: 3650 }, template: { id: preset.id, seed, perturb } } : {}),
   }

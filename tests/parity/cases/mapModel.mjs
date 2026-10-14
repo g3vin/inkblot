@@ -58,7 +58,7 @@ export const FULL = {
       { name: 'unnamed id' },
       { id: 'sun', name: 'duplicate' },
     ],
-    display: { radial: 'spiral', pxPerAU: 250 },
+    display: { radial: 'spiral', pxPerAU: 250, view: '3d' },
   },
   pins: [
     { id: 'harbour', name: 'Old Harbour', at: [120.5, 88], doc: 'Settings/Harbour', glow: true },
