@@ -9,7 +9,8 @@ import { useState } from 'react'
 import Icon from '../ui/Icon.jsx'
 import { IMAGE_EXTENSIONS_LIST, assetUrl, importAssetFromPath, measureImage } from '../lib/assets'
 import { PROJECTION_NAMES } from '../lib/map/mapProjection'
-import { SYSTEM_PRESETS, presetBodies } from '../lib/map/systemPresets'
+import { SYSTEM_PRESET_GROUPS, SYSTEM_PRESETS, presetSystem } from '../lib/map/systemPresets'
+import { newSeed } from '../lib/map/seeded'
 import { defaultTerrainEntries } from '../lib/map/terrains'
 import { BLANK_SHEET } from '../lib/map/mapModel'
 
@@ -134,24 +135,33 @@ export default function MapSetup({ projectName, onDone }) {
         ) : null}
 
         {step === 'system' ? (
-          <div className="map-setup-choices">
-            {SYSTEM_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                className="map-button"
-                title={preset.hint}
-                onClick={() =>
-                  onDone({
-                    mapKind: 'system',
-                    system: { bodies: presetBodies(preset.id), display: { radial: 'log', pxPerAU: 100 } },
-                    scale: { kmPerUnit: 1, displayUnit: 'AU', calibration: null, customUnits: [] },
-                    style: { theme: 'night' },
-                  })
-                }
-              >
-                {preset.label}
-              </button>
+          <div className="map-setup-groups">
+            {SYSTEM_PRESET_GROUPS.map(([group, title]) => (
+              <div key={group} className="map-setup-group">
+                <h3 className="ib-eyebrow">{title}</h3>
+                <div className="map-setup-choices">
+                  {SYSTEM_PRESETS.filter((preset) => preset.group === group).map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className="map-button"
+                      title={preset.hint}
+                      onClick={() =>
+                        onDone({
+                          mapKind: 'system',
+                          // A template that rolls its stars starts from a new seed each time.
+                          system: presetSystem(preset.id, { seed: preset.id === 'encounter' ? newSeed() : 1 }),
+                          scale: { kmPerUnit: 1, displayUnit: 'AU', calibration: null, customUnits: [] },
+                          style: { theme: 'night' },
+                        })
+                      }
+                    >
+                      {preset.label}
+                      {preset.group === 'three' ? <small> · {preset.stable ? 'stable' : 'chaotic'}</small> : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         ) : null}

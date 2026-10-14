@@ -10,7 +10,7 @@ import { formatArea, formatDistance, formatDuration } from '../../lib/map/mapUni
 import { legTravel } from '../../lib/map/travel'
 import { mapTransports } from '../../lib/map/transports'
 import { HATCHES, LINE_DASHES } from '../../lib/map/mapModel'
-import { STAR_PRESETS, massToLuminosity, starPreset, temperatureToColor } from '../../lib/map/stars'
+import { STAR_GROUPS, STAR_PRESETS, massToLuminosity, starFields, starPreset, temperatureToColor } from '../../lib/map/stars'
 import { bodyMass, orbitPeriod } from '../../lib/map/orbits'
 import { newBody } from '../../lib/map/systemPresets'
 import { PIN_ICONS, unitFor } from '../mapOptions'
@@ -222,7 +222,7 @@ export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focu
     patchBody({ orbit: { ...(orbit || { aAU: 1, e: 0, periapsisDeg: 0, meanAnomalyDeg: 0, periodDays: null, retrograde: false }), ...next } })
   const setPreset = (id) => {
     const preset = starPreset(id)
-    patchBody({ massSun: preset.massSun, radiusKm: preset.radiusSun * 695700, star: { spectral: preset.id, temperatureK: preset.temperatureK, luminositySun: preset.luminositySun } })
+    patchBody({ massSun: preset.massSun, radiusKm: preset.radiusSun * 695700, star: starFields(preset), color: null })
   }
   const add = (kind, distance, label) => ui.button(`body.add.${kind}`, label, () => addBody(newBody(kind, body.id, distance)))
 
@@ -248,7 +248,7 @@ export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focu
 
   if (body.kind === 'star') {
     sections.push(ui.section('star', 'Star', [
-      ui.choice('star.type', 'Type', body.star?.spectral || 'G2V', STAR_PRESETS.map((preset) => ({ value: preset.id, label: preset.name })), setPreset),
+      ui.choice('star.type', 'Type', body.star?.spectral || 'G2V', STAR_PRESETS.map((preset) => ({ value: preset.id, label: preset.name, group: STAR_GROUPS.find(([id]) => id === preset.group)?.[1] })), setPreset),
       ui.number('star.temperature', 'Temperature', body.star?.temperatureK ?? 5772, (temperatureK) => patchBody({ star: { ...body.star, temperatureK }, color: null }), { min: 0, step: 100, suffix: 'K' }),
       ui.number('star.mass', 'Mass', body.massSun ?? 1, (massSun) => patchBody({ massSun }), { min: 0.001, suffix: 'M☉' }),
       ui.number('star.brightness', 'Brightness', body.star?.luminositySun ?? 1, (luminositySun) => patchBody({ star: { ...body.star, luminositySun } }), { min: 0, suffix: 'L☉' }),
