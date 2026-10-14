@@ -4,6 +4,7 @@
  *
  * For the Earth: a globe or a flat map (and which projection), the plain map or
  * satellite photographs, street detail, raised terrain, the graticule and borders.
+ * For a star system: in 3D or laid flat, and distances squeezed or to scale.
  * Built here as a list (`MapMenuItem`) the toolbar draws — the page's own, or a
  * native shell's — and each choice comes back as `view-option` with its id.
  *
@@ -20,8 +21,18 @@ export const ONLINE_OPTIONS = new Set(['earth.imagery.satellite', 'earth.imagery
 
 const item = (id, label, { checked = false, disabled = false, separator = false } = {}) => ({ id, label, checked, disabled, separator })
 
-/** The View menu for `map`. `globeAvailable` is false where the globe could not start. */
-export function viewMenuFor(map, { globeAvailable = true } = {}) {
+/** The View menu for `map`. `globeAvailable` (`spaceAvailable`) is false where the globe (3D) could not start. */
+export function viewMenuFor(map, { globeAvailable = true, spaceAvailable = true } = {}) {
+  if (map.mapKind === 'system') {
+    const { display } = map.system
+    const in3d = display.view === '3d' && spaceAvailable
+    return [
+      item('system.view.3d', 'In 3D', { checked: in3d, disabled: !spaceAvailable }),
+      item('system.view.flat', 'Flat', { checked: !in3d }),
+      item('system.radial.log', 'Distances squeezed', { checked: display.radial === 'log', separator: true }),
+      item('system.radial.linear', 'Distances to scale', { checked: display.radial === 'linear' }),
+    ]
+  }
   if (map.mapKind !== 'earth') return []
   const { earth } = map
   const globe = earth.view === 'globe' && globeAvailable
@@ -67,6 +78,23 @@ export function viewOptionPatch(map, id) {
   return null
 }
 
+/**
+ * The edit any View choice makes: `{ section, patch }` for the map reducer's
+ * `section/patch`, or null for an id this map does not have.
+ */
+export function viewOptionEdit(map, id) {
+  if (id.startsWith('system.')) {
+    if (map.mapKind !== 'system') return null
+    const { display } = map.system
+    if (id === 'system.view.3d' || id === 'system.view.flat') return { section: 'system', patch: { display: { ...display, view: id.slice('system.view.'.length) } } }
+    if (id === 'system.radial.log' || id === 'system.radial.linear') return { section: 'system', patch: { display: { ...display, radial: id.slice('system.radial.'.length) } } }
+    return null
+  }
+  if (map.mapKind !== 'earth') return null
+  const patch = viewOptionPatch(map, id)
+  return patch ? { section: 'earth', patch } : null
+}
+
 /** Does choosing `id` (on this map) turn on something fetched online? */
 export function choosesOnline(map, id) {
   if (!ONLINE_OPTIONS.has(id)) return false
@@ -91,4 +119,8 @@ export const VIEW_COMMAND_TITLES = {
   'earth.terrain': ['Show or hide terrain in 3D', ['mountains', 'elevation', 'relief', 'hills']],
   'earth.graticule': ['Show or hide the graticule', ['latitude', 'longitude', 'grid lines']],
   'earth.borders': ['Show or hide borders', ['countries', 'frontiers']],
+  'system.view.3d': ['Show the system in 3D', ['three dimensions', 'orbit', 'space', 'perspective']],
+  'system.view.flat': ['Lay the system out flat', ['2d', 'top down', 'diagram', 'print']],
+  'system.radial.log': ['Squeeze distances so everything fits', ['log', 'compress', 'scale']],
+  'system.radial.linear': ['Draw distances to scale', ['linear', 'true scale', 'real']],
 }

@@ -206,6 +206,49 @@ const SystemGround = memo(function SystemGround({ map, projector, positions: liv
   )
 })
 
+/** Which of two bodies on top of each other keeps its name: the bigger kind. */
+const BODY_RANK = { star: 0, planet: 1, dwarf: 2, moon: 3, station: 4 }
+/** Bodies closer than this on screen show one name (a moon tucks behind its planet). */
+const NAME_CLEARANCE_PX = 16
+
+/**
+ * Over the 3D view (which draws the bodies themselves): each body's name, and a
+ * target to click, select and drag, where the camera puts it. A body drawn on top
+ * of a bigger one (a moon seen from far off) gives way, unless it is selected.
+ */
+function SpaceNames({ map, projector, positions, selection }) {
+  const placed = []
+  for (const body of map.system.bodies) {
+    if (body.kind === 'belt' || body.kind === 'barycenter') continue
+    const at = projector.toWorld(positions?.get(body.id) || [0, 0, 0])
+    if (at) placed.push({ body, at, rank: BODY_RANK[body.kind] ?? 5 })
+  }
+  placed.sort((a, b) => a.rank - b.rank)
+  const shown = []
+  for (const entry of placed) {
+    const selected = selection?.kind === 'body' && selection.id === entry.body.id
+    const crowded = shown.some((other) => Math.hypot(other.at[0] - entry.at[0], other.at[1] - entry.at[1]) < NAME_CLEARANCE_PX)
+    if (crowded && !selected) continue
+    shown.push({ ...entry, selected })
+  }
+  return (
+    <g className="map-system map-space-names">
+      {shown.map(({ body, at, selected }) => (
+        <g
+          key={body.id}
+          className={`map-body map-body-3d${selected ? ' is-selected' : ''}`}
+          data-map-item={body.id}
+          data-map-kind="body"
+          transform={`translate(${at[0]} ${at[1]})`}
+        >
+          <circle className="map-body-target" r={11} />
+          <text className="map-body-name" x={13} y={4}>{body.name}</text>
+        </g>
+      ))}
+    </g>
+  )
+}
+
 const BodyDisc = memo(function BodyDisc({ body, x, y, selected }) {
   const isStar = body.kind === 'star'
   const color = body.color || (isStar ? temperatureToColor(body.star?.temperatureK ?? 5772) : MAP_DEFAULT_COLORS.body)
@@ -528,7 +571,7 @@ const MapLayers = memo(function MapLayers({
 }) {
   // Only on a star system does anything but a traveller move with the day. Holding
   // the day still for the other layers lets them skip re-rendering during playback.
-  const staticDay = projector.kind === 'system' ? day : 0
+  const staticDay = projector.kind === 'system' || projector.kind === 'space' ? day : 0
   // On the globe, MapLibre draws the ground, the regions and the routes; this is the
   // overlay of everything else, in screen pixels.
   const overGlobe = projector.kind === 'globe'
@@ -538,6 +581,8 @@ const MapLayers = memo(function MapLayers({
         <EarthGround map={map} projector={projector} level={earthLevel} onCountries={onCountries} staticPaths={earthPaths} />
       ) : projector.kind === 'system' ? (
         <SystemGround map={map} projector={projector} positions={positions} selection={selection} />
+      ) : projector.kind === 'space' ? (
+        <SpaceNames map={map} projector={projector} positions={positions} selection={selection} />
       ) : (
         <PlaneGround map={map} projector={projector} projectName={projectName} inlineAssets={inlineAssets} />
       )}

@@ -39,6 +39,8 @@ pub const TRANSPORT_MEDIA: [&str; 4] = ["land", "water", "air", "space"];
 pub const MAP_THEMES: [&str; 4] = ["clean", "parchment", "ink", "night"];
 pub const BODY_KINDS: [&str; 7] = ["star", "planet", "dwarf", "moon", "belt", "station", "barycenter"];
 pub const RADIAL_MODES: [&str; 2] = ["linear", "log"];
+/// How a star system is shown: in three dimensions, or laid flat on the page.
+pub const SYSTEM_VIEWS: [&str; 2] = ["3d", "flat"];
 
 /// A blank map is a sheet this big, in map units, until something says otherwise.
 pub const BLANK_SHEET_WIDTH: f64 = 4000.0;
@@ -412,6 +414,7 @@ fn read_system(raw: Option<&Value>, next_id: &mut dyn FnMut() -> String) -> Valu
     let mut display_out = display.clone();
     set(&mut display_out, "radial", one_of(display.get("radial"), &RADIAL_MODES, "log"));
     set(&mut display_out, "pxPerAU", positive_or(display.get("pxPerAU"), json!(100)));
+    set(&mut display_out, "view", one_of(display.get("view"), &SYSTEM_VIEWS, "flat"));
 
     let plane = object_or(system.get("plane"));
     let mut plane_out = plane.clone();

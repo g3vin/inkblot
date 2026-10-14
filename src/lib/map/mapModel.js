@@ -61,6 +61,8 @@ export const TRANSPORT_MEDIA = ['land', 'water', 'air', 'space']
 export const MAP_THEMES = ['clean', 'parchment', 'ink', 'night']
 export const BODY_KINDS = ['star', 'planet', 'dwarf', 'moon', 'belt', 'station', 'barycenter']
 export const RADIAL_MODES = ['linear', 'log']
+/** How a star system is shown: in three dimensions, or laid flat on the page. */
+export const SYSTEM_VIEWS = ['3d', 'flat']
 
 /** A blank map is a sheet this big, in map units, until something says otherwise. */
 export const BLANK_SHEET = { width: 4000, height: 3000 }
@@ -314,6 +316,7 @@ const readSystem = (raw, nextId) => {
       ...display,
       radial: oneOf(display.radial, RADIAL_MODES, 'log'),
       pxPerAU: positiveOr(display.pxPerAU, 100),
+      view: oneOf(display.view, SYSTEM_VIEWS, 'flat'),
     },
     plane: { ...plane, tiltDeg: numberOr(plane.tiltDeg, 0), headingDeg: numberOr(plane.headingDeg, 0) },
     dynamics: oneOf(system.dynamics, SYSTEM_DYNAMICS, 'kepler'),
