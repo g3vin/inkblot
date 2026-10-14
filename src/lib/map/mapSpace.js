@@ -24,6 +24,8 @@ import { pointInRegion, regionArea, catmullRomSample } from './mapGeometry'
 import { densifyGreatCircle, EARTH_RADIUS_KM, haversineKm, interpolateGreatCircle, sphericalRingAreaKm2 } from './geodesy'
 import { KM_PER_AU, KM_PER_LIGHT_YEAR, KM_PER_MEGAPARSEC } from './mapUnits'
 import { systemPositionsAt } from './orbits'
+// An N-body system's positions come from nbody.js, which hooks itself into orbits.js.
+import './nbody'
 
 /** Samples per segment when a smoothed route is measured — enough to be within 0.1%. */
 export const ROUTE_SMOOTH_SAMPLES = 12

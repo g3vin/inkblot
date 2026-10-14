@@ -519,3 +519,58 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('turning terrain off does not ask', !choosesOnline({ ...globe, earth: { ...globe.earth, terrain3d: true } }, 'earth.terrain'))
   ok('every View choice is a command', menu.every((entry) => VIEW_COMMAND_TITLES[entry.id]))
 }
+
+/* ---------------- bodies that all pull on each other ---------------- */
+
+{
+  const { createRun, energy, runFor, stabilityOf, stateFromOrbits, toNbody } = await import('../../src/lib/map/nbody.js')
+  const { presetSystem, SYSTEM_PRESETS } = await import('../../src/lib/map/systemPresets.js')
+  const { STAR_PRESETS, starFields, starLook, variableAt } = await import('../../src/lib/map/stars.js')
+  const systemOf = (id, options) => normalizeMap({ mapKind: 'system', system: presetSystem(id, options) }).system
+
+  // The figure eight: equal stars, one path, back where they began after a period.
+  const eight = systemOf('figureEight')
+  const run = createRun(eight)
+  const period = 6.32591398 * Math.sqrt(1 / (0.01720209895 ** 2))
+  const start = run.positionsAt(0).get('a')
+  const later = run.positionsAt(period).get('a')
+  ok('the figure eight comes round again', Math.hypot(start[0] - later[0], start[1] - later[1]) < 1e-4)
+  const e0 = energy(run.checkpoint(0), run.eps2)
+  const e1 = energy(run.checkpoint(Math.ceil((period * 10) / run.span)), run.eps2)
+  ok('and keeps its energy over ten turns', Math.abs((e1 - e0) / e0) < 1e-6)
+  ok('the same system goes the same way, bit for bit', createRun(eight).positionsAt(1234.5).get('c').join() === run.positionsAt(1234.5).get('c').join())
+  const resumed = run.positionsAt(800.3).get('b').join()
+  ok('resuming from a checkpoint matches a straight run', createRun(eight).positionsAt(800.3).get('b').join() === resumed)
+  ok('it runs backwards from day 0 too', run.positionsAt(-150).get('a').every(Number.isFinite))
+
+  // Every template says truly whether it holds together.
+  for (const preset of SYSTEM_PRESETS.filter((candidate) => candidate.dynamics === 'nbody' && candidate.id !== 'encounter' && candidate.id !== 'butterfly')) {
+    ok(`${preset.label} ${preset.stable ? 'holds together' : 'comes apart'}`, stabilityOf(systemOf(preset.id)).stable === preset.stable)
+  }
+  const burrau = stabilityOf(systemOf('pythagorean'))
+  ok('Burrau’s three flings one away within the story', burrau.ejected && burrau.ejected.day < 3650)
+  ok('a random encounter differs by seed', JSON.stringify(systemOf('encounter', { seed: 1 }).bodies) !== JSON.stringify(systemOf('encounter', { seed: 2 }).bodies))
+  ok('a nudge changes the start', JSON.stringify(systemOf('figureEight', { perturb: 0.05 }).bodies) !== JSON.stringify(eight.bodies))
+
+  // A Kepler system turned N-body starts exactly where it was.
+  const sol = normalizeMap({ mapKind: 'system', system: presetSystem('sol') }).system
+  const states = stateFromOrbits(sol)
+  const kepler = systemPositionsAt(sol, 0)
+  ok('state vectors start on the orbits', Math.hypot(...states.get('earth').pos.map((value, axis) => value - kepler.get('earth')[axis])) < 1e-12)
+  const earthSpeed = Math.hypot(...states.get('earth').vel) * 149597870.7 / 86400
+  ok('and move at the orbit’s speed (Earth ≈ 29.8 km/s)', Math.abs(earthSpeed - 29.8) < 0.6)
+  const pulled = normalizeMap({ mapKind: 'system', system: toNbody(sol) }).system
+  const after = systemPositionsAt(pulled, 30).get('earth')
+  const onOrbit = systemPositionsAt(sol, 30).get('earth')
+  ok('and stay close to them a month on', Math.hypot(after[0] - onOrbit[0], after[1] - onOrbit[1], after[2] - onOrbit[2]) < 0.01)
+  ok('an N-body system is cached by what moves it', runFor(pulled) === runFor({ ...pulled }))
+
+  // Star templates.
+  ok('every star has a look', STAR_PRESETS.every((preset) => typeof preset.look === 'string'))
+  const pulsar = STAR_PRESETS.find((preset) => preset.id === 'PSR')
+  ok('a pulsar spins', starFields(pulsar).spinSeconds > 0 && starLook({ star: starFields(pulsar) }) === 'pulsar')
+  const cepheid = starFields(STAR_PRESETS.find((preset) => preset.id === 'CEP'))
+  const pulses = [0, 1, 2, 3, 4, 5].map((day) => variableAt(cepheid, day).brightness)
+  ok('a Cepheid brightens and fades', Math.max(...pulses) > 1.1 && Math.min(...pulses) < 0.9)
+  ok('a steady star does not', variableAt(starFields(STAR_PRESETS[4]), 3).brightness === 1)
+}

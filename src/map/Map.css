@@ -302,6 +302,12 @@
   vector-effect: non-scaling-stroke;
 }
 
+/* A path that is not an orbit: where an N-body body actually goes, over the story. */
+.map-trail {
+  stroke-width: 0.75;
+  opacity: 0.75;
+}
+
 .map-habitable {
   fill: none;
   stroke: color-mix(in srgb, var(--ink-green) 30%, transparent);
@@ -757,6 +763,16 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 12px;
+}
+
+.map-setup-groups {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.map-setup-group .map-setup-choices {
+  margin-top: 6px;
 }
 
 .map-foreign {

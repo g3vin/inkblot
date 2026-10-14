@@ -16,6 +16,7 @@ import { pathData, catmullRomSample } from '../lib/map/mapGeometry'
 import { measuredLine, resolvePin, routeCoords } from '../lib/map/mapSpace'
 import { pinLabel } from '../lib/map/mapModel'
 import { orbitPath } from '../lib/map/orbits'
+import { runFor } from '../lib/map/nbody'
 import { habitableZoneAU, temperatureToColor } from '../lib/map/stars'
 import { projectedEarth } from '../lib/map/earthData'
 import { hashSeed, INKED_STYLE, ROUGH_STYLE, roughenPath } from '../lib/map/roughen'
@@ -141,8 +142,10 @@ function splitRings(bodies, fixed) {
  * that orbits. What is drawn around them (orbits, belts, habitable zones) is the same
  * on every day, so it is drawn once rather than on every tick of playback.
  */
-function fixedBodies(bodies, byId) {
+function fixedBodies(bodies, byId, dynamics) {
   const fixed = new Set()
+  // Where everything pulls on everything, everything moves.
+  if (dynamics === 'nbody') return fixed
   const isFixed = (body, depth = 0) => {
     if (!body || body.orbit || depth > bodies.length) return false
     return body.parent ? isFixed(byId.get(body.parent), depth + 1) : true
@@ -151,11 +154,27 @@ function fixedBodies(bodies, byId) {
   return fixed
 }
 
+/**
+ * The paths of an N-body system's bodies over the story (day 0 to its horizon),
+ * drawn where orbits would be: they have no ellipse to follow, so their path is
+ * what they actually do. Computed once per system and frame, not per day.
+ */
+function nbodyTrails(system, projector) {
+  const run = runFor(system)
+  const horizon = system.nbody?.horizonDays || 3650
+  return run.ids.map((id) => {
+    const points = run.trail(id, 0, horizon).map((point) => projector.toWorld(point))
+    return <path key={`trail-${id}`} className="map-orbit map-trail" d={pathData(points, false)} />
+  })
+}
+
 const SystemGround = memo(function SystemGround({ map, projector, positions: livePositions, selection }) {
   const bodies = map.system.bodies
   const byId = useMemo(() => new Map(bodies.map((body) => [body.id, body])), [bodies])
   const positions = livePositions || projector.positions
-  const rings = useMemo(() => splitRings(bodies, fixedBodies(bodies, byId)), [bodies, byId])
+  const dynamics = map.system.dynamics
+  const rings = useMemo(() => splitRings(bodies, fixedBodies(bodies, byId, dynamics)), [bodies, byId, dynamics])
+  const trails = useMemo(() => (dynamics === 'nbody' ? nbodyTrails(map.system, projector) : null), [dynamics, map.system, projector])
   // A fixed body is where it is on any day, so the frame's own positions place it.
   const staticRings = useMemo(
     () => rings.still.flatMap(([body, around]) => bodyRings(body, byId, projector, projector.positions, around)),
@@ -179,6 +198,7 @@ const SystemGround = memo(function SystemGround({ map, projector, positions: liv
   }
   return (
     <g className="map-ground map-system">
+      {trails}
       {staticRings}
       {movingRings}
       {discs}

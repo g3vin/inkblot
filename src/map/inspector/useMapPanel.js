@@ -24,9 +24,10 @@ import { buildSchedules, crossScheduleConflicts } from '../../lib/map/timeline'
 import { PROJECTION_NAMES } from '../../lib/map/mapProjection'
 import { COMPASS_STYLES, newRouteLabel } from '../mapOptions'
 import { createPanelBuilder } from './panelBuilder'
-import { BODY_KIND_LABELS, bodySections, labelSections, pinSections, regionSections, routeSections } from './itemSections'
+import { bodySections, labelSections, pinSections, regionSections, routeSections } from './itemSections'
 import { journeysSections, travelSections, travelerSections } from './travelSections'
 import { traceSection, useMapTrace } from './traceSection'
+import { systemSections } from './systemSections'
 
 const THEME_LABELS = { clean: 'Clean', parchment: 'Parchment', ink: 'Pen and ink', night: 'Night' }
 const KIND_TITLES = { pin: 'Place', route: 'Route', region: 'Region', label: 'Label', traveler: 'Traveller', body: 'Body' }
@@ -74,7 +75,7 @@ function calibrateSections(ui, { map, calibration, dispatch, onDone, form, setFo
 /* ---------------- the map tab ---------------- */
 
 function mapTabSections(ui, props, { newUnit, setNewUnit, trace }) {
-  const { map, dispatch, space, onTool, onReveal, onSelect, focusBody, onFocusBody } = props
+  const { map, dispatch, space, onTool, onReveal } = props
   const patchScale = (patch) => dispatch({ type: 'section/patch', section: 'scale', patch })
   const patchEarth = (patch) => dispatch({ type: 'section/patch', section: 'earth', patch })
   const patchBackground = (patch) => dispatch({ type: 'section/patch', section: 'background', patch })
@@ -146,22 +147,7 @@ function mapTabSections(ui, props, { newUnit, setNewUnit, trace }) {
     ]))
   }
 
-  if (map.mapKind === 'system') {
-    sections.push(ui.section('system', 'Star system', [
-      ui.choice(
-        'system.radial',
-        'Distances drawn',
-        map.system.display.radial,
-        [{ value: 'log', label: 'Squeezed, so everything fits' }, { value: 'linear', label: 'To scale' }],
-        (radial) => dispatch({ type: 'section/patch', section: 'system', patch: { display: { ...map.system.display, radial } } })
-      ),
-      ui.note('Measurements and travel times always use true distances. Double-click a body to follow it.'),
-      focusBody ? ui.buttonField('system.unfollow', 'Stop following', () => onFocusBody(null)) : null,
-      ...map.system.bodies.map((body) =>
-        ui.listRow(`system.body.${body.id}`, body.name || BODY_KIND_LABELS[body.kind] || body.kind, () => onSelect('body', body.id), { indent: body.parent ? 1 : 0 })
-      ),
-    ]))
-  }
+  if (map.mapKind === 'system') sections.push(...systemSections(ui, props))
 
   sections.push(ui.section('places', 'Places', [
     !map.pins.length ? ui.note('Use the place tool, or drag documents from a Settings or Locations folder onto the map.') : null,
@@ -320,7 +306,7 @@ export function useMapPanel(props) {
     } else if (tab === 'style') {
       sections = styleTabSections(ui, { map, dispatch })
     } else {
-      sections = mapTabSections(ui, { map, dispatch, space, onTool, onReveal, onSelect, focusBody, onFocusBody, viewMenu, onViewOption }, { newUnit, setNewUnit, trace })
+      sections = mapTabSections(ui, { map, dispatch, space, calendar, onDay, onTool, onReveal, onSelect, focusBody, onFocusBody, viewMenu, onViewOption }, { newUnit, setNewUnit, trace })
     }
 
     const showTabs = !selection && !calibration
