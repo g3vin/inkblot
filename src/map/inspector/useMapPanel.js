@@ -112,14 +112,36 @@ function mapTabSections(ui, props, { newUnit, setNewUnit, trace }) {
   }
 
   if (map.mapKind === 'earth') {
+    const { viewMenu = [], onViewOption } = props
+    const option = (id) => viewMenu.find((entry) => entry.id === id)
+    const globe = Boolean(option('earth.view.globe')?.checked)
+    const toggle = (id, label) => {
+      const entry = option(id)
+      return entry ? ui.toggle(id, label, entry.checked, () => onViewOption(id)) : null
+    }
     sections.push(ui.section('earth', 'The Earth', [
-      ui.choice('earth.projection', 'Projection', map.earth.projection, EARTH_PROJECTIONS.map((projection) => ({ value: projection, label: PROJECTION_NAMES[projection] })), (projection) => patchEarth({ projection })),
-      ui.number('earth.lon', 'Centre longitude', -map.earth.rotate[0], (lon) => patchEarth({ rotate: [-lon, map.earth.rotate[1]] }), { min: -180, max: 180, step: 1, suffix: '°' }),
-      map.earth.projection === 'orthographic'
-        ? ui.number('earth.lat', 'Centre latitude', -map.earth.rotate[1], (lat) => patchEarth({ rotate: [map.earth.rotate[0], -lat] }), { min: -90, max: 90, step: 1, suffix: '°' })
-        : null,
-      ui.toggle('earth.graticule', 'Graticule', map.earth.graticule, (graticule) => patchEarth({ graticule })),
-      ui.toggle('earth.borders', 'Borders', map.earth.borders, (borders) => patchEarth({ borders })),
+      ui.choice('earth.view', 'Shown as', globe ? 'globe' : 'flat', [
+        { value: 'globe', label: 'A globe' },
+        { value: 'flat', label: 'A flat map' },
+      ], (value) => onViewOption(`earth.view.${value}`), { help: 'map.earth-view' }),
+      globe
+        ? ui.choice('earth.imagery', 'Pictures', map.earth.imagery, [
+            { value: 'map', label: 'Map' },
+            { value: 'satellite', label: 'Satellite' },
+            { value: 'hybrid', label: 'Satellite with labels' },
+          ], (imagery) => onViewOption(`earth.imagery.${imagery}`), { help: 'map.online' })
+        : ui.choice('earth.projection', 'Projection', map.earth.projection === 'orthographic' ? 'equalEarth' : map.earth.projection,
+            EARTH_PROJECTIONS.filter((projection) => projection !== 'orthographic').map((projection) => ({ value: projection, label: PROJECTION_NAMES[projection] })),
+            (projection) => onViewOption(`earth.projection.${projection}`), { help: 'map.earth-view' }),
+      globe ? toggle('earth.streets', 'Street detail') : null,
+      globe ? toggle('earth.terrain', 'Terrain in 3D') : null,
+      toggle('earth.graticule', 'Graticule'),
+      toggle('earth.borders', 'Borders'),
+      globe
+        ? ui.note('Drag to turn the globe, scroll to zoom, and drag with two fingers or ⌃ to tilt.')
+        : ui.group('earth.position', 'Position', [
+            ui.number('earth.lon', 'Centre longitude', -map.earth.rotate[0], (lon) => patchEarth({ rotate: [-lon, map.earth.rotate[1]] }), { min: -180, max: 180, step: 1, suffix: '°' }),
+          ], { collapsible: true }),
       ui.note('Coastlines and borders: Natural Earth, public domain. Distances follow great circles.'),
     ]))
   }
@@ -186,7 +208,7 @@ export function useMapPanel(props) {
   const {
     map, dispatch, space, day, onDay, schedules, conflicts, selection, selectedItem, onSelect,
     docs, missingDocs, calendar, onOpenCalendar, onOpenDoc, renameRequest, calibration, onCalibrationDone,
-    focusBody, onFocusBody, projectName, docPath, zoomNow, onTool, onReveal,
+    focusBody, onFocusBody, projectName, docPath, zoomNow, onTool, onReveal, viewMenu, onViewOption,
   } = props
   const [tab, setTab] = useState('map')
   const [crossConflicts, setCrossConflicts] = useState(null)
@@ -298,7 +320,7 @@ export function useMapPanel(props) {
     } else if (tab === 'style') {
       sections = styleTabSections(ui, { map, dispatch })
     } else {
-      sections = mapTabSections(ui, { map, dispatch, space, onTool, onReveal, onSelect, focusBody, onFocusBody }, { newUnit, setNewUnit, trace })
+      sections = mapTabSections(ui, { map, dispatch, space, onTool, onReveal, onSelect, focusBody, onFocusBody, viewMenu, onViewOption }, { newUnit, setNewUnit, trace })
     }
 
     const showTabs = !selection && !calibration
@@ -318,6 +340,6 @@ export function useMapPanel(props) {
   }, [
     calendar, calibration, calibrationForm, conflicts, crossConflicts, day, dispatch, docPath, docs, focusBody, map, matrix,
     missingDocs, newUnit, onCalibrationDone, onDay, onFocusBody, onOpenCalendar, onOpenDoc, onReveal, onSelect, onTool,
-    projectName, renameRequest, schedules, selectedItem, selection, space, tab, trace, zoomNow,
+    projectName, renameRequest, schedules, selectedItem, selection, space, tab, trace, viewMenu, onViewOption, zoomNow,
   ])
 }

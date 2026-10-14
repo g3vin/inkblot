@@ -8,11 +8,12 @@
  * The scale bar is measured, not assumed: it asks the map's space how far apart two
  * points 100 px either side of the view's centre are, so it is right on a calibrated
  * picture, on a projection whose scale changes with latitude, and on a star system.
+ * On a globe the compass turns with the camera (`bearing`), so it keeps pointing north.
  */
 import { CompassRose } from './mapGlyphs'
 import { scaleBarFor } from './mapChromeMath'
 
-export default function MapChrome({ map, projector, space, viewport, box }) {
+export default function MapChrome({ map, projector, space, viewport, box, bearing = 0 }) {
   const { style } = map
   const place = (at) => ({
     left: `${box.left + at[0] * box.width}px`,
@@ -42,7 +43,7 @@ export default function MapChrome({ map, projector, space, viewport, box }) {
     <>
       {bar}
       {style.compass.show && map.mapKind !== 'system' ? (
-        <div className="map-compass" style={place(style.compass.at)}>
+        <div className="map-compass" style={{ ...place(style.compass.at), transform: `translate(-50%, -50%) rotate(${-bearing}deg)` }}>
           <CompassRose size={style.compass.size} variant={style.compass.style} />
         </div>
       ) : null}

@@ -6,6 +6,7 @@
  * onKeyDown), so they are shown here (`shortcut`) rather than bound (`keys`).
  */
 import { useCommands } from '../lib/commands'
+import { VIEW_COMMAND_TITLES } from './mapViewMenu'
 
 const TOOLS = [
   { tool: 'select', title: 'Select and move', icon: 'cursor', shortcut: 'V', keywords: ['pointer', 'arrow', 'move'] },
@@ -19,7 +20,7 @@ const TOOLS = [
   { tool: 'pan', title: 'Move the map', icon: 'hand', shortcut: 'H', keywords: ['pan', 'hand', 'drag'] },
 ]
 
-export function useMapCommands({ active, mapKind, setTool, zoomIn, zoomOut, fitAll, hasSelection, removeSelection, openExport, showInspector }) {
+export function useMapCommands({ active, mapKind, setTool, zoomIn, zoomOut, fitAll, hasSelection, removeSelection, openExport, showInspector, viewMenu = [], onViewOption }) {
   useCommands(() => {
     if (!active) return []
     const plane = mapKind === 'blank' || mapKind === 'image'
@@ -39,6 +40,16 @@ export function useMapCommands({ active, mapKind, setTool, zoomIn, zoomOut, fitA
       { id: 'map.delete', section: 'Map', title: 'Delete the selection', icon: 'delete', keywords: ['remove', 'erase'], when: () => hasSelection, run: removeSelection },
       { id: 'map.export', section: 'Map', title: 'Export map…', icon: 'export', keys: 'Mod+Alt+E', keywords: ['png', 'svg', 'pdf', 'print', 'picture', 'image', 'save as', 'copy image'], run: openExport },
       { id: 'map.inspector', section: 'Map', title: 'Show the map’s settings', icon: 'sidebar', keywords: ['inspector', 'panel', 'scale', 'style', 'travel', 'journeys'], run: showInspector },
+      // The View menu, each choice by name.
+      // A choice already made is not offered again; an on/off is always offered.
+      ...viewMenu.filter((entry) => VIEW_COMMAND_TITLES[entry.id] && !entry.disabled && !(entry.checked && /\.(view|projection|imagery)\./.test(entry.id))).map((entry) => ({
+        id: `map.view.${entry.id}`,
+        section: 'Map',
+        title: VIEW_COMMAND_TITLES[entry.id][0],
+        icon: 'globe',
+        keywords: ['map', 'view', ...VIEW_COMMAND_TITLES[entry.id][1]],
+        run: () => onViewOption?.(entry.id),
+      })),
     ]
-  }, [active, fitAll, hasSelection, mapKind, openExport, removeSelection, setTool, showInspector, zoomIn, zoomOut])
+  }, [active, fitAll, hasSelection, mapKind, onViewOption, openExport, removeSelection, setTool, showInspector, viewMenu, zoomIn, zoomOut])
 }

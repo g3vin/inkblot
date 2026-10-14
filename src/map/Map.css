@@ -805,3 +805,35 @@
   stroke-width: 3px;
   paint-order: stroke;
 }
+
+/* ---------------- the globe (GlobeView) ---------------- */
+
+/* MapLibre draws the ground underneath; the SVG over it is an overlay of places,
+   labels and handles, and lets every other press through to the globe. Scoped to the
+   surface so it outranks maplibre-gl.css (`.maplibregl-map { position: relative }`),
+   which loads after this sheet. */
+.map-surface .map-globe {
+  position: absolute;
+  inset: 0;
+}
+
+.map-globe.is-loading {
+  background: var(--map-water);
+}
+
+.map-surface.is-globe .map-svg {
+  pointer-events: none;
+}
+
+.map-surface.is-globe .map-svg :is([data-map-item], [data-map-handle]) {
+  pointer-events: auto;
+}
+
+.map-surface.is-globe:not([data-tool='select']):not([data-tool='pan']) .maplibregl-canvas {
+  cursor: crosshair;
+}
+
+.map-surface.is-globe .maplibregl-ctrl-attrib {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}

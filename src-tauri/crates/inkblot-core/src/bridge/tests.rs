@@ -737,6 +737,7 @@ fn map_chrome() -> MapChromeState {
         reveal_panel: 1,
         active: true,
         map_kind: Some(crate::types::map::MapKind::Earth),
+        view_menu: vec![MapMenuItem { id: "earth.view.globe".into(), label: "Globe".into(), checked: true, disabled: false, separator: false }],
     }
 }
 

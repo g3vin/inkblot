@@ -454,6 +454,39 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
   },
   {
+    id: 'map.earth-view',
+    section: 'Maps',
+    title: 'The globe and flat maps',
+    body: [
+      'An Earth map can be a globe or a flat map. The globe turns as you drag it and zooms from the whole planet down to a street. Hold ⌃ and drag, or drag with two fingers, to tilt and turn the view.',
+      'A flat map shows the whole world at once in a projection: Equal Earth and Natural Earth keep the sizes of countries fair, Equirectangular is the simple grid of latitude and longitude, and Mercator keeps shapes but swells the poles.',
+      'Your places, routes, regions and journeys are the same in every view. Distances are always measured along the curve of the Earth.',
+    ],
+    related: ['map.online'],
+  },
+  {
+    id: 'map.online',
+    section: 'Maps',
+    title: 'Online maps',
+    body: [
+      'Everything you put on a map is kept in your project and works offline, along with the Earth’s coastlines and borders. Satellite pictures, street detail, raised terrain and searching for real places come from the internet, and only once you turn on online maps.',
+      'The services that send them see which part of the world you are looking at, and what you search for. Nothing from your project is sent. Turn online maps on or off in Settings ▸ Maps.',
+      'Free satellite pictures are Sentinel-2 cloudless (2016) by EOX, sharp to about a town. For closer pictures, add a key for MapTiler, Mapbox or Google Maps in Settings ▸ Maps. Streets and place names are OpenStreetMap, by way of OpenFreeMap; search is Photon, by Komoot.',
+    ],
+    related: ['map.satellite-source', 'map.earth-view'],
+  },
+  {
+    id: 'map.satellite-source',
+    section: 'Maps',
+    title: 'Where satellite pictures come from',
+    body: [
+      'Sentinel-2 is free and needs no account. MapTiler, Mapbox and Google Maps are sharper close up and need a key from an account with them; use of their pictures is under their terms, and may be charged for beyond a free allowance.',
+      'Another source takes any tile address with {z}, {x} and {y} in it, and {key} where a key goes.',
+      'Keys are kept on this computer, not in your projects.',
+    ],
+    related: ['map.online'],
+  },
+  {
     id: 'story.calendar',
     section: 'Settings',
     title: 'The story calendar',

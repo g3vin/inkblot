@@ -10,7 +10,7 @@
  * pin or a label moves that instead. So there is no separate hand tool to reach for —
  * though `pan` exists for a trackpad-less mouse and for the space bar.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { documentSurface } from '../bridge'
 import { getDocDisplayName, isMapDoc } from '../lib/docKind'
 import { isCharacterDoc } from '../lib/storyStructure'
@@ -38,6 +38,7 @@ import MapHoverCard from './MapHoverCard'
 import MapDraft from './MapDraft'
 import { useMapDocument } from './useMapDocument'
 import { useMapViewport } from './useMapViewport'
+import { useGlobeView } from './useGlobeView'
 import { useProjectDocs, useStoryCalendar } from './useMapProject'
 import { useStoryTimeline } from '../timeline/useStoryTimeline'
 import { eventCovers, setEventTime } from '../lib/timeline/timelineModel'
@@ -46,6 +47,9 @@ import { peekStoryTimeline, replaceStoryTimeline } from '../lib/timeline/timelin
 import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
 import { openStoryCalendarSettings } from '../lib/map/storyCalendarStore'
 import ExportMapDialog from './ExportMapDialog'
+import OnlineMapsDialog from './OnlineMapsDialog'
+import { choosesOnline, viewMenuFor, viewOptionPatch } from './mapViewMenu'
+import { readOnlineMaps, saveOnlineMaps } from '../lib/map/onlineMaps'
 import { useMapCommands } from './useMapCommands'
 import {
   MAP_COMMAND_EVENT,
@@ -62,6 +66,9 @@ const DRAG_THRESHOLD = 4
 const DOUBLE_CLICK_MS = 320
 /** How near (screen px) a click must be to a pin to snap a route stop to it. */
 const SNAP_PX = 14
+
+// MapLibre and the globe: loaded the first time a map is shown as a globe.
+const GlobeView = lazy(() => import('./GlobeView'))
 
 const DRAWING_TOOLS = new Set(['route', 'region', 'ruler', 'area', 'calibrate'])
 
@@ -101,17 +108,36 @@ export default function MapSurface({
   const [calibration, setCalibration] = useState(null)
   const endCalibration = useCallback(() => setCalibration(null), [])
   const [exportOpen, setExportOpen] = useState(false)
+  // A View choice that fetches online, waiting for the writer to allow online maps.
+  const [onlineAsk, setOnlineAsk] = useState(null)
 
-  const view = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.() })
-  const box = useVisibleBox(view.surfaceRef)
+  // The Earth as a globe is drawn by MapLibre, and moved by it; every other map (and
+  // the Earth laid flat) by the SVG view. Both answer to the same calls.
+  const [globeFailed, setGlobeFailed] = useState(false)
+  const wantsGlobe = initialMap.mapKind === 'earth'
+  const flatView = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.(), enabled: true })
+  const cameraRef = useRef(initialMap.camera || null)
+  const globeView = useGlobeView({
+    surfaceRef: flatView.surfaceRef,
+    initialCamera: initialMap.camera,
+    onCameraChange: (camera) => {
+      cameraRef.current = camera
+      saveViewRef.current?.()
+    },
+    enabled: wantsGlobe,
+  })
   const { map, mapRef, dispatch, undo, redo, saveView, canUndo, canRedo } = useMapDocument({
     projectName,
     docPath,
     initialMap,
-    viewportRef: view.viewportRef,
+    viewportRef: flatView.viewportRef,
     dayRef,
+    cameraRef,
     locked,
   })
+  const isGlobe = map.mapKind === 'earth' && map.earth.view === 'globe' && !globeFailed
+  const view = isGlobe ? globeView : flatView
+  const box = useVisibleBox(view.surfaceRef)
   const saveViewRef = useRef(saveView)
   useEffect(() => {
     saveViewRef.current = saveView
@@ -128,12 +154,13 @@ export default function MapSurface({
   // body. Otherwise it holds still through playback, and so does every layer drawn in
   // it: only the bodies, and what rides on them, move.
   const frameDay = isSystem && focusBody ? day : 0
-  const projector = useMemo(
+  const flatProjector = useMemo(
     () => createProjector(map, { day: frameDay, focusBody }),
     // The projector depends only on the parts of the map that decide the drawing's frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [map.mapKind, map.earth, map.system, map.background.width, map.background.height, frameDay, focusBody]
   )
+  const projector = isGlobe ? globeView.projector : flatProjector
   // A space reads only its kind, its scale and its bodies: an edit to a pin keeps it,
   // and with it the orbital positions it has cached.
   const space = useMemo(
@@ -157,7 +184,7 @@ export default function MapSurface({
     }
     return missing
   }, [docs.loaded, docs.paths, map.pins, map.travelers])
-  const earthLevel = map.mapKind === 'earth' ? earthLevelFor(map.earth, view.settledZoom) : '110m'
+  const earthLevel = map.mapKind === 'earth' && !isGlobe ? earthLevelFor(map.earth, view.settledZoom) : '110m'
   // Drawing the 50m Earth is one long task. Headed that way, do it while the map is
   // idle, so arriving at the zoom that shows it is a cache hit, not a stall.
   const warmFineEarth = map.mapKind === 'earth' && earthLevel === '110m' && earthLevelFor(map.earth, 2.5) === '50m' && view.settledZoom >= 1.6
@@ -217,9 +244,38 @@ export default function MapSurface({
     [day, map, screenOf, space, view]
   )
 
+  /* ---------------- how the map is shown (the View menu) ---------------- */
+
+  const viewMenu = useMemo(() => viewMenuFor(map, { globeAvailable: !globeFailed }), [globeFailed, map])
+  const applyViewOption = useCallback(
+    (id, { allowed = false } = {}) => {
+      const current = mapRef.current
+      const patch = viewOptionPatch(current, id)
+      if (!patch) return
+      if (!allowed && choosesOnline(current, id) && !readOnlineMaps().enabled) {
+        setOnlineAsk(id)
+        return
+      }
+      dispatch({ type: 'section/patch', section: 'earth', patch })
+    },
+    [dispatch, mapRef]
+  )
+  const allowOnline = useCallback(() => {
+    saveOnlineMaps({ enabled: true })
+    const id = onlineAsk
+    setOnlineAsk(null)
+    if (id) applyViewOption(id, { allowed: true })
+  }, [applyViewOption, onlineAsk])
+
   /* ---------------- fitting ---------------- */
 
   const fitAll = useCallback(() => {
+    if (view.fitStored) {
+      const stored = map.pins.map((pin) => resolvePin(map, space, pin, day))
+      for (const region of map.regions) for (const ring of region.rings) stored.push(...ring)
+      view.fitStored(stored)
+      return
+    }
     const points = []
     for (const pin of map.pins) points.push(projector.toWorld(resolvePin(map, space, pin, day)))
     for (const region of map.regions) for (const ring of region.rings) for (const point of ring) points.push(projector.toWorld(point))
@@ -238,6 +294,15 @@ export default function MapSurface({
     // A map never viewed before opens framed rather than at the world's corner.
     if (!v || (v.x === 0 && v.y === 0 && v.zoom === 1)) requestAnimationFrame(() => fitAll())
   }, [fitAll, initialViewport])
+
+  // Laid flat from the globe, the map is framed afresh: the flat view's last framing
+  // belongs to a projection it may no longer have.
+  const wasGlobe = useRef(isGlobe)
+  useEffect(() => {
+    if (wasGlobe.current === isGlobe) return
+    wasGlobe.current = isGlobe
+    if (!isGlobe) requestAnimationFrame(() => fitAll())
+  }, [fitAll, isGlobe])
 
   /* ---------------- editing helpers ---------------- */
 
@@ -356,7 +421,10 @@ export default function MapSurface({
       const itemEl = event.target.closest('[data-map-item]')
       const handleEl = event.target.closest('[data-map-handle]')
       const forcePan = event.button === 1 || tool === 'pan' || spaceHeldRef.current
-      const item = itemEl ? { id: itemEl.getAttribute('data-map-item'), kind: itemEl.getAttribute('data-map-kind') } : null
+      // On the globe, regions and routes are drawn by MapLibre: asked for, not found in the DOM.
+      const item = itemEl
+        ? { id: itemEl.getAttribute('data-map-item'), kind: itemEl.getAttribute('data-map-kind') }
+        : !handleEl && view.pick ? view.pick(startX, startY) : null
 
       // What a drag will do, decided at the press.
       let dragKind = 'pan'
@@ -436,7 +504,8 @@ export default function MapSurface({
           else setDraggedFrom(mapRef.current)
         }
         if (dragKind === 'pan') {
-          view.applyViewport(panMapBy(view.viewportRef.current, moveEvent.clientX - lastX, moveEvent.clientY - lastY))
+          // The globe pans itself.
+          if (!view.native) view.applyViewport(panMapBy(view.viewportRef.current, moveEvent.clientX - lastX, moveEvent.clientY - lastY))
           lastX = moveEvent.clientX
           lastY = moveEvent.clientY
           return
@@ -508,9 +577,9 @@ export default function MapSurface({
     (event) => {
       if (DRAWING_TOOLS.has(tool)) return
       const itemEl = event.target.closest('[data-map-item]')
-      if (!itemEl) return
-      const kind = itemEl.getAttribute('data-map-kind')
-      const id = itemEl.getAttribute('data-map-item')
+      const picked = itemEl ? { kind: itemEl.getAttribute('data-map-kind'), id: itemEl.getAttribute('data-map-item') } : view.pick?.(event.clientX, event.clientY)
+      if (!picked) return
+      const { kind, id } = picked
       if (kind === 'pin') {
         const pin = map.pins.find((candidate) => candidate.id === id)
         if (pin?.doc && docs.paths.has(pin.doc)) onOpenDoc?.(pin.doc)
@@ -539,7 +608,7 @@ export default function MapSurface({
         setRenameRequest((count) => count + 1)
       }
     },
-    [day, docs.paths, map, onOpenDoc, patchItem, showInspector, space, storedAt, tool]
+    [day, docs.paths, map, onOpenDoc, patchItem, showInspector, space, storedAt, tool, view]
   )
 
   /* ---------------- hover ---------------- */
@@ -635,6 +704,10 @@ export default function MapSurface({
         else if (kind === 'route') {
           const node = item.nodes[Math.floor(item.nodes.length / 2)]
           point = node?.pin ? resolvePin(current, space, current.pins.find((pin) => pin.id === node.pin), day) : node?.at
+        }
+        if (point && view.centerOnStored) {
+          view.centerOnStored(point)
+          return
         }
         const world = point ? projector.toWorld(point) : null
         if (world) view.centerOn(world[0], world[1])
@@ -736,6 +809,7 @@ export default function MapSurface({
       const { command, clientX, clientY, itemId, itemKind } = detail
       if (command === 'zoom-to-fit') fitAll()
       else if (command === 'export') setExportOpen(true)
+      else if (command === 'view-option') applyViewOption(String(detail.id || ''))
       /* The window toolbar and the inspector, when the shell draws them (`mapChrome`). */
       else if (command === 'tool') {
         if (TOOL_IDS.has(detail.tool)) setTool(detail.tool)
@@ -775,7 +849,7 @@ export default function MapSurface({
       surface.removeEventListener(MAP_DROP_DOC_EVENT, onDrop)
       surface.removeEventListener(MAP_COMMAND_EVENT, onCommand)
     }
-  }, [addItem, dispatch, dropDoc, fitAll, labelSizeNow, mapRef, onOpenDoc, redo, removeSelection, showInspector, storedAt, undo, view])
+  }, [addItem, applyViewOption, dispatch, dropDoc, fitAll, labelSizeNow, mapRef, onOpenDoc, redo, removeSelection, showInspector, storedAt, undo, view])
 
   /* ---------------- the day ---------------- */
 
@@ -883,6 +957,8 @@ export default function MapSurface({
     onFocusBody: setFocusBody,
     onReveal: reveal,
     zoomNow,
+    viewMenu,
+    onViewOption: applyViewOption,
   })
   const openExport = useCallback(() => setExportOpen(true), [])
   useMapCommands({
@@ -896,6 +972,8 @@ export default function MapSurface({
     removeSelection,
     openExport,
     showInspector,
+    viewMenu,
+    onViewOption: applyViewOption,
   })
 
   // Commands arrive through a listener set up once; they reach the panel as last built.
@@ -921,7 +999,8 @@ export default function MapSurface({
   }, [publishing])
   // Runs only when something the chrome shows changed: the panel is memoized, so a
   // pan (which re-renders the map) publishes nothing.
-  const chromeZoom = view.viewport.zoom
+  // On the globe, how far in from the whole Earth (MapLibre zoom levels are doublings).
+  const chromeZoom = isGlobe ? 2 ** ((globeView.camera.zoom || 0) - 1.4) : view.viewport.zoom
   useEffect(() => {
     if (!publishing) return
     const surfaceId = view.surfaceRef.current?.dataset.surfaceId
@@ -940,9 +1019,10 @@ export default function MapSurface({
         revealPanel,
         active: isActive,
         mapKind: map.mapKind,
+        viewMenu,
       },
     })
-  }, [canRedo, canUndo, chromeZoom, docPath, isActive, map.mapKind, mapPanel.panel, publishing, revealPanel, selection, tool, view.surfaceRef])
+  }, [canRedo, canUndo, chromeZoom, docPath, isActive, map.mapKind, mapPanel.panel, publishing, revealPanel, selection, tool, view.surfaceRef, viewMenu])
 
   /* ---------------- setup ---------------- */
 
@@ -982,7 +1062,7 @@ export default function MapSurface({
   return (
     <div
       ref={view.surfaceRef}
-      className={`map-surface${isPanning ? ' is-panning' : ''}${isActive ? ' is-active' : ''}`}
+      className={`map-surface${isPanning ? ' is-panning' : ''}${isActive ? ' is-active' : ''}${isGlobe ? ' is-globe' : ''}`}
       data-map-theme={map.style.theme}
       data-tool={tool}
       tabIndex={0}
@@ -993,9 +1073,24 @@ export default function MapSurface({
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
     >
+      {isGlobe ? (
+        <Suspense fallback={<div className="map-globe is-loading" />}>
+          <GlobeView
+            view={globeView}
+            map={map}
+            space={space}
+            day={day}
+            selection={selection}
+            surfaceRef={view.surfaceRef}
+            onError={() => setGlobeFailed(true)}
+          />
+        </Suspense>
+      ) : null}
+
       <svg className="map-svg" xmlns="http://www.w3.org/2000/svg">
         <MapDefs idPrefix={idPrefix} />
-        <g ref={view.worldRef}>
+        {/* A new group when the view changes: the flat view's transform must not stay on the globe's overlay. */}
+        <g ref={view.worldRef} key={isGlobe ? 'globe' : 'flat'}>
           <MapLayers
             map={map}
             projector={projector}
@@ -1024,7 +1119,7 @@ export default function MapSurface({
         </g>
       </svg>
 
-      <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} />
+      <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} bearing={isGlobe ? globeView.camera.bearing : 0} />
 
       {!windowInspector && !inspectorOpen ? (
         <button
@@ -1088,6 +1183,8 @@ export default function MapSurface({
           viewportRef={view.viewportRef}
         />
       ) : null}
+
+      <OnlineMapsDialog open={Boolean(onlineAsk)} onAllow={allowOnline} onCancel={() => setOnlineAsk(null)} />
 
       {map.setupPending ? (
         <MapSetup projectName={projectName} docPath={docPath} onDone={completeSetup} />

@@ -17,6 +17,7 @@ import TimersPane from './TimersPane.jsx'
 import RemindersPane from './RemindersPane.jsx'
 import ShortcutsPane from './ShortcutsPane.jsx'
 import StoryPane from './StoryPane.jsx'
+import MapsPane from './MapsPane.jsx'
 import './Settings.css'
 
 const PANES = [
@@ -26,6 +27,7 @@ const PANES = [
   { id: 'timers', title: 'Timers', icon: 'timer' },
   { id: 'reminders', title: 'Reminders', icon: 'bell' },
   { id: 'story', title: 'Story', icon: 'calendar' },
+  { id: 'maps', title: 'Maps', icon: 'map' },
   { id: 'shortcuts', title: 'Shortcuts', icon: 'keyboard' },
 ]
 
@@ -86,6 +88,7 @@ export default function SettingsSheet({ appearance }) {
       {pane === 'timers' ? <TimersPane stats={stats} /> : null}
       {pane === 'reminders' ? <RemindersPane stats={stats} /> : null}
       {pane === 'shortcuts' ? <ShortcutsPane /> : null}
+      {pane === 'maps' ? <MapsPane /> : null}
       {pane === 'story' ? <StoryPane projectName={askedProject || stats.tracker?.project || null} /> : null}
     </NavSheet>
   )

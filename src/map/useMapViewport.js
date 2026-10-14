@@ -33,7 +33,7 @@ const WHEEL_ZOOM_SENSITIVITY = 0.01
 /** The most one wheel event zooms by, in px of delta: ×1.22 a mouse notch. */
 const MAX_ZOOM_WHEEL_DELTA = 20
 
-export function useMapViewport({ initialViewport, onViewportChange }) {
+export function useMapViewport({ initialViewport, onViewportChange, enabled = true }) {
   const surfaceRef = useRef(null)
   const worldRef = useRef(null)
   const viewportRef = useRef(initialViewport)
@@ -105,10 +105,12 @@ export function useMapViewport({ initialViewport, onViewportChange }) {
     []
   )
 
+  // On mount, and again whenever this view takes over from the globe: its world
+  // group is a new element then, with no transform of its own yet.
   useEffect(() => {
-    applyViewport(viewportRef.current)
+    if (enabled) applyViewport(viewportRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [enabled])
 
   /**
    * A client point relative to the surface. Mid-gesture the rect read at the gesture's
@@ -139,7 +141,8 @@ export function useMapViewport({ initialViewport, onViewportChange }) {
 
   useEffect(() => {
     const surface = surfaceRef.current
-    if (!surface) return undefined
+    // On the globe, the wheel and the pinch are MapLibre's.
+    if (!surface || !enabled) return undefined
 
     // Native and non-passive: React's onWheel is passive, so preventDefault there is
     // ignored and the pane would scroll instead.
@@ -185,7 +188,7 @@ export function useMapViewport({ initialViewport, onViewportChange }) {
       surface.removeEventListener('gesturestart', onGestureStart)
       surface.removeEventListener('gesturechange', onGestureChange)
     }
-  }, [applyViewport, toSurfacePoint])
+  }, [applyViewport, enabled, toSurfacePoint])
 
   /* ---------------- dragging the map ---------------- */
 
