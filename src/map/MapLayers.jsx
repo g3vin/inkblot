@@ -289,7 +289,7 @@ const LabelLayer = memo(function LabelLayer({ map, projector, space, day, zoom, 
         let along = null
         if (label.route && routes.has(label.route)) {
           const coords = routeCoords(map, space, routes.get(label.route), day)
-          along = projector.kind === 'earth' ? measuredLine(space, coords).points : coords
+          along = projector.kind === 'earth' || projector.kind === 'globe' ? measuredLine(space, coords).points : coords
         } else if (label.path) {
           along = catmullRomSample(label.path, 8)
         }
@@ -509,17 +509,20 @@ const MapLayers = memo(function MapLayers({
   // Only on a star system does anything but a traveller move with the day. Holding
   // the day still for the other layers lets them skip re-rendering during playback.
   const staticDay = projector.kind === 'system' ? day : 0
+  // On the globe, MapLibre draws the ground, the regions and the routes; this is the
+  // overlay of everything else, in screen pixels.
+  const overGlobe = projector.kind === 'globe'
   return (
     <g className="map-layers">
-      {projector.kind === 'earth' ? (
+      {overGlobe ? null : projector.kind === 'earth' ? (
         <EarthGround map={map} projector={projector} level={earthLevel} onCountries={onCountries} staticPaths={earthPaths} />
       ) : projector.kind === 'system' ? (
         <SystemGround map={map} projector={projector} positions={positions} selection={selection} />
       ) : (
         <PlaneGround map={map} projector={projector} projectName={projectName} inlineAssets={inlineAssets} />
       )}
-      <RegionLayer map={map} projector={projector} selection={selection} idPrefix={idPrefix} />
-      <RouteLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} idPrefix={idPrefix} />
+      {overGlobe ? null : <RegionLayer map={map} projector={projector} selection={selection} idPrefix={idPrefix} />}
+      {overGlobe ? null : <RouteLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} idPrefix={idPrefix} />}
       <LabelLayer map={map} projector={projector} space={space} day={staticDay} zoom={zoom} selection={selection} idPrefix={idPrefix} />
       <PinLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} missingDocs={missingDocs} hideNames={hidePinNames} />
       <TravelerLayer map={map} projector={projector} space={space} day={day} schedules={schedules} selection={selection} />

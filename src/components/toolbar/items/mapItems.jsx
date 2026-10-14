@@ -76,3 +76,22 @@ export function MapDeleteItem({ ctx, spec }) {
     </ItemFrame>
   )
 }
+
+/** How the map is shown: globe or flat, projection, satellite, terrain (the page lays it out). */
+export function MapViewItem({ ctx, spec }) {
+  const menu = ctx.map?.viewMenu || []
+  return (
+    <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
+      <MenuButton
+        icon="map-view"
+        label={spec.label}
+        display={ctx.display}
+        disabled={!live(ctx) || !menu.length}
+        items={() => menu.flatMap((entry) => [
+          ...(entry.separator ? [{ separator: true }] : []),
+          { text: entry.label, checked: entry.checked, enabled: !entry.disabled, action: () => command(ctx, 'view-option', { id: entry.id }) },
+        ])}
+      />
+    </ItemFrame>
+  )
+}

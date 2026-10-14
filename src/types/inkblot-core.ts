@@ -2375,6 +2375,18 @@ export enum MapKind {
 	Model = "model",
 }
 
+/** One entry in a map's menu, laid out by the page. */
+export interface MapMenuItem {
+	/** What it does, sent back when chosen. Empty for a separator. */
+	id: string;
+	label: string;
+	/** Shown with a check: the current choice, or an option that is on. */
+	checked?: boolean;
+	disabled?: boolean;
+	/** A rule above this item. */
+	separator?: boolean;
+}
+
 export interface MapChromeState {
 	/** The surface commands go back to. */
 	surfaceId: string;
@@ -2401,6 +2413,12 @@ export interface MapChromeState {
 	 * a sheet or a picture.
 	 */
 	mapKind?: MapKind;
+	/**
+	 * The View menu: how the map is shown (globe or flat, the projection, satellite,
+	 * terrain, the camera's angle). Chosen items go back as
+	 * `mapCommand { command: "view-option", detail: { id } }`.
+	 */
+	viewMenu?: MapMenuItem[];
 }
 
 /**

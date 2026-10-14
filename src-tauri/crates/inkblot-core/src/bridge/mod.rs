@@ -114,7 +114,7 @@ pub use sidebar::{
 };
 pub use map::{
     MapButtonRole, MapButtonRow, MapCalendarMode, MapChoice, MapChoiceInput, MapChromeChanged, MapChromeState,
-    MapColorInput, MapCommandRequest, MapDateInput, MapDateParts, MapListRow, MapMarkerInput, MapNoteText,
+    MapColorInput, MapCommandRequest, MapDateInput, MapDateParts, MapListRow, MapMarkerInput, MapMenuItem, MapNoteText,
     MapNoteTone, MapNumberInput, MapPanel, MapPanelButton, MapPanelField, MapPanelGroup, MapPanelSection,
     MapPanelTab, MapShapePreview, MapStatRow,
     MapTableCell, MapTableRowView, MapTableView, MapTextInput, MapToggleInput,

@@ -4,8 +4,8 @@
  * reasons: a quick debounced save that is always flushed on unmount, and a slow
  * checkpoint into the `.versions/` sidecar once an edit burst settles.
  *
- * Two things are saved without being edits: the viewport, and the story day the
- * timeline was left on. Neither enters undo history — undoing a pin move must not
+ * Three things are saved without being edits: the viewport (or, on a globe or in 3D,
+ * the camera), and the story day the timeline was left on. Neither enters undo history — undoing a pin move must not
  * yank the timeline back — so both live in refs and are folded in at save time.
  *
  * A locked map (docLocks.ts) takes no edits: they are dropped here, before the
@@ -25,7 +25,10 @@ const COALESCE_IDLE_MS = 600
 const withDay = (map, day) =>
   Number.isFinite(day) && day !== map.timeline?.day ? { ...map, timeline: { ...map.timeline, day } } : map
 
-export function useMapDocument({ projectName, docPath, initialMap, viewportRef, dayRef, locked = false }) {
+/** The 3D or globe camera, folded in like the viewport: kept, never an edit. */
+const withCamera = (map, camera) => (camera && camera !== map.camera ? { ...map, camera } : map)
+
+export function useMapDocument({ projectName, docPath, initialMap, viewportRef, dayRef, cameraRef, locked = false }) {
   const [history, dispatch] = useReducer(historyReducer, initialMap, createHistory)
   const map = history.present
   const lockedRef = useRef(locked)
@@ -41,16 +44,16 @@ export function useMapDocument({ projectName, docPath, initialMap, viewportRef, 
   // they are built — callers pass the current map, day and viewport.
   const save = useMemo(
     () =>
-      debounce((nextMap, day, viewport) => {
-        void saveMapDocument(projectName, docPath, withDay(nextMap, day), viewport)
+      debounce((nextMap, day, viewport, camera) => {
+        void saveMapDocument(projectName, docPath, withCamera(withDay(nextMap, day), camera), viewport)
       }, SAVE_DEBOUNCE_MS),
     [docPath, projectName]
   )
 
   const checkpoint = useMemo(
     () =>
-      debounce((nextMap, day, viewport) => {
-        void appendMapVersion(projectName, docPath, serializeMap(withDay(nextMap, day), viewport))
+      debounce((nextMap, day, viewport, camera) => {
+        void appendMapVersion(projectName, docPath, serializeMap(withCamera(withDay(nextMap, day), camera), viewport))
       }, VERSION_CHECKPOINT_DEBOUNCE_MS),
     [docPath, projectName]
   )
@@ -62,9 +65,9 @@ export function useMapDocument({ projectName, docPath, initialMap, viewportRef, 
       isFirstRef.current = false
       return
     }
-    save(map, dayRef?.current, viewportRef.current)
-    checkpoint(map, dayRef?.current, viewportRef.current)
-  }, [checkpoint, dayRef, map, save, viewportRef])
+    save(map, dayRef?.current, viewportRef.current, cameraRef?.current)
+    checkpoint(map, dayRef?.current, viewportRef.current, cameraRef?.current)
+  }, [cameraRef, checkpoint, dayRef, map, save, viewportRef])
 
   useEffect(
     () => () => {
@@ -78,8 +81,8 @@ export function useMapDocument({ projectName, docPath, initialMap, viewportRef, 
 
   /** Persist where the view is and what day it shows — not an edit, but kept. */
   const saveView = useCallback(
-    () => save(mapRef.current, dayRef?.current, viewportRef.current),
-    [dayRef, save, viewportRef]
+    () => save(mapRef.current, dayRef?.current, viewportRef.current, cameraRef?.current),
+    [cameraRef, dayRef, save, viewportRef]
   )
 
   const clearCoalesce = useMemo(

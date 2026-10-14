@@ -21,7 +21,16 @@ const SHEET_SCALES = [
   { id: 'continent', label: 'A continent', hint: '5,000 km across', km: 5000, unit: 'km' },
 ]
 
-const PROJECTION_ORDER = ['equalEarth', 'orthographic', 'naturalEarth', 'mercator', 'equirectangular']
+/** The Earth: the globe first, then the flat projections. */
+const EARTH_CHOICES = [
+  { id: 'globe', label: 'A globe', hint: 'Spin it and zoom down to a street', earth: { view: 'globe', projection: 'equalEarth' } },
+  ...['equalEarth', 'naturalEarth', 'mercator', 'equirectangular'].map((projection) => ({
+    id: projection,
+    label: PROJECTION_NAMES[projection],
+    hint: 'A flat map of the whole world',
+    earth: { view: 'flat', projection },
+  })),
+]
 
 export default function MapSetup({ projectName, onDone }) {
   const [step, setStep] = useState(null)
@@ -69,7 +78,7 @@ export default function MapSetup({ projectName, onDone }) {
           <button type="button" className="map-setup-option" onClick={() => setStep('earth')}>
             <Icon name="globe" size={20} />
             <strong>The Earth</strong>
-            <small>Real coastlines and countries, offline.</small>
+            <small>A globe to spin and zoom, or a flat map. Real coastlines, offline.</small>
           </button>
           <button type="button" className="map-setup-option" onClick={() => setStep('system')}>
             <Icon name="orbit" size={20} />
@@ -103,21 +112,22 @@ export default function MapSetup({ projectName, onDone }) {
 
         {step === 'earth' ? (
           <div className="map-setup-choices">
-            {PROJECTION_ORDER.map((projection) => (
+            {EARTH_CHOICES.map((choice) => (
               <button
-                key={projection}
+                key={choice.id}
                 type="button"
                 className="map-button"
+                title={choice.hint}
                 onClick={() =>
                   onDone({
                     mapKind: 'earth',
-                    earth: { projection, rotate: [0, 0], graticule: true, borders: true, detail: 'auto' },
+                    earth: { ...choice.earth, rotate: [0, 0], graticule: true, borders: true, detail: 'auto', imagery: 'map', terrain3d: false },
                     scale: { kmPerUnit: 1, displayUnit: 'km', calibration: null, customUnits: [] },
                     terrains: defaultTerrainEntries(),
                   })
                 }
               >
-                {PROJECTION_NAMES[projection]}
+                {choice.label}
               </button>
             ))}
           </div>

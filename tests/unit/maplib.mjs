@@ -469,3 +469,53 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   const moved = rewriteMapDocRefs(system, 'Worlds', 'Places', 'folder')
   ok('and follows its folder when it moves', moved.changed && moved.map.system.bodies[0].surface === 'Places/Earth.map')
 }
+
+/* ---------------- the Earth as a globe ---------------- */
+
+{
+  const { isItemShown, isAtDay, hiddenLayers } = await import('../../src/lib/map/mapVisibility.js')
+  const { unwrapLongitudes, regionFeatures, routeFeatures } = await import('../../src/lib/map/globeFeatures.js')
+  const { viewMenuFor, viewOptionPatch, choosesOnline, VIEW_COMMAND_TITLES } = await import('../../src/map/mapViewMenu.js')
+
+  // A place founded on day 10 and gone on day 20 is there for days 10–19.
+  const city = { from: 10, until: 20 }
+  ok('an item is absent before it appears', !isAtDay(city, 9) && isAtDay(city, 10))
+  ok('and gone on its last day', isAtDay(city, 19.5) && !isAtDay(city, 20))
+  ok('an item with no dates is always there', isAtDay({ from: null, until: null }, -1e6))
+  const layered = normalizeMap({ mapKind: 'earth', layers: [{ id: 'old', name: 'Old', visible: false }], pins: [{ id: 'p', at: [0, 0], layer: 'old' }, { id: 'q', at: [0, 0] }] })
+  ok('a hidden layer hides what is on it', hiddenLayers(layered).has('old') && !isItemShown(layered, layered.pins[0], 0) && isItemShown(layered, layered.pins[1], 0))
+
+  // A route across the Pacific stays a short line, not one around the world.
+  const unwrapped = unwrapLongitudes([[170, 0], [-170, 0], [-160, 0]])
+  ok('longitudes unwrap across the antimeridian', unwrapped[1][0] === 190 && unwrapped[2][0] === 200)
+
+  const world = normalizeMap({
+    mapKind: 'earth',
+    pins: [{ id: 'lon', at: [-0.12, 51.5] }, { id: 'nyc', at: [-74, 40.7] }],
+    routes: [{ id: 'r', nodes: [{ pin: 'lon' }, { pin: 'nyc' }], until: 5 }],
+    regions: [{ id: 'g', rings: [[[-10, 40], [10, 40], [10, 55]]] }],
+  })
+  const regions = regionFeatures(world, { kind: 'region', id: 'g' }, 0)
+  const ring = regions.features[0].geometry.coordinates[0]
+  ok('a region is a closed polygon', ring.length === 4 && ring[0][0] === ring[3][0] && ring[0][1] === ring[3][1])
+  ok('carrying its id and selection', regions.features[0].properties.id === 'g' && regions.features[0].properties.selected)
+  const routes = routeFeatures(world, createSpace(world), 0, null)
+  const line = routes.features[0].geometry.coordinates
+  ok('a route follows its great circle', line.length > 2 && Math.max(...line.map((point) => point[1])) > 51.5)
+  ok('and leaves the globe when it ends', routeFeatures(world, createSpace(world), 5, null).features.length === 0)
+
+  // The View menu: a globe offers satellite pictures; a flat map does not.
+  const globe = normalizeMap({ mapKind: 'earth', earth: { view: 'globe' } })
+  const menu = viewMenuFor(globe)
+  const byId = (items, id) => items.find((entry) => entry.id === id)
+  ok('the View menu checks the globe', byId(menu, 'earth.view.globe').checked && !byId(menu, 'earth.view.flat').checked)
+  ok('satellite is offered on the globe only', !byId(menu, 'earth.imagery.satellite').disabled && byId(viewMenuFor({ ...globe, earth: { ...globe.earth, view: 'flat' } }), 'earth.imagery.satellite').disabled)
+  ok('a globe that could not start offers the flat map', byId(viewMenuFor(globe, { globeAvailable: false }), 'earth.view.flat').checked)
+  ok('a map that is not the Earth has no View menu', viewMenuFor(normalizeMap({ mapKind: 'blank' })).length === 0)
+  ok('a projection lays the globe flat', viewOptionPatch(globe, 'earth.projection.mercator').view === 'flat')
+  ok('an unknown projection is refused', viewOptionPatch(globe, 'earth.projection.dymaxion') === null)
+  ok('satellite pictures bring the globe back', viewOptionPatch({ ...globe, earth: { ...globe.earth, view: 'flat' } }, 'earth.imagery.satellite').view === 'globe')
+  ok('satellite pictures ask before going online', choosesOnline(globe, 'earth.imagery.satellite') && !choosesOnline(globe, 'earth.graticule'))
+  ok('turning terrain off does not ask', !choosesOnline({ ...globe, earth: { ...globe.earth, terrain3d: true } }, 'earth.terrain'))
+  ok('every View choice is a command', menu.every((entry) => VIEW_COMMAND_TITLES[entry.id]))
+}

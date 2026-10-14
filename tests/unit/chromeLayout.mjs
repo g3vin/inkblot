@@ -21,7 +21,7 @@ const EXPECTED_IDS = [
   'inkblot.canvas.color', 'inkblot.canvas.group', 'inkblot.canvas.undo-redo', 'inkblot.canvas.alignment-guides',
   'inkblot.canvas.snap-to-grid', 'inkblot.canvas.zoom', 'inkblot.canvas.delete',
   'inkblot.map.drawing-tools', 'inkblot.map.measure-tools', 'inkblot.map.undo-redo', 'inkblot.map.zoom',
-  'inkblot.map.delete',
+  'inkblot.map.delete', 'inkblot.map.view',
   'inkblot.history.snapshot', 'inkblot.panel.clipboard', 'inkblot.panel.workbench', 'inkblot.panel.notes',
   'inkblot.panel.history', 'inkblot.panel.references', 'inkblot.panel.stats', 'inkblot.timer',
   'inkblot.tabs.new-tab', 'inkblot.tabs.split',

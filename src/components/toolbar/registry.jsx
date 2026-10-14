@@ -57,6 +57,7 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.map.undo-redo': M.MapUndoRedoItem,
   'inkblot.map.zoom': M.MapZoomItem,
   'inkblot.map.delete': M.MapDeleteItem,
+  'inkblot.map.view': M.MapViewItem,
 
   'inkblot.history.snapshot': S.SnapshotItem,
   'inkblot.panel.clipboard': panel('clipboard'),

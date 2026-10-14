@@ -186,6 +186,20 @@ as a blank sheet at a scale, a picture (which can be traced to vectors), the Ear
 one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrace`,
 `mapdom`.
 
+- **One surface, several views.** `MapSurface` owns tools, selection, the inspector,
+  saving and commands; a *view* owns the camera and turns screen points into stored
+  ones. The flat SVG view is `useMapViewport`; the Earth as a globe is `useGlobeView`
+  (MapLibre GL, `GlobeView.jsx`, its own lazy chunk). A view has the same shape either
+  way — `screenToWorldAt`, `fitStored`, `centerOnStored`, `pick` — and a `native` view
+  (the globe) handles its own gestures. On the globe, world coordinates *are* screen
+  pixels: the projector asks MapLibre, and places, labels and handles are the same SVG
+  overlay as on a flat map. Regions and routes are GeoJSON sources the globe draws.
+- **Online is opt-in.** Every map works offline. Satellite pictures, street detail,
+  terrain and place search (`lib/map/onlineMaps.js`) are fetched only once the writer
+  turns online maps on — asked once, the first time they choose one, then in
+  Settings › Maps. Keys live in preferences, never in a project. List any new
+  service in PRIVACY.md.
+
 - **Kind comes from the suffix only** (`docKind.js`, `doc_kind.rs`). Code that meant "not a text document" asks `!isTextDoc`, not `isCanvasDoc`: a
   map that reaches `saveDocument` is wiped.
 - **A `.map` that is not a map is never written over.** People named text documents
@@ -198,7 +212,8 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   folded in at save time.
 - **The story calendar is per project** (`.story/calendar.json`); `story-calendar:changed`
   tells open maps to re-read it.
-- **Heavy things are lazy.** d3-geo and the atlases load only when an Earth map opens.
+- **Heavy things are lazy.** `MapPane` is its own chunk; d3-geo and the atlases load only
+  when an Earth map opens, MapLibre only when one is shown as a globe.
   The tracer runs in a module worker and falls back to the main thread if the worker
   will not start under `inkblot://`.
 - **The inspector is a form the page builds** (`useMapPanel`, `inspector/panelBuilder.js`):
@@ -412,8 +427,9 @@ to prove the case can fail.
 - **Print Layout:** a real print and PDF, the Page Setup sheet, a folded 16-page
   signature, an EPUB in Apple Books or `epubcheck`, and a Pinterest embed in print (a
   cloned iframe reloads, and may print blank).
-- **Maps:** the map tracer's worker, the Earth chunks' first-open latency, and the
-  fantasy themes' SVG filter cost at high zoom.
+- **Maps:** the map tracer's worker, the Earth chunks' first-open latency, the
+  fantasy themes' SVG filter cost at high zoom, and the globe's MapLibre worker under
+  `inkblot://` (driven in WebKit through a harness, not yet in the bundled app).
 - **Timeline:** driven in WebKit through a harness (drag, undo, the lens, the three
   layouts); not yet clicked through in the running app.
 - **Offline launch.** Launch the bundled `.app` with the network off, and check that

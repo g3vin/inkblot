@@ -65,6 +65,29 @@ pub struct MapChromeState {
     /// a sheet or a picture.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub map_kind: Option<MapKind>,
+    /// The View menu: how the map is shown (globe or flat, the projection, satellite,
+    /// terrain, the camera's angle). Chosen items go back as
+    /// `mapCommand { command: "view-option", detail: { id } }`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub view_menu: Vec<MapMenuItem>,
+}
+
+/// One entry in a map's menu, laid out by the page.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapMenuItem {
+    /// What it does, sent back when chosen. Empty for a separator.
+    pub id: String,
+    pub label: String,
+    /// Shown with a check: the current choice, or an option that is on.
+    #[serde(default)]
+    pub checked: bool,
+    #[serde(default)]
+    pub disabled: bool,
+    /// A rule above this item.
+    #[serde(default)]
+    pub separator: bool,
 }
 
 /// The map's tools, as the toolbar offers them. `Pan` is not on the toolbar — the

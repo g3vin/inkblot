@@ -79,6 +79,7 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.map.undo-redo', label: 'Undo/Redo', icon: 'undo', contexts: ['map'] },
   { id: 'inkblot.map.zoom', label: 'Zoom', icon: 'zoom-in', contexts: ['map'] },
   { id: 'inkblot.map.delete', label: 'Delete', icon: 'delete', contexts: ['map'] },
+  { id: 'inkblot.map.view', label: 'View', icon: 'map-view', contexts: ['map'] },
 
   { id: 'inkblot.history.snapshot', label: 'Snapshot now', icon: 'history', contexts: ALL },
   { id: 'inkblot.panel.clipboard', label: 'Clipboard', icon: 'clipboard', contexts: ALL },
@@ -146,7 +147,7 @@ export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
   map: [
     'inkblot.map.drawing-tools', 'inkblot.map.measure-tools', SPACE,
     'inkblot.map.undo-redo', SPACE,
-    'inkblot.map.zoom',
+    'inkblot.map.zoom', 'inkblot.map.view',
   ],
   typeset: [
     'inkblot.view.editor-mode',
