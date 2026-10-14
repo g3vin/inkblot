@@ -736,6 +736,7 @@ fn map_chrome() -> MapChromeState {
         },
         reveal_panel: 1,
         active: true,
+        map_kind: Some(crate::types::map::MapKind::Earth),
     }
 }
 

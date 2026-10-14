@@ -1,19 +1,26 @@
 /**
  * orbits.js — where the bodies of a star system are on a given story day.
  *
- * Two-body Kepler orbits in the plane: each body orbits its parent on an ellipse
- * (semi-major axis `aAU`, eccentricity `e`, periapsis angle, mean anomaly at day 0),
- * and its position is its parent's plus its own offset, so moons follow planets and
- * planets follow stars. Positions are AU in ordinary maths axes — x right, y UP, so
- * a prograde orbit runs counter-clockwise; the renderer flips y for the screen.
+ * Two-body Kepler orbits: each body orbits its parent on an ellipse (semi-major axis
+ * `aAU`, eccentricity `e`, periapsis angle, mean anomaly at day 0), tipped out of the
+ * system's plane by `inclinationDeg` about the line where it crosses that plane
+ * (`ascendingNodeDeg`). Its position is its parent's plus its own offset, so moons
+ * follow planets and planets follow stars. Positions are `[x, y, z]` AU in ordinary
+ * maths axes — x right, y UP, z out of the plane towards the viewer above it, so a
+ * prograde orbit runs counter-clockwise seen from above; the renderer flips y for
+ * the screen. An orbit with no inclination stays at z = 0, exactly where the flat
+ * orbits of earlier versions put it.
  *
  * The period comes from Kepler's third law, P = √(a³ / (M + m)) years with masses in
  * suns, unless an orbit fixes `periodDays` itself (a binary pair does, so both stars
  * share one period).
  *
- * Mirrored in `inkblot_core::map::orbits`. The Kepler solve takes a FIXED number of
- * Newton steps rather than iterating to a tolerance, so the two implementations stop
- * in the same place.
+ * The Kepler solve takes a FIXED number of Newton steps rather than iterating to a
+ * tolerance, so it stops in the same place every time on every machine.
+ *
+ * Systems whose bodies pull on each other (three stars, say) have no ellipses to
+ * follow; nbody.js integrates them, and `systemPositionsAt` hands their positions
+ * out the same way.
  */
 
 export const DAYS_PER_YEAR = 365.256363
@@ -63,10 +70,27 @@ export function solveKepler(meanAnomaly, e) {
   return E
 }
 
-/** A body's offset from its parent on `day`, AU. */
+/**
+ * A point in an orbit's own plane — x towards periapsis before it is turned — placed
+ * in the system: turned by the periapsis angle, tipped by the inclination about the
+ * line of nodes, then turned to the ascending node.
+ */
+export function orbitToSystem(orbit, x, y) {
+  const w = (orbit.periapsisDeg || 0) * RAD
+  const xw = x * Math.cos(w) - y * Math.sin(w)
+  const yw = x * Math.sin(w) + y * Math.cos(w)
+  const i = (orbit.inclinationDeg || 0) * RAD
+  const node = (orbit.ascendingNodeDeg || 0) * RAD
+  if (!i && !node) return [xw, yw, 0]
+  const yi = yw * Math.cos(i)
+  const zi = yw * Math.sin(i)
+  return [xw * Math.cos(node) - yi * Math.sin(node), xw * Math.sin(node) + yi * Math.cos(node), zi]
+}
+
+/** A body's offset from its parent on `day`, `[x, y, z]` AU. */
 export function orbitOffset(body, bodies, day) {
   const orbit = body?.orbit
-  if (!orbit) return [0, 0]
+  if (!orbit) return [0, 0, 0]
   const period = orbitPeriod(body, bodies)
   const direction = orbit.retrograde ? -1 : 1
   const mean = orbit.meanAnomalyDeg * RAD + direction * (TAU * day) / period
@@ -74,22 +98,36 @@ export function orbitOffset(body, bodies, day) {
   const E = solveKepler(((mean % TAU) + TAU) % TAU, e)
   const x = orbit.aAU * (Math.cos(E) - e)
   const y = orbit.aAU * Math.sqrt(1 - e * e) * Math.sin(E) * direction
-  const w = orbit.periapsisDeg * RAD
-  return [x * Math.cos(w) - y * Math.sin(w), x * Math.sin(w) + y * Math.cos(w)]
+  return orbitToSystem(orbit, x, y)
 }
 
-/** Every body's absolute position on `day`: id → [x, y] AU. */
+/** Every body's absolute position on `day`: id → [x, y, z] AU. */
 export function systemPositionsAt(system, day) {
+  if (system?.dynamics === 'nbody' && nbodyPositions) return nbodyPositions(system, day)
+  return keplerPositionsAt(system, day)
+}
+
+/**
+ * Where an N-body system's bodies are: installed by nbody.js, which this module
+ * cannot import without a cycle (it starts from these orbits).
+ */
+let nbodyPositions = null
+export const installNbodyPositions = (fn) => {
+  nbodyPositions = fn
+}
+
+/** Every body's position on `day` by nested Kepler orbits. */
+export function keplerPositionsAt(system, day) {
   const bodies = bodyMap(system)
   const positions = new Map()
   const resolve = (id, depth = 0) => {
     if (positions.has(id)) return positions.get(id)
     const body = bodies.get(id)
     // A cycle in the parent chain (only a hand-edited file can make one) ends at the origin.
-    if (!body || depth > bodies.size) return [0, 0]
-    const base = body.parent ? resolve(body.parent, depth + 1) : [0, 0]
+    if (!body || depth > bodies.size) return [0, 0, 0]
+    const base = body.parent ? resolve(body.parent, depth + 1) : [0, 0, 0]
     const offset = orbitOffset(body, bodies, day)
-    const position = [base[0] + offset[0], base[1] + offset[1]]
+    const position = [base[0] + offset[0], base[1] + offset[1], (base[2] || 0) + offset[2]]
     positions.set(id, position)
     return position
   }
@@ -97,18 +135,15 @@ export function systemPositionsAt(system, day) {
   return positions
 }
 
-/** A body's orbit as `samples` points around its parent (offsets, AU), closed. */
+/** A body's orbit as `samples` points around its parent (`[x, y, z]` offsets, AU), closed. */
 export function orbitPath(body, bodies, samples = 128) {
   const orbit = body?.orbit
   if (!orbit) return []
   const out = []
-  const w = orbit.periapsisDeg * RAD
   const b = orbit.aAU * Math.sqrt(1 - orbit.e * orbit.e)
   for (let index = 0; index <= samples; index += 1) {
     const E = (TAU * index) / samples
-    const x = orbit.aAU * (Math.cos(E) - orbit.e)
-    const y = b * Math.sin(E)
-    out.push([x * Math.cos(w) - y * Math.sin(w), x * Math.sin(w) + y * Math.cos(w)])
+    out.push(orbitToSystem(orbit, orbit.aAU * (Math.cos(E) - orbit.e), b * Math.sin(E)))
   }
   return out
 }
@@ -125,7 +160,7 @@ export function interceptDays(positionOf, fromId, toId, departDay, kmh, kmPerAU,
   const start = positionOf(fromId, departDay)
   const distanceAt = (day) => {
     const target = positionOf(toId, day)
-    return Math.hypot(target[0] - start[0], target[1] - start[1]) * kmPerAU
+    return Math.hypot(target[0] - start[0], target[1] - start[1], (target[2] || 0) - (start[2] || 0)) * kmPerAU
   }
   const perDay = kmh * 24
   let arrival = departDay + distanceAt(departDay) / perDay

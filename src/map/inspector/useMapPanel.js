@@ -19,7 +19,7 @@ import { getDocDisplayName } from '../../lib/docKind'
 import { loadDocument } from '../../lib/FileSystem'
 import { EARTH_PROJECTIONS, MAP_THEMES, normalizeMap, pinLabel, newId } from '../../lib/map/mapModel'
 import { calibrationKmPerUnit, createSpace } from '../../lib/map/mapSpace'
-import { formatDistance, mapUnits, toKm } from '../../lib/map/mapUnits'
+import { ASTRONOMICAL_UNITS, formatDistance, mapUnits, toKm } from '../../lib/map/mapUnits'
 import { buildSchedules, crossScheduleConflicts } from '../../lib/map/timeline'
 import { PROJECTION_NAMES } from '../../lib/map/mapProjection'
 import { COMPASS_STYLES, newRouteLabel } from '../mapOptions'
@@ -60,7 +60,7 @@ function calibrateSections(ui, { map, calibration, dispatch, onDone, form, setFo
         'calibrate.unit',
         'Unit',
         unit,
-        mapUnits(map).filter((option) => option.id !== 'AU' && option.id !== 'ly' && option.id !== 'pc').map((option) => ({ value: option.id, label: option.name })),
+        mapUnits(map).filter((option) => !ASTRONOMICAL_UNITS.has(option.id)).map((option) => ({ value: option.id, label: option.name })),
         (next) => setForm({ ...form, unit: next })
       ),
       ui.buttons([
