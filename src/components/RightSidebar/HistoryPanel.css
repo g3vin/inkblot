@@ -5,8 +5,8 @@
 .history-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 0 10px;
+  gap: var(--space-2);
+  padding: var(--space-1) 0 var(--space-3);
 }
 
 .history-snapshot-btn {
@@ -24,7 +24,6 @@
 .history-day {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .history-day-label {
@@ -33,7 +32,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-subtle);
-  padding: 6px 2px 0;
+  padding: var(--space-4) var(--space-1) var(--space-1);
 }
 
 /* ---------- session color dot ---------- */
@@ -45,36 +44,34 @@
   border-radius: var(--radius-pill);
 }
 
-/* ---------- one version row ---------- */
+/* ---------- one version ---------- */
 
-/* `.history-tile` and `.history-tile-header` themselves are in
-   components/Editor.historyPanel.css — see the note there on why there. */
+/* Each version is a Section straight on the panel, ruled off from the next by its
+   hairline; its chevron folds away the name and the change. */
+.history-version .ui-section-header { font-weight: 400; }
+.history-version .ui-section-accessory { gap: 0; }
+.history-version .ui-section-body { gap: var(--space-1); }
 
-.history-tile.is-named {
-  border-color: var(--accent-border);
+.history-version-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
-.history-tile.in-group {
-  background: var(--surface-3);
-}
+.history-version-title .history-timestamp { flex: 0 0 auto; }
 
-.history-tile-header .history-timestamp {
-  flex: 0 0 auto;
+/* Folded, a named version keeps its name in view; open, the name is below. */
+.history-version-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
-
-.history-tile-header .history-actions {
-  margin-left: auto;
-}
-
-.history-icon-btn {
-  width: 26px;
-  height: 26px;
-}
-
-.history-btn-danger {
-  border-color: var(--status-error);
-  color: var(--status-error);
-}
+.history-version[data-open='true'] .history-version-name { display: none; }
 
 .history-delta {
   display: inline-flex;
@@ -110,59 +107,66 @@
   font-size: 11px;
   color: var(--text-subtle);
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
 
-.history-tile:hover .history-name.is-placeholder,
+.history-version:hover .history-name.is-placeholder,
 .history-name.is-placeholder:focus-visible {
   opacity: 1;
 }
 
+/* A field on the tray: the control fill, no border; focus draws the ring. */
 .history-name-input {
   width: 100%;
   box-sizing: border-box;
-  background: var(--surface-3);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-md);
-  padding: 5px 8px;
+  height: var(--size-capsule);
+  background: var(--control-bg);
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-3);
+  font: inherit;
   font-size: 12px;
   color: var(--text-primary);
   outline: none;
 }
+.history-name-input:focus-visible { box-shadow: var(--focus-ring); }
 
 /* ---------- collapsed edit bursts ---------- */
 
+/* A burst sits on the panel like a version, ruled off by the same hairline; opened,
+   its checkpoints hang from a hairline down its left. */
 .history-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  border-bottom: 1px solid var(--border-muted);
 }
+.history-day > .history-group:last-child { border-bottom: 0; }
 
 .history-group-row {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
   width: 100%;
+  margin: 0;
   background: transparent;
-  border: 1px solid var(--border-muted);
-  border-radius: var(--radius-lg);
-  padding: 8px 10px;
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-3) var(--space-1);
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 11px;
-  transition: background 140ms ease, border-color 140ms ease;
+  font: 400 11px/1.2 var(--font-ui);
+  text-align: left;
 }
 
-.history-group-row:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
-}
+.history-group-row:hover { color: var(--text-primary); }
+.history-group-row:focus { outline: none; }
+.history-group-row:focus-visible { outline: 2px solid var(--accent-border); }
 
 .history-group-chevron {
   display: inline-flex;
   transform: rotate(-90deg);
-  transition: transform 160ms ease;
-  color: var(--text-subtle);
+  transition: transform var(--dur-fast) var(--ease-out);
+  color: var(--text-muted);
 }
 
 .history-group-chevron.is-open {
@@ -180,10 +184,9 @@
 .history-group-entries {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-left: 12px;
-  border-left: 2px solid var(--border-muted);
-  margin-left: 6px;
+  padding-left: var(--space-4);
+  margin: 0 0 var(--space-3) var(--space-2);
+  border-left: 1px solid var(--border-muted);
 }
 
 /* ---------------- the archive ---------------- */

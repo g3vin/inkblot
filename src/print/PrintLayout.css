@@ -86,16 +86,19 @@
   background: color-mix(in srgb, var(--accent-color) 30%, var(--pl-paper));
 }
 
-/* Mid-zoom the sizer is scaled as one composited layer (PrintLayoutView's zoom), so a
-   pinch moves a picture of the pages and never lays the text out again until it ends. */
-.pl-sizer.is-zooming {
+/* Mid-zoom the sizer (in a book, the whole book) is scaled as one composited layer
+   (PrintLayoutView's zoom), so a pinch moves a picture of the pages and never lays
+   the text out again until it ends. */
+.pl-sizer.is-zooming,
+.book-pages.is-zooming {
   transform-origin: 0 0;
   will-change: transform;
 }
 
 /* Settling a zoom the scroll range could not take exactly (the top of the document,
    or pages narrower than the pane, which centre). */
-.pl-sizer.is-settling {
+.pl-sizer.is-settling,
+.book-pages.is-settling {
   transform-origin: 0 0;
   transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -323,12 +326,12 @@
 .pl-status {
   position: absolute;
   right: 10px;
-  bottom: 20px;
+  bottom: var(--pane-status-bottom);
   z-index: 5;
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 26px;
+  height: var(--size-circle);
   font: 12px var(--font-ui);
   box-sizing: border-box;
   padding: 0 6px;
@@ -349,8 +352,7 @@
   bottom: 54px;
 }
 
-.pl-status button,
-.pl-status select {
+.pl-status button {
   font: inherit;
   color: inherit;
   background: transparent;
@@ -361,8 +363,38 @@
   font-variant-numeric: tabular-nums;
 }
 
-.pl-status button:hover,
-.pl-status select:hover {
+/* The zoom: its label, the percentage with its arrows close beside it, and the native
+   select stretched invisibly over it to catch the click and open its own menu. */
+.pl-zoom-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-variant-numeric: tabular-nums;
+}
+.pl-zoom-select > span { display: inline-flex; align-items: center; gap: 2px; }
+.pl-zoom-select select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.pl-zoom-select:hover {
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+.pl-zoom-select:has(select:focus-visible) { box-shadow: var(--focus-ring); }
+
+/* An icon button (Page setup): the glyph centred on the bar's line. */
+.pl-status button:has(> .ib-icon) {
+  display: grid;
+  place-items: center;
+  padding: 2px var(--space-1);
+}
+
+.pl-status button:hover {
   background: color-mix(in srgb, var(--text-primary) 12%, transparent);
 }
 
@@ -541,10 +573,33 @@
   padding: 0 24px;
 }
 
-.book-pages-stack {
+/* The book's other chapters are printed pages, which are ink on white (--print-*). On
+   the desk beside the live chapter they wear the screen's page instead, so in the dark
+   theme every page is dark, not only the one being worked on. */
+.book-pages-stack,
+.book-spreads {
+  --print-paper: var(--page-paper);
+  --print-ink: var(--page-ink);
+  --print-ink-secondary: var(--page-ink-secondary);
+  --print-faint: var(--page-faint);
+  --print-blank: var(--page-blank);
+}
+
+/* The pages at their real size, scaled from the top-left into the box that holds
+   their place on the desk (ZoomedPages, BookPages.jsx). */
+.book-zoomed {
+  position: relative;
+  margin: 0 auto;
+}
+
+.book-zoomed-pages {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  transform-origin: 0 0;
 }
 
 .book-pages-stack .book-page {
@@ -831,10 +886,7 @@
 
 /* ---- facing pages (BookPages.jsx, in spreads) ---- */
 
-.book-spreads {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.book-spreads > .book-zoomed-pages {
   padding: 24px 0;
 }
 

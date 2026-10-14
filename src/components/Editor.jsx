@@ -35,7 +35,7 @@ import {
 } from '../lib/editorSession'
 import { setPreference, setSessionValue } from '../lib/preferences'
 import { setOpenProject, clearOpenProject } from '../lib/projectContext'
-import { dragHandoff, documentSurface, DragPayloadKind } from '../bridge'
+import { dragHandoff, documentSurface, DragPayloadKind, editorRegistry } from '../bridge'
 import { getProjectRoot } from '../lib/projectPaths'
 import { useWindowPop } from '../hooks/useWindowPop'
 import DetachedWindowBar from './DetachedWindowBar'
@@ -246,6 +246,8 @@ export default function Editor({
     getClipboardDropZoneRect,
     isPointInAnyEditorPane,
     addClipboardEntry,
+    addClipboardImage,
+    removeClipboardEntry,
     clearClipboardHistory,
     moveClipboardEntryToEditor,
     handleDropToClipboard,
@@ -600,9 +602,31 @@ export default function Editor({
       return ''
     }
 
+    // The images in what is being copied. In a page that is the editor's selection,
+    // which sees a selected picture (its DOM selection need not hold the img);
+    // anywhere else, the images inside the window's selection.
+    const getSelectedImages = (target) => {
+      const live = editorRegistry.active()?.editor
+      if (live?.view?.dom?.contains?.(target)) {
+        const { from, to } = live.state.selection
+        const sources = []
+        live.state.doc.nodesBetween(from, to, (node) => {
+          if (node.type.name === 'image' && node.attrs.src) sources.push(node.attrs.src)
+        })
+        return sources
+      }
+
+      const selection = window.getSelection?.()
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return []
+      const fragment = selection.getRangeAt(0).cloneContents()
+      return Array.from(fragment.querySelectorAll('img'), (img) => img.getAttribute('src')).filter(Boolean)
+    }
+
     const onCopy = (event) => {
       const text = getSelectedText(event?.target)
       addClipboardEntry(text)
+      // Oldest first, so the first image in the selection ends up on top.
+      getSelectedImages(event?.target).reverse().forEach(addClipboardImage)
     }
 
     window.addEventListener('copy', onCopy, true)
@@ -610,7 +634,7 @@ export default function Editor({
     return () => {
       window.removeEventListener('copy', onCopy, true)
     }
-  }, [addClipboardEntry])
+  }, [addClipboardEntry, addClipboardImage])
 
   // Cmd+Shift+V: paste clipboard contents as plain text (HTML/styles stripped).
   useEffect(() => {
@@ -730,6 +754,7 @@ export default function Editor({
         clearClipboardHistory={clearClipboardHistory}
         onDropToClipboard={handleDropToClipboard}
         onMoveClipboardEntryToEditor={moveClipboardEntryToEditor}
+        onRemoveClipboardEntry={removeClipboardEntry}
         showWordCountBadge={showWordCountBadge}
 
         loadDocument={loadDocument}

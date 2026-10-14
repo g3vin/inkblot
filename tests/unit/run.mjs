@@ -61,7 +61,9 @@
  *          one blur token, no prefers-color-scheme duplicates
  *   ui     the shared controls (src/ui): reorder and placement math, native menus,
  *          and the controls mounted
- *   icons  every icon name in src/ is registered in src/ui/icons.js
+ *   icons  every icon name in src/ is registered in src/ui/icons.js, and each means one
+ *          thing: trash deletes, × closes, the magnifier finds, no glyph has two names
+ *   help   every help topic a control points at exists in src/lib/help.ts
  *   conversation  a chat tile's style (Inkblot, iMessage, Generic), its legacy look,
  *          its snapshot, and the DOM icon helper node views draw with
  *   chromeLayout what the toolbars and the inspector hold: the item ids, default sets,
@@ -109,7 +111,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'icons', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows']
 
 const failures = []
 

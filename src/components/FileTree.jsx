@@ -23,12 +23,11 @@ import Icon from '../ui/Icon.jsx'
 import { IconButton, Inlay, InlaySlot, popUpNativeMenu } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
-import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
-import { noteOpened, recentDocs } from '../lib/recentDocs'
+import { EMPTY_FILTER, TREE_KINDS, applyTreeFilter, folderPaths } from '../lib/treeFilter'
+import { noteOpened } from '../lib/recentDocs'
 import { lockReason, refreshLocks, useLocks } from '../lib/docLocks'
 import { openFolderPresets, useFolderPresets } from '../lib/folderPresets'
 import { inkColor } from '../lib/palette'
-import TreeFilterBar from './tree/TreeFilterBar'
 import {
   getStoryFolderAncestor,
   getStoryFolderPresetByKey,
@@ -58,6 +57,12 @@ import {
 } from '../lib/fileTreeState'
 
 
+
+/** Marks a scrolled list, so its stuck folder rows know to cover what passes under them. */
+const markScrolled = (event) => {
+  event.currentTarget.toggleAttribute('data-scrolled', event.currentTarget.scrollTop > 0)
+}
+
 export default function FileTree({
   projectName,
   currentDoc,
@@ -67,7 +72,7 @@ export default function FileTree({
   onSelectDoc,
   onSelectProject,
   registerRefreshFiles,
-  // Where the + and the filter go: under the list when not given; into this element
+  // Where the + goes: under the list when not given; into this element
   // when given (the left sidebar keeps them at its foot, still while Files and Book
   // swipe past above); nowhere when null (the book has the foot).
   footerSlot,
@@ -79,8 +84,10 @@ export default function FileTree({
   const [projects, setProjects] = useState([])
   const [tree, setTree] = useState({ type: 'folder', name: '', path: '', children: [] })
   const [expanded, setExpanded] = useState(new Set(['']))
-  const [filter, setFilter] = useState(EMPTY_FILTER)
-  const filtering = isFilterActive(filter)
+  // Which kinds of file the tree shows (the + menu's Show). Finding by name is the
+  // search's, beside the + at the sidebar's foot.
+  const [kind, setKind] = useState('all')
+  const filtering = kind !== 'all'
   const [order, setOrder] = useState({})
   const [isAddingEntry, setIsAddingEntry] = useState(false)
   const [newEntryName, setNewEntryName] = useState('')
@@ -673,24 +680,26 @@ export default function FileTree({
     return result
   }, [tree, order])
 
-  // The filter bar's view of the tree, fully open while it filters.
+  // The tree narrowed to one kind of file, fully open while it is.
   const shownRoot = useMemo(
-    () => (filtering ? applyTreeFilter(orderedRoot, filter, recentDocs(projectName)) : orderedRoot),
-    [filtering, orderedRoot, filter, projectName],
+    () => (filtering ? applyTreeFilter(orderedRoot, { ...EMPTY_FILTER, kind }) : orderedRoot),
+    [filtering, orderedRoot, kind],
   )
   const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
 
-  // What the clock button filters to: documents as they are opened.
+  // What the search offers as recent files: documents as they are opened.
   useEffect(() => { noteOpened(projectName, activeDoc) }, [projectName, activeDoc])
 
   // Expand or collapse every folder: all open unless all already are.
+  const allFoldersOpen = useCallback(
+    () => [...folderPaths(orderedRoot)].every((path) => expandedRef.current.has(path)),
+    [orderedRoot],
+  )
   const toggleAllFolders = useCallback(() => {
-    const all = folderPaths(orderedRoot)
-    const allOpen = [...all].every((path) => expandedRef.current.has(path))
-    const next = allOpen ? new Set(['']) : all
+    const next = allFoldersOpen() ? new Set(['']) : folderPaths(orderedRoot)
     expandedRef.current = next
     setExpanded(next)
-  }, [orderedRoot])
+  }, [allFoldersOpen, orderedRoot])
 
   // Contextual create button: while a document inside a story-preset folder is
   // open, offer a sibling of the same kind ("New Character" in Characters/…).
@@ -707,7 +716,8 @@ export default function FileTree({
 
   // Everything that can be added at the top of the project, as a native menu: the
   // kinds, then a sibling for the story folder being written in ("New character"),
-  // then the story folders.
+  // then the story folders. Under them, how the tree is shown: every folder open or
+  // shut, and which kinds of file it lists.
   const openNewMenu = (event) => {
     const contextLabel = storyFolderContext?.preset.entryLabel.toLowerCase()
     popUpNativeMenu(event, [
@@ -731,6 +741,12 @@ export default function FileTree({
           { text: 'Edit folder types…', action: () => openFolderPresets() },
         ],
       },
+      { separator: true },
+      { text: allFoldersOpen() ? 'Collapse all folders' : 'Expand all folders', action: toggleAllFolders },
+      {
+        text: 'Show',
+        items: TREE_KINDS.map(({ value, label }) => ({ text: label, checked: kind === value, action: () => setKind(value) })),
+      },
     ])
   }
 
@@ -747,7 +763,6 @@ export default function FileTree({
           onClick={openNewMenu}
         />
       </Inlay>
-      <TreeFilterBar filter={filter} onChange={setFilter} onToggleFolders={toggleAllFolders} />
     </InlaySlot>
   )
 
@@ -765,7 +780,7 @@ export default function FileTree({
       }}
       onDrop={(e) => handleDrop(e, null, '')}
     >
-      {/* A project's files add from the + beside the filter; the projects list from here. */}
+      {/* A project's files add from the + at the sidebar's foot; the projects list from here. */}
       {view === 'projects' ? (
         <div className="file-tree-header">
           <span className="file-tree-title">Projects</span>
@@ -853,11 +868,12 @@ export default function FileTree({
 
       {view === 'files' && (
         <>
-          <MotionDiv className="file-list" layout>
+          {/* Stuck folders paint a background only once the list has scrolled under them. */}
+          <MotionDiv className="file-list" layout onScroll={markScrolled}>
             {isAddingEntry && newEntryParent === '' && renderNewEntryInput()}
             {(shownRoot.children || []).length === 0 ? (
               <div className="file-tree-empty">
-                {!filtering ? 'No files yet.' : filter.recentOnly && !recentDocs(projectName).length ? 'No recent files' : 'No matching files'}
+                {!filtering ? 'No files yet.' : `No ${TREE_KINDS.find((entry) => entry.value === kind)?.label.toLowerCase()} yet.`}
               </div>
             ) : (
               <AnimatePresence initial={false}>

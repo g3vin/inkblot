@@ -23,13 +23,15 @@ speaks. The short version:
 - Never hard-code a colour, font, radius or shadow. Use the tokens in
   `src/styles/tokens.css`. Anything a writer colours uses an ink id from
   `src/lib/palette.ts`, drawn with `inkColor()`.
-- Typefaces: Inter (`--font-ui`) for chrome, Literata (`--font-editor`) for the writer's
-  words, and Courier Prime (`--font-type`) only for small typewritten accents
-  (`.ib-eyebrow`, `.ib-meta`, `Kbd`, empty-state titles).
+- Typefaces: Inter (`--font-ui`) for chrome, eyebrows included (`.ib-eyebrow`, bold
+  capitals), Literata (`--font-editor`) for the writer's words, and Courier Prime
+  (`--font-type`) only for small typewritten accents (`.ib-meta`, `Kbd`, empty-state
+  titles).
 - Icons: `<Icon name="…" />` (Phosphor Light; Fill when active), 16 or 20px, named by
   meaning in `src/ui/icons.js`.
-- The document is the room: a seamless writing surface, with floating, hideable panels
-  and a fade scrim under any chrome that overlays text.
+- The document is the room: a seamless writing surface in a card on the window's tinted
+  tray, with the sidebars docked on the tray or hovering over the card, and the toolbar
+  ruled off at the card's top (docs/DESIGN.md §6).
 - Keep the surface simple. Register every new action with `useCommands`
   (`src/lib/commands.ts`) so it appears in the ⌘K palette, and put advanced tools in
   "More" menus or inspector panels.

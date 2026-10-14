@@ -14,10 +14,19 @@ export const TILE_WIDTH = 260
 export const TILE_MIN_HEIGHT = 88
 export const TILE_MIN_RESIZE_WIDTH = 220
 export const TILE_MIN_RESIZE_HEIGHT = 64
-export const VIEWPORT_PADDING = 20
+/** How close a note may come to the window's edge: the gap the document card keeps from
+ *  it, where the tray shows (--space-3). */
+export const VIEWPORT_PADDING = 8
 export const HIDE_DELAY_MS = 110
-export const EDGE_GRAB_THRESHOLD = 18
+/** How far in from a card's edge a press resizes it, from that edge or corner. */
+export const RESIZE_GRIP = 6
+/** The band across a card's top that moves it, as a window's titlebar does. */
+export const MOVE_BAND = 28
 export const DRAG_MIN_DELTA = 3
+/** Leaving a note's dot or card: how far the pointer may drift back from every card
+ *  before they close, and how long it may pause on the way to one. */
+export const HOVER_INTENT_SLACK = 6
+export const HOVER_INTENT_STALL_MS = 450
 export const CHILD_OFFSET_X = 0
 export const CHILD_OFFSET_Y = 184
 
@@ -44,13 +53,77 @@ export interface PreviewIdentity {
 export const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
+/** A rect, as a card's position and size. */
+export interface Box { x: number; y: number; width: number; height: number }
+
+/**
+ * Keep a card inside the window, VIEWPORT_PADDING in from every edge, and out of any
+ * `keepOut` box (the traffic lights): a card that would overlap one is pushed out of
+ * it whichever way is shorter, down or right.
+ */
 export const clampPosition = (
   position: Point,
   size: NotePreviewSize = { width: TILE_WIDTH, height: TILE_MIN_HEIGHT },
-): Point => ({
-  x: clamp(position.x, VIEWPORT_PADDING, window.innerWidth - size.width - VIEWPORT_PADDING),
-  y: clamp(position.y, VIEWPORT_PADDING, window.innerHeight - size.height - VIEWPORT_PADDING),
-})
+  keepOut: Box[] = [],
+): Point => {
+  const inWindow = (point: Point): Point => ({
+    x: clamp(point.x, VIEWPORT_PADDING, window.innerWidth - size.width - VIEWPORT_PADDING),
+    y: clamp(point.y, VIEWPORT_PADDING, window.innerHeight - size.height - VIEWPORT_PADDING),
+  })
+  let next = inWindow(position)
+  keepOut.forEach((box) => {
+    const overlaps = next.x < box.x + box.width && next.x + size.width > box.x
+      && next.y < box.y + box.height && next.y + size.height > box.y
+    if (!overlaps) return
+    const down = box.y + box.height - next.y
+    const right = box.x + box.width - next.x
+    next = inWindow(down <= right ? { x: next.x, y: box.y + box.height } : { x: box.x + box.width, y: next.y })
+  })
+  return next
+}
+
+/** The room left between a new note and its parent, and around the notes it avoids. */
+export const OPEN_SPOT_GAP = 40
+
+/**
+ * Where a new note goes beside `parent`: the first place, nearest first, where it
+ * overlaps none of `others` (with OPEN_SPOT_GAP around them), stays in the window and
+ * out of `keepOut`. Below the parent first, then down and to either side, to the
+ * right, to the left and above; each further out in turn. Its top-left corner, or
+ * straight below the parent if there is no room anywhere.
+ */
+export const findOpenSpot = (parent: Box, size: NotePreviewSize, others: Box[], keepOut: Box[] = []): Point => {
+  const gap = OPEN_SPOT_GAP
+  const fits = (point: Point) => {
+    if (point.x < VIEWPORT_PADDING || point.y < VIEWPORT_PADDING) return false
+    if (point.x + size.width > window.innerWidth - VIEWPORT_PADDING) return false
+    if (point.y + size.height > window.innerHeight - VIEWPORT_PADDING) return false
+    const clear = (box: Box, room: number) => (
+      point.x >= box.x + box.width + room || point.x + size.width + room <= box.x
+      || point.y >= box.y + box.height + room || point.y + size.height + room <= box.y
+    )
+    return others.every((box) => clear(box, gap / 2)) && keepOut.every((box) => clear(box, 0))
+  }
+  const below = parent.y + parent.height + gap
+  const above = parent.y - gap - size.height
+  const right = parent.x + parent.width + gap
+  const left = parent.x - gap - size.width
+  for (let ring = 0; ring < 6; ring += 1) {
+    const down = ring * (size.height + gap)
+    const across = ring * (size.width + gap)
+    const candidates: Point[] = [
+      { x: parent.x, y: below + down },
+      { x: parent.x + (size.width + gap) * (ring + 1), y: below },
+      { x: parent.x - (size.width + gap) * (ring + 1), y: below },
+      { x: right + across, y: parent.y },
+      { x: left - across, y: parent.y },
+      { x: parent.x, y: above - down },
+    ]
+    const spot = candidates.find(fits)
+    if (spot) return spot
+  }
+  return { x: parent.x, y: below }
+}
 
 /** Default root-card position beside the anchor: right of it when there's room, else left. */
 export const getInitialTilePosition = (
@@ -107,6 +180,65 @@ export const getCurvePath = (fromPoint: Point, toPoint: Point): string => {
   return `M ${fromPoint.x} ${fromPoint.y} Q ${controlPoint.x} ${controlPoint.y} ${toPoint.x} ${toPoint.y}`
 }
 
+const insideBox = (point: Point, box: Box): boolean => (
+  point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height
+)
+
+/**
+ * A string from one note to the next: the same curve as getCurvePath between their
+ * centres, but only the part between the cards, from where it leaves `fromBox` (none
+ * for the dot in the text) to where it reaches `toBox`. So all of it shows as it
+ * draws, and `end` is where it touches the note, which grows from there.
+ */
+export const getStringPath = (fromPoint: Point, toPoint: Point, fromBox: Box | null, toBox: Box) => {
+  const distance = Math.hypot(toPoint.x - fromPoint.x, toPoint.y - fromPoint.y)
+  const sway = clamp(distance * 0.12, 18, 70)
+  const p0 = fromPoint
+  const p1 = { x: (fromPoint.x + toPoint.x) / 2, y: (fromPoint.y + toPoint.y) / 2 - sway }
+  const p2 = toPoint
+  const at = (t: number): Point => ({
+    x: (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x,
+    y: (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y,
+  })
+  // The first t where `inside` changes, by stepping then halving.
+  const edge = (from: number, to: number, inside: (t: number) => boolean): number => {
+    const steps = 48
+    const start = inside(from)
+    let lo = from
+    let hi = to
+    for (let i = 1; i <= steps; i += 1) {
+      const t = from + ((to - from) * i) / steps
+      if (inside(t) !== start) { hi = t; break }
+      lo = t
+      if (i === steps) return to
+    }
+    for (let i = 0; i < 20; i += 1) {
+      const mid = (lo + hi) / 2
+      if (inside(mid) === start) lo = mid
+      else hi = mid
+    }
+    return (lo + hi) / 2
+  }
+  const t0 = fromBox && insideBox(p0, fromBox) ? edge(0, 1, (t) => insideBox(at(t), fromBox)) : 0
+  const t1 = insideBox(p2, toBox) ? edge(t0, 1, (t) => insideBox(at(t), toBox)) : 1
+  const start = at(t0)
+  const end = at(t1)
+  // The piece of a quadratic between t0 and t1 is a quadratic; this is its control point.
+  const control = {
+    x: (1 - t0) * (1 - t1) * p0.x + ((1 - t0) * t1 + t0 * (1 - t1)) * p1.x + t0 * t1 * p2.x,
+    y: (1 - t0) * (1 - t1) * p0.y + ((1 - t0) * t1 + t0 * (1 - t1)) * p1.y + t0 * t1 * p2.y,
+  }
+  // Its length, near enough, from points along it: a longer string takes longer to draw.
+  let length = 0
+  let previous = start
+  for (let i = 1; i <= 24; i += 1) {
+    const point = at(t0 + ((t1 - t0) * i) / 24)
+    length += Math.hypot(point.x - previous.x, point.y - previous.y)
+    previous = point
+  }
+  return { d: `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`, start, end, length }
+}
+
 export const isSamePreviewIdentity = (
   left: PreviewIdentity | null | undefined,
   right: PreviewIdentity | null | undefined,
@@ -121,12 +253,87 @@ export const isSamePreviewIdentity = (
   )
 }
 
-export const isDragEdge = (clientX: number, clientY: number, rect: AnchorRect): boolean => (
-  clientX - rect.left <= EDGE_GRAB_THRESHOLD ||
-  rect.right - clientX <= EDGE_GRAB_THRESHOLD ||
-  clientY - rect.top <= EDGE_GRAB_THRESHOLD ||
-  rect.bottom - clientY <= EDGE_GRAB_THRESHOLD
-)
+/** How far a point is from a rect: 0 inside it. */
+export const distanceToRect = (x: number, y: number, rect: AnchorRect): number => {
+  const dx = Math.max(rect.left - x, 0, x - rect.right)
+  const dy = Math.max(rect.top - y, 0, y - rect.bottom)
+  return Math.hypot(dx, dy)
+}
+
+/**
+ * Hover intent, for a pointer that has left a note's dot or card: it is still on its
+ * way while it is getting closer to any of `targets`, and has gone once it is further
+ * from all of them than it has been (by more than the slack). `nearest` holds each
+ * target's closest distance so far, and is updated.
+ */
+export const hoverIntent = (x: number, y: number, targets: AnchorRect[], nearest: number[]): 'approaching' | 'away' | 'idle' => {
+  let approaching = false
+  let away = true
+  targets.forEach((rect, i) => {
+    const d = distanceToRect(x, y, rect)
+    const best = nearest[i] ?? Infinity
+    if (d < best - 0.5) approaching = true
+    if (d <= best + HOVER_INTENT_SLACK) away = false
+    nearest[i] = Math.min(best, d)
+  })
+  if (away) return 'away'
+  return approaching ? 'approaching' : 'idle'
+}
+
+/** Which edges a resize moves: some of n, s, e and w, as 'se' or 'n'. */
+export type ResizeEdges = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+export type CardGrip = ResizeEdges | 'move' | null
+
+/**
+ * What a press at this point on a card does: an edge or corner resizes it (a corner
+ * reaches a little further in, so it is easy to catch), the band across the top moves
+ * it, and anywhere else is the note's own content.
+ */
+export const getCardGrip = (clientX: number, clientY: number, rect: AnchorRect): CardGrip => {
+  const corner = RESIZE_GRIP * 2
+  const nearTop = clientY - rect.top
+  const nearBottom = rect.bottom - clientY
+  const nearLeft = clientX - rect.left
+  const nearRight = rect.right - clientX
+  const atCorner = (a: number, b: number) => a <= corner && b <= corner && (a <= RESIZE_GRIP || b <= RESIZE_GRIP)
+  if (atCorner(nearTop, nearLeft)) return 'nw'
+  if (atCorner(nearTop, nearRight)) return 'ne'
+  if (atCorner(nearBottom, nearLeft)) return 'sw'
+  if (atCorner(nearBottom, nearRight)) return 'se'
+  if (nearTop <= RESIZE_GRIP) return 'n'
+  if (nearBottom <= RESIZE_GRIP) return 's'
+  if (nearLeft <= RESIZE_GRIP) return 'w'
+  if (nearRight <= RESIZE_GRIP) return 'e'
+  if (nearTop <= MOVE_BAND) return 'move'
+  return null
+}
+
+/**
+ * A card's box after its `edges` are dragged by (dx, dy): the far edges stay put, and
+ * it is never smaller than the minimum or pushed past the viewport's padding.
+ */
+export const resizeCardBox = (
+  box: { x: number; y: number; width: number; height: number },
+  edges: ResizeEdges,
+  dx: number,
+  dy: number,
+  viewport: { width: number; height: number },
+) => {
+  let { x, y, width, height } = box
+  const right = x + width
+  const bottom = y + height
+  if (edges.includes('e')) width = Math.min(Math.max(TILE_MIN_RESIZE_WIDTH, width + dx), viewport.width - VIEWPORT_PADDING - x)
+  if (edges.includes('s')) height = Math.min(Math.max(TILE_MIN_RESIZE_HEIGHT, height + dy), viewport.height - VIEWPORT_PADDING - y)
+  if (edges.includes('w')) {
+    x = Math.min(Math.max(VIEWPORT_PADDING, x + dx), right - TILE_MIN_RESIZE_WIDTH)
+    width = right - x
+  }
+  if (edges.includes('n')) {
+    y = Math.min(Math.max(VIEWPORT_PADDING, y + dy), bottom - TILE_MIN_RESIZE_HEIGHT)
+    height = bottom - y
+  }
+  return { x, y, width, height }
+}
 
 export const setPointerCaptureSafely = (target: Element | null | undefined, pointerId: number) => {
   try {

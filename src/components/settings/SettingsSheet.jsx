@@ -7,8 +7,8 @@
  * Every change is saved as it is made.
  */
 import { useEffect, useState } from 'react'
-import { Button, FormRow, InkPicker, Segmented, Sheet, Toggle } from '../../ui'
-import Icon from '../../ui/Icon.jsx'
+import { Button, FormRow, InkPicker, Segmented, Toggle } from '../../ui'
+import NavSheet from '../../ui/NavSheet.jsx'
 import { useStats } from '../../stats/useStats.js'
 import { OPEN_SETTINGS } from '../../stats/timerMenu.js'
 import WritingPane from './WritingPane.jsx'
@@ -30,23 +30,28 @@ const PANES = [
 const THEMES = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'system', label: 'System' }]
 
 function GeneralPane({ appearance }) {
-  const { theme, onTheme, accent, onAccent, accentPresets, defaultAccent, wordCount, onWordCount } = appearance
+  const { theme, onTheme, accent, onAccent, accentPresets, defaultAccent, tray, onTray, trayInks, defaultTray, wordCount, onWordCount } = appearance
   return (
     <>
       <section className="settings-group">
-        <h3>Appearance</h3>
+        <h3 className="ib-eyebrow">Appearance</h3>
         <FormRow label="Theme"><Segmented label="Theme" value={theme} onChange={onTheme} options={THEMES} /></FormRow>
-        <FormRow label="Accent colour" stacked>
+        <FormRow label="Accent colour" stacked help="settings.accent">
           <div className="settings-swatches">
             <InkPicker label="Accent colour" value={accent} onChange={onAccent} inks={accentPresets.map((preset) => preset.id)} />
             <Button size="capsule" disabled={accent === defaultAccent} onClick={() => onAccent(defaultAccent)}>Reset</Button>
           </div>
         </FormRow>
-        <p className="settings-footer">Tints selections, focus rings and primary buttons. Ink Blue is Inkblot’s own.</p>
+        <FormRow label="Window colour" stacked help="settings.window-colour">
+          <div className="settings-swatches">
+            <InkPicker label="Window colour" value={tray} onChange={onTray} inks={trayInks} />
+            <Button size="capsule" disabled={tray === defaultTray} onClick={() => onTray(defaultTray)}>Reset</Button>
+          </div>
+        </FormRow>
       </section>
       <section className="settings-group">
-        <FormRow label="Show word count"><Toggle label="Show word count" checked={wordCount} onChange={onWordCount} /></FormRow>
-        <p className="settings-footer">The count floats at the foot of each document.</p>
+        <h3 className="ib-eyebrow">Document</h3>
+        <FormRow label="Show word count" help="settings.word-count"><Toggle label="Show word count" checked={wordCount} onChange={onWordCount} /></FormRow>
       </section>
     </>
   )
@@ -68,40 +73,13 @@ export default function SettingsSheet({ appearance }) {
 
   if (!open) return null
   return (
-    <Sheet title="Settings" onClose={() => setOpen(false)} width={640} className="settings-sheet">
-      <div className="settings-layout">
-        <nav className="settings-nav" aria-label="Settings">
-          {PANES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-current={pane === item.id ? 'page' : undefined}
-              // One stop in the tab order, on the pane showing; ↑/↓ move between them.
-              tabIndex={pane === item.id ? 0 : -1}
-              onClick={() => setPane(item.id)}
-              onKeyDown={(event) => {
-                if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-                event.preventDefault()
-                const nav = event.currentTarget.parentElement
-                const at = PANES.findIndex((p) => p.id === pane)
-                const next = PANES[(at + (event.key === 'ArrowDown' ? 1 : PANES.length - 1)) % PANES.length]
-                setPane(next.id)
-                requestAnimationFrame(() => nav?.querySelector('[aria-current="page"]')?.focus())
-              }}
-            >
-              <Icon name={item.icon} />{item.title}
-            </button>
-          ))}
-        </nav>
-        <div className="settings-pane" key={pane}>
-          {pane === 'general' ? <GeneralPane appearance={appearance} /> : null}
-          {pane === 'writing' ? <WritingPane stats={stats} /> : null}
-          {pane === 'goals' ? <GoalsPane stats={stats} /> : null}
-          {pane === 'timers' ? <TimersPane stats={stats} /> : null}
-          {pane === 'reminders' ? <RemindersPane stats={stats} /> : null}
-          {pane === 'shortcuts' ? <ShortcutsPane /> : null}
-        </div>
-      </div>
-    </Sheet>
+    <NavSheet title="Settings" items={PANES} value={pane} onChange={setPane} onClose={() => setOpen(false)} className="settings-sheet">
+      {pane === 'general' ? <GeneralPane appearance={appearance} /> : null}
+      {pane === 'writing' ? <WritingPane stats={stats} /> : null}
+      {pane === 'goals' ? <GoalsPane stats={stats} /> : null}
+      {pane === 'timers' ? <TimersPane stats={stats} /> : null}
+      {pane === 'reminders' ? <RemindersPane stats={stats} /> : null}
+      {pane === 'shortcuts' ? <ShortcutsPane /> : null}
+    </NavSheet>
   )
 }

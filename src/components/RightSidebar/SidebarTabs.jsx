@@ -4,7 +4,10 @@
  * slides with the gesture, and can itself be grabbed and dragged to another tab: the
  * panels follow it (`onIndicatorDrag`) and letting go chooses the tab it is over
  * (`onIndicatorDrop`). While it is held or swiped (not a quick flick) it lifts and grows, as macOS's
- * segmented controls do, and settles back as it lands.
+ * segmented controls do, and settles back as it lands. Whenever it travels (a click
+ * that sends it to another tab, a quick drag or swipe) it squashes vertically and
+ * stretches along its path, as Liquid Glass's selector does: full size where it sets
+ * off, flattest halfway, and back to full size as it reaches the tab it is bound for.
  *
  * It is placed from the buttons' measured boxes, rounded to whole device pixels,
  * rather than from a percentage of the strip: a fractional position is drawn one way
@@ -19,15 +22,61 @@ import { RIGHT_SIDEBAR_TABS } from './sidebarTabsConfig'
 const TAB_GAP_PX = 4
 // The strip's side padding, both sides: a kerf each in the sidebars (FileTree.css).
 const TAB_BAR_PADDING_PX = 6
-const TAB_SNAP_DURATION_MS = 260
+/** A snap takes longer the further it goes: SNAP_BASE_MS plus SNAP_PER_TAB_MS for
+ *  each tab it crosses (380ms to the next tab), never more than SNAP_MAX_MS. */
+const TAB_SNAP_BASE_MS = 260
+const TAB_SNAP_PER_TAB_MS = 120
+const TAB_SNAP_MAX_MS = 650
+/** The pill's grow and shrink as it is held and let go. */
+const TAB_GROW_DURATION_MS = 260
 const TAB_SNAP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
 /** The furthest the indicator runs past the first or last tab: over the strip's and
  *  the panel's padding, never out past the panel's edge. */
 const INDICATOR_OVERSHOOT_PX = 8
 /** Travel before a press on the indicator becomes a drag. */
 const INDICATOR_DRAG_SLOP_PX = 3
+/** The squash, px off the indicator's top and bottom, follows an arch along its
+ *  path: none at either end, the most halfway. How deep the arch goes: for a snap
+ *  (a click, or landing after a drag), SNAP_SQUASH_PX for a tab or more, less for a
+ *  shorter hop; dragged or swiped (when it is lifted and has height to spare), so
+ *  many px per px/ms of travel, never more than SQUASH_MAX_PX. It stretches along
+ *  its path by STRETCH of the squash. */
+const INDICATOR_SNAP_SQUASH_PX = 3
+const INDICATOR_SQUASH_PER_SPEED = 6
+const INDICATOR_SQUASH_MAX_PX = 7
+const INDICATOR_STRETCH = 0.6
+/** How much of the gap to the drag's depth is closed each frame: quick to deepen,
+ *  slower to ease off. */
+const INDICATOR_SQUASH_ATTACK = 0.5
+const INDICATOR_SQUASH_RELEASE = 0.18
+/** How much of the gap to the squash drawn is closed each frame, so moving from a
+ *  drag to its snap doesn't jump. */
+const INDICATOR_SQUASH_FOLLOW = 0.5
+/** Frames at rest before the speed watch stops. */
+const INDICATOR_STILL_FRAMES = 6
+
+/** Where the indicator is drawn right now, mid-transition included, in strip px. */
+const readIndicatorX = (element) => {
+  const { transform } = window.getComputedStyle(element)
+  if (!transform || transform === 'none' || typeof DOMMatrixReadOnly === 'undefined') return 0
+  return new DOMMatrixReadOnly(transform).m41
+}
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+/** 0 at either end of a path, 1 halfway. */
+const arch = (along) => Math.sin(Math.PI * clamp(along, 0, 1))
+
+/** How far x is from one tab to the next, 0–1. */
+const alongTabs = (x, slots) => {
+  if (!slots || slots.length < 2) return 0
+  for (let i = 0; i < slots.length - 1; i += 1) {
+    const a = slots[i].left
+    const b = slots[i + 1].left
+    if (x <= b) return b === a ? 0 : (x - a) / (b - a)
+  }
+  return 1
+}
 
 const snapToDevicePixel = (value) => {
   const ratio = (typeof window !== 'undefined' && window.devicePixelRatio) || 1
@@ -61,6 +110,11 @@ export default function SidebarTabs({
   const committedActiveIndex = Math.max(0, tabs.findIndex(({ id }) => id === tab))
   const stripRef = useRef(null)
   const dragRef = useRef(null)
+  const indicatorRef = useRef(null)
+  const motionRef = useRef({
+    frame: 0, lastX: null, lastT: 0, depth: 0, squash: 0, still: 0,
+    dragging: false, lifted: false, slots: null, from: 0, to: null,
+  })
   const [grabbing, setGrabbing] = useState(false)
   const [pressed, setPressed] = useState(false)
   const [slots, setSlots] = useState(null)
@@ -93,6 +147,7 @@ export default function SidebarTabs({
   const overshoot = visualProgress - restingProgress
   const measured = slots && slots.length === tabs.length
   let indicatorPlacement
+  let targetX = null
   if (measured) {
     const from = slots[Math.floor(restingProgress)]
     const to = slots[Math.ceil(restingProgress)]
@@ -100,6 +155,7 @@ export default function SidebarTabs({
     const width = from.width + (to.width - from.width) * along
     const give = clamp(overshoot * width, -INDICATOR_OVERSHOOT_PX, INDICATOR_OVERSHOOT_PX)
     const x = from.left + (to.left - from.left) * along + give
+    targetX = snapToDevicePixel(x)
     indicatorPlacement = {
       left: 0,
       width: `${snapToDevicePixel(width)}px`,
@@ -113,18 +169,105 @@ export default function SidebarTabs({
         + ` + clamp(-${INDICATOR_OVERSHOOT_PX}px, ${overshoot * 100}%, ${INDICATOR_OVERSHOOT_PX}px)))`,
     }
   }
-  // A quick flick lands without it: the pill only lifts once a press or swipe has
-  // been held as long as a swipe takes to be more than a flick.
-  const holding = !reducedMotion && (gestureActive || pressed)
-  const [lifted, setLifted] = useState(false)
+  // Grabbed, the pill lifts at once. A quick flick lands without it: a swipe only
+  // lifts it once held as long as a swipe takes to be more than a flick.
+  const swiping = !reducedMotion && gestureActive && !pressed
+  const [swipeLifted, setSwipeLifted] = useState(false)
   useEffect(() => {
-    if (!holding) {
-      setLifted(false)
+    if (!swiping) {
+      setSwipeLifted(false)
       return undefined
     }
-    const timer = window.setTimeout(() => setLifted(true), SWIPE_HOLD_MS)
+    const timer = window.setTimeout(() => setSwipeLifted(true), SWIPE_HOLD_MS)
     return () => window.clearTimeout(timer)
-  }, [holding])
+  }, [swiping])
+  const lifted = !reducedMotion && (pressed || swipeLifted)
+
+  // Watch where the indicator is drawn on its path — whether the snap's transition
+  // or the fingers carry it — and squash it to match, frame by frame, until it
+  // settles. A snap's path runs from where it was to the tab it is bound for; a
+  // drag's, from one tab to the next, as deep as the drag is quick. Written
+  // straight to its style: it changes every frame and React needn't know.
+  const placementKey = `${indicatorPlacement.transform}|${indicatorPlacement.width}`
+  const dragging = gestureActive || grabbing
+
+  // Each snap's length, from how far it goes: from the last place the indicator was
+  // sent (or dragged) to the new one, in tabs.
+  const [snap, setSnap] = useState({ to: null, ms: TAB_SNAP_BASE_MS + TAB_SNAP_PER_TAB_MS })
+  if (targetX !== null && targetX !== snap.to) {
+    const step = measured && slots.length > 1 ? slots[1].left - slots[0].left : 0
+    const tabsCrossed = snap.to === null || step <= 0 ? 1 : Math.abs(targetX - snap.to) / step
+    setSnap({
+      to: targetX,
+      ms: dragging
+        ? snap.ms
+        : Math.min(TAB_SNAP_MAX_MS, TAB_SNAP_BASE_MS + TAB_SNAP_PER_TAB_MS * tabsCrossed),
+    })
+  }
+  useEffect(() => {
+    const element = indicatorRef.current
+    const motion = motionRef.current
+    if (!element || reducedMotion || typeof requestAnimationFrame === 'undefined') return
+    motion.dragging = dragging
+    motion.lifted = lifted
+    motion.slots = measured ? slots : null
+    if (dragging || targetX === null) {
+      motion.to = null
+    } else if (targetX !== motion.to) {
+      motion.from = readIndicatorX(element)
+      motion.to = targetX
+    }
+    if (motion.frame) {
+      motion.still = 0
+      return
+    }
+    const apply = () => {
+      const squash = motion.squash < 0.05 ? 0 : motion.squash
+      element.style.setProperty('--sidebar-tabs-squash', `${squash.toFixed(2)}px`)
+      element.style.setProperty('--sidebar-tabs-stretch', `${(squash * INDICATOR_STRETCH).toFixed(2)}px`)
+    }
+    const tick = (now) => {
+      const x = readIndicatorX(element)
+      const speed = motion.lastX === null ? 0 : Math.abs(x - motion.lastX) / Math.max(now - motion.lastT, 1)
+      motion.lastX = x
+      motion.lastT = now
+      let target = 0
+      if (motion.dragging) {
+        const most = motion.lifted ? INDICATOR_SQUASH_MAX_PX : INDICATOR_SNAP_SQUASH_PX
+        const depth = Math.min(most, speed * INDICATOR_SQUASH_PER_SPEED)
+        const rate = depth > motion.depth ? INDICATOR_SQUASH_ATTACK : INDICATOR_SQUASH_RELEASE
+        motion.depth += (depth - motion.depth) * rate
+        target = motion.depth * arch(alongTabs(x, motion.slots))
+      } else if (motion.to !== null) {
+        motion.depth = 0
+        const span = motion.to - motion.from
+        if (Math.abs(span) >= 0.5) {
+          const tabWidth = motion.slots?.[0]?.width || Math.abs(span)
+          const depth = INDICATOR_SNAP_SQUASH_PX * Math.min(1, Math.abs(span) / tabWidth)
+          target = depth * arch((x - motion.from) / span)
+        }
+      }
+      motion.squash += (target - motion.squash) * INDICATOR_SQUASH_FOLLOW
+      apply()
+      motion.still = speed < 0.005 && motion.squash < 0.05 ? motion.still + 1 : 0
+      if (motion.still >= INDICATOR_STILL_FRAMES) {
+        motion.squash = 0
+        motion.still = 0
+        motion.frame = 0
+        apply()
+        return
+      }
+      motion.frame = requestAnimationFrame(tick)
+    }
+    motion.still = 0
+    motion.frame = requestAnimationFrame(tick)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- targetX is in placementKey
+  }, [placementKey, reducedMotion, dragging, lifted, measured, slots])
+  useEffect(() => () => {
+    const motion = motionRef.current
+    if (motion.frame) cancelAnimationFrame(motion.frame)
+    motion.frame = 0
+  }, [])
 
   // The indicator moves one tab per (its width + the gap) of pointer travel.
   const onIndicatorPointerDown = (event) => {
@@ -168,6 +311,7 @@ export default function SidebarTabs({
       style={{ '--sidebar-tab-count': tabs.length }}
     >
       <span
+        ref={indicatorRef}
         className={`sidebar-tabs-indicator${lifted ? ' is-lifted' : ''}`}
         aria-hidden="true"
         onPointerDown={onIndicatorPointerDown}
@@ -178,10 +322,10 @@ export default function SidebarTabs({
           ...indicatorPlacement,
           transition: gestureActive || reducedMotion
             ? 'none'
-            : `transform ${TAB_SNAP_DURATION_MS}ms ${TAB_SNAP_EASING}`,
+            : `transform ${snap.ms}ms ${TAB_SNAP_EASING}`,
           // The pill's grow (its insets, in the stylesheet) eases in and out on its
           // own, even while the position follows the fingers without one.
-          '--sidebar-tabs-grow-duration': reducedMotion ? '0ms' : `${TAB_SNAP_DURATION_MS}ms`,
+          '--sidebar-tabs-grow-duration': reducedMotion ? '0ms' : `${TAB_GROW_DURATION_MS}ms`,
           '--sidebar-tabs-grow-easing': TAB_SNAP_EASING,
         }}
       >

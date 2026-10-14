@@ -38,6 +38,7 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.speech.dictation': D.DictationItem,
   'inkblot.speech.read-aloud': D.ReadAloudItem,
   'inkblot.view.editor-mode': D.EditorModeItem,
+  'inkblot.view.page-view': D.PageViewItem,
 
   'inkblot.canvas.lock': C.CanvasLockItem,
   'inkblot.canvas.add-card': C.CanvasAddCardItem,

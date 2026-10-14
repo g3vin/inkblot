@@ -65,7 +65,7 @@ function DisplayToggle({ ctx, spec, field, icon, label, title }) {
 }
 export const SpreadItem = (props) => <DisplayToggle {...props} field="spread" icon="book" label="Spreads" title="Facing pages, as the book opens" />
 export const ProofItem = (props) => <DisplayToggle {...props} field="proof" icon="verified" label="Proof" title="Mark widows, orphans, rivers and loose lines" />
-export const GridItem = (props) => <DisplayToggle {...props} field="grid" icon="list" label="Baseline grid" title="Show the baseline grid over the text" />
+export const GridItem = (props) => <DisplayToggle {...props} field="grid" icon="baseline-grid" label="Baseline grid" title="Show the baseline grid over the text" />
 
 export function TightenItem({ ctx, spec }) {
   return (

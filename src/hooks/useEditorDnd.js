@@ -18,6 +18,7 @@ import { Fragment } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import { dragHandoff, DragPayloadKind } from '../bridge'
 import { readAnchor } from '../bridge/anchors'
+import { DROP_PREVIEW_PLUGIN_KEY, dropPreviewElement, setDropPreview } from '../extensions/DropPreview'
 import { normalizePinterestBoardUrl } from '../extensions/PinterestBoard'
 import { isEditorReady } from '../lib/editorUtils'
 
@@ -218,12 +219,13 @@ export function useEditorDnd({
     insertClipboardPayloadAtPoint(payload, targetEditor, event.clientX, event.clientY)
   }
 
-  // Insert dragged clipboard text at the drop point and consume the entry.
-  const insertClipboardPayloadAtPoint = (payload, targetEditor, x, y) => {
+  // Insert dragged clipboard text at the drop point (or at `atPos`, where a preview
+  // was showing) and consume the entry.
+  const insertClipboardPayloadAtPoint = (payload, targetEditor, x, y, atPos = null) => {
     const view = getMountedEditorView(targetEditor)
     if (!payload || !view) return false
-    const coords = view.posAtCoords({ left: x, top: y })
-    const insertPos = coords?.pos ?? view.state.selection.from
+    const coords = atPos == null ? view.posAtCoords({ left: x, top: y }) : null
+    const insertPos = atPos ?? coords?.pos ?? view.state.selection.from
     const tr = view.state.tr.insertText(payload.text, insertPos, insertPos)
     view.dispatch(tr.scrollIntoView())
     view.focus()
@@ -235,6 +237,53 @@ export function useEditorDnd({
     return true
   }
 
+  /* ---------------- A clipboard piece dragged by the pointer ---------------- */
+  // See lib/clipboardDropTarget: the panel drives the gesture, these answer for the page.
+
+  const mountedViews = () => [getEditor(), getSecondaryEditor()]
+    .map(getMountedEditorView)
+    .filter(Boolean)
+
+  const clearClipboardPreview = () => {
+    for (const view of mountedViews()) setDropPreview(view, null)
+  }
+
+  const hoverClipboardAt = (x, y) => {
+    clearClipboardPreview()
+    const targetEditor = getTargetEditorAtPoint(x, y)
+    if (!targetEditor) {
+      setDragCaret(null)
+      return false
+    }
+    updateDropCaret(targetEditor, { clientX: x, clientY: y })
+    return true
+  }
+
+  const previewClipboardAt = (x, y, text) => {
+    const view = getMountedEditorView(getTargetEditorAtPoint(x, y))
+    const pos = view?.posAtCoords({ left: x, top: y })?.pos
+    if (!view || pos == null || !text) return null
+    setDragCaret(null)
+    setDropPreview(view, pos, text)
+    const first = dropPreviewElement(view)?.getClientRects?.()[0]
+    return first ? { left: first.left, top: first.top, height: first.height } : null
+  }
+
+  const dropClipboardAt = (x, y, payload) => {
+    const targetEditor = getTargetEditorAtPoint(x, y)
+    const view = getMountedEditorView(targetEditor)
+    // Land where the preview showed, so the text drops exactly where the writer saw it.
+    const previewPos = view ? DROP_PREVIEW_PLUGIN_KEY.getState(view.state)?.pos ?? null : null
+    clearClipboardPreview()
+    setDragCaret(null)
+    if (!view || !payload?.text) return false
+    return insertClipboardPayloadAtPoint(payload, targetEditor, x, y, previewPos)
+  }
+
+  const clearClipboardDrag = () => {
+    clearClipboardPreview()
+    setDragCaret(null)
+  }
 
   return {
     createPasteHandler,
@@ -246,5 +295,9 @@ export function useEditorDnd({
     handlePaneDragOver,
     handlePaneDrop,
     insertClipboardPayloadAtPoint,
+    hoverClipboardAt,
+    previewClipboardAt,
+    dropClipboardAt,
+    clearClipboardDrag,
   }
 }

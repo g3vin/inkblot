@@ -6,17 +6,19 @@
  * companion to docs/DESIGN.md.
  */
 import { useRef, useState } from 'react'
-import { ACCENT_PRESETS, INKS, inkVar } from '../lib/palette'
-import { setAccentAttribute, setThemeAttribute } from '../lib/theme'
+import { ACCENT_PRESETS, INKS, TRAY_INKS, inkVar } from '../lib/palette'
+import { setAccentAttribute, setThemeAttribute, setTrayAttribute } from '../lib/theme'
 import { useCommands } from '../lib/commands'
 import {
   AppIcon, Mark, Wordmark,
   Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
   FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, Input, Kbd, Menu, MenuItem,
-  MenuLabel, MenuSeparator, Panel, PanelBody, PanelHeader, Popover, Section, Segmented, SelectMenu, Sheet,
-  Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
+  MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented,
+  SelectMenu, Sheet, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
 } from '../ui'
+import NavSheet from '../ui/NavSheet.jsx'
 import { ICONS } from '../ui/icons'
+import '../components/search/ProjectSearch.css'
 import './DesignShowcase.css'
 
 const SURFACES = ['--app-bg', '--surface-1', '--surface-2', '--surface-float', '--surface-sunken']
@@ -36,8 +38,13 @@ function ShowcaseSection({ title, children }) {
 export default function DesignShowcase() {
   const [theme, setTheme] = useState(document.documentElement.dataset.theme || 'dark')
   const [accent, setAccent] = useState(document.documentElement.dataset.accent || 'blue')
+  const [tray, setTray] = useState(document.documentElement.dataset.tray || 'blue')
   const [ink, setInk] = useState('amber')
   const [segment, setSegment] = useState('prose')
+  const [dsScope, setDsScope] = useState('document')
+  const [dsView, setDsView] = useState('today')
+  const [navSheet, setNavSheet] = useState(false)
+  const [navPage, setNavPage] = useState('a')
   const [trim, setTrim] = useState('6x9')
   const [size, setSize] = useState(12)
   const [tab, setTab] = useState('notes')
@@ -60,6 +67,7 @@ export default function DesignShowcase() {
 
   const switchTheme = (next) => { setThemeAttribute(next); setTheme(next) }
   const switchAccent = (next) => { setAccentAttribute(next); setAccent(next) }
+  const switchTray = (next) => { setTrayAttribute(next); setTray(next) }
 
   return (
     <div className="ds">
@@ -137,12 +145,30 @@ export default function DesignShowcase() {
           <InkPicker label="Accent" value={accent} onChange={switchAccent} inks={ACCENT_PRESETS.map((p) => p.id)} showLabels />
         </ShowcaseSection>
 
+        <ShowcaseSection title="Window (tray)">
+          <InkPicker label="Window colour" value={tray} onChange={switchTray} inks={TRAY_INKS} showLabels />
+          {/* The tray with a docked sidebar's text on it, the document card, and a sidebar
+              hovering over the card, veiled. */}
+          <div className="ds-tray ib-tray">
+            <div className="ds-tray-dock">
+              <p className="ib-eyebrow">Docked</p>
+              <p style={{ color: 'var(--text-muted)' }}>Muted text on the tray</p>
+            </div>
+            <div className="ds-tray-card">
+              <p className="ib-meta">The document card</p>
+            </div>
+            <div className="ds-tray-veil ib-tray is-veiled">
+              <p className="ib-eyebrow">Hovering</p>
+            </div>
+          </div>
+        </ShowcaseSection>
+
         <ShowcaseSection title="Typography">
           <p className="ib-display">Display — Inter 26</p>
           <p className="ib-title">Title — Inter 16 semibold</p>
           <p className="ib-body">Body — Inter 13. Plain, warm and short: “Add a note”, not “Create annotation”.</p>
           <p className="ib-hint">Hint — Inter 11, muted. Explains what a setting does.</p>
-          <p className="ib-eyebrow">Eyebrow — Courier Prime 11 caps</p>
+          <p className="ib-eyebrow">Eyebrow — Inter 11 bold caps</p>
           <p className="ib-meta">1,204 words · 6 min read · Saved 5:32 PM</p>
           <p className="ib-prose ds-prose-sample">Prose — Literata. It was a bright cold day in April, and the clocks were striking thirteen.</p>
         </ShowcaseSection>
@@ -249,9 +275,39 @@ export default function DesignShowcase() {
           </div>
         </ShowcaseSection>
 
-        <ShowcaseSection title="Inlay · engraved into a panel">
+        <ShowcaseSection title="Inspector panel · on the tray">
+          {/* The panel anatomy (DESIGN.md §6): the eyebrow with the scope and ⋯ beside it,
+              at most one view switch, then sections straight on the tray. Nothing in a
+              band or a box; the selected row is lifted onto paper. */}
+          <div className="ds-inspector ib-tray ib-sheet">
+            <div className="ds-inspector-head">
+              <span className="ib-eyebrow">Stats</span>
+              <PanelActions>
+                <ScopeMenu label="Count" value={dsScope} onChange={setDsScope} options={[{ value: 'document', label: 'This document' }, { value: 'project', label: 'This project', hint: 'Novel' }, { value: 'all', label: 'Everything' }]} />
+                <MoreMenu label="More stats options"><MenuItem icon="target">Goals…</MenuItem><MenuItem icon="timer">Timer routines…</MenuItem></MoreMenu>
+              </PanelActions>
+            </div>
+            <Segmented label="Show" value={dsView} onChange={setDsView} stretch options={[{ value: 'today', label: 'Today' }, { value: 'history', label: 'History' }, { value: 'insights', label: 'Insights' }]} />
+            <Section id="ds-inspector-attach" title="Attach the selection" help="timeline.attach" accessory={<Button variant="tinted">Attach</Button>}>
+              <FormRow label="To"><SelectMenu label="Event" value="new" onChange={() => {}} options={[{ value: 'new', label: 'A new event' }]} /></FormRow>
+              <FormRow label="Number documents in the file tree"><Toggle label="Number documents" checked onChange={() => {}} /></FormRow>
+              <FormRow label="Subtitle" stacked><Input placeholder="In which…" /></FormRow>
+              <Button>Choose a front…</Button>
+            </Section>
+            <Section id="ds-inspector-empty" title="This session">
+              <EmptyState compact title="No session yet." hint="Start typing to begin one." />
+            </Section>
+            <div className="ds-inspector-rows">
+              <div className="ds-lifted">Chapter one</div>
+              <div>Chapter two</div>
+            </div>
+          </div>
+          <Button onClick={() => setNavSheet(true)}>Open a NavSheet (Settings, Help)</Button>
+        </ShowcaseSection>
+
+        <ShowcaseSection title="Inlay · bare on a panel">
           <div className="ds-inlay-sheet ib-sheet">
-            {[['At rest', ''], ['Focused (ink in the channel)', 'ds-inked'], ['Lifted out (an empty pocket)', 'ds-lifted']].map(([caption, state]) => (
+            {[['At rest', ''], ['Focused (the glyph inked)', 'ds-inked'], ['Lifted out (hidden in place)', 'ds-lifted']].map(([caption, state]) => (
               <div key={caption} className="ds-inlay-state">
                 <InlaySlot className="ds-panel-footer">
                   <Inlay round><IconButton icon="add" label="Add note" size="circle" /></Inlay>
@@ -262,6 +318,45 @@ export default function DesignShowcase() {
                 <p className="ib-meta">{caption}</p>
               </div>
             ))}
+          </div>
+        </ShowcaseSection>
+
+        <ShowcaseSection title="Project search · the left sidebar's foot">
+          <div className="ds-search">
+            <div className="project-search-card">
+              <label className="project-search-field">
+                <Icon name="search" size={20} className="project-search-field-icon" />
+                <input className="project-search-input" aria-label="Search" defaultValue="ferry" tabIndex={-1} />
+                <IconButton icon="close" label="Clear search" size="capsule" className="project-search-clear" />
+              </label>
+              <div className="project-search-body">
+                {[
+                  ['In this document', [['text-cursor', 'The ferry left at dawn.', null]]],
+                  ['Documents', [['document', 'Ferry crossing', null], ['canvas', 'Plot', 'ferry to the island']]],
+                  ['Notes', [['note', 'ferry', 'Check the ferry timetable']]],
+                ].map(([title, rows], sectionIndex) => (
+                  <div key={title} className="project-search-section">
+                    <div className="project-search-section-title"><span className="ib-eyebrow">{title}</span></div>
+                    {rows.map(([icon, label, preview], rowIndex) => (
+                      <div key={label} className={`project-search-row${sectionIndex === 1 && rowIndex === 0 ? ' is-selected' : ''}`}>
+                        <Icon name={icon} size={20} className="project-search-row-icon" />
+                        <span className="project-search-row-text">
+                          <span className="project-search-row-title">{label}</span>
+                          {preview ? <span className="project-search-row-preview">{preview}</span> : null}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="ds-inlay-sheet ib-sheet">
+              <InlaySlot className="ds-search-foot">
+                <Inlay round><IconButton icon="add" label="New…" size="circle" /></Inlay>
+                <Inlay round><IconButton icon="search" label="Search" size="circle" /></Inlay>
+              </InlaySlot>
+              <p className="ib-meta">The foot: + outside, search inside</p>
+            </div>
           </div>
         </ShowcaseSection>
 
@@ -327,6 +422,12 @@ export default function DesignShowcase() {
           <SelectMenu label="Trim size" value={trim} onChange={setTrim} options={[{ value: '6x9', label: '6 × 9 in' }, { value: 'a5', label: 'A5' }]} />
         </FormRow>
       </Sheet>
+      {navSheet ? (
+        <NavSheet title="Help" items={[{ id: 'a', title: 'Using help', group: 'Getting around' }, { id: 'b', title: 'Sidebars', group: 'Getting around' }, { id: 'c', title: 'Accent colour', group: 'Settings' }]} value={navPage} onChange={setNavPage} onClose={() => setNavSheet(false)}>
+          <p className="ib-eyebrow">A page</p>
+          <h3 className="ib-title">The page that is chosen on the left</h3>
+        </NavSheet>
+      ) : null}
       <CommandPalette />
     </div>
   )

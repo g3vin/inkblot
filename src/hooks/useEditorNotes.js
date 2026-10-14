@@ -101,7 +101,8 @@ export function useEditorNotes({
           if (note.type !== 'quote') return note
 
           const newFrom = mapping.map(note.from)
-          const newTo = mapping.map(note.to)
+          // Typing right after a noted passage goes after its dot, outside the note.
+          const newTo = mapping.map(note.to, -1)
 
           if (newFrom >= newTo) return null
 

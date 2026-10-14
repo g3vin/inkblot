@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { shellBridge, useBridgeEvent, useLatestBridgeState } from '../../../bridge'
 import { BibliographyInclude } from '../../../types'
-import { Segmented, Toggle } from '../../../ui'
+import { Button, EmptyState, FormRow, IconButton, MenuItem, MenuLabel, MenuSeparator, MoreMenu, PanelActions, ScopeMenu, Section, SelectMenu, Toggle } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
 import Icon from '../../../ui/Icon.jsx'
 import ReferenceEditor from './ReferenceEditor'
@@ -106,33 +106,45 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
 
   const styles = schema?.styles ?? []
   const currentStyle = styles.find((style) => style.id === state?.style)
-  const styleMenu = (event) => popUpNativeMenu(event, [
-    ...styles.map((style) => ({
-      text: style.label,
-      checked: state?.style === style.id,
-      action: () => send('setCitationStyle', { docPath, style: style.id, makeProjectDefault: !docPath }),
-    })),
-    { separator: true },
-    {
-      text: `Use ${currentStyle?.short ?? 'This Style'} for New Documents`,
-      enabled: Boolean(currentStyle) && state?.projectStyle !== currentStyle?.id,
-      action: () => currentStyle && send('setCitationStyle', { docPath, style: currentStyle.id, makeProjectDefault: true }),
-    },
-  ])
 
-  const emptyTitle = input ? 'No matching sources' : !state ? 'No project open' : scope === 'document' && docPath ? 'No sources in this document' : 'No sources yet'
+  const emptyTitle = input ? 'No matching sources.' : !state ? 'No project open.' : scope === 'document' && docPath ? 'No sources in this document.' : 'No sources yet.'
   const emptyMessage = input
     ? (citing ? `Press Return to add “${input}” and cite it.` : 'Press Return to look it up and add it.')
-    : state ? 'Paste a link, DOI or ISBN above, or type a title. Sources you add here belong to the document you are in.' : ''
+    : state ? 'Paste a link, DOI or ISBN above, or type a title.' : ''
 
   return (
-    <div className="sidebar-panel references-panel">
-      <div className={`references-quick-add${citing ? ' is-citing' : ''}`}>
-        <Icon name={citing ? 'comment' : 'zoom-in'} />
+    <div className="sidebar-panel references-panel" data-help="references.panel">
+      <PanelActions>
+        <ScopeMenu
+          label="Show sources in"
+          value={scope}
+          onChange={setScope}
+          options={[
+            { value: 'document', label: 'This document', disabled: !docPath },
+            { value: 'project', label: 'This project' },
+          ]}
+        />
+        <MoreMenu label="More reference options">
+          <MenuLabel>Citation style</MenuLabel>
+          {styles.map((style) => (
+            <MenuItem key={style.id} checked={state?.style === style.id} onSelect={() => send('setCitationStyle', { docPath, style: style.id, makeProjectDefault: !docPath })}>{style.label}</MenuItem>
+          ))}
+          <MenuSeparator />
+          <MenuItem
+            disabled={!currentStyle || state?.projectStyle === currentStyle?.id}
+            onSelect={() => currentStyle && send('setCitationStyle', { docPath, style: currentStyle.id, makeProjectDefault: true })}
+          >
+            Use {currentStyle?.short ?? 'this style'} for new documents
+          </MenuItem>
+          <MenuItem icon="write" onSelect={newSource}>Enter a source by hand…</MenuItem>
+        </MoreMenu>
+      </PanelActions>
+      <div className={`references-quick-add${citing ? ' is-citing' : ''}`} data-help="references.lookup">
+        <Icon name={citing ? 'quote' : 'add'} />
         <input
           ref={inputRef}
           value={input}
-          placeholder={citing ? 'Find a source to cite…' : 'Paste a URL, DOI or ISBN — or type a title'}
+          placeholder={citing ? 'Find a source to cite…' : 'Add a source…'}
           aria-label={citing ? 'Find a source to cite' : 'Add a source'}
           onChange={(event) => {
             setInput(event.target.value)
@@ -145,27 +157,7 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
             else if (event.key === 'Escape' && (citing || input)) { event.preventDefault(); setInput(''); setCiting(false) }
           }}
         />
-        {input ? (
-          <button type="button" className="reference-icon-button" aria-label="Clear" onClick={() => setInput('')}><Icon name="close" /></button>
-        ) : null}
-        <button type="button" className="reference-icon-button" aria-label="Enter a source by hand" title="Enter a source by hand" onClick={newSource}>
-          <Icon name="write" />
-        </button>
-      </div>
-
-      <div className="references-controls">
-        <button type="button" className="references-style ui-button" data-variant="tinted" data-size="capsule" onClick={styleMenu} title="Citation style">
-          <Icon name="type-style" /> {currentStyle?.short ?? 'Style'}
-        </button>
-        <Segmented
-          value={scope}
-          onChange={setScope}
-          label="Show sources in"
-          options={[
-            { value: 'document', label: 'Document', disabled: !docPath },
-            { value: 'project', label: 'Project' },
-          ]}
-        />
+        {input ? <IconButton icon="close" label="Clear" size="capsule" onClick={() => setInput('')} /> : null}
       </div>
 
       <div ref={listRef} className="references-list sidebar-list">
@@ -182,11 +174,7 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
             onCite={() => cite([view.reference.id])}
           />
         )) : (
-          <div className="inspector-placeholder">
-            <Icon name="books" size={20} />
-            <strong>{emptyTitle}</strong>
-            <span>{emptyMessage}</span>
-          </div>
+          <EmptyState icon="books" title={emptyTitle} hint={emptyMessage || undefined} />
         )}
       </div>
 
@@ -248,12 +236,8 @@ function ReferenceRow({ view, schema, scope, docPath, highlighted, expanded, onT
           </span>
         </div>
         <div className="reference-actions">
-          <button type="button" className="reference-icon-button" aria-label="Cite" title="Cite at the caret (or double-click the source)" onClick={onCite}>
-            <Icon name="comment" />
-          </button>
-          <button type="button" className="reference-icon-button" aria-label="More" onClick={menu}>
-            <Icon name="more" />
-          </button>
+          <IconButton icon="quote" label="Cite" title="Cite at the caret (or double-click the source)" size="capsule" onClick={onCite} />
+          <IconButton icon="more" label="More source actions" size="capsule" onClick={menu} />
         </div>
       </div>
       {expanded ? <ReferenceEditor view={view} schema={schema} /> : null}
@@ -266,31 +250,38 @@ function BibliographyFooter({ state }) {
   const set = (change) => send('setBibliographyOptions', { docPath: state.docPath, options: { ...options, ...change } })
   return (
     <footer className="references-bibliography">
-      <div className="references-bibliography-head">
-        <strong>Bibliography</strong>
-        <button
-          type="button"
-          className="ui-button"
-          data-variant="tinted"
-          data-size="capsule"
-          onClick={() => send('insertBibliography', {})}
-          title={state.hasBibliography ? 'Move the live bibliography to the end of the document' : 'Add a live bibliography at the end of the document — it updates as you cite'}
-        >
-          {state.hasBibliography ? 'Move to end' : 'Insert at end'}
-        </button>
-      </div>
-      <select className="ui-select" value={options.include} aria-label="List" onChange={(event) => set({ include: event.target.value })}>
-        <option value={BibliographyInclude.Cited}>Sources cited in the text</option>
-        <option value={BibliographyInclude.Attached}>Every source in this document</option>
-      </select>
-      <label className="references-toggle">
-        <Toggle checked={options.annotated} onChange={(annotated) => set({ annotated })} label="Annotated" />
-        Annotated (show each source’s annotation)
-      </label>
-      <label className="references-toggle" title={state.hasBibliography ? 'The bibliography is in the document, so it prints with it' : undefined}>
-        <Toggle checked={state.hasBibliography || options.inPrint} disabled={state.hasBibliography} onChange={(inPrint) => set({ inPrint })} label="Add to printouts and exports" />
-        Add to printouts and exports
-      </label>
+      <Section
+        id="references.bibliography"
+        title="Bibliography"
+        help="references.bibliography"
+        accessory={(
+          <Button
+            variant="tinted"
+            onClick={() => send('insertBibliography', {})}
+            title={state.hasBibliography ? 'Move the live bibliography to the end of the document' : 'Add a live bibliography at the end of the document; it updates as you cite'}
+          >
+            {state.hasBibliography ? 'Move to end' : 'Insert at end'}
+          </Button>
+        )}
+      >
+        <FormRow label="List">
+          <SelectMenu
+            label="List"
+            value={options.include}
+            onChange={(include) => set({ include })}
+            options={[
+              { value: BibliographyInclude.Cited, label: 'Sources cited' },
+              { value: BibliographyInclude.Attached, label: 'Every source here' },
+            ]}
+          />
+        </FormRow>
+        <FormRow label="Annotated">
+          <Toggle checked={options.annotated} onChange={(annotated) => set({ annotated })} label="Annotated" />
+        </FormRow>
+        <FormRow label="In printouts and exports">
+          <Toggle checked={state.hasBibliography || options.inPrint} disabled={state.hasBibliography} onChange={(inPrint) => set({ inPrint })} label="In printouts and exports" />
+        </FormRow>
+      </Section>
     </footer>
   )
 }

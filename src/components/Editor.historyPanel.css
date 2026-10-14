@@ -6,34 +6,11 @@
   min-height: 0;
 }
 
-/* `.history-tile` and `.history-tile-header` are declared here, not in
-   RightSidebar/HistoryPanel.css, because this file loads later in Editor.css:
-   `margin-bottom: 0` has to come after `.tile-header`'s 8px (which loads between
-   the two) to cancel it. */
-.history-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.history-tile-header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 0;
-}
-
 .history-timestamp {
   font-size: 11px;
   color: var(--text-muted);
   text-transform: none;
   letter-spacing: 0;
-}
-
-.history-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .history-preview {

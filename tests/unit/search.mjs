@@ -9,10 +9,10 @@ const C = '../../src'
 const { collectCanvasMatches } = await import(`${C}/lib/canvasSearch.js`)
 const { serializeCanvas, createEmptyCanvas, makeTextNode, makeGroupNode, makeFileNode, makeEdge } =
   await import(`${C}/lib/canvasModel.js`)
-const { createMatcher } = await import(`${C}/lib/sidebarSearch.js`)
+const { createMatcher, searchEverything } = await import(`${C}/lib/sidebarSearch.js`)
 
 // collectCanvasMatches takes a COMPILED matcher, not a query string — the same one
-// sidebarSearch builds, so every scope honours the same case/whole-word/regex
+// sidebarSearch builds, so every search honours the same case/whole-word/regex
 // switches. Passing a bare string makes it return [] silently, which is the exact
 // failure this suite exists to catch.
 const m = (query, options) => createMatcher(query, options)
@@ -93,3 +93,49 @@ for (let i = 0; i < 50; i += 1) {
   many.nodeOrder.push(node.id)
 }
 ok('the limit caps results', collectCanvasMatches(serializeCanvas(many), m('match'), 'x.canvas', { limit: 24 }).length === 24)
+
+/* ---- the project search: one walk, sorted into categories ---- */
+
+const para = (text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })
+const doc = (...texts) => ({ content: { type: 'doc', content: texts.map(para) } })
+const files = {
+  'Chapters/Harbour': { ...doc('The ferry left at dawn.'), notes: [{ id: 'n1', anchor: 'ferry', content: 'Check the ferry timetable' }] },
+  'Chapters/Ferry crossing': doc('Rain all the way over.'),
+  'Chapters/Open one': doc('A ferry in the chapter being written.'),
+  'Plot.canvas': serializeCanvas((() => {
+    const board = createEmptyCanvas()
+    const card = makeTextNode({ x: 0, y: 0, text: 'ferry to the island' })
+    board.nodes[card.id] = card
+    board.nodeOrder.push(card.id)
+    return board
+  })()),
+  'Days.timeline': {},
+}
+const tree = {
+  type: 'folder', path: '', children: Object.keys(files).map((path) => ({ type: 'file', path, name: path.split('/').pop() })),
+}
+const found = await searchEverything({
+  matcher: m('ferry'),
+  projectName: 'Novel',
+  currentDocName: 'Chapters/Open one',
+  listProjectTree: async () => tree,
+  loadDocument: async (_project, path) => files[path] ?? null,
+})
+const docNames = found.documents.map((row) => row.docName)
+ok('a document whose name matches comes first', docNames[0] === 'Chapters/Ferry crossing')
+ok('documents matching in their text follow', docNames.includes('Chapters/Harbour') && docNames.includes('Plot.canvas'))
+ok('one row per document, however often it matches', new Set(docNames).size === docNames.length)
+ok('the document being written in is left to "In this document"', !docNames.includes('Chapters/Open one'))
+ok('a text match carries where it is, for the jump', typeof found.documents.find((row) => row.docName === 'Chapters/Harbour').from === 'number')
+ok('a canvas match carries its card, for the reveal', !!found.documents.find((row) => row.docName === 'Plot.canvas').nodeId)
+ok('each row says its kind, for its icon', found.documents.find((row) => row.docName === 'Plot.canvas').kind === 'canvas')
+ok('notes are their own category', found.notes.length === 1 && found.notes[0].note.id === 'n1')
+
+const capped = await searchEverything({
+  matcher: m('ferry'), projectName: 'Novel', listProjectTree: async () => tree,
+  loadDocument: async (_project, path) => files[path] ?? null, limit: 1,
+})
+ok('each category is capped', capped.documents.length === 1 && capped.notes.length === 1)
+ok('an empty query searches nothing', (await searchEverything({
+  matcher: m(''), projectName: 'Novel', listProjectTree: async () => tree, loadDocument: async () => null,
+})).documents.length === 0)

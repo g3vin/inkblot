@@ -10,8 +10,9 @@
  * Everything is the page's: the rows are `pageLayoutState.bookItems`, and every
  * change goes back as a command.
  *
- * Its + (front matter, back matter, a part) and its filter are drawn at the left
- * sidebar's foot (`footerSlot`), in the place the file tree's are while Files shows.
+ * Its + (front matter, back matter, a part) is drawn at the left sidebar's foot
+ * (`footerSlot`), in the place the file tree's is while Files shows, beside the
+ * project search.
  */
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -20,8 +21,6 @@ import { Button, IconButton, Inlay, InlaySlot, Sheet, usePointerReorder } from '
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
 import Icon from '../../ui/Icon.jsx'
 import { SECTION_TITLES, addMenu, moveTarget, rowMenu } from './bookMenu.js'
-import TreeFilterBar from '../tree/TreeFilterBar'
-import { EMPTY_FILTER } from '../../lib/treeFilter'
 import './BookNavigator.css'
 
 const send = (type, payload) => shellBridge.send(type, payload)
@@ -56,7 +55,6 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
   const [renaming, setRenaming] = useState(null)
   const [title, setTitle] = useState('')
   const [removing, setRemoving] = useState(null)
-  const [query, setQuery] = useState('')
   const rows = state?.bookItems ?? []
   const ids = rows.map((row) => row.id)
   const { dragging, insertIndex, onPointerDown } = usePointerReorder({
@@ -100,11 +98,6 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
     onReveal: (row) => { send('openBookItem', { id: row.id }); onShowFiles?.() },
   }
   const sections = ['front', 'body', 'back']
-  // The filter narrows the rows by title. Reordering a list with rows missing could
-  // only guess where a drop lands, so dragging waits until it is cleared.
-  const needle = query.trim().toLowerCase()
-  const shows = (text) => !needle || String(text ?? '').toLowerCase().includes(needle)
-  const shownRows = rows.filter((row) => shows(row.title) || shows(row.label))
   const footer = (
     <InlaySlot className="file-tree-footer">
       <Inlay round>
@@ -117,23 +110,17 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
           onClick={(event) => popUpNativeMenu(event, addMenu(rows))}
         />
       </Inlay>
-      <TreeFilterBar
-        filter={{ ...EMPTY_FILTER, text: query }}
-        onChange={(next) => setQuery(next.text)}
-        filesOnly={false}
-        placeholder={`Filter ${state.book?.title || 'the book'}`}
-      />
     </InlaySlot>
   )
 
   return (
     <div className="book-navigator">
       <div ref={listRef} className="book-list" role="listbox" aria-label="The book’s contents">
-        {shows('Cover') ? <CoverRow cover={state.cover} selected={showingCover} onOpen={() => open('cover')} /> : null}
-        {sections.filter((section) => !needle || shownRows.some((row) => row.section === section)).map((section) => (
+        <CoverRow cover={state.cover} selected={showingCover} onOpen={() => open('cover')} />
+        {sections.map((section) => (
           <div key={section} className="book-section">
             <div className="book-heading">{SECTION_TITLES[section]}</div>
-            {shownRows.filter((row) => row.section === section).map((row) => {
+            {rows.filter((row) => row.section === section).map((row) => {
               const index = ids.indexOf(row.id)
               return (
                 <div
@@ -148,7 +135,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
                   data-dragging={dragging === row.id}
                   data-insert-before={insertIndex === index && dragging && dragging !== row.id}
                   title={row.path ?? row.title}
-                  onPointerDown={(event) => { if (!needle && !event.target.closest('.book-row-eye')) onPointerDown(event, row.id) }}
+                  onPointerDown={(event) => { if (!event.target.closest('.book-row-eye')) onPointerDown(event, row.id) }}
                   onClick={() => open(row.id)}
                   onKeyDown={(event) => { if (event.key === 'Enter') open(row.id) }}
                   onContextMenu={(event) => popUpNativeMenu(event, rowMenu(row, actions))}
@@ -165,7 +152,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
                     title={row.hidden ? 'Show in the book' : 'Hide from the book: left out of the pages, print, export and the continuous document'}
                     onClick={(event) => { event.stopPropagation(); send('setBookItemHidden', { id: row.id, hidden: !row.hidden }) }}
                   >
-                    <Icon name={row.hidden ? 'hide' : 'focus'} />
+                    <Icon name={row.hidden ? 'hide' : 'show'} />
                   </button>
                 </div>
               )
@@ -173,7 +160,6 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
           </div>
         ))}
         {insertIndex === ids.length && dragging ? <span className="book-insert-end" aria-hidden="true" /> : null}
-        {needle && !shownRows.length && !shows('Cover') ? <div className="book-empty">No matching chapters</div> : null}
       </div>
       {footerSlot === undefined ? footer : footerSlot ? createPortal(footer, footerSlot) : null}
       {renaming ? (

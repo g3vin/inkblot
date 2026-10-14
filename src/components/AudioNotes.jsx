@@ -68,7 +68,7 @@ function AudioClip({ clip, projectName, onRemove }) {
         aria-label="Delete voice memo"
         title="Delete voice memo"
       >
-        <Icon name="close" />
+        <Icon name="delete" />
       </button>
 
       {url ? (

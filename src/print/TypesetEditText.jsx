@@ -22,18 +22,18 @@ const placeCaret = (editor, pos) => {
   }, 60)
 }
 
-export default function TypesetEditText({ editor, projectName, docPath, printLayout }) {
+export default function TypesetEditText({ editor, projectName, docPath, typesetting }) {
   const [offer, setOffer] = useState(null)
 
   useEffect(() => {
-    if (!editor || !printLayout) return undefined
+    if (!editor || !typesetting) return undefined
     const onEditText = (event) => {
       if (event.detail?.view !== editor.view) return
       setOffer({ pos: event.detail.pos, x: event.detail.x, y: event.detail.y })
     }
     window.addEventListener(TYPESET_EDIT_TEXT_EVENT, onEditText)
     return () => window.removeEventListener(TYPESET_EDIT_TEXT_EVENT, onEditText)
-  }, [editor, printLayout])
+  }, [editor, typesetting])
 
   // The offer goes when anything else is done: a key, a click elsewhere, a scroll.
   useEffect(() => {
@@ -53,8 +53,8 @@ export default function TypesetEditText({ editor, projectName, docPath, printLay
   }, [offer])
 
   useEffect(() => {
-    if (!printLayout) setOffer(null)
-  }, [printLayout])
+    if (!typesetting) setOffer(null)
+  }, [typesetting])
 
   const editText = useCallback(() => {
     if (!offer) return
@@ -71,7 +71,8 @@ export default function TypesetEditText({ editor, projectName, docPath, printLay
     placeCaret(editor, pos)
   }, [editor, projectName])
 
-  const returning = !printLayout && getTypesetReturn()?.docPath === docPath
+  // In Write — continuous or on its pages — until the writer goes back.
+  const returning = !typesetting && getTypesetReturn()?.docPath === docPath
 
   return (
     <>

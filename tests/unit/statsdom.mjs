@@ -83,7 +83,11 @@ await act(async () => { await wait(30) })
 
 const text = () => document.body.textContent
 ok('the panel shows the live session', text().includes('This session') && /Words written\s*12/.test(text()))
-ok('the panel names the scope', text().includes('This document: Chapter 1'))
+// The scope is the header's menu; each choice names what it counts.
+const scopeButton = document.querySelector('.stats-panel .ib-scope-menu')
+await act(async () => { scopeButton.click(); await wait(10) })
+ok('the panel names the scope', scopeButton.textContent.includes('This document') && [...document.querySelectorAll('.ib-menu [role="menuitemcheckbox"]')].some((item) => item.textContent.includes('Chapter 1')))
+await act(async () => { scopeButton.click(); await wait(10) })
 ok('no goal yet offers to set one', text().includes('No goal for today.'))
 
 // The session reaches the store; the panel reads it and the pending part goes to zero.
@@ -114,7 +118,7 @@ await act(async () => {
   await wait(10)
 })
 ok('a setting is saved as it is made', parseStatsConfig(savedConfig).idleCutoff === 600 && stats.tracker.config.idleCutoff === 600)
-const goalsTab = [...document.querySelectorAll('.settings-nav button')].find((b) => b.textContent.includes('Goals'))
+const goalsTab = [...document.querySelectorAll('.ib-navsheet-nav button')].find((b) => b.textContent.includes('Goals'))
 await act(async () => { goalsTab.click(); await wait(10) })
 ok('the goals pane lists the week', text().includes('Each week') && text().includes('Particular days'))
 

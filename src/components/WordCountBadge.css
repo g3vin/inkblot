@@ -2,12 +2,19 @@
    Word-count badge
    ============================================================ */
 
-/* Bottom-left, level with the file tree's + and filter bar and the same height (32px),
-   so the two read as one row along the bottom of the window. The word count leads; in
-   Print Layout the page count follows it. */
+/* The pane's bottom row: the word count bottom-left, the detached-window bar or the
+   zoom bar bottom-right. It is level with the file tree's + and filter and the same
+   height (--size-circle), so they read as one row along the bottom of the window. The
+   filter sits the sidebar's inset (--space-3), its hairline and its footer's margin
+   (--space-2) up from the window; the card is --space-3 up, so the row sits the rest. */
+.pane {
+  --pane-status-bottom: calc(var(--space-2) + var(--hairline));
+}
+
+/* The word count leads; in Print Layout the page count follows it. */
 .pane-status {
   position: absolute;
-  bottom: 20px;
+  bottom: var(--pane-status-bottom);
   left: 10px;
   z-index: 5;
   display: flex;
@@ -15,12 +22,17 @@
   pointer-events: none;
 }
 
-/* A floating capsule, as tall as the file tree's filter bar and level with it. */
+/* Text dissolves under the capsules rather than running into them (DESIGN.md §6). Not
+   in Print layout, whose pages sit on a desk of their own. */
+.pane-bottom-scrim { --scrim-height: 56px; z-index: 4; }
+.pane-scroll.is-print-layout ~ .pane-bottom-scrim { display: none; }
+
+/* A floating capsule, as tall as the file tree's filter and level with it. */
 .word-count {
   margin: 0;
   display: flex;
   align-items: center;
-  height: 26px;
+  height: var(--size-circle);
   box-sizing: border-box;
   padding: 0 10px;
   font: 12px var(--font-ui);

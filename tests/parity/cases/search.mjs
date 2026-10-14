@@ -16,7 +16,6 @@
  */
 import {
   createMatcher, buildPreview, getEntryLabel, collectMatchesFromDocJson,
-  getPanelNoun, getSearchPlaceholder, getRecommendedScopes, SEARCH_SCOPES, isFilterScope,
 } from '../../../src/lib/sidebarSearch.js'
 import { collectCanvasMatches } from '../../../src/lib/canvasSearch.js'
 
@@ -153,7 +152,6 @@ const PREVIEW_CASES = [
 ]
 
 const LABEL_PATHS = ['', '/', 'a', 'a/b', 'a/b/', '//a//b//', 'Folder/board.canvas', 'émigré']
-const TABS = ['clipboard', 'workbench', 'notes', 'history', 'unknown', '']
 
 export default {
   name: 'search',
@@ -213,22 +211,6 @@ export default {
           }
         }
       }
-    }
-
-    yield { fn: 'searchScopes', args: [], expected: SEARCH_SCOPES }
-    for (const scope of ['panel', 'document', 'notes', 'files', 'project']) {
-      yield { fn: 'isFilterScope', args: [scope], expected: isFilterScope(scope) }
-      for (const tab of TABS) {
-        yield {
-          fn: 'getSearchPlaceholder',
-          args: [scope, tab],
-          expected: getSearchPlaceholder(scope, tab),
-        }
-      }
-    }
-    for (const tab of TABS) {
-      yield { fn: 'getPanelNoun', args: [tab], expected: getPanelNoun(tab) }
-      yield { fn: 'getRecommendedScopes', args: [tab], expected: getRecommendedScopes(tab) }
     }
   },
 }

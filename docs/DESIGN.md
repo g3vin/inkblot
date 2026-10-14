@@ -139,6 +139,8 @@ white or pure black, which is easier on the eyes over long sessions. Don't use `
 | `--surface-1` | Cards and tiles inside a panel |
 | `--surface-float` | Floating panels, popovers, menus, dialogs |
 | `--surface-sunken` | Wells: code, previews, drop zones |
+| `--tray-glow` / `--tray-top` / `--tray-bottom` | The window's tray gradient stops, from `--tray-ink` (the window colour). Drawn by `.ib-tray` |
+| `--tray-sheet` | The tray's flat middle: the paper a sidebar's tab strip is cut from |
 | `--surface-hover` / `--surface-active` | Row and control states (translucent) |
 | `--text-primary` | Body text and titles |
 | `--text-secondary` | Supporting text |
@@ -153,7 +155,8 @@ white or pure black, which is easier on the eyes over long sessions. Don't use `
 
 There are eight fountain-pen inks, each tuned per theme: deeper on paper, lighter on
 ink. They form **the** categorical palette. Notes, canvas cards and edges, part-of-speech
-tags, map layers and accent presets all draw from it. No feature invents its own set.
+tags, map layers, accent presets and the window colour (`data-tray`, any ink) all draw
+from it. No feature invents its own set.
 
 | Id | Label | Typical use |
 |---|---|---|
@@ -224,7 +227,7 @@ There are three choices: **Light** (paper), **Dark** (ink) and **System**.
 
 | Face | Token | Role |
 |---|---|---|
-| **Inter** | `--font-ui` | All chrome: buttons, menus, panels, labels, dialogs |
+| **Inter** | `--font-ui` | All chrome: buttons, menus, panels, labels, dialogs, and the eyebrows (bold capitals) |
 | **Literata** | `--font-editor` | The writer's words: the editor, cards, previews, notes' quoted text. The default writing font; the writer can change it |
 | **Courier Prime** | `--font-type` | Small typewritten accents only (see below) |
 | Courier Prime | `--font-script` | Screenplay and stage-play pages (industry convention) |
@@ -233,8 +236,6 @@ All three are bundled (`src/styles/fonts.js`, SIL OFL) so every machine renders 
 
 **Where Courier Prime goes**, and nowhere else:
 
-- `.ib-eyebrow`: the small uppercase label above a group (panel titles, section heads,
-  dialog kickers).
 - `.ib-meta`: word counts, stats, dates, times, version names, file sizes.
 - `Kbd`: keyboard shortcuts.
 - `EmptyState` titles: "No notes yet."
@@ -255,8 +256,13 @@ It is never used for body copy, buttons, menu items, inputs or headings.
 | `--text-2xl` | 26 | Display (`.ib-display`), landing |
 | `--text-3xl` | 34 | Hero only |
 
-Weights are 400 (body), 500 (controls and labels) and 600 (titles). Use sentence case
-everywhere; only eyebrows are uppercase.
+Weights are 400 (body), 500 (controls and labels), 600 (titles) and 700 (eyebrows). Use
+sentence case everywhere; only eyebrows are uppercase.
+
+**The eyebrow** (`.ib-eyebrow`) is the small label above a group: a sidebar's or panel's
+title ("NOVEL", "STATS"), a section head in a sheet, a dialog's kicker. It is Inter
+at `--text-xs`, bold (`--weight-bold`), in capitals, tracked by `--tracking-eyebrow`,
+in `--text-muted`. Sidebar titles (`.panel-header-label`) are the same style.
 
 Classes: `.ib-display`, `.ib-title`, `.ib-body`, `.ib-hint`, `.ib-eyebrow`, `.ib-meta`,
 and `.ib-prose` (any element that shows the writer's text).
@@ -265,42 +271,98 @@ and `.ib-prose` (any element that shows the writer's text).
 
 ## 6. Layout: the document is the room
 
-- **One seamless surface.** The editor background is `--app-bg` and fills the window.
-  There is no separate "page" sheet in the writing view. Print Layout is the one place
-  pages appear, because there the page *is* the subject.
-- **Floating, hideable panels.** Side panels (file tree, inspector, notes, workbench,
-  history) float over the document on `--surface-float`, with a hairline, `--radius-lg`
-  and `--shadow-float`, inset `--space-3` from the window edge. Every panel can be hidden
-  with a toggle and a shortcut, and hidden panels leave the document full width. Use
+- **The tray and the card**, as in Arc and Dia. The window itself is the **tray**: a
+  soft gradient in the writer's window colour (`.ib-tray`, the `--tray-*` tokens,
+  Settings → Window colour). The document, canvas, map or timeline sits in one
+  **document card** floating on it (`--app-bg`, `--radius-lg`, `--shadow-card`, inset
+  `--space-3`, and no border: it stands off the tray by its shadow alone). Inside the card the editor background is
+  `--app-bg` and seamless: there is no separate "page" sheet in the writing view. Print
+  Layout is the one place pages appear, because there the page *is* the subject.
+- **Docked or hovering sidebars.** The file tree (left) and inspector (right) are
+  either **docked** (pinned) or **hidden**. Docked, a sidebar is part of the tray: no
+  sheet, border or shadow of its own, and it pushes the card over, so the card's top
+  and bottom edges run from one sidebar to the other. Hidden, the card takes the room,
+  and moving the pointer to that window edge brings the sidebar up **hovering** over the
+  card: the tray, slightly see-through (`.ib-tray.is-veiled`, `--tray-veil-alpha`), with
+  a hairline, `--radius-lg` and `--shadow-float`. Its edges sit halfway across the
+  tray's gap round the card. It goes when the pointer leaves, on a click outside, or on
+  Escape, and the card never moves for it. The sidebar icons in the card's top corners
+  pin and unpin each side (also ⌘K "Show/Hide sidebar", "Show/Hide inspector"). On the
+  tray, muted and subtle text are the main text colour let down toward the tray
+  (`--tray-text-*-mix`), which keeps them AA on every ink. Other floating panels use
   `Panel` / `PanelHeader` / `PanelBody`.
-- **Inlay: a panel's own controls are engraved into it, not floated on it.** A panel
-  is one sheet of paper. Its filter, search and + are pieces left standing inside a
-  channel cut around them, a kerf wide (`--inlay-kerf`, 3px), as an engraver cuts a
-  plate. Light falls from above, as for every shadow: the channel's floor is the
-  panel's paper a step darker (`--inlay-shade` by `--inlay-depth`), its top wall is in
-  shade (`--inlay-wall`), its bottom lip catches the light (`--inlay-lip`), and the
-  piece casts onto the floor (`--inlay-cast`) and catches the light along its own top
-  edge (`--inlay-bevel`). No hairlines: the light draws the edges. **Focus runs ink
-  into the channel** (intaglio: the ink sits in the cut). The inked channel is the
-  focus ring, so controls inside an Inlay draw none of their own. The piece is a
-  pill, so its ends and its channel's are concentric (`round` marks a single round
-  button, which also settles onto the floor when pressed). Use `Inlay` in any panel. It takes its paper from the
-  shell's `--sheet-bg`, which an `ib-sheet` shell sets (the sidebars and `Panel` do).
-  Controls that sit side by side share one long channel: put them in an `InlaySlot`,
-  which lays them out a kerf apart, each still its own piece (the + and the filter
-  under the file tree). Only the focused piece inks, inside the long channel. Keep it
-  to the panel's utility controls, one or two channels per panel. Never put a
-  `floating-capsule` inside a panel. Menus, popovers and drawers that open from an
-  inlay still float. When a piece is lifted out (sidebar search becoming the centred
-  overlay), hide it with `visibility`: its pocket stays empty until it returns.
-  A sidebar's tab strip is engraved the same way, turned inside out: the strip is the
+- **Inlay: a panel's own controls sit bare on its paper.** A panel's search and +
+  are glyphs and text drawn straight on the tray: no fill, no border, no channel,
+  no shadow. A hovered round button darkens a little, as a tab does. A field shows
+  focus by inking its glyphs (`--accent-foreground`); buttons inside it keep their own
+  focus rings. Use `Inlay` in any panel (`round` marks a single round button).
+  Controls that sit side by side go in an `InlaySlot`, which lays them out a kerf
+  apart (`--inlay-kerf`), as the + and the search at the left sidebar's foot. Keep it to the
+  panel's utility controls. Never put a `floating-capsule` inside a panel. Menus,
+  popovers and drawers that open from an inlay still float. When a piece is lifted out
+  of a panel, hide it with `visibility` so the panel doesn't reflow until it returns.
+  A sidebar's tab strip is engraved into the panel: the strip is a
   channel (`--inlay-floor`), and the tabs and the active-tab indicator (its clear
-  accent tint, a pill, concentric with the channel) sit on its floor.
-- **The fade scrim.** Chrome that overlays the document (the toolbar, a bottom bar)
-  sits on a gradient from solid `--app-bg` to transparent, so text scrolling underneath
-  dissolves instead of hitting a hard line. Use `FadeScrim` (or the existing
-  `.app-titlebar::before`, which is the same recipe). Don't give chrome over the
-  document a solid bar or a border.
+  accent tint, a pill, concentric with the channel) sit on its floor. Held, the indicator
+  grows a little past the channel's top and bottom edges; on the move
+  (clicked to another tab, dragged or swiped quickly) it squashes vertically and
+  stretches along its path with its speed, as Liquid Glass's selector does.
+- **The card's toolbar.** The toolbar sits at the top of the document card, like Dia's
+  address bar, on the card's own paper and ruled off from the document by one thin
+  border: a `--hairline` in `--border-color`, the full width of the card, under the
+  toolbar row (`.app-titlebar`'s `border-bottom`). It is the one rule in the room, and
+  it is meant: it says where the chrome ends and the page begins. Text scrolls under
+  it, clean against the rule: no fade or shadow below it. Its icon
+  controls are bare on the paper: a fill only on hover, and the accent tint for a
+  control that is on. Its menus (text style, font, size) carry the quiet control fill
+  (`--control-bg`), so they read as menus rather than labels.
+- **The fade scrim.** Other chrome that overlays the document (a bottom bar, the tab
+  bar, the word count and page capsules at the foot of a pane) sits on a gradient from solid `--app-bg` to transparent, so text scrolling
+  underneath dissolves instead of hitting a hard line. Use `FadeScrim`. Don't give that
+  chrome a solid bar or a border: the card toolbar's hairline is the only rule over
+  the document.
+- **The traffic lights never move.** On macOS they sit in one place from launch
+  (20px in, centred 30px down; placed before the first frame), the same on the
+  landing page and in a project. The left sidebar's first row (the project name) is
+  centred on their line and leaves room for them. In a project they go with the
+  sidebar: hidden whenever it is hidden, so they never sit over the card
+  (`lib/trafficLights.js`, `src-tauri/src/window_chrome.rs`).
+- **Panel anatomy.** Every inspector panel is built the same way, top to bottom:
+  1. **The header row**: the eyebrow title and, at its right, at most one `ScopeMenu`
+     (what the panel shows: "This document ▾") and one `MoreMenu` (⋯, the rarer
+     options), put there with `PanelActions`. A panel's one add or save action may sit
+     there too, as an `IconButton`.
+  2. **At most one `Segmented`**, a view switch ("Today · History · Insights"), flush
+     on the panel. Never a second row of tabs: further scope is the header's menu.
+  3. **Sections** (`Section`) straight on the panel, divided by hairlines. A section's
+     one action goes in its `accessory`, at the right of its title.
+  The inspector has no search of its own: finding is the project search's.
+- **The project search.** One search, at the left sidebar's foot: the view's + on the
+  outer end, a bare search icon on the inner end (`search/ProjectSearch.jsx`). The
+  icon opens a card upward, its left edge on the icon's, reaching out over the
+  document. There are no scopes or match options to pick. What is found is sorted under
+  eyebrowed categories (In this document, Documents, Notes; with nothing typed: Open,
+  Recent files, Recent searches), one row per document, a name match first. ↑/↓ and
+  the pointer move one selection, Enter opens it. Pausing on a document that isn't open
+  shows a preview of it beside the card, the first match marked. ⇧⌘F is the same card,
+  centred. The card and its preview are the pop-up surface veiled
+  (`--search-veil-bg` over `var(--blur-over-page)`), with a hairline edge and the
+  float shadow (§12).
+- **The find bar.** Find and replace in the open document (⌘F) floats at the top of
+  the document card, under the toolbar's rule, on its inner right (`FindBar.jsx`):
+  the field, "2 of 5", previous and next, and a click away the replace field.
+
+  Nothing in a panel sits in a band, a filled strip or a bordered box of its own.
+  `Card` is for things the writer made (a note, a source, a version, a tile), never
+  for a panel's controls.
+- **Controls on the tray.** Fields, menus, segmented tracks and text buttons in a
+  docked or hovering sidebar are the tray's paper a step darker (`--control-bg`), with
+  no border and no white box; focus draws the ring. A text button in a section is a
+  control fill too, at the start of its line, never stretched across the panel.
+- **Selection is lifted paper.** The chosen row in a list (the open document in the
+  file tree, the chosen project on the landing page, the page showing in a `NavSheet`)
+  is lifted out of its surface onto `--app-bg` with `--shadow-lift`, with no tint and no
+  border. The accent marks focus and controls that are on, not where you are.
 - **Layers.** Use `--z-chrome` < `--z-panel` < `--z-popover` < `--z-dialog` < `--z-toast`
   < `--z-tooltip`. Don't invent z-indexes.
 - **Reading width.** Prose stays near 65–75 characters. The editor's `max-width`
@@ -337,9 +399,12 @@ need the target.
 | `--radius-pill` | 999 | Tags and toggles **only** (and round icon buttons) |
 
 **Depth.** Only floating things cast shadows: panels, menus, popovers and floating
-toolbars use `--shadow-float`, and dialogs use `--shadow-dialog`. Everything inside a
+toolbars use `--shadow-float`, and dialogs use `--shadow-dialog`. The document card
+uses `--shadow-card` and a lifted selection `--shadow-lift`: the same depth with no
+ring, so neither draws an edge. Everything inside a
 surface is separated by hairlines and tonal shifts, never by shadow. The one exception
-is an Inlay's channel (§6), the only place inside a panel with a shadow or a highlight.
+is a sidebar's engraved tab strip (§6), the only place inside a panel with a shadow or a
+highlight.
 
 **Motion is subtle and quick.** Use `--dur-fast` (120ms) for hovers and small state
 changes, `--dur-base` (180ms) for popovers, dialogs and panels, and `--dur-slow` (240ms)
@@ -363,6 +428,23 @@ components also check `useReducedMotion()`.
   not `clock-counter-clockwise`), so a glyph can change in one place. Add a name only
   when no existing meaning fits.
 - Every icon-only control has a label, which becomes its tooltip. Icons don't animate.
+- **One meaning, one glyph, everywhere.** A name in `icons.js` has one glyph, and no
+  glyph answers to two names. A name nothing uses is removed, not kept for later. `tests/unit/icons.mjs` holds these:
+
+  | Meaning | Icon | Never |
+  |---|---|---|
+  | Delete or remove something the writer made (a note, an image, a row, a version) | `delete` (trash) | × |
+  | Close, dismiss or clear (a panel, a banner, a field, a filter, a tab) | `close` (×) | trash |
+  | Put away, recoverably | `archive` | |
+  | Add an item to this list | `add` (+) | |
+  | Rarer options | `more` (⋯) | |
+  | Find | `search` | zoom |
+  | Zoom | `zoom-in` / `zoom-out` | `search` |
+  | App settings | `settings` (gear) | theme, colour or a panel's own options |
+  | A view's own options | `sliders` | `filter` |
+  | Narrow a list | `filter` | options |
+  | Reorder | `arrow-up` / `arrow-down` | |
+  | Expand or collapse a branch | `chevron-right` / `chevron-down` | |
 
 ---
 
@@ -382,18 +464,20 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `useNativeMenu`, `popUpNativeMenu` | Context menus and menus a native window menu would show | The OS menu, built from the same items |
 | `Popover` | Small forms and pickers anchored to a control | Same surface as a menu. `align` start/end |
 | `Dialog` | A decision, or a small setting | Eyebrow + title + description, then the body, then the footer (secondary left, primary right) |
-| `Sheet` | Larger settings and editors (Settings, Customize Toolbar, page setup) | Centred, or dropped from under the titlebar with `placement="top"` |
-| `Section` | A collapsible group in an inspector panel | Remembers open/closed per `id` |
-| `FormRow` + `Toggle` / `Stepper` / `SelectMenu` | Inspector and settings rows | Label left, control right; `stacked` for wide controls. `Toggle` applies immediately |
+| `Sheet` | Larger settings and editors (Customize Toolbar, page setup) | Centred, or dropped from under the titlebar with `placement="top"` |
+| `NavSheet` | A sheet of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
+| `Section` | A collapsible group in an inspector panel | Remembers open/closed per `id`. `accessory` is its one action, beside the title. `help` names its help topic |
+| `FormRow` + `Toggle` / `Stepper` / `SelectMenu` | Inspector and settings rows | Label left (as wide as it needs, up to about half), control right; `stacked` for wide controls. `Toggle` applies immediately. `help` names its help topic |
+| `PanelActions`, `ScopeMenu`, `MoreMenu` | A panel's scope and ⋯, in its header row | The panel anatomy (§6). `PanelActions` puts its children in the shell's header slot, only for the panel showing |
 | `Field` + `Input` / `TextArea`, `Checkbox` | Forms in dialogs | Label above, hint below. Errors say how to fix |
 | `Segmented` | 2–4 exclusive, short options | Otherwise use `SelectMenu` |
 | `Tabs` | Views within a panel | Underline style |
-| `Panel`, `PanelHeader`, `PanelBody` | Floating side panels | Header title is an eyebrow. An `ib-sheet`, so Inlays take its paper |
-| `Inlay`, `InlaySlot` | A panel's own filter, search or + | Engraved into the panel, not floated on it. Focus inks the channel. A slot is one channel round a row of pieces. See §6 |
+| `Panel`, `PanelHeader`, `PanelBody` | Floating panels (the two sidebars are the tray's own, §6) | Header title is an eyebrow. An `ib-sheet` |
+| `Inlay`, `InlaySlot` | A panel's own filter, search or + | Bare on the panel: no fill or border. Focus inks a field's glyphs. A slot lays out a row of pieces. See §6 |
 | `FadeScrim` | Chrome over the document | See §6 |
 | `Card` | A bordered block in a panel | `ink` applies the card recipe |
 | `Tag` | Small categorical labels | Takes an ink |
-| `EmptyState` | Any list or panel with nothing in it | Typewritten line, plain hint, at most one action |
+| `EmptyState` | Any list or panel with nothing in it | Icon, typewritten line and plain hint, centred; in a panel it sits in the middle of the panel's height. At most one action. `compact` for a section or "no matches" (stays in place); `dropActive` washes it in the accent while something is dragged over |
 | `InkPicker` | **Every** colour choice | Notes, cards, accent (Settings → General). Don't build another swatch row |
 | `FloatingCapsule` | A readout floating over the page (word count, zoom, tab bar) | The floating-capsule surface; glass on iOS |
 | `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips (formatting, canvas, map) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS |
@@ -466,6 +550,12 @@ Plain and warm. Write like a knowledgeable friend in the studio.
 - **An ellipsis** (…) when an action asks for more input before it acts.
 - **Empty states** say what will appear and how to add the first one, in a calm tone:
   "No notes yet." then "Select some text and press ⌥⌘N to leave yourself a note."
+- **Explain once, out of the way.** A control's words on the surface are its label and,
+  at most, one short line of hint. Anything that needs explaining is a help topic
+  (`src/lib/help.ts`): tag the control with `help="area.thing"` (`FormRow`, `Section`)
+  or `data-help`, and a right-click on it offers "Help: …", which opens the Help sheet
+  on that topic. Help is also in ⌘K. Tooltips name things; help explains them. A live
+  status line (a count, a warning) is not an explanation and stays.
 - **Errors** say what happened and what to do next, with no apology and no blame:
   "Couldn't save. Check that the project folder still exists, then try again."
 - **Destructive confirmations** name the thing and the consequence: "Delete 'Chapter
@@ -496,7 +586,14 @@ comfortably beside the system's own glass. `src/ui/platform.js` sets
 `src/styles/base.css` do the rest. Everywhere else the capsule is opaque paper with the
 float shadow.
 
-Don't extend glass to panels, menus, dialogs, sheets or scrims, and don't add
+A sidebar hovering over the document is veiled (slightly see-through tray over
+`var(--blur-over-page)`) on every platform: that is the tray, not glass, and it carries
+no rim. A note hovering over the page (its card opened from the dot in the text) is a
+little see-through too, its 0.5px ring over a light `var(--blur-note)`, so the line it
+is about stays in view; the strings between notes stop at their edges. The project
+search card and its preview are veiled the same way as a hovering sidebar
+(`--search-veil-bg` over `var(--blur-over-page)`, falling back to the opaque menu
+surface under reduced transparency): a veil, not glass. Don't extend glass to panels, menus, dialogs, sheets or scrims, and don't add
 per-platform styling elsewhere. Touch targets are already comfortable (32px minimum;
 FABs are 44px).
 
@@ -517,9 +614,10 @@ FABs are 44px).
 ## 14. Guardrails
 
 - **`npm run lint:design`** (in CI) flags raw colours (including those inside shadows
-  and gradients), font families and px radii outside `tokens.css` and `palette.ts`. The
-  app is at zero findings, and `scripts/design-baseline.json` is empty, so any new raw
-  value fails. `--list` prints every finding.
+  and gradients), font families, px radii, px font sizes and px spacing outside
+  `tokens.css` and `palette.ts`. Colours, fonts and radii are at zero findings; the
+  older sizes and spacing are baselined per file in `scripts/design-baseline.json` and
+  may only go down, so any new raw value fails. `--list` prints every finding.
 - **Content is exempt, chrome is not.** A few files describe things the writer makes
   rather than the app's chrome, and keep their own literal values: exported and
   printed files (`src/print/export/`, the page model in `src/print/*.ts`), map worlds
@@ -528,10 +626,17 @@ FABs are 44px).
   The list lives in `IGNORED` in `scripts/lint-design.mjs`. Add to it only for content
   of that kind, never to get chrome past the check.
 - **`tests/unit/css.mjs`** (in `npm test`) keeps surfaces flat: a gradient only where it
-  does a job (listed by selector: the titlebar fade, `FadeScrim`, the canvas grid, …),
-  every `backdrop-filter` is `var(--blur-over-page)`, no OS colour-scheme media queries,
+  does a job (listed by selector: `FadeScrim`, the canvas grid, the
+  tray, …),
+  every `backdrop-filter` is `var(--blur-over-page)` or `var(--blur-note)`, no OS colour-scheme media queries,
   and the radius scale is 4/8/12. **`tests/unit/icons.mjs`** checks that every icon
-  name in `src/` is registered.
+  name in `src/` is registered and keeps its one meaning (§8).
+  **`tests/unit/help.mjs`** checks that every help topic a control points at exists,
+  and that every Typeset and Print section has one.
+- **`lint:design` also flags type and space off the scale:** a `font-size` (or `font`
+  shorthand) in px, and a gap, padding or margin of 3px or more not built from
+  `--space-*`. The legacy values are baselined per file in
+  `scripts/design-baseline.json`; a file may only go down.
 - **The showcase** (`?design` in dev) shows every token and component in both themes.
   Check your change there and in the real surface, in light *and* dark.
 - **Review checklist for any UI change:**

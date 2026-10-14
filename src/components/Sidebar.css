@@ -2,92 +2,139 @@
    Sidebars: shared shell, tabs, resizers
    ============================================================ */
 
+/*
+ * A sidebar is docked or it hovers, as in Arc and Dia.
+ *
+ *   Docked (pinned, .is-docked): part of the window's tray. No sheet of its own: it is
+ *   transparent over the tray's gradient (painted by .main-layout), and the document
+ *   card floats beside it.
+ *
+ *   Not docked: a floating sheet over the card, in the tray's colours, inset
+ *   --space-3 from the window. It
+ *   takes no room in the row (a negative margin as wide as it is), so the card keeps
+ *   its place when it comes and goes. Hidden (.collapsed), it waits off the window's
+ *   edge; peeked (.is-peeked), it slides in.
+ */
 .sidebar {
-  --sidebar-floating-offset: 8px;
-  /* Drops the header row below the macOS traffic lights, which sit in the left
-     sidebar's top-left corner (trafficLightPosition in tauri.conf.json). Both
-     sidebars clear by the same amount so their header rows stay level. */
-  --sidebar-header-offset: 32px;
+  /* Both sidebars' first row sits level with the card's toolbar: the card is inset
+     --space-3 and its toolbar row is --app-titlebar-height tall. The traffic lights
+     are centred on the left one's project name (lib/trafficLights.js). */
   --sidebar-top-fade-height: 28px;
+  --sidebar-inset: var(--space-3);
+  /* Hovering, its edges sit halfway across the tray's gap round the card, so the
+     card's edge still shows inside it. */
+  --sidebar-float-inset: calc(var(--space-3) / 2);
   position: relative;
-  z-index: 50;
+  z-index: var(--z-panel);
   display: flex;
   flex-direction: column;
+  flex: none;
   box-sizing: border-box;
-  height: calc(100% - (var(--sidebar-floating-offset) * 2));
   min-width: 100px;
-  max-width: 500px;
-  transition:
-    width 280ms ease,
-    margin 220ms ease,
-    border-color 160ms ease,
-    border-radius 160ms ease;
-
-  border: 1px solid var(--border-color);
-  padding: 8px;
-  margin-top: var(--sidebar-floating-offset);
-  margin-bottom: var(--sidebar-floating-offset);
-
-  box-shadow: var(--shadow-float);
+  max-width: 540px;
+  padding: 0 var(--sidebar-inset) var(--sidebar-inset);
+  border: var(--hairline) solid var(--border-color);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  /* Docked or hovering, a sidebar wears the window's tray. The tab strip can't be cut
+     from a gradient, so the tray's flat middle is the paper it cuts from. */
+  --sheet-bg: var(--tray-sheet);
+  /* The paper's muted greys fall below AA on a tinted tray; these are the main text
+     colour let down toward the tray instead, which keeps them readable on any ink. */
+  --text-muted: color-mix(in srgb, var(--text-primary) var(--tray-text-muted-mix), var(--tray-sheet));
+  --text-subtle: color-mix(in srgb, var(--text-primary) var(--tray-text-subtle-mix), var(--tray-sheet));
+  height: calc(100% - var(--sidebar-float-inset) * 2);
+  margin-block: var(--sidebar-float-inset);
+  --sidebar-glide:
+    margin var(--dur-slow) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out),
+    opacity var(--dur-slow) ease,
+    visibility var(--dur-slow);
+  transition: var(--sidebar-glide);
+}
 
-  /* Solid window background: on a canvas (which runs under the floating
-     sidebars) the panel fully occludes the dots rather than letting them
-     show through. It is also the paper every Inlay is cut from
-     (src/ui/Inlay.jsx). */
-  --sheet-bg: var(--app-bg);
+.sidebar.ib-tray.is-docked {
+  /* Pinned from a peek, it is already on screen and takes its place on the tray at
+     once (the card with it). Pinned from hidden (.is-gliding), it glides in as it
+     glides out. */
+  transition: none;
+  height: 100%;
+  margin: 0;
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  /* The tray itself shows through (.main-layout paints it). */
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.sidebar.ib-tray.is-docked.is-gliding {
+  transition: var(--sidebar-glide);
+}
+
+.left-sidebar:not(.is-docked) {
+  margin-left: var(--sidebar-float-inset);
+  margin-right: calc(-1 * (var(--sidebar-w) + var(--sidebar-float-inset)));
+}
+
+.right-sidebar:not(.is-docked) {
+  margin-right: var(--sidebar-float-inset);
+  margin-left: calc(-1 * (var(--sidebar-w) + var(--sidebar-float-inset)));
+}
+
+.left-sidebar.collapsed {
+  transform: translateX(calc(-100% - var(--sidebar-inset) * 2));
+}
+
+.right-sidebar.collapsed {
+  transform: translateX(calc(100% + var(--sidebar-inset) * 2));
+}
+
+.sidebar.collapsed {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .sidebar.is-resizing {
   transition: none;
 }
 
-.sidebar.collapsed {
-  width: 0 !important;
-  min-width: 0;
-  padding: 0;
-  margin: 0;
-  border: none;
-}
-
-.sidebar-content,
-.sidebar-tabs,
-.left-sidebar-switch,
-.sidebar-resizer,
-.sidebar-topbar,
-.resizer {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 200ms ease, visibility 200ms ease;
-}
-
-.sidebar.collapsed .sidebar-content,
-.sidebar.collapsed .sidebar-tabs,
-.sidebar.collapsed .left-sidebar-switch,
-.sidebar.collapsed .resizer,
-.sidebar.collapsed .sidebar-topbar {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar.ib-tray.is-docked.is-gliding {
+    transition: opacity var(--dur-fast) ease, visibility var(--dur-fast);
+  }
 }
 
 .sidebar-topbar {
   display: flex;
-  justify-content: flex-end;
-  padding: 4px 6px;
-  margin-top: var(--sidebar-header-offset);
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: calc(var(--app-titlebar-height) + var(--space-3));
+  padding: var(--space-3) 6px 0;
 }
 
+/* Hovering, it starts lower than a docked one; its row keeps level with the card's. */
+.sidebar:not(.is-docked) .sidebar-topbar {
+  min-height: calc(var(--app-titlebar-height) + var(--space-3) - var(--sidebar-float-inset));
+  padding-top: calc(var(--space-3) - var(--sidebar-float-inset));
+}
+
+/* Its shell is 2px deeper than the left one's, whose content adds 2px of its own, so
+   both sidebars' content sits 10px in. */
+.right-sidebar {
+  padding-inline: 10px;
+}
+
+/* The left sidebar's row is shared with the traffic lights, which centre on its name. */
 .left-sidebar .sidebar-topbar {
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.right-sidebar .sidebar-topbar {
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-end;
+  padding-left: 84px; /* the traffic lights: 20px in, 52px wide, then a gap */
 }
 
 .left-sidebar-project-title {
@@ -98,43 +145,8 @@
   white-space: nowrap;
 }
 
-.sidebar-pin {
-  background: transparent;
-  border: none;
-  color: var(--text-subtle);
-  font-size: 10px;
-  padding: 4px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
-}
-
-.sidebar-pin:hover {
-  background: var(--accent-surface);
-  color: var(--accent-foreground);
-}
-
-.sidebar-pin.active {
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
-
-
-.left-sidebar {
-  margin-left: var(--sidebar-floating-offset);
-}
-
-.right-sidebar {
-  margin-right: var(--sidebar-floating-offset);
-  padding: 10px;
-  /* Its shell padding is 2px deeper than the left one's, which already eats
-     2px of the clearance — keeps both header rows on the same line. */
-  --sidebar-header-offset: 30px;
-}
-
+/* Hovering, the edge of the window and the inset below it still count as inside, so
+   a peek doesn't end in the gap the pointer crossed to reach it. */
 .left-sidebar.is-peeked::before,
 .right-sidebar.is-peeked::before,
 .sidebar.is-peeked::after {
@@ -146,25 +158,23 @@
 .left-sidebar.is-peeked::before {
   top: 0;
   bottom: 0;
-  left: -8px;
-  width: 8px;
+  left: calc(-1 * var(--sidebar-float-inset) - 1px);
+  width: calc(var(--sidebar-float-inset) + 1px);
 }
 
 .right-sidebar.is-peeked::before {
   top: 0;
-  right: -8px;
+  right: calc(-1 * var(--sidebar-float-inset) - 1px);
   bottom: 0;
-  width: 8px;
+  width: calc(var(--sidebar-float-inset) + 1px);
 }
 
 .sidebar.is-peeked::after {
   left: 0;
   right: 0;
-  bottom: -8px;
-  height: 8px;
+  bottom: calc(-1 * var(--sidebar-float-inset) - 1px);
+  height: calc(var(--sidebar-float-inset) + 1px);
 }
-
-
 
 .sidebar-content {
   padding: 12px;
@@ -198,12 +208,27 @@
   padding-inline: 0;
 }
 
-/* The file tree's + and filter, held at the sidebar's foot under both views. The 2px
-   adds to the shell's 8 to sit them 16px in, as the inspector's search sits. */
+/* The sidebar's foot, under both views: the showing view's + on the outer edge (the
+   slot), and the project search on the inner one, as Dia keeps its search at the foot
+   of its tabs. 16px in from the panel's edges: the shell's 8 and these 8. */
 .left-sidebar-footer {
   flex: 0 0 auto;
-  margin-inline: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--inlay-kerf);
+  margin: var(--space-2);
 }
+/* Docked, the foot sits level with the card's bottom edge, and the + as far from the
+   window's edge as the search is from the card's: the shell's --sidebar-inset is the
+   same gap as the card keeps from the window. */
+.left-sidebar.is-docked .left-sidebar-footer {
+  margin-bottom: 0;
+  margin-left: 0;
+}
+.left-sidebar-footer-slot { display: flex; min-width: 0; }
+/* A view's +, bare on the tray (an InlaySlot). The foot holds the margin. */
+.file-tree-footer { flex: 0 0 auto; }
 
 /* Each view was a flex child of .sidebar-content; a pane is one in its place. */
 .left-sidebar-pane {
@@ -217,18 +242,6 @@
   margin-inline: -10px;
   padding: 0;
   overflow: hidden;
-}
-
-.right-sidebar-search {
-  position: relative;
-  z-index: 14;
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  min-width: 0;
-  box-sizing: border-box;
-  /* 16px in from the panel's edges, as the file tree's filter sits. */
-  margin: var(--space-2);
 }
 
 .right-sidebar-global-title {
@@ -248,24 +261,37 @@
   will-change: transform;
 }
 
+/* A click past the next tab: just the old title and the new, side by side, and one
+   slide from the one to the other (RightSidebar). */
+.right-sidebar-global-title-track.is-jumping {
+  animation-fill-mode: both;
+}
+.right-sidebar-global-title-track.is-jumping.is-forward { animation-name: right-sidebar-title-forward; }
+.right-sidebar-global-title-track.is-jumping.is-back { animation-name: right-sidebar-title-back; }
+
+@keyframes right-sidebar-title-forward {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(var(--right-sidebar-title-width) * -1)); }
+}
+
+@keyframes right-sidebar-title-back {
+  from { transform: translateX(calc(var(--right-sidebar-title-width) * -1)); }
+  to { transform: translateX(0); }
+}
+
+.right-sidebar-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+  margin-right: calc(var(--space-1) * -1);
+}
+
 .right-sidebar-global-title-label {
   flex: 0 0 var(--right-sidebar-title-width);
   width: var(--right-sidebar-title-width);
   text-align: left;
   white-space: nowrap;
-}
-
-.right-sidebar-search .sidebar-search {
-  flex: 1 1 auto;
-  min-width: 0;
-  box-sizing: border-box;
-  max-width: 100%;
-  width: 100%;
-}
-
-/* visibility, not display: the bar keeps its space (and stays unfocusable) while
-   the centered overlay is standing in for it, so nothing above shifts. */
-.right-sidebar-search.is-search-detached .sidebar-search {
-  visibility: hidden;
 }
 

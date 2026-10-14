@@ -37,10 +37,10 @@ export function ScriptProductionSection({ layout, script }) {
         options={[{ value: '', label: 'No one' }, ...script.characters.map((name) => ({ value: name, label: name.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w+/g, (w) => w.toLowerCase()) }))]}
       />
       <FormRow label="Reports">
-        <button type="button" className="fin-button" onClick={(event) => popUpNativeMenu(event, [report('characters'), report('scenes'), report('locations')])}>Report <Icon name="chevron-down" /></button>
+        <Button onClick={(event) => popUpNativeMenu(event, [report('characters'), report('scenes'), report('locations')])}>Report <Icon name="chevron-down" /></Button>
       </FormRow>
       <FormRow label="Sides">
-        <button ref={sidesRef} type="button" className="fin-button" disabled={!script.scenes.length} onClick={() => setSides(true)}>Print sides…</button>
+        <Button ref={sidesRef} disabled={!script.scenes.length} onClick={() => setSides(true)}>Print sides…</Button>
         <Popover anchorRef={sidesRef} open={sides} onClose={() => setSides(false)} align="end" className="fin-sides">
           <SidesPicker scenes={script.scenes} onPrint={(chosen) => { setSides(false); layout.printSides(chosen) }} />
         </Popover>
@@ -104,16 +104,15 @@ export function PublishingSection({ layout }) {
     <FinishingSection
       id={SECTION.publishing}
       title="Publishing"
-      note={state.scope === 'document' ? 'For this document. Choose Book in the header to check the whole book.' : 'For the whole book, at its page setup. Count the pages after changing the text or the setup.'}
     >
       <PickerRow label="Printed by" value={publishing.service} onChange={(service) => set({ service })} options={[{ value: 'none', label: 'Not chosen' }, { value: 'kdp', label: 'Amazon KDP' }, { value: 'ingramSpark', label: 'IngramSpark' }]} />
       <PickerRow label="Paper" value={publishing.paper} onChange={(paper) => set({ paper })} options={[{ value: 'cream', label: 'Cream' }, { value: 'white', label: 'White' }, { value: 'color', label: 'Colour' }]} />
       <FormRow label="Pages">
         {report?.pageCount > 0 ? <span className="fin-tabular">{report.pageCount}{report.measured ? '' : ' on screen'}</span> : <span className="fin-muted">Not counted</span>}
         {counting ? <span className="fin-spinner" aria-label="Counting" /> : (
-          <button type="button" className="fin-button is-small" title="Lay out everything Print covers, as it would print, to count its pages and words" onClick={() => { setCounting(true); layout.measure() }}>
+          <Button title="Lay out everything Print covers, as it would print, to count its pages and words" onClick={() => { setCounting(true); layout.measure() }}>
             {report?.measured ? 'Recount' : 'Count'}
-          </button>
+          </Button>
         )}
       </FormRow>
       {report?.words > 0 ? (
@@ -134,7 +133,7 @@ export function PublishingSection({ layout }) {
         <div key={issue.id} className="fin-preflight" data-severity={issue.severity}>
           <span className="fin-preflight-icon"><Icon name={SEVERITY_ICONS[issue.severity] ?? 'number'} /></span>
           <span className="fin-grow">{issue.message}</span>
-          {issue.fixLabel && issue.fixedSetup ? <button type="button" className="fin-button is-small" onClick={() => layout.fixPreflight(issue)}>{issue.fixLabel}</button> : null}
+          {issue.fixLabel && issue.fixedSetup ? <Button onClick={() => layout.fixPreflight(issue)}>{issue.fixLabel}</Button> : null}
         </div>
       )) : (
         <p className="fin-ok"><Icon name="verified" /> {report?.pageCount > 0 ? 'Ready for the printer.' : 'The setup passes. Count the pages to check the rest.'}</p>
@@ -157,7 +156,7 @@ export function CoverSection({ layout }) {
   }
   const exportScope = layout.scope === 'document' ? 'folder' : layout.scope
   return (
-    <FinishingSection id={SECTION.cover} title="Cover" note="One PDF of back, spine and front with ⅛″ bleed, as KDP and IngramSpark take it. The front is also the e-book’s cover.">
+    <FinishingSection id={SECTION.cover} title="Cover">
       {cover?.sets?.length ? (
         <div className="fin-cover-strip">
           {cover.sets.map((set) => (
@@ -190,22 +189,22 @@ export function CoverSection({ layout }) {
         </div>
       ) : null}
       <div className="fin-header-row">
-        <button type="button" className="fin-button is-small" onClick={() => layout.editCovers('add')}>New version</button>
-        {active ? <button type="button" className="fin-button is-small" onClick={() => layout.editCovers('duplicate', { id: active.id })}>Duplicate</button> : null}
-        {active ? <button type="button" className="fin-button is-small" onClick={() => setRenaming(active.id)}>Rename…</button> : null}
+        <Button onClick={() => layout.editCovers('add')}>New version</Button>
+        {active ? <Button onClick={() => layout.editCovers('duplicate', { id: active.id })}>Duplicate</Button> : null}
+        {active ? <Button onClick={() => setRenaming(active.id)}>Rename…</Button> : null}
       </div>
       {active ? (
         <>
           {PARTS.map(([part, label, key]) => (
             <FormRow key={part} label={label}>
               {active[key] ? <img className="fin-thumb" src={fileUrl(active[key])} alt="" /> : null}
-              <button type="button" className="fin-button is-small" onClick={() => choose(part)}>{active[key] ? 'Change…' : 'Choose…'}</button>
-              {active[key] ? <button type="button" className="fin-button is-small is-destructive" onClick={() => layout.setCoverImage(part, null)}>Remove</button> : null}
+              <Button onClick={() => choose(part)}>{active[key] ? 'Change…' : 'Choose…'}</Button>
+              {active[key] ? <Button variant="destructive" onClick={() => layout.setCoverImage(part, null)}>Remove</Button> : null}
             </FormRow>
           ))}
           <PickerRow label="Fit" value={active.fit} onChange={(fit) => layout.editCovers('setFit', { id: active.id, fit })} options={[{ value: 'fill', label: 'Fill, cropping' }, { value: 'fit', label: 'Fit inside' }, { value: 'stretch', label: 'Stretch' }]} />
         </>
-      ) : <button type="button" className="fin-button" onClick={() => choose('front')}>Choose a front…</button>}
+      ) : <Button onClick={() => choose('front')}>Choose a front…</Button>}
       {cover ? (
         <>
           <FormRow label="Full wrap"><span className="fin-tabular fin-muted">{cover.wrapWidthMm.toFixed(1)} × {cover.wrapHeightMm.toFixed(1)} mm</span></FormRow>
@@ -214,9 +213,9 @@ export function CoverSection({ layout }) {
         </>
       ) : null}
       <div className="fin-header-row">
-        <button type="button" className="fin-button" onClick={layout.showCover}>Show the cover</button>
+        <Button onClick={layout.showCover}>Show the cover</Button>
         <span className="fin-grow" />
-        <button type="button" className="fin-button" disabled={!active} onClick={() => layout.exportAs('coverPdf', exportScope)}>Export cover PDF…</button>
+        <Button disabled={!active} onClick={() => layout.exportAs('coverPdf', exportScope)}>Export cover PDF…</Button>
       </div>
     </FinishingSection>
   )
@@ -236,9 +235,6 @@ export function BindingSection({ layout }) {
     <FinishingSection
       id={SECTION.binding}
       title="Hand binding"
-      note={on
-        ? 'Printed double-sided (flip on the short edge), folded and nested, the sheets read in order. Paper thickness moves inner pages toward the spine to allow for creep.'
-        : 'Lays the book’s pages out on sheets to fold, nest and sew or staple — for making a book at home.'}
     >
       <ToggleRow label="Print for hand binding" checked={on} onChange={(yes) => set({ binding: yes ? 'signatures' : 'none' })} />
       {on ? (
@@ -257,8 +253,8 @@ export function BindingSection({ layout }) {
           <ToggleRow label="Crop and fold marks" checked={binding.cropMarks} onChange={(cropMarks) => set({ cropMarks })} />
           <ToggleRow label="Add a folding guide" checked={binding.includeGuide} onChange={(includeGuide) => set({ includeGuide })} />
           <div className="fin-header-row">
-            <button type="button" className="fin-button" onClick={() => layout.print(scope, true)}>Print for binding…</button>
-            <button type="button" className="fin-button" onClick={() => layout.exportAs('pdf', scope, true)}>Export PDF…</button>
+            <Button onClick={() => layout.print(scope, true)}>Print for binding…</Button>
+            <Button onClick={() => layout.exportAs('pdf', scope, true)}>Export PDF…</Button>
           </div>
         </>
       ) : null}

@@ -41,8 +41,12 @@ import {
   snapshotVersion,
 } from '../../lib/versionActions'
 import Icon from '../../ui/Icon.jsx'
+import Section from '../../ui/Section.jsx'
 import Segmented from '../../ui/Segmented'
-import ArchivePanel, { ArchiveIcon } from './ArchivePanel'
+import IconButton from '../../ui/IconButton.jsx'
+import { EmptyState } from '../../ui/Surfaces.jsx'
+import { PanelActions } from '../../ui/PanelActions.jsx'
+import ArchivePanel from './ArchivePanel'
 import './HistoryPanel.css'
 
 /** ±word-count badge. Hidden when the change was a wash. */
@@ -290,65 +294,46 @@ export default function HistoryPanel({
     const renaming = renamingId === id
     const delta = entryDelta(entry)
 
-    return (
-      <div key={id} className={`tile history-tile${named ? ' is-named' : ''}${inGroup ? ' in-group' : ''}`}>
-        <div className="tile-header history-tile-header">
-          <span
-            className="history-session-dot"
-            style={{ background: sessionColor(entry.sessionId) }}
-            title={`Editing session · ${formatFullTimestamp(entry.timestamp)}`}
-          />
-          <span className="history-timestamp" title={formatFullTimestamp(entry.timestamp)}>
-            {formatTime(entry.timestamp)}
-          </span>
-          <DeltaBadge added={delta.added} removed={delta.removed} />
-          <div className="history-actions">
-            <button
-              className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
-              title="Restore this version"
-              disabled={busy}
-              onClick={(event) => {
-                event.stopPropagation()
-                void handleRestore(entry)
-              }}
-            >
-              <Icon name="clock" />
-            </button>
-            <button
-              className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
-              title="Compare / merge"
-              onClick={(event) => {
-                event.stopPropagation()
-                onOpenCompare?.(docName, id, 'current')
-              }}
-            >
-              <Icon name="compare" />
-            </button>
-            <button
-              className="panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn"
-              title="Make a copy as a new document"
-              disabled={busy}
-              onClick={(event) => {
-                event.stopPropagation()
-                void handleMakeCopy(entry)
-              }}
-            >
-              <Icon name="copy" />
-            </button>
-            <button
-              className={`panel-action-btn panel-action-btn-small panel-icon-btn history-icon-btn${confirmDeleteId === id ? ' history-btn-danger' : ''}`}
-              title={confirmDeleteId === id ? 'Click again to delete' : 'Delete this version'}
-              disabled={busy}
-              onClick={(event) => {
-                event.stopPropagation()
-                void handleDelete(entry)
-              }}
-            >
-              <Icon name="delete" />
-            </button>
-          </div>
-        </div>
+    const confirming = confirmDeleteId === id
+    const act = (action) => (event) => {
+      event.stopPropagation()
+      action()
+    }
 
+    return (
+      <Section
+        key={id}
+        className={`history-version${named ? ' is-named' : ''}${inGroup ? ' in-group' : ''}`}
+        title={(
+          <span className="history-version-title">
+            <span
+              className="history-session-dot"
+              style={{ background: sessionColor(entry.sessionId) }}
+              title={`Editing session · ${formatFullTimestamp(entry.timestamp)}`}
+            />
+            <span className="history-timestamp" title={formatFullTimestamp(entry.timestamp)}>
+              {formatTime(entry.timestamp)}
+            </span>
+            {named ? <span className="history-version-name">{entry.name}</span> : null}
+            <DeltaBadge added={delta.added} removed={delta.removed} />
+          </span>
+        )}
+        accessory={(
+          <>
+            <IconButton icon="clock" label="Restore this version" size="circle" disabled={busy} onClick={act(() => void handleRestore(entry))} />
+            <IconButton icon="compare" label="Compare / merge" size="circle" onClick={act(() => onOpenCompare?.(docName, id, 'current'))} />
+            <IconButton icon="copy" label="Make a copy as a new document" size="circle" disabled={busy} onClick={act(() => void handleMakeCopy(entry))} />
+            <IconButton
+              icon="delete"
+              label={confirming ? 'Click again to delete' : 'Delete this version'}
+              size="circle"
+              variant={confirming ? 'destructive' : 'plain'}
+              disabled={busy}
+              onClick={act(() => void handleDelete(entry))}
+            />
+          </>
+        )}
+      >
         {renaming ? (
           <input
             ref={renameInputRef}
@@ -376,7 +361,7 @@ export default function HistoryPanel({
         )}
 
         <div className="history-preview">{renderPreview(entry)}</div>
-      </div>
+      </Section>
     )
   }
 
@@ -434,12 +419,10 @@ export default function HistoryPanel({
   /* ---------------- panel ---------------- */
 
   const emptyMessage = displayedVersions.length === 0
-    ? (isCanvas
-        ? 'No versions yet. Checkpoints appear as you work on the canvas.'
-        : isMap
-          ? 'No versions yet. Checkpoints appear as you work on the map.'
-          : 'No versions yet. Checkpoints appear as you write.')
-    : (namedOnly ? 'No named versions yet — name one from its row.' : 'No matching versions.')
+    ? { title: 'No versions yet.', hint: `Checkpoints appear as you ${isCanvas ? 'work on the canvas' : isMap ? 'work on the map' : 'write'}.` }
+    : (namedOnly
+        ? { title: 'No named versions yet.', hint: 'Name a version from its row to keep it here.' }
+        : { title: 'No matching versions.' })
 
   if (showArchive && !isStructured) {
     return (
@@ -455,37 +438,31 @@ export default function HistoryPanel({
   }
 
   return (
-    <div className="sidebar-panel history-panel">
-      <div className="history-toolbar">
-        <button
-          className="panel-action-btn panel-action-btn-small history-snapshot-btn"
+    <div className="sidebar-panel history-panel" data-help="history.panel">
+      <PanelActions>
+        <IconButton
+          icon="add"
+          label="Save a version now"
+          size="capsule"
           onClick={() => void snapshotNow()}
           disabled={busy || (!isStructured && !editor)}
-          title="Save the current state as a version you can name"
-        >
-          <Icon name="add" />
-          Snapshot now
-        </button>
+        />
+        {isStructured ? null : (
+          <IconButton icon="archive" label="Show the archive" size="capsule" onClick={() => setShowArchive(true)} />
+        )}
+      </PanelActions>
+      <div className="history-toolbar">
         <Segmented
           value={namedOnly ? 'named' : 'all'}
           onChange={(value) => setNamedOnly(value === 'named')}
           label="Which versions"
-          options={[{ value: 'all', label: 'All' }, { value: 'named', label: 'Named' }]}
+          stretch
+          options={[{ value: 'all', label: 'All versions' }, { value: 'named', label: 'Named' }]}
         />
-        {isStructured ? null : (
-          <button
-            className="panel-action-btn panel-action-btn-small panel-icon-btn"
-            onClick={() => setShowArchive(true)}
-            title="View the archive: things put away out of this document"
-            aria-label="Archive"
-          >
-            <ArchiveIcon />
-          </button>
-        )}
       </div>
 
       {sections.length === 0 ? (
-        <div className="notes-empty">{emptyMessage}</div>
+        <EmptyState compact={displayedVersions.length > 0} icon={displayedVersions.length === 0 ? 'history' : undefined} title={emptyMessage.title} hint={emptyMessage.hint} />
       ) : (
         <div className="sidebar-list history-list">
           {sections.map((section) => (

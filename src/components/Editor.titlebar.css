@@ -2,6 +2,8 @@
    Titlebar & toolbar chrome
    ============================================================ */
 
+/* The toolbar row at the top of the document card, as Dia's address bar sits at the
+   top of its page: the pin buttons in its corners and the toolbar between them. */
 .app-titlebar {
   position: absolute;
   top: 0;
@@ -25,25 +27,22 @@
   -webkit-user-select: none;
 }
 
-/* The bar behind every titlebar button: solid at the window edge, gone by a
-   little past the titlebar's bottom. Editor content scrolls UNDER it (see the
-   .pane-scroll padding swap below), so text sliding up dissolves into the top
-   of the window instead of hitting a hard line. */
+/* The toolbar's bar: the card's own paper, ruled off from the document by a hairline
+   the full width of the card, as Dia's address bar is. Editor content scrolls UNDER
+   it (the .pane-scroll padding swap in SidebarTiles.css). Nothing below the rule: a
+   fade there read as a shadow, worst over Print layout's darker desk. */
 .app-titlebar::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: calc(var(--app-titlebar-height) + 20px);
+  height: var(--app-titlebar-height);
+  box-sizing: border-box;
   pointer-events: none;
   z-index: 0;
-  background: linear-gradient(
-    to bottom,
-    var(--app-bg) 0%,
-    var(--app-bg) 45%,
-    transparent 100%
-  );
+  background: var(--app-bg);
+  border-bottom: var(--hairline) solid var(--border-color);
 }
 
 .app-titlebar-spacer {
@@ -91,34 +90,67 @@
   flex: 1;
 }
 
+/* The window's row: left sidebar, document card, right sidebar. */
 .main-layout {
   display: flex;
   flex: 1;
   min-height: 0;
   overflow: hidden;
   position: relative;
+  /* It is the tray (.ib-tray): the window itself, behind the docked sidebars and the
+     card, in the writer's window colour. */
 }
 
 /*
- * Canvas only: the board runs the full width of the window and the sidebars float
- * on top of it, so the canvas reads as the surface everything else sits on.
- *
- * Taking the sidebars out of flow is all this needs — .middle-section is `flex: 1`,
- * so it claims the whole row on its own. A document is unchanged: it keeps its
- * column between the two sidebars, which is already the look this is after.
+ * The document card: the document, canvas, map or timeline, with its toolbar, floating
+ * on the tray between the sidebars. Its top and bottom edges run from one sidebar to
+ * the other. A docked sidebar's own inset is the gap on its side; with none docked
+ * there, the card keeps --space-3 from the window.
  */
-.main-layout.is-canvas-underlay > .sidebar {
-  position: absolute;
-  top: 0;
-  z-index: 50;
+.document-card {
+  position: relative;
+  /* Keeps the card's own layers (toolbar, tab bar, split divider) under a sidebar
+     hovering over it. */
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  margin: var(--space-3);
+  overflow: hidden;
+  background: var(--app-bg);
+  border-radius: var(--radius-lg);
+  /* No border: the card stands off the tray by its shadow alone. */
+  box-shadow: var(--shadow-card);
+  transition:
+    margin-left var(--dur-slow) var(--ease-out),
+    margin-right var(--dur-slow) var(--ease-out);
 }
 
-.main-layout.is-canvas-underlay > .left-sidebar {
-  left: 0;
+/* A transition runs on the state being entered, so each docked side drops its own: a
+   sidebar pinned to the tray from a peek moves the card at once, and one put away
+   lets it glide back out. One pinned from hidden glides in with the card. */
+.document-card.has-left-dock {
+  margin-left: 0;
+  transition: margin-right var(--dur-slow) var(--ease-out);
+}
+.document-card.has-right-dock {
+  margin-right: 0;
+  transition: margin-left var(--dur-slow) var(--ease-out);
+}
+.document-card.has-left-dock.has-right-dock { transition: none; }
+.document-card.has-left-dock.is-left-gliding,
+.document-card.has-right-dock.is-right-gliding {
+  transition:
+    margin-left var(--dur-slow) var(--ease-out),
+    margin-right var(--dur-slow) var(--ease-out);
 }
 
-.main-layout.is-canvas-underlay > .right-sidebar {
-  right: 0;
+.is-sidebar-resizing .document-card { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .document-card { transition: none; }
 }
 
 .editor-page-wrapper.is-focus-mode .app-titlebar,
@@ -132,15 +164,21 @@
 }
 
 
-/* Show Sidebar / Show Inspector, at the inner edge of their grid cells. */
+/* The card's top corners: pin or unpin each sidebar. The traffic lights never sit
+   over the card: they go with the left sidebar (lib/trafficLights.js). */
 .titlebar-toggle {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   min-width: 0;
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-1);
+  pointer-events: auto;
   -webkit-app-region: no-drag;
 }
 .titlebar-toggle.is-left { grid-row: 1; grid-column: 1; justify-content: flex-end; }
 .titlebar-toggle.is-right { grid-row: 1; grid-column: 3; justify-content: flex-start; }
+.titlebar-toggle .is-mirrored .ui-icon-button-icon { transform: scaleX(-1); }
+.editor-page-wrapper.is-focus-mode .titlebar-toggle { display: none; }
 .titlebar-toggle .ui-button { color: var(--text-secondary); }
 .titlebar-toggle .ui-button:hover { color: var(--text-primary); }

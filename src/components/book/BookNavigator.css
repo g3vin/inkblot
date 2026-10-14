@@ -25,7 +25,7 @@
   user-select: none;
 }
 .book-row:hover { background: var(--hover-bg); }
-.book-row[aria-selected='true'] { background: var(--select-bg); }
+.book-row[aria-selected='true'] { background: var(--app-bg); box-shadow: var(--shadow-lift); }
 .book-row:focus-visible { outline: 2px solid var(--accent-border); outline-offset: -2px; }
 .book-row[data-in-part='true'] { padding-left: calc(var(--space-2) + 12px); }
 .book-row[data-hidden='true'] > :not(.book-row-eye) { opacity: 0.45; }

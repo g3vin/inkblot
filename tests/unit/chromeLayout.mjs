@@ -25,7 +25,7 @@ const EXPECTED_IDS = [
   'inkblot.history.snapshot', 'inkblot.panel.clipboard', 'inkblot.panel.workbench', 'inkblot.panel.notes',
   'inkblot.panel.history', 'inkblot.panel.references', 'inkblot.panel.stats', 'inkblot.timer',
   'inkblot.tabs.new-tab', 'inkblot.tabs.split',
-  'inkblot.view.editor-mode', 'inkblot.typeset.view', 'inkblot.typeset.edition', 'inkblot.typeset.spread',
+  'inkblot.view.editor-mode', 'inkblot.view.page-view', 'inkblot.typeset.view', 'inkblot.typeset.edition', 'inkblot.typeset.spread',
   'inkblot.typeset.proof', 'inkblot.typeset.grid', 'inkblot.typeset.tighten', 'inkblot.typeset.loosen',
   'inkblot.typeset.keep-together', 'inkblot.typeset.text-style', 'inkblot.typeset.insert', 'inkblot.typeset.zoom',
   'inkblot.typeset.print', 'inkblot.typeset.export',
@@ -79,7 +79,7 @@ ok('a default item the user took out stays out', read.items.join() === 'inkblot.
 ok('no default set hides items behind More', L.TOOLBAR_CONTEXTS.every((context) => !L.DEFAULT_TOOLBARS[context].includes(L.MORE)))
 const surface = L.DEFAULT_TOOLBARS.document.filter((id) => !L.isSpacer(id)).slice(0, 7)
 ok('the document toolbar leads with the essentials',
-  surface.join() === 'inkblot.view.editor-mode,inkblot.format.text-style,inkblot.format.paragraph-style,inkblot.format.bulleted-list,inkblot.format.numbered-list,inkblot.insert.note,inkblot.edit.undo-redo')
+  surface.join() === 'inkblot.view.page-view,inkblot.format.text-style,inkblot.format.paragraph-style,inkblot.format.bulleted-list,inkblot.format.numbered-list,inkblot.insert.note,inkblot.edit.undo-redo')
 read = doc(JSON.stringify({ items: ['inkblot.format.font', 'more', 'inkblot.format.highlight', 'more'], known: ids }))
 ok('More is kept, once', read.items.join() === 'inkblot.format.font,more,inkblot.format.highlight')
 read = doc(JSON.stringify({ items: ['inkblot.format.font', 'more'], known: ids }))

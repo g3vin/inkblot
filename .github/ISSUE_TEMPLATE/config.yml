@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/g3vin/inkblot/blob/main/SECURITY.md
+    about: Please report security problems privately, by email, not in an issue.

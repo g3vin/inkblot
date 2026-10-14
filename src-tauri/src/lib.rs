@@ -17,6 +17,7 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager};
 
+mod app_windows;
 mod core_commands;
 mod dictation_commands;
 mod haptics_commands;
@@ -30,6 +31,7 @@ mod stats_commands;
 mod synonym_commands;
 mod trackpad;
 mod webview_commands;
+mod window_chrome;
 
 use core_commands::{list_system_fonts, project_locks, scrape_pinterest_html};
 use dictation_commands::{
@@ -54,6 +56,7 @@ use stats_commands::{
 };
 use synonym_commands::{download_synonym_model, get_synonyms, synonym_model_status, SynonymState};
 use webview_commands::{eval_webview, get_webview_url, navigate_webview};
+use window_chrome::window_traffic_lights;
 
 /// `~/Library/Application Support/com.inkblot.app` on macOS: the preferences, the
 /// models, the stats and every project not kept elsewhere.
@@ -76,9 +79,12 @@ pub fn run() {
         .manage(ScrapeChannels::default())
         .setup(|app| {
             trackpad::install(app.handle());
+            let main = app_windows::build_main(app.handle())?;
+            window_chrome::place_default(&main);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            app_windows::open_document_window,
             navigate_webview,
             get_webview_url,
             eval_webview,
@@ -86,6 +92,7 @@ pub fn run() {
             list_system_fonts,
             project_locks,
             perform_haptic,
+            window_traffic_lights,
             get_synonyms,
             synonym_model_status,
             download_synonym_model,

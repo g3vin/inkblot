@@ -20,8 +20,9 @@
    1. Theme-independent scales
    ============================================================ */
 :root {
-  /* Type families. Inter for chrome; Courier Prime only for accent labels (eyebrows,
-     stats, metadata, empty states, the wordmark); Literata for the writer's words. */
+  /* Type families. Inter for chrome, eyebrows included; Courier Prime only for small
+     typewritten accents (stats, metadata, empty states, the wordmark); Literata for
+     the writer's words. */
   --font-ui: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-type: 'Courier Prime', 'Courier New', Courier, monospace;
   --font-editor: 'Literata Variable', 'Literata', Georgia, 'Times New Roman', serif;
@@ -48,6 +49,7 @@
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
+  --weight-bold: 700;
   --tracking-eyebrow: 0.08em;
 
   /* Space — on a 4px grid, with one 6px half-step for tight chrome. */
@@ -84,8 +86,8 @@
   --icon-sm: 16px;
   --icon-md: 20px;
   --hairline: 1px;
-  /* Inlay: the width of the channel engraved around a panel's own control
-     (src/ui/Inlay.jsx). Its light is per theme, below. */
+  /* The kerf: the gap between a panel's bare controls (src/ui/Inlay.jsx), and the
+     width of the channel round a sidebar's tab strip. Its light is per theme, below. */
   --inlay-kerf: 3px;
 
   /* Motion — subtle and quick. Motion clarifies; it never performs. */
@@ -94,12 +96,16 @@
   --dur-base: 180ms;
   --dur-slow: 240ms;
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /* --ease-out backwards: for a thing leaving the way it came. */
+  --ease-in: cubic-bezier(0.8, 0, 0.8, 0.3);
   --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
   --ease-standard: var(--ease-out);
 
-  /* The one blur in the app: Liquid Glass on iOS/iPadOS floating chrome
-     (tests/unit/css.mjs allows no other backdrop-filter value). */
+  /* The blurs (tests/unit/css.mjs allows no other backdrop-filter value): Liquid
+     Glass on iOS/iPadOS floating chrome, and the slight softening of the page behind
+     a hover note, which is a little see-through. */
   --blur-over-page: blur(20px) saturate(160%);
+  --blur-note: blur(4px);
 
   /* Layers */
   --z-chrome: 20;
@@ -151,6 +157,15 @@
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;
+
+  /* The window's tray (see the tray recipe): what its ink is mixed into, how strongly,
+     and how much of the main text colour muted text on it keeps to stay AA. */
+  --tray-base: var(--surface-sunken);
+  --tray-glow-mix: 26%;
+  --tray-top-mix: 15%;
+  --tray-bottom-mix: 5%;
+  --tray-text-muted-mix: 72%;
+  --tray-text-subtle-mix: 66%;
 
   /* Neutrals — warm ink. */
   --paper-0: #161412;
@@ -215,16 +230,21 @@
     0 0 0 0.5px rgba(0, 0, 0, 0.4),
     0 2px 6px rgba(0, 0, 0, 0.18),
     0 12px 28px rgba(0, 0, 0, 0.28);
-  /* An Inlay's channel (src/ui/Inlay.jsx), lit from above: the floor is the paper
+  /* The document card on the tray, and a row lifted onto it (the open document in
+     the file tree): the float's depth with no ring, so no edge is drawn round them. */
+  --shadow-card:
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 12px 28px rgba(0, 0, 0, 0.3);
+  --shadow-lift:
+    0 1px 2px rgba(0, 0, 0, 0.32),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+  /* A sidebar tab strip's channel (FileTree.css), lit from above: the floor is the paper
      mixed toward --inlay-shade by --inlay-depth, the top wall is in shade, the bottom
-     lip catches the light, and the piece casts onto the floor and catches the light
-     along its own top edge. */
+     lip catches the light. The pieces sit flush on the floor. */
   --inlay-shade: #000;
   --inlay-depth: 38%;
   --inlay-wall: inset 0 1px 1.5px rgba(0, 0, 0, 0.6);
   --inlay-lip: inset 0 -0.5px 0 rgba(255, 244, 222, 0.09);
-  --inlay-cast: 0 1px 1.5px rgba(0, 0, 0, 0.6);
-  --inlay-bevel: inset 0 0.5px 0 rgba(255, 244, 222, 0.07);
   --shadow-dialog:
     0 0 0 0.5px rgba(0, 0, 0, 0.45),
     0 24px 60px rgba(0, 0, 0, 0.45);
@@ -244,10 +264,11 @@
   --accent-color: var(--ink-blue);
   --accent-foreground: color-mix(in srgb, var(--accent-color) 80%, white);
 
-  /* The page in Print Layout, on screen: a near-black sheet with light ink, on a desk
-     a step lighter than the window. What goes to the printer is always --print-*. */
+  /* The page in Print Layout, on screen: a dark sheet the shade of the toolbar's bar
+     (the card's own paper), with light ink, on a desk a step lighter. What goes to the
+     printer is always --print-*. */
   --page-desk: var(--paper-3);
-  --page-paper: #0f0e0c;
+  --page-paper: var(--app-bg);
   --page-ink: var(--ink-0);
   --page-ink-secondary: var(--ink-2);
   --page-faint: rgba(255, 246, 228, 0.3);
@@ -266,6 +287,13 @@
 
 :root[data-theme='light'] {
   color-scheme: light;
+
+  --tray-base: var(--paper-2);
+  --tray-glow-mix: 30%;
+  --tray-top-mix: 18%;
+  --tray-bottom-mix: 7%;
+  --tray-text-muted-mix: 80%;
+  --tray-text-subtle-mix: 76%;
 
   /* Neutrals — warm paper. */
   --paper-0: #faf8f4;
@@ -314,12 +342,16 @@
     0 0 0 0.5px rgba(40, 32, 20, 0.12),
     0 2px 6px rgba(40, 32, 20, 0.06),
     0 12px 28px rgba(40, 32, 20, 0.1);
+  --shadow-card:
+    0 1px 3px rgba(40, 32, 20, 0.08),
+    0 12px 28px rgba(40, 32, 20, 0.1);
+  --shadow-lift:
+    0 1px 2px rgba(40, 32, 20, 0.12),
+    0 2px 6px rgba(40, 32, 20, 0.06);
   --inlay-shade: rgb(40, 32, 20);
   --inlay-depth: 9%;
   --inlay-wall: inset 0 1px 1.5px rgba(40, 32, 20, 0.24);
   --inlay-lip: inset 0 -0.5px 0 rgba(255, 255, 255, 0.9);
-  --inlay-cast: 0 1px 1.5px rgba(40, 32, 20, 0.24);
-  --inlay-bevel: inset 0 0.5px 0 rgba(255, 255, 255, 0.8);
   --shadow-dialog:
     0 0 0 0.5px rgba(40, 32, 20, 0.14),
     0 24px 56px rgba(40, 32, 20, 0.16);
@@ -385,6 +417,9 @@
   --menu-border: var(--popover-border);
   --menu-radius: var(--radius-lg);
   --menu-shadow: var(--shadow-float);
+  /* The search card and its preview: the pop-up surface, see-through over the page it
+     softens (--blur-over-page), as a hovering sidebar is. A veil, not glass. */
+  --search-veil-bg: color-mix(in srgb, var(--menu-bg) 72%, transparent);
 }
 
 /*
@@ -409,6 +444,33 @@
   --card-edge: color-mix(in srgb, var(--card-color) 30%, var(--card-edge-base));
   --card-edge-hover: color-mix(in srgb, var(--card-color) 45%, var(--card-edge-base));
 }
+
+/*
+ * The tray: the window behind the docked panels and the document card, as in Arc and
+ * Dia. A soft gradient in the ink the writer picks (Settings → Window colour), set with
+ * data-tray on <html>; Ink Blue is the default. The gradient is drawn by the `.ib-tray`
+ * recipe (src/ui/Surfaces.css) from these stops. A tab strip can't cut from a gradient, so a
+ * panel on the tray takes --tray-sheet, the gradient's flat middle, as its paper.
+ */
+:root {
+  --tray-ink: var(--ink-blue);
+  --tray-glow: color-mix(in srgb, var(--tray-ink) var(--tray-glow-mix), var(--tray-base));
+  --tray-top: color-mix(in srgb, var(--tray-ink) var(--tray-top-mix), var(--tray-base));
+  --tray-bottom: color-mix(in srgb, var(--tray-ink) var(--tray-bottom-mix), var(--tray-base));
+  --tray-sheet: color-mix(in srgb, var(--tray-top) 50%, var(--tray-bottom));
+  /* How much of the tray a sidebar hovering over the document keeps: slightly
+     see-through, so the page it covers still shows, softened (.ib-tray). */
+  --tray-veil-alpha: 86%;
+}
+
+/* Tray inks. Keep in sync with TRAY_INKS in src/lib/palette.ts. */
+:root[data-tray='teal'] { --tray-ink: var(--ink-teal); }
+:root[data-tray='green'] { --tray-ink: var(--ink-green); }
+:root[data-tray='amber'] { --tray-ink: var(--ink-amber); }
+:root[data-tray='rust'] { --tray-ink: var(--ink-rust); }
+:root[data-tray='red'] { --tray-ink: var(--ink-red); }
+:root[data-tray='violet'] { --tray-ink: var(--ink-violet); }
+:root[data-tray='slate'] { --tray-ink: var(--ink-slate); }
 
 /* Accent presets. Keep in sync with ACCENT_PRESETS in src/lib/palette.ts. */
 :root[data-accent='teal'] { --accent-color: var(--ink-teal); }

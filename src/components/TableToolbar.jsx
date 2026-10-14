@@ -171,11 +171,11 @@ export default function TableToolbar({ editor }) {
       <FloatingToolbar label="Table">
         <IconButton icon="row-above" label="Add row above" size="capsule" onClick={act.rowAbove} />
         <IconButton icon="row-below" label="Add row below" size="capsule" onClick={act.rowBelow} />
-        <IconButton icon="row-delete" label="Delete row" size="capsule" onClick={act.deleteRow} />
+        <IconButton icon="delete" label="Delete row" size="capsule" onClick={act.deleteRow} />
         <ToolbarSeparator />
         <IconButton icon="column-left" label="Add column left" size="capsule" onClick={act.columnLeft} />
         <IconButton icon="column-right" label="Add column right" size="capsule" onClick={act.columnRight} />
-        <IconButton icon="column-delete" label="Delete column" size="capsule" onClick={act.deleteColumn} />
+        <IconButton icon="delete" label="Delete column" size="capsule" onClick={act.deleteColumn} />
         <ToolbarSeparator />
         <IconButton icon="cell-merge" label="Merge cells" size="capsule" disabled={!table.canMerge} onClick={act.merge} />
         <IconButton icon="cell-split" label="Split cell" size="capsule" disabled={!table.canSplit} onClick={act.split} />

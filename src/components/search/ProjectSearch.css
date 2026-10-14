@@ -1,0 +1,273 @@
+/* ============================================================
+   Project search: one card, from the left sidebar's foot or centred (⇧⌘F),
+   with a preview of the document under the pointer beside it.
+   ============================================================ */
+
+.project-search {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+/* The card and its preview are the pop-up surface made see-through: the page behind
+   shows, softened, as it does under a hovering sidebar (docs/DESIGN.md §12). A
+   hairline edge and the float shadow lift it off the page. */
+.project-search-card,
+.project-search-preview {
+  box-sizing: border-box;
+  border: var(--hairline) solid var(--menu-border);
+  border-radius: var(--menu-radius);
+  background: var(--search-veil-bg);
+  box-shadow: var(--menu-shadow);
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .project-search-card,
+  .project-search-preview {
+    background: var(--menu-bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+.project-search-card {
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 560px);
+  overflow: hidden;
+}
+
+/* ---- The field ---- */
+
+.project-search-field {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--size-bubble);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-5);
+}
+
+.project-search-field-icon { flex: none; color: var(--text-secondary); }
+
+.project-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--text-lg) var(--font-ui);
+}
+
+.project-search-input::placeholder { color: var(--text-placeholder); }
+.project-search-field .ib-kbd { flex: none; color: var(--text-muted); }
+.project-search-clear { flex: none; color: var(--text-muted); }
+
+/* ---- The categories ---- */
+
+.project-search-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-2) var(--space-3);
+}
+
+.project-search-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* The category's name, small, set in from the rows' edge as their text is. */
+.project-search-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--size-capsule);
+  padding: var(--space-1) var(--space-3) 0;
+  color: var(--text-muted);
+}
+
+.project-search-section-title .ib-eyebrow { margin: 0; }
+.project-search-section-action { color: var(--text-muted); }
+
+.project-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: var(--size-toolbar);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--text-sm) var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-search-row.is-selected { background: var(--hover-bg); }
+.project-search-row-icon { flex: none; color: var(--text-secondary); }
+
+.project-search-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.project-search-row-title,
+.project-search-row-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-search-row-preview { color: var(--text-secondary); font-size: var(--text-xs); }
+
+/* What the query matched: the same weight of ink, picked out in the accent. */
+.project-search-hit {
+  border-radius: var(--radius-sm);
+  background: var(--accent-surface-strong);
+  color: inherit;
+}
+
+.project-search-status { padding: var(--space-2) var(--space-3); color: var(--text-muted); }
+
+/* ---- From the sidebar: the card above the foot ---- */
+
+/* On the page, above the foot (ProjectSearch places it): from the foot's outer edge,
+   out over the document, opening upward. */
+.project-search-popup {
+  position: fixed;
+  z-index: var(--z-popover);
+  margin-bottom: var(--space-2);
+  animation: project-search-open-up var(--dur-fast) var(--ease-out) both;
+}
+
+@keyframes project-search-open-up {
+  from { opacity: 0; transform: translateY(var(--space-2)); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- The preview ---- */
+
+.project-search-preview {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: none;
+  animation: project-search-fade var(--dur-fast) var(--ease-out) both;
+}
+
+@keyframes project-search-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.project-search-preview-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-2);
+  color: var(--text-secondary);
+  font: var(--weight-semibold) var(--text-sm) var(--font-ui);
+}
+
+.project-search-preview-title {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The document as it reads, small; the cut-off bottom fades so a crop reads as
+   "there is more". */
+.project-search-preview-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-2) var(--space-5) var(--space-5);
+  font-family: var(--font-editor);
+  font-size: var(--text-sm);
+  mask-image: linear-gradient(to bottom, black 80%, transparent);
+}
+
+.project-search-preview-map { flex: 1; min-height: 0; padding: var(--space-2); }
+
+.project-search-preview-empty {
+  flex: 1;
+  padding: var(--space-2) var(--space-5) var(--space-5);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---- Centred (⇧⌘F) ---- */
+
+/* No scrim: the card floats over the workspace. The layer is here only to catch the
+   click that puts it away. */
+.project-search-overlay {
+  position: fixed;
+  inset: 0;
+  /* The preview is on this layer too, and drawn after it, so it shows above. */
+  z-index: var(--z-popover);
+  background: transparent;
+}
+
+.project-search-overlay-card {
+  position: fixed;
+  top: 50%;
+  /* Centred between the sidebars' inner edges (window edges when they are hidden). */
+  left: var(--search-center-x, 50%);
+  width: min(640px, calc(var(--search-zone-width, 100vw) - var(--space-12)), calc(100vw - var(--space-12)));
+  transform: translate(-50%, -50%);
+  animation: project-search-pop var(--dur-base) var(--ease-out) both;
+}
+
+.project-search-overlay-card .project-search-field { min-height: var(--size-trash); }
+
+/* Opened from the icon: start on it and grow into the middle, so it reads as the
+   search moving rather than a second one appearing. */
+.project-search-overlay-card.is-flying {
+  animation: project-search-fly var(--dur-slow) var(--ease-out) both;
+}
+
+@keyframes project-search-pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.94); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes project-search-fly {
+  from {
+    opacity: 0.35;
+    transform:
+      translate(calc(-50% + var(--search-fly-dx, 0px)), calc(-50% + var(--search-fly-dy, 0px)))
+      scale(var(--search-fly-scale, 0.4));
+  }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-search-popup,
+  .project-search-preview,
+  .project-search-overlay-card,
+  .project-search-overlay-card.is-flying {
+    animation: none;
+  }
+}

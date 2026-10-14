@@ -5,9 +5,15 @@
 import { useEffect, useState } from 'react'
 import './ui.css'
 
-export function FormRow({ label, stacked = false, htmlFor, className = '', children }) {
+/**
+ * Label left, control right. The label takes the room it needs (up to about half the
+ * row) rather than a fixed share, so short controls don't squeeze long labels onto
+ * three lines; a wide control (a field, a long menu) goes `stacked`, under its label.
+ * `help` names the help topic a right-click on the row offers (lib/help.ts).
+ */
+export function FormRow({ label, stacked = false, htmlFor, help, className = '', children }) {
   return (
-    <div className={`ui-form-row ${className}`.trim()} data-stacked={stacked}>
+    <div className={`ui-form-row ${className}`.trim()} data-stacked={stacked} data-help={help}>
       {label ? <label className="ui-form-row-label" htmlFor={htmlFor}>{label}</label> : null}
       <div className="ui-form-row-control">{children}</div>
     </div>

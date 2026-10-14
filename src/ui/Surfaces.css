@@ -50,84 +50,34 @@
 
 /* A shell whose surface is the panel's paper (the sidebars, Panel). */
 .ib-sheet {
-  /* The floor of anything engraved into this paper: an Inlay's channel, or a strip
-     that is a channel itself (the sidebars' tabs). */
+  /* The floor of a strip engraved into this paper (the sidebars' tabs). */
   --inlay-floor: color-mix(in srgb, var(--sheet-bg, var(--surface-float)), var(--inlay-shade) var(--inlay-depth));
   background: var(--sheet-bg, var(--surface-float));
 }
 
 /*
- * Inlay — a panel's own controls are engraved into it, not floated on it. Each piece
- * is its own stacking context and paints two layers behind its contents: ::before is
- * the channel, a kerf out from the piece (floor, shaded top wall, lit bottom lip), and
- * ::after is the piece's paper, casting a little shadow onto the floor. Light falls
- * from above, as it does for --shadow-float. Focus runs ink into the channel.
+ * Inlay — a panel's own controls (the +, the filter, the search) sit straight on the
+ * panel's paper: glyphs and text, with no fill, border or channel of their own. A
+ * round button darkens a little when hovered, as a tab does. A field shows its focus
+ * by inking its glyphs; its buttons keep their own focus rings.
  */
 .ib-inlay,
 .ib-inlay-slot {
-  /* A pill: every piece is one short line (a field, a button), so its ends and its
-     channel's are concentric semicircles. */
-  --inlay-radius: var(--radius-pill);
-  --inlay-paper: var(--sheet-bg, var(--surface-float));
-  position: relative;
-  isolation: isolate;
   box-sizing: border-box;
-  border-radius: var(--inlay-radius);
+  border-radius: var(--radius-pill);
 }
 
-/* One long channel around a row of pieces, a kerf apart. The slot itself is bare. */
+/* A row of pieces, a kerf apart. */
 .ib-inlay-slot {
   display: flex;
   align-items: center;
   gap: var(--inlay-kerf);
 }
 
-/* The channel, concentric with the piece. */
-.ib-inlay::before,
-.ib-inlay-slot::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: calc(-1 * var(--inlay-kerf));
-  border-radius: calc(var(--inlay-radius) + var(--inlay-kerf));
-  background: color-mix(in srgb, var(--inlay-paper), var(--inlay-shade) var(--inlay-depth));
-  box-shadow: var(--inlay-wall), var(--inlay-lip);
-  pointer-events: none;
-  transition: background-color var(--dur-fast) ease;
-  /* The channel is the sheet's, not the piece's: it stays when a hidden piece has been
-     lifted out, an empty pocket until it returns. */
-  visibility: visible;
-}
+.ib-inlay:has(input:focus) .ib-icon { color: var(--accent-foreground); }
+.ib-inlay input:focus-visible { outline: none; box-shadow: none; }
 
-/* The piece's paper, over the floor. */
-.ib-inlay::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--inlay-paper);
-  box-shadow: var(--inlay-cast), var(--inlay-bevel);
-  pointer-events: none;
-  transition: box-shadow var(--dur-instant) ease;
-}
-
-/* In a slot the pieces share the slot's channel. */
-.ib-inlay-slot > .ib-inlay::before { content: none; }
-
-/* Focus: ink runs into the channel. In a slot, only the focused piece's own channel
-   inks, inside the long one. The ink is the focus ring, so the controls inside draw
-   none of their own. */
-.ib-inlay:has(:focus-visible)::before,
-.ib-inlay-slot > .ib-inlay:has(:focus-visible)::before {
-  content: '';
-  background: var(--accent-color);
-  box-shadow: var(--inlay-wall);
-}
-.ib-inlay :focus-visible { outline: none; box-shadow: none; }
-
-/* Pressed: the piece settles onto the floor. */
-.ib-inlay--round:active::after { box-shadow: none; }
+.ib-inlay--round .ui-button:not(:disabled):hover { background: var(--hover-bg); }
 
 /* FadeScrim — text dissolves under chrome. */
 .ib-fade-scrim {
@@ -216,6 +166,47 @@
 
 .ib-empty-action { margin-top: var(--space-3); }
 
+.ib-empty--compact { gap: var(--space-2); padding: var(--space-5) var(--space-4); }
+
+/* A drop target only shows itself while something is over it. */
+.ib-empty {
+  border-radius: var(--radius-md);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.ib-empty.is-drop-active { background: var(--accent-surface); }
+.ib-empty.is-drop-active .ib-empty-icon { color: var(--accent-foreground); }
+
+/* The panel header's scope: quiet text and a chevron, not a filled control. */
+.ib-scope-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  height: var(--size-capsule);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: 500 var(--text-xs)/1 var(--font-ui);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.ib-scope-menu:hover,
+.ib-scope-menu[aria-expanded='true'] { background: var(--surface-hover); color: var(--text-primary); }
+.ib-scope-menu:focus-visible { outline: 2px solid var(--accent-border); outline-offset: 1px; }
+.ib-scope-menu-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Fields on the tray (a docked or hovering sidebar) are its own paper a step darker,
+   like the other controls there, not white boxes; focus still draws the ring. */
+.ib-tray .ib-input,
+.ib-tray .ib-textarea {
+  border-color: transparent;
+  background: var(--control-bg);
+}
+.ib-tray .ib-input:hover,
+.ib-tray .ib-textarea:hover { border-color: transparent; background: var(--control-hover-bg); }
+.ib-tray .ib-input:focus,
+.ib-tray .ib-textarea:focus { border-color: var(--accent-border); background: var(--control-bg); }
+
 /* Tabs — an underline, not boxes: quiet, like section marks in a manuscript. */
 .ib-tabs {
   display: flex;
@@ -251,3 +242,51 @@
 }
 
 .ib-tab:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+
+/*
+ * Tray — the window behind the docked sidebars and the document card, in the writer's
+ * window colour (the --tray-* tokens). Fixed to the window, so the docked sidebars on
+ * it read as one surface. A sidebar hovering over the document wears it veiled
+ * (--tray-veil-alpha) over the page, and its own box sizes the gradient.
+ */
+.ib-tray {
+  --tray-glow-at: var(--tray-glow);
+  --tray-top-at: var(--tray-top);
+  --tray-bottom-at: var(--tray-bottom);
+  background:
+    radial-gradient(120% 70% at 0% 0%, var(--tray-glow-at), transparent 70%),
+    linear-gradient(165deg, var(--tray-top-at), var(--tray-bottom-at));
+  background-attachment: fixed;
+}
+
+.ib-tray.is-veiled {
+  --tray-glow-at: color-mix(in srgb, var(--tray-glow) var(--tray-veil-alpha), transparent);
+  --tray-top-at: color-mix(in srgb, var(--tray-top) var(--tray-veil-alpha), transparent);
+  --tray-bottom-at: color-mix(in srgb, var(--tray-bottom) var(--tray-veil-alpha), transparent);
+  background-attachment: scroll;
+  -webkit-backdrop-filter: var(--blur-over-page);
+  backdrop-filter: var(--blur-over-page);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ib-tray.is-veiled {
+    --tray-glow-at: var(--tray-glow);
+    --tray-top-at: var(--tray-top);
+    --tray-bottom-at: var(--tray-bottom);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* A text button in an inspector section reads as a control, like the menus beside it:
+   the tray's paper a step darker, at the row's size, sitting at the start of its line
+   (never stretched across the panel). Icon buttons stay bare. */
+.ib-tray .ui-section-body .ui-button[data-variant='plain']:not(.ui-icon-button) {
+  background: var(--control-bg);
+  font-size: 12px;
+}
+.ib-tray .ui-section-body .ui-button[data-variant='plain']:not(.ui-icon-button):hover:not(:disabled) {
+  background: var(--control-hover-bg);
+}
+.ib-tray .ui-section-body > .ui-button,
+.ib-tray .ui-section-body > * > .ui-button:only-child { align-self: flex-start; }

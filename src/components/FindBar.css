@@ -1,0 +1,69 @@
+/* The find bar: floating at the top of the document card, under the toolbar's rule,
+   on its inner right, as a browser's sits. It is the pop-up surface (one of the
+   floating things that cast a shadow). */
+.find-bar {
+  position: absolute;
+  top: calc(var(--app-titlebar-height) + var(--space-2));
+  right: var(--space-4);
+  z-index: var(--z-chrome);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: min(420px, calc(100% - var(--space-8)));
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-2);
+  border: var(--hairline) solid var(--menu-border);
+  border-radius: var(--menu-radius);
+  background: var(--menu-bg);
+  box-shadow: var(--menu-shadow);
+  font: var(--text-sm) var(--font-ui);
+  animation: find-bar-in var(--dur-fast) var(--ease-out) both;
+}
+
+@keyframes find-bar-in {
+  from { opacity: 0; transform: translateY(calc(var(--space-2) * -1)); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .find-bar { animation: none; }
+}
+
+.find-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.find-bar-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: var(--size-circle);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+}
+
+.find-bar-field:focus-within { box-shadow: var(--focus-ring); }
+.find-bar-field-icon { flex: none; color: var(--text-secondary); }
+
+.find-bar-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.find-bar-input::placeholder { color: var(--text-placeholder); }
+.find-bar-count { flex: none; color: var(--text-muted); white-space: nowrap; }
+
+/* Replace sits under find, its field in line with find's. */
+.find-bar-replace { padding-left: calc(var(--size-capsule) + 2px); }
+.find-bar-replace .ui-button { flex: none; }

@@ -332,6 +332,24 @@ export function ReadAloudItem({ ctx, spec }) {
   )
 }
 
+/** Write's page view: the prose on the pages it will print on, still written in Write. */
+export function PageViewItem({ ctx, spec }) {
+  const shown = Boolean(ctx.layout?.enabled)
+  return (
+    <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
+      <ToolButton
+        icon={spec.icon}
+        label={spec.label}
+        title={shown ? 'Write in the continuous editor (⌥⌘P)' : 'Write on the pages (⌥⌘P)'}
+        display={ctx.display}
+        active={shown}
+        disabled={!ctx.editor}
+        onClick={() => ctx.send('setPrintLayout', { enabled: !shown })}
+      />
+    </ItemFrame>
+  )
+}
+
 /** Write | Typeset, for the whole window. */
 export function EditorModeItem({ ctx, spec }) {
   const mode = ctx.layout?.mode || 'write'
@@ -344,7 +362,7 @@ export function EditorModeItem({ ctx, spec }) {
           type="button"
           className={mode === value ? 'active' : ''}
           aria-pressed={mode === value}
-          title={`${label} (⌥⌘P)`}
+          title={label}
           disabled={disabled}
           onClick={() => ctx.send('setEditorMode', { mode: value })}
         >

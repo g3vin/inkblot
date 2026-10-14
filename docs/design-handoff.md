@@ -4,7 +4,7 @@ Where the Quiet Studio design language stands, and what to do next. Read
 [DESIGN.md](DESIGN.md) first: it holds the rules. This file holds the state of the
 work. Update it as you go, and delete each item when it's done.
 
-_Last updated: 2026-10-08, after the surface migration on `refactor/design-migration`._
+_Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-migration`._
 
 ---
 
@@ -87,12 +87,46 @@ black on white.
 
 ---
 
+**Panel audit** (2026-10-09, screenshots in both themes; `scripts/dev/audit.mjs`)
+
+- **Panel anatomy** (DESIGN.md §6): every inspector tab has a header row with a
+  `ScopeMenu` and `MoreMenu` (`PanelActions`), at most one `Segmented`, and sections
+  straight on the tray. The paper bands in Stats and Typeset/Print are gone; Stats went
+  from three selector rows to one, History's Typeset/Text and References' style and
+  scope moved to the header.
+- **Help:** `src/lib/help.ts`, `HelpSheet` (on the new `NavSheet`, shared with
+  Settings), "Help: …" on a right-click of anything tagged `help` / `data-help`, and
+  ⌘K → Help…. The long hints in Typeset, Print & export, Timeline, References, Stats
+  and Settings moved into topics.
+- **Primitives:** `EmptyState` (now on every empty panel; `compact`, `dropActive`),
+  `Section` (its accessory is beside the toggle, not inside it), `FormRow` (label
+  sizing, stacked fields stretch), controls and fields tinted for the tray.
+- **Icons:** one meaning, one glyph (DESIGN.md §8), enforced by `tests/unit/icons.mjs`.
+- **Shell:** the traffic lights hold one place from launch and hide with the left sidebar (`lib/trafficLights.js`,
+  `src-tauri/src/window_chrome.rs`); the card has no border; selection is lifted paper;
+  a bottom fade under the word-count capsules; the layout switch shows where it goes.
+- **Lint:** px font sizes and spacing are findings now, baselined at 792.
+- **Decided:** eyebrows are Inter bold capitals, as the sidebar titles were (§5); the
+  hairline under the card's toolbar is the one intended rule over the document (§6).
+- **Unused icons removed** from `src/ui/icons.js`; `tests/unit/icons.mjs` now fails on
+  a registered name nothing uses.
+- **`fs` scope:** `**` does not match dotfiles on macOS, so the capability names
+  Inkblot's own: `**/.inkblot-*`, `**/.assets/**`, `**/.versions/**`. Other dotfiles
+  (`~/.ssh`, `~/.config`, …) stay out of reach. Add a pattern here if the app starts
+  writing a new dot-name.
+
 ## Remaining
 
 - **Logo on devices.** Check the icons on a real Mac and iPhone (see "The logo" above).
-- **Bare buttons.** About 250 bare `<button>`s style themselves in their component's
-  stylesheet. That works, because the base rule is a reset, but move them onto
-  `Button` / `IconButton` when you're in that code anyway.
+- **Traffic lights on a real Mac.** Check they appear in place at launch, line up with
+  the project name, hide with the sidebar, show on the hovering sidebar, and hold after a resize and fullscreen.
+- **Other settings panes.** Writing, Goals, Timers and Reminders still carry
+  paragraph hints (`.settings-footer`); move them into help topics.
+- **Off-scale sizes and spacing.** 792 baselined findings (`npm run lint:design --
+  --list`); lower them as you touch each file, then `--update-baseline`.
+- **Bare buttons.** About 200 bare `<button>`s style themselves in their component's
+  stylesheet. Move them onto `Button` / `IconButton` when you're in that code anyway.
+
 
 ---
 
@@ -116,6 +150,11 @@ black on white.
 - **Content colours** (exports, the printed page, map worlds and themes, conversation
   looks) are content, so `lint:design` skips those paths (`IGNORED` in
   `scripts/lint-design.mjs`). Chrome never goes on that list.
+- **A panel's header controls are a portal.** `PanelActions` renders into the
+  inspector's title row only for the panel showing; outside a `PanelActionsProvider`
+  (tests, the showcase) it renders in place.
+- **ESLint does not catch an undefined JSX component** (no `react/jsx-no-undef`). A
+  missing import is a runtime error: look at the page, or run the audit script.
 - **Toolbar layout ids are storage keys.** A layout saved before an item existed gets it
   through `normalizeToolbar` (`src/lib/chromeLayout.ts`); check the migrations in
   `tests/unit/chromeLayout.mjs` before changing a default.
@@ -135,10 +174,12 @@ npm i --no-save playwright-core
 npm run dev &
 CHROMIUM=/path/to/chromium node scripts/dev/screenshot.mjs /tmp/shot dark
 node scripts/dev/screenshot.mjs /tmp/shot light --design
+node scripts/dev/audit.mjs /tmp/audit dark      # every surface and inspector tab
 ```
 
 The page runs against `scripts/dev/tauri-mock.js`, a fake projects folder, so no
 desktop shell is needed. In Claude Code's cloud containers, Chromium is at
 `/opt/pw-browsers/chromium-*/chrome-linux/chrome`. Check both themes and confirm three
-things: text still dissolves under the titlebar, the side panels float and hide, and
+things: text still dissolves under the card's toolbar rule, the sidebars dock on the
+tray and hover over the card when unpinned, and
 the editor is set in Literata.

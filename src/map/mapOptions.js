@@ -15,7 +15,7 @@ export const MAP_TOOLS = [
   { id: 'region', icon: 'map-area', label: 'Region', key: 'G' },
   { id: 'label', icon: 'label', label: 'Label', key: 'T' },
   { id: 'ruler', icon: 'ruler', label: 'Measure distance', key: 'M' },
-  { id: 'area', icon: 'map-area', label: 'Measure area', key: 'A' },
+  { id: 'area', icon: 'measure-area', label: 'Measure area', key: 'A' },
 ]
 
 /** The zoom as the toolbar writes it: 250%, 12×. */

@@ -23,6 +23,7 @@ import { DictationInline } from '../extensions/DictationInline'
 import { DocChangeReporter } from '../extensions/DocChangeReporter'
 import { NoteAnnotation } from '../extensions/NoteAnnotation'
 import { DocumentLock } from '../extensions/DocumentLock'
+import { DropPreview } from '../extensions/DropPreview'
 import { TimelineAnchors } from '../extensions/TimelineAnchors'
 import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
@@ -113,6 +114,8 @@ export const buildEditorExtensions = (starterKit) => [
   // A screenplay's or a play's lines, and which the document is written as.
   ScriptElement,
   DocWritingFormat,
+  // Clipboard text held over the page, shown where it would land.
+  DropPreview,
   ...sharedExtensions(),
 ]
 

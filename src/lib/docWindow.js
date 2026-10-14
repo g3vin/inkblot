@@ -14,6 +14,9 @@
  * was let go (`at`). A detached window can be kept on top of the others, and can put
  * its document back: it tells the main window (`DOCK_EVENT`), which opens it in a
  * tab, and closes.
+ *
+ * The window itself is built in Rust (`open_document_window`), not with
+ * `new WebviewWindow`: only there can its webview be made without Writing Tools.
  */
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { getDocDisplayName } from './docKind'
@@ -63,21 +66,24 @@ export async function openDocumentWindow(projectName, docPath, { at = null } = {
 
   const query = `?project=${encodeURIComponent(projectName)}&doc=${encodeURIComponent(docPath)}`
 
-  const detached = new WebviewWindow(label, {
-    url: `index.html${query}`,
-    title: getDocDisplayName(docPath) || 'Inkblot',
-    width: Math.round((window?.innerWidth ?? 1200) * 0.7),
-    height: Math.round((window?.innerHeight ?? 800) * 0.9),
-    resizable: true,
-    focus: true,
-    ...(at && Number.isFinite(at.x) && Number.isFinite(at.y) ? { x: Math.round(at.x), y: Math.round(at.y) } : {}),
-  })
-
-  detached.once('tauri://error', (error) => {
+  // Built in Rust (app_windows.rs), so its webview never offers Writing Tools.
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const placed = at && Number.isFinite(at.x) && Number.isFinite(at.y)
+    await invoke('open_document_window', {
+      label,
+      url: `index.html${query}`,
+      title: getDocDisplayName(docPath) || 'Inkblot',
+      width: Math.round((window?.innerWidth ?? 1200) * 0.7),
+      height: Math.round((window?.innerHeight ?? 800) * 0.9),
+      x: placed ? Math.round(at.x) : null,
+      y: placed ? Math.round(at.y) : null,
+    })
+    return await WebviewWindow.getByLabel(label)
+  } catch (error) {
     console.warn('Failed to open document window:', error)
-  })
-
-  return detached
+    return null
+  }
 }
 
 /** From a detached window: give its document back to the main window, and close. */

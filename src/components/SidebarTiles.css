@@ -114,15 +114,12 @@
  * the resting position is identical, but once you scroll, text keeps going up
  * past the scroller's top edge and fades out under the titlebar gradient
  * (.app-titlebar::before) — vanishing off the top of the editor.
- *
- * Canvas-underlay mode is excluded: a canvas pans instead of scrolling, so it
- * keeps the plain layout padding.
  */
-.main-layout:not(.is-canvas-underlay) .middle-section {
+.main-layout .middle-section {
   padding-top: 0;
 }
 
-.main-layout:not(.is-canvas-underlay) .pane-scroll {
+.main-layout .pane-scroll {
   padding-top: var(--app-titlebar-height);
   /* Programmatic scrolls (jump-to-text, search hits) must land clear of the fade. */
   scroll-padding-top: calc(var(--app-titlebar-height) + 20px);
@@ -130,28 +127,28 @@
 
 /* Only panes touching the window top scroll under the titlebar; the bottom
    pane of a row split sits under the divider, not the titlebar. */
-.main-layout:not(.is-canvas-underlay) .split-rows .secondary-pane .pane-scroll {
+.main-layout .split-rows .secondary-pane .pane-scroll {
   padding-top: 0;
 }
 
 /* Non-scrolling pane contents need the same titlebar clearance as a
    scrolling pane. */
-.main-layout:not(.is-canvas-underlay) .draft-pane {
+.main-layout .draft-pane {
   padding-top: calc(32px + var(--app-titlebar-height));
 }
 
-.main-layout:not(.is-canvas-underlay) .empty-state {
+.main-layout .empty-state {
   padding-top: var(--app-titlebar-height);
 }
 
-.main-layout:not(.is-canvas-underlay) .canvas-pane {
+.main-layout .canvas-pane {
   box-sizing: border-box;
   padding-top: var(--app-titlebar-height);
 }
 
 
-.main-layout:not(.is-canvas-underlay) .map-pane,
-.main-layout:not(.is-canvas-underlay) .timeline-pane {
+.main-layout .map-pane,
+.main-layout .timeline-pane {
   box-sizing: border-box;
   padding-top: var(--app-titlebar-height);
 }

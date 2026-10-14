@@ -46,9 +46,9 @@ const ALL: ToolbarContext[] = ['document', 'canvas', 'map', 'typeset']
 /** Every toolbar item, in the order the palette shows them. */
 export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.format.font', label: 'Font', icon: 'type-style', contexts: ['document'] },
-  { id: 'inkblot.format.font-size', label: 'Font size', icon: 'type-style', contexts: ['document'] },
-  { id: 'inkblot.format.text-style', label: 'Text style', icon: 'type-style', contexts: ['document'] },
-  { id: 'inkblot.format.text-color', label: 'Text color', icon: 'label', contexts: ['document'] },
+  { id: 'inkblot.format.font-size', label: 'Font size', icon: 'font-size', contexts: ['document'] },
+  { id: 'inkblot.format.text-style', label: 'Text style', icon: 'text-style', contexts: ['document'] },
+  { id: 'inkblot.format.text-color', label: 'Text color', icon: 'text-color', contexts: ['document'] },
   { id: 'inkblot.format.highlight', label: 'Highlight', icon: 'highlight', contexts: ['document'] },
   { id: 'inkblot.format.alignment', label: 'Alignment', icon: 'align-left', contexts: ['document'] },
   { id: 'inkblot.format.paragraph-style', label: 'Paragraph style', icon: 'paragraph', contexts: ['document'] },
@@ -70,17 +70,17 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.canvas.group', label: 'Group', icon: 'ungroup', contexts: ['canvas'] },
   { id: 'inkblot.canvas.undo-redo', label: 'Undo/Redo', icon: 'undo', contexts: ['canvas'] },
   { id: 'inkblot.canvas.alignment-guides', label: 'Alignment guides', icon: 'guides', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.snap-to-grid', label: 'Snap to grid', icon: 'table', contexts: ['canvas'] },
-  { id: 'inkblot.canvas.zoom', label: 'Zoom', icon: 'search', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.snap-to-grid', label: 'Snap to grid', icon: 'grid', contexts: ['canvas'] },
+  { id: 'inkblot.canvas.zoom', label: 'Zoom', icon: 'zoom-in', contexts: ['canvas'] },
   { id: 'inkblot.canvas.delete', label: 'Delete', icon: 'delete', contexts: ['canvas'] },
 
   { id: 'inkblot.map.drawing-tools', label: 'Drawing tools', icon: 'map-route', contexts: ['map'] },
   { id: 'inkblot.map.measure-tools', label: 'Measure tools', icon: 'ruler', contexts: ['map'] },
   { id: 'inkblot.map.undo-redo', label: 'Undo/Redo', icon: 'undo', contexts: ['map'] },
-  { id: 'inkblot.map.zoom', label: 'Zoom', icon: 'search', contexts: ['map'] },
+  { id: 'inkblot.map.zoom', label: 'Zoom', icon: 'zoom-in', contexts: ['map'] },
   { id: 'inkblot.map.delete', label: 'Delete', icon: 'delete', contexts: ['map'] },
 
-  { id: 'inkblot.history.snapshot', label: 'Snapshot now', icon: 'clock', contexts: ALL },
+  { id: 'inkblot.history.snapshot', label: 'Snapshot now', icon: 'history', contexts: ALL },
   { id: 'inkblot.panel.clipboard', label: 'Clipboard', icon: 'clipboard', contexts: ALL },
   { id: 'inkblot.panel.workbench', label: 'Workbench', icon: 'hammer', contexts: ALL },
   { id: 'inkblot.panel.notes', label: 'Notes', icon: 'note', contexts: ALL },
@@ -88,10 +88,11 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.panel.references', label: 'References', icon: 'books', contexts: ALL },
   { id: 'inkblot.panel.stats', label: 'Stats', icon: 'chart', contexts: ALL },
   { id: 'inkblot.timer', label: 'Timer', icon: 'timer', contexts: ALL },
-  { id: 'inkblot.tabs.new-tab', label: 'New tab', icon: 'copy', contexts: ALL },
+  { id: 'inkblot.tabs.new-tab', label: 'New tab', icon: 'add', contexts: ALL },
   { id: 'inkblot.tabs.split', label: 'Split', icon: 'split-columns', contexts: ALL },
 
   { id: 'inkblot.view.editor-mode', label: 'Mode', icon: 'write', contexts: ['document', 'typeset'] },
+  { id: 'inkblot.view.page-view', label: 'Page view', icon: 'book-pages', contexts: ['document'] },
   { id: 'inkblot.typeset.view', label: 'View', icon: 'book-pages', contexts: ['typeset'] },
   { id: 'inkblot.typeset.edition', label: 'Edition', icon: 'books', contexts: ['typeset'] },
   { id: 'inkblot.typeset.spread', label: 'Spreads', icon: 'book', contexts: ['typeset'] },
@@ -100,9 +101,9 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.typeset.tighten', label: 'Tighten', icon: 'collapse-width', contexts: ['typeset'] },
   { id: 'inkblot.typeset.loosen', label: 'Loosen', icon: 'expand-width', contexts: ['typeset'] },
   { id: 'inkblot.typeset.keep-together', label: 'Keep together', icon: 'compress-height', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.text-style', label: 'Style', icon: 'label', contexts: ['document', 'typeset'] },
+  { id: 'inkblot.typeset.text-style', label: 'Style', icon: 'text-style', contexts: ['document', 'typeset'] },
   { id: 'inkblot.typeset.insert', label: 'Insert', icon: 'split-rows', contexts: ['typeset'] },
-  { id: 'inkblot.typeset.zoom', label: 'Zoom', icon: 'search', contexts: ['typeset'] },
+  { id: 'inkblot.typeset.zoom', label: 'Zoom', icon: 'zoom-in', contexts: ['typeset'] },
   { id: 'inkblot.typeset.print', label: 'Print', icon: 'print', contexts: ['typeset'] },
   { id: 'inkblot.typeset.export', label: 'Export', icon: 'export', contexts: ['typeset'] },
 
@@ -126,7 +127,7 @@ export function toolbarItemsFor(context: ToolbarContext): ToolbarItemSpec[] {
 export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
   // The essentials first, so they are the last to go behind » when the window narrows.
   document: [
-    'inkblot.view.editor-mode', SPACE,
+    'inkblot.view.page-view', SPACE,
     'inkblot.format.text-style', 'inkblot.format.paragraph-style', SPACE,
     'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', SPACE,
     'inkblot.insert.note', 'inkblot.edit.undo-redo', SPACE,
