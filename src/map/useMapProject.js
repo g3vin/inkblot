@@ -49,7 +49,7 @@ export function useProjectDocs(projectName) {
   }, [refresh])
 
   const paths = useMemo(() => new Set(state.docs.map((doc) => doc.path)), [state.docs])
-  return { ...state, paths, refresh }
+  return useMemo(() => ({ ...state, paths, refresh }), [paths, refresh, state])
 }
 
 /** The project's story calendar, kept in step with every other open map. */

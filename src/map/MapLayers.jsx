@@ -82,76 +82,130 @@ const EarthGround = memo(function EarthGround({ map, projector, level, onCountri
   )
 })
 
-function SystemGround({ map, projector, selection }) {
+/** A circle of `radius` AU around `centre`, drawn through the projector. */
+function circlePath(projector, centre, radius) {
+  const ring = []
+  for (let step = 0; step <= 96; step += 1) {
+    const angle = (step / 96) * Math.PI * 2
+    ring.push(projector.toWorld([centre[0] + Math.cos(angle) * radius, centre[1] + Math.sin(angle) * radius]))
+  }
+  return pathData(ring, true)
+}
+
+/**
+ * The rings drawn for one body: around its parent, its orbit or a belt's edges
+ * (`around: 'parent'`); around itself, a star's habitable zone (`around: 'self'`).
+ */
+function bodyRings(body, byId, projector, positions, around) {
+  const out = []
+  if (around === 'self') {
+    if (body.kind !== 'star' || !(body.star?.luminositySun > 0)) return out
+    const zone = habitableZoneAU(body.star.luminositySun)
+    const at = positions.get(body.id) || [0, 0]
+    if (zone) {
+      for (const radius of zone) out.push(<path key={`hz-${body.id}-${radius}`} className="map-habitable" d={circlePath(projector, at, radius)} />)
+    }
+    return out
+  }
+  const parentAt = body.parent ? positions.get(body.parent) || [0, 0] : [0, 0]
+  if (body.kind === 'belt') {
+    const belt = body.belt || {}
+    const inner = Number(belt.innerAU) || body.orbit?.aAU || 2
+    const outer = Number(belt.outerAU) || inner * 1.3
+    for (const radius of [inner, (inner + outer) / 2, outer]) {
+      out.push(<path key={`${body.id}-${radius}`} className="map-belt" d={circlePath(projector, parentAt, radius)} />)
+    }
+    return out
+  }
+  if (body.orbit) {
+    const ring = orbitPath(body, byId, 128).map(([x, y]) => projector.toWorld([parentAt[0] + x, parentAt[1] + y]))
+    out.push(<path key={`orbit-${body.id}`} className="map-orbit" d={pathData(ring, true)} />)
+  }
+  return out
+}
+
+/** Every ring of every body, split into those whose centre is fixed and those that move. */
+function splitRings(bodies, fixed) {
+  const still = []
+  const moving = []
+  for (const body of bodies) {
+    const parentFixed = !body.parent || fixed.has(body.parent)
+    ;(parentFixed ? still : moving).push([body, 'parent'])
+    ;(fixed.has(body.id) ? still : moving).push([body, 'self'])
+  }
+  return { still, moving }
+}
+
+/**
+ * Ids of the bodies that never move: no orbit of their own, and nothing above them
+ * that orbits. What is drawn around them (orbits, belts, habitable zones) is the same
+ * on every day, so it is drawn once rather than on every tick of playback.
+ */
+function fixedBodies(bodies, byId) {
+  const fixed = new Set()
+  const isFixed = (body, depth = 0) => {
+    if (!body || body.orbit || depth > bodies.length) return false
+    return body.parent ? isFixed(byId.get(body.parent), depth + 1) : true
+  }
+  for (const body of bodies) if (isFixed(body)) fixed.add(body.id)
+  return fixed
+}
+
+const SystemGround = memo(function SystemGround({ map, projector, positions: livePositions, selection }) {
   const bodies = map.system.bodies
   const byId = useMemo(() => new Map(bodies.map((body) => [body.id, body])), [bodies])
-  const { positions } = projector
+  const positions = livePositions || projector.positions
+  const rings = useMemo(() => splitRings(bodies, fixedBodies(bodies, byId)), [bodies, byId])
+  // A fixed body is where it is on any day, so the frame's own positions place it.
+  const staticRings = useMemo(
+    () => rings.still.flatMap(([body, around]) => bodyRings(body, byId, projector, projector.positions, around)),
+    [byId, projector, rings]
+  )
+  const movingRings = rings.moving.flatMap(([body, around]) => bodyRings(body, byId, projector, positions, around))
 
-  const orbits = []
   const discs = []
   for (const body of bodies) {
-    const parentAt = body.parent ? positions.get(body.parent) || [0, 0] : [0, 0]
-    if (body.kind === 'belt') {
-      const belt = body.belt || {}
-      const inner = Number(belt.innerAU) || body.orbit?.aAU || 2
-      const outer = Number(belt.outerAU) || inner * 1.3
-      for (const radius of [inner, (inner + outer) / 2, outer]) {
-        const ring = []
-        for (let step = 0; step <= 96; step += 1) {
-          const angle = (step / 96) * Math.PI * 2
-          ring.push(projector.toWorld([parentAt[0] + Math.cos(angle) * radius, parentAt[1] + Math.sin(angle) * radius]))
-        }
-        orbits.push(<path key={`${body.id}-${radius}`} className="map-belt" d={pathData(ring, true)} />)
-      }
-      continue
-    }
-    if (body.orbit) {
-      const ring = orbitPath(body, byId, 128).map(([x, y]) => projector.toWorld([parentAt[0] + x, parentAt[1] + y]))
-      orbits.push(<path key={`orbit-${body.id}`} className="map-orbit" d={pathData(ring, true)} />)
-    }
-    if (body.kind === 'star' && body.star?.luminositySun > 0) {
-      const zone = habitableZoneAU(body.star.luminositySun)
-      const at = positions.get(body.id) || [0, 0]
-      if (zone) {
-        for (const radius of zone) {
-          const ring = []
-          for (let step = 0; step <= 96; step += 1) {
-            const angle = (step / 96) * Math.PI * 2
-            ring.push(projector.toWorld([at[0] + Math.cos(angle) * radius, at[1] + Math.sin(angle) * radius]))
-          }
-          orbits.push(<path key={`hz-${body.id}-${radius}`} className="map-habitable" d={pathData(ring, true)} />)
-        }
-      }
-    }
-    if (body.kind === 'barycenter') continue
+    if (body.kind === 'belt' || body.kind === 'barycenter') continue
     const at = projector.toWorld(positions.get(body.id) || [0, 0])
-    const isStar = body.kind === 'star'
-    const color = body.color || (isStar ? temperatureToColor(body.star?.temperatureK ?? 5772) : MAP_DEFAULT_COLORS.body)
-    const radius = isStar ? 11 : body.kind === 'moon' ? 3.5 : body.kind === 'station' ? 3 : body.kind === 'dwarf' ? 3.5 : 6
-    const blackHole = isStar && body.star?.spectral === 'BH'
     discs.push(
-      <g
+      <BodyDisc
         key={body.id}
-        className={`map-body${selection?.kind === 'body' && selection.id === body.id ? ' is-selected' : ''}`}
-        data-map-item={body.id}
-        data-map-kind="body"
-        transform={`translate(${at[0]} ${at[1]})`}
-      >
-        <g className="map-mark">
-          {isStar ? <circle r={radius * 2.4} fill={blackHole ? 'none' : color} opacity={0.18} stroke={blackHole ? MAP_DEFAULT_COLORS.blackHoleRim : 'none'} strokeWidth={blackHole ? 3 : 0} /> : null}
-          <circle className="map-body-disc" r={radius} fill={blackHole ? MAP_DEFAULT_COLORS.blackHole : color} stroke={blackHole ? MAP_DEFAULT_COLORS.blackHoleRim : 'none'} strokeWidth={blackHole ? 1.5 : 0} />
-          <text className="map-body-name" x={radius + 5} y={4}>{body.name}</text>
-        </g>
-      </g>
+        body={body}
+        x={at[0]}
+        y={at[1]}
+        selected={selection?.kind === 'body' && selection.id === body.id}
+      />
     )
   }
   return (
     <g className="map-ground map-system">
-      {orbits}
+      {staticRings}
+      {movingRings}
       {discs}
     </g>
   )
-}
+})
+
+const BodyDisc = memo(function BodyDisc({ body, x, y, selected }) {
+  const isStar = body.kind === 'star'
+  const color = body.color || (isStar ? temperatureToColor(body.star?.temperatureK ?? 5772) : MAP_DEFAULT_COLORS.body)
+  const radius = isStar ? 11 : body.kind === 'moon' ? 3.5 : body.kind === 'station' ? 3 : body.kind === 'dwarf' ? 3.5 : 6
+  const blackHole = isStar && body.star?.spectral === 'BH'
+  return (
+    <g
+      className={`map-body${selected ? ' is-selected' : ''}`}
+      data-map-item={body.id}
+      data-map-kind="body"
+      transform={`translate(${x} ${y})`}
+    >
+      <g className="map-mark">
+        {isStar ? <circle r={radius * 2.4} fill={blackHole ? 'none' : color} opacity={0.18} stroke={blackHole ? MAP_DEFAULT_COLORS.blackHoleRim : 'none'} strokeWidth={blackHole ? 3 : 0} /> : null}
+        <circle className="map-body-disc" r={radius} fill={blackHole ? MAP_DEFAULT_COLORS.blackHole : color} stroke={blackHole ? MAP_DEFAULT_COLORS.blackHoleRim : 'none'} strokeWidth={blackHole ? 1.5 : 0} />
+        <text className="map-body-name" x={radius + 5} y={4}>{body.name}</text>
+      </g>
+    </g>
+  )
+})
 
 /* ---------------- items ---------------- */
 
@@ -280,27 +334,39 @@ const PinLayer = memo(function PinLayer({ map, projector, space, day, selection,
       {map.pins.map((pin) => {
         const at = projector.toWorld(resolvePin(map, space, pin, day))
         if (!at) return null
-        const missing = Boolean(pin.doc && missingDocs?.has(pin.doc))
-        const selected = selection?.kind === 'pin' && selection.id === pin.id
         return (
-          <g
+          <PinMark
             key={pin.id}
-            className={`map-pin${selected ? ' is-selected' : ''}${missing ? ' is-missing' : ''}`}
-            data-map-item={pin.id}
-            data-map-kind="pin"
-            transform={`translate(${at[0]} ${at[1]})`}
-          >
-            <g className="map-mark">
-              <PinGlyph icon={pin.icon} color={pin.color} />
-              {hideNames ? null : (
-                <text className="map-pin-name" y={16} textAnchor="middle">
-                  {pinLabel(pin, getDocDisplayName)}{missing ? ' (missing)' : ''}
-                </text>
-              )}
-            </g>
-          </g>
+            pin={pin}
+            x={at[0]}
+            y={at[1]}
+            selected={selection?.kind === 'pin' && selection.id === pin.id}
+            missing={Boolean(pin.doc && missingDocs?.has(pin.doc))}
+            hideNames={hideNames}
+          />
         )
       })}
+    </g>
+  )
+})
+
+/** One pin. Memoized: in playback only the pins riding a body move, and only they redraw. */
+const PinMark = memo(function PinMark({ pin, x, y, selected, missing, hideNames }) {
+  return (
+    <g
+      className={`map-pin${selected ? ' is-selected' : ''}${missing ? ' is-missing' : ''}`}
+      data-map-item={pin.id}
+      data-map-kind="pin"
+      transform={`translate(${x} ${y})`}
+    >
+      <g className="map-mark">
+        <PinGlyph icon={pin.icon} color={pin.color} />
+        {hideNames ? null : (
+          <text className="map-pin-name" y={16} textAnchor="middle">
+            {pinLabel(pin, getDocDisplayName)}{missing ? ' (missing)' : ''}
+          </text>
+        )}
+      </g>
     </g>
   )
 })
@@ -438,6 +504,7 @@ const MapLayers = memo(function MapLayers({
   inlineAssets = null,
   earthPaths = null,
   timelineEvents = null,
+  positions = null,
 }) {
   // Only on a star system does anything but a traveller move with the day. Holding
   // the day still for the other layers lets them skip re-rendering during playback.
@@ -447,7 +514,7 @@ const MapLayers = memo(function MapLayers({
       {projector.kind === 'earth' ? (
         <EarthGround map={map} projector={projector} level={earthLevel} onCountries={onCountries} staticPaths={earthPaths} />
       ) : projector.kind === 'system' ? (
-        <SystemGround map={map} projector={projector} selection={selection} />
+        <SystemGround map={map} projector={projector} positions={positions} selection={selection} />
       ) : (
         <PlaneGround map={map} projector={projector} projectName={projectName} inlineAssets={inlineAssets} />
       )}

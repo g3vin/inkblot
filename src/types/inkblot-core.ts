@@ -2272,9 +2272,9 @@ export interface MapChoiceInput {
 }
 
 /**
- * The map's tools, as the toolbar offers them. `Pan` and `Calibrate` are not on the
- * toolbar — the space bar and the Scale section reach them — but either can be the
- * tool in hand.
+ * The map's tools, as the toolbar offers them. `Pan` is not on the toolbar — the
+ * space bar and the middle button reach it — but it can be the tool in hand.
+ * `Calibrate` (set the scale from two points) is, on a sheet or a picture.
  */
 export enum MapTool {
 	Select = "select",
@@ -2337,6 +2337,13 @@ export interface MapPanel {
 	sections: MapPanelSection[];
 }
 
+export enum MapKind {
+	Blank = "blank",
+	Image = "image",
+	Earth = "earth",
+	System = "system",
+}
+
 export interface MapChromeState {
 	/** The surface commands go back to. */
 	surfaceId: string;
@@ -2358,6 +2365,11 @@ export interface MapChromeState {
 	revealPanel: number;
 	/** The map is the active document, so the toolbar is its. */
 	active?: boolean;
+	/**
+	 * What kind of map it is, so the toolbar offers what fits: the scale tool only on
+	 * a sheet or a picture.
+	 */
+	mapKind?: MapKind;
 }
 
 /**
@@ -2459,13 +2471,6 @@ export interface MapEarth {
 	borders: boolean;
 	/** `auto`, `110m` or `50m`. */
 	detail: string;
-}
-
-export enum MapKind {
-	Blank = "blank",
-	Image = "image",
-	Earth = "earth",
-	System = "system",
 }
 
 export interface MapScale {

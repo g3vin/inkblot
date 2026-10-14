@@ -1,7 +1,7 @@
 /**
  * travelSections.js — journeys and how they are made: a traveller's itinerary, the
- * story calendar, the conflicts the timeline found, the ways of travelling, the
- * terrains, and the table of distances between places.
+ * conflicts the timeline found, the ways of travelling, the terrains, and the table of
+ * distances between places. The story calendar itself is edited in Settings ▸ Story.
  */
 import { getDocDisplayName } from '../../lib/docKind'
 import { formatDay, fromParts, normalizeCalendar, toParts } from '../../lib/map/calendar'
@@ -160,7 +160,7 @@ export function travelerSections(ui, { map, traveler, index, schedule, conflicts
 
 /* ---------------- journeys: every traveller, the calendar, conflicts ---------------- */
 
-export function journeysSections(ui, { map, schedules, conflicts, calendar, onCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps, crossConflicts, editingCalendar, setEditingCalendar }) {
+export function journeysSections(ui, { map, schedules, conflicts, calendar, onOpenCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps, crossConflicts }) {
   const cal = normalizeCalendar(calendar)
   const problems = [...conflicts, ...(crossConflicts || [])]
   return [
@@ -188,54 +188,8 @@ export function journeysSections(ui, { map, schedules, conflicts, calendar, onCa
     ], [ui.button('problems.checkAll', 'Check all maps', onCheckAllMaps, { help: 'Check this project’s other maps too' })]),
 
     ui.section('calendar', 'Calendar', [
-      ui.note(`Shared by every map in this project. Day 1 of the story is ${formatDay(cal, 0)}.`),
-      ...(editingCalendar ? calendarFields(ui, cal, onCalendar) : []),
-    ], [ui.button('calendar.edit', editingCalendar ? 'Done' : 'Edit', () => setEditingCalendar(!editingCalendar))]),
-  ]
-}
-
-export function calendarFields(ui, cal, onCalendar) {
-  const custom = (patch) => onCalendar({ ...cal, custom: { ...cal.custom, ...patch } })
-  return [
-    ui.choice(
-      'calendar.mode',
-      'Dates as',
-      cal.mode,
-      [{ value: 'day', label: 'Story days (Day 1, Day 2…)' }, { value: 'gregorian', label: 'Real dates' }, { value: 'custom', label: 'My world’s calendar' }],
-      (mode) => onCalendar({ ...cal, mode })
-    ),
-    cal.mode === 'gregorian'
-      ? ui.text('calendar.epoch', 'Story begins', cal.gregorianEpoch, (gregorianEpoch) => onCalendar({ ...cal, gregorianEpoch }), { placeholder: '1850-03-01' })
-      : null,
-    ...(cal.mode === 'custom'
-      ? [
-          ui.text(
-            'calendar.months',
-            'Months',
-            cal.custom.months.map((month) => `${month.name}:${month.days}`).join(', '),
-            (text) => custom({
-              months: text.split(',').map((entry) => entry.trim()).filter(Boolean).map((entry) => {
-                const [name, days] = entry.split(':')
-                return { name: name.trim(), days: Math.max(1, Math.round(Number(days) || 30)) }
-              }),
-            }),
-            { multiline: true }
-          ),
-          ui.text('calendar.weekdays', 'Weekdays', cal.custom.weekdays.join(', '), (text) => custom({ weekdays: text.split(',').map((name) => name.trim()).filter(Boolean) }), {
-            placeholder: 'optional, comma separated',
-          }),
-          ui.number('calendar.yearZero', 'First year', cal.custom.yearZero, (yearZero) => custom({ yearZero: Math.round(yearZero) }), { step: 1 }),
-          ui.text('calendar.era', 'Era', cal.custom.era, (era) => custom({ era }), { placeholder: 'e.g. AR' }),
-          ui.toggle('calendar.leap', 'Leap years', Boolean(cal.custom.leap), (on) => custom({ leap: on ? { every: 4, days: 1, month: 1 } : null })),
-          cal.custom.leap
-            ? ui.number('calendar.leapEvery', 'Every', cal.custom.leap.every, (every) => custom({ leap: { ...cal.custom.leap, every: Math.round(every) } }), {
-                min: 1,
-                step: 1,
-                suffix: 'years, +1 day',
-              })
-            : null,
-        ]
-      : []),
+      ui.note(`Dates follow the project’s story calendar. Day 1 of the story is ${formatDay(cal, 0)}.`),
+    ], [ui.button('calendar.open', 'Story calendar…', onOpenCalendar, { help: 'Edit the calendar in Settings' })]),
   ]
 }
 

@@ -17,7 +17,7 @@
  *
  * tests/unit/editor.mjs mounts this component and exercises all of them.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 
@@ -32,7 +32,6 @@ import { setClipboardDropTarget } from '../lib/clipboardDropTarget'
 import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
 import CanvasPane from '../canvas/CanvasPane'
-import MapPane from '../map/MapPane'
 import TimelinePane from '../timeline/TimelinePane'
 import TimeLensBar from '../timeline/TimeLensBar'
 import { createTimelineDelegates } from '../timeline/timelineDelegates'
@@ -56,6 +55,17 @@ import TableToolbar from './TableToolbar'
 import { lockReason, useLocks } from '../lib/docLocks'
 import { setEditorLock } from '../extensions/DocumentLock'
 import { FadeScrim } from '../ui/Surfaces.jsx'
+
+// A map is a heavy editor (and its globe and space views heavier still): loaded the
+// first time one opens, never for a writer who only writes.
+const LazyMapPane = lazy(() => import('../map/MapPane'))
+function MapPane(props) {
+  return (
+    <Suspense fallback={<div className="map-surface is-loading" />}>
+      <LazyMapPane {...props} />
+    </Suspense>
+  )
+}
 
 const EMPTY_NOTES = []
 

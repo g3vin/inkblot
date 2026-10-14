@@ -35,6 +35,7 @@ import { boundViewport, MAX_PX_PER_DAY, MIN_PX_PER_DAY, snapUnit } from '../lib/
 import { requestMapReveal } from '../map/mapEvents'
 import MapPanelView from '../map/MapPanelView'
 import { useProjectDocs, useStoryCalendar } from '../map/useMapProject'
+import { openStoryCalendarSettings } from '../lib/map/storyCalendarStore'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
 import TimelineAxis from './TimelineAxis'
 import TimelineLanes from './TimelineLanes'
@@ -67,7 +68,7 @@ export default function TimelineSurface({
   const plotRef = useRef(null)
   const timeline = useStoryTimeline(projectName)
   const cursor = useStoryCursor(projectName)
-  const [calendar, saveCalendar] = useStoryCalendar(projectName)
+  const [calendar] = useStoryCalendar(projectName)
   const docs = useProjectDocs(projectName)
   const [view, setView] = useState(() => normalizeTimelineView(initialView))
   const [selection, setSelection] = useState(null)
@@ -331,7 +332,7 @@ export default function TimelineSurface({
     onSelect: (id) => select(id),
     commit,
     calendar,
-    onCalendar: saveCalendar,
+    onOpenCalendar: () => openStoryCalendarSettings(projectName),
     docs,
     places: maps.places,
     journeys: maps.journeys,

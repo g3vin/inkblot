@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use crate::types::json::JsonValue;
+use crate::types::map::MapKind;
 
 /* ---------------- the toolbar and the panel ---------------- */
 
@@ -60,11 +61,15 @@ pub struct MapChromeState {
     /// The map is the active document, so the toolbar is its.
     #[serde(default)]
     pub active: bool,
+    /// What kind of map it is, so the toolbar offers what fits: the scale tool only on
+    /// a sheet or a picture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map_kind: Option<MapKind>,
 }
 
-/// The map's tools, as the toolbar offers them. `Pan` and `Calibrate` are not on the
-/// toolbar — the space bar and the Scale section reach them — but either can be the
-/// tool in hand.
+/// The map's tools, as the toolbar offers them. `Pan` is not on the toolbar — the
+/// space bar and the middle button reach it — but it can be the tool in hand.
+/// `Calibrate` (set the scale from two points) is, on a sheet or a picture.
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
