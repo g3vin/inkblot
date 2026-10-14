@@ -16,6 +16,7 @@ import GoalsPane from './GoalsPane.jsx'
 import TimersPane from './TimersPane.jsx'
 import RemindersPane from './RemindersPane.jsx'
 import ShortcutsPane from './ShortcutsPane.jsx'
+import StoryPane from './StoryPane.jsx'
 import './Settings.css'
 
 const PANES = [
@@ -24,6 +25,7 @@ const PANES = [
   { id: 'goals', title: 'Goals', icon: 'target' },
   { id: 'timers', title: 'Timers', icon: 'timer' },
   { id: 'reminders', title: 'Reminders', icon: 'bell' },
+  { id: 'story', title: 'Story', icon: 'calendar' },
   { id: 'shortcuts', title: 'Shortcuts', icon: 'keyboard' },
 ]
 
@@ -61,10 +63,14 @@ export default function SettingsSheet({ appearance }) {
   const stats = useStats()
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState('general')
+  // The project a pane is about: the one that asked (a map's "Story calendar…"), else
+  // the one being written in.
+  const [askedProject, setAskedProject] = useState(null)
 
   useEffect(() => {
     const show = (event) => {
       setPane(PANES.some((p) => p.id === event.detail?.pane) ? event.detail.pane : 'general')
+      setAskedProject(event.detail?.projectName || null)
       setOpen(true)
     }
     window.addEventListener(OPEN_SETTINGS, show)
@@ -80,6 +86,7 @@ export default function SettingsSheet({ appearance }) {
       {pane === 'timers' ? <TimersPane stats={stats} /> : null}
       {pane === 'reminders' ? <RemindersPane stats={stats} /> : null}
       {pane === 'shortcuts' ? <ShortcutsPane /> : null}
+      {pane === 'story' ? <StoryPane projectName={askedProject || stats.tracker?.project || null} /> : null}
     </NavSheet>
   )
 }

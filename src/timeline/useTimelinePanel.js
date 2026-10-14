@@ -19,7 +19,7 @@ import {
   removeTag, reorderLanes, updateEra, updateEvent, updateEventNote, updateLane, updateTag, sortedEvents,
 } from '../lib/timeline/timelineModel'
 import { createPanelBuilder } from '../map/inspector/panelBuilder'
-import { calendarFields, calendarShape, dayToParts, partsToDay } from '../map/inspector/travelSections'
+import { calendarShape, dayToParts, partsToDay } from '../map/inspector/travelSections'
 
 const TABS = [
   { id: 'view', label: 'View' },
@@ -308,7 +308,7 @@ function eventTagSection(ui, { timeline, event, commit }, form, setForm) {
 /**
  * `{ panel, handlers }` for the inspector. `props`: `timeline`, `view`, `patchView`,
  * `selection` (an event id or null), `onSelect`, `commit(label, edit)`, `calendar`,
- * `onCalendar`, `docs` (useProjectDocs), `places`, `suggestDay(eventId)`,
+ * `onOpenCalendar`, `docs` (useProjectDocs), `places`, `suggestDay(eventId)`,
  * `journeys`, `onOpenDoc(path)`, `onOpenLink(link)`, `onJumpToPassage(eventId, doc)`, `title`.
  */
 export function useTimelinePanel(props) {
@@ -341,7 +341,7 @@ export function useTimelinePanel(props) {
       case 'calendar':
         sections = [ui.section('calendar', 'Calendar', [
           ui.note(`Shared by every timeline and map in this project. Day 1 of the story is ${formatDay(calendar, 0)}.`),
-          ...calendarFields(ui, calendar, props.onCalendar),
+          ui.buttonField('calendar.open', 'Story calendar…', props.onOpenCalendar, { icon: 'calendar' }),
         ])]
         break
       default: sections = viewSections(ui, common)

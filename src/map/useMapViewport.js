@@ -65,7 +65,12 @@ export function useMapViewport({ initialViewport, onViewportChange }) {
     const world = worldRef.current
     if (world) {
       world.setAttribute('transform', svgWorldTransform(next))
-      world.style.setProperty('--map-inv-zoom', String(1 / next.zoom))
+      // Every mark on the map reads this, so writing it restyles all of them: only
+      // when the zoom moved, never for a pan.
+      if (world.dataset.zoom !== String(next.zoom)) {
+        world.dataset.zoom = String(next.zoom)
+        world.style.setProperty('--map-inv-zoom', String(1 / next.zoom))
+      }
     }
     const surface = surfaceRef.current
     if (surface) {

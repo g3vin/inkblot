@@ -44,6 +44,9 @@ import { eventCovers, setEventTime } from '../lib/timeline/timelineModel'
 import { getStoryCursor, setStoryDay, subscribeStoryCursor } from '../lib/timeline/storyCursor'
 import { peekStoryTimeline, replaceStoryTimeline } from '../lib/timeline/timelineStore'
 import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
+import { openStoryCalendarSettings } from '../lib/map/storyCalendarStore'
+import ExportMapDialog from './ExportMapDialog'
+import { useMapCommands } from './useMapCommands'
 import {
   MAP_COMMAND_EVENT,
   MAP_DROP_DOC_EVENT,
@@ -96,6 +99,8 @@ export default function MapSurface({
   const [renameRequest, setRenameRequest] = useState(0)
   const [isPanning, setIsPanning] = useState(false)
   const [calibration, setCalibration] = useState(null)
+  const endCalibration = useCallback(() => setCalibration(null), [])
+  const [exportOpen, setExportOpen] = useState(false)
 
   const view = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.() })
   const box = useVisibleBox(view.surfaceRef)
@@ -113,20 +118,36 @@ export default function MapSurface({
   }, [saveView])
 
   const docs = useProjectDocs(projectName)
-  const [calendar, saveCalendar] = useStoryCalendar(projectName)
+  const [calendar] = useStoryCalendar(projectName)
+  const openCalendar = useCallback(() => openStoryCalendarSettings(projectName), [projectName])
 
   /* ---------------- derived ---------------- */
 
   const isSystem = map.mapKind === 'system'
+  // The frame (where AU land on the page) moves with the day only while it follows a
+  // body. Otherwise it holds still through playback, and so does every layer drawn in
+  // it: only the bodies, and what rides on them, move.
+  const frameDay = isSystem && focusBody ? day : 0
   const projector = useMemo(
-    () => createProjector(map, { day: isSystem ? day : 0, focusBody }),
+    () => createProjector(map, { day: frameDay, focusBody }),
     // The projector depends only on the parts of the map that decide the drawing's frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [map.mapKind, map.earth, map.system, map.background.width, map.background.height, isSystem ? day : 0, focusBody]
+    [map.mapKind, map.earth, map.system, map.background.width, map.background.height, frameDay, focusBody]
   )
-  const space = useMemo(() => createSpace(map), [map])
-  const schedules = useMemo(() => buildSchedules(map, space), [map, space])
-  const conflicts = useMemo(() => mapConflicts(map, space, docPath), [map, space, docPath])
+  // A space reads only its kind, its scale and its bodies: an edit to a pin keeps it,
+  // and with it the orbital positions it has cached.
+  const space = useMemo(
+    () => createSpace(map),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [map.mapKind, map.scale, map.system]
+  )
+  const positions = useMemo(() => (isSystem ? space.positionsAt(day) : null), [day, isSystem, space])
+  // While a pin or a handle is dragged the map changes every frame; journeys and their
+  // conflicts are worked out again when it is let go, not sixty times a second.
+  const [draggedFrom, setDraggedFrom] = useState(null)
+  const scheduleMap = draggedFrom || map
+  const schedules = useMemo(() => buildSchedules(scheduleMap, space), [scheduleMap, space])
+  const conflicts = useMemo(() => mapConflicts(scheduleMap, space, docPath), [scheduleMap, space, docPath])
   const extent = useMemo(() => timelineExtent(schedules, day), [schedules, day])
   const missingDocs = useMemo(() => {
     if (!docs.loaded) return null
@@ -249,6 +270,7 @@ export default function MapSurface({
     setSelection(null)
   }, [dispatch, map.system.bodies, selection])
 
+  const zoomNow = useCallback(() => view.viewportRef.current.zoom, [view.viewportRef])
   const labelSizeNow = useCallback(() => Math.round((18 / view.viewportRef.current.zoom) * 100) / 100, [view.viewportRef])
 
   /* ---------------- drafts (drawing with the route, region and measuring tools) ---------------- */
@@ -411,6 +433,7 @@ export default function MapSurface({
         if (!moved) {
           moved = true
           if (dragKind === 'pan') setIsPanning(true)
+          else setDraggedFrom(mapRef.current)
         }
         if (dragKind === 'pan') {
           view.applyViewport(panMapBy(view.viewportRef.current, moveEvent.clientX - lastX, moveEvent.clientY - lastY))
@@ -431,6 +454,7 @@ export default function MapSurface({
         if (moved) {
           if (pending) flush()
           setIsPanning(false)
+          setDraggedFrom(null)
           return
         }
         if (forcePan || handleEl) return
@@ -473,6 +497,7 @@ export default function MapSurface({
         window.removeEventListener('pointerup', onUp)
         window.removeEventListener('pointercancel', onUp)
         if (frame) cancelAnimationFrame(frame)
+        setDraggedFrom(null)
         endDragRef.current = null
       }
     },
@@ -687,7 +712,7 @@ export default function MapSurface({
         // On a star system a place is usually somewhere: stick it to the nearest body.
         const world = view.screenToWorldAt(clientX, clientY)
         let best = null
-        for (const [id, position] of projector.positions) {
+        for (const [id, position] of space.positionsAt(day)) {
           const drawn = projector.toWorld(position)
           const distance = Math.hypot(drawn[0] - world.x, drawn[1] - world.y) * view.viewportRef.current.zoom
           if (distance < 30 && (!best || distance < best.distance)) best = { id, distance }
@@ -699,7 +724,7 @@ export default function MapSurface({
       }
       addItem('pins', pin, 'pin')
     },
-    [addItem, day, dispatch, docPath, mapRef, onActivate, pinNear, projector, showInspector, storedAt, view]
+    [addItem, day, dispatch, docPath, mapRef, onActivate, pinNear, projector, showInspector, space, storedAt, view]
   )
 
   useEffect(() => {
@@ -710,6 +735,7 @@ export default function MapSurface({
       const detail = event.detail || {}
       const { command, clientX, clientY, itemId, itemKind } = detail
       if (command === 'zoom-to-fit') fitAll()
+      else if (command === 'export') setExportOpen(true)
       /* The window toolbar and the inspector, when the shell draws them (`mapChrome`). */
       else if (command === 'tool') {
         if (TOOL_IDS.has(detail.tool)) setTool(detail.tool)
@@ -847,18 +873,31 @@ export default function MapSurface({
     docs,
     missingDocs,
     calendar,
-    onCalendar: saveCalendar,
+    onOpenCalendar: openCalendar,
     onOpenDoc,
     renameRequest,
     onTool: setTool,
     calibration,
-    onCalibrationDone: () => setCalibration(null),
+    onCalibrationDone: endCalibration,
     focusBody,
     onFocusBody: setFocusBody,
     onReveal: reveal,
-    surfaceRef: view.surfaceRef,
-    viewport: view.viewport,
+    zoomNow,
   })
+  const openExport = useCallback(() => setExportOpen(true), [])
+  useMapCommands({
+    active: isActive,
+    mapKind: map.mapKind,
+    setTool,
+    zoomIn: view.zoomIn,
+    zoomOut: view.zoomOut,
+    fitAll,
+    hasSelection: Boolean(selection),
+    removeSelection,
+    openExport,
+    showInspector,
+  })
+
   // Commands arrive through a listener set up once; they reach the panel as last built.
   const panelRef = useRef(mapPanel)
   useEffect(() => {
@@ -876,36 +915,34 @@ export default function MapSurface({
    */
   // Always published: the web toolbar draws the map's tools from it too.
   const publishing = isActive || chromeWhileInactive
-  const lastChromeRef = useRef(null)
   useEffect(() => {
     if (!publishing) return undefined
-    return () => {
-      lastChromeRef.current = null
-      documentSurface.publishMapChrome({})
-    }
+    return () => documentSurface.publishMapChrome({})
   }, [publishing])
+  // Runs only when something the chrome shows changed: the panel is memoized, so a
+  // pan (which re-renders the map) publishes nothing.
+  const chromeZoom = view.viewport.zoom
   useEffect(() => {
     if (!publishing) return
     const surfaceId = view.surfaceRef.current?.dataset.surfaceId
     if (!surfaceId) return
-    const state = {
-      surfaceId,
-      docPath,
-      tool,
-      zoom: view.viewport.zoom,
-      zoomLabel: formatZoom(view.viewport.zoom),
-      canUndo,
-      canRedo,
-      hasSelection: Boolean(selection),
-      panel: mapPanel.panel,
-      revealPanel,
-      active: isActive,
-    }
-    const json = JSON.stringify(state)
-    if (json === lastChromeRef.current) return
-    lastChromeRef.current = json
-    documentSurface.publishMapChrome({ state })
-  })
+    documentSurface.publishMapChrome({
+      state: {
+        surfaceId,
+        docPath,
+        tool,
+        zoom: chromeZoom,
+        zoomLabel: formatZoom(chromeZoom),
+        canUndo,
+        canRedo,
+        hasSelection: Boolean(selection),
+        panel: mapPanel.panel,
+        revealPanel,
+        active: isActive,
+        mapKind: map.mapKind,
+      },
+    })
+  }, [canRedo, canUndo, chromeZoom, docPath, isActive, map.mapKind, mapPanel.panel, publishing, revealPanel, selection, tool, view.surfaceRef])
 
   /* ---------------- setup ---------------- */
 
@@ -972,6 +1009,7 @@ export default function MapSurface({
             idPrefix={idPrefix}
             earthLevel={earthLevel}
             timelineEvents={timelineEvents}
+            positions={positions}
           />
           <MapDraft
             map={map}
@@ -1033,6 +1071,21 @@ export default function MapSurface({
           missing={Boolean(missingDocs?.has(hoverItem.doc))}
           x={hover.x}
           y={hover.y}
+        />
+      ) : null}
+
+      {exportOpen ? (
+        <ExportMapDialog
+          open
+          onClose={() => setExportOpen(false)}
+          map={map}
+          projector={projector}
+          space={space}
+          day={day}
+          projectName={projectName}
+          docPath={docPath}
+          surfaceRef={view.surfaceRef}
+          viewportRef={view.viewportRef}
         />
       ) : null}
 

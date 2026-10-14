@@ -9,7 +9,7 @@
  *
  * `useMapTrace` holds the settings and the preview; `traceSection` describes them.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { assetUrl, writeAsset } from '../../lib/assets'
 import { DEFAULT_TRACE_OPTIONS, traceImage, traceToSvg } from '../../lib/map/trace'
 import { newId } from '../../lib/map/mapModel'
@@ -118,7 +118,10 @@ export function useMapTrace({ map, dispatch, projectName }) {
     if (regions.length) dispatch({ type: 'items/add', collection: 'regions', items: regions })
   }, [dispatch, preview, regionCount])
 
-  return { options, setOptions, open, setOpen, preview, busy, regionCount, setRegionCount, apply, makeRegions }
+  return useMemo(
+    () => ({ options, setOptions, open, setOpen, preview, busy, regionCount, setRegionCount, apply, makeRegions }),
+    [apply, busy, makeRegions, open, options, preview, regionCount]
+  )
 }
 
 export function traceSection(ui, { map, dispatch, trace }) {

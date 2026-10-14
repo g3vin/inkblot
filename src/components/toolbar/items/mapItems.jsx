@@ -20,7 +20,7 @@ function ToolSet({ ctx, spec, ids }) {
           key={tool.id}
           icon={tool.icon}
           label={tool.label}
-          title={`${tool.label} (${tool.key})`}
+          title={tool.key ? `${tool.label} (${tool.key})` : tool.label}
           display={ctx.display}
           active={ctx.map?.tool === tool.id}
           disabled={!live(ctx)}
@@ -32,7 +32,11 @@ function ToolSet({ ctx, spec, ids }) {
 }
 
 export const MapDrawingItem = (props) => <ToolSet {...props} ids={['select', 'pin', 'route', 'region', 'label']} />
-export const MapMeasureItem = (props) => <ToolSet {...props} ids={['ruler', 'area']} />
+/** Measuring, and on a sheet or a picture, setting the scale by measuring something known. */
+export const MapMeasureItem = (props) => {
+  const kind = props.ctx.map?.mapKind
+  return <ToolSet {...props} ids={kind === 'blank' || kind === 'image' ? ['ruler', 'area', 'calibrate'] : ['ruler', 'area']} />
+}
 
 export function MapUndoRedoItem({ ctx, spec }) {
   return (
@@ -48,7 +52,16 @@ export function MapZoomItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton icon="zoom-out" label="Zoom out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
-      <MenuButton label="Zoom" display={ctx.display} disabled={disabled} items={[{ text: 'Zoom to fit', action: () => command(ctx, 'zoom-to-fit') }]}>
+      <MenuButton
+        label="Zoom"
+        display={ctx.display}
+        disabled={disabled}
+        items={[
+          { text: 'Zoom to fit', action: () => command(ctx, 'zoom-to-fit') },
+          { separator: true },
+          { text: 'Export map…', action: () => command(ctx, 'export') },
+        ]}
+      >
         <span className="tb-text tb-zoom-readout">{ctx.map?.zoomLabel ?? '100%'}</span>
       </MenuButton>
       <ToolButton icon="zoom-in" label="Zoom in" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />

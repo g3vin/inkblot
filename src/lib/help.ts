@@ -442,6 +442,27 @@ export const HELP_TOPICS: HelpTopic[] = [
       'The archive holds the things you have put away out of this document, ready to restore.',
     ],
   },
+  // ---------- Maps ----------
+  {
+    id: 'map.export',
+    section: 'Maps',
+    title: 'Exporting a map',
+    body: [
+      'Export map… (in the zoom menu, or ⌥⌘E) saves the map as a picture: a PNG for the screen, an SVG or a PDF that stays sharp at any size, or straight to the printer. Copy image puts it on the clipboard, ready to paste into a chapter.',
+      'Choose what’s on screen to export the part you are looking at, or the whole map for all of it. Sharpness multiplies a PNG’s pixels: Retina for screens, Print for paper.',
+      'To show a map in a canvas, drag it there instead. It stays up to date as the map changes.',
+    ],
+  },
+  {
+    id: 'story.calendar',
+    section: 'Settings',
+    title: 'The story calendar',
+    body: [
+      'Every map, timeline and journey in a project tells time on one calendar. Story days count from Day 1. Real dates start from the day your story begins. Your world’s calendar has its own months, weekdays, eras and leap years.',
+      'Changing the calendar changes how dates are written, never when things happen: an event on the 40th day of the story stays on the 40th day.',
+    ],
+    related: ['map.export'],
+  },
 ]
 
 const BY_ID = new Map(HELP_TOPICS.map((topic) => [topic.id, topic]))
