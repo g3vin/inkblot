@@ -146,8 +146,15 @@ await act(async () => {
 await act(async () => { await new Promise((resolve) => setTimeout(resolve, 60)) })
 ok('the panel lists what the page publishes, this document’s by default', container.querySelectorAll('.reference-row').length === 1)
 ok('with its formatted entry and its badges', container.querySelector('.reference-entry-text i')?.textContent === 'Book a' && container.textContent.includes('Cited'))
-ok('and the style', container.querySelector('.references-style')?.textContent.includes('APA'))
-await act(async () => [...container.querySelectorAll('[role="radio"]')].find((b) => b.textContent === 'Project').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+// The scope and the style are in the panel's header (ui/PanelActions): a scope menu and ⋯.
+const scopeButton = container.querySelector('.ib-scope-menu')
+ok('the header names the scope', scopeButton?.textContent.includes('This document'))
+await act(async () => container.querySelector('[aria-label="More reference options"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+const styleItem = [...document.querySelectorAll('.ib-menu [role="menuitemcheckbox"]')].find((item) => item.textContent.includes('APA'))
+ok('and the style', styleItem?.getAttribute('aria-checked') === 'true')
+await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+await act(async () => scopeButton.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+await act(async () => [...document.querySelectorAll('.ib-menu [role="menuitemcheckbox"]')].find((b) => b.textContent.includes('This project')).dispatchEvent(new MouseEvent('click', { bubbles: true })))
 ok('Project shows every source', container.querySelectorAll('.reference-row').length === 2)
 
 const refCommands = []

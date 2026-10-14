@@ -78,7 +78,8 @@ dictionary: `INKBLOT_CMUDICT=/path/to/cmudict.dict cargo test -p inkblot-models 
 
 Branch naming, commit messages and the pull request flow are in
 [CONTRIBUTING.md](CONTRIBUTING.md). Notable changes are recorded in
-[CHANGELOG.md](CHANGELOG.md).
+[CHANGELOG.md](CHANGELOG.md). To report a security problem, follow
+[SECURITY.md](SECURITY.md) rather than opening an issue.
 
 ## License
 

@@ -7,7 +7,7 @@
  */
 import { useCallback } from 'react'
 import { dragHandoff, DragPayloadKind } from '../bridge'
-import { CLIPBOARD_PERSIST_KEY, MAX_CLIPBOARD_ENTRIES } from '../lib/editorSession'
+import { CLIPBOARD_PERSIST_KEY, MAX_CLIPBOARD_ENTRIES, MAX_CLIPBOARD_IMAGES } from '../lib/editorSession'
 
 export function useClipboardHistory({
   activeDoc,
@@ -65,14 +65,39 @@ export function useClipboardHistory({
     })
   }, [activeDoc, currentDoc, setClipboardHistory])
 
+  // A copied image keeps its src (usually a data URL) and no text.
+  const addClipboardImage = useCallback((src) => {
+    if (!src) return
+
+    setClipboardHistory(prev => {
+      const nextEntry = {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        kind: 'image',
+        text: '',
+        src,
+        docName: activeDoc || currentDoc || '',
+        timestamp: new Date().toISOString(),
+      }
+
+      let images = 0
+      const kept = [nextEntry, ...prev.filter(entry => entry.src !== src)].filter(entry => (
+        entry.kind !== 'image' || ++images <= MAX_CLIPBOARD_IMAGES
+      ))
+      return kept.slice(0, MAX_CLIPBOARD_ENTRIES)
+    })
+  }, [activeDoc, currentDoc, setClipboardHistory])
+
+  const removeClipboardEntry = useCallback((entryId) => {
+    if (!entryId) return
+    setClipboardHistory(prev => prev.filter(entry => entry.id !== entryId))
+  }, [setClipboardHistory])
+
   const clearClipboardHistory = useCallback(() => {
     setClipboardHistory([])
   }, [setClipboardHistory])
 
-  const moveClipboardEntryToEditor = useCallback((entryId) => {
-    if (!entryId) return
-    setClipboardHistory(prev => prev.filter(entry => entry.id !== entryId))
-  }, [setClipboardHistory])
+  // Dropped into a page, a piece leaves the clipboard.
+  const moveClipboardEntryToEditor = removeClipboardEntry
 
   // Handle text dropped onto the clipboard panel. If the drag originated from an
   // editor selection, this is a "move": the selection is deleted from its source doc.
@@ -119,6 +144,8 @@ export function useClipboardHistory({
     getClipboardDropZoneRect,
     isPointInAnyEditorPane,
     addClipboardEntry,
+    addClipboardImage,
+    removeClipboardEntry,
     clearClipboardHistory,
     moveClipboardEntryToEditor,
     handleDropToClipboard,

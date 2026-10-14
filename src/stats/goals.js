@@ -14,7 +14,7 @@ export const METRIC_INFO = {
   words: { title: 'Words written', unit: 'words', icon: 'text-cursor', defaultAmount: 1000 },
   netWords: { title: 'Net words', unit: 'words', icon: 'plus-minus', defaultAmount: 1000 },
   typingMinutes: { title: 'Time typing', unit: 'min', icon: 'keyboard', defaultAmount: 45 },
-  openMinutes: { title: 'Time open', unit: 'min', icon: 'document', defaultAmount: 60 },
+  openMinutes: { title: 'Time open', unit: 'min', icon: 'clock', defaultAmount: 60 },
   sessions: { title: 'Sessions', unit: 'sessions', icon: 'clock', defaultAmount: 2 },
   sprints: { title: 'Sprints', unit: 'sprints', icon: 'timer', defaultAmount: 3 },
 }

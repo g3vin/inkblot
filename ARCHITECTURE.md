@@ -137,9 +137,15 @@ Everything is drawn by the page, from what the document surface publishes:
 
 ## Print Layout
 
-The editor shown as physical pages (View ▸ Print Layout, ⌥⌘P), printed exactly as
-shown, imposed for self-binding, and exported to PDF, EPUB, Markdown and HTML, for one
-document or a folder compiled as a book. All of it is in `src/print/`.
+The editor shown as physical pages, printed exactly as shown, imposed for self-binding,
+and exported to PDF, EPUB, Markdown and HTML, for one document or a folder compiled as a
+book. All of it is in `src/print/`.
+
+Pages are a view, not a mode. Write's page view (View ▸ Page view, ⌥⌘P, or the toolbar
+button) shows the document's own pages with its prose editable and Write's toolbar and
+panels. Typeset always shows pages, set as the book, with its chapters' prose locked.
+`isPrintLayoutEnabled` (`printLayoutStore.js`) answers "pages?", and `isTypesetMode`
+answers "typesetting?". Keep the two apart.
 
 - **One live editor, pushed, not split.** Content never moves between containers.
   `PaginationExtension.ts` measures the laid-out document (`measure.ts`), decides the
@@ -425,7 +431,7 @@ to prove the case can fail.
 - **Reminders while Inkblot is closed.** The page posts them while it runs; nothing is
   left with the system to fire later.
 - **Toolbar items** still wanted: New Document/Canvas/Folder, Bubble, workbench
-  lookups, and focusing the inspector's search.
+  lookups, and focusing the project search.
 
 **iOS and iPadOS**
 

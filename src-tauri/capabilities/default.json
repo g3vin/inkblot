@@ -21,6 +21,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -35,6 +50,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -49,6 +79,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -63,6 +108,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -83,6 +143,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -97,6 +172,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -111,6 +201,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -125,6 +230,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -139,6 +259,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -153,6 +288,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },
@@ -174,6 +324,21 @@
         },
         {
           "path": "**"
+        },
+        {
+          "path": "**/.inkblot-*"
+        },
+        {
+          "path": "**/.assets"
+        },
+        {
+          "path": "**/.assets/**"
+        },
+        {
+          "path": "**/.versions"
+        },
+        {
+          "path": "**/.versions/**"
         }
       ]
     },

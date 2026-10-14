@@ -5,9 +5,10 @@
  * scope they edit the setup every chapter prints in.
  */
 import { useEffect, useRef, useState } from 'react'
-import { FormRow, Segmented } from '../../../ui'
+import { Button, FormRow, Segmented } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
 import Icon from '../../../ui/Icon.jsx'
+import IconButton from '../../../ui/IconButton.jsx'
 import FinishingSection from './FinishingSection'
 import FontSelect from './FontSelect'
 import { Caution, CommitNumber, CommitText, LengthInput, LengthRow, Note, NumberRow, PickerRow, ToggleRow } from './controls'
@@ -41,8 +42,7 @@ export function FormatSection({ layout }) {
       ) : <Note>{current.summary}</Note>) : null}
       {!editsBook && state.bookSetupActive ? (
         <>
-          <Note>This book prints every chapter in a setup of its own. This one shows on screen and when the document is printed alone.</Note>
-          <button type="button" className="fin-button" onClick={() => layout.setScope('folder')}>Edit the book’s setup</button>
+          <Button onClick={() => layout.setScope('folder')}>Edit the book’s setup</Button>
         </>
       ) : null}
     </FinishingSection>
@@ -64,7 +64,7 @@ export function PageSection({ layout }) {
   }
   const suggested = state.suggestedInsideMarginMm
   return (
-    <FinishingSection id={SECTION.pageSize} title="Page" note="The gutter is added to the inside margin, where the binding takes up paper.">
+    <FinishingSection id={SECTION.pageSize} title="Page">
       <PickerRow
         label="Size"
         value={setup.presetId}
@@ -95,7 +95,7 @@ export function PageSection({ layout }) {
       {state.pageCount > 0 && margins.insideMm + margins.gutterMm + 0.05 < suggested ? (
         <>
           <Caution>For {state.pageCount} pages, binders suggest at least {describeLength(suggested, unit)} on the inside.</Caution>
-          <button type="button" className="fin-button" onClick={() => setMargin('gutterMm', Math.max(0, suggested - margins.insideMm))}>Widen the gutter to fit</button>
+          <Button onClick={() => setMargin('gutterMm', Math.max(0, suggested - margins.insideMm))}>Widen the gutter to fit</Button>
         </>
       ) : null}
       <FormRow label="Columns">
@@ -104,7 +104,6 @@ export function PageSection({ layout }) {
       {setup.columns > 1 ? (
         <>
           <LengthRow label="Space between" mm={setup.columnGapMm} unit={unit} onCommit={(mm) => layout.applySetup({ columnGapMm: mm })} />
-          <Note>You write in one running column; the columns sit side by side when printed or exported as PDF.</Note>
         </>
       ) : null}
     </FinishingSection>
@@ -197,9 +196,7 @@ function RunningTextEditor({ title, value, onCommit, tokens, resolve }) {
     <div className="fin-running">
       <div className="fin-running-head">
         <span className="fin-label">{title}</span>
-        <button type="button" className="reference-icon-button" aria-label="Insert a token" title="Insert a page number, the title, the chapter or the author" onClick={insert}>
-          <Icon name="add" />
-        </button>
+        <IconButton icon="add" label="Insert a token" title="Insert a page number, the title, the chapter or the author" size="capsule" onClick={insert} />
       </div>
       <div className="fin-running-fields">
         {field('left', 'Left')}
@@ -222,7 +219,7 @@ export function HeaderFooterSection({ layout }) {
   const recto = runningPreview(state, setup)
   const verso = runningPreview(state, setup, true)
   return (
-    <FinishingSection id={SECTION.headerFooter} title="Header & footer" note="Insert page numbers, the title, the chapter, the author, the word count or the date with the + menu. The chapter is the most recent Heading 1. Header and footer stay within their margins.">
+    <FinishingSection id={SECTION.headerFooter} title="Header & footer">
       <RunningTextEditor title={versoDiffers ? 'Header, right-hand pages' : 'Header'} value={setup.header} tokens={tokens} resolve={recto} onCommit={(header) => layout.applySetup({ header })} />
       <RunningTextEditor title={versoDiffers ? 'Footer, right-hand pages' : 'Footer'} value={setup.footer} tokens={tokens} resolve={recto} onCommit={(footer) => layout.applySetup({ footer })} />
       <ToggleRow
@@ -264,7 +261,7 @@ export function TextFlowSection({ layout, toolbarTarget, send }) {
       />
       <ToggleRow label="Chapters start on a right-hand page" checked={setup.chapterStartsOnRecto} onChange={(on) => layout.applySetup({ chapterStartsOnRecto: on })} />
       <FormRow label="Insert">
-        <button type="button" className="fin-button" disabled={!toolbarTarget} onClick={insertBreak}>Break <Icon name="chevron-down" /></button>
+        <Button disabled={!toolbarTarget} onClick={insertBreak}>Break <Icon name="chevron-down" /></Button>
       </FormRow>
     </FinishingSection>
   )
@@ -295,7 +292,6 @@ export function TypographySection({ layout }) {
     <FinishingSection
       id={SECTION.typography}
       title="Body text"
-      note={t ? 'A horizontal rule prints as the scene break. How chapters open — the drop cap, how far down the page — is under Chapter Openings.' : 'Pages print in the editor’s font. Set type for print to choose a font, spacing and scene breaks for the page alone.'}
     >
       <ToggleRow
         label="Set type for print"
@@ -307,7 +303,7 @@ export function TypographySection({ layout }) {
         <>
           <FormRow label="Font">
             <FontSelect value={t.fontFamily} projectFamilies={projectFonts.map((f) => f.family)} onChange={(name) => edit({ fontFamily: cssFamily(name) })} />
-            <button type="button" className="reference-icon-button" aria-label="Add a font file" title="Add a font file to the project, so the book sets and embeds it on any computer" onClick={addFont}><Icon name="add" /></button>
+            <IconButton icon="add" label="Add a font file" title="Add a font file to the project, so the book sets and embeds it on any computer" size="capsule" onClick={addFont} />
           </FormRow>
           {current && !current.embeddable ? <Caution>{current.family}’s licence does not allow embedding. A printer’s PDF and a store’s EPUB must embed their fonts.</Caution> : null}
           <FormRow label="Size"><span className="fin-length"><CommitNumber value={t.fontSizePt} digits={1} min={5} max={72} label="Size" onCommit={(fontSizePt) => edit({ fontSizePt })} /><span className="fin-unit">pt</span></span></FormRow>
@@ -355,7 +351,7 @@ export function TypographySection({ layout }) {
           <ToggleRow label="No indent after a heading or break" checked={t.noIndentAfterBreak} onChange={(noIndentAfterBreak) => edit({ noIndentAfterBreak })} />
           <FormRow label="Scene break">
             <CommitText className="fin-centered" value={t.sceneBreak} placeholder="* * *" label="Scene break" onCommit={(sceneBreak) => edit({ sceneBreak })} />
-            <button type="button" className="reference-icon-button" aria-label="Common scene breaks" onClick={(event) => popUpNativeMenu(event, SCENE_BREAKS.map((glyph) => ({ text: glyph, action: () => edit({ sceneBreak: glyph }) })))}><Icon name="chevron-down" /></button>
+            <IconButton icon="chevron-down" label="Common scene breaks" size="capsule" onClick={(event) => popUpNativeMenu(event, SCENE_BREAKS.map((glyph) => ({ text: glyph, action: () => edit({ sceneBreak: glyph }) })))} />
           </FormRow>
         </>
       ) : null}
@@ -369,7 +365,7 @@ export function TitlePageSection({ layout, onEditAuthor }) {
   const page = layout.setup.titlePage
   const set = (patch) => layout.applySetup({ titlePage: { ...page, ...patch } })
   return (
-    <FinishingSection id={SECTION.titlePage} title="Title page" note="The title page prints and exports ahead of the text, unnumbered. Contact details come from your author details.">
+    <FinishingSection id={SECTION.titlePage} title="Title page">
       <ToggleRow label="Add a title page" checked={Boolean(page)} onChange={(on) => layout.applySetup({ titlePage: on ? { style: 'manuscript', showContact: true, showWordCount: true } : undefined })} />
       {page ? (
         <>
@@ -381,7 +377,7 @@ export function TitlePageSection({ layout, onEditAuthor }) {
           />
           <ToggleRow label="Contact details" checked={page.showContact} onChange={(showContact) => set({ showContact })} />
           {page.style === 'manuscript' ? <ToggleRow label="Word count" checked={page.showWordCount} onChange={(showWordCount) => set({ showWordCount })} /> : null}
-          <FormRow label="Author"><button type="button" className="fin-button" onClick={onEditAuthor}>Edit author details…</button></FormRow>
+          <FormRow label="Author"><Button onClick={onEditAuthor}>Edit author details…</Button></FormRow>
         </>
       ) : null}
     </FinishingSection>

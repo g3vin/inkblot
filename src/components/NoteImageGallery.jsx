@@ -28,10 +28,10 @@ export default function NoteImageGallery({
                 event.stopPropagation()
                 onRemoveImage(image.id)
               }}
-              aria-label="Remove image"
-              title="Remove image"
+              aria-label="Delete image"
+              title="Delete image"
             >
-              <Icon name="close" />
+              <Icon name="delete" />
             </button>
           ) : null}
         </figure>

@@ -34,11 +34,12 @@ export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLay
         type="button"
         className="inspector-layout-switch"
         onClick={() => onChooseLayout(other)}
-        title={`${INSPECTOR_LAYOUT_INFO[other].title} panels (switches to ${INSPECTOR_LAYOUT_INFO[other].title})`}
-        aria-label={`Show the ${INSPECTOR_LAYOUT_INFO[other].title} panels`}
+        title={`Switch to ${INSPECTOR_LAYOUT_INFO[other].title}`}
+        aria-label={`Switch to the ${INSPECTOR_LAYOUT_INFO[other].title} panels`}
         data-layout={layout}
       >
-        <Icon name={INSPECTOR_LAYOUT_INFO[layout].icon} />
+        {/* Where it goes, not where you are: the tabs already say that. */}
+        <Icon name={INSPECTOR_LAYOUT_INFO[other].icon} />
       </button>
     </div>
   )

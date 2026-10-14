@@ -5,11 +5,12 @@
  */
 import { useState } from 'react'
 import { shellBridge } from '../../../bridge'
-import { FormRow, Segmented } from '../../../ui'
+import { Button, FormRow, Segmented } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
 import { DEFAULT_CHAPTER_DESIGN } from '../../../print/chapterDesign'
 import { chapterLabel } from '../../../print/bookMatter'
 import Icon from '../../../ui/Icon.jsx'
+import IconButton from '../../../ui/IconButton.jsx'
 import FinishingSection from './FinishingSection'
 import FontSelect from './FontSelect'
 import { Caution, CommitNumber, CommitText, LengthRow, Note, PickerRow, ToggleRow } from './controls'
@@ -21,20 +22,13 @@ const send = (type, payload) => shellBridge.send(type, payload)
 /* ---------------- this page ---------------- */
 
 const CHAPTER_TYPES = [['chapter', 'Chapter'], ['prologue', 'Prologue'], ['epilogue', 'Epilogue'], ['interlude', 'Interlude'], ['unnumbered', 'Unnumbered']]
-const ROW_NOTES = {
-  chapter: 'A prologue, an epilogue or an interlude is headed by what it is and not numbered; the chapters after it count on.',
-  matter: 'A page of the book’s own. Write it in the page itself — in Typeset or in Write.',
-  generated: 'Laid out from the book: its title and author, its chapters.',
-  part: 'A divider before the chapters of the part.',
-}
-
 export function ThisPageSection({ layout, row }) {
   const { state } = layout
   const page = (patch) => send('editBookItem', { id: row.id, page: { ...row.page, ...patch } })
   const meta = { subtitle: '', epigraph: '', epigraphSource: '', ...(state.chapterMeta || {}) }
   const setMeta = (patch) => layout.setChapterMeta({ ...meta, ...patch })
   return (
-    <FinishingSection id={SECTION.thisPage} title={`This Page: ${row.title}`} note={ROW_NOTES[row.kind]}>
+    <FinishingSection id={SECTION.thisPage} title={`This page: ${row.title}`}>
       {row.kind === 'chapter' ? (
         <>
           <PickerRow label="Chapter type" value={row.chapterType ?? 'chapter'} onChange={(chapterType) => send('editBookItem', { id: row.id, chapterType })} options={CHAPTER_TYPES.map(([value, label]) => ({ value, label }))} />
@@ -46,8 +40,8 @@ export function ThisPageSection({ layout, row }) {
               {meta.epigraph ? <FormRow label="Epigraph by" stacked><CommitText value={meta.epigraphSource} placeholder="Who said it" label="Epigraph by" onCommit={(epigraphSource) => setMeta({ epigraphSource })} /></FormRow> : null}
               <FormRow label="Picture">
                 {state.chapterImageFile ? <img className="fin-thumb" src={fileUrl(state.chapterImageFile)} alt="" /> : null}
-                <button type="button" className="fin-button" onClick={async () => { const path = await choosePath({ title: 'Choose a picture for this chapter’s head' }); if (path) layout.setHeadImage('chapter', path) }}>{meta.image ? 'Change…' : 'Choose…'}</button>
-                {meta.image ? <button type="button" className="fin-button is-destructive" onClick={() => layout.setHeadImage('chapter', null)}>Remove</button> : null}
+                <Button onClick={async () => { const path = await choosePath({ title: 'Choose a picture for this chapter’s head' }); if (path) layout.setHeadImage('chapter', path) }}>{meta.image ? 'Change…' : 'Choose…'}</Button>
+                {meta.image ? <Button variant="destructive" onClick={() => layout.setHeadImage('chapter', null)}>Remove</Button> : null}
               </FormRow>
             </>
           ) : null}
@@ -63,7 +57,7 @@ export function ThisPageSection({ layout, row }) {
       {row.hidden ? (
         <>
           <Caution>Hidden: this is left out of the pages, print and export.</Caution>
-          <button type="button" className="fin-button" onClick={() => send('setBookItemHidden', { id: row.id, hidden: false })}>Show in the Book</button>
+          <Button onClick={() => send('setBookItemHidden', { id: row.id, hidden: false })}>Show in the Book</Button>
         </>
       ) : null}
     </FinishingSection>
@@ -83,7 +77,7 @@ export function BookInfoSection({ layout }) {
   const { state, book } = layout
   const active = state.cover?.sets?.find((set) => set.id === state.cover?.active)
   return (
-    <FinishingSection id={SECTION.bookInfo} title="Book" note="The title and author go on the running heads, the EPUB and the PDF. The language is what an e-reader reads it in; the cover is the EPUB’s.">
+    <FinishingSection id={SECTION.bookInfo} title="Book">
       <PickerRow label="Contains" value={state.scope === 'project' ? 'project' : 'folder'} onChange={layout.setScope} options={[{ value: 'folder', label: folderLabel(book.folder) }, { value: 'project', label: 'The whole project' }]} />
       <FormRow label="Title"><CommitText value={book.title} label="Title" onCommit={(title) => layout.applyBook({ title })} /></FormRow>
       <FormRow label="Author"><CommitText value={book.author} placeholder="Your name" label="Author" onCommit={(author) => layout.applyBook({ author })} /></FormRow>
@@ -92,7 +86,7 @@ export function BookInfoSection({ layout }) {
       <ToggleRow label="Number documents in the file tree" title="Each chapter’s number beside its name in the file tree" checked={numbering(book).showInTree} onChange={(showInTree) => layout.applyBook({ chapterNumbering: { ...numbering(book), showInTree } })} />
       <FormRow label="Cover">
         {active?.frontFile ? <img className="fin-cover-thumb" src={fileUrl(active.frontFile)} alt="The cover" /> : null}
-        <button type="button" className="fin-button" onClick={layout.showCover}>Show the cover</button>
+        <Button onClick={layout.showCover}>Show the cover</Button>
       </FormRow>
     </FinishingSection>
   )
@@ -106,13 +100,12 @@ export function BookSetupSection({ layout }) {
       {state.bookSetupActive ? (
         <>
           <FormRow label="Every chapter prints in"><span className="fin-value">{format?.label ?? 'The book’s own setup'}</span></FormRow>
-          <button type="button" className="fin-button" onClick={() => { if (state.scope === 'document') layout.setScope('folder') }}>Edit the book’s setup</button>
-          <button type="button" className="fin-button is-destructive" onClick={layout.clearBookSetup}>Let each chapter use its own</button>
+          <Button onClick={() => { if (state.scope === 'document') layout.setScope('folder') }}>Edit the book’s setup</Button>
+          <Button variant="destructive" onClick={layout.clearBookSetup}>Let each chapter use its own</Button>
         </>
       ) : (
         <>
-          <Note>Each chapter shows its own setup on screen; printed as a book, every chapter takes the first chapter’s. Give the book a setup of its own to print them all alike.</Note>
-          <button type="button" className="fin-button" disabled={!state.docPath} onClick={layout.useSetupForBook}>Use this document’s setup for the book</button>
+          <Button disabled={!state.docPath} onClick={layout.useSetupForBook}>Use this document’s setup for the book</Button>
         </>
       )}
     </FinishingSection>
@@ -126,7 +119,7 @@ export function DigitalSection({ layout }) {
   const digital = { ...DIGITAL, ...(book.digital || {}) }
   const set = (patch) => layout.applyBook({ digital: { ...digital, ...patch } })
   return (
-    <FinishingSection id={SECTION.digital} title="E-book" note="A reader chooses the page, the type size and often the font. These are what the book still decides — the EPUB and the preview both follow them.">
+    <FinishingSection id={SECTION.digital} title="E-book">
       <ToggleRow label="Show the E-book preview" checked={state.typesetView === 'digital'} onChange={(on) => layout.setTypesetView(on ? 'digital' : 'print')} />
       <ToggleRow label="Drop caps" title="A large first letter on each chapter, as in print" checked={digital.dropCaps} onChange={(dropCaps) => set({ dropCaps })} />
       <ToggleRow label="Chapter pictures" title="The chapter’s picture and a picture ornament in each chapter’s head" checked={digital.headImages} onChange={(headImages) => set({ headImages })} />
@@ -141,7 +134,7 @@ export function NotesSection({ layout }) {
   const notes = { placement: 'page', numbering: 'perChapter', marks: 'numbers', heading: 'Notes', ...(layout.book.notes || {}) }
   const set = (patch) => layout.applyBook({ notes: { ...notes, ...patch } })
   return (
-    <FinishingSection id={SECTION.notes} title="Footnotes & endnotes" note="Put a note in with Insert ▸ Footnote in Write, and click its mark to write it. An e-book sets notes after each chapter, linked both ways; Word gets real footnotes.">
+    <FinishingSection id={SECTION.notes} title="Footnotes & endnotes">
       <PickerRow label="Set Notes" value={notes.placement} onChange={(placement) => set({ placement })} options={[{ value: 'page', label: 'At the foot of the page' }, { value: 'chapter', label: 'After each chapter' }, { value: 'book', label: 'At the end of the book' }]} />
       <PickerRow label="Numbered" value={notes.numbering} onChange={(numbering) => set({ numbering })} options={[{ value: 'perChapter', label: 'Afresh in each chapter' }, { value: 'continuous', label: 'On through the book' }]} />
       <FormRow label="Marks"><Segmented value={notes.marks} onChange={(marks) => set({ marks })} label="Marks" options={[{ value: 'numbers', label: '1 2 3' }, { value: 'symbols', label: '* † ‡' }]} /></FormRow>
@@ -170,9 +163,6 @@ export function EditionsSection({ layout }) {
     <FinishingSection
       id={SECTION.editions}
       title="Editions"
-      note={editions.length
-        ? 'Changes to the page and the type are the edition’s being typeset. Export All Editions writes each print edition’s interior and cover PDFs, and each e-book’s EPUB.'
-        : 'Add a hardcover, a large-print or an e-book edition: each keeps its own trim, margins, type and cover; the text and design stay one.'}
     >
       <PickerRow label="Typesetting" value={active ?? ''} onChange={(id) => layout.editEditions('activate', id ? { id } : {})} options={[{ value: '', label: 'The book as set up' }, ...editions.map((e) => ({ value: e.id, label: e.name }))]} />
       {editions.map((edition) => (
@@ -182,9 +172,7 @@ export function EditionsSection({ layout }) {
             <CommitText value={edition.name} label="Edition name" onCommit={(name) => { layout.editEditions('rename', { id: edition.id, name }); setRenaming(null) }} />
           ) : <span className={`fin-grow${edition.id === active ? ' is-strong' : ''}`}>{edition.name}</span>}
           {sets.length ? (
-            <button
-              type="button"
-              className="fin-button is-small"
+            <Button
               title="The cover this edition prints and exports with"
               onClick={(event) => popUpNativeMenu(event, [
                 { text: 'The book’s cover', action: () => layout.editEditions('setCover', { id: edition.id }) },
@@ -193,25 +181,23 @@ export function EditionsSection({ layout }) {
               ])}
             >
               {sets.find((set) => set.id === edition.coverSetId)?.name ?? 'Book’s cover'}
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className="reference-icon-button"
-            aria-label="Edition actions"
+          <IconButton
+            icon="more"
+            label="Edition actions"
+            size="capsule"
             onClick={(event) => popUpNativeMenu(event, [
               { text: 'Rename…', action: () => setRenaming(edition.id) },
               { text: 'Duplicate', action: () => layout.editEditions('duplicate', { id: edition.id }) },
               { separator: true },
               { text: 'Delete', action: () => layout.editEditions('delete', { id: edition.id }) },
             ])}
-          >
-            <Icon name="more" />
-          </button>
+          />
         </div>
       ))}
-      <button type="button" className="fin-button" onClick={add}><Icon name="add" /> Add an edition</button>
-      {editions.length ? <button type="button" className="fin-button" onClick={layout.exportAllEditions}><Icon name="export" /> Export all editions…</button> : null}
+      <Button onClick={add}><Icon name="add" /> Add an edition</Button>
+      {editions.length ? <Button onClick={layout.exportAllEditions}><Icon name="export" /> Export all editions…</Button> : null}
     </FinishingSection>
   )
 }
@@ -246,7 +232,7 @@ export function StyleGallerySection({ layout }) {
   const current = styles.find((style) => style.id === design?.styleId)
   const changed = current && design && JSON.stringify(design) !== JSON.stringify(current.design)
   return (
-    <FinishingSection id={SECTION.style} title="Style" note="A style sets the book’s type, how its chapters open and its running heads. Everything below fine-tunes it.">
+    <FinishingSection id={SECTION.style} title="Style">
       <div className="fin-style-grid">
         {styles.map((style) => <StyleCard key={style.id} style={style} current={style.id === current?.id} onChoose={() => layout.applyStyle(style.id)} />)}
       </div>
@@ -265,10 +251,10 @@ export function ProofSection({ layout }) {
   const issues = state.proofIssues ?? []
   const paragraph = state.paragraph
   return (
-    <FinishingSection id={SECTION.proof} title="Proof" note="Fixes change how lines fall, never the words, and print only. Each is in the typeset history.">
+    <FinishingSection id={SECTION.proof} title="Proof">
       <ToggleRow label="Mark problems on the pages" checked={state.proof} onChange={(proof) => layout.setDisplay({ proof })} />
       {state.proof ? (state.spread || state.typesetView === 'digital' ? (
-        <Note>The proof reads the chapter’s own pages: show them one at a time, in Print.</Note>
+        <Note>Show the pages one at a time, in Print, to proof them.</Note>
       ) : issues.length === 0 ? (
         <p className="fin-ok"><Icon name="check" /> Nothing to fix on this chapter’s pages.</p>
       ) : issues.map((issue) => (
@@ -276,16 +262,16 @@ export function ProofSection({ layout }) {
           <strong>{PROOF_NAMES[issue.kind]} · page {issue.page}</strong>
           <span className="fin-proof-text">{issue.anchor.text}</span>
           <span className="fin-proof-fixes">
-            {issue.fixes.map((fix) => <button key={fix} type="button" className="fin-button is-small" onClick={(event) => { event.stopPropagation(); layout.fixProofIssue(issue, fix) }}>{FIX_NAMES[fix]}</button>)}
+            {issue.fixes.map((fix) => <Button key={fix} onClick={(event) => { event.stopPropagation(); layout.fixProofIssue(issue, fix) }}>{FIX_NAMES[fix]}</Button>)}
           </span>
         </div>
       ))) : null}
       {paragraph ? (
         <>
           <FormRow label="Tracking">
-            <button type="button" className="fin-button is-small" aria-label="Tighter" disabled={paragraph.tracking <= -10} onClick={() => layout.setParagraph({ nudgeTracking: -5 })}>−</button>
+            <Button aria-label="Tighter" disabled={paragraph.tracking <= -10} onClick={() => layout.setParagraph({ nudgeTracking: -5 })}>−</Button>
             <span className="fin-tabular">{paragraph.tracking === 0 ? '0' : `${paragraph.tracking > 0 ? '+' : ''}${paragraph.tracking}`}</span>
-            <button type="button" className="fin-button is-small" aria-label="Looser" disabled={paragraph.tracking >= 10} onClick={() => layout.setParagraph({ nudgeTracking: 5 })}>+</button>
+            <Button aria-label="Looser" disabled={paragraph.tracking >= 10} onClick={() => layout.setParagraph({ nudgeTracking: 5 })}>+</Button>
           </FormRow>
           <ToggleRow label="Keep lines together" checked={paragraph.keepTogether} onChange={(keepTogether) => layout.setParagraph({ keepTogether })} />
           <ToggleRow label="Keep with next" checked={paragraph.keepWithNext} onChange={(keepWithNext) => layout.setParagraph({ keepWithNext })} />
@@ -320,7 +306,7 @@ export function TextStylesSection({ layout }) {
     if (open === id) setOpen(null)
   }
   return (
-    <FinishingSection id={SECTION.textStyles} title="Text styles" note="Give a paragraph a style from Format ▸ Text Style. In Write it shows as a faint rule beside the text; here it is set as the book sets it.">
+    <FinishingSection id={SECTION.textStyles} title="Text styles">
       {looks.map((look) => {
         const builtin = BUILTIN_STYLES.has(look.id)
         const set = (patch) => save({ ...look, ...patch })
@@ -344,15 +330,13 @@ export function TextStylesSection({ layout }) {
                 <ToggleRow label="No first-line indent" checked={look.flush} onChange={(flush) => set({ flush })} />
                 <FormRow label="Space around"><span className="fin-length"><CommitNumber value={look.spaceLines} digits={1} min={0} max={4} label="Space around" onCommit={(spaceLines) => set({ spaceLines })} /><span className="fin-unit">lines</span></span></FormRow>
                 <ToggleRow label="Ruled box" checked={look.boxed} onChange={(boxed) => set({ boxed })} />
-                <button type="button" className={`fin-button${builtin ? '' : ' is-destructive'}`} onClick={() => remove(look.id)}>{builtin ? 'Reset to the app’s look' : 'Delete style'}</button>
+                <Button variant={builtin ? 'plain' : 'destructive'} onClick={() => remove(look.id)}>{builtin ? 'Reset to the app’s look' : 'Delete style'}</Button>
               </>
             ) : null}
           </div>
         )
       })}
-      <button
-        type="button"
-        className="fin-button"
+      <Button
         onClick={() => {
           const id = `custom-${Math.random().toString(16).slice(2, 10)}`
           save({ id, name: 'New style', size: 1, italic: false, smallCaps: false, align: 'inherit', indentEm: 0, flush: false, spaceLines: 1, boxed: false })
@@ -360,7 +344,7 @@ export function TextStylesSection({ layout }) {
         }}
       >
         <Icon name="add" /> Add a Style
-      </button>
+      </Button>
     </FinishingSection>
   )
 }
@@ -390,7 +374,7 @@ export function ChapterOpeningsSection({ layout }) {
   const editType = (patch) => layout.applySetup({ typography: { ...t, ...patch } })
   const example = chapterLabel(num.startAt === 0 ? 0 : 3, num) ?? ''
   return (
-    <FinishingSection id={SECTION.headings} title="Chapter openings" note="Every chapter opens this way, in the Typeset pages, in print and in every export. A chapter’s own subtitle, picture and epigraph are under This Page.">
+    <FinishingSection id={SECTION.headings} title="Chapter openings">
       <PickerRow label="Chapters start" value={design.chapterBreak} onChange={(chapterBreak) => edit({ chapterBreak })} options={[{ value: 'newPage', label: 'On a new page' }, { value: 'newRightPage', label: 'On a right-hand page' }, { value: 'continue', label: 'Straight on, where there’s room' }]} />
       <ToggleRow
         label="Number"
@@ -422,14 +406,14 @@ export function ChapterOpeningsSection({ layout }) {
       {design.ornament === 'glyph' ? (
         <FormRow label="Glyph">
           <CommitText className="fin-centered" value={design.ornamentGlyph} placeholder="❦" label="Glyph" onCommit={(ornamentGlyph) => edit({ ornamentGlyph })} />
-          <button type="button" className="reference-icon-button" aria-label="Glyphs" onClick={(event) => popUpNativeMenu(event, HEAD_GLYPHS.map((glyph) => ({ text: glyph, action: () => edit({ ornamentGlyph: glyph }) })))}><Icon name="chevron-down" /></button>
+          <IconButton icon="chevron-down" label="Glyphs" size="capsule" onClick={(event) => popUpNativeMenu(event, HEAD_GLYPHS.map((glyph) => ({ text: glyph, action: () => edit({ ornamentGlyph: glyph }) })))} />
         </FormRow>
       ) : null}
       {design.ornament === 'image' ? (
         <FormRow label="Picture">
           {state.ornamentImageFile ? <img className="fin-thumb" src={fileUrl(state.ornamentImageFile)} alt="" /> : null}
-          <button type="button" className="fin-button" onClick={async () => { const path = await choosePath({ title: 'Choose a picture every chapter’s head carries' }); if (path) layout.setHeadImage('ornament', path) }}>{design.ornamentImage ? 'Change…' : 'Choose…'}</button>
-          {design.ornamentImage ? <button type="button" className="fin-button is-destructive" onClick={() => layout.setHeadImage('ornament', null)}>Remove</button> : null}
+          <Button onClick={async () => { const path = await choosePath({ title: 'Choose a picture every chapter’s head carries' }); if (path) layout.setHeadImage('ornament', path) }}>{design.ornamentImage ? 'Change…' : 'Choose…'}</Button>
+          {design.ornamentImage ? <Button variant="destructive" onClick={() => layout.setHeadImage('ornament', null)}>Remove</Button> : null}
         </FormRow>
       ) : null}
       {design.ornament !== 'none' || design.showImage ? (
@@ -443,7 +427,7 @@ export function ChapterOpeningsSection({ layout }) {
           <PickerRow label="First paragraph" value={t.chapterOpening} onChange={(chapterOpening) => editType({ chapterOpening })} options={[{ value: 'plain', label: 'Plain' }, { value: 'dropCap', label: 'Drop cap' }, { value: 'smallCaps', label: 'Small caps' }, { value: 'dropCapAndSmallCaps', label: 'Drop cap & small caps' }]} />
           <LengthRow label="Head down the page" mm={t.chapterSinkMm} unit={unit} onCommit={(chapterSinkMm) => editType({ chapterSinkMm })} />
         </>
-      ) : <Note>Set type for print, under Body Text, for a drop cap and to set how far down the page each chapter opens.</Note>}
+      ) : <Note>Set type for print under Body text to style chapter openings.</Note>}
     </FinishingSection>
   )
 }
@@ -453,7 +437,7 @@ export function PartsSection({ layout }) {
   const part = book.partDesign
   const edit = (patch) => layout.applyBook({ partDesign: clampDesign({ ...part, ...patch }) })
   return (
-    <FinishingSection id={SECTION.parts} title="Parts" note="Add a part from the Book navigator’s + menu. Parts are numbered “Part One”, “Part Two” in the chapters’ style, and listed in the contents.">
+    <FinishingSection id={SECTION.parts} title="Parts">
       <ToggleRow
         label="A design of their own"
         checked={Boolean(part)}

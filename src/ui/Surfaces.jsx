@@ -97,11 +97,16 @@ export function Tag({ ink = 'slate', children, className }) {
 
 /**
  * Empty states are a small brand moment: a typewritten line, then a plain hint and at
- * most one action. "Nothing here yet" — never an error tone.
+ * most one action. "Nothing here yet" — never an error tone. `compact` for a short
+ * spot (a section with nothing in it); `dropActive` washes it in the accent while
+ * something is dragged over it, for a panel that takes drops (the clipboard).
  */
-export function EmptyState({ icon, title, hint, action }) {
+export function EmptyState({ icon, title, hint, action, compact = false, dropActive = false, className, ...rest }) {
   return (
-    <div className="ib-empty">
+    <div
+      className={['ib-empty', compact && 'ib-empty--compact', dropActive && 'is-drop-active', className].filter(Boolean).join(' ')}
+      {...rest}
+    >
       {icon ? <Icon name={icon} size={20} className="ib-empty-icon" /> : null}
       <p className="ib-empty-title">{title}</p>
       {hint ? <p className="ib-hint ib-empty-hint">{hint}</p> : null}

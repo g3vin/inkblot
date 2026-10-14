@@ -46,9 +46,8 @@
 }
 
 /* ---- Segmented groups -------------------------------------------------
-   The group owns the background and border; its members are transparent
-   until hovered or active, so a cluster reads as one control while each
-   button stays individually toggleable. */
+   Bare on the page: a group is only spacing, and its members show a fill
+   when hovered or active, so the toolbar reads as icons on the paper. */
 
 /* border-box so the group measures 28px overall and lines up with the align
    trigger, which is a <button> and therefore border-box from the UA sheet. */
@@ -61,7 +60,7 @@
   padding: 3px;
   border: 0;
   border-radius: var(--radius-md);
-  background: var(--control-bg);
+  background: transparent;
 }
 
 .toolbar-group-divider {
@@ -112,16 +111,18 @@
 
 /* ---- Font & size selects ---- */
 
+/* A menu, so it looks like one at rest: the control fill, not bare text that reads
+   as a label beside the icon buttons. */
 .toolbar-select {
-  height: 22px;
-  min-height: 22px;
-  padding: 0 4px;
+  height: var(--size-capsule);
+  min-height: var(--size-capsule);
+  padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-md);
-  background: transparent;
+  background: var(--control-bg);
   color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   outline: none;
   cursor: pointer;
   appearance: none;
@@ -130,10 +131,8 @@
   transition: background 120ms ease;
 }
 
-.toolbar-select:hover,
-.toolbar-select:focus-visible {
-  background: var(--surface-active);
-}
+.toolbar-select:hover { background: var(--control-hover-bg); }
+.toolbar-select:focus-visible { background: var(--control-hover-bg); box-shadow: var(--focus-ring); }
 
 /* Font names come from the OS and can be any length, so clip long ones rather
    than letting the control stretch the titlebar. */
@@ -143,7 +142,8 @@
 }
 
 .toolbar-select-size {
-  width: 34px;
+  width: 40px;
+  padding: 0;
   text-align: center;
 }
 

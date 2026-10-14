@@ -17,8 +17,9 @@ import './styles/fonts.js'
 import './index.css'
 import App from './App.jsx'
 import { getPreference, hydratePreferences } from './lib/preferences'
-import { setAccentAttribute, setThemeAttribute } from './lib/theme'
+import { setAccentAttribute, setThemeAttribute, setTrayAttribute } from './lib/theme'
 import { applyPlatformAttribute } from './ui/platform'
+import { placeTrafficLights } from './lib/trafficLights'
 
 // A theme before anything else paints — the OS's until the saved one is known.
 setThemeAttribute('system')
@@ -27,6 +28,9 @@ applyPlatformAttribute()
 await hydratePreferences()
 setThemeAttribute(getPreference('inkblot-theme'))
 setAccentAttribute(getPreference('inkblot-accent-color'))
+setTrayAttribute(getPreference('inkblot-tray-color'))
+// The traffic lights where the landing page wants them; the editor moves them with its sidebar.
+placeTrafficLights()
 
 // Dev only: `?design` renders the design-language showcase instead of the app.
 const showcase = import.meta.env.DEV && new URLSearchParams(window.location.search).has('design')

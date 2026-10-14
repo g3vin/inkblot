@@ -5,6 +5,9 @@
  * elastic loop's refs are threaded in rather than owned here: the spring exists
  * because of the drag, and the two share the same position and velocity state.
  *
+ * There are no handles. As with a window, the band across a card's top moves it and
+ * its edges and corners resize it (getCardGrip); everything else is the note's own.
+ *
  * Pointer events, not HTML5 drag: a card can be dragged out onto the canvas, and
  * the drag must survive leaving the card's own DOM.
  */
@@ -12,15 +15,13 @@ import { useCallback } from 'react'
 import {
   DRAG_MIN_DELTA,
   TILE_MIN_HEIGHT,
-  TILE_MIN_RESIZE_HEIGHT,
-  TILE_MIN_RESIZE_WIDTH,
   TILE_WIDTH,
-  VIEWPORT_PADDING,
   addPointerDragListeners,
   clampPosition,
   collectDescendantIds,
-  isDragEdge,
+  getCardGrip,
   releasePointerCaptureSafely,
+  resizeCardBox,
   setPointerCaptureSafely,
 } from '../lib/notePreviewGeometry'
 
@@ -43,20 +44,19 @@ export function useNoteCardDrag({
   startElasticLoop,
 }) {
 
-  const shouldStartDrag = useCallback((event) => {
-    if (!(event.target instanceof HTMLElement)) return false
-    if (event.target.closest('.note-preview-close')) return false
-    if (event.target.closest('.note-preview-drag')) return true
-    if (event.target.closest('textarea, input, button, a, label')) return false
-
+  // What a press does: an edge or corner resizes, the top band moves, and a control
+  // or the note's text is left alone (a press on an edge wins over what is under it).
+  const gripAt = useCallback((event) => {
+    if (!(event.target instanceof Element)) return null
     const card = event.currentTarget
-    if (!(card instanceof HTMLElement)) return false
-    const rect = card.getBoundingClientRect()
-    return isDragEdge(event.clientX, event.clientY, rect)
+    if (!(card instanceof HTMLElement)) return null
+    const grip = getCardGrip(event.clientX, event.clientY, card.getBoundingClientRect())
+    if (grip === 'move' && event.target.closest('textarea, input, button, a, label, audio')) return null
+    return grip
   }, [])
 
-  const handleDragStart = useCallback((noteId, event) => {
-    if (!preview || !layout || !shouldStartDrag(event)) return
+  const handleMoveStart = useCallback((noteId, event) => {
+    if (!preview || !layout) return
 
     const position = layout.positions.get(noteId)
     const note = noteById.get(noteId)
@@ -168,9 +168,10 @@ export function useNoteCardDrag({
     }
 
     const removePointerListeners = addPointerDragListeners(dragTarget, handlePointerMove, handlePointerUp)
-  }, [childMap, commitLayout, layout, lockPreview, noteById, preview, shouldStartDrag, startElasticLoop, elasticPositionsRef, elasticVelocityRef, setElasticPositions, dragStateRef, cardSizesRef, dragLayoutsRef, setDragLayouts])
+  }, [childMap, commitLayout, layout, lockPreview, noteById, preview, startElasticLoop, elasticPositionsRef, elasticVelocityRef, setElasticPositions, dragStateRef, cardSizesRef, dragLayoutsRef, setDragLayouts])
 
-  const handleResizeStart = useCallback((noteId, event) => {
+  // Resizing from a left or top edge moves the card too, so its far edges stay put.
+  const handleResizeStart = useCallback((noteId, edges, event) => {
     const note = noteById.get(noteId)
     const position = layout?.positions.get(noteId)
     const currentSize = layout?.sizes.get(noteId)
@@ -182,44 +183,30 @@ export function useNoteCardDrag({
     setPointerCaptureSafely(dragTarget, event.pointerId)
     lockPreview()
 
-    dragStateRef.current = {
-      mode: 'resize',
-      noteId,
-      originX: event.clientX,
-      originY: event.clientY,
-      initialWidth: currentSize.width,
-      initialHeight: currentSize.height,
-      position,
-    }
+    const parentPosition = note.parentNoteId ? layout.positions.get(note.parentNoteId) || null : null
+    const base = parentPosition || layout.rootBase
+    const box = { ...position, width: currentSize.width, height: currentSize.height }
+    const movesOrigin = edges.includes('n') || edges.includes('w')
+
+    dragStateRef.current = { mode: 'resize', noteId }
 
     const handlePointerMove = (moveEvent) => {
-      const dragState = dragStateRef.current
-      if (!dragState || dragState.mode !== 'resize') return
+      if (dragStateRef.current?.mode !== 'resize') return
       moveEvent.preventDefault()
 
-      const nextWidth = Math.max(
-        TILE_MIN_RESIZE_WIDTH,
-  TILE_WIDTH,
-  VIEWPORT_PADDING,
-        dragState.initialWidth + (moveEvent.clientX - dragState.originX)
-      )
-      const nextHeight = Math.max(
-        TILE_MIN_RESIZE_HEIGHT,
-        dragState.initialHeight + (moveEvent.clientY - dragState.originY)
-      )
-      const clampedSize = {
-        width: Math.min(nextWidth, window.innerWidth - dragState.position.x - VIEWPORT_PADDING),
-        height: Math.min(nextHeight, window.innerHeight - dragState.position.y - VIEWPORT_PADDING),
-      }
+      const next = resizeCardBox(box, edges, moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      })
+      const size = { width: next.width, height: next.height }
+      cardSizesRef.current = { ...cardSizesRef.current, [noteId]: size }
+      setCardSizes((current) => ({ ...current, [noteId]: size }))
 
-      cardSizesRef.current = {
-        ...cardSizesRef.current,
-        [noteId]: clampedSize,
+      if (movesOrigin) {
+        const offset = { offsetX: next.x - base.x, offsetY: next.y - base.y }
+        dragLayoutsRef.current = { ...dragLayoutsRef.current, [noteId]: offset }
+        setDragLayouts((current) => ({ ...current, [noteId]: offset }))
       }
-      setCardSizes((current) => ({
-        ...current,
-        [noteId]: clampedSize,
-      }))
     }
 
     const handlePointerUp = (upEvent) => {
@@ -229,14 +216,31 @@ export function useNoteCardDrag({
       releasePointerCaptureSafely(dragTarget, event.pointerId)
       upEvent?.preventDefault?.()
 
-      if (!dragState || dragState.mode !== 'resize') return
-      const finalSize = cardSizesRef.current[noteId] || currentSize
-      commitSize(noteId, finalSize)
+      if (dragState?.mode !== 'resize') return
+      commitSize(noteId, cardSizesRef.current[noteId] || currentSize)
+      const finalLayout = dragLayoutsRef.current[noteId]
+      if (movesOrigin && finalLayout) commitLayout(noteId, finalLayout)
     }
 
     const removePointerListeners = addPointerDragListeners(dragTarget, handlePointerMove, handlePointerUp)
-  }, [commitSize, layout, lockPreview, noteById, dragStateRef, cardSizesRef, setCardSizes])
+  }, [commitLayout, commitSize, layout, lockPreview, noteById, dragStateRef, cardSizesRef, setCardSizes, dragLayoutsRef, setDragLayouts])
 
+  /** A press on a card: move it from the top band, resize it from an edge or corner. */
+  const handleCardPointerDown = useCallback((noteId, event) => {
+    if (event.button !== undefined && event.button !== 0) return
+    const grip = gripAt(event)
+    if (!grip) return
+    if (grip === 'move') handleMoveStart(noteId, event)
+    else handleResizeStart(noteId, grip, event)
+  }, [gripAt, handleMoveStart, handleResizeStart])
 
-  return { handleDragStart, handleResizeStart }
+  /** The cursor a press here would get: shown as the pointer moves over the card. */
+  const cursorAt = useCallback((event) => {
+    const grip = gripAt(event)
+    if (!grip) return ''
+    if (grip === 'move') return 'grab'
+    return { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize' }[grip]
+  }, [gripAt])
+
+  return { handleCardPointerDown, cursorAt }
 }

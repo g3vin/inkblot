@@ -14,7 +14,7 @@
 import { useState } from 'react'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { EditionAction, TypesetVersionKind } from '../../types'
-import { Button } from '../../ui'
+import { Button, EmptyState, IconButton, Input, PanelActions } from '../../ui'
 import { popUpNativeMenu } from '../../ui/useNativeMenu'
 import Icon from '../../ui/Icon.jsx'
 import './TypesetHistory.css'
@@ -67,7 +67,8 @@ export default function TypesetHistoryView() {
       <div className="typeset-history-top">
         {naming ? (
           <form className="typeset-history-naming" onSubmit={(event) => { event.preventDefault(); commitName() }}>
-            <input
+            <Input
+              size="sm"
               autoFocus
               value={naming.name}
               placeholder={naming.id ? 'Name' : 'Sent to the printer'}
@@ -77,11 +78,10 @@ export default function TypesetHistoryView() {
             />
             <Button type="submit" variant="tinted">{naming.id ? 'Rename' : 'Save'}</Button>
           </form>
-        ) : (
-          <Button variant="tinted" className="typeset-history-save" onClick={() => setNaming({ id: null, name: '' })} title="Keep the book’s typesetting as it is now, under a name">
-            <Icon name="add" /> Save Typeset Version…
-          </Button>
-        )}
+        ) : null}
+        <PanelActions>
+          <IconButton icon="add" label="Save a typeset version…" size="capsule" onClick={() => setNaming({ id: null, name: '' })} />
+        </PanelActions>
         {history.previewing ? (
           <div className="typeset-history-previewing">
             <span>{history.comparing ? 'Comparing in the pages' : 'Previewing in the pages'}</span>
@@ -109,11 +109,11 @@ export default function TypesetHistoryView() {
                     {row.summary.slice(0, 4).map((line, index) => <p key={index} className="typeset-history-summary">{line}</p>)}
                     {row.summary.length > 4 ? <p className="typeset-history-more">and {row.summary.length - 4} more</p> : null}
                     <div className="typeset-history-actions">
-                      <button type="button" disabled={previewing} onClick={() => send('previewTypesetVersion', { id: row.id })}>{previewing ? 'Previewing' : 'Preview'}</button>
-                      <button type="button" onClick={() => send('previewTypesetVersion', { id: row.id, compare: true })}>Compare</button>
-                      <button type="button" onClick={() => restore(row)}>Restore…</button>
+                      <Button disabled={previewing} onClick={() => send('previewTypesetVersion', { id: row.id })}>{previewing ? 'Previewing' : 'Preview'}</Button>
+                      <Button onClick={() => send('previewTypesetVersion', { id: row.id, compare: true })}>Compare</Button>
+                      <Button onClick={() => restore(row)}>Restore…</Button>
                       <span className="typeset-history-spacer" />
-                      <button type="button" aria-label="More" onClick={(event) => menu(event, row)}><Icon name="more" /></button>
+                      <IconButton icon="more" label="More version actions" size="capsule" onClick={(event) => menu(event, row)} />
                     </div>
                   </article>
                 )
@@ -122,11 +122,7 @@ export default function TypesetHistoryView() {
           ))}
         </div>
       ) : (
-        <div className="inspector-placeholder">
-          <Icon name="type-style" size={20} />
-          <strong>No typeset versions yet</strong>
-          <span>A version is kept as you typeset the book, and each time it is printed or exported.</span>
-        </div>
+        <EmptyState icon="history" title="No typeset versions yet." hint="A version is kept as you typeset the book, and each time it is printed or exported." />
       )}
       <p className="typeset-history-footer">
         {rows.length ? `${rows.length} typeset ${rows.length === 1 ? 'version' : 'versions'} of this book` : ''}

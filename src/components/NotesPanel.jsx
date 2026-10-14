@@ -5,18 +5,34 @@
  * (children via parentNoteId), with search filtering, pin/collapse toggles,
  * per-note color picking, image attachments, and jump-to-anchor.
  */
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import NoteCard from './RightSidebar/NoteCard'
+import NoteBranchLines from './NoteBranchLines'
 import { canvasSurfaceAt, dispatchCanvasDropNote } from '../canvas/canvasEvents'
 import {
   collectNoteBranchIds,
-  NOTE_COLOR_OPTIONS,
   compareNotes,
+  createFreeNote,
   noteColor,
   touchNote,
 } from '../lib/noteUtils'
-import { isInkId, legacyInkFor } from '../lib/palette'
-import { InkPicker, Popover } from '../ui'
+import { EmptyState } from '../ui/Surfaces.jsx'
+import { NOTE_POP_MS, closeSchedule, drawMs, lineStart, openTiming, prefersReducedMotion } from '../lib/noteReveal'
+
+const findBranch = (branches, id) => {
+  for (const branch of branches) {
+    if (branch.note.id === id) return branch
+    const found = findBranch(branch.children, id)
+    if (found) return found
+  }
+  return null
+}
+
+/** The replies showing under a branch, generation by generation, as [parentId, child]. */
+const visibleEdges = (branch, isRoot = true) => {
+  if (!isRoot && branch.note.collapsedChildren) return []
+  return branch.children.flatMap((child) => [[branch.note.id, child], ...visibleEdges(child, false)])
+}
 
 /**
  * Drag a note onto an open canvas.
@@ -127,13 +143,6 @@ export default function NotesPanel({
 }) {
   const [dragGhost, setDragGhost] = useState(null)
   const startNoteDrag = useNoteCanvasDrag(docName, setDragGhost)
-  const [colorPicker, setColorPicker] = useState(null)
-  const colorAnchorRef = useRef(null)
-
-  const closeMenus = useCallback(() => {
-    setColorPicker(null)
-  }, [])
-
   const updateNote = useCallback((id, updater) => {
     setNotes(prev =>
       prev.map(note => {
@@ -182,27 +191,26 @@ export default function NotesPanel({
     updateNote(id, note => touchNote(note, { pinned: !note.pinned }))
   }, [updateNote])
 
-  const handleToggleCollapse = useCallback((id) => {
-    updateNote(id, note => ({
-      ...note,
-      collapsedChildren: !note.collapsedChildren,
-    }))
+
+  // A connected note, in the parent's colour, opened under it with the caret in it.
+  const handleAddChild = useCallback((parentId) => {
+    const parent = notes.find((note) => note.id === parentId)
+    const child = touchNote(createFreeNote(parent?.color), { parentNoteId: parentId, collapsedChildren: false })
+    finishMotion()
+    setNotes((prev) => [
+      ...prev.map((note) => (note.id === parentId && note.collapsedChildren ? { ...note, collapsedChildren: false } : note)),
+      child,
+    ])
+    // It draws and pops in on its own, as one added to a hover note does.
+    if (!prefersReducedMotion()) setMotion({ kind: 'pending', rootId: parentId, only: child.id })
+    requestAnimationFrame(() => document.querySelector(`#note-${child.id} textarea`)?.focus())
+  // finishMotion is stable in all but name: it reads the motion through a ref.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes, setNotes])
+
+  const handleChangeColor = useCallback((id, color) => {
+    updateNote(id, note => touchNote(note, { color }))
   }, [updateNote])
-
-  const handleOpenColorPicker = useCallback((event, noteId) => {
-    colorAnchorRef.current = event.currentTarget
-    setColorPicker({ noteId })
-  }, [])
-
-  const handleApplyColor = useCallback((color) => {
-    if (!colorPicker) return
-
-    if (colorPicker.noteId) {
-      updateNote(colorPicker.noteId, note => touchNote(note, { color }))
-    }
-
-    setColorPicker(null)
-  }, [colorPicker, updateNote])
 
   const handleJump = useCallback(
     (note) => {
@@ -251,6 +259,99 @@ export default function NotesPanel({
     return (byParent.get('__root__') || []).map(buildBranch).filter(Boolean)
   }, [noteMatchesSearch, notes])
 
+  /* ---------------- opening and closing a branch ----------------
+     As a hover note's do (lib/noteReveal): opening, the lines draw from the parent a
+     generation at a time and each reply grows out of its line's end; closing, the
+     same backwards and quicker, deepest first, and the branch folds once it has
+     played. 'pending' is the commit the replies first appear in, hidden, so they can
+     be measured (NoteBranchLines) before the timings are set, all before a paint. */
+
+  const [motion, setMotion] = useState(null)
+  const motionRef = useRef(null)
+  motionRef.current = motion
+  const motionTimerRef = useRef(0)
+  // Each reply's line length, by id, as last measured.
+  const [lineLengths] = useState(() => new Map())
+
+  // Settle whatever is playing: a closing folds its branch now.
+  const finishMotion = () => {
+    window.clearTimeout(motionTimerRef.current)
+    motionTimerRef.current = 0
+    const playing = motionRef.current
+    if (playing?.kind === 'close') {
+      updateNote(playing.rootId, (note) => ({ ...note, collapsedChildren: true }))
+    }
+    if (playing) setMotion(null)
+  }
+  useEffect(() => () => window.clearTimeout(motionTimerRef.current), [])
+
+  const handleToggleCollapse = (id) => {
+    finishMotion()
+    const branch = findBranch(noteTree, id)
+    const animate = !queryText && !prefersReducedMotion() && branch
+    if (branch?.note.collapsedChildren) {
+      updateNote(id, (note) => ({ ...note, collapsedChildren: false }))
+      if (animate) setMotion({ kind: 'pending', rootId: id })
+      return
+    }
+    if (!animate) {
+      updateNote(id, (note) => ({ ...note, collapsedChildren: true }))
+      return
+    }
+    const edges = visibleEdges(branch).map(([fromId, child]) => ({
+      fromNoteId: fromId === id ? null : fromId,
+      toNoteId: child.note.id,
+      duration: drawMs(lineLengths.get(child.note.id)),
+    }))
+    const { schedule, total } = closeSchedule(edges)
+    const notesMotion = new Map()
+    schedule.forEach(({ card, string }, noteId) => notesMotion.set(noteId, { state: 'closing', card, line: string }))
+    setMotion({ kind: 'close', rootId: id, notes: notesMotion })
+    motionTimerRef.current = window.setTimeout(finishMotion, total)
+  }
+
+  // The replies are in and measured: time the opening by their lines.
+  useLayoutEffect(() => {
+    if (motion?.kind !== 'pending') return
+    const branch = findBranch(noteTree, motion.rootId)
+    if (!branch) {
+      setMotion(null)
+      return
+    }
+    const timings = new Map()
+    const notesMotion = new Map()
+    let total = 0
+    visibleEdges(branch).forEach(([fromId, child]) => {
+      const id = child.note.id
+      if (motion.only && id !== motion.only) return
+      const draw = drawMs(lineLengths.get(id))
+      const timing = openTiming(motion.only ? 0 : lineStart(fromId === motion.rootId ? null : timings.get(fromId)), draw)
+      timings.set(id, timing)
+      notesMotion.set(id, {
+        state: 'opening',
+        card: { delay: timing.pop, ms: NOTE_POP_MS },
+        line: { delay: timing.line, ms: timing.draw },
+      })
+      total = Math.max(total, timing.pop + NOTE_POP_MS)
+    })
+    setMotion({ kind: 'open', rootId: motion.rootId, notes: notesMotion })
+    motionTimerRef.current = window.setTimeout(finishMotion, total)
+  // Runs once per pending opening; the rest is read as it stands then.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [motion])
+
+  // While a branch opens, its replies wait hidden until their turn.
+  const pendingIds = useMemo(() => {
+    if (motion?.kind !== 'pending') return null
+    if (motion.only) return new Set([motion.only])
+    const branch = findBranch(noteTree, motion.rootId)
+    return new Set(branch ? visibleEdges(branch).map(([, child]) => child.note.id) : [])
+  }, [motion, noteTree])
+
+  const motionFor = (id) => (pendingIds?.has(id) ? { state: 'pending' } : motion?.notes?.get(id) ?? null)
+
+  // A reply hangs from its parent by a line in the parent's ink (NoteBranchLines);
+  // its depth sets its indent.
   const renderBranch = (branch, depth = 0) => {
     const isCollapsed = branch.note.collapsedChildren && !queryText
 
@@ -258,13 +359,15 @@ export default function NotesPanel({
       <div
         key={branch.note.id}
         className="note-branch"
+        data-note-id={branch.note.id}
+        style={{ '--note-depth': depth }}
         // Dragging the tile onto a canvas places it there; a plain click still jumps
         // to the anchor, because the drag only arms after ~4px of movement.
         onPointerDown={(event) => startNoteDrag(event, branch.note.id, branch.note)}
       >
         <NoteCard
           note={branch.note}
-          depth={depth}
+          motion={motionFor(branch.note.id)}
           hasChildren={branch.children.length > 0}
           onJump={() => handleJump(branch.note)}
           onRemove={() => handleRemove(branch.note.id)}
@@ -273,7 +376,8 @@ export default function NotesPanel({
           onRemoveImage={(imageId) => handleRemoveImage(branch.note.id, imageId)}
           onTogglePin={() => handleTogglePin(branch.note.id)}
           onToggleCollapse={() => handleToggleCollapse(branch.note.id)}
-          onOpenColorPicker={(event) => handleOpenColorPicker(event, branch.note.id)}
+          onAddChild={() => handleAddChild(branch.note.id)}
+          onChangeColor={(ink) => handleChangeColor(branch.note.id, ink)}
           onStopEditing={clearActiveNoteHighlight}
           onChangeAudio={(audio) => handleChangeAudio(branch.note.id, audio)}
           projectName={projectName}
@@ -281,6 +385,12 @@ export default function NotesPanel({
 
         {branch.children.length > 0 && !isCollapsed ? (
           <div className="note-children">
+            <NoteBranchLines
+              parentColor={branch.note.color}
+              childIds={branch.children.map((child) => child.note.id)}
+              lengths={lineLengths}
+              motionFor={motionFor}
+            />
             {branch.children.map((child) => renderBranch(child, depth + 1))}
           </div>
         ) : null}
@@ -288,21 +398,13 @@ export default function NotesPanel({
     )
   }
 
-  const pickedColor = colorPicker ? notes.find(note => note.id === colorPicker.noteId)?.color : null
-  const pickedInk = isInkId(pickedColor) ? pickedColor : legacyInkFor(pickedColor) ?? NOTE_COLOR_OPTIONS[0]
-
   return (
-    <div className="sidebar-panel notes-panel">
-      <Popover anchorRef={colorAnchorRef} open={Boolean(colorPicker)} onClose={closeMenus} className="note-color-menu">
-        <div className="ib-eyebrow">Note colour</div>
-        <InkPicker label="Note colour" value={pickedInk} inks={NOTE_COLOR_OPTIONS} onChange={handleApplyColor} />
-      </Popover>
-
+    <div className="sidebar-panel notes-panel" data-help="notes.panel">
       <div className="notes-list">
         {noteTree.length === 0 ? (
-          <div className="notes-empty">
-            {notes.length === 0 ? 'No notes yet.' : 'No matching notes.'}
-          </div>
+          notes.length === 0
+            ? <EmptyState icon="note" title="No notes yet." hint="Select some text and press ⌥⌘N to leave yourself a note." />
+            : <EmptyState compact title="No matching notes." />
         ) : (
           noteTree.map((branch) => renderBranch(branch))
         )}

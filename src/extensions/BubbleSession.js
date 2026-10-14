@@ -229,7 +229,7 @@ const buildChips = (doc, editor) => {
         }))
       }
       return chip
-    }, { side: 1, key: `bubble-chip:${entry.id}:${count}:${page}/${pages}`, ignoreSelection: true }))
+    }, { key: `bubble-chip:${entry.id}:${count}:${page}/${pages}`, ignoreSelection: true }))
   }
   return DecorationSet.create(doc, decorations)
 }

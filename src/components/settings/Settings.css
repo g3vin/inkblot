@@ -2,24 +2,9 @@
    Settings sheet
    ============================================================ */
 
-.settings-sheet { overflow: hidden; }
-.settings-sheet .ui-sheet-body { padding: 0; }
-.settings-nav button:focus-visible { outline: 2px solid var(--accent-border); outline-offset: -2px; }
-.settings-layout { display: flex; height: min(620px, calc(100vh - 160px)); font-family: var(--font-ui); }
-.settings-nav { display: flex; flex-direction: column; gap: 2px; flex: 0 0 150px; padding: var(--space-3); border-right: 1px solid var(--border-muted); background: var(--surface-1); }
-.settings-nav button {
-  display: flex; align-items: center; gap: var(--space-2);
-  height: 28px; padding: 0 var(--space-3);
-  border: 0; border-radius: var(--radius-sm);
-  background: transparent; color: var(--text-primary);
-  font: 13px var(--font-ui); text-align: left; cursor: pointer;
-}
-.settings-nav button:hover { background: var(--hover-bg); }
-.settings-nav button[aria-current='page'] { background: var(--select-bg); color: var(--accent-foreground); }
-.settings-pane { flex: 1; min-width: 0; overflow: auto; padding: var(--space-4) var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-5); }
 
 .settings-group { display: flex; flex-direction: column; gap: var(--space-2); }
-.settings-group h3 { margin: 0 0 var(--space-1); font: 600 12px var(--font-ui); color: var(--text-secondary); }
+.settings-group h3 { margin: 0 0 var(--space-1); }
 .settings-group .ui-form-row-label { flex-basis: 50%; }
 .settings-footer { margin: 0; font-size: 11px; line-height: 1.45; color: var(--text-muted); }
 .settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
@@ -69,7 +54,7 @@
 }
 .settings-weekdays button[aria-pressed='true'] { background: var(--accent-color); border-color: var(--accent-color); color: var(--text-on-accent); }
 
-.settings-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.settings-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-block: var(--space-1); }
 
 /* Shortcuts: a row per command, its keys at the right; a warning under one that clashes. */
 .settings-shortcuts { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }

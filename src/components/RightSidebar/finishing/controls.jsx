@@ -6,7 +6,7 @@
  * not be lost, and the page should not re-lay the book per character.
  */
 import { useEffect, useRef, useState } from 'react'
-import { FormRow, Toggle } from '../../../ui'
+import { FormRow, SelectMenu, Stepper, Toggle } from '../../../ui'
 import Icon from '../../../ui/Icon.jsx'
 import { fromMm, roundTo, toMm, UNITS } from './units'
 
@@ -76,16 +76,9 @@ export function LengthRow({ label, mm, onCommit, unit, digits }) {
 
 /** A whole number, typed or stepped. */
 export function NumberRow({ label, value, onCommit, min = 0, max = 99999 }) {
-  const clamp = (n) => Math.max(min, Math.min(max, Math.round(n)))
   return (
     <FormRow label={label}>
-      <span className="fin-length">
-        <CommitNumber value={value} digits={0} min={min} max={max} label={label} onCommit={(n) => onCommit(clamp(n))} />
-        <span className="fin-stepper">
-          <button type="button" aria-label={`Increase ${label}`} onClick={() => onCommit(clamp(value + 1))}>▴</button>
-          <button type="button" aria-label={`Decrease ${label}`} onClick={() => onCommit(clamp(value - 1))}>▾</button>
-        </span>
-      </span>
+      <Stepper label={label} value={value} min={min} max={max} step={1} onChange={(n) => onCommit(Math.round(n))} />
     </FormRow>
   )
 }
@@ -98,15 +91,11 @@ export function Caution({ children }) {
   return <p className="fin-caution"><Icon name="warning" /> {children}</p>
 }
 
-/** A <select> in a row. `options`: [{ value, label }] or [{ label, options }]. */
+/** A menu in a row. `options`: [{ value, label }] or [{ label, options }]. */
 export function PickerRow({ label, value, onChange, options, disabled }) {
   return (
     <FormRow label={label}>
-      <select className="ui-select" value={value ?? ''} disabled={disabled} aria-label={label} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (option.options
-          ? <optgroup key={option.label} label={option.label}>{option.options.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}</optgroup>
-          : <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>))}
-      </select>
+      <SelectMenu label={label} value={value ?? ''} disabled={disabled} onChange={onChange} options={options} />
     </FormRow>
   )
 }

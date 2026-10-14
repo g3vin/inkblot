@@ -8,7 +8,7 @@
  * the tracker records, the scope changes, or the chart's range does.
  */
 import { useEffect, useState } from 'react'
-import { IconButton, Section, Segmented, SelectMenu } from '../../ui'
+import { EmptyState, MenuItem, MenuLabel, MenuSeparator, MoreMenu, PanelActions, ScopeMenu, Section, Segmented, SelectMenu } from '../../ui'
 import Icon from '../../ui/Icon.jsx'
 import { getPreference, setPreference } from '../../lib/preferences'
 import { latestBridgeEvent } from '../../bridge'
@@ -25,7 +25,7 @@ import {
 import './Stats.css'
 
 const PAGES = [{ value: 'today', label: 'Today' }, { value: 'history', label: 'History' }, { value: 'insights', label: 'Insights' }]
-const SCOPES = [{ value: 'document', label: 'Document' }, { value: 'project', label: 'Project' }, { value: 'all', label: 'All' }]
+const SCOPES = [{ value: 'document', label: 'This document' }, { value: 'project', label: 'This project' }, { value: 'all', label: 'Everything' }]
 const METRICS = [{ value: 'words', label: 'Words' }, { value: 'typing', label: 'Time typing' }, { value: 'open', label: 'Time open' }]
 const RANGES = [{ value: '7', label: '7 days' }, { value: '30', label: '30 days' }, { value: '90', label: '90 days' }]
 const INSIGHT_DAYS = 90
@@ -100,29 +100,36 @@ export default function StatsPanel({ query = '' }) {
     || (kind === 'document' && session.project === tracker.project && session.docPath === tracker.docPath))
   const pending = inScope ? tracker.pending : { written: 0, deleted: 0, open: 0, active: 0 }
 
-  const caption = kind === 'document' ? `This document: ${docName(tracker.docPath)}`
-    : kind === 'project' ? `The ${tracker.project} project` : 'Everything written in Inkblot on this computer'
+  // The scope menu names what it counts: the document by name, the project by name.
+  const scopes = SCOPES.map((option) => ({
+    ...option,
+    hint: option.value === 'document' ? docName(tracker.docPath) || undefined
+      : option.value === 'project' ? tracker.project || undefined : 'All your writing',
+  }))
 
   return (
-    <div className="sidebar-panel stats-panel">
-      <header className="stats-header">
-        <div className="stats-header-row">
-          <Segmented value={page} onChange={setPage} options={PAGES} label="Page" stretch />
-          <IconButton icon="settings" label="Stats settings" onClick={() => openSettings('goals')} />
-        </div>
-        <Segmented value={chosen} onChange={setChosen} options={SCOPES} label="Scope" stretch />
-        <p className="stats-note">{caption}</p>
-      </header>
+    <div className="sidebar-panel stats-panel" data-help="stats.panel">
+      <PanelActions>
+        <ScopeMenu label="Count" value={chosen} onChange={setChosen} options={scopes} />
+        <MoreMenu label="More stats options">
+          <MenuItem icon="target" onSelect={() => openSettings('goals')}>Goals…</MenuItem>
+          <MenuItem icon="timer" onSelect={() => openSettings('timers')}>Timer routines…</MenuItem>
+          <MenuItem icon="settings" onSelect={() => openSettings('writing')}>Writing settings…</MenuItem>
+        </MoreMenu>
+      </PanelActions>
+      <div className="stats-view-switch">
+        <Segmented value={page} onChange={setPage} options={PAGES} label="Show" stretch />
+      </div>
       <div className="stats-body">
         {page === 'today' ? (
           <>
             <Section id="stats.timer" title="Timer"><TimerSection stats={stats} /></Section>
             <GoalsSection stats={stats} />
             <DeadlinesSection stats={stats} project={tracker.project} />
-            <Section id="stats.session" title="This session">
+            <Section id="stats.session" title="This session" help="stats.session">
               {session ? (
                 <SessionRows stats={stats} query={query} />
-              ) : <p className="stats-muted">Start typing to begin a session.</p>}
+              ) : <EmptyState compact title="No session yet." hint="Start typing to begin one." />}
             </Section>
             {snapshot ? <TodaySection snapshot={snapshot} pending={pending} pastes={pastes} query={query} /> : null}
           </>
@@ -131,7 +138,7 @@ export default function StatsPanel({ query = '' }) {
           <>
             <StreakSection stats={stats} />
             {snapshot ? (
-              <Section id="stats.activity" title="Activity">
+              <Section id="stats.activity" title="Activity" help="stats.activity">
                 <div className="stats-controls">
                   <SelectMenu label="Show" value={metric} onChange={setMetric} options={METRICS} />
                   <SelectMenu label="Range" value={String(rangeDays)} onChange={(value) => setRangeDays(Number(value))} options={RANGES} />
@@ -180,7 +187,7 @@ function TodaySection({ snapshot, pending, pastes, query }) {
   const written = (today ? today.wordsAdded + (pastes ? today.wordsPasted : 0) : 0) + pending.written
   const average = averageWrittenPerDay(snapshot, pastes)
   return (
-    <Section id="stats.today" title="Today">
+    <Section id="stats.today" title="So far today">
       <Row query={query} label="Words written" value={formatNumber(written)} detail={average > 0 ? `${formatNumber(average)} a day on average` : null} />
       <Row query={query} label="Words deleted" value={formatNumber((today?.wordsDeleted ?? 0) + pending.deleted)} />
       <Row query={query} label="Time typing" value={formatDuration((today?.activeSecs ?? 0) + pending.active)} />
@@ -204,7 +211,7 @@ function TotalsSection({ stats, kind, snapshot, pending, query }) {
   const skipped = runs.reduce((sum, run) => sum + (run.sprintsSkipped ?? 0), 0)
   const runWords = runs.reduce((sum, run) => sum + (run.wordsWritten ?? 0), 0)
   return (
-    <Section id="stats.totals" title="All time">
+    <Section id="stats.totals" title="All time" help="stats.totals">
       {length ? <Row query={query} label={kind === 'document' ? 'Length' : 'Project length'} value={`${formatNumber(length.words)} words`} detail={`${formatNumber(length.chars)} characters`} /> : null}
       <Row query={query} label="Words written" value={formatNumber(written)} />
       <Row query={query} label="Words deleted" value={formatNumber(totals.wordsDeleted + pending.deleted)} />
@@ -227,22 +234,34 @@ function TotalsSection({ stats, kind, snapshot, pending, query }) {
   )
 }
 
-const SHADINGS = [{ value: 'words', label: 'Words' }, { value: 'goals', label: 'Goals' }]
-const WEEKS = [{ value: '13', label: '3 months' }, { value: '26', label: '6 months' }, { value: '53', label: '1 year' }]
+const SHADINGS = [{ value: 'words', label: 'Words written' }, { value: 'goals', label: 'Goals met' }]
+const WEEKS = [{ value: '13', label: 'The last 3 months' }, { value: '26', label: 'The last 6 months' }, { value: '53', label: 'The last year' }]
 
 function StreakSection({ stats }) {
   const [weeks, setWeeks] = usePreference('inkblot.stats.heatmapWeeks', 26)
   const [shading, setShading] = usePreference('inkblot.stats.heatmapShading', 'words')
   const history = { ...stats.history, [stats.todayKey]: stats.today }
   return (
-    <Section id="stats.streak" title="Streak">
+    <Section
+      id="stats.streak"
+      title="Streak"
+      help="stats.streak"
+      accessory={(
+        <MoreMenu label="Streak options">
+          <MenuLabel>Shade by</MenuLabel>
+          {SHADINGS.map((option) => (
+            <MenuItem key={option.value} checked={shading === option.value} onSelect={() => setShading(option.value)}>{option.label}</MenuItem>
+          ))}
+          <MenuSeparator />
+          <MenuLabel>Show</MenuLabel>
+          {WEEKS.map((option) => (
+            <MenuItem key={option.value} checked={String(weeks) === option.value} onSelect={() => setWeeks(Number(option.value))}>{option.label}</MenuItem>
+          ))}
+        </MoreMenu>
+      )}
+    >
       <StreakRow streak={stats.streak} />
-      <div className="stats-controls">
-        <Segmented value={shading} onChange={setShading} options={SHADINGS} label="Shade by" />
-        <SelectMenu label="Weeks" value={String(weeks)} onChange={(value) => setWeeks(Number(value))} options={WEEKS} />
-      </div>
       <StreakHeatmap history={history} plan={stats.plan} today={stats.todayKey} weeks={Number(weeks)} shading={shading} />
-      <p className="stats-note">{stats.plan.project ? `Writing in ${stats.plan.project}, as your goals count it.` : 'All your writing, as your goals count it.'}</p>
     </Section>
   )
 }
@@ -256,7 +275,7 @@ function InsightsSections({ stats, scope }) {
   const sentence = parts.length ? `${capitalize(parts.join(', and '))}.` : 'Nothing written in the last seven days yet.'
   return (
     <>
-      <Section id="stats.week" title="This week">
+      <Section id="stats.week" title="This week" help="stats.week">
         <div className="stats-week">
           <span className="stats-big">{formatNumber(insights.thisWeekWords)}</span>
           <span className="stats-muted">words</span>
@@ -269,13 +288,12 @@ function InsightsSections({ stats, scope }) {
         </div>
         <p className="stats-muted">{sentence}</p>
       </Section>
-      <Section id="stats.rhythm" title="When you Write">
+      <Section id="stats.rhythm" title="When you write" help="stats.rhythm">
         {insights.bestHour != null ? <Row label="Best time" value={hourRange(insights.bestHour)} /> : null}
         {insights.bestWeekday != null ? <Row label="Best day" value={weekdayName(insights.bestWeekday)} /> : null}
         <HourGrid grid={insights.grid} />
-        <p className="stats-note">Time typing by hour and weekday, over the last {INSIGHT_DAYS} days.</p>
       </Section>
-      <Section id="stats.habits" title="How you Write">
+      <Section id="stats.habits" title="How you write" help="stats.habits">
         <Row label="Flow sessions" value={formatNumber(insights.flowSessions)} detail={`of ${formatNumber(insights.sessions)} sessions`}
           help={`Sessions with at least ${stats.config.flowMinutes} minutes of typing in a row, each minute mostly typing.`} />
         <Row label="Longest flow" value={insights.longestFlowMinutes ? `${insights.longestFlowMinutes} min` : '—'} />

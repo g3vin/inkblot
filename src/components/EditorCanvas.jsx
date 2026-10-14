@@ -28,6 +28,7 @@ import { canvasDelegates } from '../bridge/canvasDelegates'
 import { mapDelegates } from '../bridge/mapDelegates'
 import { useSurfacePublisher } from '../bridge/useSurfacePublisher'
 import { buildEditorExtensions } from '../lib/editorExtensions'
+import { setClipboardDropTarget } from '../lib/clipboardDropTarget'
 import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
 import CanvasPane from '../canvas/CanvasPane'
@@ -54,6 +55,7 @@ import DocLockBadge from './DocLockBadge'
 import TableToolbar from './TableToolbar'
 import { lockReason, useLocks } from '../lib/docLocks'
 import { setEditorLock } from '../extensions/DocumentLock'
+import { FadeScrim } from '../ui/Surfaces.jsx'
 
 const EMPTY_NOTES = []
 
@@ -141,13 +143,15 @@ export default function EditorCanvas({
   const {
     createPasteHandler,
     getDraggedClipboardPayload,
-    clearDragGlobals,
     getTargetEditorAtPoint,
     updateDropCaret,
     handlePaneDragStart,
     handlePaneDragOver,
     handlePaneDrop,
-    insertClipboardPayloadAtPoint,
+    hoverClipboardAt,
+    previewClipboardAt,
+    dropClipboardAt,
+    clearClipboardDrag,
   } = useEditorDnd({
     // Accessors, not values: this hook runs before `editor` and `secondaryEditor`
     // are declared below — `editor` supplies useEditor's paste handler, so the
@@ -364,40 +368,15 @@ export default function EditorCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, secondaryEditor, splitView])
 
-  useEffect(() => {
-    const onClipboardDragEndDrop = (event) => {
-      const detail = event?.detail || {}
-      const held = dragHandoff.point()
-      const point = { x: detail.x ?? held?.x ?? null, y: detail.y ?? held?.y ?? null }
-      const payload = {
-        id: detail.id || '',
-        text: detail.text || '',
-      }
-
-      // Somebody already took this drop — the clipboard panel, most likely, since it
-      // is the other end of this same drag.
-      if (dragHandoff.isClaimed()) {
-        setDragCaret(null)
-        clearDragGlobals()
-        return
-      }
-
-      const targetEditor = getTargetEditorAtPoint(point.x, point.y)
-      if (targetEditor && payload.text) {
-        insertClipboardPayloadAtPoint(payload, targetEditor, point.x, point.y)
-      }
-
-      setDragCaret(null)
-      clearDragGlobals()
-    }
-
-    window.addEventListener('inkblot:clipboard-dragend-drop', onClipboardDragEndDrop)
-    return () => {
-      window.removeEventListener('inkblot:clipboard-dragend-drop', onClipboardDragEndDrop)
-    }
-  // Clipboard drag completion reads the current drop globals at event time.
+  // The panes are where a clipboard piece dragged from the panel lands
+  // (lib/clipboardDropTarget). The handlers read the live editors at event time.
+  useEffect(() => setClipboardDropTarget({
+    hover: hoverClipboardAt,
+    preview: previewClipboardAt,
+    clear: clearClipboardDrag,
+    drop: dropClipboardAt,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, secondaryEditor, splitView])
+  }), [editor, secondaryEditor, splitView])
 
   /* ---------------- Expose Editor ---------------- */
 
@@ -801,6 +780,7 @@ export default function EditorCanvas({
               )}
             />
           )}
+          {!primaryIsStructured && !showDraftPane ? <FadeScrim edge="bottom" height={56} className="pane-bottom-scrim" /> : null}
           {!primaryIsStructured && !showDraftPane ? (
             <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName}>
               {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(primaryWordStats)}</div> : null}
@@ -903,6 +883,7 @@ export default function EditorCanvas({
                 )}
               />
             )}
+            {!secondaryIsStructured ? <FadeScrim edge="bottom" height={56} className="pane-bottom-scrim" /> : null}
             {!secondaryIsStructured ? (
               <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName}>
                 {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}

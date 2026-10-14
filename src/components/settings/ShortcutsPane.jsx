@@ -86,7 +86,7 @@ function ShortcutRow({ command, overrides, commands, recorder }) {
               <IconButton icon="undo" label="Use the default shortcut" size="capsule" onClick={() => resetBinding(command.id)} />
             ) : null}
             {binding && !isRecording ? (
-              <IconButton icon="close" label="Remove shortcut" size="capsule" onClick={() => setBinding(command.id, '')} />
+              <IconButton icon="close" label="Clear shortcut" size="capsule" onClick={() => setBinding(command.id, '')} />
             ) : null}
             <Button
               className="settings-shortcut-keys"

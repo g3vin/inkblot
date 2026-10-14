@@ -32,7 +32,7 @@ import { readDocPageSetup } from './DocPageSetup'
 import { documentSurface } from '../bridge'
 import { assetUrl, isAssetPath, writeAssetFromFile } from '../lib/assets'
 import { useDocPageSetup } from './useDocPageSetup'
-import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, getTypesetDisplay, getTypesetView, isPrintLayoutEnabled, isShowingCover, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
+import { bookAuthor, getBookForDoc, getBookSettings, getPrintZoom, getTypesetDisplay, getTypesetView, isPrintLayoutEnabled, isShowingCover, isTypesetMode, setBookSettings, setPrintZoom, usePrintLayoutStore } from './printLayoutStore'
 import { resolvePageSetup } from './pageSetup'
 
 /**
@@ -74,12 +74,15 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
     () => resolvePageSetup({ docSetup: ownSetup, bookSetup: bookJson ? JSON.parse(bookJson) : null }).setup,
     [ownSetup, bookJson]
   )
+  // Pages show in Typeset, and in Write's page view — where the prose is written on
+  // them, as the document's own pages, with none of Typeset's book around it.
   const printLayout = Boolean(editor) && isPrintLayoutEnabled(projectName, docPath)
+  const typesetting = printLayout && isTypesetMode(projectName)
   // In Typeset, the e-book as a reader shows it, in place of the pages.
-  const digital = printLayout && getTypesetView(projectName) === 'digital'
+  const digital = typesetting && getTypesetView(projectName) === 'digital'
   // In Typeset a chapter's prose is locked — it is written in Write — and the book's own
   // pages, its front and back matter, are not: they are only ever edited here.
-  const locked = printLayout && !isMatterPath(docPath)
+  const locked = typesetting && !isMatterPath(docPath)
   useEffect(() => {
     if (editor && !editor.isDestroyed && editor.storage.typesetLock) editor.storage.typesetLock.locked = locked
   }, [editor, locked])
@@ -87,7 +90,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
   // pages, opening with its designed head.
   const placement = useBookPlacement(editor ? projectName : null, editor ? docPath : null)
   const row = placement?.row
-  const inBook = Boolean(printLayout && row && !row.hidden)
+  const inBook = Boolean(typesetting && row && !row.hidden)
   const design = placement?.book?.chapterDesign
   const headed = inBook && row.kind === 'chapter' && design
   const meta = headed ? readChapterMeta(editor?.state.doc) : null
@@ -105,7 +108,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
   // What the page's handles change, in Typeset.
   const [toast, setToast] = useState(null)
   const typeset = useMemo(() => {
-    if (!printLayout || !editor || !placement) return null
+    if (!typesetting || !editor || !placement) return null
     const { folder } = placement
     const book = placement.book
     const editBook = (change, label) => {
@@ -134,16 +137,17 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
       },
       focus: (sectionId) => documentSurface.publishTypesetFocus({ sectionId }),
     }
-  }, [design, editor, headed, placement, printLayout, projectName])
+  }, [design, editor, headed, placement, typesetting, projectName])
   // How Typeset shows the pages: in spreads (the whole book, still), with the grid,
   // with the proof's marks — which are read off the live pages.
-  const display = getTypesetDisplay(projectName)
-  const showingCover = printLayout && placement && isShowingCover()
-  const spread = printLayout && inBook && display.spread && !digital && !showingCover
+  const typesetDisplay = getTypesetDisplay(projectName)
+  const display = typesetting ? typesetDisplay : { ...typesetDisplay, spread: false, grid: false, proof: false }
+  const showingCover = typesetting && placement && isShowingCover()
+  const spread = inBook && display.spread && !digital && !showingCover
   useProof({
     editor,
     docPath,
-    active: Boolean(printLayout && display.proof && !digital && !spread && !showingCover),
+    active: Boolean(typesetting && display.proof && !digital && !spread && !showingCover),
     hyphenLimit: compositionOf(pageSetup.typography).hyphenLimitLines,
   })
   // Where the book sets its notes, and how it marks them.
@@ -186,7 +190,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
       tabIndex={printLayout ? -1 : undefined}
     >
       {header}
-      <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} printLayout={printLayout} />
+      <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} typesetting={typesetting} />
       <FootnoteEditor editor={editor} locked={locked} />
       {showingCover ? (
         <CoverView projectName={projectName} docPath={docPath} folder={placement.folder} setup={pageSetup} />

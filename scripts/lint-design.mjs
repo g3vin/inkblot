@@ -10,6 +10,9 @@
  *   color   hex / rgb() / hsl() literals        → use a token (--text-*, --ink-*, …)
  *   font    font-family not built from a var()  → use --font-ui / --font-type / --font-editor
  *   radius  border-radius in px                 → use --radius-sm / md / lg / pill
+ *   size    font-size (or the font shorthand) in px → use --text-2xs … --text-3xl
+ *   space   gap / padding / margin of 3px or more  → use --space-1 … --space-12
+ *           (0, 1px and 2px hairline nudges are fine)
  *
  * A raw shadow is caught by its colour (rgba(…) / #…) → use --shadow-float / --shadow-dialog.
  *
@@ -70,6 +73,10 @@ function check(rel, text) {
       if (font && !/var\(|inherit|initial|unset/.test(font[1])) at('font', line)
       const radius = /border(?:-[a-z]+)*-radius\s*:\s*([^;]+)/.exec(line)
       if (radius && /\b(?!0px)\d+(?:\.\d+)?px/.test(radius[1]) && !/var\(/.test(radius[1])) at('radius', line)
+      const size = /(?:^|[\s;{])font(?:-size)?\s*:\s*([^;]+)/.exec(line)
+      if (size && /(?:^|[\s(])\d+(?:\.\d+)?px/.test(size[1].replace(/\/\s*\d+(?:\.\d+)?px/g, ''))) at('size', line)
+      const space = /(?:^|[\s;{])(?:gap|row-gap|column-gap|padding|margin)(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?\s*:\s*([^;]+)/.exec(line)
+      if (space && /(?:^|[\s(-])(?:[3-9]|\d{2,})(?:\.\d+)?px/.test(space[1])) at('space', line)
     } else {
       // In scripts only colour literals in strings are flagged (inline styles, palettes).
       const strings = line.match(/(['"`])(?:\\.|(?!\1).)*\1/g) || []

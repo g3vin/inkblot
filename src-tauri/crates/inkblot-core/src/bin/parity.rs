@@ -23,7 +23,7 @@ use inkblot_core::search::{self, ProjectFile};
 use inkblot_core::store::{paths, versions};
 use inkblot_core::types::{
     CanvasEdge, CanvasFile, CanvasNode, CanvasNodeType, DiffChunk, DocKind, EdgeSide, HtmlBlock,
-    MergeChoice, Note, Point, ReadAloudPayload, Rect, SearchScope, VersionEntry, Viewport,
+    MergeChoice, Note, Point, ReadAloudPayload, Rect, VersionEntry, Viewport,
 };
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
@@ -243,16 +243,6 @@ fn matcher_options(value: &Value) -> MatcherOptions {
         match_case: value["matchCase"].as_bool().unwrap_or(false),
         whole_word: value["wholeWord"].as_bool().unwrap_or(false),
         use_regex: value["useRegex"].as_bool().unwrap_or(false),
-    }
-}
-
-fn search_scope(value: &Value) -> SearchScope {
-    match value.as_str() {
-        Some("document") => SearchScope::Document,
-        Some("notes") => SearchScope::Notes,
-        Some("files") => SearchScope::Files,
-        Some("project") => SearchScope::Project,
-        _ => SearchScope::Panel,
     }
 }
 
@@ -685,18 +675,6 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
                 &matcher,
                 args[3].as_str().unwrap_or_default(),
                 args[4].as_u64().unwrap_or(u64::MAX) as usize
-            ))
-        }
-        "searchScopes" => json!(search::search_scopes()),
-        "isFilterScope" => json!(search::is_filter_scope(search_scope(&args[0]))),
-        "getPanelNoun" => json!(search::get_panel_noun(args[0].as_str().unwrap_or_default())),
-        "getSearchPlaceholder" => json!(search::get_search_placeholder(
-            search_scope(&args[0]),
-            args[1].as_str().unwrap_or_default()
-        )),
-        "getRecommendedScopes" => {
-            json!(search::get_recommended_scopes(
-                args[0].as_str().unwrap_or_default()
             ))
         }
         "flattenProjectFiles" => {

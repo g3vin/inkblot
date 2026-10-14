@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createProject, getProjectRoot, linkProject, listProjects, moveProject } from '../lib/FileSystem'
-import { Button, Sheet } from '../ui'
+import { Button, EmptyState, Sheet } from '../ui'
 import { popUpNativeMenu } from '../ui/useNativeMenu.js'
 import Icon from '../ui/Icon.jsx'
 import { AppIcon, Wordmark } from '../ui/Brand.jsx'
@@ -208,7 +208,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
             if (event.key === 'Enter' && selected) { event.preventDefault(); onOpenProject(selected) }
           }}
         >
-          {sorted.length === 0 ? <p className="picker-empty">No projects</p> : sorted.map((name) => (
+          {sorted.length === 0 ? <EmptyState icon="folder" title="No projects yet." hint="Start one with New project, or open a folder you already write in." /> : sorted.map((name) => (
             <div
               key={name}
               id={`picker-${name}`}

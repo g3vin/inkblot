@@ -6,9 +6,10 @@
  * changes. So the stylesheets need only one dark rule and one light rule per surface,
  * keyed on [data-theme], never a prefers-color-scheme duplicate (docs/DESIGN.md → Themes).
  *
- * data-accent names an ink from lib/palette.ts; absent means Ink Blue.
+ * data-accent names an ink from lib/palette.ts; absent means Ink Blue. So does data-tray,
+ * the window's colour behind the panels and the document card.
  */
-import { DEFAULT_ACCENT, normalizeAccent } from './palette'
+import { DEFAULT_ACCENT, DEFAULT_TRAY, normalizeAccent, normalizeTray } from './palette'
 import type { InkId } from './palette'
 
 export type ThemeChoice = 'light' | 'dark' | 'system'
@@ -48,5 +49,14 @@ export function setAccentAttribute(value: unknown): InkId {
   else root.setAttribute('data-accent', id)
   // A hex left inline from before the ink palette would override the token.
   root.style.removeProperty('--accent-color')
+  return id
+}
+
+/** Put the window (tray) colour on the root. Takes an ink id. */
+export function setTrayAttribute(value: unknown): InkId {
+  const id = normalizeTray(value)
+  const root = document.documentElement
+  if (id === DEFAULT_TRAY) root.removeAttribute('data-tray')
+  else root.setAttribute('data-tray', id)
   return id
 }

@@ -55,6 +55,7 @@ import {
   getStoredBook,
   getTypesetDisplay,
   getEditorMode,
+  getPageView,
   getTypesetView,
   getLastExport,
   getMeasurement,
@@ -63,10 +64,12 @@ import {
   getSelectedBookItem,
   isShowingCover,
   isPrintLayoutEnabled,
+  isTypesetMode,
   setAuthorProfile,
   setBookSettings,
   setDisplayPointsPerInch,
   setEditorMode,
+  setPageView,
   setTypesetView,
   setTypesetDisplay,
   setStoredBook,
@@ -361,11 +364,19 @@ export default function usePrintLayoutController({
   // A setup sent before the document's editor was there to take it: applied when it is.
   const pendingSetup = useRef(null)
 
-  // Pages on or off is the window's mode now: Typeset shows every text pane as pages.
+  // Pages on or off is Write's page view. Typeset only shows pages, so turning them
+  // off there goes back to Write's continuous editor.
   const togglePrintLayout = useCallback((enabled) => {
     const { projectName: project } = stateRef.current
-    const typeset = enabled ?? getEditorMode(project) !== 'typeset'
-    setEditorMode(project, typeset ? 'typeset' : 'write')
+    const typeset = isTypesetMode(project)
+    const shown = enabled ?? !(typeset || getPageView(project))
+    if (typeset) {
+      if (shown) return
+      setPageView(project, false)
+      setEditorMode(project, 'write')
+      return
+    }
+    setPageView(project, shown)
   }, [])
 
   const publish = useCallback(() => {

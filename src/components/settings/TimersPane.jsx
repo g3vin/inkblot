@@ -34,8 +34,8 @@ function SegmentRow({ segment, index, count, onChange, onMove, onDelete }) {
       <div className="settings-segment-row">
         <SelectMenu label="Kind" value={segment.kind} options={KINDS} onChange={(kind) => change({ kind, wordGoal: kind === 'rest' ? null : segment.wordGoal })} />
         <input className="settings-input settings-grow" aria-label="Label" placeholder={kindTitle(segment.kind)} value={segment.label} onChange={(event) => change({ label: event.target.value })} />
-        <IconButton icon="split" label="Move up" size="capsule" disabled={index === 0} onClick={() => onMove(-1)} />
-        <IconButton icon="merge" label="Move down" size="capsule" disabled={index === count - 1} onClick={() => onMove(1)} />
+        <IconButton icon="arrow-up" label="Move up" size="capsule" disabled={index === 0} onClick={() => onMove(-1)} />
+        <IconButton icon="arrow-down" label="Move down" size="capsule" disabled={index === count - 1} onClick={() => onMove(1)} />
         <IconButton icon="delete" label="Delete segment" size="capsule" disabled={count <= 1} onClick={onDelete} />
       </div>
       <div className="settings-segment-row">

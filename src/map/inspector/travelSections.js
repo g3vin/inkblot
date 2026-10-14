@@ -122,8 +122,8 @@ export function travelerSections(ui, { map, traveler, index, schedule, conflicts
         }, { disabled: legIndex === 0, icon: 'arrow-up', help: 'Move earlier' }),
         ui.button(`${prefix}.remove`, '×', () => setLegs(traveler.legs.filter((candidate) => candidate.id !== leg.id)), {
           role: 'destructive',
-          icon: 'close',
-          help: 'Remove this leg',
+          icon: 'delete',
+          help: 'Delete this leg',
         }),
       ],
     })

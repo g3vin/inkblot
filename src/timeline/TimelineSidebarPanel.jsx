@@ -17,6 +17,7 @@ import { useStoryCalendar } from '../map/useMapProject'
 import { requestTimelineReveal } from './timelineEvents'
 import { describeWhen } from './useTimelinePanel'
 import { useStoryCursor, useStoryTimeline } from './useStoryTimeline'
+import { Button, EmptyState, FormRow, IconButton, Section, SelectMenu, Toggle } from '../ui'
 import './Timeline.css'
 
 /** The editor's ranges, as React state that follows every transaction. */
@@ -56,22 +57,22 @@ export default function TimelineSidebarPanel({ projectName, docPath, editor }) {
   )
 
   if (!projectName || !docPath || !isTextDoc(docPath)) {
-    return <div className="timeline-side is-empty">Open a document to see where it sits in the timeline.</div>
+    return <EmptyState icon="timeline" title="No document open." hint="Open a document to see where it sits in the timeline." />
   }
-  if (!timeline) return <div className="timeline-side is-empty">Loading…</div>
+  if (!timeline) return <EmptyState compact title="Loading the timeline…" />
 
   const attach = async () => {
     await attachSelectionToEvent({ editor, projectName, docPath, eventId: choice || null })
     setChoice('')
   }
   const hasSelection = Boolean(editor && !editor.isDestroyed && !editor.state.selection.empty)
+  const events = [{ value: '', label: 'A new event' }, ...sortedEvents(timeline).map((event) => ({ value: event.id, label: event.title || 'Untitled' }))]
 
   return (
-    <div className="timeline-side">
-      <section>
-        <h3>In this document</h3>
+    <div className="timeline-side" data-help="timeline.panel">
+      <Section id="timeline.passages" title="In this document" help="timeline.passages">
         {!threads.length ? (
-          <p className="timeline-side-hint">Nothing here is attached to the timeline yet. Select a passage and attach it to an event below.</p>
+          <EmptyState compact title="Nothing attached yet." hint="Select a passage, then attach it to an event below." />
         ) : (
           <ol className="timeline-side-list">
             {threads.map((thread) => {
@@ -85,36 +86,36 @@ export default function TimelineSidebarPanel({ projectName, docPath, editor }) {
                     <button type="button" className="timeline-side-link" onClick={() => requestTimelineReveal(thread.eventId)} title="Show in the timeline">
                       {event?.title || 'Untitled'}
                     </button>
-                    <span className="timeline-side-when">{event ? describeWhen(event, calendar) : ''}</span>
-                    {thread.jump ? <span className="timeline-side-jump">{thread.jump === 'back' ? '↶ flashback' : '↷ flash-forward'}</span> : null}
-                    <button type="button" className="timeline-side-remove" onClick={() => removeTimelineRanges(editor, [thread.id])} title="Detach this passage" aria-label="Detach this passage">×</button>
+                    <span className="timeline-side-when ib-meta">{event ? describeWhen(event, calendar) : ''}</span>
+                    {thread.jump ? <span className="timeline-side-jump">{thread.jump === 'back' ? 'Flashback' : 'Flash-forward'}</span> : null}
+                    <IconButton icon="close" label="Detach this passage" size="capsule" iconSize={16} onClick={() => removeTimelineRanges(editor, [thread.id])} />
                   </div>
                 </li>
               )
             })}
           </ol>
         )}
-      </section>
+      </Section>
 
-      <section>
-        <h3>Attach the selection</h3>
-        <select value={choice} onChange={(event) => setChoice(event.target.value)} aria-label="Event">
-          <option value="">A new event</option>
-          {sortedEvents(timeline).map((event) => <option key={event.id} value={event.id}>{event.title || 'Untitled'}</option>)}
-        </select>
-        <button type="button" disabled={!hasSelection} onClick={attach}>Attach</button>
-      </section>
+      <Section
+        id="timeline.attach"
+        title="Attach the selection"
+        help="timeline.attach"
+        accessory={<Button variant="tinted" disabled={!hasSelection} onClick={attach}>Attach</Button>}
+      >
+        <FormRow label="To">
+          <SelectMenu label="Event" value={choice} onChange={setChoice} options={events} />
+        </FormRow>
+      </Section>
 
-      <section className="timeline-side-toggles">
-        <label>
-          <input type="checkbox" checked={Boolean(cursor.lens.on)} onChange={(event) => setTimeLens(projectName, { on: event.target.checked }, 'sidebar')} />
-          Time lens — highlight passages in a window of time
-        </label>
-        <label>
-          <input type="checkbox" checked={Boolean(cursor.editingRanges)} onChange={(event) => setRangeEditing(projectName, event.target.checked, 'sidebar')} />
-          Show handles to drag where passages start and end
-        </label>
-      </section>
+      <Section id="timeline.view" title="On the page" help="timeline.lens">
+        <FormRow label="Time lens" help="timeline.lens">
+          <Toggle label="Time lens" checked={Boolean(cursor.lens.on)} onChange={(on) => setTimeLens(projectName, { on }, 'sidebar')} />
+        </FormRow>
+        <FormRow label="Passage handles" help="timeline.handles">
+          <Toggle label="Passage handles" checked={Boolean(cursor.editingRanges)} onChange={(on) => setRangeEditing(projectName, on, 'sidebar')} />
+        </FormRow>
+      </Section>
     </div>
   )
 }

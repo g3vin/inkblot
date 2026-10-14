@@ -1,18 +1,12 @@
 /**
- * Inlay.jsx — a panel's own controls (filter, search, add) engraved into the panel
- * instead of floated on it (docs/DESIGN.md → Layout → Inlay). The panel is one sheet
- * of paper, and each Inlay is a piece left standing inside a channel cut around it, a
- * kerf wide, as an engraver cuts a plate. Light falls from above: the channel's floor
- * is a step darker, its top wall in shade, its bottom lip catching the light, and the
- * piece casts a little shadow onto the floor. When a piece takes focus, ink runs into
- * its channel (intaglio: the ink sits in the cut).
+ * Inlay.jsx — a panel's own controls (filter, search, add) set bare on the panel's
+ * paper (docs/DESIGN.md → Layout → Inlay): glyphs and text with no fill, border or
+ * channel. A field shows focus by inking its glyphs.
  *
- *   Inlay        the piece, with its channel around it
- *   InlaySlot    one long channel around a row of pieces (the + and the filter), each
- *                still its own piece, a kerf apart
+ *   Inlay        one piece (a field, or `round` for a single round button)
+ *   InlaySlot    a row of pieces (the + and the filter), a kerf apart
  *
- * It is all CSS (Surfaces.css → Inlay): each piece paints its channel and its own paper
- * behind its contents, so it needs nothing from the panel it sits in.
+ * It is all CSS (Surfaces.css → Inlay).
  */
 import { forwardRef } from 'react'
 import './Surfaces.css'
@@ -20,8 +14,7 @@ import './Surfaces.css'
 const classes = (...names) => names.filter(Boolean).join(' ')
 
 /**
- * A control engraved into the panel, a pill. `round` for a single round button: the
- * piece is the button's size, and settles onto the floor when pressed.
+ * A panel's own control, bare on its paper. `round` for a single round button.
  */
 export const Inlay = forwardRef(function Inlay({ round = false, className, children, ...rest }, ref) {
   return (
@@ -32,9 +25,7 @@ export const Inlay = forwardRef(function Inlay({ round = false, className, child
 })
 
 /**
- * One channel for several pieces: lay Inlays out inside it (it is a flex row). The
- * pieces stay separate, a kerf apart, and cut no channels of their own; the one with
- * focus gets an inked channel of its own, inside the long one.
+ * A row of pieces: lay Inlays out inside it (it is a flex row), a kerf apart.
  */
 export const InlaySlot = forwardRef(function InlaySlot({ className, children, ...rest }, ref) {
   return (

@@ -16,7 +16,7 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { marginHangDecorations } from '../lib/marginHang'
+import { marginHangCaret, marginHangDecorations } from '../lib/marginHang'
 import { noteColor } from '../lib/noteUtils'
 
 const NOTE_ANNOTATION_PLUGIN_KEY = new PluginKey('noteAnnotation')
@@ -238,6 +238,10 @@ const buildNoteDecorations = (doc, notes = [], docName = null, activeNoteId = nu
           marker.onclick = (event) => {
             event.preventDefault()
             event.stopPropagation()
+            // Opening a note takes the writer out of the text: no caret left blinking
+            // in the editor behind it.
+            view.dom.blur()
+            window.getSelection()?.removeAllRanges()
             dispatchPreviewEvent(
               NOTE_PREVIEW_PIN_EVENT,
               note,
@@ -248,7 +252,9 @@ const buildNoteDecorations = (doc, notes = [], docName = null, activeNoteId = nu
           }
           return marker
         },
-        { side: 1, key: `note-widget:${note.id}` }
+        // The colour is in the key: ProseMirror reuses a widget's DOM while its key
+        // matches, so without it a recoloured note would keep its old dot.
+        { key: `note-widget:${note.id}:${note.color || ''}` }
       )
     )
   })
@@ -261,6 +267,7 @@ export const NoteAnnotation = Extension.create({
 
   addProseMirrorPlugins() {
     return [
+      marginHangCaret(),
       new Plugin({
         key: NOTE_ANNOTATION_PLUGIN_KEY,
         state: {

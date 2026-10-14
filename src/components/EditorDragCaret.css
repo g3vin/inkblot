@@ -12,6 +12,14 @@
   z-index: 30;
 }
 
+/* Clipboard text held over the page (extensions/DropPreview): where it would land,
+   in the accent, until the pointer lets go or moves on. */
+.drop-preview {
+  color: var(--accent-foreground);
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+
 .editor .ProseMirror-dropcursor {
   background-color: var(--accent-color);
 }

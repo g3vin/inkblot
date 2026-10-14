@@ -27,7 +27,7 @@ export function DayGoalEditor({ goal, onChange }) {
               <SelectMenu label="Measure" value={target.metric} options={METRIC_OPTIONS} onChange={(metric) => setTarget(target.id, { metric })} />
               <Stepper label="Amount" value={target.amount} min={1} max={100000} step={target.metric === 'words' || target.metric === 'netWords' ? 50 : 1} unit={METRIC_INFO[target.metric].unit}
                 onChange={(amount) => setTarget(target.id, { amount })} />
-              <IconButton icon="minus" label="Remove target" size="capsule" onClick={() => change({ targets: goal.targets.filter((t) => t.id !== target.id) })} />
+              <IconButton icon="delete" label="Delete target" size="capsule" onClick={() => change({ targets: goal.targets.filter((t) => t.id !== target.id) })} />
             </div>
           ))}
           <div className="settings-actions">

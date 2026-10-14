@@ -333,9 +333,20 @@ ok('…with the live editor inside the page stage', !!document.querySelector('.p
 ok('…the same editor instance, with the same text', control.editor === editorBefore && paneText() === textBefore)
 ok('…a page count beside the word count', /Page 1 of \d+/.test(document.querySelector('.primary-pane .pane-status .pl-page-count-badge')?.textContent || ''))
 ok('…and a zoom bar', !!document.querySelector('.primary-pane .pl-status'))
+ok('the page view is Write\'s: the mode stays Write', printStore.getEditorMode(P) === 'write')
+ok('…the prose on the pages is not locked', !document.querySelector('.primary-pane .is-typeset-locked') && control.editor.storage.typesetLock?.locked !== true)
+ok('…and it is the document\'s own pages, not the book\'s', !document.querySelector('.primary-pane .book-pages'))
+
+await act(async () => { printStore.setEditorMode(P, 'typeset') })
+await settle()
 ok('in Typeset, a chapter of a book is shown among the book\'s pages', !!document.querySelector('.primary-pane .book-pages .book-pages-live .pl-stage'))
 ok('…opening with its designed head, drawn around its live text', !!document.querySelector('.primary-pane .pl-flow .ProseMirror > .chapter-head.is-live-top') &&
   !!document.querySelector('.primary-pane .pl-flow .ProseMirror .chapter-head.is-live-bottom'))
+ok('…its prose locked', !!document.querySelector('.primary-pane .is-typeset-locked'))
+ok('…the same editor still', control.editor === editorBefore)
+await act(async () => { printStore.setEditorMode(P, 'write') })
+await settle()
+ok('back in Write, the page view is as it was left', !!document.querySelector('.primary-pane .print-layout .pl-stage') && !document.querySelector('.primary-pane .is-typeset-locked'))
 
 await act(async () => {
   control.editor.commands.setPageSetup(bookPageSetup('trade-6x9'))
@@ -347,7 +358,7 @@ ok('a page break is a node in the document', control.editor.getJSON().content.so
 
 await act(async () => { printStore.setPrintLayoutEnabled(P, 'one', false) })
 await settle()
-ok('turning Print Layout off returns the continuous editor', !document.querySelector('.primary-pane .print-layout') && !!document.querySelector('.primary-pane .editor .ProseMirror'))
+ok('turning the page view off returns the continuous editor', !document.querySelector('.primary-pane .print-layout') && !!document.querySelector('.primary-pane .editor .ProseMirror'))
 ok('…still the same editor', control.editor === editorBefore)
 
 // Switching documents flushes the autosave; the setup must be in what was written.

@@ -97,6 +97,7 @@ export async function viewItems(api) {
     { text: 'Write', action: () => send('setEditorMode', { mode: 'write' }) },
     { text: 'Typeset', action: () => send('setEditorMode', { mode: 'typeset' }) },
     { text: 'Typeset the book / back to Write', action: () => send('setEditorMode', { mode: mode() === 'typeset' ? 'write' : 'typeset' }) },
+    { text: 'Page view', action: () => send('setPrintLayout', { enabled: !(mode() !== 'typeset' && layout()?.enabled) }) },
     { text: 'E-book preview', action: typeset(() => send('setTypesetView', { view: layout()?.typesetView === 'digital' ? 'print' : 'digital' })) },
     { text: 'Show spreads', action: typeset(() => send('setTypesetDisplay', { spread: !layout()?.spread })) },
     { text: 'Show baseline grid', action: typeset(() => send('setTypesetDisplay', { grid: !layout()?.showGrid })) },

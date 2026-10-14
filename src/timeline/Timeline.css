@@ -810,24 +810,8 @@
 .timeline-side {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 8px 12px 16px;
-  font-size: 13px;
-}
-
-.timeline-side.is-empty,
-.timeline-side-hint {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.timeline-side h3 {
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  padding: 0 var(--space-3) var(--space-5);
+  font-size: var(--text-sm);
 }
 
 .timeline-side-list {
@@ -836,22 +820,19 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .timeline-side-list li {
-  border-left: 2px solid color-mix(in srgb, var(--text-primary) 15%, transparent);
-  padding-left: 8px;
+  border-left: 2px solid var(--border-color);
+  padding-left: var(--space-3);
 }
 
 .timeline-side-list li.is-back { border-left-color: var(--timeline-flashback); }
 .timeline-side-list li.is-forward { border-left-color: var(--timeline-flashforward); }
 
 .timeline-side-passage,
-.timeline-side-link,
-.timeline-side-remove {
-  border: 0;
-  background: transparent;
+.timeline-side-link {
   padding: 0;
   font: inherit;
   color: inherit;
@@ -860,6 +841,7 @@
 }
 
 .timeline-side-anchor {
+  font-family: var(--font-editor);
   font-style: italic;
   color: var(--text-primary);
 }
@@ -867,41 +849,20 @@
 .timeline-side-event {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: 2px;
   font-size: 12px;
 }
 
+.timeline-side-event .ui-icon-button { margin-left: auto; }
+
 .timeline-side-link {
   font-weight: 600;
-  color: var(--accent-color);
+  color: var(--accent-foreground);
 }
 
 .timeline-side-when,
 .timeline-side-jump {
   color: var(--text-muted);
-}
-
-.timeline-side-remove {
-  margin-left: auto;
-  color: var(--text-muted);
-}
-
-.timeline-side section > select {
-  width: 100%;
-  margin-bottom: 6px;
-}
-
-.timeline-side-toggles {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.timeline-side-toggles label {
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
 }

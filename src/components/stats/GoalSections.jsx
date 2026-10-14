@@ -33,6 +33,7 @@ export function GoalsSection({ stats }) {
     <Section
       id="stats.goal"
       title="Today’s goal"
+      help="stats.goal"
       accessory={status.met === true ? <span className="stats-met" data-just={stats.metJustNow}><Icon name="verified" />Met</span> : null}
     >
       {goal.rest ? (
@@ -46,7 +47,6 @@ export function GoalsSection({ stats }) {
         </>
       )}
       <StreakRow streak={stats.streak} />
-      <p className="stats-note">{stats.plan.project ? `Counting writing in ${stats.plan.project}.` : 'Counting all your writing.'}</p>
     </Section>
   )
 }

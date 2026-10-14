@@ -2324,6 +2324,7 @@ dependencies = [
  "inkblot-core",
  "inkblot-models",
  "objc2",
+ "objc2-web-kit",
  "reqwest 0.12.28",
  "serde",
  "serde_json",

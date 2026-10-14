@@ -49,8 +49,8 @@ export const EDITOR_MODES = ['write', 'typeset']
 
 /**
  * Write or Typeset, per project: the mode it was left in. Typeset shows every text
- * pane as its pages and locks the chapters' prose; Write is the continuous editor. It
- * replaced a per-document Print Layout switch, whose old preferences are not read.
+ * pane as its pages and locks the chapters' prose; Write edits the prose, as the
+ * continuous editor or — with the page view on — as pages.
  */
 export const getEditorMode = (projectName) => (
   projectName && getPreference(`${MODE_PREFIX}${projectName}`) === 'typeset' ? 'typeset' : 'write'
@@ -62,14 +62,33 @@ export const setEditorMode = (projectName, mode) => {
   emit()
 }
 
-/** Whether a document shows as pages: every one does, in Typeset. */
-export const isPrintLayoutEnabled = (projectName, docPath) => (
-  Boolean(projectName && docPath) && getEditorMode(projectName) === 'typeset'
+export const isTypesetMode = (projectName) => getEditorMode(projectName) === 'typeset'
+
+const PAGE_VIEW_PREFIX = 'inkblot-page-view:'
+
+/**
+ * Write's page view, per project: the prose written on the pages it will print on,
+ * with Write's toolbar and panels. Typeset always shows pages, whatever this is, and
+ * leaves it as it was for the return to Write.
+ */
+export const getPageView = (projectName) => (
+  Boolean(projectName) && getPreference(`${PAGE_VIEW_PREFIX}${projectName}`) === 'on'
 )
 
-/** Pages on or off — which, now, is the mode. Kept for the menus and keys that ask. */
+export const setPageView = (projectName, shown) => {
+  if (!projectName || getPageView(projectName) === Boolean(shown)) return
+  setPreference(`${PAGE_VIEW_PREFIX}${projectName}`, shown ? 'on' : 'off')
+  emit()
+}
+
+/** Whether a document shows as pages: every one does in Typeset, and in Write's page view. */
+export const isPrintLayoutEnabled = (projectName, docPath) => (
+  Boolean(projectName && docPath) && (isTypesetMode(projectName) || getPageView(projectName))
+)
+
+/** Pages on or off: Write's page view. Typeset has no other way to show. */
 export const setPrintLayoutEnabled = (projectName, _docPath, enabled) => {
-  setEditorMode(projectName, enabled ? 'typeset' : 'write')
+  setPageView(projectName, enabled)
 }
 
 const VIEW_PREFIX = 'inkblot-typeset-view:'

@@ -21,6 +21,8 @@ import { getPreference } from './preferences'
 export const PERSIST_KEY = 'inkblot-session'
 export const CLIPBOARD_PERSIST_KEY = 'inkblot-clipboard-history'
 export const MAX_CLIPBOARD_ENTRIES = 80
+// Copied images are kept as data URLs in the preferences file, so fewer of them.
+export const MAX_CLIPBOARD_IMAGES = 12
 // Search is the sidebar's search bar, not a tab, so a stored 'search' (or any
 // unknown id) restores to the default tab.
 export const RIGHT_SIDEBAR_TAB_IDS = new Set([
@@ -324,9 +326,14 @@ export const loadSession = (fallbackProject?: string | null): EditorSession => {
   }
 }
 
-/** One entry of the clipboard history panel. */
+/**
+ * One entry of the clipboard history panel. A copied image is `kind: 'image'` with its
+ * `src` (and an empty `text`, so older builds still load the history).
+ */
 export interface ClipboardEntry {
   text: string
+  kind?: 'text' | 'image'
+  src?: string
   [key: string]: unknown
 }
 
