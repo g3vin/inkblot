@@ -13,8 +13,9 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import mapCss from './Map.css?raw'
 import MapLayers, { MapDefs } from './MapLayers'
-import { CompassRose } from './mapGlyphs'
-import { scaleBarFor } from './mapChromeMath'
+import { CompassRose, MapKey } from './mapGlyphs'
+import { NO_NORTH, scaleBarFor } from './mapChromeMath'
+import { legendEntries } from './mapLegend'
 import { assetUrl } from '../lib/assets'
 import { projectedEarth } from '../lib/map/earthData'
 import { earthLevelFor } from './mapRender'
@@ -91,7 +92,14 @@ export async function buildMapSvg({
   const chrome = []
   const at = (fraction) => [fraction[0] * pixelWidth, fraction[1] * pixelHeight]
   const { style } = map
-  if (style.compass.show && map.mapKind !== 'system') {
+  if (style.legend.show) {
+    const entries = legendEntries(map, day)
+    if (entries.length) {
+      const [x, y] = at(style.legend.at)
+      chrome.push(`<g transform="translate(${x} ${y}) scale(${scale})">${renderToStaticMarkup(createElement(MapKey, { entries }))}</g>`)
+    }
+  }
+  if (style.compass.show && !NO_NORTH.has(map.mapKind)) {
     const [x, y] = at(style.compass.at)
     const size = style.compass.size * scale
     chrome.push(`<g transform="translate(${x - size / 2} ${y - size / 2})" style="color:var(--map-ink)">${renderToStaticMarkup(createElement(CompassRose, { size, variant: style.compass.style }))}</g>`)

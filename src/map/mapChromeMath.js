@@ -12,6 +12,9 @@ const MAX_BAR_PX = 160
 const NICE = [1, 2, 5]
 
 /** The longest round length (1, 2 or 5 × 10ⁿ units) that fits in MAX_BAR_PX. */
+/** Maps with no north to point to: space has no up, and a model has its own. */
+export const NO_NORTH = new Set(['system', 'galaxy', 'universe', 'model'])
+
 export function niceScale(kmPerPx, unitKm) {
   if (!(kmPerPx > 0)) return null
   const maxUnits = (kmPerPx * MAX_BAR_PX) / unitKm

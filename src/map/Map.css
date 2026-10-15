@@ -597,6 +597,12 @@
   color: var(--map-ink);
 }
 
+.map-key {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+
 .map-cartouche {
   position: absolute;
   z-index: 3;

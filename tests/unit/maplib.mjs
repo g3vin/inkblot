@@ -715,3 +715,22 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('a locked layer holds its items', isItemLocked(map, 'pin', 'c') && !isItemLocked(map, 'pin', 'b'))
   ok('an item follows an event: in at its start, gone at its end', eventDay({ start: 3, end: 9 }, 'from') === 3 && eventDay({ start: 3, end: 9 }, 'until') === 9 && eventDay({ start: 3, end: null }, 'until') === 4)
 }
+
+/* ---------------- the key ---------------- */
+
+{
+  const { legendEntries } = await import('../../src/map/mapLegend.js')
+  const map = normalizeMap({
+    terrains: [{ id: 'forest', name: 'Forest', fill: '#4a7a3a' }],
+    pins: [{ id: 'a', at: [0, 0], icon: 'city' }, { id: 'b', at: [1, 0], icon: 'city' }, { id: 'c', at: [2, 0], icon: 'castle', from: 50 }],
+    regions: [{ id: 'f', rings: [[[0, 0], [1, 0], [1, 1]]], terrain: 'forest' }, { id: 'g', rings: [[[0, 0], [2, 0], [2, 2]]], terrain: 'forest' }],
+    routes: [{ id: 'r', name: 'King’s road', nodes: [{ pin: 'a' }, { pin: 'b' }] }],
+  })
+  const labels = (day) => legendEntries(map, day).map((entry) => entry.label)
+  ok('the key lists each kind of place once', labels(0).filter((label) => label === 'City').length === 1)
+  ok('a terrain is named once, however many regions wear it', labels(0).filter((label) => label === 'Forest').length === 1)
+  ok('a few routes are listed by name', labels(0).includes('King’s road'))
+  ok('what is not there on the day is not in the key', !labels(0).includes('Castle') && labels(60).includes('Castle'))
+  const many = normalizeMap({ pins: [{ id: 'a', at: [0, 0] }, { id: 'b', at: [1, 0] }], routes: Array.from({ length: 6 }, (_, index) => ({ id: `r${index}`, name: `Road ${index}`, nodes: [{ pin: 'a' }, { pin: 'b' }] })) })
+  ok('many routes drawn alike gather into one row', legendEntries(many).filter((entry) => entry.kind === 'route').length === 1)
+}

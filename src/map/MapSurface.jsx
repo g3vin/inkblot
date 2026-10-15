@@ -1398,7 +1398,7 @@ export default function MapSurface({
         </div>
       ) : null}
 
-      <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} bearing={isGlobe ? globeView.camera.bearing : 0} />
+      <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} bearing={isGlobe ? globeView.camera.bearing : 0} day={day} />
 
       {!windowInspector && !inspectorOpen ? (
         <button
