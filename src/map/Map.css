@@ -964,3 +964,43 @@
   font: var(--text-sm) / 1.4 var(--font-ui);
   transform: translateX(-50%);
 }
+
+/* ---------------- find on this map (MapSearch.jsx) ---------------- */
+
+.map-search {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(360px, calc(100% - var(--space-6)));
+  padding: var(--space-2);
+  transform: translateX(-50%);
+}
+
+.map-search-field .ib-input-wrap {
+  width: 100%;
+}
+
+.map-search-results {
+  /* A menu's list, inside the search's own card rather than a second one. */
+  position: static;
+  width: 100%;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.map-search-note {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+}
+
+.map-search-add {
+  display: flex;
+  justify-content: flex-end;
+}

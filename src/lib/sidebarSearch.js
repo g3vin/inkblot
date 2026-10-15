@@ -28,6 +28,10 @@ const PREVIEW_RADIUS = 34
 export const FIND_EVENT = 'inkblot:find'
 export const requestFind = (query = '') => window.dispatchEvent(new CustomEvent(FIND_EVENT, { detail: { query } }))
 
+/** ⌘F on a map: the active map opens its own search (MapSearch.jsx). */
+export const MAP_FIND_EVENT = 'inkblot:map-find'
+export const requestMapFind = () => window.dispatchEvent(new CustomEvent(MAP_FIND_EVENT))
+
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /**
