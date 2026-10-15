@@ -23,6 +23,8 @@ import { isItemLocked } from '../lib/map/mapVisibility'
 import { eventDay } from './inspector/whenSections'
 import { geoJSONToItems, IMPORT_KINDS, readGeoFile } from '../lib/map/geoInterchange'
 import { MAP_FIND_EVENT } from '../lib/sidebarSearch'
+import { requestTimelineReveal } from '../timeline/timelineEvents'
+
 import MapSearch from './MapSearch'
 import { forgetAncestry, loadAncestry, trailFor } from '../lib/map/mapAncestry'
 import Breadcrumb from '../ui/Breadcrumb.jsx'
@@ -57,7 +59,7 @@ import { useGlobeView } from './useGlobeView'
 import { useSpaceView } from './useSpaceView'
 import { useProjectDocs, useStoryCalendar } from './useMapProject'
 import { useStoryTimeline } from '../timeline/useStoryTimeline'
-import { eventCovers, setEventTime } from '../lib/timeline/timelineModel'
+import { addEvent, eventCovers, setEventTime } from '../lib/timeline/timelineModel'
 import { getStoryCursor, setStoryDay, subscribeStoryCursor } from '../lib/timeline/storyCursor'
 import { peekStoryTimeline, replaceStoryTimeline } from '../lib/timeline/timelineStore'
 import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
@@ -75,6 +77,10 @@ import {
   registerMapSurface,
   takePendingMapReveal,
 } from './mapEvents'
+
+/** The story's events at a place on this map, earliest first. */
+const sortedEventsAt = (timeline, docPath, pinId) =>
+  (timeline?.events || []).filter((event) => event.place?.map === docPath && event.place?.pin === pinId).sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity))
 
 /** Screen pixels a press may wander before it becomes a drag. */
 const DRAG_THRESHOLD = 4
@@ -1104,6 +1110,28 @@ export default function MapSurface({
     }
   }, [dispatch, projectName])
 
+  /** An event in a timeline document, selected and in view: the first timeline in the project. */
+  const showEvent = useCallback((eventId) => {
+    const timelineDoc = docs.docs.find((doc) => doc.kind === 'timeline')
+    if (!timelineDoc) {
+      setNotice('Make a timeline document to see the story’s events laid out.')
+      return
+    }
+    requestTimelineReveal(eventId, timelineDoc.path)
+    onOpenDoc?.(timelineDoc.path)
+  }, [docs.docs, onOpenDoc])
+
+  /** A new timeline event at `pin`, on the day the map is at. */
+  const addEventHere = useCallback(async (pin) => {
+    let created = null
+    await replaceStoryTimeline(projectName, (timeline) => {
+      const result = addEvent(timeline, { title: `At ${pinLabel(pin, getDocDisplayName)}`, start: Math.floor(dayRef.current), place: { map: docPath, pin: pin.id } })
+      created = result.id
+      return result.timeline
+    })
+    if (created) showEvent(created)
+  }, [docPath, projectName, showEvent])
+
   /** The way the map is being looked at, and the day: what a saved view keeps. */
   const captureView = useCallback(() => {
     const camera = viewKind === 'flat'
@@ -1191,10 +1219,16 @@ export default function MapSurface({
     storyEvents: timeline?.events,
     onSaveView: captureView,
     extent,
+    onShowEvent: showEvent,
+    onAddEventHere: addEventHere,
     onShowView: showView,
     onOpenPinMap: map.mapKind === 'galaxy' || map.mapKind === 'universe' ? openPinMap : null,
   })
   const openExport = useCallback(() => setExportOpen(true), [])
+  // The first event at the selected place, for "Show this place on the timeline".
+  const selectedPinEvent = selection?.kind === 'pin'
+    ? sortedEventsAt(timeline, docPath, selection.id)[0] || null
+    : null
 
   /* ---------------- find on this map ---------------- */
 
@@ -1260,6 +1294,8 @@ export default function MapSurface({
     openExport,
     importGeo: IMPORT_KINDS.has(map.mapKind) ? importGeo : null,
     openSearch: () => setSearchOpen(true),
+    showOnTimeline: selectedPinEvent ? () => showEvent(selectedPinEvent.id) : null,
+    addEventHere: selection?.kind === 'pin' && selectedItem ? () => void addEventHere(selectedItem) : null,
     showInspector,
     viewMenu,
     onViewOption: applyViewOption,
