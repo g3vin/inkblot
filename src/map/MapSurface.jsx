@@ -1190,6 +1190,7 @@ export default function MapSurface({
     onChooseModel: map.mapKind === 'model' ? chooseModel : null,
     storyEvents: timeline?.events,
     onSaveView: captureView,
+    extent,
     onShowView: showView,
     onOpenPinMap: map.mapKind === 'galaxy' || map.mapKind === 'universe' ? openPinMap : null,
   })

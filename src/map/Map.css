@@ -1004,3 +1004,42 @@
   display: flex;
   justify-content: flex-end;
 }
+
+/* ---------------- a chart in the inspector (distance over time) ---------------- */
+
+.map-chart {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.map-chart-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font: var(--text-xs)/1.2 var(--font-ui);
+  text-align: right;
+}
+
+.map-chart-plot {
+  width: 100%;
+  height: 96px;
+  border-bottom: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
+  cursor: crosshair;
+}
+
+.map-chart-x {
+  display: flex;
+  grid-column: 2;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font: var(--text-xs)/1.2 var(--font-ui);
+}
+
+.map-chart > .map-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}

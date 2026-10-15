@@ -166,6 +166,7 @@ pub enum MapPanelField {
     Date(MapDateInput),
     Table(MapTableView),
     Preview(MapShapePreview),
+    Chart(MapChartView),
     Group(MapPanelGroup),
 }
 
@@ -431,6 +432,35 @@ pub struct MapShapePreview {
     pub height: f64,
     pub path: String,
     pub filled: bool,
+}
+
+/// A line over the story's days: the distance between two things, say. Picking a
+/// point on it sends its day back under `id`.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapChartView {
+    pub id: String,
+    pub points: Vec<MapChartPoint>,
+    /// The day the story is at, marked on the line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marker: Option<f64>,
+    /// The first and last days, written in the story calendar.
+    pub x_from: String,
+    pub x_to: String,
+    /// The least and greatest values, written for reading.
+    pub y_min: String,
+    pub y_max: String,
+    /// The chart in words, for VoiceOver and for a glance.
+    pub summary: String,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapChartPoint {
+    pub x: f64,
+    pub y: f64,
 }
 
 /// Rows that belong to one thing — a leg of a journey, a terrain — with their own

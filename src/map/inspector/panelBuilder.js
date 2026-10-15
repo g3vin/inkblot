@@ -132,6 +132,22 @@ export function createPanelBuilder() {
 
     preview: (width, height, path, filled) => field('preview', { width, height, path, filled }),
 
+    /** A line over days (`points` are `[day, value]`); picking a point sends its day to `onPick`. */
+    chart: (id, { points, marker = null, xFrom, xTo, yMin, yMax, summary }, onPick) =>
+      field('chart', {
+        id: on(id, (day) => {
+          const number = Number(day)
+          if (Number.isFinite(number)) onPick?.(number)
+        }),
+        points: points.map(([x, y]) => ({ x, y })),
+        marker: Number.isFinite(marker) ? marker : undefined,
+        xFrom,
+        xTo,
+        yMin,
+        yMax,
+        summary,
+      }),
+
     group: (id, title, fields, { actions = [], swatch, collapsible = false } = {}) =>
       field('group', { id, title, swatch, actions: actions.filter(Boolean), fields: fields.flat().filter(Boolean), collapsible }),
   }

@@ -781,3 +781,22 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   const solar = normalizeMap({ mapKind: 'system', system: presetSystem('sol') })
   ok('a body is found where it is', findOnMap(solar, createSpace(solar), 'mars')[0]?.kind === 'body')
 }
+
+/* ---------------- distance over time ---------------- */
+
+{
+  const { distanceSeries, distanceSpan, distanceEnds, distanceOn } = await import('../../src/lib/map/distanceOverTime.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const solar = normalizeMap({ mapKind: 'system', system: presetSystem('sol') })
+  const space = createSpace(solar)
+  const ends = distanceEnds(solar)
+  const earth = ends.find((end) => end.label === 'Earth')?.value
+  const mars = ends.find((end) => end.label === 'Mars')?.value
+  const span = distanceSpan(solar, earth, mars, { from: 0, to: 30 })
+  ok('a span covers two of the longer orbit', span.to - span.from > 1300 && span.to - span.from < 1400)
+  const series = distanceSeries(solar, space, earth, mars, span)
+  const AU = 149597870.7
+  ok('Earth and Mars come within about half an AU, and go about two and a half apart', series.closest.km / AU < 0.7 && series.farthest.km / AU > 2.3 && series.farthest.km / AU < 2.7)
+  ok('the distance on a day matches the series', Math.abs(distanceOn(solar, space, earth, mars, series.points[10][0]) - series.points[10][1]) < 1e-6)
+  ok('an end that names nothing gives no series', distanceSeries(solar, space, earth, 'body:nowhere', span) === null)
+}
