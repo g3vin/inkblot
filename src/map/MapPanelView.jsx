@@ -47,6 +47,40 @@ const Swatch = ({ color, round = true }) => (
   <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: round ? 5 : 2, background: inkColor(color), marginRight: 6 }} />
 )
 
+const CHART_W = 300
+const CHART_H = 100
+
+/** A line over days; a click picks the day under it. */
+function ChartField({ field, pick }) {
+  const { points, marker, xFrom, xTo, yMin, yMax, summary } = field
+  if (!points.length) return <p className="map-note">{summary}</p>
+  const x0 = points[0].x
+  const x1 = points[points.length - 1].x
+  const ys = points.map((point) => point.y)
+  const low = Math.min(...ys)
+  const high = Math.max(...ys)
+  const sx = (x) => ((x - x0) / Math.max(x1 - x0, 1e-9)) * CHART_W
+  const sy = (y) => CHART_H - 4 - ((y - low) / Math.max(high - low, 1e-9)) * (CHART_H - 8)
+  const line = points.map((point) => `${sx(point.x).toFixed(1)},${sy(point.y).toFixed(1)}`).join(' ')
+  const onClick = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    pick(x0 + ((event.clientX - rect.left) / rect.width) * (x1 - x0))
+  }
+  return (
+    <div className="map-chart">
+      <div className="map-chart-y" aria-hidden="true"><span>{yMax}</span><span>{yMin}</span></div>
+      <svg className="map-chart-plot" viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none" role="img" aria-label={summary} onClick={onClick}>
+        <polyline points={line} fill="none" stroke="var(--accent-color)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        {Number.isFinite(marker) && marker >= x0 && marker <= x1 ? (
+          <line x1={sx(marker)} x2={sx(marker)} y1={0} y2={CHART_H} stroke="var(--text-secondary)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+        ) : null}
+      </svg>
+      <div className="map-chart-x" aria-hidden="true"><span>{xFrom}</span><span>{xTo}</span></div>
+      <p className="map-note">{summary}</p>
+    </div>
+  )
+}
+
 function DateField({ field, commit }) {
   const { label, value, mode, months, allowEmpty, placeholder } = field
   if (!value) {
@@ -211,6 +245,8 @@ function PanelField({ field: { type, payload: field }, commit, run }) {
           />
         </svg>
       )
+    case 'chart':
+      return <ChartField field={field} pick={set} />
     case 'group': {
       const fields = field.fields.map((inner, index) => <PanelField key={inner.payload?.id || index} field={inner} commit={commit} run={run} />)
       if (field.collapsible) {

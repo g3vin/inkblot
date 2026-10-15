@@ -2278,6 +2278,30 @@ export interface MapCartouche {
 	subtitle?: string | null;
 }
 
+export interface MapChartPoint {
+	x: number;
+	y: number;
+}
+
+/**
+ * A line over the story's days: the distance between two things, say. Picking a
+ * point on it sends its day back under `id`.
+ */
+export interface MapChartView {
+	id: string;
+	points: MapChartPoint[];
+	/** The day the story is at, marked on the line. */
+	marker?: number;
+	/** The first and last days, written in the story calendar. */
+	xFrom: string;
+	xTo: string;
+	/** The least and greatest values, written for reading. */
+	yMin: string;
+	yMax: string;
+	/** The chart in words, for VoiceOver and for a glance. */
+	summary: string;
+}
+
 export interface MapChoice {
 	value: string;
 	label: string;
@@ -2335,6 +2359,7 @@ export type MapPanelField =
 	| { type: "date", payload: MapDateInput }
 	| { type: "table", payload: MapTableView }
 	| { type: "preview", payload: MapShapePreview }
+	| { type: "chart", payload: MapChartView }
 	| { type: "group", payload: MapPanelGroup };
 
 export interface MapPanelSection {

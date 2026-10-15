@@ -33,6 +33,7 @@ import { galaxySections } from './galaxySections'
 import { modelSections } from './modelSections'
 import { whenSections } from './whenSections'
 import { layersSections } from './layersSections'
+import { distanceOverTimeSections } from './distanceSections'
 
 const THEME_LABELS = { clean: 'Clean', parchment: 'Parchment', ink: 'Pen and ink', night: 'Night' }
 const KIND_TITLES = { pin: 'Place', route: 'Route', region: 'Region', label: 'Label', traveler: 'Traveller', body: 'Body' }
@@ -210,12 +211,13 @@ export function useMapPanel(props) {
     map, dispatch, space, day, onDay, schedules, conflicts, selection, selectedItem, onSelect,
     docs, missingDocs, calendar, onOpenCalendar, onOpenDoc, renameRequest, calibration, onCalibrationDone,
     focusBody, onFocusBody, projectName, docPath, zoomNow, onTool, onReveal, viewMenu, onViewOption,
-    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView,
+    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent,
   } = props
   const [tab, setTab] = useState('map')
   const [crossConflicts, setCrossConflicts] = useState(null)
   const [calibrationForm, setCalibrationForm] = useState(() => ({ distance: null, unit: map.scale.displayUnit || 'km' }))
   const [newUnit, setNewUnit] = useState({ name: '', km: null })
+  const [distancePair, setDistancePair] = useState({ a: null, b: null, show: false })
   const [matrix, setMatrix] = useState(() => ({ show: false, transport: map.mapKind === 'system' ? 'light10' : 'horse' }))
   const trace = useMapTrace({ map, dispatch, projectName })
 
@@ -322,6 +324,7 @@ export function useMapPanel(props) {
     } else if (tab === 'travel') {
       sections = [
         ...journeysSections(ui, { map, schedules, conflicts, calendar, onOpenCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps: checkAllMaps, crossConflicts }),
+        ...distanceOverTimeSections(ui, { map, space, day, calendar, extent, state: distancePair, setState: setDistancePair, onDay }),
         ...travelSections(ui, { map, space, day, dispatch, matrix, setMatrix }),
       ]
     } else if (tab === 'layers') {
@@ -350,6 +353,6 @@ export function useMapPanel(props) {
     calendar, calibration, calibrationForm, conflicts, crossConflicts, day, dispatch, docPath, docs, focusBody, map, matrix,
     missingDocs, newUnit, onCalibrationDone, onDay, onFocusBody, onOpenCalendar, onOpenDoc, onReveal, onSelect, onTool,
     projectName, renameRequest, schedules, selectedItem, selection, space, tab, trace, viewMenu, onViewOption, zoomNow,
-    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView,
+    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent, distancePair,
   ])
 }
