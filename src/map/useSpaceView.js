@@ -10,6 +10,7 @@
  *
  * The camera is published once per drawn frame, so what the surface draws over the
  * scene — names, places, handles — moves with it, and it is saved when it settles.
+ * A map without a saved camera calls `onReady` once the scene is up, to be framed.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readSpaceCamera } from './space/spaceMath'
@@ -29,19 +30,22 @@ export function spaceProjector(api, camera, size) {
   }
 }
 
-export function useSpaceView({ surfaceRef, initialCamera, onCameraChange, enabled }) {
+export function useSpaceView({ surfaceRef, initialCamera, onCameraChange, onReady, enabled }) {
   const apiRef = useRef(null)
   const worldRef = useRef(null)
   const viewportRef = useRef(IDENTITY)
   const [initial] = useState(() => readSpaceCamera(initialCamera))
-  const cameraRef = useRef(initial)
+  // Null until there is a camera worth keeping, so a new map is framed rather than restored.
+  const cameraRef = useRef(initialCamera ? initial : null)
   const [api, setApi] = useState(null)
   const [camera, setCamera] = useState(initial)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const onCameraChangeRef = useRef(onCameraChange)
+  const onReadyRef = useRef(onReady)
   useEffect(() => {
     onCameraChangeRef.current = onCameraChange
-  }, [onCameraChange])
+    onReadyRef.current = onReady
+  }, [onCameraChange, onReady])
 
   /**
    * Called by the scene with its API (null when it goes): `project`, `unproject`,
@@ -51,6 +55,8 @@ export function useSpaceView({ surfaceRef, initialCamera, onCameraChange, enable
     apiRef.current = next
     setApi(next)
     if (!next) return undefined
+    // A map with no camera of its own is framed once its scene is up (a frame later).
+    if (!cameraRef.current) requestAnimationFrame(() => onReadyRef.current?.())
     return next.subscribe(
       (frame) => {
         setCamera(frame.camera)

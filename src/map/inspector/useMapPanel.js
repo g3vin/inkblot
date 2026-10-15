@@ -28,6 +28,7 @@ import { bodySections, labelSections, pinSections, regionSections, routeSections
 import { journeysSections, travelSections, travelerSections } from './travelSections'
 import { traceSection, useMapTrace } from './traceSection'
 import { systemSections } from './systemSections'
+import { worldSections } from './worldSections'
 
 const THEME_LABELS = { clean: 'Clean', parchment: 'Parchment', ink: 'Pen and ink', night: 'Night' }
 const KIND_TITLES = { pin: 'Place', route: 'Route', region: 'Region', label: 'Label', traveler: 'Traveller', body: 'Body' }
@@ -148,6 +149,7 @@ function mapTabSections(ui, props, { newUnit, setNewUnit, trace }) {
   }
 
   if (map.mapKind === 'system') sections.push(...systemSections(ui, props))
+  if (map.mapKind === 'planet') sections.push(...worldSections(ui, { map, dispatch, onChoosePicture: props.onChoosePlanetPicture }))
 
   sections.push(ui.section('places', 'Places', [
     !map.pins.length ? ui.note('Use the place tool, or drag documents from a Settings or Locations folder onto the map.') : null,
@@ -195,6 +197,7 @@ export function useMapPanel(props) {
     map, dispatch, space, day, onDay, schedules, conflicts, selection, selectedItem, onSelect,
     docs, missingDocs, calendar, onOpenCalendar, onOpenDoc, renameRequest, calibration, onCalibrationDone,
     focusBody, onFocusBody, projectName, docPath, zoomNow, onTool, onReveal, viewMenu, onViewOption,
+    onOpenSurface, onChoosePlanetPicture,
   } = props
   const [tab, setTab] = useState('map')
   const [crossConflicts, setCrossConflicts] = useState(null)
@@ -295,6 +298,7 @@ export function useMapPanel(props) {
           onDelete: removeBody,
           focused: focusBody === selectedItem.id,
           onFocus: () => onFocusBody(focusBody === selectedItem.id ? null : selectedItem.id),
+          onOpenSurface: onOpenSurface ? () => onOpenSurface(selectedItem) : null,
           renameRequest,
         })
       }
@@ -306,7 +310,7 @@ export function useMapPanel(props) {
     } else if (tab === 'style') {
       sections = styleTabSections(ui, { map, dispatch })
     } else {
-      sections = mapTabSections(ui, { map, dispatch, space, calendar, onDay, onTool, onReveal, onSelect, focusBody, onFocusBody, viewMenu, onViewOption }, { newUnit, setNewUnit, trace })
+      sections = mapTabSections(ui, { map, dispatch, space, calendar, onDay, onTool, onReveal, onSelect, focusBody, onFocusBody, viewMenu, onViewOption, onChoosePlanetPicture }, { newUnit, setNewUnit, trace })
     }
 
     const showTabs = !selection && !calibration
@@ -327,5 +331,6 @@ export function useMapPanel(props) {
     calendar, calibration, calibrationForm, conflicts, crossConflicts, day, dispatch, docPath, docs, focusBody, map, matrix,
     missingDocs, newUnit, onCalibrationDone, onDay, onFocusBody, onOpenCalendar, onOpenDoc, onReveal, onSelect, onTool,
     projectName, renameRequest, schedules, selectedItem, selection, space, tab, trace, viewMenu, onViewOption, zoomNow,
+    onOpenSurface, onChoosePlanetPicture,
   ])
 }

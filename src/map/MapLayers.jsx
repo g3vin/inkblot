@@ -574,7 +574,8 @@ const MapLayers = memo(function MapLayers({
   const staticDay = projector.kind === 'system' || projector.kind === 'space' ? day : 0
   // On the globe, MapLibre draws the ground, the regions and the routes; this is the
   // overlay of everything else, in screen pixels.
-  const overGlobe = projector.kind === 'globe'
+  // A planet's world is drawn the same way (PlanetView paints them on).
+  const overGlobe = projector.kind === 'globe' || projector.kind === 'planet'
   return (
     <g className="map-layers">
       {overGlobe ? null : projector.kind === 'earth' ? (

@@ -19,7 +19,7 @@ import type { MapCollection, StoredMap } from '../types'
 const HISTORY_LIMIT = 100
 
 /** The sections of a map that are one object rather than a list. */
-export type MapSection = 'scale' | 'background' | 'earth' | 'system' | 'style' | 'timeline'
+export type MapSection = 'scale' | 'background' | 'earth' | 'system' | 'surface' | 'galaxy' | 'universe' | 'model' | 'style' | 'timeline'
 
 export interface ActionMeta {
   /** Loading a document is not an edit — it resets the stacks instead of pushing. */

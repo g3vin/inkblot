@@ -96,7 +96,7 @@ export function systemSections(ui, { map, dispatch, calendar, onSelect, onDay, f
         suffix: '%',
         help: 'Knock the starting speeds off by up to this much. A stable dance may survive a nudge; a chaotic one never repeats.',
       }))
-      motion.push(ui.buttons([ui.button('system.reroll', 'Roll again', () => rebuild({ seed: newSeed() }), { help: 'Draw new starting nudges (and, for a random encounter, new stars).' })]))
+      motion.push(ui.buttons([ui.button('system.reroll', 'Roll again', () => rebuild({ seed: newSeed() }))]))
       motion.push(ui.note('Rolling again replaces the starting places and speeds of these bodies.'))
     }
     motion.push(ui.number('system.step', 'Step', system.nbody.stepDays, (stepDays) => patchSystem({ nbody: { ...system.nbody, stepDays } }), {

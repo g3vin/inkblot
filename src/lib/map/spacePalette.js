@@ -43,3 +43,6 @@ export const WORLD_PARTS = {
   atmosphere: '#8fc2ff',
   rings: '#d8c7a0',
 }
+
+/** The ink region masks are rasterized with (planetSurface.js): only its coverage counts. */
+export const MASK_INK = '#fff'

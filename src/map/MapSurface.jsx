@@ -12,13 +12,18 @@
  */
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { documentSurface } from '../bridge'
-import { getDocDisplayName, isMapDoc } from '../lib/docKind'
+import { getDocDisplayName, isMapDoc, MAP_SUFFIX } from '../lib/docKind'
 import { isCharacterDoc } from '../lib/storyStructure'
 import { createProjector } from '../lib/map/mapProjection'
 import { projectedEarth } from '../lib/map/earthData'
 import { createSpace, resolvePin } from '../lib/map/mapSpace'
 import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timeline'
-import { makePin, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
+import { createEmptyMap, makePin, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
+import { saveMapDocument } from '../lib/map/mapFileSystem'
+import { surfaceForBody } from '../lib/map/planetPresets'
+import { defaultTerrainEntries } from '../lib/map/terrains'
+import { IMAGE_EXTENSIONS_LIST, importAssetFromPath } from '../lib/assets'
+import { announceProjectFiles } from '../lib/projectFiles'
 import { MAP_DOC_MOVED_EVENT } from '../lib/map/mapLinks'
 import { panMapBy, pointsBounds } from '../lib/map/mapViewport'
 import { nearestOnPolyline } from '../lib/map/mapGeometry'
@@ -71,6 +76,7 @@ const SNAP_PX = 14
 // MapLibre and the globe: loaded the first time a map is shown as a globe.
 const GlobeView = lazy(() => import('./GlobeView'))
 const SpaceView = lazy(() => import('./space/SpaceView'))
+const PlanetView = lazy(() => import('./space/PlanetView'))
 
 const DRAWING_TOOLS = new Set(['route', 'region', 'ruler', 'area', 'calibrate'])
 
@@ -119,7 +125,7 @@ export default function MapSurface({
   const [globeFailed, setGlobeFailed] = useState(false)
   const [spaceFailed, setSpaceFailed] = useState(false)
   const wantsGlobe = initialMap.mapKind === 'earth'
-  const wantsSpace = initialMap.mapKind === 'system'
+  const wantsSpace = initialMap.mapKind === 'system' || initialMap.mapKind === 'planet'
   const flatView = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.(), enabled: true })
   const cameraRef = useRef(initialMap.camera || null)
   const onCameraChange = (camera) => {
@@ -132,10 +138,12 @@ export default function MapSurface({
     onCameraChange,
     enabled: wantsGlobe,
   })
+  const fitAllRef = useRef(null)
   const spaceView = useSpaceView({
     surfaceRef: flatView.surfaceRef,
     initialCamera: wantsSpace ? initialMap.camera : null,
     onCameraChange,
+    onReady: () => fitAllRef.current?.(),
     enabled: wantsSpace,
   })
   const { map, mapRef, dispatch, undo, redo, saveView, canUndo, canRedo } = useMapDocument({
@@ -148,9 +156,10 @@ export default function MapSurface({
     locked,
   })
   const isGlobe = map.mapKind === 'earth' && map.earth.view === 'globe' && !globeFailed
-  const isSpace = map.mapKind === 'system' && map.system.display.view === '3d' && !spaceFailed
+  const isPlanet = map.mapKind === 'planet' && !spaceFailed
+  const isSpace = (map.mapKind === 'system' && map.system.display.view === '3d' && !spaceFailed) || isPlanet
   const view = isGlobe ? globeView : isSpace ? spaceView : flatView
-  const viewKind = isGlobe ? 'globe' : isSpace ? 'space' : 'flat'
+  const viewKind = isGlobe ? 'globe' : isPlanet ? 'planet' : isSpace ? 'space' : 'flat'
   const box = useVisibleBox(view.surfaceRef)
   const saveViewRef = useRef(saveView)
   useEffect(() => {
@@ -174,7 +183,9 @@ export default function MapSurface({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [map.mapKind, map.earth, map.system, map.background.width, map.background.height, frameDay, focusBody]
   )
-  const projector = isGlobe ? globeView.projector : isSpace ? spaceView.projector : flatProjector
+  // A planet's projector says so: its regions and routes are painted on the world.
+  const planetProjector = useMemo(() => ({ ...spaceView.projector, kind: 'planet' }), [spaceView.projector])
+  const projector = isGlobe ? globeView.projector : isPlanet ? planetProjector : isSpace ? spaceView.projector : flatProjector
   // A space reads only its kind, its scale and its bodies: an edit to a pin keeps it,
   // and with it the orbital positions it has cached.
   const space = useMemo(
@@ -299,6 +310,10 @@ export default function MapSurface({
     const useContent = content && content.width > frame.width * 0.05 && map.mapKind !== 'blank' && map.mapKind !== 'image'
     view.fitTo(useContent ? content : frame, 40)
   }, [day, map, projector, space, view])
+
+  useEffect(() => {
+    fitAllRef.current = fitAll
+  }, [fitAll])
 
   const didInitialFit = useRef(false)
   useEffect(() => {
@@ -944,6 +959,51 @@ export default function MapSurface({
 
   /* ---------------- the inspector ---------------- */
 
+  /*
+   * A body's surface: its own planet map, linked from the body (`body.surface`).
+   * The first time, it is made — beside this map, named after the body, looking
+   * like it (planetPresets.surfaceForBody) — and then opened.
+   */
+  const openSurface = useCallback(async (body) => {
+    if (!body) return
+    if (body.surface && docs.paths.has(body.surface)) {
+      onOpenDoc?.(body.surface)
+      return
+    }
+    const folder = docPath.includes('/') ? docPath.slice(0, docPath.lastIndexOf('/') + 1) : ''
+    const base = (body.name || 'World').replace(/[\\/:*?"<>|]/g, ' ').trim() || 'World'
+    let path = `${folder}${base}${MAP_SUFFIX}`
+    for (let copy = 2; docs.paths.has(path); copy += 1) path = `${folder}${base} ${copy}${MAP_SUFFIX}`
+    const current = mapRef.current
+    const bodies = new Map(current.system.bodies.map((candidate) => [candidate.id, candidate]))
+    const world = createEmptyMap('planet', {
+      surface: surfaceForBody(body, bodies),
+      scale: { kmPerUnit: 1, displayUnit: 'km', calibration: null, customUnits: [] },
+      terrains: defaultTerrainEntries(),
+      style: { theme: 'night' },
+    })
+    if (!(await saveMapDocument(projectName, path, world))) return
+    dispatch({
+      type: 'section/patch',
+      section: 'system',
+      patch: { bodies: mapRef.current.system.bodies.map((candidate) => (candidate.id === body.id ? { ...candidate, surface: path } : candidate)) },
+    })
+    announceProjectFiles()
+    onOpenDoc?.(path)
+  }, [dispatch, docPath, docs.paths, mapRef, onOpenDoc, projectName])
+
+  const choosePlanetPicture = useCallback(async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, filters: [{ name: 'Images', extensions: IMAGE_EXTENSIONS_LIST }] })
+      if (!selected) return
+      const texture = await importAssetFromPath(projectName, Array.isArray(selected) ? selected[0] : selected)
+      dispatch({ type: 'section/patch', section: 'surface', patch: { look: { ...mapRef.current.surface.look, kind: 'texture', texture } } })
+    } catch (error) {
+      console.error('[map] could not import the picture:', error)
+    }
+  }, [dispatch, mapRef, projectName])
+
   const mapPanel = useMapPanel({
     projectName,
     docPath,
@@ -973,6 +1033,8 @@ export default function MapSurface({
     zoomNow,
     viewMenu,
     onViewOption: applyViewOption,
+    onOpenSurface: isSystem ? openSurface : null,
+    onChoosePlanetPicture: choosePlanetPicture,
   })
   const openExport = useCallback(() => setExportOpen(true), [])
   useMapCommands({
@@ -1100,7 +1162,21 @@ export default function MapSurface({
           />
         </Suspense>
       ) : null}
-      {isSpace ? (
+      {isPlanet ? (
+        <Suspense fallback={<div className="map-space is-loading" />}>
+          <PlanetView
+            view={spaceView}
+            map={map}
+            space={space}
+            day={day}
+            selection={selection}
+            projectName={projectName}
+            skySeed={docPath}
+            surfaceRef={view.surfaceRef}
+            onError={() => setSpaceFailed(true)}
+          />
+        </Suspense>
+      ) : isSpace ? (
         <Suspense fallback={<div className="map-space is-loading" />}>
           <SpaceView
             view={spaceView}

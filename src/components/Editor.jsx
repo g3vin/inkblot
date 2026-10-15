@@ -12,6 +12,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import EditorLayout from './EditorLayout'
 import { loadDocument, listProjects, documentExists } from '../lib/FileSystem'
+import { PROJECT_FILES_CHANGED } from '../lib/projectFiles'
 import { readDetachedTarget } from '../lib/docWindow'
 import { normalizeNotes } from '../lib/noteUtils'
 import Icon from '../ui/Icon.jsx'
@@ -94,6 +95,12 @@ export default function Editor({
   const [activeTabId, setActiveTabId] = useState(null)
   const refreshFilesRef = useRef(null)
   const draggedSelectionRef = useRef(null)
+  // A document written outside the tree (lib/projectFiles.js) appears in it.
+  useEffect(() => {
+    const refresh = () => void refreshFilesRef.current?.()
+    window.addEventListener(PROJECT_FILES_CHANGED, refresh)
+    return () => window.removeEventListener(PROJECT_FILES_CHANGED, refresh)
+  }, [])
 
   // Switch to a project (or back to the landing page when passed a falsy name),
   // restoring that project's persisted docs/tiles/sidebar state.

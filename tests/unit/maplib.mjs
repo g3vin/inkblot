@@ -602,3 +602,50 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('distances to scale is an edit to the system', edit.section === 'system' && edit.patch.display.radial === 'linear' && edit.patch.display.view === '3d')
   ok('a 3D view that could not start offers flat only', viewMenuFor(system, { spaceAvailable: false }).find((entry) => entry.id === 'system.view.3d').disabled)
 }
+
+/* ---------------- planets and stars as worlds ---------------- */
+
+{
+  const { planetTexture, MASK_WATER, MASK_LAND } = await import('../../src/lib/map/planetTexture.js')
+  const { presetSurface, surfaceForBody, PLANET_PRESETS } = await import('../../src/lib/map/planetPresets.js')
+  const { lonLatToUnit, unitToLonLat, subsolarPoint } = await import('../../src/map/space/spaceMath.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const size = { width: 64, height: 32 }
+  const look = normalizeMap({ mapKind: 'planet', surface: presetSurface('earthlike', 5) }).surface.look
+  const a = planetTexture(look, size)
+  ok('the same seed draws the same world', a.color.join() === planetTexture(look, size).color.join())
+  ok('another seed draws another', a.color.join() !== planetTexture({ ...look, seed: 6 }, size).color.join())
+  const seaShare = (surface) => {
+    const { relief } = planetTexture(surface, size)
+    const level = Math.round(surface.seaLevel * 255)
+    return [...relief].filter((value) => value <= level).length / relief.length
+  }
+  ok('a higher sea drowns more of the world', seaShare({ ...look, seaLevel: 0.75 }) > seaShare({ ...look, seaLevel: 0.3 }) + 0.2)
+  const mask = new Uint8Array(size.width * size.height)
+  mask.fill(MASK_WATER)
+  const drowned = planetTexture(look, { ...size, mask })
+  ok('drawn water is sea', [...drowned.relief].every((value) => value <= Math.round(look.seaLevel * 255)))
+  mask.fill(MASK_LAND)
+  const raised = planetTexture(look, { ...size, mask })
+  ok('drawn land rises out of it', [...raised.relief].every((value) => value > Math.round(look.seaLevel * 255)))
+  const gas = planetTexture({ kind: 'gas', palette: 'jovian', seed: 3, roughness: 0.5 }, size)
+  ok('a giant is drawn in bands', new Set(gas.color.filter((_, index) => index % 4 === 0)).size > 8)
+  ok('every preset reads cleanly', PLANET_PRESETS.every((preset) => normalizeMap({ mapKind: 'planet', surface: presetSurface(preset.id) }).surface.radiusKm > 0))
+
+  const sol = normalizeMap({ mapKind: 'system', system: presetSystem('sol') }).system
+  const bodies = new Map(sol.bodies.map((body) => [body.id, body]))
+  const mars = surfaceForBody(bodies.get('mars'), bodies)
+  ok('red Mars opens as a rust world', mars.look.palette === 'rust' && mars.look.kind === 'generated')
+  ok('with its own year', Math.abs(mars.yearDays - 687) < 2)
+  ok('Jupiter opens as a giant', surfaceForBody(bodies.get('jupiter'), bodies).look.kind === 'gas')
+  ok('the Sun opens as a star', surfaceForBody(bodies.get('sun'), bodies).look.kind === 'star')
+  ok('a body opens the same world every time', surfaceForBody(bodies.get('earth'), bodies).look.seed === surfaceForBody(bodies.get('earth'), bodies).look.seed)
+
+  const round = unitToLonLat(lonLatToUnit([123, -45]))
+  ok('longitude and latitude survive the trip to 3D', Math.abs(round[0] - 123) < 1e-9 && Math.abs(round[1] + 45) < 1e-9)
+  const tilted = { dayHours: 24, yearDays: 360, axialTiltDeg: 23 }
+  ok('noon is on the prime meridian on day 0', Math.abs(subsolarPoint(tilted, 0)[0]) < 1e-9)
+  ok('and has moved west six hours later', Math.abs(subsolarPoint(tilted, 0.25)[0] + 90) < 1e-9)
+  ok('the sun reaches the tropic at midsummer', Math.abs(subsolarPoint(tilted, 90)[1] - 23) < 1e-9)
+  ok('an upright world has no seasons', subsolarPoint({ ...tilted, axialTiltDeg: 0 }, 90)[1] === 0)
+}

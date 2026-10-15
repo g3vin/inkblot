@@ -100,7 +100,9 @@ void main() {
     float band = sin(vDir.y * uBands + ibFbm(vDir * 3.0 + vec3(uSeed)) * 4.0);
     cells *= 0.82 + 0.18 * band;
   }
-  vec3 color = uColor * cells * limb * uBrightness;
+  // The limb is cooler as well as dimmer: it reddens towards the edge.
+  vec3 tint = mix(vec3(1.0, 0.72, 0.5), vec3(1.0), pow(mu, 0.5));
+  vec3 color = uColor * tint * cells * limb * uBrightness;
   // A hot core reads as white: lift the brightest parts towards it.
   color = mix(color, vec3(1.0), clamp((cells * limb - 1.0) * 0.6, 0.0, 0.5));
   gl_FragColor = vec4(color, 1.0);
@@ -269,10 +271,17 @@ const LOOKS = {
   blackHole: { hole: true },
 }
 
-/** A star body's 3D object: `{ object, core, setRadius, update, dispose, glowColor }`. */
-export function createStar(body) {
+/**
+ * A star body's 3D object: `{ object, core, setRadius, update, dispose }`.
+ * `closeUp` is for a star filling the view (a star's own map): finer granulation,
+ * truer colour and a tighter corona, so it reads as a surface and not a glare.
+ */
+export function createStar(body, { closeUp = false } = {}) {
   const look = LOOKS[starLook(body)] ? starLook(body) : 'main'
-  const recipe = LOOKS[look]
+  const base = LOOKS[look]
+  const recipe = closeUp && !base.hole
+    ? { ...base, granule: (base.granule || 0) * 5 + 6, contrast: Math.min(0.24, Math.max(0.16, base.contrast || 0)), brightness: 1.1, glow: 2.4, glowOpacity: 0.6, wind: base.wind ? base.wind * 0.5 : 0 }
+    : base
   const seed = seedOf(body.id)
   const parts = sharedParts()
   const object = new Group()

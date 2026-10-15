@@ -765,6 +765,10 @@
   margin-top: 12px;
 }
 
+.map-setup-heading {
+  margin: var(--space-5) 0 var(--space-2);
+}
+
 .map-setup-groups {
   display: grid;
   gap: var(--space-4);
