@@ -4,7 +4,8 @@
  *
  * Opened from the map toolbar's More menu, ⌘K and ⇧⌘E. Everything is drawn by
  * mapExport.js from the same layers the editor shows, so an export is what was on
- * screen.
+ * screen. A globe or 3D view is exported as it is framed, drawn by its own renderer
+ * under the same places and labels.
  */
 import { useState } from 'react'
 import { Button, Dialog, FormRow, Segmented, SelectMenu } from '../ui'
@@ -16,15 +17,19 @@ import { buildMapSvg, saveBytes, svgToPng } from './mapExport'
 const FRAMES = [{ value: 'view', label: 'What’s on screen' }, { value: 'all', label: 'The whole map' }]
 const SHARPNESS = [{ value: '1', label: 'Standard (1×)' }, { value: '2', label: 'Retina (2×)' }, { value: '4', label: 'Print (4×)' }]
 
-export default function ExportMapDialog({ open, onClose, map, projector, space, day, projectName, docPath, surfaceRef, viewportRef }) {
+export default function ExportMapDialog({ open, onClose, map, projector, space, day, projectName, docPath, surfaceRef, viewportRef, picture = null }) {
   const [frame, setFrame] = useState('view')
   const [scale, setScale] = useState(2)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const name = getDocDisplayName(docPath)
 
-  const build = (pixelScale) => {
+  // A globe or a 3D view draws itself (`picture`); only what is on screen can be shown.
+  const native = Boolean(picture)
+  const build = async (pixelScale) => {
     const surface = surfaceRef.current
+    const canvas = native ? await picture(pixelScale) : null
+    if (native && !canvas) throw new Error('The view could not be drawn.')
     return buildMapSvg({
       map,
       projector,
@@ -35,8 +40,9 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
       surface,
       viewport: viewportRef.current,
       viewSize: { width: surface?.clientWidth || 1200, height: surface?.clientHeight || 800 },
-      frame,
+      frame: native ? 'view' : frame,
       scale: pixelScale,
+      backdrop: canvas ? canvas.toDataURL('image/png') : null,
     })
   }
 
@@ -102,9 +108,11 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
         </>
       }
     >
-      <FormRow label="What">
-        <Segmented label="What to export" value={frame} onChange={setFrame} options={FRAMES} />
-      </FormRow>
+      {native ? null : (
+        <FormRow label="What">
+          <Segmented label="What to export" value={frame} onChange={setFrame} options={FRAMES} />
+        </FormRow>
+      )}
       <FormRow label="Sharpness" help="map.export">
         <SelectMenu label="Sharpness" value={String(scale)} options={SHARPNESS} onChange={(value) => setScale(Number(value))} />
       </FormRow>

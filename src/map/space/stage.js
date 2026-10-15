@@ -5,7 +5,8 @@
  * `invalidate()` asks for a frame; nothing draws otherwise (the controls' damping
  * asks for more while it settles). After each frame the view's `onFrame` hears the
  * camera, and a quarter-second after the camera stops, `onSettle` (to save it).
- * `moveTo` glides the camera somewhere (or cuts, under reduced motion).
+ * `moveTo` glides the camera somewhere (or cuts, under reduced motion); `picture`
+ * draws the view into a canvas, for an export.
  *
  * The space view (systems) and the planet view (one world) build on it; each adds
  * its own scene and the projector API the map surface talks to.
@@ -135,6 +136,26 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     }
   }
 
+  /**
+   * The view as a picture, `scale` times the screen's size in pixels: a canvas,
+   * drawn now (the drawing buffer is not kept between frames, so it is copied at once).
+   */
+  function picture(scale = 1) {
+    const ratio = renderer.getPixelRatio()
+    renderer.setPixelRatio(scale)
+    renderer.setSize(size.width, size.height, false)
+    beforeRender?.(camera, size)
+    renderer.render(scene, camera)
+    const out = document.createElement('canvas')
+    out.width = renderer.domElement.width
+    out.height = renderer.domElement.height
+    out.getContext('2d').drawImage(renderer.domElement, 0, 0)
+    renderer.setPixelRatio(ratio)
+    renderer.setSize(size.width, size.height, false)
+    invalidate()
+    return out
+  }
+
   function dispose() {
     disposed = true
     cancelAnimationFrame(frame)
@@ -146,5 +167,5 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     renderer.domElement.remove()
   }
 
-  return { renderer, camera, controls, scene, size, invalidate, settle, moveTo, screenOf, subscribe, dispose }
+  return { renderer, camera, controls, scene, size, invalidate, settle, moveTo, screenOf, subscribe, picture, dispose }
 }
