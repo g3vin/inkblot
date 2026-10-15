@@ -649,3 +649,19 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('the sun reaches the tropic at midsummer', Math.abs(subsolarPoint(tilted, 90)[1] - 23) < 1e-9)
   ok('an upright world has no seasons', subsolarPoint({ ...tilted, axialTiltDeg: 0 }, 90)[1] === 0)
 }
+
+/* ---------------- where a map sits ---------------- */
+
+{
+  const { parentIndex, trailFor } = await import('../../src/lib/map/mapAncestry.js')
+  const galaxy = normalizeMap({ mapKind: 'blank', pins: [{ id: 's', at: [1, 1], doc: 'Space/Sol.map' }, { id: 'n', at: [2, 2], doc: 'Notes/Chapter' }] })
+  const sol = normalizeMap({ mapKind: 'system', system: { bodies: [{ id: 'e', name: 'Earth', kind: 'planet', surface: 'Space/Earth.map' }] } })
+  const earth = normalizeMap({ mapKind: 'planet' })
+  const index = parentIndex([{ path: 'Space/Milky Way.map', map: galaxy }, { path: 'Space/Sol.map', map: sol }, { path: 'Space/Earth.map', map: earth }])
+  const trail = trailFor('Space/Earth.map', index)
+  ok('a world sits in its system, and the system in its galaxy', trail.map((step) => step.path).join(' > ') === 'Space/Milky Way.map > Space/Sol.map > Space/Earth.map')
+  ok('each step knows its kind', trail[1].kind === 'system' && trail[2].kind === 'planet')
+  ok('a pin on a document is not a parent', !index.parents.has('Notes/Chapter'))
+  const loop = parentIndex([{ path: 'A.map', map: normalizeMap({ mapKind: 'blank', pins: [{ id: 'p', at: [0, 0], doc: 'B.map' }] }) }, { path: 'B.map', map: normalizeMap({ mapKind: 'blank', pins: [{ id: 'p', at: [0, 0], doc: 'A.map' }] }) }])
+  ok('maps that link to each other end the trail', trailFor('A.map', loop).length === 2)
+}

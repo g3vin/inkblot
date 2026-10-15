@@ -893,3 +893,8 @@
   stroke: var(--map-accent);
   stroke-width: 1.5;
 }
+
+/* Where the map sits (galaxy › system › world), over its top-left corner. */
+.map-breadcrumb {
+  padding: var(--space-1);
+}

@@ -11,7 +11,7 @@ import { setAccentAttribute, setThemeAttribute, setTrayAttribute } from '../lib/
 import { useCommands } from '../lib/commands'
 import {
   AppIcon, Mark, Wordmark,
-  Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
+  Breadcrumb, Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
   FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, Input, Kbd, Menu, MenuItem,
   MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented,
   SelectMenu, Sheet, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
@@ -202,6 +202,14 @@ export default function DesignShowcase() {
             <Field label="Note" htmlFor="ds-note" error="Notes can’t be empty.">
               <TextArea id="ds-note" placeholder="Write a note…" />
             </Field>
+          </div>
+          <div className="ds-row">
+            <Breadcrumb label="Where this map is" onSelect={() => {}} items={[
+              { id: 'group', label: 'Local Group' },
+              { id: 'galaxy', label: 'Milky Way' },
+              { id: 'system', label: 'Sol', icon: 'orbit' },
+              { id: 'world', label: 'Earth', icon: 'world' },
+            ]} />
           </div>
           <div className="ds-row">
             <Checkbox label="Number chapters" checked={check} onChange={setCheck} />

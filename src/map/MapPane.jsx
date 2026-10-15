@@ -29,14 +29,17 @@ export default function MapPane({
   chromeWhileInactive = false,
 }) {
   const locked = useLockReason(docPath) !== null
-  const [loaded, setLoaded] = useState(null)
+  const [result, setResult] = useState(null)
+  // What was loaded, only for the path it was loaded from: when the pane is switched to
+  // another map, the render before the new load must not mount the new path's surface
+  // on the old map (whose first autosave would then write it over the new file).
+  const loaded = result?.docPath === docPath ? result : null
 
   useEffect(() => {
     if (!projectName || !docPath) return undefined
     let cancelled = false
-    setLoaded(null)
-    loadMapDocument(projectName, docPath).then((result) => {
-      if (!cancelled) setLoaded(result)
+    loadMapDocument(projectName, docPath).then((next) => {
+      if (!cancelled) setResult({ ...next, docPath })
     })
     return () => {
       cancelled = true

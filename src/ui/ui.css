@@ -356,3 +356,54 @@
 }
 .reference-icon-button:hover { background: var(--hover-bg); border-color: transparent; color: var(--text-primary); }
 .reference-link { margin: 0 0 0 auto; padding: 0; border: 0; background: none; color: var(--accent-foreground); font: 11px var(--font-ui); cursor: pointer; }
+
+/* ---------------- Breadcrumb ---------------- */
+
+.ib-breadcrumb ol {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 500 var(--text-sm) / 1 var(--font-ui);
+}
+
+.ib-breadcrumb li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ib-breadcrumb-step,
+.ib-breadcrumb-here {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 180px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.ib-breadcrumb-step span,
+.ib-breadcrumb-here span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ib-breadcrumb-step {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ib-breadcrumb-step:hover { background: var(--hover-bg); color: var(--text-primary); }
+.ib-breadcrumb-step:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ib-breadcrumb-here { color: var(--text-primary); }
+.ib-breadcrumb-sep,
+.ib-breadcrumb-fold { color: var(--text-muted); flex: none; }

@@ -34,15 +34,18 @@ export default function CanvasPane({
   isActive = true,
 }) {
   const locked = useLockReason(docPath) !== null
-  const [doc, setDoc] = useState(null)
+  const [result, setResult] = useState(null)
+  // What was loaded, only for the path it was loaded from: switched to another canvas,
+  // the render before the new load must not mount the new path's surface on the old
+  // canvas (whose next save would write it over the new file).
+  const doc = result?.docPath === docPath ? result.loaded : null
 
   useEffect(() => {
     if (!projectName || !docPath) return
     let cancelled = false
 
-    setDoc(null)
     loadCanvasDocument(projectName, docPath).then((loaded) => {
-      if (!cancelled) setDoc(loaded)
+      if (!cancelled) setResult({ docPath, loaded })
     })
 
     return () => {

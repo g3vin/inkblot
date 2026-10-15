@@ -103,6 +103,18 @@ export function useMapDocument({ projectName, docPath, initialMap, viewportRef, 
     [clearCoalesce, docPath]
   )
 
+  /**
+   * Write `nextMap` now, not after the debounce, and resolve when it is on disk: for
+   * an edit another map is about to read (a link to a world about to be opened).
+   */
+  const saveNow = useCallback(
+    (nextMap) => {
+      save.cancel()
+      return saveMapDocument(projectName, docPath, withCamera(withDay(nextMap, dayRef?.current), cameraRef?.current), viewportRef.current)
+    },
+    [cameraRef, dayRef, docPath, projectName, save, viewportRef]
+  )
+
   const undo = useCallback(() => run({ type: 'history/undo' }), [run])
   const redo = useCallback(() => run({ type: 'history/redo' }), [run])
 
@@ -113,6 +125,7 @@ export function useMapDocument({ projectName, docPath, initialMap, viewportRef, 
     undo,
     redo,
     saveView,
+    saveNow,
     canUndo: canUndo(history),
     canRedo: canRedo(history),
   }
