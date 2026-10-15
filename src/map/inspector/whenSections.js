@@ -50,3 +50,24 @@ export function whenSections(ui, { map, item, calendar, events = [], patch, onDa
     ]),
   ]
 }
+
+/**
+ * A place's events: the timeline events set here (an event's `place`), each opening
+ * the timeline at it, and Add an event here, on the day the map is at.
+ */
+export function eventsHereSections(ui, { pin, docPath, calendar, events = [], onShowEvent, onAddEvent }) {
+  const here = events
+    .filter((event) => event.place?.map === docPath && event.place?.pin === pin.id)
+    .sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity))
+  return [
+    ui.section('eventsHere', 'Events here', [
+      ...here.map((event) =>
+        ui.listRow(`eventsHere.${event.id}`, event.title || 'Untitled event', () => onShowEvent?.(event.id), {
+          subtitle: Number.isFinite(event.start) ? formatDay(calendar, event.start) : 'Undated',
+          swatch: event.color || undefined,
+        })
+      ),
+      here.length ? null : ui.note('Nothing on the timeline happens here yet.'),
+    ], [onAddEvent ? ui.button('eventsHere.add', 'Add', onAddEvent, { icon: 'add' }) : null]),
+  ]
+}

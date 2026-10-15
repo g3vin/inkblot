@@ -31,7 +31,7 @@ import { systemSections } from './systemSections'
 import { worldSections } from './worldSections'
 import { galaxySections } from './galaxySections'
 import { modelSections } from './modelSections'
-import { whenSections } from './whenSections'
+import { eventsHereSections, whenSections } from './whenSections'
 import { layersSections } from './layersSections'
 import { distanceOverTimeSections } from './distanceSections'
 
@@ -211,7 +211,7 @@ export function useMapPanel(props) {
     map, dispatch, space, day, onDay, schedules, conflicts, selection, selectedItem, onSelect,
     docs, missingDocs, calendar, onOpenCalendar, onOpenDoc, renameRequest, calibration, onCalibrationDone,
     focusBody, onFocusBody, projectName, docPath, zoomNow, onTool, onReveal, viewMenu, onViewOption,
-    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent,
+    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent, onShowEvent, onAddEventHere,
   } = props
   const [tab, setTab] = useState('map')
   const [crossConflicts, setCrossConflicts] = useState(null)
@@ -294,6 +294,16 @@ export function useMapPanel(props) {
       if (['pin', 'route', 'region', 'label'].includes(selection.kind)) {
         // Before the last section, which ends in Delete.
         sections.splice(Math.max(0, sections.length - 1), 0, ...whenSections(ui, { map, item: selectedItem, calendar, events: storyEvents, patch, onDay }))
+      }
+      if (selection.kind === 'pin') {
+        sections.splice(Math.max(0, sections.length - 1), 0, ...eventsHereSections(ui, {
+          pin: selectedItem,
+          docPath,
+          calendar,
+          events: storyEvents,
+          onShowEvent,
+          onAddEvent: onAddEventHere ? () => onAddEventHere(selectedItem) : null,
+        }))
       } else if (selection.kind === 'traveler') {
         sections = travelerSections(ui, {
           ...common,
@@ -353,6 +363,6 @@ export function useMapPanel(props) {
     calendar, calibration, calibrationForm, conflicts, crossConflicts, day, dispatch, docPath, docs, focusBody, map, matrix,
     missingDocs, newUnit, onCalibrationDone, onDay, onFocusBody, onOpenCalendar, onOpenDoc, onReveal, onSelect, onTool,
     projectName, renameRequest, schedules, selectedItem, selection, space, tab, trace, viewMenu, onViewOption, zoomNow,
-    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent, distancePair,
+    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent, distancePair, onShowEvent, onAddEventHere,
   ])
 }
