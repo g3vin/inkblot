@@ -46,3 +46,15 @@ export const WORLD_PARTS = {
 
 /** The ink region masks are rasterized with (planetSurface.js): only its coverage counts. */
 export const MASK_INK = '#fff'
+
+/** What galaxies are drawn in (galaxyScene.js). */
+export const GALAXY_PARTS = {
+  dust: '#1c130d',
+  core: '#ffe2bd',
+  coreStops: [
+    [0, 'rgba(255,255,255,0.95)'],
+    [0.15, 'rgba(255,255,255,0.5)'],
+    [0.45, 'rgba(255,255,255,0.12)'],
+    [1, 'rgba(255,255,255,0)'],
+  ],
+}

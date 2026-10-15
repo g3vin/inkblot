@@ -29,6 +29,7 @@ import { journeysSections, travelSections, travelerSections } from './travelSect
 import { traceSection, useMapTrace } from './traceSection'
 import { systemSections } from './systemSections'
 import { worldSections } from './worldSections'
+import { galaxySections } from './galaxySections'
 
 const THEME_LABELS = { clean: 'Clean', parchment: 'Parchment', ink: 'Pen and ink', night: 'Night' }
 const KIND_TITLES = { pin: 'Place', route: 'Route', region: 'Region', label: 'Label', traveler: 'Traveller', body: 'Body' }
@@ -150,6 +151,9 @@ function mapTabSections(ui, props, { newUnit, setNewUnit, trace }) {
 
   if (map.mapKind === 'system') sections.push(...systemSections(ui, props))
   if (map.mapKind === 'planet') sections.push(...worldSections(ui, { map, dispatch, onChoosePicture: props.onChoosePlanetPicture }))
+  if (map.mapKind === 'galaxy' || map.mapKind === 'universe') {
+    sections.push(...galaxySections(ui, { map, dispatch, addPins: (items) => dispatch({ type: 'items/add', collection: 'pins', items }) }))
+  }
 
   sections.push(ui.section('places', 'Places', [
     !map.pins.length ? ui.note('Use the place tool, or drag documents from a Settings or Locations folder onto the map.') : null,
@@ -197,7 +201,7 @@ export function useMapPanel(props) {
     map, dispatch, space, day, onDay, schedules, conflicts, selection, selectedItem, onSelect,
     docs, missingDocs, calendar, onOpenCalendar, onOpenDoc, renameRequest, calibration, onCalibrationDone,
     focusBody, onFocusBody, projectName, docPath, zoomNow, onTool, onReveal, viewMenu, onViewOption,
-    onOpenSurface, onChoosePlanetPicture,
+    onOpenSurface, onChoosePlanetPicture, onOpenPinMap,
   } = props
   const [tab, setTab] = useState('map')
   const [crossConflicts, setCrossConflicts] = useState(null)
@@ -258,7 +262,7 @@ export function useMapPanel(props) {
     } else if (editing) {
       const common = { map, space, day, renameRequest }
       if (selection.kind === 'pin') {
-        sections = pinSections(ui, { ...common, pin: selectedItem, docs, missing: Boolean(selectedItem.doc && missingDocs?.has(selectedItem.doc)), patch, onOpenDoc, onDelete: remove })
+        sections = pinSections(ui, { ...common, pin: selectedItem, docs, missing: Boolean(selectedItem.doc && missingDocs?.has(selectedItem.doc)), patch, onOpenDoc, onOpenPinMap: onOpenPinMap ? () => onOpenPinMap(selectedItem) : null, onDelete: remove })
       } else if (selection.kind === 'route') {
         sections = routeSections(ui, { ...common, route: selectedItem, patch, onDelete: remove, onAddLabel: () => addLabel(newRouteLabel(selectedItem)) })
       } else if (selection.kind === 'region') {
@@ -331,6 +335,6 @@ export function useMapPanel(props) {
     calendar, calibration, calibrationForm, conflicts, crossConflicts, day, dispatch, docPath, docs, focusBody, map, matrix,
     missingDocs, newUnit, onCalibrationDone, onDay, onFocusBody, onOpenCalendar, onOpenDoc, onReveal, onSelect, onTool,
     projectName, renameRequest, schedules, selectedItem, selection, space, tab, trace, viewMenu, onViewOption, zoomNow,
-    onOpenSurface, onChoosePlanetPicture,
+    onOpenSurface, onChoosePlanetPicture, onOpenPinMap,
   ])
 }

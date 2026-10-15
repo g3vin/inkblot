@@ -38,14 +38,24 @@ export function kmPerPixel(projector, space, viewport, width, height) {
   return Number.isFinite(km) && km > 0 ? km / 100 : null
 }
 
-/** A unit that suits a star-system distance — AU across a system, km near a planet. */
-const autoUnit = (kmPerPx) => (kmPerPx * MAX_BAR_PX > 2e7 ? 'AU' : 'km')
+/**
+ * A unit that suits the distance a bar spans: km near a planet, AU across a system,
+ * light-years among the stars, and millions of light-years between galaxies.
+ */
+const KM_PER_LY = 9.4607e12
+const autoUnit = (kmPerPx) => {
+  const span = kmPerPx * MAX_BAR_PX
+  if (span > 1e5 * KM_PER_LY) return 'Mly'
+  if (span > 0.2 * KM_PER_LY) return 'ly'
+  return span > 2e7 ? 'AU' : 'km'
+}
+const AUTO_UNIT_KINDS = new Set(['system', 'galaxy', 'universe'])
 
 /** The scale bar for a view `width` × `height` px: `{ px, value, label }`, or null. */
 export function scaleBarFor(map, projector, space, viewport, width, height) {
   const perPx = kmPerPixel(projector, space, viewport, width, height)
   if (!perPx) return null
-  const unitId = map.mapKind === 'system' ? autoUnit(perPx) : map.scale.displayUnit || 'km'
+  const unitId = AUTO_UNIT_KINDS.has(map.mapKind) ? autoUnit(perPx) : map.scale.displayUnit || 'km'
   const unit = mapUnits(map).find((candidate) => candidate.id === unitId)
   const nice = niceScale(perPx, kmPerUnit(unitId, map))
   return nice ? { ...nice, label: `${formatNumber(nice.value)} ${unit?.short || unitId}` } : null

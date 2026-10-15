@@ -665,3 +665,33 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   const loop = parentIndex([{ path: 'A.map', map: normalizeMap({ mapKind: 'blank', pins: [{ id: 'p', at: [0, 0], doc: 'B.map' }] }) }, { path: 'B.map', map: normalizeMap({ mapKind: 'blank', pins: [{ id: 'p', at: [0, 0], doc: 'A.map' }] }) }])
   ok('maps that link to each other end the trail', trailFor('A.map', loop).length === 2)
 }
+
+/* ---------------- galaxies, and groups of them ---------------- */
+
+{
+  const { generateGalaxy, galaxyStats, galaxyShape, GALAXY_TYPE_NAMES } = await import('../../src/lib/map/galaxyGen.js')
+  const { fillUniverse } = await import('../../src/lib/map/universeGen.js')
+  const { GALAXY_TYPES } = await import('../../src/lib/map/mapModel.js')
+  const make = (type, seed = 4, extra = {}) => generateGalaxy({ type, seed, radiusLy: 50000, thicknessLy: 1000, ...extra }, { count: 12000 })
+  const stats = (type, seed) => galaxyStats(make(type, seed), 50000)
+
+  ok('every type draws, and has a name', GALAXY_TYPES.every((type) => make(type).count > 0 && GALAXY_TYPE_NAMES[type]))
+  ok('the same seed draws the same galaxy, point for point', make('Sb').positions.join() === make('Sb').positions.join())
+  ok('another seed draws another', make('Sb', 4).positions.join() !== make('Sb', 5).positions.join())
+  ok('a round elliptical has no bar', [1, 2, 3, 4].every((seed) => stats('E0', seed).barAspect < 1.15))
+  ok('an elliptical has no dust', make('E5').dust.count === 0)
+  ok('the higher the class, the flatter the elliptical', stats('E7').flatness < stats('E3').flatness && stats('E3').flatness < stats('E0').flatness)
+  ok('a spiral is a thin disc', stats('Sc').flatness < 0.15)
+  ok('an Sa has more bulge than an Sd', [1, 2, 3].every((seed) => stats('Sa', seed).bulgeShare > stats('Sd', seed).bulgeShare))
+  ok('a barred spiral has a bar, an unbarred one none', [1, 2, 3, 4].every((seed) => stats('SBb', seed).barAspect > 1.8 && stats('Sb', seed).barAspect < 1.4))
+  ok('a fixed shape survives a reroll', galaxyShape({ type: 'Sc', seed: 9, params: { arms: 5 } }).arms === 5 && galaxyShape({ type: 'Sc', seed: 10, params: { arms: 5 } }).arms === 5)
+  ok('a dwarf is sparse', make('dwarf').count < make('Sb').count / 2)
+
+  const group = fillUniverse({ seed: 8, count: 200, extentMpc: 40 })
+  ok('a group of galaxies is drawn from its seed', JSON.stringify(group) === JSON.stringify(fillUniverse({ seed: 8, count: 200, extentMpc: 40 })))
+  ok('every galaxy has a name, a place and a look', group.every((pin) => pin.name && pin.at.length === 3 && GALAXY_TYPES.includes(pin.galaxy.type)))
+  ok('they stay inside the region', group.every((pin) => pin.at.every((value) => Math.abs(value) <= 20)))
+  const elliptical = (pins) => pins.filter((pin) => /^E|S0/.test(pin.galaxy.type)).length / pins.length
+  ok('ellipticals are a minority overall', elliptical(group) < 0.6)
+  ok('a galaxy pin reads cleanly', normalizeMap({ mapKind: 'universe', pins: group.slice(0, 3) }).pins[0].galaxy.type === group[0].galaxy.type)
+}

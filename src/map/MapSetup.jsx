@@ -5,13 +5,17 @@
  * projection, or a star system. Every creation path makes the same blank map marked
  * `setupPending`; this is where it becomes one of those.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../ui/Icon.jsx'
 import { IMAGE_EXTENSIONS_LIST, assetUrl, importAssetFromPath, measureImage } from '../lib/assets'
 import { PROJECTION_NAMES } from '../lib/map/mapProjection'
 import { SYSTEM_PRESET_GROUPS, SYSTEM_PRESETS, presetSystem } from '../lib/map/systemPresets'
 import { newSeed } from '../lib/map/seeded'
 import { PLANET_PRESET_GROUPS, PLANET_PRESETS, presetSurface } from '../lib/map/planetPresets'
+import { GALAXY_TYPES } from '../lib/map/mapModel'
+import { GALAXY_TYPE_NAMES } from '../lib/map/galaxyGen'
+import { paintGalaxy } from '../lib/map/galaxyPicture'
+import { fillUniverse } from '../lib/map/universeGen'
 import { defaultTerrainEntries } from '../lib/map/terrains'
 import { BLANK_SHEET } from '../lib/map/mapModel'
 
@@ -34,6 +38,27 @@ const EARTH_CHOICES = [
   })),
 ]
 
+/** A galaxy's picture, drawn when the browser is idle (they take a few ms each). */
+function GalaxyThumb({ type, seed }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const canvas = ref.current
+    if (!canvas) return undefined
+    const idle = window.requestIdleCallback || ((callback) => window.setTimeout(callback, 16))
+    const cancel = window.cancelIdleCallback || window.clearTimeout
+    const handle = idle(() => paintGalaxy(canvas, type, seed, { tilt: 0.5, count: 5000 }))
+    return () => cancel(handle)
+  }, [seed, type])
+  return <canvas ref={ref} className="map-setup-galaxy" width={96} height={96} aria-hidden="true" />
+}
+
+/** Group sizes offered for a new group of galaxies. */
+const UNIVERSE_CHOICES = [
+  { id: 'empty', label: 'Empty', hint: 'Place your own galaxies', count: 0, extentMpc: 50 },
+  { id: 'group', label: 'A small group', hint: 'Two dozen galaxies, like the Local Group', count: 24, extentMpc: 6 },
+  { id: 'web', label: 'A slice of the cosmic web', hint: 'Clusters and filaments of galaxies', count: 160, extentMpc: 60 },
+]
+
 /** A new planet map wearing `surface`. */
 const planetMap = (surface) => ({
   mapKind: 'planet',
@@ -46,6 +71,8 @@ const planetMap = (surface) => ({
 export default function MapSetup({ projectName, onDone }) {
   const [step, setStep] = useState(null)
   const [status, setStatus] = useState('')
+  // One seed for the gallery, so what was shown is what is made.
+  const [gallerySeed] = useState(newSeed)
 
   const chooseImage = async () => {
     setStatus('')
@@ -122,7 +149,63 @@ export default function MapSetup({ projectName, onDone }) {
             <strong>A star system</strong>
             <small>Stars, planets and moons that move with your story, in 3D.</small>
           </button>
+          <button type="button" className="map-setup-option" onClick={() => setStep('galaxy')}>
+            <Icon name="galaxy" size={20} />
+            <strong>A galaxy</strong>
+            <small>Spiral, barred, elliptical or stranger. Every one different.</small>
+          </button>
+          <button type="button" className="map-setup-option" onClick={() => setStep('universe')}>
+            <Icon name="universe" size={20} />
+            <strong>A group of galaxies</strong>
+            <small>Galaxies placed in space, from a few neighbours to a cosmic web.</small>
+          </button>
         </div>
+
+        {step === 'galaxy' ? (
+          <div className="map-setup-gallery">
+            {GALAXY_TYPES.map((type, index) => (
+              <button
+                key={type}
+                type="button"
+                className="map-setup-galaxy-choice"
+                onClick={() => onDone({
+                  mapKind: 'galaxy',
+                  galaxy: { type, seed: gallerySeed + index, radiusLy: type === 'dwarf' ? 5000 : /^E/.test(type) ? 80000 : 50000, thicknessLy: 1000 },
+                  scale: { kmPerUnit: 1, displayUnit: 'ly', calibration: null, customUnits: [] },
+                  style: { theme: 'night' },
+                })}
+              >
+                <GalaxyThumb type={type} seed={gallerySeed + index} />
+                <small>{GALAXY_TYPE_NAMES[type]}</small>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {step === 'universe' ? (
+          <div className="map-setup-choices">
+            {UNIVERSE_CHOICES.map((choice) => (
+              <button
+                key={choice.id}
+                type="button"
+                className="map-button"
+                title={choice.hint}
+                onClick={() => {
+                  const seed = newSeed()
+                  onDone({
+                    mapKind: 'universe',
+                    universe: { seed, extentMpc: choice.extentMpc },
+                    pins: choice.count ? fillUniverse({ seed, count: choice.count, extentMpc: choice.extentMpc }) : [],
+                    scale: { kmPerUnit: 1, displayUnit: 'Mly', calibration: null, customUnits: [] },
+                    style: { theme: 'night' },
+                  })
+                }}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {step === 'planet' ? (
           <div className="map-setup-groups">
