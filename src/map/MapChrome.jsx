@@ -1,6 +1,6 @@
 /**
  * MapChrome.jsx — what sits on a map rather than in it: the scale bar, the compass
- * rose and the title cartouche. Each is anchored at a fraction of the view
+ * rose, the title cartouche and the key. Each is anchored at a fraction of the view
  * (`style.*.at`), so it stays put while the map moves under it.
  *
  * They are placed in the part of the map nothing else covers (`useVisibleBox`).
@@ -10,13 +10,11 @@
  * picture, on a projection whose scale changes with latitude, and on a star system.
  * On a globe the compass turns with the camera (`bearing`), so it keeps pointing north.
  */
-import { CompassRose } from './mapGlyphs'
+import { CompassRose, MapKey } from './mapGlyphs'
+import { legendEntries } from './mapLegend'
+import { NO_NORTH, scaleBarFor } from './mapChromeMath'
 
-/** Maps with no north to point to: space has no up, and a model has its own. */
-const NO_NORTH = new Set(['system', 'galaxy', 'universe', 'model'])
-import { scaleBarFor } from './mapChromeMath'
-
-export default function MapChrome({ map, projector, space, viewport, box, bearing = 0 }) {
+export default function MapChrome({ map, projector, space, viewport, box, bearing = 0, day = 0 }) {
   const { style } = map
   const place = (at) => ({
     left: `${box.left + at[0] * box.width}px`,
@@ -42,9 +40,16 @@ export default function MapChrome({ map, projector, space, viewport, box, bearin
     }
   }
 
+  const keyEntries = style.legend.show ? legendEntries(map, day) : []
+
   return (
     <>
       {bar}
+      {keyEntries.length ? (
+        <div className="map-key" style={{ ...place(style.legend.at), transform: 'none' }}>
+          <MapKey entries={keyEntries} />
+        </div>
+      ) : null}
       {style.compass.show && !NO_NORTH.has(map.mapKind) ? (
         <div className="map-compass" style={{ ...place(style.compass.at), transform: `translate(-50%, -50%) rotate(${-bearing}deg)` }}>
           <CompassRose size={style.compass.size} variant={style.compass.style} />

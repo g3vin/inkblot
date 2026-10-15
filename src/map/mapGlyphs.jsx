@@ -85,3 +85,48 @@ export function CompassRose({ size = 96, variant = 'rose8' }) {
     </svg>
   )
 }
+
+const KEY_DASHES = { dashed: '6 4', dotted: '1 4' }
+const KEY_ROW = 22
+const KEY_PAD = 12
+
+/** How wide the key's box is for `entries`: the longest label, roughly. */
+const mapKeySize = (entries) => ({
+  width: KEY_PAD * 2 + 34 + Math.max(40, ...entries.map((entry) => entry.label.length * 6.4)),
+  height: KEY_PAD * 2 + 18 + entries.length * KEY_ROW,
+})
+
+/**
+ * The map's key (mapLegend.js's entries), as SVG in the map's own ink and sheet:
+ * drawn the same on screen and in an exported picture.
+ */
+export function MapKey({ entries }) {
+  const { width, height } = mapKeySize(entries)
+  return (
+    <svg className="map-key-card" width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+      <rect x={0.5} y={0.5} width={width - 1} height={height - 1} rx={4} fill="var(--map-sheet)" stroke="var(--map-ink)" strokeOpacity={0.5} />
+      <text x={KEY_PAD} y={KEY_PAD + 9} fill="var(--map-ink)" fontSize={10} fontWeight={700} letterSpacing={1.2} fontFamily="var(--font-ui, system-ui)">KEY</text>
+      {entries.map((entry, index) => {
+        const y = KEY_PAD + 18 + index * KEY_ROW + KEY_ROW / 2
+        let swatch
+        if (entry.kind === 'pin') {
+          swatch = <g transform="translate(14 8) scale(0.62)"><PinGlyph icon={entry.icon} color={entry.color} /></g>
+        } else if (entry.kind === 'region') {
+          const fill = entry.fill || 'var(--map-region)'
+          swatch = <rect x={3} y={-6} width={22} height={12} rx={2} fill={fill} fillOpacity={0.45} stroke={fill} />
+        } else if (entry.kind === 'route') {
+          const stroke = entry.stroke || 'var(--map-route)'
+          swatch = <path d="M2 0h24" stroke={stroke} strokeWidth={Math.min(4, entry.width || 2)} strokeDasharray={KEY_DASHES[entry.dash]} strokeLinecap="round" fill="none" />
+        } else {
+          swatch = <circle cx={14} cy={0} r={5} fill={entry.color} stroke="var(--map-sheet)" strokeWidth={1.5} />
+        }
+        return (
+          <g key={`${entry.kind}-${index}`} transform={`translate(${KEY_PAD} ${y})`}>
+            {swatch}
+            <text x={34} y={4} fill="var(--map-ink)" fontSize={11.5} fontFamily="var(--map-label-font, serif)">{entry.label}</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}

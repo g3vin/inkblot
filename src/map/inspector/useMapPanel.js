@@ -193,6 +193,10 @@ function styleTabSections(ui, { map, dispatch }) {
       ui.choice('compass.style', 'Style', style.compass.style, COMPASS_STYLES.map((option) => ({ value: option.id, label: option.label })), (next) => patchStyle({ compass: { ...style.compass, style: next } })),
       ui.number('compass.size', 'Size', style.compass.size, (size) => patchStyle({ compass: { ...style.compass, size } }), { min: 32, max: 240, step: 4, suffix: 'px' }),
     ]),
+    ui.section('legend', 'Key', [
+      ui.toggle('legend.show', 'Show key', style.legend.show, (show) => patchStyle({ legend: { ...style.legend, show } })),
+      ui.note('Lists the kinds of place, the terrains, the routes and the travellers on the map, as they are on the day shown.'),
+    ]),
     ui.section('scaleBar', 'Scale bar', [
       ui.toggle('scaleBar.show', 'Show scale bar', style.scaleBar.show, (show) => patchStyle({ scaleBar: { ...style.scaleBar, show } })),
     ]),
