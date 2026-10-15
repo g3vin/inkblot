@@ -38,3 +38,44 @@ export function isItemShown(map, item, day = 0, hidden = hiddenLayers(map)) {
   if (item?.layer && hidden.has(item.layer)) return false
   return isAtDay(item, day)
 }
+
+const SHOWN_COLLECTIONS = ['pins', 'routes', 'regions', 'labels']
+const COLLECTION_OF = { pin: 'pins', route: 'routes', region: 'regions', label: 'labels' }
+
+/**
+ * What is off the map on `day`, as one string: equal strings, equal maps. Cheap
+ * enough to ask every frame of playback, so the layers redraw only when something
+ * actually comes or goes.
+ */
+export function hiddenKey(map, day = 0) {
+  const hidden = hiddenLayers(map)
+  let key = ''
+  for (const collection of SHOWN_COLLECTIONS) {
+    for (const item of map?.[collection] || []) if (!isItemShown(map, item, day, hidden)) key += `${item.id},`
+  }
+  return key
+}
+
+/** The ids a `hiddenKey` names. */
+export const hiddenIds = (key) => new Set(key ? key.split(',').filter(Boolean) : [])
+
+/**
+ * `map` without the routes, regions and labels `hiddenKey` names: the same map
+ * when nothing is hidden. Pins stay, since routes and travellers find their stops
+ * through them; whoever draws pins skips the hidden ones (`hiddenIds`).
+ */
+export function withoutHidden(map, key) {
+  if (!key) return map
+  const gone = hiddenIds(key)
+  const next = { ...map }
+  for (const collection of ['routes', 'regions', 'labels']) next[collection] = (map[collection] || []).filter((item) => !gone.has(item.id))
+  return next
+}
+
+/** Is the item of `kind` and `id` on a locked layer (so it cannot be picked up)? */
+export function isItemLocked(map, kind, id) {
+  const collection = COLLECTION_OF[kind]
+  if (!collection) return false
+  const item = (map?.[collection] || []).find((candidate) => candidate.id === id)
+  return Boolean(item?.layer && lockedLayers(map).has(item.layer))
+}

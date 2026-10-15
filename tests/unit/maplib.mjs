@@ -695,3 +695,23 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('ellipticals are a minority overall', elliptical(group) < 0.6)
   ok('a galaxy pin reads cleanly', normalizeMap({ mapKind: 'universe', pins: group.slice(0, 3) }).pins[0].galaxy.type === group[0].galaxy.type)
 }
+
+/* ---------------- layers, and places that come and go ---------------- */
+
+{
+  const { hiddenKey, withoutHidden, hiddenIds, isItemLocked } = await import('../../src/lib/map/mapVisibility.js')
+  const { eventDay } = await import('../../src/map/inspector/whenSections.js')
+  const map = normalizeMap({
+    layers: [{ id: 'old', name: 'Old roads', visible: false }, { id: 'war', name: 'The war', locked: true }],
+    pins: [{ id: 'a', at: [0, 0], layer: 'old' }, { id: 'b', at: [1, 1], from: 10 }, { id: 'c', at: [2, 2], layer: 'war' }],
+    routes: [{ id: 'r', nodes: [{ pin: 'a' }, { pin: 'c' }], layer: 'old' }],
+    labels: [{ id: 'l', text: 'Gone', at: [3, 3], until: 5 }],
+  })
+  ok('a hidden layer and a day outside a span hide their items', hiddenIds(hiddenKey(map, 0)).has('a') && hiddenIds(hiddenKey(map, 0)).has('b') && hiddenIds(hiddenKey(map, 0)).has('r'))
+  ok('a span opens on its day, and closes on its until', !hiddenIds(hiddenKey(map, 10)).has('b') && hiddenIds(hiddenKey(map, 5)).has('l') && !hiddenIds(hiddenKey(map, 4)).has('l'))
+  const shown = withoutHidden(map, hiddenKey(map, 0))
+  ok('hidden routes leave, pins stay for what leans on them', shown.routes.length === 0 && shown.pins.length === 3)
+  ok('nothing hidden gives back the same map', withoutHidden(map, '') === map)
+  ok('a locked layer holds its items', isItemLocked(map, 'pin', 'c') && !isItemLocked(map, 'pin', 'b'))
+  ok('an item follows an event: in at its start, gone at its end', eventDay({ start: 3, end: 9 }, 'from') === 3 && eventDay({ start: 3, end: 9 }, 'until') === 9 && eventDay({ start: 3, end: null }, 'until') === 4)
+}

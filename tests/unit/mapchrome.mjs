@@ -94,7 +94,7 @@ ok('the page draws no tool bar', !document.querySelector('[role="toolbar"][aria-
 ok('the active map publishes its chrome', !!latest() && latest().active === true)
 ok('with the tool in hand', latest()?.tool === 'select')
 ok('and the zoom as the page writes it', /%|×/.test(latest()?.zoomLabel || ''))
-ok('the settings come in three tabs', latest()?.panel.tabs.map((tab) => tab.id).join() === 'map,travel,style')
+ok('the settings come in four tabs', latest()?.panel.tabs.map((tab) => tab.id).join() === 'map,travel,layers,style')
 ok('the Map tab lists the places', sectionIds().includes('places') && !!fieldById(`places.${rivendell.id}`))
 ok('and leaves export to its dialog', !sectionIds().includes('export'))
 // A map never viewed opens by fitting itself, a frame after it mounts: a real change.
@@ -125,7 +125,7 @@ await command('undo')
 ok('Undo from the toolbar takes it back', fieldById('pin.name')?.payload.value === 'Rivendell')
 
 await command('panel-back')
-ok('Back returns to the map’s settings', latest()?.panel.tabs.length === 3 && !latest()?.panel.canGoBack)
+ok('Back returns to the map’s settings', latest()?.panel.tabs.length === 4 && !latest()?.panel.canGoBack)
 
 await command('panel-tab', { id: 'travel' })
 ok('Travel holds the travellers and the ways of travelling', ['travelers', 'problems', 'transports'].every((id) => sectionIds().includes(id)))

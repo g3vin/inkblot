@@ -247,6 +247,8 @@ export default function PlanetView({ view, map, space, day, selection, projectNa
         }
         return null
       },
+      /** Glide to a saved camera: `{ position, target }` in scene units. */
+      goTo: (saved) => stage.moveTo(new Vector3(...saved.target), new Vector3(...saved.position)),
       subscribe: stage.subscribe,
     }
 
