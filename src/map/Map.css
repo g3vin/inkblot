@@ -944,3 +944,17 @@
 .map-breadcrumb {
   padding: var(--space-1);
 }
+
+/* A short message over the bottom of the map: what the view could not do, or how
+   to drive it (Look around). */
+.map-notice {
+  left: 50%;
+  bottom: calc(var(--space-12) + var(--space-8));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: min(520px, calc(100% - var(--space-8)));
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  font: var(--text-sm) / 1.4 var(--font-ui);
+  transform: translateX(-50%);
+}

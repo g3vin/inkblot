@@ -27,7 +27,7 @@ import { presetSystem } from '../lib/map/systemPresets'
 import { starFields, starPreset } from '../lib/map/stars'
 import { random, seedOf } from '../lib/map/seeded'
 import { defaultTerrainEntries } from '../lib/map/terrains'
-import { IMAGE_EXTENSIONS_LIST, importAssetFromPath } from '../lib/assets'
+import { IMAGE_EXTENSIONS_LIST, MODEL_EXTENSIONS_LIST, importAssetFromPath } from '../lib/assets'
 import { announceProjectFiles } from '../lib/projectFiles'
 import { MAP_DOC_MOVED_EVENT } from '../lib/map/mapLinks'
 import { panMapBy, pointsBounds } from '../lib/map/mapViewport'
@@ -80,7 +80,7 @@ const SNAP_PX = 14
 
 // MapLibre and the globe: loaded the first time a map is shown as a globe.
 /** The breadcrumb's glyph for each kind of map. */
-const MAP_KIND_ICONS = { earth: 'globe', planet: 'world', system: 'orbit', galaxy: 'galaxy', universe: 'universe' }
+const MAP_KIND_ICONS = { earth: 'globe', planet: 'world', system: 'orbit', galaxy: 'galaxy', universe: 'universe', model: 'model' }
 
 const GlobeView = lazy(() => import('./GlobeView'))
 const SpaceView = lazy(() => import('./space/SpaceView'))
@@ -126,6 +126,9 @@ export default function MapSurface({
   const [exportOpen, setExportOpen] = useState(false)
   // A View choice that fetches online, waiting for the writer to allow online maps.
   const [onlineAsk, setOnlineAsk] = useState(null)
+  // Walking about inside a model (SpaceView), and anything the view needs to say.
+  const [lookAround, setLookAround] = useState(false)
+  const [notice, setNotice] = useState(null)
 
   // The Earth as a globe is drawn by MapLibre, and moved by it; a star system in 3D
   // by three.js; every other map (and either laid flat) by the SVG view. All three
@@ -133,7 +136,7 @@ export default function MapSurface({
   const [globeFailed, setGlobeFailed] = useState(false)
   const [spaceFailed, setSpaceFailed] = useState(false)
   const wantsGlobe = initialMap.mapKind === 'earth'
-  const wantsSpace = ['system', 'planet', 'galaxy', 'universe'].includes(initialMap.mapKind)
+  const wantsSpace = ['system', 'planet', 'galaxy', 'universe', 'model'].includes(initialMap.mapKind)
   const flatView = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.(), enabled: true })
   const cameraRef = useRef(initialMap.camera || null)
   const onCameraChange = (camera) => {
@@ -165,7 +168,7 @@ export default function MapSurface({
   })
   const isGlobe = map.mapKind === 'earth' && map.earth.view === 'globe' && !globeFailed
   const isPlanet = map.mapKind === 'planet' && !spaceFailed
-  const isDeepSpace = (map.mapKind === 'galaxy' || map.mapKind === 'universe') && !spaceFailed
+  const isDeepSpace = (map.mapKind === 'galaxy' || map.mapKind === 'universe' || map.mapKind === 'model') && !spaceFailed
   const isSpace = (map.mapKind === 'system' && map.system.display.view === '3d' && !spaceFailed) || isPlanet || isDeepSpace
   const view = isGlobe ? globeView : isSpace ? spaceView : flatView
   const viewKind = isGlobe ? 'globe' : isPlanet ? 'planet' : isSpace ? 'space' : 'flat'
@@ -280,9 +283,13 @@ export default function MapSurface({
 
   /* ---------------- how the map is shown (the View menu) ---------------- */
 
-  const viewMenu = useMemo(() => viewMenuFor(map, { globeAvailable: !globeFailed, spaceAvailable: !spaceFailed }), [globeFailed, map, spaceFailed])
+  const viewMenu = useMemo(() => viewMenuFor(map, { globeAvailable: !globeFailed, spaceAvailable: !spaceFailed, lookAround }), [globeFailed, lookAround, map, spaceFailed])
   const applyViewOption = useCallback(
     (id, { allowed = false } = {}) => {
+      if (id === 'model.look') {
+        setLookAround((on) => !on)
+        return
+      }
       const current = mapRef.current
       const edit = viewOptionEdit(current, id)
       if (!edit) return
@@ -1056,6 +1063,20 @@ export default function MapSurface({
     }
   }, [dispatch, mapRef, projectName])
 
+  /** Swap a model map's model for another; its places stay where they are. */
+  const chooseModel = useCallback(async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, filters: [{ name: '3D models', extensions: MODEL_EXTENSIONS_LIST }] })
+      if (!selected) return
+      const asset = await importAssetFromPath(projectName, Array.isArray(selected) ? selected[0] : selected)
+      dispatch({ type: 'section/patch', section: 'model', patch: { asset } })
+    } catch (error) {
+      console.error('[map] could not import the model:', error)
+      setNotice(error?.forWriter ? error.message : 'That model could not be imported.')
+    }
+  }, [dispatch, projectName])
+
   /*
    * Where this map sits: the maps that contain it, outermost first (a galaxy, its
    * system, this world), read from the links between the project's maps.
@@ -1115,6 +1136,7 @@ export default function MapSurface({
     onViewOption: applyViewOption,
     onOpenSurface: isSystem ? openSurface : null,
     onChoosePlanetPicture: choosePlanetPicture,
+    onChooseModel: map.mapKind === 'model' ? chooseModel : null,
     onOpenPinMap: map.mapKind === 'galaxy' || map.mapKind === 'universe' ? openPinMap : null,
   })
   const openExport = useCallback(() => setExportOpen(true), [])
@@ -1268,9 +1290,24 @@ export default function MapSurface({
             day={day}
             focusBody={focusBody}
             skySeed={docPath}
+            projectName={projectName}
+            lookAround={lookAround && map.mapKind === 'model'}
             onError={() => setSpaceFailed(true)}
+            onProblem={setNotice}
           />
         </Suspense>
+      ) : null}
+      {notice ? (
+        <div className="map-floating map-notice" role="status">
+          <span>{notice}</span>
+          <button type="button" className="map-button" onClick={() => setNotice(null)}>OK</button>
+        </div>
+      ) : null}
+      {lookAround && map.mapKind === 'model' ? (
+        <div className="map-floating map-notice" role="status">
+          <span>Drag to look. W A S D to move, Q and E to go down and up, ⇧ to hurry.</span>
+          <button type="button" className="map-button" onClick={() => setLookAround(false)}>Done</button>
+        </div>
       ) : null}
 
       <svg className="map-svg" xmlns="http://www.w3.org/2000/svg">
