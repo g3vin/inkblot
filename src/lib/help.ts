@@ -450,7 +450,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: [
       'Export map… (in the zoom menu, or ⌥⌘E) saves the map as a picture: a PNG for the screen, an SVG or a PDF that stays sharp at any size, or straight to the printer. Copy image puts it on the clipboard, ready to paste into a chapter.',
       'Choose what’s on screen to export the part you are looking at, or the whole map for all of it. Sharpness multiplies a PNG’s pixels: Retina for screens, Print for paper.',
-      'A globe, a planet, a star system in 3D, a galaxy or a model is exported as you are looking at it, with its places, key and scale bar on top. Turn and frame it first.',
+      'A globe, a planet, a star system in 3D, a galaxy or a model is exported as you are looking at it, with its places, key and scale bar on top. Turn and frame it first. A 3D view can also be saved as a turntable video, going once round the scene (names and places are left out of the film).',
       'To show a map in a canvas, drag it there instead. It stays up to date as the map changes.',
     ],
   },

@@ -1573,6 +1573,7 @@ export default function MapSurface({
           surfaceRef={view.surfaceRef}
           viewportRef={view.viewportRef}
           picture={view.native ? view.picture : null}
+          recorder={view.canRecord?.() ? view : null}
         />
       ) : null}
 
