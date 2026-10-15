@@ -206,15 +206,22 @@ export function createGalaxyScene(map, { colors, pixelRatio = Math.min(window.de
   root.add(plane)
   const owned = []
   const impostorMeshes = []
+  // Point sizes follow the drawing's pixel ratio, which an export raises (stage.js picture).
+  const ratioUniforms = []
   let reach
 
   if (!universe) {
     const galaxy = map.galaxy
     const result = generateGalaxy(galaxy)
     const extentKly = galaxy.radiusLy / KLY
-    plane.add(lightPoints(result, KLY, pixelRatio, owned, extentKly))
+    const light = lightPoints(result, KLY, pixelRatio, owned, extentKly)
+    plane.add(light)
+    ratioUniforms.push(light.material.uniforms.uPixelRatio)
     const dust = dustPoints(result, KLY, pixelRatio, owned, extentKly)
-    if (dust) plane.add(dust)
+    if (dust) {
+      plane.add(dust)
+      ratioUniforms.push(dust.material.uniforms.uPixelRatio)
+    }
     const core = new Sprite(new SpriteMaterial({ map: glowTexture(), color: new Color(GALAXY_PARTS.core), blending: AdditiveBlending, depthWrite: false, transparent: true, opacity: /^E|S0|dwarf/.test(galaxy.type) ? 0.9 : 0.7 }))
     const coreSize = (galaxy.radiusLy / KLY) * (/^E/.test(galaxy.type) ? 1.1 : 0.5)
     core.scale.set(coreSize, coreSize, 1)
@@ -255,7 +262,8 @@ export function createGalaxyScene(map, { colors, pixelRatio = Math.min(window.de
     toScene: (point) => [point[0] / unit, (point[2] || 0) / unit, -point[1] / unit],
     fromScene: (local) => [local[0] * unit, -local[2] * unit],
     setDay: () => {},
-    beforeRender: (camera, heightPx) => {
+    beforeRender: (camera, heightPx, ratio = pixelRatio) => {
+      for (const uniform of ratioUniforms) uniform.value = ratio
       if (!universe) return
       // A galaxy is drawn at its size, but never smaller than a thumbnail's worth.
       const perPixel = (distance) => (2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / heightPx

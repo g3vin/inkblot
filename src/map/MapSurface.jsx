@@ -1460,6 +1460,7 @@ export default function MapSurface({
           docPath={docPath}
           surfaceRef={view.surfaceRef}
           viewportRef={view.viewportRef}
+          picture={view.native ? view.picture : null}
         />
       ) : null}
 

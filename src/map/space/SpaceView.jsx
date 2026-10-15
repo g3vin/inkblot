@@ -40,7 +40,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
         background: CINEMATIC.background,
         beforeRender: (camera, size) => {
           backdrop?.follow(camera)
-          stateRef.current?.content?.beforeRender(camera, size.height)
+          stateRef.current?.content?.beforeRender(camera, size.height, stage?.renderer.getPixelRatio())
         },
       })
     } catch (error) {
@@ -139,6 +139,8 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
       },
       /** Glide to a saved camera: `{ position, target }` in scene units. */
       goTo: (saved) => stage.moveTo(new Vector3(...saved.target), new Vector3(...saved.position)),
+      /** The view as a picture, for an export (stage.js). */
+      picture: (scale) => stage.picture(scale),
       subscribe: stage.subscribe,
     }
 

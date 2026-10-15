@@ -184,6 +184,43 @@ export function useGlobeView({ surfaceRef, initialCamera, onCameraChange, enable
     return hit?.properties?.id ? { kind: hit.properties.kind, id: hit.properties.id } : null
   }, [toSurfacePoint])
 
+  /**
+   * The globe as a picture, `scale` times the screen's size: drawn again at that
+   * sharpness, copied the moment it is drawn (MapLibre does not keep its buffer).
+   */
+  const picture = useCallback((scale = 1) => new Promise((resolve) => {
+    const gl = glRef.current
+    if (!gl) {
+      resolve(null)
+      return
+    }
+    const ratio = gl.getPixelRatio()
+    let done = false
+    const finish = (canvas) => {
+      if (done) return
+      done = true
+      gl.setPixelRatio(ratio)
+      resolve(canvas)
+    }
+    const capture = () => {
+      gl.once('render', () => {
+        const source = gl.getCanvas()
+        const out = document.createElement('canvas')
+        out.width = source.width
+        out.height = source.height
+        out.getContext('2d').drawImage(source, 0, 0)
+        finish(out)
+      })
+      gl.triggerRepaint()
+    }
+    gl.setPixelRatio(scale)
+    gl.once('idle', capture)
+    // A globe still fetching pictures may never fall idle: take what is there.
+    window.setTimeout(() => {
+      if (!done) capture()
+    }, 8000)
+  }), [])
+
   /** Fly to a saved camera: `{ center, zoom, bearing, pitch }`. */
   const goTo = useCallback((saved) => {
     if (!saved || !Array.isArray(saved.center)) return
@@ -220,5 +257,6 @@ export function useGlobeView({ surfaceRef, initialCamera, onCameraChange, enable
     lockPan,
     pick,
     goTo,
-  }), [applyViewport, attach, camera, centerOn, centerOnStored, enabled, fitStored, fitTo, goTo, lockPan, pick, projector, screenToWorldAt, surfaceRef, toSurfacePoint, zoomIn, zoomOut])
+    picture,
+  }), [applyViewport, attach, camera, centerOn, centerOnStored, enabled, fitStored, fitTo, goTo, lockPan, pick, picture, projector, screenToWorldAt, surfaceRef, toSurfacePoint, zoomIn, zoomOut])
 }

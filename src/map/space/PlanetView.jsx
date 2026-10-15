@@ -249,6 +249,8 @@ export default function PlanetView({ view, map, space, day, selection, projectNa
       },
       /** Glide to a saved camera: `{ position, target }` in scene units. */
       goTo: (saved) => stage.moveTo(new Vector3(...saved.target), new Vector3(...saved.position)),
+      /** The view as a picture, for an export (stage.js). */
+      picture: (scale) => stage.picture(scale),
       subscribe: stage.subscribe,
     }
 
