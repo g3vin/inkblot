@@ -22,7 +22,13 @@ export const ONLINE_OPTIONS = new Set(['earth.imagery.satellite', 'earth.imagery
 const item = (id, label, { checked = false, disabled = false, separator = false } = {}) => ({ id, label, checked, disabled, separator })
 
 /** The View menu for `map`. `globeAvailable` (`spaceAvailable`) is false where the globe (3D) could not start. */
-export function viewMenuFor(map, { globeAvailable = true, spaceAvailable = true } = {}) {
+export function viewMenuFor(map, { globeAvailable = true, spaceAvailable = true, lookAround = false } = {}) {
+  if (map.mapKind === 'model') {
+    return [
+      item('model.look', 'Look around', { checked: lookAround, disabled: !spaceAvailable }),
+      item('model.up', 'Model is z-up', { checked: map.model.up === 'z', separator: true }),
+    ]
+  }
   if (map.mapKind === 'system') {
     const { display } = map.system
     const in3d = display.view === '3d' && spaceAvailable
@@ -83,6 +89,7 @@ export function viewOptionPatch(map, id) {
  * `section/patch`, or null for an id this map does not have.
  */
 export function viewOptionEdit(map, id) {
+  if (id === 'model.up' && map.mapKind === 'model') return { section: 'model', patch: { up: map.model.up === 'z' ? 'y' : 'z' } }
   if (id.startsWith('system.')) {
     if (map.mapKind !== 'system') return null
     const { display } = map.system
@@ -119,6 +126,8 @@ export const VIEW_COMMAND_TITLES = {
   'earth.terrain': ['Show or hide terrain in 3D', ['mountains', 'elevation', 'relief', 'hills']],
   'earth.graticule': ['Show or hide the graticule', ['latitude', 'longitude', 'grid lines']],
   'earth.borders': ['Show or hide borders', ['countries', 'frontiers']],
+  'model.look': ['Look around inside the model', ['first person', 'walk', 'wasd', 'inside', 'explore', 'station']],
+  'model.up': ['Stand the model upright (z-up)', ['rotate', 'axis', 'upright', 'blender']],
   'system.view.3d': ['Show the system in 3D', ['three dimensions', 'orbit', 'space', 'perspective']],
   'system.view.flat': ['Lay the system out flat', ['2d', 'top down', 'diagram', 'print']],
   'system.radial.log': ['Squeeze distances so everything fits', ['log', 'compress', 'scale']],

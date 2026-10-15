@@ -487,6 +487,46 @@ export const HELP_TOPICS: HelpTopic[] = [
     related: ['map.online'],
   },
   {
+    id: 'map.systems',
+    section: 'Maps',
+    title: 'Star systems',
+    body: [
+      'A star system moves with your story: scrub the timeline and every planet and moon goes round. Drag to turn the view, scroll to zoom, and switch between 3D and flat in the view menu. Distances squeezed keeps the inner planets in reach; to scale shows the true gulfs.',
+      'Templates start you off: our Solar System, binaries, triples, a star feeding a black hole, and three-body systems. A stable one keeps its dance for as long as your story; a chaotic one may fling a star out, and the Motion section says when.',
+      'Select a planet or star and choose Make a map of this world to open it as a globe of its own. The trail at the top takes you back up.',
+    ],
+    related: ['map.worlds', 'map.galaxies'],
+  },
+  {
+    id: 'map.worlds',
+    section: 'Maps',
+    title: 'Planets and stars',
+    body: [
+      'A planet or star map is a whole world to turn. A planet’s surface is drawn from a seed: Roll again for another, or set the sea, the ruggedness and the palette. To use your own picture, choose one drawn as a flat map of the whole world, twice as wide as it is tall.',
+      'Draw regions with a terrain and turn on Land from regions to paint your continents onto the globe. Day and night follow the story day, the planet’s tilt and the length of its year.',
+    ],
+    related: ['map.systems'],
+  },
+  {
+    id: 'map.galaxies',
+    section: 'Maps',
+    title: 'Galaxies',
+    body: [
+      'A galaxy is drawn from its type and a seed, so no two are alike: spirals and barred spirals, ellipticals, lenticulars, rings, irregulars, dwarfs and torn ones. Roll again draws another of the same type; a shape you set yourself stays put.',
+      'Place star systems with the place tool, then choose Make a star system here to open one. A group of galaxies holds galaxies the same way, and Fill with galaxies lays them out along filaments and clusters. Distances are in light-years, or millions of them.',
+    ],
+    related: ['map.systems'],
+  },
+  {
+    id: 'map.models',
+    section: 'Maps',
+    title: '3D models',
+    body: [
+      'A 3D model map is a station, a ship or a building to walk around. Use a .glb file, or a .gltf with everything inside it; Draco-compressed models aren’t supported yet. If it stands on its side, set Up is to Z.',
+      'Place pins on its surface with the place tool. Look around (in the view menu) puts you inside: drag to look, W A S D to move, Q and E to go down and up.',
+    ],
+  },
+  {
     id: 'story.calendar',
     section: 'Settings',
     title: 'The story calendar',

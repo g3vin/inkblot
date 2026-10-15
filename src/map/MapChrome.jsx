@@ -11,6 +11,9 @@
  * On a globe the compass turns with the camera (`bearing`), so it keeps pointing north.
  */
 import { CompassRose } from './mapGlyphs'
+
+/** Maps with no north to point to: space has no up, and a model has its own. */
+const NO_NORTH = new Set(['system', 'galaxy', 'universe', 'model'])
 import { scaleBarFor } from './mapChromeMath'
 
 export default function MapChrome({ map, projector, space, viewport, box, bearing = 0 }) {
@@ -42,7 +45,7 @@ export default function MapChrome({ map, projector, space, viewport, box, bearin
   return (
     <>
       {bar}
-      {style.compass.show && map.mapKind !== 'system' ? (
+      {style.compass.show && !NO_NORTH.has(map.mapKind) ? (
         <div className="map-compass" style={{ ...place(style.compass.at), transform: `translate(-50%, -50%) rotate(${-bearing}deg)` }}>
           <CompassRose size={style.compass.size} variant={style.compass.style} />
         </div>

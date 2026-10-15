@@ -2,12 +2,13 @@
  * MapSetup.jsx — what a new map is, asked the first time it is opened.
  *
  * A blank sheet at a chosen scale, a picture of a map, the Earth in a chosen
- * projection, or a star system. Every creation path makes the same blank map marked
+ * projection, a planet or star, a star system, a galaxy, a group of galaxies, or a
+ * 3D model. Every creation path makes the same blank map marked
  * `setupPending`; this is where it becomes one of those.
  */
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../ui/Icon.jsx'
-import { IMAGE_EXTENSIONS_LIST, assetUrl, importAssetFromPath, measureImage } from '../lib/assets'
+import { IMAGE_EXTENSIONS_LIST, MODEL_EXTENSIONS_LIST, assetUrl, importAssetFromPath, measureImage } from '../lib/assets'
 import { PROJECTION_NAMES } from '../lib/map/mapProjection'
 import { SYSTEM_PRESET_GROUPS, SYSTEM_PRESETS, presetSystem } from '../lib/map/systemPresets'
 import { newSeed } from '../lib/map/seeded'
@@ -112,6 +113,27 @@ export default function MapSetup({ projectName, onDone }) {
     }
   }
 
+  /** A 3D model (a .glb, or a self-contained .gltf): a station, a ship, a city block. */
+  const chooseModel = async () => {
+    setStatus('')
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, filters: [{ name: '3D models', extensions: MODEL_EXTENSIONS_LIST }] })
+      if (!selected) return
+      setStatus('Importing…')
+      const asset = await importAssetFromPath(projectName, Array.isArray(selected) ? selected[0] : selected)
+      onDone({
+        mapKind: 'model',
+        model: { asset, metresPerUnit: 1, up: 'y' },
+        scale: { kmPerUnit: 1, displayUnit: 'm', calibration: null, customUnits: [] },
+        style: { theme: 'night' },
+      })
+    } catch (error) {
+      console.error('[map] could not import the model:', error)
+      setStatus(error?.forWriter ? error.message : 'That model could not be imported.')
+    }
+  }
+
   return (
     <div className="map-setup">
       <div className="map-floating map-setup-card" style={{ position: 'relative' }}>
@@ -158,6 +180,11 @@ export default function MapSetup({ projectName, onDone }) {
             <Icon name="universe" size={20} />
             <strong>A group of galaxies</strong>
             <small>Galaxies placed in space, from a few neighbours to a cosmic web.</small>
+          </button>
+          <button type="button" className="map-setup-option" onClick={chooseModel}>
+            <Icon name="model" size={20} />
+            <strong>A 3D model</strong>
+            <small>A station, a ship or a building, from a .glb file. Pin its rooms and look around.</small>
           </button>
         </div>
 

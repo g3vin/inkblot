@@ -17,10 +17,11 @@ import { CINEMATIC } from '../../lib/map/spacePalette'
 import { createBackdrop } from './backdrop'
 import { createSystemScene } from './systemScene'
 import { createGalaxyScene } from './galaxyScene'
+import { createModelScene } from './modelScene'
 import { readSpaceCamera } from './spaceMath'
 import { createStage } from './stage'
 
-export default function SpaceView({ view, map, space, day, focusBody, skySeed, onError }) {
+export default function SpaceView({ view, map, space, day, focusBody, skySeed, projectName, lookAround = false, onError, onProblem }) {
   const containerRef = useRef(null)
   const stateRef = useRef(null)
   const dayRef = useRef(day)
@@ -75,6 +76,8 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
         if (!scene3) return null
         raycaster.setFromCamera(new Vector2((x / size.width) * 2 - 1, -(y / size.height) * 2 + 1), camera)
         scene3.plane.updateMatrixWorld()
+        // A model is clicked on its surface; everything else on its plane.
+        if (scene3.raycast) return scene3.raycast(raycaster)
         const normal = new Vector3(0, 1, 0).transformDirection(scene3.plane.matrixWorld)
         const floor = new Plane().setFromNormalAndCoplanarPoint(normal, scene3.plane.getWorldPosition(new Vector3()))
         const hit = raycaster.ray.intersectPlane(floor, new Vector3())
@@ -137,7 +140,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
       subscribe: stage.subscribe,
     }
 
-    stateRef.current = { stage, content: null }
+    stateRef.current = { stage, content: null, fit: api.fit }
     const detach = view.attach(api)
 
     return () => {
@@ -158,7 +161,21 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
   useEffect(() => {
     const state = stateRef.current
     if (!state) return undefined
-    const content = map.mapKind === 'system' ? createSystemScene(map, space, { colors: CINEMATIC }) : createGalaxyScene(map, { colors: CINEMATIC })
+    const content = map.mapKind === 'system'
+      ? createSystemScene(map, space, { colors: CINEMATIC })
+      : map.mapKind === 'model'
+        ? createModelScene(map, {
+            projectName,
+            renderer: state.stage.renderer,
+            scene: state.stage.scene,
+            onLoaded: () => {
+              // Framed once it is in, unless the map remembers where it was looked at from.
+              if (!view.cameraRef.current?.target) state.fit?.([])
+              state.stage.invalidate()
+            },
+            onError: (message) => onProblem?.(message),
+          })
+        : createGalaxyScene(map, { colors: CINEMATIC })
     state.stage.scene.add(content.root)
     state.content = content
     content.setDay(dayRef.current)
@@ -170,7 +187,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
     }
     // The scene is the system's: its bodies, plane and display (space follows the system).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map.mapKind, map.system, map.galaxy, map.universe, map.mapKind === 'universe' ? map.pins : null, space])
+  }, [map.mapKind, map.system, map.galaxy, map.universe, map.model, map.mapKind === 'universe' ? map.pins : null, space])
 
   /* ---------------- the day, and the body the camera follows ---------------- */
 
@@ -199,6 +216,71 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
     }
     state.stage.invalidate()
   }, [day, focusBody, map.system, map.galaxy, map.universe])
+
+  /* ---------------- looking around: turn in place, walk with the keys ---------------- */
+
+  useEffect(() => {
+    const state = stateRef.current
+    if (!state || !lookAround) return undefined
+    const { camera, controls } = state.stage
+    const saved = { target: controls.target.clone(), rotateSpeed: controls.rotateSpeed, enableZoom: controls.enableZoom }
+    // Orbit a point just in front of the eye: dragging turns the view where you stand.
+    const ahead = () => controls.target.clone().sub(camera.position).normalize()
+    const reach = Math.max(1e-4, camera.position.distanceTo(controls.target) * 0.002)
+    const facing = ahead()
+    controls.target.copy(camera.position).addScaledVector(facing, reach)
+    controls.rotateSpeed = -0.35
+    controls.enableZoom = false
+    controls.update()
+    const held = new Set()
+    let frame = 0
+    const scale = state.content?.extent?.().radius || 1
+    const walk = () => {
+      frame = 0
+      if (!held.size) return
+      const forward = ahead()
+      const right = new Vector3().crossVectors(forward, camera.up).normalize()
+      const step = new Vector3()
+      if (held.has('w') || held.has('arrowup')) step.add(forward)
+      if (held.has('s') || held.has('arrowdown')) step.sub(forward)
+      if (held.has('d') || held.has('arrowright')) step.add(right)
+      if (held.has('a') || held.has('arrowleft')) step.sub(right)
+      if (held.has('e')) step.add(camera.up)
+      if (held.has('q')) step.sub(camera.up)
+      step.multiplyScalar(scale * 0.006 * (held.has('shift') ? 4 : 1))
+      camera.position.add(step)
+      controls.target.add(step)
+      controls.update()
+      state.stage.invalidate()
+      state.stage.settle()
+      frame = requestAnimationFrame(walk)
+    }
+    const typing = (event) => event.target?.closest?.('input, textarea, [contenteditable="true"]')
+    const onDown = (event) => {
+      if (typing(event) || event.metaKey || event.ctrlKey) return
+      const key = event.key.toLowerCase()
+      if (!['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(key)) return
+      event.preventDefault()
+      held.add(key)
+      if (!frame) frame = requestAnimationFrame(walk)
+    }
+    const onUp = (event) => held.delete(event.key.toLowerCase())
+    window.addEventListener('keydown', onDown)
+    window.addEventListener('keyup', onUp)
+    window.addEventListener('blur', () => held.clear())
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('keydown', onDown)
+      window.removeEventListener('keyup', onUp)
+      controls.rotateSpeed = saved.rotateSpeed
+      controls.enableZoom = saved.enableZoom
+      // Step back out to orbiting what is in front of you.
+      const facingNow = ahead()
+      controls.target.copy(camera.position).addScaledVector(facingNow, Math.max(camera.position.distanceTo(saved.target), scale * 0.5))
+      controls.update()
+      state.stage.invalidate()
+    }
+  }, [lookAround])
 
   return <div ref={containerRef} className="map-space" aria-hidden="true" />
 }
