@@ -21,6 +21,7 @@ import { habitableZoneAU, temperatureToColor } from '../lib/map/stars'
 import { projectedEarth } from '../lib/map/earthData'
 import { hashSeed, INKED_STYLE, ROUGH_STYLE, roughenPath } from '../lib/map/roughen'
 import { travelerPositionAt } from '../lib/map/timeline'
+import { hiddenIds, hiddenKey, withoutHidden } from '../lib/map/mapVisibility'
 import { useAssetUrl } from '../canvas/useAssetUrl'
 import { PinGlyph } from './mapGlyphs'
 import { initials, labelNeedsFlip, linePath, ringsPath, travelerColor, travelerName } from './mapRender'
@@ -394,13 +395,14 @@ const LabelLayer = memo(function LabelLayer({ map, projector, space, day, zoom, 
 /** Galaxy names closer than this on screen give way to the first drawn. */
 const GALAXY_NAME_CLEARANCE_PX = 34
 
-const PinLayer = memo(function PinLayer({ map, projector, space, day, selection, missingDocs, hideNames }) {
+const PinLayer = memo(function PinLayer({ map, projector, space, day, selection, missingDocs, hideNames, hidden }) {
   // In a group of galaxies, a galaxy is its picture (drawn by the 3D view); its pin
   // is a quiet ring to click, named where there is room.
   const named = []
   return (
     <g className="map-pins">
       {map.pins.map((pin) => {
+        if (hidden?.has(pin.id)) return null
         const at = projector.toWorld(resolvePin(map, space, pin, day))
         if (!at) return null
         if (pin.galaxy && projector.kind === 'space') {
@@ -574,7 +576,7 @@ function TimelineEventLayer({ map, projector, space, day, events }) {
  */
 /** Memoized: a pan or zoom changes none of its props, so the layers sit it out. */
 const MapLayers = memo(function MapLayers({
-  map,
+  map: wholeMap,
   projector,
   space,
   day = 0,
@@ -592,6 +594,10 @@ const MapLayers = memo(function MapLayers({
   timelineEvents = null,
   positions = null,
 }) {
+  // What is on a hidden layer, or not there on this day, is not drawn at all.
+  const hidden = hiddenKey(wholeMap, day)
+  const map = useMemo(() => withoutHidden(wholeMap, hidden), [hidden, wholeMap])
+  const hiddenPins = useMemo(() => hiddenIds(hidden), [hidden])
   // Only on a star system does anything but a traveller move with the day. Holding
   // the day still for the other layers lets them skip re-rendering during playback.
   const staticDay = projector.kind === 'system' || projector.kind === 'space' ? day : 0
@@ -613,7 +619,7 @@ const MapLayers = memo(function MapLayers({
       {overGlobe ? null : <RegionLayer map={map} projector={projector} selection={selection} idPrefix={idPrefix} />}
       {overGlobe ? null : <RouteLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} idPrefix={idPrefix} />}
       <LabelLayer map={map} projector={projector} space={space} day={staticDay} zoom={zoom} selection={selection} idPrefix={idPrefix} />
-      <PinLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} missingDocs={missingDocs} hideNames={hidePinNames} />
+      <PinLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} missingDocs={missingDocs} hideNames={hidePinNames} hidden={hiddenPins} />
       <TravelerLayer map={map} projector={projector} space={space} day={day} schedules={schedules} selection={selection} />
       <TimelineEventLayer map={map} projector={projector} space={space} day={day} events={timelineEvents} />
     </g>

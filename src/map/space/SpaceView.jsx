@@ -137,6 +137,8 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
         }
         return best ? { kind: 'body', id: best.id } : null
       },
+      /** Glide to a saved camera: `{ position, target }` in scene units. */
+      goTo: (saved) => stage.moveTo(new Vector3(...saved.target), new Vector3(...saved.position)),
       subscribe: stage.subscribe,
     }
 

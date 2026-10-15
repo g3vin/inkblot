@@ -19,6 +19,8 @@ import { projectedEarth } from '../lib/map/earthData'
 import { createSpace, resolvePin } from '../lib/map/mapSpace'
 import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timeline'
 import { createEmptyMap, makePin, mapDocRefs, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
+import { isItemLocked } from '../lib/map/mapVisibility'
+import { eventDay } from './inspector/whenSections'
 import { forgetAncestry, loadAncestry, trailFor } from '../lib/map/mapAncestry'
 import Breadcrumb from '../ui/Breadcrumb.jsx'
 import { saveMapDocument } from '../lib/map/mapFileSystem'
@@ -467,9 +469,11 @@ export default function MapSurface({
       const handleEl = event.target.closest('[data-map-handle]')
       const forcePan = event.button === 1 || tool === 'pan' || spaceHeldRef.current
       // On the globe, regions and routes are drawn by MapLibre: asked for, not found in the DOM.
-      const item = itemEl
+      const picked = itemEl
         ? { id: itemEl.getAttribute('data-map-item'), kind: itemEl.getAttribute('data-map-kind') }
         : !handleEl && view.pick ? view.pick(startX, startY) : null
+      // What is on a locked layer stays put: a press there pans, as on empty ground.
+      const item = picked && !isItemLocked(map, picked.kind, picked.id) ? picked : null
 
       // What a drag will do, decided at the press.
       let dragKind = 'pan'
@@ -950,6 +954,25 @@ export default function MapSurface({
     return () => window.removeEventListener(MAP_SET_LEG_EVENT, onSetLeg)
   }, [dispatch, docPath, mapRef, projectName])
 
+  // Places that come and go with an event: when the event moves, so do they.
+  useEffect(() => {
+    if (!timeline) return
+    const events = new Map(timeline.events.map((event) => [event.id, event]))
+    for (const collection of ['pins', 'routes', 'regions', 'labels']) {
+      const patches = {}
+      for (const item of map[collection]) {
+        const patch = {}
+        for (const [edge, key] of [['from', 'fromEvent'], ['until', 'untilEvent']]) {
+          if (!item[key]) continue
+          const next = eventDay(events.get(item[key]), edge)
+          if (next !== null && next !== item[edge]) patch[edge] = next
+        }
+        if (Object.keys(patch).length) patches[item.id] = patch
+      }
+      if (Object.keys(patches).length) dispatch({ type: 'items/patch', collection, patches, meta: { upkeep: true, coalesce: 'follow-events' } })
+    }
+  }, [dispatch, map, timeline])
+
   // A leg moved here: events linked to it leave when it now leaves.
   useEffect(() => {
     const current = peekStoryTimeline(projectName)
@@ -1077,6 +1100,30 @@ export default function MapSurface({
     }
   }, [dispatch, projectName])
 
+  /** The way the map is being looked at, and the day: what a saved view keeps. */
+  const captureView = useCallback(() => {
+    const camera = viewKind === 'flat'
+      ? { view: 'flat', viewport: { ...flatView.viewportRef.current } }
+      : { view: viewKind, ...(viewKind === 'globe' ? globeView.cameraRef.current || globeView.camera : spaceView.cameraRef.current || spaceView.camera) }
+    return { camera, day: dayRef.current }
+  }, [flatView.viewportRef, globeView, spaceView, viewKind])
+
+  /** Back to a saved view: its day, and its camera when it was taken from this kind of view. */
+  const showView = useCallback((saved) => {
+    if (Number.isFinite(saved.day)) changeDay(saved.day)
+    const camera = saved.camera || {}
+    if (camera.view !== viewKind) {
+      setNotice('That view was saved from another way of showing this map. Switch back to see it as it was.')
+      return
+    }
+    if (viewKind === 'flat') {
+      if (camera.viewport) {
+        flatView.applyViewport(camera.viewport)
+        saveViewRef.current?.()
+      }
+    } else view.goTo?.(camera)
+  }, [changeDay, flatView, view, viewKind])
+
   /*
    * Where this map sits: the maps that contain it, outermost first (a galaxy, its
    * system, this world), read from the links between the project's maps.
@@ -1137,6 +1184,9 @@ export default function MapSurface({
     onOpenSurface: isSystem ? openSurface : null,
     onChoosePlanetPicture: choosePlanetPicture,
     onChooseModel: map.mapKind === 'model' ? chooseModel : null,
+    storyEvents: timeline?.events,
+    onSaveView: captureView,
+    onShowView: showView,
     onOpenPinMap: map.mapKind === 'galaxy' || map.mapKind === 'universe' ? openPinMap : null,
   })
   const openExport = useCallback(() => setExportOpen(true), [])

@@ -90,6 +90,7 @@ export function useSpaceView({ surfaceRef, initialCamera, onCameraChange, onRead
     const { x, y } = toSurfacePoint(clientX, clientY)
     return apiRef.current?.pick(x, y) || null
   }, [toSurfacePoint])
+  const goTo = useCallback((saved) => apiRef.current?.goTo?.(readSpaceCamera(saved)), [])
   const applyViewport = useCallback(() => {}, [])
 
   const projector = useMemo(() => spaceProjector(api, camera, size), [api, camera, size])
@@ -117,5 +118,6 @@ export function useSpaceView({ surfaceRef, initialCamera, onCameraChange, onRead
     centerOnStored,
     lockPan,
     pick,
-  }), [applyViewport, attach, camera, centerOn, centerOnStored, enabled, fitStored, fitTo, lockPan, pick, projector, surfaceRef, toSurfacePoint, zoomIn, zoomOut])
+    goTo,
+  }), [applyViewport, attach, camera, centerOn, centerOnStored, enabled, fitStored, fitTo, goTo, lockPan, pick, projector, surfaceRef, toSurfacePoint, zoomIn, zoomOut])
 }

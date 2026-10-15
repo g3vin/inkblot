@@ -184,6 +184,12 @@ export function useGlobeView({ surfaceRef, initialCamera, onCameraChange, enable
     return hit?.properties?.id ? { kind: hit.properties.kind, id: hit.properties.id } : null
   }, [toSurfacePoint])
 
+  /** Fly to a saved camera: `{ center, zoom, bearing, pitch }`. */
+  const goTo = useCallback((saved) => {
+    if (!saved || !Array.isArray(saved.center)) return
+    ease({ center: saved.center, zoom: saved.zoom, bearing: saved.bearing || 0, pitch: saved.pitch || 0 })
+  }, [ease])
+
   // Unused on the globe (MapLibre owns the gestures), present so callers need not ask.
   const applyViewport = useCallback(() => {}, [])
 
@@ -213,5 +219,6 @@ export function useGlobeView({ surfaceRef, initialCamera, onCameraChange, enable
     centerOnStored,
     lockPan,
     pick,
-  }), [applyViewport, attach, camera, centerOn, centerOnStored, enabled, fitStored, fitTo, lockPan, pick, projector, screenToWorldAt, surfaceRef, toSurfacePoint, zoomIn, zoomOut])
+    goTo,
+  }), [applyViewport, attach, camera, centerOn, centerOnStored, enabled, fitStored, fitTo, goTo, lockPan, pick, projector, screenToWorldAt, surfaceRef, toSurfacePoint, zoomIn, zoomOut])
 }
