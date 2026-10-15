@@ -214,7 +214,7 @@ export function labelSections(ui, { map, label, patch, onDelete, renameRequest }
 
 /* ---------------- star-system bodies ---------------- */
 
-export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focused, onFocus, renameRequest }) {
+export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focused, onFocus, onOpenSurface, renameRequest }) {
   const bodies = new Map(map.system.bodies.map((candidate) => [candidate.id, candidate]))
   const period = body.orbit ? orbitPeriod(body, bodies) : null
   const orbit = body.orbit
@@ -243,6 +243,9 @@ export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focu
         ? ui.color('body.color', 'Colour', body.color, MAP_DEFAULT_COLORS.body, (color) => patchBody({ color }))
         : null,
       ui.buttonField('body.focus', focused ? 'Stop following' : 'Centre the view on it', onFocus),
+      onOpenSurface && body.kind !== 'belt' && body.kind !== 'barycenter'
+        ? ui.buttonField('body.surface', body.surface ? 'Open its surface' : body.kind === 'star' ? 'Make a map of this star' : 'Make a map of this world', onOpenSurface)
+        : null,
     ]),
   ]
 

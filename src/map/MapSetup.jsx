@@ -11,6 +11,7 @@ import { IMAGE_EXTENSIONS_LIST, assetUrl, importAssetFromPath, measureImage } fr
 import { PROJECTION_NAMES } from '../lib/map/mapProjection'
 import { SYSTEM_PRESET_GROUPS, SYSTEM_PRESETS, presetSystem } from '../lib/map/systemPresets'
 import { newSeed } from '../lib/map/seeded'
+import { PLANET_PRESET_GROUPS, PLANET_PRESETS, presetSurface } from '../lib/map/planetPresets'
 import { defaultTerrainEntries } from '../lib/map/terrains'
 import { BLANK_SHEET } from '../lib/map/mapModel'
 
@@ -32,6 +33,15 @@ const EARTH_CHOICES = [
     earth: { view: 'flat', projection },
   })),
 ]
+
+/** A new planet map wearing `surface`. */
+const planetMap = (surface) => ({
+  mapKind: 'planet',
+  surface,
+  scale: { kmPerUnit: 1, displayUnit: 'km', calibration: null, customUnits: [] },
+  terrains: defaultTerrainEntries(),
+  style: { theme: 'night' },
+})
 
 export default function MapSetup({ projectName, onDone }) {
   const [step, setStep] = useState(null)
@@ -59,12 +69,29 @@ export default function MapSetup({ projectName, onDone }) {
     }
   }
 
+  /** A planet wrapped in a picture: an equirectangular map of a world. */
+  const choosePlanetPicture = async () => {
+    setStatus('')
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, filters: [{ name: 'Images', extensions: IMAGE_EXTENSIONS_LIST }] })
+      if (!selected) return
+      setStatus('Importing…')
+      const texture = await importAssetFromPath(projectName, Array.isArray(selected) ? selected[0] : selected)
+      onDone(planetMap({ ...presetSurface('earthlike'), look: { kind: 'texture', texture, seed: 1 } }))
+    } catch (error) {
+      console.error('[map] could not import the picture:', error)
+      setStatus('That picture could not be imported.')
+    }
+  }
+
   return (
     <div className="map-setup">
       <div className="map-floating map-setup-card" style={{ position: 'relative' }}>
         <h2>What kind of map is this?</h2>
         <p className="map-note">You can add places, routes and journeys to any of them, and change the look later.</p>
 
+        <h3 className="ib-eyebrow map-setup-heading">On a world</h3>
         <div className="map-setup-grid">
           <button type="button" className="map-setup-option" onClick={() => setStep('blank')}>
             <Icon name="map" size={20} />
@@ -81,12 +108,43 @@ export default function MapSetup({ projectName, onDone }) {
             <strong>The Earth</strong>
             <small>A globe to spin and zoom, or a flat map. Real coastlines, offline.</small>
           </button>
+          <button type="button" className="map-setup-option" onClick={() => setStep('planet')}>
+            <Icon name="world" size={20} />
+            <strong>A planet or star</strong>
+            <small>A whole world to turn, invented or drawn. Paint its continents.</small>
+          </button>
+        </div>
+
+        <h3 className="ib-eyebrow map-setup-heading">In space</h3>
+        <div className="map-setup-grid">
           <button type="button" className="map-setup-option" onClick={() => setStep('system')}>
             <Icon name="orbit" size={20} />
             <strong>A star system</strong>
-            <small>Stars, planets and moons that move with your story.</small>
+            <small>Stars, planets and moons that move with your story, in 3D.</small>
           </button>
         </div>
+
+        {step === 'planet' ? (
+          <div className="map-setup-groups">
+            {PLANET_PRESET_GROUPS.map(([group, title]) => (
+              <div key={group} className="map-setup-group">
+                <h3 className="ib-eyebrow">{title}</h3>
+                <div className="map-setup-choices">
+                  {PLANET_PRESETS.filter((preset) => preset.group === group).map((preset) => (
+                    <button key={preset.id} type="button" className="map-button" title={preset.hint} onClick={() => onDone(planetMap(presetSurface(preset.id, newSeed())))}>
+                      {preset.label}
+                    </button>
+                  ))}
+                  {group === 'world' ? (
+                    <button type="button" className="map-button" title="An equirectangular picture of a world" onClick={choosePlanetPicture}>
+                      From a picture…
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {step === 'blank' ? (
           <div className="map-setup-choices">

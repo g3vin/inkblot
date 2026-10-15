@@ -68,3 +68,38 @@ export function sceneReach(positions, display) {
   for (const position of positions.values()) reach = Math.max(reach, Math.hypot(...systemToScene(position, display)))
   return reach
 }
+
+/* ---------------- one world (planet maps) ---------------- */
+
+const RAD = Math.PI / 180
+
+/**
+ * A `[lon, lat]` (degrees) as a unit direction in the scene: longitude 0 towards
+ * +x, north up, longitude 90° E towards −z — the way three.js wraps an
+ * equirectangular picture round a sphere, so the map and its surface agree.
+ */
+export function lonLatToUnit(point) {
+  const lon = point[0] * RAD
+  const lat = point[1] * RAD
+  return [Math.cos(lat) * Math.cos(lon), Math.sin(lat), -Math.cos(lat) * Math.sin(lon)]
+}
+
+/** A unit direction back to `[lon, lat]`. */
+export function unitToLonLat(unit) {
+  return [Math.atan2(-unit[2], unit[0]) / RAD, Math.asin(Math.max(-1, Math.min(1, unit[1]))) / RAD]
+}
+
+/**
+ * Where the sun is overhead on `day`: the world turns once every `dayHours`, so
+ * noon sweeps west, and over its year (`yearDays`) the overhead latitude swings
+ * between its tropics, set by its axial tilt. Day 0 is noon on the prime meridian
+ * at the northern spring equinox.
+ */
+export function subsolarPoint(surface, day) {
+  const dayHours = surface.dayHours > 0 ? surface.dayHours : 24
+  const yearDays = surface.yearDays > 0 ? surface.yearDays : 365.25
+  const turns = (day * 24) / dayHours
+  const lon = -((((turns % 1) + 1) % 1) * 360)
+  const lat = (surface.axialTiltDeg || 0) * Math.sin((2 * Math.PI * day) / yearDays)
+  return [((lon + 540) % 360) - 180, Math.max(-90, Math.min(90, lat))]
+}
