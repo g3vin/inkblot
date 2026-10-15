@@ -20,7 +20,7 @@ const TOOLS = [
   { tool: 'pan', title: 'Move the map', icon: 'hand', shortcut: 'H', keywords: ['pan', 'hand', 'drag'] },
 ]
 
-export function useMapCommands({ active, mapKind, setTool, zoomIn, zoomOut, fitAll, hasSelection, removeSelection, openExport, showInspector, viewMenu = [], onViewOption, upOneLevel, openSurface }) {
+export function useMapCommands({ active, mapKind, setTool, zoomIn, zoomOut, fitAll, hasSelection, removeSelection, openExport, importGeo, showInspector, viewMenu = [], onViewOption, upOneLevel, openSurface }) {
   useCommands(() => {
     if (!active) return []
     const plane = mapKind === 'blank' || mapKind === 'image'
@@ -39,6 +39,7 @@ export function useMapCommands({ active, mapKind, setTool, zoomIn, zoomOut, fitA
       { id: 'map.fit', section: 'Map', title: 'Zoom to fit the map', icon: 'fit', shortcut: '⌘0', keywords: ['whole map', 'everything', 'reset view', 'frame'], run: fitAll },
       { id: 'map.delete', section: 'Map', title: 'Delete the selection', icon: 'delete', keywords: ['remove', 'erase'], when: () => hasSelection, run: removeSelection },
       { id: 'map.export', section: 'Map', title: 'Export map…', icon: 'export', keys: 'Mod+Alt+E', keywords: ['png', 'svg', 'pdf', 'print', 'picture', 'image', 'save as', 'copy image'], run: openExport },
+      { id: 'map.import', section: 'Map', title: 'Import places and borders…', icon: 'import', keywords: ['geojson', 'kml', 'google earth', 'gis', 'shapes', 'countries', 'open'], when: () => Boolean(importGeo), run: () => importGeo?.() },
       { id: 'map.up', section: 'Map', title: 'Go up to the map this is inside', icon: 'up-level', keywords: ['up', 'parent', 'out', 'back', 'system', 'galaxy', 'breadcrumb'], when: () => Boolean(upOneLevel), run: () => upOneLevel?.() },
       { id: 'map.open-surface', section: 'Map', title: 'Open the selected body’s surface', icon: 'world', keywords: ['planet', 'world', 'globe', 'drill', 'into', 'star'], when: () => Boolean(openSurface), run: () => openSurface?.() },
       { id: 'map.inspector', section: 'Map', title: 'Show the map’s settings', icon: 'sidebar', keywords: ['inspector', 'panel', 'scale', 'style', 'travel', 'journeys'], run: showInspector },
@@ -53,5 +54,5 @@ export function useMapCommands({ active, mapKind, setTool, zoomIn, zoomOut, fitA
         run: () => onViewOption?.(entry.id),
       })),
     ]
-  }, [active, fitAll, hasSelection, mapKind, onViewOption, openExport, openSurface, removeSelection, setTool, showInspector, upOneLevel, viewMenu, zoomIn, zoomOut])
+  }, [active, fitAll, hasSelection, importGeo, mapKind, onViewOption, openExport, openSurface, removeSelection, setTool, showInspector, upOneLevel, viewMenu, zoomIn, zoomOut])
 }

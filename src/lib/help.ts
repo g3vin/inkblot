@@ -455,6 +455,17 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
   },
   {
+    id: 'map.interchange',
+    section: 'Maps',
+    title: 'GeoJSON and KML',
+    body: [
+      'Import places and borders… (⌘K) reads a GeoJSON or KML file, from a GIS tool, Google Earth or a mapping site: points become places, lines routes, and shapes regions.',
+      'On the Earth and on a planet they land where they say. On a drawn map the whole file is fitted into the middle of the sheet, north up, ready to move.',
+      'Export map… saves this map’s places, routes and regions the same way, with their names, colours and days.',
+    ],
+    related: ['map.export'],
+  },
+  {
     id: 'map.earth-view',
     section: 'Maps',
     title: 'The globe and flat maps',

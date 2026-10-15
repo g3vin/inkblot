@@ -734,3 +734,33 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   const many = normalizeMap({ pins: [{ id: 'a', at: [0, 0] }, { id: 'b', at: [1, 0] }], routes: Array.from({ length: 6 }, (_, index) => ({ id: `r${index}`, name: `Road ${index}`, nodes: [{ pin: 'a' }, { pin: 'b' }] })) })
   ok('many routes drawn alike gather into one row', legendEntries(many).filter((entry) => entry.kind === 'route').length === 1)
 }
+
+/* ---------------- GeoJSON and KML ---------------- */
+
+{
+  const { JSDOM } = await import('jsdom')
+  globalThis.DOMParser = new JSDOM('').window.DOMParser
+  const { mapToGeoJSON, mapToKml, geoJSONToItems, kmlToGeoJSON, readGeoFile } = await import('../../src/lib/map/geoInterchange.js')
+  const earth = normalizeMap({
+    mapKind: 'earth',
+    pins: [{ id: 'p', name: 'Paris', at: [2.35, 48.85], icon: 'city' }, { id: 'l', name: 'London', at: [-0.13, 51.5] }],
+    routes: [{ id: 'r', name: 'Ferry', nodes: [{ pin: 'l' }, { pin: 'p' }] }],
+    regions: [{ id: 'g', name: 'Île', rings: [[[2, 48], [3, 48], [3, 49]]], from: 10 }],
+  })
+  const json = mapToGeoJSON(earth, createSpace(earth))
+  ok('out: places, routes and regions become features', json.features.map((feature) => feature.geometry.type).join() === 'Point,Point,LineString,Polygon')
+  ok('out: a route follows its places', JSON.stringify(json.features[2].geometry.coordinates) === JSON.stringify([[-0.13, 51.5], [2.35, 48.85]]))
+  ok('out: a polygon ring is closed, and a day kept', json.features[3].geometry.coordinates[0].length === 4 && json.features[3].properties.from === 10)
+  const back = geoJSONToItems(json, earth)
+  ok('in: what went out comes back', back.pins.length === 2 && back.routes.length === 1 && back.regions.length === 1 && back.pins[0].name === 'Paris' && back.pins[0].icon === 'city')
+  ok('in: a ring is opened again, and lands where it says on the Earth', back.regions[0].rings[0].length === 3 && back.regions[0].rings[0][0][0] === 2)
+  const kml = mapToKml(earth, createSpace(earth), { name: 'Trip' })
+  const fromKml = kmlToGeoJSON(kml)
+  ok('KML out and in again keeps names and shapes', fromKml.features.length === 4 && fromKml.features[0].properties.name === 'Paris' && fromKml.features[3].geometry.type === 'Polygon')
+  ok('a file is read by its look', readGeoFile(kml, 'trip.kml').features.length === 4 && readGeoFile(JSON.stringify(json)).features.length === 4)
+  const sheet = normalizeMap({ mapKind: 'blank' })
+  const fitted = geoJSONToItems({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'MultiPoint', coordinates: [[10, 50], [12, 52]] }, properties: {} }] }, sheet)
+  const [south, north] = fitted.pins
+  ok('on a drawn map an import is fitted to the sheet, north up', fitted.pins.length === 2 && north.at[1] < south.at[1] && south.at.every((value) => value > 0 && value < 4000))
+  ok('nonsense is counted, not imported', geoJSONToItems({ type: 'Feature', geometry: { type: 'Point', coordinates: ['a', 1] } }, earth).skipped === 1)
+}

@@ -2,6 +2,9 @@
  * ExportMapDialog.jsx — Export map… : the map out into the world as a PNG, SVG or
  * PDF, on paper, or on the clipboard (paste it into a chapter like any picture).
  *
+ * Places, routes and regions also go out as GeoJSON or KML, for GIS tools and
+ * Google Earth.
+ *
  * Opened from the map toolbar's More menu, ⌘K and ⇧⌘E. Everything is drawn by
  * mapExport.js from the same layers the editor shows, so an export is what was on
  * screen. A globe or 3D view is exported as it is framed, drawn by its own renderer
@@ -13,6 +16,7 @@ import { getDocDisplayName } from '../lib/docKind'
 import { buildSchedules } from '../lib/map/timeline'
 import { printFigure } from '../print/printJob'
 import { buildMapSvg, saveBytes, svgToPng } from './mapExport'
+import { mapToGeoJSON, mapToKml } from '../lib/map/geoInterchange'
 
 const FRAMES = [{ value: 'view', label: 'What’s on screen' }, { value: 'all', label: 'The whole map' }]
 const SHARPNESS = [{ value: '1', label: 'Standard (1×)' }, { value: '2', label: 'Retina (2×)' }, { value: '4', label: 'Print (4×)' }]
@@ -84,6 +88,15 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
     await printFigure({ markup: svg, widthPx: width, heightPx: height, jobName: name })
     return false
   })
+  const exportGeoJson = run('Saving GeoJSON', async () => {
+    const text = JSON.stringify(mapToGeoJSON(map, space, { day }), null, 2)
+    const path = await saveBytes(new TextEncoder().encode(text), name, 'geojson', 'GeoJSON')
+    return path ? `Saved ${path.split('/').pop()}.` : false
+  })
+  const exportKml = run('Saving KML', async () => {
+    const path = await saveBytes(new TextEncoder().encode(mapToKml(map, space, { name, day })), name, 'kml', 'KML')
+    return path ? `Saved ${path.split('/').pop()}.` : false
+  })
   const copy = run('Copying', async () => {
     const { svg, width, height } = await build(scale)
     const blob = await svgToPng(svg, width, height)
@@ -115,6 +128,12 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
       )}
       <FormRow label="Sharpness" help="map.export">
         <SelectMenu label="Sharpness" value={String(scale)} options={SHARPNESS} onChange={(value) => setScale(Number(value))} />
+      </FormRow>
+      <FormRow label="Places and borders" help="map.interchange">
+        <span className="map-row">
+          <Button disabled={busy} onClick={exportGeoJson}>Save GeoJSON…</Button>
+          <Button disabled={busy} onClick={exportKml}>Save KML…</Button>
+        </span>
       </FormRow>
       <p className="ib-hint" role="status">{status || 'Drag this map onto a canvas to show it there, kept up to date.'}</p>
     </Dialog>

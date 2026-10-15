@@ -21,6 +21,7 @@ import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timelin
 import { createEmptyMap, makePin, mapDocRefs, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
 import { isItemLocked } from '../lib/map/mapVisibility'
 import { eventDay } from './inspector/whenSections'
+import { geoJSONToItems, IMPORT_KINDS, readGeoFile } from '../lib/map/geoInterchange'
 import { forgetAncestry, loadAncestry, trailFor } from '../lib/map/mapAncestry'
 import Breadcrumb from '../ui/Breadcrumb.jsx'
 import { saveMapDocument } from '../lib/map/mapFileSystem'
@@ -1190,6 +1191,31 @@ export default function MapSurface({
     onOpenPinMap: map.mapKind === 'galaxy' || map.mapKind === 'universe' ? openPinMap : null,
   })
   const openExport = useCallback(() => setExportOpen(true), [])
+
+  /** Places, routes and regions from a GeoJSON or KML file, added in one step. */
+  const importGeo = useCallback(async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, filters: [{ name: 'GeoJSON or KML', extensions: ['geojson', 'json', 'kml'] }] })
+      if (!selected) return
+      const path = Array.isArray(selected) ? selected[0] : selected
+      const { readTextFile } = await import('@tauri-apps/plugin-fs')
+      const items = geoJSONToItems(readGeoFile(await readTextFile(path), path), mapRef.current)
+      const counts = [[items.pins, 'place'], [items.routes, 'route'], [items.regions, 'region'], [items.labels, 'label']]
+        .filter(([list]) => list.length)
+        .map(([list, noun]) => `${list.length} ${noun}${list.length === 1 ? '' : 's'}`)
+      for (const collection of ['pins', 'routes', 'regions', 'labels']) {
+        if (items[collection].length) dispatch({ type: 'items/add', collection, items: items[collection], meta: { coalesce: `import-${path}` } })
+      }
+      const list = counts.length > 1 ? `${counts.slice(0, -1).join(', ')} and ${counts[counts.length - 1]}` : counts[0]
+      setNotice(list ? `Imported ${list}.${items.skipped ? ` ${items.skipped} could not be read.` : ''}` : 'Nothing in that file could be placed on this map.')
+      if (list) window.requestAnimationFrame(() => fitAllRef.current?.())
+    } catch (error) {
+      console.error('[map] could not import:', error)
+      setNotice(error?.message || 'That file could not be imported.')
+    }
+  }, [dispatch, mapRef])
+
   useMapCommands({
     active: isActive,
     mapKind: map.mapKind,
@@ -1200,6 +1226,7 @@ export default function MapSurface({
     hasSelection: Boolean(selection),
     removeSelection,
     openExport,
+    importGeo: IMPORT_KINDS.has(map.mapKind) ? importGeo : null,
     showInspector,
     viewMenu,
     onViewOption: applyViewOption,
