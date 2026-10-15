@@ -251,6 +251,8 @@ export default function PlanetView({ view, map, space, day, selection, projectNa
       goTo: (saved) => stage.moveTo(new Vector3(...saved.target), new Vector3(...saved.position)),
       /** The view as a picture, for an export (stage.js). */
       picture: (scale) => stage.picture(scale),
+      canRecord: stage.canRecord,
+      record: (options) => stage.record(options),
       subscribe: stage.subscribe,
     }
 

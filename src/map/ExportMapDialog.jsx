@@ -8,7 +8,8 @@
  * Opened from the map toolbar's More menu, ⌘K and ⇧⌘E. Everything is drawn by
  * mapExport.js from the same layers the editor shows, so an export is what was on
  * screen. A globe or 3D view is exported as it is framed, drawn by its own renderer
- * under the same places and labels.
+ * under the same places and labels; a 3D view can also be filmed going once round
+ * (a turntable video, of the scene alone).
  */
 import { useState } from 'react'
 import { Button, Dialog, FormRow, Segmented, SelectMenu } from '../ui'
@@ -19,13 +20,15 @@ import { buildMapSvg, saveBytes, svgToPng } from './mapExport'
 import { mapToGeoJSON, mapToKml } from '../lib/map/geoInterchange'
 
 const FRAMES = [{ value: 'view', label: 'What’s on screen' }, { value: 'all', label: 'The whole map' }]
+const TURNTABLE_LENGTHS = [{ value: '4', label: '4 s' }, { value: '8', label: '8 s' }, { value: '16', label: '16 s' }]
 const SHARPNESS = [{ value: '1', label: 'Standard (1×)' }, { value: '2', label: 'Retina (2×)' }, { value: '4', label: 'Print (4×)' }]
 
-export default function ExportMapDialog({ open, onClose, map, projector, space, day, projectName, docPath, surfaceRef, viewportRef, picture = null }) {
+export default function ExportMapDialog({ open, onClose, map, projector, space, day, projectName, docPath, surfaceRef, viewportRef, picture = null, recorder = null }) {
   const [frame, setFrame] = useState('view')
   const [scale, setScale] = useState(2)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [seconds, setSeconds] = useState('8')
   const name = getDocDisplayName(docPath)
 
   // A globe or a 3D view draws itself (`picture`); only what is on screen can be shown.
@@ -97,6 +100,15 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
     const path = await saveBytes(new TextEncoder().encode(mapToKml(map, space, { name, day })), name, 'kml', 'KML')
     return path ? `Saved ${path.split('/').pop()}.` : false
   })
+  const exportVideo = run('Recording', async () => {
+    const { blob, extension } = await recorder.record({
+      seconds: Number(seconds),
+      onProgress: (fraction) => setStatus(`Recording… ${Math.round(fraction * 100)}%`),
+    })
+    setStatus('Saving…')
+    const path = await saveBytes(new Uint8Array(await blob.arrayBuffer()), `${name} turntable`, extension, 'Video')
+    return path ? `Saved ${path.split('/').pop()}.` : false
+  })
   const copy = run('Copying', async () => {
     const { svg, width, height } = await build(scale)
     const blob = await svgToPng(svg, width, height)
@@ -129,6 +141,14 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
       <FormRow label="Sharpness" help="map.export">
         <SelectMenu label="Sharpness" value={String(scale)} options={SHARPNESS} onChange={(value) => setScale(Number(value))} />
       </FormRow>
+      {recorder ? (
+        <FormRow label="Turntable" help="map.export">
+          <span className="map-row">
+            <Segmented label="How long" value={seconds} onChange={setSeconds} options={TURNTABLE_LENGTHS} />
+            <Button disabled={busy} onClick={exportVideo}>Save video…</Button>
+          </span>
+        </FormRow>
+      ) : null}
       <FormRow label="Places and borders" help="map.interchange">
         <span className="map-row">
           <Button disabled={busy} onClick={exportGeoJson}>Save GeoJSON…</Button>

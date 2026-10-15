@@ -6,7 +6,7 @@
  * asks for more while it settles). After each frame the view's `onFrame` hears the
  * camera, and a quarter-second after the camera stops, `onSettle` (to save it).
  * `moveTo` glides the camera somewhere (or cuts, under reduced motion); `picture`
- * draws the view into a canvas, for an export.
+ * draws the view into a canvas, for an export, and `record` films a turntable.
  *
  * The space view (systems) and the planet view (one world) build on it; each adds
  * its own scene and the projector API the map surface talks to.
@@ -48,6 +48,8 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
   let glide = 0
   let settleTimer = 0
   let disposed = false
+  // While a turntable records, it alone draws.
+  let recording = false
 
   const snapshot = () => ({
     position: camera.position.toArray(),
@@ -59,7 +61,7 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
 
   function draw() {
     frame = 0
-    if (disposed) return
+    if (disposed || recording) return
     const moving = controls.update()
     beforeRender?.(camera, size)
     renderer.render(scene, camera)
@@ -156,6 +158,62 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     return out
   }
 
+  /** Whether this browser can record the view as a video. */
+  const canRecord = () => typeof renderer.domElement.captureStream === 'function' && typeof MediaRecorder !== 'undefined'
+
+  /**
+   * A turntable: the camera goes once round what it looks at, about the scene's up,
+   * over `seconds`, recorded from the canvas. Resolves to `{ blob, extension }`.
+   * Frames are drawn one by one and paced in real time, which is how the recorder
+   * stamps them; the camera comes back to where it was.
+   */
+  async function record({ seconds = 8, fps = 30, onProgress } = {}) {
+    if (!canRecord()) throw new Error('Video recording is not available here.')
+    const stream = renderer.domElement.captureStream(0)
+    const [track] = stream.getVideoTracks()
+    const mimeType = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((type) => MediaRecorder.isTypeSupported(type))
+    if (!mimeType) throw new Error('Video recording is not available here.')
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 12e6 })
+    const chunks = []
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) chunks.push(event.data)
+    }
+    const stopped = new Promise((resolve) => {
+      recorder.onstop = resolve
+    })
+    cancelAnimationFrame(frame)
+    frame = 0
+    recording = true
+    controls.enabled = false
+    const target = controls.target.clone()
+    const start = camera.position.clone()
+    const offset = start.clone().sub(target)
+    const frames = Math.round(seconds * fps)
+    recorder.start()
+    try {
+      for (let index = 0; index <= frames; index += 1) {
+        const angle = (index / frames) * Math.PI * 2
+        camera.position.copy(target).add(offset.clone().applyAxisAngle(camera.up, angle))
+        camera.lookAt(target)
+        beforeRender?.(camera, size)
+        renderer.render(scene, camera)
+        track.requestFrame?.()
+        onProgress?.(index / frames)
+        await new Promise((resolve) => window.setTimeout(resolve, 1000 / fps))
+      }
+    } finally {
+      recorder.stop()
+      track.stop()
+      recording = false
+      camera.position.copy(start)
+      controls.enabled = true
+      controls.update()
+      invalidate()
+    }
+    await stopped
+    return { blob: new Blob(chunks, { type: mimeType }), extension: mimeType.startsWith('video/mp4') ? 'mp4' : 'webm' }
+  }
+
   function dispose() {
     disposed = true
     cancelAnimationFrame(frame)
@@ -167,5 +225,5 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     renderer.domElement.remove()
   }
 
-  return { renderer, camera, controls, scene, size, invalidate, settle, moveTo, screenOf, subscribe, picture, dispose }
+  return { renderer, camera, controls, scene, size, invalidate, settle, moveTo, screenOf, subscribe, picture, canRecord, record, dispose }
 }

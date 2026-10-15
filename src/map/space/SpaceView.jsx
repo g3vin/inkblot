@@ -141,6 +141,8 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
       goTo: (saved) => stage.moveTo(new Vector3(...saved.target), new Vector3(...saved.position)),
       /** The view as a picture, for an export (stage.js). */
       picture: (scale) => stage.picture(scale),
+      canRecord: stage.canRecord,
+      record: (options) => stage.record(options),
       subscribe: stage.subscribe,
     }
 
