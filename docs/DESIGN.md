@@ -472,6 +472,7 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `Field` + `Input` / `TextArea`, `Checkbox` | Forms in dialogs | Label above, hint below. Errors say how to fix |
 | `Segmented` | 2–4 exclusive, short options | Otherwise use `SelectMenu` |
 | `Tabs` | Views within a panel | Underline style |
+| `Breadcrumb` | Where something sits in a chain that contains it (a map inside a system inside a galaxy) | Every step but the last goes there; the last is `aria-current`. Past four steps the middle folds into “…” |
 | `Panel`, `PanelHeader`, `PanelBody` | Floating panels (the two sidebars are the tray's own, §6) | Header title is an eyebrow. An `ib-sheet` |
 | `Inlay`, `InlaySlot` | A panel's own filter, search or + | Bare on the panel: no fill or border. Focus inks a field's glyphs. A slot lays out a row of pieces. See §6 |
 | `FadeScrim` | Chrome over the document | See §6 |

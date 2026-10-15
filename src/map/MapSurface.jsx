@@ -18,7 +18,9 @@ import { createProjector } from '../lib/map/mapProjection'
 import { projectedEarth } from '../lib/map/earthData'
 import { createSpace, resolvePin } from '../lib/map/mapSpace'
 import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timeline'
-import { createEmptyMap, makePin, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
+import { createEmptyMap, makePin, mapDocRefs, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
+import { forgetAncestry, loadAncestry, trailFor } from '../lib/map/mapAncestry'
+import Breadcrumb from '../ui/Breadcrumb.jsx'
 import { saveMapDocument } from '../lib/map/mapFileSystem'
 import { surfaceForBody } from '../lib/map/planetPresets'
 import { defaultTerrainEntries } from '../lib/map/terrains'
@@ -74,6 +76,9 @@ const DOUBLE_CLICK_MS = 320
 const SNAP_PX = 14
 
 // MapLibre and the globe: loaded the first time a map is shown as a globe.
+/** The breadcrumb's glyph for each kind of map. */
+const MAP_KIND_ICONS = { earth: 'globe', planet: 'world', system: 'orbit' }
+
 const GlobeView = lazy(() => import('./GlobeView'))
 const SpaceView = lazy(() => import('./space/SpaceView'))
 const PlanetView = lazy(() => import('./space/PlanetView'))
@@ -146,7 +151,7 @@ export default function MapSurface({
     onReady: () => fitAllRef.current?.(),
     enabled: wantsSpace,
   })
-  const { map, mapRef, dispatch, undo, redo, saveView, canUndo, canRedo } = useMapDocument({
+  const { map, mapRef, dispatch, undo, redo, saveView, saveNow, canUndo, canRedo } = useMapDocument({
     projectName,
     docPath,
     initialMap,
@@ -983,14 +988,14 @@ export default function MapSurface({
       style: { theme: 'night' },
     })
     if (!(await saveMapDocument(projectName, path, world))) return
-    dispatch({
-      type: 'section/patch',
-      section: 'system',
-      patch: { bodies: mapRef.current.system.bodies.map((candidate) => (candidate.id === body.id ? { ...candidate, surface: path } : candidate)) },
-    })
+    const bodiesLinked = mapRef.current.system.bodies.map((candidate) => (candidate.id === body.id ? { ...candidate, surface: path } : candidate))
+    dispatch({ type: 'section/patch', section: 'system', patch: { bodies: bodiesLinked } })
+    // On disk before the world opens, so it finds this system above it.
+    await saveNow({ ...mapRef.current, system: { ...mapRef.current.system, bodies: bodiesLinked } })
+    forgetAncestry()
     announceProjectFiles()
     onOpenDoc?.(path)
-  }, [dispatch, docPath, docs.paths, mapRef, onOpenDoc, projectName])
+  }, [dispatch, docPath, docs.paths, mapRef, onOpenDoc, projectName, saveNow])
 
   const choosePlanetPicture = useCallback(async () => {
     try {
@@ -1003,6 +1008,34 @@ export default function MapSurface({
       console.error('[map] could not import the picture:', error)
     }
   }, [dispatch, mapRef, projectName])
+
+  /*
+   * Where this map sits: the maps that contain it, outermost first (a galaxy, its
+   * system, this world), read from the links between the project's maps.
+   */
+  const [trail, setTrail] = useState([])
+  const mapPathsKey = useMemo(() => docs.docs.map((doc) => doc.path).filter((path) => isMapDoc(path)).sort().join('\n'), [docs.docs])
+  const linksKey = useMemo(() => mapDocRefs(map).join('\n'), [map])
+  const lastLinksKey = useRef(linksKey)
+  useEffect(() => {
+    if (!docs.loaded || !mapPathsKey) return undefined
+    if (lastLinksKey.current !== linksKey) {
+      lastLinksKey.current = linksKey
+      forgetAncestry()
+    }
+    let cancelled = false
+    void loadAncestry(projectName, mapPathsKey.split('\n')).then((index) => {
+      if (!cancelled) setTrail(trailFor(docPath, index))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [docPath, docs.loaded, linksKey, mapPathsKey, projectName])
+  const breadcrumb = useMemo(() => trail.map((step) => ({
+    id: step.path,
+    label: getDocDisplayName(step.path),
+    icon: MAP_KIND_ICONS[step.kind] || 'map',
+  })), [trail])
 
   const mapPanel = useMapPanel({
     projectName,
@@ -1050,6 +1083,8 @@ export default function MapSurface({
     showInspector,
     viewMenu,
     onViewOption: applyViewOption,
+    upOneLevel: trail.length > 1 ? () => onOpenDoc?.(trail[trail.length - 2].path) : null,
+    openSurface: isSystem && selection?.kind === 'body' && selectedItem ? () => void openSurface(selectedItem) : null,
   })
 
   // Commands arrive through a listener set up once; they reach the panel as last built.
@@ -1221,6 +1256,12 @@ export default function MapSurface({
           />
         </g>
       </svg>
+
+      {breadcrumb.length > 1 ? (
+        <div className="map-floating map-breadcrumb" style={{ left: `${box.left + 12}px`, top: `${box.top + 12}px` }}>
+          <Breadcrumb label="Where this map is" items={breadcrumb} onSelect={(path) => onOpenDoc?.(path)} />
+        </div>
+      ) : null}
 
       <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} bearing={isGlobe ? globeView.camera.bearing : 0} />
 
