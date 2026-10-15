@@ -18,6 +18,8 @@
   --map-pin: #c0392b;
   --map-region: #6d9c5a;
   --map-label-font: 'Iowan Old Style', 'Palatino', Georgia, serif;
+  /* Space behind a 3D view, and behind a galaxy's picture. */
+  --map-space: #03050b;
 }
 
 :root[data-theme='dark'] .map-surface[data-map-theme='clean'] {

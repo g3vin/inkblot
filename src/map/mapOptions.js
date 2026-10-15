@@ -54,6 +54,8 @@ export const PIN_ICONS = [
   { id: 'battle', label: 'Battle' },
   { id: 'star', label: 'Landmark' },
   { id: 'skull', label: 'Danger' },
+  { id: 'system', label: 'Star system' },
+  { id: 'galaxy', label: 'Galaxy' },
 ]
 
 /** Compass rose styles the style panel offers. */
@@ -64,7 +66,7 @@ export const COMPASS_STYLES = [
 ]
 
 /** The unit distances on this map are shown in; a star system picks per figure. */
-export const unitFor = (map) => (map.mapKind === 'system' ? 'auto' : map.scale.displayUnit || 'km')
+export const unitFor = (map) => (['system', 'galaxy', 'universe'].includes(map.mapKind) ? 'auto' : map.scale.displayUnit || 'km')
 
 /** A label that runs along `route`, carrying its name. */
 export const newRouteLabel = (route) => ({

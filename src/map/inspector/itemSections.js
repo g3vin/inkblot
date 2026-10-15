@@ -40,14 +40,18 @@ const deleteSection = (ui, id, onDelete, label = 'Delete') =>
 
 /* ---------------- places ---------------- */
 
-export function pinSections(ui, { map, pin, space, day, docs, missing, patch, onOpenDoc, onDelete, renameRequest }) {
+export function pinSections(ui, { map, pin, space, day, docs, missing, patch, onOpenDoc, onOpenPinMap, onDelete, renameRequest }) {
   const at = resolvePin(map, space, pin, day)
   const coordinates = at
     ? map.mapKind === 'earth'
       ? `${Math.abs(at[1]).toFixed(3)}° ${at[1] >= 0 ? 'N' : 'S'}, ${Math.abs(at[0]).toFixed(3)}° ${at[0] >= 0 ? 'E' : 'W'}`
       : map.mapKind === 'system'
         ? `${Math.hypot(at[0], at[1]).toFixed(3)} AU from the centre`
-        : `${Math.round(at[0])}, ${Math.round(at[1])}`
+        : map.mapKind === 'galaxy'
+          ? `${(Math.hypot(at[0], at[1], at[2] || 0) / 1000).toFixed(1)} thousand light-years from the centre`
+          : map.mapKind === 'universe'
+            ? `${(Math.hypot(at[0], at[1], at[2] || 0) * 3.2616).toFixed(2)} million light-years from the centre`
+            : `${Math.round(at[0])}, ${Math.round(at[1])}`
     : '—'
   return [
     ui.section('place', 'Place', [
@@ -64,6 +68,10 @@ export function pinSections(ui, { map, pin, space, day, docs, missing, patch, on
       ),
       missing ? ui.warning('The linked document has been deleted or moved. Choose it again above.') : null,
       pin.doc && !missing ? ui.buttonField('pin.open', `Open “${getDocDisplayName(pin.doc)}”`, () => onOpenDoc?.(pin.doc)) : null,
+      // In space, a place can be a map of its own: a galaxy in a group, a star system in a galaxy.
+      !pin.doc && onOpenPinMap && (map.mapKind === 'universe' || map.mapKind === 'galaxy')
+        ? ui.buttonField('pin.map', map.mapKind === 'universe' ? 'Open as a galaxy' : 'Make a star system here', onOpenPinMap)
+        : null,
       !docs.docs.some((doc) => doc.isLocation)
         ? ui.note('Tip: documents in a folder named Settings, Locations or Places are offered first here — and can be dragged straight onto the map.')
         : null,

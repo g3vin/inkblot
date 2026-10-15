@@ -1,6 +1,6 @@
 /**
- * SpaceView.jsx — a star system in three dimensions, drawn by three.js. Loaded only
- * when a system is shown in 3D.
+ * SpaceView.jsx — a star system, a galaxy or a group of galaxies in three
+ * dimensions, drawn by three.js. Loaded only when one is shown in 3D.
  *
  * It owns the renderer, the camera and its controls (drag to orbit, scroll or pinch
  * to zoom, right-drag or ⇧-drag to pan), and the scene (systemScene.js). Places,
@@ -16,7 +16,8 @@ import { seedOf } from '../../lib/map/seeded'
 import { CINEMATIC } from '../../lib/map/spacePalette'
 import { createBackdrop } from './backdrop'
 import { createSystemScene } from './systemScene'
-import { readSpaceCamera, sceneToSystem, systemToScene } from './spaceMath'
+import { createGalaxyScene } from './galaxyScene'
+import { readSpaceCamera } from './spaceMath'
 import { createStage } from './stage'
 
 export default function SpaceView({ view, map, space, day, focusBody, skySeed, onError }) {
@@ -24,8 +25,6 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
   const stateRef = useRef(null)
   const dayRef = useRef(day)
   const followRef = useRef(null)
-  const displayRef = useRef(map.system.display)
-  displayRef.current = map.system.display
 
   /* ---------------- the stage, and the API the surface talks to ---------------- */
 
@@ -63,7 +62,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
     const toWorld = (point) => {
       const scene3 = content()
       if (!scene3) return null
-      return scene3.plane.localToWorld(new Vector3(...systemToScene(point, displayRef.current)))
+      return scene3.plane.localToWorld(new Vector3(...scene3.toScene(point)))
     }
     const raycaster = new Raycaster()
     const api = {
@@ -81,7 +80,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
         const hit = raycaster.ray.intersectPlane(floor, new Vector3())
         if (!hit) return null
         const local = scene3.plane.worldToLocal(hit)
-        const point = sceneToSystem([local.x, local.y, local.z], displayRef.current)
+        const point = scene3.fromScene([local.x, local.y, local.z])
         return [point[0], point[1]]
       },
       fit: (points) => {
@@ -90,9 +89,17 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
         const worlds = points.length
           ? points.map(toWorld).filter(Boolean)
           : scene3.hitList().map((entry) => entry.object.getWorldPosition(new Vector3()))
-        if (!worlds.length) worlds.push(new Vector3())
-        const centre = worlds.reduce((sum, point) => sum.add(point), new Vector3()).divideScalar(worlds.length)
-        const radius = Math.max(0.05, ...worlds.map((point) => point.distanceTo(centre)))
+        let centre
+        let radius
+        if (scene3.extent) {
+          // A galaxy or a group: the whole of it, and any place set out beyond it.
+          ;({ centre, radius } = scene3.extent())
+          for (const point of worlds) radius = Math.max(radius, point.distanceTo(centre) * 1.05)
+        } else {
+          if (!worlds.length) worlds.push(new Vector3())
+          centre = worlds.reduce((sum, point) => sum.add(point), new Vector3()).divideScalar(worlds.length)
+          radius = Math.max(0.05, ...worlds.map((point) => point.distanceTo(centre)))
+        }
         const distance = (radius / Math.sin(((camera.fov * Math.PI) / 180) / 2)) * 1.1
         const direction = camera.position.clone().sub(controls.target)
         if (direction.lengthSq() < 1e-12) direction.set(0, 0.55, 0.83)
@@ -151,7 +158,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
   useEffect(() => {
     const state = stateRef.current
     if (!state) return undefined
-    const content = createSystemScene(map, space, { colors: CINEMATIC })
+    const content = map.mapKind === 'system' ? createSystemScene(map, space, { colors: CINEMATIC }) : createGalaxyScene(map, { colors: CINEMATIC })
     state.stage.scene.add(content.root)
     state.content = content
     content.setDay(dayRef.current)
@@ -163,7 +170,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
     }
     // The scene is the system's: its bodies, plane and display (space follows the system).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map.system, space])
+  }, [map.mapKind, map.system, map.galaxy, map.universe, map.mapKind === 'universe' ? map.pins : null, space])
 
   /* ---------------- the day, and the body the camera follows ---------------- */
 
@@ -191,7 +198,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, o
       followRef.current = null
     }
     state.stage.invalidate()
-  }, [day, focusBody, map.system])
+  }, [day, focusBody, map.system, map.galaxy, map.universe])
 
   return <div ref={containerRef} className="map-space" aria-hidden="true" />
 }

@@ -391,12 +391,35 @@ const LabelLayer = memo(function LabelLayer({ map, projector, space, day, zoom, 
   )
 })
 
+/** Galaxy names closer than this on screen give way to the first drawn. */
+const GALAXY_NAME_CLEARANCE_PX = 34
+
 const PinLayer = memo(function PinLayer({ map, projector, space, day, selection, missingDocs, hideNames }) {
+  // In a group of galaxies, a galaxy is its picture (drawn by the 3D view); its pin
+  // is a quiet ring to click, named where there is room.
+  const named = []
   return (
     <g className="map-pins">
       {map.pins.map((pin) => {
         const at = projector.toWorld(resolvePin(map, space, pin, day))
         if (!at) return null
+        if (pin.galaxy && projector.kind === 'space') {
+          const selected = selection?.kind === 'pin' && selection.id === pin.id
+          const roomy = !named.some((other) => Math.hypot(other[0] - at[0], other[1] - at[1]) < GALAXY_NAME_CLEARANCE_PX)
+          if (roomy || selected) named.push(at)
+          return (
+            <g
+              key={pin.id}
+              className={`map-pin map-pin-galaxy${selected ? ' is-selected' : ''}`}
+              data-map-item={pin.id}
+              data-map-kind="pin"
+              transform={`translate(${at[0]} ${at[1]})`}
+            >
+              <circle className="map-body-target" r={9} />
+              {roomy || selected ? <text className="map-body-name" x={11} y={4}>{pinLabel(pin, getDocDisplayName)}</text> : null}
+            </g>
+          )
+        }
         return (
           <PinMark
             key={pin.id}

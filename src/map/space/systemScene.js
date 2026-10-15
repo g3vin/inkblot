@@ -37,7 +37,7 @@ import { runFor } from '../../lib/map/nbody'
 import { habitableZoneAU, temperatureToColor } from '../../lib/map/stars'
 import { random, seedOf } from '../../lib/map/seeded'
 import { STAR_PARTS } from '../../lib/map/spacePalette'
-import { sceneScaleAt, systemToScene } from './spaceMath'
+import { sceneScaleAt, sceneToSystem, systemToScene } from './spaceMath'
 import { createStar } from './starMeshes'
 import { createWorld } from './planetMeshes'
 
@@ -264,6 +264,12 @@ export function createSystemScene(map, space, { colors }) {
   return {
     root,
     plane,
+    /** A system point (AU) in the plane group's space, and back (onto the plane). */
+    toScene: (point) => systemToScene(point, display),
+    fromScene: (local) => {
+      const point = sceneToSystem(local, display)
+      return [point[0], point[1]]
+    },
     setDay,
     beforeRender,
     /** A body's scene position (in the plane group's space) on the current day. */
