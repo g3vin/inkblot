@@ -455,6 +455,16 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
   },
   {
+    id: 'map.find',
+    section: 'Maps',
+    title: 'Finding things on a map',
+    body: [
+      '⌘F on a map finds its places, routes, regions, labels, bodies and travellers by name as you type. Choose one, or press ↓ then Return, to fly there and select it.',
+      'On the Earth, with online maps on, Return also looks for real places of that name. Choose one to fly there, then Add as a place to pin it.',
+    ],
+    related: ['map.online'],
+  },
+  {
     id: 'map.interchange',
     section: 'Maps',
     title: 'GeoJSON and KML',

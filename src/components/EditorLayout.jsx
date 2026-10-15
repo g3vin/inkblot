@@ -55,7 +55,7 @@ import { setInspectorOpen } from '../lib/inspectorPresence'
 import { useCommands } from '../lib/commands'
 import { createClipboardNote, createFreeNote, createQuoteNote } from '../lib/noteUtils'
 import { requestDraftKind } from '../lib/draftDocument'
-import { requestFind } from '../lib/sidebarSearch'
+import { requestFind, requestMapFind } from '../lib/sidebarSearch'
 import { refreshFolderPresets } from '../lib/folderPresets'
 import FolderPresetsSheet from './FolderPresetsSheet'
 import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason } from '../lib/docLocks'
@@ -353,11 +353,15 @@ export default function EditorLayout(props) {
 
   // ⌘F: the find bar, finding what is selected.
   const findInDocument = useCallback(() => {
+    if (isMapDoc(activeDoc || currentDoc)) {
+      requestMapFind()
+      return
+    }
     const live = props.activeEditor
     const selection = live && !live.isDestroyed ? live.state.selection : null
     const query = selection && !selection.empty ? live.state.doc.textBetween(selection.from, selection.to, ' ').trim() : ''
     requestFind(query)
-  }, [props.activeEditor])
+  }, [activeDoc, currentDoc, props.activeEditor])
 
   // The project's locks (docLocks.ts), read when it opens; the file tree re-reads them.
   // And its own folder types (folderPresets.ts).
@@ -808,7 +812,7 @@ export default function EditorLayout(props) {
             </div>
           </div>
 
-          {comparing ? null : <FindBar editor={props.activeEditor} />}
+          {comparing || activeIsMap ? null : <FindBar editor={props.activeEditor} />}
 
           <EditorCanvas
             {...props}

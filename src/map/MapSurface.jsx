@@ -22,6 +22,8 @@ import { createEmptyMap, makePin, mapDocRefs, newId, normalizeMap, pinLabel, rew
 import { isItemLocked } from '../lib/map/mapVisibility'
 import { eventDay } from './inspector/whenSections'
 import { geoJSONToItems, IMPORT_KINDS, readGeoFile } from '../lib/map/geoInterchange'
+import { MAP_FIND_EVENT } from '../lib/sidebarSearch'
+import MapSearch from './MapSearch'
 import { forgetAncestry, loadAncestry, trailFor } from '../lib/map/mapAncestry'
 import Breadcrumb from '../ui/Breadcrumb.jsx'
 import { saveMapDocument } from '../lib/map/mapFileSystem'
@@ -131,6 +133,7 @@ export default function MapSurface({
   const [onlineAsk, setOnlineAsk] = useState(null)
   // Walking about inside a model (SpaceView), and anything the view needs to say.
   const [lookAround, setLookAround] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [notice, setNotice] = useState(null)
 
   // The Earth as a globe is drawn by MapLibre, and moved by it; a star system in 3D
@@ -1192,6 +1195,34 @@ export default function MapSurface({
   })
   const openExport = useCallback(() => setExportOpen(true), [])
 
+  /* ---------------- find on this map ---------------- */
+
+  useEffect(() => {
+    if (!isActive) return undefined
+    const open = () => setSearchOpen(true)
+    window.addEventListener(MAP_FIND_EVENT, open)
+    return () => window.removeEventListener(MAP_FIND_EVENT, open)
+  }, [isActive])
+  const pickFound = useCallback((hit) => {
+    select(hit.kind, hit.id)
+    if (view.centerOnStored) view.centerOnStored(hit.at)
+    else {
+      const world = projector.toWorld(hit.at)
+      if (world) view.centerOn(world[0], world[1])
+    }
+    setSearchOpen(false)
+  }, [projector, select, view])
+  const goWorld = useCallback((place) => {
+    if (view.fitStored) view.fitStored([place.at])
+    else {
+      const world = projector.toWorld(place.at)
+      if (world) view.centerOn(world[0], world[1])
+    }
+  }, [projector, view])
+  const addWorld = useCallback((place) => {
+    addItem('pins', makePin({ name: place.name, at: place.at }), 'pin')
+  }, [addItem])
+
   /** Places, routes and regions from a GeoJSON or KML file, added in one step. */
   const importGeo = useCallback(async () => {
     try {
@@ -1227,6 +1258,7 @@ export default function MapSurface({
     removeSelection,
     openExport,
     importGeo: IMPORT_KINDS.has(map.mapKind) ? importGeo : null,
+    openSearch: () => setSearchOpen(true),
     showInspector,
     viewMenu,
     onViewOption: applyViewOption,
@@ -1379,6 +1411,22 @@ export default function MapSurface({
           <span>{notice}</span>
           <button type="button" className="map-button" onClick={() => setNotice(null)}>OK</button>
         </div>
+      ) : null}
+      {searchOpen ? (
+        <MapSearch
+          map={map}
+          space={space}
+          day={day}
+          online={map.mapKind === 'earth' && readOnlineMaps().enabled}
+          near={isGlobe ? globeView.camera.center : null}
+          onPick={pickFound}
+          onGoWorld={goWorld}
+          onAddWorld={addWorld}
+          onClose={() => {
+            setSearchOpen(false)
+            view.surfaceRef.current?.focus({ preventScroll: true })
+          }}
+        />
       ) : null}
       {lookAround && map.mapKind === 'model' ? (
         <div className="map-floating map-notice" role="status">

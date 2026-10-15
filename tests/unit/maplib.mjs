@@ -764,3 +764,20 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('on a drawn map an import is fitted to the sheet, north up', fitted.pins.length === 2 && north.at[1] < south.at[1] && south.at.every((value) => value > 0 && value < 4000))
   ok('nonsense is counted, not imported', geoJSONToItems({ type: 'Feature', geometry: { type: 'Point', coordinates: ['a', 1] } }, earth).skipped === 1)
 }
+
+/* ---------------- finding on the map ---------------- */
+
+{
+  const { findOnMap } = await import('../../src/lib/map/mapFind.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const map = normalizeMap({
+    pins: [{ id: 'a', name: 'Ashford', at: [10, 10] }, { id: 'b', name: 'New Ashby', at: [20, 20] }, { id: 'c', name: 'Clashing Rocks', at: [30, 30] }, { id: 'd', name: 'Ashen Keep', at: [5, 5], from: 99 }],
+    regions: [{ id: 'g', name: 'Ashlands', rings: [[[0, 0], [10, 0], [10, 10], [0, 10]]] }],
+  })
+  const names = findOnMap(map, createSpace(map), 'ash').map((hit) => hit.name)
+  ok('a name that starts with the query comes first, a word that does next, then the rest', names.join() === 'Ashford,Ashlands,New Ashby,Clashing Rocks')
+  ok('what is not there on the day is not found', !names.includes('Ashen Keep') && findOnMap(map, createSpace(map), 'ash', { day: 100 }).some((hit) => hit.name === 'Ashen Keep'))
+  ok('a region is found at its middle', findOnMap(map, createSpace(map), 'ashlands')[0].at.join() === '5,5')
+  const solar = normalizeMap({ mapKind: 'system', system: presetSystem('sol') })
+  ok('a body is found where it is', findOnMap(solar, createSpace(solar), 'mars')[0]?.kind === 'body')
+}
