@@ -58,7 +58,7 @@ pub struct TimelineLink {
     pub note_id: Option<String>,
 }
 
-/// Where an event happens: a pin on a map, or a location document.
+/// Where an event happens: a pin (or another item) on a map, or a location document.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,6 +67,11 @@ pub struct TimelinePlace {
     pub map: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pin: Option<String>,
+    /// What else on the map it is at: `region`, `route`, `label` or `body` (with `item`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc: Option<String>,
 }

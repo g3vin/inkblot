@@ -4438,10 +4438,13 @@ export interface StoryFolderAncestor {
 	path: string;
 }
 
-/** Where an event happens: a pin on a map, or a location document. */
+/** Where an event happens: a pin (or another item) on a map, or a location document. */
 export interface TimelinePlace {
 	map?: string;
 	pin?: string;
+	/** What else on the map it is at: `region`, `route`, `label` or `body` (with `item`). */
+	kind?: string;
+	item?: string;
 	doc?: string;
 }
 

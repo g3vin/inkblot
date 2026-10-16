@@ -17,6 +17,7 @@ import { isCharacterDoc } from '../lib/storyStructure'
 import { createProjector } from '../lib/map/mapProjection'
 import { projectedEarth } from '../lib/map/earthData'
 import { createSpace, resolvePin } from '../lib/map/mapSpace'
+import { itemPoint } from '../lib/map/mapFind'
 import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timeline'
 import { createEmptyMap, makePin, mapDocRefs, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
 import { isItemLocked } from '../lib/map/mapVisibility'
@@ -60,7 +61,7 @@ import { useGlobeView } from './useGlobeView'
 import { useSpaceView } from './useSpaceView'
 import { useProjectDocs, useStoryCalendar } from './useMapProject'
 import { useStoryTimeline } from '../timeline/useStoryTimeline'
-import { addEvent, eventCovers, setEventTime } from '../lib/timeline/timelineModel'
+import { addEvent, eventCovers, placeOnMap, placeTarget, setEventTime } from '../lib/timeline/timelineModel'
 import { getStoryCursor, setStoryDay, subscribeStoryCursor } from '../lib/timeline/storyCursor'
 import { peekStoryTimeline, replaceStoryTimeline } from '../lib/timeline/timelineStore'
 import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
@@ -89,9 +90,14 @@ const lookFilter = () => {
 /** Kinds whose 3D view can be plotted as line art (space/plot/plotScene.js). */
 const PLOTTABLE_KINDS = new Set(['system', 'galaxy', 'universe'])
 
-/** The story's events at a place on this map, earliest first. */
-const sortedEventsAt = (timeline, docPath, pinId) =>
-  (timeline?.events || []).filter((event) => event.place?.map === docPath && event.place?.pin === pinId).sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity))
+/** The story's events at something on this map (`kind`/`id`), earliest first. */
+const sortedEventsAt = (timeline, docPath, kind, id) =>
+  (timeline?.events || [])
+    .filter((event) => {
+      const target = placeTarget(event.place)
+      return target?.map === docPath && target.kind === kind && target.id === id
+    })
+    .sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity))
 
 /** Screen pixels a press may wander before it becomes a drag. */
 const DRAG_THRESHOLD = 4
@@ -666,7 +672,7 @@ export default function MapSurface({
         endDragRef.current = null
       }
     },
-    [addDraftPoint, addItem, finishDraft, labelSizeNow, map, mapRef, onActivate, patchItem, pinNear, select, showInspector, storedAt, tool, view]
+    [addDraftPoint, addItem, dispatch, finishDraft, labelSizeNow, map, mapRef, onActivate, patchItem, pinNear, select, showInspector, storedAt, tool, view]
   )
 
   const onDoubleClick = useCallback(
@@ -788,19 +794,12 @@ export default function MapSurface({
   const reveal = useCallback(
     (itemId) => {
       const current = mapRef.current
-      for (const [kind, list] of [['pin', current.pins], ['route', current.routes], ['region', current.regions], ['label', current.labels], ['traveler', current.travelers]]) {
-        const item = list.find((candidate) => candidate.id === itemId)
-        if (!item) continue
+      const lists = [['pin', current.pins], ['route', current.routes], ['region', current.regions], ['label', current.labels], ['traveler', current.travelers], ['body', current.mapKind === 'system' ? current.system.bodies : []]]
+      for (const [kind, list] of lists) {
+        if (!list.some((candidate) => candidate.id === itemId)) continue
         setSelection({ kind, id: itemId })
         showInspector()
-        let point = null
-        if (kind === 'pin') point = resolvePin(current, space, item, day)
-        else if (kind === 'label') point = item.at || item.path?.[0] || null
-        else if (kind === 'region') point = item.rings[0]?.[0] || null
-        else if (kind === 'route') {
-          const node = item.nodes[Math.floor(item.nodes.length / 2)]
-          point = node?.pin ? resolvePin(current, space, current.pins.find((pin) => pin.id === node.pin), day) : node?.at
-        }
+        const point = itemPoint(current, space, kind, itemId, day)
         if (point && view.centerOnStored) {
           view.centerOnStored(point)
           return
@@ -979,8 +978,11 @@ export default function MapSurface({
     if (!timeline) return []
     const laneColor = new Map(timeline.lanes.map((lane) => [lane.id, lane.color]))
     return timeline.events
-      .filter((event) => event.place?.map === docPath && eventCovers(event, day))
-      .map((event) => ({ id: event.id, title: event.title, pin: event.place.pin, color: event.color || laneColor.get(event.laneId) || null }))
+      .filter((event) => placeTarget(event.place)?.map === docPath && eventCovers(event, day))
+      .map((event) => {
+        const target = placeTarget(event.place)
+        return { id: event.id, title: event.title, kind: target.kind, item: target.id, color: event.color || laneColor.get(event.laneId) || null }
+      })
   }, [day, docPath, timeline])
 
   // A leg moved from a timeline view: this map owns its document, so it makes the edit.
@@ -1158,11 +1160,12 @@ export default function MapSurface({
     onOpenDoc?.(timelineDoc.path)
   }, [docs.docs, onOpenDoc])
 
-  /** A new timeline event at `pin`, on the day the map is at. */
-  const addEventHere = useCallback(async (pin) => {
+  /** A new timeline event at `item` (a `kind` on this map), on the day the map is at. */
+  const addEventHere = useCallback(async (kind, item) => {
     let created = null
+    const name = kind === 'pin' ? pinLabel(item, getDocDisplayName) : kind === 'label' ? item.text : item.name
     await replaceStoryTimeline(projectName, (timeline) => {
-      const result = addEvent(timeline, { title: `At ${pinLabel(pin, getDocDisplayName)}`, start: Math.floor(dayRef.current), place: { map: docPath, pin: pin.id } })
+      const result = addEvent(timeline, { title: name ? `At ${name}` : 'Something happens', start: Math.floor(dayRef.current), place: placeOnMap(docPath, kind, item.id) })
       created = result.id
       return result.timeline
     })
@@ -1275,10 +1278,8 @@ export default function MapSurface({
     onOpenPinMap: map.mapKind === 'galaxy' || map.mapKind === 'universe' ? openPinMap : null,
   })
   const openExport = useCallback(() => setExportOpen(true), [])
-  // The first event at the selected place, for "Show this place on the timeline".
-  const selectedPinEvent = selection?.kind === 'pin'
-    ? sortedEventsAt(timeline, docPath, selection.id)[0] || null
-    : null
+  // The first event at the selected item, for "Show on timeline".
+  const selectedPinEvent = selection ? sortedEventsAt(timeline, docPath, selection.kind, selection.id)[0] || null : null
 
   /* ---------------- find on this map ---------------- */
 
