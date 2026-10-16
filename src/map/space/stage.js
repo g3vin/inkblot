@@ -211,7 +211,7 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
    * The view as a picture, `scale` times the screen's size in pixels: a canvas,
    * drawn now (the drawing buffer is not kept between frames, so it is copied at once).
    */
-  function picture(scale = 1) {
+  function picture(scale = 1, { filter = null } = {}) {
     const ratio = renderer.getPixelRatio()
     renderer.setPixelRatio(scale)
     renderer.setSize(size.width, size.height, false)
@@ -220,7 +220,10 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     const out = document.createElement('canvas')
     out.width = renderer.domElement.width
     out.height = renderer.domElement.height
-    out.getContext('2d').drawImage(renderer.domElement, 0, 0)
+    const context = out.getContext('2d')
+    // The look's filter (Atlas, Ink), as the screen shows it.
+    if (filter) context.filter = filter
+    context.drawImage(renderer.domElement, 0, 0)
     renderer.setPixelRatio(ratio)
     renderer.setSize(size.width, size.height, false)
     invalidate()

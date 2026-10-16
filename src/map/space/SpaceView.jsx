@@ -140,7 +140,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
       /** Glide to a saved camera: `{ position, target }` in scene units. */
       goTo: (saved) => stage.moveTo(new Vector3(...saved.target), new Vector3(...saved.position)),
       /** The view as a picture, for an export (stage.js). */
-      picture: (scale) => stage.picture(scale),
+      picture: (scale, options) => stage.picture(scale, options),
       canRecord: stage.canRecord,
       /** A camera choice from the View menu: an angle (`face`, `edge`, `three`), flat, or held. */
       setCamera: (choice) => {

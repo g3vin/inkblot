@@ -90,7 +90,7 @@ export function useSpaceView({ surfaceRef, initialCamera, onCameraChange, onRead
     const { x, y } = toSurfacePoint(clientX, clientY)
     return apiRef.current?.pick(x, y) || null
   }, [toSurfacePoint])
-  const picture = useCallback(async (scale) => apiRef.current?.picture?.(scale) || null, [])
+  const picture = useCallback(async (scale, options) => apiRef.current?.picture?.(scale, options) || null, [])
   const chooseCamera = useCallback((choice) => apiRef.current?.setCamera?.(choice), [])
   const canRecord = useCallback(() => Boolean(apiRef.current?.canRecord?.()), [])
   const record = useCallback((options) => apiRef.current.record(options), [])

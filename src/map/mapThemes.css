@@ -84,3 +84,51 @@
   --map-halo: rgba(3, 5, 11, 0.85);
   --map-space: #03050b;
 }
+
+/* ---- 3D looks (style.look) ----
+ * Cinematic is the night sky as rendered. Atlas and Ink lay it on paper: the scene's
+ * canvas is turned negative on the GPU (Atlas keeping its hues, Ink in one ink), so
+ * the same scene reads as a plate — and the names and places over it change ink to
+ * match. A printed plate in vector is the plotter's (space/plot/). */
+.map-surface.is-space[data-space-look='atlas'] {
+  --map-ink: #1b1f27;
+  --map-ink-soft: rgba(27, 31, 39, 0.6);
+  --map-route: #b3462f;
+  --map-pin: #c0392b;
+  --map-region: #3f6fd8;
+  --map-halo: rgba(248, 246, 240, 0.9);
+  --map-space: #f8f6f0;
+}
+
+.map-surface.is-space[data-space-look='atlas'] .map-space-canvas {
+  filter: invert(1) hue-rotate(180deg) saturate(1.25);
+}
+
+.map-surface.is-space[data-space-look='ink'] {
+  --map-ink: #111111;
+  --map-ink-soft: rgba(17, 17, 17, 0.6);
+  --map-route: #111111;
+  --map-pin: #111111;
+  --map-region: #111111;
+  --map-halo: rgba(255, 255, 255, 0.92);
+  --map-space: #ffffff;
+}
+
+.map-surface.is-space[data-space-look='ink'] .map-space-canvas {
+  filter: grayscale(1) invert(1) contrast(1.25);
+}
+
+/* Ink on parchment is sepia. */
+.map-surface.is-space[data-space-look='ink'][data-map-theme='parchment'] {
+  --map-ink: #3b2a17;
+  --map-ink-soft: rgba(59, 42, 23, 0.6);
+  --map-route: #3b2a17;
+  --map-pin: #3b2a17;
+  --map-region: #3b2a17;
+  --map-halo: rgba(244, 236, 216, 0.92);
+  --map-space: #f4ecd8;
+}
+
+.map-surface.is-space[data-space-look='ink'][data-map-theme='parchment'] .map-space-canvas {
+  filter: grayscale(1) invert(1) contrast(1.2) sepia(0.6);
+}
