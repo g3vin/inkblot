@@ -78,6 +78,13 @@ import {
   takePendingMapReveal,
 } from './mapEvents'
 
+/** The CSS filter a 3D look draws the scene's canvas through (mapThemes.css), for a picture of it. */
+const lookFilter = () => {
+  const canvas = document.querySelector('.map-surface.is-space.is-active .map-space-canvas') || document.querySelector('.map-surface.is-space .map-space-canvas')
+  const filter = canvas ? getComputedStyle(canvas).filter : 'none'
+  return filter && filter !== 'none' ? filter : null
+}
+
 /** Kinds whose 3D view can be plotted as line art (space/plot/plotScene.js). */
 const PLOTTABLE_KINDS = new Set(['system', 'galaxy', 'universe'])
 
@@ -1408,6 +1415,7 @@ export default function MapSurface({
       ref={view.surfaceRef}
       className={`map-surface${isPanning ? ' is-panning' : ''}${isActive ? ' is-active' : ''}${isGlobe ? ' is-globe' : ''}${isSpace ? ' is-space' : ''}`}
       data-map-theme={map.style.theme}
+      data-space-look={isSpace ? map.style.look : undefined}
       data-tool={tool}
       tabIndex={0}
       onPointerDown={onPointerDown}
@@ -1589,7 +1597,7 @@ export default function MapSurface({
           docPath={docPath}
           surfaceRef={view.surfaceRef}
           viewportRef={view.viewportRef}
-          picture={view.native ? view.picture : null}
+          picture={view.native ? (scale) => view.picture(scale, { filter: lookFilter() }) : null}
           recorder={view.canRecord?.() ? view : null}
           plotCamera={isSpace && PLOTTABLE_KINDS.has(map.mapKind) ? () => spaceView.cameraRef.current || spaceView.camera : null}
         />

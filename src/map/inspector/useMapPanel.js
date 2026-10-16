@@ -17,7 +17,7 @@
 import { useMemo, useState } from 'react'
 import { getDocDisplayName } from '../../lib/docKind'
 import { loadDocument } from '../../lib/FileSystem'
-import { EARTH_PROJECTIONS, MAP_THEMES, normalizeMap, pinLabel, newId } from '../../lib/map/mapModel'
+import { EARTH_PROJECTIONS, MAP_THEMES, normalizeMap, pinLabel, newId, SPACE_KINDS } from '../../lib/map/mapModel'
 import { calibrationKmPerUnit, createSpace } from '../../lib/map/mapSpace'
 import { ASTRONOMICAL_UNITS, formatDistance, mapUnits, toKm } from '../../lib/map/mapUnits'
 import { buildSchedules, crossScheduleConflicts } from '../../lib/map/timeline'
@@ -171,6 +171,12 @@ function mapTabSections(ui, props, { newUnit, setNewUnit, trace }) {
 
 /* ---------------- the style tab ---------------- */
 
+const SPACE_LOOK_CHOICES = [
+  { value: 'cinematic', label: 'Cinematic' },
+  { value: 'atlas', label: 'Atlas' },
+  { value: 'ink', label: 'Ink' },
+]
+
 function styleTabSections(ui, { map, dispatch }) {
   const patchStyle = (patch) => dispatch({ type: 'section/patch', section: 'style', patch })
   const { style } = map
@@ -179,6 +185,9 @@ function styleTabSections(ui, { map, dispatch }) {
       ui.buttons(MAP_THEMES.map((theme) =>
         ui.button(`theme.${theme}`, THEME_LABELS[theme], () => patchStyle({ theme }), { role: style.theme === theme ? 'primary' : 'normal' })
       )),
+      SPACE_KINDS.includes(map.mapKind)
+        ? ui.choice('look.space', 'In 3D', style.look, SPACE_LOOK_CHOICES, (look) => patchStyle({ look }), { help: 'Cinematic is the night sky. Atlas and Ink lay the scene on paper, for reading and for print.' })
+        : null,
     ]),
     ui.section('title', 'Title', [
       ui.toggle('title.show', 'Show title', style.cartouche.show, (show) => patchStyle({ cartouche: { ...style.cartouche, show } })),
