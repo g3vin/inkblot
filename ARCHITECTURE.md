@@ -181,7 +181,9 @@ its WebKit, which are not project dependencies; see `tests/layout/run.mjs`).
 A map (`Name.map`) holds places (pins, optionally linked to documents), routes,
 regions with terrain, labels, and characters' journeys on a story timeline. It starts
 as a blank sheet at a scale, a picture (which can be traced to vectors), the Earth
-(Natural Earth, bundled), or a star system with Kepler orbits. The logic is in
+(Natural Earth, bundled), a planet or star, a star system (Kepler orbits, or N-body
+for three-body templates, `nbody.js`), a galaxy (`galaxyGen.js`, seeded per Hubble
+type), a group of galaxies, or a 3D model (glTF). The logic is in
 `src/lib/map/`, the UI in `src/map/` (`MapPane` → `MapSurface`, with `MapLayers` the
 one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrace`,
 `mapdom`.
@@ -194,6 +196,17 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   (the globe) handles its own gestures. On the globe, world coordinates *are* screen
   pixels: the projector asks MapLibre, and places, labels and handles are the same SVG
   overlay as on a flat map. Regions and routes are GeoJSON sources the globe draws.
+  The 3D kinds share `useSpaceView` and `space/stage.js` (three.js, its own lazy
+  chunk, drawing on demand): `SpaceView` takes a *scene* module (`systemScene`,
+  `galaxyScene`, `modelScene`) with one shape; `PlanetView` is a world as a globe.
+  The stage also takes pictures for export, films turntables, and holds the camera
+  presets and the flat (telephoto) view. Looks (Atlas, Ink) are CSS filters on its
+  canvas (`mapThemes.css`); print plates are vector, plotted from the same scene
+  through the saved camera (`space/plot/plotScene.js`), never read back from WebGL.
+- **Maps nest by links.** A system in a galaxy, a galaxy in a group, is a pin whose
+  `doc` is a `.map`; a body's surface is `body.surface`. `mapAncestry.js` reads the
+  links backwards for the breadcrumb, and `openLinkedMap` writes the new map, links
+  it and saves before opening it, so the trail is there at once.
 - **Online is opt-in.** Every map works offline. Satellite pictures, street detail,
   terrain and place search (`lib/map/onlineMaps.js`) are fetched only once the writer
   turns online maps on — asked once, the first time they choose one, then in
@@ -213,7 +226,8 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
 - **The story calendar is per project** (`.story/calendar.json`); `story-calendar:changed`
   tells open maps to re-read it.
 - **Heavy things are lazy.** `MapPane` is its own chunk; d3-geo and the atlases load only
-  when an Earth map opens, MapLibre only when one is shown as a globe.
+  when an Earth map opens, MapLibre only when one is shown as a globe, three.js only
+  when a 3D kind opens. Planet surfaces are drawn in a worker (`planetTexture.worker.js`).
   The tracer runs in a module worker and falls back to the main thread if the worker
   will not start under `inkblot://`.
 - **The inspector is a form the page builds** (`useMapPanel`, `inspector/panelBuilder.js`):
@@ -221,8 +235,11 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   map's floating panel and the inspector's Map tab (`MapPanelView.jsx`), each edit sent
   back as `mapCommand { panel-field | panel-action, id }`. Add a field in the builder
   and both have it; add a field *type* in `map.rs` and draw it in `MapPanelView`.
-- **What a map draws over itself** — the scale bar, compass, title, tool hint and
+- **What a map draws over itself** — the scale bar, compass, title, key, tool hint and
   timeline — is placed in `useVisibleBox`.
+- **Hidden means not drawn.** Layers and an item's days (`from`, `until`, or the
+  timeline events it follows) are read in one place, `mapVisibility.js`, by every
+  renderer, the key and the search.
 - **Rust twins only what Rust uses**: the kind, normalizing and creating maps, word
   counts, links, search matches and version entries. The maths (geometry, geodesy,
   travel, orbits, calendar) is JS only. Port a module, with parity cases, when Rust
