@@ -8,25 +8,64 @@
  * `moveTo` glides the camera somewhere (or cuts, under reduced motion); `picture`
  * draws the view into a canvas, for an export, and `record` films a turntable.
  *
+ * The Cinematic look adds bloom: a glow round what is brighter than white (stars,
+ * cores, jets), drawn at half size. A governor watches how long frames take while
+ * the view moves, and if they are slow it steps quality down — bloom off first,
+ * then fewer pixels — never the frame rate. It does not step back up while the
+ * view is open, so it never see-saws.
+ *
  * The space view (systems) and the planet view (one world) build on it; each adds
  * its own scene and the projector API the map surface talks to.
  */
-import { ACESFilmicToneMapping, Color, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three'
+import { ACESFilmicToneMapping, Color, PerspectiveCamera, Scene, Vector2, Vector3, WebGLRenderer } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { CAMERA_ANGLES, DEFAULT_SPACE_CAMERA, FLAT_FOV } from './spaceMath'
 
 const SETTLE_MS = 250
 const MAX_PIXEL_RATIO = 2
+/** Bloom: how strong, how wide, and how bright a pixel must be to glow. */
+const BLOOM = { strength: 0.55, radius: 0.35, threshold: 0.82 }
+/** A frame slower than this while moving (about 40 a second) is slow. */
+const FRAME_BUDGET_MS = 25
+/** Frames in a row the governor looks at before it judges. */
+const GOVERNOR_FRAMES = 24
+/** The steps down, best first: bloom allowed, and the most pixels per CSS pixel. */
+export const QUALITY_STEPS = [
+  { bloom: true, pixelRatio: MAX_PIXEL_RATIO },
+  { bloom: false, pixelRatio: MAX_PIXEL_RATIO },
+  { bloom: false, pixelRatio: 1.5 },
+  { bloom: false, pixelRatio: 1 },
+]
+
+/**
+ * The governor's judgement: given the last frames' times (ms) and the step it is
+ * at, the step to be at. Slow on the whole (the median over budget) steps down
+ * one; it never steps up.
+ */
+export function governQuality(times, step) {
+  if (times.length < GOVERNOR_FRAMES || step >= QUALITY_STEPS.length - 1) return step
+  const sorted = [...times].sort((a, b) => a - b)
+  return sorted[Math.floor(sorted.length / 2)] > FRAME_BUDGET_MS ? step + 1 : step
+}
 
 export const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
 
 /**
  * Set up a stage in `container`, the camera where `saved` says. Throws if WebGL is
- * not available. `beforeRender(camera, size)` runs before each frame.
+ * not available. `beforeRender(camera, size)` runs before each frame. Under bloom
+ * the sky is cleared to `bloomBackground`, which comes out as `background`.
  */
-export function createStage(container, { saved, background, near = 1e-6, far = 1e7, beforeRender }) {
+export function createStage(container, { saved, background, bloomBackground = null, near = 1e-6, far = 1e7, beforeRender, bloom = false }) {
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance', logarithmicDepthBuffer: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO))
+  // The governor's step (QUALITY_STEPS) and whether the look wants bloom.
+  let quality = 0
+  let wantsBloom = bloom
+  const screenRatio = () => Math.min(window.devicePixelRatio || 1, QUALITY_STEPS[quality].pixelRatio)
+  renderer.setPixelRatio(screenRatio())
   renderer.toneMapping = ACESFilmicToneMapping
   renderer.setClearColor(new Color(background), 1)
   renderer.domElement.className = 'map-space-canvas'
@@ -68,13 +107,59 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     distance: camera.position.distanceTo(controls.target),
   })
 
-  function draw() {
+  // Bloom is a chain of passes made the first time it is wanted, at half size.
+  let composer = null
+  let bloomPass = null
+  const glowing = () => wantsBloom && QUALITY_STEPS[quality].bloom
+  function ensureComposer() {
+    if (composer) return composer
+    composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, camera, null, new Color(bloomBackground || background), 1))
+    bloomPass = new UnrealBloomPass(new Vector2(size.width / 2, size.height / 2), BLOOM.strength, BLOOM.radius, BLOOM.threshold)
+    composer.addPass(bloomPass)
+    composer.addPass(new OutputPass())
+    sizeComposer()
+    return composer
+  }
+  function sizeComposer() {
+    if (!composer) return
+    composer.setPixelRatio(renderer.getPixelRatio())
+    composer.setSize(size.width, size.height)
+    bloomPass.resolution.set(size.width / 2, size.height / 2)
+  }
+  /** One frame, with bloom when the look and the governor allow it. */
+  function render() {
+    if (glowing()) ensureComposer().render()
+    else renderer.render(scene, camera)
+  }
+
+  // Frame times while the view is moving: a frame that follows straight on from the
+  // last (the controls still settling) is how fast the view can go.
+  const times = []
+  let lastDraw = 0
+  let chained = false
+  function govern(now) {
+    if (chained && lastDraw) times.push(now - lastDraw)
+    if (times.length > GOVERNOR_FRAMES) times.shift()
+    const next = governQuality(times, quality)
+    if (next === quality) return
+    quality = next
+    times.length = 0
+    renderer.setPixelRatio(screenRatio())
+    renderer.setSize(size.width, size.height, false)
+    sizeComposer()
+  }
+
+  function draw(now = performance.now()) {
     frame = 0
     if (disposed || recording) return
+    govern(now)
     const moving = controls.update()
     beforeRender?.(camera, size)
-    renderer.render(scene, camera)
+    render()
     listeners.frame?.({ camera: snapshot(), width: size.width, height: size.height })
+    lastDraw = now
+    chained = moving
     if (moving) invalidate()
   }
   function invalidate() {
@@ -93,6 +178,7 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     size.width = container.clientWidth || 1
     size.height = container.clientHeight || 1
     renderer.setSize(size.width, size.height, false)
+    sizeComposer()
     camera.aspect = size.width / size.height
     camera.updateProjectionMatrix()
     invalidate()
@@ -190,6 +276,13 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     settle()
   }
 
+  /** Bloom on or off (the Cinematic look has it); the governor may still hold it off. */
+  function setBloom(on) {
+    if (wantsBloom === on) return
+    wantsBloom = on
+    invalidate()
+  }
+
   /** Screen pixels of a world point, or null behind the camera. */
   function screenOf(world) {
     const ndc = world.clone().project(camera)
@@ -215,8 +308,11 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     const ratio = renderer.getPixelRatio()
     renderer.setPixelRatio(scale)
     renderer.setSize(size.width, size.height, false)
+    sizeComposer()
     beforeRender?.(camera, size)
-    renderer.render(scene, camera)
+    // An export is drawn at its best, whatever the governor chose for the screen.
+    if (wantsBloom) ensureComposer().render()
+    else renderer.render(scene, camera)
     const out = document.createElement('canvas')
     out.width = renderer.domElement.width
     out.height = renderer.domElement.height
@@ -226,6 +322,7 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     context.drawImage(renderer.domElement, 0, 0)
     renderer.setPixelRatio(ratio)
     renderer.setSize(size.width, size.height, false)
+    sizeComposer()
     invalidate()
     return out
   }
@@ -268,7 +365,8 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
         camera.position.copy(target).add(offset.clone().applyAxisAngle(camera.up, angle))
         camera.lookAt(target)
         beforeRender?.(camera, size)
-        renderer.render(scene, camera)
+        if (wantsBloom) ensureComposer().render()
+        else renderer.render(scene, camera)
         track.requestFrame?.()
         onProgress?.(index / frames)
         await new Promise((resolve) => window.setTimeout(resolve, 1000 / fps))
@@ -293,9 +391,11 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     window.clearTimeout(settleTimer)
     observer.disconnect()
     controls.dispose()
+    composer?.dispose()
+    bloomPass?.dispose()
     renderer.dispose()
     renderer.domElement.remove()
   }
 
-  return { renderer, camera, controls, scene, size, invalidate, settle, moveTo, setAngle, setOrtho, setLocked, screenOf, subscribe, picture, canRecord, record, dispose }
+  return { renderer, camera, controls, scene, size, invalidate, settle, moveTo, setAngle, setOrtho, setLocked, setBloom, quality: () => quality, screenOf, subscribe, picture, canRecord, record, dispose }
 }

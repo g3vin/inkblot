@@ -858,6 +858,19 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('a model is drawn with its hidden edges taken out', strokes >= 9 && strokes <= 12)
 }
 
+/* ---------------- the quality governor ---------------- */
+
+{
+  const { governQuality, QUALITY_STEPS } = await import('../../src/map/space/stage.js')
+  const frames = (ms, count = 24) => Array.from({ length: count }, () => ms)
+  ok('smooth frames keep the best quality', governQuality(frames(16.7), 0) === 0)
+  ok('slow frames step down one, bloom first', governQuality(frames(40), 0) === 1 && !QUALITY_STEPS[1].bloom && QUALITY_STEPS[1].pixelRatio === QUALITY_STEPS[0].pixelRatio)
+  ok('then fewer pixels', QUALITY_STEPS[2].pixelRatio < QUALITY_STEPS[1].pixelRatio)
+  ok('a few slow frames among smooth ones are not judged slow', governQuality([...frames(16.7, 18), ...frames(80, 6)], 0) === 0)
+  ok('too few frames to judge, no change', governQuality(frames(80, 5), 0) === 0)
+  ok('it never steps up, and stops at the bottom', governQuality(frames(5), 2) === 2 && governQuality(frames(80), QUALITY_STEPS.length - 1) === QUALITY_STEPS.length - 1)
+}
+
 /* ---------------- three bodies: problems, and holding them together ---------------- */
 
 {

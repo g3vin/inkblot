@@ -72,7 +72,7 @@ void main() {
 }
 `
 
-export default function PlanetView({ view, map, space, day, selection, projectName, skySeed, surfaceRef, onError }) {
+export default function PlanetView({ view, map, space, day, selection, projectName, skySeed, surfaceRef, bloom = false, onError }) {
   const containerRef = useRef(null)
   const stateRef = useRef(null)
   const { surface } = map
@@ -91,6 +91,7 @@ export default function PlanetView({ view, map, space, day, selection, projectNa
       stage = createStage(container, {
         saved,
         background: CINEMATIC.background,
+        bloomBackground: CINEMATIC.bloomBackground,
         near: 1e-5,
         far: 5000,
         beforeRender: (camera) => {
@@ -282,6 +283,11 @@ export default function PlanetView({ view, map, space, day, selection, projectNa
     // One stage per mounted view; the camera and the attach are read once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // The Cinematic look glows (stage.js keeps it off when frames are slow).
+  useEffect(() => {
+    stateRef.current?.stage.setBloom(bloom)
+  }, [bloom])
 
   useEffect(() => {
     if (stateRef.current) stateRef.current.inputs = { map, space, day }

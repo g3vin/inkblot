@@ -21,7 +21,7 @@ import { createModelScene } from './modelScene'
 import { readSpaceCamera } from './spaceMath'
 import { createStage } from './stage'
 
-export default function SpaceView({ view, map, space, day, focusBody, skySeed, projectName, lookAround = false, onError, onProblem }) {
+export default function SpaceView({ view, map, space, day, focusBody, skySeed, projectName, lookAround = false, bloom = false, onError, onProblem }) {
   const containerRef = useRef(null)
   const stateRef = useRef(null)
   const dayRef = useRef(day)
@@ -38,6 +38,7 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
       stage = createStage(container, {
         saved: readSpaceCamera(view.cameraRef.current),
         background: CINEMATIC.background,
+        bloomBackground: CINEMATIC.bloomBackground,
         beforeRender: (camera, size) => {
           backdrop?.follow(camera)
           stateRef.current?.content?.beforeRender(camera, size.height, stage?.renderer.getPixelRatio())
@@ -169,6 +170,11 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
     // One stage per mounted view; the camera and the attach are read once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // The Cinematic look glows (stage.js keeps it off when frames are slow).
+  useEffect(() => {
+    stateRef.current?.stage.setBloom(bloom)
+  }, [bloom])
 
   /* ---------------- the scene: rebuilt when the system changes ---------------- */
 

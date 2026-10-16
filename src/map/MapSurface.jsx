@@ -71,6 +71,7 @@ import OnlineMapsDialog from './OnlineMapsDialog'
 import { cameraChoice, choosesOnline, viewMenuFor, viewOptionEdit } from './mapViewMenu'
 import { readOnlineMaps, saveOnlineMaps } from '../lib/map/onlineMaps'
 import { useMapCommands } from './useMapCommands'
+import { isTouchApplePlatform } from '../ui/platform'
 import {
   MAP_COMMAND_EVENT,
   MAP_DROP_DOC_EVENT,
@@ -199,6 +200,8 @@ export default function MapSurface({
   const isPlanet = map.mapKind === 'planet' && !spaceFailed
   const isDeepSpace = (map.mapKind === 'galaxy' || map.mapKind === 'universe' || map.mapKind === 'model') && !spaceFailed
   const isSpace = (map.mapKind === 'system' && map.system.display.view === '3d' && !spaceFailed) || isPlanet || isDeepSpace
+  // Bloom is for the Cinematic look, and not on iPhone and iPad, where it costs too much.
+  const bloom = map.style.look === 'cinematic' && !isTouchApplePlatform()
   const view = isGlobe ? globeView : isSpace ? spaceView : flatView
   const viewKind = isGlobe ? 'globe' : isPlanet ? 'planet' : isSpace ? 'space' : 'flat'
   const box = useVisibleBox(view.surfaceRef)
@@ -1472,6 +1475,7 @@ export default function MapSurface({
         <Suspense fallback={<div className="map-space is-loading" />}>
           <PlanetView
             view={spaceView}
+            bloom={bloom}
             map={map}
             space={space}
             day={day}
@@ -1493,6 +1497,7 @@ export default function MapSurface({
             skySeed={docPath}
             projectName={projectName}
             lookAround={lookAround && map.mapKind === 'model'}
+            bloom={bloom}
             onError={() => setSpaceFailed(true)}
             onProblem={setNotice}
           />

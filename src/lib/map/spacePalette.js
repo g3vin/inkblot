@@ -9,6 +9,9 @@
 /** The Cinematic look: a dark sky and soft, cool lines. */
 export const CINEMATIC = {
   background: '#03050b',
+  // The same sky as cleared under bloom: that chain tone-maps the clear colour with
+  // the scene (stage.js), and this comes out as `background`.
+  bloomBackground: '#010203',
   orbit: '#8ea6cc',
   grid: '#6c82a8',
   habitable: '#3fbf7f',
