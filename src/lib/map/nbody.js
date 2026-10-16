@@ -23,6 +23,8 @@ import { bodyMass, installNbodyPositions, keplerPositionsAt, orbitPeriod } from 
 
 /** G in AU³ / (M☉ · day²): the Gaussian gravitational constant, squared. */
 export const G = 0.01720209895 ** 2
+/** One AU a day, in kilometres a second. */
+export const KMS_PER_AU_DAY = 149597870.7 / 86400
 const CHECKPOINT_STEPS = 16
 /** Yoshida's coefficients for a fourth-order symplectic step. */
 const W1 = 1 / (2 - 2 ** (1 / 3))
@@ -398,4 +400,188 @@ export function toNbody(system) {
     dynamics: 'nbody',
     bodies: system.bodies.map((body) => (takesPart(body) && states.has(body.id) ? { ...body, state: states.get(body.id) } : body)),
   }
+}
+
+/* ---------------- close passes, and holding a system together ---------------- */
+
+const KM_PER_AU_HERE = 149597870.7
+/** Passes closer than this (AU) are worth telling the writer about. */
+export const CLOSE_PASS_AU = 0.05
+
+/**
+ * Every close pass over the story: `[{ ids: [a, b], day, au, touching }]`, one per
+ * approach (the closest moment of each dip below CLOSE_PASS_AU), earliest first, at
+ * most `limit`. `touching` when they come within their summed radii: a collision,
+ * or a star swallowing a planet.
+ */
+export function closePasses(system, { horizonDays = system?.nbody?.horizonDays || 3650, limit = 8 } = {}) {
+  const run = runFor(system)
+  const n = run.ids.length
+  if (n < 2) return []
+  const byId = new Map((system.bodies || []).map((body) => [body.id, body]))
+  const radiusAU = (id) => (byId.get(id)?.radiusKm || 0) / KM_PER_AU_HERE
+  const steps = Math.ceil(horizonDays / run.span)
+  const dips = new Map()
+  const passes = []
+  for (let k = 0; k <= steps; k += 1) {
+    const state = run.checkpoint(k)
+    const day = k * run.span
+    for (let i = 0; i < n; i += 1) {
+      for (let j = i + 1; j < n; j += 1) {
+        const key = `${i}|${j}`
+        const au = distance(state, i, j)
+        const dip = dips.get(key)
+        if (au < CLOSE_PASS_AU) {
+          if (!dip || au < dip.au) dips.set(key, { ids: [run.ids[i], run.ids[j]], day, au })
+        } else if (dip) {
+          passes.push(dip)
+          dips.delete(key)
+        }
+      }
+    }
+  }
+  passes.push(...dips.values())
+  return passes
+    .map((pass) => ({ ...pass, touching: pass.au <= radiusAU(pass.ids[0]) + radiusAU(pass.ids[1]) }))
+    .sort((a, b) => a.day - b.day)
+    .slice(0, limit)
+}
+
+/**
+ * The system with every body's starting state written out (`state`), centre of
+ * mass at rest, its speeds about it times `factor` — and, for `circular`, that
+ * body set on a circular path round all the others.
+ */
+export function withStartSpeeds(system, factor = 1, { circular = null } = {}) {
+  const list = initialBodies(system)
+  const states = new Map(list.map((body) => [body.id, { pos: body.pos.slice(), vel: body.vel.map((value) => value * factor) }]))
+  if (circular && states.has(circular)) {
+    const rest = list.filter((body) => body.id !== circular)
+    const mass = rest.reduce((sum, body) => sum + body.mass, 0)
+    if (mass > 0) {
+      const centre = [0, 1, 2].map((axis) => rest.reduce((sum, body) => sum + body.mass * body.pos[axis], 0) / mass)
+      const restVel = [0, 1, 2].map((axis) => rest.reduce((sum, body) => sum + body.mass * states.get(body.id).vel[axis], 0) / mass)
+      const own = states.get(circular)
+      const dx = own.pos.map((value, axis) => value - centre[axis])
+      const r = Math.hypot(...dx)
+      if (r > 0) {
+        // Round the others, in the plane the system mostly lies in (the x–y plane).
+        const speed = Math.sqrt((G * mass) / r)
+        const flat = Math.hypot(dx[0], dx[1]) || 1
+        own.vel = [restVel[0] - (dx[1] / flat) * speed, restVel[1] + (dx[0] / flat) * speed, restVel[2]]
+      }
+    }
+  }
+  return {
+    ...system,
+    dynamics: 'nbody',
+    bodies: system.bodies.map((body) => (states.has(body.id) ? { ...body, state: states.get(body.id) } : body)),
+  }
+}
+
+/** Speeds tried, nearest first, when holding a system together. */
+const STEADYING_FACTORS = [0.97, 0.94, 0.9, 0.85, 0.8, 0.75, 0.7, 0.6, 0.5]
+
+/**
+ * The nearest system to `system` that holds together over the story, or null: the
+ * starting speeds slowed a little at a time (a bound system is a stabler one),
+ * then the body that leaves set on a circular path round the rest. Returns
+ * `{ system, how }`, `how` in words.
+ */
+export function makeStable(system) {
+  const verdict = stabilityOf(system)
+  if (verdict.stable) return { system, how: 'It already holds together.' }
+  for (const factor of STEADYING_FACTORS) {
+    const next = withStartSpeeds(system, factor)
+    if (stabilityOf(next).stable) return { system: next, how: `Starting speeds slowed by ${Math.round((1 - factor) * 100)}%.` }
+  }
+  const leaving = verdict.ejected?.id
+  if (leaving) {
+    const next = withStartSpeeds(system, 1, { circular: leaving })
+    if (stabilityOf(next).stable) return { system: next, how: 'The body that left now circles the rest.' }
+  }
+  // Last, a hierarchy, as stable triples are in the sky: the closest pair circling
+  // each other, the rest circling them, further out each try.
+  for (const spread of [1, 1.5, 2, 3, 4, 6]) {
+    const next = asHierarchy(system, spread)
+    if (next && stabilityOf(next).stable) {
+      return { system: next, how: spread === 1 ? 'Set as a close pair with the others circling it.' : `Set as a close pair with the others circling it, ${spread} times as far out.` }
+    }
+  }
+  return null
+}
+
+/** A circular velocity for a body at `dx` from a centre of `mass`, in the x–y plane. */
+const circularVelocity = (dx, mass) => {
+  const r = Math.hypot(...dx)
+  const flat = Math.hypot(dx[0], dx[1])
+  if (!(r > 0) || !(mass > 0)) return [0, 0, 0]
+  const speed = Math.sqrt((G * mass) / r)
+  // A body on the axis gets a direction of its own.
+  return flat > 0 ? [(-dx[1] / flat) * speed, (dx[0] / flat) * speed, 0] : [speed, 0, 0]
+}
+
+/**
+ * The system rebuilt as a hierarchy: its closest pair on a circular orbit about
+ * their middle, each other body (nearest first) on a circle round everything
+ * inside it, `spread` times as far out as it was. Null with fewer than two bodies.
+ */
+export function asHierarchy(system, spread = 1) {
+  const list = initialBodies(system).filter((body) => body.mass > 0)
+  if (list.length < 2) return null
+  let pair = [0, 1]
+  let best = Infinity
+  for (let i = 0; i < list.length; i += 1) {
+    for (let j = i + 1; j < list.length; j += 1) {
+      const d = Math.hypot(...[0, 1, 2].map((axis) => list[i].pos[axis] - list[j].pos[axis]))
+      if (d < best) {
+        best = d
+        pair = [i, j]
+      }
+    }
+  }
+  const [a, b] = pair.map((index) => list[index])
+  const inner = a.mass + b.mass
+  const middle = [0, 1, 2].map((axis) => (a.mass * a.pos[axis] + b.mass * b.pos[axis]) / inner)
+  const states = new Map()
+  const relative = [0, 1, 2].map((axis) => b.pos[axis] - a.pos[axis])
+  const vRel = circularVelocity(relative, inner)
+  states.set(a.id, { pos: a.pos.slice(), vel: vRel.map((value) => (-value * b.mass) / inner) })
+  states.set(b.id, { pos: b.pos.slice(), vel: vRel.map((value) => (value * a.mass) / inner) })
+  let mass = inner
+  let centre = middle
+  const rest = list.filter((body) => body !== a && body !== b)
+    .sort((x, y) => Math.hypot(...x.pos.map((value, axis) => value - middle[axis])) - Math.hypot(...y.pos.map((value, axis) => value - middle[axis])))
+  for (const body of rest) {
+    const dx = body.pos.map((value, axis) => (value - centre[axis]) * spread)
+    const pos = dx.map((value, axis) => value + centre[axis])
+    states.set(body.id, { pos, vel: circularVelocity(dx, mass + body.mass) })
+    centre = [0, 1, 2].map((axis) => (mass * centre[axis] + body.mass * pos[axis]) / (mass + body.mass))
+    mass += body.mass
+  }
+  return {
+    ...system,
+    dynamics: 'nbody',
+    bodies: system.bodies.map((body) => (states.has(body.id) ? { ...body, state: states.get(body.id) } : body)),
+  }
+}
+
+/**
+ * How many days of motion a velocity arrow on the map shows: a quarter of the
+ * system's size at its bodies' typical starting speed, so arrows are long enough to
+ * grab and their lengths compare. Fixed for a drag (MapSurface reads it at the press).
+ */
+export function arrowDays(system) {
+  const list = initialBodies(system)
+  if (!list.length) return 30
+  const size = Math.max(...list.map((body) => Math.hypot(...body.pos)), 1e-6)
+  const speeds = list.map((body) => Math.hypot(...body.vel)).filter((speed) => speed > 0).sort((a, b) => a - b)
+  const typical = speeds.length ? speeds[Math.floor(speeds.length / 2)] : 0
+  return typical > 0 ? (0.25 * size) / typical : 30
+}
+
+/** Where `id` starts and how fast it goes on day 0 (its `state`, or its orbit's). */
+export const startStateOf = (system, id) => {
+  const body = system.bodies.find((candidate) => candidate.id === id)
+  return body?.state || stateFromOrbits(system).get(id) || null
 }

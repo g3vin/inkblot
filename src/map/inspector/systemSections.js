@@ -7,7 +7,7 @@
  * holds together over the story, and if not, who leaves and when (nbody.js).
  */
 import { formatDay } from '../../lib/map/calendar'
-import { stabilityOf, toNbody } from '../../lib/map/nbody'
+import { makeStable, stabilityOf, toNbody } from '../../lib/map/nbody'
 import { newSeed } from '../../lib/map/seeded'
 import { presetSystem, SYSTEM_PRESETS } from '../../lib/map/systemPresets'
 import { BODY_KIND_LABELS } from './itemSections'
@@ -17,7 +17,7 @@ const nameOf = (map, id) => {
   return body?.name || BODY_KIND_LABELS[body?.kind] || 'A body'
 }
 
-export function systemSections(ui, { map, dispatch, calendar, onSelect, onDay, focusBody, onFocusBody }) {
+export function systemSections(ui, { map, dispatch, calendar, onSelect, onDay, focusBody, onFocusBody, motionCheck, onNotice }) {
   const { system } = map
   const patchSystem = (patch) => dispatch({ type: 'section/patch', section: 'system', patch })
   const nbody = system.dynamics === 'nbody'
@@ -71,13 +71,20 @@ export function systemSections(ui, { map, dispatch, calendar, onSelect, onDay, f
   if (!nbody) {
     motion.push(ui.note('Each body follows its own ellipse. For three stars, or a planet that might be flung out, let them pull on each other.'))
   } else {
-    const verdict = stabilityOf(system)
+    const verdict = motionCheck?.verdict || stabilityOf(system)
     if (verdict.stable) {
       motion.push(ui.note('Holds together for the length of your story.'))
     } else {
       const { id, day } = verdict.ejected
       motion.push(ui.note(`Comes apart: ${nameOf(map, id)} leaves for good by ${formatDay(calendar, day)}.`))
-      motion.push(ui.buttonField('system.ejection', 'Go to that day', () => onDay?.(day)))
+      motion.push(ui.buttons([
+        ui.button('system.ejection', 'Go to that day', () => onDay?.(day)),
+        ui.button('system.steady', 'Make it stable', () => {
+          const steadied = makeStable(system)
+          if (steadied) patchSystem({ bodies: steadied.system.bodies, dynamics: 'nbody', template: null })
+          onNotice?.(steadied ? `Steadied. ${steadied.how}` : 'No small change holds these together. Try moving a body further out.')
+        }),
+      ]))
     }
     if (verdict.closest && verdict.closest.au < 0.05) {
       const [a, b] = verdict.closest.ids

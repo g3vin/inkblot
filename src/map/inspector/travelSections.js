@@ -160,9 +160,26 @@ export function travelerSections(ui, { map, traveler, index, schedule, conflicts
 
 /* ---------------- journeys: every traveller, the calendar, conflicts ---------------- */
 
-export function journeysSections(ui, { map, schedules, conflicts, calendar, onOpenCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps, crossConflicts }) {
+const bodyName = (map, id) => map.system.bodies.find((body) => body.id === id)?.name || 'A body'
+
+/**
+ * What goes wrong in a system of bodies pulling on each other (nbody.js): who is
+ * flung out and when, and the close passes, as `[{ title, day }]`, in order.
+ */
+export function motionProblems(map, motionCheck) {
+  if (!motionCheck) return []
+  const out = motionCheck.passes.map((pass) => ({
+    title: `${bodyName(map, pass.ids[0])} and ${bodyName(map, pass.ids[1])} ${pass.touching ? 'collide' : 'pass close'}`,
+    day: pass.day,
+  }))
+  if (motionCheck.verdict.ejected) out.push({ title: `${bodyName(map, motionCheck.verdict.ejected.id)} is flung out of the system`, day: motionCheck.verdict.ejected.day })
+  return out.sort((a, b) => a.day - b.day)
+}
+
+export function journeysSections(ui, { map, schedules, conflicts, calendar, onOpenCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps, crossConflicts, motionCheck, onAddStoryEvents }) {
   const cal = normalizeCalendar(calendar)
   const problems = [...conflicts, ...(crossConflicts || [])]
+  const motion = motionProblems(map, motionCheck)
   return [
     ui.section('travelers', 'Travellers', [
       !map.travelers.length ? ui.note('Drag a character’s document from the file tree onto the map to send them travelling — or add one here.') : null,
@@ -178,7 +195,13 @@ export function journeysSections(ui, { map, schedules, conflicts, calendar, onOp
     ], [ui.button('travelers.add', 'Add', addTraveler, { disabled: !map.pins.length })]),
 
     ui.section('problems', 'Problems', [
-      !problems.length ? ui.note('No one is in two places at once.') : null,
+      !problems.length && !motion.length ? ui.note(map.mapKind === 'system' && map.system.dynamics === 'nbody' ? 'No one is in two places at once, and nothing comes apart.' : 'No one is in two places at once.') : null,
+      ...motion.map((problem, index) => ui.warning(`${problem.title}, ${formatDay(cal, problem.day)}.`, {
+        action: ui.button(`problems.motion.${index}`, 'Go there', () => onDay(problem.day)),
+      })),
+      motion.length && onAddStoryEvents
+        ? ui.buttons([ui.button('problems.toTimeline', 'Add these to the timeline', () => onAddStoryEvents(motion.map(({ title, day }) => ({ title, start: day }))))])
+        : null,
       ...problems.map((conflict, index) => {
         const where = conflict.maps && conflict.maps[0] !== conflict.maps[1] ? ` (on ${conflict.maps.map((path) => getDocDisplayName(path)).join(' and ')})` : ''
         return ui.warning(`${describeConflict(conflict, map, cal)}${where}`, {

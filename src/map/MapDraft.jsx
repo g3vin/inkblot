@@ -5,13 +5,15 @@
  * a rubber band from the last one to the pointer (moved imperatively by MapSurface,
  * so following the mouse costs no render), and for the measuring tools the running
  * figure. When a route or region is selected, its corners get handles to drag, and
- * the middle of each side a handle that adds a corner there.
+ * the middle of each side a handle that adds a corner there. A body of a system
+ * whose bodies pull on each other gets its start and its velocity arrow to drag.
  */
 import { memo } from 'react'
 import { formatArea, formatDistance } from '../lib/map/mapUnits'
 import { lineKm, resolvePin } from '../lib/map/mapSpace'
 import { pathData } from '../lib/map/mapGeometry'
 import { linePath } from './mapRender'
+import { arrowDays, startStateOf } from '../lib/map/nbody'
 import { unitFor } from './mapOptions'
 
 
@@ -95,6 +97,28 @@ const MapDraft = memo(function MapDraft({ map, projector, space, day, draft, sel
       }
       parts.push(<Handle key={`gh${index}`} at={at} index={index} owner={selectedItem.id} ownerKind="region" />)
     })
+  }
+
+  // A body that pulls and is pulled (nbody.js): where it starts, and an arrow for how
+  // fast it sets off. Drag either to change them.
+  if (selection?.kind === 'body' && map.mapKind === 'system' && map.system.dynamics === 'nbody') {
+    const start = startStateOf(map.system, selection.id)
+    if (start) {
+      const days = arrowDays(map.system)
+      const tip = [0, 1, 2].map((axis) => (start.pos[axis] || 0) + (start.vel[axis] || 0) * days)
+      const from = projector.toWorld(start.pos)
+      const to = projector.toWorld(tip)
+      if (from && to) {
+        parts.push(
+          <g key="body-velocity" className="map-body-start">
+            <line className="map-velocity" x1={from[0]} y1={from[1]} x2={to[0]} y2={to[1]} />
+            <Measure at={from} text="Start" />
+          </g>
+        )
+        parts.push(<Handle key="body-start" at={from} index={0} owner={selection.id} ownerKind="body-start" />)
+        parts.push(<Handle key="body-tip" at={to} index={1} owner={selection.id} ownerKind="body-velocity" />)
+      }
+    }
   }
 
   return <g className="map-draft">{parts}</g>

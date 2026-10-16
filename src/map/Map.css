@@ -223,6 +223,13 @@
   fill: var(--status-error);
 }
 
+.map-velocity {
+  stroke: var(--map-accent);
+  stroke-width: calc(1.5px * var(--map-inv-zoom, 1));
+  stroke-dasharray: calc(4px * var(--map-inv-zoom, 1)) calc(3px * var(--map-inv-zoom, 1));
+  pointer-events: none;
+}
+
 .map-handle {
   fill: var(--map-sheet);
   stroke: var(--map-accent);

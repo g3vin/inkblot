@@ -21,6 +21,7 @@ import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timelin
 import { createEmptyMap, makePin, mapDocRefs, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
 import { isItemLocked } from '../lib/map/mapVisibility'
 import { eventDay } from './inspector/whenSections'
+import { arrowDays, startStateOf } from '../lib/map/nbody'
 import { geoJSONToItems, IMPORT_KINDS, readGeoFile } from '../lib/map/geoInterchange'
 import { MAP_FIND_EVENT } from '../lib/sidebarSearch'
 import { requestTimelineReveal } from '../timeline/timelineEvents'
@@ -572,6 +573,21 @@ export default function MapSurface({
               ring[dragTarget.index] = at
             }
             patchItem('regions', region.id, { rings: [ring, ...region.rings.slice(1)] }, `handle-${region.id}`)
+          } else if (dragTarget.ownerKind === 'body-start' || dragTarget.ownerKind === 'body-velocity') {
+            // Where a body starts, or how fast (the arrow's tip, `days` of motion on).
+            const system = current.system
+            const start = startStateOf(system, dragTarget.owner)
+            if (!start) return
+            dragTarget.days ??= arrowDays(system)
+            const state = dragTarget.ownerKind === 'body-start'
+              ? { pos: [at[0], at[1], start.pos[2] || 0], vel: start.vel.slice(0, 3) }
+              : { pos: start.pos.slice(0, 3), vel: [(at[0] - start.pos[0]) / dragTarget.days, (at[1] - start.pos[1]) / dragTarget.days, start.vel[2] || 0] }
+            dispatch({
+              type: 'section/patch',
+              section: 'system',
+              patch: { bodies: system.bodies.map((body) => (body.id === dragTarget.owner ? { ...body, state } : body)), template: null },
+              meta: { coalesce: `start-${dragTarget.owner}` },
+            })
           }
         }
       }
@@ -1153,6 +1169,17 @@ export default function MapSurface({
     if (created) showEvent(created)
   }, [docPath, projectName, showEvent])
 
+  /** Timeline events (`{ title, start }`) for things that happen on this map, once each. */
+  const addStoryEvents = useCallback(async (events) => {
+    let added = 0
+    await replaceStoryTimeline(projectName, (timeline) => events.reduce((current, event) => {
+      if (current.events.some((existing) => existing.title === event.title && existing.start === event.start)) return current
+      added += 1
+      return addEvent(current, event).timeline
+    }, timeline))
+    setNotice(added ? `Added ${added} event${added === 1 ? '' : 's'} to the timeline.` : 'They are on the timeline already.')
+  }, [projectName])
+
   /** The way the map is being looked at, and the day: what a saved view keeps. */
   const captureView = useCallback(() => {
     const camera = viewKind === 'flat'
@@ -1242,6 +1269,8 @@ export default function MapSurface({
     extent,
     onShowEvent: showEvent,
     onAddEventHere: addEventHere,
+    onAddStoryEvents: addStoryEvents,
+    onNotice: setNotice,
     onShowView: showView,
     onOpenPinMap: map.mapKind === 'galaxy' || map.mapKind === 'universe' ? openPinMap : null,
   })
