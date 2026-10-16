@@ -7,7 +7,8 @@
  * hatched away from the brightest star; belts stippled; a three-body dance as its
  * trails. A galaxy: stippled, a dot per star of the generator (galaxyGen.js), its
  * dust lanes left as paper, with rings of distance. A group of galaxies: each a
- * little stipple of itself, turned as on screen. Names in the map's label face.
+ * little stipple of itself, turned as on screen. A world, engraved (plotPlanet.js);
+ * a model, as a technical drawing (plotModel.js). Names in the map's label face.
  *
  * Deterministic: the same map, day and camera give the same SVG, with no raster in
  * it. Colours are the map theme's ink (spacePalette.js `INK_PALETTES`).
@@ -21,6 +22,9 @@ import { INK_PALETTES } from '../../../lib/map/spacePalette'
 import { pinLabel } from '../../../lib/map/mapModel'
 import { systemToScene } from '../spaceMath'
 import { plotCamera } from './plotCamera'
+import { plotModel } from './plotModel'
+import { plotPlanet } from './plotPlanet'
+import { dotsPath, escapeXml, fmt, linePath, namer, runs } from './plotParts'
 
 const RAD = Math.PI / 180
 const KLY = 1000
@@ -30,49 +34,6 @@ const MIN_PIXELS = { star: 12, planet: 7, dwarf: 4.5, moon: 4, station: 4.5 }
 const ORBIT_SAMPLES = 240
 /** A galaxy in a group is drawn at least this many pixels in radius (galaxyScene.js holds them to 30 across). */
 const MIN_GALAXY_PX = 15
-
-const fmt = (value) => (Math.round(value * 10) / 10).toString()
-const escapeXml = (text) => String(text).replace(/[<>&"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[char])
-
-/** Dots as one path: a zero-length stroke with a round cap is a dot. */
-const dotsPath = (points) => points.map(([x, y]) => `M${fmt(x)} ${fmt(y)}h0`).join('')
-
-/** A polyline's points split into runs (`split(index)` says which side a point is on). */
-function runs(points, side) {
-  const out = []
-  let current = null
-  points.forEach((point, index) => {
-    if (!point) {
-      current = null
-      return
-    }
-    const which = side(index)
-    if (!current || current.side !== which) {
-      // Each run starts where the last ended, so the line is unbroken.
-      current = { side: which, points: current ? [current.points[current.points.length - 1], point] : [point] }
-      out.push(current)
-    } else current.points.push(point)
-  })
-  return out
-}
-const linePath = (points) => points.map(([x, y], index) => `${index ? 'L' : 'M'}${fmt(x)} ${fmt(y)}`).join('')
-
-/** Names placed where they do not overlap one already written. */
-function namer(scale) {
-  const boxes = []
-  const out = []
-  return {
-    add(text, [x, y], dx = 8, { bold = false, force = false } = {}) {
-      if (!text) return
-      const size = 11 * scale
-      const box = { left: x + dx * scale, right: x + dx * scale + text.length * size * 0.56, top: y - size, bottom: y + size * 0.3 }
-      if (!force && boxes.some((other) => box.left < other.right && other.left < box.right && box.top < other.bottom && other.top < box.bottom)) return
-      boxes.push(box)
-      out.push(`<text x="${fmt(box.left)}" y="${fmt(y + size * 0.35)}" font-size="${fmt(size)}"${bold ? ' font-weight="600"' : ''}>${escapeXml(text)}</text>`)
-    },
-    svg: () => out.join(''),
-  }
-}
 
 /* ---------------- a star system ---------------- */
 
@@ -253,9 +214,10 @@ function plotPins(map, eye, scale, out, toScene, { marks = true } = {}) {
 /**
  * The plate as an SVG string: `map` on `day`, through `camera` (a saved space
  * camera), `width` × `height` pixels times `scale`. `mono` draws black on white
- * whatever the theme.
+ * whatever the theme. A planet takes the writer's drawn ground as `mask`
+ * (plotPlanet.js); a model needs the loaded `model` (plotModel.js).
  */
-export function plotScene(map, space, { day = 0, camera, width, height, scale = 1, mono = false, title = null }) {
+export function plotScene(map, space, { day = 0, camera, width, height, scale = 1, mono = false, title = null, mask = null, model = null }) {
   const palette = mono ? INK_PALETTES.ink : INK_PALETTES[map.style.theme] || INK_PALETTES.ink
   const W = Math.round(width * scale)
   const H = Math.round(height * scale)
@@ -264,6 +226,8 @@ export function plotScene(map, space, { day = 0, camera, width, height, scale = 
   if (map.mapKind === 'system') plotSystem(map, space, day, eye, scale, out)
   else if (map.mapKind === 'galaxy') plotGalaxy(map, eye, scale, out)
   else if (map.mapKind === 'universe') plotUniverse(map, eye, scale, out)
+  else if (map.mapKind === 'planet') plotPlanet(map, space, day, eye, scale, out, { mask })
+  else if (map.mapKind === 'model') plotModel(map, day, eye, scale, W, H, out, { object: model })
   const heading = title ? `<text x="${fmt(24 * scale)}" y="${fmt(40 * scale)}" font-size="${fmt(20 * scale)}" letter-spacing="${fmt(2 * scale)}">${escapeXml(String(title).toUpperCase())}</text>` : ''
   return {
     width: W,

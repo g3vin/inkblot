@@ -9,9 +9,10 @@
  * mapExport.js from the same layers the editor shows, so an export is what was on
  * screen. A globe or 3D view is exported as it is framed, drawn by its own renderer
  * under the same places and labels; a 3D view can also be filmed going once round
- * (a turntable video, of the scene alone). A star system, galaxy or group of
- * galaxies can instead be plotted as line art in one ink (plotScene.js): crisp
- * vector plates for a book, from whatever angle it is framed at.
+ * (a turntable video, of the scene alone). Any 3D map — a star system, a galaxy, a
+ * group of galaxies, a world, a model — can instead be plotted as line art in one
+ * ink (plotScene.js): crisp vector plates for a book, from whatever angle it is
+ * framed at.
  */
 import { useState } from 'react'
 import { Button, Dialog, FormRow, Segmented, SelectMenu } from '../ui'
@@ -26,7 +27,7 @@ const DRAWINGS = [{ value: 'picture', label: 'As on screen' }, { value: 'ink', l
 const TURNTABLE_LENGTHS = [{ value: '4', label: '4 s' }, { value: '8', label: '8 s' }, { value: '16', label: '16 s' }]
 const SHARPNESS = [{ value: '1', label: 'Standard (1×)' }, { value: '2', label: 'Retina (2×)' }, { value: '4', label: 'Print (4×)' }]
 
-export default function ExportMapDialog({ open, onClose, map, projector, space, day, projectName, docPath, surfaceRef, viewportRef, picture = null, recorder = null, plotCamera = null }) {
+export default function ExportMapDialog({ open, onClose, map, projector, space, day, projectName, docPath, surfaceRef, viewportRef, picture = null, recorder = null, plotCamera = null, plotObject = null }) {
   const [frame, setFrame] = useState('view')
   const [scale, setScale] = useState(2)
   const [status, setStatus] = useState('')
@@ -44,7 +45,15 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
     if (plotting) {
       const { plotScene } = await import('./space/plot/plotScene')
       const { cartouche } = map.style
+      // A world's drawn continents raise its ground, as on screen (planetSurface.js).
+      let mask = null
+      if (map.mapKind === 'planet' && map.surface.terrainFromRegions) {
+        const [{ regionMask }, { PLANET_PLOT_GRID }] = await Promise.all([import('./space/planetSurface'), import('./space/plot/plotPlanet')])
+        mask = regionMask(map, PLANET_PLOT_GRID).mask
+      }
       return plotScene(map, space, {
+        mask,
+        model: plotObject?.() || null,
         day,
         camera: plotCamera(),
         width: surface?.clientWidth || 1200,

@@ -835,6 +835,27 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   const north = top.project(new Vector3(0, 0, -5))
   ok('from above and flat, +x is right and the system’s +y is up the page', east[0] > 300 && Math.abs(east[1] - 300) < 1e-6 && north[1] < 300 && Math.abs(north[0] - 300) < 1e-6)
   ok('flat keeps sizes alike near and far', Math.abs(top.pxPerUnitAt(new Vector3(0, 5, 0)) - top.pxPerUnitAt(new Vector3(0, -5, 0))) < 1e-9)
+
+  // A world, engraved.
+  const world = normalizeMap({ mapKind: 'planet', surface: { look: { kind: 'generated', seed: 7 } }, pins: [{ id: 'p', name: 'Corrin', at: [0, 10] }, { id: 'q', name: 'Farside', at: [180, 0] }] })
+  const front = { position: [3, 0, 0], target: [0, 0, 0], fov: 35 }
+  const engrave = () => plotScene(world, createSpace(world), { day: 0, camera: front, width: 500, height: 500 }).svg
+  const engraved = engrave()
+  ok('a world’s plate is the same every time, and only lines', engraved === engrave() && !/<image|data:image/.test(engraved))
+  ok('a place on the near side is named; one round the back is not', engraved.includes('Corrin') && !engraved.includes('Farside'))
+  const ray = plotCamera(front, 500, 500).ray(250, 250)
+  ok('the line of sight through the middle runs to the target', ray.direction.distanceTo(new Vector3(-1, 0, 0)) < 1e-9)
+  const night = plotScene(world, createSpace(world), { day: 0, camera: { position: [-3, 0, 0], target: [0, 0, 0], fov: 35 }, width: 500, height: 500 }).svg
+  ok('the night side is hatched: more lines from behind the world than from under its sun', night.length > engraved.length * 0.5 && (night.match(/L/g) || []).length > 0)
+
+  // A model, as a technical drawing: a cube from a corner shows nine edges, not twelve.
+  const { BoxGeometry, Group, Mesh, MeshBasicMaterial } = await import('three')
+  const holder = new Group()
+  holder.add(new Mesh(new BoxGeometry(2, 2, 2), new MeshBasicMaterial()))
+  const station = normalizeMap({ mapKind: 'model', model: { asset: null }, pins: [] })
+  const drawing = plotScene(station, createSpace(station), { camera: { position: [5, 4, 6], target: [0, 0, 0], fov: 35 }, width: 600, height: 600, model: holder }).svg
+  const strokes = (drawing.match(/M[\d.-]+ [\d.-]+L/g) || []).length
+  ok('a model is drawn with its hidden edges taken out', strokes >= 9 && strokes <= 12)
 }
 
 /* ---------------- three bodies: problems, and holding them together ---------------- */

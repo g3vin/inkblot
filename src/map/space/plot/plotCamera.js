@@ -15,9 +15,10 @@ import { readSpaceCamera } from '../spaceMath'
 const RAD = Math.PI / 180
 
 /**
- * `{ project, depth, pxPerUnitAt }` for `saved` on a `width` × `height` plate.
- * `project(v)` is `[x, y]` in pixels, or null behind the eye; `depth(v)` how far in
- * front of the eye; `pxPerUnitAt(v)` how many pixels a scene unit spans there.
+ * `{ project, depth, pxPerUnitAt, ray, position, forward }` for `saved` on a
+ * `width` × `height` plate. `project(v)` is `[x, y]` in pixels, or null behind the
+ * eye; `depth(v)` how far in front of the eye; `pxPerUnitAt(v)` how many pixels a
+ * scene unit spans there; `ray(x, y)` the line of sight through a pixel.
  */
 export function plotCamera(saved, width, height) {
   const camera = readSpaceCamera(saved)
@@ -45,5 +46,17 @@ export function plotCamera(saved, width, height) {
     return [((scratch.x + 1) / 2) * width, ((1 - scratch.y) / 2) * height]
   }
   const pxPerUnitAt = (v) => (camera.ortho ? height / (2 * halfHeight) : height / (2 * Math.max(1e-9, depth(v)) * Math.tan((camera.fov * RAD) / 2)))
-  return { project, depth, pxPerUnitAt, ortho: camera.ortho }
+  const forward = target.clone().sub(position).normalize()
+  /** The ray through pixel (x, y): `{ origin, direction }`, direction a unit vector. */
+  const ray = (x, y) => {
+    const ndcX = (x / width) * 2 - 1
+    const ndcY = 1 - (y / height) * 2
+    if (camera.ortho) {
+      const origin = new Vector3(ndcX, ndcY, -1).unproject(eye)
+      return { origin, direction: forward.clone() }
+    }
+    const through = new Vector3(ndcX, ndcY, 0.5).unproject(eye)
+    return { origin: position.clone(), direction: through.sub(position).normalize() }
+  }
+  return { project, depth, pxPerUnitAt, ray, position, forward, ortho: camera.ortho }
 }

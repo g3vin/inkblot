@@ -88,7 +88,7 @@ const lookFilter = () => {
 }
 
 /** Kinds whose 3D view can be plotted as line art (space/plot/plotScene.js). */
-const PLOTTABLE_KINDS = new Set(['system', 'galaxy', 'universe'])
+const PLOTTABLE_KINDS = new Set(['system', 'galaxy', 'universe', 'planet', 'model'])
 
 /** The story's events at something on this map (`kind`/`id`), earliest first. */
 const sortedEventsAt = (timeline, docPath, kind, id) =>
@@ -1630,6 +1630,7 @@ export default function MapSurface({
           picture={view.native ? (scale) => view.picture(scale, { filter: lookFilter() }) : null}
           recorder={view.canRecord?.() ? view : null}
           plotCamera={isSpace && PLOTTABLE_KINDS.has(map.mapKind) ? () => spaceView.cameraRef.current || spaceView.camera : null}
+          plotObject={map.mapKind === 'model' ? spaceView.plotObject : null}
         />
       ) : null}
 

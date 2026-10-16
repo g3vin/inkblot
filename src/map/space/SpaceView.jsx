@@ -141,6 +141,8 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
       goTo: (saved) => stage.moveTo(new Vector3(...saved.target), new Vector3(...saved.position)),
       /** The view as a picture, for an export (stage.js). */
       picture: (scale, options) => stage.picture(scale, options),
+      /** A model's placed scene graph, for a line drawing of it (plot/plotModel.js). */
+      plotObject: () => content()?.plotObject?.() || null,
       canRecord: stage.canRecord,
       /** A camera choice from the View menu: an angle (`face`, `edge`, `three`), flat, or held. */
       setCamera: (choice) => {
