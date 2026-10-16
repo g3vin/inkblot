@@ -462,7 +462,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: [
       'Anything on a map can come and go: select it and set Appears on and Gone from in its When section, or tie either to a timeline event so it moves when the event does. Scrub the timeline to watch the map change.',
       'Layers (in the Layers tab) gather things to hide or lock together. Saved views keep a way of looking at the map, and the day, to come back to.',
-      'A place lists the timeline events set there under Events here; Add makes a new one on the day the map is at.',
+      'A place, region, route, label or body lists the timeline events set there under Events here; Add makes a new one on the day the map is at. On the timeline, an event’s Place can be any of them.',
     ],
     related: ['map.find'],
   },

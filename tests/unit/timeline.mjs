@@ -216,6 +216,28 @@ const ids = () => `id${counter++}`
   ok('every path the chronology holds is listed', T.timelineDocRefs(tl).includes('World.map') && T.timelineDocRefs(tl).includes('Board.canvas'))
 }
 
+/* ---------------- places on maps ---------------- */
+
+{
+  const tl = T.normalizeTimeline({
+    events: [
+      { title: 'old', place: { map: 'World.map', pin: 'p1' } },
+      { title: 'region', place: { map: 'World.map', kind: 'region', item: 'r1' } },
+      { title: 'body', place: { map: 'Sol.map', kind: 'body', item: 'earth' } },
+      { title: 'odd', place: { map: 'World.map', kind: 'teapot', item: 'x' } },
+    ],
+  }, ids)
+  const [pin, region, body, odd] = tl.events.map((event) => event.place)
+  ok('a place at a pin reads as it always did', pin.map === 'World.map' && pin.pin === 'p1' && T.placeTarget(pin).kind === 'pin' && T.placeTarget(pin).id === 'p1')
+  ok('an event can happen in a region', T.placeTarget(region).kind === 'region' && T.placeTarget(region).id === 'r1')
+  ok('or at a body of a system', T.placeTarget(body).map === 'Sol.map' && T.placeTarget(body).kind === 'body')
+  ok('a kind of place that does not exist is nowhere', odd === null)
+  ok('a pin is stored in the first form, so older copies read it', JSON.stringify(T.placeOnMap('W.map', 'pin', 'p')) === '{"map":"W.map","pin":"p"}')
+  ok('anything else in the new form', JSON.stringify(T.placeOnMap('W.map', 'route', 'r')) === '{"map":"W.map","kind":"route","item":"r"}')
+  const moved = T.rewriteTimelineDocRefs(tl, 'Sol.map', 'Systems/Sol.map')
+  ok('a moved map takes its events at bodies with it', T.placeTarget(moved.events[2].place).map === 'Systems/Sol.map' && moved.events[2].place.item === 'earth')
+}
+
 /* ---------------- ticks ---------------- */
 
 {

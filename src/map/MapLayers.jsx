@@ -21,6 +21,7 @@ import { habitableZoneAU, temperatureToColor } from '../lib/map/stars'
 import { projectedEarth } from '../lib/map/earthData'
 import { hashSeed, INKED_STYLE, ROUGH_STYLE, roughenPath } from '../lib/map/roughen'
 import { travelerPositionAt } from '../lib/map/timeline'
+import { itemPoint } from '../lib/map/mapFind'
 import { hiddenIds, hiddenKey, withoutHidden } from '../lib/map/mapVisibility'
 import { useAssetUrl } from '../canvas/useAssetUrl'
 import { PinGlyph } from './mapGlyphs'
@@ -554,16 +555,16 @@ export function MapDefs({ idPrefix }) {
  */
 function TimelineEventLayer({ map, projector, space, day, events }) {
   if (!events?.length) return null
-  const pins = new Map(map.pins.map((pin) => [pin.id, pin]))
   const stacked = new Map()
   return (
     <g className="map-timeline-events">
       {events.map((event) => {
-        const pin = pins.get(event.pin)
-        const at = pin ? projector.toWorld(resolvePin(map, space, pin, day)) : null
+        const point = itemPoint(map, space, event.kind, event.item, day)
+        const at = point ? projector.toWorld(point) : null
         if (!at) return null
-        const level = stacked.get(event.pin) || 0
-        stacked.set(event.pin, level + 1)
+        const key = `${event.kind}:${event.item}`
+        const level = stacked.get(key) || 0
+        stacked.set(key, level + 1)
         return (
           <g key={event.id} className="map-timeline-event" data-timeline-event={event.id} transform={`translate(${at[0]} ${at[1]})`} style={event.color ? { '--event': inkColor(event.color) } : undefined}>
             <g className="map-mark">

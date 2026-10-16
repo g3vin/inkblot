@@ -311,16 +311,7 @@ export function useMapPanel(props) {
         // Before the last section, which ends in Delete.
         sections.splice(Math.max(0, sections.length - 1), 0, ...whenSections(ui, { map, item: selectedItem, calendar, events: storyEvents, patch, onDay }))
       }
-      if (selection.kind === 'pin') {
-        sections.splice(Math.max(0, sections.length - 1), 0, ...eventsHereSections(ui, {
-          pin: selectedItem,
-          docPath,
-          calendar,
-          events: storyEvents,
-          onShowEvent,
-          onAddEvent: onAddEventHere ? () => onAddEventHere(selectedItem) : null,
-        }))
-      } else if (selection.kind === 'traveler') {
+      if (selection.kind === 'traveler') {
         sections = travelerSections(ui, {
           ...common,
           traveler: selectedItem,
@@ -334,7 +325,7 @@ export function useMapPanel(props) {
           onDay,
           onOpenDoc,
         })
-      } else {
+      } else if (selection.kind === 'body') {
         sections = bodySections(ui, {
           map,
           body: selectedItem,
@@ -346,6 +337,17 @@ export function useMapPanel(props) {
           onOpenSurface: onOpenSurface ? () => onOpenSurface(selectedItem) : null,
           renameRequest,
         })
+      }
+      if (['pin', 'route', 'region', 'label', 'body'].includes(selection.kind)) {
+        sections.splice(Math.max(0, sections.length - 1), 0, ...eventsHereSections(ui, {
+          kind: selection.kind,
+          id: selectedItem.id,
+          docPath,
+          calendar,
+          events: storyEvents,
+          onShowEvent,
+          onAddEvent: onAddEventHere ? () => onAddEventHere(selection.kind, selectedItem) : null,
+        }))
       }
     } else if (tab === 'travel') {
       sections = [

@@ -7,6 +7,7 @@
  * `until` in step with it: MapSurface moves them when the event moves.
  */
 import { formatDay } from '../../lib/map/calendar'
+import { placeTarget } from '../../lib/timeline/timelineModel'
 import { calendarShape, dayToParts, partsToDay } from './travelSections'
 
 /** The day an item following `event` appears, or is gone: an event's start, or its end. */
@@ -52,12 +53,15 @@ export function whenSections(ui, { map, item, calendar, events = [], patch, onDa
 }
 
 /**
- * A place's events: the timeline events set here (an event's `place`), each opening
- * the timeline at it, and Add an event here, on the day the map is at.
+ * Something's events: the timeline events set at `kind`/`id` (an event's `place`),
+ * each opening the timeline at it, and Add an event here, on the day the map is at.
  */
-export function eventsHereSections(ui, { pin, docPath, calendar, events = [], onShowEvent, onAddEvent }) {
+export function eventsHereSections(ui, { kind, id, docPath, calendar, events = [], onShowEvent, onAddEvent }) {
   const here = events
-    .filter((event) => event.place?.map === docPath && event.place?.pin === pin.id)
+    .filter((event) => {
+      const target = placeTarget(event.place)
+      return target?.map === docPath && target.kind === kind && target.id === id
+    })
     .sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity))
   return [
     ui.section('eventsHere', 'Events here', [

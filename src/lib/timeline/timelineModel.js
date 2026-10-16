@@ -118,9 +118,29 @@ function readEra(raw, nextId) {
   return { ...raw, id: string(raw.id) || nextId(), name: string(raw.name, 'Era'), color: optionalString(raw.color), start: Math.min(a, b), end: Math.max(a, b) }
 }
 
+/** What on a map an event can be at, besides a place (a pin). */
+export const PLACE_ITEM_KINDS = ['region', 'route', 'label', 'body']
+
+/**
+ * Where on a map an event's `place` is: `{ map, kind, id }` (kind `pin` for the
+ * first form, `{ map, pin }`), or null when it is a document or nowhere.
+ */
+export function placeTarget(place) {
+  if (!place?.map) return null
+  if (place.pin) return { map: place.map, kind: 'pin', id: place.pin }
+  if (PLACE_ITEM_KINDS.includes(place.kind) && place.item) return { map: place.map, kind: place.kind, id: place.item }
+  return null
+}
+
+/** The `place` for something on a map: `{ map, pin }` for a pin, else `{ map, kind, item }`. */
+export function placeOnMap(map, kind, id) {
+  return kind === 'pin' ? { map, pin: id } : { map, kind, item: id }
+}
+
 function readPlace(raw) {
   if (!isObject(raw)) return null
   if (typeof raw.map === 'string' && raw.map && typeof raw.pin === 'string' && raw.pin) return { map: raw.map, pin: raw.pin }
+  if (typeof raw.map === 'string' && raw.map && PLACE_ITEM_KINDS.includes(raw.kind) && typeof raw.item === 'string' && raw.item) return { map: raw.map, kind: raw.kind, item: raw.item }
   if (typeof raw.doc === 'string' && raw.doc) return { doc: raw.doc }
   return null
 }

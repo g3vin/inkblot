@@ -23,6 +23,36 @@ const middle = (points) => {
   return sum.map((value) => value / usable.length).slice(0, usable[0].length)
 }
 
+/**
+ * Where `kind`/`id` is on `day`, in the map's own coordinates: a place where it
+ * resolves, a route's middle, a region's middle, a label's anchor, a body's position
+ * or a traveller's whereabouts. Null when it is nowhere (or missing).
+ */
+export function itemPoint(map, space, kind, id, day = 0) {
+  if (kind === 'pin') {
+    const pin = map.pins.find((candidate) => candidate.id === id)
+    return pin ? resolvePin(map, space, pin, day) : null
+  }
+  if (kind === 'route') {
+    const route = map.routes.find((candidate) => candidate.id === id)
+    return route ? middle(routeCoords(map, space, route, day)) : null
+  }
+  if (kind === 'region') {
+    const region = map.regions.find((candidate) => candidate.id === id)
+    return region ? middle(region.rings[0] || []) : null
+  }
+  if (kind === 'label') {
+    const label = map.labels.find((candidate) => candidate.id === id)
+    return label ? label.at || label.path?.[0] || null : null
+  }
+  if (kind === 'body') return map.mapKind === 'system' && space.positionsAt ? space.positionsAt(day).get(id) || null : null
+  if (kind === 'traveler') {
+    const traveler = map.travelers.find((candidate) => candidate.id === id)
+    return traveler ? travelerPositionAt(map, space, buildSchedule(map, space, traveler), day)?.point || null : null
+  }
+  return null
+}
+
 /** How well `name` answers `query` (lower case): 0 best, null not at all. */
 function rank(name, query) {
   const text = String(name || '').toLowerCase()

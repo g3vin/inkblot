@@ -68,7 +68,8 @@ export function mapJourneys(map, mapPath) {
 
 /**
  * Every map's journeys and places: `{ journeys, places }`, a place being
- * `{ map, pin, name, mapName }` — what an event's place can be.
+ * `{ map, kind, id, name, mapName }` — what an event's place can be: a pin, or a
+ * named region, route or label, or a system's body.
  */
 export async function loadProjectMaps(projectName) {
   const journeys = []
@@ -80,7 +81,14 @@ export async function loadProjectMaps(projectName) {
       if (!raw || !isMapPayload(raw)) continue
       const map = normalizeMap(raw)
       journeys.push(...mapJourneys(map, path))
-      for (const pin of map.pins) places.push({ map: path, pin: pin.id, name: pinLabel(pin) || 'Place', mapName: getDocDisplayName(path) })
+      const mapName = getDocDisplayName(path)
+      for (const pin of map.pins) places.push({ map: path, kind: 'pin', id: pin.id, name: pinLabel(pin) || 'Place', mapName })
+      for (const region of map.regions) if (region.name) places.push({ map: path, kind: 'region', id: region.id, name: region.name, mapName })
+      for (const route of map.routes) if (route.name) places.push({ map: path, kind: 'route', id: route.id, name: route.name, mapName })
+      for (const label of map.labels) if (label.text) places.push({ map: path, kind: 'label', id: label.id, name: label.text, mapName })
+      if (map.mapKind === 'system') {
+        for (const body of map.system.bodies) if (body.kind !== 'barycenter') places.push({ map: path, kind: 'body', id: body.id, name: body.name || 'Body', mapName })
+      }
     }
   } catch (error) {
     console.warn('[journeys] could not read the maps:', error)

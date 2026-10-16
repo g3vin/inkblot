@@ -16,7 +16,7 @@ import { getDocDisplayName } from '../lib/docKind'
 import { formatDay, normalizeCalendar } from '../lib/map/calendar'
 import {
   addEra, addEventNote, addLane, addLink, addTag, eventById, setEventTime, isDated, removeEra, removeEvent, removeEventNote, removeLane, removeLink,
-  removeTag, reorderLanes, updateEra, updateEvent, updateEventNote, updateLane, updateTag, sortedEvents,
+  removeTag, reorderLanes, updateEra, updateEvent, updateEventNote, updateLane, updateTag, sortedEvents, placeOnMap, placeTarget,
 } from '../lib/timeline/timelineModel'
 import { createPanelBuilder } from '../map/inspector/panelBuilder'
 import { calendarShape, dayToParts, partsToDay } from '../map/inspector/travelSections'
@@ -38,6 +38,8 @@ export const describeWhen = (event, calendar) => {
   return event.end === null ? start : `${start} – ${formatDay(calendar, event.end)}`
 }
 
+const PLACE_KIND_NAMES = { region: 'region', route: 'route', label: 'label', body: 'body' }
+
 const LINK_LABELS = { text: 'Passage in', mapLeg: 'Journey on', canvas: 'Card on', note: 'Note in' }
 
 /* ---------------- one event ---------------- */
@@ -49,15 +51,16 @@ function eventSections(ui, props, form, setForm) {
   const lanes = [{ value: '', label: 'No lane' }, ...timeline.lanes.map((lane) => ({ value: lane.id, label: lane.name }))]
   const characters = docs.docs.filter((doc) => doc.isCharacter && !event.participants.includes(doc.path))
   const others = docs.docs.filter((doc) => doc.kind === 'text' && !doc.isCharacter && !event.participants.includes(doc.path))
-  const placeKey = event.place?.map ? `pin|${event.place.map}|${event.place.pin}` : event.place?.doc ? `doc|${event.place.doc}` : ''
+  const target = placeTarget(event.place)
+  const placeKey = target ? `item|${target.map}|${target.kind}|${target.id}` : event.place?.doc ? `doc|${event.place.doc}` : ''
   const placeOptions = [
     { value: '', label: 'Nowhere in particular' },
-    ...places.map((place) => ({ value: `pin|${place.map}|${place.pin}`, label: place.name, group: `On ${place.mapName}` })),
+    ...places.map((place) => ({ value: `item|${place.map}|${place.kind}|${place.id}`, label: place.kind === 'pin' ? place.name : `${place.name} (${PLACE_KIND_NAMES[place.kind]})`, group: `On ${place.mapName}` })),
     ...docs.docs.filter((doc) => doc.isLocation).map((doc) => ({ value: `doc|${doc.path}`, label: doc.name, group: 'Locations' })),
   ]
   const setPlace = (value) => {
-    const [kind, a, b] = value.split('|')
-    patch('Set place', { place: kind === 'pin' ? { map: a, pin: b } : kind === 'doc' ? { doc: a } : null })
+    const [kind, a, b, c] = value.split('|')
+    patch('Set place', { place: kind === 'item' ? placeOnMap(a, b, c) : kind === 'doc' ? { doc: a } : null })
   }
   const sequence = sortedEvents(timeline)
   const position = sequence.findIndex((item) => item.id === id)
@@ -105,7 +108,7 @@ function eventSections(ui, props, form, setForm) {
 
     ui.section('where', 'Where', [
       ui.choice('where.place', 'Place', placeKey, placeOptions, setPlace),
-      event.place?.map ? ui.buttonField('where.show', 'Show on map', () => onOpenLink({ kind: 'pin', map: event.place.map, pin: event.place.pin })) : null,
+      target ? ui.buttonField('where.show', 'Show on map', () => onOpenLink({ kind: 'pin', map: target.map, pin: target.id })) : null,
     ]),
 
     ui.section('links', 'Linked', [
