@@ -84,6 +84,8 @@ export function createModelScene(map, { projectName, renderer, scene, onLoaded, 
       const local = plane.worldToLocal(hit.point.clone())
       return [local.x, local.y, local.z]
     },
+    /** The model as placed, for a line drawing of it (plot/plotModel.js); null until it is in. */
+    plotObject: () => (model ? plane : null),
     setDay: () => {},
     beforeRender: () => {},
     bodyAt: () => null,

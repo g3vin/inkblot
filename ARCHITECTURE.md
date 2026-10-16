@@ -202,7 +202,9 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   The stage also takes pictures for export, films turntables, and holds the camera
   presets and the flat (telephoto) view. Looks (Atlas, Ink) are CSS filters on its
   canvas (`mapThemes.css`); print plates are vector, plotted from the same scene
-  through the saved camera (`space/plot/plotScene.js`), never read back from WebGL.
+  through the saved camera (`space/plot/plotScene.js`), never read back from WebGL:
+  a world is engraved from its seeded ground (`plotPlanet.js`), a model drawn by its
+  edges with hidden lines removed in a software depth buffer (`plotModel.js`).
 - **Maps nest by links.** A system in a galaxy, a galaxy in a group, is a pin whose
   `doc` is a `.map`; a body's surface is `body.surface`. `mapAncestry.js` reads the
   links backwards for the breadcrumb, and `openLinkedMap` writes the new map, links

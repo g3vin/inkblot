@@ -451,7 +451,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       'Export map… (in the zoom menu, or ⌥⌘E) saves the map as a picture: a PNG for the screen, an SVG or a PDF that stays sharp at any size, or straight to the printer. Copy image puts it on the clipboard, ready to paste into a chapter.',
       'Choose what’s on screen to export the part you are looking at, or the whole map for all of it. Sharpness multiplies a PNG’s pixels: Retina for screens, Print for paper.',
       'A globe, a planet, a star system in 3D, a galaxy or a model is exported as you are looking at it, with its places, key and scale bar on top. Turn and frame it first. A 3D view can also be saved as a turntable video, going once round the scene (names and places are left out of the film).',
-      'A star system, a galaxy or a group of galaxies can also be drawn as an ink drawing: fine lines and stipple in one ink, the far side of each orbit dashed, from the angle you framed. Black and white makes it black on white whatever the map’s look. Saved as SVG or PDF it stays sharp at any size, ready for a book.',
+      'Any 3D map can also be drawn as an ink drawing, from the angle you framed: a star system’s orbits as fine lines with their far sides dashed, a galaxy in stipple, a world engraved with its coasts, seas and night side, a model as a technical drawing with its hidden lines taken out. Black and white makes it black on white whatever the map’s look. Saved as SVG or PDF it stays sharp at any size, ready for a book.',
       'To show a map in a canvas, drag it there instead. It stays up to date as the map changes.',
     ],
   },
