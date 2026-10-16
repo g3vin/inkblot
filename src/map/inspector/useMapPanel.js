@@ -15,6 +15,7 @@
  * the edits its ids stand for.
  */
 import { useMemo, useState } from 'react'
+import { closePasses, stabilityOf } from '../../lib/map/nbody'
 import { getDocDisplayName } from '../../lib/docKind'
 import { loadDocument } from '../../lib/FileSystem'
 import { EARTH_PROJECTIONS, MAP_THEMES, normalizeMap, pinLabel, newId, SPACE_KINDS } from '../../lib/map/mapModel'
@@ -220,13 +221,19 @@ export function useMapPanel(props) {
     map, dispatch, space, day, onDay, schedules, conflicts, selection, selectedItem, onSelect,
     docs, missingDocs, calendar, onOpenCalendar, onOpenDoc, renameRequest, calibration, onCalibrationDone,
     focusBody, onFocusBody, projectName, docPath, zoomNow, onTool, onReveal, viewMenu, onViewOption,
-    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent, onShowEvent, onAddEventHere,
+    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent, onShowEvent, onAddEventHere, onAddStoryEvents, onNotice,
   } = props
   const [tab, setTab] = useState('map')
   const [crossConflicts, setCrossConflicts] = useState(null)
   const [calibrationForm, setCalibrationForm] = useState(() => ({ distance: null, unit: map.scale.displayUnit || 'km' }))
   const [newUnit, setNewUnit] = useState({ name: '', km: null })
   const [distancePair, setDistancePair] = useState({ a: null, b: null, show: false })
+  // Whether a system of bodies pulling on each other holds together, and its close
+  // passes: worked out once per edit to the system, not on every day of playback.
+  const motionCheck = useMemo(
+    () => (map.mapKind === 'system' && map.system.dynamics === 'nbody' ? { verdict: stabilityOf(map.system), passes: closePasses(map.system) } : null),
+    [map.mapKind, map.system]
+  )
   const [matrix, setMatrix] = useState(() => ({ show: false, transport: map.mapKind === 'system' ? 'light10' : 'horse' }))
   const trace = useMapTrace({ map, dispatch, projectName })
 
@@ -342,7 +349,7 @@ export function useMapPanel(props) {
       }
     } else if (tab === 'travel') {
       sections = [
-        ...journeysSections(ui, { map, schedules, conflicts, calendar, onOpenCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps: checkAllMaps, crossConflicts }),
+        ...journeysSections(ui, { map, schedules, conflicts, calendar, onOpenCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps: checkAllMaps, crossConflicts, motionCheck, onAddStoryEvents }),
         ...distanceOverTimeSections(ui, { map, space, day, calendar, extent, state: distancePair, setState: setDistancePair, onDay }),
         ...travelSections(ui, { map, space, day, dispatch, matrix, setMatrix }),
       ]
@@ -351,7 +358,7 @@ export function useMapPanel(props) {
     } else if (tab === 'style') {
       sections = styleTabSections(ui, { map, dispatch })
     } else {
-      sections = mapTabSections(ui, { map, dispatch, space, calendar, onDay, onTool, onReveal, onSelect, focusBody, onFocusBody, viewMenu, onViewOption, onChoosePlanetPicture, onChooseModel }, { newUnit, setNewUnit, trace })
+      sections = mapTabSections(ui, { map, dispatch, space, calendar, onDay, onTool, onReveal, onSelect, focusBody, onFocusBody, viewMenu, onViewOption, onChoosePlanetPicture, onChooseModel, motionCheck, onNotice }, { newUnit, setNewUnit, trace })
     }
 
     const showTabs = !selection && !calibration
@@ -372,6 +379,6 @@ export function useMapPanel(props) {
     calendar, calibration, calibrationForm, conflicts, crossConflicts, day, dispatch, docPath, docs, focusBody, map, matrix,
     missingDocs, newUnit, onCalibrationDone, onDay, onFocusBody, onOpenCalendar, onOpenDoc, onReveal, onSelect, onTool,
     projectName, renameRequest, schedules, selectedItem, selection, space, tab, trace, viewMenu, onViewOption, zoomNow,
-    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent, distancePair, onShowEvent, onAddEventHere,
+    onOpenSurface, onChoosePlanetPicture, onOpenPinMap, onChooseModel, storyEvents, onSaveView, onShowView, extent, distancePair, onShowEvent, onAddEventHere, onAddStoryEvents, motionCheck, onNotice,
   ])
 }

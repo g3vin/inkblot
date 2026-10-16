@@ -836,3 +836,26 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('from above and flat, +x is right and the system’s +y is up the page', east[0] > 300 && Math.abs(east[1] - 300) < 1e-6 && north[1] < 300 && Math.abs(north[0] - 300) < 1e-6)
   ok('flat keeps sizes alike near and far', Math.abs(top.pxPerUnitAt(new Vector3(0, 5, 0)) - top.pxPerUnitAt(new Vector3(0, -5, 0))) < 1e-9)
 }
+
+/* ---------------- three bodies: problems, and holding them together ---------------- */
+
+{
+  const { makeStable, closePasses, stabilityOf, withStartSpeeds, asHierarchy, arrowDays, startStateOf } = await import('../../src/lib/map/nbody.js')
+  const { motionProblems } = await import('../../src/map/inspector/travelSections.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const burrau = normalizeMap({ mapKind: 'system', system: presetSystem('pythagorean') })
+  const system = burrau.system
+  ok('Burrau’s three come apart', !stabilityOf(system).stable)
+  const passes = closePasses(system)
+  ok('their close passes are found, in order, each once per approach', passes.length > 0 && passes.every((pass, index) => index === 0 || pass.day >= passes[index - 1].day))
+  const steadied = makeStable(system)
+  ok('Make it stable finds a system that holds together', Boolean(steadied) && stabilityOf(steadied.system).stable && typeof steadied.how === 'string')
+  ok('and keeps the bodies where they start', steadied.system.bodies.every((body) => !body.state || system.bodies.some((other) => other.id === body.id)))
+  const slowed = withStartSpeeds(normalizeMap({ mapKind: 'system', system: presetSystem('figureEight') }).system, 0.5)
+  const full = withStartSpeeds(normalizeMap({ mapKind: 'system', system: presetSystem('figureEight') }).system, 1)
+  ok('slowing scales every starting speed', slowed.bodies.every((body, index) => !body.state || Math.abs(Math.hypot(...body.state.vel) * 2 - Math.hypot(...full.bodies[index].state.vel)) < 1e-12))
+  ok('a hierarchy sets every body moving', asHierarchy(system).bodies.filter((body) => body.state).every((body) => Math.hypot(...body.state.vel) > 0))
+  ok('an arrow shows some days of motion', arrowDays(system) > 0 && startStateOf(system, system.bodies[0].id))
+  const problems = motionProblems(burrau, { verdict: stabilityOf(system), passes })
+  ok('the problems say who is flung out', problems.some((problem) => /flung out/.test(problem.title)) && problems.every((problem) => Number.isFinite(problem.day)))
+}

@@ -13,6 +13,7 @@ import { HATCHES, LINE_DASHES } from '../../lib/map/mapModel'
 import { STAR_GROUPS, STAR_PRESETS, massToLuminosity, starFields, starPreset, temperatureToColor } from '../../lib/map/stars'
 import { bodyMass, orbitPeriod } from '../../lib/map/orbits'
 import { newBody } from '../../lib/map/systemPresets'
+import { KMS_PER_AU_DAY, stateFromOrbits } from '../../lib/map/nbody'
 import { PIN_ICONS, unitFor } from '../mapOptions'
 import { MAP_DEFAULT_COLORS } from '../../lib/map/mapColors'
 
@@ -277,7 +278,27 @@ export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focu
     ]))
   }
 
-  if (body.kind !== 'belt' && body.parent) {
+  const pulling = map.system.dynamics === 'nbody' && body.kind !== 'belt' && body.kind !== 'barycenter'
+  if (pulling) {
+    // Bodies pulling on each other have no orbit to follow: where each starts, and how
+    // fast it is going, is all there is (nbody.js).
+    const start = body.state || stateFromOrbits(map.system).get(body.id) || { pos: [0, 0, 0], vel: [0, 0, 0] }
+    const setStart = (part, axis, value) => {
+      const next = { pos: start.pos.slice(0, 3), vel: start.vel.slice(0, 3) }
+      next[part][axis] = part === 'vel' ? value / KMS_PER_AU_DAY : value
+      patchBody({ state: next })
+    }
+    const speed = Math.hypot(...start.vel) * KMS_PER_AU_DAY
+    sections.push(ui.section('start', 'Where it starts', [
+      ...['x', 'y', 'z'].map((name, axis) => ui.number(`start.pos.${name}`, `Position ${name}`, Math.round(start.pos[axis] * 1e6) / 1e6, (value) => setStart('pos', axis, value), { step: 0.01, suffix: 'AU' })),
+      ...['x', 'y', 'z'].map((name, axis) => ui.number(`start.vel.${name}`, `Speed ${name}`, Math.round(start.vel[axis] * KMS_PER_AU_DAY * 1e3) / 1e3, (value) => setStart('vel', axis, value), { step: 0.1, suffix: 'km/s' })),
+      ui.stat('Moving at', `${speed.toFixed(speed < 10 ? 2 : 1)} km/s`),
+      ui.number('start.mass', 'Mass', body.massSun ?? null, (massSun) => patchBody({ massSun }), { min: 0, suffix: 'M☉', allowEmpty: true }),
+      ui.note('On day 0. Drag the body, or the tip of its arrow, on the map to move where it starts and how fast it goes.'),
+    ]))
+  }
+
+  if (body.kind !== 'belt' && body.parent && !pulling) {
     sections.push(ui.section('orbit', 'Orbit', [
       ui.number('orbit.distance', 'Distance', orbit?.aAU ?? 1, (aAU) => patchOrbit({ aAU }), { min: 0.00001, suffix: 'AU', help: 'The orbit’s semi-major axis.' }),
       ui.number('orbit.e', 'Eccentricity', orbit?.e ?? 0, (e) => patchOrbit({ e }), { min: 0, max: 0.99, step: 0.01, help: '0 is a circle; toward 1, a long ellipse.' }),
