@@ -78,6 +78,9 @@ import {
   takePendingMapReveal,
 } from './mapEvents'
 
+/** Kinds whose 3D view can be plotted as line art (space/plot/plotScene.js). */
+const PLOTTABLE_KINDS = new Set(['system', 'galaxy', 'universe'])
+
 /** The story's events at a place on this map, earliest first. */
 const sortedEventsAt = (timeline, docPath, pinId) =>
   (timeline?.events || []).filter((event) => event.place?.map === docPath && event.place?.pin === pinId).sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity))
@@ -1588,6 +1591,7 @@ export default function MapSurface({
           viewportRef={view.viewportRef}
           picture={view.native ? view.picture : null}
           recorder={view.canRecord?.() ? view : null}
+          plotCamera={isSpace && PLOTTABLE_KINDS.has(map.mapKind) ? () => spaceView.cameraRef.current || spaceView.camera : null}
         />
       ) : null}
 
