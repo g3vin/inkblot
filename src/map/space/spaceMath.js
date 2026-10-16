@@ -46,7 +46,23 @@ export function sceneScaleAt(r, display) {
 }
 
 /** The camera a system opens with: three-quarters from above, looking at the centre. */
-export const DEFAULT_SPACE_CAMERA = Object.freeze({ position: [0, 9, 14], target: [0, 0, 0], fov: 40, ortho: false })
+export const DEFAULT_SPACE_CAMERA = Object.freeze({ position: [0, 9, 14], target: [0, 0, 0], fov: 40, ortho: false, locked: false })
+
+/**
+ * The flat (orthographic) view's field of view, in degrees. It is a telephoto, not
+ * a true orthographic camera: from far enough away, at one degree, perspective is
+ * gone to the eye (a point at the scene's edge is out by under 0.01%), and every
+ * part of the view that reads the field of view (framing, picking, sizes on screen)
+ * goes on working unchanged.
+ */
+export const FLAT_FOV = 1
+
+/** Where the camera looks from, as a direction from its target, for each preset angle. */
+export const CAMERA_ANGLES = Object.freeze({
+  face: [0, 1, 1e-4],
+  edge: [0, 0, 1],
+  three: [0, 0.55, 0.83],
+})
 
 const isPoint = (value) => Array.isArray(value) && value.length >= 3 && value.slice(0, 3).every(Number.isFinite)
 
@@ -57,8 +73,9 @@ export function readSpaceCamera(raw) {
   return {
     position: camera.position.slice(0, 3),
     target: camera.target.slice(0, 3),
-    fov: Number.isFinite(camera.fov) && camera.fov > 5 && camera.fov < 120 ? camera.fov : DEFAULT_SPACE_CAMERA.fov,
+    fov: camera.ortho ? FLAT_FOV : Number.isFinite(camera.fov) && camera.fov > 5 && camera.fov < 120 ? camera.fov : DEFAULT_SPACE_CAMERA.fov,
     ortho: Boolean(camera.ortho),
+    locked: Boolean(camera.locked),
   }
 }
 

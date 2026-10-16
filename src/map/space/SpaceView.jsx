@@ -142,6 +142,12 @@ export default function SpaceView({ view, map, space, day, focusBody, skySeed, p
       /** The view as a picture, for an export (stage.js). */
       picture: (scale) => stage.picture(scale),
       canRecord: stage.canRecord,
+      /** A camera choice from the View menu: an angle (`face`, `edge`, `three`), flat, or held. */
+      setCamera: (choice) => {
+        if (choice.angle) stage.setAngle(choice.angle)
+        if (choice.ortho !== undefined) stage.setOrtho(choice.ortho)
+        if (choice.locked !== undefined) stage.setLocked(choice.locked)
+      },
       record: (options) => stage.record(options),
       subscribe: stage.subscribe,
     }

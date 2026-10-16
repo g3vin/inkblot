@@ -66,7 +66,7 @@ import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
 import { openStoryCalendarSettings } from '../lib/map/storyCalendarStore'
 import ExportMapDialog from './ExportMapDialog'
 import OnlineMapsDialog from './OnlineMapsDialog'
-import { choosesOnline, viewMenuFor, viewOptionEdit } from './mapViewMenu'
+import { cameraChoice, choosesOnline, viewMenuFor, viewOptionEdit } from './mapViewMenu'
 import { readOnlineMaps, saveOnlineMaps } from '../lib/map/onlineMaps'
 import { useMapCommands } from './useMapCommands'
 import {
@@ -295,11 +295,22 @@ export default function MapSurface({
 
   /* ---------------- how the map is shown (the View menu) ---------------- */
 
-  const viewMenu = useMemo(() => viewMenuFor(map, { globeAvailable: !globeFailed, spaceAvailable: !spaceFailed, lookAround }), [globeFailed, lookAround, map, spaceFailed])
+  // Only the camera's flat and held flags reach the menu, so it is not rebuilt every frame.
+  const cameraOrtho = Boolean(spaceView.camera?.ortho)
+  const cameraLocked = Boolean(spaceView.camera?.locked)
+  const viewMenu = useMemo(
+    () => viewMenuFor(map, { globeAvailable: !globeFailed, spaceAvailable: !spaceFailed, lookAround, camera: { ortho: cameraOrtho, locked: cameraLocked } }),
+    [cameraLocked, cameraOrtho, globeFailed, lookAround, map, spaceFailed]
+  )
   const applyViewOption = useCallback(
     (id, { allowed = false } = {}) => {
       if (id === 'model.look') {
         setLookAround((on) => !on)
+        return
+      }
+      const choice = cameraChoice(id, spaceView.camera)
+      if (choice) {
+        spaceView.chooseCamera(choice)
         return
       }
       const current = mapRef.current
@@ -311,7 +322,7 @@ export default function MapSurface({
       }
       dispatch({ type: 'section/patch', section: edit.section, patch: edit.patch })
     },
-    [dispatch, mapRef]
+    [dispatch, mapRef, spaceView]
   )
   const allowOnline = useCallback(() => {
     saveOnlineMaps({ enabled: true })
@@ -1327,7 +1338,10 @@ export default function MapSurface({
   // Runs only when something the chrome shows changed: the panel is memoized, so a
   // pan (which re-renders the map) publishes nothing.
   // On the globe, how far in from the whole Earth (MapLibre zoom levels are doublings).
-  const chromeZoom = isGlobe ? 2 ** ((globeView.camera.zoom || 0) - 1.4) : isSpace ? 16 / Math.max(1e-6, spaceView.camera.distance || 16) : view.viewport.zoom
+  // In 3D, by how much of the scene the view holds (distance through the lens), so going
+  // flat — further away, through a narrower lens — leaves the figure where it was.
+  const spaceReach = (spaceView.camera.distance || 16) * Math.tan(((spaceView.camera.fov || 40) * Math.PI) / 360)
+  const chromeZoom = isGlobe ? 2 ** ((globeView.camera.zoom || 0) - 1.4) : isSpace ? (16 * Math.tan((40 * Math.PI) / 360)) / Math.max(1e-6, spaceReach) : view.viewport.zoom
   useEffect(() => {
     if (!publishing) return
     const surfaceId = view.surfaceRef.current?.dataset.surfaceId

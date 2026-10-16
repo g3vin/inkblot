@@ -800,3 +800,16 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('the distance on a day matches the series', Math.abs(distanceOn(solar, space, earth, mars, series.points[10][0]) - series.points[10][1]) < 1e-6)
   ok('an end that names nothing gives no series', distanceSeries(solar, space, earth, 'body:nowhere', span) === null)
 }
+
+/* ---------------- camera choices ---------------- */
+
+{
+  const { viewMenuFor, cameraChoice } = await import('../../src/map/mapViewMenu.js')
+  const galaxy = normalizeMap({ mapKind: 'galaxy' })
+  const ids = viewMenuFor(galaxy, { camera: { ortho: true } }).map((entry) => entry.id)
+  ok('a 3D map offers the angles, flat and holding', ['camera.face', 'camera.edge', 'camera.three', 'camera.ortho', 'camera.lock'].every((id) => ids.includes(id)))
+  ok('flat is ticked when the camera is flat', viewMenuFor(galaxy, { camera: { ortho: true } }).find((entry) => entry.id === 'camera.ortho').checked)
+  ok('a planet has no angles to choose', !viewMenuFor(normalizeMap({ mapKind: 'planet' })).some((entry) => entry.id === 'camera.face'))
+  ok('a flat system has no camera', !viewMenuFor(normalizeMap({ mapKind: 'system' })).some((entry) => entry.id.startsWith('camera.')))
+  ok('choices toggle against the camera now', cameraChoice('camera.ortho', { ortho: true }).ortho === false && cameraChoice('camera.face').angle === 'face' && cameraChoice('earth.borders') === null)
+}
