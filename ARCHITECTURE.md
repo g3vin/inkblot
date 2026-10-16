@@ -200,8 +200,10 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   chunk, drawing on demand): `SpaceView` takes a *scene* module (`systemScene`,
   `galaxyScene`, `modelScene`) with one shape; `PlanetView` is a world as a globe.
   The stage also takes pictures for export, films turntables, and holds the camera
-  presets and the flat (telephoto) view. Looks (Atlas, Ink) are CSS filters on its
-  canvas (`mapThemes.css`); print plates are vector, plotted from the same scene
+  presets and the flat (telephoto) view. Cinematic adds a half-size bloom chain (not
+  on iOS), and a governor steps quality down (bloom, then pixel ratio) when frames
+  run slow while the view moves. Atlas and Ink are CSS filters on its canvas
+  (`mapThemes.css`); print plates are vector, plotted from the same scene
   through the saved camera (`space/plot/plotScene.js`), never read back from WebGL:
   a world is engraved from its seeded ground (`plotPlanet.js`), a model drawn by its
   edges with hidden lines removed in a software depth buffer (`plotModel.js`).
