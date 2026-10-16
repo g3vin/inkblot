@@ -527,6 +527,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       'A star system moves with your story: scrub the timeline and every planet and moon goes round. Drag to turn the view, scroll to zoom, and switch between 3D and flat in the view menu. Distances squeezed keeps the inner planets in reach; to scale shows the true gulfs.',
       'Templates start you off: our Solar System, binaries, triples, a star feeding a black hole, and three-body systems. A stable one keeps its dance for as long as your story; a chaotic one may fling a star out, and the Motion section says when.',
       'Select a planet or star and choose Make a map of this world to open it as a globe of its own. The trail at the top takes you back up.',
+      'The view menu turns any 3D map to look from above, edge on or three-quarters, and Flat takes the perspective away: from above and flat, it is a plan for a book. Hold this angle keeps it there while you pan and zoom.',
     ],
     related: ['map.worlds', 'map.galaxies'],
   },

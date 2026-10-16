@@ -11,8 +11,9 @@
  * The space view (systems) and the planet view (one world) build on it; each adds
  * its own scene and the projector API the map surface talks to.
  */
-import { ACESFilmicToneMapping, Color, PerspectiveCamera, Scene, WebGLRenderer } from 'three'
+import { ACESFilmicToneMapping, Color, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { CAMERA_ANGLES, DEFAULT_SPACE_CAMERA, FLAT_FOV } from './spaceMath'
 
 const SETTLE_MS = 250
 const MAX_PIXEL_RATIO = 2
@@ -51,11 +52,19 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
   // While a turntable records, it alone draws.
   let recording = false
 
+  // Flat (orthographic, as a telephoto: spaceMath FLAT_FOV) and the angle held still.
+  let ortho = Boolean(saved.ortho)
+  let locked = Boolean(saved.locked)
+  // The field of view to come back to from flat.
+  const roundFov = saved.ortho ? DEFAULT_SPACE_CAMERA.fov : saved.fov
+  controls.enableRotate = !locked
+
   const snapshot = () => ({
     position: camera.position.toArray(),
     target: controls.target.toArray(),
     fov: camera.fov,
-    ortho: false,
+    ortho,
+    locked,
     distance: camera.position.distanceTo(controls.target),
   })
 
@@ -119,6 +128,66 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
       else settle()
     }
     glide = requestAnimationFrame(step)
+  }
+
+  /** Look from a preset angle (`CAMERA_ANGLES`: face-on, edge-on, three-quarter), as far away. */
+  function setAngle(name) {
+    const direction = CAMERA_ANGLES[name]
+    if (!direction) return
+    const target = controls.target.clone()
+    const distance = camera.position.distanceTo(target)
+    moveTo(target, target.clone().add(new Vector3(...direction).normalize().multiplyScalar(distance)))
+  }
+
+  /**
+   * Flat or in depth: a dolly zoom, the camera backing away as the lens narrows (or
+   * coming in as it widens), so what is in the middle stays the same size.
+   */
+  function setOrtho(on) {
+    if (on === ortho) return
+    ortho = on
+    const target = controls.target.clone()
+    const direction = camera.position.clone().sub(target)
+    const fromDistance = direction.length()
+    direction.normalize()
+    const fromFov = camera.fov
+    const toFov = on ? FLAT_FOV : roundFov
+    const half = (fov) => Math.tan((fov * Math.PI) / 360)
+    const toDistance = (fromDistance * half(fromFov)) / half(toFov)
+    const apply = (t) => {
+      const fov = fromFov + (toFov - fromFov) * t
+      camera.fov = fov
+      camera.updateProjectionMatrix()
+      // Keep the target the same size on screen at every step of the way.
+      camera.position.copy(target).addScaledVector(direction, (fromDistance * half(fromFov)) / half(fov))
+    }
+    cancelAnimationFrame(glide)
+    if (reducedMotion()) {
+      apply(1)
+      camera.position.copy(target).addScaledVector(direction, toDistance)
+      controls.update()
+      invalidate()
+      settle()
+      return
+    }
+    const start = performance.now()
+    const step = () => {
+      const t = Math.min(1, (performance.now() - start) / 700)
+      apply(1 - (1 - t) ** 3)
+      controls.update()
+      invalidate()
+      if (t < 1) glide = requestAnimationFrame(step)
+      else settle()
+    }
+    glide = requestAnimationFrame(step)
+  }
+
+  /** Hold the angle (only pan and zoom), or let it turn again. */
+  function setLocked(on) {
+    locked = on
+    controls.enableRotate = !on
+    invalidate()
+    settle()
   }
 
   /** Screen pixels of a world point, or null behind the camera. */
@@ -225,5 +294,5 @@ export function createStage(container, { saved, background, near = 1e-6, far = 1
     renderer.domElement.remove()
   }
 
-  return { renderer, camera, controls, scene, size, invalidate, settle, moveTo, screenOf, subscribe, picture, canRecord, record, dispose }
+  return { renderer, camera, controls, scene, size, invalidate, settle, moveTo, setAngle, setOrtho, setLocked, screenOf, subscribe, picture, canRecord, record, dispose }
 }

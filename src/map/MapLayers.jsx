@@ -211,6 +211,8 @@ const SystemGround = memo(function SystemGround({ map, projector, positions: liv
 const BODY_RANK = { star: 0, planet: 1, dwarf: 2, moon: 3, station: 4 }
 /** Bodies closer than this on screen show one name (a moon tucks behind its planet). */
 const NAME_CLEARANCE_PX = 16
+/** Roughly how wide a character of a body's name is, for keeping names apart. */
+const NAME_CHAR_PX = 6.2
 
 /**
  * Over the 3D view (which draws the bodies themselves): each body's name, and a
@@ -226,15 +228,23 @@ function SpaceNames({ map, projector, positions, selection }) {
   }
   placed.sort((a, b) => a.rank - b.rank)
   const shown = []
+  // Names already written, as boxes: a name that would overlap one keeps its target
+  // (to click) but not its words, unless it is selected.
+  const boxes = []
+  const boxOf = (entry) => ({ left: entry.at[0] + 13, right: entry.at[0] + 13 + entry.body.name.length * NAME_CHAR_PX, top: entry.at[1] - 8, bottom: entry.at[1] + 6 })
+  const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
   for (const entry of placed) {
     const selected = selection?.kind === 'body' && selection.id === entry.body.id
     const crowded = shown.some((other) => Math.hypot(other.at[0] - entry.at[0], other.at[1] - entry.at[1]) < NAME_CLEARANCE_PX)
     if (crowded && !selected) continue
-    shown.push({ ...entry, selected })
+    const box = boxOf(entry)
+    const named = selected || !boxes.some((other) => overlaps(box, other))
+    if (named) boxes.push(box)
+    shown.push({ ...entry, selected, named })
   }
   return (
     <g className="map-system map-space-names">
-      {shown.map(({ body, at, selected }) => (
+      {shown.map(({ body, at, selected, named }) => (
         <g
           key={body.id}
           className={`map-body map-body-3d${selected ? ' is-selected' : ''}`}
@@ -243,7 +253,7 @@ function SpaceNames({ map, projector, positions, selection }) {
           transform={`translate(${at[0]} ${at[1]})`}
         >
           <circle className="map-body-target" r={11} />
-          <text className="map-body-name" x={13} y={4}>{body.name}</text>
+          {named ? <text className="map-body-name" x={13} y={4}>{body.name}</text> : null}
         </g>
       ))}
     </g>

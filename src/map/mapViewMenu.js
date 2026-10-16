@@ -4,7 +4,9 @@
  *
  * For the Earth: a globe or a flat map (and which projection), the plain map or
  * satellite photographs, street detail, raised terrain, the graticule and borders.
- * For a star system: in 3D or laid flat, and distances squeezed or to scale.
+ * For a star system: in 3D or laid flat, and distances squeezed or to scale. For
+ * any 3D view: the angle (from above, edge on, three-quarter), flat (no
+ * perspective) and holding the angle.
  * Built here as a list (`MapMenuItem`) the toolbar draws — the page's own, or a
  * native shell's — and each choice comes back as `view-option` with its id.
  *
@@ -21,12 +23,30 @@ export const ONLINE_OPTIONS = new Set(['earth.imagery.satellite', 'earth.imagery
 
 const item = (id, label, { checked = false, disabled = false, separator = false } = {}) => ({ id, label, checked, disabled, separator })
 
+/**
+ * The camera choices of a 3D view: an angle (a planet is a globe, so it has none),
+ * flat (orthographic), and holding the angle still. `camera` is the view's own.
+ */
+function cameraItems(map, camera) {
+  const angles = map.mapKind === 'planet' ? [] : [
+    item('camera.face', 'From above', { separator: true }),
+    item('camera.edge', 'Edge on'),
+    item('camera.three', 'Three-quarter'),
+  ]
+  return [
+    ...angles,
+    item('camera.ortho', 'Flat (no perspective)', { checked: Boolean(camera?.ortho), separator: !angles.length }),
+    item('camera.lock', 'Hold this angle', { checked: Boolean(camera?.locked) }),
+  ]
+}
+
 /** The View menu for `map`. `globeAvailable` (`spaceAvailable`) is false where the globe (3D) could not start. */
-export function viewMenuFor(map, { globeAvailable = true, spaceAvailable = true, lookAround = false } = {}) {
+export function viewMenuFor(map, { globeAvailable = true, spaceAvailable = true, lookAround = false, camera = null } = {}) {
   if (map.mapKind === 'model') {
     return [
       item('model.look', 'Look around', { checked: lookAround, disabled: !spaceAvailable }),
       item('model.up', 'Model is z-up', { checked: map.model.up === 'z', separator: true }),
+      ...(spaceAvailable ? cameraItems(map, camera) : []),
     ]
   }
   if (map.mapKind === 'system') {
@@ -37,8 +57,10 @@ export function viewMenuFor(map, { globeAvailable = true, spaceAvailable = true,
       item('system.view.flat', 'Flat', { checked: !in3d }),
       item('system.radial.log', 'Distances squeezed', { checked: display.radial === 'log', separator: true }),
       item('system.radial.linear', 'Distances to scale', { checked: display.radial === 'linear' }),
+      ...(in3d ? cameraItems(map, camera) : []),
     ]
   }
+  if (['planet', 'galaxy', 'universe'].includes(map.mapKind)) return spaceAvailable ? cameraItems(map, camera).map((entry, index) => (index === 0 ? { ...entry, separator: false } : entry)) : []
   if (map.mapKind !== 'earth') return []
   const { earth } = map
   const globe = earth.view === 'globe' && globeAvailable
@@ -132,4 +154,17 @@ export const VIEW_COMMAND_TITLES = {
   'system.view.flat': ['Lay the system out flat', ['2d', 'top down', 'diagram', 'print']],
   'system.radial.log': ['Squeeze distances so everything fits', ['log', 'compress', 'scale']],
   'system.radial.linear': ['Draw distances to scale', ['linear', 'true scale', 'real']],
+  'camera.face': ['Look from above', ['top down', 'face on', 'plan', '2d', 'overhead']],
+  'camera.edge': ['Look edge on', ['side', 'profile', 'horizon', 'plane']],
+  'camera.three': ['Look from three-quarters', ['angle', 'perspective', 'default view']],
+  'camera.ortho': ['Turn perspective off or on', ['orthographic', 'flat', '2d', 'isometric', 'print', 'plan']],
+  'camera.lock': ['Hold or free the angle', ['lock', 'rotation', 'pan only', '2d']],
+}
+
+/** A camera choice (`camera.*`) as the 3D view takes it, given the camera now; null for anything else. */
+export function cameraChoice(id, camera) {
+  if (id === 'camera.face' || id === 'camera.edge' || id === 'camera.three') return { angle: id.slice('camera.'.length) }
+  if (id === 'camera.ortho') return { ortho: !camera?.ortho }
+  if (id === 'camera.lock') return { locked: !camera?.locked }
+  return null
 }
