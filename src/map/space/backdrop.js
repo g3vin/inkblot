@@ -4,13 +4,18 @@
  *
  * Drawn from a seed, so a system's sky is its own and the same every time. It is a
  * single Points buffer that rides with the camera (`follow`), so it is always at
- * infinity: orbiting turns the sky, moving does not.
+ * infinity: orbiting turns the sky, moving does not. Anything nearer than the sky
+ * that writes depth (a world, a star) hides the stars behind it.
  */
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, Points, ShaderMaterial } from 'three'
 import { temperatureToColor } from '../../lib/map/stars'
 import { gaussian, random } from '../../lib/map/seeded'
 
+// The stage's depth buffer is logarithmic (stage.js): the sky writes its depth the
+// same way, so a world in front of it hides the stars behind.
 const VERTEX = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_vertex>
 attribute float size;
 attribute vec3 color;
 varying vec3 vColor;
@@ -20,11 +25,14 @@ void main() {
   vec4 view = modelViewMatrix * vec4(position, 1.0);
   gl_PointSize = size * uScale;
   gl_Position = projectionMatrix * view;
+  #include <logdepthbuf_vertex>
 }
 `
 const FRAGMENT = /* glsl */ `
+#include <logdepthbuf_pars_fragment>
 varying vec3 vColor;
 void main() {
+  #include <logdepthbuf_fragment>
   vec2 d = gl_PointCoord - 0.5;
   float r = length(d) * 2.0;
   float alpha = smoothstep(1.0, 0.0, r);
@@ -86,7 +94,6 @@ export function createBackdrop(seed = 1, { count = 4200, radius = 900, pixelRati
     fragmentShader: FRAGMENT,
     transparent: true,
     depthWrite: false,
-    depthTest: false,
     blending: AdditiveBlending,
   })
   const points = new Points(geometry, material)

@@ -100,11 +100,16 @@ function rocky(look, width, height, mask, color, relief) {
       else if (drawn === MASK_MOUNTAINS) h = Math.max(h, seaLevel + 0.3 + fine * 0.25)
       else if (drawn !== MASK_NONE) h = Math.max(h, seaLevel + 0.03 + fine * 0.18)
       const latitude = Math.abs(lat) * (180 / Math.PI)
-      const cold = latitude > palette.caps - (h > seaLevel ? (h - seaLevel) * 30 : 0)
+      // The ice's edge wanders (a broad noise, ±6°), comes further down on high
+      // ground, and fades in over a few degrees: never a ruled line of latitude.
+      const wander = fbm3(d[0] * 3, d[1] * 3, d[2] * 3, seed + 131, 3, 0.5) * 6
+      const edge = palette.caps + wander - (h > seaLevel ? (h - seaLevel) * 30 : 0)
+      const ice = Math.min(1, Math.max(0, (latitude - edge) / 4 + 0.5))
+      const cold = ice > 0
       let rgb
       if (h < seaLevel) {
         rgb = mix(palette.deep, palette.shallow, (h / Math.max(seaLevel, 1e-6)) ** 3)
-        if (cold) rgb = mix(rgb, palette.peak, 0.85)
+        if (cold) rgb = mix(rgb, palette.peak, 0.85 * ice)
       } else {
         const t = (h - seaLevel) / Math.max(1 - seaLevel, 1e-6)
         rgb = t < 0.04 ? mix(palette.shore, palette.low, t / 0.04)
@@ -113,7 +118,7 @@ function rocky(look, width, height, mask, color, relief) {
               : mix(palette.high, palette.peak, (t - 0.8) / 0.2)
         if (drawn === MASK_FOREST) rgb = mix(rgb, palette.forest, 0.7)
         else if (drawn === MASK_DESERT) rgb = mix(rgb, palette.desert, 0.8)
-        else if (drawn === MASK_ICE || cold) rgb = mix(rgb, palette.peak, drawn === MASK_ICE ? 0.9 : 0.8)
+        else if (drawn === MASK_ICE || cold) rgb = mix(rgb, palette.peak, drawn === MASK_ICE ? 0.9 : 0.85 * ice)
       }
       color[index * 4] = rgb[0]
       color[index * 4 + 1] = rgb[1]
