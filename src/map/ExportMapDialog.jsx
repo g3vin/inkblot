@@ -9,7 +9,9 @@
  * mapExport.js from the same layers the editor shows, so an export is what was on
  * screen. A globe or 3D view is exported as it is framed, drawn by its own renderer
  * under the same places and labels; a 3D view can also be filmed going once round
- * (a turntable video, of the scene alone).
+ * (a turntable video, of the scene alone). A star system, galaxy or group of
+ * galaxies can instead be plotted as line art in one ink (plotScene.js): crisp
+ * vector plates for a book, from whatever angle it is framed at.
  */
 import { useState } from 'react'
 import { Button, Dialog, FormRow, Segmented, SelectMenu } from '../ui'
@@ -20,21 +22,38 @@ import { buildMapSvg, saveBytes, svgToPng } from './mapExport'
 import { mapToGeoJSON, mapToKml } from '../lib/map/geoInterchange'
 
 const FRAMES = [{ value: 'view', label: 'What’s on screen' }, { value: 'all', label: 'The whole map' }]
+const DRAWINGS = [{ value: 'picture', label: 'As on screen' }, { value: 'ink', label: 'Ink drawing' }, { value: 'mono', label: 'Black and white' }]
 const TURNTABLE_LENGTHS = [{ value: '4', label: '4 s' }, { value: '8', label: '8 s' }, { value: '16', label: '16 s' }]
 const SHARPNESS = [{ value: '1', label: 'Standard (1×)' }, { value: '2', label: 'Retina (2×)' }, { value: '4', label: 'Print (4×)' }]
 
-export default function ExportMapDialog({ open, onClose, map, projector, space, day, projectName, docPath, surfaceRef, viewportRef, picture = null, recorder = null }) {
+export default function ExportMapDialog({ open, onClose, map, projector, space, day, projectName, docPath, surfaceRef, viewportRef, picture = null, recorder = null, plotCamera = null }) {
   const [frame, setFrame] = useState('view')
   const [scale, setScale] = useState(2)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [seconds, setSeconds] = useState('8')
+  // A 3D view can be drawn as on screen, or plotted as line art (space/plot/).
+  const [drawing, setDrawing] = useState('picture')
+  const plotting = Boolean(plotCamera) && drawing !== 'picture'
   const name = getDocDisplayName(docPath)
 
   // A globe or a 3D view draws itself (`picture`); only what is on screen can be shown.
   const native = Boolean(picture)
   const build = async (pixelScale) => {
     const surface = surfaceRef.current
+    if (plotting) {
+      const { plotScene } = await import('./space/plot/plotScene')
+      const { cartouche } = map.style
+      return plotScene(map, space, {
+        day,
+        camera: plotCamera(),
+        width: surface?.clientWidth || 1200,
+        height: surface?.clientHeight || 800,
+        scale: pixelScale,
+        mono: drawing === 'mono',
+        title: cartouche.show ? cartouche.title : null,
+      })
+    }
     const canvas = native ? await picture(pixelScale) : null
     if (native && !canvas) throw new Error('The view could not be drawn.')
     return buildMapSvg({
@@ -121,6 +140,7 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
       open={open}
       onClose={onClose}
       eyebrow="Map"
+      width="min(600px, calc(100vw - 32px))"
       title="Export map"
       description="Save it as a picture, print it, or copy it to paste into a chapter."
       footer={
@@ -133,6 +153,11 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
         </>
       }
     >
+      {plotCamera ? (
+        <FormRow label="Drawing" help="map.export">
+          <Segmented label="How to draw it" value={drawing} onChange={setDrawing} options={DRAWINGS} />
+        </FormRow>
+      ) : null}
       {native ? null : (
         <FormRow label="What">
           <Segmented label="What to export" value={frame} onChange={setFrame} options={FRAMES} />

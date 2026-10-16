@@ -58,3 +58,14 @@ export const GALAXY_PARTS = {
     [1, 'rgba(255,255,255,0)'],
   ],
 }
+
+/**
+ * Ink for a printed plate of a 3D map (space/plot/), by the map's theme: black on
+ * white, sepia on parchment, white on black for night. `mono` forces black on white.
+ */
+export const INK_PALETTES = {
+  clean: { paper: '#ffffff', ink: '#111111' },
+  ink: { paper: '#ffffff', ink: '#111111' },
+  parchment: { paper: '#f4ecd8', ink: '#3b2a17' },
+  night: { paper: '#0b0d12', ink: '#e9edf3' },
+}

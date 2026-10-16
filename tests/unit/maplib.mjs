@@ -813,3 +813,26 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('a flat system has no camera', !viewMenuFor(normalizeMap({ mapKind: 'system' })).some((entry) => entry.id.startsWith('camera.')))
   ok('choices toggle against the camera now', cameraChoice('camera.ortho', { ortho: true }).ortho === false && cameraChoice('camera.face').angle === 'face' && cameraChoice('earth.borders') === null)
 }
+
+/* ---------------- plates: 3D maps as line art ---------------- */
+
+{
+  const { plotScene } = await import('../../src/map/space/plot/plotScene.js')
+  const { plotCamera } = await import('../../src/map/space/plot/plotCamera.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const { Vector3 } = await import('three')
+  const sol = normalizeMap({ mapKind: 'system', system: presetSystem('sol') })
+  const camera = { position: [0, 9, 14], target: [0, 0, 0], fov: 40 }
+  const plate = () => plotScene(sol, createSpace(sol), { day: 100, camera, width: 800, height: 600 }).svg
+  ok('a plate is the same every time', plate() === plate())
+  ok('a plate has no pictures in it, only lines', !/<image|data:image/.test(plate()))
+  ok('far halves of orbits are dashed', /stroke-dasharray/.test(plate()))
+  const galaxy = normalizeMap({ mapKind: 'galaxy', galaxy: { type: 'Sb', seed: 3, radiusLy: 50000 } })
+  const black = plotScene(galaxy, createSpace(galaxy), { camera: { position: [0, 80, 1e-4], target: [0, 0, 0], fov: 40 }, width: 600, height: 600, mono: true }).svg
+  ok('black and white is black on white whatever the theme', black.includes('--plot-ink:#111111') && black.includes('--plot-paper:#ffffff'))
+  const top = plotCamera({ position: [0, 20, 1e-4], target: [0, 0, 0], fov: 1, ortho: true }, 600, 600)
+  const east = top.project(new Vector3(5, 0, 0))
+  const north = top.project(new Vector3(0, 0, -5))
+  ok('from above and flat, +x is right and the system’s +y is up the page', east[0] > 300 && Math.abs(east[1] - 300) < 1e-6 && north[1] < 300 && Math.abs(north[0] - 300) < 1e-6)
+  ok('flat keeps sizes alike near and far', Math.abs(top.pxPerUnitAt(new Vector3(0, 5, 0)) - top.pxPerUnitAt(new Vector3(0, -5, 0))) < 1e-9)
+}
