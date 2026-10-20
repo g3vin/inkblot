@@ -94,7 +94,8 @@ colour.
 ## Audit
 
 Done 2026-10-20: [audit.md](audit.md), and the board `design-review/out/audit.html`
-(rebuilt from the control run). Twelve families scored. The proposed order of rounds:
+(rebuilt from the control run). Twelve families scored. The order of rounds, confirmed
+by the design lead on 2026-10-20:
 
 1. Modals: shell and behaviour
 2. Pop-ups
@@ -109,6 +110,6 @@ Done 2026-10-20: [audit.md](audit.md), and the board `design-review/out/audit.ht
 
 | Round | Family | State |
 | --- | --- | --- |
-| — | — | None yet. The order above is a proposal until the design lead confirms it. |
+| — | — | None yet. The design lead confirmed the order above on 2026-10-20. |
 
-**Next step:** confirm the order, then `/design-review round modals`.
+**Next step:** `/design-review round modals`.
