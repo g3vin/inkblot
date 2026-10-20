@@ -4,7 +4,7 @@
  * focus mode and sprint mode, where the toolbar is away. When a routine runs to its
  * end, the recap takes its place (TimerRecapView in MenuBarAndRecap.swift).
  */
-import { Button, FloatingCapsule, IconButton, Sheet } from '../../ui'
+import { Button, Dialog, FloatingCapsule, IconButton } from '../../ui'
 import Icon from '../../ui/Icon.jsx'
 import { useStats } from '../../stats/useStats.js'
 import { segmentTitle } from '../../stats/routines.js'
@@ -18,7 +18,7 @@ function Recap({ stats, run }) {
   const streak = stats.streak
   const close = () => stats.timer.dismissRecap()
   return (
-    <Sheet title={`${run.routine.name} complete`} onClose={close} width={380} className="stats-recap"
+    <Dialog eyebrow="Timer" title={`${run.routine.name} complete`} onClose={close} size="small" className="stats-recap"
       footer={(
         <>
           <Button onClick={() => { close(); stats.startTimer(run.routine) }}>Run again</Button>
@@ -42,7 +42,7 @@ function Recap({ stats, run }) {
         ) : null}
         {streak.current > 0 ? <p className="stats-muted stats-inline"><Icon name="streak" />{streak.current}-day streak</p> : null}
       </div>
-    </Sheet>
+    </Dialog>
   )
 }
 

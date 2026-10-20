@@ -3,7 +3,7 @@
    layout lives here: the controls are the shared ones.
    ============================================================ */
 
-.pss-sheet .ui-sheet-body {
+.pss-sheet .ib-dialog-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);

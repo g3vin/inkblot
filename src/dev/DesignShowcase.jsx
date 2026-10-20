@@ -14,7 +14,7 @@ import {
   Breadcrumb, Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
   FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, Input, Kbd, Menu, MenuItem,
   MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented,
-  SelectMenu, Sheet, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
+  SelectMenu, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
 } from '../ui'
 import NavSheet from '../ui/NavSheet.jsx'
 import { ICONS } from '../ui/icons'
@@ -61,7 +61,7 @@ export default function DesignShowcase() {
 
   useCommands(() => [
     { id: 'ds.dialog', section: 'Showcase', title: 'Open a dialog', icon: 'info', run: () => setDialog(true) },
-    { id: 'ds.sheet', section: 'Showcase', title: 'Open a sheet', icon: 'sidebar', run: () => setSheet(true) },
+    { id: 'ds.sheet', section: 'Showcase', title: 'Open a medium dialog', icon: 'sidebar', run: () => setSheet(true) },
     { id: 'ds.theme', section: 'View', title: 'Toggle theme', icon: 'moon', shortcut: '⌘⇧L', run: () => switchTheme(theme === 'dark' ? 'light' : 'dark') },
   ], [theme])
 
@@ -243,8 +243,8 @@ export default function DesignShowcase() {
               <p className="ib-eyebrow ds-pop-label">Note colour</p>
               <InkPicker label="Note colour" value={ink} onChange={setInk} />
             </Popover>
-            <Button variant="tinted" onClick={() => setDialog(true)}>Open dialog</Button>
-            <Button variant="tinted" onClick={() => setSheet(true)}>Open sheet</Button>
+            <Button variant="tinted" onClick={() => setDialog(true)}>Open a small decision</Button>
+            <Button variant="tinted" onClick={() => setSheet(true)}>Open a medium dialog</Button>
           </div>
         </ShowcaseSection>
 
@@ -419,17 +419,19 @@ export default function DesignShowcase() {
         )}
       </Panel>
 
-      <Dialog open={dialog} onClose={() => setDialog(false)} eyebrow="Document" title="Delete this chapter?"
+      {/* A small decision: its two buttons share the width, and Cancel is its way out. */}
+      <Dialog open={dialog} onClose={() => setDialog(false)} size="small" decision eyebrow="Document" title="Delete this chapter?"
         description="It moves to the archive, where you can restore it for 30 days."
         footer={<><Button onClick={() => setDialog(false)}>Cancel</Button><Button variant="destructive" onClick={() => setDialog(false)}>Delete</Button></>}>
         <Checkbox label="Also delete its notes" checked={check} onChange={setCheck} />
       </Dialog>
-      <Sheet open={sheet} onClose={() => setSheet(false)} title="Page setup"
-        footer={<><span className="ui-sheet-footer-spacer" /><Button variant="filled" onClick={() => setSheet(false)}>Done</Button></>}>
+      {/* A medium dialog with a leading utility; Done closes it, so no ×. */}
+      <Dialog open={sheet} onClose={() => setSheet(false)} size="medium" eyebrow="Typeset" title="Page setup"
+        footer={<><Button>Restore defaults</Button><span className="ib-dialog-footer-spacer" /><Button variant="filled" onClick={() => setSheet(false)}>Done</Button></>}>
         <FormRow label="Trim size">
           <SelectMenu label="Trim size" value={trim} onChange={setTrim} options={[{ value: '6x9', label: '6 × 9 in' }, { value: 'a5', label: 'A5' }]} />
         </FormRow>
-      </Sheet>
+      </Dialog>
       {navSheet ? (
         <NavSheet title="Help" items={[{ id: 'a', title: 'Using help', group: 'Getting around' }, { id: 'b', title: 'Sidebars', group: 'Getting around' }, { id: 'c', title: 'Accent colour', group: 'Settings' }]} value={navPage} onChange={setNavPage} onClose={() => setNavSheet(false)}>
           <p className="ib-eyebrow">A page</p>

@@ -83,6 +83,10 @@
   --size-toolbar: 36px;
   --size-bubble: 42px;
   --size-trash: 56px;
+  /* Dialog widths (docs/DESIGN.md §9): decisions, forms and lists, pages. */
+  --dialog-sm: 400px;
+  --dialog-md: 560px;
+  --dialog-lg: 720px;
   --icon-sm: 16px;
   --icon-md: 20px;
   --hairline: 1px;

@@ -17,7 +17,7 @@ new feature from its first commit.
 For anyone short on time, human or agent. The rest of this document explains each one.
 
 1. **Build from `src/ui/`.** Use `Button`, `IconButton`, `Segmented`, `Menu`, `Popover`,
-   `Sheet`, `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`, `Panel`,
+   `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`, `Panel`,
    `Card`, `EmptyState`, `InkPicker` and the others. Don't restyle a bare `<button>` or
    write a new modal.
 2. **Never hard-code a design value.** Colours, fonts, radii, shadows, durations and
@@ -260,7 +260,7 @@ Weights are 400 (body), 500 (controls and labels), 600 (titles) and 700 (eyebrow
 sentence case everywhere; only eyebrows are uppercase.
 
 **The eyebrow** (`.ib-eyebrow`) is the small label above a group: a sidebar's or panel's
-title ("NOVEL", "STATS"), a section head in a sheet, a dialog's kicker. It is Inter
+title ("NOVEL", "STATS"), a section head in a dialog, a dialog's kicker. It is Inter
 at `--text-xs`, bold (`--weight-bold`), in capitals, tracked by `--tracking-eyebrow`,
 in `--text-muted`. Sidebar titles (`.panel-header-label`) are the same style.
 
@@ -395,7 +395,7 @@ need the target.
 |---|---|---|
 | `--radius-xs`, `--radius-sm` | 4 | Inputs, selects, chips, small controls, menu items |
 | `--radius-md` | 8 | Buttons, segmented controls, steppers, cards, rows |
-| `--radius-lg`, `--radius-card` | 12 | Floating panels and capsules, popovers, menus, dialogs, sheets |
+| `--radius-lg`, `--radius-card` | 12 | Floating panels and capsules, popovers, menus, dialogs |
 | `--radius-pill` | 999 | Tags and toggles **only** (and round icon buttons) |
 
 **Depth.** Only floating things cast shadows: panels, menus, popovers and floating
@@ -407,8 +407,10 @@ is a sidebar's engraved tab strip (§6), the only place inside a panel with a sh
 highlight.
 
 **Motion is subtle and quick.** Use `--dur-fast` (120ms) for hovers and small state
-changes, `--dur-base` (180ms) for popovers, dialogs and panels, and `--dur-slow` (240ms)
-for sheets. The easing is `--ease-out` (`--ease-standard` is the same curve). There is no bounce or overshoot, and no looping
+changes, `--dur-base` (180ms) for popovers, panels and small dialogs, and `--dur-slow`
+(240ms) for medium and large dialogs. Things arrive on `--ease-out` (`--ease-standard` is
+the same curve). A dialog also leaves the way it came, quicker (`--dur-fast`) and easing
+in (`--ease-in`); `useExitAnimation` does this without the caller keeping it mounted. There is no bounce or overshoot, and no looping
 or attention-seeking animation. Motion explains where something came from and never
 decorates. `prefers-reduced-motion` is honoured globally (`base.css`); framer-motion
 components also check `useReducedMotion()`.
@@ -463,9 +465,8 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in. `danger` items go last, after a separator |
 | `useNativeMenu`, `popUpNativeMenu` | Context menus and menus a native window menu would show | The OS menu, built from the same items |
 | `Popover` | Small forms and pickers anchored to a control | Same surface as a menu. `align` start/end |
-| `Dialog` | A decision, or a small setting | Eyebrow + title + description, then the body, then the footer (secondary left, primary right) |
-| `Sheet` | Larger settings and editors (Customize Toolbar, page setup) | Centred, or dropped from under the titlebar with `placement="top"` |
-| `NavSheet` | A sheet of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
+| `Dialog` | **The one modal**: a decision, a form, an editor, Settings | See *Dialogs* below |
+| `NavSheet` | A large `Dialog` of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
 | `Section` | A collapsible group in an inspector panel | Remembers open/closed per `id`. `accessory` is its one action, beside the title. `help` names its help topic |
 | `FormRow` + `Toggle` / `Stepper` / `SelectMenu` | Inspector and settings rows | Label left (as wide as it needs, up to about half), control right; `stacked` for wide controls. `Toggle` applies immediately. `help` names its help topic |
 | `PanelActions`, `ScopeMenu`, `MoreMenu` | A panel's scope and ⋯, in its header row | The panel anatomy (§6). `PanelActions` puts its children in the shell's header slot, only for the panel showing |
@@ -489,6 +490,37 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 Behaviour hooks (`src/ui/hooks.js`) are `useDismiss`, `useFocusTrap`, `useRovingFocus`
 and `useAnchoredPosition` (`placePopover.js` is the placement maths `Popover` uses). Use them when building anything floating or list-like
 instead of re-implementing focus handling.
+
+### Dialogs
+
+There is one modal, `Dialog` (decided in design review round 01, 2026-10-20; see
+`docs/design-review/rounds/01-modals.md`). Every modal is built the same way:
+
+- **Header:** an eyebrow saying where the dialog came from (`Book`, `Typeset`,
+  `Inspector`, `Toolbar`, `Files`, `Timer`, `Map`), the title in `.ib-title`
+  (`--text-lg`), and a one-line description when it needs one. New project, Settings
+  and Help have no eyebrow.
+- **One visible way out.** The footer's Cancel or Done is it. A dialog with no footer, or
+  whose footer doesn't close it (`footerCloses={false}`: Export map, Folder types), shows
+  a × at the top right. Escape and a click on the scrim always close a dialog.
+- **Footer:** the actions at the trailing edge, secondary then primary. A leading utility
+  (Units, Restore defaults, Show) goes first, before `<span
+  className="ib-dialog-footer-spacer" />`. A small `decision` (create, rename, remove)
+  splits its two buttons across the width.
+- **Size:** `small` (`--dialog-sm`, 400) for decisions and short forms, `medium`
+  (`--dialog-md`, 560) for forms and lists, `large` (`--dialog-lg`, 720) for pages
+  (Settings, Help, Customize toolbar).
+- **Layer and motion:** on `--z-dialog`, over `--scrim-bg`. It fades in (§7) and leaves the
+  way it came. Reduced motion stills both.
+- **Focus:** the first control inside, never the ×. Tab stays inside, the app behind is
+  inert, and focus goes back where it was.
+
+**Declared exceptions:**
+
+- **Customize toolbar** drops from under the titlebar (`placement="top"`), and the app
+  behind it is not made inert, because its toolbar is what items are dragged into.
+- **The command palette** has its own surface and scrim (`CommandPalette`). It hasn't been
+  reviewed yet (the pop-ups round).
 
 **If a component doesn't exist yet,** build it in `src/ui/` from tokens, add it to the
 showcase (`src/dev/DesignShowcase.jsx`) and to this table, in the same PR.
@@ -594,7 +626,7 @@ little see-through too, its 0.5px ring over a light `var(--blur-note)`, so the l
 is about stays in view; the strings between notes stop at their edges. The project
 search card and its preview are veiled the same way as a hovering sidebar
 (`--search-veil-bg` over `var(--blur-over-page)`, falling back to the opaque menu
-surface under reduced transparency): a veil, not glass. Don't extend glass to panels, menus, dialogs, sheets or scrims, and don't add
+surface under reduced transparency): a veil, not glass. Don't extend glass to panels, menus, dialogs or scrims, and don't add
 per-platform styling elsewhere. Touch targets are already comfortable (32px minimum;
 FABs are 44px).
 
@@ -605,7 +637,8 @@ FABs are 44px).
 - **Contrast:** AA, as in §3. Never rely on colour alone.
 - **Keyboard:** Every action is reachable by keyboard. Focus is always visible
   (`--focus-ring`). Menus, tabs, segmented controls and swatches use arrow keys.
-  Dialogs trap focus and return it on close.
+  Dialogs focus their first control (never the ×), trap focus, make the app behind
+  inert, and return focus on close.
 - **Names:** Icon-only controls have `label`s. Decorative icons are `aria-hidden`.
 - **Motion:** Honour `prefers-reduced-motion` (global in `base.css`).
 - **Text:** Nothing important below `--text-xs` (11px). Don't disable zoom.

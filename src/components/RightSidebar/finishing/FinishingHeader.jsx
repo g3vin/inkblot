@@ -10,7 +10,7 @@
  * The scope it sets is also what Typeset edits.
  */
 import { useRef, useState } from 'react'
-import { Button, Field, Input, MenuItem, MenuLabel, MenuSeparator, MoreMenu, PanelActions, Popover, ScopeMenu, SelectMenu, Sheet, TextArea } from '../../../ui'
+import { Button, Dialog, Field, Input, MenuItem, MenuLabel, MenuSeparator, MoreMenu, PanelActions, Popover, ScopeMenu, SelectMenu, TextArea } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
 import { exportMenuItems } from '../../toolbar/items/exportMenu'
 import { describeJob } from '../../../print/usePrintJobStatus'
@@ -195,11 +195,12 @@ export function AuthorSheet({ profile, onSave, onClose }) {
     </Field>
   )
   return (
-    <Sheet
+    <Dialog
+      eyebrow="Typeset"
       title="Author details"
-      width={420}
+      size="small"
       onClose={onClose}
-      footer={<><span className="ui-sheet-footer-spacer" /><Button onClick={onClose}>Cancel</Button><Button variant="filled" onClick={() => { onSave(draft); onClose() }}>Save</Button></>}
+      footer={<><Button onClick={onClose}>Cancel</Button><Button variant="filled" onClick={() => { onSave(draft); onClose() }}>Save</Button></>}
     >
       <div className="fin-form">
         {field('byline', 'Byline', 'The name on the cover')}
@@ -210,7 +211,7 @@ export function AuthorSheet({ profile, onSave, onClose }) {
         {field('agent', 'Agent', 'Agent and agency')}
         <p className="fin-note">Printed on manuscript and screenplay title pages. Kept on this computer only.</p>
       </div>
-    </Sheet>
+    </Dialog>
   )
 }
 

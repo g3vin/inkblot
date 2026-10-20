@@ -1,7 +1,7 @@
 /**
  * The shared controls (src/ui): the reorder and placement math, the native-menu
  * builder, and the controls mounted — a Segmented moved with the keyboard, a Section
- * that remembers being closed, a Sheet that Escape closes.
+ * that remembers being closed, a Dialog that Escape closes.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -29,7 +29,8 @@ const { buildNativeMenu } = await import('../../src/ui/useNativeMenu.js')
 const { default: Segmented } = await import('../../src/ui/Segmented.jsx')
 const { default: Section } = await import('../../src/ui/Section.jsx')
 const { SECTIONS_KEY } = await import('../../src/ui/sectionState.js')
-const { default: Sheet } = await import('../../src/ui/Sheet.jsx')
+const { default: Dialog } = await import('../../src/ui/Dialog.jsx')
+const { default: Button } = await import('../../src/ui/Button.jsx')
 const { Stepper } = await import('../../src/ui/FormRow.jsx')
 
 /* ---------------- reorder math ---------------- */
@@ -111,10 +112,20 @@ await act(async () => container.querySelector('[aria-label="Increase Margin"]').
 ok('a stepper steps', stepped === 1.25)
 
 let closed = 0
-await act(async () => root.render(React.createElement(Sheet, { title: 'Customize', onClose: () => { closed += 1 } }, React.createElement('button', null, 'Inside'))))
-ok('a sheet is a modal dialog in the body', document.body.querySelector('[role="dialog"][aria-modal="true"]') !== null)
-ok('and takes focus', document.activeElement?.textContent === 'Inside')
+await act(async () => root.render(React.createElement(Dialog, { title: 'Customize', onClose: () => { closed += 1 } }, React.createElement('button', null, 'Inside'))))
+ok('a dialog is a modal dialog in the body', document.body.querySelector('[role="dialog"][aria-modal="true"]') !== null)
+ok('and focuses its first control, not the ×', document.activeElement?.textContent === 'Inside')
+ok('with no footer, it shows a ×', document.body.querySelector('.ib-dialog-close') !== null)
+ok('and the app behind is inert', !document.getElementById('root') || document.getElementById('root').hasAttribute('inert'))
 await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
 ok('Escape closes it', closed === 1)
+
+const footer = React.createElement(React.Fragment, null, React.createElement(Button, null, 'Cancel'), React.createElement(Button, { variant: 'filled' }, 'Rename'))
+await act(async () => root.render(React.createElement(Dialog, { title: 'Rename', size: 'small', decision: true, footer, onClose: () => {} }, 'body')))
+ok('a footer that closes it means no ×', document.body.querySelector('.ib-dialog-close') === null)
+ok('a small decision splits its footer', document.body.querySelector('.ib-dialog-footer--split') !== null)
+ok('sizes are named', document.body.querySelector('.ib-dialog--small') !== null)
+await act(async () => root.render(React.createElement(Dialog, { title: 'Export', footer, footerCloses: false, onClose: () => {} }, 'body')))
+ok('a footer that does not close it keeps the ×', document.body.querySelector('.ib-dialog-close') !== null)
 
 await act(async () => root.unmount())

@@ -143,7 +143,7 @@ function overlayAnatomy(rootSelector) {
   const root = [...document.querySelectorAll(rootSelector)].find(visible)
   if (!root) return null
   const rr = root.getBoundingClientRect()
-  const title = [...root.querySelectorAll('h1, h2, h3, .ib-title, .ui-sheet-title, [class*="title"]')].find(visible)
+  const title = [...root.querySelectorAll('h1, h2, h3, .ib-title, [class*="title"]')].find(visible)
   const eyebrow = [...root.querySelectorAll('.ib-eyebrow')].find((e) => visible(e) && title && (e.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING) && e.getBoundingClientRect().top < title.getBoundingClientRect().top)
   const description = root.querySelector('.ib-dialog-description') || (title?.nextElementSibling?.tagName === 'P' ? title.nextElementSibling : null)
   const close = [...root.querySelectorAll('button')].find((b) => visible(b) && /^close\b/i.test(b.getAttribute('aria-label') || b.textContent.trim()))
@@ -152,7 +152,7 @@ function overlayAnatomy(rootSelector) {
     const r = close.getBoundingClientRect()
     closeAt = `${r.top - rr.top < 56 ? 'top' : 'bottom'}-${rr.right - r.right < 56 ? 'right' : r.left - rr.left < 56 ? 'left' : 'middle'}`
   }
-  const footer = root.querySelector(':scope footer, .ui-sheet-footer, .ib-dialog-footer')
+  const footer = root.querySelector(':scope footer, .ib-dialog-footer')
   const buttons = [...(footer || root).querySelectorAll('.ui-button')].filter(visible)
   const footerButtons = (footer ? buttons : buttons.filter((b) => rr.bottom - b.getBoundingClientRect().bottom < 72))
     .map((b) => `${b.textContent.trim().replace(/\s+/g, ' ')} [${b.dataset.variant}]`)
@@ -293,7 +293,7 @@ async function measureProbe(probe) {
           const icon = (isPrimitive ? e : e.parentElement).querySelector('svg')
           return {
             primitive: isPrimitive ? `EmptyState${e.classList.contains('ib-empty--compact') ? ' compact' : ''}` : 'bespoke',
-            where: label(e.closest('.right-sidebar, .left-sidebar, .ui-sheet, .ib-palette, .canvas-pane, .timeline-view, [class*="pane"]') || e.parentElement).split(' "')[0],
+            where: label(e.closest('.right-sidebar, .left-sidebar, .ib-dialog, .ib-palette, .canvas-pane, .timeline-view, [class*="pane"]') || e.parentElement).split(' "')[0],
             title: title ? `${title.textContent.trim().slice(0, 50)} (${font(title)})` : null,
             hint: hint ? `${hint.textContent.trim().slice(0, 50)} (${font(hint)})` : null,
             icon: icon && visible(icon) ? `${Math.round(icon.getBoundingClientRect().width)}px` : null,

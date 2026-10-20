@@ -4,7 +4,7 @@
  * toolbar shows its items.
  */
 import { DEFAULT_TOOLBARS, FLEXIBLE_SPACE, MORE, SPACE, toolbarItemsFor } from '../../lib/chromeLayout'
-import { Button, SelectMenu, Sheet } from '../../ui'
+import { Button, Dialog, SelectMenu } from '../../ui'
 import ToolbarItem from './ToolbarItem'
 import { inToolbar } from './toolbarEdits'
 
@@ -39,9 +39,10 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
   }
 
   return (
-    <Sheet
+    <Dialog
+      eyebrow="Toolbar"
       title={`Drag the items you use into ${CONTEXT_TITLES[context] ?? 'the toolbar'}`}
-      width={720}
+      size="large"
       placement="top"
       onClose={onClose}
       className="tb-palette"
@@ -52,7 +53,7 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
             <SelectMenu value={display} onChange={onDisplay} options={DISPLAY_OPTIONS} label="Show" />
           </label>
           <Button variant="plain" onClick={onReset}>Restore default set</Button>
-          <span className="ui-sheet-footer-spacer" />
+          <span className="ib-dialog-footer-spacer" />
           <Button variant="filled" onClick={onClose}>Done</Button>
         </>
       )}
@@ -88,6 +89,6 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
           </div>
         ))}
       </div>
-    </Sheet>
+    </Dialog>
   )
 }

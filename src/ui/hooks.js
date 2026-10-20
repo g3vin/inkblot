@@ -8,7 +8,8 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-const FOCUSABLE = [
+/** What can take focus with Tab. */
+export const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
   'input:not([disabled]):not([type="hidden"])',
@@ -19,7 +20,7 @@ const FOCUSABLE = [
 ].join(',')
 
 export const focusableWithin = (root) =>
-  root ? [...root.querySelectorAll(FOCUSABLE)].filter((el) => !el.closest('[inert]') && el.offsetParent !== null) : []
+  root ? [...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter((el) => !el.closest('[inert]') && el.offsetParent !== null) : []
 
 /**
  * Call `onDismiss` on Escape or on a pointer-down outside every ref in `refs`.
@@ -191,4 +192,34 @@ export function useAnchoredPosition(open, floatingRef, { anchorRef, point, place
   }, [open, update])
 
   return style
+}
+
+/**
+ * Let `ref`'s element leave the way it came when its component unmounts: a copy is put
+ * back in the body with `leavingClass`, plays that class's animation, and is removed.
+ * The caller unmounts as usual and needs no "closing" state. Skipped under reduced
+ * motion, and where there's no matchMedia (tests). The copy keeps no ids or roles. (Under
+ * StrictMode's trial unmount the element is still in the page, so no copy is made.)
+ */
+export function useExitAnimation(ref, leavingClass = 'is-leaving') {
+  useLayoutEffect(() => {
+    const node = ref.current
+    return () => {
+      queueMicrotask(() => {
+        if (!node || node.isConnected) return
+        // No matchMedia means no real browser (tests); reduced motion means no motion.
+        if (!window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+        const ghost = node.cloneNode(true)
+        // A copy, not the thing: nothing in it can be found as a dialog or by its id.
+        for (const el of [ghost, ...ghost.querySelectorAll('[id], [role]')]) { el.removeAttribute('id'); el.removeAttribute('role') }
+        ghost.classList.add(leavingClass)
+        ghost.setAttribute('aria-hidden', 'true')
+        ghost.inert = true
+        document.body.append(ghost)
+        const done = () => ghost.remove()
+        ghost.addEventListener('animationend', (event) => { if (event.target === ghost) done() })
+        setTimeout(done, 400)
+      })
+    }
+  }, [ref, leavingClass])
 }

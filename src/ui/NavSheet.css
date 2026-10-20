@@ -1,6 +1,6 @@
 /* NavSheet: pages down the left, the page on the right (Settings, Help). */
 .ib-navsheet { overflow: hidden; }
-.ib-navsheet .ui-sheet-body { padding: 0; }
+.ib-navsheet .ib-dialog-body { padding: 0; }
 
 .ib-navsheet-layout {
   display: flex;

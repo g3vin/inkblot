@@ -149,7 +149,8 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
       open={open}
       onClose={onClose}
       eyebrow="Map"
-      width="min(600px, calc(100vw - 32px))"
+      size="medium"
+      footerCloses={false}
       title="Export map"
       description="Save it as a picture, print it, or copy it to paste into a chapter."
       footer={

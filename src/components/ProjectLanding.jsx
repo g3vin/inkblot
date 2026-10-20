@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createProject, getProjectRoot, linkProject, listProjects, moveProject } from '../lib/FileSystem'
-import { Button, EmptyState, Sheet } from '../ui'
+import { Button, Dialog, EmptyState } from '../ui'
 import { popUpNativeMenu } from '../ui/useNativeMenu.js'
 import Icon from '../ui/Icon.jsx'
 import { AppIcon, Wordmark } from '../ui/Brand.jsx'
@@ -52,7 +52,7 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
     onCreated(trimmed)
   }
   return (
-    <Sheet title="New project" width={400} onClose={onClose} footer={(
+    <Dialog title="New project" size="small" decision onClose={onClose} footer={(
       <>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="filled" disabled={!name.trim()} onClick={submit}>Create</Button>
@@ -73,7 +73,7 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
         </button>
         {error ? <p className="picker-error" role="alert">{error}</p> : null}
       </form>
-    </Sheet>
+    </Dialog>
   )
 }
 

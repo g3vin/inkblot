@@ -47,6 +47,15 @@ _Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-m
   defaults (the bare button is now a reset), `SFIcon` and `sfIconNames.js`,
   `IconButton`'s `symbol` prop, and the `system_accent_color` Tauri command.
 
+**Design review round 01: modals** (`design/round-01-modals`, see
+`docs/design-review/rounds/01-modals.md`)
+
+- `Sheet` is gone: `Dialog` is the one modal, and NavSheet is a large Dialog. Its header,
+  close, footer, size, motion and focus rules are in DESIGN.md §9 → *Dialogs*.
+- Sizes are tokens (`--dialog-sm`/`-md`/`-lg`). Call sites say `size`, not `width`.
+- `useExitAnimation` (`src/ui/hooks.js`) plays a dialog's exit on a copy, so callers
+  still just unmount.
+
 ## The logo (done)
 
 The user chose the **"ib" monogram** in a brand review held in October 2026. It
@@ -150,6 +159,13 @@ black on white.
 - **Content colours** (exports, the printed page, map worlds and themes, conversation
   looks) are content, so `lint:design` skips those paths (`IGNORED` in
   `scripts/lint-design.mjs`). Chrome never goes on that list.
+- **A closing dialog leaves a copy behind for `--dur-fast`.** `useExitAnimation` clones
+  the scrim to play the exit; the copy has no `role` or ids, is inert and goes in about
+  120ms. Query a dialog by `[role="dialog"]`, not by class, if it matters whether it's
+  still open. There is no copy under reduced motion or without `matchMedia` (tests).
+- **A pop-up opened from inside a dialog sits under it.** Dialogs are on `--z-dialog`
+  (80), above `--z-popover` (60). No dialog opens a `Menu` or `Popover` today
+  (`SelectMenu` is native); one that does needs a decision (the pop-ups round).
 - **A panel's header controls are a portal.** `PanelActions` renders into the
   inspector's title row only for the panel showing; outside a `PanelActionsProvider`
   (tests, the showcase) it renders in place.

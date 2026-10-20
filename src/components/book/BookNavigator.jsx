@@ -17,7 +17,7 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
-import { Button, IconButton, Inlay, InlaySlot, Sheet, usePointerReorder } from '../../ui'
+import { Button, Dialog, IconButton, Inlay, InlaySlot, usePointerReorder } from '../../ui'
 import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
 import Icon from '../../ui/Icon.jsx'
 import { SECTION_TITLES, addMenu, moveTarget, rowMenu } from './bookMenu.js'
@@ -163,7 +163,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
       </div>
       {footerSlot === undefined ? footer : footerSlot ? createPortal(footer, footerSlot) : null}
       {renaming ? (
-        <Sheet title="Rename" width={340} onClose={() => setRenaming(null)} footer={(
+        <Dialog eyebrow="Book" title="Rename" size="small" decision onClose={() => setRenaming(null)} footer={(
           <>
             <Button onClick={() => setRenaming(null)}>Cancel</Button>
             <Button variant="filled" onClick={() => { send('editBookItem', { id: renaming.id, title }); setRenaming(null) }}>Rename</Button>
@@ -176,17 +176,17 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => { if (event.key === 'Enter') { send('editBookItem', { id: renaming.id, title }); setRenaming(null) } }}
           />
-        </Sheet>
+        </Dialog>
       ) : null}
       {removing ? (
-        <Sheet title={`Remove “${removing.title}” from the book?`} width={380} onClose={() => setRemoving(null)} footer={(
+        <Dialog eyebrow="Book" title={`Remove “${removing.title}” from the book?`} size="small" decision onClose={() => setRemoving(null)} footer={(
           <>
             <Button onClick={() => setRemoving(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => { send('removeBookItem', { id: removing.id }); setRemoving(null) }}>Remove</Button>
           </>
         )}>
           <p className="book-note">{removing.kind === 'matter' ? 'Its page is deleted with it. This can’t be undone.' : 'You can add it again from the + menu.'}</p>
-        </Sheet>
+        </Dialog>
       ) : null}
     </div>
   )

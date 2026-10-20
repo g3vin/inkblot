@@ -1,23 +1,28 @@
+/* Dialog: the one modal (Dialog.jsx, docs/DESIGN.md §9). */
+
 .ib-dialog-scrim {
   position: fixed;
   inset: 0;
   z-index: var(--z-dialog);
   display: flex;
-  background: var(--modal-overlay-bg);
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim-bg);
   animation: ib-fade-in var(--dur-base) var(--ease-out);
 }
 
-.ib-dialog-scrim--center {
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-6);
+/* Dropped from under the titlebar, which stays uncovered and live. */
+.ib-dialog-scrim[data-placement='top'] {
+  top: var(--app-titlebar-height, 44px);
+  align-items: flex-start;
 }
 
 .ib-dialog {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  max-height: calc(100vh - 2 * var(--space-6));
+  max-width: calc(100vw - 2 * var(--space-6));
+  max-height: calc(100vh - 2 * var(--space-8));
   border: var(--hairline) solid var(--border-color);
   border-radius: var(--radius-lg);
   background: var(--surface-float);
@@ -25,11 +30,16 @@
   color: var(--text-primary);
   font-family: var(--font-ui);
   outline: none;
+  animation: ib-dialog-in var(--dur-slow) var(--ease-out);
 }
+.ib-dialog--small { width: var(--dialog-sm); animation-duration: var(--dur-base); }
+.ib-dialog--medium { width: var(--dialog-md); }
+.ib-dialog--large { width: var(--dialog-lg); }
 
-.ib-dialog--center {
-  width: min(460px, calc(100vw - 32px));
-  animation: ib-dialog-in var(--dur-base) var(--ease-out);
+.ib-dialog-scrim[data-placement='top'] .ib-dialog {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  animation-name: ib-dialog-drop;
 }
 
 .ib-dialog-header {
@@ -48,6 +58,7 @@
 }
 
 .ib-dialog-heading .ib-eyebrow { margin: 0; }
+.ib-dialog-close { flex: none; }
 
 .ib-dialog-description {
   margin: var(--space-1) 0 0;
@@ -59,23 +70,41 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-3) var(--space-6) var(--space-6);
+  padding: var(--space-3) var(--space-6);
 }
 
 .ib-dialog-footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-6) var(--space-6);
+  padding: var(--space-4) var(--space-6) var(--space-5);
 }
+.ib-dialog-footer-spacer { flex: 1; }
+
+/* A small decision: its two buttons share the width. */
+.ib-dialog-footer--split > .ui-button {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+/* Leaving, the way it came: quicker, easing in (useExitAnimation adds the class). */
+.ib-dialog-scrim.is-leaving {
+  pointer-events: none;
+  animation: ib-fade-out var(--dur-fast) var(--ease-in) forwards;
+}
+.ib-dialog-scrim.is-leaving .ib-dialog { animation: ib-dialog-out var(--dur-fast) var(--ease-in) forwards; }
+.ib-dialog-scrim.is-leaving[data-placement='top'] .ib-dialog { animation-name: ib-dialog-rise; }
 
 @keyframes ib-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
+@keyframes ib-fade-out { to { opacity: 0; } }
 @keyframes ib-dialog-in {
   from { opacity: 0; transform: translateY(6px) scale(0.99); }
   to { opacity: 1; transform: none; }
 }
-
+@keyframes ib-dialog-out { to { opacity: 0; transform: translateY(6px) scale(0.99); } }
+@keyframes ib-dialog-drop { from { opacity: 0; transform: translateY(-16px); } }
+@keyframes ib-dialog-rise { to { opacity: 0; transform: translateY(-16px); } }
