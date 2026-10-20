@@ -52,7 +52,7 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
     onCreated(trimmed)
   }
   return (
-    <Dialog title="New project" size="small" decision onClose={onClose} footer={(
+    <Dialog title="New project" size="small" onClose={onClose} footer={(
       <>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="filled" disabled={!name.trim()} onClick={submit}>Create</Button>

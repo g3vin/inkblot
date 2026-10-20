@@ -163,7 +163,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
       </div>
       {footerSlot === undefined ? footer : footerSlot ? createPortal(footer, footerSlot) : null}
       {renaming ? (
-        <Dialog eyebrow="Book" title="Rename" size="small" decision onClose={() => setRenaming(null)} footer={(
+        <Dialog eyebrow="Book" title="Rename" size="small" onClose={() => setRenaming(null)} footer={(
           <>
             <Button onClick={() => setRenaming(null)}>Cancel</Button>
             <Button variant="filled" onClick={() => { send('editBookItem', { id: renaming.id, title }); setRenaming(null) }}>Rename</Button>
@@ -179,7 +179,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
         </Dialog>
       ) : null}
       {removing ? (
-        <Dialog eyebrow="Book" title={`Remove “${removing.title}” from the book?`} size="small" decision onClose={() => setRemoving(null)} footer={(
+        <Dialog eyebrow="Book" title={`Remove “${removing.title}” from the book?`} size="small" onClose={() => setRemoving(null)} footer={(
           <>
             <Button onClick={() => setRemoving(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => { send('removeBookItem', { id: removing.id }); setRemoving(null) }}>Remove</Button>

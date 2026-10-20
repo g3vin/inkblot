@@ -28,7 +28,7 @@ lead's words, the date, and the commit sha.
 ### 01.3 Footer layout
 
 - **Options:** A control (left on three sheets, right on the rest) · B actions at the trailing edge · C B, and a small two-button decision shares the width
-- **Pick:** C (applied to decisions only: New project, Rename, Remove; scope awaiting confirmation)
+- **Pick:** C, for every small dialog whose footer is two buttons (confirmed after apply: not decisions only)
 - **Reason:** not given
 - **Date:** 2026-10-20
 - **Commit:** `8eada1e` on `design/round-01-modals`
@@ -44,7 +44,7 @@ lead's words, the date, and the commit sha.
 ### 01.5 Focus and the app behind
 
 - **Options:** A control · B Dialog's trap and an inert app everywhere (Customize toolbar exempt) · C B with one first-focus rule
-- **Pick:** B (the × is never first focus; awaiting confirmation)
+- **Pick:** B; first focus is never the × (confirmed after apply)
 - **Reason:** not given
 - **Date:** 2026-10-20
 - **Commit:** `8eada1e` on `design/round-01-modals`

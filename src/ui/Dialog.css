@@ -82,8 +82,9 @@
 }
 .ib-dialog-footer-spacer { flex: 1; }
 
-/* A small decision: its two buttons share the width. */
-.ib-dialog-footer--split > .ui-button {
+/* In a small dialog, a footer of exactly two buttons shares the width between them. */
+.ib-dialog--small .ib-dialog-footer > .ui-button:first-child:nth-last-child(2),
+.ib-dialog--small .ib-dialog-footer > .ui-button:first-child:nth-last-child(2) + .ui-button {
   flex: 1 1 0;
   justify-content: center;
 }

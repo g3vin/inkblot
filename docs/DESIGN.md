@@ -505,8 +505,8 @@ There is one modal, `Dialog` (decided in design review round 01, 2026-10-20; see
   a × at the top right. Escape and a click on the scrim always close a dialog.
 - **Footer:** the actions at the trailing edge, secondary then primary. A leading utility
   (Units, Restore defaults, Show) goes first, before `<span
-  className="ib-dialog-footer-spacer" />`. A small `decision` (create, rename, remove)
-  splits its two buttons across the width.
+  className="ib-dialog-footer-spacer" />`. In a small dialog, a footer of exactly two
+  buttons shares the width between them.
 - **Size:** `small` (`--dialog-sm`, 400) for decisions and short forms, `medium`
   (`--dialog-md`, 560) for forms and lists, `large` (`--dialog-lg`, 720) for pages
   (Settings, Help, Customize toolbar).

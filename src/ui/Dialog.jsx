@@ -2,7 +2,7 @@
  * Dialog.jsx — the one modal (docs/DESIGN.md §9): anything that takes over the window
  * until it is dismissed, from a decision to Settings.
  *
- *   <Dialog open onClose={close} eyebrow="Book" title="Rename" size="small" decision
+ *   <Dialog open onClose={close} eyebrow="Book" title="Rename" size="small"
  *     footer={<><Button onClick={close}>Cancel</Button><Button variant="filled">Rename</Button></>}>
  *     …
  *   </Dialog>
@@ -13,8 +13,8 @@
  *   footer, or whose footer doesn't close it (`footerCloses={false}`), shows a ×.
  *   Escape and a click on the scrim always close it.
  * - Footer: the actions at the trailing edge, the primary last. A leading utility (a
- *   unit, a reset) goes before a `<span className="ib-dialog-footer-spacer" />`. A small
- *   `decision` (create, rename, remove) gives its two buttons the width between them.
+ *   unit, a reset) goes before a `<span className="ib-dialog-footer-spacer" />`. In a
+ *   small dialog, a footer of exactly two buttons shares the width between them.
  * - Size: `small` (400), `medium` (560) or `large` (720).
  * - Motion: it fades in on `--z-dialog` (medium and large over `--dur-slow`) and leaves
  *   the way it came.
@@ -31,20 +31,20 @@ import IconButton from './IconButton'
 import './Dialog.css'
 
 export default function Dialog({
-  open = true, onClose, eyebrow, title, description, footer, footerCloses = true, decision = false,
+  open = true, onClose, eyebrow, title, description, footer, footerCloses = true,
   size = 'medium', placement = 'center', className, initialFocusRef, children,
 }) {
   if (!open) return null
   return (
     <DialogOpen
-      {...{ onClose, eyebrow, title, description, footer, footerCloses, decision, size, placement, className, initialFocusRef }}
+      {...{ onClose, eyebrow, title, description, footer, footerCloses, size, placement, className, initialFocusRef }}
     >
       {children}
     </DialogOpen>
   )
 }
 
-function DialogOpen({ onClose, eyebrow, title, description, footer, footerCloses, decision, size, placement, className, initialFocusRef, children }) {
+function DialogOpen({ onClose, eyebrow, title, description, footer, footerCloses, size, placement, className, initialFocusRef, children }) {
   const scrimRef = useRef(null)
   const ref = useRef(null)
   const firstRef = useRef(null)
@@ -115,7 +115,7 @@ function DialogOpen({ onClose, eyebrow, title, description, footer, footerCloses
         )}
         <div className="ib-dialog-body">{children}</div>
         {footer ? (
-          <footer className={`ib-dialog-footer${decision && size === 'small' ? ' ib-dialog-footer--split' : ''}`}>{footer}</footer>
+          <footer className="ib-dialog-footer">{footer}</footer>
         ) : null}
       </div>
     </div>,

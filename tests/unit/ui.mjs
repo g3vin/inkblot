@@ -121,9 +121,9 @@ await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: '
 ok('Escape closes it', closed === 1)
 
 const footer = React.createElement(React.Fragment, null, React.createElement(Button, null, 'Cancel'), React.createElement(Button, { variant: 'filled' }, 'Rename'))
-await act(async () => root.render(React.createElement(Dialog, { title: 'Rename', size: 'small', decision: true, footer, onClose: () => {} }, 'body')))
+await act(async () => root.render(React.createElement(Dialog, { title: 'Rename', size: 'small', footer, onClose: () => {} }, 'body')))
 ok('a footer that closes it means no ×', document.body.querySelector('.ib-dialog-close') === null)
-ok('a small decision splits its footer', document.body.querySelector('.ib-dialog-footer--split') !== null)
+ok('a small dialog with two footer buttons is the shared-width kind', document.body.querySelector('.ib-dialog--small .ib-dialog-footer')?.children.length === 2)
 ok('sizes are named', document.body.querySelector('.ib-dialog--small') !== null)
 await act(async () => root.render(React.createElement(Dialog, { title: 'Export', footer, footerCloses: false, onClose: () => {} }, 'body')))
 ok('a footer that does not close it keeps the ×', document.body.querySelector('.ib-dialog-close') !== null)

@@ -110,8 +110,8 @@ by the design lead on 2026-10-20:
 
 | Round | Family | State |
 | --- | --- | --- |
-| [01](rounds/01-modals.md) | Modals: shell and behaviour | Applied on `design/round-01-modals` (1B, 2C, 3C, 4C, 5B, 6C); four points to confirm, then the PR |
+| [01](rounds/01-modals.md) | Modals: shell and behaviour | Applied on `design/round-01-modals` (1B, 2C, 3C, 4C, 5B, 6C); PR open, waiting to merge |
 
 The design lead confirmed the order above on 2026-10-20.
 
-**Next step:** the design lead confirms round 01's four apply notes, and says which base the PR goes against. When it merges, its sha becomes the control.
+**Next step:** review and merge round 01's PR. When it merges, its sha becomes the control (recapture, update this file), and round 02 (pop-ups) can start.

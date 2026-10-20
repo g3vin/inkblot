@@ -419,8 +419,8 @@ export default function DesignShowcase() {
         )}
       </Panel>
 
-      {/* A small decision: its two buttons share the width, and Cancel is its way out. */}
-      <Dialog open={dialog} onClose={() => setDialog(false)} size="small" decision eyebrow="Document" title="Delete this chapter?"
+      {/* A small dialog: its two footer buttons share the width, and Cancel is its way out. */}
+      <Dialog open={dialog} onClose={() => setDialog(false)} size="small" eyebrow="Document" title="Delete this chapter?"
         description="It moves to the archive, where you can restore it for 30 days."
         footer={<><Button onClick={() => setDialog(false)}>Cancel</Button><Button variant="destructive" onClick={() => setDialog(false)}>Delete</Button></>}>
         <Checkbox label="Also delete its notes" checked={check} onChange={setCheck} />

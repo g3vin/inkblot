@@ -143,19 +143,18 @@ modal and NavSheet a large Dialog (DESIGN.md §9 → *Dialogs*).
 
 Recaptured against the control: 76 of 348 screenshots changed, exactly the 19 modal
 surfaces × 2 themes × 2 sizes, and nothing else. Against the capture of the picks
-together, 18 of 22 are pixel-identical. The other four, and two choices the picks left
-open, are below for the design lead to confirm.
+together, 18 of 22 were pixel-identical. The design lead settled the rest on 2026-10-20:
 
-1. **3C's scope.** The pair goes on decisions only: New project, Rename, Remove
-   (`decision` prop). Author details and Timer complete keep their two buttons at the
-   trailing edge, as Author details looked in the picks. Not confirmed yet.
-2. **Body and footer spacing.** Sheet and Dialog spaced their body and footer
-   differently, and no pick covered it. The one Dialog keeps the Sheet's (8px under the
-   body, 16px under the footer), which changes only Export map (Dialog had 24 and 24).
+1. **3C's scope: every small two-button footer.** Not only decisions: Author details and
+   Timer complete split their buttons too. This is CSS on the footer, with no prop.
+   Author details changed again (0.2–0.3% of its screenshots); Timer complete can't be
+   reached through the mock.
+2. **Body and footer spacing: the Sheet's.** Sheet and Dialog spaced them differently,
+   and no pick covered it. The one Dialog keeps the Sheet's (8px under the body, 16px
+   under the footer), which changes only Export map (Dialog had 24 and 24).
 3. **First focus is never the ×.** With 2C's × in the header, the prototype focused it
-   first in Help (so the filter lost focus). The applied Dialog follows 5B's "focus the
-   first control" and skips the ×: Help focuses its filter, as it does today. 0.12% of
-   Help's screenshot.
+   first in Help (so the filter lost focus). The Dialog follows 5B's "focus the first
+   control" and skips the ×, so Help focuses its filter, as it does today.
 4. **Export map is 560 wide.** The prototype mis-sized it to 720 (its width was a CSS
    string, which the prototype's size logic didn't parse), though 6C's text placed it
    at medium. The applied build follows the text.
