@@ -12,6 +12,8 @@
  * A screenshot counts as changed when any pixel differs beyond the colour threshold.
  *
  * Options: --threshold <0–1> (pixelmatch's per-pixel colour tolerance, default 0.1),
+ * --noise <percent> (a change no bigger than this share of the screenshot is WebGL
+ * antialiasing noise, reported but not counted; default 0.005),
  * --strict (exit 1 on any change, or on a screenshot only the second run has; use it to
  * prove a variant switch left the default render pixel-identical). Screenshots only the
  * first run has are listed apart, so a partial run (`capture --only`) compares cleanly.
@@ -30,7 +32,7 @@ const opt = (name, fallback) => {
   const i = args.indexOf(`--${name}`)
   return i >= 0 ? args[i + 1] : fallback
 }
-const [runA, runB] = args.filter((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--threshold'))
+const [runA, runB] = args.filter((a, i) => !a.startsWith('--') && !['--threshold', '--noise'].includes(args[i - 1]))
 if (!runA || !runB) {
   console.error('Usage: node scripts/dev/compare.mjs <run-a> <run-b> [--threshold 0.1] [--strict]')
   process.exit(2)
@@ -54,6 +56,9 @@ const inA = pngs(dirA)
 const inB = pngs(dirB)
 const names = [...new Set([...inA, ...inB])].sort()
 const threshold = Number(opt('threshold', 0.1))
+// WebGL views (the globe, 3D maps) can antialias a handful of pixels differently from
+// run to run. A change no bigger than this share of the screenshot counts as noise.
+const noise = Number(opt('noise', 0.005))
 
 const rows = []
 for (const name of names) {
@@ -70,25 +75,27 @@ for (const name of names) {
   const diff = new PNG({ width: a.width, height: a.height })
   const changed = pixelmatch(a.data, b.data, diff.data, a.width, a.height, { threshold, alpha: 0.25 })
   const percent = (changed / (a.width * a.height)) * 100
-  if (changed) fs.writeFileSync(path.join(reportDir, 'diff', name), PNG.sync.write(diff))
-  rows.push({ name, status: changed ? 'changed' : 'same', percent, pixels: changed })
+  const status = changed === 0 ? 'same' : percent <= noise ? 'noise' : 'changed'
+  if (status === 'changed') fs.writeFileSync(path.join(reportDir, 'diff', name), PNG.sync.write(diff))
+  rows.push({ name, status, percent, pixels: changed })
 }
 
 // Missing screenshots are listed apart: comparing a partial run (`capture --only`) with a
 // full one is normal, and they would bury the real changes.
 const missing = rows.filter((r) => r.percent === null)
 const compared = rows.filter((r) => r.percent !== null)
-const changed = compared.filter((r) => r.status !== 'same').sort((x, y) => y.percent - x.percent)
-const same = compared.length - changed.length
+const changed = compared.filter((r) => r.status === 'changed').sort((x, y) => y.percent - x.percent)
+const noisy = compared.filter((r) => r.status === 'noise').map((r) => r.name.replace(/\.png$/, ''))
+const same = compared.length - changed.length - noisy.length
 const fmt = (r) => (r.status === 'resized' ? `resized ${r.size.join(' → ')}` : `${r.percent.toFixed(3)}%`)
 const onlyIn = (status) => missing.filter((r) => r.status === status).map((r) => r.name.replace(/\.png$/, ''))
-const summary = { a: runA, b: runB, threshold, compared: compared.length, same, changed: changed.length, rows: changed, onlyInA: onlyIn('only-a'), onlyInB: onlyIn('only-b') }
+const summary = { a: runA, b: runB, threshold, noise, noisy, compared: compared.length, same, changed: changed.length, rows: changed, onlyInA: onlyIn('only-a'), onlyInB: onlyIn('only-b') }
 fs.writeFileSync(path.join(reportDir, 'report.json'), `${JSON.stringify(summary, null, 2)}\n`)
 
 const md = [
   `# ${runA} → ${runB}`,
   '',
-  `${compared.length} screenshots compared at threshold ${threshold}: ${changed.length} changed, ${same} identical.`,
+  `${compared.length} screenshots compared at threshold ${threshold}: ${changed.length} changed, ${same} identical${noisy.length ? `, ${noisy.length} within the ${noise}% noise floor (${noisy.join(', ')})` : ''}.`,
   ...(summary.onlyInA.length ? [`${summary.onlyInA.length} only in ${runA} (see report.json).`] : []),
   ...(summary.onlyInB.length ? [`${summary.onlyInB.length} only in ${runB}: ${summary.onlyInB.join(', ')}.`] : []),
   '',
@@ -113,7 +120,7 @@ const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content
   @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
 </style>
 <h1>${esc(runA)} → ${esc(runB)}</h1>
-<p>${compared.length} screenshots compared at threshold ${threshold}: ${changed.length} changed, ${same} identical.${missing.length ? ` ${missing.length} are in only one run.` : ''}</p>
+<p>${compared.length} screenshots compared at threshold ${threshold}: ${changed.length} changed, ${same} identical${noisy.length ? `, ${noisy.length} within the noise floor` : ''}.${missing.length ? ` ${missing.length} are in only one run.` : ''}</p>
 ${changed.map((r) => `<section><h2>${esc(r.name.replace(/\.png$/, ''))} <span>${esc(fmt(r))}</span></h2><div class="row">
   <figure><img loading="lazy" src="${esc(rel(dirA, r.name))}"><figcaption>${esc(runA)}</figcaption></figure>
   <figure><img loading="lazy" src="${esc(rel(dirB, r.name))}"><figcaption>${esc(runB)}</figcaption></figure>

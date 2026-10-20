@@ -22,39 +22,19 @@
  * http://localhost:5173), CHROMIUM (a Chromium binary, if Playwright's own is not
  * installed), PLAYWRIGHT_CORE (path to playwright-core's index.mjs).
  *
- * To keep runs comparable it fixes the clock, asks for reduced motion, hides the text
- * caret and blocks every off-site request (a surface can answer one with a fixture). Each surface × theme × viewport starts from a fresh page, so nothing one
+ * To keep runs comparable it fixes the clock, seeds Math.random, asks for reduced motion,
+ * hides the text caret and blocks every off-site request (a surface can answer one with
+ * a fixture). Each surface × theme × viewport starts from a fresh page, so nothing one
  * surface opens leaks into the next.
  */
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { THEMES, VIEWPORTS, catalogue, cli, launch, pick, preparePage, repo, base } from './surfaces.mjs'
 
-const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const base = process.env.BASE_URL || 'http://localhost:5173'
-
-const VIEWPORTS = {
-  desktop: { viewport: { width: 1400, height: 900 } },
-  ipad: {
-    viewport: { width: 820, height: 1180 },
-    hasTouch: true,
-    userAgent: 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
-  },
-}
-const THEMES = ['light', 'dark']
-const FIXED_TIME = new Date('2026-10-01T10:00:00')
-
-const args = process.argv.slice(2)
-const opt = (name, fallback) => {
-  const i = args.indexOf(`--${name}`)
-  return i >= 0 ? args[i + 1] : fallback
-}
-const opts = (name) => args.flatMap((a, i) => (a === `--${name}` ? args[i + 1].split(',') : []))
-
-const catalogue = JSON.parse(fs.readFileSync(path.join(repo, 'design-review/surfaces.json'), 'utf8'))
-const globs = opts('only').map((g) => new RegExp(`^${g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`))
-const surfaces = catalogue.surfaces.filter((s) => !globs.length || globs.some((re) => re.test(s.id)))
+const { args, opt, opts } = cli()
+const globs = opts('only')
+const surfaces = pick(globs)
 const themes = opts('themes').length ? opts('themes') : THEMES
 const viewports = opts('viewports').length ? opts('viewports') : Object.keys(VIEWPORTS)
 
@@ -71,64 +51,7 @@ const variant = opt('variant')
 const outDir = path.join(repo, 'design-review/out', run)
 fs.mkdirSync(outDir, { recursive: true })
 
-const { chromium } = await import(process.env.PLAYWRIGHT_CORE || 'playwright-core')
-const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {})
-const mock = fs.readFileSync(path.join(repo, 'scripts/dev/tauri-mock.js'), 'utf8')
-
-const appUrl = (extra = '') => {
-  const url = new URL(extra || '/', base)
-  if (variant) url.searchParams.set('variant', variant)
-  return url.toString()
-}
-
-// One step of a surface's script. A step is an object with one action key; `optional:
-// true` lets a surface go on when that step fails.
-async function step(page, s) {
-  // The first visible match: the toolbar keeps hidden copies of its buttons for measuring.
-  const loc = (sel) => page.locator(`${sel} >> visible=true`).first()
-  if (s.open) return runSteps(page, catalogue.presets[s.open] ?? (() => { throw new Error(`no preset ${s.open}`) })())
-  if (s.goto !== undefined) {
-    await page.goto(appUrl(s.goto), { waitUntil: 'networkidle' })
-    return page.evaluate(() => document.fonts.ready)
-  }
-  if (s.click) return loc(s.click).click({ timeout: 5000, force: Boolean(s.force) })
-  if (s.dblclick) return loc(s.dblclick).dblclick({ timeout: 5000 })
-  if (s.rightclick) return loc(s.rightclick).click({ button: 'right', timeout: 5000 })
-  if (s.hover) return loc(s.hover).hover({ timeout: 5000 })
-  if (s.focus) return loc(s.focus).focus({ timeout: 5000 })
-  if (s.fill) return loc(s.fill).fill(s.value ?? '', { timeout: 5000 })
-  if (s.press) return page.keyboard.press(s.press)
-  if (s.type) return page.keyboard.type(s.type, { delay: 10 })
-  if (s.waitFor) return loc(s.waitFor).waitFor({ timeout: s.timeout ?? 8000 })
-  if (s.wait) return page.waitForTimeout(s.wait)
-  if (s.eval) return page.evaluate(s.eval)
-  // Choose an item in the native menu the last step popped up (see tauri-mock.js).
-  if (s.menuItem) return page.evaluate((text) => window.__ibMenuClick(text), s.menuItem)
-  if (s.reload) { await page.reload({ waitUntil: 'networkidle' }); return page.waitForTimeout(1200) }
-  if (s.command) {
-    // Run a ⌘K command by its title, as a writer would.
-    await page.keyboard.press('Meta+k')
-    await loc('.ib-palette-input').waitFor({ timeout: 4000 })
-    await page.keyboard.type(s.command, { delay: 5 })
-    await page.waitForTimeout(250)
-    const option = page.locator('.ib-palette [role=option]').filter({ hasText: s.command }).first()
-    await option.click({ timeout: 4000 })
-    return
-  }
-  if (s.scroll) return page.evaluate(([sel, y]) => document.querySelector(sel)?.scrollBy(0, y), [s.scroll, s.by ?? 400])
-  throw new Error(`unknown step ${JSON.stringify(s)}`)
-}
-
-async function runSteps(page, steps = []) {
-  for (const s of steps) {
-    try {
-      await step(page, s)
-      await page.waitForTimeout(s.settle ?? 350)
-    } catch (error) {
-      if (!s.optional) throw new Error(`${JSON.stringify(s)}: ${process.env.DEBUG ? error.message : error.message.split('\n')[0]}`)
-    }
-  }
-}
+const browser = await launch()
 
 async function capture(surface, theme, viewport) {
   const name = `${surface.id}-${theme}-${viewport}`
@@ -142,24 +65,8 @@ async function capture(surface, theme, viewport) {
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   try {
-    await page.clock.setFixedTime(FIXED_TIME)
-    // Nothing leaves the machine: off-site requests fail, unless the surface answers them
-    // with a fixture (`routes`: { "<url glob>": <JSON body> }).
-    await page.route((url) => !url.href.startsWith(base) && !url.protocol.startsWith('data') && !url.protocol.startsWith('blob'), (route) => route.abort())
-    for (const [glob, body] of Object.entries(surface.routes ?? {})) {
-      await page.route(glob, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }))
-    }
-    if (surface.seed) await page.addInitScript((seed) => { window.__ibMockSeed = seed }, surface.seed)
-    await page.addInitScript({ content: mock })
-    await page.addInitScript(() => {
-      // No blinking caret in a screenshot.
-      addEventListener('DOMContentLoaded', () => {
-        const style = document.createElement('style')
-        style.textContent = '* { caret-color: transparent !important; }'
-        document.head.append(style)
-      })
-    })
-    await runSteps(page, surface.steps)
+    const run = await preparePage(page, surface, { variant })
+    await run(surface.steps)
     await page.waitForTimeout(surface.settle ?? 600)
     const shot = surface.shot ?? {}
     const file = path.join(outDir, `${name}.png`)

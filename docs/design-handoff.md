@@ -185,6 +185,7 @@ For the design review (`docs/design-review/`), `capture.mjs` shoots every surfac
 npm i --no-save playwright-core pixelmatch pngjs
 node scripts/dev/capture.mjs --run head              # → design-review/out/head/
 node scripts/dev/compare.mjs control head            # what changed, and by how much
+node scripts/dev/measure.mjs --run head              # computed styles and behaviour of overlays
 ```
 
 The page runs against `scripts/dev/tauri-mock.js`, an in-memory projects folder (writes
