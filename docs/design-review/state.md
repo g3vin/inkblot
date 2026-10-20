@@ -110,7 +110,7 @@ by the design lead on 2026-10-20:
 
 | Round | Family | State |
 | --- | --- | --- |
-| [01](rounds/01-modals.md) | Modals: shell and behaviour | Applied on `design/round-01-modals` (1B, 2C, 3C, 4C, 5B, 6C); PR open, waiting to merge |
+| [01](rounds/01-modals.md) | Modals: shell and behaviour | Applied on `design/round-01-modals` (1B, 2C, 3C, 4C, 5B, 6C); [PR #79](https://github.com/g3vin/inkblot/pull/79) open, waiting to merge |
 
 The design lead confirmed the order above on 2026-10-20.
 
