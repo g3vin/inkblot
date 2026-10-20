@@ -32,3 +32,6 @@ npm-debug.log*
 
 # Coverage output
 *.profraw
+
+# Design review screenshots (reproducible from the sha in docs/design-review/state.md)
+design-review/out/

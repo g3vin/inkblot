@@ -177,8 +177,20 @@ node scripts/dev/screenshot.mjs /tmp/shot light --design
 node scripts/dev/audit.mjs /tmp/audit dark      # every surface and inspector tab
 ```
 
-The page runs against `scripts/dev/tauri-mock.js`, a fake projects folder, so no
-desktop shell is needed. In Claude Code's cloud containers, Chromium is at
+For the design review (`docs/design-review/`), `capture.mjs` shoots every surface in
+`design-review/surfaces.json` in both themes at desktop and iPad sizes, and
+`compare.mjs` pixel-diffs two runs:
+
+```bash
+npm i --no-save playwright-core pixelmatch pngjs
+node scripts/dev/capture.mjs --run head              # → design-review/out/head/
+node scripts/dev/compare.mjs control head            # what changed, and by how much
+```
+
+The page runs against `scripts/dev/tauri-mock.js`, an in-memory projects folder (writes
+land in it, so new canvases, maps and timelines work), so no desktop shell is needed.
+Native menus can't be drawn in a browser: the mock records each one's items, and
+`window.__ibMenuClick('Rename')` runs one. In Claude Code's cloud containers, Chromium is at
 `/opt/pw-browsers/chromium-*/chrome-linux/chrome`. Check both themes and confirm three
 things: text still dissolves under the card's toolbar rule, the sidebars dock on the
 tray and hover over the card when unpinned, and
