@@ -4,7 +4,7 @@
  * Tags each word of the selected text with a simplified part of speech
  * (via the compromise NLP library) and renders color-coded badges.
  */
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import nlp from 'compromise'
 import { POS_INKS } from '../../lib/palette'
 

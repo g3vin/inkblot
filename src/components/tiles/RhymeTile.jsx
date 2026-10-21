@@ -8,7 +8,7 @@
  * The dictionary is 3.6 MB, so when Rust reports `MODEL_NOT_INSTALLED` the tile
  * fetches it without asking, the way it would load any other small resource.
  */
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 /** Tauri's API, imported lazily so the tile still renders in a plain browser. */
 const tauri =

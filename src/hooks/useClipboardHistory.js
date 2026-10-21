@@ -7,7 +7,7 @@
  */
 import { useCallback } from 'react'
 import { dragHandoff, DragPayloadKind } from '../bridge'
-import { CLIPBOARD_PERSIST_KEY, MAX_CLIPBOARD_ENTRIES, MAX_CLIPBOARD_IMAGES } from '../lib/editorSession'
+import { MAX_CLIPBOARD_ENTRIES, MAX_CLIPBOARD_IMAGES } from '../lib/editorSession'
 
 export function useClipboardHistory({
   activeDoc,

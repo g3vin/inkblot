@@ -24,7 +24,7 @@
  */
 import { Mark, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { DecorationSet } from '@tiptap/pm/view'
 import { Fragment, Slice } from '@tiptap/pm/model'
 import { normalizeSession, reconcileSession, composeSentence } from '../lib/bubbleText'
 import { formPage, formPages, formsStateOf, showFormPage, withFormsState } from '../lib/bubbleForms'

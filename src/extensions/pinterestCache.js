@@ -11,8 +11,6 @@ import { getProjectOpenId as readProjectOpenId } from '../lib/projectContext'
 
 export const PINTEREST_CACHE_PREFIX = 'inkblot:pinterest-preview:'
 export const PINTEREST_PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
-export const PINTEREST_CACHE_VERSION = 1
-export const PINTEREST_CACHE_MAX_ITEMS = 80
 
 export const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
 
