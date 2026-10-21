@@ -52,8 +52,8 @@ pub mod common;
 pub mod envelope;
 pub mod event;
 pub mod map;
-pub mod references;
 pub mod print;
+pub mod references;
 pub mod sidebar;
 pub mod tabs;
 pub mod timeline;
@@ -62,70 +62,20 @@ pub use archive::{ArchivedItem, ArchivedKind};
 pub use bubble::{BubbleAside, BubbleForm, BubbleMode, BubbleSession, BubbleWord};
 pub use command::{
     ApplyMarkCommand, CanvasCommandRequest, CanvasDropDocCommand, CanvasDropNoteCommand,
-    CanvasRestoreCommand, CanvasRevealCommand, DictationCancelCommand,
-    DictationLevelCommand, CreateEntryCommand, DeleteEntryCommand, DictationTranscript,
-    DuplicateEntryCommand, EntryKind, InsertPlainTextCommand, MoveEntryCommand,
-    RenameEntryCommand, InsertTableCommand, OpenProjectCommand, JumpToAnchorCommand,
-    NativeCommand, OpenDocumentCommand, ReplaceRangesCommand, SetAlignmentCommand,
-    SetCaretAtDocPosCommand, SetColorCommand, SetContentCommand, SetFontFamilyCommand,
-    SetFontSizeCommand, SetHighlightCommand, SetSelectionCommand, SyncNotesCommand,
-    TargetOnly, SetBlockTypeCommand, SetWritingFormatCommand, ToggleListCommand,
-    EditorHistoryCommand, SetFocusModeCommand, SetWordCountVisibleCommand,
+    CanvasRestoreCommand, CanvasRevealCommand, CreateEntryCommand, DeleteEntryCommand,
+    DictationCancelCommand, DictationLevelCommand, DictationTranscript, DuplicateEntryCommand,
+    EditorHistoryCommand, EntryKind, InsertPlainTextCommand, InsertTableCommand,
+    JumpToAnchorCommand, MoveEntryCommand, NativeCommand, OpenDocumentCommand, OpenProjectCommand,
+    RenameEntryCommand, ReplaceRangesCommand, SetAlignmentCommand, SetBlockTypeCommand,
+    SetCaretAtDocPosCommand, SetColorCommand, SetContentCommand, SetFocusModeCommand,
+    SetFontFamilyCommand, SetFontSizeCommand, SetHighlightCommand, SetSelectionCommand,
+    SetWordCountVisibleCommand, SetWritingFormatCommand, SyncNotesCommand, TargetOnly,
+    ToggleListCommand,
 };
-pub use references::{
-    AddReferenceCommand, BibliographyInclude, BibliographyOptions, ChooseReferenceCandidateCommand,
-    CitationStyleSpec, Contributor, ContributorRoleSpec, CreateReferenceCommand, InsertBibliographyCommand,
-    InsertCitationCommand, Reference, ReferenceCandidate, ReferenceFieldInput, ReferenceFieldSpec,
-    ReferenceKindSpec, ReferenceOrigin, ReferencePatch, ReferenceRef, ReferenceSchema, ReferenceStatus,
-    ReferenceView, ReferencesChanged, RevealReference, SetBibliographyOptionsCommand,
-    SetCitationStyleCommand, SetReferenceAttachedCommand, UpdateReferenceCommand,
+pub use common::{
+    Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit,
+    TextAnchor, WritingFormat,
 };
-pub use print::{
-    ExportAgainCommand, ImportScriptCommand, LastExport, MeasureBookCommand, ReportOutput,
-    SceneNumbering, SceneSummary, ScriptReportCommand, ScriptReportKind, ScriptSummary,
-    SetSceneNumbersCommand, PreflightIssue, PreflightSeverity, PrintOptions, PrintRange,
-    PublishingReport, ApplyFormatCommand, ClearBookSetupCommand, ExportDocumentCommand,
-    ExportFormat, FormatKind, FormatOption, GoToPageCommand, InsertBreakCommand,
-    PageBreakKind, PageLayoutCatalog, PageLayoutState, PageSetupTarget, PageSizeOption,
-    PrintDocumentCommand, AddBookItemCommand, ApplyBookStyleCommand, BookStyleOption,
-    HeadImageTarget, SetChapterMetaCommand, SetHeadImageCommand, BookRow, BookRowSection,
-    EditBookItemCommand, EditorMode, MoveBookItemCommand, OpenBookItemCommand,
-    RemoveBookItemCommand, SetBookItemHiddenCommand, PrintJobKind, PrintJobPhase,
-    PrintJobStatus, PrintScope, RefreshBookChaptersCommand, TypesetFocus,
-    TypesetHistoryChanged, TypesetVersionRow, TypesetVersionKind,
-    SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
-    PreviewTypesetVersionCommand, CoverSetAction, CoverSetView, CoverState,
-    EditCoverSetsCommand, SetCoverImageCommand, SetFolderBookOptionsCommand,
-    SetTypesetViewCommand, TypesetView, ProofKind, ProofFix, ProofIssue,
-    SetParagraphTypesetCommand, ParagraphTypeset, ShowProofIssueCommand,
-    SetTypesetDisplayCommand, ProjectFont, AddProjectFontCommand, SetTextStyleCommand,
-    InsertFootnoteCommand, EditionAction, EditEditionsCommand, ExportAllEditionsCommand,
-    RunningToken, SetAuthorProfileCommand, SetBookCoverCommand, SetBookSettingsCommand,
-    SetDisplayDensityCommand, SetPageSetupCommand, SetEditorModeCommand,
-    SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand, SetupSource,
-    SignatureAdvice, UseSetupForBookCommand, ZoomFit,
-};
-pub use sidebar::{
-    AddReplyCommand, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand,
-    NotePatch, NoteRef, RemoveClipboardEntriesCommand, RemoveTilesCommand,
-    RenameVersionCommand, ReplaceTileWordCommand, RevealSearchResultCommand,
-    ShowSidebarTab, SidebarTab, TileKind, TileRef, UpdateNoteCommand, VersionAction,
-    VersionActionCommand, WorkbenchTile,
-};
-pub use map::{
-    MapButtonRole, MapButtonRow, MapCalendarMode, MapChoice, MapChoiceInput, MapChromeChanged, MapChromeState,
-    MapColorInput, MapCommandRequest, MapDateInput, MapDateParts, MapListRow, MapMarkerInput, MapMenuItem, MapNoteText,
-    MapNoteTone, MapNumberInput, MapPanel, MapPanelButton, MapPanelField, MapPanelGroup, MapPanelSection,
-    MapPanelTab, MapShapePreview, MapStatRow,
-    MapTableCell, MapTableRowView, MapTableView, MapTextInput, MapToggleInput,
-    MapTool,
-};
-pub use timeline::{
-    AttachTimelineEventCommand, JumpToTimelinePassageCommand, RevealTimelineEventCommand, SetTimeLensCommand,
-    SetTimelineRangeEditingCommand, TimelineChromeChanged, TimelineChromeState, TimelineCommandRequest,
-    TimelineCursorChanged, TimelineRangesChanged,
-};
-pub use common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
 pub use envelope::{
     BridgeError, BridgeErrorCode, BridgeReply, BridgeRequest, CommandEnvelope, DocumentText,
     EditorQuery, EventEnvelope, InboundMessage, OutboundMessage, ReadAloudQuery, ReplyEnvelope,
@@ -136,9 +86,59 @@ pub use event::{
     ProjectChanged, ReadAloudPayloadEvent, SelectionContext, ToolbarState, ViewOptions,
     WebviewEvent,
 };
+pub use map::{
+    MapButtonRole, MapButtonRow, MapCalendarMode, MapChoice, MapChoiceInput, MapChromeChanged,
+    MapChromeState, MapColorInput, MapCommandRequest, MapDateInput, MapDateParts, MapListRow,
+    MapMarkerInput, MapMenuItem, MapNoteText, MapNoteTone, MapNumberInput, MapPanel,
+    MapPanelButton, MapPanelField, MapPanelGroup, MapPanelSection, MapPanelTab, MapShapePreview,
+    MapStatRow, MapTableCell, MapTableRowView, MapTableView, MapTextInput, MapToggleInput, MapTool,
+};
+pub use print::{
+    AddBookItemCommand, AddProjectFontCommand, ApplyBookStyleCommand, ApplyFormatCommand, BookRow,
+    BookRowSection, BookStyleOption, ClearBookSetupCommand, CoverSetAction, CoverSetView,
+    CoverState, EditBookItemCommand, EditCoverSetsCommand, EditEditionsCommand, EditionAction,
+    EditorMode, ExportAgainCommand, ExportAllEditionsCommand, ExportDocumentCommand, ExportFormat,
+    FormatKind, FormatOption, GoToPageCommand, HeadImageTarget, ImportScriptCommand,
+    InsertBreakCommand, InsertFootnoteCommand, LastExport, MeasureBookCommand, MoveBookItemCommand,
+    OpenBookItemCommand, PageBreakKind, PageLayoutCatalog, PageLayoutState, PageSetupTarget,
+    PageSizeOption, ParagraphTypeset, PreflightIssue, PreflightSeverity,
+    PreviewTypesetVersionCommand, PrintDocumentCommand, PrintJobKind, PrintJobPhase,
+    PrintJobStatus, PrintOptions, PrintRange, PrintScope, ProjectFont, ProofFix, ProofIssue,
+    ProofKind, PublishingReport, RefreshBookChaptersCommand, RemoveBookItemCommand,
+    RenameTypesetVersionCommand, ReportOutput, RunningToken, SaveTypesetVersionCommand,
+    SceneNumbering, SceneSummary, ScriptReportCommand, ScriptReportKind, ScriptSummary,
+    SetAuthorProfileCommand, SetBookCoverCommand, SetBookItemHiddenCommand, SetBookSettingsCommand,
+    SetChapterMetaCommand, SetCoverImageCommand, SetDisplayDensityCommand, SetEditorModeCommand,
+    SetFolderBookOptionsCommand, SetHeadImageCommand, SetPageSetupCommand,
+    SetParagraphTypesetCommand, SetPrintLayoutCommand, SetPrintScopeCommand, SetPrintZoomCommand,
+    SetSceneNumbersCommand, SetTextStyleCommand, SetTypesetDisplayCommand, SetTypesetViewCommand,
+    SetupSource, ShowProofIssueCommand, SignatureAdvice, TypesetFocus, TypesetHistoryChanged,
+    TypesetVersionKind, TypesetVersionRef, TypesetVersionRow, TypesetView, UseSetupForBookCommand,
+    ZoomFit,
+};
+pub use references::{
+    AddReferenceCommand, BibliographyInclude, BibliographyOptions, ChooseReferenceCandidateCommand,
+    CitationStyleSpec, Contributor, ContributorRoleSpec, CreateReferenceCommand,
+    InsertBibliographyCommand, InsertCitationCommand, Reference, ReferenceCandidate,
+    ReferenceFieldInput, ReferenceFieldSpec, ReferenceKindSpec, ReferenceOrigin, ReferencePatch,
+    ReferenceRef, ReferenceSchema, ReferenceStatus, ReferenceView, ReferencesChanged,
+    RevealReference, SetBibliographyOptionsCommand, SetCitationStyleCommand,
+    SetReferenceAttachedCommand, UpdateReferenceCommand,
+};
+pub use sidebar::{
+    AddReplyCommand, ClipboardDropCommand, ClipboardEntry, InsertClipboardEntryCommand, NotePatch,
+    NoteRef, RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
+    ReplaceTileWordCommand, RevealSearchResultCommand, ShowSidebarTab, SidebarTab, TileKind,
+    TileRef, UpdateNoteCommand, VersionAction, VersionActionCommand, WorkbenchTile,
+};
 pub use tabs::{
-    CloseSplitCommand, DocTab, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand,
-    ScreenPoint, SetTabOrderCommand, SplitOrientation, TabRef, TabsChanged,
+    CloseSplitCommand, DocTab, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand,
+    OpenInSplitCommand, ScreenPoint, SetTabOrderCommand, SplitOrientation, TabRef, TabsChanged,
+};
+pub use timeline::{
+    AttachTimelineEventCommand, JumpToTimelinePassageCommand, RevealTimelineEventCommand,
+    SetTimeLensCommand, SetTimelineRangeEditingCommand, TimelineChromeChanged, TimelineChromeState,
+    TimelineCommandRequest, TimelineCursorChanged, TimelineRangesChanged,
 };
 
 #[cfg(test)]

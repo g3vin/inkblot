@@ -35,12 +35,19 @@ mod mac {
         let len = value.len();
         let alloc: *mut AnyObject = msg_send![class!(NSString), alloc];
         // NSUTF8StringEncoding = 4.
-        let string: *mut AnyObject = msg_send![alloc, initWithBytes: bytes, length: len, encoding: 4usize];
+        let string: *mut AnyObject =
+            msg_send![alloc, initWithBytes: bytes, length: len, encoding: 4usize];
         msg_send![string, autorelease]
     }
 
     /// Run the print operation on `webview` (a `WKWebView *`). Main thread only.
-    pub unsafe fn print(webview: *mut AnyObject, job_name: &str, width_pt: f64, height_pt: f64, pdf_path: Option<&str>) {
+    pub unsafe fn print(
+        webview: *mut AnyObject,
+        job_name: &str,
+        width_pt: f64,
+        height_pt: f64,
+        pdf_path: Option<&str>,
+    ) {
         let shared: *mut AnyObject = msg_send![class!(NSPrintInfo), sharedPrintInfo];
         let info: *mut AnyObject = msg_send![shared, copy];
         let info: *mut AnyObject = msg_send![info, autorelease];
@@ -72,7 +79,11 @@ mod mac {
         if op.is_null() {
             return;
         }
-        let show_panel = if pdf_path.is_some() { Bool::NO } else { Bool::YES };
+        let show_panel = if pdf_path.is_some() {
+            Bool::NO
+        } else {
+            Bool::YES
+        };
         let _: () = msg_send![op, setShowsPrintPanel: show_panel];
         let _: () = msg_send![op, setShowsProgressPanel: Bool::YES];
         let _: () = msg_send![op, setJobTitle: ns_string(job_name)];
@@ -108,7 +119,15 @@ pub fn print_webview(
         webview
             .with_webview(move |platform| {
                 let wk = platform.inner() as *mut objc2::runtime::AnyObject;
-                unsafe { mac::print(wk, &job_name, paper_width_pt, paper_height_pt, pdf_path.as_deref()) };
+                unsafe {
+                    mac::print(
+                        wk,
+                        &job_name,
+                        paper_width_pt,
+                        paper_height_pt,
+                        pdf_path.as_deref(),
+                    )
+                };
             })
             .map_err(|e| format!("Failed to print: {e}"))?;
         Ok(())

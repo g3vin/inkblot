@@ -20,7 +20,8 @@ pub struct FetchedText {
 
 #[tauri::command]
 pub async fn fetch_text(url: String, accept: Option<String>) -> Result<FetchedText, String> {
-    let parsed = reqwest::Url::parse(&url).map_err(|_| "Only web addresses can be looked up".to_string())?;
+    let parsed =
+        reqwest::Url::parse(&url).map_err(|_| "Only web addresses can be looked up".to_string())?;
     if !matches!(parsed.scheme(), "http" | "https") {
         return Err("Only web addresses can be looked up".into());
     }
@@ -29,7 +30,9 @@ pub async fn fetch_text(url: String, accept: Option<String>) -> Result<FetchedTe
         .timeout(std::time::Duration::from_secs(15))
         .build()
         .map_err(|e| format!("http client: {e}"))?;
-    let mut request = client.get(parsed).header("Accept-Language", "en-US,en;q=0.9");
+    let mut request = client
+        .get(parsed)
+        .header("Accept-Language", "en-US,en;q=0.9");
     if let Some(accept) = accept.filter(|a| !a.is_empty()) {
         request = request.header("Accept", accept);
     }
@@ -49,5 +52,10 @@ pub async fn fetch_text(url: String, accept: Option<String>) -> Result<FetchedTe
             break;
         }
     }
-    Ok(FetchedText { status, final_url, content_type, body: String::from_utf8_lossy(&bytes).into_owned() })
+    Ok(FetchedText {
+        status,
+        final_url,
+        content_type,
+        body: String::from_utf8_lossy(&bytes).into_owned(),
+    })
 }

@@ -9,17 +9,30 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::references::{
-    AddReferenceCommand, ChooseReferenceCandidateCommand, CreateReferenceCommand, InsertBibliographyCommand,
-    InsertCitationCommand, ReferenceRef, SetBibliographyOptionsCommand, SetCitationStyleCommand,
-    SetReferenceAttachedCommand, UpdateReferenceCommand,
+use super::common::{
+    Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit,
+    TextAnchor, WritingFormat,
 };
-use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
-use crate::types::json::JsonValue;
 use super::map::MapCommandRequest;
-use super::timeline::{
-    AttachTimelineEventCommand, JumpToTimelinePassageCommand, RevealTimelineEventCommand, SetTimeLensCommand,
-    SetTimelineRangeEditingCommand, TimelineCommandRequest,
+use super::print::{
+    AddBookItemCommand, AddProjectFontCommand, ApplyBookStyleCommand, ApplyFormatCommand,
+    ClearBookSetupCommand, EditBookItemCommand, EditCoverSetsCommand, EditEditionsCommand,
+    ExportAgainCommand, ExportAllEditionsCommand, ExportDocumentCommand, GoToPageCommand,
+    ImportScriptCommand, InsertBreakCommand, InsertFootnoteCommand, MeasureBookCommand,
+    MoveBookItemCommand, OpenBookItemCommand, PreviewTypesetVersionCommand, PrintDocumentCommand,
+    RefreshBookChaptersCommand, RemoveBookItemCommand, RenameTypesetVersionCommand,
+    SaveTypesetVersionCommand, ScriptReportCommand, SetAuthorProfileCommand, SetBookCoverCommand,
+    SetBookItemHiddenCommand, SetBookSettingsCommand, SetChapterMetaCommand, SetCoverImageCommand,
+    SetDisplayDensityCommand, SetEditorModeCommand, SetFolderBookOptionsCommand,
+    SetHeadImageCommand, SetPageSetupCommand, SetParagraphTypesetCommand, SetPrintLayoutCommand,
+    SetPrintScopeCommand, SetPrintZoomCommand, SetSceneNumbersCommand, SetTextStyleCommand,
+    SetTypesetDisplayCommand, SetTypesetViewCommand, ShowProofIssueCommand, TypesetVersionRef,
+    UseSetupForBookCommand,
+};
+use super::references::{
+    AddReferenceCommand, ChooseReferenceCandidateCommand, CreateReferenceCommand,
+    InsertBibliographyCommand, InsertCitationCommand, ReferenceRef, SetBibliographyOptionsCommand,
+    SetCitationStyleCommand, SetReferenceAttachedCommand, UpdateReferenceCommand,
 };
 use super::sidebar::{
     AddReplyCommand, ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef,
@@ -27,25 +40,16 @@ use super::sidebar::{
     ReplaceTileWordCommand, RevealSearchResultCommand, TileRef, UpdateNoteCommand,
     VersionActionCommand,
 };
-use super::tabs::{CloseSplitCommand, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand, SetTabOrderCommand, TabRef};
-use crate::types::note::Note;
-use super::print::{
-    ApplyFormatCommand, ClearBookSetupCommand, ExportAgainCommand, ExportDocumentCommand,
-    GoToPageCommand, ImportScriptCommand, InsertBreakCommand, MeasureBookCommand,
-    ScriptReportCommand, SetSceneNumbersCommand, PrintDocumentCommand,
-    RefreshBookChaptersCommand, SetBookSettingsCommand, SetDisplayDensityCommand,
-    SetPageSetupCommand, SetPrintLayoutCommand, SetAuthorProfileCommand,
-    SetBookCoverCommand, SetEditorModeCommand, SetPrintScopeCommand, SetPrintZoomCommand,
-    UseSetupForBookCommand, MoveBookItemCommand, SetBookItemHiddenCommand,
-    AddBookItemCommand, RemoveBookItemCommand, EditBookItemCommand, OpenBookItemCommand,
-    ApplyBookStyleCommand, SetChapterMetaCommand, SetHeadImageCommand,
-    SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
-    PreviewTypesetVersionCommand, SetCoverImageCommand, EditCoverSetsCommand,
-    SetFolderBookOptionsCommand, SetTypesetViewCommand, SetParagraphTypesetCommand,
-    ShowProofIssueCommand, SetTypesetDisplayCommand, AddProjectFontCommand,
-    SetTextStyleCommand, InsertFootnoteCommand, EditEditionsCommand,
-    ExportAllEditionsCommand,
+use super::tabs::{
+    CloseSplitCommand, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand,
+    OpenInSplitCommand, SetTabOrderCommand, TabRef,
 };
+use super::timeline::{
+    AttachTimelineEventCommand, JumpToTimelinePassageCommand, RevealTimelineEventCommand,
+    SetTimeLensCommand, SetTimelineRangeEditingCommand, TimelineCommandRequest,
+};
+use crate::types::json::JsonValue;
+use crate::types::note::Note;
 
 /// A command aimed at an editor with nothing else to say.
 #[typeshare]

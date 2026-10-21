@@ -25,7 +25,11 @@ pub const DEFAULT_CENTER_Y: f64 = 30.0;
 pub fn place_default(window: &WebviewWindow) {
     #[cfg(target_os = "macos")]
     if let Ok(ns_window) = window.ns_window() {
-        let placement = macos::Placement { visible: true, x: DEFAULT_X, center_y: DEFAULT_CENTER_Y };
+        let placement = macos::Placement {
+            visible: true,
+            x: DEFAULT_X,
+            center_y: DEFAULT_CENTER_Y,
+        };
         macos::place(window.label(), ns_window as usize, placement);
     }
 }
@@ -35,12 +39,23 @@ pub fn place_default(window: &WebviewWindow) {
 /// in fullscreen, where AppKit owns the buttons.
 #[tauri::command]
 #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
-pub fn window_traffic_lights(window: WebviewWindow, visible: bool, x: f64, center_y: f64) -> Result<(), String> {
+pub fn window_traffic_lights(
+    window: WebviewWindow,
+    visible: bool,
+    x: f64,
+    center_y: f64,
+) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        let ns_window = window.ns_window().map_err(|e| format!("No native window: {e}"))? as usize;
+        let ns_window = window
+            .ns_window()
+            .map_err(|e| format!("No native window: {e}"))? as usize;
         let label = window.label().to_string();
-        let placement = macos::Placement { visible, x, center_y };
+        let placement = macos::Placement {
+            visible,
+            x,
+            center_y,
+        };
         window
             .run_on_main_thread(move || macos::place(&label, ns_window, placement))
             .map_err(|e| format!("Failed to place the traffic lights: {e}"))?;
@@ -68,21 +83,30 @@ mod macos {
 
     #[repr(C)]
     #[derive(Clone, Copy)]
-    struct Point { x: f64, y: f64 }
+    struct Point {
+        x: f64,
+        y: f64,
+    }
     unsafe impl Encode for Point {
         const ENCODING: Encoding = Encoding::Struct("CGPoint", &[f64::ENCODING, f64::ENCODING]);
     }
 
     #[repr(C)]
     #[derive(Clone, Copy)]
-    struct Size { width: f64, height: f64 }
+    struct Size {
+        width: f64,
+        height: f64,
+    }
     unsafe impl Encode for Size {
         const ENCODING: Encoding = Encoding::Struct("CGSize", &[f64::ENCODING, f64::ENCODING]);
     }
 
     #[repr(C)]
     #[derive(Clone, Copy)]
-    struct Rect { origin: Point, size: Size }
+    struct Rect {
+        origin: Point,
+        size: Size,
+    }
     unsafe impl Encode for Rect {
         const ENCODING: Encoding = Encoding::Struct("CGRect", &[Point::ENCODING, Size::ENCODING]);
     }
@@ -94,7 +118,10 @@ mod macos {
     // AppKit spaces the buttons 20px apart; used if it reports nothing better.
     const BUTTON_SPACING: f64 = 20.0;
     // After these, AppKit has laid the titlebar out again.
-    const RELAYOUT_NOTIFICATIONS: [&str; 2] = ["NSWindowDidResizeNotification", "NSWindowDidExitFullScreenNotification"];
+    const RELAYOUT_NOTIFICATIONS: [&str; 2] = [
+        "NSWindowDidResizeNotification",
+        "NSWindowDidExitFullScreenNotification",
+    ];
 
     /// Each window's last placement, by label, and whether it is being watched.
     static PLACEMENTS: Mutex<Option<HashMap<String, (Placement, bool)>>> = Mutex::new(None);
@@ -129,8 +156,11 @@ mod macos {
                     let queue: *mut AnyObject = msg_send![class!(NSOperationQueue), mainQueue];
                     let _: () = msg_send![queue, addOperationWithBlock: &*later];
                 });
-                let Ok(cname) = CString::new(name) else { continue };
-                let ns_name: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: cname.as_ptr()];
+                let Ok(cname) = CString::new(name) else {
+                    continue;
+                };
+                let ns_name: *mut AnyObject =
+                    msg_send![class!(NSString), stringWithUTF8String: cname.as_ptr()];
                 // Kept for the window's life: the observer token is never removed, and
                 // the block is a no-op once the window has gone (no notifications come).
                 let _token: *mut AnyObject = msg_send![
@@ -146,10 +176,11 @@ mod macos {
 
     /// Apply the window's last placement, if it has one.
     fn reapply(label: &str, ns_window: usize) {
-        let placement = PLACEMENTS
-            .lock()
-            .ok()
-            .and_then(|guard| guard.as_ref().and_then(|map| map.get(label).map(|(p, _)| *p)));
+        let placement = PLACEMENTS.lock().ok().and_then(|guard| {
+            guard
+                .as_ref()
+                .and_then(|map| map.get(label).map(|(p, _)| *p))
+        });
         if let Some(placement) = placement {
             unsafe { apply(ns_window as *mut AnyObject, placement) };
         }
@@ -205,7 +236,10 @@ mod macos {
         // AppKit's coordinates run up from the bottom; the container is centred on the line.
         let y = (height - close.size.height) / 2.0;
         for (i, &button) in buttons.iter().enumerate() {
-            let origin = Point { x: placement.x + i as f64 * spacing, y };
+            let origin = Point {
+                x: placement.x + i as f64 * spacing,
+                y,
+            };
             let _: () = msg_send![button, setFrameOrigin: origin];
         }
     }

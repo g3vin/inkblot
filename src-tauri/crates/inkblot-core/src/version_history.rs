@@ -839,9 +839,21 @@ mod tests {
         assert_eq!(rows[0].summary.as_deref(), Some("+1 place · 1 edited"));
         assert_eq!(rows[1].summary.as_deref(), Some("Snapshot · 1 place"));
         // "Old Harbour" + "Keep" against "Harbour".
-        assert_eq!(rows[0].delta, WordDelta { added: 2, removed: 0 });
+        assert_eq!(
+            rows[0].delta,
+            WordDelta {
+                added: 2,
+                removed: 0
+            }
+        );
         assert!(rows[0].snippet.is_empty());
-        assert_eq!(span_delta(&versions, 0, 1), WordDelta { added: 3, removed: 0 });
+        assert_eq!(
+            span_delta(&versions, 0, 1),
+            WordDelta {
+                added: 3,
+                removed: 0
+            }
+        );
     }
 
     #[test]

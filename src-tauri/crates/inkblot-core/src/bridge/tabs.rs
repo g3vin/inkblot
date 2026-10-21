@@ -141,8 +141,18 @@ mod tests {
     fn tabs_cross_in_camel_case_and_a_draft_has_no_path() {
         let event = WebviewEvent::TabsChanged(TabsChanged {
             tabs: vec![
-                DocTab { id: "1".into(), doc_path: Some("ch/one".into()), secondary_doc: Some("notes".into()), split: Some(SplitOrientation::Rows) },
-                DocTab { id: "2".into(), doc_path: None, secondary_doc: None, split: None },
+                DocTab {
+                    id: "1".into(),
+                    doc_path: Some("ch/one".into()),
+                    secondary_doc: Some("notes".into()),
+                    split: Some(SplitOrientation::Rows),
+                },
+                DocTab {
+                    id: "2".into(),
+                    doc_path: None,
+                    secondary_doc: None,
+                    split: None,
+                },
             ],
             active_tab_id: Some("2".into()),
         });
@@ -168,7 +178,10 @@ mod tests {
         .unwrap();
         assert_eq!(
             command,
-            NativeCommand::OpenInSplit(OpenInSplitCommand { doc_path: None, orientation: SplitOrientation::Rows })
+            NativeCommand::OpenInSplit(OpenInSplitCommand {
+                doc_path: None,
+                orientation: SplitOrientation::Rows
+            })
         );
     }
 }
