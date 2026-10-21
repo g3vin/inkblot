@@ -148,6 +148,7 @@ const firstSentenceBreak = (u: LayoutUnit, from: number): number => {
 /** Layout tolerance, px. Measured rects carry subpixel noise; half a pixel is not a line. */
 const EPS = 0.5
 
+/** Break measured units into pages (and columns) of `frame`. Pure: no DOM, no editor. */
 export const paginate = (units: LayoutUnit[], frame: LayoutFrame): LayoutResult => {
   const { slotHeight, stride } = frame
   const columns = Math.max(1, Math.floor(frame.columns))

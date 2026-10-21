@@ -775,6 +775,7 @@ export const printPages = ({ elements, widthPx, heightPx, jobName, pdfPath, jobI
   prepare: async () => ({ elements, widthPx, heightPx, jobName, images: elements[0] }),
 })
 
+/** `{ pageCount, words }` for a print with these options, laid out but not printed; queued like a job. */
 export const measurePrint = (options) => enqueue(() => preparePrint({ ...options, measureOnly: true }))
 
 /** `Book.pdf` for Sam Reader → `Book – Sam Reader.pdf`, beside it. */

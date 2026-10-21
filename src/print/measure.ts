@@ -213,6 +213,7 @@ const isPushWidget = (el: Element) => (
   el.classList.contains('pg-line-push') || el.classList.contains('pg-block-push') || el.classList.contains('pg-row-push')
 )
 
+/** The editor's content as natural layout units (see above). Resets the cache when `layoutKey` changes. */
 export const measureUnits = (ctx: MeasureContext): LayoutUnit[] => {
   const { view, scale, originOffset } = ctx
   if (ctx.layoutKey !== cacheKey) {
