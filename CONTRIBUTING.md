@@ -5,6 +5,12 @@ Inkblot is proprietary software (see [LICENSE](LICENSE)). These are the working 
 Before changing anything that crosses a boundary (chrome ↔ document surface,
 JavaScript ↔ Rust), read [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## Setup
+
+Install the prerequisites in the [README](README.md#prerequisites), then `npm install`
+and `npm run tauri dev`. `npm run dev` alone serves the page in a browser, without
+the Tauri commands; `/?design` there is the design showcase.
+
 ## Branches
 
 `main` is always releasable. Work happens on short-lived branches cut from `main` and merged back through a pull request.
@@ -55,16 +61,79 @@ build from `src/ui/` and the tokens in `src/styles/tokens.css`, never hard-code 
 colour, font, radius or shadow, and register new actions with the command palette.
 `npm run dev` then `?design` shows every token and component in both themes.
 
+## Adding a feature, end to end
+
+Most features touch the same layers in the same order. Skip the ones yours doesn't need.
+
+1. **Types.** A new shape on disk or on the bridge is defined once in Rust
+   (`inkblot-core/src/types/` or `src/bridge/`), then `npm run types`.
+2. **Logic.** Pure logic goes in `src/lib/` (or `src/lib/map/`, `src/lib/timeline/`,
+   `src/print/`) with a suite in `tests/unit/`. If Rust needs it too, port it with a
+   parity case ([ARCHITECTURE.md → Recipes](ARCHITECTURE.md#recipes)).
+3. **Persistence.** Saving goes through the document layer (`src/lib/FileSystem.js`
+   and its neighbours) or a Tauri command (`src-tauri/src/*_commands.rs`).
+4. **The surface.** Editor behaviour is a TipTap extension in `src/extensions/`; a
+   pane's behaviour is in `src/canvas/`, `src/map/`, `src/timeline/` or `src/print/`.
+   If the chrome needs to see or change it, add a bridge command or event.
+5. **The chrome.** Build the UI from `src/ui/`
+   ([docs/DESIGN.md](docs/DESIGN.md)). Register every action with `useCommands` so ⌘K
+   finds it, and add a toolbar item or an inspector field if it belongs there.
+6. **Tests and docs.** Mount the component in a suite, update ARCHITECTURE.md if you
+   changed how pieces fit, and add a line to CHANGELOG.md under Unreleased.
+
 ## Code style
 
 - **Lint clean.** `npm run lint` must report 0 errors and 0 warnings. Format Rust with
   `cargo fmt`.
-- **Comments describe the code as it is.** Say what the code does and why. Don't
-  narrate how it got there, what it used to do, or which bug it fixed; that belongs in
-  the commit message.
+- **Comments follow the standard below.**
 - **Generated files are never edited by hand.** `src/types/inkblot-core.ts` comes from
   `npm run types`.
 - **Mount it or it's untested.** A component with logic worth keeping is mounted by a
   suite in `tests/unit/`.
 - **Mirror both sides.** A function that exists in both JavaScript and Rust gets a
   parity case in `tests/parity/cases/`.
+
+## Comments
+
+**A comment explains why, not what or when.** The code says what it does, and git says
+when and how it changed.
+
+Write a comment for:
+
+- Intent or reasoning the code can't show: why this approach, why this order.
+- Invariants, preconditions and assumptions a caller or a later edit must keep.
+- Performance, concurrency, ordering or security constraints that aren't obvious.
+- Workarounds for an outside bug or platform quirk: one or two lines, a link to the
+  issue, and when it can go (`WebKit drops the caret here; remove once
+  https://bugs.webkit.org/… ships`).
+- Public functions and types, in JSDoc (`/** … */`) or rustdoc (`///`): what it does,
+  what it returns, and anything a caller must know. Skip it when the name and
+  signature already say everything.
+- A header at the top of any non-trivial module: what it is responsible for and how
+  it fits with its neighbours.
+
+Don't write:
+
+- History: "changed from X", "previously", "now uses", "as before", dates, or
+  which bug a line fixed. Put that in the commit message, the pull request or
+  CHANGELOG.md.
+- A comment that restates the next line.
+- Commented-out code. Delete it; git keeps it.
+- Long explanations of how several modules fit together. Those go in
+  [ARCHITECTURE.md](ARCHITECTURE.md), with a short pointer in the code if needed.
+- A bare `TODO`. Write `TODO(#123): …` or give a one-line reason, or don't write it.
+- Comments addressed to, or written as, an AI assistant.
+
+When you fix a bug, the explanation goes in the commit message. Add a comment only if
+the fixed code would otherwise look wrong or removable, and then state the constraint,
+not the story:
+
+```js
+// Bad: history, and it doesn't say what must stay true.
+// Fixed the bug where renaming lost the last edit (was saving after the rename).
+
+// Good: the constraint that still holds.
+// Close the document first: its pane's final autosave writes to the path it had.
+```
+
+A lint suppression always carries its reason: `// eslint-disable-next-line rule -- why`.
