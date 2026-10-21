@@ -9,17 +9,16 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::map::MapChromeChanged;
-use super::timeline::{TimelineChromeChanged, TimelineCursorChanged, TimelineRangesChanged};
-use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
 use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor, WritingFormat};
-use super::sidebar::{ShowSidebarTab};
-use super::tabs::TabsChanged;
-use crate::types::read_aloud::ReadAloudPayload;
+use super::map::MapChromeChanged;
 use super::print::{
-    PageLayoutCatalog, PageLayoutState, PrintJobStatus, TypesetFocus,
-    TypesetHistoryChanged,
+    PageLayoutCatalog, PageLayoutState, PrintJobStatus, TypesetFocus, TypesetHistoryChanged,
 };
+use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
+use super::sidebar::ShowSidebarTab;
+use super::tabs::TabsChanged;
+use super::timeline::{TimelineChromeChanged, TimelineCursorChanged, TimelineRangesChanged};
+use crate::types::read_aloud::ReadAloudPayload;
 
 /// Which marks are on at the selection.
 #[typeshare]

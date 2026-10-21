@@ -27,10 +27,38 @@ fn preset(
 /// `STORY_FOLDER_PRESETS`, in declaration order — which is the order the menu shows.
 pub fn story_folder_presets() -> Vec<StoryFolderPreset> {
     vec![
-        preset("characters", "Characters", "Character folder", "Character", ("users", "characters"), &[]),
-        preset("settings", "Settings", "Setting folder", "Setting", ("map-world", "map-pin"), &["Locations", "Places"]),
-        preset("outline", "Outline", "Outline folder", "Outline entry", ("list", "list-bullets"), &[]),
-        preset("novel", "Novel", "Novel folder", "Chapter", ("book", "notebook"), &["Book"]),
+        preset(
+            "characters",
+            "Characters",
+            "Character folder",
+            "Character",
+            ("users", "characters"),
+            &[],
+        ),
+        preset(
+            "settings",
+            "Settings",
+            "Setting folder",
+            "Setting",
+            ("map-world", "map-pin"),
+            &["Locations", "Places"],
+        ),
+        preset(
+            "outline",
+            "Outline",
+            "Outline folder",
+            "Outline entry",
+            ("list", "list-bullets"),
+            &[],
+        ),
+        preset(
+            "novel",
+            "Novel",
+            "Novel folder",
+            "Chapter",
+            ("book", "notebook"),
+            &["Book"],
+        ),
     ]
 }
 
@@ -78,12 +106,14 @@ pub fn get_story_folder_preset_for_entry(
 /// A doc filed under a Settings folder (or one called Locations or Places) — what a
 /// map pin links to by default.
 pub fn is_location_doc(doc_path: &str) -> bool {
-    get_story_folder_preset_for_entry(doc_path, "file").is_some_and(|preset| preset.key == "settings")
+    get_story_folder_preset_for_entry(doc_path, "file")
+        .is_some_and(|preset| preset.key == "settings")
 }
 
 /// A doc filed under a Characters folder — what travels a map's routes.
 pub fn is_character_doc(doc_path: &str) -> bool {
-    get_story_folder_preset_for_entry(doc_path, "file").is_some_and(|preset| preset.key == "characters")
+    get_story_folder_preset_for_entry(doc_path, "file")
+        .is_some_and(|preset| preset.key == "characters")
 }
 
 /// The nearest preset folder a file lives in, with the path to create siblings in.

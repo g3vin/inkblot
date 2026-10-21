@@ -20,6 +20,9 @@ pub async fn scrape_pinterest_html(
 
 /// What the writer has locked in a project (`src/lib/docLocks.ts`).
 #[tauri::command]
-pub async fn project_locks(app_handle: AppHandle, project_name: String) -> Result<LockedEntries, String> {
+pub async fn project_locks(
+    app_handle: AppHandle,
+    project_name: String,
+) -> Result<LockedEntries, String> {
     Ok(crate::stats_commands::projects(&app_handle)?.locked_entries(&project_name))
 }

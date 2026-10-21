@@ -16,8 +16,8 @@ use typeshare::typeshare;
 
 use super::common::{EditorTarget, TextAnchor, WritingFormat};
 use crate::types::page_setup::{
-    AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, CoverFit, CoverPart, RunningText, GeneratedKind, MatterKind, PageOptions, PageSetup,
-    PrintTypography,
+    AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, CoverFit,
+    CoverPart, GeneratedKind, MatterKind, PageOptions, PageSetup, PrintTypography, RunningText,
 };
 
 #[typeshare]

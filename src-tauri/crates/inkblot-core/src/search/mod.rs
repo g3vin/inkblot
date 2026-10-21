@@ -309,7 +309,12 @@ const MAP_SEARCH_FIELDS: [(&str, &str, Option<&str>, &str); 5] = [
 /// Every match in a map's raw (on-disk) JSON, addressed by the id of the item that
 /// carries the text. A pin or traveler with no name of its own is searched by the
 /// path of the doc it links to — that is the name it shows.
-pub fn collect_map_matches(raw: &Value, matcher: &Matcher, doc_path: &str, limit: usize) -> Vec<SearchResult> {
+pub fn collect_map_matches(
+    raw: &Value,
+    matcher: &Matcher,
+    doc_path: &str,
+    limit: usize,
+) -> Vec<SearchResult> {
     if raw.is_null() || matcher.is_empty || !matcher.valid {
         return Vec::new();
     }
@@ -320,7 +325,9 @@ pub fn collect_map_matches(raw: &Value, matcher: &Matcher, doc_path: &str, limit
             if matches.len() >= limit {
                 return matches;
             }
-            let Some(id) = item["id"].as_str().filter(|id| !id.is_empty()) else { continue };
+            let Some(id) = item["id"].as_str().filter(|id| !id.is_empty()) else {
+                continue;
+            };
             let own = item[key].as_str().unwrap_or("");
             let text = match fallback {
                 Some(fallback) if own.is_empty() => item[fallback].as_str().unwrap_or(""),
@@ -483,11 +490,18 @@ pub fn search_project(
             if scope == SearchScope::Notes {
                 continue;
             }
-            let Some(map) = store.load_document(project_name, &entry.path)? else { continue };
+            let Some(map) = store.load_document(project_name, &entry.path)? else {
+                continue;
+            };
             if is_cancelled() {
                 return Ok(Vec::new());
             }
-            results.extend(collect_map_matches(&map, matcher, &entry.path, MAX_RESULTS_PER_DOCUMENT));
+            results.extend(collect_map_matches(
+                &map,
+                matcher,
+                &entry.path,
+                MAX_RESULTS_PER_DOCUMENT,
+            ));
             continue;
         }
 

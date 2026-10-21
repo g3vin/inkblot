@@ -47,7 +47,9 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::doc_kind::{doc_kind_name, get_doc_kind, is_map_doc, is_text_doc, strip_doc_suffix, with_doc_suffix};
+use crate::doc_kind::{
+    doc_kind_name, get_doc_kind, is_map_doc, is_text_doc, strip_doc_suffix, with_doc_suffix,
+};
 use crate::map::model::is_map_payload;
 use crate::types::{JsonValue, TreeNode, TreeNodeType, VersionEntry};
 use doc_lock::DocLocks;
@@ -297,7 +299,10 @@ impl ProjectStore {
             // file too, owned by their own stores (`archiveStore.js`, `referenceStore.js`,
             // `TimelineAnchors.js`), and are carried forward the way the JS save does.
             if let (Some(existing), Some(fields)) = (existing.as_ref(), document.as_object_mut()) {
-                if let Some(archive) = existing.get("archive").filter(|a| a.as_array().is_some_and(|a| !a.is_empty())) {
+                if let Some(archive) = existing
+                    .get("archive")
+                    .filter(|a| a.as_array().is_some_and(|a| !a.is_empty()))
+                {
                     fields.insert("archive".to_string(), archive.clone());
                 }
                 if let Some(citations) = existing.get("citations").filter(|c| c.is_object()) {
@@ -305,7 +310,10 @@ impl ProjectStore {
                 }
                 // So are the passages attached to timeline events, which the page's editor
                 // writes (`saveDocumentTimeline`).
-                if let Some(timeline) = existing.get("timeline").filter(|t| t.as_array().is_some_and(|t| !t.is_empty())) {
+                if let Some(timeline) = existing
+                    .get("timeline")
+                    .filter(|t| t.as_array().is_some_and(|t| !t.is_empty()))
+                {
                     fields.insert("timeline".to_string(), timeline.clone());
                 }
                 // So is the writer's lock (`docLocks.ts`); the page keeps the text
@@ -338,7 +346,9 @@ impl ProjectStore {
         notes: &Value,
     ) -> Result<bool> {
         if !is_text_doc(doc_name) {
-            return Err(StoreError::Refused(format!("{doc_name} is not a text document and has no notes")));
+            return Err(StoreError::Refused(format!(
+                "{doc_name} is not a text document and has no notes"
+            )));
         }
 
         self.locks.with_doc_lock(project_name, doc_name, || {
@@ -960,7 +970,12 @@ impl ProjectStore {
     pub fn locked_entries(&self, project_name: &str) -> LockedEntries {
         let root = self.project_root(project_name);
         let mut found = LockedEntries::default();
-        for child in self.list_project_tree(project_name).children.iter().flatten() {
+        for child in self
+            .list_project_tree(project_name)
+            .children
+            .iter()
+            .flatten()
+        {
             collect_locked(&root, child, &mut found);
         }
         found

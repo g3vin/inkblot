@@ -27,7 +27,8 @@ use inkblot_core::types::{
 };
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
-    map::diff as map_diff, map::model as map_model, story_structure as story, version_history as history,
+    map::diff as map_diff, map::model as map_model, story_structure as story,
+    version_history as history,
 };
 
 /// `String(x || '')`, the coercion the JS entry points open with.
@@ -467,7 +468,9 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             ))
         }
         "isLocationDoc" => json!(story::is_location_doc(args[0].as_str().unwrap_or_default())),
-        "isCharacterDoc" => json!(story::is_character_doc(args[0].as_str().unwrap_or_default())),
+        "isCharacterDoc" => json!(story::is_character_doc(
+            args[0].as_str().unwrap_or_default()
+        )),
 
         /* ---- map::model ---- */
         "normalizeMap" => {
@@ -478,7 +481,9 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
                 id
             }))
         }
-        "createEmptyMap" => json!(map_model::create_empty_map(args[0].as_str().unwrap_or_default())),
+        "createEmptyMap" => json!(map_model::create_empty_map(
+            args[0].as_str().unwrap_or_default()
+        )),
         "isMapPayload" => json!(map_model::is_map_payload(args.first())),
         "readMapViewport" => json!(map_model::read_map_viewport(&args[0])),
         "countMapWords" => json!(map_model::count_map_words(&args[0])),
@@ -507,7 +512,10 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             &args[1]
         )),
         "collectMapMatches" => {
-            let matcher = Matcher::new(args[1].as_str().unwrap_or_default(), matcher_options(&args[2]));
+            let matcher = Matcher::new(
+                args[1].as_str().unwrap_or_default(),
+                matcher_options(&args[2]),
+            );
             json!(search::collect_map_matches(
                 &args[0],
                 &matcher,
