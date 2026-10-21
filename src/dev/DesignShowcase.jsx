@@ -239,8 +239,7 @@ export default function DesignShowcase() {
               <MenuItem icon="delete" danger>Delete note</MenuItem>
             </Menu>
             <Button ref={popRef} variant="tinted" onClick={() => setPopover(!popover)}><Icon name="palette" /> Note colour</Button>
-            <Popover open={popover} onClose={() => setPopover(false)} anchorRef={popRef} aria-label="Note colour">
-              <p className="ib-eyebrow ds-pop-label">Note colour</p>
+            <Popover open={popover} onClose={() => setPopover(false)} anchorRef={popRef} eyebrow="Note colour" aria-label="Note colour">
               <InkPicker label="Note colour" value={ink} onChange={setInk} />
             </Popover>
             <Button variant="tinted" onClick={() => setDialog(true)}>Open a small decision</Button>

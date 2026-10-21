@@ -9,8 +9,11 @@
  * back to the system speechSynthesis voices if Kokoro can't load.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import Button from '../ui/Button.jsx'
+import { Field } from '../ui/Field.jsx'
+import { SelectMenu } from '../ui/FormRow.jsx'
 import Icon from '../ui/Icon.jsx'
+import Popover from '../ui/Popover.jsx'
 import { useCommands } from '../lib/commands'
 import { clearReadAloudHighlight, setReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import {
@@ -152,34 +155,6 @@ export default function ReadAloudControl({ editor }) {
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
   const [levels, setLevels] = useState(INITIAL_READ_ALOUD_LEVELS)
-  const [popoverAnchor, setPopoverAnchor] = useState({ top: 52, right: 16 })
-
-  const updatePopoverAnchor = useCallback(() => {
-    const rect = buttonRef.current?.getBoundingClientRect?.()
-    if (!rect) {
-      setPopoverAnchor({ top: 52, right: 16 })
-      return
-    }
-
-    setPopoverAnchor({
-      top: Math.round(rect.bottom + 8),
-      right: Math.max(12, Math.round(window.innerWidth - rect.right)),
-    })
-  }, [])
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    updatePopoverAnchor()
-    window.addEventListener('resize', updatePopoverAnchor)
-    window.addEventListener('scroll', updatePopoverAnchor, true)
-
-    return () => {
-      window.removeEventListener('resize', updatePopoverAnchor)
-      window.removeEventListener('scroll', updatePopoverAnchor, true)
-    }
-  }, [open, updatePopoverAnchor])
-
   useEffect(() => {
     setPreference(READ_ALOUD_VOICE_STORAGE_KEY, voice)
   }, [voice])
@@ -591,21 +566,18 @@ export default function ReadAloudControl({ editor }) {
     run: active ? stop : read,
   }], [active, editor, read, stop])
   const selectedVoice = READ_ALOUD_VOICES.find((option) => option.id === voice)
-  const popover = open ? createPortal(
-    <div
-      className={`read-aloud-popover ${status}`}
-      style={{
-        '--read-aloud-popover-top': `${popoverAnchor.top}px`,
-        '--read-aloud-popover-right': `${popoverAnchor.right}px`,
-      }}
-    >
-      <div className="read-aloud-popover-header">
-        <div>
-          <div className="read-aloud-title">Read aloud</div>
-          <div className="read-aloud-subtitle">
-            {selectedVoice ? `${selectedVoice.name} · ${selectedVoice.language} ${selectedVoice.gender}` : 'Choose a voice'}
-          </div>
-        </div>
+  const voiceGroups = ['American', 'British'].flatMap((language) => ['Female', 'Male'].map((gender) => ({
+    label: `${language} ${gender.toLowerCase()}`,
+    options: READ_ALOUD_VOICES
+      .filter((option) => option.language === language && option.gender === gender)
+      .map((option) => ({ value: option.id, label: `${option.name} (${option.grade})` })),
+  })))
+  const popover = (
+    <Popover open={open} anchorRef={buttonRef} onClose={() => setOpen(false)} align="end" eyebrow="Read aloud" className={`read-aloud-popover ${status}`}>
+      <div className="read-aloud-head">
+        <p className="ib-meta read-aloud-voice">
+          {selectedVoice ? `${selectedVoice.name} · ${selectedVoice.language} ${selectedVoice.gender}` : 'Choose a voice'}
+        </p>
         <div className="read-aloud-wave" aria-hidden="true">
           {levels.map((level, index) => (
             <span
@@ -616,62 +588,15 @@ export default function ReadAloudControl({ editor }) {
           ))}
         </div>
       </div>
-
-      <label className="read-aloud-field">
-        <span>Voice</span>
-        <select
-          className="read-aloud-voice-select"
-          value={voice}
-          onChange={(event) => setVoice(event.target.value)}
-          disabled={active}
-          aria-label="Read aloud voice"
-          title={selectedVoice ? `${selectedVoice.name} - ${selectedVoice.language} ${selectedVoice.gender}` : 'Read aloud voice'}
-        >
-          <optgroup label="American female">
-            {READ_ALOUD_VOICES.filter((option) => option.language === 'American' && option.gender === 'Female').map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name} ({option.grade})
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="American male">
-            {READ_ALOUD_VOICES.filter((option) => option.language === 'American' && option.gender === 'Male').map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name} ({option.grade})
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="British female">
-            {READ_ALOUD_VOICES.filter((option) => option.language === 'British' && option.gender === 'Female').map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name} ({option.grade})
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="British male">
-            {READ_ALOUD_VOICES.filter((option) => option.language === 'British' && option.gender === 'Male').map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name} ({option.grade})
-              </option>
-            ))}
-          </optgroup>
-        </select>
-      </label>
-
-      <div className={`read-aloud-status ${status}`}>
-        {message || (active ? 'Preparing...' : 'Reads selection, or the whole document.')}
-      </div>
-
-      <button
-        type="button"
-        className="read-aloud-action"
-        onClick={active ? stop : read}
-      >
-        {active ? 'Stop' : 'Read'}
-      </button>
-    </div>,
-    document.body
-  ) : null
+      <Field label="Voice">
+        <SelectMenu label="Read aloud voice" value={voice} onChange={setVoice} disabled={active} options={voiceGroups} />
+      </Field>
+      <p className={`ib-hint read-aloud-status${status === 'error' ? ' is-error' : ''}`}>
+        {message || (active ? 'Preparing…' : 'Reads the selection, or the whole document.')}
+      </p>
+      <Button variant="filled" className="read-aloud-action" onClick={active ? stop : read}>{active ? 'Stop' : 'Read'}</Button>
+    </Popover>
+  )
 
   return (
     <div className="read-aloud-control">
@@ -679,10 +604,7 @@ export default function ReadAloudControl({ editor }) {
         ref={buttonRef}
         type="button"
         className={`read-aloud-btn${active ? ' active' : ''}${status === 'loading' ? ' loading' : ''}${status === 'error' ? ' error' : ''}`}
-        onClick={() => {
-          updatePopoverAnchor()
-          setOpen((current) => !current)
-        }}
+        onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-label="Read aloud options"
         title="Read aloud"

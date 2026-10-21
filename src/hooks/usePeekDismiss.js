@@ -16,7 +16,7 @@ export default function usePeekDismiss(ref, peeked, onDismiss) {
       if (!panel || !(event.target instanceof Node)) return
       if (panel.contains(event.target)) return
       // Menus, popovers and dialogs opened from the sidebar are portaled out of it.
-      if (event.target instanceof Element && event.target.closest('[role="menu"], [role="dialog"], [role="listbox"], .ui-popover, .ib-menu')) return
+      if (event.target instanceof Element && event.target.closest('[role="menu"], [role="dialog"], [role="listbox"], .ib-popover, .ib-menu')) return
       onDismiss?.()
     }
     const onKeyDown = (event) => {

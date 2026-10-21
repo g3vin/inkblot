@@ -183,7 +183,6 @@ body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
   cursor: pointer;
 }
 .tb-overflow:hover, .tb-overflow[aria-expanded='true'] { background: var(--hover-bg); color: var(--text-primary); }
-.tb-overflow-popover { padding: var(--space-2); }
 .tb-overflow-list.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); max-width: 360px; height: auto; padding: 0; margin: 0; justify-content: flex-start; }
 
 /* The More marker: a token while customizing; everything after it goes behind ». */
@@ -201,4 +200,4 @@ body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
 .tb-row:not(.is-customizing) .tb-slot:has(> .tb-more-marker) { display: none; }
 
 /* The canvas toolbar's colour popover: the ink row, then "No colour". */
-.tb-canvas-colors { display: grid; gap: var(--space-3); justify-items: start; padding: var(--space-3); }
+.tb-canvas-colors { display: grid; gap: var(--space-3); justify-items: start; }

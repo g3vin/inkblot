@@ -94,7 +94,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
           >
             Export <Icon name="chevron-down" />
           </Button>
-          <Popover anchorRef={printRef} open={options} onClose={() => setOptions(false)} align="start" className="fin-print-options">
+          <Popover anchorRef={printRef} open={options} onClose={() => setOptions(false)} align="start" eyebrow="Print options" className="fin-print-options">
             <PrintOptions layout={layout} onPrint={() => { setOptions(false); layout.print(scope) }} />
           </Popover>
         </div>

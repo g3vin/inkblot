@@ -7,8 +7,11 @@
  * its text, and are written in Write: there the note is shown, not edited.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 
+import Button from '../ui/Button.jsx'
+import { TextArea } from '../ui/Field.jsx'
+import Kbd from '../ui/Kbd.jsx'
+import Popover from '../ui/Popover.jsx'
 import { FOOTNOTE_EDIT_EVENT } from './Footnote'
 
 export default function FootnoteEditor({ editor, locked = false }) {
@@ -27,10 +30,6 @@ export default function FootnoteEditor({ editor, locked = false }) {
     window.addEventListener(FOOTNOTE_EDIT_EVENT, onEdit)
     return () => window.removeEventListener(FOOTNOTE_EDIT_EVENT, onEdit)
   }, [editor])
-
-  useEffect(() => {
-    if (open && !locked) fieldRef.current?.focus()
-  }, [open, locked])
 
   /** The note's position now: found again by its id, if the text around it moved. */
   const where = useCallback(() => {
@@ -59,55 +58,40 @@ export default function FootnoteEditor({ editor, locked = false }) {
     editor.commands.focus()
   }, [editor, locked, open, where])
 
-  useEffect(() => {
-    if (!open) return undefined
-    const onDown = (event) => {
-      if (event.target?.closest?.('.footnote-editor')) return
-      close(true)
-    }
-    window.addEventListener('mousedown', onDown, true)
-    return () => window.removeEventListener('mousedown', onDown, true)
-  }, [close, open])
-
   if (!open) return null
-  const left = Math.max(12, Math.min(open.x - 20, window.innerWidth - 332))
-  const top = Math.min(open.y + 8, window.innerHeight - 180)
-  return createPortal(
-    <div className="footnote-editor" style={{ left: `${left}px`, top: `${top}px` }} role="dialog" aria-label="Footnote">
+  const remove = () => {
+    const pos = where()
+    setOpen(null)
+    if (pos != null) editor.chain().deleteRange({ from: pos, to: pos + 1 }).focus().run()
+  }
+  // The mark is a place in the text, not a control: the pop-up opens under its rect.
+  const at = { left: open.x, right: open.x, width: 0, top: open.y, bottom: open.y, height: 0 }
+  return (
+    <Popover open anchorRect={at} onClose={() => close(true)} onEscape={() => close(false)} eyebrow="Footnote" className="footnote-editor" role="dialog" aria-label="Footnote">
       {locked ? (
         <>
           <p className="footnote-editor-text">{open.text || 'An empty note.'}</p>
-          <span className="footnote-editor-hint">Notes are written in Write mode.</span>
+          <p className="ib-hint">Notes are written in Write mode.</p>
         </>
       ) : (
         <>
-          <textarea
+          <TextArea
             ref={fieldRef}
             defaultValue={open.text}
             placeholder="The note"
             rows={3}
+            aria-label="Footnote"
             onKeyDown={(event) => {
-              if (event.key === 'Escape') { event.preventDefault(); close(false) }
               if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); close(true) }
             }}
           />
           <div className="footnote-editor-actions">
-            <button
-              type="button"
-              className="is-destructive"
-              onClick={() => {
-                const pos = where()
-                setOpen(null)
-                if (pos != null) editor.chain().deleteRange({ from: pos, to: pos + 1 }).focus().run()
-              }}
-            >
-              Delete Note
-            </button>
-            <button type="button" onClick={() => close(true)}>Done</button>
+            <Button variant="destructive" onClick={remove}>Delete note</Button>
+            <Kbd>⌘↩</Kbd>
+            <Button variant="filled" onClick={() => close(true)}>Done</Button>
           </div>
         </>
       )}
-    </div>,
-    document.body
+    </Popover>
   )
 }

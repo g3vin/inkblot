@@ -94,7 +94,7 @@ export function CanvasColorItem({ ctx, spec }) {
       >
         <Glyph icon="palette" label={spec.label} display={ctx.display} />
       </button>
-      <Popover anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} align="center" className="tb-canvas-colors">
+      <Popover anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} align="center" eyebrow="Card colour" className="tb-canvas-colors">
         {/* JSON Canvas stores its six presets as '1'–'6'; each is one of the inks. */}
         <InkPicker label="Card colour" value={null} inks={Object.values(CANVAS_PRESET_INKS)} onChange={(ink) => apply(PRESET_FOR_INK[ink])} />
         <Button onClick={() => apply(null)}>No colour</Button>

@@ -407,10 +407,11 @@ is a sidebar's engraved tab strip (§6), the only place inside a panel with a sh
 highlight.
 
 **Motion is subtle and quick.** Use `--dur-fast` (120ms) for hovers and small state
-changes, `--dur-base` (180ms) for popovers, panels and small dialogs, and `--dur-slow`
-(240ms) for medium and large dialogs. Things arrive on `--ease-out` (`--ease-standard` is
-the same curve). A dialog also leaves the way it came, quicker (`--dur-fast`) and easing
-in (`--ease-in`); `useExitAnimation` does this without the caller keeping it mounted. There is no bounce or overshoot, and no looping
+changes and menus, `--dur-base` (180ms) for popovers, panels and small dialogs, and
+`--dur-slow` (240ms) for medium and large dialogs. Things arrive on `--ease-out`
+(`--ease-standard` is the same curve). Dialogs, popovers and menus also leave the way they
+came, quicker (`--dur-fast`) and easing in (`--ease-in`); `useExitAnimation` does this
+without the caller keeping it mounted. There is no bounce or overshoot, and no looping
 or attention-seeking animation. Motion explains where something came from and never
 decorates. `prefers-reduced-motion` is honoured globally (`base.css`); framer-motion
 components also check `useReducedMotion()`.
@@ -462,9 +463,9 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `iconElement` | An icon in code that builds DOM by hand (TipTap node views) | `iconElement('add')` returns the same glyph `Icon` draws, as an `<svg>` element |
 | `Tooltip` | Naming a control in a richer way than `title` | Short, no period, after a 500ms delay, with an optional shortcut. Never holds anything a user must read to succeed |
 | `Kbd` | Showing a shortcut | Courier Prime |
-| `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in. `danger` items go last, after a separator |
+| `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in; Tab closes it. `danger` items go last, after a separator. See *Pop-ups* below |
 | `useNativeMenu`, `popUpNativeMenu` | Context menus and menus a native window menu would show | The OS menu, built from the same items |
-| `Popover` | Small forms and pickers anchored to a control | Same surface as a menu. `align` start/end |
+| `Popover` | Small forms and pickers anchored to a control, or to a place in the text | **The one pop-up shell.** `eyebrow`, `align`, `anchorRect`, `onEscape`. See *Pop-ups* below |
 | `Dialog` | **The one modal**: a decision, a form, an editor, Settings | See *Dialogs* below |
 | `NavSheet` | A large `Dialog` of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
 | `Section` | A collapsible group in an inspector panel | Remembers open/closed per `id`. `accessory` is its one action, beside the title. `help` names its help topic |
@@ -520,7 +521,32 @@ There is one modal, `Dialog` (decided in design review round 01, 2026-10-20; see
 - **Customize toolbar** drops from under the titlebar (`placement="top"`), and the app
   behind it is not made inert, because its toolbar is what items are dragged into.
 - **The command palette** has its own surface and scrim (`CommandPalette`). It hasn't been
-  reviewed yet (the pop-ups round).
+  reviewed yet (design review round 02b, menus).
+
+### Pop-ups
+
+Anything anchored to a control (or a place in the text) that floats until it's dismissed
+is a `Popover` or a `Menu` (decided in design review round 02, 2026-10-21; see
+`docs/design-review/rounds/02-popups.md`). Don't build another floating box: the footnote
+editor, read aloud, the e-book Reader, Typeset's page pickers and the citation editor
+(plain DOM, with the same classes) are all Popovers.
+
+- **Surface:** `.ib-popover` (`Popover.css`), the menu's surface, on `--z-popover`, with a
+  hairline edge. It owns its padding (`--space-4`); call sites add none.
+- **Title:** an eyebrow (`eyebrow`) over a pop-up of more than one control, naming it:
+  Read aloud, Footnote, Cell fill, Card colour, Print options, Print sides, Reader, Citation,
+  and Typeset's pickers (Chapter number, Running head…). A one-line form (Go to page) or a
+  strip of tools (») has none.
+- **Insides:** `src/ui` controls (`Field`, `SelectMenu`, `TextArea`, `Button`, `FormRow` +
+  `Toggle`, `Segmented`). A pop-up's one bespoke visual is its signature (read aloud's
+  live waveform).
+- **Motion:** a popover floats in over `--dur-base`, a menu over `--dur-fast`, and both
+  leave the way they came (§7).
+- **Focus:** a popover moves focus to its first control; Tab and ⇧Tab stay inside it;
+  Escape or a click outside closes it, and focus goes back to the control that opened it.
+  A menu focuses its first item, arrows move, and Tab closes it.
+- **Inside a dialog,** a pop-up renders in the dialog's layer (`layer.js`), above it, and
+  Escape closes the pop-up before the dialog.
 
 **If a component doesn't exist yet,** build it in `src/ui/` from tokens, add it to the
 showcase (`src/dev/DesignShowcase.jsx`) and to this table, in the same PR.
@@ -638,7 +664,9 @@ FABs are 44px).
 - **Keyboard:** Every action is reachable by keyboard. Focus is always visible
   (`--focus-ring`). Menus, tabs, segmented controls and swatches use arrow keys.
   Dialogs focus their first control (never the ×), trap focus, make the app behind
-  inert, and return focus on close.
+  inert, and return focus on close. Popovers focus their first control, keep Tab inside
+  and return focus to their opener; menus close on Tab. A roving group (swatches,
+  segments) is one Tab stop.
 - **Names:** Icon-only controls have `label`s. Decorative icons are `aria-hidden`.
 - **Motion:** Honour `prefers-reduced-motion` (global in `base.css`).
 - **Text:** Nothing important below `--text-xs` (11px). Don't disable zoom.

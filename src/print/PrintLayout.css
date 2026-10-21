@@ -459,7 +459,8 @@
 
 .pl-stage:hover .typeset-overlay :is(.to-headbar, .to-imagebar) { opacity: 1; }
 
-.typeset-overlay :is(.to-headbar, .to-imagebar, .to-popover) button,
+.typeset-overlay :is(.to-headbar, .to-imagebar) button,
+.to-popover button,
 .typeset-overlay .to-file {
   min-width: 24px;
   height: 22px;
@@ -475,9 +476,11 @@
   justify-content: center;
 }
 
-.typeset-overlay :is(.to-headbar, .to-imagebar, .to-popover) button:hover,
+.typeset-overlay :is(.to-headbar, .to-imagebar) button:hover,
+.to-popover button:hover,
 .typeset-overlay .to-file:hover { background: color-mix(in srgb, var(--to-accent) 14%, transparent); }
-.typeset-overlay :is(.to-headbar, .to-popover) button.is-on { background: var(--to-accent); color: var(--text-on-accent); }
+.typeset-overlay .to-headbar button.is-on,
+.to-popover button.is-on { background: var(--to-accent); color: var(--text-on-accent); }
 .typeset-overlay .to-file input { display: none; }
 .typeset-overlay .to-sep { width: 1px; margin: 3px 2px; background: var(--border-color); }
 
@@ -507,26 +510,17 @@
   pointer-events: none;
 }
 
-.typeset-overlay .to-popover {
-  z-index: 4;
-  transform: translateX(-50%);
-  min-width: 180px;
-  padding: 8px;
-  border-radius: var(--radius-lg);
-  border: var(--hairline) solid var(--menu-border);
-  background: var(--surface-float);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-float);
-  font: 12px/1.4 var(--font-ui);
-}
+/* The page pickers: a Popover under a mark where the click was (TypesetOverlay.jsx). */
+.typeset-overlay .to-mark { width: 0; height: 0; pointer-events: none; }
+.to-popover { --to-accent: var(--accent-color); min-width: 180px; }
 
-.typeset-overlay .to-list { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
-.typeset-overlay .to-list > button { justify-content: flex-start; }
-.typeset-overlay .to-glyphs { display: grid; grid-template-columns: repeat(5, auto); gap: 2px; }
-.typeset-overlay .to-field { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; }
-.typeset-overlay .to-field input { font: inherit; padding: 2px 4px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: transparent; color: inherit; }
-.typeset-overlay .to-row { display: flex; align-items: center; gap: 4px; }
-.typeset-overlay .to-tokens { display: flex; flex-wrap: wrap; gap: 4px; opacity: 0.7; }
+.to-popover .to-list { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.to-popover .to-list > button { justify-content: flex-start; }
+.to-popover .to-glyphs { display: grid; grid-template-columns: repeat(5, auto); gap: 2px; }
+.to-popover .to-field { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; }
+.to-popover .to-field input { font: inherit; padding: 2px 4px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: transparent; color: inherit; }
+.to-popover .to-row { display: flex; align-items: center; gap: 4px; }
+.to-popover .to-tokens { display: flex; flex-wrap: wrap; gap: 4px; opacity: 0.7; }
 
 .typeset-toast {
   position: fixed;
@@ -835,36 +829,13 @@
   margin-right: 0.3em;
 }
 
-.footnote-editor {
-  position: fixed;
-  z-index: 1000;
-  width: 320px;
-  padding: 10px;
-  border-radius: var(--radius-lg);
-  border: var(--hairline) solid var(--menu-border);
-  background: var(--surface-float);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-float);
-  font: 13px/1.4 var(--font-ui);
-}
-
-.footnote-editor textarea {
-  width: 100%;
-  box-sizing: border-box;
-  resize: vertical;
-  font: inherit;
-  padding: 6px 8px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: inherit;
-}
-
-.footnote-editor-actions { display: flex; justify-content: space-between; margin-top: 8px; }
-.footnote-editor-actions button { font: inherit; padding: 3px 10px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: transparent; color: inherit; cursor: pointer; }
-.footnote-editor-actions .is-destructive { color: var(--status-danger); }
-.footnote-editor-text { margin: 0 0 6px; }
-.footnote-editor-hint { opacity: 0.6; font-size: 12px; }
+/* The footnote editor: a Popover by the note's mark (FootnoteEditor.jsx). */
+.footnote-editor { width: 320px; display: grid; gap: var(--space-3); }
+.footnote-editor .ib-popover-eyebrow,
+.footnote-editor-text,
+.footnote-editor .ib-hint { margin: 0; }
+.footnote-editor-actions { display: flex; align-items: center; gap: var(--space-3); }
+.footnote-editor-actions > .ib-kbd { margin-left: auto; color: var(--text-muted); }
 
 /* ---- the baseline grid, and the proof's marks ---- */
 
@@ -954,25 +925,10 @@
 .digital-bar .digital-segmented button { border: 0; border-radius: 0; background: transparent; }
 .digital-bar .digital-segmented button.is-on { background: var(--accent-color); color: var(--text-on-accent); }
 
-.digital-more { position: relative; }
-.digital-more summary { cursor: pointer; padding: 3px 9px; border: 1px solid var(--pl-faint); border-radius: var(--radius-md); background: var(--pl-paper); list-style: none; }
-.digital-more summary::-webkit-details-marker { display: none; }
-.digital-more-panel {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 6px);
-  left: 0;
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  min-width: 280px;
-  border-radius: var(--radius-md);
-  border: var(--hairline) solid var(--menu-border);
-  background: var(--surface-float);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-float);
-}
-.digital-more-panel > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.digital-reader-button { display: inline-flex; align-items: center; gap: var(--space-1); cursor: pointer; padding: 3px 9px; border: 1px solid var(--pl-faint); border-radius: var(--radius-md); background: var(--pl-paper); color: inherit; font: inherit; }
+/* Reader: a Popover of FormRows (DigitalPreview.jsx). */
+.digital-reader { width: 340px; display: grid; gap: var(--space-3); }
+.digital-reader .ib-popover-eyebrow { margin: 0; }
 
 .digital-checks-toggle.has-warnings::before { content: '●'; color: var(--status-warning); margin-right: 4px; }
 .digital-checks { margin: 0; padding: 8px 16px 8px 32px; border-bottom: 1px solid var(--pl-faint); background: var(--pl-paper); }

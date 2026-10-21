@@ -185,7 +185,7 @@ export default function TableToolbar({ editor }) {
         <IconButton ref={moreRef} icon="more" label="More table tools" size="capsule" aria-haspopup="menu" aria-expanded={menu === 'more'} onClick={() => setMenu(menu === 'more' ? null : 'more')} />
       </FloatingToolbar>
 
-      <Popover anchorRef={fillRef} open={menu === 'fill'} onClose={closeMenu} className="table-fill-popover">
+      <Popover anchorRef={fillRef} open={menu === 'fill'} onClose={closeMenu} eyebrow="Cell fill" className="table-fill-popover">
         <InkPicker label="Cell fill" value={table.fill} onChange={(ink) => act.fill(ink)} />
         <Button disabled={!table.fill} onClick={() => act.fill(null)}>No fill</Button>
       </Popover>

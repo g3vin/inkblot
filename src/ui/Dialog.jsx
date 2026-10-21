@@ -22,12 +22,16 @@
  *   focus goes back where it was. `placement="top"` drops it from under the titlebar and
  *   leaves the toolbar live (Customize toolbar drags into it).
  *
+ * - Pop-ups: a Popover or Menu opened inside renders in the dialog's layer, above it,
+ *   and Escape closes it before the dialog.
+ *
  * Settings and Help are NavSheet, built on this.
  */
-import { useEffect, useId, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FOCUSABLE_SELECTOR, focusableWithin, useExitAnimation, useFocusTrap } from './hooks'
 import IconButton from './IconButton'
+import { LayerContext } from './layer'
 import './Dialog.css'
 
 export default function Dialog({
@@ -46,6 +50,9 @@ export default function Dialog({
 
 function DialogOpen({ onClose, eyebrow, title, description, footer, footerCloses, size, placement, className, initialFocusRef, children }) {
   const scrimRef = useRef(null)
+  // Pop-ups opened inside portal into the scrim, above the dialog (layer.js).
+  const [layer, setLayer] = useState(null)
+  const scrim = useCallback((node) => { scrimRef.current = node; setLayer(node) }, [])
   const ref = useRef(null)
   const firstRef = useRef(null)
   const titleId = useId()
@@ -70,6 +77,8 @@ function DialogOpen({ onClose, eyebrow, title, description, footer, footerCloses
   useEffect(() => {
     const onKey = (event) => {
       if (event.key !== 'Escape') return
+      // A pop-up opened in the dialog closes first.
+      if (event.target instanceof Element && event.target.closest('.ib-popover, .ib-menu')) return
       event.stopPropagation()
       onClose?.()
     }
@@ -89,35 +98,37 @@ function DialogOpen({ onClose, eyebrow, title, description, footer, footerCloses
 
   return createPortal(
     <div
-      ref={scrimRef}
+      ref={scrim}
       className="ib-dialog-scrim"
       data-placement={placement}
       onPointerDown={(event) => { if (event.target === event.currentTarget) onClose?.() }}
     >
-      <div
-        ref={ref}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={title ? titleId : undefined}
-        aria-describedby={description ? descId : undefined}
-        tabIndex={-1}
-        className={['ib-dialog', `ib-dialog--${size}`, className].filter(Boolean).join(' ')}
-      >
-        {(title || eyebrow || close) && (
-          <header className="ib-dialog-header">
-            <div className="ib-dialog-heading">
-              {eyebrow ? <p className="ib-eyebrow">{eyebrow}</p> : null}
-              {title ? <h2 id={titleId} className="ib-title">{title}</h2> : null}
-              {description ? <p id={descId} className="ib-dialog-description">{description}</p> : null}
-            </div>
-            {close}
-          </header>
-        )}
-        <div className="ib-dialog-body">{children}</div>
-        {footer ? (
-          <footer className="ib-dialog-footer">{footer}</footer>
-        ) : null}
-      </div>
+      <LayerContext.Provider value={layer}>
+        <div
+          ref={ref}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={title ? titleId : undefined}
+          aria-describedby={description ? descId : undefined}
+          tabIndex={-1}
+          className={['ib-dialog', `ib-dialog--${size}`, className].filter(Boolean).join(' ')}
+        >
+          {(title || eyebrow || close) && (
+            <header className="ib-dialog-header">
+              <div className="ib-dialog-heading">
+                {eyebrow ? <p className="ib-eyebrow">{eyebrow}</p> : null}
+                {title ? <h2 id={titleId} className="ib-title">{title}</h2> : null}
+                {description ? <p id={descId} className="ib-dialog-description">{description}</p> : null}
+              </div>
+              {close}
+            </header>
+          )}
+          <div className="ib-dialog-body">{children}</div>
+          {footer ? (
+            <footer className="ib-dialog-footer">{footer}</footer>
+          ) : null}
+        </div>
+      </LayerContext.Provider>
     </div>,
     document.body,
   )

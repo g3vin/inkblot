@@ -3,6 +3,7 @@
  *
  *   useDismiss         close on Escape or a pointer-down outside
  *   useFocusTrap       keep Tab inside a dialog; restore focus on close
+ *   trapTab            keep one Tab keypress inside a container (dialogs, popovers)
  *   useRovingFocus     arrow keys / Home / End / typeahead across a list of items
  *   useAnchoredPosition place a floating element beside its anchor, kept on screen
  */
@@ -56,6 +57,29 @@ export function useDismiss(active, onDismiss, refs) {
 }
 
 /**
+ * If `event` is a Tab that would leave `container`, wrap it round to the other end.
+ * Only what Tab reaches counts: a roving group (a row of swatches) is one stop.
+ */
+export function trapTab(event, container) {
+  if (event.key !== 'Tab') return
+  const items = focusableWithin(container).filter((el) => el.tabIndex >= 0)
+  if (items.length === 0) {
+    event.preventDefault()
+    return
+  }
+  const first = items[0]
+  const last = items[items.length - 1]
+  const at = document.activeElement
+  if (event.shiftKey && (at === first || !items.includes(at) && at === container)) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && at === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+/**
  * While active: focus the first focusable (or `initialFocusRef`), wrap Tab inside
  * `containerRef`, and on deactivate return focus to whatever had it before.
  */
@@ -67,23 +91,7 @@ export function useFocusTrap(active, containerRef, initialFocusRef) {
     const first = initialFocusRef?.current || focusableWithin(container)[0] || container
     first?.focus?.({ preventScroll: true })
 
-    const onKey = (event) => {
-      if (event.key !== 'Tab' || !container) return
-      const items = focusableWithin(container)
-      if (items.length === 0) {
-        event.preventDefault()
-        return
-      }
-      const firstItem = items[0]
-      const lastItem = items[items.length - 1]
-      if (event.shiftKey && document.activeElement === firstItem) {
-        event.preventDefault()
-        lastItem.focus()
-      } else if (!event.shiftKey && document.activeElement === lastItem) {
-        event.preventDefault()
-        firstItem.focus()
-      }
-    }
+    const onKey = (event) => { if (container) trapTab(event, container) }
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)

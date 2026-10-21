@@ -26,7 +26,7 @@ _Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-m
 
 - **Every surface is migrated:** shell, editor, inspector, settings and stats, notes
   and bubble editor, canvas, map, Typeset and page setup, script, extensions.
-  - Pop-ups are `Menu`, `Popover` and `Sheet`; colour pickers are `InkPicker`.
+  - Pop-ups are `Menu` and `Popover`, modals `Dialog`; colour pickers are `InkPicker`.
   - Switches are `FormRow` + `Toggle`.
   - Icons are `Icon` with semantic names; node views use `iconElement()`.
 - **Raw values:** `lint:design` is at zero findings and the baseline is empty.
@@ -55,6 +55,20 @@ _Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-m
 - Sizes are tokens (`--dialog-sm`/`-md`/`-lg`). Call sites say `size`, not `width`.
 - `useExitAnimation` (`src/ui/hooks.js`) plays a dialog's exit on a copy, so callers
   still just unmount.
+
+**Design review round 02: pop-ups** (`design/round-02-popups`, see
+`docs/design-review/rounds/02-popups.md`)
+
+- `Popover` is the one pop-up shell: `.ib-popover` on `--z-popover`, an `eyebrow`, focus
+  in and Tab kept inside, and an exit. `.ui-popover` (ui.css) is gone. Its rules are in
+  DESIGN.md §9 → *Pop-ups*.
+- Read aloud, the footnote editor, the e-book Reader and Typeset's page pickers are
+  Popovers now, with `src/ui` insides. The citation editor is plain DOM and wears the
+  same classes (`.ib-popover`, `.ib-input`, `.ui-select`, `.ui-button`).
+- `trapTab` (`src/ui/hooks.js`) is the one Tab trap, for dialogs and popovers; it counts
+  a roving group (swatches) as one stop, which also fixed Tab escaping a dialog through
+  an InkPicker.
+- Menus leave the way they came too (`useExitAnimation`).
 
 ## The logo (done)
 
@@ -159,13 +173,16 @@ black on white.
 - **Content colours** (exports, the printed page, map worlds and themes, conversation
   looks) are content, so `lint:design` skips those paths (`IGNORED` in
   `scripts/lint-design.mjs`). Chrome never goes on that list.
-- **A closing dialog leaves a copy behind for `--dur-fast`.** `useExitAnimation` clones
-  the scrim to play the exit; the copy has no `role` or ids, is inert and goes in about
-  120ms. Query a dialog by `[role="dialog"]`, not by class, if it matters whether it's
-  still open. There is no copy under reduced motion or without `matchMedia` (tests).
-- **A pop-up opened from inside a dialog sits under it.** Dialogs are on `--z-dialog`
-  (80), above `--z-popover` (60). No dialog opens a `Menu` or `Popover` today
-  (`SelectMenu` is native); one that does needs a decision (the pop-ups round).
+- **A closing dialog, popover or menu leaves a copy behind for `--dur-fast`.**
+  `useExitAnimation` clones it to play the exit; the copy has no `role` or ids, is inert,
+  has `.is-leaving` and goes in about 120ms. Query by role, or by
+  `.ib-popover:not(.is-leaving)`, if it matters whether it's still open. There is no copy
+  under reduced motion; tests that stub `matchMedia` get one.
+- **A pop-up opened from inside a dialog renders in the dialog's layer.** `Dialog`
+  provides its scrim through `LayerContext` (`src/ui/layer.js`); `Popover` and `Menu`
+  portal into it, so they sit above the dialog (`--z-popover` is under `--z-dialog`) and
+  aren't inert. Dialog's Escape ignores keys from inside a pop-up, so the pop-up closes
+  first. A pop-up portaled some other way would sit under the dialog.
 - **A panel's header controls are a portal.** `PanelActions` renders into the
   inspector's title row only for the panel showing; outside a `PanelActionsProvider`
   (tests, the showcase) it renders in place.

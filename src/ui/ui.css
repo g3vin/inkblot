@@ -127,24 +127,8 @@
   color: var(--text-primary);
 }
 
-/* The Bubble editor's fade (src/components/bubble). Modals are Dialog.css. */
+/* The Bubble editor's fade (src/components/bubble). Modals are Dialog.css; pop-ups Popover.css. */
 @keyframes ui-fade-in { from { opacity: 0; } }
-
-/* ---------- Popover ---------- */
-
-.ui-popover {
-  position: fixed;
-  z-index: 2100;
-  box-sizing: border-box;
-  min-width: 160px;
-  padding: var(--space-2);
-  border: 1px solid var(--menu-border);
-  border-radius: var(--menu-radius);
-  background: var(--menu-bg);
-  box-shadow: var(--menu-shadow);
-  color: var(--text-primary);
-  font: 13px/1.35 var(--font-ui);
-}
 
 /* ---------- Section and form rows ---------- */
 

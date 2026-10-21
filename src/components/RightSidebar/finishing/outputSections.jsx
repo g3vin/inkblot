@@ -41,7 +41,7 @@ export function ScriptProductionSection({ layout, script }) {
       </FormRow>
       <FormRow label="Sides">
         <Button ref={sidesRef} disabled={!script.scenes.length} onClick={() => setSides(true)}>Print sides…</Button>
-        <Popover anchorRef={sidesRef} open={sides} onClose={() => setSides(false)} align="end" className="fin-sides">
+        <Popover anchorRef={sidesRef} open={sides} onClose={() => setSides(false)} align="end" eyebrow="Print sides" className="fin-sides">
           <SidesPicker scenes={script.scenes} onPrint={(chosen) => { setSides(false); layout.printSides(chosen) }} />
         </Popover>
       </FormRow>

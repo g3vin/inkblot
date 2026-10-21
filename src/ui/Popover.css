@@ -1,4 +1,4 @@
-/* The one pop-up surface: Popover, Menu, CommandPalette. */
+/* The one pop-up surface: Popover, Menu, CommandPalette (docs/DESIGN.md §9 → Pop-ups). */
 .ib-popover,
 .ib-menu {
   z-index: var(--z-popover);
@@ -13,13 +13,28 @@
   animation: ib-float-in var(--dur-fast) var(--ease-out);
 }
 
+/* Popover owns its padding; call sites don't add their own. */
 .ib-popover {
+  position: fixed;
   padding: var(--space-4);
   min-width: 200px;
   max-width: min(360px, calc(100vw - 16px));
+  animation-duration: var(--dur-base);
+}
+
+.ib-popover:focus { outline: none; }
+
+.ib-popover-eyebrow { margin: 0 0 var(--space-3); }
+
+/* Leaving the way it came (useExitAnimation's copy). */
+:is(.ib-popover, .ib-menu).is-leaving {
+  animation: ib-float-out var(--dur-fast) var(--ease-in) forwards;
+  pointer-events: none;
 }
 
 @keyframes ib-float-in {
   from { opacity: 0; transform: translateY(-2px) scale(0.99); }
   to { opacity: 1; transform: none; }
 }
+
+@keyframes ib-float-out { to { opacity: 0; transform: translateY(-2px) scale(0.99); } }

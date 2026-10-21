@@ -111,7 +111,9 @@ by the design lead on 2026-10-20:
 | Round | Family | State |
 | --- | --- | --- |
 | [01](rounds/01-modals.md) | Modals: shell and behaviour | Applied on `design/round-01-modals` (1B, 2C, 3C, 4C, 5B, 6C); [PR #79](https://github.com/g3vin/inkblot/pull/79) open, waiting to merge |
+| [02](rounds/02-popups.md) | Pop-ups: shell and behaviour | Picked 2026-10-21 (1B, 2C, 3C, 4C, 5C) on `design/round-02-popups` (stacked on round 01); ready to apply |
+| 02b | Pop-ups: menus (native vs in-page, », the command palette) | Not started |
 
 The design lead confirmed the order above on 2026-10-20.
 
-**Next step:** review and merge round 01's PR. When it merges, its sha becomes the control (recapture, update this file), and round 02 (pop-ups) can start.
+**Next step:** `/design-review apply 02`. Round 01's PR can merge in the meantime. When it does, its sha becomes the control (recapture, update this file), and round 02's branch rebases onto it.

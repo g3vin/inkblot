@@ -33,7 +33,7 @@
     { "id": "editor-find", "family": "toolbar", "title": "Find bar", "steps": [{ "open": "editor-focused" }, { "press": "Meta+f" }, { "type": "April" }] },
     { "id": "editor-note-hover", "root": ".note-preview-card", "family": "card", "title": "Note hover card", "steps": [{ "open": "editor" }, { "hover": ".note-marker" }, { "wait": 900 }] },
     { "id": "editor-table", "family": "toolbar", "title": "A table and its toolbar", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label='Insert table']" }, { "wait": 800 }] },
-    { "id": "editor-table-fill", "root": ".ui-popover", "family": "popover", "title": "Table cell fill", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label='Insert table']" }, { "wait": 600 }, { "click": "button[aria-label='Cell fill']" }] },
+    { "id": "editor-table-fill", "root": ".ib-popover", "family": "popover", "title": "Table cell fill", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label='Insert table']" }, { "wait": 600 }, { "click": "button[aria-label='Cell fill']" }] },
     { "id": "editor-table-more", "root": ".ib-menu", "family": "menu", "title": "More table tools (in-page menu)", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label='Insert table']" }, { "wait": 600 }, { "click": "button[aria-label='More table tools']" }] },
     { "id": "editor-conversation", "family": "editor", "title": "Conversation tile", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label='Insert conversation']" }, { "wait": 800 }] },
     { "id": "editor-bubble", "family": "editor", "title": "Bubble paragraph", "steps": [{ "open": "editor" }, { "rightclick": ".ProseMirror p >> nth=1" }, { "menuItem": "Bubble paragraph" }, { "wait": 800 }] },
@@ -41,7 +41,7 @@
     { "id": "editor-citation", "family": "panel", "title": "Insert citation (opens References, searching)", "steps": [{ "open": "editor-focused" }, { "menuItem": "Insert citation…" }, { "wait": 800 }] },
     { "id": "editor-context-menu", "family": "menu", "title": "Editor right-click menu", "menu": true, "steps": [{ "open": "editor" }, { "rightclick": ".ProseMirror p >> nth=1" }] },
 
-    { "id": "toolbar-more", "root": ".ui-popover", "family": "popover", "title": "More toolbar items", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }] },
+    { "id": "toolbar-more", "root": ".ib-popover", "family": "popover", "title": "More toolbar items", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }] },
     { "id": "toolbar-alignment", "family": "menu", "title": "Alignment menu", "menu": true, "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label^='Alignment']" }] },
     { "id": "toolbar-read-aloud", "root": ".read-aloud-popover", "family": "popover", "title": "Read aloud options", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": ".read-aloud-btn" }] },
     { "id": "toolbar-context-menu", "viewports": ["desktop"], "family": "menu", "title": "Toolbar right-click menu", "menu": true, "steps": [{ "open": "editor-focused" }, { "rightclick": "button[aria-label='Bold']" }] },
@@ -70,10 +70,11 @@
 
     { "id": "typeset", "family": "print", "title": "Typeset layout: Typeset panel", "steps": [{ "open": "typeset" }] },
     { "id": "typeset-print-export", "family": "print", "title": "Typeset layout: Print & export", "steps": [{ "open": "typeset" }, { "click": ".right-sidebar button[aria-label='Print & export']" }] },
-    { "id": "typeset-print-options", "root": ".ui-popover", "family": "popover", "title": "Print options", "steps": [{ "open": "typeset" }, { "click": ".right-sidebar button[aria-label='Print & export']" }, { "click": "button[aria-label='More print and export options']" }, { "click": ".ib-menu >> text=Print options…" }] },
-    { "id": "typeset-go-to-page", "root": ".ui-popover", "family": "popover", "title": "Go to page", "steps": [{ "open": "typeset" }, { "click": ".fin-status-link" }] },
+    { "id": "typeset-print-options", "root": ".ib-popover", "family": "popover", "title": "Print options", "steps": [{ "open": "typeset" }, { "click": ".right-sidebar button[aria-label='Print & export']" }, { "click": "button[aria-label='More print and export options']" }, { "click": ".ib-menu >> text=Print options…" }] },
+    { "id": "typeset-go-to-page", "root": ".ib-popover", "family": "popover", "title": "Go to page", "steps": [{ "open": "typeset" }, { "click": ".fin-status-link" }] },
     { "id": "typeset-history", "family": "panel", "title": "Typeset layout: History", "steps": [{ "open": "typeset" }, { "click": ".right-sidebar button[aria-label='History']" }] },
     { "id": "typeset-digital", "family": "print", "title": "E-book preview", "steps": [{ "open": "typeset" }, { "click": "button[aria-label='Digital']" }, { "wait": 1200 }] },
+    { "id": "typeset-reader", "root": ".digital-reader", "family": "popover", "title": "E-book preview: Reader options", "steps": [{ "open": "typeset" }, { "click": "button[aria-label='Digital']" }, { "wait": 1200 }, { "click": ".digital-reader-button" }, { "wait": 300 }] },
     { "id": "typeset-spreads", "viewports": ["desktop"], "family": "print", "title": "Spreads", "steps": [{ "open": "typeset" }, { "click": "button[aria-label='Spreads']" }, { "wait": 1200 }] },
     { "id": "typeset-insert", "viewports": ["desktop"], "family": "menu", "title": "Typeset Insert menu", "menu": true, "steps": [{ "open": "typeset" }, { "click": ".ProseMirror p >> nth=1" }, { "click": "button[aria-label='Insert']" }] },
     { "id": "typeset-more-menu", "root": ".ib-menu", "family": "menu", "title": "More typeset options (in-page menu)", "steps": [{ "open": "typeset" }, { "click": "button[aria-label='More typeset options']" }] },
@@ -99,7 +100,7 @@
 
     { "id": "canvas-empty", "family": "canvas", "title": "New, empty canvas", "steps": [{ "open": "canvas" }] },
     { "id": "canvas-card", "family": "canvas", "title": "A canvas with a card", "steps": [{ "open": "canvas" }, { "dblclick": ".canvas-surface, .canvas-viewport" }, { "type": "A card on the board" }, { "press": "Escape" }, { "wait": 600 }] },
-    { "id": "canvas-colors", "viewports": ["desktop"], "root": ".ui-popover", "family": "popover", "title": "Canvas card colour", "steps": [{ "open": "canvas" }, { "dblclick": ".canvas-surface, .canvas-viewport" }, { "type": "A card on the board" }, { "press": "Escape" }, { "wait": 400 }, { "click": "button[aria-label='Color']" }] },
+    { "id": "canvas-colors", "viewports": ["desktop"], "root": ".ib-popover", "family": "popover", "title": "Canvas card colour", "steps": [{ "open": "canvas" }, { "dblclick": ".canvas-surface, .canvas-viewport" }, { "type": "A card on the board" }, { "press": "Escape" }, { "wait": 400 }, { "click": "button[aria-label='Color']" }] },
     { "id": "map-setup", "root": ".map-setup-card", "family": "map", "title": "New map: what kind?", "steps": [{ "open": "map-setup" }] },
     { "id": "map-blank", "family": "map", "title": "Map: a blank sheet", "steps": [{ "open": "map-setup" }, { "click": ".map-setup-option:has-text('A blank sheet')" }, { "click": ".map-setup-choices .map-button:has-text('A region')" }, { "wait": 1500 }] },
     { "id": "map-earth", "family": "map", "title": "Map: the Earth", "steps": [{ "open": "map-setup" }, { "click": ".map-setup-option:has-text('The Earth')" }, { "click": ".map-setup-choices .map-button >> nth=0" }, { "wait": 2500 }] },
@@ -116,6 +117,7 @@
     { "what": "Detached document windows (Open in new window, a tab dragged out)", "why": "They need a second Tauri window." },
     { "what": "Dictation, read aloud speaking, synonyms and rhymes in the Workbench", "why": "They need the on-device models and the Rust side." },
     { "what": "Pinterest boards on a canvas, link previews, satellite pictures and online map tiles", "why": "They fetch from the network, which the capture blocks so runs stay comparable." },
+    { "what": "Typeset's page pickers (chapter number, ornament, opening, scene break, running head) and the citation editor", "why": "In the mock the chapter head measures at 0,0, so its pickers open off-screen; the sample project has no chapter-opening typography or scene breaks; the margin handles show only for a focused page section; and a citation needs a reference, which the Rust side adds." },
     { "what": "Trackpad swiping between sidebar panels, drag ghosts (tabs, files, notes, clipboard), the traffic lights", "why": "They need native gestures, a live drag, or the macOS window." }
   ]
 }

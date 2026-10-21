@@ -1,7 +1,7 @@
 /**
  * The shared controls (src/ui): the reorder and placement math, the native-menu
  * builder, and the controls mounted — a Segmented moved with the keyboard, a Section
- * that remembers being closed, a Dialog that Escape closes.
+ * that remembers being closed, a Dialog that Escape closes, a Popover that takes focus.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -30,6 +30,7 @@ const { default: Segmented } = await import('../../src/ui/Segmented.jsx')
 const { default: Section } = await import('../../src/ui/Section.jsx')
 const { SECTIONS_KEY } = await import('../../src/ui/sectionState.js')
 const { default: Dialog } = await import('../../src/ui/Dialog.jsx')
+const { default: Popover } = await import('../../src/ui/Popover.jsx')
 const { default: Button } = await import('../../src/ui/Button.jsx')
 const { Stepper } = await import('../../src/ui/FormRow.jsx')
 
@@ -127,5 +128,45 @@ ok('a small dialog with two footer buttons is the shared-width kind', document.b
 ok('sizes are named', document.body.querySelector('.ib-dialog--small') !== null)
 await act(async () => root.render(React.createElement(Dialog, { title: 'Export', footer, footerCloses: false, onClose: () => {} }, 'body')))
 ok('a footer that does not close it keeps the ×', document.body.querySelector('.ib-dialog-close') !== null)
+
+// A Popover: the one surface, an eyebrow, focus inside, Escape.
+const anchor = document.createElement('button')
+document.body.append(anchor)
+const anchorRef = { current: anchor }
+let popClosed = 0
+let escaped = 0
+await act(async () => root.render(React.createElement(Popover, { open: true, anchorRef, eyebrow: 'Cell fill', onClose: () => { popClosed += 1 } }, React.createElement('button', null, 'Blue'))))
+await act(async () => new Promise((resolve) => requestAnimationFrame(resolve)))
+const pop = document.body.querySelector('.ib-popover')
+ok('a popover is the one pop-up surface', pop !== null && !document.body.querySelector('.ui-popover'))
+ok('with its eyebrow', pop?.querySelector('.ib-popover-eyebrow')?.textContent === 'Cell fill')
+ok('and focus moves into it', pop?.contains(document.activeElement))
+await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+ok('Escape closes it', popClosed === 1)
+await act(async () => root.render(React.createElement(Popover, { open: false, anchorRef, onClose: () => {} })))
+ok('closed, it is gone (only its leaving copy stays a moment)', document.body.querySelector('.ib-popover:not(.is-leaving)') === null)
+ok('and that copy is inert', document.body.querySelector('.ib-popover.is-leaving')?.inert !== false)
+ok('and focus is back on the opener', document.activeElement === anchor)
+await act(async () => root.render(React.createElement(Popover, { open: true, anchorRect: { left: 10, right: 10, top: 10, bottom: 10, width: 0, height: 0 }, onClose: () => { popClosed += 1 }, onEscape: () => { escaped += 1 } }, 'note')))
+await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+ok('onEscape replaces closing on Escape', escaped === 1 && popClosed === 1)
+// Opened inside a dialog, a popover is in the dialog's layer, and Escape closes it first.
+let dialogClosed = 0
+function InDialog() {
+  const ref = React.useRef(null)
+  const [open, setOpen] = useState(false)
+  return React.createElement(Dialog, { title: 'Page setup', onClose: () => { dialogClosed += 1 } },
+    React.createElement('button', { ref, onClick: () => setOpen(true) }, 'Units'),
+    React.createElement(Popover, { open, anchorRef: ref, onClose: () => setOpen(false) }, React.createElement('button', null, 'Inches')))
+}
+await act(async () => root.render(React.createElement(InDialog)))
+await act(async () => [...document.body.querySelectorAll('button')].find((b) => b.textContent === 'Units').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+const inner = document.body.querySelector('.ib-popover:not(.is-leaving)')
+ok('a popover opened in a dialog renders in its layer', inner?.parentElement?.classList.contains('ib-dialog-scrim'))
+inner?.focus()
+await act(async () => inner.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+ok('and Escape closes the popover, not the dialog', dialogClosed === 0 && !document.body.querySelector('.ib-popover:not(.is-leaving)'))
+await act(async () => root.render(React.createElement('div')))
+anchor.remove()
 
 await act(async () => root.unmount())

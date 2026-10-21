@@ -18,7 +18,7 @@
   "src/components/RightSidebar/references/References.css": 12,
   "src/components/Sidebar.css": 8,
   "src/components/SidebarTiles.css": 14,
-  "src/components/Toolbar.css": 27,
+  "src/components/Toolbar.css": 12,
   "src/components/VersionComparePane.css": 25,
   "src/components/WordCountBadge.css": 9,
   "src/components/book/BookNavigator.css": 10,
@@ -28,13 +28,12 @@
   "src/components/tabs/DocumentTabBar.css": 6,
   "src/components/toolbar/Toolbar.customize.css": 10,
   "src/dev/DesignShowcase.css": 4,
-  "src/extensions/Citation.css": 9,
   "src/extensions/ConversationTile.css": 56,
   "src/extensions/PinterestBoard.css": 9,
   "src/extensions/ResizableImage.css": 5,
   "src/map/Map.css": 57,
-  "src/print/PrintLayout.css": 92,
+  "src/print/PrintLayout.css": 79,
   "src/timeline/Timeline.css": 45,
   "src/ui/Surfaces.css": 1,
-  "src/ui/ui.css": 13
+  "src/ui/ui.css": 12
 }
