@@ -11,10 +11,12 @@ export type DocChangeSink = (editor: unknown, transaction: unknown) => void
 
 let sink: DocChangeSink | null = null
 
+/** Point reports at `next`, or nowhere with null. */
 export function setDocChangeSink(next: DocChangeSink | null): void {
   sink = next
 }
 
+/** Called by `DocChangeReporter` for each transaction that changes the document. */
 export function reportDocTransaction(editor: unknown, transaction: unknown): void {
   sink?.(editor, transaction)
 }
