@@ -85,8 +85,6 @@ export const textStylesOf = (book: Partial<BookSettings> | null | undefined): Te
   return out
 }
 
-export const isBuiltinTextStyle = (id: string): boolean => BUILTIN_TEXT_STYLES.some((b) => b.id === id)
-
 const cssIdent = (id: string) => id.replace(/["\\]/g, '')
 
 /**
