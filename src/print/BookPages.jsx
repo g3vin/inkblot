@@ -169,7 +169,7 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
       .then((prepared) => { if (live) setPreviewPages((prepared?.elements || []).map(trimmed)) })
       .catch((error) => console.error('[typeset] previewing failed:', error))
     return () => { live = false }
-  }, [preview?.id, preview?.snapshot, projectName, docPath]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [preview?.id, preview?.snapshot, projectName, docPath]) // eslint-disable-line react-hooks/exhaustive-deps -- keyed on the preview; the placement and editor are read as they stand then
 
   const compose = useCallback(async () => {
     const run = ++runRef.current

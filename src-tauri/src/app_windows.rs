@@ -29,6 +29,7 @@ pub fn build_main(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 /// Open a detached document window (src/lib/docWindow.js says what goes in it).
 /// `x`/`y` put its top-left corner at that screen point, in logical px.
 #[tauri::command]
+// A command's parameters are its IPC arguments, named by the page's invoke().
 #[allow(clippy::too_many_arguments)]
 pub async fn open_document_window(
     app_handle: AppHandle,

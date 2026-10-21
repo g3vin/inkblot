@@ -76,7 +76,7 @@ function useInsights(stats, scope) {
       if (live) setInsights(rhythmInsights(days, sessions, today, stats.config.flowMinutes, stats.config.countPastedWords))
     })
     return () => { live = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` names every input
   }, [key])
   return insights
 }
