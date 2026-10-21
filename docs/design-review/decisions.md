@@ -56,3 +56,45 @@ lead's words, the date, and the commit sha.
 - **Reason:** not given
 - **Date:** 2026-10-20
 - **Commit:** `8eada1e` on `design/round-01-modals`
+
+## Round 02: Pop-ups (family: pop-ups)
+
+### 02.1 Surface and layer
+
+- **Options:** A control (`.ui-popover`, z 2100, call sites' own padding) · B `.ib-popover` on `--z-popover`, 12px owned by the surface · C B at 8px
+- **Pick:** B
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `d54b327` on `design/round-02-popups`
+
+### 02.2 Motion
+
+- **Options:** A control (only menus animate; nothing leaves) · B a menu's float-in everywhere over `--dur-fast` · C popovers over `--dur-base`, menus over `--dur-fast`, and both leave the way they came
+- **Pick:** C
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `d54b327` on `design/round-02-popups`
+
+### 02.3 Focus and keys
+
+- **Options:** A control (a popover leaves focus where it was) · B a menu's: focus in, Tab closes, back to the opener · C a dialog's without the scrim: focus in, Tab stays inside, back to the opener
+- **Pick:** C
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `d54b327` on `design/round-02-popups`
+
+### 02.4 The bespoke pop-ups
+
+- **Options:** A control · B their shells on Popover · C B, and their insides on `src/ui` (Typeset's page pickers keep theirs)
+- **Pick:** C (the board's Reader shot for C was broken; applied per the option's text)
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `d54b327` on `design/round-02-popups`
+
+### 02.5 A pop-up's title
+
+- **Options:** A control (read aloud's title only) · B no titles · C an eyebrow over every pop-up of more than one control
+- **Pick:** C
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `d54b327` on `design/round-02-popups`
