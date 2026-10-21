@@ -111,7 +111,7 @@ by the design lead on 2026-10-20:
 | Round | Family | State |
 | --- | --- | --- |
 | [01](rounds/01-modals.md) | Modals: shell and behaviour | Applied on `design/round-01-modals` (1B, 2C, 3C, 4C, 5B, 6C); [PR #79](https://github.com/g3vin/inkblot/pull/79) open, waiting to merge |
-| [02](rounds/02-popups.md) | Pop-ups: shell and behaviour | Applied on `design/round-02-popups` (1B, 2C, 3C, 4C, 5C), stacked on round 01; PR open, waiting to merge |
+| [02](rounds/02-popups.md) | Pop-ups: shell and behaviour | Applied on `design/round-02-popups` (1B, 2C, 3C, 4C, 5C); [PR #80](https://github.com/g3vin/inkblot/pull/80) open, stacked on #79 |
 | 02b | Pop-ups: menus (native vs in-page, », the command palette) | Not started |
 
 The design lead confirmed the order above on 2026-10-20.
