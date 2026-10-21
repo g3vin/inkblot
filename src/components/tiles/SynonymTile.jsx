@@ -11,7 +11,7 @@
  * `MODEL_NOT_INSTALLED`, it offers the download and reports progress, rather than
  * silently showing "no matches" for a model that was never there.
  */
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import nlp from "compromise"
 
 const normalizeTerm = (term) => term.trim().toLowerCase()

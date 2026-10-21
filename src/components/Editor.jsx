@@ -29,7 +29,6 @@ import {
   CLIPBOARD_PERSIST_KEY,
   MAX_CLIPBOARD_ENTRIES,
   PERSIST_KEY,
-  RIGHT_SIDEBAR_TAB_IDS,
   loadClipboardHistory,
   loadSession,
   normalizeProjectSession,

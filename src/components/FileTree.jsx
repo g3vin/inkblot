@@ -8,7 +8,7 @@
  * the preference store. Other parts of the app talk to it through `filetree:*`
  * window events (new-entry, refresh-projects, folders-visibility, …).
  */
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {

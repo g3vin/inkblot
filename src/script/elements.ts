@@ -52,8 +52,6 @@ export const elementsFor = (format: WritingFormat): ElementSpec[] => (
 
 export const isElement = (value: unknown): value is ScriptElementType => ALL_ELEMENTS.some((e) => e.id === value)
 
-export const isUpper = (element: ScriptElementType): boolean => ALL_ELEMENTS.find((e) => e.id === element)?.upper ?? false
-
 /** The element a new script starts with, and the one prose paragraphs become. */
 export const BODY_ELEMENT: Record<Exclude<WritingFormat, 'prose'>, ScriptElementType> = {
   screenplay: 'action',

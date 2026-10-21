@@ -21,7 +21,6 @@ import {
   PartsSection, ProofSection, StyleGallerySection, TextStylesSection, ThisPageSection,
 } from './bookSections'
 import { BindingSection, CoverSection, PublishingSection, ScriptProductionSection } from './outputSections'
-import { Note } from './controls'
 import './Finishing.css'
 
 const NO_TOOLBAR = {}
