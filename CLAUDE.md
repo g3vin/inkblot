@@ -54,7 +54,33 @@ Every surface is on the design language. What's left (the logo check on real dev
 moving bare buttons onto `src/ui`) and the gotchas are in
 [docs/design-handoff.md](docs/design-handoff.md). Read it before design-system work.
 
+## Code comments
+
+The full standard is in [CONTRIBUTING.md → Comments](CONTRIBUTING.md#comments). The rules:
+
+- **Explain why, not what or when.** Keep intent, invariants, and ordering,
+  performance or security constraints the code can't show.
+- **Never write history:** "changed from", "previously", "now uses", "fixed the bug
+  where", dates. Never leave commented-out code. Never address a comment to an AI
+  assistant or write one as one. History goes in the commit message, the PR
+  description or CHANGELOG.md; how modules fit together goes in ARCHITECTURE.md.
+- **Fixing a bug:** explain it in the commit message. Add a comment only if the fixed
+  code would look wrong or removable without it, and then state the constraint.
+- **Workarounds** for outside bugs: one or two lines, a link to the issue, and when it
+  can be removed.
+- **TODOs** are `TODO(#123): …` or carry a one-line reason. A lint suppression
+  carries its reason after `--`.
+
+```js
+// Bad:  Fixed rename losing the last edit (we used to save after renaming).
+// Good: Close the document first: its pane's final autosave writes to the path it had.
+```
+
 ## Checks
 
-`npm run lint`, `npm run lint:design`, `npm run typecheck`, `npm test`, `npm run build`
-must all pass before you commit. The bar for ESLint is 0 errors and 0 warnings.
+These must pass before you commit (what each catches: [README → Checks](README.md#checks)):
+
+- `npm run lint` (0 errors and 0 warnings), `npm run lint:design`, `npm run typecheck`,
+  `npm test`, `npm run build`
+- When you touch Rust or a mirrored module: `npm run parity`, `npm run types:check`,
+  and `cd src-tauri && cargo build --workspace && cargo test --workspace`
