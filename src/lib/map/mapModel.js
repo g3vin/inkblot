@@ -41,8 +41,6 @@ export const MAP_FORMAT_VERSION = 2
 export const MAP_KINDS = ['blank', 'image', 'earth', 'planet', 'system', 'galaxy', 'universe', 'model']
 /** Kinds drawn in 3D (space/): the camera, not a pan and zoom, is how they are viewed. */
 export const SPACE_KINDS = ['planet', 'system', 'galaxy', 'universe', 'model']
-/** Kinds whose points are `[lon, lat]` on a sphere. */
-export const GLOBE_KINDS = ['earth', 'planet']
 export const EARTH_VIEWS = ['globe', 'flat']
 export const EARTH_IMAGERY = ['map', 'satellite', 'hybrid']
 export const SURFACE_LOOKS = ['generated', 'texture', 'gas', 'ice', 'star']

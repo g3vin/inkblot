@@ -169,19 +169,3 @@ export function Stat({ label, children }) {
     </div>
   )
 }
-
-/** A select of project documents: `preferred` first, then everything else. */
-export function DocField({ label, value, docs, preferred, preferredLabel, onChange, noneLabel = 'None' }) {
-  const own = docs.filter((doc) => preferred(doc))
-  const rest = docs.filter((doc) => !preferred(doc) && doc.kind === 'text')
-  const others = docs.filter((doc) => !preferred(doc) && doc.kind !== 'text')
-  const known = docs.some((doc) => doc.path === value)
-  const options = [
-    { value: '', label: noneLabel },
-    ...(value && !known ? [{ value, label: `${value} (missing)` }] : []),
-    ...(own.length ? [{ group: preferredLabel, options: own.map((doc) => ({ value: doc.path, label: doc.path })) }] : []),
-    ...(rest.length ? [{ group: 'Other documents', options: rest.map((doc) => ({ value: doc.path, label: doc.path })) }] : []),
-    ...(others.length ? [{ group: 'Maps and canvases', options: others.map((doc) => ({ value: doc.path, label: doc.path })) }] : []),
-  ]
-  return <SelectField label={label} value={value || ''} options={options} onChange={(next) => onChange(next || null)} />
-}

@@ -322,12 +322,6 @@ export const SYSTEM_PRESET_GROUPS = [
   ['three', 'Three bodies'],
 ]
 
-/** A fresh copy of a preset's bodies (ids prefixed, so two presets never collide). */
-export function presetBodies(presetId, options = {}) {
-  const preset = SYSTEM_PRESETS.find((candidate) => candidate.id === presetId) || SYSTEM_PRESETS[0]
-  return preset.build({ seed: options.seed ?? 1, perturb: options.perturb ?? 0 })
-}
-
 /**
  * A whole `system` section for a preset: its bodies, dynamics and, for a template
  * that can be re-rolled, what it was made from (`template`).
