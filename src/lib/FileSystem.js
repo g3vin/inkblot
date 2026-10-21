@@ -199,6 +199,12 @@ const timelineRangesFor = (docData, existing) => {
   return Array.isArray(ranges) && ranges.length ? { timeline: ranges } : {}
 }
 
+/**
+ * Write a text document, carrying forward what the file already holds (versions,
+ * archive, citations, timeline passages, lock), and add a version when `docData`
+ * asks with `_appendVersion`. Refuses any path that is not a text document: a canvas
+ * or map written here would be wiped.
+ */
 export async function saveDocument(projectName, docName, docData) {
   if (!isTextDoc(docName)) {
     console.error(
@@ -474,6 +480,7 @@ export async function linkProject(projectDir) {
   }
 }
 
+/** Delete a project's folder, wherever it lives, and its registry entry. True on success. */
 export async function deleteProject(projectName) {
   try {
     const root = await getProjectRoot(projectName)
@@ -488,6 +495,7 @@ export async function deleteProject(projectName) {
   }
 }
 
+/** The project's new name, or null when it is missing, the name is taken or the rename fails. */
 export async function renameProject(projectName, newName) {
   try {
     const currentName = projectName?.trim()
@@ -616,6 +624,11 @@ async function relocateSidecar(root, fromRel, toRel) {
   }
 }
 
+/**
+ * Remove a file or folder with its version sidecar and attachments. Call it through
+ * `entryOperations`, which closes the panes showing the entry first: a pane's last
+ * autosave would otherwise write the file back.
+ */
 export async function deleteEntry(projectName, entryPath, type = 'file') {
   try {
     const root = await getProjectRoot(projectName)
@@ -679,6 +692,11 @@ export async function duplicateEntry(projectName, entryPath) {
   }
 }
 
+/**
+ * Rename in place, moving the version sidecar, attachments and book entries with it.
+ * Returns the new path, or null on failure. Call it through `entryOperations` (see
+ * `deleteEntry`).
+ */
 export async function renameEntry(projectName, entryPath, newName, type = 'file') {
   try {
     const root = await getProjectRoot(projectName)
@@ -714,6 +732,7 @@ export async function renameEntry(projectName, entryPath, newName, type = 'file'
   }
 }
 
+/** `renameEntry`, into another folder under the same name. */
 export async function moveEntry(projectName, entryPath, targetFolderPath, type = 'file') {
   try {
     const root = await getProjectRoot(projectName)

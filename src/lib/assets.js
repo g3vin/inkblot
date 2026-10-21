@@ -153,6 +153,7 @@ export async function writeAssetFromBlob(projectName, blob, fallbackExt = 'webm'
  */
 const urlCache = new Map()
 
+/** A URL the web view can load for a project asset (`.assets/…`), cached per path. */
 export async function assetUrl(projectName, relativePath) {
   const key = `${projectName}::${relativePath}`
   if (urlCache.has(key)) return urlCache.get(key)

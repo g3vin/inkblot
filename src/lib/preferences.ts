@@ -137,6 +137,7 @@ export function renamePreferencePrefix(fromPrefix: string, toPrefix: string): vo
  */
 const sessionState = new Map<string, string>()
 
+/** A per-launch value (see above): never written to disk. */
 export function getSessionValue(key: string): string | null {
   const value = sessionState.get(key)
   return value === undefined ? null : value

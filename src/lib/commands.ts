@@ -67,6 +67,7 @@ export function registerCommands(commands: Command[]): () => void {
   }
 }
 
+/** The commands that can run right now (their `when`, if any, says yes). */
 export const listCommands = (): Command[] => snapshot.filter((command) => command.when?.() ?? true)
 
 /** Every registered command, including those that cannot run right now. */
@@ -82,6 +83,7 @@ export function subscribeCommands(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
+/** Run a command by id. False, without running, when it is unknown or its `when` says no. */
 export async function runCommand(id: string): Promise<boolean> {
   const command = registry.get(id)
   if (!command || command.when?.() === false) return false

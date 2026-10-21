@@ -24,6 +24,7 @@ const VERSION_CAP = 200
 const newVersionId = () =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
+/** Tell open history panels (`versions:changed`) that a document's versions changed. */
 export const emitVersionsChanged = (projectName, docName) => {
   try {
     if (typeof window !== 'undefined' && window?.dispatchEvent) {
@@ -129,11 +130,13 @@ export const pushVersionEntry = (versions, entry) => {
   return next
 }
 
+/** `.versions/<doc>.versions.json`: canvases' history, and text documents' before it was embedded. */
 export const versionsSidecarPath = (root, docName) => {
   const rel = normalizePath(docName)
   return joinPath(root, '.versions', `${rel || docName}.versions.json`)
 }
 
+/** The sidecar's versions; [] when there is none or it does not parse. */
 export async function readSidecarVersions(root, docName) {
   try {
     const raw = await readTextFile(versionsSidecarPath(root, docName))
@@ -273,6 +276,7 @@ export async function updateVersionEntry(projectName, docName, versionId, patch)
   })
 }
 
+/** Delete one version, wherever the document keeps them. True if one was removed. */
 export async function deleteVersionEntry(projectName, docName, versionId) {
   return withDocLock(projectName, docName, async () => {
     try {
