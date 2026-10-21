@@ -22,8 +22,8 @@ import { isEditorReady } from '../lib/editorUtils'
 
 export default function CanvasCardEditor({ node, setActiveEditor, onCommit, onExit, docPath = null }) {
   const containerRef = useRef(null)
-  // Built once: new extension instances each render made useEditor call setOptions
-  // on every render. The card's content is read at creation only, as before.
+  // Built once: new extension instances on each render would make useEditor call
+  // setOptions every time. The card's content is read at creation only.
   const [options] = useState(() => ({
     extensions: buildCardExtensions(),
     content: node.inkblotTipTap || node.text || '',

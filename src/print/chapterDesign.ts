@@ -53,7 +53,7 @@ export const designFor = (
   return {
     ...DEFAULT_CHAPTER_DESIGN,
     showNumber: numbered,
-    // Numbered chapters used to keep their title only when asked to.
+    // Before designs, the numbering's includeTitle (on unless turned off) kept a numbered chapter's title.
     showTitle: !numbered || book?.chapterNumbering?.includeTitle !== false,
     chapterBreak: setup?.chapterStartsOnRecto ? ChapterBreak.NewRightPage : ChapterBreak.NewPage,
   }

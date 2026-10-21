@@ -411,9 +411,8 @@
   border-bottom: 1px solid var(--border-color);
   background: var(--surface-1);
   box-shadow: var(--shadow-float);
-  /* A fixed 30px, a third shorter than it was (45), and the same in both sidebars
-     whatever holds it. The 4px side padding is what SidebarTabs sizes the
-     indicator against. */
+  /* A fixed 30px, the same in both sidebars whatever holds it. The 4px side
+     padding is what SidebarTabs sizes the indicator against. */
   box-sizing: border-box;
   height: 30px;
   padding: 3px 4px;
