@@ -270,6 +270,7 @@ const runKey = (system) =>
     (system.bodies || []).map((body) => [body.id, body.kind, body.parent, body.massSun, body.state, body.orbit]),
   ])
 
+/** The integration for a system, shared: kept in a small LRU keyed by what moves its bodies. */
 export function runFor(system) {
   const key = runKey(system)
   let run = runs.get(key)
