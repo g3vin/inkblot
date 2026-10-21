@@ -95,8 +95,8 @@ export default function RightSidebar({
   const tabIds = useMemo(() => tabs.map(({ id }) => id), [tabs])
   const activeTabIndex = Math.max(0, tabIds.indexOf(sidebarTab))
 
-  // If the strip ever changes shape again, never leave the sidebar on a tab that
-  // no longer exists — no panel active, and the strip pointing at nothing.
+  // When the tab list changes, never leave the sidebar on a tab that no longer
+  // exists — no panel active, and the strip pointing at nothing.
   useEffect(() => {
     if (!tabIds.includes(sidebarTab)) setSidebarTab(tabIds[0])
   }, [sidebarTab, setSidebarTab, tabIds])

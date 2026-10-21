@@ -53,9 +53,8 @@ import {
   versionsSidecarPath,
 } from './versionStore'
 
-/* This was one 956-line module. Paths, the per-document write lock and version
-   history now live in their own files; they are re-exported here so the call
-   sites that import them from FileSystem keep working. */
+/* Paths, the per-document write lock and version history live in their own modules;
+   they are re-exported so callers can take the whole document layer from here. */
 export { getProjectRoot } from './projectPaths'
 export {
   buildTextVersionEntry,
