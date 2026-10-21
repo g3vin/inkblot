@@ -60,7 +60,7 @@ const useAssetUrls = (projectName, sources) => {
       .then((pairs) => { if (live) setUrls(new Map(pairs)) })
       .catch(() => {})
     return () => { live = false }
-  }, [projectName, key]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectName, key]) // eslint-disable-line react-hooks/exhaustive-deps -- `key` names `wanted`
   return urls
 }
 

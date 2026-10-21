@@ -35,12 +35,12 @@ export default function GlobeView({ view, map, space, day, selection, surfaceRef
   const shownKey = [...map.regions, ...map.routes].filter((item) => isItemShown(map, item, day)).map((item) => item.id).join(',')
   const regions = useMemo(
     () => regionFeatures(map, selection, day),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `shownKey` stands in for `day`
     [map.regions, map.terrains, map.layers, selection, shownKey]
   )
   const routes = useMemo(
     () => routeFeatures(map, space, day, selection),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `shownKey` stands in for `day`
     [map.routes, map.pins, map.layers, space, selection, shownKey]
   )
   const itemsRef = useRef({ regions, routes })

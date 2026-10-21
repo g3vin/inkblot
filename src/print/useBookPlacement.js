@@ -45,5 +45,5 @@ export const useBookPlacement = (projectName, docPath) => {
     const rows = bookRows(items, book.chapterNumbering)
     const row = rows.find((r) => r.path === docPath) || null
     return { folder, book, items, rows, row, chapters: listed.chapters }
-  }, [docPath, folder, listed, projectName, version]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [docPath, folder, listed, projectName, version]) // eslint-disable-line react-hooks/exhaustive-deps -- `version` re-reads the book settings from the store
 }

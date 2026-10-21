@@ -145,6 +145,7 @@ pub struct ProjectStore {
     locks: DocLocks,
     /// One id per launch, so the history panel can color-code edits by sitting.
     session_id: String,
+    // Used only here, so an alias would name it once.
     #[allow(clippy::type_complexity)]
     listener: Mutex<Option<Box<dyn Fn(&str, &str) + Send + Sync>>>,
 }

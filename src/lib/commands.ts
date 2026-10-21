@@ -92,7 +92,7 @@ export async function runCommand(id: string): Promise<boolean> {
 /** Register commands for the life of a component. */
 export function useCommands(factory: () => Command[], deps: unknown[]): void {
   useEffect(() => registerCommands(factory()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the caller names the deps
     deps)
 }
 

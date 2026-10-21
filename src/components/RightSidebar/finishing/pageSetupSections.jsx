@@ -159,12 +159,12 @@ function RunningTextEditor({ title, value, onCommit, tokens, resolve }) {
   const focused = useRef(false)
   const latest = useRef({ draft, value, onCommit })
   useEffect(() => { latest.current = { draft, value, onCommit } })
-  useEffect(() => { if (!focused.current) setDraft({ ...empty, ...(value || {}) }) }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!focused.current) setDraft({ ...empty, ...(value || {}) }) }, [value]) // eslint-disable-line react-hooks/exhaustive-deps -- `empty` is a fresh literal each render; only `value` matters
   const commit = (next = latest.current.draft) => {
     const { value: current, onCommit: apply } = latest.current
     if (JSON.stringify(next) !== JSON.stringify({ ...empty, ...(current || {}) })) apply(next)
   }
-  useEffect(() => () => commit(), []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => commit(), []) // eslint-disable-line react-hooks/exhaustive-deps -- commits once, on unmount; `commit` reads `latest`
 
   const field = (key, placeholder) => (
     <input

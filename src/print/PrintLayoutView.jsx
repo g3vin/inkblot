@@ -113,7 +113,7 @@ export default function PrintLayoutView({
     let live = true
     loadTypographyFont(setup.typography).then(() => { if (live) setFontsLoaded((n) => n + 1) })
     return () => { live = false }
-  }, [typeKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [typeKey]) // eslint-disable-line react-hooks/exhaustive-deps -- `typeKey` names the typography
 
   // The notes, as plain values: the frame must not change unless they do.
   const atFoot = notes ? Boolean(notes.footnotes) : true
@@ -178,7 +178,7 @@ export default function PrintLayoutView({
     setupUsesToken(setup, 'words') && editor && !editor.isDestroyed
       ? describeWordCount(countEditorWords(editor))
       : ''
-  ), [editor, result, setup]) // eslint-disable-line react-hooks/exhaustive-deps
+  ), [editor, result, setup]) // eslint-disable-line react-hooks/exhaustive-deps -- `result` re-counts after a layout; the editor object does not change
 
   // The notes at each page's foot: those whose marks the page holds.
   const footnotes = useMemo(() => {
