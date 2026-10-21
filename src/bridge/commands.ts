@@ -6,7 +6,8 @@
  * next to the editor. Every toolbar and menu reaches the editor through these.
  *
  * Each function takes the resolved editor, because resolving a target is the registry's
- * job and doing it twice is how the two disagree.
+ * job and doing it twice is how the two disagree. A command that returns a boolean
+ * says whether it ran: false when the editor is gone or destroyed.
  */
 import { Alignment, BlockType, HistoryAction, ListKind, MarkKind } from '../types'
 import type {
@@ -210,6 +211,7 @@ export function insertBibliography(editor: unknown): boolean {
   return run(editor, (chain) => { chain.focus().insertBibliography().run() })
 }
 
+/** Select an anchor's text. False, and nothing moves, when the anchor no longer resolves. */
 export function setSelection(
   editor: unknown,
   { anchor, scrollIntoView, focus }: SetSelectionCommand
@@ -276,6 +278,10 @@ export function replaceRanges(editor: unknown, { edits }: ReplaceRangesCommand):
   return applied
 }
 
+/**
+ * Put the caret at a raw ProseMirror position, clamped to the document. The one command
+ * that takes a bare position; a Rust test keeps it the only one (ARCHITECTURE.md).
+ */
 export function setCaretAtDocPos(editor: unknown, { pos }: SetCaretAtDocPosCommand): boolean {
   if (!isEditorReady(editor)) return false
   const size = asEditor(editor).state.doc.content.size

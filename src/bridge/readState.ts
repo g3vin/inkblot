@@ -97,6 +97,7 @@ const isMarkActive = (editor: PmEditor, markName: string): boolean => {
   return marks.some((mark) => mark.type === markType)
 }
 
+/** The marks and nodes at the selection the toolbar shows as on; all off with no live editor. */
 export function readActiveMarks(editor: unknown): ActiveMarks {
   if (!isEditorReady(editor)) {
     return {
