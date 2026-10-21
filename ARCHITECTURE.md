@@ -6,16 +6,28 @@ in its header comment. This document covers what spans modules.
 
 ## The pieces
 
-```text
- The page (src/)                                       Tauri (src-tauri/)
- ──────────────────────────────────────────────        ─────────────────────────────
- The chrome: toolbar, file tree, inspector,            *_commands.rs ─► inkblot-core
- tab bar, menus, settings, stats                                     └► inkblot-models
-        │                                                     ▲
-   shellBridge ◄── bridge protocol (JSON, in process) ──►     │ invoke()
-        │          (src/bridge/transport.ts)                   │
-   documentSurface: the panes, editors, canvases, maps ────────┘
+```mermaid
+flowchart LR
+  subgraph page["The page (src/)"]
+    chrome["The chrome<br/>toolbar, file tree, inspector,<br/>tab bar, menus, settings, stats"]
+    surface["The document surface<br/>panes, editors, canvases,<br/>maps, timelines"]
+    chrome -- "commands, requests<br/>(shellBridge)" --> surface
+    surface -- "events, replies<br/>(documentSurface)" --> chrome
+  end
+  subgraph tauri["Tauri (src-tauri/)"]
+    commands["*_commands.rs"]
+    core["inkblot-core<br/>domain, persistence, protocol types"]
+    models["inkblot-models<br/>on-device models"]
+    commands --> core
+    commands --> models
+  end
+  surface -- "invoke()" --> commands
+  chrome -- "invoke()" --> commands
+  core -. "typeshare: src/types/inkblot-core.ts" .-> page
 ```
+
+The bridge between the chrome and the surface runs in process, but every message is
+round-tripped through JSON (`src/bridge/transport.ts`).
 
 - **The page** (`src/`) is the whole app: the editor and everything around it.
 - **The chrome and the document surface talk through the bridge protocol**, in
@@ -28,6 +40,38 @@ in its header comment. This document covers what spans modules.
 - **`inkblot-models`** holds the on-device models.
 - **The Tauri app** wraps both crates as `#[tauri::command]`s, which the page calls
   through `invoke`.
+
+### Key abstractions
+
+| Abstraction | What it is | Where |
+|---|---|---|
+| Document kind | Text, canvas, map or timeline, from the path's suffix alone | `src/lib/docKind.js`, `inkblot-core/src/doc_kind.rs` |
+| Bridge protocol | Every message between the chrome and the surface, defined in Rust | `inkblot-core/src/bridge/`, generated into `src/types/inkblot-core.ts` |
+| Shell and surface bridges | The two typed ends of the protocol | `src/bridge/client.ts` |
+| Document surface | Handles every command and request; publishes the state the chrome draws | `src/bridge/surface.ts` |
+| Editor registry | Turns a target name (`primary`, `canvasCard`, …) into the live editor | `src/bridge/editorRegistry.ts` |
+| `TextAnchor` | A place in a document: positions plus the text they covered | `src/bridge/anchors.ts` |
+| Document layer | Load, save, per-document write lock, version history | `src/lib/FileSystem.js`, `versionStore.js`, `docLocks.ts` |
+| Entry operations | Rename, move and delete, closing what they touch first | `src/lib/entryOperations.ts` |
+| Preferences | Hydrated before the first render, read synchronously after | `src/lib/preferences.ts` |
+| Commands | The ⌘K registry every action joins | `src/lib/commands.ts` |
+| Reducers | Canvas and map state, with undo as snapshots | `src/canvas/canvasReducer.ts`, `src/map/mapReducer.ts` |
+| Timeline store | The project's one chronology, with previews and undo | `src/lib/timeline/timelineStore.js` |
+| `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/mod.rs` |
+| UI primitives | Every control the chrome is built from | `src/ui/`, [docs/DESIGN.md](docs/DESIGN.md) |
+
+### A keystroke, end to end
+
+1. TipTap applies the transaction. `DocChangeReporter` hands document changes to the
+   surface, which sends them as one `docChanged` per window of edits.
+2. `useSurfacePublisher` hears the selection or document change on the active editor
+   and publishes a fresh `toolbarState`, coalesced to one per frame. The toolbar
+   re-renders from it.
+3. `useEditorAutosave` debounces the write (800 ms) and calls `saveDocument`, which
+   takes the document's lock, carries forward what the file holds and writes
+   `<path>.json`.
+4. A slower debounce (15 s) saves again with a version appended, and
+   `versions:changed` tells the History panel.
 
 ## Data model
 
