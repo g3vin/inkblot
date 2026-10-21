@@ -19,9 +19,6 @@ import { getPreference, setPreference } from './preferences'
  */
 export const BUNDLED_FONTS = ['Literata', 'Inter', 'Courier Prime']
 
-/** The default family for new writing. See docs/DESIGN.md → Typography. */
-export const DEFAULT_EDITOR_FONT = 'Literata'
-
 /** Pinned to the top of the picker so the common choices stay one click away. */
 export const SUGGESTED_FONTS = [
   ...BUNDLED_FONTS,

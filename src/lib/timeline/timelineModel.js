@@ -259,9 +259,6 @@ export function normalizeTimeline(raw, nextId = newId) {
 
 export const createEmptyTimeline = () => normalizeTimeline({})
 
-/** Whether a parsed file is a chronology (anything with an `events` list, or empty). */
-export const isTimelinePayload = (raw) => isObject(raw) && (raw.events === undefined || Array.isArray(raw.events))
-
 /* ---------------- reading the sequence ---------------- */
 
 /** Events in sequence: by key. */
@@ -512,9 +509,6 @@ export function removeLink(timeline, id, link) {
   const key = linkKey(link)
   return mapEvent(timeline, id, (event) => ({ ...event, links: event.links.filter((existing) => linkKey(existing) !== key) }))
 }
-
-/** Every event holding a link that matches `predicate`. */
-export const eventsLinked = (timeline, predicate) => timeline.events.filter((event) => event.links.some(predicate))
 
 export function addEventNote(timeline, id, { text = '', at = null } = {}, nextId = newId) {
   const note = { id: nextId(), text, at: finite(at) }

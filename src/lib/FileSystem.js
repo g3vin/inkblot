@@ -33,7 +33,6 @@ import {
   remove,
 } from '@tauri-apps/plugin-fs'
 import { getDocKind, isTextDoc, stripDocSuffix, withDocSuffix } from './docKind'
-import { EDIT_SESSION_ID } from './versionHistory'
 import {
   FOLDER_FILE,
   ORDER_FILE,

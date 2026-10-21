@@ -66,8 +66,3 @@ export function setTimeLens(projectName, patch, source = null) {
 export function setRangeEditing(projectName, editingRanges, source = null) {
   update(projectName, { editingRanges: Boolean(editingRanges) }, source)
 }
-
-export function resetStoryCursor(projectName) {
-  if (projectName === undefined) cursors.clear()
-  else cursors.delete(projectName)
-}
