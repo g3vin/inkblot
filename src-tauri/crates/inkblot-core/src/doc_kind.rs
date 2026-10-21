@@ -70,6 +70,7 @@ pub fn is_text_doc(path: &str) -> bool {
     matches!(get_doc_kind(path), DocKind::Text)
 }
 
+/// A canvas's file name for `name`, unchanged if it already has the suffix.
 pub fn with_canvas_suffix(name: &str) -> String {
     if is_canvas_doc(name) {
         name.to_string()
@@ -78,6 +79,7 @@ pub fn with_canvas_suffix(name: &str) -> String {
     }
 }
 
+/// `name` without its canvas suffix, unchanged if it has none.
 pub fn strip_canvas_suffix(name: &str) -> String {
     if is_canvas_doc(name) {
         // The suffix is ASCII, so a byte slice is the same cut JS makes.

@@ -11,6 +11,7 @@ use std::path::Path;
 /// would otherwise produce tens of thousands of events.
 const PROGRESS_EVERY: u64 = 4 * 1024 * 1024;
 
+/// The HTTP client every model download uses.
 pub fn client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .user_agent("inkblot")

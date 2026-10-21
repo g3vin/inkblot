@@ -66,6 +66,7 @@ pub(crate) fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("no app data dir: {e}"))
 }
 
+/// Build and run the app: its plugins, managed state, setup and commands.
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

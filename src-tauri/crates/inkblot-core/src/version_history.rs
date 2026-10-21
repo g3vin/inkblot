@@ -114,6 +114,7 @@ pub fn text_words(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// Whitespace-separated words in `html_or_text`, read as HTML when `is_html`.
 pub fn count_words(html_or_text: &str, is_html: bool) -> u32 {
     let text = if is_html {
         html_to_text(html_or_text)

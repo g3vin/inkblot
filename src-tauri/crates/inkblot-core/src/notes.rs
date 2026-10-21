@@ -176,6 +176,7 @@ pub fn normalize_audio_clip(
     })
 }
 
+/// A note's voice memos; clips with no asset are dropped.
 pub fn normalize_note_audio(
     raw: &Value,
     new_id: &dyn Fn() -> String,
@@ -270,6 +271,7 @@ pub fn normalize_note(raw: &Value, defaults: &NoteDefaults) -> Note {
     }
 }
 
+/// [`normalize_note`] over a list; anything that is not an array is no notes.
 pub fn normalize_notes(raw: &Value, defaults: &NoteDefaults) -> Vec<Note> {
     raw.as_array()
         .map(|notes| {

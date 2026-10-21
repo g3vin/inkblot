@@ -42,6 +42,7 @@ pub fn join_path(parts: &[&str]) -> String {
     joined.join("/")
 }
 
+/// The folder holding `abs_path` (a trailing slash ignored); "" at the root.
 pub fn parent_of(abs_path: &str) -> String {
     let trimmed = strip_trailing_slash(abs_path);
     let mut segments: Vec<&str> = trimmed.split('/').collect();

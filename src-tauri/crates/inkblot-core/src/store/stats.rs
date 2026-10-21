@@ -276,6 +276,7 @@ impl StatsStore {
         })
     }
 
+    /// Move a project's sessions and timer runs to its new name.
     pub fn rename_project(&self, old_name: &str, new_name: &str) -> Result<()> {
         self.rewrite(|session| {
             if session.project != old_name {
@@ -372,6 +373,7 @@ impl StatsStore {
         std::fs::read_to_string(self.root.join("config.json")).ok()
     }
 
+    /// Replace the stats settings. Fails without writing unless `json` parses.
     pub fn set_config(&self, json: &str) -> Result<()> {
         serde_json::from_str::<Value>(json)?;
         let _guard = self.lock();

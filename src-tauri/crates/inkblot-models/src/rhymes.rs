@@ -134,6 +134,8 @@ impl RhymeIndex {
         )
     }
 
+    /// [`Self::rhymes_ranked`] with no ordinary-word list; `None` for a word the
+    /// dictionary does not know.
     pub fn rhymes(&self, word: &str) -> Option<Vec<String>> {
         self.rhymes_ranked(word, None)
     }
@@ -212,6 +214,8 @@ impl RhymeEngine {
         })
     }
 
+    /// Fetch the pronouncing dictionary unless it is already on disk, reporting
+    /// `progress`, and return the new status.
     pub async fn download(
         &self,
         progress: &(dyn Fn(RhymeDownloadProgress) + Send + Sync),
