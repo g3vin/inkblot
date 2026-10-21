@@ -6,7 +6,6 @@
  * here is path arithmetic plus the one lookup in projectLocations.
  */
 import { appDataDir } from '@tauri-apps/api/path'
-import { CANVAS_SUFFIX } from './docKind'
 import { getProjectLocation } from './projectLocations'
 
 export const ORDER_FILE = '.inkblot-order.json'

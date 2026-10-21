@@ -50,6 +50,3 @@ export function forgetLiveRanges(projectName, docPath) {
 }
 
 export const liveRanges = (projectName, docPath) => live.get(projectName)?.get(docPath) ?? null
-
-/** The event ids a document's ranges attach to. */
-export const rangeEventIds = (ranges) => [...new Set(ranges.map((range) => range.eventId))]
