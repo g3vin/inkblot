@@ -252,6 +252,7 @@ export function diffBlockLists(aBlocks, bBlocks) {
   return chunks
 }
 
+/** Two versions' HTML compared block by block: the chunks the compare view shows. */
 export const diffHtmlDocuments = (aHtml, bHtml) =>
   diffBlockLists(htmlToBlocks(aHtml), htmlToBlocks(bHtml))
 
