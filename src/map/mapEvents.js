@@ -72,6 +72,7 @@ export function requestMapReveal(docPath, itemId) {
   window.dispatchEvent(new CustomEvent(MAP_REVEAL_EVENT, { detail: { docPath, itemId } }))
 }
 
+/** The item a mounting map should reveal, once: taking it clears the request. */
 export function takePendingMapReveal(docPath) {
   if (pendingReveal?.docPath !== docPath) return null
   const { itemId } = pendingReveal

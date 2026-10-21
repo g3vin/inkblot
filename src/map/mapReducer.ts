@@ -87,6 +87,7 @@ const renormalize = (map: StoredMap): StoredMap =>
     throw new Error('mapReducer: an item lost its id')
   }) as StoredMap
 
+/** One edit to the document, without history. */
 export function docReducer(map: StoredMap, action: MapDocAction): StoredMap {
   switch (action.type) {
     case 'doc/replace':
@@ -138,6 +139,7 @@ export const createHistory = (map: StoredMap): MapHistory => ({
   coalesceKey: null,
 })
 
+/** `docReducer` with undo and redo: edits push a snapshot (or join a coalesced one), silent ones reset the stacks. */
 export function historyReducer(history: MapHistory, action: MapAction): MapHistory {
   if (action.type === 'history/undo') {
     if (!history.past.length) return history

@@ -42,6 +42,7 @@ export const SATELLITE_PROVIDERS = [
   { id: 'custom', label: 'Another source…', needsKey: false },
 ]
 
+/** The writer's online-maps choice, from preferences; an unknown provider reads as 'free'. */
 export function readOnlineMaps() {
   const provider = getPreference(KEYS.provider)
   return {
@@ -52,6 +53,7 @@ export function readOnlineMaps() {
   }
 }
 
+/** Merge `patch` into the choice, save it, and tell open maps (`ONLINE_MAPS_CHANGED`). */
 export function saveOnlineMaps(patch) {
   const next = { ...readOnlineMaps(), ...patch }
   setPreference(KEYS.enabled, next.enabled ? '1' : '0')
