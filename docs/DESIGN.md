@@ -654,10 +654,10 @@ FABs are 44px).
 ## 15. Migration
 
 Every surface is on the design language: tokens, `src/ui` primitives, `Icon` with
-semantic names, sentence-case copy and commands in the palette. The legacy layer is
-gone: the component aliases in `tokens.css`, the shared menu rule and bare-`<button>`
-defaults in `base.css` (the bare button is now a reset), `SFIcon` and its name table,
-and the `system_accent_color` command.
+semantic names, sentence-case copy and commands in the palette. In `base.css` a bare
+`<button>` is a reset, not a styled control. What is left is older px sizes and
+spacing (the baselined findings, §14) and about 190 bare buttons that style
+themselves; [design-handoff.md](design-handoff.md) tracks both.
 
 The conversation tile has a Brand / iMessage / Generic style switch, stored as the
 node's `style` attribute. New tiles start in Brand; tiles saved before the switch read
@@ -666,7 +666,8 @@ as iMessage so they look as they did.
 **When you touch older code:**
 
 - Replace a one-off button, menu or dialog you meet with its `src/ui` component.
-- Keep new values on tokens. `lint:design` holds the line at zero.
+- Keep new values on tokens. `lint:design` fails on any new raw value, and a file's
+  baseline only goes down (§14).
 - Write new copy to §11 and register new actions with `useCommands`.
 
 ---

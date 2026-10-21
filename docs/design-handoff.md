@@ -1,132 +1,49 @@
 # Design language — handoff
 
-Where the Quiet Studio design language stands, and what to do next. Read
-[DESIGN.md](DESIGN.md) first: it holds the rules. This file holds the state of the
-work. Update it as you go, and delete each item when it's done.
-
-_Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-migration`._
-
----
-
-## Done
-
-**Foundation** (PR g3vin/inkblot#63)
-
-- **Tokens:** `src/styles/tokens.css` is the single source of design values: warm
-  paper and ink neutrals, Ink Blue, the eight-ink palette, and the type, space, radius
-  (4/8/12), motion, shadow and glass scales.
-- **Themes:** `data-theme` is always resolved (`src/lib/theme.ts`). The accent is
-  `data-accent`, an ink id.
-- **Fonts:** Inter (UI), Literata (writing), Courier Prime (typewritten accents and
-  screenplays), bundled through `src/styles/fonts.js`.
-- **Components, command palette, showcase, docs:** `src/ui`, ⌘K, `/?design`,
-  `docs/DESIGN.md`.
-
-**Surface migration** (`refactor/design-migration`)
-
-- **Every surface is migrated:** shell, editor, inspector, settings and stats, notes
-  and bubble editor, canvas, map, Typeset and page setup, script, extensions.
-  - Pop-ups are `Menu`, `Popover` and `Sheet`; colour pickers are `InkPicker`.
-  - Switches are `FormRow` + `Toggle`.
-  - Icons are `Icon` with semantic names; node views use `iconElement()`.
-- **Raw values:** `lint:design` is at zero findings and the baseline is empty.
-  Content (exports, the printed page, map worlds and themes, conversation looks) is
-  exempt by path. See DESIGN.md §14.
-- **Toolbar:** the default document toolbar holds the essentials. A `MORE` marker in
-  the layout sends the rest behind », and writers can move it in Customize toolbar.
-- **Conversation tile:** a Brand / iMessage / Generic style switch, stored as the
-  node's `style` attribute. Older tiles read as iMessage.
-- **Commands:** new document, canvas and map; add note (⌥⌘N); focus mode; sidebar and
-  inspector; split right, split down and close split; version history; typeset; project
-  search (⇧⌘F); dictation; read aloud. All are in ⌘K.
-- **Copy:** labels, menus (the native menu bar too), titles and empty states are in
-  sentence case. Names keep their capitals.
-- **Shapes and cards:** pill radii are left only on tags, toggles and round controls.
-  Note hover cards and dot previews wear the card recipe.
-- **Retired:** the legacy token aliases, the shared menu rule, the bare-`<button>`
-  defaults (the bare button is now a reset), `SFIcon` and `sfIconNames.js`,
-  `IconButton`'s `symbol` prop, and the `system_accent_color` Tauri command.
-
-## The logo (done)
-
-The user chose the **"ib" monogram** in a brand review held in October 2026. It
-replaces the earlier *i*-plus-spray mark, which read as the "info" glyph at small
-sizes. It's "ib" in Literata ExtraBold, with the *i*'s dot replaced by an ink splash,
-black on white.
-
-- **Generator:** `docs/brand/generator/` rebuilds it. `splash.py` models the ink impact:
-  impact-angle ellipse, rim fingering, downstream bias and droplets that pinch off.
-  `generate.py` sets the letters from the font outlines and swaps each *i*'s dot for
-  the splash. It writes `src/ui/brandPaths.js`, `src/assets/brand/*.svg` and
-  `public/favicon.svg`. Its settings (`MARK`, `WORDMARK_DOT`, `ICON_SIZE`,
-  `ICON_CENTRE`) are the decisions from the review, so change them only on purpose.
-- **Settings the user picked:**
-  - The splash is large and sits close to the stem (`dot_width` 360, `dot_gap` 40).
-  - The monogram keeps its tight *i*–*b* spacing (`kern` −40). The splash moves left
-    (`dot_dx` −45) to clear the *b*, because widening the spacing loosened the
-    monogram.
-  - The mark fills 41 of the 64-unit tile.
-- **Wordmark:** "inkblot" in Courier Prime Bold with the same splash for its dot
-  (`dot_width` 330, `dot_gap` 55). The splash adds height, so `Wordmark` call sites
-  use about 1.3× their old `height` to keep the letters the same size.
-- **App icon:** optically centred. The point halfway between the ink's box centre and
-  its centre of weight sits at (32, 31.6), because the heavy letters sit low and the
-  splash high.
-- **Desktop and iOS icons:** `src-tauri/icons/` was regenerated with `npx tauri icon`
-  from `src-tauri/icons/source/`.
-  - `icon-macos-1024.png`: a Big Sur–style inset tile, transparent around it.
-  - `icon-ios-1024.png`: full-bleed and opaque. The iOS set comes from this one.
-- **Regenerating after a change:**
-  1. Run `generate.py`.
-  2. Rasterise `app-icon.svg` into the two 1024px sources. The macOS one is inset
-     100px with corners at 0.225 of the tile; the iOS one is full-bleed and opaque.
-     Use `rsvg-convert` (librsvg) or a headless browser screenshot.
-  3. Run `npx tauri icon` on each and copy `ios/` from the iOS run.
-- **Remaining:** check the icons on a real Mac and iPhone. The Android launcher icons
-  came from the macOS source (an inset tile), so revisit them if Android ships.
-
----
-
-**Panel audit** (2026-10-09, screenshots in both themes; `scripts/dev/audit.mjs`)
-
-- **Panel anatomy** (DESIGN.md §6): every inspector tab has a header row with a
-  `ScopeMenu` and `MoreMenu` (`PanelActions`), at most one `Segmented`, and sections
-  straight on the tray. The paper bands in Stats and Typeset/Print are gone; Stats went
-  from three selector rows to one, History's Typeset/Text and References' style and
-  scope moved to the header.
-- **Help:** `src/lib/help.ts`, `HelpSheet` (on the new `NavSheet`, shared with
-  Settings), "Help: …" on a right-click of anything tagged `help` / `data-help`, and
-  ⌘K → Help…. The long hints in Typeset, Print & export, Timeline, References, Stats
-  and Settings moved into topics.
-- **Primitives:** `EmptyState` (now on every empty panel; `compact`, `dropActive`),
-  `Section` (its accessory is beside the toggle, not inside it), `FormRow` (label
-  sizing, stacked fields stretch), controls and fields tinted for the tray.
-- **Icons:** one meaning, one glyph (DESIGN.md §8), enforced by `tests/unit/icons.mjs`.
-- **Shell:** the traffic lights hold one place from launch and hide with the left sidebar (`lib/trafficLights.js`,
-  `src-tauri/src/window_chrome.rs`); the card has no border; selection is lifted paper;
-  a bottom fade under the word-count capsules; the layout switch shows where it goes.
-- **Lint:** px font sizes and spacing are findings now, baselined at 792.
-- **Decided:** eyebrows are Inter bold capitals, as the sidebar titles were (§5); the
-  hairline under the card's toolbar is the one intended rule over the document (§6).
-- **Unused icons removed** from `src/ui/icons.js`; `tests/unit/icons.mjs` now fails on
-  a registered name nothing uses.
-- **`fs` scope:** `**` does not match dotfiles on macOS, so the capability names
-  Inkblot's own: `**/.inkblot-*`, `**/.assets/**`, `**/.versions/**`. Other dotfiles
-  (`~/.ssh`, `~/.config`, …) stay out of reach. Add a pattern here if the app starts
-  writing a new dot-name.
+What is left of the Quiet Studio design work, and the traps in it. Read
+[DESIGN.md](DESIGN.md) first: it holds the rules. Delete each item here when it's
+done; the history is in git and [CHANGELOG.md](../CHANGELOG.md).
 
 ## Remaining
 
-- **Logo on devices.** Check the icons on a real Mac and iPhone (see "The logo" above).
+- **Logo on devices.** Check the icons on a real Mac and iPhone. The Android launcher
+  icons came from the macOS source (an inset tile), so revisit them if Android ships.
 - **Traffic lights on a real Mac.** Check they appear in place at launch, line up with
-  the project name, hide with the sidebar, show on the hovering sidebar, and hold after a resize and fullscreen.
+  the project name, hide with the sidebar, show on the hovering sidebar, and hold
+  after a resize and fullscreen (`lib/trafficLights.js`,
+  `src-tauri/src/window_chrome.rs`).
 - **Other settings panes.** Writing, Goals, Timers and Reminders still carry
-  paragraph hints (`.settings-footer`); move them into help topics.
-- **Off-scale sizes and spacing.** 792 baselined findings (`npm run lint:design --
+  paragraph hints (`.settings-footer`); move them into help topics (`src/lib/help.ts`).
+- **Off-scale sizes and spacing.** 736 baselined findings (`npm run lint:design --
   --list`); lower them as you touch each file, then `--update-baseline`.
-- **Bare buttons.** About 200 bare `<button>`s style themselves in their component's
+- **Bare buttons.** About 190 bare `<button>`s style themselves in their component's
   stylesheet. Move them onto `Button` / `IconButton` when you're in that code anyway.
 
+## Regenerating the logo
+
+The design is in DESIGN.md §2. `docs/brand/generator/` builds it: `splash.py` models
+the ink impact, and `generate.py` sets the letters from the font outlines, swaps each
+*i*'s dot for the splash, and writes `src/ui/brandPaths.js`, `src/assets/brand/*.svg`
+and `public/favicon.svg`.
+
+Its settings are decisions from the brand review, so change them only on purpose:
+
+- `MARK`: the splash is large and close to the stem (`dot_width` 360, `dot_gap` 40).
+  The monogram keeps its tight *i*–*b* spacing (`kern` −40), and the splash moves left
+  (`dot_dx` −45) to clear the *b*; widening the spacing loosened the monogram.
+- `WORDMARK_DOT`: `dot_width` 330, `dot_gap` 55. The splash adds height, so a
+  `Wordmark` is sized about 1.3× the height its letters alone would need.
+- `ICON_SIZE`, `ICON_CENTRE`: the mark fills 41 of the 64-unit tile, and the point
+  halfway between the ink's box centre and its centre of weight sits at (32, 31.6).
+
+After a change:
+
+1. Run `generate.py`.
+2. Rasterise `app-icon.svg` into the two 1024px sources in `src-tauri/icons/source/`:
+   `icon-macos-1024.png`, inset 100px with corners at 0.225 of the tile and
+   transparent around it, and `icon-ios-1024.png`, full-bleed and opaque. Use
+   `rsvg-convert` (librsvg) or a headless browser screenshot.
+3. Run `npx tauri icon` on each, and copy `ios/` from the iOS run.
 
 ---
 
@@ -158,6 +75,14 @@ black on white.
 - **Toolbar layout ids are storage keys.** A layout saved before an item existed gets it
   through `normalizeToolbar` (`src/lib/chromeLayout.ts`); check the migrations in
   `tests/unit/chromeLayout.mjs` before changing a default.
+- **Help topics.** A control tagged `help` / `data-help` gets "Help: …" on right-click,
+  from `src/lib/help.ts`. `tests/unit/help.mjs` fails on a topic that doesn't exist.
+- **Icons.** `tests/unit/icons.mjs` fails on a registered name nothing uses, as well
+  as on an unregistered one.
+- **The `fs` scope.** `**` does not match dotfiles on macOS, so the capability names
+  Inkblot's own: `**/.inkblot-*`, `**/.assets/**`, `**/.versions/**`. Other dotfiles
+  (`~/.ssh`, `~/.config`, …) stay out of reach. Add a pattern if the app starts writing
+  a new dot-name.
 
 ---
 
