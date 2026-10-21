@@ -79,13 +79,6 @@ export function readSpaceCamera(raw) {
   }
 }
 
-/** The extent (scene units) a system's bodies reach on `positions`, for framing. */
-export function sceneReach(positions, display) {
-  let reach = 0.5
-  for (const position of positions.values()) reach = Math.max(reach, Math.hypot(...systemToScene(position, display)))
-  return reach
-}
-
 /* ---------------- one world (planet maps) ---------------- */
 
 const RAD = Math.PI / 180

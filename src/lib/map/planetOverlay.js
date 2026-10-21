@@ -118,12 +118,3 @@ export function paintOverlay(canvas, map, space, day, { selection = null, colors
     context.setLineDash([])
   }
 }
-
-/** What the overlay depends on, as a key: repaint only when it changes. */
-export const overlayKey = (map, day, selection) =>
-  JSON.stringify([
-    map.regions.filter((item) => isItemShown(map, item, day)).map((region) => [region.id, region.rings, region.fill, region.stroke, region.terrain]),
-    map.routes.filter((item) => isItemShown(map, item, day)).map((route) => [route.id, route.nodes, route.style]),
-    map.pins.map((pin) => [pin.id, pin.at]),
-    selection,
-  ])
