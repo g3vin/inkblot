@@ -755,6 +755,7 @@ pub fn new_id() -> String {
     format!("{:016x}", (nanos as u64) ^ count.wrapping_mul(0x9e37_79b9_7f4a_7c15))
 }
 
+/// [`normalize_map_with`], drawing new ids at random.
 pub fn normalize_map(raw: &Value) -> Value {
     normalize_map_with(raw, new_id)
 }

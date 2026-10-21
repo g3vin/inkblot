@@ -361,6 +361,7 @@ pub struct ProjectFile {
     pub name: String,
 }
 
+/// Every file under `node`, depth first, without the folders.
 pub fn flatten_project_files(node: &crate::types::TreeNode) -> Vec<ProjectFile> {
     let mut files = Vec::new();
     collect_files(node, &mut files);
@@ -555,6 +556,8 @@ pub fn get_panel_noun(tab: &str) -> &'static str {
     }
 }
 
+/// The search field's placeholder: "Filter" and the panel's noun in a filter scope,
+/// otherwise "Search" and the scope's label.
 pub fn get_search_placeholder(scope: SearchScope, tab: &str) -> String {
     if is_filter_scope(scope) {
         return format!("Filter {}", get_panel_noun(tab));
