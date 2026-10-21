@@ -116,6 +116,3 @@ export const relocateTypesetHistory = async (projectName, fromRel, toRel, { fold
   entry.books = books
   await write(projectName, entry)
 }
-
-/** For tests: forget every project read so far. */
-export const resetTypesetHistoryStore = () => projects.clear()
