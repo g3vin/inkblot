@@ -98,3 +98,37 @@ lead's words, the date, and the commit sha.
 - **Reason:** not given
 - **Date:** 2026-10-21
 - **Commit:** `d54b327` on `design/round-02-popups`
+
+## Round 02b: Menus ([02b-menus.md](rounds/02b-menus.md))
+
+### 02b.1 Native or in-page menus
+
+- **Options:** A control (mixed) · B right-click menus native, every menu a button opens an in-page `Menu` · C every menu native
+- **Pick:** B
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `0e717c3` on `design/round-02b-menus`
+
+### 02b.2 The » strip
+
+- **Options:** A control (a strip of icons) · B a labelled list · C tiles, three across
+- **Pick:** B
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `0e717c3` on `design/round-02b-menus`
+
+### 02b.3 A pop-up opened from a pop-up
+
+- **Options:** A control (a click inside closes both) · B they stack · C the inner one takes the outer's place · D the outer becomes the inner: its button stays pressed, the others go, the pop-up grows; that button again goes back
+- **Pick:** D, the design lead's own proposal, confirmed after it was prototyped
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `0e717c3` on `design/round-02b-menus`
+
+### 02b.4 The command palette
+
+- **Options:** A control (its own scrim and motion) · B a Dialog's scrim and behaviour · C no scrim, a launcher on the pop-up layer
+- **Pick:** B
+- **Reason:** not given
+- **Date:** 2026-10-21
+- **Commit:** `0e717c3` on `design/round-02b-menus`
