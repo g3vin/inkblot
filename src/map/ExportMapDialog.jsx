@@ -81,7 +81,7 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
     })
   }
 
-  const run = (label, task) => async () => {
+  const run = async (label, task) => {
     setBusy(true)
     setStatus(`${label}…`)
     try {
@@ -95,18 +95,18 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
     }
   }
 
-  const exportPng = run('Saving PNG', async () => {
+  const exportPng = () => run('Saving PNG', async () => {
     const { svg, width, height } = await build(scale)
     const blob = await svgToPng(svg, width, height)
     const path = await saveBytes(new Uint8Array(await blob.arrayBuffer()), name, 'png', 'PNG image')
     return path ? `Saved ${path.split('/').pop()} (${width} × ${height}).` : false
   })
-  const exportSvg = run('Saving SVG', async () => {
+  const exportSvg = () => run('Saving SVG', async () => {
     const { svg } = await build(1)
     const path = await saveBytes(new TextEncoder().encode(svg), name, 'svg', 'SVG image')
     return path ? `Saved ${path.split('/').pop()}.` : false
   })
-  const exportPdf = run('Saving PDF', async () => {
+  const exportPdf = () => run('Saving PDF', async () => {
     const { save } = await import('@tauri-apps/plugin-dialog')
     const pdfPath = await save({ defaultPath: `${name}.pdf`, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
     if (!pdfPath) return false
@@ -114,21 +114,21 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
     await printFigure({ markup: svg, widthPx: width, heightPx: height, jobName: name, pdfPath })
     return `Saved ${pdfPath.split('/').pop()}.`
   })
-  const print = run('Printing', async () => {
+  const print = () => run('Printing', async () => {
     const { svg, width, height } = await build(1)
     await printFigure({ markup: svg, widthPx: width, heightPx: height, jobName: name })
     return false
   })
-  const exportGeoJson = run('Saving GeoJSON', async () => {
+  const exportGeoJson = () => run('Saving GeoJSON', async () => {
     const text = JSON.stringify(mapToGeoJSON(map, space, { day }), null, 2)
     const path = await saveBytes(new TextEncoder().encode(text), name, 'geojson', 'GeoJSON')
     return path ? `Saved ${path.split('/').pop()}.` : false
   })
-  const exportKml = run('Saving KML', async () => {
+  const exportKml = () => run('Saving KML', async () => {
     const path = await saveBytes(new TextEncoder().encode(mapToKml(map, space, { name, day })), name, 'kml', 'KML')
     return path ? `Saved ${path.split('/').pop()}.` : false
   })
-  const exportVideo = run('Recording', async () => {
+  const exportVideo = () => run('Recording', async () => {
     const { blob, extension } = await recorder.record({
       seconds: Number(seconds),
       onProgress: (fraction) => setStatus(`Recording… ${Math.round(fraction * 100)}%`),
@@ -137,7 +137,7 @@ export default function ExportMapDialog({ open, onClose, map, projector, space, 
     const path = await saveBytes(new Uint8Array(await blob.arrayBuffer()), `${name} turntable`, extension, 'Video')
     return path ? `Saved ${path.split('/').pop()}.` : false
   })
-  const copy = run('Copying', async () => {
+  const copy = () => run('Copying', async () => {
     const { svg, width, height } = await build(scale)
     const blob = await svgToPng(svg, width, height)
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])

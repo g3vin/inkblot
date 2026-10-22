@@ -493,6 +493,18 @@ export default function FileTree({
   )
 
   // Render one tree node (file or folder) plus its drop slots and children.
+  const orderedRoot = useMemo(() => {
+    const result = applyOrderToTree(tree, { ...order })
+    return result
+  }, [tree, order])
+
+  // The tree narrowed to one kind of file, fully open while it is.
+  const shownRoot = useMemo(
+    () => (filtering ? applyTreeFilter(orderedRoot, { ...EMPTY_FILTER, kind }) : orderedRoot),
+    [filtering, orderedRoot, kind],
+  )
+  const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
+
   const renderNode = (node, depth = 0, siblings = []) => {
     if (!node) return null
     // Every decision this row makes lives in fileTreeNodeState.js; what is left
@@ -674,18 +686,6 @@ export default function FileTree({
       </MotionDiv>
     )
   }
-
-  const orderedRoot = useMemo(() => {
-    const result = applyOrderToTree(tree, { ...order })
-    return result
-  }, [tree, order])
-
-  // The tree narrowed to one kind of file, fully open while it is.
-  const shownRoot = useMemo(
-    () => (filtering ? applyTreeFilter(orderedRoot, { ...EMPTY_FILTER, kind }) : orderedRoot),
-    [filtering, orderedRoot, kind],
-  )
-  const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
 
   // What the search offers as recent files: documents as they are opened.
   useEffect(() => { noteOpened(projectName, activeDoc) }, [projectName, activeDoc])
