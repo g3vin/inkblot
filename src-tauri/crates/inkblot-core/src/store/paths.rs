@@ -12,6 +12,8 @@ use crate::doc_kind::CANVAS_SUFFIX;
 /// The file tree's stored sort order. Reserved, and never written: the order is
 /// machine-local, kept in the preference store (see `store::preferences`).
 pub const ORDER_FILE: &str = ".inkblot-order.json";
+/// Inside a folder: `{ "locked": true }` when the writer has locked it (`docLocks.ts`).
+pub const FOLDER_FILE: &str = ".inkblot-folder.json";
 
 pub const CANVAS_SUFFIX_LENGTH: usize = CANVAS_SUFFIX.len();
 
@@ -40,6 +42,7 @@ pub fn join_path(parts: &[&str]) -> String {
     joined.join("/")
 }
 
+/// The folder holding `abs_path` (a trailing slash ignored); "" at the root.
 pub fn parent_of(abs_path: &str) -> String {
     let trimmed = strip_trailing_slash(abs_path);
     let mut segments: Vec<&str> = trimmed.split('/').collect();

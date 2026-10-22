@@ -363,7 +363,7 @@ export const compileSections = (
     if (item.kind !== BookItemKind.Chapter || !section.content) return { ...section, role }
     const number = numbers.get(item.id)
     const typeLabel = TYPE_LABELS[item.chapterType as ChapterType]
-    let content = section.content
+    let content: Doc
     let label: string | null = null
     if (design) {
       label = number != null ? chapterLabel(number, { ...numbering, style: numbering?.style && numbering.style !== ChapterNumberStyle.None ? numbering.style : ChapterNumberStyle.Words, prefix: numbering?.prefix ?? 'Chapter' } as ChapterNumbering) : (typeLabel || null)

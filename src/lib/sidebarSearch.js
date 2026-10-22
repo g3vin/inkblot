@@ -1,16 +1,17 @@
 /**
- * sidebarSearch.js — the search engine behind the right sidebar's search bar.
+ * sidebarSearch.js — the search engine behind the project search and the find bar.
  *
- * The sidebar has one search bar, shared by every panel, that expands into a
- * full search surface. This module holds everything about that search which is
- * not React: how a query is turned into a matcher (literal / case / whole-word /
- * regex), how the four scopes are searched, and what the bar recommends when the
- * query is empty.
+ * There is one search, at the left sidebar's foot (and centred, ⇧⌘F). It has no
+ * scopes: what it finds is sorted into categories — the document you are in, the
+ * project's documents, its notes — the way a browser's search sorts tabs, history
+ * and bookmarks. This module holds everything about that search which is not React:
+ * how a query is turned into a matcher, how the project is walked, and recent
+ * searches. The find bar (⌘F) uses the same matcher on the open document.
  *
  * Kept free of React and of the filesystem (callers inject `listProjectTree` /
  * `loadDocument`) so the matching rules can be tested directly.
  */
-import { isCanvasDoc, isMapDoc } from './docKind'
+import { getDocDisplayName, getDocKind } from './docKind'
 import { collectCanvasMatches } from './canvasSearch'
 import { collectMapMatches } from './map/mapSearch'
 import { getPreference, setPreference, removePreference } from './preferences'
@@ -18,26 +19,18 @@ import { getPreference, setPreference, removePreference } from './preferences'
 export const MAX_RESULTS_PER_DOCUMENT = 24
 export const MAX_PROJECT_RESULTS = 120
 export const MAX_RECENT_SEARCHES = 6
+/** No category runs on past this many rows, so a common word cannot flood the card. */
+export const MAX_PER_CATEGORY = 8
 
 const PREVIEW_RADIUS = 34
 
-/**
- * Scopes, in the order they appear in the bar.
- *
- * `panel` is the default and is what the bar did before it could search: it
- * filters whatever panel is showing (clipboard entries, tiles, notes, versions).
- * Every other scope searches content and shows its own results, so the panel
- * underneath is left unfiltered.
- */
-export const SEARCH_SCOPES = [
-  { value: 'panel', label: 'This panel', hint: 'Filter what is on screen' },
-  { value: 'document', label: 'Document', hint: 'Find and replace in the open document' },
-  { value: 'notes', label: 'Notes', hint: 'Every note in the project' },
-  { value: 'files', label: 'Files', hint: 'File and folder names' },
-  { value: 'project', label: 'All documents', hint: 'Full text of every document' },
-]
+/** `detail: { query }` — ⌘F: open the inspector's search, finding `query` if there is one. */
+export const FIND_EVENT = 'inkblot:find'
+export const requestFind = (query = '') => window.dispatchEvent(new CustomEvent(FIND_EVENT, { detail: { query } }))
 
-export const isFilterScope = (scope) => scope === 'panel'
+/** ⌘F on a map: the active map opens its own search (MapSearch.jsx). */
+export const MAP_FIND_EVENT = 'inkblot:map-find'
+export const requestMapFind = () => window.dispatchEvent(new CustomEvent(MAP_FIND_EVENT))
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -234,147 +227,106 @@ const buildNotePreview = (note, matcher) => {
   return buildPreview(combined, hit.index, hit.index + hit.length)
 }
 
+const firstHit = (hits) => hits[0] || null
+
 /**
- * Search the project for the `notes`, `files`, and `project` scopes.
+ * Search the whole project at once, sorted into the card's categories.
+ *
+ * `documents` has one row per file, a name match ranked above a match in the text
+ * only, its preview the first hit in the text. `notes` has a row per matching note.
+ * The document being written in (`currentDocName`) is left out of `documents`: its
+ * hits are the card's "In this document", which the card reads from the live editor.
  *
  * Open documents are read from their live editors (via `getLiveDoc`) so unsaved
  * edits are searchable; everything else is read from disk.
  */
-export const searchProject = async ({
-  scope,
+export const searchEverything = async ({
   matcher,
   projectName,
+  currentDocName = '',
   listProjectTree,
   loadDocument,
   getLiveDoc = () => null,
   isCancelled = () => false,
+  limit = MAX_PER_CATEGORY,
 }) => {
-  if (!projectName || !matcher || matcher.isEmpty || !matcher.valid) return []
+  const empty = { documents: [], notes: [] }
+  if (!projectName || !matcher || matcher.isEmpty || !matcher.valid) return empty
 
   const tree = await listProjectTree(projectName)
-  if (isCancelled()) return []
+  if (isCancelled()) return empty
 
-  const fileEntries = flattenProjectFiles(tree)
+  const named = []
+  const inText = []
+  const notes = []
 
-  if (scope === 'files') {
-    return fileEntries
-      .filter((entry) => matcher.test(entry.path))
-      .map((entry, index) => ({
-        id: `file-${entry.path}-${index}`,
-        type: 'file-entry',
-        docName: entry.path,
-        title: entry.name,
-        path: entry.path,
-        preview: entry.path,
-      }))
-      .slice(0, MAX_PROJECT_RESULTS)
-  }
+  for (const entry of flattenProjectFiles(tree)) {
+    if (named.length >= limit && notes.length >= limit) break
 
-  let results = []
+    const kind = getDocKind(entry.path)
+    const title = getDocDisplayName(entry.path)
+    const nameMatched = matcher.test(title)
+    const row = (hit, matchCount) => ({
+      id: `doc-${entry.path}`,
+      type: 'document',
+      kind,
+      docName: entry.path,
+      title,
+      path: entry.path,
+      preview: hit?.preview || entry.path,
+      from: hit?.from,
+      to: hit?.to,
+      nodeId: hit?.nodeId,
+      matchText: hit?.matchText,
+      matchCount,
+    })
 
-  for (const entry of fileEntries) {
-    if (results.length >= MAX_PROJECT_RESULTS) break
-
-    // A canvas has no live editor to read and no notes — its text lives in
-    // cards, addressed by node id rather than by document position. Without this
-    // branch collectMatchesFromDocJson would coerce it to an empty doc and it
-    // would silently never match.
-    if (isCanvasDoc(entry.path)) {
-      if (scope === 'notes') continue
-
-      const canvasData = await loadDocument(projectName, entry.path)
-      if (isCancelled()) return []
-      if (!canvasData) continue
-
-      results.push(...collectCanvasMatches(canvasData, matcher, entry.path, {
-        limit: MAX_RESULTS_PER_DOCUMENT,
-      }))
-
-      if (results.length >= MAX_PROJECT_RESULTS) break
+    // A timeline view holds no text of its own — its events are the project's.
+    if (kind === 'timeline') {
+      if (nameMatched && entry.path !== currentDocName) named.push(row(null, 0))
       continue
     }
 
-    // A map is the same: no notes, and its text is addressed by item id.
-    if (isMapDoc(entry.path)) {
-      if (scope === 'notes') continue
+    const data = (kind === 'text' ? getLiveDoc(entry.path) : null) || await loadDocument(projectName, entry.path)
+    if (isCancelled()) return empty
 
-      const mapData = await loadDocument(projectName, entry.path)
-      if (isCancelled()) return []
-      if (!mapData) continue
+    // A canvas or a map has no notes, and its text is addressed by item id rather
+    // than by document position.
+    let hits = []
+    if (data && kind === 'canvas') hits = collectCanvasMatches(data, matcher, entry.path, { limit: MAX_RESULTS_PER_DOCUMENT })
+    else if (data && kind === 'map') hits = collectMapMatches(data, matcher, entry.path, { limit: MAX_RESULTS_PER_DOCUMENT })
+    else if (data) hits = collectMatchesFromDocJson(data.content, matcher, entry.path)
 
-      results.push(...collectMapMatches(mapData, matcher, entry.path, {
-        limit: MAX_RESULTS_PER_DOCUMENT,
-      }))
-
-      if (results.length >= MAX_PROJECT_RESULTS) break
-      continue
+    if (entry.path !== currentDocName && (nameMatched || hits.length > 0)) {
+      ;(nameMatched ? named : inText).push(row(firstHit(hits), hits.length))
     }
 
-    const docData = getLiveDoc(entry.path) || await loadDocument(projectName, entry.path)
-    if (isCancelled()) return []
-    if (!docData) continue
-
-    if (scope === 'notes') {
-      const notes = Array.isArray(docData.notes) ? docData.notes : []
-
-      results.push(...notes
+    if (kind === 'text' && data && notes.length < limit) {
+      const docNotes = Array.isArray(data.notes) ? data.notes : []
+      docNotes
         .filter((note) => matcher.test(note.anchor || '') || matcher.test(note.content || ''))
-        .map((note, index) => ({
-          id: `note-${entry.path}-${note.id || index}`,
-          type: 'note-match',
-          docName: entry.path,
-          title: note.anchor || getEntryLabel(entry.path),
-          path: entry.path,
-          preview: buildNotePreview(note, matcher),
-          note,
-        })))
-    } else {
-      results.push(...collectMatchesFromDocJson(docData.content, matcher, entry.path))
+        .forEach((note, index) => {
+          notes.push({
+            id: `note-${entry.path}-${note.id || index}`,
+            type: 'note-match',
+            kind: 'note',
+            docName: entry.path,
+            title: note.anchor || title,
+            path: entry.path,
+            preview: buildNotePreview(note, matcher),
+            note,
+          })
+        })
     }
-
-    if (results.length >= MAX_PROJECT_RESULTS) break
   }
 
-  return results.slice(0, MAX_PROJECT_RESULTS)
+  return {
+    documents: [...named, ...inText].slice(0, limit),
+    notes: notes.slice(0, limit),
+  }
 }
 
-/* ---- Recommendations & recents --------------------------------------------- */
-
-/** What each panel's own filter is actually filtering, for the bar's placeholder. */
-const PANEL_NOUNS = {
-  clipboard: 'clipboard entries',
-  workbench: 'tiles',
-  notes: 'notes on this document',
-  history: 'versions',
-}
-
-export const getPanelNoun = (tab) => PANEL_NOUNS[tab] || 'this panel'
-
-export const getSearchPlaceholder = (scope, tab) => {
-  if (isFilterScope(scope)) return `Filter ${getPanelNoun(tab)}`
-  const active = SEARCH_SCOPES.find((entry) => entry.value === scope)
-  return `Search ${(active?.label || '').toLowerCase()}`
-}
-
-/**
- * Scope suggestions shown while the query is empty, with the one most relevant
- * to the panel you are on promoted to the top (Notes while on the Notes panel).
- */
-export const getRecommendedScopes = (tab) => {
-  const promoted = tab === 'notes' ? ['notes'] : []
-
-  const order = [
-    ...promoted,
-    'document',
-    'project',
-    'notes',
-    'files',
-  ].filter((value, index, all) => all.indexOf(value) === index)
-
-  return order
-    .map((value) => SEARCH_SCOPES.find((entry) => entry.value === value))
-    .filter(Boolean)
-}
+/* ---- Recents --------------------------------------------------------------- */
 
 const RECENT_STORAGE_KEY = 'inkblot.search.recent'
 

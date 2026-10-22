@@ -25,8 +25,8 @@ export async function mapMenu(ctx) {
   if (item) {
     const kind = item.getAttribute('data-map-kind')
     if (kind === 'pin') {
-      items.push(await MenuItem.new({ text: 'Open Linked Document', action: () => run('open-item') }))
-      items.push(await MenuItem.new({ text: 'Link to Document…', action: () => run('link-item') }))
+      items.push(await MenuItem.new({ text: 'Open linked document', action: () => run('open-item') }))
+      items.push(await MenuItem.new({ text: 'Link to document…', action: () => run('link-item') }))
     }
     items.push(
       await MenuItem.new({ text: 'Rename…', action: () => run('rename-item') }),
@@ -35,10 +35,10 @@ export async function mapMenu(ctx) {
     )
   } else {
     items.push(
-      await MenuItem.new({ text: 'Add Place Here', action: () => run('add-pin') }),
-      await MenuItem.new({ text: 'Add Label Here', action: () => run('add-label') }),
+      await MenuItem.new({ text: 'Add place here', action: () => run('add-pin') }),
+      await MenuItem.new({ text: 'Add label here', action: () => run('add-label') }),
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      await MenuItem.new({ text: 'Zoom to Fit', action: () => run('zoom-to-fit') }),
+      await MenuItem.new({ text: 'Zoom to fit', action: () => run('zoom-to-fit') }),
     )
   }
 

@@ -17,7 +17,7 @@
 //! does not consider `é` a word character.
 //!
 //! So the pattern is **translated** before it is compiled: the eight JS class escapes
-//! are rewritten to the explicit sets JS means by them ([`translate_js_classes`]).
+//! are rewritten to the explicit sets JS means by them (`translate_js_classes`).
 //! What that does not cover is documented on that function, and `npm run parity`
 //! checks the whole matcher against the real `RegExp` over several hundred patterns.
 //!
@@ -83,6 +83,8 @@ pub struct Matcher {
 }
 
 impl Matcher {
+    /// Compile `query` as JS's search would. An invalid pattern still builds: check
+    /// `valid` and `error`.
     pub fn new(query: &str, options: MatcherOptions) -> Self {
         // `js_trim`, not `str::trim`: a query of nothing but a byte order mark is an
         // empty query to JS and a one-character search to Rust.
@@ -165,6 +167,7 @@ impl Matcher {
         found
     }
 
+    /// Whether `value` holds at least one match.
     pub fn test(&self, value: &str) -> bool {
         !self.find_all(value, 1).is_empty()
     }

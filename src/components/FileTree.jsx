@@ -8,7 +8,8 @@
  * the preference store. Other parts of the app talk to it through `filetree:*`
  * window events (new-entry, refresh-projects, folders-visibility, …).
  */
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   listProjects,
@@ -18,14 +19,16 @@ import {
 } from '../lib/FileSystem'
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
+import { IconButton, Inlay, InlaySlot, popUpNativeMenu } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
-import { EMPTY_FILTER, applyTreeFilter, folderPaths, isFilterActive } from '../lib/treeFilter'
-import { noteOpened, recentDocs } from '../lib/recentDocs'
-import TreeFilterBar from './tree/TreeFilterBar'
+import { EMPTY_FILTER, TREE_KINDS, applyTreeFilter, folderPaths } from '../lib/treeFilter'
+import { noteOpened } from '../lib/recentDocs'
+import { lockReason, refreshLocks, useLocks } from '../lib/docLocks'
+import { openFolderPresets, useFolderPresets } from '../lib/folderPresets'
+import { inkColor } from '../lib/palette'
 import {
-  STORY_FOLDER_PRESETS,
   getStoryFolderAncestor,
   getStoryFolderPresetByKey,
 } from '../lib/storyStructure'
@@ -54,6 +57,12 @@ import {
 } from '../lib/fileTreeState'
 
 
+
+/** Marks a scrolled list, so its stuck folder rows know to cover what passes under them. */
+const markScrolled = (event) => {
+  event.currentTarget.toggleAttribute('data-scrolled', event.currentTarget.scrollTop > 0)
+}
+
 export default function FileTree({
   projectName,
   currentDoc,
@@ -63,14 +72,22 @@ export default function FileTree({
   onSelectDoc,
   onSelectProject,
   registerRefreshFiles,
+  // Where the + goes: under the list when not given; into this element
+  // when given (the left sidebar keeps them at its foot, still while Files and Book
+  // swipe past above); nowhere when null (the book has the foot).
+  footerSlot,
 }) {
   const prefersReducedMotion = useReducedMotion()
+  const locks = useLocks()
+  const presets = useFolderPresets()
   const [view, setView] = useState('files')
   const [projects, setProjects] = useState([])
   const [tree, setTree] = useState({ type: 'folder', name: '', path: '', children: [] })
   const [expanded, setExpanded] = useState(new Set(['']))
-  const [filter, setFilter] = useState(EMPTY_FILTER)
-  const filtering = isFilterActive(filter)
+  // Which kinds of file the tree shows (the + menu's Show). Finding by name is the
+  // search's, beside the + at the sidebar's foot.
+  const [kind, setKind] = useState('all')
+  const filtering = kind !== 'all'
   const [order, setOrder] = useState({})
   const [isAddingEntry, setIsAddingEntry] = useState(false)
   const [newEntryName, setNewEntryName] = useState('')
@@ -81,14 +98,12 @@ export default function FileTree({
   const [isAddingProject, setIsAddingProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectLocation, setNewProjectLocation] = useState(null)
-  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
   const [dragOverPath, setDragOverPath] = useState(null)
   const [dragInsert, setDragInsert] = useState(null)
   const [dragOverFolder, setDragOverFolder] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragPreview, setDragPreview] = useState(null)
   const [dragSourceId, setDragSourceId] = useState(null)
-  const createMenuRef = useRef(null)
   const manualDragRef = useRef(null)
   const manualDragActiveRef = useRef(false)
   const dragInsertRef = useRef(null)
@@ -113,6 +128,8 @@ export default function FileTree({
     orderRef.current = nextOrder
     setOrder(nextOrder)
     setTree(orderedTree)
+    // Whatever changed the tree may have moved, copied or removed something locked.
+    void refreshLocks(projectName)
   }, [projectName])
 
   useEffect(() => {
@@ -213,7 +230,6 @@ export default function FileTree({
     setNewEntryParent(parent)
     setNewEntryName('')
     setIsAddingEntry(true)
-    setIsCreateMenuOpen(false)
     // The name box renders among the folder's children, which only exist while
     // the folder is open.
     if (parent) expandPath(parent)
@@ -229,17 +245,16 @@ export default function FileTree({
   }, [updateOrder])
 
   const createStoryFolder = useCallback(async (presetKey, parent = '') => {
-    const preset = getStoryFolderPresetByKey(presetKey)
+    const preset = getStoryFolderPresetByKey(presetKey, presets)
     if (!preset || !projectName) return
 
     const path = parent ? `${parent}/${preset.name}` : preset.name
     await createFolder(projectName, path)
     ensureOrderItem(parent || '', `folder:${path}`)
     setIsAddingEntry(false)
-    setIsCreateMenuOpen(false)
     await refreshTree()
     expandPath(path)
-  }, [ensureOrderItem, expandPath, projectName, refreshTree])
+  }, [ensureOrderItem, expandPath, presets, projectName, refreshTree])
 
   // Listen for new entry or rename events
   useEffect(() => {
@@ -255,7 +270,6 @@ export default function FileTree({
         setRenameValue(stripDocSuffix(detail.name))
         setIsAddingEntry(false)
         setIsAddingProject(false)
-        setIsCreateMenuOpen(false)
         return
       }
       if (detail.presetKey) {
@@ -267,17 +281,6 @@ export default function FileTree({
     window.addEventListener('filetree:new-entry', handler)
     return () => window.removeEventListener('filetree:new-entry', handler)
   }, [beginNewEntry, createStoryFolder])
-
-  useEffect(() => {
-    const handlePointerDown = (event) => {
-      if (!createMenuRef.current?.contains(event.target)) {
-        setIsCreateMenuOpen(false)
-      }
-    }
-
-    window.addEventListener('pointerdown', handlePointerDown)
-    return () => window.removeEventListener('pointerdown', handlePointerDown)
-  }, [])
 
   const confirmNewEntry = async () => {
     if (!newEntryName.trim()) return
@@ -461,7 +464,9 @@ export default function FileTree({
               ? 'Canvas name...'
               : newEntryType === 'map'
                 ? 'Map name...'
-                : 'File name...'
+                : newEntryType === 'timeline'
+                  ? 'Timeline name...'
+                  : 'File name...'
         }
       />
     </div>
@@ -488,6 +493,18 @@ export default function FileTree({
   )
 
   // Render one tree node (file or folder) plus its drop slots and children.
+  const orderedRoot = useMemo(() => {
+    const result = applyOrderToTree(tree, { ...order })
+    return result
+  }, [tree, order])
+
+  // The tree narrowed to one kind of file, fully open while it is.
+  const shownRoot = useMemo(
+    () => (filtering ? applyTreeFilter(orderedRoot, { ...EMPTY_FILTER, kind }) : orderedRoot),
+    [filtering, orderedRoot, kind],
+  )
+  const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
+
   const renderNode = (node, depth = 0, siblings = []) => {
     if (!node) return null
     // Every decision this row makes lives in fileTreeNodeState.js; what is left
@@ -496,6 +513,7 @@ export default function FileTree({
       dragName,
       hasEntryIcon,
       iconFilled,
+      iconInk,
       iconName,
       isDragOver,
       isDragSource,
@@ -521,11 +539,15 @@ export default function FileTree({
       expanded: shownExpanded,
       isAddingEntry,
       newEntryParent,
+      presets,
       renamingEntry,
       secondaryDoc,
       siblings,
       splitView,
     })
+    // Locked itself, or inside a locked folder (docLocks.ts), which marks it more quietly.
+    const lock = lockReason(node.path, locks)
+    const lockInherited = lock?.by === 'folder' && lock.folder !== node.path
 
     return (
       <MotionDiv
@@ -593,17 +615,20 @@ export default function FileTree({
           }}
         >
           {hasEntryIcon ? (
-            <SFIcon
-              name={iconName}
-              filled={iconFilled}
-              className="file-item-icon"
-            />
+            <Icon name={iconName} active={iconFilled} className="file-item-icon" style={iconInk ? { color: inkColor(iconInk) } : undefined} />
           ) : null}
           {isRenaming ? (
             renderRenameInput({ marginLeft: hasEntryIcon ? 4 : 0, minWidth: 80 })
           ) : (
             <span className="file-item-label">{label}</span>
           )}
+          {lock && !isRenaming ? (
+            <Icon
+              name="lock"
+              label={lockInherited ? `Locked with “${lock.folder.split('/').pop()}”` : 'Locked'}
+              className={`file-item-lock${lockInherited ? ' is-inherited' : ''}`}
+            />
+          ) : null}
 
           <AnimatePresence initial={false}>
             {showFolderDivider ? (
@@ -662,35 +687,25 @@ export default function FileTree({
     )
   }
 
-  const orderedRoot = useMemo(() => {
-    const result = applyOrderToTree(tree, { ...order })
-    return result
-  }, [tree, order])
-
-  // The filter bar's view of the tree, fully open while it filters.
-  const shownRoot = useMemo(
-    () => (filtering ? applyTreeFilter(orderedRoot, filter, recentDocs(projectName)) : orderedRoot),
-    [filtering, orderedRoot, filter, projectName],
-  )
-  const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
-
-  // What the clock button filters to: documents as they are opened.
+  // What the search offers as recent files: documents as they are opened.
   useEffect(() => { noteOpened(projectName, activeDoc) }, [projectName, activeDoc])
 
   // Expand or collapse every folder: all open unless all already are.
+  const allFoldersOpen = useCallback(
+    () => [...folderPaths(orderedRoot)].every((path) => expandedRef.current.has(path)),
+    [orderedRoot],
+  )
   const toggleAllFolders = useCallback(() => {
-    const all = folderPaths(orderedRoot)
-    const allOpen = [...all].every((path) => expandedRef.current.has(path))
-    const next = allOpen ? new Set(['']) : all
+    const next = allFoldersOpen() ? new Set(['']) : folderPaths(orderedRoot)
     expandedRef.current = next
     setExpanded(next)
-  }, [orderedRoot])
+  }, [allFoldersOpen, orderedRoot])
 
   // Contextual create button: while a document inside a story-preset folder is
   // open, offer a sibling of the same kind ("New Character" in Characters/…).
   const storyFolderContext = useMemo(
-    () => getStoryFolderAncestor(activeDoc || currentDoc || ''),
-    [activeDoc, currentDoc]
+    () => getStoryFolderAncestor(activeDoc || currentDoc || '', presets),
+    [activeDoc, currentDoc, presets]
   )
 
   useEffect(() => {
@@ -698,6 +713,58 @@ export default function FileTree({
     if (currentDoc) expandPath(getParentPath(currentDoc))
     if (splitView === 'editor' && secondaryDoc) expandPath(getParentPath(secondaryDoc))
   }, [projectName, currentDoc, secondaryDoc, splitView, expandPath])
+
+  // Everything that can be added at the top of the project, as a native menu: the
+  // kinds, then a sibling for the story folder being written in ("New character"),
+  // then the story folders. Under them, how the tree is shown: every folder open or
+  // shut, and which kinds of file it lists.
+  const openNewMenu = (event) => {
+    const contextLabel = storyFolderContext?.preset.entryLabel.toLowerCase()
+    popUpNativeMenu(event, [
+      { text: 'New document', action: () => beginNewEntry('file', '') },
+      { text: 'New canvas', action: () => beginNewEntry('canvas', '') },
+      { text: 'New map', action: () => beginNewEntry('map', '') },
+      { text: 'New timeline', action: () => beginNewEntry('timeline', '') },
+      { text: 'New folder', action: () => beginNewEntry('folder', '') },
+      { separator: true },
+      storyFolderContext
+        ? { text: `New ${contextLabel}`, action: () => beginNewEntry('file', storyFolderContext.path) }
+        : null,
+      {
+        text: 'New story folder',
+        items: [
+          ...presets.map((preset) => ({
+            text: preset.name,
+            action: () => { void createStoryFolder(preset.key, '') },
+          })),
+          { separator: true },
+          { text: 'Edit folder types…', action: () => openFolderPresets() },
+        ],
+      },
+      { separator: true },
+      { text: allFoldersOpen() ? 'Collapse all folders' : 'Expand all folders', action: toggleAllFolders },
+      {
+        text: 'Show',
+        items: TREE_KINDS.map(({ value, label }) => ({ text: label, checked: kind === value, action: () => setKind(value) })),
+      },
+    ])
+  }
+
+  const footer = (
+    <InlaySlot className="file-tree-footer">
+      <Inlay round>
+        <IconButton
+          icon="add"
+          label="New…"
+          title="Add a document, canvas, map, timeline or folder"
+          size="circle"
+          className="file-tree-new"
+          aria-haspopup="menu"
+          onClick={openNewMenu}
+        />
+      </Inlay>
+    </InlaySlot>
+  )
 
   return (
     <div
@@ -713,93 +780,20 @@ export default function FileTree({
       }}
       onDrop={(e) => handleDrop(e, null, '')}
     >
-      <div className="file-tree-header">
-        {view === 'files' ? (
-          <div className="file-tree-actions" ref={createMenuRef}>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('file', '')}
-              title="New document"
-              aria-label="New document"
-            >
-              <SFIcon name="doc" />
-            </button>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('canvas', '')}
-              title="New canvas"
-              aria-label="New canvas"
-            >
-              <SFIcon name="canvas" />
-            </button>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('map', '')}
-              title="New map"
-              aria-label="New map"
-            >
-              <SFIcon name="map" />
-            </button>
-            <button
-              className="file-tree-action"
-              onClick={() => beginNewEntry('folder', '')}
-              title="New folder"
-              aria-label="New folder"
-            >
-              <SFIcon name="folder" />
-            </button>
-            <button
-              className="file-tree-action"
-              onClick={() => setIsCreateMenuOpen(open => !open)}
-              title="Other…"
-              aria-label="Other"
-              aria-expanded={isCreateMenuOpen}
-            >
-              <SFIcon name="ellipsis" />
-            </button>
-
-            {storyFolderContext ? (
-              <button
-                className="file-tree-action file-tree-action-smart"
-                onClick={() => beginNewEntry('file', storyFolderContext.path)}
-                title={`New ${storyFolderContext.preset.entryLabel}`}
-                aria-label={`New ${storyFolderContext.preset.entryLabel}`}
-              >
-                <SFIcon name={storyFolderContext.preset.fileIcon} />
-              </button>
-            ) : null}
-
-            {isCreateMenuOpen && (
-              <div className="file-tree-create-menu">
-                {STORY_FOLDER_PRESETS.map(preset => (
-                  <button
-                    key={preset.key}
-                    className="file-tree-create-option"
-                    onClick={() => {
-                      void createStoryFolder(preset.key, '')
-                    }}
-                  >
-                    <SFIcon name={preset.folderIcon} className="file-tree-create-icon" />
-                    <span>{preset.menuLabel}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <span className="file-tree-title">Projects</span>
-            <button
-              className="file-tree-add"
-              onClick={() => setIsAddingProject(true)}
-              aria-label="New project"
-              title="New project"
-            >
-              <SFIcon name="plus" />
-            </button>
-          </>
-        )}
-      </div>
+      {/* A project's files add from the + at the sidebar's foot; the projects list from here. */}
+      {view === 'projects' ? (
+        <div className="file-tree-header">
+          <span className="file-tree-title">Projects</span>
+          <button
+            className="file-tree-add"
+            onClick={() => setIsAddingProject(true)}
+            aria-label="New project"
+            title="New project"
+          >
+            <Icon name="add" />
+          </button>
+        </div>
+      ) : null}
 
       {view === 'projects' && (
         <>
@@ -829,7 +823,7 @@ export default function FileTree({
                 onClick={chooseNewProjectLocation}
                 title={newProjectLocation || 'Stored in the app’s default location'}
               >
-                <SFIcon name="folder" className="new-project-location-icon" />
+                <Icon name="folder" className="new-project-location-icon" />
                 <span className="new-project-location-label">
                   {newProjectLocation
                     ? newProjectLocation.split('/').filter(Boolean).pop()
@@ -858,7 +852,7 @@ export default function FileTree({
                       handleSelectProject(project)
                     }}
                   >
-                    <SFIcon name="folder" className="file-item-icon" />
+                    <Icon name="folder" className="file-item-icon" />
                     {isRenamingProject ? (
                       renderRenameInput({ marginLeft: 4, minWidth: 80 })
                     ) : (
@@ -874,11 +868,12 @@ export default function FileTree({
 
       {view === 'files' && (
         <>
-          <MotionDiv className="file-list" layout>
+          {/* Stuck folders paint a background only once the list has scrolled under them. */}
+          <MotionDiv className="file-list" layout onScroll={markScrolled}>
             {isAddingEntry && newEntryParent === '' && renderNewEntryInput()}
             {(shownRoot.children || []).length === 0 ? (
               <div className="file-tree-empty">
-                {!filtering ? 'No files yet.' : filter.recentOnly && !recentDocs(projectName).length ? 'No Recent Files' : 'No Matching Files'}
+                {!filtering ? 'No files yet.' : `No ${TREE_KINDS.find((entry) => entry.value === kind)?.label.toLowerCase()} yet.`}
               </div>
             ) : (
               <AnimatePresence initial={false}>
@@ -889,7 +884,7 @@ export default function FileTree({
               </AnimatePresence>
             )}
           </MotionDiv>
-          <TreeFilterBar filter={filter} onChange={setFilter} onToggleFolders={toggleAllFolders} />
+          {footerSlot === undefined ? footer : footerSlot ? createPortal(footer, footerSlot) : null}
         </>
       )}
 
@@ -909,11 +904,7 @@ export default function FileTree({
             }}
           >
             {dragPreview.iconName ? (
-              <SFIcon
-                name={dragPreview.iconName}
-                filled={dragPreview.iconFilled}
-                className="file-item-icon"
-              />
+              <Icon name={dragPreview.iconName} active={dragPreview.iconFilled} className="file-item-icon" />
             ) : null}
             <span className="file-tree-drag-ghost-label">{dragPreview.name}</span>
           </MotionDiv>

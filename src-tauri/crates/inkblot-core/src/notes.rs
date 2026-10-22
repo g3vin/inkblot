@@ -176,6 +176,7 @@ pub fn normalize_audio_clip(
     })
 }
 
+/// A note's voice memos; clips with no asset are dropped.
 pub fn normalize_note_audio(
     raw: &Value,
     new_id: &dyn Fn() -> String,
@@ -270,6 +271,7 @@ pub fn normalize_note(raw: &Value, defaults: &NoteDefaults) -> Note {
     }
 }
 
+/// [`normalize_note`] over a list; anything that is not an array is no notes.
 pub fn normalize_notes(raw: &Value, defaults: &NoteDefaults) -> Vec<Note> {
     raw.as_array()
         .map(|notes| {
@@ -401,10 +403,8 @@ mod tests {
 
     #[test]
     fn a_note_that_is_not_an_object_is_still_a_note() {
-        // JS throws here. `normalizeNote(note = {})` defaults on `undefined` and not on
-        // `null`, so a document whose `notes` array holds a null crashes on load,
-        // despite the function being documented as safe for untrusted data. Nothing is
-        // gained by reproducing that, so this returns the same note `{}` would.
+        // A corrupt document's `notes` can hold anything. Each is the note `{}` would
+        // be, on both sides (the parity corpus compares these).
         for raw in [json!(null), json!("not a note"), json!(7), json!([])] {
             let note = normalize_note(&raw, &defaults());
             assert_eq!(note.id, "generated");

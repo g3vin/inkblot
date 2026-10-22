@@ -61,7 +61,11 @@
  *          one blur token, no prefers-color-scheme duplicates
  *   ui     the shared controls (src/ui): reorder and placement math, native menus,
  *          and the controls mounted
- *   icons  every SF-style icon name in src/ resolves to a registered Phosphor icon
+ *   icons  every icon name in src/ is registered in src/ui/icons.js, and each means one
+ *          thing: trash deletes, × closes, the magnifier finds, no glyph has two names
+ *   help   every help topic a control points at exists in src/lib/help.ts
+ *   conversation  a chat tile's style (Inkblot, iMessage, Generic), its legacy look,
+ *          its snapshot, and the DOM icon helper node views draw with
  *   chromeLayout what the toolbars and the inspector hold: the item ids, default sets,
  *          and every migration a saved layout goes through
  *   toolbar the toolbars drawn from their layouts: every item renders disabled with no
@@ -75,6 +79,20 @@
  *   tabbar the tab bar: drawn from tabsChanged, commands, shortcuts, names
  *   book   the Book navigator: the book's rows, commands, where a drop lands
  *   notegeom where a note's hover card goes
+ *   timeline the story's chronology: sequence keys, dated and undated events in one order,
+ *          the lens, flashbacks in the manuscript, renames followed, undo across
+ *          files, and passages kept on their words in a real editor and on disk
+ *   spaceswipe the sidebars' swipe between panels: one panel per flick, several when
+ *          held, and the momentum after a lift swallowed
+ *   locks  locked documents and folders: the flag kept through every save, folder
+ *          markers, the editor and the canvas and map refusing edits, the badge
+ *   keys   keyboard shortcuts: the notation, rebinding, conflicts, the one key
+ *          handler, and Settings ▸ Shortcuts recording a new one
+ *   tables cell fills and table borders in the document and the exports, and the
+ *          table toolbar's tools
+ *   presets the writer's own folder types: matching, saved with the project, the sheet
+ *   updates after an update: once per version, highlights from a release, the banner
+ *   windows a tab dragged out into a window of its own, put back, kept on top
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -93,7 +111,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'icons', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows']
 
 const failures = []
 

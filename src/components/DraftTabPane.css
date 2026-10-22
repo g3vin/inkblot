@@ -31,7 +31,7 @@
   align-items: flex-start;
   gap: 4px;
   padding: 16px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--control-bg);
   color: var(--text-secondary);
@@ -71,7 +71,7 @@
   flex: 1;
   min-width: 0;
   padding: 9px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--surface-1);
   color: var(--text-primary);
@@ -86,7 +86,7 @@
 
 .draft-pane-create {
   padding: 9px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--accent-border);
   background: var(--accent-surface);
   color: var(--accent-foreground);

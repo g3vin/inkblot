@@ -16,8 +16,8 @@ use typeshare::typeshare;
 
 use super::common::{EditorTarget, TextAnchor, WritingFormat};
 use crate::types::page_setup::{
-    AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, CoverFit, CoverPart, RunningText, GeneratedKind, MatterKind, PageOptions, PageSetup,
-    PrintTypography,
+    AuthorProfile, BookItemKind, BookSettings, ChapterDesign, ChapterMeta, ChapterType, CoverFit,
+    CoverPart, GeneratedKind, MatterKind, PageOptions, PageSetup, PrintTypography, RunningText,
 };
 
 #[typeshare]
@@ -478,11 +478,12 @@ pub struct PreviewTypesetVersionCommand {
 
 /// The window's mode: writing a draft, or setting it as a book.
 ///
-/// Write shows every text pane as the continuous editor in the writer's own font, with
-/// the file tree and the drafting panels. Typeset shows every text pane as the pages it
-/// will print on, with the book's navigator in place of the file tree, the typeset
-/// toolbar and panels, and the chapters' prose locked — it is edited in Write, where
-/// proofing happens. The page owns the mode; the shell asks for a change.
+/// Write is where the prose is written, with the drafting toolbar and panels: as the
+/// continuous editor, or — with its page view on (`SetPrintLayoutCommand`) — on the
+/// pages it will print on. Typeset always shows the pages, set as the book, with the
+/// typeset toolbar and panels and the chapters' prose locked — it is edited in Write,
+/// where proofing happens. Either mode can show the book's navigator in place of the
+/// file tree. The page owns the mode; the shell asks for a change.
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -657,8 +658,9 @@ pub struct AddProjectFontCommand {
     pub path: String,
 }
 
-/// Show a document as pages, or as the continuous editor: the one named — a pane's own
-/// toggle names the document in it — or else the active one.
+/// Write's page view on or off: the prose written on its pages, or in the continuous
+/// editor. Typeset always shows pages, so turning them off there goes back to Write.
+/// The view is the project's; `doc_path` is accepted for the shells that name one.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1051,7 +1053,8 @@ pub struct SetHeadImageCommand {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PageLayoutState {
-    /// Whether the active pane shows pages.
+    /// Whether the active pane shows pages: always in Typeset, and in Write while its
+    /// page view is on.
     pub enabled: bool,
     /// Write or Typeset, for the whole window.
     #[serde(default)]

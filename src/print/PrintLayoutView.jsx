@@ -34,6 +34,7 @@ import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, snapToDeviceP
 import { PAGE_GAP } from './printLayoutConstants'
 import { setCurrentPrintPage } from './printLayoutStore'
 import TypesetOverlay from './TypesetOverlay'
+import { Icon } from '../ui'
 import { notesBySlot, pageNotesOf } from './notes'
 import { bleedPicturesOf } from './bleed'
 import './PrintLayout.css'
@@ -58,6 +59,12 @@ const chapterAt = (headings, pos, fallback) => {
   }
   return text
 }
+
+/** Where `sizer` starts in `scrollEl`'s content. Not its offsetTop, which counts only
+ *  from the print layout: in a book, the chapters before sit above that. */
+const topInScroller = (sizer, scrollEl) => (
+  sizer.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top - scrollEl.clientTop + scrollEl.scrollTop
+)
 
 export default function PrintLayoutView({
   editor,
@@ -106,7 +113,7 @@ export default function PrintLayoutView({
     let live = true
     loadTypographyFont(setup.typography).then(() => { if (live) setFontsLoaded((n) => n + 1) })
     return () => { live = false }
-  }, [typeKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [typeKey]) // eslint-disable-line react-hooks/exhaustive-deps -- `typeKey` names the typography
 
   // The notes, as plain values: the frame must not change unless they do.
   const atFoot = notes ? Boolean(notes.footnotes) : true
@@ -171,7 +178,7 @@ export default function PrintLayoutView({
     setupUsesToken(setup, 'words') && editor && !editor.isDestroyed
       ? describeWordCount(countEditorWords(editor))
       : ''
-  ), [editor, result, setup]) // eslint-disable-line react-hooks/exhaustive-deps
+  ), [editor, result, setup]) // eslint-disable-line react-hooks/exhaustive-deps -- `result` re-counts after a layout; the editor object does not change
 
   // The notes at each page's foot: those whose marks the page holds.
   const footnotes = useMemo(() => {
@@ -226,7 +233,8 @@ export default function PrintLayoutView({
   useEffect(() => {
     if (!scrollEl) return undefined
     const onScroll = () => {
-      const stageTop = scrollEl.querySelector('.pl-sizer')?.offsetTop || 0
+      const sizer = scrollEl.querySelector('.pl-sizer')
+      const stageTop = sizer ? topInScroller(sizer, scrollEl) : 0
       const y = (scrollEl.scrollTop - stageTop + scrollEl.clientHeight / 3) / (zoomRef.current || 1)
       const strip = Math.max(0, Math.min(stripCount - 1, Math.floor(y / slotStride)))
       setCurrentPage((galley ? Math.floor(strip / setup.columns) : strip) + 1)
@@ -264,9 +272,13 @@ export default function PrintLayoutView({
 
   const liveZoom = () => (liveRef.current ? liveRef.current.base * liveRef.current.s : zoomRef.current || 1)
 
+  // What the transform scales: the sizer, or in a book the whole book, whose other
+  // chapters' pages (BookPages.jsx) change size with the zoom too.
+  const zoomSurface = () => sizerRef.current?.closest('.book-pages') || sizerRef.current
+
   /** Draws the pages at `next`, keeping the screen point (ax, ay) where it is. */
   const zoomVisual = useCallback((next, ax, ay) => {
-    const sizer = sizerRef.current
+    const sizer = zoomSurface()
     if (!sizer) return
     let live = liveRef.current
     if (!live) {
@@ -302,31 +314,36 @@ export default function PrintLayoutView({
     sizer.style.transform = `translate(${live.tx}px, ${live.ty}px) scale(${live.s})`
   }, [])
 
-  /** Scrolls the laid-out pages to where the transform last drew them, and drops it. */
+  /**
+   * Scrolls the laid-out pages to where the transform last drew them, and drops it.
+   * It lines up the sizer itself, on screen: what lies around it (the desk's padding,
+   * centring) doesn't scale with the zoom, so working it out from offsets drifted.
+   */
   const settle = useCallback((pending) => {
     const sizer = sizerRef.current
-    if (!sizer || !scrollEl) return
-    sizer.classList.remove('is-zooming', 'is-settling')
-    sizer.style.transform = ''
-    const wantTop = pending.scrollTop + (sizer.offsetTop - pending.offsetTop) - pending.ty
-    const wantLeft = pending.scrollLeft + (sizer.offsetLeft - pending.offsetLeft) - pending.tx
-    scrollEl.scrollTop = wantTop
-    scrollEl.scrollLeft = wantLeft
+    const surface = zoomSurface()
+    if (!sizer || !surface || !scrollEl) return
+    surface.classList.remove('is-zooming', 'is-settling')
+    surface.style.transform = ''
+    const laid = sizer.getBoundingClientRect()
+    scrollEl.scrollTop += laid.top - pending.y
+    scrollEl.scrollLeft += laid.left - pending.x
     // The scroll range could not take it all — the document's top, or pages that now
     // fit across and centre. Ease the rest in rather than jump.
-    const dx = scrollEl.scrollLeft - wantLeft
-    const dy = scrollEl.scrollTop - wantTop
+    const now = sizer.getBoundingClientRect()
+    const dx = pending.x - now.left
+    const dy = pending.y - now.top
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
-    sizer.style.transform = `translate(${dx}px, ${dy}px)`
-    void sizer.offsetWidth
-    sizer.classList.add('is-settling')
-    sizer.style.transform = ''
+    surface.style.transform = `translate(${dx}px, ${dy}px)`
+    void surface.offsetWidth
+    surface.classList.add('is-settling')
+    surface.style.transform = ''
     const done = (event) => {
-      if (event.target !== sizer) return
-      sizer.removeEventListener('transitionend', done)
-      if (!liveRef.current) sizer.classList.remove('is-settling')
+      if (event.target !== surface) return
+      surface.removeEventListener('transitionend', done)
+      if (!liveRef.current) surface.classList.remove('is-settling')
     }
-    sizer.addEventListener('transitionend', done)
+    surface.addEventListener('transitionend', done)
   }, [scrollEl])
 
   /** Ends the zoom in progress: one layout at the new zoom, then `settle`. */
@@ -339,15 +356,9 @@ export default function PrintLayoutView({
     const target = clampZoom(live.base * live.s)
     zoomVisual(target, live.ax, live.ay)
     liveRef.current = null
-    const pending = {
-      zoom: target,
-      tx: live.tx,
-      ty: live.ty,
-      scrollTop: scrollEl.scrollTop,
-      scrollLeft: scrollEl.scrollLeft,
-      offsetTop: sizer.offsetTop,
-      offsetLeft: sizer.offsetLeft,
-    }
+    // Where the transform drew the sizer, for `settle` to put the laid-out one.
+    const drawn = sizer.getBoundingClientRect()
+    const pending = { zoom: target, x: drawn.left, y: drawn.top }
     if (target === zoomRef.current) {
       settle(pending)
       return
@@ -507,7 +518,8 @@ export default function PrintLayoutView({
     if (!scrollEl) return
     commitZoom()
     const strip = galley ? (page - 1) * setup.columns : page - 1
-    const stageTop = scrollEl.querySelector('.pl-sizer')?.offsetTop || 0
+    const sizer = scrollEl.querySelector('.pl-sizer')
+    const stageTop = sizer ? topInScroller(sizer, scrollEl) : 0
     scrollEl.scrollTo({ top: stageTop + strip * slotStride * (zoomRef.current || 1) - 16, behavior: 'smooth' })
   }, [commitZoom, galley, scrollEl, setup.columns, slotStride])
 
@@ -552,23 +564,28 @@ export default function PrintLayoutView({
   const zoomBar = (
     <div className="pl-status" role="toolbar" aria-label="Zoom">
       <button type="button" onClick={() => stepZoom(-1)} aria-label="Zoom out" title="Zoom out (⌘−)">−</button>
-      <select
-        value=""
-        onChange={(event) => {
-          const v = event.target.value
-          if (v === 'width' || v === 'page') fit(v)
-          else if (v) applyZoom(Number(v))
-        }}
-        aria-label="Zoom"
-        title="Zoom"
-      >
-        <option value="" hidden>{Math.round(zoom * 100)}%</option>
-        <option value="width">Fit width</option>
-        <option value="page">Fit page</option>
-        {ZOOM_STEPS.map((s) => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}
-      </select>
+      {/* The native menu, laid invisibly over its label: a select is as wide as its
+          longest option, so on its own its arrows would sit past "Fit width". */}
+      <span className="pl-zoom-select">
+        <span aria-hidden="true">{Math.round(zoom * 100)}%<Icon name="chevron-up-down" /></span>
+        <select
+          value=""
+          onChange={(event) => {
+            const v = event.target.value
+            if (v === 'width' || v === 'page') fit(v)
+            else if (v) applyZoom(Number(v))
+          }}
+          aria-label="Zoom"
+          title="Zoom"
+        >
+          <option value="" hidden>{Math.round(zoom * 100)}%</option>
+          <option value="width">Fit width</option>
+          <option value="page">Fit page</option>
+          {ZOOM_STEPS.map((s) => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}
+        </select>
+      </span>
       <button type="button" onClick={() => stepZoom(1)} aria-label="Zoom in" title="Zoom in (⌘+)">+</button>
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} title="Page Setup">Page Setup…</button>
+      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} aria-label="Page setup" title="Page setup"><Icon name="settings" /></button>
     </div>
   )
   const pageCountHost = statusHost?.querySelector(':scope > .pane-status') || null

@@ -30,6 +30,7 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.format.numbered-list': D.NumberedListItem,
   'inkblot.insert.table': D.TableItem,
   'inkblot.insert.conversation': D.ConversationItem,
+  'inkblot.insert.note': D.AddNoteItem,
   'inkblot.edit.undo-redo': D.UndoRedoItem,
   'inkblot.edit.paste-and-match-style': D.PasteAndMatchStyleItem,
   'inkblot.view.focus-mode': D.FocusModeItem,
@@ -37,6 +38,7 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.speech.dictation': D.DictationItem,
   'inkblot.speech.read-aloud': D.ReadAloudItem,
   'inkblot.view.editor-mode': D.EditorModeItem,
+  'inkblot.view.page-view': D.PageViewItem,
 
   'inkblot.canvas.lock': C.CanvasLockItem,
   'inkblot.canvas.add-card': C.CanvasAddCardItem,
@@ -55,6 +57,7 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.map.undo-redo': M.MapUndoRedoItem,
   'inkblot.map.zoom': M.MapZoomItem,
   'inkblot.map.delete': M.MapDeleteItem,
+  'inkblot.map.view': M.MapViewItem,
 
   'inkblot.history.snapshot': S.SnapshotItem,
   'inkblot.panel.clipboard': panel('clipboard'),

@@ -289,7 +289,7 @@ const B = R.restSegment
   const segmentIds = R.BUILT_IN_ROUTINES.flatMap((r) => r.segments.map((s) => s.id))
   ok('routines: built-in segment ids are unique', new Set(segmentIds).size === segmentIds.length)
   ok('routines: the built-in ids are fixed', R.SPRINT.id === '5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F00'
-    && R.POMODORO.segments[7].id === '5C0F1E6B-7A0D-4B8E-8A11-000000001007' && R.POMODORO.segments[7].label === 'Long Break')
+    && R.POMODORO.segments[7].id === '5C0F1E6B-7A0D-4B8E-8A11-000000001007' && R.POMODORO.segments[7].label === 'Long break')
   ok('routines: a summary', R.routineSummary(R.POMODORO) === '25 · 5 · 25 · 5 · 25 · 5 · 25 · 15')
 }
 

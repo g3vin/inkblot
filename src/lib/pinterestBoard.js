@@ -16,7 +16,6 @@ import { getProjectOpenId } from './projectContext'
 
 const CACHE_PREFIX = 'inkblot:pinterest-preview:'
 const PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
-const PROJECT_OPEN_ID_KEY = 'inkblot:project-open-id'
 const CACHE_VERSION = 1
 const CACHE_MAX_ITEMS = 80
 

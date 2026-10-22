@@ -16,13 +16,18 @@ import { pathData, catmullRomSample } from '../lib/map/mapGeometry'
 import { measuredLine, resolvePin, routeCoords } from '../lib/map/mapSpace'
 import { pinLabel } from '../lib/map/mapModel'
 import { orbitPath } from '../lib/map/orbits'
+import { runFor } from '../lib/map/nbody'
 import { habitableZoneAU, temperatureToColor } from '../lib/map/stars'
 import { projectedEarth } from '../lib/map/earthData'
 import { hashSeed, INKED_STYLE, ROUGH_STYLE, roughenPath } from '../lib/map/roughen'
 import { travelerPositionAt } from '../lib/map/timeline'
+import { itemPoint } from '../lib/map/mapFind'
+import { hiddenIds, hiddenKey, withoutHidden } from '../lib/map/mapVisibility'
 import { useAssetUrl } from '../canvas/useAssetUrl'
 import { PinGlyph } from './mapGlyphs'
 import { initials, labelNeedsFlip, linePath, ringsPath, travelerColor, travelerName } from './mapRender'
+import { inkColor } from '../lib/palette'
+import { MAP_DEFAULT_COLORS } from '../lib/map/mapColors'
 
 const DASHES = { solid: null, dashed: '10 6', dotted: '1 6', inked: null, rough: null }
 
@@ -80,76 +85,202 @@ const EarthGround = memo(function EarthGround({ map, projector, level, onCountri
   )
 })
 
-function SystemGround({ map, projector, selection }) {
+/** A circle of `radius` AU around `centre`, drawn through the projector. */
+function circlePath(projector, centre, radius) {
+  const ring = []
+  for (let step = 0; step <= 96; step += 1) {
+    const angle = (step / 96) * Math.PI * 2
+    ring.push(projector.toWorld([centre[0] + Math.cos(angle) * radius, centre[1] + Math.sin(angle) * radius]))
+  }
+  return pathData(ring, true)
+}
+
+/**
+ * The rings drawn for one body: around its parent, its orbit or a belt's edges
+ * (`around: 'parent'`); around itself, a star's habitable zone (`around: 'self'`).
+ */
+function bodyRings(body, byId, projector, positions, around) {
+  const out = []
+  if (around === 'self') {
+    if (body.kind !== 'star' || !(body.star?.luminositySun > 0)) return out
+    const zone = habitableZoneAU(body.star.luminositySun)
+    const at = positions.get(body.id) || [0, 0]
+    if (zone) {
+      for (const radius of zone) out.push(<path key={`hz-${body.id}-${radius}`} className="map-habitable" d={circlePath(projector, at, radius)} />)
+    }
+    return out
+  }
+  const parentAt = body.parent ? positions.get(body.parent) || [0, 0] : [0, 0]
+  if (body.kind === 'belt') {
+    const belt = body.belt || {}
+    const inner = Number(belt.innerAU) || body.orbit?.aAU || 2
+    const outer = Number(belt.outerAU) || inner * 1.3
+    for (const radius of [inner, (inner + outer) / 2, outer]) {
+      out.push(<path key={`${body.id}-${radius}`} className="map-belt" d={circlePath(projector, parentAt, radius)} />)
+    }
+    return out
+  }
+  if (body.orbit) {
+    const ring = orbitPath(body, byId, 128).map(([x, y]) => projector.toWorld([parentAt[0] + x, parentAt[1] + y]))
+    out.push(<path key={`orbit-${body.id}`} className="map-orbit" d={pathData(ring, true)} />)
+  }
+  return out
+}
+
+/** Every ring of every body, split into those whose centre is fixed and those that move. */
+function splitRings(bodies, fixed) {
+  const still = []
+  const moving = []
+  for (const body of bodies) {
+    const parentFixed = !body.parent || fixed.has(body.parent)
+    ;(parentFixed ? still : moving).push([body, 'parent'])
+    ;(fixed.has(body.id) ? still : moving).push([body, 'self'])
+  }
+  return { still, moving }
+}
+
+/**
+ * Ids of the bodies that never move: no orbit of their own, and nothing above them
+ * that orbits. What is drawn around them (orbits, belts, habitable zones) is the same
+ * on every day, so it is drawn once rather than on every tick of playback.
+ */
+function fixedBodies(bodies, byId, dynamics) {
+  const fixed = new Set()
+  // Where everything pulls on everything, everything moves.
+  if (dynamics === 'nbody') return fixed
+  const isFixed = (body, depth = 0) => {
+    if (!body || body.orbit || depth > bodies.length) return false
+    return body.parent ? isFixed(byId.get(body.parent), depth + 1) : true
+  }
+  for (const body of bodies) if (isFixed(body)) fixed.add(body.id)
+  return fixed
+}
+
+/**
+ * The paths of an N-body system's bodies over the story (day 0 to its horizon),
+ * drawn where orbits would be: they have no ellipse to follow, so their path is
+ * what they actually do. Computed once per system and frame, not per day.
+ */
+function nbodyTrails(system, projector) {
+  const run = runFor(system)
+  const horizon = system.nbody?.horizonDays || 3650
+  return run.ids.map((id) => {
+    const points = run.trail(id, 0, horizon).map((point) => projector.toWorld(point))
+    return <path key={`trail-${id}`} className="map-orbit map-trail" d={pathData(points, false)} />
+  })
+}
+
+const SystemGround = memo(function SystemGround({ map, projector, positions: livePositions, selection }) {
   const bodies = map.system.bodies
   const byId = useMemo(() => new Map(bodies.map((body) => [body.id, body])), [bodies])
-  const { positions } = projector
+  const positions = livePositions || projector.positions
+  const dynamics = map.system.dynamics
+  const rings = useMemo(() => splitRings(bodies, fixedBodies(bodies, byId, dynamics)), [bodies, byId, dynamics])
+  const trails = useMemo(() => (dynamics === 'nbody' ? nbodyTrails(map.system, projector) : null), [dynamics, map.system, projector])
+  // A fixed body is where it is on any day, so the frame's own positions place it.
+  const staticRings = useMemo(
+    () => rings.still.flatMap(([body, around]) => bodyRings(body, byId, projector, projector.positions, around)),
+    [byId, projector, rings]
+  )
+  const movingRings = rings.moving.flatMap(([body, around]) => bodyRings(body, byId, projector, positions, around))
 
-  const orbits = []
   const discs = []
   for (const body of bodies) {
-    const parentAt = body.parent ? positions.get(body.parent) || [0, 0] : [0, 0]
-    if (body.kind === 'belt') {
-      const belt = body.belt || {}
-      const inner = Number(belt.innerAU) || body.orbit?.aAU || 2
-      const outer = Number(belt.outerAU) || inner * 1.3
-      for (const radius of [inner, (inner + outer) / 2, outer]) {
-        const ring = []
-        for (let step = 0; step <= 96; step += 1) {
-          const angle = (step / 96) * Math.PI * 2
-          ring.push(projector.toWorld([parentAt[0] + Math.cos(angle) * radius, parentAt[1] + Math.sin(angle) * radius]))
-        }
-        orbits.push(<path key={`${body.id}-${radius}`} className="map-belt" d={pathData(ring, true)} />)
-      }
-      continue
-    }
-    if (body.orbit) {
-      const ring = orbitPath(body, byId, 128).map(([x, y]) => projector.toWorld([parentAt[0] + x, parentAt[1] + y]))
-      orbits.push(<path key={`orbit-${body.id}`} className="map-orbit" d={pathData(ring, true)} />)
-    }
-    if (body.kind === 'star' && body.star?.luminositySun > 0) {
-      const zone = habitableZoneAU(body.star.luminositySun)
-      const at = positions.get(body.id) || [0, 0]
-      if (zone) {
-        for (const radius of zone) {
-          const ring = []
-          for (let step = 0; step <= 96; step += 1) {
-            const angle = (step / 96) * Math.PI * 2
-            ring.push(projector.toWorld([at[0] + Math.cos(angle) * radius, at[1] + Math.sin(angle) * radius]))
-          }
-          orbits.push(<path key={`hz-${body.id}-${radius}`} className="map-habitable" d={pathData(ring, true)} />)
-        }
-      }
-    }
-    if (body.kind === 'barycenter') continue
+    if (body.kind === 'belt' || body.kind === 'barycenter') continue
     const at = projector.toWorld(positions.get(body.id) || [0, 0])
-    const isStar = body.kind === 'star'
-    const color = body.color || (isStar ? temperatureToColor(body.star?.temperatureK ?? 5772) : '#9aa7b8')
-    const radius = isStar ? 11 : body.kind === 'moon' ? 3.5 : body.kind === 'station' ? 3 : body.kind === 'dwarf' ? 3.5 : 6
-    const blackHole = isStar && body.star?.spectral === 'BH'
     discs.push(
-      <g
+      <BodyDisc
         key={body.id}
-        className={`map-body${selection?.kind === 'body' && selection.id === body.id ? ' is-selected' : ''}`}
-        data-map-item={body.id}
-        data-map-kind="body"
-        transform={`translate(${at[0]} ${at[1]})`}
-      >
-        <g className="map-mark">
-          {isStar ? <circle r={radius * 2.4} fill={blackHole ? 'none' : color} opacity={0.18} stroke={blackHole ? '#ffb86b' : 'none'} strokeWidth={blackHole ? 3 : 0} /> : null}
-          <circle className="map-body-disc" r={radius} fill={blackHole ? '#000' : color} stroke={blackHole ? '#ffb86b' : 'none'} strokeWidth={blackHole ? 1.5 : 0} />
-          <text className="map-body-name" x={radius + 5} y={4}>{body.name}</text>
-        </g>
-      </g>
+        body={body}
+        x={at[0]}
+        y={at[1]}
+        selected={selection?.kind === 'body' && selection.id === body.id}
+      />
     )
   }
   return (
     <g className="map-ground map-system">
-      {orbits}
+      {trails}
+      {staticRings}
+      {movingRings}
       {discs}
     </g>
   )
+})
+
+/** Which of two bodies on top of each other keeps its name: the bigger kind. */
+const BODY_RANK = { star: 0, planet: 1, dwarf: 2, moon: 3, station: 4 }
+/** Bodies closer than this on screen show one name (a moon tucks behind its planet). */
+const NAME_CLEARANCE_PX = 16
+/** Roughly how wide a character of a body's name is, for keeping names apart. */
+const NAME_CHAR_PX = 6.2
+
+/**
+ * Over the 3D view (which draws the bodies themselves): each body's name, and a
+ * target to click, select and drag, where the camera puts it. A body drawn on top
+ * of a bigger one (a moon seen from far off) gives way, unless it is selected.
+ */
+function SpaceNames({ map, projector, positions, selection }) {
+  const placed = []
+  for (const body of map.system.bodies) {
+    if (body.kind === 'belt' || body.kind === 'barycenter') continue
+    const at = projector.toWorld(positions?.get(body.id) || [0, 0, 0])
+    if (at) placed.push({ body, at, rank: BODY_RANK[body.kind] ?? 5 })
+  }
+  placed.sort((a, b) => a.rank - b.rank)
+  const shown = []
+  // Names already written, as boxes: a name that would overlap one keeps its target
+  // (to click) but not its words, unless it is selected.
+  const boxes = []
+  const boxOf = (entry) => ({ left: entry.at[0] + 13, right: entry.at[0] + 13 + entry.body.name.length * NAME_CHAR_PX, top: entry.at[1] - 8, bottom: entry.at[1] + 6 })
+  const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+  for (const entry of placed) {
+    const selected = selection?.kind === 'body' && selection.id === entry.body.id
+    const crowded = shown.some((other) => Math.hypot(other.at[0] - entry.at[0], other.at[1] - entry.at[1]) < NAME_CLEARANCE_PX)
+    if (crowded && !selected) continue
+    const box = boxOf(entry)
+    const named = selected || !boxes.some((other) => overlaps(box, other))
+    if (named) boxes.push(box)
+    shown.push({ ...entry, selected, named })
+  }
+  return (
+    <g className="map-system map-space-names">
+      {shown.map(({ body, at, selected, named }) => (
+        <g
+          key={body.id}
+          className={`map-body map-body-3d${selected ? ' is-selected' : ''}`}
+          data-map-item={body.id}
+          data-map-kind="body"
+          transform={`translate(${at[0]} ${at[1]})`}
+        >
+          <circle className="map-body-target" r={11} />
+          {named ? <text className="map-body-name" x={13} y={4}>{body.name}</text> : null}
+        </g>
+      ))}
+    </g>
+  )
 }
+
+const BodyDisc = memo(function BodyDisc({ body, x, y, selected }) {
+  const isStar = body.kind === 'star'
+  const color = body.color || (isStar ? temperatureToColor(body.star?.temperatureK ?? 5772) : MAP_DEFAULT_COLORS.body)
+  const radius = isStar ? 11 : body.kind === 'moon' ? 3.5 : body.kind === 'station' ? 3 : body.kind === 'dwarf' ? 3.5 : 6
+  const blackHole = isStar && body.star?.spectral === 'BH'
+  return (
+    <g
+      className={`map-body${selected ? ' is-selected' : ''}`}
+      data-map-item={body.id}
+      data-map-kind="body"
+      transform={`translate(${x} ${y})`}
+    >
+      <g className="map-mark">
+        {isStar ? <circle r={radius * 2.4} fill={blackHole ? 'none' : color} opacity={0.18} stroke={blackHole ? MAP_DEFAULT_COLORS.blackHoleRim : 'none'} strokeWidth={blackHole ? 3 : 0} /> : null}
+        <circle className="map-body-disc" r={radius} fill={blackHole ? MAP_DEFAULT_COLORS.blackHole : color} stroke={blackHole ? MAP_DEFAULT_COLORS.blackHoleRim : 'none'} strokeWidth={blackHole ? 1.5 : 0} />
+        <text className="map-body-name" x={radius + 5} y={4}>{body.name}</text>
+      </g>
+    </g>
+  )
+})
 
 /* ---------------- items ---------------- */
 
@@ -233,7 +364,7 @@ const LabelLayer = memo(function LabelLayer({ map, projector, space, day, zoom, 
         let along = null
         if (label.route && routes.has(label.route)) {
           const coords = routeCoords(map, space, routes.get(label.route), day)
-          along = projector.kind === 'earth' ? measuredLine(space, coords).points : coords
+          along = projector.kind === 'earth' || projector.kind === 'globe' ? measuredLine(space, coords).points : coords
         } else if (label.path) {
           along = catmullRomSample(label.path, 8)
         }
@@ -272,33 +403,69 @@ const LabelLayer = memo(function LabelLayer({ map, projector, space, day, zoom, 
   )
 })
 
-const PinLayer = memo(function PinLayer({ map, projector, space, day, selection, missingDocs, hideNames }) {
+/** Galaxy names closer than this on screen give way to the first drawn. */
+const GALAXY_NAME_CLEARANCE_PX = 34
+
+const PinLayer = memo(function PinLayer({ map, projector, space, day, selection, missingDocs, hideNames, hidden }) {
+  // In a group of galaxies, a galaxy is its picture (drawn by the 3D view); its pin
+  // is a quiet ring to click, named where there is room.
+  const named = []
   return (
     <g className="map-pins">
       {map.pins.map((pin) => {
+        if (hidden?.has(pin.id)) return null
         const at = projector.toWorld(resolvePin(map, space, pin, day))
         if (!at) return null
-        const missing = Boolean(pin.doc && missingDocs?.has(pin.doc))
-        const selected = selection?.kind === 'pin' && selection.id === pin.id
-        return (
-          <g
-            key={pin.id}
-            className={`map-pin${selected ? ' is-selected' : ''}${missing ? ' is-missing' : ''}`}
-            data-map-item={pin.id}
-            data-map-kind="pin"
-            transform={`translate(${at[0]} ${at[1]})`}
-          >
-            <g className="map-mark">
-              <PinGlyph icon={pin.icon} color={pin.color} />
-              {hideNames ? null : (
-                <text className="map-pin-name" y={16} textAnchor="middle">
-                  {pinLabel(pin, getDocDisplayName)}{missing ? ' (missing)' : ''}
-                </text>
-              )}
+        if (pin.galaxy && projector.kind === 'space') {
+          const selected = selection?.kind === 'pin' && selection.id === pin.id
+          const roomy = !named.some((other) => Math.hypot(other[0] - at[0], other[1] - at[1]) < GALAXY_NAME_CLEARANCE_PX)
+          if (roomy || selected) named.push(at)
+          return (
+            <g
+              key={pin.id}
+              className={`map-pin map-pin-galaxy${selected ? ' is-selected' : ''}`}
+              data-map-item={pin.id}
+              data-map-kind="pin"
+              transform={`translate(${at[0]} ${at[1]})`}
+            >
+              <circle className="map-body-target" r={9} />
+              {roomy || selected ? <text className="map-body-name" x={11} y={4}>{pinLabel(pin, getDocDisplayName)}</text> : null}
             </g>
-          </g>
+          )
+        }
+        return (
+          <PinMark
+            key={pin.id}
+            pin={pin}
+            x={at[0]}
+            y={at[1]}
+            selected={selection?.kind === 'pin' && selection.id === pin.id}
+            missing={Boolean(pin.doc && missingDocs?.has(pin.doc))}
+            hideNames={hideNames}
+          />
         )
       })}
+    </g>
+  )
+})
+
+/** One pin. Memoized: in playback only the pins riding a body move, and only they redraw. */
+const PinMark = memo(function PinMark({ pin, x, y, selected, missing, hideNames }) {
+  return (
+    <g
+      className={`map-pin${selected ? ' is-selected' : ''}${missing ? ' is-missing' : ''}`}
+      data-map-item={pin.id}
+      data-map-kind="pin"
+      transform={`translate(${x} ${y})`}
+    >
+      <g className="map-mark">
+        <PinGlyph icon={pin.icon} color={pin.color} />
+        {hideNames ? null : (
+          <text className="map-pin-name" y={16} textAnchor="middle">
+            {pinLabel(pin, getDocDisplayName)}{missing ? ' (missing)' : ''}
+          </text>
+        )}
+      </g>
     </g>
   )
 })
@@ -338,7 +505,7 @@ function TravelerLayer({ map, projector, space, day, schedules, selection }) {
             >
               <g className="map-mark">
                 <circle className="map-traveler-dot" r={selected ? 11 : 9} fill={color} />
-                <text y={4} textAnchor="middle" fontSize={9} fontWeight={700} fill="#fff" pointerEvents="none">
+                <text y={4} textAnchor="middle" fontSize={9} fontWeight={700} fill={MAP_DEFAULT_COLORS.travelerLabel} pointerEvents="none">
                   {initials(travelerName(traveler))}
                 </text>
                 <text className="map-traveler-name" y={-14} textAnchor="middle" fill={color}>
@@ -381,6 +548,37 @@ export function MapDefs({ idPrefix }) {
   )
 }
 
+/**
+ * Timeline events happening here and now: each event placed at one of this map's pins
+ * whose time covers the map's day, as a flag over the pin. Only the editing surface
+ * passes any; a thumbnail or an export draws the map alone.
+ */
+function TimelineEventLayer({ map, projector, space, day, events }) {
+  if (!events?.length) return null
+  const stacked = new Map()
+  return (
+    <g className="map-timeline-events">
+      {events.map((event) => {
+        const point = itemPoint(map, space, event.kind, event.item, day)
+        const at = point ? projector.toWorld(point) : null
+        if (!at) return null
+        const key = `${event.kind}:${event.item}`
+        const level = stacked.get(key) || 0
+        stacked.set(key, level + 1)
+        return (
+          <g key={event.id} className="map-timeline-event" data-timeline-event={event.id} transform={`translate(${at[0]} ${at[1]})`} style={event.color ? { '--event': inkColor(event.color) } : undefined}>
+            <g className="map-mark">
+              <text className="map-timeline-event-text" y={-22 - level * 16} textAnchor="middle">
+                ◆ {event.title || 'Event'}
+              </text>
+            </g>
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
 /* ---------------- all together ---------------- */
 
 /**
@@ -389,7 +587,7 @@ export function MapDefs({ idPrefix }) {
  */
 /** Memoized: a pan or zoom changes none of its props, so the layers sit it out. */
 const MapLayers = memo(function MapLayers({
-  map,
+  map: wholeMap,
   projector,
   space,
   day = 0,
@@ -404,24 +602,37 @@ const MapLayers = memo(function MapLayers({
   hidePinNames = false,
   inlineAssets = null,
   earthPaths = null,
+  timelineEvents = null,
+  positions = null,
 }) {
+  // What is on a hidden layer, or not there on this day, is not drawn at all.
+  const hidden = hiddenKey(wholeMap, day)
+  const map = useMemo(() => withoutHidden(wholeMap, hidden), [hidden, wholeMap])
+  const hiddenPins = useMemo(() => hiddenIds(hidden), [hidden])
   // Only on a star system does anything but a traveller move with the day. Holding
   // the day still for the other layers lets them skip re-rendering during playback.
-  const staticDay = projector.kind === 'system' ? day : 0
+  const staticDay = projector.kind === 'system' || projector.kind === 'space' ? day : 0
+  // On the globe, MapLibre draws the ground, the regions and the routes; this is the
+  // overlay of everything else, in screen pixels.
+  // A planet's world is drawn the same way (PlanetView paints them on).
+  const overGlobe = projector.kind === 'globe' || projector.kind === 'planet'
   return (
     <g className="map-layers">
-      {projector.kind === 'earth' ? (
+      {overGlobe ? null : projector.kind === 'earth' ? (
         <EarthGround map={map} projector={projector} level={earthLevel} onCountries={onCountries} staticPaths={earthPaths} />
       ) : projector.kind === 'system' ? (
-        <SystemGround map={map} projector={projector} selection={selection} />
+        <SystemGround map={map} projector={projector} positions={positions} selection={selection} />
+      ) : projector.kind === 'space' ? (
+        <SpaceNames map={map} projector={projector} positions={positions} selection={selection} />
       ) : (
         <PlaneGround map={map} projector={projector} projectName={projectName} inlineAssets={inlineAssets} />
       )}
-      <RegionLayer map={map} projector={projector} selection={selection} idPrefix={idPrefix} />
-      <RouteLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} idPrefix={idPrefix} />
+      {overGlobe ? null : <RegionLayer map={map} projector={projector} selection={selection} idPrefix={idPrefix} />}
+      {overGlobe ? null : <RouteLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} idPrefix={idPrefix} />}
       <LabelLayer map={map} projector={projector} space={space} day={staticDay} zoom={zoom} selection={selection} idPrefix={idPrefix} />
-      <PinLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} missingDocs={missingDocs} hideNames={hidePinNames} />
+      <PinLayer map={map} projector={projector} space={space} day={staticDay} selection={selection} missingDocs={missingDocs} hideNames={hidePinNames} hidden={hiddenPins} />
       <TravelerLayer map={map} projector={projector} space={space} day={day} schedules={schedules} selection={selection} />
+      <TimelineEventLayer map={map} projector={projector} space={space} day={day} events={timelineEvents} />
     </g>
   )
 })

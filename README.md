@@ -41,6 +41,32 @@ npm run tauri build    # a bundled .app
 
 The app keeps its data in `~/Library/Application Support/com.inkblot.app`.
 
+## Where to start
+
+Read [ARCHITECTURE.md](ARCHITECTURE.md) first, then these, in order:
+
+1. `src/main.jsx`: the entry point, and why preferences load before the first render.
+2. `src/components/Editor.jsx`: the open project's state (documents, panes, notes)
+   and what it hands to `EditorLayout`.
+3. `src/bridge/surface.ts`: how the chrome and the documents talk, from the page's side.
+   The protocol itself is in `src-tauri/crates/inkblot-core/src/bridge/mod.rs`.
+4. `src/lib/FileSystem.js`: how documents are read and written.
+5. `src-tauri/src/lib.rs`: every Tauri command the page can call.
+
+Where to look for common tasks:
+
+| To… | Look in |
+|---|---|
+| Add a toolbar button | `src/lib/chromeLayout.ts`, `src/components/toolbar/registry.jsx` |
+| Add a ⌘K command | `useCommands` in `src/lib/commands.ts` |
+| Build or restyle UI | `src/ui/`, `src/styles/tokens.css`, [docs/DESIGN.md](docs/DESIGN.md) |
+| Change an editor feature | `src/extensions/` (TipTap extensions and node views) |
+| Change canvases, maps, timelines, print | `src/canvas/`, `src/map/` + `src/lib/map/`, `src/timeline/` + `src/lib/timeline/`, `src/print/` |
+| Add a Rust command | `src-tauri/src/*_commands.rs`, logic in `src-tauri/crates/` |
+| Add a test | the header of `tests/unit/run.mjs` |
+
+Step-by-step recipes for each are in [ARCHITECTURE.md → Recipes](ARCHITECTURE.md#recipes).
+
 ## Checks
 
 Run these before every commit. Each catches failures the others can't. CI
@@ -53,10 +79,11 @@ Run these before every commit. Each catches failures the others can't. CI
 | `npm run lint:design` | No new raw colours, fonts, radii or shadows outside `src/styles/tokens.css` (a per-file ratchet; see [docs/DESIGN.md](docs/DESIGN.md#14-guardrails)) | A hard-coded hex that ignores the theme |
 | `npm run typecheck` | `tsc --noEmit` over the TypeScript | |
 | `npm run build` | The Vite production build | Bad dynamic imports, and named imports a module does not export |
-| `npm run parity` | One corpus (about 17,000 cases) through both the JS and the Rust implementation of every mirrored function | Float, rounding and string-semantics drift between JS and Rust |
+| `npm run parity` | One corpus (about 19,000 cases) through both the JS and the Rust implementation of every mirrored function | Float, rounding and string-semantics drift between JS and Rust |
 | `npm run types:check` | The generated TypeScript types are current | A Rust type change that was never regenerated |
 | `npm run test:layout` | Print Layout in real WebKit (needs `playwright-core` and its WebKit; see `tests/layout/run.mjs`) | Page breaks that differ between jsdom and a real browser |
 | `cd src-tauri && cargo build --workspace && cargo test --workspace` | The Rust crates and their tests | Linker errors: `cargo check` does not link |
+| `cd src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings` | Rust formatting and lints | Code rustfmt would rewrite; an API newer than the declared `rust-version` |
 
 The one ignored Rust test runs the rhyme index against the real pronouncing
 dictionary: `INKBLOT_CMUDICT=/path/to/cmudict.dict cargo test -p inkblot-models -- --ignored`.
@@ -78,7 +105,8 @@ dictionary: `INKBLOT_CMUDICT=/path/to/cmudict.dict cargo test -p inkblot-models 
 
 Branch naming, commit messages and the pull request flow are in
 [CONTRIBUTING.md](CONTRIBUTING.md). Notable changes are recorded in
-[CHANGELOG.md](CHANGELOG.md).
+[CHANGELOG.md](CHANGELOG.md). To report a security problem, follow
+[SECURITY.md](SECURITY.md) rather than opening an issue.
 
 ## License
 

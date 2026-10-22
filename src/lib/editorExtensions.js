@@ -7,14 +7,11 @@
  */
 import { StarterKit } from '@tiptap/starter-kit'
 import { Color } from '@tiptap/extension-color'
-import { Dropcursor } from '@tiptap/extension-dropcursor'
 import { FontFamily } from '@tiptap/extension-font-family'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { Highlight } from '@tiptap/extension-highlight'
-import { Table } from '@tiptap/extension-table'
-import { TableCell } from '@tiptap/extension-table-cell'
-import { TableHeader } from '@tiptap/extension-table-header'
 import { TableRow } from '@tiptap/extension-table-row'
+import { StyledTable, StyledTableCell, StyledTableHeader } from '../extensions/TableStyles'
 import { getSchema } from '@tiptap/core'
 
 import { Bibliography } from '../extensions/Bibliography'
@@ -25,6 +22,9 @@ import ConversationTile from '../extensions/ConversationTile'
 import { DictationInline } from '../extensions/DictationInline'
 import { DocChangeReporter } from '../extensions/DocChangeReporter'
 import { NoteAnnotation } from '../extensions/NoteAnnotation'
+import { DocumentLock } from '../extensions/DocumentLock'
+import { DropPreview } from '../extensions/DropPreview'
+import { TimelineAnchors } from '../extensions/TimelineAnchors'
 import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import ResizableImage from '../extensions/ResizableImage'
@@ -64,10 +64,11 @@ const sharedExtensions = () => [
     types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
   }),
   Highlight.configure({ multicolor: true }),
-  Table.configure({ resizable: true }),
+  // Cell fills and the table's borders on top of the stock table (TableStyles.js).
+  StyledTable.configure({ resizable: true }),
   TableRow,
-  TableHeader,
-  TableCell,
+  StyledTableHeader,
+  StyledTableCell,
   ResizableImage.configure({
     inline: true,
     allowBase64: true,
@@ -81,12 +82,13 @@ const sharedExtensions = () => [
 export const buildEditorExtensions = (starterKit) => [
   // The empty paragraph the editor keeps last would be prose in a script: a script
   // ends on its own lines (ScriptElement.ts).
-  starterKit.configure({ trailingNode: { notAfter: ['scriptElement'] } }),
-  Dropcursor.configure({
-    color: 'rgba(84, 165, 255, 0.95)',
-    width: 2,
+  starterKit.configure({
+    trailingNode: { notAfter: ['scriptElement'] },
+    dropcursor: { color: 'var(--accent-color)', width: 2 },
   }),
   NoteAnnotation,
+  TimelineAnchors,
+  DocumentLock,
   ConversationTile,
   PinterestBoard,
   Citation,
@@ -112,6 +114,8 @@ export const buildEditorExtensions = (starterKit) => [
   // A screenplay's or a play's lines, and which the document is written as.
   ScriptElement,
   DocWritingFormat,
+  // Clipboard text held over the page, shown where it would land.
+  DropPreview,
   ...sharedExtensions(),
 ]
 

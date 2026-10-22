@@ -9,13 +9,14 @@ import { newId } from '../lib/map/mapModel'
 import { travelerName } from './mapRender'
 
 export const MAP_TOOLS = [
-  { id: 'select', icon: 'cursorarrow', label: 'Select and move', key: 'V' },
-  { id: 'pin', icon: 'mappin', label: 'Place', key: 'P' },
-  { id: 'route', icon: 'map.route', label: 'Route', key: 'R' },
-  { id: 'region', icon: 'map.region', label: 'Region', key: 'G' },
-  { id: 'label', icon: 'map.label', label: 'Label', key: 'T' },
-  { id: 'ruler', icon: 'map.ruler', label: 'Measure distance', key: 'M' },
-  { id: 'area', icon: 'map.area', label: 'Measure area', key: 'A' },
+  { id: 'select', icon: 'cursor', label: 'Select and move', key: 'V' },
+  { id: 'pin', icon: 'map-pin', label: 'Place', key: 'P' },
+  { id: 'route', icon: 'map-route', label: 'Route', key: 'R' },
+  { id: 'region', icon: 'map-area', label: 'Region', key: 'G' },
+  { id: 'label', icon: 'label', label: 'Label', key: 'T' },
+  { id: 'ruler', icon: 'ruler', label: 'Measure distance', key: 'M' },
+  { id: 'area', icon: 'measure-area', label: 'Measure area', key: 'A' },
+  { id: 'calibrate', icon: 'calibrate', label: 'Set scale', key: null },
 ]
 
 /** The zoom as the toolbar writes it: 250%, 12×. */
@@ -53,6 +54,8 @@ export const PIN_ICONS = [
   { id: 'battle', label: 'Battle' },
   { id: 'star', label: 'Landmark' },
   { id: 'skull', label: 'Danger' },
+  { id: 'system', label: 'Star system' },
+  { id: 'galaxy', label: 'Galaxy' },
 ]
 
 /** Compass rose styles the style panel offers. */
@@ -63,7 +66,7 @@ export const COMPASS_STYLES = [
 ]
 
 /** The unit distances on this map are shown in; a star system picks per figure. */
-export const unitFor = (map) => (map.mapKind === 'system' ? 'auto' : map.scale.displayUnit || 'km')
+export const unitFor = (map) => (['system', 'galaxy', 'universe'].includes(map.mapKind) ? 'auto' : map.scale.displayUnit || 'km')
 
 /** A label that runs along `route`, carrying its name. */
 export const newRouteLabel = (route) => ({

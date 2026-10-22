@@ -10,15 +10,34 @@
  * pin or a label moves that instead. So there is no separate hand tool to reach for —
  * though `pan` exists for a trackpad-less mouse and for the space bar.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { documentSurface } from '../bridge'
-import { getDocDisplayName, isMapDoc } from '../lib/docKind'
+import { getDocDisplayName, isMapDoc, MAP_SUFFIX } from '../lib/docKind'
 import { isCharacterDoc } from '../lib/storyStructure'
 import { createProjector } from '../lib/map/mapProjection'
 import { projectedEarth } from '../lib/map/earthData'
 import { createSpace, resolvePin } from '../lib/map/mapSpace'
+import { itemPoint } from '../lib/map/mapFind'
 import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timeline'
-import { makePin, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
+import { createEmptyMap, makePin, mapDocRefs, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
+import { isItemLocked } from '../lib/map/mapVisibility'
+import { eventDay } from './inspector/whenSections'
+import { arrowDays, startStateOf } from '../lib/map/nbody'
+import { geoJSONToItems, IMPORT_KINDS, readGeoFile } from '../lib/map/geoInterchange'
+import { MAP_FIND_EVENT } from '../lib/sidebarSearch'
+import { requestTimelineReveal } from '../timeline/timelineEvents'
+
+import MapSearch from './MapSearch'
+import { forgetAncestry, loadAncestry, trailFor } from '../lib/map/mapAncestry'
+import Breadcrumb from '../ui/Breadcrumb.jsx'
+import { saveMapDocument } from '../lib/map/mapFileSystem'
+import { surfaceForBody } from '../lib/map/planetPresets'
+import { presetSystem } from '../lib/map/systemPresets'
+import { starFields, starPreset } from '../lib/map/stars'
+import { random, seedOf } from '../lib/map/seeded'
+import { defaultTerrainEntries } from '../lib/map/terrains'
+import { IMAGE_EXTENSIONS_LIST, MODEL_EXTENSIONS_LIST, importAssetFromPath } from '../lib/assets'
+import { announceProjectFiles } from '../lib/projectFiles'
 import { MAP_DOC_MOVED_EVENT } from '../lib/map/mapLinks'
 import { panMapBy, pointsBounds } from '../lib/map/mapViewport'
 import { nearestOnPolyline } from '../lib/map/mapGeometry'
@@ -26,7 +45,7 @@ import MapLayers, { MapDefs } from './MapLayers'
 import { earthLevelFor } from './mapRender'
 import { MAP_TOOLS, TOOL_HINTS, formatZoom } from './mapOptions'
 import MapPanelView from './MapPanelView'
-import SFIcon from '../components/SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { useInspectorOpen } from '../lib/inspectorPresence'
 import { useMapPanel } from './inspector/useMapPanel'
 import { runPanelCommand } from './inspector/panelBuilder'
@@ -38,7 +57,21 @@ import MapHoverCard from './MapHoverCard'
 import MapDraft from './MapDraft'
 import { useMapDocument } from './useMapDocument'
 import { useMapViewport } from './useMapViewport'
+import { useGlobeView } from './useGlobeView'
+import { useSpaceView } from './useSpaceView'
 import { useProjectDocs, useStoryCalendar } from './useMapProject'
+import { useStoryTimeline } from '../timeline/useStoryTimeline'
+import { addEvent, eventCovers, placeOnMap, placeTarget, setEventTime } from '../lib/timeline/timelineModel'
+import { getStoryCursor, setStoryDay, subscribeStoryCursor } from '../lib/timeline/storyCursor'
+import { peekStoryTimeline, replaceStoryTimeline } from '../lib/timeline/timelineStore'
+import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
+import { openStoryCalendarSettings } from '../lib/map/storyCalendarStore'
+import ExportMapDialog from './ExportMapDialog'
+import OnlineMapsDialog from './OnlineMapsDialog'
+import { cameraChoice, choosesOnline, viewMenuFor, viewOptionEdit } from './mapViewMenu'
+import { readOnlineMaps, saveOnlineMaps } from '../lib/map/onlineMaps'
+import { useMapCommands } from './useMapCommands'
+import { isTouchApplePlatform } from '../ui/platform'
 import {
   MAP_COMMAND_EVENT,
   MAP_DROP_DOC_EVENT,
@@ -48,12 +81,39 @@ import {
   takePendingMapReveal,
 } from './mapEvents'
 
+/** The CSS filter a 3D look draws the scene's canvas through (mapThemes.css), for a picture of it. */
+const lookFilter = () => {
+  const canvas = document.querySelector('.map-surface.is-space.is-active .map-space-canvas') || document.querySelector('.map-surface.is-space .map-space-canvas')
+  const filter = canvas ? getComputedStyle(canvas).filter : 'none'
+  return filter && filter !== 'none' ? filter : null
+}
+
+/** Kinds whose 3D view can be plotted as line art (space/plot/plotScene.js). */
+const PLOTTABLE_KINDS = new Set(['system', 'galaxy', 'universe', 'planet', 'model'])
+
+/** The story's events at something on this map (`kind`/`id`), earliest first. */
+const sortedEventsAt = (timeline, docPath, kind, id) =>
+  (timeline?.events || [])
+    .filter((event) => {
+      const target = placeTarget(event.place)
+      return target?.map === docPath && target.kind === kind && target.id === id
+    })
+    .sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity))
+
 /** Screen pixels a press may wander before it becomes a drag. */
 const DRAG_THRESHOLD = 4
 /** Two clicks this close in time and space finish a drawing. */
 const DOUBLE_CLICK_MS = 320
 /** How near (screen px) a click must be to a pin to snap a route stop to it. */
 const SNAP_PX = 14
+
+// MapLibre and the globe: loaded the first time a map is shown as a globe.
+/** The breadcrumb's glyph for each kind of map. */
+const MAP_KIND_ICONS = { earth: 'globe', planet: 'world', system: 'orbit', galaxy: 'galaxy', universe: 'universe', model: 'model' }
+
+const GlobeView = lazy(() => import('./GlobeView'))
+const SpaceView = lazy(() => import('./space/SpaceView'))
+const PlanetView = lazy(() => import('./space/PlanetView'))
 
 const DRAWING_TOOLS = new Set(['route', 'region', 'ruler', 'area', 'calibrate'])
 
@@ -71,6 +131,7 @@ export default function MapSurface({
   onOpenDoc,
   isActive = true,
   chromeWhileInactive = false,
+  locked = false,
 }) {
   const idPrefix = `map${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const [day, setDay] = useState(() => initialMap.timeline?.day || 0)
@@ -90,36 +151,99 @@ export default function MapSurface({
   const [renameRequest, setRenameRequest] = useState(0)
   const [isPanning, setIsPanning] = useState(false)
   const [calibration, setCalibration] = useState(null)
+  const endCalibration = useCallback(() => setCalibration(null), [])
+  const [exportOpen, setExportOpen] = useState(false)
+  // A View choice that fetches online, waiting for the writer to allow online maps.
+  const [onlineAsk, setOnlineAsk] = useState(null)
+  // Walking about inside a model (SpaceView), and anything the view needs to say.
+  const [lookAround, setLookAround] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [notice, setNotice] = useState(null)
 
-  const view = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.() })
-  const box = useVisibleBox(view.surfaceRef)
-  const { map, mapRef, dispatch, undo, redo, saveView, canUndo, canRedo } = useMapDocument({
+  // The Earth as a globe is drawn by MapLibre, and moved by it; a star system in 3D
+  // by three.js; every other map (and either laid flat) by the SVG view. All three
+  // answer to the same calls. A map has one camera, the globe's or the scene's.
+  const [globeFailed, setGlobeFailed] = useState(false)
+  const [spaceFailed, setSpaceFailed] = useState(false)
+  const wantsGlobe = initialMap.mapKind === 'earth'
+  const wantsSpace = ['system', 'planet', 'galaxy', 'universe', 'model'].includes(initialMap.mapKind)
+  const flatView = useMapViewport({ initialViewport, onViewportChange: () => saveViewRef.current?.(), enabled: true })
+  const cameraRef = useRef(initialMap.camera || null)
+  const onCameraChange = (camera) => {
+    cameraRef.current = camera
+    saveViewRef.current?.()
+  }
+  const globeView = useGlobeView({
+    surfaceRef: flatView.surfaceRef,
+    initialCamera: wantsGlobe ? initialMap.camera : null,
+    onCameraChange,
+    enabled: wantsGlobe,
+  })
+  const fitAllRef = useRef(null)
+  const spaceView = useSpaceView({
+    surfaceRef: flatView.surfaceRef,
+    initialCamera: wantsSpace ? initialMap.camera : null,
+    onCameraChange,
+    onReady: () => fitAllRef.current?.(),
+    enabled: wantsSpace,
+  })
+  const { map, mapRef, dispatch, undo, redo, saveView, saveNow, canUndo, canRedo } = useMapDocument({
     projectName,
     docPath,
     initialMap,
-    viewportRef: view.viewportRef,
+    viewportRef: flatView.viewportRef,
     dayRef,
+    cameraRef,
+    locked,
   })
+  const isGlobe = map.mapKind === 'earth' && map.earth.view === 'globe' && !globeFailed
+  const isPlanet = map.mapKind === 'planet' && !spaceFailed
+  const isDeepSpace = (map.mapKind === 'galaxy' || map.mapKind === 'universe' || map.mapKind === 'model') && !spaceFailed
+  const isSpace = (map.mapKind === 'system' && map.system.display.view === '3d' && !spaceFailed) || isPlanet || isDeepSpace
+  // Bloom is for the Cinematic look, and not on iPhone and iPad, where it costs too much.
+  const bloom = map.style.look === 'cinematic' && !isTouchApplePlatform()
+  const view = isGlobe ? globeView : isSpace ? spaceView : flatView
+  const viewKind = isGlobe ? 'globe' : isPlanet ? 'planet' : isSpace ? 'space' : 'flat'
+  const box = useVisibleBox(view.surfaceRef)
   const saveViewRef = useRef(saveView)
   useEffect(() => {
     saveViewRef.current = saveView
   }, [saveView])
 
   const docs = useProjectDocs(projectName)
-  const [calendar, saveCalendar] = useStoryCalendar(projectName)
+  const [calendar] = useStoryCalendar(projectName)
+  const openCalendar = useCallback(() => openStoryCalendarSettings(projectName), [projectName])
 
   /* ---------------- derived ---------------- */
 
   const isSystem = map.mapKind === 'system'
-  const projector = useMemo(
-    () => createProjector(map, { day: isSystem ? day : 0, focusBody }),
+  // The frame (where AU land on the page) moves with the day only while it follows a
+  // body. Otherwise it holds still through playback, and so does every layer drawn in
+  // it: only the bodies, and what rides on them, move.
+  const frameDay = isSystem && focusBody ? day : 0
+  const flatProjector = useMemo(
+    () => createProjector(map, { day: frameDay, focusBody }),
     // The projector depends only on the parts of the map that decide the drawing's frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [map.mapKind, map.earth, map.system, map.background.width, map.background.height, isSystem ? day : 0, focusBody]
+    [map.mapKind, map.earth, map.system, map.background.width, map.background.height, frameDay, focusBody]
   )
-  const space = useMemo(() => createSpace(map), [map])
-  const schedules = useMemo(() => buildSchedules(map, space), [map, space])
-  const conflicts = useMemo(() => mapConflicts(map, space, docPath), [map, space, docPath])
+  // A planet's projector says so: its regions and routes are painted on the world.
+  const planetProjector = useMemo(() => ({ ...spaceView.projector, kind: 'planet' }), [spaceView.projector])
+  const projector = isGlobe ? globeView.projector : isPlanet ? planetProjector : isSpace ? spaceView.projector : flatProjector
+  // A space reads only its kind, its scale and its bodies: an edit to a pin keeps it,
+  // and with it the orbital positions it has cached.
+  const space = useMemo(
+    () => createSpace(map),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [map.mapKind, map.scale, map.system]
+  )
+  const positions = useMemo(() => (isSystem ? space.positionsAt(day) : null), [day, isSystem, space])
+  // While a pin or a handle is dragged the map changes every frame; journeys and their
+  // conflicts are worked out again when it is let go, not sixty times a second.
+  const [draggedFrom, setDraggedFrom] = useState(null)
+  const scheduleMap = draggedFrom || map
+  const schedules = useMemo(() => buildSchedules(scheduleMap, space), [scheduleMap, space])
+  const conflicts = useMemo(() => mapConflicts(scheduleMap, space, docPath), [scheduleMap, space, docPath])
   const extent = useMemo(() => timelineExtent(schedules, day), [schedules, day])
   const missingDocs = useMemo(() => {
     if (!docs.loaded) return null
@@ -129,7 +253,7 @@ export default function MapSurface({
     }
     return missing
   }, [docs.loaded, docs.paths, map.pins, map.travelers])
-  const earthLevel = map.mapKind === 'earth' ? earthLevelFor(map.earth, view.settledZoom) : '110m'
+  const earthLevel = map.mapKind === 'earth' && !isGlobe ? earthLevelFor(map.earth, view.settledZoom) : '110m'
   // Drawing the 50m Earth is one long task. Headed that way, do it while the map is
   // idle, so arriving at the zoom that shows it is a cache hit, not a stall.
   const warmFineEarth = map.mapKind === 'earth' && earthLevel === '110m' && earthLevelFor(map.earth, 2.5) === '50m' && view.settledZoom >= 1.6
@@ -189,9 +313,53 @@ export default function MapSurface({
     [day, map, screenOf, space, view]
   )
 
+  /* ---------------- how the map is shown (the View menu) ---------------- */
+
+  // Only the camera's flat and held flags reach the menu, so it is not rebuilt every frame.
+  const cameraOrtho = Boolean(spaceView.camera?.ortho)
+  const cameraLocked = Boolean(spaceView.camera?.locked)
+  const viewMenu = useMemo(
+    () => viewMenuFor(map, { globeAvailable: !globeFailed, spaceAvailable: !spaceFailed, lookAround, camera: { ortho: cameraOrtho, locked: cameraLocked } }),
+    [cameraLocked, cameraOrtho, globeFailed, lookAround, map, spaceFailed]
+  )
+  const applyViewOption = useCallback(
+    (id, { allowed = false } = {}) => {
+      if (id === 'model.look') {
+        setLookAround((on) => !on)
+        return
+      }
+      const choice = cameraChoice(id, spaceView.camera)
+      if (choice) {
+        spaceView.chooseCamera(choice)
+        return
+      }
+      const current = mapRef.current
+      const edit = viewOptionEdit(current, id)
+      if (!edit) return
+      if (!allowed && choosesOnline(current, id) && !readOnlineMaps().enabled) {
+        setOnlineAsk(id)
+        return
+      }
+      dispatch({ type: 'section/patch', section: edit.section, patch: edit.patch })
+    },
+    [dispatch, mapRef, spaceView]
+  )
+  const allowOnline = useCallback(() => {
+    saveOnlineMaps({ enabled: true })
+    const id = onlineAsk
+    setOnlineAsk(null)
+    if (id) applyViewOption(id, { allowed: true })
+  }, [applyViewOption, onlineAsk])
+
   /* ---------------- fitting ---------------- */
 
   const fitAll = useCallback(() => {
+    if (view.fitStored) {
+      const stored = map.pins.map((pin) => resolvePin(map, space, pin, day))
+      for (const region of map.regions) for (const ring of region.rings) stored.push(...ring)
+      view.fitStored(stored)
+      return
+    }
     const points = []
     for (const pin of map.pins) points.push(projector.toWorld(resolvePin(map, space, pin, day)))
     for (const region of map.regions) for (const ring of region.rings) for (const point of ring) points.push(projector.toWorld(point))
@@ -202,6 +370,10 @@ export default function MapSurface({
     view.fitTo(useContent ? content : frame, 40)
   }, [day, map, projector, space, view])
 
+  useEffect(() => {
+    fitAllRef.current = fitAll
+  }, [fitAll])
+
   const didInitialFit = useRef(false)
   useEffect(() => {
     if (didInitialFit.current) return
@@ -210,6 +382,15 @@ export default function MapSurface({
     // A map never viewed before opens framed rather than at the world's corner.
     if (!v || (v.x === 0 && v.y === 0 && v.zoom === 1)) requestAnimationFrame(() => fitAll())
   }, [fitAll, initialViewport])
+
+  // Laid flat from the globe or the 3D view, the map is framed afresh: the flat
+  // view's last framing belongs to a projection it may no longer have.
+  const lastViewKind = useRef(viewKind)
+  useEffect(() => {
+    if (lastViewKind.current === viewKind) return
+    lastViewKind.current = viewKind
+    if (viewKind === 'flat') requestAnimationFrame(() => fitAll())
+  }, [fitAll, viewKind])
 
   /* ---------------- editing helpers ---------------- */
 
@@ -242,6 +423,7 @@ export default function MapSurface({
     setSelection(null)
   }, [dispatch, map.system.bodies, selection])
 
+  const zoomNow = useCallback(() => view.viewportRef.current.zoom, [view.viewportRef])
   const labelSizeNow = useCallback(() => Math.round((18 / view.viewportRef.current.zoom) * 100) / 100, [view.viewportRef])
 
   /* ---------------- drafts (drawing with the route, region and measuring tools) ---------------- */
@@ -327,7 +509,12 @@ export default function MapSurface({
       const itemEl = event.target.closest('[data-map-item]')
       const handleEl = event.target.closest('[data-map-handle]')
       const forcePan = event.button === 1 || tool === 'pan' || spaceHeldRef.current
-      const item = itemEl ? { id: itemEl.getAttribute('data-map-item'), kind: itemEl.getAttribute('data-map-kind') } : null
+      // On the globe, regions and routes are drawn by MapLibre: asked for, not found in the DOM.
+      const picked = itemEl
+        ? { id: itemEl.getAttribute('data-map-item'), kind: itemEl.getAttribute('data-map-kind') }
+        : !handleEl && view.pick ? view.pick(startX, startY) : null
+      // What is on a locked layer stays put: a press there pans, as on empty ground.
+      const item = picked && !isItemLocked(map, picked.kind, picked.id) ? picked : null
 
       // What a drag will do, decided at the press.
       let dragKind = 'pan'
@@ -395,6 +582,21 @@ export default function MapSurface({
               ring[dragTarget.index] = at
             }
             patchItem('regions', region.id, { rings: [ring, ...region.rings.slice(1)] }, `handle-${region.id}`)
+          } else if (dragTarget.ownerKind === 'body-start' || dragTarget.ownerKind === 'body-velocity') {
+            // Where a body starts, or how fast (the arrow's tip, `days` of motion on).
+            const system = current.system
+            const start = startStateOf(system, dragTarget.owner)
+            if (!start) return
+            dragTarget.days ??= arrowDays(system)
+            const state = dragTarget.ownerKind === 'body-start'
+              ? { pos: [at[0], at[1], start.pos[2] || 0], vel: start.vel.slice(0, 3) }
+              : { pos: start.pos.slice(0, 3), vel: [(at[0] - start.pos[0]) / dragTarget.days, (at[1] - start.pos[1]) / dragTarget.days, start.vel[2] || 0] }
+            dispatch({
+              type: 'section/patch',
+              section: 'system',
+              patch: { bodies: system.bodies.map((body) => (body.id === dragTarget.owner ? { ...body, state } : body)), template: null },
+              meta: { coalesce: `start-${dragTarget.owner}` },
+            })
           }
         }
       }
@@ -404,9 +606,11 @@ export default function MapSurface({
         if (!moved) {
           moved = true
           if (dragKind === 'pan') setIsPanning(true)
+          else setDraggedFrom(mapRef.current)
         }
         if (dragKind === 'pan') {
-          view.applyViewport(panMapBy(view.viewportRef.current, moveEvent.clientX - lastX, moveEvent.clientY - lastY))
+          // The globe pans itself.
+          if (!view.native) view.applyViewport(panMapBy(view.viewportRef.current, moveEvent.clientX - lastX, moveEvent.clientY - lastY))
           lastX = moveEvent.clientX
           lastY = moveEvent.clientY
           return
@@ -424,6 +628,7 @@ export default function MapSurface({
         if (moved) {
           if (pending) flush()
           setIsPanning(false)
+          setDraggedFrom(null)
           return
         }
         if (forcePan || handleEl) return
@@ -466,19 +671,20 @@ export default function MapSurface({
         window.removeEventListener('pointerup', onUp)
         window.removeEventListener('pointercancel', onUp)
         if (frame) cancelAnimationFrame(frame)
+        setDraggedFrom(null)
         endDragRef.current = null
       }
     },
-    [addDraftPoint, addItem, finishDraft, labelSizeNow, map, mapRef, onActivate, patchItem, pinNear, select, showInspector, storedAt, tool, view]
+    [addDraftPoint, addItem, dispatch, finishDraft, labelSizeNow, map, mapRef, onActivate, patchItem, pinNear, select, showInspector, storedAt, tool, view]
   )
 
   const onDoubleClick = useCallback(
     (event) => {
       if (DRAWING_TOOLS.has(tool)) return
       const itemEl = event.target.closest('[data-map-item]')
-      if (!itemEl) return
-      const kind = itemEl.getAttribute('data-map-kind')
-      const id = itemEl.getAttribute('data-map-item')
+      const picked = itemEl ? { kind: itemEl.getAttribute('data-map-kind'), id: itemEl.getAttribute('data-map-item') } : view.pick?.(event.clientX, event.clientY)
+      if (!picked) return
+      const { kind, id } = picked
       if (kind === 'pin') {
         const pin = map.pins.find((candidate) => candidate.id === id)
         if (pin?.doc && docs.paths.has(pin.doc)) onOpenDoc?.(pin.doc)
@@ -507,7 +713,7 @@ export default function MapSurface({
         setRenameRequest((count) => count + 1)
       }
     },
-    [day, docs.paths, map, onOpenDoc, patchItem, showInspector, space, storedAt, tool]
+    [day, docs.paths, map, onOpenDoc, patchItem, showInspector, space, storedAt, tool, view]
   )
 
   /* ---------------- hover ---------------- */
@@ -591,18 +797,15 @@ export default function MapSurface({
   const reveal = useCallback(
     (itemId) => {
       const current = mapRef.current
-      for (const [kind, list] of [['pin', current.pins], ['route', current.routes], ['region', current.regions], ['label', current.labels], ['traveler', current.travelers]]) {
-        const item = list.find((candidate) => candidate.id === itemId)
-        if (!item) continue
+      const lists = [['pin', current.pins], ['route', current.routes], ['region', current.regions], ['label', current.labels], ['traveler', current.travelers], ['body', current.mapKind === 'system' ? current.system.bodies : []]]
+      for (const [kind, list] of lists) {
+        if (!list.some((candidate) => candidate.id === itemId)) continue
         setSelection({ kind, id: itemId })
         showInspector()
-        let point = null
-        if (kind === 'pin') point = resolvePin(current, space, item, day)
-        else if (kind === 'label') point = item.at || item.path?.[0] || null
-        else if (kind === 'region') point = item.rings[0]?.[0] || null
-        else if (kind === 'route') {
-          const node = item.nodes[Math.floor(item.nodes.length / 2)]
-          point = node?.pin ? resolvePin(current, space, current.pins.find((pin) => pin.id === node.pin), day) : node?.at
+        const point = itemPoint(current, space, kind, itemId, day)
+        if (point && view.centerOnStored) {
+          view.centerOnStored(point)
+          return
         }
         const world = point ? projector.toWorld(point) : null
         if (world) view.centerOn(world[0], world[1])
@@ -639,7 +842,7 @@ export default function MapSurface({
       const { projectName: movedIn, entryPath, nextPath, type } = event.detail || {}
       if (movedIn !== projectName) return
       const { map: next, changed } = rewriteMapDocRefs(mapRef.current, entryPath, nextPath, type)
-      if (changed) dispatch({ type: 'doc/replace', map: next })
+      if (changed) dispatch({ type: 'doc/replace', map: next, meta: { upkeep: true } })
       void docs.refresh()
     }
     window.addEventListener(MAP_DOC_MOVED_EVENT, onMoved)
@@ -680,7 +883,7 @@ export default function MapSurface({
         // On a star system a place is usually somewhere: stick it to the nearest body.
         const world = view.screenToWorldAt(clientX, clientY)
         let best = null
-        for (const [id, position] of projector.positions) {
+        for (const [id, position] of space.positionsAt(day)) {
           const drawn = projector.toWorld(position)
           const distance = Math.hypot(drawn[0] - world.x, drawn[1] - world.y) * view.viewportRef.current.zoom
           if (distance < 30 && (!best || distance < best.distance)) best = { id, distance }
@@ -692,7 +895,7 @@ export default function MapSurface({
       }
       addItem('pins', pin, 'pin')
     },
-    [addItem, day, dispatch, docPath, mapRef, onActivate, pinNear, projector, showInspector, storedAt, view]
+    [addItem, day, dispatch, docPath, mapRef, onActivate, pinNear, projector, showInspector, space, storedAt, view]
   )
 
   useEffect(() => {
@@ -703,6 +906,8 @@ export default function MapSurface({
       const detail = event.detail || {}
       const { command, clientX, clientY, itemId, itemKind } = detail
       if (command === 'zoom-to-fit') fitAll()
+      else if (command === 'export') setExportOpen(true)
+      else if (command === 'view-option') applyViewOption(String(detail.id || ''))
       /* The window toolbar and the inspector, when the shell draws them (`mapChrome`). */
       else if (command === 'tool') {
         if (TOOL_IDS.has(detail.tool)) setTool(detail.tool)
@@ -742,20 +947,296 @@ export default function MapSurface({
       surface.removeEventListener(MAP_DROP_DOC_EVENT, onDrop)
       surface.removeEventListener(MAP_COMMAND_EVENT, onCommand)
     }
-  }, [addItem, dispatch, dropDoc, fitAll, labelSizeNow, mapRef, onOpenDoc, redo, removeSelection, showInspector, storedAt, undo, view])
+  }, [addItem, applyViewOption, dispatch, dropDoc, fitAll, labelSizeNow, mapRef, onOpenDoc, redo, removeSelection, showInspector, storedAt, undo, view])
 
   /* ---------------- the day ---------------- */
 
+  // The day is the project's "now" (storyCursor.js): scrubbing here moves every timeline
+  // view and every other map, and they move this one.
+  const cursorSource = `map:${docPath}`
   const changeDay = useCallback(
     (next) => {
       setDay(next)
       dayRef.current = next
       saveViewRef.current?.()
+      setStoryDay(projectName, next, cursorSource)
     },
-    []
+    [cursorSource, projectName]
   )
+  useEffect(() => {
+    const follow = (cursor, source) => {
+      if (source === cursorSource || !Number.isFinite(cursor.day) || cursor.day === dayRef.current) return
+      setDay(cursor.day)
+      dayRef.current = cursor.day
+    }
+    follow(getStoryCursor(projectName), null)
+    return subscribeStoryCursor(projectName, follow)
+  }, [cursorSource, projectName])
+
+  /* ---------------- the chronology ---------------- */
+
+  // Timeline events placed at this map's pins, drawn while the day is inside them.
+  const timeline = useStoryTimeline(projectName)
+  const timelineEvents = useMemo(() => {
+    if (!timeline) return []
+    const laneColor = new Map(timeline.lanes.map((lane) => [lane.id, lane.color]))
+    return timeline.events
+      .filter((event) => placeTarget(event.place)?.map === docPath && eventCovers(event, day))
+      .map((event) => {
+        const target = placeTarget(event.place)
+        return { id: event.id, title: event.title, kind: target.kind, item: target.id, color: event.color || laneColor.get(event.laneId) || null }
+      })
+  }, [day, docPath, timeline])
+
+  // A leg moved from a timeline view: this map owns its document, so it makes the edit.
+  useEffect(() => {
+    const onSetLeg = (event) => {
+      const { projectName: from, docPath: target, travelerId, legId, departDay } = event.detail || {}
+      if (from !== projectName || target !== docPath) return
+      const traveler = mapRef.current.travelers.find((item) => item.id === travelerId)
+      if (!traveler?.legs.some((leg) => leg.id === legId)) return
+      event.detail.claimed = true
+      dispatch({
+        type: 'items/patch',
+        collection: 'travelers',
+        patches: { [travelerId]: { legs: traveler.legs.map((leg) => (leg.id === legId ? { ...leg, departDay } : leg)) } },
+      })
+    }
+    window.addEventListener(MAP_SET_LEG_EVENT, onSetLeg)
+    return () => window.removeEventListener(MAP_SET_LEG_EVENT, onSetLeg)
+  }, [dispatch, docPath, mapRef, projectName])
+
+  // Places that come and go with an event: when the event moves, so do they.
+  useEffect(() => {
+    if (!timeline) return
+    const events = new Map(timeline.events.map((event) => [event.id, event]))
+    for (const collection of ['pins', 'routes', 'regions', 'labels']) {
+      const patches = {}
+      for (const item of map[collection]) {
+        const patch = {}
+        for (const [edge, key] of [['from', 'fromEvent'], ['until', 'untilEvent']]) {
+          if (!item[key]) continue
+          const next = eventDay(events.get(item[key]), edge)
+          if (next !== null && next !== item[edge]) patch[edge] = next
+        }
+        if (Object.keys(patch).length) patches[item.id] = patch
+      }
+      if (Object.keys(patches).length) dispatch({ type: 'items/patch', collection, patches, meta: { upkeep: true, coalesce: 'follow-events' } })
+    }
+  }, [dispatch, map, timeline])
+
+  // A leg moved here: events linked to it leave when it now leaves.
+  useEffect(() => {
+    const current = peekStoryTimeline(projectName)
+    if (!current) return
+    const departures = new Map()
+    for (const schedule of schedules) {
+      for (const interval of schedule.intervals) {
+        if (interval.kind === 'travel') departures.set(`${schedule.travelerId}|${interval.legId}`, interval.from)
+      }
+    }
+    const moves = []
+    for (const event of current.events) {
+      for (const link of event.links) {
+        if (link.kind !== 'mapLeg' || link.map !== docPath) continue
+        const depart = departures.get(`${link.traveler}|${link.leg}`)
+        if (Number.isFinite(depart) && depart !== event.start) moves.push({ id: event.id, depart, length: event.end === null ? null : event.end - event.start })
+      }
+    }
+    if (!moves.length) return
+    void replaceStoryTimeline(projectName, (tl) =>
+      moves.reduce((acc, move) => setEventTime(acc, move.id, move.depart, move.length === null ? null : move.depart + move.length), tl))
+  }, [docPath, projectName, schedules])
 
   /* ---------------- the inspector ---------------- */
+
+  /*
+   * A map of its own for something on this one — a body's surface, a galaxy in a
+   * group, a star system in a galaxy: written beside this map, named after the
+   * thing, linked from it (`link` patches this map with the new path), saved so the
+   * new map finds this one above it, and opened.
+   */
+  const openLinkedMap = useCallback(async (name, created, link) => {
+    const folder = docPath.includes('/') ? docPath.slice(0, docPath.lastIndexOf('/') + 1) : ''
+    const base = (name || 'Untitled').replace(/[\\/:*?"<>|]/g, ' ').trim() || 'Untitled'
+    let path = `${folder}${base}${MAP_SUFFIX}`
+    for (let copy = 2; docs.paths.has(path); copy += 1) path = `${folder}${base} ${copy}${MAP_SUFFIX}`
+    if (!(await saveMapDocument(projectName, path, created))) return
+    const linked = link(mapRef.current, path)
+    dispatch({ type: 'map/patch', patch: linked })
+    await saveNow(linked)
+    forgetAncestry()
+    announceProjectFiles()
+    onOpenDoc?.(path)
+  }, [dispatch, docPath, docs.paths, mapRef, onOpenDoc, projectName, saveNow])
+
+  /** A body's surface: its planet map, made the first time to look like the body. */
+  const openSurface = useCallback(async (body) => {
+    if (!body) return
+    if (body.surface && docs.paths.has(body.surface)) {
+      onOpenDoc?.(body.surface)
+      return
+    }
+    const bodies = new Map(mapRef.current.system.bodies.map((candidate) => [candidate.id, candidate]))
+    const world = createEmptyMap('planet', {
+      surface: surfaceForBody(body, bodies),
+      scale: { kmPerUnit: 1, displayUnit: 'km', calibration: null, customUnits: [] },
+      terrains: defaultTerrainEntries(),
+      style: { theme: 'night' },
+    })
+    await openLinkedMap(body.name || 'World', world, (current, path) => ({
+      ...current,
+      system: { ...current.system, bodies: current.system.bodies.map((candidate) => (candidate.id === body.id ? { ...candidate, surface: path } : candidate)) },
+    }))
+  }, [docs.paths, mapRef, onOpenDoc, openLinkedMap])
+
+  /**
+   * A place in space as a map of its own: a galaxy in a group opens as that galaxy
+   * (its type and seed, so it looks as its dot did); a place in a galaxy becomes a
+   * star system, its star from the stars of that part of the galaxy.
+   */
+  const openPinMap = useCallback(async (pin) => {
+    const current = mapRef.current
+    let created
+    if (current.mapKind === 'universe') {
+      const look = pin.galaxy || { type: 'Sb', seed: seedOf(pin.id), radiusLy: 50000 }
+      created = createEmptyMap('galaxy', {
+        galaxy: { type: look.type, seed: look.seed, radiusLy: look.radiusLy || 50000, thicknessLy: 1000 },
+        scale: { kmPerUnit: 1, displayUnit: 'ly', calibration: null, customUnits: [] },
+        style: { theme: 'night' },
+      })
+    } else {
+      const radius = current.galaxy.radiusLy || 50000
+      const out = Math.hypot(pin.at?.[0] || 0, pin.at?.[1] || 0) / radius
+      const rand = random(seedOf(pin.id))
+      // Near the bulge the stars are old and red; out in the arms, younger and bluer.
+      const spectral = out < 0.15 ? ['K5V', 'M2V', 'K3III'][Math.floor(rand() * 3)] : ['G2V', 'K5V', 'M2V', 'F5V', 'M5V'][Math.floor(rand() * 5)]
+      const system = presetSystem('lone')
+      const preset = starPreset(spectral)
+      system.bodies = system.bodies.map((body) => (body.kind === 'star' ? { ...body, name: pin.name || 'Star', massSun: preset.massSun, radiusKm: preset.radiusSun * 695700, star: starFields(preset) } : body))
+      created = createEmptyMap('system', {
+        system,
+        scale: { kmPerUnit: 1, displayUnit: 'AU', calibration: null, customUnits: [] },
+        style: { theme: 'night' },
+      })
+    }
+    await openLinkedMap(pin.name || (current.mapKind === 'universe' ? 'Galaxy' : 'Star system'), created, (map, path) => ({
+      ...map,
+      pins: map.pins.map((candidate) => (candidate.id === pin.id ? { ...candidate, doc: path } : candidate)),
+    }))
+  }, [mapRef, openLinkedMap])
+
+  const choosePlanetPicture = useCallback(async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, filters: [{ name: 'Images', extensions: IMAGE_EXTENSIONS_LIST }] })
+      if (!selected) return
+      const texture = await importAssetFromPath(projectName, Array.isArray(selected) ? selected[0] : selected)
+      dispatch({ type: 'section/patch', section: 'surface', patch: { look: { ...mapRef.current.surface.look, kind: 'texture', texture } } })
+    } catch (error) {
+      console.error('[map] could not import the picture:', error)
+    }
+  }, [dispatch, mapRef, projectName])
+
+  /** Swap a model map's model for another; its places stay where they are. */
+  const chooseModel = useCallback(async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, filters: [{ name: '3D models', extensions: MODEL_EXTENSIONS_LIST }] })
+      if (!selected) return
+      const asset = await importAssetFromPath(projectName, Array.isArray(selected) ? selected[0] : selected)
+      dispatch({ type: 'section/patch', section: 'model', patch: { asset } })
+    } catch (error) {
+      console.error('[map] could not import the model:', error)
+      setNotice(error?.forWriter ? error.message : 'That model could not be imported.')
+    }
+  }, [dispatch, projectName])
+
+  /** An event in a timeline document, selected and in view: the first timeline in the project. */
+  const showEvent = useCallback((eventId) => {
+    const timelineDoc = docs.docs.find((doc) => doc.kind === 'timeline')
+    if (!timelineDoc) {
+      setNotice('Make a timeline document to see the story’s events laid out.')
+      return
+    }
+    requestTimelineReveal(eventId, timelineDoc.path)
+    onOpenDoc?.(timelineDoc.path)
+  }, [docs.docs, onOpenDoc])
+
+  /** A new timeline event at `item` (a `kind` on this map), on the day the map is at. */
+  const addEventHere = useCallback(async (kind, item) => {
+    let created = null
+    const name = kind === 'pin' ? pinLabel(item, getDocDisplayName) : kind === 'label' ? item.text : item.name
+    await replaceStoryTimeline(projectName, (timeline) => {
+      const result = addEvent(timeline, { title: name ? `At ${name}` : 'Something happens', start: Math.floor(dayRef.current), place: placeOnMap(docPath, kind, item.id) })
+      created = result.id
+      return result.timeline
+    })
+    if (created) showEvent(created)
+  }, [docPath, projectName, showEvent])
+
+  /** Timeline events (`{ title, start }`) for things that happen on this map, once each. */
+  const addStoryEvents = useCallback(async (events) => {
+    let added = 0
+    await replaceStoryTimeline(projectName, (timeline) => events.reduce((current, event) => {
+      if (current.events.some((existing) => existing.title === event.title && existing.start === event.start)) return current
+      added += 1
+      return addEvent(current, event).timeline
+    }, timeline))
+    setNotice(added ? `Added ${added} event${added === 1 ? '' : 's'} to the timeline.` : 'They are on the timeline already.')
+  }, [projectName])
+
+  /** The way the map is being looked at, and the day: what a saved view keeps. */
+  const captureView = useCallback(() => {
+    const camera = viewKind === 'flat'
+      ? { view: 'flat', viewport: { ...flatView.viewportRef.current } }
+      : { view: viewKind, ...(viewKind === 'globe' ? globeView.cameraRef.current || globeView.camera : spaceView.cameraRef.current || spaceView.camera) }
+    return { camera, day: dayRef.current }
+  }, [flatView.viewportRef, globeView, spaceView, viewKind])
+
+  /** Back to a saved view: its day, and its camera when it was taken from this kind of view. */
+  const showView = useCallback((saved) => {
+    if (Number.isFinite(saved.day)) changeDay(saved.day)
+    const camera = saved.camera || {}
+    if (camera.view !== viewKind) {
+      setNotice('That view was saved from another way of showing this map. Switch back to see it as it was.')
+      return
+    }
+    if (viewKind === 'flat') {
+      if (camera.viewport) {
+        flatView.applyViewport(camera.viewport)
+        saveViewRef.current?.()
+      }
+    } else view.goTo?.(camera)
+  }, [changeDay, flatView, view, viewKind])
+
+  /*
+   * Where this map sits: the maps that contain it, outermost first (a galaxy, its
+   * system, this world), read from the links between the project's maps.
+   */
+  const [trail, setTrail] = useState([])
+  const mapPathsKey = useMemo(() => docs.docs.map((doc) => doc.path).filter((path) => isMapDoc(path)).sort().join('\n'), [docs.docs])
+  const linksKey = useMemo(() => mapDocRefs(map).join('\n'), [map])
+  const lastLinksKey = useRef(linksKey)
+  useEffect(() => {
+    if (!docs.loaded || !mapPathsKey) return undefined
+    if (lastLinksKey.current !== linksKey) {
+      lastLinksKey.current = linksKey
+      forgetAncestry()
+    }
+    let cancelled = false
+    void loadAncestry(projectName, mapPathsKey.split('\n')).then((index) => {
+      if (!cancelled) setTrail(trailFor(docPath, index))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [docPath, docs.loaded, linksKey, mapPathsKey, projectName])
+  const breadcrumb = useMemo(() => trail.map((step) => ({
+    id: step.path,
+    label: getDocDisplayName(step.path),
+    icon: MAP_KIND_ICONS[step.kind] || 'map',
+  })), [trail])
 
   const mapPanel = useMapPanel({
     projectName,
@@ -774,18 +1255,108 @@ export default function MapSurface({
     docs,
     missingDocs,
     calendar,
-    onCalendar: saveCalendar,
+    onOpenCalendar: openCalendar,
     onOpenDoc,
     renameRequest,
     onTool: setTool,
     calibration,
-    onCalibrationDone: () => setCalibration(null),
+    onCalibrationDone: endCalibration,
     focusBody,
     onFocusBody: setFocusBody,
     onReveal: reveal,
-    surfaceRef: view.surfaceRef,
-    viewport: view.viewport,
+    zoomNow,
+    viewMenu,
+    onViewOption: applyViewOption,
+    onOpenSurface: isSystem ? openSurface : null,
+    onChoosePlanetPicture: choosePlanetPicture,
+    onChooseModel: map.mapKind === 'model' ? chooseModel : null,
+    storyEvents: timeline?.events,
+    onSaveView: captureView,
+    extent,
+    onShowEvent: showEvent,
+    onAddEventHere: addEventHere,
+    onAddStoryEvents: addStoryEvents,
+    onNotice: setNotice,
+    onShowView: showView,
+    onOpenPinMap: map.mapKind === 'galaxy' || map.mapKind === 'universe' ? openPinMap : null,
   })
+  const openExport = useCallback(() => setExportOpen(true), [])
+  // The first event at the selected item, for "Show on timeline".
+  const selectedPinEvent = selection ? sortedEventsAt(timeline, docPath, selection.kind, selection.id)[0] || null : null
+
+  /* ---------------- find on this map ---------------- */
+
+  useEffect(() => {
+    if (!isActive) return undefined
+    const open = () => setSearchOpen(true)
+    window.addEventListener(MAP_FIND_EVENT, open)
+    return () => window.removeEventListener(MAP_FIND_EVENT, open)
+  }, [isActive])
+  const pickFound = useCallback((hit) => {
+    select(hit.kind, hit.id)
+    if (view.centerOnStored) view.centerOnStored(hit.at)
+    else {
+      const world = projector.toWorld(hit.at)
+      if (world) view.centerOn(world[0], world[1])
+    }
+    setSearchOpen(false)
+  }, [projector, select, view])
+  const goWorld = useCallback((place) => {
+    if (view.fitStored) view.fitStored([place.at])
+    else {
+      const world = projector.toWorld(place.at)
+      if (world) view.centerOn(world[0], world[1])
+    }
+  }, [projector, view])
+  const addWorld = useCallback((place) => {
+    addItem('pins', makePin({ name: place.name, at: place.at }), 'pin')
+  }, [addItem])
+
+  /** Places, routes and regions from a GeoJSON or KML file, added in one step. */
+  const importGeo = useCallback(async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, filters: [{ name: 'GeoJSON or KML', extensions: ['geojson', 'json', 'kml'] }] })
+      if (!selected) return
+      const path = Array.isArray(selected) ? selected[0] : selected
+      const { readTextFile } = await import('@tauri-apps/plugin-fs')
+      const items = geoJSONToItems(readGeoFile(await readTextFile(path), path), mapRef.current)
+      const counts = [[items.pins, 'place'], [items.routes, 'route'], [items.regions, 'region'], [items.labels, 'label']]
+        .filter(([list]) => list.length)
+        .map(([list, noun]) => `${list.length} ${noun}${list.length === 1 ? '' : 's'}`)
+      for (const collection of ['pins', 'routes', 'regions', 'labels']) {
+        if (items[collection].length) dispatch({ type: 'items/add', collection, items: items[collection], meta: { coalesce: `import-${path}` } })
+      }
+      const list = counts.length > 1 ? `${counts.slice(0, -1).join(', ')} and ${counts[counts.length - 1]}` : counts[0]
+      setNotice(list ? `Imported ${list}.${items.skipped ? ` ${items.skipped} could not be read.` : ''}` : 'Nothing in that file could be placed on this map.')
+      if (list) window.requestAnimationFrame(() => fitAllRef.current?.())
+    } catch (error) {
+      console.error('[map] could not import:', error)
+      setNotice(error?.message || 'That file could not be imported.')
+    }
+  }, [dispatch, mapRef])
+
+  useMapCommands({
+    active: isActive,
+    mapKind: map.mapKind,
+    setTool,
+    zoomIn: view.zoomIn,
+    zoomOut: view.zoomOut,
+    fitAll,
+    hasSelection: Boolean(selection),
+    removeSelection,
+    openExport,
+    importGeo: IMPORT_KINDS.has(map.mapKind) ? importGeo : null,
+    openSearch: () => setSearchOpen(true),
+    showOnTimeline: selectedPinEvent ? () => showEvent(selectedPinEvent.id) : null,
+    addEventHere: selection?.kind === 'pin' && selectedItem ? () => void addEventHere(selectedItem) : null,
+    showInspector,
+    viewMenu,
+    onViewOption: applyViewOption,
+    upOneLevel: trail.length > 1 ? () => onOpenDoc?.(trail[trail.length - 2].path) : null,
+    openSurface: isSystem && selection?.kind === 'body' && selectedItem ? () => void openSurface(selectedItem) : null,
+  })
+
   // Commands arrive through a listener set up once; they reach the panel as last built.
   const panelRef = useRef(mapPanel)
   useEffect(() => {
@@ -803,36 +1374,39 @@ export default function MapSurface({
    */
   // Always published: the web toolbar draws the map's tools from it too.
   const publishing = isActive || chromeWhileInactive
-  const lastChromeRef = useRef(null)
   useEffect(() => {
     if (!publishing) return undefined
-    return () => {
-      lastChromeRef.current = null
-      documentSurface.publishMapChrome({})
-    }
+    return () => documentSurface.publishMapChrome({})
   }, [publishing])
+  // Runs only when something the chrome shows changed: the panel is memoized, so a
+  // pan (which re-renders the map) publishes nothing.
+  // On the globe, how far in from the whole Earth (MapLibre zoom levels are doublings).
+  // In 3D, by how much of the scene the view holds (distance through the lens), so going
+  // flat — further away, through a narrower lens — leaves the figure where it was.
+  const spaceReach = (spaceView.camera.distance || 16) * Math.tan(((spaceView.camera.fov || 40) * Math.PI) / 360)
+  const chromeZoom = isGlobe ? 2 ** ((globeView.camera.zoom || 0) - 1.4) : isSpace ? (16 * Math.tan((40 * Math.PI) / 360)) / Math.max(1e-6, spaceReach) : view.viewport.zoom
   useEffect(() => {
     if (!publishing) return
     const surfaceId = view.surfaceRef.current?.dataset.surfaceId
     if (!surfaceId) return
-    const state = {
-      surfaceId,
-      docPath,
-      tool,
-      zoom: view.viewport.zoom,
-      zoomLabel: formatZoom(view.viewport.zoom),
-      canUndo,
-      canRedo,
-      hasSelection: Boolean(selection),
-      panel: mapPanel.panel,
-      revealPanel,
-      active: isActive,
-    }
-    const json = JSON.stringify(state)
-    if (json === lastChromeRef.current) return
-    lastChromeRef.current = json
-    documentSurface.publishMapChrome({ state })
-  })
+    documentSurface.publishMapChrome({
+      state: {
+        surfaceId,
+        docPath,
+        tool,
+        zoom: chromeZoom,
+        zoomLabel: formatZoom(chromeZoom),
+        canUndo,
+        canRedo,
+        hasSelection: Boolean(selection),
+        panel: mapPanel.panel,
+        revealPanel,
+        active: isActive,
+        mapKind: map.mapKind,
+        viewMenu,
+      },
+    })
+  }, [canRedo, canUndo, chromeZoom, docPath, isActive, map.mapKind, mapPanel.panel, publishing, revealPanel, selection, tool, view.surfaceRef, viewMenu])
 
   /* ---------------- setup ---------------- */
 
@@ -869,11 +1443,15 @@ export default function MapSurface({
   const windowInspector = useInspectorOpen()
   const pageInspector = !windowInspector && inspectorOpen
 
+  const { surfaceRef, worldRef, viewportRef, viewport, settledZoom } = view
+  // Whether the view can film itself is the stage's to say; it answers once it is up.
+  const recorder = view.canRecord?.() ? view : null
   return (
     <div
-      ref={view.surfaceRef}
-      className={`map-surface${isPanning ? ' is-panning' : ''}${isActive ? ' is-active' : ''}`}
+      ref={surfaceRef}
+      className={`map-surface${isPanning ? ' is-panning' : ''}${isActive ? ' is-active' : ''}${isGlobe ? ' is-globe' : ''}${isSpace ? ' is-space' : ''}`}
       data-map-theme={map.style.theme}
+      data-space-look={isSpace ? map.style.look : undefined}
       data-tool={tool}
       tabIndex={0}
       onPointerDown={onPointerDown}
@@ -883,21 +1461,98 @@ export default function MapSurface({
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
     >
+      {isGlobe ? (
+        <Suspense fallback={<div className="map-globe is-loading" />}>
+          <GlobeView
+            view={globeView}
+            map={map}
+            space={space}
+            day={day}
+            selection={selection}
+            surfaceRef={surfaceRef}
+            onError={() => setGlobeFailed(true)}
+          />
+        </Suspense>
+      ) : null}
+      {isPlanet ? (
+        <Suspense fallback={<div className="map-space is-loading" />}>
+          <PlanetView
+            view={spaceView}
+            bloom={bloom}
+            map={map}
+            space={space}
+            day={day}
+            selection={selection}
+            projectName={projectName}
+            skySeed={docPath}
+            surfaceRef={surfaceRef}
+            onError={() => setSpaceFailed(true)}
+          />
+        </Suspense>
+      ) : isSpace ? (
+        <Suspense fallback={<div className="map-space is-loading" />}>
+          <SpaceView
+            view={spaceView}
+            map={map}
+            space={space}
+            day={day}
+            focusBody={focusBody}
+            skySeed={docPath}
+            projectName={projectName}
+            lookAround={lookAround && map.mapKind === 'model'}
+            bloom={bloom}
+            onError={() => setSpaceFailed(true)}
+            onProblem={setNotice}
+          />
+        </Suspense>
+      ) : null}
+      {notice ? (
+        <div className="map-floating map-notice" role="status">
+          <span>{notice}</span>
+          <button type="button" className="map-button" onClick={() => setNotice(null)}>OK</button>
+        </div>
+      ) : null}
+      {searchOpen ? (
+        <MapSearch
+          map={map}
+          space={space}
+          day={day}
+          online={map.mapKind === 'earth' && readOnlineMaps().enabled}
+          near={isGlobe ? globeView.camera.center : null}
+          onPick={pickFound}
+          onGoWorld={goWorld}
+          onAddWorld={addWorld}
+          onClose={() => {
+            setSearchOpen(false)
+            surfaceRef.current?.focus({ preventScroll: true })
+          }}
+        />
+      ) : null}
+      {lookAround && map.mapKind === 'model' ? (
+        <div className="map-floating map-notice" role="status">
+          <span>Drag to look. W A S D to move, Q and E to go down and up, ⇧ to hurry.</span>
+          <button type="button" className="map-button" onClick={() => setLookAround(false)}>Done</button>
+        </div>
+      ) : null}
+
       <svg className="map-svg" xmlns="http://www.w3.org/2000/svg">
         <MapDefs idPrefix={idPrefix} />
-        <g ref={view.worldRef}>
+        {/* A new group when the view changes: the flat view's transform must not stay on the globe's overlay. */}
+        <g ref={worldRef} key={viewKind}>
           <MapLayers
             map={map}
             projector={projector}
             space={space}
             day={day}
-            zoom={view.settledZoom}
+            zoom={settledZoom}
             schedules={schedules}
             selection={selection}
             missingDocs={missingDocs}
             projectName={projectName}
             idPrefix={idPrefix}
             earthLevel={earthLevel}
+            timelineEvents={timelineEvents}
+            positions={positions}
           />
           <MapDraft
             map={map}
@@ -912,7 +1567,13 @@ export default function MapSurface({
         </g>
       </svg>
 
-      <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} />
+      {breadcrumb.length > 1 ? (
+        <div className="map-floating map-breadcrumb" style={{ left: `${box.left + 12}px`, top: `${box.top + 12}px` }}>
+          <Breadcrumb label="Where this map is" items={breadcrumb} onSelect={(path) => onOpenDoc?.(path)} />
+        </div>
+      ) : null}
+
+      <MapChrome map={map} projector={projector} space={space} viewport={viewport} box={box} bearing={isGlobe ? globeView.camera.bearing : 0} day={day} />
 
       {!windowInspector && !inspectorOpen ? (
         <button
@@ -922,7 +1583,7 @@ export default function MapSurface({
           aria-label="Show the inspector"
           onClick={() => setInspectorOpen(true)}
         >
-          <SFIcon name="sidebar.right" size={16} />
+          <Icon name="sidebar" />
         </button>
       ) : null}
 
@@ -961,6 +1622,27 @@ export default function MapSurface({
           y={hover.y}
         />
       ) : null}
+
+      {exportOpen ? (
+        <ExportMapDialog
+          open
+          onClose={() => setExportOpen(false)}
+          map={map}
+          projector={projector}
+          space={space}
+          day={day}
+          projectName={projectName}
+          docPath={docPath}
+          surfaceRef={surfaceRef}
+          viewportRef={viewportRef}
+          picture={view.native ? (scale) => view.picture(scale, { filter: lookFilter() }) : null}
+          recorder={recorder}
+          plotCamera={isSpace && PLOTTABLE_KINDS.has(map.mapKind) ? () => spaceView.cameraRef.current || spaceView.camera : null}
+          plotObject={map.mapKind === 'model' ? spaceView.plotObject : null}
+        />
+      ) : null}
+
+      <OnlineMapsDialog open={Boolean(onlineAsk)} onAllow={allowOnline} onCancel={() => setOnlineAsk(null)} />
 
       {map.setupPending ? (
         <MapSetup projectName={projectName} docPath={docPath} onDone={completeSetup} />

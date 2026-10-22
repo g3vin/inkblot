@@ -9,6 +9,13 @@
  * the normalizers are the boundary, and past them the rest of the tile may rely on
  * the shape.
  */
+import {
+  CONVERSATION_STYLES,
+  DEFAULT_CONVERSATION_STYLE,
+  LEGACY_CONVERSATION_STYLE,
+  normalizeConversationStyle,
+  type ConversationStyleId,
+} from './conversationStyles'
 import type { Loose } from '../types'
 
 export const MIN_WIDTH = 240
@@ -97,6 +104,8 @@ export interface ConversationAttrs {
   saved: boolean
   /** The rendered SVG of a saved tile. */
   snapshot: string
+  /** Brand, iMessage or Generic (conversationStyles.ts). */
+  style: ConversationStyleId
   groupChat: boolean
   showTimestamps: boolean
   showReadReceipts: boolean
@@ -120,13 +129,14 @@ export const DEFAULT_ATTRS: Omit<ConversationAttrs, 'messages'> & { messages: St
   snapshotHeight: null,
   saved: false,
   snapshot: '',
+  style: DEFAULT_CONVERSATION_STYLE,
   groupChat: false,
   showTimestamps: true,
   showReadReceipts: false,
-  outgoingColor: '#007aff',
-  incomingColor: '#e9e9eb',
-  outgoingTextColor: '#ffffff',
-  incomingTextColor: '#111111',
+  outgoingColor: CONVERSATION_STYLES.imessage.outgoing,
+  incomingColor: CONVERSATION_STYLES.imessage.incoming,
+  outgoingTextColor: CONVERSATION_STYLES.imessage.outgoingText,
+  incomingTextColor: CONVERSATION_STYLES.imessage.incomingText,
   participants: DEFAULT_PARTICIPANTS,
   groupMembers: DEFAULT_GROUP_MEMBERS,
   messages: DEFAULT_MESSAGES,
@@ -285,6 +295,8 @@ export const normalizeAttrs = (attrs: Loose<ConversationAttrs> = {}): Conversati
     snapshotHeight: parseNumber(attrs.snapshotHeight, null),
     saved: attrs.saved === true || attrs.saved === 'true',
     snapshot: typeof attrs.snapshot === 'string' ? attrs.snapshot : '',
+    // A tile saved before styles existed has none, and keeps the iMessage look it had.
+    style: normalizeConversationStyle(attrs.style, LEGACY_CONVERSATION_STYLE),
     groupChat: attrs.groupChat === true || attrs.groupChat === 'true',
     showTimestamps: attrs.showTimestamps !== false && attrs.showTimestamps !== 'false',
     showReadReceipts: attrs.showReadReceipts === true || attrs.showReadReceipts === 'true',

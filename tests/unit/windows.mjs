@@ -1,0 +1,127 @@
+/**
+ * Documents in windows of their own (docWindow.js, useWindowPop.js, the tab bar).
+ *
+ *   - a tab let go outside the window opens its document in a window where it was let
+ *     go, and leaves the tab bar; one let go inside does not;
+ *   - a detached window's document goes back: its pending save is written first, then
+ *     the main window is told, then the window closes;
+ *   - the main window opens a document given back in a tab;
+ *   - a detached window can be kept on top.
+ *
+ * The real @tauri-apps window and event modules run against a stand-in for the IPC,
+ * which records what they ask for.
+ */
+import { JSDOM } from 'jsdom'
+import { installGlobals } from './install-globals.mjs'
+import { ok } from './assert.mjs'
+
+const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { pretendToBeVisual: true })
+installGlobals(dom.window, ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'DOMParser',
+  'requestAnimationFrame', 'cancelAnimationFrame', 'CustomEvent', 'Event', 'KeyboardEvent', 'MouseEvent', 'PointerEvent', 'getComputedStyle'])
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
+globalThis.CSS ??= { escape: (value) => value }
+window.PointerEvent ??= window.MouseEvent
+globalThis.PointerEvent ??= window.MouseEvent
+
+const ipc = []
+const callbacks = new Map()
+let nextCallback = 1
+window.__TAURI_INTERNALS__ = {
+  metadata: { currentWindow: { label: 'doc-x' }, currentWebview: { windowLabel: 'doc-x', label: 'doc-x' } },
+  transformCallback: (callback) => { const id = nextCallback++; callbacks.set(id, callback); return id },
+  unregisterCallback: (id) => callbacks.delete(id),
+  invoke: async (cmd, args) => {
+    ipc.push({ cmd, args })
+    if (cmd === 'plugin:event|listen') return 1
+    if (cmd === 'plugin:window|get_all_windows') return ['main', 'doc-x']
+    return null
+  },
+}
+window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} }
+
+const React = (await import('react')).default
+const { act } = await import('react')
+const { createRoot } = await import('react-dom/client')
+const { documentSurface } = await import('../../src/bridge/index.ts')
+const T = await import('../../src/components/tabs/tabBarState.js')
+const { default: DocumentTabBar } = await import('../../src/components/tabs/DocumentTabBar.jsx')
+const { useWindowPop } = await import('../../src/hooks/useWindowPop.js')
+const { DOCK_EVENT } = await import('../../src/lib/docWindow.js')
+const { withDocLock } = await import('../../src/lib/docLock.ts')
+const { runCommand } = await import('../../src/lib/commands.ts')
+
+ok('a point past any edge is outside the window', T.outsideWindow({ x: -5, y: 10 }, 800, 600) && T.outsideWindow({ x: 10, y: 601 }, 800, 600))
+ok('a point in it is not', !T.outsideWindow({ x: 400, y: 300 }, 800, 600) && !T.outsideWindow(null, 800, 600))
+
+/* ---------------- dragging a tab out ---------------- */
+
+const commands = []
+for (const type of ['openDocInWindow', 'closeTab', 'setTabOrder']) {
+  documentSurface.onCommand(type, (payload) => commands.push({ type, payload }))
+}
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const host = document.getElementById('root').appendChild(document.createElement('div'))
+const root = createRoot(host)
+await act(async () => { documentSurface.publishTabsChanged({ tabs: [{ id: 't1', docPath: 'One' }, { id: 't2', docPath: 'Two' }], activeTabId: 't1' }); await wait(40) })
+await act(async () => root.render(React.createElement(DocumentTabBar, { activeDoc: 'One' })))
+const tab = () => host.querySelector('[data-reorder-id="t2"]')
+const drag = async (to) => {
+  await act(async () => { tab().dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 100, clientY: 20 })) })
+  await act(async () => { window.dispatchEvent(new window.PointerEvent('pointermove', { bubbles: true, clientX: to.x, clientY: to.y })) })
+  await act(async () => { window.dispatchEvent(new window.PointerEvent('pointerup', { bubbles: true, clientX: to.x, clientY: to.y })) })
+}
+await drag({ x: 300, y: 400 })
+ok('let go inside the window, nothing pops out', !commands.some((c) => c.type === 'openDocInWindow'))
+await drag({ x: 300, y: -60 })
+const popped = commands.find((c) => c.type === 'openDocInWindow')
+ok('let go outside, its document opens in a window', popped?.payload.docPath === 'Two')
+ok('where it was let go', Number.isInteger(popped?.payload.at?.x) && popped.payload.at.y === (window.screenY || 0) - 60 - 20)
+ok('and the tab leaves', commands.at(-1)?.type === 'closeTab' && commands.at(-1).payload.tabId === 't2')
+await act(async () => root.unmount())
+
+/* ---------------- a detached window ---------------- */
+
+let currentDoc = 'Notes/Reference'
+let saved = false
+function Detached() {
+  const [doc, setDoc] = React.useState(currentDoc)
+  currentDoc = doc
+  Detached.pop = useWindowPop({ detached: true, projectName: 'P', currentDoc: doc, setCurrentDoc: setDoc, openDocInTab: () => {}, openProject: () => {} })
+  React.useEffect(() => () => {
+    // A pane letting go flushes its autosave, which writes under the document's lock.
+    if (doc) void withDocLock('P', doc, () => wait(30).then(() => { saved = true }))
+  }, [doc])
+  return null
+}
+const detachedRoot = createRoot(document.getElementById('root').appendChild(document.createElement('div')))
+await act(async () => detachedRoot.render(React.createElement(Detached)))
+
+await act(async () => { await runCommand('window.on-top') })
+ok('it can be kept on top', ipc.some((c) => c.cmd === 'plugin:window|set_always_on_top' && c.args.value === true) && Detached.pop.onTop)
+
+ipc.length = 0
+await act(async () => { await Detached.pop.dock() })
+const emitted = ipc.findIndex((c) => c.cmd === 'plugin:event|emit_to')
+ok('docking lets go of the document', currentDoc === '')
+ok('and waits for its save', saved)
+ok('then gives it to the main window', emitted >= 0 && ipc[emitted].args.event === DOCK_EVENT
+  && ipc[emitted].args.target?.label === 'main' && ipc[emitted].args.payload?.docPath === 'Notes/Reference')
+ok('then closes', ipc.findIndex((c) => c.cmd === 'plugin:window|close') > emitted)
+await act(async () => detachedRoot.unmount())
+
+/* ---------------- the main window ---------------- */
+
+const opened = []
+function Main() {
+  useWindowPop({ detached: false, projectName: 'P', currentDoc: 'One', setCurrentDoc: () => {}, openDocInTab: (path) => opened.push(path), openProject: () => {} })
+  return null
+}
+ipc.length = 0
+const mainRoot = createRoot(document.getElementById('root').appendChild(document.createElement('div')))
+await act(async () => mainRoot.render(React.createElement(Main)))
+await act(async () => wait(10))
+const listening = ipc.find((c) => c.cmd === 'plugin:event|listen' && c.args.event === DOCK_EVENT)
+ok('the main window listens for documents given back', Boolean(listening))
+await act(async () => { callbacks.get(listening.args.handler)({ event: DOCK_EVENT, id: 1, payload: { projectName: 'P', docPath: 'Notes/Reference' } }) })
+ok('and opens one in a tab', opened.join() === 'Notes/Reference')
+await act(async () => mainRoot.unmount())

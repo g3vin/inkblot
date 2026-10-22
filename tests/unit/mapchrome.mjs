@@ -86,6 +86,7 @@ const command = async (name, detail) => {
 /* ---------------- the page draws neither ---------------- */
 
 ok('the map mounts', !!document.querySelector('.map-surface:not(.is-loading)'))
+ok('the chrome says what kind of map it is', latest()?.mapKind === 'blank' || typeof latest()?.mapKind === 'string')
 ok('the page draws no tool bar', !document.querySelector('[role="toolbar"][aria-label="Map tools"]'))
 
 /* ---------------- it publishes them ---------------- */
@@ -93,8 +94,9 @@ ok('the page draws no tool bar', !document.querySelector('[role="toolbar"][aria-
 ok('the active map publishes its chrome', !!latest() && latest().active === true)
 ok('with the tool in hand', latest()?.tool === 'select')
 ok('and the zoom as the page writes it', /%|×/.test(latest()?.zoomLabel || ''))
-ok('the settings come in four tabs', latest()?.panel.tabs.map((tab) => tab.id).join() === 'map,journeys,travel,style')
+ok('the settings come in four tabs', latest()?.panel.tabs.map((tab) => tab.id).join() === 'map,travel,layers,style')
 ok('the Map tab lists the places', sectionIds().includes('places') && !!fieldById(`places.${rivendell.id}`))
+ok('and leaves export to its dialog', !sectionIds().includes('export'))
 // A map never viewed opens by fitting itself, a frame after it mounts: a real change.
 await settle(120)
 const before = chromes().length
@@ -124,6 +126,12 @@ ok('Undo from the toolbar takes it back', fieldById('pin.name')?.payload.value =
 
 await command('panel-back')
 ok('Back returns to the map’s settings', latest()?.panel.tabs.length === 4 && !latest()?.panel.canGoBack)
+
+await command('panel-tab', { id: 'travel' })
+ok('Travel holds the travellers and the ways of travelling', ['travelers', 'problems', 'transports'].every((id) => sectionIds().includes(id)))
+ok('and sends the calendar to Settings rather than editing it', sectionIds().includes('calendar') && !fieldById('calendar.mode'))
+await command('panel-tab', { id: 'journeys' })
+ok('an old tab id falls back to the Map tab', latest()?.panel.tab === 'map')
 
 await command('panel-tab', { id: 'style' })
 ok('a tab chosen natively is shown', latest()?.panel.tab === 'style' && sectionIds().includes('compass'))

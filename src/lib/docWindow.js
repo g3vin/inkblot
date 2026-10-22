@@ -9,6 +9,14 @@
  * A detached window deliberately does NOT persist its session: two windows
  * writing the same session key would each clobber the other's idea of what
  * is open. The main window stays the one that remembers.
+ *
+ * A tab dragged out of the main window opens its document in one of these where it
+ * was let go (`at`). A detached window can be kept on top of the others, and can put
+ * its document back: it tells the main window (`DOCK_EVENT`), which opens it in a
+ * tab, and closes.
+ *
+ * The window itself is built in Rust (`open_document_window`), not with
+ * `new WebviewWindow`: only there can its webview be made without Writing Tools.
  */
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { getDocDisplayName } from './docKind'
@@ -34,7 +42,13 @@ export function readDetachedTarget() {
   }
 }
 
-export async function openDocumentWindow(projectName, docPath) {
+const MAIN_WINDOW = 'main'
+
+/** Sent to the main window with `{ projectName, docPath }`: open this in a tab again. */
+export const DOCK_EVENT = 'inkblot:dock-document'
+
+/** Open a document in a window of its own; `at` puts its corner at that screen point. */
+export async function openDocumentWindow(projectName, docPath, { at = null } = {}) {
   if (!projectName || !docPath) return null
 
   const label = toWindowLabel(projectName, docPath)
@@ -52,18 +66,47 @@ export async function openDocumentWindow(projectName, docPath) {
 
   const query = `?project=${encodeURIComponent(projectName)}&doc=${encodeURIComponent(docPath)}`
 
-  const detached = new WebviewWindow(label, {
-    url: `index.html${query}`,
-    title: getDocDisplayName(docPath) || 'Inkblot',
-    width: Math.round((window?.innerWidth ?? 1200) * 0.7),
-    height: Math.round((window?.innerHeight ?? 800) * 0.9),
-    resizable: true,
-    focus: true,
-  })
-
-  detached.once('tauri://error', (error) => {
+  // Built in Rust (app_windows.rs), so its webview never offers Writing Tools.
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const placed = at && Number.isFinite(at.x) && Number.isFinite(at.y)
+    await invoke('open_document_window', {
+      label,
+      url: `index.html${query}`,
+      title: getDocDisplayName(docPath) || 'Inkblot',
+      width: Math.round((window?.innerWidth ?? 1200) * 0.7),
+      height: Math.round((window?.innerHeight ?? 800) * 0.9),
+      x: placed ? Math.round(at.x) : null,
+      y: placed ? Math.round(at.y) : null,
+    })
+    return await WebviewWindow.getByLabel(label)
+  } catch (error) {
     console.warn('Failed to open document window:', error)
-  })
+    return null
+  }
+}
 
-  return detached
+/** From a detached window: give its document back to the main window, and close. */
+export async function dockToMainWindow(projectName, docPath) {
+  const { emitTo } = await import('@tauri-apps/api/event')
+  await emitTo(MAIN_WINDOW, DOCK_EVENT, { projectName, docPath })
+  try {
+    await (await WebviewWindow.getByLabel(MAIN_WINDOW))?.setFocus()
+  } catch {
+    // The main window comes forward when it can; the document is in its tabs anyway.
+  }
+  const { getCurrentWindow } = await import('@tauri-apps/api/window')
+  await getCurrentWindow().close()
+}
+
+/** In the main window: call `handler({ projectName, docPath })` for each document given back. */
+export async function listenForDocking(handler) {
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen(DOCK_EVENT, (event) => handler(event.payload || {}))
+}
+
+/** Keep this window above the others, or not. */
+export async function setKeepOnTop(on) {
+  const { getCurrentWindow } = await import('@tauri-apps/api/window')
+  await getCurrentWindow().setAlwaysOnTop(Boolean(on))
 }

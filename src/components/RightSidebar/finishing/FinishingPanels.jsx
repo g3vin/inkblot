@@ -10,8 +10,8 @@
  * Both are drawn from what the page publishes and edit by command (usePageLayout).
  */
 import { useState } from 'react'
-import { Button } from '../../../ui'
-import SFIcon from '../../SFIcon'
+import { Button, EmptyState } from '../../../ui'
+import Icon from '../../../ui/Icon.jsx'
 import { useLatestBridgeState, shellBridge } from '../../../bridge'
 import usePageLayout from './usePageLayout'
 import FinishingHeader, { AuthorSheet } from './FinishingHeader'
@@ -21,19 +21,12 @@ import {
   PartsSection, ProofSection, StyleGallerySection, TextStylesSection, ThisPageSection,
 } from './bookSections'
 import { BindingSection, CoverSection, PublishingSection, ScriptProductionSection } from './outputSections'
-import { Note } from './controls'
 import './Finishing.css'
 
 const NO_TOOLBAR = {}
 
 function NoDocument() {
-  return (
-    <div className="inspector-placeholder">
-      <SFIcon name="doc.text" size={22} />
-      <strong>No Document</strong>
-      <span>Open a document to set up its pages, print it, or export it.</span>
-    </div>
-  )
+  return <EmptyState icon="document" title="No document open." hint="Open a document to set up its pages, print it or export it." />
 }
 
 export function TypesetPanel({ onShowOutput }) {
@@ -46,7 +39,7 @@ export function TypesetPanel({ onShowOutput }) {
   const digital = state.typesetView === 'digital'
   const hasSetup = Boolean(state.docPath && setup)
   return (
-    <div className="sidebar-panel fin-panel">
+    <div className="sidebar-panel fin-panel" data-help="typeset.panel">
       <FinishingHeader layout={layout} showsActions={false} />
       <div className="fin-body">
         {selected ? <ThisPageSection layout={layout} row={selected} /> : null}
@@ -64,8 +57,7 @@ export function TypesetPanel({ onShowOutput }) {
         <BookSetupSection layout={layout} />
         {digital ? null : <DigitalSection layout={layout} />}
         <div className="fin-next">
-          <Button variant="tinted" className="fin-grow" onClick={onShowOutput}>Next: Print & Export <SFIcon name="chevron.right" size={11} /></Button>
-          <Note>Proof the pages in the editor first — the Typeset pages are what prints.</Note>
+          <Button variant="tinted" className="fin-grow" onClick={onShowOutput}>Next: print and export <Icon name="chevron-right" /></Button>
         </div>
       </div>
       {author ? <AuthorSheet profile={state.author} onSave={layout.setAuthor} onClose={() => setAuthor(false)} /> : null}
@@ -78,7 +70,7 @@ export function OutputPanel() {
   const { state, book } = layout
   if (!state?.docPath || !book) return <NoDocument />
   return (
-    <div className="sidebar-panel fin-panel">
+    <div className="sidebar-panel fin-panel" data-help="output.panel">
       <FinishingHeader layout={layout} />
       <div className="fin-body">
         {state.script ? <ScriptProductionSection layout={layout} script={state.script} /> : null}

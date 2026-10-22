@@ -41,15 +41,15 @@ export async function buildInsertMenu(api) {
   return api.Submenu.new({
     text: 'Insert',
     items: await items(api, [
-      { text: 'Page Break', action: withTarget('insertBreak', { kind: 'page' }) },
-      { text: 'Column Break', action: withTarget('insertBreak', { kind: 'column' }) },
-      { text: 'Break to Next Right-Hand Page', action: withTarget('insertBreak', { kind: 'recto' }) },
+      { text: 'Page break', action: withTarget('insertBreak', { kind: 'page' }) },
+      { text: 'Column break', action: withTarget('insertBreak', { kind: 'column' }) },
+      { text: 'Break to next right-hand page', action: withTarget('insertBreak', { kind: 'recto' }) },
       { separator: true },
       { text: 'Footnote', accelerator: 'CmdOrCtrl+Alt+F', action: () => { if (layout()?.mode !== 'typeset') withTarget('insertFootnote')() } },
       { separator: true },
-      { text: 'Add Reference…', accelerator: 'CmdOrCtrl+Alt+R', action: openReferences(false) },
-      { text: 'Insert Citation…', accelerator: 'CmdOrCtrl+Alt+K', action: () => { if (target()) openReferences(true)() } },
-      { text: 'Insert Bibliography', action: withTarget('insertBibliography') },
+      { text: 'Add reference…', accelerator: 'CmdOrCtrl+Alt+R', action: openReferences(false) },
+      { text: 'Insert citation…', accelerator: 'CmdOrCtrl+Alt+K', action: () => { if (target()) openReferences(true)() } },
+      { text: 'Insert bibliography', action: withTarget('insertBibliography') },
     ]),
   })
 }
@@ -66,14 +66,14 @@ export async function buildFormatMenu(api) {
       { text: 'Underline', action: withTarget('applyMark', { mark: 'underline' }) },
       { text: 'Strikethrough', action: withTarget('applyMark', { mark: 'strike' }) },
       { separator: true },
-      { text: 'Align Left', action: withTarget('setAlignment', { alignment: 'left' }) },
+      { text: 'Align left', action: withTarget('setAlignment', { alignment: 'left' }) },
       { text: 'Center', action: withTarget('setAlignment', { alignment: 'center' }) },
-      { text: 'Align Right', action: withTarget('setAlignment', { alignment: 'right' }) },
+      { text: 'Align right', action: withTarget('setAlignment', { alignment: 'right' }) },
       { separator: true },
-      { text: 'Write As', items: [
+      { text: 'Write as', items: [
         { text: 'Prose', action: format('prose') },
         { text: 'Screenplay', action: format('screenplay') },
-        { text: 'Stage Play', action: format('stageplay') },
+        { text: 'Stage play', action: format('stageplay') },
       ] },
     ]),
   })
@@ -87,24 +87,25 @@ export async function viewItems(api) {
   const activeTab = () => tabs()?.tabs?.find((tab) => tab.id === tabs()?.activeTabId)
   return items(api, [
     { separator: true },
-    { text: 'Customize Toolbar…', action: event(CUSTOMIZE_TOOLBAR_EVENT) },
-    { text: 'Customize Inspector Layout…', action: event(CUSTOMIZE_INSPECTOR_EVENT) },
+    { text: 'Customize toolbar…', action: event(CUSTOMIZE_TOOLBAR_EVENT) },
+    { text: 'Customize inspector layout…', action: event(CUSTOMIZE_INSPECTOR_EVENT) },
     { separator: true },
-    { text: 'Split Right', action: () => { if (activeTab()?.split !== 'columns') send('openInSplit', { orientation: 'columns' }) } },
-    { text: 'Split Down', action: () => { if (activeTab()?.split !== 'rows') send('openInSplit', { orientation: 'rows' }) } },
-    { text: 'Close Split', action: () => { if (activeTab()?.split) send('closeSplit', {}) } },
+    { text: 'Split right', action: () => { if (activeTab()?.split !== 'columns') send('openInSplit', { orientation: 'columns' }) } },
+    { text: 'Split down', action: () => { if (activeTab()?.split !== 'rows') send('openInSplit', { orientation: 'rows' }) } },
+    { text: 'Close split', action: () => { if (activeTab()?.split) send('closeSplit', {}) } },
     { separator: true },
     { text: 'Write', action: () => send('setEditorMode', { mode: 'write' }) },
     { text: 'Typeset', action: () => send('setEditorMode', { mode: 'typeset' }) },
-    { text: 'Typeset the Book / Back to Write', action: () => send('setEditorMode', { mode: mode() === 'typeset' ? 'write' : 'typeset' }) },
-    { text: 'E-book Preview', action: typeset(() => send('setTypesetView', { view: layout()?.typesetView === 'digital' ? 'print' : 'digital' })) },
-    { text: 'Show Spreads', action: typeset(() => send('setTypesetDisplay', { spread: !layout()?.spread })) },
-    { text: 'Show Baseline Grid', action: typeset(() => send('setTypesetDisplay', { grid: !layout()?.showGrid })) },
+    { text: 'Typeset the book / back to Write', action: () => send('setEditorMode', { mode: mode() === 'typeset' ? 'write' : 'typeset' }) },
+    { text: 'Page view', action: () => send('setPrintLayout', { enabled: !(mode() !== 'typeset' && layout()?.enabled) }) },
+    { text: 'E-book preview', action: typeset(() => send('setTypesetView', { view: layout()?.typesetView === 'digital' ? 'print' : 'digital' })) },
+    { text: 'Show spreads', action: typeset(() => send('setTypesetDisplay', { spread: !layout()?.spread })) },
+    { text: 'Show baseline grid', action: typeset(() => send('setTypesetDisplay', { grid: !layout()?.showGrid })) },
     { text: 'Proof the Pages', action: typeset(() => send('setTypesetDisplay', { proof: !layout()?.proof })) },
-    { text: 'Page Zoom', items: [
-      { text: 'Fit Width', action: () => send('setPrintZoom', { fit: 'width' }) },
-      { text: 'Fit Page', action: () => send('setPrintZoom', { fit: 'page' }) },
-      { text: 'Actual Size', action: () => send('setPrintZoom', { fit: 'actual' }) },
+    { text: 'Page zoom', items: [
+      { text: 'Fit width', action: () => send('setPrintZoom', { fit: 'width' }) },
+      { text: 'Fit page', action: () => send('setPrintZoom', { fit: 'page' }) },
+      { text: 'Actual size', action: () => send('setPrintZoom', { fit: 'actual' }) },
       { separator: true },
       { text: '100%', action: () => send('setPrintZoom', { zoom: 1 }) },
     ] },
@@ -119,8 +120,8 @@ export async function windowTabItems(api) {
     if (next) send('selectTab', { tabId: next.id })
   }
   return items(api, [
-    { text: 'Show Previous Tab', action: step(-1) },
-    { text: 'Show Next Tab', action: step(1) },
+    { text: 'Show previous tab', action: step(-1) },
+    { text: 'Show next tab', action: step(1) },
     { separator: true },
   ])
 }
@@ -128,12 +129,12 @@ export async function windowTabItems(api) {
 /** File ▸ New Tab, Export Again, Print and Export Whole Project. */
 export async function fileExtraItems(api) {
   return items(api, [
-    { text: 'New Tab', action: () => send('newTab', {}) },
+    { text: 'New tab', action: () => send('newTab', {}) },
     { separator: true },
-    { text: 'Export Again', accelerator: 'CmdOrCtrl+Shift+E', action: () => send('exportAgain', {}) },
-    { text: 'Print Whole Project…', action: () => send('printDocument', { scope: 'project', bound: false }) },
-    { text: 'Export Whole Project', items: [
-      ['pdf', 'PDF…'], ['docx', 'Word (.docx)…'], ['epub', 'EPUB…'], ['markdown', 'Markdown…'], ['html', 'HTML…'], ['plainText', 'Plain Text…'],
+    { text: 'Export again', accelerator: 'CmdOrCtrl+Shift+E', action: () => send('exportAgain', {}) },
+    { text: 'Print whole project…', action: () => send('printDocument', { scope: 'project', bound: false }) },
+    { text: 'Export whole project', items: [
+      ['pdf', 'PDF…'], ['docx', 'Word (.docx)…'], ['epub', 'EPUB…'], ['markdown', 'Markdown…'], ['html', 'HTML…'], ['plainText', 'Plain text…'],
     ].map(([format, text]) => ({ text, action: () => send('exportDocument', { format, scope: 'project' }) })) },
   ])
 }
@@ -141,7 +142,7 @@ export async function fileExtraItems(api) {
 /** Edit ▸ Paste and Match Style: the clipboard's text, without its formatting. */
 export async function pasteAndMatchStyleItem(api) {
   return api.MenuItem.new({
-    text: 'Paste and Match Style',
+    text: 'Paste and match style',
     accelerator: 'CmdOrCtrl+Alt+Shift+V',
     action: async () => {
       const t = target()

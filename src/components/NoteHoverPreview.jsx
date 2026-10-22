@@ -9,15 +9,17 @@
  * persisted onto each note (previewLayout/previewSize); dragging a card with
  * children pulls the descendants along on an elastic spring animation.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
+import InkPicker from '../ui/InkPicker.jsx'
 import { useNoteCardDrag } from '../hooks/useNoteCardDrag'
 import NoteImageGallery from './NoteImageGallery'
-import AudioNotes from './AudioNotes'
-import { readClipboardImages } from '../lib/noteImageUtils'
-import { collectNoteBranchIds, createFreeNote, noteColor, touchNote } from '../lib/noteUtils'
-import { RESIZE_ICON_PATHS } from '../lib/resizeIcon'
+import { AudioClipList, AudioRecordButton } from './AudioNotes'
+import { pickNoteImages, readClipboardImages } from '../lib/noteImageUtils'
+import { trafficLightsBox } from '../lib/trafficLights'
+import { NOTE_CLOSE_MS, NOTE_POP_MS, STRING_CLOSE_MIN_MS, STRING_MIN_MS, closeSchedule, drawMs, lineStart, openTiming } from '../lib/noteReveal'
+import { NOTE_COLOR_OPTIONS, collectNoteBranchIds, createFreeNote, noteColor, noteInk, touchNote } from '../lib/noteUtils'
 import {
   NOTE_HIGHLIGHT_EVENT,
   NOTE_PREVIEW_ENTER_EVENT,
@@ -32,16 +34,15 @@ import {
   TILE_MIN_RESIZE_HEIGHT,
   VIEWPORT_PADDING,
   HIDE_DELAY_MS,
-  EDGE_GRAB_THRESHOLD,
-  DRAG_MIN_DELTA,
-  CHILD_OFFSET_X,
-  CHILD_OFFSET_Y,
+  HOVER_INTENT_STALL_MS,
+  hoverIntent,
   clampPosition,
+  findOpenSpot,
   getInitialTilePosition,
   getDotPoint,
   getCardCenter,
   getDefaultChildOffset,
-  getCurvePath,
+  getStringPath,
   isSamePreviewIdentity,
   hasStoredChildOffset,
   areRectsEqual,
@@ -56,17 +57,60 @@ const queryAnchorRect = (noteId, editorView) => {
 }
 
 
+// The reveal's timing and the closing's (drawMs, lineStart, openTiming, closeSchedule)
+// are shared with the notes panel: lib/noteReveal.
+
 export default function NoteHoverPreview({
   notesByDoc = {},
   setNotesForDoc,
   projectName,
 }) {
-  const [preview, setPreview] = useState(null)
+  const [preview, setPreviewState] = useState(null)
+  const previewRef = useRef(null)
+  // When each note's string starts drawing, by id, for the card now open (see layout).
+  const [reveal] = useState(() => ({ rootId: null, timings: new Map(), closeTotal: 0 }))
+
+  // Closing plays the opening backwards, quicker: the furthest notes shrink back
+  // into their strings first, the strings draw back to their parents, and so on up to
+  // the dot. The cards stay up (and out of reach) until it has played.
+  const [closing, setClosing] = useState(false)
+  const closeTimerRef = useRef(0)
+  const cancelClose = useCallback(() => {
+    if (!closeTimerRef.current) return
+    window.clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = 0
+    setClosing(false)
+  }, [])
+  const beginClose = useCallback(() => {
+    if (closeTimerRef.current) return
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const total = reduced ? 0 : reveal.closeTotal
+    setClosing(true)
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = 0
+      setClosing(false)
+      setPreviewState(null)
+    }, total)
+  }, [reveal])
+  useEffect(() => () => window.clearTimeout(closeTimerRef.current), [])
+
+  /** As setState, but closing (to null) plays the closing first. Only opening a note
+   *  (openPreview) calls a closing off; other updates, like the anchor following a
+   *  scroll, leave it playing. */
+  const setPreview = useCallback((update) => {
+    const current = previewRef.current
+    const next = typeof update === 'function' ? update(current) : update
+    if (!next && current) {
+      beginClose()
+      return
+    }
+    previewRef.current = next
+    setPreviewState(next)
+  }, [beginClose])
   const [dragLayouts, setDragLayouts] = useState({})
   const [cardSizes, setCardSizes] = useState({})
   const [focusNoteId, setFocusNoteId] = useState(null)
   const [elasticPositions, setElasticPositions] = useState({})
-  const previewRef = useRef(null)
   const hideTimeoutRef = useRef(null)
   const previousPreviewRef = useRef(null)
   const textareaRefs = useRef(new Map())
@@ -78,19 +122,68 @@ export default function NoteHoverPreview({
   const elasticFrameRef = useRef(0)
   const layoutRef = useRef(null)
 
+  const hoverIntentRef = useRef(null)
+  const maskId = `note-strings-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
+
+  // Each card's drawn size: a note's text and images grow it past its stored size, and
+  // the strings run between the centres of the cards as drawn, and stop at their edges.
+  const [drawnSizes, setDrawnSizes] = useState({})
+  const layerRef = useRef(null)
+  const [colorNoteId, setColorNoteId] = useState(null)
+
+  // The colour picker: its own colour focused as it opens, closed by a press outside it.
+  useEffect(() => {
+    if (!colorNoteId) return undefined
+    document.querySelector('.note-preview-ink-pill [aria-checked="true"]')?.focus()
+    const close = (event) => {
+      if (event.target instanceof Element && event.target.closest('.note-preview-ink-pill')) return
+      setColorNoteId(null)
+    }
+    window.addEventListener('pointerdown', close, true)
+    return () => window.removeEventListener('pointerdown', close, true)
+  }, [colorNoteId])
+
+
   const clearHideTimeout = useCallback(() => {
     if (hideTimeoutRef.current) {
       window.clearTimeout(hideTimeoutRef.current)
       hideTimeoutRef.current = null
     }
+    hoverIntentRef.current?.()
+    hoverIntentRef.current = null
   }, [])
 
+  // The pointer has left the dot or a card. While it is heading for a card (any of
+  // them: one that has just appeared, or the next in a branch) they stay; once it
+  // turns away from all of them, or stops short, they go. Reaching a card, or the
+  // dot again, clears this.
   const scheduleHide = useCallback(() => {
     clearHideTimeout()
-    hideTimeoutRef.current = window.setTimeout(() => {
+    const hide = () => {
+      clearHideTimeout()
       setPreview((current) => (current?.locked ? current : null))
-    }, HIDE_DELAY_MS)
-  }, [clearHideTimeout])
+    }
+    const targets = [...document.querySelectorAll('.note-preview-card')].map((card) => card.getBoundingClientRect())
+    const anchor = previewRef.current?.anchorRect
+    if (anchor) targets.push(anchor)
+    if (targets.length === 0) {
+      hideTimeoutRef.current = window.setTimeout(hide, HIDE_DELAY_MS)
+      return
+    }
+    const nearest = []
+    const stall = () => {
+      window.clearTimeout(hideTimeoutRef.current)
+      hideTimeoutRef.current = window.setTimeout(hide, HOVER_INTENT_STALL_MS)
+    }
+    const handleMove = (event) => {
+      const intent = hoverIntent(event.clientX, event.clientY, targets, nearest)
+      if (intent === 'away') hide()
+      else if (intent === 'approaching') stall()
+    }
+    window.addEventListener('pointermove', handleMove)
+    hoverIntentRef.current = () => window.removeEventListener('pointermove', handleMove)
+    stall()
+  }, [clearHideTimeout, setPreview])
 
   const lockPreview = useCallback(() => {
     clearHideTimeout()
@@ -98,7 +191,7 @@ export default function NoteHoverPreview({
       if (!current || current.locked) return current
       return { ...current, locked: true }
     })
-  }, [clearHideTimeout])
+  }, [clearHideTimeout, setPreview])
 
   useEffect(() => clearHideTimeout, [clearHideTimeout])
 
@@ -180,6 +273,7 @@ export default function NoteHoverPreview({
   useEffect(() => {
     const openPreview = (detail, locked) => {
       if (!detail?.note || !detail?.anchorRect) return
+      cancelClose()
 
       clearHideTimeout()
       const currentPreview = previewRef.current
@@ -229,7 +323,7 @@ export default function NoteHoverPreview({
       window.removeEventListener(NOTE_PREVIEW_PIN_EVENT, handlePin)
       window.removeEventListener(NOTE_PREVIEW_LEAVE_EVENT, handleLeave)
     }
-  }, [clearHideTimeout, scheduleHide])
+  }, [cancelClose, clearHideTimeout, scheduleHide, setPreview])
 
   // Keep the anchor rect current while the page scrolls/resizes so the strings follow.
   useEffect(() => {
@@ -263,13 +357,13 @@ export default function NoteHoverPreview({
       window.removeEventListener('resize', syncAnchor)
       window.removeEventListener('scroll', syncAnchor, true)
     }
-  }, [preview?.editorView, preview?.note?.id])
+  }, [preview?.editorView, preview?.note?.id, setPreview])
 
   useEffect(() => {
     const handlePointerDown = (event) => {
       if (!preview?.locked) return
       if (dragStateRef.current) return
-      if (event.target instanceof HTMLElement && event.target.closest('.note-preview-card, .note-marker')) {
+      if (event.target instanceof Element && event.target.closest('.note-preview-card, .note-marker')) {
         return
       }
       setPreview(null)
@@ -287,13 +381,17 @@ export default function NoteHoverPreview({
       window.removeEventListener('pointerdown', handlePointerDown)
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [preview])
+  }, [preview, setPreview])
 
   // Compute card positions/sizes and connecting edges for the whole visible
   // branch. Child positions are offsets from their parent (stored on the note
   // or overridden mid-drag), so moving a parent shifts its subtree.
   const layout = useMemo(() => {
-    if (!preview?.anchorRect || !rootNote) return null
+    if (!preview?.anchorRect || !rootNote) {
+      // Closed: the next opening reveals in order again.
+      reveal.rootId = null
+      return null
+    }
 
     const rootBase = getInitialTilePosition(preview.anchorRect)
     const getNoteSize = (note) => cardSizes[note.id] || note.previewSize || {
@@ -301,12 +399,17 @@ export default function NoteHoverPreview({
       height: TILE_MIN_HEIGHT,
     }
 
-    const rootSize = getNoteSize(rootNote)
+    // Kept in the window by the size each card is drawn at (its text can grow it past
+    // its stored size), and clear of the traffic lights.
+    const boundsOf = (note) => drawnSizes[note.id] || getNoteSize(note)
+    const lights = trafficLightsBox(VIEWPORT_PADDING)
+    const keepOut = lights ? [lights] : []
+
     const rootOffset = dragLayouts[rootNote.id] || rootNote.previewLayout || { offsetX: 0, offsetY: 0 }
     const rootPosition = clampPosition({
       x: rootBase.x + (rootOffset.offsetX || 0),
       y: rootBase.y + (rootOffset.offsetY || 0),
-    }, rootSize)
+    }, boundsOf(rootNote), keepOut)
 
     const positions = new Map()
     const sizes = new Map()
@@ -330,7 +433,6 @@ export default function NoteHoverPreview({
         size,
         depth,
         childCount: children.length,
-        revealDelay: depth * 0.05 + nodes.length * 0.018,
       })
 
       if (note.collapsedChildren) return
@@ -339,17 +441,17 @@ export default function NoteHoverPreview({
         const fallbackOffset = getDefaultChildOffset(index, children.length)
         const storedOffset = dragLayouts[child.id]
           || (hasStoredChildOffset(child) ? child.previewLayout : fallbackOffset)
-        const childSize = getNoteSize(child)
         const childPosition = clampPosition({
           x: position.x + (storedOffset.offsetX || 0),
           y: position.y + (storedOffset.offsetY || 0),
-        }, childSize)
+        }, boundsOf(child), keepOut)
 
         edges.push({
           id: `${note.id}:${child.id}`,
           fromNoteId: note.id,
           toNoteId: child.id,
           color: noteColor(child.color || note.color),
+          fromColor: noteColor(note.color),
           depth: depth + 1,
         })
 
@@ -358,8 +460,77 @@ export default function NoteHoverPreview({
     }
 
     visit(rootNote, rootPosition, 0)
+
+    // The reveal, a generation at a time: the string to a note draws itself from its
+    // parent (or the dot), taking longer the longer it is; the note pops in as it
+    // arrives; then its children's strings start. Only the notes there as the card
+    // opens are staggered; one added or expanded later draws and pops at once.
+    const boxOf = (id) => {
+      const at = positions.get(id)
+      const size = drawnSizes[id] || sizes.get(id)
+      return at && size ? { x: at.x, y: at.y, width: size.width, height: size.height } : null
+    }
+    const drawMsFor = (edge) => {
+      const toBox = boxOf(edge.toNoteId)
+      const fromBox = edge.fromNoteId ? boxOf(edge.fromNoteId) : null
+      if (!toBox) return STRING_MIN_MS
+      const fromPoint = fromBox ? getCardCenter(fromBox, fromBox) : edge.anchorPoint
+      const { length } = getStringPath(fromPoint, getCardCenter(toBox, toBox), fromBox, toBox)
+      return drawMs(length)
+    }
+    const fresh = reveal.rootId !== rootNote.id
+    if (fresh) {
+      reveal.rootId = rootNote.id
+      reveal.timings.clear()
+    }
+    // Edges come parent first, so a parent's timing is known before its children's.
+    edges.forEach((edge) => {
+      if (!reveal.timings.has(edge.toNoteId)) {
+        const draw = drawMsFor(edge)
+        const parent = edge.fromNoteId ? reveal.timings.get(edge.fromNoteId) : null
+        const line = fresh ? lineStart(parent) : 0
+        reveal.timings.set(edge.toNoteId, openTiming(line, draw))
+      }
+      const timing = reveal.timings.get(edge.toNoteId)
+      edge.delay = timing.line
+      edge.duration = timing.draw
+    })
+    nodes.forEach((node) => {
+      node.revealDelay = reveal.timings.get(node.note.id)?.pop ?? 0
+    })
+    const closing = closeSchedule(edges)
+    reveal.closeTotal = closing.total
+    edges.forEach((edge) => { edge.close = closing.schedule.get(edge.toNoteId)?.string })
+    nodes.forEach((node) => { node.close = closing.schedule.get(node.note.id)?.card })
     return { nodes, edges, positions, sizes, rootBase, rootPosition }
-  }, [cardSizes, childMap, dragLayouts, preview, rootNote])
+  }, [cardSizes, childMap, dragLayouts, drawnSizes, preview, reveal, rootNote])
+
+  // Watch the cards as drawn (see drawnSizes) whenever the set of them changes.
+  const cardIds = layout?.nodes.map(({ note }) => note.id).join(' ')
+  useEffect(() => {
+    const layer = layerRef.current
+    if (!layer || !cardIds) return undefined
+    const observer = new ResizeObserver((entries) => {
+      setDrawnSizes((current) => {
+        let next = current
+        entries.forEach(({ target }) => {
+          const id = target.dataset.noteId
+          const size = {
+            width: target.offsetWidth,
+            height: target.offsetHeight,
+            radius: parseFloat(getComputedStyle(target).borderTopLeftRadius) || 0,
+          }
+          const was = current[id]
+          if (was && was.width === size.width && was.height === size.height && was.radius === size.radius) return
+          if (next === current) next = { ...current }
+          next[id] = size
+        })
+        return next
+      })
+    })
+    layer.querySelectorAll('.note-preview-card').forEach((card) => observer.observe(card))
+    return () => observer.disconnect()
+  }, [cardIds])
 
   useEffect(() => {
     layoutRef.current = layout
@@ -386,15 +557,27 @@ export default function NoteHoverPreview({
       const nextPositions = { ...elasticPositionsRef.current }
       const nextVelocity = { ...elasticVelocityRef.current }
 
-      descendantIds.forEach((noteId) => {
-        const target = currentLayout.positions.get(noteId)
-        if (!target) {
+      // Each note chases where its parent is now, not where it will end up: the lag
+      // passes down the branch, so a child trails the card being dragged and its own
+      // child trails it in turn. Parents come first in layout.nodes, so a parent has
+      // moved this frame before its children follow it.
+      currentLayout.nodes.forEach(({ note }) => {
+        const noteId = note.id
+        if (!descendantIds.has(noteId)) return
+        const settled = currentLayout.positions.get(noteId)
+        if (!settled) {
           delete nextPositions[noteId]
           delete nextVelocity[noteId]
           return
         }
+        const parentId = note.parentNoteId
+        const parentSettled = parentId ? currentLayout.positions.get(parentId) : null
+        const parentNow = parentId ? nextPositions[parentId] || parentSettled : null
+        const target = parentSettled && parentNow
+          ? { x: parentNow.x + (settled.x - parentSettled.x), y: parentNow.y + (settled.y - parentSettled.y) }
+          : settled
 
-        const current = nextPositions[noteId] || { ...target }
+        const current = nextPositions[noteId] || { ...settled }
         const velocity = nextVelocity[noteId] || { x: 0, y: 0 }
 
         velocity.x = (velocity.x + (target.x - current.x) * 0.12) * 0.72
@@ -406,8 +589,8 @@ export default function NoteHoverPreview({
         }
 
         if (
-          Math.abs(target.x - next.x) > 0.35 ||
-          Math.abs(target.y - next.y) > 0.35 ||
+          Math.abs(settled.x - next.x) > 0.35 ||
+          Math.abs(settled.y - next.y) > 0.35 ||
           Math.abs(velocity.x) > 0.12 ||
           Math.abs(velocity.y) > 0.12
         ) {
@@ -415,7 +598,7 @@ export default function NoteHoverPreview({
           nextPositions[noteId] = next
           nextVelocity[noteId] = velocity
         } else {
-          nextPositions[noteId] = { ...target }
+          nextPositions[noteId] = { ...settled }
           nextVelocity[noteId] = { x: 0, y: 0 }
         }
       })
@@ -488,10 +671,22 @@ export default function NoteHoverPreview({
     if (!preview?.docName || !setNotesForDoc) return
 
     const currentChildren = childMap.get(parentId) || []
-    const nextTotal = currentChildren.length + 1
-    const nextIndex = currentChildren.length
-    const previewLayout = getDefaultChildOffset(nextIndex, nextTotal)
     const parentNote = noteById.get(parentId)
+    // It goes where there is room: beside its parent, clear of every note showing.
+    const boxOf = (id) => {
+      const at = layout?.positions.get(id)
+      const size = drawnSizes[id] || layout?.sizes.get(id)
+      return at && size ? { x: at.x, y: at.y, width: size.width, height: size.height } : null
+    }
+    const parentBox = boxOf(parentId)
+    const lights = trafficLightsBox(VIEWPORT_PADDING)
+    const previewLayout = parentBox
+      ? (() => {
+          const others = (layout?.nodes || []).map(({ note }) => boxOf(note.id)).filter(Boolean)
+          const spot = findOpenSpot(parentBox, { width: TILE_WIDTH, height: TILE_MIN_HEIGHT }, others, lights ? [lights] : [])
+          return { offsetX: spot.x - parentBox.x, offsetY: spot.y - parentBox.y }
+        })()
+      : getDefaultChildOffset(currentChildren.length, currentChildren.length + 1)
     const newNote = touchNote(createFreeNote(parentNote?.color), {
       parentNoteId: parentId,
       previewLayout,
@@ -501,7 +696,7 @@ export default function NoteHoverPreview({
     lockPreview()
     setNotesForDoc(preview.docName, (currentNotes) => [...currentNotes, newNote])
     setFocusNoteId(newNote.id)
-  }, [childMap, lockPreview, noteById, preview, setNotesForDoc])
+  }, [childMap, drawnSizes, layout, lockPreview, noteById, preview, setNotesForDoc])
 
   const commitLayout = useCallback((noteId, nextLayout) => {
     updateNote(noteId, (note) => ({
@@ -523,9 +718,8 @@ export default function NoteHoverPreview({
     }))
   }, [updateNote])
 
-  // A drag starts from the drag handle or by grabbing near a card edge —
-  // never from the close button or interactive controls.
-  const { handleDragStart, handleResizeStart } = useNoteCardDrag({
+  // A card moves by its top band and resizes by its edges and corners, as a window does.
+  const { handleCardPointerDown, cursorAt } = useNoteCardDrag({
     cardSizesRef,
     childMap,
     commitLayout,
@@ -572,7 +766,7 @@ export default function NoteHoverPreview({
       })
       return next
     })
-  }, [docNotes, preview, rootNote, setNotesForDoc])
+  }, [docNotes, preview, rootNote, setNotesForDoc, setPreview])
 
   const handlePasteImages = useCallback(async (noteId, event) => {
     const images = await readClipboardImages(event.clipboardData)
@@ -586,54 +780,84 @@ export default function NoteHoverPreview({
 
   if (!preview || !layout || !rootNote) return null
 
+  // Each string, from the edge of its parent (or the dot) to the edge of its note, and
+  // where it reaches the note: the note grows out from that point.
+  const boxOf = (id) => {
+    const at = elasticPositions[id] || layout.positions.get(id)
+    const size = drawnSizes[id] || layout.sizes.get(id)
+    return at && size ? { x: at.x, y: at.y, width: size.width, height: size.height } : null
+  }
+  const growFrom = new Map()
+  const strings = layout.edges.flatMap((edge) => {
+    const toBox = boxOf(edge.toNoteId)
+    const fromBox = edge.fromNoteId ? boxOf(edge.fromNoteId) : null
+    if (!toBox || (edge.fromNoteId && !fromBox)) return []
+    const fromPoint = fromBox ? getCardCenter(fromBox, fromBox) : edge.anchorPoint
+    const { d, start, end } = getStringPath(fromPoint, getCardCenter(toBox, toBox), fromBox, toBox)
+    growFrom.set(edge.toNoteId, `${end.x - toBox.x}px ${end.y - toBox.y}px`)
+    return [{ edge, path: d, start, end }]
+  })
+
   return (
-    <div className="note-preview-layer" style={{ '--note-color': noteColor(rootNote.color) }}>
+    <div ref={layerRef} className={`note-preview-layer${closing ? ' is-closing' : ''}`} style={{ '--note-color': noteColor(rootNote.color) }}>
       <svg
         className="note-preview-string"
         viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
         preserveAspectRatio="none"
         style={{ pointerEvents: 'none' }}
       >
-        {layout.edges.map((edge) => {
-          const toPosition = elasticPositions[edge.toNoteId] || layout.positions.get(edge.toNoteId)
-          const toSize = layout.sizes.get(edge.toNoteId)
-          if (!toPosition || !toSize) return null
-
-          const fromPosition = edge.fromNoteId
-            ? elasticPositions[edge.fromNoteId] || layout.positions.get(edge.fromNoteId)
-            : null
-          const fromSize = edge.fromNoteId ? layout.sizes.get(edge.fromNoteId) : null
-          if (edge.fromNoteId && (!fromPosition || !fromSize)) return null
-
-          const fromPoint = edge.fromNoteId
-            ? getCardCenter(fromPosition, fromSize)
-            : edge.anchorPoint
-          const toPoint = getCardCenter(toPosition, toSize)
-          const path = getCurvePath(fromPoint, toPoint)
-          return (
-            <g key={edge.id} style={{ '--note-color': edge.color }}>
-              <path
-                className="note-preview-string-shadow"
-                d={path}
-              />
-              <path
-                className="note-preview-string-path"
-                d={path}
-                style={{
-                  animationDelay: `${(edge.depth ?? 0) * 50 + 40}ms`,
-                }}
-              />
-            </g>
-          )
-        })}
+        {/* The cards are a little see-through, so the strings stop at their edges. */}
+        <defs>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={window.innerWidth} height={window.innerHeight}>
+            <rect x="0" y="0" width={window.innerWidth} height={window.innerHeight} fill="white" />
+            {layout.nodes.map(({ note, position, size }) => {
+              const at = elasticPositions[note.id] || position
+              const drawn = drawnSizes[note.id] || size
+              return <rect key={note.id} x={at.x} y={at.y} width={drawn.width} height={drawn.height} rx={drawn.radius ?? 0} fill="black" />
+            })}
+          </mask>
+        </defs>
+        <g mask={`url(#${maskId})`}>
+          {strings.map(({ edge, path, start, end }) => {
+            // A note recoloured away from its parent: the string blends from one to the other.
+            const gradientId = edge.fromColor && edge.fromColor !== edge.color ? `${maskId}-${edge.id.replace(/[^a-zA-Z0-9_-]/g, '')}` : null
+            return (
+              <g key={edge.id} style={{ '--note-color': gradientId ? `url(#${gradientId})` : edge.color }}>
+                {gradientId ? (
+                  <defs>
+                    <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={start.x} y1={start.y} x2={end.x} y2={end.y}>
+                      <stop offset="0" style={{ stopColor: edge.fromColor }} />
+                      <stop offset="1" style={{ stopColor: edge.color }} />
+                    </linearGradient>
+                  </defs>
+                ) : null}
+                <path
+                  className="note-preview-string-shadow"
+                  d={path}
+                />
+                <path
+                  className="note-preview-string-path"
+                  d={path}
+                  pathLength="1"
+                  style={{
+                    '--string-delay': `${edge.delay}ms`,
+                    '--string-ms': `${edge.duration}ms`,
+                    '--string-close-delay': `${edge.close?.delay ?? 0}ms`,
+                    '--string-close-ms': `${edge.close?.ms ?? STRING_CLOSE_MIN_MS}ms`,
+                  }}
+                />
+              </g>
+            )
+          })}
+        </g>
       </svg>
 
-      {layout.nodes.map(({ note, position, size, childCount, revealDelay }) => {
+      {layout.nodes.map(({ note, position, size, childCount, revealDelay, close }) => {
         const renderPosition = elasticPositions[note.id] || position
-        const addIconName = childCount > 0 ? 'git.pullrequest' : 'arrow.down.to.dot'
         return (
           <article
             key={note.id}
+            data-note-id={note.id}
             className={`note-preview-card${preview.locked ? ' locked' : ''}`}
             style={{
               left: `${renderPosition.x}px`,
@@ -641,38 +865,74 @@ export default function NoteHoverPreview({
               width: `${size.width}px`,
               minHeight: `${size.height}px`,
               '--note-color': noteColor(note.color),
-              '--note-reveal-delay': `${revealDelay}s`,
+              '--note-reveal-delay': `${revealDelay}ms`,
+              '--note-pop-ms': `${NOTE_POP_MS}ms`,
+              '--note-close-delay': `${close?.delay ?? 0}ms`,
+              '--note-close-ms': `${close?.ms ?? NOTE_CLOSE_MS}ms`,
+              '--note-grow-from': growFrom.get(note.id),
             }}
-            onPointerDown={(event) => handleDragStart(note.id, event)}
+            onPointerDown={(event) => handleCardPointerDown(note.id, event)}
+            onPointerMove={(event) => {
+              if (!dragStateRef.current) event.currentTarget.style.cursor = cursorAt(event)
+            }}
             onMouseEnter={clearHideTimeout}
             onMouseLeave={() => {
               if (dragStateRef.current) return
               if (!preview.locked) scheduleHide()
             }}
           >
+            {/* The band across the top moves the card; a click outside closes it. */}
             <div className="note-preview-header">
-              <button
-                type="button"
-                className="note-preview-drag"
-                onPointerDown={(event) => handleDragStart(note.id, event)}
-                onClick={(event) => event.preventDefault()}
-                aria-label="Move note"
-                title="Move note"
-              >
-                <SFIcon name="ellipsis" size={14} />
-              </button>
-
-              {note.id === rootNote.id ? (
+              {colorNoteId === note.id ? (
+                // The note's own colour stays where its dot was; the others run out
+                // to its right in a pill. Picking one, or a press elsewhere, closes it.
+                <div
+                  className="note-preview-ink-pill"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Escape') return
+                    event.stopPropagation()
+                    setColorNoteId(null)
+                  }}
+                >
+                  <InkPicker
+                    label="Note colour"
+                    value={noteInk(note)}
+                    inks={[noteInk(note), ...NOTE_COLOR_OPTIONS.filter((ink) => ink !== noteInk(note))]}
+                    onChange={(ink) => {
+                      updateNote(note.id, (current) => touchNote(current, { color: ink }))
+                      setColorNoteId(null)
+                    }}
+                  />
+                </div>
+              ) : (
                 <button
                   type="button"
-                  className="note-preview-close"
-                  onClick={() => setPreview(null)}
-                  aria-label="Close note preview"
-                  title="Close note preview"
+                  className="note-tool-btn note-preview-tool note-preview-color"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    lockPreview()
+                    setColorNoteId(note.id)
+                  }}
+                  aria-label="Note colour"
+                  title="Note colour"
+                  aria-expanded={false}
                 >
-                  <SFIcon name="xmark" size={12} />
+                  <span className="note-preview-color-dot" aria-hidden="true" />
                 </button>
-              ) : <span className="note-preview-spacer" />}
+              )}
+              <button
+                type="button"
+                className="note-tool-btn note-preview-tool"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void handleDeleteNote(note.id)
+                }}
+                aria-label="Delete note branch"
+                title="Delete note branch"
+              >
+                <Icon name="delete" />
+              </button>
             </div>
 
             <textarea
@@ -706,32 +966,50 @@ export default function NoteHoverPreview({
 
             {/* Voice memos are stored on the note, so one recorded here is the same
                 memo the notes panel and any canvas card show. */}
-            <AudioNotes
-              audio={note.audio}
-              projectName={projectName}
-              onChange={(audio) => handleChangeAudio(note.id, audio)}
-              compact
-            />
+            <AudioClipList audio={note.audio} projectName={projectName} onChange={(audio) => handleChangeAudio(note.id, audio)} />
 
-            <div className="note-footer note-preview-footer">
-              <div className="note-preview-branch-actions">
+            <div className="note-preview-footer">
+              <div className="note-preview-footer-start">
+                <AudioRecordButton
+                  audio={note.audio}
+                  projectName={projectName}
+                  onChange={(audio) => handleChangeAudio(note.id, audio)}
+                  iconOnly
+                />
                 <button
                   type="button"
-                  className="note-tool-btn note-preview-branch-btn"
-                  onClick={(event) => {
+                  className="note-tool-btn note-preview-tool"
+                  onClick={async (event) => {
                     event.stopPropagation()
-                    void handleDeleteNote(note.id)
+                    lockPreview()
+                    const images = await pickNoteImages()
+                    if (images.length) handleAddImages(note.id, images)
                   }}
-                  aria-label="Delete note branch"
-                  title="Delete note branch"
+                  aria-label="Add image"
+                  title="Add image"
                 >
-                  <SFIcon name="trash" size={14} />
+                  <Icon name="image" />
                 </button>
+              </div>
 
+              <button
+                type="button"
+                className="note-tool-btn note-preview-tool"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleAddChild(note.id)
+                }}
+                aria-label={childCount > 0 ? 'Add another connected note' : 'Add connected note'}
+                title={childCount > 0 ? 'Add another connected note' : 'Add connected note'}
+              >
+                <Icon name={childCount > 0 ? 'branch' : 'add'} />
+              </button>
+
+              <div className="note-preview-footer-end">
                 {childCount > 0 ? (
                   <button
                     type="button"
-                    className={`note-tool-btn note-preview-branch-btn${note.collapsedChildren ? ' active' : ''}`}
+                    className={`note-tool-btn note-preview-tool${note.collapsedChildren ? ' active' : ''}`}
                     onClick={(event) => {
                       event.stopPropagation()
                       handleToggleCollapse(note.id)
@@ -739,49 +1017,11 @@ export default function NoteHoverPreview({
                     aria-label={note.collapsedChildren ? 'Expand branch' : 'Collapse branch'}
                     title={note.collapsedChildren ? 'Expand branch' : 'Collapse branch'}
                   >
-                    <SFIcon name="arrow.up.from.dot" size={14} />
+                    <Icon name={note.collapsedChildren ? 'chevron-right' : 'chevron-down'} />
                   </button>
                 ) : null}
-
-                <button
-                  type="button"
-                  className="note-tool-btn note-preview-branch-btn"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleAddChild(note.id)
-                  }}
-                  aria-label="Add connected note"
-                  title="Add connected note"
-                >
-                  <SFIcon name={addIconName} size={14} />
-                </button>
               </div>
             </div>
-
-            <button
-              type="button"
-              className="note-preview-resize"
-              onPointerDown={(event) => handleResizeStart(note.id, event)}
-              onClick={(event) => event.preventDefault()}
-              aria-label="Resize note"
-              title="Resize note"
-            >
-              <svg
-                className="resize-corner-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                {RESIZE_ICON_PATHS.map(path => <path key={path} d={path} />)}
-              </svg>
-            </button>
           </article>
         )
       })}

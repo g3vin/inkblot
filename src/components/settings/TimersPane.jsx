@@ -7,7 +7,7 @@
  */
 import { useState } from 'react'
 import { Button, FormRow, IconButton, SelectMenu, Stepper, Toggle } from '../../ui'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { allRoutines, findRoutine } from '../../stats/config.js'
 import {
   TIMER_SOUNDS, duplicateRoutine, isBuiltIn, kindTitle, restSegment, segmentTitle, soundTitle, writeSegment,
@@ -34,9 +34,9 @@ function SegmentRow({ segment, index, count, onChange, onMove, onDelete }) {
       <div className="settings-segment-row">
         <SelectMenu label="Kind" value={segment.kind} options={KINDS} onChange={(kind) => change({ kind, wordGoal: kind === 'rest' ? null : segment.wordGoal })} />
         <input className="settings-input settings-grow" aria-label="Label" placeholder={kindTitle(segment.kind)} value={segment.label} onChange={(event) => change({ label: event.target.value })} />
-        <IconButton symbol="arrow.up.from.dot" label="Move Up" size="capsule" iconSize={12} disabled={index === 0} onClick={() => onMove(-1)} />
-        <IconButton symbol="arrow.down.to.dot" label="Move Down" size="capsule" iconSize={12} disabled={index === count - 1} onClick={() => onMove(1)} />
-        <IconButton symbol="trash" label="Delete Segment" size="capsule" iconSize={12} disabled={count <= 1} onClick={onDelete} />
+        <IconButton icon="arrow-up" label="Move up" size="capsule" disabled={index === 0} onClick={() => onMove(-1)} />
+        <IconButton icon="arrow-down" label="Move down" size="capsule" disabled={index === count - 1} onClick={() => onMove(1)} />
+        <IconButton icon="delete" label="Delete segment" size="capsule" disabled={count <= 1} onClick={onDelete} />
       </div>
       <div className="settings-segment-row">
         <label className="settings-check">
@@ -99,8 +99,8 @@ function RoutineEditor({ routine, onChange }) {
           />
         ))}
         <div className="settings-actions">
-          <Button onClick={() => setSegments([...routine.segments, writeSegment(25)])}><SFIcon name="pencil" size={12} />Add Writing</Button>
-          <Button onClick={() => setSegments([...routine.segments, restSegment(5)])}><SFIcon name="cup.and.saucer" size={12} />Add Break</Button>
+          <Button onClick={() => setSegments([...routine.segments, writeSegment(25)])}><Icon name="edit" />Add writing</Button>
+          <Button onClick={() => setSegments([...routine.segments, restSegment(5)])}><Icon name="break" />Add break</Button>
         </div>
         <p className="settings-footer">{routinePlan(routine)}</p>
       </section>
@@ -135,20 +135,20 @@ export default function TimersPane({ stats }) {
         <h3>Routines</h3>
         <FormRow label="Routine"><SelectMenu label="Routine" value={selected.id} options={routineOptions(config)} onChange={setSelection} /></FormRow>
         <div className="settings-actions">
-          <Button onClick={() => add({ id: newId(), name: 'My Routine', segments: [writeSegment(30), restSegment(5)], repeats: 1, autoAdvance: true, pauseTrackingOnBreaks: true })}><SFIcon name="plus" size={12} />New Routine</Button>
-          <Button onClick={() => add(duplicateRoutine(selected))}><SFIcon name="plus.square.on.square" size={12} />Duplicate</Button>
+          <Button onClick={() => add({ id: newId(), name: 'My routine', segments: [writeSegment(30), restSegment(5)], repeats: 1, autoAdvance: true, pauseTrackingOnBreaks: true })}><Icon name="add" />New routine</Button>
+          <Button onClick={() => add(duplicateRoutine(selected))}><Icon name="copy" />Duplicate</Button>
           <span className="settings-grow" />
           <Button variant="destructive" disabled={isBuiltIn(selected)} onClick={() => {
             save({ ...config, routines: config.routines.filter((r) => r.id !== selected.id), lastRoutineID: config.lastRoutineID === selected.id ? null : config.lastRoutineID })
             setSelection(null)
-          }}><SFIcon name="trash" size={12} />Delete</Button>
+          }}><Icon name="delete" />Delete</Button>
         </div>
       </section>
       {isBuiltIn(selected) ? (
         <section className="settings-group">
           <h3>{selected.name}</h3>
           {selected.segments.map((segment) => (
-            <FormRow key={segment.id} label={<span className="settings-inline"><SFIcon name={segment.kind === 'write' ? 'pencil' : 'cup.and.saucer'} size={12} />{segmentTitle(segment)}</span>}>
+            <FormRow key={segment.id} label={<span className="settings-inline"><Icon name={segment.kind === 'write' ? 'edit' : 'break'} />{segmentTitle(segment)}</span>}>
               <span className="settings-value">{segmentLength(segment)}</span>
             </FormRow>
           ))}

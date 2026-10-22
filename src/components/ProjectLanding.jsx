@@ -10,9 +10,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createProject, getProjectRoot, linkProject, listProjects, moveProject } from '../lib/FileSystem'
-import { Button, Sheet } from '../ui'
+import { Button, EmptyState, Sheet } from '../ui'
 import { popUpNativeMenu } from '../ui/useNativeMenu.js'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { AppIcon, Wordmark } from '../ui/Brand.jsx'
 import './ProjectLanding.css'
 
@@ -52,7 +52,7 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
     onCreated(trimmed)
   }
   return (
-    <Sheet title="New Project" width={400} onClose={onClose} footer={(
+    <Sheet title="New project" width={400} onClose={onClose} footer={(
       <>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="filled" disabled={!name.trim()} onClick={submit}>Create</Button>
@@ -67,7 +67,7 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
           onChange={(event) => { setName(event.target.value); setError('') }}
         />
         <button type="button" className="picker-location" onClick={choose} title={location || 'Stored in the app’s own folder'}>
-          <SFIcon name="folder" size={13} />
+          <Icon name="folder" />
           <span>{location ? location : 'In Inkblot’s own folder'}</span>
           <strong>Change…</strong>
         </button>
@@ -145,7 +145,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
     if (typeof target !== 'string' || !target) return
     const result = await moveProject(name, target)
     if (!result?.ok) {
-      await message(result?.error === 'target-exists' ? 'A folder with that project name already exists there.' : 'Could not move the project.', { title: 'Move Project', kind: 'error' })
+      await message(result?.error === 'target-exists' ? 'A folder with that project name already exists there.' : 'Could not move the project.', { title: 'Move project', kind: 'error' })
       return
     }
     await refresh()
@@ -171,24 +171,24 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
       <div className="picker-column">
         <header className="picker-header">
           <AppIcon className="picker-logo" size={98} label="" />
-          <h1 className="picker-wordmark"><Wordmark height={30} /></h1>
+          <h1 className="picker-wordmark"><Wordmark height={40} /></h1>
           {version ? <p>Version {version}</p> : null}
         </header>
 
         <div className="picker-actions">
           <button type="button" className="picker-capsule" onClick={openExisting}>Open…</button>
           <span className="picker-capsule picker-split">
-            <button type="button" onClick={() => setCreating(true)}>New Project</button>
+            <button type="button" onClick={() => setCreating(true)}>New project</button>
             <button
               type="button"
               className="picker-chevron"
-              aria-label="New Project Options"
+              aria-label="New project options"
               onClick={(event) => popUpNativeMenu(event, [
-                { text: 'New Project…', action: () => setCreating(true) },
-                { text: 'New Project in Folder…', action: () => setCreating('folder') },
+                { text: 'New project…', action: () => setCreating(true) },
+                { text: 'New project in folder…', action: () => setCreating('folder') },
               ])}
             >
-              <SFIcon name="chevron.down" size={11} />
+              <Icon name="chevron-down" />
             </button>
           </span>
         </div>
@@ -208,7 +208,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
             if (event.key === 'Enter' && selected) { event.preventDefault(); onOpenProject(selected) }
           }}
         >
-          {sorted.length === 0 ? <p className="picker-empty">No Projects</p> : sorted.map((name) => (
+          {sorted.length === 0 ? <EmptyState icon="folder" title="No projects yet." hint="Start one with New project, or open a folder you already write in." /> : sorted.map((name) => (
             <div
               key={name}
               id={`picker-${name}`}
@@ -224,11 +224,11 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
                   { text: 'Open', action: () => onOpenProject(name) },
                   { text: 'Show in Finder', action: () => reveal(name) },
                   { separator: true },
-                  { text: 'Move Folder Location…', action: () => moveFolder(name) },
+                  { text: 'Move folder location…', action: () => moveFolder(name) },
                 ])
               }}
             >
-              <span className="picker-row-icon"><SFIcon name="folder" size={22} /></span>
+              <span className="picker-row-icon"><Icon name="folder" size={20} /></span>
               <span className="picker-row-text">
                 <strong>{name}</strong>
                 <small>{locationOf(roots[name], home)}</small>

@@ -14,17 +14,17 @@
 import { useState } from 'react'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { EditionAction, TypesetVersionKind } from '../../types'
-import { Button } from '../../ui'
+import { Button, EmptyState, IconButton, Input, PanelActions } from '../../ui'
 import { popUpNativeMenu } from '../../ui/useNativeMenu'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import './TypesetHistory.css'
 import { byDay } from '../../lib/historyDays'
 
-const SYMBOLS = {
+const ICONS = {
   [TypesetVersionKind.Auto]: 'clock',
   [TypesetVersionKind.Named]: 'bookmark',
-  [TypesetVersionKind.Export]: 'printer',
-  [TypesetVersionKind.Restore]: 'arrow.uturn.backward',
+  [TypesetVersionKind.Export]: 'print',
+  [TypesetVersionKind.Restore]: 'undo',
 }
 
 const time = (iso) => {
@@ -44,7 +44,7 @@ export default function TypesetHistoryView() {
 
   const menu = (event, row) => popUpNativeMenu(event, [
     { text: 'Name…', action: () => setNaming({ id: row.id, name: row.name ?? '' }) },
-    { text: 'Duplicate as Edition', action: () => send('editEditions', { action: EditionAction.FromTypesetVersion, id: row.id, name: row.name }) },
+    { text: 'Duplicate as edition', action: () => send('editEditions', { action: EditionAction.FromTypesetVersion, id: row.id, name: row.name }) },
     { separator: true },
     { text: 'Delete…', action: () => { if (ask('Delete this typeset version?')) send('deleteTypesetVersion', { id: row.id }) } },
   ])
@@ -67,7 +67,8 @@ export default function TypesetHistoryView() {
       <div className="typeset-history-top">
         {naming ? (
           <form className="typeset-history-naming" onSubmit={(event) => { event.preventDefault(); commitName() }}>
-            <input
+            <Input
+              size="sm"
               autoFocus
               value={naming.name}
               placeholder={naming.id ? 'Name' : 'Sent to the printer'}
@@ -77,11 +78,10 @@ export default function TypesetHistoryView() {
             />
             <Button type="submit" variant="tinted">{naming.id ? 'Rename' : 'Save'}</Button>
           </form>
-        ) : (
-          <Button variant="tinted" className="typeset-history-save" onClick={() => setNaming({ id: null, name: '' })} title="Keep the book’s typesetting as it is now, under a name">
-            <SFIcon name="plus" size={12} /> Save Typeset Version…
-          </Button>
-        )}
+        ) : null}
+        <PanelActions>
+          <IconButton icon="add" label="Save a typeset version…" size="capsule" onClick={() => setNaming({ id: null, name: '' })} />
+        </PanelActions>
         {history.previewing ? (
           <div className="typeset-history-previewing">
             <span>{history.comparing ? 'Comparing in the pages' : 'Previewing in the pages'}</span>
@@ -102,18 +102,18 @@ export default function TypesetHistoryView() {
                 return (
                   <article key={row.id} className={`typeset-history-row${previewing ? ' is-previewing' : ''}`} data-kind={row.kind}>
                     <header>
-                      <SFIcon name={SYMBOLS[row.kind] ?? 'clock'} size={13} />
+                      <Icon name={ICONS[row.kind] ?? 'clock'} />
                       <span className={`typeset-history-title${row.name ? ' is-named' : ''}`}>{row.name ?? time(row.timestamp)}</span>
                       {row.name ? <span className="typeset-history-time">{time(row.timestamp)}</span> : null}
                     </header>
                     {row.summary.slice(0, 4).map((line, index) => <p key={index} className="typeset-history-summary">{line}</p>)}
                     {row.summary.length > 4 ? <p className="typeset-history-more">and {row.summary.length - 4} more</p> : null}
                     <div className="typeset-history-actions">
-                      <button type="button" disabled={previewing} onClick={() => send('previewTypesetVersion', { id: row.id })}>{previewing ? 'Previewing' : 'Preview'}</button>
-                      <button type="button" onClick={() => send('previewTypesetVersion', { id: row.id, compare: true })}>Compare</button>
-                      <button type="button" onClick={() => restore(row)}>Restore…</button>
+                      <Button disabled={previewing} onClick={() => send('previewTypesetVersion', { id: row.id })}>{previewing ? 'Previewing' : 'Preview'}</Button>
+                      <Button onClick={() => send('previewTypesetVersion', { id: row.id, compare: true })}>Compare</Button>
+                      <Button onClick={() => restore(row)}>Restore…</Button>
                       <span className="typeset-history-spacer" />
-                      <button type="button" aria-label="More" onClick={(event) => menu(event, row)}><SFIcon name="ellipsis" size={14} /></button>
+                      <IconButton icon="more" label="More version actions" size="capsule" onClick={(event) => menu(event, row)} />
                     </div>
                   </article>
                 )
@@ -122,11 +122,7 @@ export default function TypesetHistoryView() {
           ))}
         </div>
       ) : (
-        <div className="inspector-placeholder">
-          <SFIcon name="textformat" size={22} />
-          <strong>No Typeset Versions Yet</strong>
-          <span>A version is kept as you typeset the book, and each time it is printed or exported.</span>
-        </div>
+        <EmptyState icon="history" title="No typeset versions yet." hint="A version is kept as you typeset the book, and each time it is printed or exported." />
       )}
       <p className="typeset-history-footer">
         {rows.length ? `${rows.length} typeset ${rows.length === 1 ? 'version' : 'versions'} of this book` : ''}

@@ -86,13 +86,26 @@ pub struct OpenDocInTabCommand {
     pub doc_path: String,
 }
 
-/// Open a document in a detached window of its own (a tab's Move to New Window). The
-/// page opens it as "Open in New Window" does.
+/// Open a document in a detached window of its own (a tab's Move to New Window, or a
+/// tab dragged out of the window). The page opens it as "Open in New Window" does.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenDocInWindowCommand {
     pub doc_path: String,
+    /// Where the window's top-left corner goes on screen: where a dragged-out tab was
+    /// let go. Without it the window opens where windows open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<ScreenPoint>,
+}
+
+/// A point on the screen, in logical pixels.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScreenPoint {
+    pub x: i32,
+    pub y: i32,
 }
 
 /// Open the active tab's split, or turn it. Without a `doc_path` the split keeps what
@@ -128,8 +141,18 @@ mod tests {
     fn tabs_cross_in_camel_case_and_a_draft_has_no_path() {
         let event = WebviewEvent::TabsChanged(TabsChanged {
             tabs: vec![
-                DocTab { id: "1".into(), doc_path: Some("ch/one".into()), secondary_doc: Some("notes".into()), split: Some(SplitOrientation::Rows) },
-                DocTab { id: "2".into(), doc_path: None, secondary_doc: None, split: None },
+                DocTab {
+                    id: "1".into(),
+                    doc_path: Some("ch/one".into()),
+                    secondary_doc: Some("notes".into()),
+                    split: Some(SplitOrientation::Rows),
+                },
+                DocTab {
+                    id: "2".into(),
+                    doc_path: None,
+                    secondary_doc: None,
+                    split: None,
+                },
             ],
             active_tab_id: Some("2".into()),
         });
@@ -155,7 +178,10 @@ mod tests {
         .unwrap();
         assert_eq!(
             command,
-            NativeCommand::OpenInSplit(OpenInSplitCommand { doc_path: None, orientation: SplitOrientation::Rows })
+            NativeCommand::OpenInSplit(OpenInSplitCommand {
+                doc_path: None,
+                orientation: SplitOrientation::Rows
+            })
         );
     }
 }

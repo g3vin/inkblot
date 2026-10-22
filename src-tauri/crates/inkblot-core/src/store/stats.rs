@@ -91,7 +91,10 @@ impl StatsStore {
         if !ends_with_newline(&path) {
             line.insert(0, '\n');
         }
-        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path)?;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?;
         file.write_all(line.as_bytes())?;
         Ok(())
     }
@@ -128,7 +131,11 @@ impl StatsStore {
             }
         }
         let mut records: Vec<T> = latest.into_values().collect();
-        records.sort_by(|a, b| a.start().total_cmp(&b.start()).then_with(|| a.id().cmp(b.id())));
+        records.sort_by(|a, b| {
+            a.start()
+                .total_cmp(&b.start())
+                .then_with(|| a.id().cmp(b.id()))
+        });
 
         if !records.is_empty() && lines > records.len() * COMPACT_RATIO {
             let _guard = self.lock();
@@ -175,12 +182,20 @@ impl StatsStore {
     /// Months that can hold a session touching the range. One month earlier than the
     /// range starts, because a session that began on the last evening of a month runs
     /// its minutes into the next.
-    fn months_between<T: Logged>(&self, from_day: Option<&str>, to_day: Option<&str>) -> Vec<String> {
+    fn months_between<T: Logged>(
+        &self,
+        from_day: Option<&str>,
+        to_day: Option<&str>,
+    ) -> Vec<String> {
         let from_month = from_day.map(|day| previous_month(&day[..7.min(day.len())]));
         let to_month = to_day.map(|day| day[..7.min(day.len())].to_string());
         self.months::<T>()
             .into_iter()
-            .filter(|month| from_month.as_deref().map_or(true, |from| month.as_str() >= from))
+            .filter(|month| {
+                from_month
+                    .as_deref()
+                    .map_or(true, |from| month.as_str() >= from)
+            })
             .filter(|month| to_month.as_deref().map_or(true, |to| month.as_str() <= to))
             .collect()
     }
@@ -236,9 +251,21 @@ impl StatsStore {
             totals.words_deleted += session.words_deleted;
             totals.words_pasted += session.words_pasted;
             totals.longest_session_secs = totals.longest_session_secs.max(session.open_secs);
-            totals.first_session = Some(totals.first_session.map_or(session.start, |at| at.min(session.start)));
-            totals.last_session = Some(totals.last_session.map_or(session.start, |at| at.max(session.start)));
-            for minute in session.minutes.iter().filter(|minute| minute.words_added > 0) {
+            totals.first_session = Some(
+                totals
+                    .first_session
+                    .map_or(session.start, |at| at.min(session.start)),
+            );
+            totals.last_session = Some(
+                totals
+                    .last_session
+                    .map_or(session.start, |at| at.max(session.start)),
+            );
+            for minute in session
+                .minutes
+                .iter()
+                .filter(|minute| minute.words_added > 0)
+            {
                 let at = session.start + f64::from(minute.minute) * 60_000.0;
                 written_days.insert(local_iso(at, session.utc_offset_minutes)[..10].to_string());
             }
@@ -251,7 +278,13 @@ impl StatsStore {
 
     /// A document or folder was renamed or moved: its sessions follow it. A folder
     /// takes every document under it.
-    pub fn rename_entry(&self, project: &str, old_path: &str, new_path: &str, is_folder: bool) -> Result<()> {
+    pub fn rename_entry(
+        &self,
+        project: &str,
+        old_path: &str,
+        new_path: &str,
+        is_folder: bool,
+    ) -> Result<()> {
         let (old_path, new_path) = (old_path.trim_matches('/'), new_path.trim_matches('/'));
         self.rewrite(|session| {
             if session.project != project {
@@ -276,6 +309,7 @@ impl StatsStore {
         })
     }
 
+    /// Move a project's sessions and timer runs to its new name.
     pub fn rename_project(&self, old_name: &str, new_name: &str) -> Result<()> {
         self.rewrite(|session| {
             if session.project != old_name {
@@ -287,7 +321,10 @@ impl StatsStore {
         for month in self.months::<TimerRun>() {
             let mut runs = self.read_month::<TimerRun>(&month);
             let mut changed = false;
-            for run in runs.iter_mut().filter(|run| run.project.as_deref() == Some(old_name)) {
+            for run in runs
+                .iter_mut()
+                .filter(|run| run.project.as_deref() == Some(old_name))
+            {
                 run.project = Some(new_name.to_string());
                 changed = true;
             }
@@ -318,12 +355,19 @@ impl StatsStore {
     /// Forget every session and timer run in scope. The whole history when the scope is
     /// empty.
     pub fn reset(&self, scope: &StatsScope) -> Result<()> {
-        self.reset_log::<WritingSession>(|session| in_scope(session, scope), scope.project.is_none())?;
+        self.reset_log::<WritingSession>(
+            |session| in_scope(session, scope),
+            scope.project.is_none(),
+        )?;
         // A run belongs to a project, not a document: a document's reset leaves it.
         if scope.doc_path.is_none() {
             let project = scope.project.clone();
             self.reset_log::<TimerRun>(
-                |run| project.as_ref().map_or(true, |project| run.project.as_ref() == Some(project)),
+                |run| {
+                    project
+                        .as_ref()
+                        .map_or(true, |project| run.project.as_ref() == Some(project))
+                },
                 scope.project.is_none(),
             )?;
         }
@@ -340,7 +384,11 @@ impl StatsStore {
         }
         for month in self.months::<T>() {
             let records = self.read_month::<T>(&month);
-            let kept: Vec<T> = records.iter().filter(|record| !doomed(record)).cloned().collect();
+            let kept: Vec<T> = records
+                .iter()
+                .filter(|record| !doomed(record))
+                .cloned()
+                .collect();
             if kept.len() != records.len() {
                 let _guard = self.lock();
                 write_month(&self.month_path::<T>(&month), &kept)?;
@@ -357,7 +405,12 @@ impl StatsStore {
     }
 
     /// Runs that began in the range, for one project or all of them.
-    pub fn timer_runs(&self, project: Option<&str>, from_day: Option<&str>, to_day: Option<&str>) -> Vec<TimerRun> {
+    pub fn timer_runs(
+        &self,
+        project: Option<&str>,
+        from_day: Option<&str>,
+        to_day: Option<&str>,
+    ) -> Vec<TimerRun> {
         self.read_range::<TimerRun>(from_day, to_day)
             .into_iter()
             .filter(|run| project.map_or(true, |project| run.project.as_deref() == Some(project)))
@@ -372,6 +425,7 @@ impl StatsStore {
         std::fs::read_to_string(self.root.join("config.json")).ok()
     }
 
+    /// Replace the stats settings. Fails without writing unless `json` parses.
     pub fn set_config(&self, json: &str) -> Result<()> {
         serde_json::from_str::<Value>(json)?;
         let _guard = self.lock();
@@ -391,16 +445,28 @@ trait Logged: Serialize + DeserializeOwned + Clone {
 
 impl Logged for WritingSession {
     const DIR: &'static str = "sessions";
-    fn id(&self) -> &str { &self.id }
-    fn start(&self) -> f64 { self.start }
-    fn utc_offset_minutes(&self) -> i32 { self.utc_offset_minutes }
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn start(&self) -> f64 {
+        self.start
+    }
+    fn utc_offset_minutes(&self) -> i32 {
+        self.utc_offset_minutes
+    }
 }
 
 impl Logged for TimerRun {
     const DIR: &'static str = "timer-runs";
-    fn id(&self) -> &str { &self.id }
-    fn start(&self) -> f64 { self.start }
-    fn utc_offset_minutes(&self) -> i32 { self.utc_offset_minutes }
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn start(&self) -> f64 {
+        self.start
+    }
+    fn utc_offset_minutes(&self) -> i32 {
+        self.utc_offset_minutes
+    }
 }
 
 fn day_entry<'a>(days: &'a mut BTreeMap<String, DayStat>, day: &str) -> &'a mut DayStat {
@@ -412,8 +478,14 @@ fn day_entry<'a>(days: &'a mut BTreeMap<String, DayStat>, day: &str) -> &'a mut 
 }
 
 fn in_scope(session: &WritingSession, scope: &StatsScope) -> bool {
-    scope.project.as_deref().map_or(true, |project| session.project == project)
-        && scope.doc_path.as_deref().map_or(true, |doc| session.doc_path == doc)
+    scope
+        .project
+        .as_deref()
+        .map_or(true, |project| session.project == project)
+        && scope
+            .doc_path
+            .as_deref()
+            .map_or(true, |doc| session.doc_path == doc)
 }
 
 /// `YYYY-MM-DDTHH:MM:SS.sssZ` for the local wall clock at `millis` — the `Z` is a lie
@@ -439,7 +511,9 @@ fn previous_month(month: &str) -> String {
 /// True for a missing or empty file too: there is nothing to be glued to.
 fn ends_with_newline(path: &Path) -> bool {
     use std::io::{Read, Seek, SeekFrom};
-    let Ok(mut file) = std::fs::File::open(path) else { return true };
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return true;
+    };
     if file.seek(SeekFrom::End(-1)).is_err() {
         return true;
     }
@@ -478,13 +552,23 @@ pub fn count_document(doc_path: &str, raw: &Value) -> DocWordCount {
         count_canvas(raw)
     } else if crate::doc_kind::is_map_doc(doc_path) {
         (crate::map::model::count_map_words(raw), 0)
+    } else if crate::doc_kind::is_timeline_doc(doc_path) {
+        // A view of the chronology: none of the writing is in it.
+        (0, 0)
     } else {
         let mut text = String::new();
         let mut chars = 0u32;
         walk_text(&raw["content"], &mut text, &mut chars);
-        (crate::version_history::text_words(&text).len() as u32, chars)
+        (
+            crate::version_history::text_words(&text).len() as u32,
+            chars,
+        )
     };
-    DocWordCount { doc_path: doc_path.to_string(), words, chars }
+    DocWordCount {
+        doc_path: doc_path.to_string(),
+        words,
+        chars,
+    }
 }
 
 fn walk_text(node: &Value, text: &mut String, chars: &mut u32) {
@@ -560,7 +644,13 @@ mod tests {
     /// 2026-03-14T23:30:00Z.
     const LATE_MARCH_14: f64 = 1_773_531_000_000.0;
 
-    fn session(id: &str, project: &str, doc: &str, start: f64, minutes: &[(u32, u32)]) -> WritingSession {
+    fn session(
+        id: &str,
+        project: &str,
+        doc: &str,
+        start: f64,
+        minutes: &[(u32, u32)],
+    ) -> WritingSession {
         WritingSession {
             id: id.into(),
             project: project.into(),
@@ -589,8 +679,18 @@ mod tests {
     fn a_checkpointed_session_is_read_back_once_as_its_latest_record() {
         let dir = TempDir::new();
         let store = dir.store();
-        store.record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &[(0, 10)])).unwrap();
-        store.record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &[(0, 10), (1, 20)])).unwrap();
+        store
+            .record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &[(0, 10)]))
+            .unwrap();
+        store
+            .record_session(&session(
+                "s1",
+                "Novel",
+                "one",
+                LATE_MARCH_14,
+                &[(0, 10), (1, 20)],
+            ))
+            .unwrap();
 
         let sessions = store.sessions(&StatsScope::default(), None, None);
         assert_eq!(sessions.len(), 1);
@@ -601,12 +701,16 @@ mod tests {
     fn a_line_cut_off_by_a_crash_is_skipped_and_the_rest_survive() {
         let dir = TempDir::new();
         let store = dir.store();
-        store.record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &[(0, 10)])).unwrap();
+        store
+            .record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &[(0, 10)]))
+            .unwrap();
         let path = store.month_path::<WritingSession>("2026-03");
         let mut text = std::fs::read_to_string(&path).unwrap();
         text.push_str("{\"id\":\"s2\",\"proj");
         std::fs::write(&path, text).unwrap();
-        store.record_session(&session("s3", "Novel", "two", LATE_MARCH_14, &[(0, 5)])).unwrap();
+        store
+            .record_session(&session("s3", "Novel", "two", LATE_MARCH_14, &[(0, 5)]))
+            .unwrap();
 
         assert_eq!(store.sessions(&StatsScope::default(), None, None).len(), 2);
     }
@@ -616,10 +720,15 @@ mod tests {
         let dir = TempDir::new();
         let store = dir.store();
         for words in 0..10 {
-            store.record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &[(0, words)])).unwrap();
+            store
+                .record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &[(0, words)]))
+                .unwrap();
         }
         store.sessions(&StatsScope::default(), None, None);
-        let lines = std::fs::read_to_string(store.month_path::<WritingSession>("2026-03")).unwrap().lines().count();
+        let lines = std::fs::read_to_string(store.month_path::<WritingSession>("2026-03"))
+            .unwrap()
+            .lines()
+            .count();
         assert_eq!(lines, 1);
     }
 
@@ -629,12 +738,20 @@ mod tests {
         let store = dir.store();
         // 23:30 UTC for an hour: thirty minutes on the 14th, thirty on the 15th.
         let minutes: Vec<(u32, u32)> = (0..60).map(|minute| (minute, 1)).collect();
-        store.record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &minutes)).unwrap();
+        store
+            .record_session(&session("s1", "Novel", "one", LATE_MARCH_14, &minutes))
+            .unwrap();
 
         let days = store.daily(&StatsScope::default(), "2026-03-14", "2026-03-15");
         assert_eq!(days.len(), 2);
-        assert_eq!((days[0].day.as_str(), days[0].words_added, days[0].sessions), ("2026-03-14", 30, 1));
-        assert_eq!((days[1].day.as_str(), days[1].words_added, days[1].sessions), ("2026-03-15", 30, 0));
+        assert_eq!(
+            (days[0].day.as_str(), days[0].words_added, days[0].sessions),
+            ("2026-03-14", 30, 1)
+        );
+        assert_eq!(
+            (days[1].day.as_str(), days[1].words_added, days[1].sessions),
+            ("2026-03-15", 30, 0)
+        );
         assert_eq!(days[0].hours[23], 30 * 30);
         assert_eq!(days[1].hours[0], 30 * 30);
     }
@@ -645,7 +762,8 @@ mod tests {
         let store = dir.store();
         // 2026-03-31T23:30Z is 01:30 on April 1st two hours east — an April day, filed
         // under April, and still found from March's side of the range.
-        let start = 1_775_000_000_000.0 - (1_775_000_000_000.0 % 86_400_000.0) + 86_400_000.0 - 1_800_000.0;
+        let start =
+            1_775_000_000_000.0 - (1_775_000_000_000.0 % 86_400_000.0) + 86_400_000.0 - 1_800_000.0;
         let mut east = session("s1", "Novel", "one", start, &[(0, 7)]);
         east.utc_offset_minutes = 120;
         store.record_session(&east).unwrap();
@@ -659,13 +777,25 @@ mod tests {
     fn a_scope_narrows_to_a_project_and_then_to_a_document() {
         let dir = TempDir::new();
         let store = dir.store();
-        store.record_session(&session("a", "Novel", "one", LATE_MARCH_14, &[(0, 10)])).unwrap();
-        store.record_session(&session("b", "Novel", "two", LATE_MARCH_14, &[(0, 20)])).unwrap();
-        store.record_session(&session("c", "Essays", "one", LATE_MARCH_14, &[(0, 40)])).unwrap();
+        store
+            .record_session(&session("a", "Novel", "one", LATE_MARCH_14, &[(0, 10)]))
+            .unwrap();
+        store
+            .record_session(&session("b", "Novel", "two", LATE_MARCH_14, &[(0, 20)]))
+            .unwrap();
+        store
+            .record_session(&session("c", "Essays", "one", LATE_MARCH_14, &[(0, 40)]))
+            .unwrap();
 
         let everything = store.totals(&StatsScope::default());
-        let novel = store.totals(&StatsScope { project: Some("Novel".into()), doc_path: None });
-        let chapter = store.totals(&StatsScope { project: Some("Novel".into()), doc_path: Some("one".into()) });
+        let novel = store.totals(&StatsScope {
+            project: Some("Novel".into()),
+            doc_path: None,
+        });
+        let chapter = store.totals(&StatsScope {
+            project: Some("Novel".into()),
+            doc_path: Some("one".into()),
+        });
         assert_eq!((everything.words_added, everything.sessions), (70, 3));
         assert_eq!(novel.words_added, 30);
         assert_eq!(chapter.words_added, 10);
@@ -677,12 +807,40 @@ mod tests {
     fn a_rename_takes_the_history_with_it_and_a_folder_takes_everything_under_it() {
         let dir = TempDir::new();
         let store = dir.store();
-        store.record_session(&session("a", "Novel", "drafts/one", LATE_MARCH_14, &[(0, 1)])).unwrap();
-        store.record_session(&session("b", "Novel", "drafts-old/two", LATE_MARCH_14, &[(0, 1)])).unwrap();
-        store.record_session(&session("c", "Essays", "drafts/one", LATE_MARCH_14, &[(0, 1)])).unwrap();
+        store
+            .record_session(&session(
+                "a",
+                "Novel",
+                "drafts/one",
+                LATE_MARCH_14,
+                &[(0, 1)],
+            ))
+            .unwrap();
+        store
+            .record_session(&session(
+                "b",
+                "Novel",
+                "drafts-old/two",
+                LATE_MARCH_14,
+                &[(0, 1)],
+            ))
+            .unwrap();
+        store
+            .record_session(&session(
+                "c",
+                "Essays",
+                "drafts/one",
+                LATE_MARCH_14,
+                &[(0, 1)],
+            ))
+            .unwrap();
 
-        store.rename_entry("Novel", "drafts", "chapters", true).unwrap();
-        store.rename_entry("Novel", "chapters/one", "chapters/prologue", false).unwrap();
+        store
+            .rename_entry("Novel", "drafts", "chapters", true)
+            .unwrap();
+        store
+            .rename_entry("Novel", "chapters/one", "chapters/prologue", false)
+            .unwrap();
         store.rename_project("Novel", "The Novel").unwrap();
 
         let paths: Vec<(String, String)> = store
@@ -691,18 +849,33 @@ mod tests {
             .map(|session| (session.project, session.doc_path))
             .collect();
         assert!(paths.contains(&("The Novel".into(), "chapters/prologue".into())));
-        assert!(paths.contains(&("The Novel".into(), "drafts-old/two".into())), "a sibling that shares a prefix is not inside the folder");
-        assert!(paths.contains(&("Essays".into(), "drafts/one".into())), "another project's document of the same name stays");
+        assert!(
+            paths.contains(&("The Novel".into(), "drafts-old/two".into())),
+            "a sibling that shares a prefix is not inside the folder"
+        );
+        assert!(
+            paths.contains(&("Essays".into(), "drafts/one".into())),
+            "another project's document of the same name stays"
+        );
     }
 
     #[test]
     fn a_reset_forgets_only_its_scope() {
         let dir = TempDir::new();
         let store = dir.store();
-        store.record_session(&session("a", "Novel", "one", LATE_MARCH_14, &[(0, 1)])).unwrap();
-        store.record_session(&session("b", "Essays", "one", LATE_MARCH_14, &[(0, 1)])).unwrap();
+        store
+            .record_session(&session("a", "Novel", "one", LATE_MARCH_14, &[(0, 1)]))
+            .unwrap();
+        store
+            .record_session(&session("b", "Essays", "one", LATE_MARCH_14, &[(0, 1)]))
+            .unwrap();
 
-        store.reset(&StatsScope { project: Some("Novel".into()), doc_path: None }).unwrap();
+        store
+            .reset(&StatsScope {
+                project: Some("Novel".into()),
+                doc_path: None,
+            })
+            .unwrap();
         assert_eq!(store.totals(&StatsScope::default()).sessions, 1);
         store.reset(&StatsScope::default()).unwrap();
         assert_eq!(store.totals(&StatsScope::default()).sessions, 0);
@@ -749,23 +922,44 @@ mod tests {
             sprints_completed: sprints,
             ..TimerRun::default()
         };
-        store.record_timer_run(&run("r1", Some("Novel"), 1)).unwrap();
-        store.record_timer_run(&run("r1", Some("Novel"), 2)).unwrap();
-        store.record_timer_run(&run("r2", Some("Essays"), 1)).unwrap();
+        store
+            .record_timer_run(&run("r1", Some("Novel"), 1))
+            .unwrap();
+        store
+            .record_timer_run(&run("r1", Some("Novel"), 2))
+            .unwrap();
+        store
+            .record_timer_run(&run("r2", Some("Essays"), 1))
+            .unwrap();
 
         let novel = store.timer_runs(Some("Novel"), None, None);
         assert_eq!(novel.len(), 1);
         assert_eq!(novel[0].sprints_completed, 2);
-        assert_eq!(store.timer_runs(None, Some("2026-03-14"), Some("2026-03-14")).len(), 2);
+        assert_eq!(
+            store
+                .timer_runs(None, Some("2026-03-14"), Some("2026-03-14"))
+                .len(),
+            2
+        );
         assert!(store.timer_runs(None, Some("2026-03-15"), None).is_empty());
 
         store.rename_project("Novel", "The Novel").unwrap();
         assert_eq!(store.timer_runs(Some("The Novel"), None, None).len(), 1);
 
         // A document's reset leaves the project's runs; the project's takes them.
-        store.reset(&StatsScope { project: Some("The Novel".into()), doc_path: Some("one".into()) }).unwrap();
+        store
+            .reset(&StatsScope {
+                project: Some("The Novel".into()),
+                doc_path: Some("one".into()),
+            })
+            .unwrap();
         assert_eq!(store.timer_runs(Some("The Novel"), None, None).len(), 1);
-        store.reset(&StatsScope { project: Some("The Novel".into()), doc_path: None }).unwrap();
+        store
+            .reset(&StatsScope {
+                project: Some("The Novel".into()),
+                doc_path: None,
+            })
+            .unwrap();
         assert!(store.timer_runs(Some("The Novel"), None, None).is_empty());
         assert_eq!(store.timer_runs(None, None, None).len(), 1);
     }

@@ -16,7 +16,7 @@ pub mod matcher;
 
 use serde_json::Value;
 
-use crate::doc_kind::{is_canvas_doc, is_map_doc};
+use crate::doc_kind::{is_canvas_doc, is_map_doc, is_timeline_doc};
 use crate::js_string::{js_trim, utf16_len, utf16_slice};
 use crate::store::{ProjectStore, StoreError};
 use crate::types::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
@@ -65,8 +65,7 @@ pub fn build_preview(text: &str, from: usize, to: usize, radius: usize) -> Strin
 /// The last segment of a path, or the whole path when it has none.
 pub fn get_entry_label(path: &str) -> String {
     path.split('/')
-        .filter(|segment| !segment.is_empty())
-        .next_back()
+        .rfind(|segment| !segment.is_empty())
         .unwrap_or(path)
         .to_string()
 }
@@ -309,7 +308,12 @@ const MAP_SEARCH_FIELDS: [(&str, &str, Option<&str>, &str); 5] = [
 /// Every match in a map's raw (on-disk) JSON, addressed by the id of the item that
 /// carries the text. A pin or traveler with no name of its own is searched by the
 /// path of the doc it links to — that is the name it shows.
-pub fn collect_map_matches(raw: &Value, matcher: &Matcher, doc_path: &str, limit: usize) -> Vec<SearchResult> {
+pub fn collect_map_matches(
+    raw: &Value,
+    matcher: &Matcher,
+    doc_path: &str,
+    limit: usize,
+) -> Vec<SearchResult> {
     if raw.is_null() || matcher.is_empty || !matcher.valid {
         return Vec::new();
     }
@@ -320,7 +324,9 @@ pub fn collect_map_matches(raw: &Value, matcher: &Matcher, doc_path: &str, limit
             if matches.len() >= limit {
                 return matches;
             }
-            let Some(id) = item["id"].as_str().filter(|id| !id.is_empty()) else { continue };
+            let Some(id) = item["id"].as_str().filter(|id| !id.is_empty()) else {
+                continue;
+            };
             let own = item[key].as_str().unwrap_or("");
             let text = match fallback {
                 Some(fallback) if own.is_empty() => item[fallback].as_str().unwrap_or(""),
@@ -361,6 +367,7 @@ pub struct ProjectFile {
     pub name: String,
 }
 
+/// Every file under `node`, depth first, without the folders.
 pub fn flatten_project_files(node: &crate::types::TreeNode) -> Vec<ProjectFile> {
     let mut files = Vec::new();
     collect_files(node, &mut files);
@@ -472,16 +479,28 @@ pub fn search_project(
             continue;
         }
 
+        // A timeline view holds no text of its own: its events are the project's.
+        if is_timeline_doc(&entry.path) {
+            continue;
+        }
+
         // A map is the same: no notes, and its text is addressed by item id.
         if is_map_doc(&entry.path) {
             if scope == SearchScope::Notes {
                 continue;
             }
-            let Some(map) = store.load_document(project_name, &entry.path)? else { continue };
+            let Some(map) = store.load_document(project_name, &entry.path)? else {
+                continue;
+            };
             if is_cancelled() {
                 return Ok(Vec::new());
             }
-            results.extend(collect_map_matches(&map, matcher, &entry.path, MAX_RESULTS_PER_DOCUMENT));
+            results.extend(collect_map_matches(
+                &map,
+                matcher,
+                &entry.path,
+                MAX_RESULTS_PER_DOCUMENT,
+            ));
             continue;
         }
 
@@ -550,6 +569,8 @@ pub fn get_panel_noun(tab: &str) -> &'static str {
     }
 }
 
+/// The search field's placeholder: "Filter" and the panel's noun in a filter scope,
+/// otherwise "Search" and the scope's label.
 pub fn get_search_placeholder(scope: SearchScope, tab: &str) -> String {
     if is_filter_scope(scope) {
         return format!("Filter {}", get_panel_noun(tab));

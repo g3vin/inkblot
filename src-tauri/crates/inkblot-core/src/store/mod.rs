@@ -44,16 +44,19 @@ pub mod versions;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::doc_kind::{doc_kind_name, get_doc_kind, is_map_doc, is_text_doc, strip_doc_suffix, with_doc_suffix};
+use crate::doc_kind::{
+    doc_kind_name, get_doc_kind, is_map_doc, is_text_doc, strip_doc_suffix, with_doc_suffix,
+};
 use crate::map::model::is_map_payload;
 use crate::types::{JsonValue, TreeNode, TreeNodeType, VersionEntry};
 use doc_lock::DocLocks;
 use locations::ProjectLocations;
 use paths::{
     file_path_for, folder_path_for, join_path, normalize_path, parent_of, strip_trailing_slash,
-    versions_sidecar_path, ORDER_FILE,
+    versions_sidecar_path, FOLDER_FILE, ORDER_FILE,
 };
 use versions::{push_version_entry, NewTextVersion};
 
@@ -144,6 +147,7 @@ pub struct ProjectStore {
     locks: DocLocks,
     /// One id per launch, so the history panel can color-code edits by sitting.
     session_id: String,
+    // Used only here, so an alias would name it once.
     #[allow(clippy::type_complexity)]
     listener: Mutex<Option<Box<dyn Fn(&str, &str) + Send + Sync>>>,
 }
@@ -291,15 +295,31 @@ impl ProjectStore {
                 "notes": body.notes,
                 "versions": versions,
             });
-            // The archive and the citation settings live in this file too, owned by
-            // their own stores (`archiveStore.js`, `referenceStore.js`), and are carried
-            // forward the way the JS save does.
+            // The archive, the citation settings and the timeline passages live in this
+            // file too, owned by their own stores (`archiveStore.js`, `referenceStore.js`,
+            // `TimelineAnchors.js`), and are carried forward the way the JS save does.
             if let (Some(existing), Some(fields)) = (existing.as_ref(), document.as_object_mut()) {
-                if let Some(archive) = existing.get("archive").filter(|a| a.as_array().is_some_and(|a| !a.is_empty())) {
+                if let Some(archive) = existing
+                    .get("archive")
+                    .filter(|a| a.as_array().is_some_and(|a| !a.is_empty()))
+                {
                     fields.insert("archive".to_string(), archive.clone());
                 }
                 if let Some(citations) = existing.get("citations").filter(|c| c.is_object()) {
                     fields.insert("citations".to_string(), citations.clone());
+                }
+                // So are the passages attached to timeline events, which the page's editor
+                // writes (`saveDocumentTimeline`).
+                if let Some(timeline) = existing
+                    .get("timeline")
+                    .filter(|t| t.as_array().is_some_and(|t| !t.is_empty()))
+                {
+                    fields.insert("timeline".to_string(), timeline.clone());
+                }
+                // So is the writer's lock (`docLocks.ts`); the page keeps the text
+                // from changing, the save only keeps the flag.
+                if is_locked(existing) {
+                    fields.insert("locked".to_string(), Value::Bool(true));
                 }
             }
             std::fs::write(&file_path, serde_json::to_string(&document)?)?;
@@ -326,7 +346,9 @@ impl ProjectStore {
         notes: &Value,
     ) -> Result<bool> {
         if !is_text_doc(doc_name) {
-            return Err(StoreError::Refused(format!("{doc_name} is not a text document and has no notes")));
+            return Err(StoreError::Refused(format!(
+                "{doc_name} is not a text document and has no notes"
+            )));
         }
 
         self.locks.with_doc_lock(project_name, doc_name, || {
@@ -682,8 +704,7 @@ impl ProjectStore {
 
         let name = dir
             .split(['/', '\\'])
-            .filter(|part| !part.is_empty())
-            .next_back()
+            .rfind(|part| !part.is_empty())
             .unwrap_or("");
         // A dotted directory is skipped by list_projects, so linking one would
         // "succeed" into a project that never appears.
@@ -721,12 +742,11 @@ impl ProjectStore {
 
     /// Returns the new name, or `None` when the project is missing or the name is taken.
     ///
-    /// **Stricter than the JS**, deliberately. `renameProject` only checks whether a
-    /// directory already sits at the new path *inside the same parent*, so a
-    /// custom-located project can be renamed onto a name an AppData project already
-    /// holds. Both then answer to that name, `getProjectRoot` resolves to the registry
-    /// entry, and the AppData project becomes unreachable — the exact stranding
-    /// `link_project` refuses to cause. This checks the name, not just the path.
+    /// The name is checked, not just the path beside the old directory: a
+    /// custom-located project renamed onto an AppData project's name would leave both
+    /// answering to it, the registry entry would win, and the AppData project would be
+    /// unreachable — the stranding `link_project` refuses to cause. `renameProject` in
+    /// JS makes the same check.
     pub fn rename_project(&self, project_name: &str, new_name: &str) -> Result<Option<String>> {
         let (current, next) = (project_name.trim(), new_name.trim());
         if current.is_empty() || next.is_empty() {
@@ -842,7 +862,7 @@ impl ProjectStore {
         Ok(())
     }
 
-    /// Copy a document beside itself as "<name> copy", then "copy 2", …
+    /// Copy a document beside itself as "`<name>` copy", then "copy 2", …
     ///
     /// The bytes are copied verbatim rather than round-tripped through load and save,
     /// because that pair whitelists the keys of a *text* document and would quietly
@@ -893,11 +913,7 @@ impl ProjectStore {
     ) -> Result<Option<String>> {
         let rel = normalize_path(entry_path);
         let target_folder = normalize_path(target_folder_path);
-        let base_name = rel
-            .split('/')
-            .filter(|part| !part.is_empty())
-            .next_back()
-            .unwrap_or("");
+        let base_name = rel.split('/').rfind(|part| !part.is_empty()).unwrap_or("");
         let next_path = if target_folder.is_empty() {
             base_name.to_string()
         } else {
@@ -941,6 +957,24 @@ impl ProjectStore {
         Ok(Some(next_path.to_string()))
     }
 
+    /// Every document and folder a writer has locked (`src/lib/docLocks.ts`). A
+    /// document is locked by its own `locked` flag and a folder by the marker file
+    /// inside it, so both travel with the project. Only the flag is read out of each
+    /// document.
+    pub fn locked_entries(&self, project_name: &str) -> LockedEntries {
+        let root = self.project_root(project_name);
+        let mut found = LockedEntries::default();
+        for child in self
+            .list_project_tree(project_name)
+            .children
+            .iter()
+            .flatten()
+        {
+            collect_locked(&root, child, &mut found);
+        }
+        found
+    }
+
     /// A project's full folder and file tree. Dotfiles and the order file are excluded.
     pub fn list_project_tree(&self, project_name: &str) -> TreeNode {
         let root = self.project_root(project_name);
@@ -950,6 +984,43 @@ impl ProjectStore {
             path: String::new(),
             children: Some(read_directory(&root, "")),
         }
+    }
+}
+
+/// What [`ProjectStore::locked_entries`] finds, by tree path.
+#[derive(Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LockedEntries {
+    pub documents: Vec<String>,
+    pub folders: Vec<String>,
+}
+
+/// The one key a lock scan reads out of a document; serde skips the rest.
+#[derive(Deserialize)]
+struct LockFlag {
+    #[serde(default)]
+    locked: bool,
+}
+
+fn is_locked(doc: &Value) -> bool {
+    doc.get("locked").and_then(Value::as_bool).unwrap_or(false)
+}
+
+fn collect_locked(root: &str, node: &TreeNode, found: &mut LockedEntries) {
+    let path = join_path(&[root, &node.path]);
+    if node.node_type == TreeNodeType::Folder {
+        if read_json(&join_path(&[&path, FOLDER_FILE])).is_some_and(|marker| is_locked(&marker)) {
+            found.folders.push(node.path.clone());
+        }
+        for child in node.children.iter().flatten() {
+            collect_locked(root, child, found);
+        }
+    } else if std::fs::read_to_string(format!("{path}.json"))
+        .ok()
+        .and_then(|raw| serde_json::from_str::<LockFlag>(&raw).ok())
+        .is_some_and(|flag| flag.locked)
+    {
+        found.documents.push(node.path.clone());
     }
 }
 

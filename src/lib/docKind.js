@@ -2,7 +2,8 @@
  * docKind.js — which kind of document a tree path refers to.
  *
  * Canvases live on disk as `<name>.canvas.json`, so their tree path is
- * `Folder/name.canvas`; maps likewise as `<name>.map.json` → `Folder/name.map`.
+ * `Folder/name.canvas`; maps likewise as `<name>.map.json` → `Folder/name.map`, and
+ * timeline views as `<name>.timeline.json` → `Folder/name.timeline`.
  * Every path→file mapping in FileSystem.js appends
  * `.json` to the tree path, so canvases travel through save/load/rename/move/
  * delete unchanged, and the document kind is a pure function of the path —
@@ -15,15 +16,17 @@
 
 export const CANVAS_SUFFIX = '.canvas'
 export const MAP_SUFFIX = '.map'
+export const TIMELINE_SUFFIX = '.timeline'
 
 /** The suffix each structured kind carries; a text document carries none. */
-const KIND_SUFFIX = { canvas: CANVAS_SUFFIX, map: MAP_SUFFIX }
+const KIND_SUFFIX = { canvas: CANVAS_SUFFIX, map: MAP_SUFFIX, timeline: TIMELINE_SUFFIX }
 
-/** 'canvas' | 'map' | 'text' for a document tree path. */
+/** 'canvas' | 'map' | 'timeline' | 'text' for a document tree path. */
 export const getDocKind = (path) => {
   const value = String(path || '')
   if (value.endsWith(CANVAS_SUFFIX)) return 'canvas'
   if (value.endsWith(MAP_SUFFIX)) return 'map'
+  if (value.endsWith(TIMELINE_SUFFIX)) return 'timeline'
   return 'text'
 }
 
@@ -31,10 +34,12 @@ export const isCanvasDoc = (path) => getDocKind(path) === 'canvas'
 
 export const isMapDoc = (path) => getDocKind(path) === 'map'
 
+export const isTimelineDoc = (path) => getDocKind(path) === 'timeline'
+
 /**
  * A rich-text document — the only kind that goes through `saveDocument`, the
  * text autosave, print, references and word counts. Anything else (a canvas,
- * a map) is a structured document with its own loader and writer.
+ * a map, a timeline view) is a structured document with its own loader and writer.
  */
 export const isTextDoc = (path) => getDocKind(path) === 'text'
 

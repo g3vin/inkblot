@@ -141,6 +141,9 @@ pub struct ReplyEnvelope {
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "message", rename_all = "camelCase")]
+// Boxing variants would change the generated TypeScript, and a message is serialized
+// as soon as it is built, so its size is never copied around.
+#[allow(clippy::large_enum_variant)]
 pub enum InboundMessage {
     Command(CommandEnvelope),
     Request(RequestEnvelope),
@@ -150,6 +153,8 @@ pub enum InboundMessage {
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "message", rename_all = "camelCase")]
+// As InboundMessage.
+#[allow(clippy::large_enum_variant)]
 pub enum OutboundMessage {
     Event(EventEnvelope),
     Reply(ReplyEnvelope),

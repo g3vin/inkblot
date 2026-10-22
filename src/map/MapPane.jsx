@@ -11,9 +11,12 @@
  */
 import { useEffect, useState } from 'react'
 import { getDocDisplayName } from '../lib/docKind'
+import { useLockReason } from '../lib/docLocks'
+import DocLockBadge from '../components/DocLockBadge'
 import { loadMapDocument } from '../lib/map/mapFileSystem'
 import MapSurface from './MapSurface'
 import './Map.css'
+import './mapThemes.css'
 
 export default function MapPane({
   projectName,
@@ -25,14 +28,18 @@ export default function MapPane({
   isActive = true,
   chromeWhileInactive = false,
 }) {
-  const [loaded, setLoaded] = useState(null)
+  const locked = useLockReason(docPath) !== null
+  const [result, setResult] = useState(null)
+  // What was loaded, only for the path it was loaded from: when the pane is switched to
+  // another map, the render before the new load must not mount the new path's surface
+  // on the old map (whose first autosave would then write it over the new file).
+  const loaded = result?.docPath === docPath ? result : null
 
   useEffect(() => {
     if (!projectName || !docPath) return undefined
     let cancelled = false
-    setLoaded(null)
-    loadMapDocument(projectName, docPath).then((result) => {
-      if (!cancelled) setLoaded(result)
+    loadMapDocument(projectName, docPath).then((next) => {
+      if (!cancelled) setResult({ ...next, docPath })
     })
     return () => {
       cancelled = true
@@ -60,6 +67,7 @@ export default function MapPane({
       ) : loaded ? (
         <MapSurface
           key={docPath}
+          locked={locked}
           projectName={projectName}
           docPath={docPath}
           initialMap={loaded.map}
@@ -72,6 +80,7 @@ export default function MapPane({
       ) : (
         <div className="map-surface is-loading" />
       )}
+      <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} />
     </div>
   )
 }

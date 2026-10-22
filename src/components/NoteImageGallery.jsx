@@ -2,7 +2,7 @@
  * NoteImageGallery.jsx — thumbnail strip of a note's attached images,
  * each with an optional remove button. Used by NoteCard and the note cards on a canvas or layer.
  */
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 
 export default function NoteImageGallery({
   images = [],
@@ -28,10 +28,10 @@ export default function NoteImageGallery({
                 event.stopPropagation()
                 onRemoveImage(image.id)
               }}
-              aria-label="Remove image"
-              title="Remove image"
+              aria-label="Delete image"
+              title="Delete image"
             >
-              <SFIcon name="xmark" size={11} />
+              <Icon name="delete" />
             </button>
           ) : null}
         </figure>

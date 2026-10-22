@@ -23,11 +23,12 @@ use inkblot_core::search::{self, ProjectFile};
 use inkblot_core::store::{paths, versions};
 use inkblot_core::types::{
     CanvasEdge, CanvasFile, CanvasNode, CanvasNodeType, DiffChunk, DocKind, EdgeSide, HtmlBlock,
-    MergeChoice, Note, Point, ReadAloudPayload, Rect, SearchScope, VersionEntry, Viewport,
+    MergeChoice, Note, Point, ReadAloudPayload, Rect, VersionEntry, Viewport,
 };
 use inkblot_core::{
     canvas_geometry as geo, canvas_model as model, doc_kind, js_number::format_js_number,
-    map::diff as map_diff, map::model as map_model, story_structure as story, version_history as history,
+    map::diff as map_diff, map::model as map_model, story_structure as story,
+    version_history as history,
 };
 
 /// `String(x || '')`, the coercion the JS entry points open with.
@@ -246,16 +247,6 @@ fn matcher_options(value: &Value) -> MatcherOptions {
     }
 }
 
-fn search_scope(value: &Value) -> SearchScope {
-    match value.as_str() {
-        Some("document") => SearchScope::Document,
-        Some("notes") => SearchScope::Notes,
-        Some("files") => SearchScope::Files,
-        Some("project") => SearchScope::Project,
-        _ => SearchScope::Panel,
-    }
-}
-
 /// A hit, shaped the way `findAll` returns it in JS.
 fn hit_json(hit: &inkblot_core::search::matcher::Hit) -> Value {
     json!({ "index": hit.index, "length": hit.length, "text": hit.text })
@@ -293,12 +284,14 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
         "stripCanvasSuffix" => json!(doc_kind::strip_canvas_suffix(&text()?)),
         "getDocDisplayName" => json!(doc_kind::get_doc_display_name(&text()?)),
         "isMapDoc" => json!(doc_kind::is_map_doc(&text()?)),
+        "isTimelineDoc" => json!(doc_kind::is_timeline_doc(&text()?)),
         "isTextDoc" => json!(doc_kind::is_text_doc(&text()?)),
         "stripDocSuffix" => json!(doc_kind::strip_doc_suffix(&text()?)),
         "withDocSuffix" => {
             let kind = match args.get(1).and_then(Value::as_str) {
                 Some("canvas") => Some(DocKind::Canvas),
                 Some("map") => Some(DocKind::Map),
+                Some("timeline") => Some(DocKind::Timeline),
                 _ => None,
             };
             let name = text()?;
@@ -475,7 +468,9 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             ))
         }
         "isLocationDoc" => json!(story::is_location_doc(args[0].as_str().unwrap_or_default())),
-        "isCharacterDoc" => json!(story::is_character_doc(args[0].as_str().unwrap_or_default())),
+        "isCharacterDoc" => json!(story::is_character_doc(
+            args[0].as_str().unwrap_or_default()
+        )),
 
         /* ---- map::model ---- */
         "normalizeMap" => {
@@ -486,7 +481,9 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
                 id
             }))
         }
-        "createEmptyMap" => json!(map_model::create_empty_map(args[0].as_str().unwrap_or_default())),
+        "createEmptyMap" => json!(map_model::create_empty_map(
+            args[0].as_str().unwrap_or_default()
+        )),
         "isMapPayload" => json!(map_model::is_map_payload(args.first())),
         "readMapViewport" => json!(map_model::read_map_viewport(&args[0])),
         "countMapWords" => json!(map_model::count_map_words(&args[0])),
@@ -515,7 +512,10 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
             &args[1]
         )),
         "collectMapMatches" => {
-            let matcher = Matcher::new(args[1].as_str().unwrap_or_default(), matcher_options(&args[2]));
+            let matcher = Matcher::new(
+                args[1].as_str().unwrap_or_default(),
+                matcher_options(&args[2]),
+            );
             json!(search::collect_map_matches(
                 &args[0],
                 &matcher,
@@ -683,18 +683,6 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
                 &matcher,
                 args[3].as_str().unwrap_or_default(),
                 args[4].as_u64().unwrap_or(u64::MAX) as usize
-            ))
-        }
-        "searchScopes" => json!(search::search_scopes()),
-        "isFilterScope" => json!(search::is_filter_scope(search_scope(&args[0]))),
-        "getPanelNoun" => json!(search::get_panel_noun(args[0].as_str().unwrap_or_default())),
-        "getSearchPlaceholder" => json!(search::get_search_placeholder(
-            search_scope(&args[0]),
-            args[1].as_str().unwrap_or_default()
-        )),
-        "getRecommendedScopes" => {
-            json!(search::get_recommended_scopes(
-                args[0].as_str().unwrap_or_default()
             ))
         }
         "flattenProjectFiles" => {

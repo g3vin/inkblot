@@ -9,6 +9,7 @@
 import { exists, mkdir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import { getProjectRoot, joinPath } from '../projectPaths'
 import { normalizeCalendar } from './calendar'
+import { OPEN_SETTINGS } from '../../stats/timerMenu.js'
 
 export const STORY_CALENDAR_CHANGED_EVENT = 'story-calendar:changed'
 
@@ -39,4 +40,9 @@ export async function saveStoryCalendar(projectName, calendar) {
     console.error('[storyCalendar] could not save the calendar:', error)
     return false
   }
+}
+
+/** Opens Settings ▸ Story on `projectName`'s calendar: where maps and timelines send you to edit it. */
+export function openStoryCalendarSettings(projectName) {
+  window.dispatchEvent(new CustomEvent(OPEN_SETTINGS, { detail: { pane: 'story', projectName } }))
 }

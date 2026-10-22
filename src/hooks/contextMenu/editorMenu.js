@@ -5,6 +5,7 @@
  * and split-view actions land underneath it.
  */
 import { createQuoteNote } from '../../lib/noteUtils'
+import { DEFAULT_HIGHLIGHT_COLOR } from '../../lib/palette'
 import { bubbleSessionAt, sessionForms, showSessionForm } from '../../extensions/BubbleSession'
 import { paragraphForBubble, selectionForBubble } from '../useBubbleSessions'
 
@@ -56,13 +57,13 @@ export async function editorMenu(ctx) {
     if (isEditorArea) {
       items.push(
         await MenuItem.new({
-          text: 'Focus Mode',
+          text: 'Focus mode',
           action: () => {
             onEnterFocusMode?.()
           },
         }),
         await MenuItem.new({
-          text: 'Print Layout',
+          text: 'Print layout',
           action: () => window.dispatchEvent(new CustomEvent('inkblot:print-layout-toggle')),
         }),
         await PredefinedMenuItem.new({ item: 'Separator' })
@@ -70,10 +71,10 @@ export async function editorMenu(ctx) {
       // Manual breaks, where the caret is. ⌘↩ and ⇧⌘↩ do the same from the keyboard.
       if (editor.can().insertPageBreak?.('page')) {
         items.push(
-          await MenuItem.new({ text: 'Insert Page Break', action: () => editor.chain().focus().insertPageBreak('page').run() }),
-          await MenuItem.new({ text: 'Insert Column Break', action: () => editor.chain().focus().insertPageBreak('column').run() }),
+          await MenuItem.new({ text: 'Insert page break', action: () => editor.chain().focus().insertPageBreak('page').run() }),
+          await MenuItem.new({ text: 'Insert column break', action: () => editor.chain().focus().insertPageBreak('column').run() }),
           await MenuItem.new({
-            text: 'Insert Break to Next Right-Hand Page',
+            text: 'Insert break to next right-hand page',
             action: () => editor.chain().focus().insertPageBreak('recto').run(),
           }),
           await PredefinedMenuItem.new({ item: 'Separator' })
@@ -89,11 +90,11 @@ export async function editorMenu(ctx) {
     if (session && bubbles) {
       items.push(
         await MenuItem.new({
-          text: 'Open Bubble',
+          text: 'Open bubble',
           action: () => bubbles.openSession(editor, session.id),
         }),
         await MenuItem.new({
-          text: 'Archive Bubble',
+          text: 'Archive bubble',
           action: () => bubbles.archiveSession(editor, session.id),
         }),
       )
@@ -102,12 +103,12 @@ export async function editorMenu(ctx) {
       if (pages > 1) {
         items.push(
           await MenuItem.new({
-            text: 'Previous Form',
+            text: 'Previous form',
             enabled: page > 0,
             action: () => showSessionForm(editor, session.id, page - 1),
           }),
           await MenuItem.new({
-            text: 'Next Form',
+            text: 'Next form',
             enabled: page < pages - 1,
             action: () => showSessionForm(editor, session.id, page + 1),
           }),
@@ -120,7 +121,7 @@ export async function editorMenu(ctx) {
     if (!text.trim() && !session && bubbles && paragraphForBubble(editor)) {
       items.push(
         await MenuItem.new({
-          text: 'Bubble Paragraph',
+          text: 'Bubble paragraph',
           action: () => bubbles.openParagraph(editor),
         }),
         await PredefinedMenuItem.new({ item: 'Separator' })
@@ -137,7 +138,7 @@ export async function editorMenu(ctx) {
           action: () => {
             try {
               const highlightColor =
-                editor.storage.lastHighlightColor || '#ffff00'
+                editor.storage.lastHighlightColor || DEFAULT_HIGHLIGHT_COLOR
               editor.chain().focus().setHighlight({ color: highlightColor }).run()
             } catch (err) {
               console.warn('Failed to apply highlight:', err)
@@ -150,7 +151,7 @@ export async function editorMenu(ctx) {
       if (touchesHighlight) {
         items.push(
           await MenuItem.new({
-            text: 'Remove Highlight',
+            text: 'Remove highlight',
             action: () => {
               removePartialHighlight(editor)
             },
@@ -207,7 +208,7 @@ export async function editorMenu(ctx) {
       if (text.split(/\s+/).length <= 2) {
         items.push(
           await MenuItem.new({
-            text: 'Find Synonyms',
+            text: 'Find synonyms',
             action: () => addWorkbenchTile('synonym'),
           })
         )
@@ -216,7 +217,7 @@ export async function editorMenu(ctx) {
       if (text.split(/\s+/).length === 1) {
         items.push(
           await MenuItem.new({
-            text: 'Find Rhymes',
+            text: 'Find rhymes',
             action: () => addWorkbenchTile('rhyme'),
           })
         )
@@ -263,7 +264,7 @@ export async function editorMenu(ctx) {
 
       items.push(
         await MenuItem.new({
-          text: 'Search Web',
+          text: 'Search web',
           action: async () => {
             const query = String(text || '').trim()
             if (!query) return

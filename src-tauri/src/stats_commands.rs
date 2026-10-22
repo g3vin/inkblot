@@ -8,7 +8,9 @@ use std::sync::OnceLock;
 
 use inkblot_core::store::stats::StatsStore;
 use inkblot_core::store::ProjectStore;
-use inkblot_core::types::{DayStat, DocWordCount, StatsScope, StatsTotals, TimerRun, WritingSession};
+use inkblot_core::types::{
+    DayStat, DocWordCount, StatsScope, StatsTotals, TimerRun, WritingSession,
+};
 use tauri::AppHandle;
 
 static STATS: OnceLock<StatsStore> = OnceLock::new();
@@ -16,7 +18,10 @@ static PROJECTS: OnceLock<ProjectStore> = OnceLock::new();
 
 fn root(app_handle: &AppHandle) -> Result<String, String> {
     let app_data = crate::app_data_dir(app_handle)?;
-    app_data.to_str().map(str::to_string).ok_or_else(|| "AppData path is not valid UTF-8".to_string())
+    app_data
+        .to_str()
+        .map(str::to_string)
+        .ok_or_else(|| "AppData path is not valid UTF-8".to_string())
 }
 
 fn stats(app_handle: &AppHandle) -> Result<&'static StatsStore, String> {
@@ -28,7 +33,7 @@ fn stats(app_handle: &AppHandle) -> Result<&'static StatsStore, String> {
 }
 
 /// For counting a project's words from disk: read only, so its session id locks nothing.
-fn projects(app_handle: &AppHandle) -> Result<&'static ProjectStore, String> {
+pub(crate) fn projects(app_handle: &AppHandle) -> Result<&'static ProjectStore, String> {
     if let Some(store) = PROJECTS.get() {
         return Ok(store);
     }
@@ -48,7 +53,10 @@ fn failed(error: impl std::fmt::Display) -> String {
 
 /// Record a session, new or a later checkpoint of one.
 #[tauri::command]
-pub async fn stats_record_session(app_handle: AppHandle, session: WritingSession) -> Result<(), String> {
+pub async fn stats_record_session(
+    app_handle: AppHandle,
+    session: WritingSession,
+) -> Result<(), String> {
     stats(&app_handle)?.record_session(&session).map_err(failed)
 }
 
@@ -61,7 +69,11 @@ pub async fn stats_sessions(
     from_day: Option<String>,
     to_day: Option<String>,
 ) -> Result<Vec<WritingSession>, String> {
-    Ok(stats(&app_handle)?.sessions(&scope(project, doc_path), from_day.as_deref(), to_day.as_deref()))
+    Ok(stats(&app_handle)?.sessions(
+        &scope(project, doc_path),
+        from_day.as_deref(),
+        to_day.as_deref(),
+    ))
 }
 
 /// The days in the range that have anything, oldest first.
@@ -77,7 +89,11 @@ pub async fn stats_daily(
 }
 
 #[tauri::command]
-pub async fn stats_totals(app_handle: AppHandle, project: Option<String>, doc_path: Option<String>) -> Result<StatsTotals, String> {
+pub async fn stats_totals(
+    app_handle: AppHandle,
+    project: Option<String>,
+    doc_path: Option<String>,
+) -> Result<StatsTotals, String> {
     Ok(stats(&app_handle)?.totals(&scope(project, doc_path)))
 }
 
@@ -90,7 +106,9 @@ pub async fn stats_rename_entry(
     new_path: String,
     is_folder: bool,
 ) -> Result<(), String> {
-    stats(&app_handle)?.rename_entry(&project, &path, &new_path, is_folder).map_err(failed)
+    stats(&app_handle)?
+        .rename_entry(&project, &path, &new_path, is_folder)
+        .map_err(failed)
 }
 
 /// Re-key an entry's history when it moves: the same name, in `target_folder`.
@@ -102,21 +120,44 @@ pub async fn stats_move_entry(
     target_folder: String,
     is_folder: bool,
 ) -> Result<(), String> {
-    let name = path.trim_matches('/').rsplit('/').next().unwrap_or("").to_string();
+    let name = path
+        .trim_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .to_string();
     let folder = target_folder.trim_matches('/');
-    let new_path = if folder.is_empty() { name } else { format!("{folder}/{name}") };
-    stats(&app_handle)?.rename_entry(&project, &path, &new_path, is_folder).map_err(failed)
+    let new_path = if folder.is_empty() {
+        name
+    } else {
+        format!("{folder}/{name}")
+    };
+    stats(&app_handle)?
+        .rename_entry(&project, &path, &new_path, is_folder)
+        .map_err(failed)
 }
 
 #[tauri::command]
-pub async fn stats_rename_project(app_handle: AppHandle, old_name: String, new_name: String) -> Result<(), String> {
-    stats(&app_handle)?.rename_project(&old_name, &new_name).map_err(failed)
+pub async fn stats_rename_project(
+    app_handle: AppHandle,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    stats(&app_handle)?
+        .rename_project(&old_name, &new_name)
+        .map_err(failed)
 }
 
 /// Forget the history in scope — all of it when `project` is absent.
 #[tauri::command]
-pub async fn stats_reset(app_handle: AppHandle, project: Option<String>, doc_path: Option<String>) -> Result<(), String> {
-    stats(&app_handle)?.reset(&scope(project, doc_path)).map_err(failed)
+pub async fn stats_reset(
+    app_handle: AppHandle,
+    project: Option<String>,
+    doc_path: Option<String>,
+) -> Result<(), String> {
+    stats(&app_handle)?
+        .reset(&scope(project, doc_path))
+        .map_err(failed)
 }
 
 /// Record a timer run, new or a later record of one in progress.
@@ -149,12 +190,18 @@ pub async fn stats_set_config(app_handle: AppHandle, json: String) -> Result<(),
 /// Every document's words in the project, read from disk — so a project's length
 /// includes the chapters nobody has opened this week.
 #[tauri::command]
-pub async fn project_word_counts(app_handle: AppHandle, project_name: String) -> Result<Vec<DocWordCount>, String> {
+pub async fn project_word_counts(
+    app_handle: AppHandle,
+    project_name: String,
+) -> Result<Vec<DocWordCount>, String> {
     let store = projects(&app_handle)?;
     let tree = store.list_project_tree(&project_name);
     let mut counts = Vec::new();
     for file in inkblot_core::search::flatten_project_files(&tree) {
-        if let Some(raw) = store.load_document(&project_name, &file.path).map_err(failed)? {
+        if let Some(raw) = store
+            .load_document(&project_name, &file.path)
+            .map_err(failed)?
+        {
             counts.push(inkblot_core::store::stats::count_document(&file.path, &raw));
         }
     }

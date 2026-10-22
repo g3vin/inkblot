@@ -8,7 +8,7 @@
  * normalizeNote(s) so downstream code can rely on the shape.
  */
 import { normalizeNoteAudio } from './audioNotes'
-import { DEFAULT_NOTE_INK, NOTE_INKS, inkColor, inkVar, isInkId } from './palette'
+import { DEFAULT_NOTE_INK, NOTE_INKS, inkColor, inkVar, isInkId, legacyInkFor } from './palette'
 
 /**
  * A note's colour is an ink id from src/lib/palette.ts ('amber'), or — for notes saved
@@ -21,6 +21,9 @@ export const DEFAULT_NOTE_COLOR = DEFAULT_NOTE_INK
 export const NOTE_FALLBACK_COLOR = 'blue'
 
 export const NOTE_COLOR_OPTIONS = NOTE_INKS
+
+/** A note's colour as an ink id (older notes stored a CSS colour). */
+export const noteInk = (note) => (isInkId(note?.color) ? note.color : legacyInkFor(note?.color) ?? NOTE_COLOR_OPTIONS[0])
 
 /** A stored note colour → the CSS colour to draw it with. */
 export const noteColor = (value) => inkColor(value, inkVar(NOTE_FALLBACK_COLOR))
@@ -98,7 +101,9 @@ const normalizeNoteImages = (images = []) => (
 )
 
 /** Fill in defaults/coerce every note field; safe to call on untrusted or legacy data. */
-export const normalizeNote = (note = {}) => {
+export const normalizeNote = (raw = {}) => {
+  // Anything that is not an object is an empty note, not a crash or its characters as keys.
+  const note = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
   const fallbackDate = nowIso()
   const createdAt = normalizeDate(note.createdAt, normalizeDate(note.updatedAt, fallbackDate))
   const updatedAt = normalizeDate(note.updatedAt, createdAt)
@@ -173,6 +178,14 @@ export const touchNote = (note, changes = {}) => (
     updatedAt: nowIso(),
   })
 )
+
+/** A free note holding a clipboard piece: its words, or its picture. */
+export const createClipboardNote = (entry = {}) => {
+  const note = createFreeNote()
+  if (entry.kind !== 'image') return touchNote(note, { content: entry.text || '' })
+  const mimeType = /^data:([^;,]+)/.exec(entry.src || '')?.[1]
+  return touchNote(note, { images: [{ src: entry.src, mimeType }] })
+}
 
 /** Collect a note's id plus all descendant note ids (children via parentNoteId). */
 export const collectNoteBranchIds = (notes = [], rootId) => {

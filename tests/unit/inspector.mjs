@@ -37,7 +37,7 @@ const titles = (title) => [...column(title).querySelectorAll('.inspector-editor-
 const click = (el) => act(async () => el.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 
 ok('both layouts are listed', !!column('Write') && !!column('Typeset'))
-ok('Write lists its panels first, then the rest', titles('Write').join() === 'Clipboard,Workbench,Notes,References,History,Stats,Typeset,Print & Export')
+ok('Write lists its panels first, then the rest', titles('Write').join() === 'Clipboard,Workbench,Notes,Timeline,References,History,Stats,Typeset,Print & export')
 ok('shown panels are checked', box('Write', 'Notes').checked && !box('Write', 'Typeset').checked)
 
 await click(box('Write', 'Clipboard'))
@@ -45,12 +45,12 @@ ok('unchecking hides the panel', !L.tabsOf(readInspectorLayouts(), 'drafting').i
 ok('and it moves under the shown ones', titles('Write').indexOf('Clipboard') > titles('Write').indexOf('Stats'))
 ok('Typeset is untouched', L.tabsOf(readInspectorLayouts(), 'finishing').join() === 'typeset,output,notes,references,history,stats')
 
-await click(box('Write', 'Print & Export'))
+await click(box('Write', 'Print & export'))
 ok('checking shows it, last', L.tabsOf(readInspectorLayouts(), 'drafting').at(-1) === 'output')
 
-for (const tab of ['Workbench', 'Notes', 'References', 'History', 'Stats']) await click(box('Write', tab))
+for (const tab of ['Workbench', 'Notes', 'Timeline', 'References', 'History', 'Stats']) await click(box('Write', tab))
 ok('down to one panel', L.tabsOf(readInspectorLayouts(), 'drafting').join() === 'output')
-ok('whose box cannot be unchecked', box('Write', 'Print & Export').disabled)
+ok('whose box cannot be unchecked', box('Write', 'Print & export').disabled)
 ok('and it is saved', JSON.parse(prefs.getPreference(L.INSPECTOR_LAYOUTS_KEY)).layouts.drafting.join() === 'output')
 
 /* ---------------- a layout follows the mode ---------------- */
@@ -96,7 +96,7 @@ ok('typeset versions by day: Today, Yesterday, then a date', days.map((d) => d.l
 
 const { default: TypesetHistoryView } = await import('../../src/components/RightSidebar/TypesetHistoryView.jsx')
 await act(async () => root.render(React.createElement(TypesetHistoryView)))
-ok('with none kept yet, it says how they will be', container.textContent.includes('No Typeset Versions Yet'))
+ok('with none kept yet, it says how they will be', container.textContent.includes('No typeset versions yet'))
 await act(async () => {
   documentSurface.publishTypesetHistoryChanged({
     folder: '',
@@ -139,15 +139,22 @@ ok('This Document shows the document’s sources, Project every one',
 const { default: ReferencesPanel } = await import('../../src/components/RightSidebar/references/ReferencesPanel.jsx')
 await act(async () => root.render(React.createElement(ReferencesPanel)))
 await act(async () => {
-  documentSurface.publishReferenceSchema({ kinds: [{ id: 'book', label: 'Book', group: 'Books', symbol: 'book', fields: [{ key: 'title', label: 'Title', placeholder: '', input: 'text', required: true }], roles: ['author'] }], roles: [{ id: 'author', label: 'Author' }], styles: [{ id: 'apa', label: 'APA 7th edition', short: 'APA', heading: 'References', notes: false }] })
+  documentSurface.publishReferenceSchema({ kinds: [{ id: 'book', label: 'Book', group: 'Books', icon: 'book', fields: [{ key: 'title', label: 'Title', placeholder: '', input: 'text', required: true }], roles: ['author'] }], roles: [{ id: 'author', label: 'Author' }], styles: [{ id: 'apa', label: 'APA 7th edition', short: 'APA', heading: 'References', notes: false }] })
   documentSurface.publishReferencesChanged(refState)
 })
 // The list is coalesced to one per frame.
 await act(async () => { await new Promise((resolve) => setTimeout(resolve, 60)) })
 ok('the panel lists what the page publishes, this document’s by default', container.querySelectorAll('.reference-row').length === 1)
 ok('with its formatted entry and its badges', container.querySelector('.reference-entry-text i')?.textContent === 'Book a' && container.textContent.includes('Cited'))
-ok('and the style', container.querySelector('.references-style')?.textContent.includes('APA'))
-await act(async () => [...container.querySelectorAll('[role="radio"]')].find((b) => b.textContent === 'Project').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+// The scope and the style are in the panel's header (ui/PanelActions): a scope menu and ⋯.
+const scopeButton = container.querySelector('.ib-scope-menu')
+ok('the header names the scope', scopeButton?.textContent.includes('This document'))
+await act(async () => container.querySelector('[aria-label="More reference options"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+const styleItem = [...document.querySelectorAll('.ib-menu [role="menuitemcheckbox"]')].find((item) => item.textContent.includes('APA'))
+ok('and the style', styleItem?.getAttribute('aria-checked') === 'true')
+await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+await act(async () => scopeButton.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+await act(async () => [...document.querySelectorAll('.ib-menu [role="menuitemcheckbox"]')].find((b) => b.textContent.includes('This project')).dispatchEvent(new MouseEvent('click', { bubbles: true })))
 ok('Project shows every source', container.querySelectorAll('.reference-row').length === 2)
 
 const refCommands = []

@@ -10,10 +10,12 @@ import { formatArea, formatDistance, formatDuration } from '../../lib/map/mapUni
 import { legTravel } from '../../lib/map/travel'
 import { mapTransports } from '../../lib/map/transports'
 import { HATCHES, LINE_DASHES } from '../../lib/map/mapModel'
-import { STAR_PRESETS, massToLuminosity, starPreset, temperatureToColor } from '../../lib/map/stars'
+import { STAR_GROUPS, STAR_PRESETS, massToLuminosity, starFields, starPreset, temperatureToColor } from '../../lib/map/stars'
 import { bodyMass, orbitPeriod } from '../../lib/map/orbits'
 import { newBody } from '../../lib/map/systemPresets'
+import { KMS_PER_AU_DAY, stateFromOrbits } from '../../lib/map/nbody'
 import { PIN_ICONS, unitFor } from '../mapOptions'
+import { MAP_DEFAULT_COLORS } from '../../lib/map/mapColors'
 
 const HATCH_LABELS = { none: 'None', diagonal: 'Diagonal lines', cross: 'Cross-hatch', dots: 'Dots', waves: 'Waves', mountains: 'Mountains' }
 const DASH_LABELS = { solid: 'Solid', dashed: 'Dashed', dotted: 'Dotted', inked: 'Inked (hand-drawn)', rough: 'Rough (sketchy)' }
@@ -39,14 +41,18 @@ const deleteSection = (ui, id, onDelete, label = 'Delete') =>
 
 /* ---------------- places ---------------- */
 
-export function pinSections(ui, { map, pin, space, day, docs, missing, patch, onOpenDoc, onDelete, renameRequest }) {
+export function pinSections(ui, { map, pin, space, day, docs, missing, patch, onOpenDoc, onOpenPinMap, onDelete, renameRequest }) {
   const at = resolvePin(map, space, pin, day)
   const coordinates = at
     ? map.mapKind === 'earth'
       ? `${Math.abs(at[1]).toFixed(3)}° ${at[1] >= 0 ? 'N' : 'S'}, ${Math.abs(at[0]).toFixed(3)}° ${at[0] >= 0 ? 'E' : 'W'}`
       : map.mapKind === 'system'
         ? `${Math.hypot(at[0], at[1]).toFixed(3)} AU from the centre`
-        : `${Math.round(at[0])}, ${Math.round(at[1])}`
+        : map.mapKind === 'galaxy'
+          ? `${(Math.hypot(at[0], at[1], at[2] || 0) / 1000).toFixed(1)} thousand light-years from the centre`
+          : map.mapKind === 'universe'
+            ? `${(Math.hypot(at[0], at[1], at[2] || 0) * 3.2616).toFixed(2)} million light-years from the centre`
+            : `${Math.round(at[0])}, ${Math.round(at[1])}`
     : '—'
   return [
     ui.section('place', 'Place', [
@@ -63,13 +69,17 @@ export function pinSections(ui, { map, pin, space, day, docs, missing, patch, on
       ),
       missing ? ui.warning('The linked document has been deleted or moved. Choose it again above.') : null,
       pin.doc && !missing ? ui.buttonField('pin.open', `Open “${getDocDisplayName(pin.doc)}”`, () => onOpenDoc?.(pin.doc)) : null,
+      // In space, a place can be a map of its own: a galaxy in a group, a star system in a galaxy.
+      !pin.doc && onOpenPinMap && (map.mapKind === 'universe' || map.mapKind === 'galaxy')
+        ? ui.buttonField('pin.map', map.mapKind === 'universe' ? 'Open as a galaxy' : 'Make a star system here', onOpenPinMap)
+        : null,
       !docs.docs.some((doc) => doc.isLocation)
         ? ui.note('Tip: documents in a folder named Settings, Locations or Places are offered first here — and can be dragged straight onto the map.')
         : null,
     ]),
     ui.section('marker', 'Marker', [
       ui.markers('pin.icon', pin.icon, pin.color, PIN_ICONS.map((icon) => ({ value: icon.id, label: icon.label })), (icon) => patch({ icon })),
-      ui.color('pin.color', 'Colour', pin.color, '#c0392b', (color) => patch({ color })),
+      ui.color('pin.color', 'Colour', pin.color, MAP_DEFAULT_COLORS.pin, (color) => patch({ color })),
       map.mapKind === 'system'
         ? ui.choice(
             'pin.body',
@@ -117,7 +127,7 @@ export function routeSections(ui, { map, route, space, day, patch, onDelete, onA
       ui.note('Drag a stop to move it (onto a place to route through it); drag a faint midpoint to add one; double-click the line to add a stop there.'),
     ]),
     ui.section('line', 'Line', [
-      ui.color('route.stroke', 'Colour', route.style.stroke, '#b3462f', (stroke) => patch({ style: { ...route.style, stroke } })),
+      ui.color('route.stroke', 'Colour', route.style.stroke, MAP_DEFAULT_COLORS.route, (stroke) => patch({ style: { ...route.style, stroke } })),
       ui.number('route.width', 'Width', route.style.width, (width) => patch({ style: { ...route.style, width } }), { min: 0.5, max: 20, step: 0.5, suffix: 'px' }),
       ui.choice('route.dash', 'Style', route.style.dash, LINE_DASHES.map((dash) => ({ value: dash, label: DASH_LABELS[dash] })), (dash) => patch({ style: { ...route.style, dash } })),
       ui.toggle('route.arrow', 'Arrow at end', route.style.arrow, (arrow) => patch({ style: { ...route.style, arrow } })),
@@ -154,8 +164,8 @@ export function regionSections(ui, { map, region, space, patch, onDelete, onAddL
       terrain ? ui.note(`Travel across it is slowed or sped by the ${terrain.name.toLowerCase()} terrain (edit terrains under Travel).`) : null,
     ]),
     ui.section('look', 'Look', [
-      ui.color('region.fill', 'Fill', region.fill, terrain?.fill || '#6d9c5a', (fill) => patch({ fill })),
-      ui.color('region.stroke', 'Edge', region.stroke, region.fill || terrain?.fill || '#6d9c5a', (stroke) => patch({ stroke })),
+      ui.color('region.fill', 'Fill', region.fill, terrain?.fill || MAP_DEFAULT_COLORS.region, (fill) => patch({ fill })),
+      ui.color('region.stroke', 'Edge', region.stroke, region.fill || terrain?.fill || MAP_DEFAULT_COLORS.region, (stroke) => patch({ stroke })),
       ui.choice('region.hatch', 'Hatching', region.hatch, HATCHES.map((hatch) => ({ value: hatch, label: HATCH_LABELS[hatch] })), (hatch) => patch({ hatch })),
       ui.buttonField('region.label', 'Label it', onAddLabel),
     ]),
@@ -213,7 +223,7 @@ export function labelSections(ui, { map, label, patch, onDelete, renameRequest }
 
 /* ---------------- star-system bodies ---------------- */
 
-export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focused, onFocus, renameRequest }) {
+export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focused, onFocus, onOpenSurface, renameRequest }) {
   const bodies = new Map(map.system.bodies.map((candidate) => [candidate.id, candidate]))
   const period = body.orbit ? orbitPeriod(body, bodies) : null
   const orbit = body.orbit
@@ -221,7 +231,7 @@ export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focu
     patchBody({ orbit: { ...(orbit || { aAU: 1, e: 0, periapsisDeg: 0, meanAnomalyDeg: 0, periodDays: null, retrograde: false }), ...next } })
   const setPreset = (id) => {
     const preset = starPreset(id)
-    patchBody({ massSun: preset.massSun, radiusKm: preset.radiusSun * 695700, star: { spectral: preset.id, temperatureK: preset.temperatureK, luminositySun: preset.luminositySun } })
+    patchBody({ massSun: preset.massSun, radiusKm: preset.radiusSun * 695700, star: starFields(preset), color: null })
   }
   const add = (kind, distance, label) => ui.button(`body.add.${kind}`, label, () => addBody(newBody(kind, body.id, distance)))
 
@@ -239,15 +249,18 @@ export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focu
         (parent) => patchBody({ parent: parent || null })
       ),
       body.kind !== 'star' && body.kind !== 'barycenter' && body.kind !== 'belt'
-        ? ui.color('body.color', 'Colour', body.color, '#9aa7b8', (color) => patchBody({ color }))
+        ? ui.color('body.color', 'Colour', body.color, MAP_DEFAULT_COLORS.body, (color) => patchBody({ color }))
         : null,
       ui.buttonField('body.focus', focused ? 'Stop following' : 'Centre the view on it', onFocus),
+      onOpenSurface && body.kind !== 'belt' && body.kind !== 'barycenter'
+        ? ui.buttonField('body.surface', body.surface ? 'Open its surface' : body.kind === 'star' ? 'Make a map of this star' : 'Make a map of this world', onOpenSurface)
+        : null,
     ]),
   ]
 
   if (body.kind === 'star') {
     sections.push(ui.section('star', 'Star', [
-      ui.choice('star.type', 'Type', body.star?.spectral || 'G2V', STAR_PRESETS.map((preset) => ({ value: preset.id, label: preset.name })), setPreset),
+      ui.choice('star.type', 'Type', body.star?.spectral || 'G2V', STAR_PRESETS.map((preset) => ({ value: preset.id, label: preset.name, group: STAR_GROUPS.find(([id]) => id === preset.group)?.[1] })), setPreset),
       ui.number('star.temperature', 'Temperature', body.star?.temperatureK ?? 5772, (temperatureK) => patchBody({ star: { ...body.star, temperatureK }, color: null }), { min: 0, step: 100, suffix: 'K' }),
       ui.number('star.mass', 'Mass', body.massSun ?? 1, (massSun) => patchBody({ massSun }), { min: 0.001, suffix: 'M☉' }),
       ui.number('star.brightness', 'Brightness', body.star?.luminositySun ?? 1, (luminositySun) => patchBody({ star: { ...body.star, luminositySun } }), { min: 0, suffix: 'L☉' }),
@@ -265,7 +278,27 @@ export function bodySections(ui, { map, body, patchBody, addBody, onDelete, focu
     ]))
   }
 
-  if (body.kind !== 'belt' && body.parent) {
+  const pulling = map.system.dynamics === 'nbody' && body.kind !== 'belt' && body.kind !== 'barycenter'
+  if (pulling) {
+    // Bodies pulling on each other have no orbit to follow: where each starts, and how
+    // fast it is going, is all there is (nbody.js).
+    const start = body.state || stateFromOrbits(map.system).get(body.id) || { pos: [0, 0, 0], vel: [0, 0, 0] }
+    const setStart = (part, axis, value) => {
+      const next = { pos: start.pos.slice(0, 3), vel: start.vel.slice(0, 3) }
+      next[part][axis] = part === 'vel' ? value / KMS_PER_AU_DAY : value
+      patchBody({ state: next })
+    }
+    const speed = Math.hypot(...start.vel) * KMS_PER_AU_DAY
+    sections.push(ui.section('start', 'Where it starts', [
+      ...['x', 'y', 'z'].map((name, axis) => ui.number(`start.pos.${name}`, `Position ${name}`, Math.round(start.pos[axis] * 1e6) / 1e6, (value) => setStart('pos', axis, value), { step: 0.01, suffix: 'AU' })),
+      ...['x', 'y', 'z'].map((name, axis) => ui.number(`start.vel.${name}`, `Speed ${name}`, Math.round(start.vel[axis] * KMS_PER_AU_DAY * 1e3) / 1e3, (value) => setStart('vel', axis, value), { step: 0.1, suffix: 'km/s' })),
+      ui.stat('Moving at', `${speed.toFixed(speed < 10 ? 2 : 1)} km/s`),
+      ui.number('start.mass', 'Mass', body.massSun ?? null, (massSun) => patchBody({ massSun }), { min: 0, suffix: 'M☉', allowEmpty: true }),
+      ui.note('On day 0. Drag the body, or the tip of its arrow, on the map to move where it starts and how fast it goes.'),
+    ]))
+  }
+
+  if (body.kind !== 'belt' && body.parent && !pulling) {
     sections.push(ui.section('orbit', 'Orbit', [
       ui.number('orbit.distance', 'Distance', orbit?.aAU ?? 1, (aAU) => patchOrbit({ aAU }), { min: 0.00001, suffix: 'AU', help: 'The orbit’s semi-major axis.' }),
       ui.number('orbit.e', 'Eccentricity', orbit?.e ?? 0, (e) => patchOrbit({ e }), { min: 0, max: 0.99, step: 0.01, help: '0 is a circle; toward 1, a long ellipse.' }),

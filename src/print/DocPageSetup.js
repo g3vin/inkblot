@@ -57,9 +57,6 @@ export const DocPageSetup = Extension.create({
 /** The document's own page setup, or null when it has never been given one. */
 export const readDocPageSetup = (doc) => doc?.attrs?.pageSetup || null
 
-/** The setup a document lays out in: its own, or the default page. */
-export const effectivePageSetup = (doc) => normalizePageSetup(readDocPageSetup(doc))
-
 /**
  * Replace an editor's content — a text version restored, a merge — keeping its
  * typesetting as it is now.

@@ -11,22 +11,11 @@
   height: 100%;
 }
 
-.clipboard-panel.drop-active {
-  outline: 1px dashed #4b87bb;
-  outline-offset: 6px;
-  border-radius: 10px;
-}
-
+/* While something is dragged over the panel its list washes in the accent: the one
+   sign it will take the drop (an empty panel's EmptyState does the same). */
 .clipboard-panel.drop-active .clipboard-list {
-  outline: 1px dashed #4b87bb;
-  outline-offset: 6px;
-  border-radius: 10px;
-}
-
-.clipboard-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   flex: 1;
   min-height: 120px;
 }
@@ -37,43 +26,58 @@
 
 .clipboard-empty-state {
   flex: 1;
-  min-height: 160px;
-  display: flex;
-  align-items: center;
   justify-content: center;
-  text-align: center;
-  padding: 16px;
-  border: 1px dashed rgba(75, 135, 187, 0.22);
-  border-radius: 12px;
 }
 
+/* Each piece is a Section straight on the panel, ruled off from the next by its
+   hairline; the last one keeps its rule too, since the list is not the panel's end. */
 .clipboard-item {
-  cursor: default;
-}
-
-.clipboard-item[draggable='true'] {
+  border-bottom: 1px solid var(--border-muted);
   cursor: grab;
+  touch-action: none;
 }
+.clipboard-item:last-child { border-bottom: 0; }
 
-.clipboard-item[draggable='true']:active {
-  cursor: grabbing;
+/* A piece's actions (make a note, copy, delete) show on hover, or once focus is in
+   it so the keyboard can reach them; a touch screen has no hover and always shows them. */
+.clipboard-item .ui-section-accessory {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
+.clipboard-item:hover .ui-section-accessory,
+.clipboard-item:focus-within .ui-section-accessory { opacity: 1; }
+@media (hover: none) {
+  .clipboard-item .ui-section-accessory { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clipboard-item .ui-section-accessory { transition: none; }
+}
+.clipboard-item .ui-section { border-bottom: 0; }
+.clipboard-item .ui-section-header { cursor: grab; font-weight: 400; }
 
-.clipboard-item-header {
+/* Open, the header names where the piece came from; collapsed, it shows the piece's
+   first line instead, so a collapsed list still reads. */
+.clipboard-item .ui-section-title {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
+  min-width: 0;
 }
-
+.clipboard-peek,
+.clipboard-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .clipboard-meta {
   font-size: 11px;
   color: var(--text-subtle);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
+.clipboard-peek {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.clipboard-item .ui-section[data-open='true'] .clipboard-peek,
+.clipboard-item .ui-section[data-open='false'] .clipboard-meta { display: none; }
 
 .clipboard-text {
   font-size: 13px;
@@ -81,18 +85,51 @@
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 7.2em;
+  max-height: 7.5em;
   overflow: auto;
+  user-select: none;
 }
 
-.clipboard-actions {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
+/* A copied image shows as itself, whole, at the panel's width at most. It stays put:
+   only text drags into the page. */
+.clipboard-image {
+  display: block;
+  max-width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  user-select: none;
 }
+.clipboard-item.is-image { cursor: default; }
+.clipboard-item.is-image .ui-section-header { cursor: pointer; }
 
-.clipboard-icon-btn {
-  line-height: 1;
+/* The text in hand while a piece is dragged: just the words, over everything. */
+.clipboard-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-tooltip);
+  box-sizing: border-box;
+  max-height: 7.5em;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-shadow: 0 0 4px var(--app-bg), 0 0 8px var(--app-bg);
+  pointer-events: none;
+  will-change: transform;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+/* Settled into the page as a preview: the page shows the words now. */
+.clipboard-ghost[data-settled='true'] { opacity: 0; }
+
+html.is-dragging-clipboard,
+html.is-dragging-clipboard * {
+  cursor: grabbing !important;
+  user-select: none !important;
 }
 
 .search-results {

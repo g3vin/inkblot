@@ -1,15 +1,18 @@
 /**
  * EditorLayout.jsx — main workspace layout.
  *
- * Arranges the titlebar/toolbar, left sidebar (file tree), editor canvas,
- * and right sidebar around the state owned by Editor.jsx. Also hosts
+ * Arranges the window as Arc and Dia do: the left sidebar (file tree) and right
+ * sidebar (inspector) docked on the window's tinted tray, and between them one
+ * floating card holding the toolbar and the editor canvas. A sidebar that is not
+ * pinned hides and hovers over the card when the pointer reaches its window edge;
+ * the buttons in the card's top corners pin and unpin them. Also hosts
  * cross-cutting UI behaviors: the custom window-drag titlebar, fullscreen
  * chrome detection, the right-click context menu, "jump to text" for notes
  * and search results, and the Bubble editor.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { resolveAnchor } from '../bridge/anchors'
-import { documentSurface, useBridgeEvent, useBridgeState, useLatestBridgeState } from '../bridge'
+import { documentSurface, shellBridge, useBridgeEvent, useBridgeState, useLatestBridgeState } from '../bridge'
 import { EditorTarget } from '../types'
 
 /** A stable identity, so useBridgeState's initial value is not a new object each render. */
@@ -27,10 +30,11 @@ import { getBookForDoc, getBookSettings, getPrintScope, setMeasurement } from '.
 import { TYPESET_MILESTONE_EVENT } from '../print/useTypesetHistory'
 
 /** What a format is called in the typeset history: "Exported PDF". */
-const EXPORT_NAMES = { pdf: 'PDF', epub: 'EPUB', docx: 'Word', html: 'HTML', markdown: 'Markdown', plainText: 'Plain Text', fountain: 'Fountain', fdx: 'Final Draft' }
+const EXPORT_NAMES = { pdf: 'PDF', epub: 'EPUB', docx: 'Word', html: 'HTML', markdown: 'Markdown', plainText: 'Plain text', fountain: 'Fountain', fdx: 'Final Draft' }
 const milestone = (label) => window.dispatchEvent(new CustomEvent(TYPESET_MILESTONE_EVENT, { detail: { label } }))
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
+import FindBar from './FindBar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useEditorContextMenu } from '../hooks/useEditorContextMenu'
 import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
@@ -48,30 +52,39 @@ import { readDisplayMode, TOOLBAR_LAYOUT_CHANGED } from './toolbar/useToolbarLay
 import { CUSTOMIZE_INSPECTOR_EVENT, popUpToolbarMenu } from '../hooks/contextMenu/toolbarMenu'
 import InspectorLayoutEditor from './RightSidebar/InspectorLayoutEditor'
 import { setInspectorOpen } from '../lib/inspectorPresence'
+import { useCommands } from '../lib/commands'
+import { createClipboardNote, createFreeNote, createQuoteNote } from '../lib/noteUtils'
+import { requestDraftKind } from '../lib/draftDocument'
+import { requestFind, requestMapFind } from '../lib/sidebarSearch'
+import { refreshFolderPresets } from '../lib/folderPresets'
+import FolderPresetsSheet from './FolderPresetsSheet'
+import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason } from '../lib/docLocks'
+import { currentTrafficLights, DEFAULT_TRAFFIC_LIGHTS, placeTrafficLights, TRAFFIC_LIGHT_DIAMETER, TRAFFIC_LIGHT_SPACING } from '../lib/trafficLights'
 
-const LEFT_SIDEBAR_OUTER_CHROME_WIDTH = 18
-// Room in the titlebar for a sidebar's show button while it is put away.
-const TITLEBAR_TOGGLE_WIDTH = 44
-const RIGHT_SIDEBAR_OUTER_CHROME_WIDTH = 22
+// Room in the card's toolbar row for a corner's pin button.
+const CARD_TOGGLE_WIDTH = 44
 
-// The macOS traffic lights sit inside the left sidebar's top-left corner; their
-// origin is `trafficLightPosition` in tauri.conf.json. macOS spaces the three
-// 12px buttons 20px apart, so the green (fullscreen) one starts 40px in. The
-// box is padded a few px so a click near its edge still counts.
-const TRAFFIC_LIGHT_ORIGIN = { x: 20, y: 30 }
-const TRAFFIC_LIGHT_DIAMETER = 12
-const FULLSCREEN_BUTTON_BOX = {
-  left: TRAFFIC_LIGHT_ORIGIN.x + 36,
-  right: TRAFFIC_LIGHT_ORIGIN.x + 58,
-  top: TRAFFIC_LIGHT_ORIGIN.y - 8,
-  bottom: TRAFFIC_LIGHT_ORIGIN.y + 20,
+// The green (fullscreen) traffic light's box, from where the lights were last put
+// (lib/trafficLights.js), padded a few px so a click near its edge still counts.
+const fullscreenButtonBox = () => {
+  const lights = currentTrafficLights()
+  const left = lights.x + TRAFFIC_LIGHT_SPACING * 2
+  return {
+    visible: lights.visible,
+    left: left - 4,
+    right: left + TRAFFIC_LIGHT_DIAMETER + 6,
+    top: lights.centerY - 14,
+    bottom: lights.centerY + 14,
+  }
 }
 
 // Drag strip, as in Apple's own apps: a full-width band centered on the traffic
 // lights, reaching from the top of the window to as far below their centers as
 // the window top is above them.
-const TRAFFIC_LIGHT_CENTER_Y = TRAFFIC_LIGHT_ORIGIN.y + TRAFFIC_LIGHT_DIAMETER / 2
-const WINDOW_DRAG_STRIP_HEIGHT = TRAFFIC_LIGHT_CENTER_Y * 2
+const WINDOW_DRAG_STRIP_HEIGHT = DEFAULT_TRAFFIC_LIGHTS.centerY * 2
+
+/** How long a hovering sidebar takes to slide in (--dur-slow): its lights wait for it. */
+const PEEK_SETTLE_MS = 240
 
 /** Return the editor only if it is fully mounted and usable (guards against destroyed instances). */
 const getLiveEditor = (editor) => {
@@ -125,9 +138,6 @@ export default function EditorLayout(props) {
     setActiveDoc,
     setCurrentDoc,
   } = props
-  const titlebarLeftWidth = left.collapsed && !left.peeked
-    ? 86 + TITLEBAR_TOGGLE_WIDTH
-    : left.width + LEFT_SIDEBAR_OUTER_CHROME_WIDTH
   // The toolbar's Focus Mode item. The mode stays this page's; the toolbar asks for it
   // and lights its button from what is published back.
   useEffect(() => documentSurface.onCommand('setFocusMode', ({ open }) => setFocusModeOpen(Boolean(open))), [])
@@ -144,9 +154,6 @@ export default function EditorLayout(props) {
       { editor: props.secondaryEditor, path: props.secondaryDoc },
     ],
   })
-  const titlebarRightWidth = right.collapsed && !right.peeked
-    ? TITLEBAR_TOGGLE_WIDTH
-    : right.width + RIGHT_SIDEBAR_OUTER_CHROME_WIDTH
   // On a canvas, the only editor the Toolbar may drive is a card's own editor.
   // Falling back to the pane's TipTap editors would point the Toolbar at an idle
   // instance holding no document.
@@ -157,11 +164,6 @@ export default function EditorLayout(props) {
   // the instance.
   const activeEditorInfo = useBridgeState('activeEditorChanged', EMPTY_ACTIVE_EDITOR)
   const activeIsCanvas = isCanvasDoc(activeDoc || currentDoc)
-  // A canvas or a map pans instead of scrolling, and runs on under the sidebars — when
-  // it has the editor to itself. In a split both panes keep the document's column
-  // whichever is active, or hovering from one to the other would slide the other one
-  // under the sidebars and the toolbar and back.
-  const activeUnderlays = !isTextDoc(activeDoc || currentDoc) && props.splitView !== 'editor'
   const [compareToolbarSlot, setCompareToolbarSlot] = useState(null)
   const liveActiveEditor = getLiveEditor(activeEditor)
   const toolbarEditor = activeIsCanvas
@@ -269,8 +271,10 @@ export default function EditorLayout(props) {
 
     const handleFullscreenButtonPointerDown = (event) => {
       if (event.button !== 0) return
-      if (event.clientX < FULLSCREEN_BUTTON_BOX.left || event.clientX > FULLSCREEN_BUTTON_BOX.right) return
-      if (event.clientY < FULLSCREEN_BUTTON_BOX.top || event.clientY > FULLSCREEN_BUTTON_BOX.bottom) return
+      const box = fullscreenButtonBox()
+      if (!box.visible) return
+      if (event.clientX < box.left || event.clientX > box.right) return
+      if (event.clientY < box.top || event.clientY > box.bottom) return
 
       setFullscreenChrome(!fullscreenChromeRef.current)
       window.clearTimeout(settleTimeout)
@@ -313,7 +317,7 @@ export default function EditorLayout(props) {
   useBridgeEvent('showSidebarTab', ({ tab }) => { if (tab) openRightSidebarTab(tab) })
 
   // The toolbar's panel items: show a panel, or hide the inspector if it is showing.
-  const rightOpen = !right.collapsed || right.peeked
+  const rightOpen = right.shown
   const togglePanel = useCallback((tab) => {
     if (rightOpen && props.sidebarTab === tab) {
       right.collapse()
@@ -326,6 +330,82 @@ export default function EditorLayout(props) {
     () => ({ tab: props.sidebarTab, open: rightOpen, toggle: togglePanel }),
     [props.sidebarTab, rightOpen, togglePanel]
   )
+
+  // A note on the selection, or a free one with nothing selected (⌥⌘N, the toolbar's
+  // Add Note, the command palette).
+  const { setNotes } = props
+  const addNote = useCallback(() => {
+    const live = getLiveEditor(props.activeEditor)
+    const selection = live?.state.selection
+    const note = selection && !selection.empty
+      ? createQuoteNote({ from: selection.from, to: selection.to, anchor: live.state.doc.textBetween(selection.from, selection.to) })
+      : createFreeNote()
+    setNotes?.((notes) => [note, ...notes])
+    openRightSidebarTab('notes')
+  }, [props.activeEditor, setNotes, openRightSidebarTab])
+
+  // A clipboard piece kept as a note on the active document (the clipboard keeps it too).
+  const makeNoteFromClipboard = useCallback((entry) => {
+    if (!entry) return
+    setNotes?.((notes) => [createClipboardNote(entry), ...notes])
+    openRightSidebarTab('notes')
+  }, [setNotes, openRightSidebarTab])
+
+  // ⌘F: the find bar, finding what is selected.
+  const findInDocument = useCallback(() => {
+    if (isMapDoc(activeDoc || currentDoc)) {
+      requestMapFind()
+      return
+    }
+    const live = props.activeEditor
+    const selection = live && !live.isDestroyed ? live.state.selection : null
+    const query = selection && !selection.empty ? live.state.doc.textBetween(selection.from, selection.to, ' ').trim() : ''
+    requestFind(query)
+  }, [activeDoc, currentDoc, props.activeEditor])
+
+  // The project's locks (docLocks.ts), read when it opens; the file tree re-reads them.
+  // And its own folder types (folderPresets.ts).
+  useEffect(() => {
+    void refreshLocks(props.projectName)
+    void refreshFolderPresets(props.projectName)
+  }, [props.projectName])
+  const lockTarget = activeDoc || currentDoc
+  const lock = useLockReason(lockTarget)
+
+  const leftShown = left.shown
+  const activeIsText = isTextDoc(activeDoc || currentDoc)
+  const editorMode = pageLayoutState?.mode
+  const split = props.splitView
+  const lastCopy = props.clipboardHistory?.[0]
+  useCommands(() => {
+    const send = (type, payload = {}) => shellBridge.send(type, payload)
+    const newOf = (kind) => () => { requestDraftKind(kind); send('newTab') }
+    return [
+      { id: 'document.new', section: 'Document', title: 'New document…', icon: 'new-document', keys: 'Mod+N', keywords: ['create', 'chapter', 'page', 'file'], when: () => Boolean(props.projectName), run: newOf('doc') },
+      { id: 'folder.new', section: 'Document', title: 'New folder…', icon: 'folder', keys: 'Mod+Shift+N', keywords: ['create', 'group', 'directory'], when: () => Boolean(props.projectName), run: () => {
+        if (!leftShown) left.open()
+        window.dispatchEvent(new CustomEvent('filetree:new-entry', { detail: { type: 'folder', parent: '' } }))
+      } },
+      { id: 'canvas.new', section: 'Document', title: 'New canvas…', icon: 'canvas', keywords: ['create', 'board', 'cards'], when: () => Boolean(props.projectName), run: newOf('canvas') },
+      { id: 'map.new', section: 'Document', title: 'New map…', icon: 'map', keywords: ['create', 'world', 'places'], when: () => Boolean(props.projectName), run: newOf('map') },
+      { id: 'timeline.new', section: 'Document', title: 'New timeline…', icon: 'timeline', keywords: ['create', 'chronology', 'events', 'dates'], when: () => Boolean(props.projectName), run: newOf('timeline') },
+      { id: 'notes.add', section: 'Notes', title: 'Add note', icon: 'note', keys: 'Mod+Alt+N', keywords: ['comment', 'annotate'], when: () => activeIsText, run: addNote },
+      { id: 'clipboard.make-note', section: 'Notes', title: 'Make a note of the last copy', icon: 'note', keywords: ['clipboard', 'paste', 'copied'], when: () => activeIsText && Boolean(lastCopy), run: () => makeNoteFromClipboard(lastCopy) },
+      { id: 'search.find', section: 'Search', title: 'Find…', icon: 'search', keys: 'Mod+F', keywords: ['search', 'look for', 'replace', 'selection'], run: findInDocument },
+      { id: 'view.focus-mode', section: 'View', title: focusModeOpen ? 'Leave focus mode' : 'Enter focus mode', icon: 'crosshair', keywords: ['distraction free', 'zen', 'full screen'], when: () => activeIsText, run: () => setFocusModeOpen((open) => !open) },
+      { id: 'view.sidebar', section: 'View', title: left.pinned ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', keywords: ['files', 'file tree', 'left panel', 'pin', 'unpin'], run: left.togglePin },
+      { id: 'view.inspector', section: 'View', title: right.pinned ? 'Hide inspector' : 'Show inspector', icon: 'sidebar', keywords: ['right panel', 'panels', 'pin', 'unpin'], run: right.togglePin },
+      { id: 'view.split.right', section: 'View', title: 'Split right', icon: 'split-columns', keywords: ['side by side', 'two documents'], when: () => split !== 'editor', run: () => send('openInSplit', { orientation: 'columns' }) },
+      { id: 'view.split.down', section: 'View', title: 'Split down', icon: 'split-rows', keywords: ['above and below', 'two documents'], when: () => split !== 'editor', run: () => send('openInSplit', { orientation: 'rows' }) },
+      { id: 'view.split.toggle', section: 'View', title: split === 'editor' ? 'Close split view' : 'Split view', icon: 'split-columns', keys: 'Mod+\\', keywords: ['side by side', 'two documents'], run: () => (split === 'editor' ? send('closeSplit') : send('openInSplit', { orientation: 'columns' })) },
+      { id: 'view.split.close', section: 'View', title: 'Close split', icon: 'close', when: () => split === 'editor', run: () => send('closeSplit') },
+      lock?.by === 'folder'
+        ? { id: 'document.lock', section: 'Document', title: `Unlock folder “${lock.folder.split('/').pop()}”`, icon: 'unlock', keywords: ['read only', 'edit', 'lock'], run: () => setFolderLocked(props.projectName, lock.folder, false) }
+        : { id: 'document.lock', section: 'Document', title: lock ? 'Unlock document' : 'Lock document', icon: lock ? 'unlock' : 'lock', keywords: ['read only', 'freeze', 'protect', 'edit'], when: () => Boolean(props.projectName && lockTarget), run: () => setDocumentLocked(props.projectName, lockTarget, !lock) },
+      { id: 'history.open', section: 'Document', title: 'Show version history', icon: 'history', keywords: ['versions', 'snapshots', 'restore', 'undo'], run: () => openRightSidebarTab('history') },
+      { id: 'view.typeset', section: 'Print & export', title: editorMode === 'typeset' ? 'Back to Write' : 'Typeset the book', icon: editorMode === 'typeset' ? 'write' : 'type-style', keywords: ['pages', 'layout', 'print', 'book', 'write'], when: () => activeIsText, run: () => send('setEditorMode', { mode: editorMode === 'typeset' ? 'write' : 'typeset' }) },
+    ]
+  }, [props.projectName, activeIsText, addNote, lastCopy, makeNoteFromClipboard, focusModeOpen, leftShown, rightOpen, left, right, split, editorMode, openRightSidebarTab, lock, lockTarget, findInDocument])
 
   const handleContextMenu = useEditorContextMenu({
     editor: props.activeEditor,
@@ -623,6 +703,27 @@ export default function EditorLayout(props) {
   // under): taller when the toolbar shows its labels.
   const pageToolbarStyle = toolbarDisplay === 'iconAndLabel' ? { '--app-titlebar-height': '56px' } : undefined
 
+  // The traffic lights stay where the landing page has them (the left sidebar's first
+  // row is centred on the same line), shown while the sidebar is docked or hovering and
+  // hidden while it is hidden. A hovering sidebar slides in, so they wait until it has
+  // arrived. In fullscreen AppKit owns them.
+  const leftShowing = left.pinned || left.peeked
+  useEffect(() => {
+    if (isFullscreenChrome) return undefined
+    const place = (event) => placeTrafficLights({ visible: leftShowing, force: event?.type === 'resize' })
+    const timer = window.setTimeout(place, leftShowing && !left.pinned ? PEEK_SETTLE_MS : 0)
+    window.addEventListener('resize', place)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('resize', place)
+    }
+  }, [isFullscreenChrome, leftShowing, left.pinned])
+  useEffect(() => () => placeTrafficLights({ visible: true }), [])
+
+  // The card's top-left holds only its pin button: the traffic lights go with the left
+  // sidebar and never sit over the card.
+  const cardLeftChrome = CARD_TOGGLE_WIDTH
+
   return (
     <CanvasToolbarSlotContext.Provider value={canvasToolbarTarget}>
     <CompareToolbarSlotContext.Provider value={comparing ? compareToolbarSlot : null}>
@@ -643,51 +744,8 @@ export default function EditorLayout(props) {
       {customizingInspector ? (
         <InspectorLayoutEditor onClose={() => setCustomizingInspector(false)} />
       ) : null}
-      <div
-        onContextMenu={comparing ? undefined : popUpToolbarMenu}
-        className="app-titlebar"
-        style={{
-          '--titlebar-left-width': `${titlebarLeftWidth}px`,
-          '--titlebar-right-width': `${titlebarRightWidth}px`,
-        }}
-      >
-        {/* One slot, four states, in precedence order: a comparison takes the
-            titlebar outright (portaled in by VersionComparePane), else a card being
-            edited gets the text Toolbar, else a canvas gets its own toolbar
-            (portaled in by the active CanvasSurface), else a plain document gets
-            the text Toolbar. */}
-        {/* Show Sidebar and Show Inspector, while each is put away — the round
-            buttons in a macOS window's toolbar. The pin in each sidebar puts it away. */}
-        {left.collapsed && !left.peeked ? (
-          <div className="titlebar-toggle is-left">
-            <IconButton symbol="sidebar.left" label="Show Sidebar" size="circle" className="floating-capsule" onClick={left.pin} />
-          </div>
-        ) : null}
-        {right.collapsed && !right.peeked ? (
-          <div className="titlebar-toggle is-right">
-            <IconButton symbol="sidebar.right" label="Show Inspector" size="circle" className="floating-capsule" onClick={right.pin} />
-          </div>
-        ) : null}
-        <div className="app-titlebar-toolbar">
-          {comparing ? (
-            <div className="canvas-toolbar-slot" ref={setCompareToolbarSlot} />
-          ) : toolbarContext ? (
-            <ToolbarHost
-              key={toolbarContext}
-              context={toolbarContext}
-              editor={toolbarEditor}
-              activeDoc={activeDoc || currentDoc}
-              hasProject={Boolean(props.projectName)}
-              panel={toolbarPanel}
-              split={props.splitView === 'editor' ? props.splitOrientation : null}
-            />
-          ) : (
-            <div className="toolbar-placeholder" data-tauri-drag-region />
-          )}
-        </div>
-      </div>
-
-      <div className={`main-layout${activeUnderlays ? ' is-canvas-underlay' : ''}`}>
+      <FolderPresetsSheet projectName={props.projectName} />
+      <div className="main-layout ib-tray">
 
         <LeftSidebar
           {...props}
@@ -697,15 +755,71 @@ export default function EditorLayout(props) {
           collapsed={left.collapsed}
           peeked={left.peeked}
           pinned={left.pinned}
+          gliding={left.gliding}
           togglePin={left.togglePin}
           onAutoCollapse={left.collapse}
+          onOpenSearchTarget={openSearchTarget}
         />
 
-        <EditorCanvas
-          {...props}
-          focusModeOpen={focusModeOpen}
-          onExitFocusMode={() => setFocusModeOpen(false)}
-        />
+        <div
+          className={`document-card${left.pinned ? ' has-left-dock' : ''}${right.pinned ? ' has-right-dock' : ''}${left.gliding ? ' is-left-gliding' : ''}${right.gliding ? ' is-right-gliding' : ''}`}
+        >
+          <div
+            onContextMenu={comparing ? undefined : popUpToolbarMenu}
+            className="app-titlebar"
+            style={{
+              '--titlebar-left-width': `${cardLeftChrome}px`,
+              '--titlebar-right-width': `${CARD_TOGGLE_WIDTH}px`,
+            }}
+          >
+            {/* One slot, four states, in precedence order: a comparison takes the
+                titlebar outright (portaled in by VersionComparePane), else a card being
+                edited gets the text Toolbar, else a canvas gets its own toolbar
+                (portaled in by the active CanvasSurface), else a plain document gets
+                the text Toolbar. */}
+            {/* The card's top corners pin and unpin each sidebar, as Dia's do. */}
+            <div className="titlebar-toggle is-left">
+              <IconButton
+                icon="sidebar"
+                label={left.pinned ? 'Hide sidebar' : 'Keep sidebar open'}
+                onClick={left.togglePin}
+              />
+            </div>
+            <div className="titlebar-toggle is-right">
+              <IconButton
+                icon="sidebar"
+                className="is-mirrored"
+                label={right.pinned ? 'Hide inspector' : 'Keep inspector open'}
+                onClick={right.togglePin}
+              />
+            </div>
+            <div className="app-titlebar-toolbar">
+              {comparing ? (
+                <div className="canvas-toolbar-slot" ref={setCompareToolbarSlot} />
+              ) : toolbarContext ? (
+                <ToolbarHost
+                  key={toolbarContext}
+                  context={toolbarContext}
+                  editor={toolbarEditor}
+                  activeDoc={activeDoc || currentDoc}
+                  hasProject={Boolean(props.projectName)}
+                  panel={toolbarPanel}
+                  split={props.splitView === 'editor' ? props.splitOrientation : null}
+                />
+              ) : (
+                <div className="toolbar-placeholder" data-tauri-drag-region />
+              )}
+            </div>
+          </div>
+
+          {comparing || activeIsMap ? null : <FindBar editor={props.activeEditor} />}
+
+          <EditorCanvas
+            {...props}
+            focusModeOpen={focusModeOpen}
+            onExitFocusMode={() => setFocusModeOpen(false)}
+          />
+        </div>
 
         <RightSidebar
           width={right.width}
@@ -714,6 +828,7 @@ export default function EditorLayout(props) {
           collapsed={right.collapsed}
           peeked={right.peeked}
           pinned={right.pinned}
+          gliding={right.gliding}
           togglePin={right.togglePin}
           onAutoCollapse={right.collapse}
 
@@ -724,10 +839,8 @@ export default function EditorLayout(props) {
           setTiles={props.setTiles}
           notes={props.notes}
           setNotes={props.setNotes}
-          notesByDoc={props.notesByDoc}
 
           editor={props.editor}
-          activeEditor={props.activeEditor}
           secondaryEditor={props.secondaryEditor}
           currentDoc={props.currentDoc}
           secondaryDoc={props.secondaryDoc}
@@ -738,11 +851,12 @@ export default function EditorLayout(props) {
           clipboardHistory={props.clipboardHistory}
           clearClipboardHistory={props.clearClipboardHistory}
           onDropToClipboard={props.onDropToClipboard}
+          onRemoveClipboardEntry={props.onRemoveClipboardEntry}
+          onMakeNoteFromClipboard={makeNoteFromClipboard}
           activeDoc={props.activeDoc}
           projectName={props.projectName}
 
           jumpToText={jumpToText}
-          onOpenSearchTarget={openSearchTarget}
 
           refreshFiles={props.refreshFiles}
           onOpenDocInTab={props.onOpenDocInTab}

@@ -38,11 +38,11 @@ export default function WritingPane({ stats }) {
             <div className="settings-actions">
               <Button onClick={() => setConfirming(false)}>Cancel</Button>
               {project ? <Button variant="destructive" onClick={() => { stats.resetStats({ project }); setConfirming(false) }}>Reset {project} Only</Button> : null}
-              <Button variant="destructive" onClick={() => { stats.resetStats({}); setConfirming(false) }}>Reset Everything</Button>
+              <Button variant="destructive" onClick={() => { stats.resetStats({}); setConfirming(false) }}>Reset everything</Button>
             </div>
           </div>
         ) : (
-          <Button variant="destructive" onClick={() => setConfirming(true)}>Reset Writing Stats…</Button>
+          <Button variant="destructive" onClick={() => setConfirming(true)}>Reset writing stats…</Button>
         )}
         <p className="settings-footer">Stats are kept on this computer, not in your projects.</p>
       </section>

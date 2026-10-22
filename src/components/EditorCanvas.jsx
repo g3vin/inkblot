@@ -17,7 +17,7 @@
  *
  * tests/unit/editor.mjs mounts this component and exercises all of them.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 
@@ -28,23 +28,44 @@ import { canvasDelegates } from '../bridge/canvasDelegates'
 import { mapDelegates } from '../bridge/mapDelegates'
 import { useSurfacePublisher } from '../bridge/useSurfacePublisher'
 import { buildEditorExtensions } from '../lib/editorExtensions'
+import { setClipboardDropTarget } from '../lib/clipboardDropTarget'
 import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
 import CanvasPane from '../canvas/CanvasPane'
-import MapPane from '../map/MapPane'
+import TimelinePane from '../timeline/TimelinePane'
+import TimeLensBar from '../timeline/TimeLensBar'
+import { createTimelineDelegates } from '../timeline/timelineDelegates'
+import { getStoryCursor, subscribeStoryCursor } from '../lib/timeline/storyCursor'
 import { useEditorAutosave } from '../hooks/useEditorAutosave'
 import { useEditorDnd } from '../hooks/useEditorDnd'
 import { useEditorDocCache } from '../hooks/useEditorDocCache'
 import { useEditorDocLoader } from '../hooks/useEditorDocLoader'
 import { useEditorNotes } from '../hooks/useEditorNotes'
+import { useEditorTimeline } from '../hooks/useEditorTimeline'
 import { formatWordStats, useEditorWordCount } from '../hooks/useEditorWordCount'
 import DraftTabPane from './DraftTabPane'
 import FocusModeOverlay from './FocusModeOverlay'
 import VersionComparePane from './VersionComparePane'
-import SFIcon from './SFIcon'
+import Icon from '../ui/Icon.jsx'
 import DocumentTabBar from './tabs/DocumentTabBar'
 import { useShowsTabBar } from './tabs/tabBarState'
 import PaneEditorSurface from '../print/PaneEditorSurface'
+import DocLockBadge from './DocLockBadge'
+import TableToolbar from './TableToolbar'
+import { lockReason, useLocks } from '../lib/docLocks'
+import { setEditorLock } from '../extensions/DocumentLock'
+import { FadeScrim } from '../ui/Surfaces.jsx'
+
+// A map is a heavy editor (and its globe and space views heavier still): loaded the
+// first time one opens, never for a writer who only writes.
+const LazyMapPane = lazy(() => import('../map/MapPane'))
+function MapPane(props) {
+  return (
+    <Suspense fallback={<div className="map-surface is-loading" />}>
+      <LazyMapPane {...props} />
+    </Suspense>
+  )
+}
 
 const EMPTY_NOTES = []
 
@@ -132,13 +153,15 @@ export default function EditorCanvas({
   const {
     createPasteHandler,
     getDraggedClipboardPayload,
-    clearDragGlobals,
     getTargetEditorAtPoint,
     updateDropCaret,
     handlePaneDragStart,
     handlePaneDragOver,
     handlePaneDrop,
-    insertClipboardPayloadAtPoint,
+    hoverClipboardAt,
+    previewClipboardAt,
+    dropClipboardAt,
+    clearClipboardDrag,
   } = useEditorDnd({
     // Accessors, not values: this hook runs before `editor` and `secondaryEditor`
     // are declared below — `editor` supplies useEditor's paste handler, so the
@@ -355,40 +378,15 @@ export default function EditorCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, secondaryEditor, splitView])
 
-  useEffect(() => {
-    const onClipboardDragEndDrop = (event) => {
-      const detail = event?.detail || {}
-      const held = dragHandoff.point()
-      const point = { x: detail.x ?? held?.x ?? null, y: detail.y ?? held?.y ?? null }
-      const payload = {
-        id: detail.id || '',
-        text: detail.text || '',
-      }
-
-      // Somebody already took this drop — the clipboard panel, most likely, since it
-      // is the other end of this same drag.
-      if (dragHandoff.isClaimed()) {
-        setDragCaret(null)
-        clearDragGlobals()
-        return
-      }
-
-      const targetEditor = getTargetEditorAtPoint(point.x, point.y)
-      if (targetEditor && payload.text) {
-        insertClipboardPayloadAtPoint(payload, targetEditor, point.x, point.y)
-      }
-
-      setDragCaret(null)
-      clearDragGlobals()
-    }
-
-    window.addEventListener('inkblot:clipboard-dragend-drop', onClipboardDragEndDrop)
-    return () => {
-      window.removeEventListener('inkblot:clipboard-dragend-drop', onClipboardDragEndDrop)
-    }
-  // Clipboard drag completion reads the current drop globals at event time.
+  // The panes are where a clipboard piece dragged from the panel lands
+  // (lib/clipboardDropTarget). The handlers read the live editors at event time.
+  useEffect(() => setClipboardDropTarget({
+    hover: hoverClipboardAt,
+    preview: previewClipboardAt,
+    clear: clearClipboardDrag,
+    drop: dropClipboardAt,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, secondaryEditor, splitView])
+  }), [editor, secondaryEditor, splitView])
 
   /* ---------------- Expose Editor ---------------- */
 
@@ -480,6 +478,17 @@ export default function EditorCanvas({
     splitView,
   })
 
+  // Passages attached to timeline events: drawn from the chronology, saved with the text.
+  useEditorTimeline({
+    projectName,
+    currentDoc,
+    editor,
+    secondaryDoc,
+    secondaryEditor,
+    splitView,
+    docCache,
+  })
+
   /* ---------------- Render ---------------- */
 
   const closeSecondary = () => {
@@ -534,6 +543,14 @@ export default function EditorCanvas({
     activatePane(docPath, null)
   }, [activatePane, setCurrentDoc, setSecondaryDoc])
 
+  // A timeline opens what it links to beside itself, so it stays in view: in the other
+  // pane of a split, or in a split it opens.
+  const openDocBesideTimeline = useCallback((timelinePane, docPath) => {
+    if (!docPath) return
+    if (splitView !== 'editor') setSplitView?.('editor')
+    openDocFromCanvas(timelinePane === 'primary' ? 'secondary' : 'primary', docPath)
+  }, [openDocFromCanvas, setSplitView, splitView])
+
   // The commands the surface cannot serve alone. The canvas ones need nothing from
   // React — they resolve a surface id and dispatch what the canvas already listens
   // for — so they are a module. `openDocument` needs app state, and is the same swap
@@ -544,12 +561,36 @@ export default function EditorCanvas({
     documentSurface.setDelegates({
       ...canvasDelegates,
       ...mapDelegates,
+      ...createTimelineDelegates({ projectName, openDoc: (path) => openDocFromCanvas('primary', path) }),
       openDocument: ({ path, pane }) => openDocFromCanvas(pane, path),
     })
-  }, [openDocFromCanvas])
+  }, [openDocFromCanvas, projectName])
+
+  // The time lens's switches, for a shell's menus to tick.
+  useEffect(() => {
+    if (!projectName) return undefined
+    const publish = (cursor) => documentSurface.publishTimelineCursor({
+      lensOn: Boolean(cursor.lens.on),
+      lensEditing: Boolean(cursor.lens.editing),
+      editingRanges: Boolean(cursor.editingRanges),
+    })
+    publish(getStoryCursor(projectName))
+    return subscribeStoryCursor(projectName, publish)
+  }, [projectName])
 
   const liveEditor = isEditorReady(editor) ? editor : null
   const liveSecondaryEditor = isEditorReady(secondaryEditor) ? secondaryEditor : null
+
+  // A locked document's text is frozen (docLocks.ts); each editor is told what it holds.
+  const locks = useLocks()
+  const primaryLocked = isTextDoc(currentDoc) && lockReason(currentDoc, locks) !== null
+  const secondaryLocked = isTextDoc(secondaryDoc) && lockReason(secondaryDoc, locks) !== null
+  useEffect(() => {
+    setEditorLock(liveEditor, currentDoc, primaryLocked)
+  }, [currentDoc, liveEditor, primaryLocked])
+  useEffect(() => {
+    setEditorLock(liveSecondaryEditor, secondaryDoc, secondaryLocked)
+  }, [liveSecondaryEditor, secondaryDoc, secondaryLocked])
   const liveActiveEditor = isEditorReady(activeEditor) ? activeEditor : null
   const focusModeEditor = liveActiveEditor || liveEditor || liveSecondaryEditor
 
@@ -582,7 +623,7 @@ export default function EditorCanvas({
                 aria-label="Create new document"
                 title="Create new document"
               >
-                <SFIcon name="plus" />
+                <Icon name="add" />
               </button>
             )}
           </div>
@@ -664,6 +705,7 @@ export default function EditorCanvas({
         <div
           ref={primaryPaneRef}
           className="pane primary-pane"
+          data-locked={primaryLocked}
           // A canvas owns its own wheel/pointer handling and stops propagation, so
           // it activates its pane itself rather than through these editor handlers.
           // A draft pane has no document either, and its form must keep focus —
@@ -719,24 +761,44 @@ export default function EditorCanvas({
               // that is a map too, whose panel it then is.
               chromeWhileInactive={secondaryKind !== 'map'}
             />
+          ) : primaryKind === 'timeline' ? (
+            <TimelinePane
+              projectName={projectName}
+              docPath={currentDoc}
+              onActivate={() => activatePane(currentDoc, null)}
+              onOpenDoc={(docPath) => openDocBesideTimeline('primary', docPath)}
+              showHeader={paneHeaders}
+              onClose={closePrimary}
+              isActive={activeDoc === currentDoc}
+            />
           ) : (
             <PaneEditorSurface
               editor={liveEditor}
               projectName={projectName}
               docPath={currentDoc}
               onOpenDoc={(path) => openDocFromCanvas('primary', path)}
-              header={paneHeaders ? (
-                <div className="pane-header pane-header-centered">
-                  <span>{currentDoc}</span>
-                  <button onClick={closePrimary}>×</button>
-                </div>
-              ) : null}
+              header={(
+                <>
+                  {paneHeaders ? (
+                    <div className="pane-header pane-header-centered">
+                      <span>{currentDoc}</span>
+                      <button onClick={closePrimary}>×</button>
+                    </div>
+                  ) : null}
+                  <TimeLensBar projectName={projectName} />
+                </>
+              )}
             />
           )}
+          {!primaryIsStructured && !showDraftPane ? <FadeScrim edge="bottom" height={56} className="pane-bottom-scrim" /> : null}
           {!primaryIsStructured && !showDraftPane ? (
             <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName}>
               {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(primaryWordStats)}</div> : null}
+              <DocLockBadge projectName={projectName} docPath={currentDoc} />
             </div>
+          ) : null}
+          {!primaryIsStructured && !showDraftPane ? (
+            <TableToolbar editor={liveEditor} />
           ) : null}
         </div>
 
@@ -758,6 +820,7 @@ export default function EditorCanvas({
           <div
             ref={secondaryPaneRef}
             className="pane secondary-pane"
+            data-locked={secondaryLocked}
             onFocus={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
             onMouseEnter={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
             onWheel={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
@@ -801,24 +864,44 @@ export default function EditorCanvas({
                 isActive={activeDoc === secondaryDoc}
                 chromeWhileInactive={primaryKind !== 'map'}
               />
+            ) : secondaryKind === 'timeline' ? (
+              <TimelinePane
+                projectName={projectName}
+                docPath={secondaryDoc}
+                onActivate={() => activatePane(secondaryDoc, null)}
+                onOpenDoc={(docPath) => openDocBesideTimeline('secondary', docPath)}
+                showHeader={paneHeaders}
+                onClose={closeSecondary}
+                isActive={activeDoc === secondaryDoc}
+              />
             ) : (
               <PaneEditorSurface
                 editor={liveSecondaryEditor}
                 projectName={projectName}
                 docPath={secondaryDoc}
                 onOpenDoc={(path) => openDocFromCanvas('secondary', path)}
-                header={paneHeaders ? (
-                  <div className="pane-header split-header pane-header-centered">
-                    <span>{secondaryDoc}</span>
-                    <button onClick={closeSecondary}>×</button>
-                  </div>
-                ) : null}
+                header={(
+                  <>
+                    {paneHeaders ? (
+                      <div className="pane-header split-header pane-header-centered">
+                        <span>{secondaryDoc}</span>
+                        <button onClick={closeSecondary}>×</button>
+                      </div>
+                    ) : null}
+                    <TimeLensBar projectName={projectName} />
+                  </>
+                )}
               />
             )}
+            {!secondaryIsStructured ? <FadeScrim edge="bottom" height={56} className="pane-bottom-scrim" /> : null}
             {!secondaryIsStructured ? (
               <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName}>
                 {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}
+                <DocLockBadge projectName={projectName} docPath={secondaryDoc} />
               </div>
+            ) : null}
+            {!secondaryIsStructured ? (
+              <TableToolbar editor={liveSecondaryEditor} />
             ) : null}
           </div>
         )}

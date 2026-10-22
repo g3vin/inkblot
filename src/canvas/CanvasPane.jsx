@@ -14,6 +14,8 @@
 import { useEffect, useState } from 'react'
 import { loadCanvasDocument } from '../lib/canvasFileSystem'
 import { getDocDisplayName } from '../lib/docKind'
+import { useLockReason } from '../lib/docLocks'
+import DocLockBadge from '../components/DocLockBadge'
 import { CanvasNotesProvider } from './CanvasNotesContext'
 import CanvasSurface from './CanvasSurface'
 import './Canvas.css'
@@ -31,15 +33,19 @@ export default function CanvasPane({
   openDocs,
   isActive = true,
 }) {
-  const [doc, setDoc] = useState(null)
+  const locked = useLockReason(docPath) !== null
+  const [result, setResult] = useState(null)
+  // What was loaded, only for the path it was loaded from: switched to another canvas,
+  // the render before the new load must not mount the new path's surface on the old
+  // canvas (whose next save would write it over the new file).
+  const doc = result?.docPath === docPath ? result.loaded : null
 
   useEffect(() => {
     if (!projectName || !docPath) return
     let cancelled = false
 
-    setDoc(null)
     loadCanvasDocument(projectName, docPath).then((loaded) => {
-      if (!cancelled) setDoc(loaded)
+      if (!cancelled) setResult({ docPath, loaded })
     })
 
     return () => {
@@ -68,6 +74,7 @@ export default function CanvasPane({
         >
           <CanvasSurface
             key={docPath}
+            docLocked={locked}
             projectName={projectName}
             docPath={docPath}
             initialState={doc.state}
@@ -81,6 +88,7 @@ export default function CanvasPane({
       ) : (
         <div className="canvas-surface" />
       )}
+      <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} />
     </div>
   )
 }

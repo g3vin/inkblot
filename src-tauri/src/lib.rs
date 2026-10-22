@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager};
 
-mod accent_commands;
+mod app_windows;
 mod core_commands;
 mod dictation_commands;
 mod haptics_commands;
@@ -29,10 +29,11 @@ mod reference_commands;
 mod rhyme_commands;
 mod stats_commands;
 mod synonym_commands;
+mod trackpad;
 mod webview_commands;
+mod window_chrome;
 
-use accent_commands::system_accent_color;
-use core_commands::{list_system_fonts, scrape_pinterest_html};
+use core_commands::{list_system_fonts, project_locks, scrape_pinterest_html};
 use dictation_commands::{
     cancel_dictation_session, dictation_status, load_dictation_model, start_dictation_session,
     stop_dictation_session, AppDictationState,
@@ -55,6 +56,7 @@ use stats_commands::{
 };
 use synonym_commands::{download_synonym_model, get_synonyms, synonym_model_status, SynonymState};
 use webview_commands::{eval_webview, get_webview_url, navigate_webview};
+use window_chrome::window_traffic_lights;
 
 /// `~/Library/Application Support/com.inkblot.app` on macOS: the preferences, the
 /// models, the stats and every project not kept elsewhere.
@@ -64,6 +66,7 @@ pub(crate) fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("no app data dir: {e}"))
 }
 
+/// Build and run the app: its plugins, managed state, setup and commands.
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -75,14 +78,22 @@ pub fn run() {
         .manage(SynonymState::default())
         .manage(RhymeState::default())
         .manage(ScrapeChannels::default())
+        .setup(|app| {
+            trackpad::install(app.handle());
+            let main = app_windows::build_main(app.handle())?;
+            window_chrome::place_default(&main);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            app_windows::open_document_window,
             navigate_webview,
             get_webview_url,
             eval_webview,
             scrape_pinterest_html,
             list_system_fonts,
+            project_locks,
             perform_haptic,
-            system_accent_color,
+            window_traffic_lights,
             get_synonyms,
             synonym_model_status,
             download_synonym_model,

@@ -35,13 +35,17 @@ pub mod read_aloud;
 pub mod search;
 pub mod stats;
 pub mod story;
+pub mod timeline;
 
 pub use canvas::{CanvasEdge, CanvasFile, CanvasFileMeta, CanvasNode, CanvasNodeType, CanvasState};
 pub use diff::{
     CanvasDiff, CanvasNodeChange, DiffChunk, DiffChunkType, DiffOp, DiffOpType, HtmlBlock,
     MergeChoice, VersionRow, WordDelta,
 };
-pub use document::{DocKind, DocumentCitations, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind, VERSION_CAP};
+pub use document::{
+    DocKind, DocumentCitations, TextDocument, TreeNode, TreeNodeType, VersionEntry, VersionKind,
+    VERSION_CAP,
+};
 pub use geometry::{BezierPath, EdgeSide, Point, Rect, Viewport};
 pub use json::{JsonMap, JsonValue};
 pub use map::{
@@ -56,15 +60,24 @@ pub use note::{
     INK_IDS, NOTE_COLOR_OPTIONS,
 };
 pub use page_setup::{
-    AuthorProfile, BackMatter, ChapterMeta, ImageAlign, ImageTypesetting, BindingSettings, BindingType, BookItem, BookItemKind, BookSettings,
-    ChapterBreak, ChapterDesign, ChapterNumberStyle, ChapterNumbering, ChapterOpening, ChapterType,
-    CoverFit, CoverPart, CoverSet, Composition, DigitalOptions, OpenTypeFeatures, TextStyleAlign, TextStyleLook, NotePlacement, NoteNumbering, NoteMarks, NotesOptions, Edition, EditionKind, DuplexMode, FrontMatter, GeneratedKind, HeadAlignment, HeadCase,
-    MatterKind, OrnamentKind, OrnamentPosition, PageOptions, PagePosition, PageStart,
-    LineSpacing, PageMargins, PageNumberFormat, PageOrientation, PageSetup, PaperStock, PrintAlignment, PublishingService,
-    PublishingTarget,
-    PrintTypography, RunningText, SheetFit, TitlePageOptions, TitlePageStyle,
+    AuthorProfile, BackMatter, BindingSettings, BindingType, BookItem, BookItemKind, BookSettings,
+    ChapterBreak, ChapterDesign, ChapterMeta, ChapterNumberStyle, ChapterNumbering, ChapterOpening,
+    ChapterType, Composition, CoverFit, CoverPart, CoverSet, DigitalOptions, DuplexMode, Edition,
+    EditionKind, FrontMatter, GeneratedKind, HeadAlignment, HeadCase, ImageAlign, ImageTypesetting,
+    LineSpacing, MatterKind, NoteMarks, NoteNumbering, NotePlacement, NotesOptions,
+    OpenTypeFeatures, OrnamentKind, OrnamentPosition, PageMargins, PageNumberFormat, PageOptions,
+    PageOrientation, PagePosition, PageSetup, PageStart, PaperStock, PrintAlignment,
+    PrintTypography, PublishingService, PublishingTarget, RunningText, SheetFit, TextStyleAlign,
+    TextStyleLook, TitlePageOptions, TitlePageStyle,
 };
 pub use read_aloud::{ReadAloudChunk, ReadAloudPayload, ReadAloudWord};
 pub use search::{SearchResult, SearchResultType, SearchScope, SearchScopeInfo};
-pub use stats::{DayStat, DocWordCount, StatsMinute, StatsScope, StatsTotals, TimerRun, WritingSession};
+pub use stats::{
+    DayStat, DocWordCount, StatsMinute, StatsScope, StatsTotals, TimerRun, WritingSession,
+};
 pub use story::{StoryFolderAncestor, StoryFolderPreset};
+pub use timeline::{
+    StoryTimeline, TimelineEra, TimelineEvent, TimelineEventNote, TimelineLane, TimelineLink,
+    TimelineLinkKind, TimelinePlace, TimelineRange, TimelineScale, TimelineTag, TimelineViewFile,
+    TimelineViewFilter,
+};

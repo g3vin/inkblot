@@ -3,7 +3,7 @@
  * the streak row, and a card per deadline with its burndown.
  */
 import { Section } from '../../ui'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { dayDate, formatNumber } from '../../stats/day.js'
 import { GoalRings, Burndown } from './StatsCharts.jsx'
 import { capitalize, mediumDate, openSettings, plural } from './statsText.js'
@@ -17,7 +17,7 @@ export function StreakRow({ streak }) {
   if (!streak.todayCounts && streak.current > 0) parts.unshift('today not yet')
   return (
     <div className="stats-row" data-lit={streak.todayCounts}>
-      <span className="stats-row-label stats-streak-label"><SFIcon name="flame" size={13} />Streak</span>
+      <span className="stats-row-label stats-streak-label"><Icon name="streak" />Streak</span>
       <span className="stats-row-value">
         <span>{streak.current === 1 ? '1 day' : `${formatNumber(streak.current)} days`}</span>
         <small>{parts.join(' · ')}</small>
@@ -32,13 +32,14 @@ export function GoalsSection({ stats }) {
   return (
     <Section
       id="stats.goal"
-      title="Today’s Goal"
-      accessory={status.met === true ? <span className="stats-met" data-just={stats.metJustNow}><SFIcon name="checkmark.seal" size={12} />Met</span> : null}
+      title="Today’s goal"
+      help="stats.goal"
+      accessory={status.met === true ? <span className="stats-met" data-just={stats.metJustNow}><Icon name="verified" />Met</span> : null}
     >
       {goal.rest ? (
-        <p className="stats-muted stats-inline"><SFIcon name="moon.zzz" size={13} />Rest day. Nothing is asked of today.</p>
+        <p className="stats-muted stats-inline"><Icon name="rest" />Rest day. Nothing is asked of today.</p>
       ) : status.targets.length === 0 ? (
-        <p className="stats-muted">No goal for today. <button type="button" className="reference-link" onClick={() => openSettings('goals')}>Set Goals…</button></p>
+        <p className="stats-muted">No goal for today. <button type="button" className="reference-link" onClick={() => openSettings('goals')}>Set goals…</button></p>
       ) : (
         <>
           <GoalRings status={status} />
@@ -46,16 +47,15 @@ export function GoalsSection({ stats }) {
         </>
       )}
       <StreakRow streak={stats.streak} />
-      <p className="stats-note">{stats.plan.project ? `Counting writing in ${stats.plan.project}.` : 'Counting all your writing.'}</p>
     </Section>
   )
 }
 
 function DeadlineBadge({ status }) {
-  if (status.isDone) return <span className="stats-badge" data-tone="done"><SFIcon name="checkmark.seal" size={11} />Done</span>
-  if (status.isOverdue) return <span className="stats-badge" data-tone="warn"><SFIcon name="exclamationmark.triangle" size={11} />Past due</span>
-  if (status.onTrack) return <span className="stats-badge"><SFIcon name="checkmark" size={11} />On track</span>
-  return <span className="stats-badge" data-tone="warn"><SFIcon name="chart.line.downtrend.xyaxis" size={11} />Behind</span>
+  if (status.isDone) return <span className="stats-badge" data-tone="done"><Icon name="verified" />Done</span>
+  if (status.isOverdue) return <span className="stats-badge" data-tone="warn"><Icon name="warning" />Past due</span>
+  if (status.onTrack) return <span className="stats-badge"><Icon name="check" />On track</span>
+  return <span className="stats-badge" data-tone="warn"><Icon name="chart-down" />Behind</span>
 }
 
 function DeadlineCard({ stats, deadline, status }) {

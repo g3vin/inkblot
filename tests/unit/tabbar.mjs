@@ -1,6 +1,7 @@
 /**
  * The web tab bar (components/tabs): drawn from `tabsChanged`, changing the tabs only
- * by command, with the shortcuts and the rules for names that clash.
+ * by command, with the shortcuts (commands, answered by the app's key handler) and the
+ * rules for names that clash.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -19,11 +20,12 @@ const { documentSurface } = await import('../../src/bridge/index.ts')
 const T = await import('../../src/components/tabs/tabBarState.js')
 const { default: DocumentTabBar } = await import('../../src/components/tabs/DocumentTabBar.jsx')
 const { default: useTabShortcuts } = await import('../../src/components/tabs/useTabShortcuts.js')
+const { isMacPlatform, useKeybindings } = await import('../../src/lib/keybindings.ts')
 
 /* ---------------- names ---------------- */
 
 ok('a canvas is named without its suffix', T.tabName('Boards/Plot.canvas') === 'Plot')
-ok('a draft is a new tab', T.tabName(null) === 'New Tab')
+ok('a draft is a new tab', T.tabName(null) === 'New tab')
 const clash = [{ id: 'a', docPath: 'Part One/Notes' }, { id: 'b', docPath: 'Part Two/Notes' }, { id: 'c', docPath: 'Chapter' }]
 ok('two tabs of one name show their folders', T.tabTitle(clash[0], clash) === 'Notes — Part One' && T.tabTitle(clash[2], clash) === 'Chapter')
 ok('one tab needs no bar', !T.needsTabBar([{ id: 'a' }]) && T.needsTabBar([{ id: 'a', split: 'columns' }]) && T.needsTabBar(clash))
@@ -37,6 +39,7 @@ for (const type of ['selectTab', 'closeTab', 'newTab', 'setTabOrder']) {
   documentSurface.onCommand(type, (payload) => commands.push({ type, payload }))
 }
 function Harness() {
+  useKeybindings()
   useTabShortcuts()
   return React.createElement(DocumentTabBar, { activeDoc: 'Chapter 1' })
 }
@@ -60,15 +63,17 @@ ok('the ✕ closes by command', commands.at(-1)?.type === 'closeTab' && commands
 await act(async () => { document.querySelector('.document-tab-new').click() })
 ok('+ opens a new tab', commands.at(-1)?.type === 'newTab')
 
-const key = (init) => act(async () => { window.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, ...init })) })
-await key({ key: '2', metaKey: true })
+const key = (init) => act(async () => { window.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })) })
+// ⌘ on a Mac, Ctrl elsewhere.
+const mod = isMacPlatform() ? { metaKey: true } : { ctrlKey: true }
+await key({ key: '2', code: 'Digit2', ...mod })
 ok('⌘2 picks the second tab', commands.at(-1)?.type === 'selectTab' && commands.at(-1).payload.tabId === 't2')
-await key({ key: 'Tab', ctrlKey: true })
+await key({ key: 'Tab', code: 'Tab', ctrlKey: true })
 ok('⌃Tab moves on', commands.at(-1)?.payload.tabId === 't2')
-await key({ key: 'w', metaKey: true })
+await key({ key: 'w', code: 'KeyW', ...mod })
 ok('⌘W closes the active tab', commands.at(-1)?.type === 'closeTab' && commands.at(-1).payload.tabId === 't1')
-await key({ key: 't', ctrlKey: true })
-ok('⌘T (or Ctrl+T) opens a new tab', commands.at(-1)?.type === 'newTab')
+await key({ key: 't', code: 'KeyT', ...mod })
+ok('⌘T opens a new tab', commands.at(-1)?.type === 'newTab')
 
 await act(async () => { T.setShowsTabBar(false) })
 ok('View ▸ Hide Tab Bar hides it', !document.querySelector('.document-tab-bar'))

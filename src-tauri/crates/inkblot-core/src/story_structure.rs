@@ -9,7 +9,8 @@ fn preset(
     name: &str,
     menu_label: &str,
     entry_label: &str,
-    icon_suffix: &str,
+    // Semantic icon names (src/ui/icons.js): the folder's, and each document's in it.
+    (folder_icon, file_icon): (&str, &str),
     aliases: &[&str],
 ) -> StoryFolderPreset {
     StoryFolderPreset {
@@ -17,8 +18,8 @@ fn preset(
         name: name.to_string(),
         menu_label: menu_label.to_string(),
         entry_label: entry_label.to_string(),
-        folder_icon: format!("folder.{icon_suffix}"),
-        file_icon: format!("doc.{icon_suffix}"),
+        folder_icon: folder_icon.to_string(),
+        file_icon: file_icon.to_string(),
         aliases: aliases.iter().map(|alias| alias.to_string()).collect(),
     }
 }
@@ -26,10 +27,38 @@ fn preset(
 /// `STORY_FOLDER_PRESETS`, in declaration order — which is the order the menu shows.
 pub fn story_folder_presets() -> Vec<StoryFolderPreset> {
     vec![
-        preset("characters", "Characters", "Character Folder", "Character", "characters", &[]),
-        preset("settings", "Settings", "Setting Folder", "Setting", "settings", &["Locations", "Places"]),
-        preset("outline", "Outline", "Outline Folder", "Outline Entry", "outline", &[]),
-        preset("novel", "Novel", "Novel Folder", "Chapter", "novel", &["Book"]),
+        preset(
+            "characters",
+            "Characters",
+            "Character folder",
+            "Character",
+            ("users", "characters"),
+            &[],
+        ),
+        preset(
+            "settings",
+            "Settings",
+            "Setting folder",
+            "Setting",
+            ("map-world", "map-pin"),
+            &["Locations", "Places"],
+        ),
+        preset(
+            "outline",
+            "Outline",
+            "Outline folder",
+            "Outline entry",
+            ("list", "list-bullets"),
+            &[],
+        ),
+        preset(
+            "novel",
+            "Novel",
+            "Novel folder",
+            "Chapter",
+            ("book", "notebook"),
+            &["Book"],
+        ),
     ]
 }
 
@@ -77,12 +106,14 @@ pub fn get_story_folder_preset_for_entry(
 /// A doc filed under a Settings folder (or one called Locations or Places) — what a
 /// map pin links to by default.
 pub fn is_location_doc(doc_path: &str) -> bool {
-    get_story_folder_preset_for_entry(doc_path, "file").is_some_and(|preset| preset.key == "settings")
+    get_story_folder_preset_for_entry(doc_path, "file")
+        .is_some_and(|preset| preset.key == "settings")
 }
 
 /// A doc filed under a Characters folder — what travels a map's routes.
 pub fn is_character_doc(doc_path: &str) -> bool {
-    get_story_folder_preset_for_entry(doc_path, "file").is_some_and(|preset| preset.key == "characters")
+    get_story_folder_preset_for_entry(doc_path, "file")
+        .is_some_and(|preset| preset.key == "characters")
 }
 
 /// The nearest preset folder a file lives in, with the path to create siblings in.

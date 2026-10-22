@@ -413,3 +413,483 @@ const within = (a, b, fraction) => Math.abs(a - b) <= Math.abs(b) * fraction
   ok('roughen reads pathData\'s spaced form and keeps subpaths', parsePath(roughenPath('M0 0L10 0M20 0L30 0', ROUGH_STYLE, 1)).length === 2)
   ok('roughen of nothing is nothing', roughenPath('', ROUGH_STYLE, 1) === '')
 }
+
+/* ---------------- maps in three dimensions (format 2) ---------------- */
+
+{
+  const { readPoint, GALAXY_TYPES } = await import('../../src/lib/map/mapModel.js')
+  const { orbitOffset } = await import('../../src/lib/map/orbits.js')
+  const { KM_PER_LIGHT_YEAR, formatLightTime } = await import('../../src/lib/map/mapUnits.js')
+
+  // A file from before the third dimension opens unchanged, and saves as format 2.
+  const old = normalizeMap({ formatVersion: 1, mapKind: 'earth', earth: { projection: 'orthographic' }, pins: [{ id: 'p', at: [2, 51] }] })
+  ok('an old file reads as format 2', old.formatVersion === 2)
+  ok('an old globe opens as the globe, an old flat map flat', old.earth.view === 'globe' && normalizeMap({ mapKind: 'earth' }).earth.view === 'flat')
+  ok('its points stay two-dimensional', old.pins[0].at.length === 2)
+  ok('and nothing new is on it', old.layers.length === 0 && old.views.length === 0 && old.pins[0].from === null && old.pins[0].layer === null)
+
+  ok('a point keeps a height', readPoint([1, 2, 3]).join() === '1,2,3')
+  ok('a height that is not a number drops, the point stays', readPoint([1, 2, 'z']).join() === '1,2')
+  ok('anything past the height drops', readPoint([1, 2, 3, 4]).join() === '1,2,3')
+
+  for (const kind of ['planet', 'galaxy', 'universe', 'model']) {
+    ok(`a ${kind} map can be made`, createEmptyMap(kind).mapKind === kind)
+  }
+  ok('a galaxy is one of the known shapes', GALAXY_TYPES.includes(normalizeMap({ galaxy: { type: 'blob' } }).galaxy.type))
+  const surface = normalizeMap({ mapKind: 'planet', surface: { radiusKm: 3389.5, look: { seaLevel: 3 } } }).surface
+  ok('a planet keeps its size and clamps its sea', surface.radiusKm === 3389.5 && surface.look.seaLevel === 1)
+
+  // Distances at every level.
+  const mars = createSpace({ mapKind: 'planet', surface: { radiusKm: 3389.5 } })
+  const earth = createSpace({ mapKind: 'earth' })
+  const pole = [[0, 0], [0, 90]]
+  ok('a quarter of the way round Mars is a quarter of Mars', near(mars.distanceKm(...pole), (Math.PI / 2) * 3389.5, 1e-6))
+  ok('the same quarter on the Earth is longer by the ratio of their sizes', near(earth.distanceKm(...pole) / mars.distanceKm(...pole), 6371.0088 / 3389.5, 1e-9))
+  const galaxy = createSpace({ mapKind: 'galaxy' })
+  ok('a galaxy measures in light-years, in three dimensions', near(galaxy.distanceKm([0, 0, 0], [3, 0, 4]), 5 * KM_PER_LIGHT_YEAR, 1))
+  ok('from Sol to Alpha Centauri, light takes four years and a bit', /^4\.\d+ years$/.test(formatLightTime(4.37 * KM_PER_LIGHT_YEAR)))
+  ok('a ruler across a galaxy reads in light-years', /ly$/.test(formatDistance(4.37 * KM_PER_LIGHT_YEAR, 'auto')))
+  ok('across the universe, in millions', /Mly$/.test(formatDistance(2.5e6 * KM_PER_LIGHT_YEAR, 'auto')))
+  const model = createSpace({ mapKind: 'model', model: { metresPerUnit: 2 } })
+  ok('a model measures in its own metres', near(model.distanceKm([0, 0, 0], [0, 10, 0]), 0.02, 1e-12))
+
+  // Orbits out of the plane.
+  const flat = { id: 'p', orbit: { aAU: 1, e: 0.2, periapsisDeg: 30, meanAnomalyDeg: 10, periodDays: 365, retrograde: false } }
+  const bodies = new Map([['p', flat]])
+  const before = orbitOffset(flat, bodies, 40)
+  ok('an orbit in the plane stays in it', before[2] === 0)
+  const tilted = { ...flat, orbit: { ...flat.orbit, inclinationDeg: 30 } }
+  const after = orbitOffset(tilted, new Map([['p', tilted]]), 40)
+  ok('a tilted orbit leaves the plane', Math.abs(after[2]) > 0.01)
+  ok('and keeps its distance from what it orbits', near(Math.hypot(...before), Math.hypot(...after), 1e-12))
+
+  // Linked maps: a body's surface follows its map's moves.
+  const system = normalizeMap({ mapKind: 'system', system: { bodies: [{ id: 'e', surface: 'Worlds/Earth.map' }] } })
+  ok('a body’s surface counts as a link', mapDocRefs(system).includes('Worlds/Earth.map'))
+  const moved = rewriteMapDocRefs(system, 'Worlds', 'Places', 'folder')
+  ok('and follows its folder when it moves', moved.changed && moved.map.system.bodies[0].surface === 'Places/Earth.map')
+}
+
+/* ---------------- the Earth as a globe ---------------- */
+
+{
+  const { isItemShown, isAtDay, hiddenLayers } = await import('../../src/lib/map/mapVisibility.js')
+  const { unwrapLongitudes, regionFeatures, routeFeatures } = await import('../../src/lib/map/globeFeatures.js')
+  const { viewMenuFor, viewOptionPatch, choosesOnline, VIEW_COMMAND_TITLES } = await import('../../src/map/mapViewMenu.js')
+
+  // A place founded on day 10 and gone on day 20 is there for days 10–19.
+  const city = { from: 10, until: 20 }
+  ok('an item is absent before it appears', !isAtDay(city, 9) && isAtDay(city, 10))
+  ok('and gone on its last day', isAtDay(city, 19.5) && !isAtDay(city, 20))
+  ok('an item with no dates is always there', isAtDay({ from: null, until: null }, -1e6))
+  const layered = normalizeMap({ mapKind: 'earth', layers: [{ id: 'old', name: 'Old', visible: false }], pins: [{ id: 'p', at: [0, 0], layer: 'old' }, { id: 'q', at: [0, 0] }] })
+  ok('a hidden layer hides what is on it', hiddenLayers(layered).has('old') && !isItemShown(layered, layered.pins[0], 0) && isItemShown(layered, layered.pins[1], 0))
+
+  // A route across the Pacific stays a short line, not one around the world.
+  const unwrapped = unwrapLongitudes([[170, 0], [-170, 0], [-160, 0]])
+  ok('longitudes unwrap across the antimeridian', unwrapped[1][0] === 190 && unwrapped[2][0] === 200)
+
+  const world = normalizeMap({
+    mapKind: 'earth',
+    pins: [{ id: 'lon', at: [-0.12, 51.5] }, { id: 'nyc', at: [-74, 40.7] }],
+    routes: [{ id: 'r', nodes: [{ pin: 'lon' }, { pin: 'nyc' }], until: 5 }],
+    regions: [{ id: 'g', rings: [[[-10, 40], [10, 40], [10, 55]]] }],
+  })
+  const regions = regionFeatures(world, { kind: 'region', id: 'g' }, 0)
+  const ring = regions.features[0].geometry.coordinates[0]
+  ok('a region is a closed polygon', ring.length === 4 && ring[0][0] === ring[3][0] && ring[0][1] === ring[3][1])
+  ok('carrying its id and selection', regions.features[0].properties.id === 'g' && regions.features[0].properties.selected)
+  const routes = routeFeatures(world, createSpace(world), 0, null)
+  const line = routes.features[0].geometry.coordinates
+  ok('a route follows its great circle', line.length > 2 && Math.max(...line.map((point) => point[1])) > 51.5)
+  ok('and leaves the globe when it ends', routeFeatures(world, createSpace(world), 5, null).features.length === 0)
+
+  // The View menu: a globe offers satellite pictures; a flat map does not.
+  const globe = normalizeMap({ mapKind: 'earth', earth: { view: 'globe' } })
+  const menu = viewMenuFor(globe)
+  const byId = (items, id) => items.find((entry) => entry.id === id)
+  ok('the View menu checks the globe', byId(menu, 'earth.view.globe').checked && !byId(menu, 'earth.view.flat').checked)
+  ok('satellite is offered on the globe only', !byId(menu, 'earth.imagery.satellite').disabled && byId(viewMenuFor({ ...globe, earth: { ...globe.earth, view: 'flat' } }), 'earth.imagery.satellite').disabled)
+  ok('a globe that could not start offers the flat map', byId(viewMenuFor(globe, { globeAvailable: false }), 'earth.view.flat').checked)
+  ok('a map that is not the Earth has no View menu', viewMenuFor(normalizeMap({ mapKind: 'blank' })).length === 0)
+  ok('a projection lays the globe flat', viewOptionPatch(globe, 'earth.projection.mercator').view === 'flat')
+  ok('an unknown projection is refused', viewOptionPatch(globe, 'earth.projection.dymaxion') === null)
+  ok('satellite pictures bring the globe back', viewOptionPatch({ ...globe, earth: { ...globe.earth, view: 'flat' } }, 'earth.imagery.satellite').view === 'globe')
+  ok('satellite pictures ask before going online', choosesOnline(globe, 'earth.imagery.satellite') && !choosesOnline(globe, 'earth.graticule'))
+  ok('turning terrain off does not ask', !choosesOnline({ ...globe, earth: { ...globe.earth, terrain3d: true } }, 'earth.terrain'))
+  ok('every View choice is a command', menu.every((entry) => VIEW_COMMAND_TITLES[entry.id]))
+}
+
+/* ---------------- bodies that all pull on each other ---------------- */
+
+{
+  const { createRun, energy, runFor, stabilityOf, stateFromOrbits, toNbody } = await import('../../src/lib/map/nbody.js')
+  const { presetSystem, SYSTEM_PRESETS } = await import('../../src/lib/map/systemPresets.js')
+  const { STAR_PRESETS, starFields, starLook, variableAt } = await import('../../src/lib/map/stars.js')
+  const systemOf = (id, options) => normalizeMap({ mapKind: 'system', system: presetSystem(id, options) }).system
+
+  // The figure eight: equal stars, one path, back where they began after a period.
+  const eight = systemOf('figureEight')
+  const run = createRun(eight)
+  const period = 6.32591398 * Math.sqrt(1 / (0.01720209895 ** 2))
+  const start = run.positionsAt(0).get('a')
+  const later = run.positionsAt(period).get('a')
+  ok('the figure eight comes round again', Math.hypot(start[0] - later[0], start[1] - later[1]) < 1e-4)
+  const e0 = energy(run.checkpoint(0), run.eps2)
+  const e1 = energy(run.checkpoint(Math.ceil((period * 10) / run.span)), run.eps2)
+  ok('and keeps its energy over ten turns', Math.abs((e1 - e0) / e0) < 1e-6)
+  ok('the same system goes the same way, bit for bit', createRun(eight).positionsAt(1234.5).get('c').join() === run.positionsAt(1234.5).get('c').join())
+  const resumed = run.positionsAt(800.3).get('b').join()
+  ok('resuming from a checkpoint matches a straight run', createRun(eight).positionsAt(800.3).get('b').join() === resumed)
+  ok('it runs backwards from day 0 too', run.positionsAt(-150).get('a').every(Number.isFinite))
+
+  // Every template says truly whether it holds together.
+  for (const preset of SYSTEM_PRESETS.filter((candidate) => candidate.dynamics === 'nbody' && candidate.id !== 'encounter' && candidate.id !== 'butterfly')) {
+    ok(`${preset.label} ${preset.stable ? 'holds together' : 'comes apart'}`, stabilityOf(systemOf(preset.id)).stable === preset.stable)
+  }
+  const burrau = stabilityOf(systemOf('pythagorean'))
+  ok('Burrau’s three flings one away within the story', burrau.ejected && burrau.ejected.day < 3650)
+  ok('a random encounter differs by seed', JSON.stringify(systemOf('encounter', { seed: 1 }).bodies) !== JSON.stringify(systemOf('encounter', { seed: 2 }).bodies))
+  ok('a nudge changes the start', JSON.stringify(systemOf('figureEight', { perturb: 0.05 }).bodies) !== JSON.stringify(eight.bodies))
+
+  // A Kepler system turned N-body starts exactly where it was.
+  const sol = normalizeMap({ mapKind: 'system', system: presetSystem('sol') }).system
+  const states = stateFromOrbits(sol)
+  const kepler = systemPositionsAt(sol, 0)
+  ok('state vectors start on the orbits', Math.hypot(...states.get('earth').pos.map((value, axis) => value - kepler.get('earth')[axis])) < 1e-12)
+  const earthSpeed = Math.hypot(...states.get('earth').vel) * 149597870.7 / 86400
+  ok('and move at the orbit’s speed (Earth ≈ 29.8 km/s)', Math.abs(earthSpeed - 29.8) < 0.6)
+  const pulled = normalizeMap({ mapKind: 'system', system: toNbody(sol) }).system
+  const after = systemPositionsAt(pulled, 30).get('earth')
+  const onOrbit = systemPositionsAt(sol, 30).get('earth')
+  ok('and stay close to them a month on', Math.hypot(after[0] - onOrbit[0], after[1] - onOrbit[1], after[2] - onOrbit[2]) < 0.01)
+  ok('an N-body system is cached by what moves it', runFor(pulled) === runFor({ ...pulled }))
+
+  // Star templates.
+  ok('every star has a look', STAR_PRESETS.every((preset) => typeof preset.look === 'string'))
+  const pulsar = STAR_PRESETS.find((preset) => preset.id === 'PSR')
+  ok('a pulsar spins', starFields(pulsar).spinSeconds > 0 && starLook({ star: starFields(pulsar) }) === 'pulsar')
+  const cepheid = starFields(STAR_PRESETS.find((preset) => preset.id === 'CEP'))
+  const pulses = [0, 1, 2, 3, 4, 5].map((day) => variableAt(cepheid, day).brightness)
+  ok('a Cepheid brightens and fades', Math.max(...pulses) > 1.1 && Math.min(...pulses) < 0.9)
+  ok('a steady star does not', variableAt(starFields(STAR_PRESETS[4]), 3).brightness === 1)
+}
+
+/* ---------------- a star system in 3D ---------------- */
+
+{
+  const { systemToScene, sceneToSystem, readSpaceCamera, DEFAULT_SPACE_CAMERA } = await import('../../src/map/space/spaceMath.js')
+  const { viewMenuFor, viewOptionEdit } = await import('../../src/map/mapViewMenu.js')
+  const display = { radial: 'log', pxPerAU: 100 }
+  // Seen from straight above, the 3D layout is the flat map's: scene x is the page's
+  // x, scene z is the page's y (down), at 1 drawn-AU per pxPerAU world units.
+  const samePlace = [[1, 0], [0.4, -2.5], [-30, 12]].every((point) => {
+    const scene = systemToScene([point[0], point[1], 0], display)
+    const flat = systemToWorld(point, display)
+    return Math.abs(scene[0] * 100 - flat[0]) < 1e-9 && Math.abs(scene[2] * 100 - flat[1]) < 1e-9 && scene[1] === 0
+  })
+  ok('face-on, the 3D system is laid out as the flat map', samePlace)
+  const back = sceneToSystem(systemToScene([3, -4, 1.5], display), display)
+  ok('scene and system points convert both ways', Math.hypot(back[0] - 3, back[1] + 4, back[2] - 1.5) < 1e-9)
+  ok('above the plane is up in the scene', systemToScene([0, 0, 2], { radial: 'linear' })[1] === 2)
+  ok('a malformed camera falls back to the default', readSpaceCamera({ center: [0, 0], zoom: 3 }).fov === DEFAULT_SPACE_CAMERA.fov)
+  ok('a saved camera is kept', readSpaceCamera({ position: [1, 2, 3], target: [0, 0, 0], fov: 50 }).position[2] === 3)
+
+  const system = normalizeMap({ mapKind: 'system', system: { display: { view: '3d' } } })
+  ok('a system offers 3D and flat', viewMenuFor(system).find((entry) => entry.id === 'system.view.3d').checked)
+  ok('an old system opens flat', normalizeMap({ mapKind: 'system' }).system.display.view === 'flat')
+  const edit = viewOptionEdit(system, 'system.radial.linear')
+  ok('distances to scale is an edit to the system', edit.section === 'system' && edit.patch.display.radial === 'linear' && edit.patch.display.view === '3d')
+  ok('a 3D view that could not start offers flat only', viewMenuFor(system, { spaceAvailable: false }).find((entry) => entry.id === 'system.view.3d').disabled)
+}
+
+/* ---------------- planets and stars as worlds ---------------- */
+
+{
+  const { planetTexture, MASK_WATER, MASK_LAND } = await import('../../src/lib/map/planetTexture.js')
+  const { presetSurface, surfaceForBody, PLANET_PRESETS } = await import('../../src/lib/map/planetPresets.js')
+  const { lonLatToUnit, unitToLonLat, subsolarPoint } = await import('../../src/map/space/spaceMath.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const size = { width: 64, height: 32 }
+  const look = normalizeMap({ mapKind: 'planet', surface: presetSurface('earthlike', 5) }).surface.look
+  const a = planetTexture(look, size)
+  ok('the same seed draws the same world', a.color.join() === planetTexture(look, size).color.join())
+  ok('another seed draws another', a.color.join() !== planetTexture({ ...look, seed: 6 }, size).color.join())
+  const seaShare = (surface) => {
+    const { relief } = planetTexture(surface, size)
+    const level = Math.round(surface.seaLevel * 255)
+    return [...relief].filter((value) => value <= level).length / relief.length
+  }
+  ok('a higher sea drowns more of the world', seaShare({ ...look, seaLevel: 0.75 }) > seaShare({ ...look, seaLevel: 0.3 }) + 0.2)
+  const mask = new Uint8Array(size.width * size.height)
+  mask.fill(MASK_WATER)
+  const drowned = planetTexture(look, { ...size, mask })
+  ok('drawn water is sea', [...drowned.relief].every((value) => value <= Math.round(look.seaLevel * 255)))
+  mask.fill(MASK_LAND)
+  const raised = planetTexture(look, { ...size, mask })
+  ok('drawn land rises out of it', [...raised.relief].every((value) => value > Math.round(look.seaLevel * 255)))
+  const gas = planetTexture({ kind: 'gas', palette: 'jovian', seed: 3, roughness: 0.5 }, size)
+  ok('a giant is drawn in bands', new Set(gas.color.filter((_, index) => index % 4 === 0)).size > 8)
+  ok('every preset reads cleanly', PLANET_PRESETS.every((preset) => normalizeMap({ mapKind: 'planet', surface: presetSurface(preset.id) }).surface.radiusKm > 0))
+
+  const sol = normalizeMap({ mapKind: 'system', system: presetSystem('sol') }).system
+  const bodies = new Map(sol.bodies.map((body) => [body.id, body]))
+  const mars = surfaceForBody(bodies.get('mars'), bodies)
+  ok('red Mars opens as a rust world', mars.look.palette === 'rust' && mars.look.kind === 'generated')
+  ok('with its own year', Math.abs(mars.yearDays - 687) < 2)
+  ok('Jupiter opens as a giant', surfaceForBody(bodies.get('jupiter'), bodies).look.kind === 'gas')
+  ok('the Sun opens as a star', surfaceForBody(bodies.get('sun'), bodies).look.kind === 'star')
+  ok('a body opens the same world every time', surfaceForBody(bodies.get('earth'), bodies).look.seed === surfaceForBody(bodies.get('earth'), bodies).look.seed)
+
+  const round = unitToLonLat(lonLatToUnit([123, -45]))
+  ok('longitude and latitude survive the trip to 3D', Math.abs(round[0] - 123) < 1e-9 && Math.abs(round[1] + 45) < 1e-9)
+  const tilted = { dayHours: 24, yearDays: 360, axialTiltDeg: 23 }
+  ok('noon is on the prime meridian on day 0', Math.abs(subsolarPoint(tilted, 0)[0]) < 1e-9)
+  ok('and has moved west six hours later', Math.abs(subsolarPoint(tilted, 0.25)[0] + 90) < 1e-9)
+  ok('the sun reaches the tropic at midsummer', Math.abs(subsolarPoint(tilted, 90)[1] - 23) < 1e-9)
+  ok('an upright world has no seasons', subsolarPoint({ ...tilted, axialTiltDeg: 0 }, 90)[1] === 0)
+}
+
+/* ---------------- where a map sits ---------------- */
+
+{
+  const { parentIndex, trailFor } = await import('../../src/lib/map/mapAncestry.js')
+  const galaxy = normalizeMap({ mapKind: 'blank', pins: [{ id: 's', at: [1, 1], doc: 'Space/Sol.map' }, { id: 'n', at: [2, 2], doc: 'Notes/Chapter' }] })
+  const sol = normalizeMap({ mapKind: 'system', system: { bodies: [{ id: 'e', name: 'Earth', kind: 'planet', surface: 'Space/Earth.map' }] } })
+  const earth = normalizeMap({ mapKind: 'planet' })
+  const index = parentIndex([{ path: 'Space/Milky Way.map', map: galaxy }, { path: 'Space/Sol.map', map: sol }, { path: 'Space/Earth.map', map: earth }])
+  const trail = trailFor('Space/Earth.map', index)
+  ok('a world sits in its system, and the system in its galaxy', trail.map((step) => step.path).join(' > ') === 'Space/Milky Way.map > Space/Sol.map > Space/Earth.map')
+  ok('each step knows its kind', trail[1].kind === 'system' && trail[2].kind === 'planet')
+  ok('a pin on a document is not a parent', !index.parents.has('Notes/Chapter'))
+  const loop = parentIndex([{ path: 'A.map', map: normalizeMap({ mapKind: 'blank', pins: [{ id: 'p', at: [0, 0], doc: 'B.map' }] }) }, { path: 'B.map', map: normalizeMap({ mapKind: 'blank', pins: [{ id: 'p', at: [0, 0], doc: 'A.map' }] }) }])
+  ok('maps that link to each other end the trail', trailFor('A.map', loop).length === 2)
+}
+
+/* ---------------- galaxies, and groups of them ---------------- */
+
+{
+  const { generateGalaxy, galaxyStats, galaxyShape, GALAXY_TYPE_NAMES } = await import('../../src/lib/map/galaxyGen.js')
+  const { fillUniverse } = await import('../../src/lib/map/universeGen.js')
+  const { GALAXY_TYPES } = await import('../../src/lib/map/mapModel.js')
+  const make = (type, seed = 4, extra = {}) => generateGalaxy({ type, seed, radiusLy: 50000, thicknessLy: 1000, ...extra }, { count: 12000 })
+  const stats = (type, seed) => galaxyStats(make(type, seed), 50000)
+
+  ok('every type draws, and has a name', GALAXY_TYPES.every((type) => make(type).count > 0 && GALAXY_TYPE_NAMES[type]))
+  ok('the same seed draws the same galaxy, point for point', make('Sb').positions.join() === make('Sb').positions.join())
+  ok('another seed draws another', make('Sb', 4).positions.join() !== make('Sb', 5).positions.join())
+  ok('a round elliptical has no bar', [1, 2, 3, 4].every((seed) => stats('E0', seed).barAspect < 1.15))
+  ok('an elliptical has no dust', make('E5').dust.count === 0)
+  ok('the higher the class, the flatter the elliptical', stats('E7').flatness < stats('E3').flatness && stats('E3').flatness < stats('E0').flatness)
+  ok('a spiral is a thin disc', stats('Sc').flatness < 0.15)
+  ok('an Sa has more bulge than an Sd', [1, 2, 3].every((seed) => stats('Sa', seed).bulgeShare > stats('Sd', seed).bulgeShare))
+  ok('a barred spiral has a bar, an unbarred one none', [1, 2, 3, 4].every((seed) => stats('SBb', seed).barAspect > 1.8 && stats('Sb', seed).barAspect < 1.4))
+  ok('a fixed shape survives a reroll', galaxyShape({ type: 'Sc', seed: 9, params: { arms: 5 } }).arms === 5 && galaxyShape({ type: 'Sc', seed: 10, params: { arms: 5 } }).arms === 5)
+  ok('a dwarf is sparse', make('dwarf').count < make('Sb').count / 2)
+
+  const group = fillUniverse({ seed: 8, count: 200, extentMpc: 40 })
+  ok('a group of galaxies is drawn from its seed', JSON.stringify(group) === JSON.stringify(fillUniverse({ seed: 8, count: 200, extentMpc: 40 })))
+  ok('every galaxy has a name, a place and a look', group.every((pin) => pin.name && pin.at.length === 3 && GALAXY_TYPES.includes(pin.galaxy.type)))
+  ok('they stay inside the region', group.every((pin) => pin.at.every((value) => Math.abs(value) <= 20)))
+  const elliptical = (pins) => pins.filter((pin) => /^E|S0/.test(pin.galaxy.type)).length / pins.length
+  ok('ellipticals are a minority overall', elliptical(group) < 0.6)
+  ok('a galaxy pin reads cleanly', normalizeMap({ mapKind: 'universe', pins: group.slice(0, 3) }).pins[0].galaxy.type === group[0].galaxy.type)
+}
+
+/* ---------------- layers, and places that come and go ---------------- */
+
+{
+  const { hiddenKey, withoutHidden, hiddenIds, isItemLocked } = await import('../../src/lib/map/mapVisibility.js')
+  const { eventDay } = await import('../../src/map/inspector/whenSections.js')
+  const map = normalizeMap({
+    layers: [{ id: 'old', name: 'Old roads', visible: false }, { id: 'war', name: 'The war', locked: true }],
+    pins: [{ id: 'a', at: [0, 0], layer: 'old' }, { id: 'b', at: [1, 1], from: 10 }, { id: 'c', at: [2, 2], layer: 'war' }],
+    routes: [{ id: 'r', nodes: [{ pin: 'a' }, { pin: 'c' }], layer: 'old' }],
+    labels: [{ id: 'l', text: 'Gone', at: [3, 3], until: 5 }],
+  })
+  ok('a hidden layer and a day outside a span hide their items', hiddenIds(hiddenKey(map, 0)).has('a') && hiddenIds(hiddenKey(map, 0)).has('b') && hiddenIds(hiddenKey(map, 0)).has('r'))
+  ok('a span opens on its day, and closes on its until', !hiddenIds(hiddenKey(map, 10)).has('b') && hiddenIds(hiddenKey(map, 5)).has('l') && !hiddenIds(hiddenKey(map, 4)).has('l'))
+  const shown = withoutHidden(map, hiddenKey(map, 0))
+  ok('hidden routes leave, pins stay for what leans on them', shown.routes.length === 0 && shown.pins.length === 3)
+  ok('nothing hidden gives back the same map', withoutHidden(map, '') === map)
+  ok('a locked layer holds its items', isItemLocked(map, 'pin', 'c') && !isItemLocked(map, 'pin', 'b'))
+  ok('an item follows an event: in at its start, gone at its end', eventDay({ start: 3, end: 9 }, 'from') === 3 && eventDay({ start: 3, end: 9 }, 'until') === 9 && eventDay({ start: 3, end: null }, 'until') === 4)
+}
+
+/* ---------------- the key ---------------- */
+
+{
+  const { legendEntries } = await import('../../src/map/mapLegend.js')
+  const map = normalizeMap({
+    terrains: [{ id: 'forest', name: 'Forest', fill: '#4a7a3a' }],
+    pins: [{ id: 'a', at: [0, 0], icon: 'city' }, { id: 'b', at: [1, 0], icon: 'city' }, { id: 'c', at: [2, 0], icon: 'castle', from: 50 }],
+    regions: [{ id: 'f', rings: [[[0, 0], [1, 0], [1, 1]]], terrain: 'forest' }, { id: 'g', rings: [[[0, 0], [2, 0], [2, 2]]], terrain: 'forest' }],
+    routes: [{ id: 'r', name: 'King’s road', nodes: [{ pin: 'a' }, { pin: 'b' }] }],
+  })
+  const labels = (day) => legendEntries(map, day).map((entry) => entry.label)
+  ok('the key lists each kind of place once', labels(0).filter((label) => label === 'City').length === 1)
+  ok('a terrain is named once, however many regions wear it', labels(0).filter((label) => label === 'Forest').length === 1)
+  ok('a few routes are listed by name', labels(0).includes('King’s road'))
+  ok('what is not there on the day is not in the key', !labels(0).includes('Castle') && labels(60).includes('Castle'))
+  const many = normalizeMap({ pins: [{ id: 'a', at: [0, 0] }, { id: 'b', at: [1, 0] }], routes: Array.from({ length: 6 }, (_, index) => ({ id: `r${index}`, name: `Road ${index}`, nodes: [{ pin: 'a' }, { pin: 'b' }] })) })
+  ok('many routes drawn alike gather into one row', legendEntries(many).filter((entry) => entry.kind === 'route').length === 1)
+}
+
+/* ---------------- GeoJSON and KML ---------------- */
+
+{
+  const { JSDOM } = await import('jsdom')
+  globalThis.DOMParser = new JSDOM('').window.DOMParser
+  const { mapToGeoJSON, mapToKml, geoJSONToItems, kmlToGeoJSON, readGeoFile } = await import('../../src/lib/map/geoInterchange.js')
+  const earth = normalizeMap({
+    mapKind: 'earth',
+    pins: [{ id: 'p', name: 'Paris', at: [2.35, 48.85], icon: 'city' }, { id: 'l', name: 'London', at: [-0.13, 51.5] }],
+    routes: [{ id: 'r', name: 'Ferry', nodes: [{ pin: 'l' }, { pin: 'p' }] }],
+    regions: [{ id: 'g', name: 'Île', rings: [[[2, 48], [3, 48], [3, 49]]], from: 10 }],
+  })
+  const json = mapToGeoJSON(earth, createSpace(earth))
+  ok('out: places, routes and regions become features', json.features.map((feature) => feature.geometry.type).join() === 'Point,Point,LineString,Polygon')
+  ok('out: a route follows its places', JSON.stringify(json.features[2].geometry.coordinates) === JSON.stringify([[-0.13, 51.5], [2.35, 48.85]]))
+  ok('out: a polygon ring is closed, and a day kept', json.features[3].geometry.coordinates[0].length === 4 && json.features[3].properties.from === 10)
+  const back = geoJSONToItems(json, earth)
+  ok('in: what went out comes back', back.pins.length === 2 && back.routes.length === 1 && back.regions.length === 1 && back.pins[0].name === 'Paris' && back.pins[0].icon === 'city')
+  ok('in: a ring is opened again, and lands where it says on the Earth', back.regions[0].rings[0].length === 3 && back.regions[0].rings[0][0][0] === 2)
+  const kml = mapToKml(earth, createSpace(earth), { name: 'Trip' })
+  const fromKml = kmlToGeoJSON(kml)
+  ok('KML out and in again keeps names and shapes', fromKml.features.length === 4 && fromKml.features[0].properties.name === 'Paris' && fromKml.features[3].geometry.type === 'Polygon')
+  ok('a file is read by its look', readGeoFile(kml, 'trip.kml').features.length === 4 && readGeoFile(JSON.stringify(json)).features.length === 4)
+  const sheet = normalizeMap({ mapKind: 'blank' })
+  const fitted = geoJSONToItems({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'MultiPoint', coordinates: [[10, 50], [12, 52]] }, properties: {} }] }, sheet)
+  const [south, north] = fitted.pins
+  ok('on a drawn map an import is fitted to the sheet, north up', fitted.pins.length === 2 && north.at[1] < south.at[1] && south.at.every((value) => value > 0 && value < 4000))
+  ok('nonsense is counted, not imported', geoJSONToItems({ type: 'Feature', geometry: { type: 'Point', coordinates: ['a', 1] } }, earth).skipped === 1)
+}
+
+/* ---------------- finding on the map ---------------- */
+
+{
+  const { findOnMap } = await import('../../src/lib/map/mapFind.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const map = normalizeMap({
+    pins: [{ id: 'a', name: 'Ashford', at: [10, 10] }, { id: 'b', name: 'New Ashby', at: [20, 20] }, { id: 'c', name: 'Clashing Rocks', at: [30, 30] }, { id: 'd', name: 'Ashen Keep', at: [5, 5], from: 99 }],
+    regions: [{ id: 'g', name: 'Ashlands', rings: [[[0, 0], [10, 0], [10, 10], [0, 10]]] }],
+  })
+  const names = findOnMap(map, createSpace(map), 'ash').map((hit) => hit.name)
+  ok('a name that starts with the query comes first, a word that does next, then the rest', names.join() === 'Ashford,Ashlands,New Ashby,Clashing Rocks')
+  ok('what is not there on the day is not found', !names.includes('Ashen Keep') && findOnMap(map, createSpace(map), 'ash', { day: 100 }).some((hit) => hit.name === 'Ashen Keep'))
+  ok('a region is found at its middle', findOnMap(map, createSpace(map), 'ashlands')[0].at.join() === '5,5')
+  const solar = normalizeMap({ mapKind: 'system', system: presetSystem('sol') })
+  ok('a body is found where it is', findOnMap(solar, createSpace(solar), 'mars')[0]?.kind === 'body')
+}
+
+/* ---------------- distance over time ---------------- */
+
+{
+  const { distanceSeries, distanceSpan, distanceEnds, distanceOn } = await import('../../src/lib/map/distanceOverTime.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const solar = normalizeMap({ mapKind: 'system', system: presetSystem('sol') })
+  const space = createSpace(solar)
+  const ends = distanceEnds(solar)
+  const earth = ends.find((end) => end.label === 'Earth')?.value
+  const mars = ends.find((end) => end.label === 'Mars')?.value
+  const span = distanceSpan(solar, earth, mars, { from: 0, to: 30 })
+  ok('a span covers two of the longer orbit', span.to - span.from > 1300 && span.to - span.from < 1400)
+  const series = distanceSeries(solar, space, earth, mars, span)
+  const AU = 149597870.7
+  ok('Earth and Mars come within about half an AU, and go about two and a half apart', series.closest.km / AU < 0.7 && series.farthest.km / AU > 2.3 && series.farthest.km / AU < 2.7)
+  ok('the distance on a day matches the series', Math.abs(distanceOn(solar, space, earth, mars, series.points[10][0]) - series.points[10][1]) < 1e-6)
+  ok('an end that names nothing gives no series', distanceSeries(solar, space, earth, 'body:nowhere', span) === null)
+}
+
+/* ---------------- camera choices ---------------- */
+
+{
+  const { viewMenuFor, cameraChoice } = await import('../../src/map/mapViewMenu.js')
+  const galaxy = normalizeMap({ mapKind: 'galaxy' })
+  const ids = viewMenuFor(galaxy, { camera: { ortho: true } }).map((entry) => entry.id)
+  ok('a 3D map offers the angles, flat and holding', ['camera.face', 'camera.edge', 'camera.three', 'camera.ortho', 'camera.lock'].every((id) => ids.includes(id)))
+  ok('flat is ticked when the camera is flat', viewMenuFor(galaxy, { camera: { ortho: true } }).find((entry) => entry.id === 'camera.ortho').checked)
+  ok('a planet has no angles to choose', !viewMenuFor(normalizeMap({ mapKind: 'planet' })).some((entry) => entry.id === 'camera.face'))
+  ok('a flat system has no camera', !viewMenuFor(normalizeMap({ mapKind: 'system' })).some((entry) => entry.id.startsWith('camera.')))
+  ok('choices toggle against the camera now', cameraChoice('camera.ortho', { ortho: true }).ortho === false && cameraChoice('camera.face').angle === 'face' && cameraChoice('earth.borders') === null)
+}
+
+/* ---------------- plates: 3D maps as line art ---------------- */
+
+{
+  const { plotScene } = await import('../../src/map/space/plot/plotScene.js')
+  const { plotCamera } = await import('../../src/map/space/plot/plotCamera.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const { Vector3 } = await import('three')
+  const sol = normalizeMap({ mapKind: 'system', system: presetSystem('sol') })
+  const camera = { position: [0, 9, 14], target: [0, 0, 0], fov: 40 }
+  const plate = () => plotScene(sol, createSpace(sol), { day: 100, camera, width: 800, height: 600 }).svg
+  ok('a plate is the same every time', plate() === plate())
+  ok('a plate has no pictures in it, only lines', !/<image|data:image/.test(plate()))
+  ok('far halves of orbits are dashed', /stroke-dasharray/.test(plate()))
+  const galaxy = normalizeMap({ mapKind: 'galaxy', galaxy: { type: 'Sb', seed: 3, radiusLy: 50000 } })
+  const black = plotScene(galaxy, createSpace(galaxy), { camera: { position: [0, 80, 1e-4], target: [0, 0, 0], fov: 40 }, width: 600, height: 600, mono: true }).svg
+  ok('black and white is black on white whatever the theme', black.includes('--plot-ink:#111111') && black.includes('--plot-paper:#ffffff'))
+  const top = plotCamera({ position: [0, 20, 1e-4], target: [0, 0, 0], fov: 1, ortho: true }, 600, 600)
+  const east = top.project(new Vector3(5, 0, 0))
+  const north = top.project(new Vector3(0, 0, -5))
+  ok('from above and flat, +x is right and the system’s +y is up the page', east[0] > 300 && Math.abs(east[1] - 300) < 1e-6 && north[1] < 300 && Math.abs(north[0] - 300) < 1e-6)
+  ok('flat keeps sizes alike near and far', Math.abs(top.pxPerUnitAt(new Vector3(0, 5, 0)) - top.pxPerUnitAt(new Vector3(0, -5, 0))) < 1e-9)
+
+  // A world, engraved.
+  const world = normalizeMap({ mapKind: 'planet', surface: { look: { kind: 'generated', seed: 7 } }, pins: [{ id: 'p', name: 'Corrin', at: [0, 10] }, { id: 'q', name: 'Farside', at: [180, 0] }] })
+  const front = { position: [3, 0, 0], target: [0, 0, 0], fov: 35 }
+  const engrave = () => plotScene(world, createSpace(world), { day: 0, camera: front, width: 500, height: 500 }).svg
+  const engraved = engrave()
+  ok('a world’s plate is the same every time, and only lines', engraved === engrave() && !/<image|data:image/.test(engraved))
+  ok('a place on the near side is named; one round the back is not', engraved.includes('Corrin') && !engraved.includes('Farside'))
+  const ray = plotCamera(front, 500, 500).ray(250, 250)
+  ok('the line of sight through the middle runs to the target', ray.direction.distanceTo(new Vector3(-1, 0, 0)) < 1e-9)
+  const night = plotScene(world, createSpace(world), { day: 0, camera: { position: [-3, 0, 0], target: [0, 0, 0], fov: 35 }, width: 500, height: 500 }).svg
+  ok('the night side is hatched: more lines from behind the world than from under its sun', night.length > engraved.length * 0.5 && (night.match(/L/g) || []).length > 0)
+
+  // A model, as a technical drawing: a cube from a corner shows nine edges, not twelve.
+  const { BoxGeometry, Group, Mesh, MeshBasicMaterial } = await import('three')
+  const holder = new Group()
+  holder.add(new Mesh(new BoxGeometry(2, 2, 2), new MeshBasicMaterial()))
+  const station = normalizeMap({ mapKind: 'model', model: { asset: null }, pins: [] })
+  const drawing = plotScene(station, createSpace(station), { camera: { position: [5, 4, 6], target: [0, 0, 0], fov: 35 }, width: 600, height: 600, model: holder }).svg
+  const strokes = (drawing.match(/M[\d.-]+ [\d.-]+L/g) || []).length
+  ok('a model is drawn with its hidden edges taken out', strokes >= 9 && strokes <= 12)
+}
+
+/* ---------------- the quality governor ---------------- */
+
+{
+  const { governQuality, QUALITY_STEPS } = await import('../../src/map/space/stage.js')
+  const frames = (ms, count = 24) => Array.from({ length: count }, () => ms)
+  ok('smooth frames keep the best quality', governQuality(frames(16.7), 0) === 0)
+  ok('slow frames step down one, bloom first', governQuality(frames(40), 0) === 1 && !QUALITY_STEPS[1].bloom && QUALITY_STEPS[1].pixelRatio === QUALITY_STEPS[0].pixelRatio)
+  ok('then fewer pixels', QUALITY_STEPS[2].pixelRatio < QUALITY_STEPS[1].pixelRatio)
+  ok('a few slow frames among smooth ones are not judged slow', governQuality([...frames(16.7, 18), ...frames(80, 6)], 0) === 0)
+  ok('too few frames to judge, no change', governQuality(frames(80, 5), 0) === 0)
+  ok('it never steps up, and stops at the bottom', governQuality(frames(5), 2) === 2 && governQuality(frames(80), QUALITY_STEPS.length - 1) === QUALITY_STEPS.length - 1)
+}
+
+/* ---------------- three bodies: problems, and holding them together ---------------- */
+
+{
+  const { makeStable, closePasses, stabilityOf, withStartSpeeds, asHierarchy, arrowDays, startStateOf } = await import('../../src/lib/map/nbody.js')
+  const { motionProblems } = await import('../../src/map/inspector/travelSections.js')
+  const { presetSystem } = await import('../../src/lib/map/systemPresets.js')
+  const burrau = normalizeMap({ mapKind: 'system', system: presetSystem('pythagorean') })
+  const system = burrau.system
+  ok('Burrau’s three come apart', !stabilityOf(system).stable)
+  const passes = closePasses(system)
+  ok('their close passes are found, in order, each once per approach', passes.length > 0 && passes.every((pass, index) => index === 0 || pass.day >= passes[index - 1].day))
+  const steadied = makeStable(system)
+  ok('Make it stable finds a system that holds together', Boolean(steadied) && stabilityOf(steadied.system).stable && typeof steadied.how === 'string')
+  ok('and keeps the bodies where they start', steadied.system.bodies.every((body) => !body.state || system.bodies.some((other) => other.id === body.id)))
+  const slowed = withStartSpeeds(normalizeMap({ mapKind: 'system', system: presetSystem('figureEight') }).system, 0.5)
+  const full = withStartSpeeds(normalizeMap({ mapKind: 'system', system: presetSystem('figureEight') }).system, 1)
+  ok('slowing scales every starting speed', slowed.bodies.every((body, index) => !body.state || Math.abs(Math.hypot(...body.state.vel) * 2 - Math.hypot(...full.bodies[index].state.vel)) < 1e-12))
+  ok('a hierarchy sets every body moving', asHierarchy(system).bodies.filter((body) => body.state).every((body) => Math.hypot(...body.state.vel) > 0))
+  ok('an arrow shows some days of motion', arrowDays(system) > 0 && startStateOf(system, system.bodies[0].id))
+  const problems = motionProblems(burrau, { verdict: stabilityOf(system), passes })
+  ok('the problems say who is flung out', problems.some((problem) => /flung out/.test(problem.title)) && problems.every((problem) => Number.isFinite(problem.day)))
+}

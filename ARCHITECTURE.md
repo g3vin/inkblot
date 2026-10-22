@@ -6,16 +6,28 @@ in its header comment. This document covers what spans modules.
 
 ## The pieces
 
-```text
- The page (src/)                                       Tauri (src-tauri/)
- ──────────────────────────────────────────────        ─────────────────────────────
- The chrome: toolbar, file tree, inspector,            *_commands.rs ─► inkblot-core
- tab bar, menus, settings, stats                                     └► inkblot-models
-        │                                                     ▲
-   shellBridge ◄── bridge protocol (JSON, in process) ──►     │ invoke()
-        │          (src/bridge/transport.ts)                   │
-   documentSurface: the panes, editors, canvases, maps ────────┘
+```mermaid
+flowchart LR
+  subgraph page["The page (src/)"]
+    chrome["The chrome<br/>toolbar, file tree, inspector,<br/>tab bar, menus, settings, stats"]
+    surface["The document surface<br/>panes, editors, canvases,<br/>maps, timelines"]
+    chrome -- "commands, requests<br/>(shellBridge)" --> surface
+    surface -- "events, replies<br/>(documentSurface)" --> chrome
+  end
+  subgraph tauri["Tauri (src-tauri/)"]
+    commands["*_commands.rs"]
+    core["inkblot-core<br/>domain, persistence, protocol types"]
+    models["inkblot-models<br/>on-device models"]
+    commands --> core
+    commands --> models
+  end
+  surface -- "invoke()" --> commands
+  chrome -- "invoke()" --> commands
+  core -. "typeshare: src/types/inkblot-core.ts" .-> page
 ```
+
+The bridge between the chrome and the surface runs in process, but every message is
+round-tripped through JSON (`src/bridge/transport.ts`).
 
 - **The page** (`src/`) is the whole app: the editor and everything around it.
 - **The chrome and the document surface talk through the bridge protocol**, in
@@ -29,6 +41,38 @@ in its header comment. This document covers what spans modules.
 - **The Tauri app** wraps both crates as `#[tauri::command]`s, which the page calls
   through `invoke`.
 
+### Key abstractions
+
+| Abstraction | What it is | Where |
+|---|---|---|
+| Document kind | Text, canvas, map or timeline, from the path's suffix alone | `src/lib/docKind.js`, `inkblot-core/src/doc_kind.rs` |
+| Bridge protocol | Every message between the chrome and the surface, defined in Rust | `inkblot-core/src/bridge/`, generated into `src/types/inkblot-core.ts` |
+| Shell and surface bridges | The two typed ends of the protocol | `src/bridge/client.ts` |
+| Document surface | Handles every command and request; publishes the state the chrome draws | `src/bridge/surface.ts` |
+| Editor registry | Turns a target name (`primary`, `canvasCard`, …) into the live editor | `src/bridge/editorRegistry.ts` |
+| `TextAnchor` | A place in a document: positions plus the text they covered | `src/bridge/anchors.ts` |
+| Document layer | Load, save, per-document write lock, version history | `src/lib/FileSystem.js`, `versionStore.js`, `docLocks.ts` |
+| Entry operations | Rename, move and delete, closing what they touch first | `src/lib/entryOperations.ts` |
+| Preferences | Hydrated before the first render, read synchronously after | `src/lib/preferences.ts` |
+| Commands | The ⌘K registry every action joins | `src/lib/commands.ts` |
+| Reducers | Canvas and map state, with undo as snapshots | `src/canvas/canvasReducer.ts`, `src/map/mapReducer.ts` |
+| Timeline store | The project's one chronology, with previews and undo | `src/lib/timeline/timelineStore.js` |
+| `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/mod.rs` |
+| UI primitives | Every control the chrome is built from | `src/ui/`, [docs/DESIGN.md](docs/DESIGN.md) |
+
+### A keystroke, end to end
+
+1. TipTap applies the transaction. `DocChangeReporter` hands document changes to the
+   surface, which sends them as one `docChanged` per window of edits.
+2. `useSurfacePublisher` hears the selection or document change on the active editor
+   and publishes a fresh `toolbarState`, coalesced to one per frame. The toolbar
+   re-renders from it.
+3. `useEditorAutosave` debounces the write (800 ms) and calls `saveDocument`, which
+   takes the document's lock, carries forward what the file holds and writes
+   `<path>.json`.
+4. A slower debounce (15 s) saves again with a version appended, and
+   `versions:changed` tells the History panel.
+
 ## Data model
 
 - **A canvas is a document kind, not a view mode.** The routing is purely the
@@ -39,8 +83,10 @@ in its header comment. This document covers what spans modules.
   (`editingNodeId`). Every other card is static HTML from `generateHTML`.
 - **A map is the third document kind**, routed by the `.map` suffix the same way:
   `<name>.map.json`. See [Maps](#maps).
+- **A timeline view is the fourth**, `<name>.timeline.json`. It holds how the project's
+  one chronology is shown, never events. See [Timeline](#timeline).
 - **Text documents** are `<path>.json`: `{ content, notes, versions?, archive?,
-  citations? }`.
+  citations?, timeline?, locked? }`. `timeline` is the passages attached to timeline events.
   - `archive` holds bubble sessions the writer archived (`bridge/archive.rs`). A
     session still open lives in the text as a `bubbleSession` mark whose attributes
     are the whole session, so version history restores it.
@@ -51,6 +97,12 @@ in its header comment. This document covers what spans modules.
   - Print Layout's page setup is an attribute of the `doc` node, so it rides in
     autosave and every version. `setContent` drops doc attributes, so restores and
     merges go through `setContentKeepingPageSetup`.
+- **Locks** (`docLocks.ts`). Any document can carry `locked: true`, and every save
+  keeps it (`keepLock` in FileSystem.js, and the Rust save). A locked folder holds a
+  `.inkblot-folder.json` marker, so the lock moves with it. The panes freeze the
+  content (the `DocumentLock` extension, the canvas and map reducers' dispatch, the
+  timeline's commit); notes still change. The page reads a project's locks through
+  `project_locks`, a Rust scan that reads only the flag.
 - **Version history.**
   - Text versions store both HTML (for diffing and preview) and ProseMirror JSON (for
     restore).
@@ -129,9 +181,15 @@ Everything is drawn by the page, from what the document surface publishes:
 
 ## Print Layout
 
-The editor shown as physical pages (View ▸ Print Layout, ⌥⌘P), printed exactly as
-shown, imposed for self-binding, and exported to PDF, EPUB, Markdown and HTML, for one
-document or a folder compiled as a book. All of it is in `src/print/`.
+The editor shown as physical pages, printed exactly as shown, imposed for self-binding,
+and exported to PDF, EPUB, Markdown and HTML, for one document or a folder compiled as a
+book. All of it is in `src/print/`.
+
+Pages are a view, not a mode. Write's page view (View ▸ Page view, ⌥⌘P, or the toolbar
+button) shows the document's own pages with its prose editable and Write's toolbar and
+panels. Typeset always shows pages, set as the book, with its chapters' prose locked.
+`isPrintLayoutEnabled` (`printLayoutStore.js`) answers "pages?", and `isTypesetMode`
+answers "typesetting?". Keep the two apart.
 
 - **One live editor, pushed, not split.** Content never moves between containers.
   `PaginationExtension.ts` measures the laid-out document (`measure.ts`), decides the
@@ -167,10 +225,41 @@ its WebKit, which are not project dependencies; see `tests/layout/run.mjs`).
 A map (`Name.map`) holds places (pins, optionally linked to documents), routes,
 regions with terrain, labels, and characters' journeys on a story timeline. It starts
 as a blank sheet at a scale, a picture (which can be traced to vectors), the Earth
-(Natural Earth, bundled), or a star system with Kepler orbits. The logic is in
+(Natural Earth, bundled), a planet or star, a star system (Kepler orbits, or N-body
+for three-body templates, `nbody.js`), a galaxy (`galaxyGen.js`, seeded per Hubble
+type), a group of galaxies, or a 3D model (glTF). The logic is in
 `src/lib/map/`, the UI in `src/map/` (`MapPane` → `MapSurface`, with `MapLayers` the
 one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrace`,
 `mapdom`.
+
+- **One surface, several views.** `MapSurface` owns tools, selection, the inspector,
+  saving and commands; a *view* owns the camera and turns screen points into stored
+  ones. The flat SVG view is `useMapViewport`; the Earth as a globe is `useGlobeView`
+  (MapLibre GL, `GlobeView.jsx`, its own lazy chunk). A view has the same shape either
+  way — `screenToWorldAt`, `fitStored`, `centerOnStored`, `pick` — and a `native` view
+  (the globe) handles its own gestures. On the globe, world coordinates *are* screen
+  pixels: the projector asks MapLibre, and places, labels and handles are the same SVG
+  overlay as on a flat map. Regions and routes are GeoJSON sources the globe draws.
+  The 3D kinds share `useSpaceView` and `space/stage.js` (three.js, its own lazy
+  chunk, drawing on demand): `SpaceView` takes a *scene* module (`systemScene`,
+  `galaxyScene`, `modelScene`) with one shape; `PlanetView` is a world as a globe.
+  The stage also takes pictures for export, films turntables, and holds the camera
+  presets and the flat (telephoto) view. Cinematic adds a half-size bloom chain (not
+  on iOS), and a governor steps quality down (bloom, then pixel ratio) when frames
+  run slow while the view moves. Atlas and Ink are CSS filters on its canvas
+  (`mapThemes.css`); print plates are vector, plotted from the same scene
+  through the saved camera (`space/plot/plotScene.js`), never read back from WebGL:
+  a world is engraved from its seeded ground (`plotPlanet.js`), a model drawn by its
+  edges with hidden lines removed in a software depth buffer (`plotModel.js`).
+- **Maps nest by links.** A system in a galaxy, a galaxy in a group, is a pin whose
+  `doc` is a `.map`; a body's surface is `body.surface`. `mapAncestry.js` reads the
+  links backwards for the breadcrumb, and `openLinkedMap` writes the new map, links
+  it and saves before opening it, so the trail is there at once.
+- **Online is opt-in.** Every map works offline. Satellite pictures, street detail,
+  terrain and place search (`lib/map/onlineMaps.js`) are fetched only once the writer
+  turns online maps on — asked once, the first time they choose one, then in
+  Settings › Maps. Keys live in preferences, never in a project. List any new
+  service in PRIVACY.md.
 
 - **Kind comes from the suffix only** (`docKind.js`, `doc_kind.rs`). Code that meant "not a text document" asks `!isTextDoc`, not `isCanvasDoc`: a
   map that reaches `saveDocument` is wiped.
@@ -184,7 +273,9 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   folded in at save time.
 - **The story calendar is per project** (`.story/calendar.json`); `story-calendar:changed`
   tells open maps to re-read it.
-- **Heavy things are lazy.** d3-geo and the atlases load only when an Earth map opens.
+- **Heavy things are lazy.** `MapPane` is its own chunk; d3-geo and the atlases load only
+  when an Earth map opens, MapLibre only when one is shown as a globe, three.js only
+  when a 3D kind opens. Planet surfaces are drawn in a worker (`planetTexture.worker.js`).
   The tracer runs in a module worker and falls back to the main thread if the worker
   will not start under `inkblot://`.
 - **The inspector is a form the page builds** (`useMapPanel`, `inspector/panelBuilder.js`):
@@ -192,12 +283,47 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   map's floating panel and the inspector's Map tab (`MapPanelView.jsx`), each edit sent
   back as `mapCommand { panel-field | panel-action, id }`. Add a field in the builder
   and both have it; add a field *type* in `map.rs` and draw it in `MapPanelView`.
-- **What a map draws over itself** — the scale bar, compass, title, tool hint and
+- **What a map draws over itself** — the scale bar, compass, title, key, tool hint and
   timeline — is placed in `useVisibleBox`.
+- **Hidden means not drawn.** Layers and an item's days (`from`, `until`, or the
+  timeline events it follows) are read in one place, `mapVisibility.js`, by every
+  renderer, the key and the search.
 - **Rust twins only what Rust uses**: the kind, normalizing and creating maps, word
   counts, links, search matches and version entries. The maths (geometry, geodesy,
   travel, orbits, calendar) is JS only. Port a module, with parity cases, when Rust
   first needs it.
+
+## Timeline
+
+- **One chronology per project**, `.story/timeline.json` beside `.story/calendar.json`:
+  events, lanes, eras and tags (`types/timeline.rs`, `src/lib/timeline/`). Timeline
+  documents are views of it — scale, range, filters — so every view, document, map and
+  canvas card shows the same events, and a change anywhere is drawn everywhere.
+- **Time is the map's axis**: a float story day in the project calendar. A date is
+  optional. `order`, a fractional-index key compared as a plain string, is sequence;
+  `setEventTime` keeps a dated event's key between its dated neighbours, so sequence and
+  chronology never disagree, and undated events are placed by key alone.
+- **Links go one way by id and the other by path.** Everything names an event by id; an
+  event names documents, map legs, canvas cards and notes by path, kept right through
+  renames by `timelineLinks.js` (which also rewrites undo snapshots).
+- **Passages live in their document**, in a ProseMirror plugin's state
+  (`TimelineAnchors.js`): mapped through every transaction, restored with the cached
+  EditorState, saved by the autosave with the text (`timeline` is carried forward by
+  both the JS and Rust saves). A change that moves no text is saved alone
+  (`saveDocumentTimeline`).
+- **One store, previews and one undo** (`timelineStore.js`): a drag previews the
+  chronology everywhere and commits on release. An undo step can carry `effects` on other
+  files — a map leg moved with its linked event — so one ⌘Z puts both back. A map open in
+  a pane claims a leg edit (`map:set-leg`) rather than being written under.
+- **The story's "now" and the time lens** (`storyCursor.js`) are shared, unsaved state:
+  maps scrub and follow the day; the lens is a window of time the editor highlights
+  passages in, draggable in the lens bar and in any view.
+- **Three layouts**: by date, in order, and the manuscript — passages in reading order
+  (the book's compile order) joined to when they happen, flashbacks and flash-forwards
+  found by `manuscriptThreads`.
+- **Chrome of its own**: a timeline view draws its tool bar (`TimelineToolbar.jsx`) and
+  its inspector, a `MapPanel` form drawn by `MapPanelView`, in the page. The logic is JS
+  only; port it with parity cases when Rust first needs it.
 
 ## JavaScript and Rust parity
 
@@ -235,10 +361,6 @@ harness:
 Deliberate divergences, each documented where it lives:
 - `normalize_canvas` drops an edge whose endpoints are not strings.
 - `diff_canvases` compares parsed content rather than serialized JSON.
-- `store::rename_project` refuses a name any project already holds.
-- `normalize_note` accepts a non-object.
-
-The last two fix bugs the JS still has. Whether to fix the JS too is an open decision.
 
 ## Recipes
 
@@ -279,11 +401,13 @@ mind:
 `useTabsPublisher` and the tab bar are the worked example.
 
 **A toolbar item.** See `src/lib/chromeLayout.ts` and `components/toolbar/registry.jsx`.
-1. Add it to `TOOLBAR_ITEMS` with an id `inkblot.<area>.<name>`, a label, an SF Symbol
-   name and its contexts. Ids are keys in people's saved layouts: never rename or reuse
+1. Add it to `TOOLBAR_ITEMS` with an id `inkblot.<area>.<name>`, a label, a semantic
+   icon name (`src/ui/icons.js`) and its contexts. Ids are keys in people's saved layouts: never rename or reuse
    one; a removed item's id goes in `RETIRED_TOOLBAR_IDS`.
 2. Add its component to `registry.jsx`, built from `ToolbarControls.jsx`.
-3. Add it to a default set only if every new user should see it.
+3. Add it to a default set only if new users should have it: before `MORE` if nearly
+   everyone needs it (docs/DESIGN.md → Progressive disclosure), otherwise after it,
+   behind ». Register its action with `useCommands` too, so ⌘K finds it.
 4. **Disable, never omit.** An item that returns nothing moves the rest of the layout.
 5. If it has on/off state, the surface publishes it: editor facts in
    `ToolbarState`/`ActiveMarks`, canvas facts in `CanvasToolbarState`, app settings in
@@ -357,11 +481,18 @@ to prove the case can fail.
   suites: the tab bar (a tab's context menu, drag to reorder, a document dropped from
   the file tree), the toolbar's » overflow, the menus (Insert, Format, Timer, View),
   notifications and the tray title, and the timer's sounds.
+- **Windows of their own:** a tab dragged out of the window, Move back to the main
+  window, and Keep on top, in the running app (the `windows` suite drives the real
+  Tauri modules against a stand-in IPC). Detached windows (`doc-*`) share the main
+  window's capability.
 - **Print Layout:** a real print and PDF, the Page Setup sheet, a folded 16-page
   signature, an EPUB in Apple Books or `epubcheck`, and a Pinterest embed in print (a
   cloned iframe reloads, and may print blank).
-- **Maps:** the map tracer's worker, the Earth chunks' first-open latency, and the
-  fantasy themes' SVG filter cost at high zoom.
+- **Maps:** the map tracer's worker, the Earth chunks' first-open latency, the
+  fantasy themes' SVG filter cost at high zoom, and the globe's MapLibre worker under
+  `inkblot://` (driven in WebKit through a harness, not yet in the bundled app).
+- **Timeline:** driven in WebKit through a harness (drag, undo, the lens, the three
+  layouts); not yet clicked through in the running app.
 - **Offline launch.** Launch the bundled `.app` with the network off, and check that
   the synonym model loads from AppData and dictation finds its model.
 - **Read Aloud's native voice** on a machine with no Python installed.
@@ -371,10 +502,13 @@ to prove the case can fail.
 - **The Kokoro download.** The page never offers it (`download_kokoro_model` exists),
   so native Read Aloud needs the model installed by other means and otherwise falls
   back to kokoro-js's in-browser WASM build.
+- **Timeline, still to come:** version history for the chronology, a timeline view in
+  the window's toolbar and inspector (it keeps its own in the page), attaching an
+  existing note to an event, continuity checks, relative dates, and export.
 - **Reminders while Inkblot is closed.** The page posts them while it runs; nothing is
   left with the system to fire later.
 - **Toolbar items** still wanted: New Document/Canvas/Folder, Bubble, workbench
-  lookups, and focusing the inspector's search.
+  lookups, and focusing the project search.
 
 **iOS and iPadOS**
 

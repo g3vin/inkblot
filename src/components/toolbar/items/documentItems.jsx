@@ -6,6 +6,7 @@
  * itself to an editor elected since. The voice controls are the exception, and keep
  * the live editor (see DictationControl, ReadAloudControl).
  */
+import { runCommand } from '../../../lib/commands'
 import { useEffect, useState } from 'react'
 import DictationControl from '../../DictationControl'
 import ReadAloudControl from '../../ReadAloudControl'
@@ -19,7 +20,7 @@ import {
   toCssFontFamily,
   togglePinnedFont,
 } from '../../../lib/systemFonts'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import { Glyph, ItemFrame, MenuButton, ToolButton } from '../ToolbarControls'
 import { blockOptions } from './blockOptions'
 
@@ -75,7 +76,7 @@ export function FontItem({ ctx, spec }) {
         aria-label={pinned ? `Unpin ${toolbar.font}` : `Pin ${toolbar.font}`}
         title={pinned ? `Unpin ${toolbar.font}` : `Pin ${toolbar.font}`}
       >
-        <SFIcon name="pin" filled={pinned} />
+        <Icon name="pin" active={pinned} />
       </button>
     </ItemFrame>
   )
@@ -103,20 +104,20 @@ export function FontSizeItem({ ctx, spec }) {
 }
 
 const MARKS = [
-  { mark: MarkKind.Bold, key: 'bold', symbol: 'bold', label: 'Bold' },
-  { mark: MarkKind.Italic, key: 'italic', symbol: 'italic', label: 'Italic' },
-  { mark: MarkKind.Underline, key: 'underline', symbol: 'underline', label: 'Underline' },
-  { mark: MarkKind.Strike, key: 'strike', symbol: 'strikethrough', label: 'Strikethrough' },
+  { mark: MarkKind.Bold, key: 'bold', icon: 'bold', label: 'Bold' },
+  { mark: MarkKind.Italic, key: 'italic', icon: 'italic', label: 'Italic' },
+  { mark: MarkKind.Underline, key: 'underline', icon: 'underline', label: 'Underline' },
+  { mark: MarkKind.Strike, key: 'strike', icon: 'strikethrough', label: 'Strikethrough' },
 ]
 
 export function TextStyleItem({ ctx, spec }) {
   const { toolbar } = ctx
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      {MARKS.map(({ mark, key, symbol, label }) => (
+      {MARKS.map(({ mark, key, icon, label }) => (
         <ToolButton
           key={key}
-          symbol={symbol}
+          icon={icon}
           label={label}
           display={ctx.display}
           active={Boolean(toolbar.activeMarks?.[key])}
@@ -134,7 +135,7 @@ function ColorWell({ ctx, spec, value, glyph, onChange, onBlur }) {
       <label className="toolbar-color" title={spec.label} aria-disabled={!ctx.toolbar.target}>
         {ctx.display === 'label'
           ? <span className="tb-text">{spec.label}</span>
-          : <span className={`toolbar-color-glyph${glyph === 'A' ? ' toolbar-color-glyph-text' : ''}`} aria-hidden="true">{glyph === 'A' ? 'A' : <SFIcon name={glyph} />}</span>}
+          : <span className={`toolbar-color-glyph${glyph === 'A' ? ' toolbar-color-glyph-text' : ''}`} aria-hidden="true">{glyph === 'A' ? 'A' : <Icon name={glyph} />}</span>}
         <span className="toolbar-color-bar" style={{ background: value }} aria-hidden="true" />
         <input type="color" value={value} disabled={!ctx.toolbar.target} onChange={onChange} onBlur={onBlur} aria-label={spec.label} />
       </label>
@@ -155,7 +156,7 @@ export function HighlightItem({ ctx, spec }) {
       ctx={ctx}
       spec={spec}
       value={draft ?? ctx.toolbar.highlight}
-      glyph="highlighter"
+      glyph="highlight"
       onBlur={() => setDraft(null)}
       onChange={(e) => {
         setDraft(e.target.value)
@@ -166,9 +167,9 @@ export function HighlightItem({ ctx, spec }) {
 }
 
 const ALIGNMENTS = [
-  { value: Alignment.Left, symbol: 'text.alignleft', label: 'Align Left' },
-  { value: Alignment.Center, symbol: 'text.aligncenter', label: 'Align Center' },
-  { value: Alignment.Right, symbol: 'text.alignright', label: 'Align Right' },
+  { value: Alignment.Left, icon: 'align-left', label: 'Align left' },
+  { value: Alignment.Center, icon: 'align-center', label: 'Align center' },
+  { value: Alignment.Right, icon: 'align-right', label: 'Align right' },
 ]
 
 export function AlignmentItem({ ctx, spec }) {
@@ -177,7 +178,7 @@ export function AlignmentItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <MenuButton
-        symbol={active.symbol}
+        icon={active.icon}
         label={`Alignment: ${active.label}`}
         display={ctx.display}
         disabled={!toolbar.target}
@@ -187,7 +188,7 @@ export function AlignmentItem({ ctx, spec }) {
           action: () => sendTo(ctx, 'setAlignment', { alignment: option.value }),
         }))}
       >
-        {ctx.display === 'label' ? <span className="tb-text">Alignment</span> : <SFIcon name={active.symbol} />}
+        {ctx.display === 'label' ? <span className="tb-text">Alignment</span> : <Icon name={active.icon} />}
       </MenuButton>
     </ItemFrame>
   )
@@ -197,7 +198,7 @@ export function ParagraphStyleItem({ ctx, spec }) {
   const { toolbar } = ctx
   const format = toolbar.writingFormat || WritingFormat.Prose
   const options = blockOptions(format)
-  const title = format === WritingFormat.Prose ? 'Paragraph Style' : 'Script Element'
+  const title = format === WritingFormat.Prose ? 'Paragraph style' : 'Script element'
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <select
@@ -220,7 +221,7 @@ function ListItem({ ctx, spec, list, markKey }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton
-        symbol={spec.symbol}
+        icon={spec.icon}
         label={spec.label}
         display={ctx.display}
         active={Boolean(ctx.toolbar.activeMarks?.[markKey])}
@@ -237,8 +238,8 @@ export function TableItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton
-        symbol="table.grid"
-        label="Insert Table"
+        icon="table"
+        label="Insert table"
         display={ctx.display}
         active={Boolean(ctx.toolbar.activeMarks?.table)}
         disabled={!ctx.toolbar.target}
@@ -251,7 +252,16 @@ export function TableItem({ ctx, spec }) {
 export function ConversationItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="speech" label="Insert Conversation" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => sendTo(ctx, 'insertConversationTile')} />
+      <ToolButton icon="chat" label="Insert conversation" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => sendTo(ctx, 'insertConversationTile')} />
+    </ItemFrame>
+  )
+}
+
+/** Runs the `notes.add` command (EditorLayout), as ⌥⌘N and the palette do. */
+export function AddNoteItem({ ctx, spec }) {
+  return (
+    <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
+      <ToolButton icon="note" label="Add note" title="Add a note (⌥⌘N)" display={ctx.display} disabled={!ctx.toolbar.target} onClick={() => { void runCommand('notes.add') }} />
     </ItemFrame>
   )
 }
@@ -260,8 +270,8 @@ export function UndoRedoItem({ ctx, spec }) {
   const { toolbar } = ctx
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="arrow.uturn.backward" label="Undo" title="Undo (⌘Z)" display={ctx.display} disabled={!toolbar.target || !toolbar.canUndo} onClick={() => sendTo(ctx, 'editorHistory', { action: HistoryAction.Undo })} />
-      <ToolButton symbol="arrow.uturn.forward" label="Redo" title="Redo (⇧⌘Z)" display={ctx.display} disabled={!toolbar.target || !toolbar.canRedo} onClick={() => sendTo(ctx, 'editorHistory', { action: HistoryAction.Redo })} />
+      <ToolButton icon="undo" label="Undo" title="Undo (⌘Z)" display={ctx.display} disabled={!toolbar.target || !toolbar.canUndo} onClick={() => sendTo(ctx, 'editorHistory', { action: HistoryAction.Undo })} />
+      <ToolButton icon="redo" label="Redo" title="Redo (⇧⌘Z)" display={ctx.display} disabled={!toolbar.target || !toolbar.canRedo} onClick={() => sendTo(ctx, 'editorHistory', { action: HistoryAction.Redo })} />
     </ItemFrame>
   )
 }
@@ -270,9 +280,9 @@ export function PasteAndMatchStyleItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton
-        symbol={spec.symbol}
+        icon={spec.icon}
         label={spec.label}
-        title="Paste and Match Style (⌥⇧⌘V)"
+        title="Paste and match style (⌥⇧⌘V)"
         display={ctx.display}
         disabled={!ctx.toolbar.target}
         onClick={async () => {
@@ -292,7 +302,7 @@ export function FocusModeItem({ ctx, spec }) {
   const on = Boolean(ctx.view.focusMode)
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="scope" label={spec.label} title={on ? 'Leave Focus Mode' : 'Focus Mode'} display={ctx.display} active={on} disabled={!ctx.toolbar.target && !on} onClick={() => ctx.send('setFocusMode', { open: !on })} />
+      <ToolButton icon="crosshair" label={spec.label} title={on ? 'Leave focus mode' : 'Focus mode'} display={ctx.display} active={on} disabled={!ctx.toolbar.target && !on} onClick={() => ctx.send('setFocusMode', { open: !on })} />
     </ItemFrame>
   )
 }
@@ -301,7 +311,7 @@ export function WordCountItem({ ctx, spec }) {
   const on = ctx.view.wordCountVisible !== false
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="number" label={spec.label} title={on ? 'Hide the word count' : 'Show the word count'} display={ctx.display} active={on} onClick={() => ctx.send('setWordCountVisible', { visible: !on })} />
+      <ToolButton icon="number" label={spec.label} title={on ? 'Hide the word count' : 'Show the word count'} display={ctx.display} active={on} onClick={() => ctx.send('setWordCountVisible', { visible: !on })} />
     </ItemFrame>
   )
 }
@@ -309,7 +319,7 @@ export function WordCountItem({ ctx, spec }) {
 export function DictationItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      {ctx.editor ? <DictationControl editor={ctx.editor} /> : <ToolButton symbol="mic" label={spec.label} display={ctx.display} disabled />}
+      {ctx.editor ? <DictationControl editor={ctx.editor} /> : <ToolButton icon="dictate" label={spec.label} display={ctx.display} disabled />}
     </ItemFrame>
   )
 }
@@ -317,7 +327,25 @@ export function DictationItem({ ctx, spec }) {
 export function ReadAloudItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      {ctx.editor ? <ReadAloudControl editor={ctx.editor} /> : <ToolButton symbol="read.aloud" label={spec.label} display={ctx.display} disabled />}
+      {ctx.editor ? <ReadAloudControl editor={ctx.editor} /> : <ToolButton icon="read-aloud" label={spec.label} display={ctx.display} disabled />}
+    </ItemFrame>
+  )
+}
+
+/** Write's page view: the prose on the pages it will print on, still written in Write. */
+export function PageViewItem({ ctx, spec }) {
+  const shown = Boolean(ctx.layout?.enabled)
+  return (
+    <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
+      <ToolButton
+        icon={spec.icon}
+        label={spec.label}
+        title={shown ? 'Write in the continuous editor (⌥⌘P)' : 'Write on the pages (⌥⌘P)'}
+        display={ctx.display}
+        active={shown}
+        disabled={!ctx.editor}
+        onClick={() => ctx.send('setPrintLayout', { enabled: !shown })}
+      />
     </ItemFrame>
   )
 }
@@ -328,17 +356,17 @@ export function EditorModeItem({ ctx, spec }) {
   const disabled = !ctx.hasProject
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      {[['write', 'Write', 'pencil.line'], ['typeset', 'Typeset', 'textformat']].map(([value, label, symbol]) => (
+      {[['write', 'Write', 'write'], ['typeset', 'Typeset', 'type-style']].map(([value, label, icon]) => (
         <button
           key={value}
           type="button"
           className={mode === value ? 'active' : ''}
           aria-pressed={mode === value}
-          title={`${label} (⌥⌘P)`}
+          title={label}
           disabled={disabled}
           onClick={() => ctx.send('setEditorMode', { mode: value })}
         >
-          <Glyph symbol={symbol} label={label} display={ctx.display} />
+          <Glyph icon={icon} label={label} display={ctx.display} />
         </button>
       ))}
     </ItemFrame>

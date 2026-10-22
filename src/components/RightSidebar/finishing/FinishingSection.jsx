@@ -1,7 +1,11 @@
 /**
  * A Finishing section: collapsible, remembered open or shut (ui/Section), re-read when
- * Expand or Collapse All is chosen, with its note as its last row. Picking a handle on
- * a Typeset page (`typesetFocus`) opens the section it belongs to and scrolls to it.
+ * Expand or Collapse All is chosen. Picking a handle on a Typeset page
+ * (`typesetFocus`) opens the section it belongs to and scrolls to it.
+ *
+ * What a section is for is its help topic, under the section's id (lib/help.ts),
+ * offered on a right-click. `note` is only for a short, live status line (a count, a
+ * warning), never an explanation.
  */
 import { useEffect, useState } from 'react'
 import Section from '../../../ui/Section'
@@ -9,7 +13,7 @@ import { writeSectionState } from '../../../ui/sectionState'
 import { shellBridge } from '../../../bridge'
 import { Note } from './controls'
 
-export default function FinishingSection({ id, title, note, accessory, children }) {
+export default function FinishingSection({ id, title, note, accessory, help, children }) {
   const [generation, setGeneration] = useState(0)
   useEffect(() => {
     const reread = () => setGeneration((g) => g + 1)
@@ -28,7 +32,7 @@ export default function FinishingSection({ id, title, note, accessory, children 
     }
   }, [id])
   return (
-    <Section key={generation} id={id} title={title} accessory={accessory} className="fin-section">
+    <Section key={generation} id={id} title={title} accessory={accessory} help={help ?? id} className="fin-section">
       {children}
       {note ? <Note>{note}</Note> : null}
     </Section>

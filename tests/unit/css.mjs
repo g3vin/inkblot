@@ -3,8 +3,9 @@
  *
  *   - Surfaces are flat: a gradient is allowed only where it does a job (a fade at a
  *     scroll edge, a mask, a grid, the dictation sweep), listed below by selector.
- *   - The one translucent, blurred surface is the floating capsule over the page, and
- *     the scrim behind a sheet. So a backdrop-filter is only ever the shared token.
+ *   - The translucent, blurred surfaces are the floating capsule over the page, the
+ *     scrim behind a sheet, and a hover note. So a backdrop-filter is only ever one of
+ *     the shared tokens.
  *   - Radii come from the --radius-* scale. Literals are counted, not failed yet, while
  *     the older stylesheets are brought over.
  */
@@ -30,6 +31,8 @@ const FUNCTIONAL_GRADIENTS = [
   '.dictation-inline-draft',        // the sweep over text being dictated
   '.canvas-grid',                   // the canvas grid
   '.ib-fade-scrim',                 // content fading under chrome that overlays it (src/ui FadeScrim)
+  '.ib-tray',                       // the window's tray, in the writer's window colour (src/ui Surfaces.css)
+  '.note-range',                    // a noted passage's highlight, a flat band sized to its words
 ]
 
 const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
@@ -67,7 +70,7 @@ for (const file of cssFiles(src)) {
 
   for (const m of css.matchAll(/(?:-webkit-)?backdrop-filter\s*:\s*([^;}]*)/g)) {
     const value = m[1].trim()
-    if (value === 'var(--blur-over-page)' || value === 'none') continue
+    if (value === 'var(--blur-over-page)' || value === 'var(--blur-note)' || value === 'none') continue
     blurProblems.push(`${name}:${line(m.index)} ${value}`)
   }
 
@@ -80,7 +83,7 @@ for (const problem of gradientProblems) console.log(`      decorative gradient: 
 ok('no decorative gradients', gradientProblems.length === 0)
 
 for (const problem of blurProblems) console.log(`      blur: ${problem}`)
-ok('every backdrop-filter is var(--blur-over-page)', blurProblems.length === 0)
+ok('every backdrop-filter is a --blur-* token', blurProblems.length === 0)
 
 console.log(`      ${radiusLiterals} border-radius literals left to bring onto --radius-*`)
 const tokens = readFileSync(join(src, 'styles/tokens.css'), 'utf8')

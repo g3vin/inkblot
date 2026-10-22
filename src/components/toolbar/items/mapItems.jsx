@@ -18,9 +18,9 @@ function ToolSet({ ctx, spec, ids }) {
       {MAP_TOOLS.filter((tool) => ids.includes(tool.id)).map((tool) => (
         <ToolButton
           key={tool.id}
-          symbol={tool.icon}
+          icon={tool.icon}
           label={tool.label}
-          title={`${tool.label} (${tool.key})`}
+          title={tool.key ? `${tool.label} (${tool.key})` : tool.label}
           display={ctx.display}
           active={ctx.map?.tool === tool.id}
           disabled={!live(ctx)}
@@ -32,13 +32,17 @@ function ToolSet({ ctx, spec, ids }) {
 }
 
 export const MapDrawingItem = (props) => <ToolSet {...props} ids={['select', 'pin', 'route', 'region', 'label']} />
-export const MapMeasureItem = (props) => <ToolSet {...props} ids={['ruler', 'area']} />
+/** Measuring, and on a sheet or a picture, setting the scale by measuring something known. */
+export const MapMeasureItem = (props) => {
+  const kind = props.ctx.map?.mapKind
+  return <ToolSet {...props} ids={kind === 'blank' || kind === 'image' ? ['ruler', 'area', 'calibrate'] : ['ruler', 'area']} />
+}
 
 export function MapUndoRedoItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="arrow.uturn.backward" label="Undo" title="Undo (⌘Z)" display={ctx.display} disabled={!live(ctx) || !ctx.map.canUndo} onClick={() => command(ctx, 'undo')} />
-      <ToolButton symbol="arrow.uturn.forward" label="Redo" title="Redo (⇧⌘Z)" display={ctx.display} disabled={!live(ctx) || !ctx.map.canRedo} onClick={() => command(ctx, 'redo')} />
+      <ToolButton icon="undo" label="Undo" title="Undo (⌘Z)" display={ctx.display} disabled={!live(ctx) || !ctx.map.canUndo} onClick={() => command(ctx, 'undo')} />
+      <ToolButton icon="redo" label="Redo" title="Redo (⇧⌘Z)" display={ctx.display} disabled={!live(ctx) || !ctx.map.canRedo} onClick={() => command(ctx, 'redo')} />
     </ItemFrame>
   )
 }
@@ -47,11 +51,20 @@ export function MapZoomItem({ ctx, spec }) {
   const disabled = !live(ctx)
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="minus.magnifyingglass" label="Zoom Out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
-      <MenuButton label="Zoom" display={ctx.display} disabled={disabled} items={[{ text: 'Zoom to Fit', action: () => command(ctx, 'zoom-to-fit') }]}>
+      <ToolButton icon="zoom-out" label="Zoom out" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-out')} />
+      <MenuButton
+        label="Zoom"
+        display={ctx.display}
+        disabled={disabled}
+        items={[
+          { text: 'Zoom to fit', action: () => command(ctx, 'zoom-to-fit') },
+          { separator: true },
+          { text: 'Export map…', action: () => command(ctx, 'export') },
+        ]}
+      >
         <span className="tb-text tb-zoom-readout">{ctx.map?.zoomLabel ?? '100%'}</span>
       </MenuButton>
-      <ToolButton symbol="plus.magnifyingglass" label="Zoom In" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />
+      <ToolButton icon="zoom-in" label="Zoom in" display={ctx.display === 'label' ? 'icon' : ctx.display} disabled={disabled} onClick={() => command(ctx, 'zoom-in')} />
     </ItemFrame>
   )
 }
@@ -59,7 +72,26 @@ export function MapZoomItem({ ctx, spec }) {
 export function MapDeleteItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol="trash" label={spec.label} display={ctx.display} disabled={!live(ctx) || !ctx.map.hasSelection} onClick={() => command(ctx, 'delete')} />
+      <ToolButton icon="delete" label={spec.label} display={ctx.display} disabled={!live(ctx) || !ctx.map.hasSelection} onClick={() => command(ctx, 'delete')} />
+    </ItemFrame>
+  )
+}
+
+/** How the map is shown: globe or flat, projection, satellite, terrain (the page lays it out). */
+export function MapViewItem({ ctx, spec }) {
+  const menu = ctx.map?.viewMenu || []
+  return (
+    <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
+      <MenuButton
+        icon="map-view"
+        label={spec.label}
+        display={ctx.display}
+        disabled={!live(ctx) || !menu.length}
+        items={() => menu.flatMap((entry) => [
+          ...(entry.separator ? [{ separator: true }] : []),
+          { text: entry.label, checked: entry.checked, enabled: !entry.disabled, action: () => command(ctx, 'view-option', { id: entry.id }) },
+        ])}
+      />
     </ItemFrame>
   )
 }

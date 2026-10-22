@@ -46,7 +46,7 @@ export function useDocPreview(projectName, file) {
         return
       }
 
-      let html = ''
+      let html
       try {
         // The DOCUMENT extension set, not the card one: a document can hold nodes a
         // card cannot (ConversationTile, PinterestBoard), and generateHTML throws on

@@ -5,9 +5,8 @@
  * stay sharp at any zoom. Marks that must hold their size on screen — pins,
  * handles, travellers — sit in a `.map-mark` group that scales by --map-inv-zoom.
  *
- * Themes are sets of custom properties on [data-map-theme]. `clean` follows the
- * app's light/dark tokens; parchment, ink and night are fixed palettes, because a
- * map drawn on parchment should not turn dark when the OS does.
+ * Themes are sets of custom properties on [data-map-theme], in mapThemes.css: they
+ * are the map's own colours (content, like a printed page), not the app's chrome.
  */
 
 .map-pane {
@@ -23,18 +22,9 @@
   --map-inv-zoom: 1;
   --map-paper: var(--surface-0);
   --map-sheet: var(--surface-1);
-  --map-ink: #1b1f27;
   --map-ink-soft: color-mix(in srgb, var(--map-ink) 55%, transparent);
-  --map-land: #e7e3d6;
-  --map-land-edge: #9c937e;
-  --map-water: #cfe1ee;
-  --map-border: rgba(80, 70, 60, 0.45);
   --map-grid: color-mix(in srgb, var(--map-ink) 12%, transparent);
-  --map-route: #b3462f;
-  --map-pin: #c0392b;
-  --map-region: #6d9c5a;
   --map-accent: var(--accent-color);
-  --map-label-font: 'Iowan Old Style', 'Palatino', Georgia, serif;
   --map-ui-bg: var(--popover-bg);
   --map-ui-border: var(--popover-border);
   --map-ui-text: var(--text-primary);
@@ -51,56 +41,6 @@
   user-select: none;
   background: var(--map-paper);
   color: var(--map-ink);
-}
-
-:root[data-theme='dark'] .map-surface[data-map-theme='clean'] {
-  --map-ink: #eef1f6;
-  --map-land: #2e3a33;
-  --map-land-edge: #6f8a78;
-  --map-water: #16232e;
-  --map-border: rgba(210, 220, 230, 0.35);
-  --map-route: #f08a6c;
-  --map-pin: #ff7a66;
-}
-
-.map-surface[data-map-theme='parchment'] {
-  --map-paper: #d8c8a2;
-  --map-sheet: #efe2c1;
-  --map-ink: #3b2a1a;
-  --map-land: #e8d7ad;
-  --map-land-edge: #6b4f2e;
-  --map-water: #b9c9bf;
-  --map-border: rgba(90, 60, 30, 0.55);
-  --map-route: #7a2e1d;
-  --map-pin: #8c2f1f;
-  --map-region: #7c8b4f;
-}
-
-.map-surface[data-map-theme='ink'] {
-  --map-paper: #f4f1ea;
-  --map-sheet: #fbfaf6;
-  --map-ink: #121212;
-  --map-land: #fbfaf6;
-  --map-land-edge: #121212;
-  --map-water: #fbfaf6;
-  --map-border: rgba(18, 18, 18, 0.7);
-  --map-route: #121212;
-  --map-pin: #121212;
-  --map-region: #121212;
-}
-
-.map-surface[data-map-theme='night'] {
-  --map-paper: #0b1020;
-  --map-sheet: #111833;
-  --map-ink: #dbe4ff;
-  --map-land: #1c2747;
-  --map-land-edge: #7f9cff;
-  --map-water: #0b1020;
-  --map-border: rgba(127, 156, 255, 0.45);
-  --map-route: #ffcf6e;
-  --map-pin: #ffcf6e;
-  --map-region: #7f9cff;
-  --map-label-font: 'Avenir Next', 'Helvetica Neue', sans-serif;
 }
 
 .map-surface.is-loading {
@@ -283,6 +223,13 @@
   fill: var(--status-error);
 }
 
+.map-velocity {
+  stroke: var(--map-accent);
+  stroke-width: calc(1.5px * var(--map-inv-zoom, 1));
+  stroke-dasharray: calc(4px * var(--map-inv-zoom, 1)) calc(3px * var(--map-inv-zoom, 1));
+  pointer-events: none;
+}
+
 .map-handle {
   fill: var(--map-sheet);
   stroke: var(--map-accent);
@@ -348,7 +295,7 @@
 }
 
 .map-traveler-name {
-  font: 600 11px/1 -apple-system, system-ui, sans-serif;
+  font: 600 11px/1 var(--font-ui);
   paint-order: stroke;
   stroke: var(--map-sheet);
   stroke-width: 3px;
@@ -362,9 +309,15 @@
   vector-effect: non-scaling-stroke;
 }
 
+/* A path that is not an orbit: where an N-body body actually goes, over the story. */
+.map-trail {
+  stroke-width: 0.75;
+  opacity: 0.75;
+}
+
 .map-habitable {
   fill: none;
-  stroke: rgba(80, 200, 120, 0.25);
+  stroke: color-mix(in srgb, var(--ink-green) 30%, transparent);
   vector-effect: non-scaling-stroke;
 }
 
@@ -394,7 +347,7 @@
   z-index: 4;
   background: var(--map-ui-bg);
   border: 1px solid var(--map-ui-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-popover);
   color: var(--map-ui-text);
   font: 13px/1.35 var(--font-ui);
@@ -420,7 +373,7 @@
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--map-ui-text);
   cursor: pointer;
@@ -524,7 +477,7 @@
   box-sizing: border-box;
   padding: 5px 7px;
   border: 1px solid var(--map-ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--map-ui-text);
   font: inherit;
@@ -535,7 +488,7 @@
   height: 24px;
   padding: 0;
   border: 1px solid var(--map-ui-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: none;
 }
 
@@ -549,7 +502,7 @@
 .map-button {
   padding: 5px 10px;
   border: 1px solid var(--map-ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--map-ui-text);
   font: inherit;
@@ -563,7 +516,7 @@
 .map-button.is-primary {
   background: var(--accent-color);
   border-color: transparent;
-  color: #fff;
+  color: var(--text-on-accent);
 }
 
 .map-button.is-danger {
@@ -596,7 +549,7 @@
 .map-warning {
   margin: 6px 0;
   padding: 6px 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--status-warning) 16%, transparent);
   color: var(--map-ui-text);
   font-size: 12px;
@@ -612,7 +565,7 @@
   padding: 8px;
   margin: 6px 0;
   border: 1px solid var(--map-ui-border);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
 }
 
@@ -641,7 +594,7 @@
   z-index: 3;
   pointer-events: none;
   color: var(--map-ink);
-  font: 600 11px/1 -apple-system, system-ui, sans-serif;
+  font: 600 11px/1 var(--font-ui);
 }
 
 .map-compass {
@@ -649,6 +602,12 @@
   z-index: 3;
   pointer-events: none;
   color: var(--map-ink);
+}
+
+.map-key {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
 }
 
 .map-cartouche {
@@ -741,7 +700,7 @@
   width: 3px;
   height: 7px;
   margin-left: -1px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--status-error);
   pointer-events: none;
 }
@@ -749,7 +708,7 @@
 .map-timeline-speed {
   padding: 3px 4px;
   border: 1px solid var(--map-ui-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--control-bg);
   color: var(--map-ui-text);
   font: inherit;
@@ -792,7 +751,7 @@
   gap: 6px;
   padding: 14px;
   border: 1px solid var(--map-ui-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--control-bg);
   color: var(--map-ui-text);
   text-align: left;
@@ -817,6 +776,59 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 12px;
+}
+
+.map-setup-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.map-setup-galaxy-choice {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font: var(--text-xs) / 1.3 var(--font-ui);
+  text-align: center;
+  cursor: pointer;
+}
+
+.map-setup-galaxy-choice:hover {
+  border-color: var(--border-color);
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.map-setup-galaxy-choice:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.map-setup-galaxy {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-pill);
+  background: var(--map-space);
+}
+
+.map-setup-heading {
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+.map-setup-groups {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.map-setup-group .map-setup-choices {
+  margin-top: var(--space-2);
 }
 
 .map-foreign {
@@ -850,3 +862,191 @@
   background: transparent;
 }
 .map-inspector-panel .map-inspector-header [aria-label='Hide the inspector'] { display: none; }
+
+/* ---------------- timeline events at their places ---------------- */
+
+.map-timeline-event {
+  --event: var(--map-accent);
+  pointer-events: none;
+}
+
+.map-timeline-event-text {
+  font: 600 11px/1 var(--font-ui);
+  fill: var(--event);
+  stroke: var(--map-paper);
+  stroke-width: 3px;
+  paint-order: stroke;
+}
+
+/* ---------------- the globe (GlobeView) ---------------- */
+
+/* MapLibre draws the ground underneath; the SVG over it is an overlay of places,
+   labels and handles, and lets every other press through to the globe. Scoped to the
+   surface so it outranks maplibre-gl.css (`.maplibregl-map { position: relative }`),
+   which loads after this sheet. */
+.map-surface .map-globe {
+  position: absolute;
+  inset: 0;
+}
+
+.map-globe.is-loading {
+  background: var(--map-water);
+}
+
+.map-surface:is(.is-globe, .is-space) .map-svg {
+  pointer-events: none;
+}
+
+.map-surface:is(.is-globe, .is-space) .map-svg :is([data-map-item], [data-map-handle]) {
+  pointer-events: auto;
+}
+
+.map-surface.is-globe:not([data-tool='select']):not([data-tool='pan']) .maplibregl-canvas {
+  cursor: crosshair;
+}
+
+.map-surface.is-globe .maplibregl-ctrl-attrib {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+
+/* ---------------- a system in 3D (space/SpaceView) ---------------- */
+
+/* three.js draws the bodies, orbits and sky; the SVG over it carries their names,
+   a target to click on each, and the places and handles. */
+.map-surface .map-space {
+  position: absolute;
+  inset: 0;
+  background: var(--map-space);
+}
+
+.map-space-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.map-surface.is-space:not([data-tool='select']):not([data-tool='pan']) .map-space-canvas {
+  cursor: crosshair;
+}
+
+.map-body-target {
+  fill: transparent;
+  stroke: none;
+}
+
+.map-body-3d .map-body-name {
+  paint-order: stroke;
+  stroke: var(--map-halo);
+  stroke-width: 3px;
+}
+
+.map-pin-galaxy .map-body-name {
+  paint-order: stroke;
+  stroke: var(--map-halo);
+  stroke-width: 3px;
+}
+
+.map-pin-galaxy.is-selected .map-body-target,
+.map-body-3d.is-selected .map-body-target {
+  stroke: var(--map-accent);
+  stroke-width: 1.5;
+}
+
+/* Where the map sits (galaxy › system › world), over its top-left corner. */
+.map-breadcrumb {
+  padding: var(--space-1);
+}
+
+/* A short message over the bottom of the map: what the view could not do, or how
+   to drive it (Look around). */
+.map-notice {
+  left: 50%;
+  bottom: calc(var(--space-12) + var(--space-8));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: min(520px, calc(100% - var(--space-8)));
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  font: var(--text-sm) / 1.4 var(--font-ui);
+  transform: translateX(-50%);
+}
+
+/* ---------------- find on this map (MapSearch.jsx) ---------------- */
+
+.map-search {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(360px, calc(100% - var(--space-6)));
+  padding: var(--space-2);
+  transform: translateX(-50%);
+}
+
+.map-search-field .ib-input-wrap {
+  width: 100%;
+}
+
+.map-search-results {
+  /* A menu's list, inside the search's own card rather than a second one. */
+  position: static;
+  width: 100%;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.map-search-note {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+}
+
+.map-search-add {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------------- a chart in the inspector (distance over time) ---------------- */
+
+.map-chart {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.map-chart-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font: var(--text-xs)/1.2 var(--font-ui);
+  text-align: right;
+}
+
+.map-chart-plot {
+  width: 100%;
+  height: 96px;
+  border-bottom: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
+  cursor: crosshair;
+}
+
+.map-chart-x {
+  display: flex;
+  grid-column: 2;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font: var(--text-xs)/1.2 var(--font-ui);
+}
+
+.map-chart > .map-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}

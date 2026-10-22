@@ -100,10 +100,11 @@ impl DictationEngine {
 
         self.service
             .lock()
-            .load_model(resolved.to_string_lossy().to_string())
+            .load_model(resolved.to_string_lossy())
             .map_err(|err| err.to_string())
     }
 
+    /// Start a live session that sends its events to `sink`, and return its id.
     pub fn start_session(
         &self,
         options: Option<LiveDictationOptions>,

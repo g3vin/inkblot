@@ -17,6 +17,7 @@ import { useCallback, useRef } from 'react'
 import { createDocument } from '@tiptap/core'
 import { EditorState } from '@tiptap/pm/state'
 import { isEditorReady } from '../lib/editorUtils'
+import { setTimelineRanges } from '../extensions/TimelineAnchors'
 
 const EMPTY_DOC_CONTENT = '<p></p>'
 
@@ -86,6 +87,8 @@ export function useEditorDocCache({ hasNotesForDoc, projectName, setNotesForDoc 
     const nextState = cachedState || createEditorStateFromContent(targetEditor, loadedDoc?.content)
 
     installEditorState(targetEditor, nextState)
+    // A cached state carries its timeline passages already, mapped to the text it holds.
+    if (!cachedState) setTimelineRanges(targetEditor, docName, loadedDoc?.timeline)
     if (cacheKey) {
       loadedDocsRef.current.add(cacheKey)
     }

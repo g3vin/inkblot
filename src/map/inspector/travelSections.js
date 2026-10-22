@@ -1,7 +1,7 @@
 /**
  * travelSections.js — journeys and how they are made: a traveller's itinerary, the
- * story calendar, the conflicts the timeline found, the ways of travelling, the
- * terrains, and the table of distances between places.
+ * conflicts the timeline found, the ways of travelling, the terrains, and the table of
+ * distances between places. The story calendar itself is edited in Settings ▸ Story.
  */
 import { getDocDisplayName } from '../../lib/docKind'
 import { formatDay, fromParts, normalizeCalendar, toParts } from '../../lib/map/calendar'
@@ -12,6 +12,7 @@ import { newId, pinLabel } from '../../lib/map/mapModel'
 import { travelerColor, travelerName } from '../mapRender'
 import { describeConflict, unitFor } from '../mapOptions'
 import { docChoices } from './itemSections'
+import { MAP_DEFAULT_COLORS } from '../../lib/map/mapColors'
 
 const GREGORIAN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
@@ -118,11 +119,11 @@ export function travelerSections(ui, { map, traveler, index, schedule, conflicts
           const legs = [...traveler.legs]
           legs.splice(legIndex - 1, 0, legs.splice(legIndex, 1)[0])
           setLegs(legs)
-        }, { disabled: legIndex === 0, symbol: 'arrow.up', help: 'Move earlier' }),
+        }, { disabled: legIndex === 0, icon: 'arrow-up', help: 'Move earlier' }),
         ui.button(`${prefix}.remove`, '×', () => setLegs(traveler.legs.filter((candidate) => candidate.id !== leg.id)), {
           role: 'destructive',
-          symbol: 'xmark',
-          help: 'Remove this leg',
+          icon: 'delete',
+          help: 'Delete this leg',
         }),
       ],
     })
@@ -159,9 +160,26 @@ export function travelerSections(ui, { map, traveler, index, schedule, conflicts
 
 /* ---------------- journeys: every traveller, the calendar, conflicts ---------------- */
 
-export function journeysSections(ui, { map, schedules, conflicts, calendar, onCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps, crossConflicts, editingCalendar, setEditingCalendar }) {
+const bodyName = (map, id) => map.system.bodies.find((body) => body.id === id)?.name || 'A body'
+
+/**
+ * What goes wrong in a system of bodies pulling on each other (nbody.js): who is
+ * flung out and when, and the close passes, as `[{ title, day }]`, in order.
+ */
+export function motionProblems(map, motionCheck) {
+  if (!motionCheck) return []
+  const out = motionCheck.passes.map((pass) => ({
+    title: `${bodyName(map, pass.ids[0])} and ${bodyName(map, pass.ids[1])} ${pass.touching ? 'collide' : 'pass close'}`,
+    day: pass.day,
+  }))
+  if (motionCheck.verdict.ejected) out.push({ title: `${bodyName(map, motionCheck.verdict.ejected.id)} is flung out of the system`, day: motionCheck.verdict.ejected.day })
+  return out.sort((a, b) => a.day - b.day)
+}
+
+export function journeysSections(ui, { map, schedules, conflicts, calendar, onOpenCalendar, onSelect, onDay, docs, addTraveler, onCheckAllMaps, crossConflicts, motionCheck, onAddStoryEvents }) {
   const cal = normalizeCalendar(calendar)
   const problems = [...conflicts, ...(crossConflicts || [])]
+  const motion = motionProblems(map, motionCheck)
   return [
     ui.section('travelers', 'Travellers', [
       !map.travelers.length ? ui.note('Drag a character’s document from the file tree onto the map to send them travelling — or add one here.') : null,
@@ -177,7 +195,13 @@ export function journeysSections(ui, { map, schedules, conflicts, calendar, onCa
     ], [ui.button('travelers.add', 'Add', addTraveler, { disabled: !map.pins.length })]),
 
     ui.section('problems', 'Problems', [
-      !problems.length ? ui.note('No one is in two places at once.') : null,
+      !problems.length && !motion.length ? ui.note(map.mapKind === 'system' && map.system.dynamics === 'nbody' ? 'No one is in two places at once, and nothing comes apart.' : 'No one is in two places at once.') : null,
+      ...motion.map((problem, index) => ui.warning(`${problem.title}, ${formatDay(cal, problem.day)}.`, {
+        action: ui.button(`problems.motion.${index}`, 'Go there', () => onDay(problem.day)),
+      })),
+      motion.length && onAddStoryEvents
+        ? ui.buttons([ui.button('problems.toTimeline', 'Add these to the timeline', () => onAddStoryEvents(motion.map(({ title, day }) => ({ title, start: day }))))])
+        : null,
       ...problems.map((conflict, index) => {
         const where = conflict.maps && conflict.maps[0] !== conflict.maps[1] ? ` (on ${conflict.maps.map((path) => getDocDisplayName(path)).join(' and ')})` : ''
         return ui.warning(`${describeConflict(conflict, map, cal)}${where}`, {
@@ -187,54 +211,8 @@ export function journeysSections(ui, { map, schedules, conflicts, calendar, onCa
     ], [ui.button('problems.checkAll', 'Check all maps', onCheckAllMaps, { help: 'Check this project’s other maps too' })]),
 
     ui.section('calendar', 'Calendar', [
-      ui.note(`Shared by every map in this project. Day 1 of the story is ${formatDay(cal, 0)}.`),
-      ...(editingCalendar ? calendarFields(ui, cal, onCalendar) : []),
-    ], [ui.button('calendar.edit', editingCalendar ? 'Done' : 'Edit', () => setEditingCalendar(!editingCalendar))]),
-  ]
-}
-
-function calendarFields(ui, cal, onCalendar) {
-  const custom = (patch) => onCalendar({ ...cal, custom: { ...cal.custom, ...patch } })
-  return [
-    ui.choice(
-      'calendar.mode',
-      'Dates as',
-      cal.mode,
-      [{ value: 'day', label: 'Story days (Day 1, Day 2…)' }, { value: 'gregorian', label: 'Real dates' }, { value: 'custom', label: 'My world’s calendar' }],
-      (mode) => onCalendar({ ...cal, mode })
-    ),
-    cal.mode === 'gregorian'
-      ? ui.text('calendar.epoch', 'Story begins', cal.gregorianEpoch, (gregorianEpoch) => onCalendar({ ...cal, gregorianEpoch }), { placeholder: '1850-03-01' })
-      : null,
-    ...(cal.mode === 'custom'
-      ? [
-          ui.text(
-            'calendar.months',
-            'Months',
-            cal.custom.months.map((month) => `${month.name}:${month.days}`).join(', '),
-            (text) => custom({
-              months: text.split(',').map((entry) => entry.trim()).filter(Boolean).map((entry) => {
-                const [name, days] = entry.split(':')
-                return { name: name.trim(), days: Math.max(1, Math.round(Number(days) || 30)) }
-              }),
-            }),
-            { multiline: true }
-          ),
-          ui.text('calendar.weekdays', 'Weekdays', cal.custom.weekdays.join(', '), (text) => custom({ weekdays: text.split(',').map((name) => name.trim()).filter(Boolean) }), {
-            placeholder: 'optional, comma separated',
-          }),
-          ui.number('calendar.yearZero', 'First year', cal.custom.yearZero, (yearZero) => custom({ yearZero: Math.round(yearZero) }), { step: 1 }),
-          ui.text('calendar.era', 'Era', cal.custom.era, (era) => custom({ era }), { placeholder: 'e.g. AR' }),
-          ui.toggle('calendar.leap', 'Leap years', Boolean(cal.custom.leap), (on) => custom({ leap: on ? { every: 4, days: 1, month: 1 } : null })),
-          cal.custom.leap
-            ? ui.number('calendar.leapEvery', 'Every', cal.custom.leap.every, (every) => custom({ leap: { ...cal.custom.leap, every: Math.round(every) } }), {
-                min: 1,
-                step: 1,
-                suffix: 'years, +1 day',
-              })
-            : null,
-        ]
-      : []),
+      ui.note(`Dates follow the project’s story calendar. Day 1 of the story is ${formatDay(cal, 0)}.`),
+    ], [ui.button('calendar.open', 'Story calendar…', onOpenCalendar, { help: 'Edit the calendar in Settings' })]),
   ]
 }
 
@@ -324,12 +302,12 @@ export function travelSections(ui, { map, space, day, dispatch, matrix: matrixSt
               patchTerrain(terrain.id, { multipliers })
             }, { min: 0, max: 10, step: 0.05, suffix: '×', allowEmpty: true })
           ),
-          ui.color(`${prefix}.fill`, 'Colour', terrain.fill, '#8a9a5b', (fill) => patchTerrain(terrain.id, { fill })),
+          ui.color(`${prefix}.fill`, 'Colour', terrain.fill, MAP_DEFAULT_COLORS.terrain, (fill) => patchTerrain(terrain.id, { fill })),
           ui.buttonField(`${prefix}.remove`, 'Remove', () => setTerrains(map.terrains.filter((candidate) => candidate.id !== terrain.id)), { role: 'destructive' }),
-        ], { swatch: terrain.fill || '#888', collapsible: true })
+        ], { swatch: terrain.fill || MAP_DEFAULT_COLORS.terrainSwatch, collapsible: true })
       }),
     ], [
-      ui.button('terrain.add', 'Add', () => setTerrains([...map.terrains, { id: newId(), name: 'New terrain', multipliers: { '*land': 0.5 }, fill: '#8a9a5b', hatch: 'none' }])),
+      ui.button('terrain.add', 'Add', () => setTerrains([...map.terrains, { id: newId(), name: 'New terrain', multipliers: { '*land': 0.5 }, fill: MAP_DEFAULT_COLORS.terrain, hatch: 'none' }])),
     ]))
   }
   return sections

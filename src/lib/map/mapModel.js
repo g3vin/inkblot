@@ -7,14 +7,24 @@
  * any keys it does not model, so a round-trip never strips data a newer build (or
  * another tool) wrote.
  *
- *   { type: 'map', formatVersion, mapKind: 'blank'|'image'|'earth'|'system',
- *     scale, background, earth, system,
- *     pins, routes, regions, terrains, labels, transports, travelers,
- *     timeline, style, viewport }
+ *   { type: 'map', formatVersion, mapKind, scale, background, earth, surface, system,
+ *     galaxy, universe, model, pins, routes, regions, terrains, labels, transports,
+ *     travelers, layers, views, timeline, style, viewport }
  *
- * Every stored point is `[x, y]`. What the pair means depends on the map kind —
- * pixels of the background on a plane map, `[lon, lat]` degrees on an Earth map,
- * AU on a star system — and only mapSpace.js interprets it.
+ * Kinds: a sheet (`blank`), a picture (`image`), `earth`, a `planet` or star of the
+ * writer's own (its `surface`), a star `system`, a `galaxy` of systems, a `universe`
+ * of galaxies, and a 3D `model` (a station, a ship) to look around.
+ *
+ * A stored point is `[x, y]` or `[x, y, z]`. What it means depends on the kind —
+ * pixels of the sheet or picture, `[lon, lat]` degrees on the Earth or a planet, AU
+ * in a star system (z above its plane), light-years in a galaxy, megaparsecs in a
+ * universe, metres in a model — and only mapSpace.js interprets it. Ornaments and
+ * the Earth's rotation stay `[x, y]`.
+ *
+ * Maps link into each other by path: a pin whose `doc` is a map (a system in its
+ * galaxy, a galaxy in its universe), and a body's `surface` (the planet map of a
+ * planet, the model map of a station). That is how a writer drills in and climbs
+ * back out.
  *
  * Doc references (`pin.doc`, `traveler.doc`) are TREE paths, e.g.
  * `Settings/Rivertown`, never `.json` file paths.
@@ -26,9 +36,20 @@
 
 import { describeMapDiff, diffMaps } from './mapDiff'
 
-export const MAP_FORMAT_VERSION = 1
+export const MAP_FORMAT_VERSION = 2
 
-export const MAP_KINDS = ['blank', 'image', 'earth', 'system']
+export const MAP_KINDS = ['blank', 'image', 'earth', 'planet', 'system', 'galaxy', 'universe', 'model']
+/** Kinds drawn in 3D (space/): the camera, not a pan and zoom, is how they are viewed. */
+export const SPACE_KINDS = ['planet', 'system', 'galaxy', 'universe', 'model']
+export const EARTH_VIEWS = ['globe', 'flat']
+export const EARTH_IMAGERY = ['map', 'satellite', 'hybrid']
+export const SURFACE_LOOKS = ['generated', 'texture', 'gas', 'ice', 'star']
+export const SYSTEM_DYNAMICS = ['kepler', 'nbody']
+/** Hubble's classes, and the shapes outside them. */
+export const GALAXY_TYPES = [
+  'E0', 'E3', 'E5', 'E7', 'S0', 'Sa', 'Sb', 'Sc', 'Sd', 'SBa', 'SBb', 'SBc', 'SBd', 'ring', 'irregular', 'dwarf', 'peculiar',
+]
+export const SPACE_LOOKS = ['cinematic', 'atlas', 'ink']
 export const EARTH_PROJECTIONS = ['equalEarth', 'equirectangular', 'mercator', 'naturalEarth', 'orthographic']
 export const EARTH_DETAIL = ['auto', '110m', '50m']
 export const ROUTE_SMOOTHING = ['linear', 'catmullRom']
@@ -38,6 +59,8 @@ export const TRANSPORT_MEDIA = ['land', 'water', 'air', 'space']
 export const MAP_THEMES = ['clean', 'parchment', 'ink', 'night']
 export const BODY_KINDS = ['star', 'planet', 'dwarf', 'moon', 'belt', 'station', 'barycenter']
 export const RADIAL_MODES = ['linear', 'log']
+/** How a star system is shown: in three dimensions, or laid flat on the page. */
+export const SYSTEM_VIEWS = ['3d', 'flat']
 
 /** A blank map is a sheet this big, in map units, until something says otherwise. */
 export const BLANK_SHEET = { width: 4000, height: 3000 }
@@ -62,9 +85,25 @@ const oneOf = (value, allowed, fallback) => (allowed.includes(value) ? value : f
 const objectOr = (value) => (isObject(value) ? value : {})
 
 /** `[x, y]` from anything; null unless both are finite numbers. Extra entries drop. */
-export const readPoint = (value) =>
+export const readPoint2 = (value) =>
   Array.isArray(value) && value.length >= 2 && Number.isFinite(value[0]) && Number.isFinite(value[1])
     ? [value[0], value[1]]
+    : null
+
+/**
+ * A stored point: `[x, y]`, or `[x, y, z]` when a third finite number follows. Null
+ * unless x and y are finite numbers. Anything past z drops.
+ */
+export const readPoint = (value) => {
+  const point = readPoint2(value)
+  if (point && Number.isFinite(value[2])) point.push(value[2])
+  return point
+}
+
+/** `[x, y, z]`: exactly three finite numbers, or null. */
+export const readVector = (value) =>
+  Array.isArray(value) && value.length >= 3 && [0, 1, 2].every((index) => Number.isFinite(value[index]))
+    ? [value[0], value[1], value[2]]
     : null
 
 const readPoints = (value) => (Array.isArray(value) ? value.map(readPoint).filter(Boolean) : [])
@@ -89,13 +128,25 @@ const readList = (value, nextId, normalizeItem) => {
   return out
 }
 
+/**
+ * What every placed item may carry: the layer it is on, and the story days it is on
+ * the map between (null: always), each optionally following a timeline event.
+ */
+const readPlacement = (item) => ({
+  layer: stringOr(item.layer, null),
+  from: numberOr(item.from, null),
+  until: numberOr(item.until, null),
+  fromEvent: stringOr(item.fromEvent, null),
+  untilEvent: stringOr(item.untilEvent, null),
+})
+
 /* ---------- sections ---------- */
 
 const readScale = (raw) => {
   const scale = objectOr(raw)
   const calibration = objectOr(scale.calibration)
-  const a = readPoint(calibration.a)
-  const b = readPoint(calibration.b)
+  const a = readPoint2(calibration.a)
+  const b = readPoint2(calibration.b)
   const distance = positiveOr(calibration.distance, null)
   return {
     ...scale,
@@ -129,10 +180,69 @@ const readEarth = (raw) => {
   return {
     ...earth,
     projection: oneOf(earth.projection, EARTH_PROJECTIONS, 'equalEarth'),
-    rotate: readPoint(earth.rotate) || [0, 0],
+    rotate: readPoint2(earth.rotate) || [0, 0],
     graticule: boolOr(earth.graticule, true),
     borders: boolOr(earth.borders, true),
     detail: oneOf(earth.detail, EARTH_DETAIL, 'auto'),
+    // A map from before the globe opened flat — unless it was already a globe.
+    view: oneOf(earth.view, EARTH_VIEWS, earth.projection === 'orthographic' ? 'globe' : 'flat'),
+    imagery: oneOf(earth.imagery, EARTH_IMAGERY, 'map'),
+    terrain3d: boolOr(earth.terrain3d, false),
+  }
+}
+
+/** A planet's or a star's own globe: how big, how it turns, what its ground looks like. */
+const readSurface = (raw) => {
+  const surface = objectOr(raw)
+  const look = objectOr(surface.look)
+  return {
+    ...surface,
+    radiusKm: positiveOr(surface.radiusKm, 6371),
+    axialTiltDeg: Math.min(180, Math.max(0, numberOr(surface.axialTiltDeg, 0))),
+    dayHours: positiveOr(surface.dayHours, 24),
+    look: {
+      ...look,
+      kind: oneOf(look.kind, SURFACE_LOOKS, 'generated'),
+      seed: numberOr(look.seed, 1),
+      seaLevel: Math.min(1, Math.max(0, numberOr(look.seaLevel, 0.55))),
+      roughness: Math.min(1, Math.max(0, numberOr(look.roughness, 0.5))),
+      palette: stringOr(look.palette, 'temperate'),
+      texture: stringOr(look.texture, null),
+      temperatureK: positiveOr(look.temperatureK, 5772),
+    },
+    terrainFromRegions: boolOr(surface.terrainFromRegions, true),
+    atmosphere: boolOr(surface.atmosphere, true),
+  }
+}
+
+const readGalaxy = (raw) => {
+  const galaxy = objectOr(raw)
+  return {
+    ...galaxy,
+    type: oneOf(galaxy.type, GALAXY_TYPES, 'Sb'),
+    seed: numberOr(galaxy.seed, 1),
+    radiusLy: positiveOr(galaxy.radiusLy, 50000),
+    thicknessLy: positiveOr(galaxy.thicknessLy, 1000),
+    params: objectOr(galaxy.params),
+  }
+}
+
+const readUniverse = (raw) => {
+  const universe = objectOr(raw)
+  return {
+    ...universe,
+    seed: numberOr(universe.seed, 1),
+    extentMpc: positiveOr(universe.extentMpc, 50),
+  }
+}
+
+const readModel = (raw) => {
+  const model = objectOr(raw)
+  return {
+    ...model,
+    asset: stringOr(model.asset, null),
+    metresPerUnit: positiveOr(model.metresPerUnit, 1),
+    up: oneOf(model.up, ['y', 'z'], 'y'),
   }
 }
 
@@ -150,7 +260,24 @@ const readOrbit = (raw) => {
     meanAnomalyDeg: numberOr(raw.meanAnomalyDeg, 0),
     periodDays: positiveOr(raw.periodDays, null),
     retrograde: boolOr(raw.retrograde, false),
+    inclinationDeg: numberOr(raw.inclinationDeg, 0),
+    ascendingNodeDeg: numberOr(raw.ascendingNodeDeg, 0),
   }
+}
+
+/** Where an N-body body starts (AU) and how it is moving (AU a day); both, or neither. */
+const readState = (raw) => {
+  if (!isObject(raw)) return null
+  const pos = readVector(raw.pos)
+  const vel = readVector(raw.vel)
+  return pos && vel ? { ...raw, pos, vel } : null
+}
+
+const readRings = (raw) => {
+  if (!isObject(raw)) return null
+  const innerKm = positiveOr(raw.innerKm, null)
+  const outerKm = positiveOr(raw.outerKm, null)
+  return innerKm !== null && outerKm !== null && outerKm > innerKm ? { ...raw, innerKm, outerKm, color: stringOr(raw.color, null) } : null
 }
 
 const readBody = (body) => ({
@@ -162,6 +289,11 @@ const readBody = (body) => ({
   radiusKm: positiveOr(body.radiusKm, null),
   color: stringOr(body.color, null),
   orbit: readOrbit(body.orbit),
+  state: readState(body.state),
+  axialTiltDeg: numberOr(body.axialTiltDeg, 0),
+  rotationHours: positiveOr(body.rotationHours, null),
+  rings: readRings(body.rings),
+  surface: stringOr(body.surface, null),
 })
 
 const readSystem = (raw, nextId) => {
@@ -173,6 +305,8 @@ const readSystem = (raw, nextId) => {
   for (const body of bodies) {
     if (body.parent !== null && (!ids.has(body.parent) || body.parent === body.id)) body.parent = null
   }
+  const plane = objectOr(system.plane)
+  const nbody = objectOr(system.nbody)
   return {
     ...system,
     bodies,
@@ -180,6 +314,15 @@ const readSystem = (raw, nextId) => {
       ...display,
       radial: oneOf(display.radial, RADIAL_MODES, 'log'),
       pxPerAU: positiveOr(display.pxPerAU, 100),
+      view: oneOf(display.view, SYSTEM_VIEWS, 'flat'),
+    },
+    plane: { ...plane, tiltDeg: numberOr(plane.tiltDeg, 0), headingDeg: numberOr(plane.headingDeg, 0) },
+    dynamics: oneOf(system.dynamics, SYSTEM_DYNAMICS, 'kepler'),
+    nbody: {
+      ...nbody,
+      stepDays: positiveOr(nbody.stepDays, 0.25),
+      softeningAU: positiveOr(nbody.softeningAU, 0.001),
+      horizonDays: positiveOr(nbody.horizonDays, 3650),
     },
   }
 }
@@ -208,6 +351,7 @@ const readPin = (pin) => {
     body,
     icon: stringOr(pin.icon, 'pin'),
     color: stringOr(pin.color, null),
+    ...readPlacement(pin),
   }
 }
 
@@ -234,6 +378,7 @@ const readRoute = (pinIds) => (route) => {
     nodes,
     smooth: oneOf(route.smooth, ROUTE_SMOOTHING, 'linear'),
     style: readLineStyle(route.style),
+    ...readPlacement(route),
   }
 }
 
@@ -250,6 +395,7 @@ const readRegion = (region) => {
     fill: stringOr(region.fill, null),
     hatch: oneOf(region.hatch, HATCHES, 'none'),
     stroke: stringOr(region.stroke, null),
+    ...readPlacement(region),
   }
 }
 
@@ -285,8 +431,24 @@ const readLabel = (routeIds) => (label) => {
     font: stringOr(label.font, 'serif'),
     minZoom: numberOr(label.minZoom, 0),
     maxZoom: positiveOr(label.maxZoom, null),
+    ...readPlacement(label),
   }
 }
+
+const readLayer = (layer) => ({
+  ...layer,
+  name: stringOr(layer.name, 'Layer'),
+  visible: boolOr(layer.visible, true),
+  locked: boolOr(layer.locked, false),
+})
+
+/** A saved view: a name, the camera (kept as written; each view reads its own), a day. */
+const readView = (view) => ({
+  ...view,
+  name: stringOr(view.name, 'View'),
+  camera: objectOr(view.camera),
+  day: numberOr(view.day, null),
+})
 
 const readTransport = (transport) => {
   const fractionC = numberOr(transport.fractionC, null)
@@ -327,7 +489,7 @@ const readOrnament = (raw, show, at, extra = {}) => {
     ...ornament,
     ...extra,
     show: boolOr(ornament.show, show),
-    at: readPoint(ornament.at) || at,
+    at: readPoint2(ornament.at) || at,
   }
 }
 
@@ -347,6 +509,8 @@ const readStyle = (raw) => {
       title: stringOr(cartouche.title, null),
       subtitle: stringOr(cartouche.subtitle, null),
     }),
+    legend: readOrnament(style.legend, false, [0.05, 0.16]),
+    look: oneOf(style.look, SPACE_LOOKS, 'cinematic'),
   }
 }
 
@@ -388,7 +552,11 @@ export function normalizeMap(raw, nextId = newId) {
     scale: readScale(source.scale),
     background: readBackground(source.background),
     earth: readEarth(source.earth),
+    surface: readSurface(source.surface),
     system: readSystem(source.system, nextId),
+    galaxy: readGalaxy(source.galaxy),
+    universe: readUniverse(source.universe),
+    model: readModel(source.model),
     pins,
     routes,
     regions: readList(source.regions, nextId, readRegion),
@@ -396,6 +564,8 @@ export function normalizeMap(raw, nextId = newId) {
     labels: readList(source.labels, nextId, readLabel(routeIds)),
     transports: readList(source.transports, nextId, readTransport),
     travelers: readList(source.travelers, nextId, readTraveler(routeIds, pinIds, nextId)),
+    layers: readList(source.layers, nextId, readLayer),
+    views: readList(source.views, nextId, readView),
     timeline: { ...objectOr(source.timeline), day: numberOr(objectOr(source.timeline).day, 0) },
     style: readStyle(source.style),
     viewport: readMapViewport(source),
@@ -519,21 +689,40 @@ export function rewriteMapDocRefs(map, entryPath, nextPath, type = 'file') {
 
   const pins = rewrite(map.pins)
   const travelers = rewrite(map.travelers)
-  return changed ? { map: { ...map, pins, travelers }, changed } : { map, changed }
+  // A body's surface: the planet or model map it opens into.
+  let system = map.system
+  const bodies = Array.isArray(map.system?.bodies) ? map.system.bodies : null
+  if (bodies) {
+    let touched = false
+    const next = bodies.map((body) => {
+      const moved = isObject(body) ? remapDocRef(body.surface, entryPath, nextPath, type) : undefined
+      if (typeof moved !== 'string' || moved === body.surface) return body
+      touched = true
+      return { ...body, surface: moved }
+    })
+    if (touched) {
+      changed = true
+      system = { ...map.system, bodies: next }
+    }
+  }
+  return changed ? { map: { ...map, pins, travelers, system }, changed } : { map, changed }
 }
 
-/** Every doc the map links to, deduplicated, in first-seen order. */
+/** Every doc the map links to — pins, travellers, bodies' surfaces — deduplicated, in first-seen order. */
 export function mapDocRefs(map) {
   const out = []
   const seen = new Set()
-  for (const list of [map?.pins, map?.travelers]) {
-    for (const item of Array.isArray(list) ? list : []) {
-      if (isObject(item) && typeof item.doc === 'string' && item.doc && !seen.has(item.doc)) {
-        seen.add(item.doc)
-        out.push(item.doc)
-      }
+  const add = (path) => {
+    if (typeof path === 'string' && path && !seen.has(path)) {
+      seen.add(path)
+      out.push(path)
     }
   }
+  for (const list of [map?.pins, map?.travelers]) {
+    for (const item of Array.isArray(list) ? list : []) if (isObject(item)) add(item.doc)
+  }
+  const bodies = isObject(map?.system) && Array.isArray(map.system.bodies) ? map.system.bodies : []
+  for (const body of bodies) if (isObject(body)) add(body.surface)
   return out
 }
 

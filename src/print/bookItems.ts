@@ -314,14 +314,6 @@ export const moveItem = (items: BookItem[], id: string, before: string | null): 
   return at < 0 ? [...rest, item] : [...rest.slice(0, at), item, ...rest.slice(at)]
 }
 
-/** The items reordered to `ids`, with any the list did not name kept, last. */
-export const reorderItems = (items: BookItem[], ids: string[]): BookItem[] => {
-  const byId = new Map(items.map((it) => [it.id, it]))
-  const out = ids.map((id) => byId.get(id)).filter((it): it is BookItem => Boolean(it))
-  const named = new Set(ids)
-  return [...out, ...items.filter((it) => !named.has(it.id))]
-}
-
 /* ---------------- templates ---------------- */
 
 interface PMNode { type: string; attrs?: Record<string, unknown>; content?: PMNode[]; text?: string; marks?: { type: string }[] }

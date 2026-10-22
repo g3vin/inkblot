@@ -9,17 +9,16 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::map::MapChromeChanged;
-
-use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
 use super::common::{Alignment, BlockType, EditorTarget, Pane, TextAnchor, WritingFormat};
-use super::sidebar::{ShowSidebarTab};
-use super::tabs::TabsChanged;
-use crate::types::read_aloud::ReadAloudPayload;
+use super::map::MapChromeChanged;
 use super::print::{
-    PageLayoutCatalog, PageLayoutState, PrintJobStatus, TypesetFocus,
-    TypesetHistoryChanged,
+    PageLayoutCatalog, PageLayoutState, PrintJobStatus, TypesetFocus, TypesetHistoryChanged,
 };
+use super::references::{ReferenceSchema, ReferencesChanged, RevealReference};
+use super::sidebar::ShowSidebarTab;
+use super::tabs::TabsChanged;
+use super::timeline::{TimelineChromeChanged, TimelineCursorChanged, TimelineRangesChanged};
+use crate::types::read_aloud::ReadAloudPayload;
 
 /// Which marks are on at the selection.
 #[typeshare]
@@ -245,6 +244,8 @@ pub struct ProjectChanged {
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+// As InboundMessage (envelope.rs): boxing would change the generated TypeScript.
+#[allow(clippy::large_enum_variant)]
 pub enum WebviewEvent {
     ToolbarState(ToolbarState),
     SelectionContext(SelectionContext),
@@ -253,6 +254,12 @@ pub enum WebviewEvent {
     CanvasToolbarChanged(CanvasToolbarChanged),
     /// The active map's toolbar and inspector (`map.rs`). Coalesced per frame.
     MapChromeChanged(MapChromeChanged),
+    /// The active timeline view's toolbar and inspector (`timeline.rs`). Coalesced per frame.
+    TimelineChromeChanged(TimelineChromeChanged),
+    /// The time lens and passage handles, switched on or off.
+    TimelineCursorChanged(TimelineCursorChanged),
+    /// A document's timeline passages, as its editor maps them. Coalesced per frame.
+    TimelineRangesChanged(TimelineRangesChanged),
     ReadAloudPayload(ReadAloudPayloadEvent),
     ProjectChanged(ProjectChanged),
     ShowSidebarTab(ShowSidebarTab),

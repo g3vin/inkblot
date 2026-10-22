@@ -11,8 +11,11 @@
  *
  *   useCommands(() => [{
  *     id: 'notes.add', title: 'Add note', section: 'Notes', icon: 'note',
- *     shortcut: '⌥⌘N', keywords: ['comment', 'annotate'], run: addNote,
+ *     keys: 'Mod+Alt+N', keywords: ['comment', 'annotate'], run: addNote,
  *   }], [addNote])
+ *
+ * `keys` is the command's default shortcut: the app's key handler runs it, and the
+ * writer can change it in Settings ▸ Shortcuts (keybindings.ts).
  */
 import { useEffect, useSyncExternalStore } from 'react'
 
@@ -27,7 +30,12 @@ export interface Command {
   keywords?: string[]
   /** An icon name from src/ui/icons.js. */
   icon?: string
-  /** Shown, not bound: the shortcut is bound wherever it already lives. */
+  /**
+   * The default shortcut, as `Mod+Shift+N` (keybindings.ts). The app's key handler
+   * runs the command on it, and the writer can rebind it.
+   */
+  keys?: string
+  /** Shown, not bound: for a shortcut bound wherever it lives, not rebindable. */
   shortcut?: string
   /** False hides the command (it cannot run right now). */
   when?: () => boolean
@@ -59,13 +67,23 @@ export function registerCommands(commands: Command[]): () => void {
   }
 }
 
+/** The commands that can run right now (their `when`, if any, says yes). */
 export const listCommands = (): Command[] => snapshot.filter((command) => command.when?.() ?? true)
+
+/** Every registered command, including those that cannot run right now. */
+export const listAllCommands = (): Command[] => snapshot
+
+/** Every registered command, re-rendering when commands come and go. */
+export function useAllCommands(): Command[] {
+  return useSyncExternalStore(subscribeCommands, () => snapshot, () => snapshot)
+}
 
 export function subscribeCommands(listener: () => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
 }
 
+/** Run a command by id. False, without running, when it is unknown or its `when` says no. */
 export async function runCommand(id: string): Promise<boolean> {
   const command = registry.get(id)
   if (!command || command.when?.() === false) return false
@@ -76,7 +94,7 @@ export async function runCommand(id: string): Promise<boolean> {
 /** Register commands for the life of a component. */
 export function useCommands(factory: () => Command[], deps: unknown[]): void {
   useEffect(() => registerCommands(factory()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the caller names the deps
     deps)
 }
 

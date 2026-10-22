@@ -261,6 +261,46 @@ export interface ArchivedItem {
 	bubble?: BubbleSession;
 }
 
+/**
+ * A place in a document, as the protocol carries it.
+ * 
+ * A ProseMirror position is an index into a document that every edit invalidates.
+ * In one process that is survivable: the holder maps its positions through each
+ * transaction's mapping and is never more than a tick out of date. Across a process
+ * boundary it is not — native holds a note, a workbench tile, a search result or a
+ * read-aloud word, the user types, and the positions native is holding now address
+ * different text with no signal that they do.
+ * 
+ * So nothing in this protocol carries a bare position. Everything carries the text
+ * the position was resolved from as well, and the webview re-resolves by that text
+ * when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
+ * or reports it gone when the text is.
+ * 
+ * `from` and `to` are **UTF-16 code units**, like every other offset in this
+ * codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
+ * wrong place in any document containing an emoji.
+ */
+export interface TextAnchor {
+	from: number;
+	to: number;
+	/**
+	 * The text `from..to` covered when this anchor was made. The webview falls back
+	 * to searching for it when the positions no longer do.
+	 */
+	text: string;
+}
+
+/**
+ * Attach a passage to an event: `event_id`, or a new event (titled `title`, or after
+ * the words chosen) placed in sequence after the one the passage before it tells.
+ */
+export interface AttachTimelineEventCommand {
+	target: EditorTarget;
+	anchor: TextAnchor;
+	eventId?: string;
+	title?: string;
+}
+
 /** A voice memo attached to a note. */
 export interface AudioClip {
 	id: string;
@@ -1392,6 +1432,14 @@ export type NativeCommand =
 	| { type: "canvasRestore", payload: CanvasRestoreCommand }
 	/** Run a command on a map (`map.rs`). */
 	| { type: "mapCommand", payload: MapCommandRequest }
+	/** Run a command on a timeline view (`timeline.rs`). */
+	| { type: "timelineCommand", payload: TimelineCommandRequest }
+	/** Attach a passage to a timeline event. */
+	| { type: "attachTimelineEvent", payload: AttachTimelineEventCommand }
+	| { type: "jumpToTimelinePassage", payload: JumpToTimelinePassageCommand }
+	| { type: "revealTimelineEvent", payload: RevealTimelineEventCommand }
+	| { type: "setTimeLens", payload: SetTimeLensCommand }
+	| { type: "setTimelineRangeEditing", payload: SetTimelineRangeEditingCommand }
 	| { type: "insertPlainText", payload: InsertPlainTextCommand }
 	| { type: "createEntry", payload: CreateEntryCommand }
 	| { type: "renameEntry", payload: RenameEntryCommand }
@@ -1566,11 +1614,12 @@ export enum EntryKind {
 	Document = "document",
 	Canvas = "canvas",
 	Map = "map",
+	Timeline = "timeline",
 	Folder = "folder",
 }
 
 /**
- * Create a document, canvas, map or folder in the open project, and open it if it is
+ * Create a document, canvas, map, timeline or folder in the open project, and open it if it is
  * not a folder.
  * 
  * The page does the writing, not the shell, for the same reason as every command
@@ -1581,7 +1630,7 @@ export enum EntryKind {
 export interface CreateEntryCommand {
 	/** Tree path of the folder to create in; empty for the project root. */
 	parentFolder: string;
-	/** The bare name. For a canvas or map the page adds the `.canvas` or `.map` suffix. */
+	/** The bare name. For a canvas, map or timeline the page adds its suffix. */
 	name: string;
 	kind: EntryKind;
 }
@@ -1789,7 +1838,7 @@ export interface DocumentText {
 	text: string;
 }
 
-/** Copy a document beside itself as "<name> copy", and open the copy. */
+/** Copy a document beside itself as "`<name>` copy", and open the copy. */
 export interface DuplicateEntryCommand {
 	path: string;
 }
@@ -1883,6 +1932,12 @@ export type WebviewEvent =
 	| { type: "canvasToolbarChanged", payload: CanvasToolbarChanged }
 	/** The active map's toolbar and inspector (`map.rs`). Coalesced per frame. */
 	| { type: "mapChromeChanged", payload: MapChromeChanged }
+	/** The active timeline view's toolbar and inspector (`timeline.rs`). Coalesced per frame. */
+	| { type: "timelineChromeChanged", payload: TimelineChromeChanged }
+	/** The time lens and passage handles, switched on or off. */
+	| { type: "timelineCursorChanged", payload: TimelineCursorChanged }
+	/** A document's timeline passages, as its editor maps them. Coalesced per frame. */
+	| { type: "timelineRangesChanged", payload: TimelineRangesChanged }
 	| { type: "readAloudPayload", payload: ReadAloudPayloadEvent }
 	| { type: "projectChanged", payload: ProjectChanged }
 	| { type: "showSidebarTab", payload: ShowSidebarTab }
@@ -2086,35 +2141,6 @@ export interface InsertTableCommand {
 }
 
 /**
- * A place in a document, as the protocol carries it.
- * 
- * A ProseMirror position is an index into a document that every edit invalidates.
- * In one process that is survivable: the holder maps its positions through each
- * transaction's mapping and is never more than a tick out of date. Across a process
- * boundary it is not — native holds a note, a workbench tile, a search result or a
- * read-aloud word, the user types, and the positions native is holding now address
- * different text with no signal that they do.
- * 
- * So nothing in this protocol carries a bare position. Everything carries the text
- * the position was resolved from as well, and the webview re-resolves by that text
- * when the positions no longer cover it (`src/bridge/anchors.ts`, `resolveAnchor`),
- * or reports it gone when the text is.
- * 
- * `from` and `to` are **UTF-16 code units**, like every other offset in this
- * codebase — see `js_string`. A byte offset or a `char` offset puts the caret in the
- * wrong place in any document containing an emoji.
- */
-export interface TextAnchor {
-	from: number;
-	to: number;
-	/**
-	 * The text `from..to` covered when this anchor was made. The webview falls back
-	 * to searching for it when the positions no longer do.
-	 */
-	text: string;
-}
-
-/**
  * Put the selection on some text, re-finding it if the positions have gone stale.
  * 
  * The difference from `setSelection` is which half of the anchor is authoritative.
@@ -2132,6 +2158,13 @@ export interface JumpToAnchorCommand {
 	 * on disk.
 	 */
 	preferPositions: boolean;
+}
+
+/** Open a document at a passage of an event (a particular one when `range_id`). */
+export interface JumpToTimelinePassageCommand {
+	docPath: string;
+	eventId: string;
+	rangeId?: string;
 }
 
 /** The export Export Again repeats. */
@@ -2173,6 +2206,22 @@ export interface MapOrbit {
 	/** Overrides the period Kepler's third law gives. */
 	periodDays?: number | null;
 	retrograde: boolean;
+	/** Tilt of the orbit out of the system's plane. */
+	inclinationDeg: number;
+	/** Where the orbit crosses the plane going up. */
+	ascendingNodeDeg: number;
+}
+
+/** An N-body body's start: position (AU) and velocity (AU a day) on day 0. */
+export interface MapBodyState {
+	pos: number[];
+	vel: number[];
+}
+
+export interface MapRings {
+	innerKm: number;
+	outerKm: number;
+	color?: string | null;
 }
 
 export interface MapBody {
@@ -2184,6 +2233,13 @@ export interface MapBody {
 	radiusKm?: number | null;
 	color?: string | null;
 	orbit?: MapOrbit | null;
+	/** Where it starts when the system is N-body rather than Kepler. */
+	state?: MapBodyState | null;
+	axialTiltDeg: number;
+	rotationHours?: number | null;
+	rings?: MapRings | null;
+	/** The planet or model map this body opens into. */
+	surface?: string | null;
 }
 
 export enum MapButtonRole {
@@ -2198,8 +2254,8 @@ export interface MapPanelButton {
 	label: string;
 	role: MapButtonRole;
 	disabled: boolean;
-	/** An SF Symbol name, for a button that shows one. */
-	symbol?: string;
+	/** A semantic icon name (src/ui/icons.js), for a button that shows one. */
+	icon?: string;
 	help?: string;
 }
 
@@ -2222,6 +2278,30 @@ export interface MapCartouche {
 	subtitle?: string | null;
 }
 
+export interface MapChartPoint {
+	x: number;
+	y: number;
+}
+
+/**
+ * A line over the story's days: the distance between two things, say. Picking a
+ * point on it sends its day back under `id`.
+ */
+export interface MapChartView {
+	id: string;
+	points: MapChartPoint[];
+	/** The day the story is at, marked on the line. */
+	marker?: number;
+	/** The first and last days, written in the story calendar. */
+	xFrom: string;
+	xTo: string;
+	/** The least and greatest values, written for reading. */
+	yMin: string;
+	yMax: string;
+	/** The chart in words, for VoiceOver and for a glance. */
+	summary: string;
+}
+
 export interface MapChoice {
 	value: string;
 	label: string;
@@ -2239,9 +2319,9 @@ export interface MapChoiceInput {
 }
 
 /**
- * The map's tools, as the toolbar offers them. `Pan` and `Calibrate` are not on the
- * toolbar — the space bar and the Scale section reach them — but either can be the
- * tool in hand.
+ * The map's tools, as the toolbar offers them. `Pan` is not on the toolbar — the
+ * space bar and the middle button reach it — but it can be the tool in hand.
+ * `Calibrate` (set the scale from two points) is, on a sheet or a picture.
  */
 export enum MapTool {
 	Select = "select",
@@ -2279,6 +2359,7 @@ export type MapPanelField =
 	| { type: "date", payload: MapDateInput }
 	| { type: "table", payload: MapTableView }
 	| { type: "preview", payload: MapShapePreview }
+	| { type: "chart", payload: MapChartView }
 	| { type: "group", payload: MapPanelGroup };
 
 export interface MapPanelSection {
@@ -2304,6 +2385,33 @@ export interface MapPanel {
 	sections: MapPanelSection[];
 }
 
+export enum MapKind {
+	Blank = "blank",
+	Image = "image",
+	Earth = "earth",
+	/** A planet or a star of the writer's own: a globe of `surface`. */
+	Planet = "planet",
+	System = "system",
+	/** Star systems placed in a galaxy, in light-years. */
+	Galaxy = "galaxy",
+	/** Galaxies placed in a universe, in megaparsecs. */
+	Universe = "universe",
+	/** A 3D model (a station, a ship) to look around and pin. */
+	Model = "model",
+}
+
+/** One entry in a map's menu, laid out by the page. */
+export interface MapMenuItem {
+	/** What it does, sent back when chosen. Empty for a separator. */
+	id: string;
+	label: string;
+	/** Shown with a check: the current choice, or an option that is on. */
+	checked?: boolean;
+	disabled?: boolean;
+	/** A rule above this item. */
+	separator?: boolean;
+}
+
 export interface MapChromeState {
 	/** The surface commands go back to. */
 	surfaceId: string;
@@ -2325,6 +2433,17 @@ export interface MapChromeState {
 	revealPanel: number;
 	/** The map is the active document, so the toolbar is its. */
 	active?: boolean;
+	/**
+	 * What kind of map it is, so the toolbar offers what fits: the scale tool only on
+	 * a sheet or a picture.
+	 */
+	mapKind?: MapKind;
+	/**
+	 * The View menu: how the map is shown (globe or flat, the projection, satellite,
+	 * terrain, the camera's angle). Chosen items go back as
+	 * `mapCommand { command: "view-option", detail: { id } }`.
+	 */
+	viewMenu?: MapMenuItem[];
 }
 
 /**
@@ -2426,13 +2545,12 @@ export interface MapEarth {
 	borders: boolean;
 	/** `auto`, `110m` or `50m`. */
 	detail: string;
-}
-
-export enum MapKind {
-	Blank = "blank",
-	Image = "image",
-	Earth = "earth",
-	System = "system",
+	/** `globe` (the zoomable globe) or `flat` (`projection`). */
+	view: string;
+	/** `map`, `satellite` or `hybrid`; anything but `map` is fetched online. */
+	imagery: string;
+	/** Mountains raised in 3D on the globe (online elevation). */
+	terrain3d: boolean;
 }
 
 export interface MapScale {
@@ -2446,15 +2564,88 @@ export interface MapScale {
 	customUnits: MapCustomUnit[];
 }
 
+/** What a planet's or star's ground looks like. */
+export interface MapSurfaceLook {
+	/** `generated`, `texture`, `gas`, `ice` or `star`. */
+	kind: string;
+	/** Every generated surface is its seed's own. */
+	seed: number;
+	/** 0–1: how much of a generated world is under water. */
+	seaLevel: number;
+	/** 0–1: how rugged its land is. */
+	roughness: number;
+	palette: string;
+	/** An equirectangular picture in `.assets/`, for `texture`. */
+	texture?: string | null;
+	/** A star's surface temperature, which sets its colour. */
+	temperatureK: number;
+}
+
+/** A planet or star map's globe. */
+export interface MapSurface {
+	radiusKm: number;
+	axialTiltDeg: number;
+	dayHours: number;
+	look: MapSurfaceLook;
+	/** Regions drawn as land raise the generated ground. */
+	terrainFromRegions: boolean;
+	atmosphere: boolean;
+}
+
 export interface MapSystemDisplay {
 	/** `linear` or `log`. */
 	radial: string;
 	pxPerAU: number;
+	/** `3d` or `flat`. */
+	view: string;
+}
+
+export interface MapSystemPlane {
+	tiltDeg: number;
+	headingDeg: number;
+}
+
+export interface MapNbody {
+	stepDays: number;
+	softeningAU: number;
+	/** How far ahead the simulation runs. */
+	horizonDays: number;
 }
 
 export interface MapSystem {
 	bodies: MapBody[];
 	display: MapSystemDisplay;
+	/** How the system's plane sits in its galaxy. */
+	plane: MapSystemPlane;
+	/** `kepler` (nested orbits) or `nbody` (bodies pulling on each other). */
+	dynamics: string;
+	nbody: MapNbody;
+}
+
+export interface MapGalaxy {
+	/**
+	 * A Hubble class (`E0`…`E7`, `S0`, `Sa`…`Sd`, `SBa`…`SBd`) or `ring`, `irregular`,
+	 * `dwarf`, `peculiar`.
+	 */
+	type: string;
+	seed: number;
+	radiusLy: number;
+	thicknessLy: number;
+	/** Shape settings the writer pinned; the seed decides the rest. */
+	params: Record<string, unknown>;
+}
+
+export interface MapUniverse {
+	seed: number;
+	extentMpc: number;
+}
+
+export interface MapModel {
+	/** A `.glb` in `.assets/`. */
+	asset?: string | null;
+	metresPerUnit: number;
+	/** `y` or `z`: which way is up in the model's file. */
+	up: string;
 }
 
 export interface MapPin {
@@ -2468,6 +2659,16 @@ export interface MapPin {
 	body?: string | null;
 	icon: string;
 	color?: string | null;
+	/** The layer it is on. */
+	layer?: string | null;
+	/** The story day it appears; null: always there. */
+	from?: number | null;
+	/** The story day it goes; null: never. */
+	until?: number | null;
+	/** A timeline event `from` follows. */
+	fromEvent?: string | null;
+	/** A timeline event `until` follows. */
+	untilEvent?: string | null;
 }
 
 /**
@@ -2494,6 +2695,16 @@ export interface MapRoute {
 	/** `linear` or `catmullRom`. */
 	smooth: string;
 	style: MapLineStyle;
+	/** The layer it is on. */
+	layer?: string | null;
+	/** The story day it appears; null: always there. */
+	from?: number | null;
+	/** The story day it goes; null: never. */
+	until?: number | null;
+	/** A timeline event `from` follows. */
+	fromEvent?: string | null;
+	/** A timeline event `until` follows. */
+	untilEvent?: string | null;
 }
 
 export interface MapRegion {
@@ -2506,6 +2717,16 @@ export interface MapRegion {
 	fill?: string | null;
 	hatch: string;
 	stroke?: string | null;
+	/** The layer it is on. */
+	layer?: string | null;
+	/** The story day it appears; null: always there. */
+	from?: number | null;
+	/** The story day it goes; null: never. */
+	until?: number | null;
+	/** A timeline event `from` follows. */
+	fromEvent?: string | null;
+	/** A timeline event `until` follows. */
+	untilEvent?: string | null;
 }
 
 export interface MapTerrain {
@@ -2532,6 +2753,16 @@ export interface MapLabel {
 	font: string;
 	minZoom: number;
 	maxZoom?: number | null;
+	/** The layer it is on. */
+	layer?: string | null;
+	/** The story day it appears; null: always there. */
+	from?: number | null;
+	/** The story day it goes; null: never. */
+	until?: number | null;
+	/** A timeline event `from` follows. */
+	fromEvent?: string | null;
+	/** A timeline event `until` follows. */
+	untilEvent?: string | null;
 }
 
 export enum TransportMedium {
@@ -2578,6 +2809,21 @@ export interface MapTraveler {
 	legs: MapLeg[];
 }
 
+export interface MapLayer {
+	id: string;
+	name: string;
+	visible: boolean;
+	locked: boolean;
+}
+
+/** A saved view: the camera (as its view kind wrote it) and, optionally, a day. */
+export interface MapView {
+	id: string;
+	name: string;
+	camera: Record<string, unknown>;
+	day?: number | null;
+}
+
 export interface MapTimeline {
 	/** The story day the map shows, a float; day 0 is the story's epoch. */
 	day: number;
@@ -2595,6 +2841,9 @@ export interface MapStyle {
 	compass: MapCompass;
 	scaleBar: MapOrnament;
 	cartouche: MapCartouche;
+	legend: MapOrnament;
+	/** How a 3D map is drawn: `cinematic`, `atlas` or `ink`. */
+	look: string;
 }
 
 export interface MapViewport {
@@ -2615,7 +2864,11 @@ export interface MapFile {
 	scale: MapScale;
 	background: MapBackground;
 	earth: MapEarth;
+	surface: MapSurface;
 	system: MapSystem;
+	galaxy: MapGalaxy;
+	universe: MapUniverse;
+	model: MapModel;
 	pins: MapPin[];
 	routes: MapRoute[];
 	regions: MapRegion[];
@@ -2624,6 +2877,8 @@ export interface MapFile {
 	/** Custom transports; one sharing a built-in's id replaces it on this map. */
 	transports: MapTransport[];
 	travelers: MapTraveler[];
+	layers: MapLayer[];
+	views: MapView[];
 	timeline: MapTimeline;
 	style: MapStyle;
 	viewport: MapViewport;
@@ -2878,12 +3133,23 @@ export interface OpenDocInTabCommand {
 	docPath: string;
 }
 
+/** A point on the screen, in logical pixels. */
+export interface ScreenPoint {
+	x: number;
+	y: number;
+}
+
 /**
- * Open a document in a detached window of its own (a tab's Move to New Window). The
- * page opens it as "Open in New Window" does.
+ * Open a document in a detached window of its own (a tab's Move to New Window, or a
+ * tab dragged out of the window). The page opens it as "Open in New Window" does.
  */
 export interface OpenDocInWindowCommand {
 	docPath: string;
+	/**
+	 * Where the window's top-left corner goes on screen: where a dragged-out tab was
+	 * let go. Without it the window opens where windows open.
+	 */
+	at?: ScreenPoint;
 }
 
 export interface OpenDocumentCommand {
@@ -2959,11 +3225,12 @@ export interface PageLayoutCatalog {
 /**
  * The window's mode: writing a draft, or setting it as a book.
  * 
- * Write shows every text pane as the continuous editor in the writer's own font, with
- * the file tree and the drafting panels. Typeset shows every text pane as the pages it
- * will print on, with the book's navigator in place of the file tree, the typeset
- * toolbar and panels, and the chapters' prose locked — it is edited in Write, where
- * proofing happens. The page owns the mode; the shell asks for a change.
+ * Write is where the prose is written, with the drafting toolbar and panels: as the
+ * continuous editor, or — with its page view on (`SetPrintLayoutCommand`) — on the
+ * pages it will print on. Typeset always shows the pages, set as the book, with the
+ * typeset toolbar and panels and the chapters' prose locked — it is edited in Write,
+ * where proofing happens. Either mode can show the book's navigator in place of the
+ * file tree. The page owns the mode; the shell asks for a change.
  */
 export enum EditorMode {
 	Write = "write",
@@ -3107,7 +3374,10 @@ export interface ScriptSummary {
  * only then: the page skips a state identical to the last.
  */
 export interface PageLayoutState {
-	/** Whether the active pane shows pages. */
+	/**
+	 * Whether the active pane shows pages: always in Typeset, and in Write while its
+	 * page view is on.
+	 */
 	enabled: boolean;
 	/** Write or Typeset, for the whole window. */
 	mode?: EditorMode;
@@ -3411,8 +3681,8 @@ export interface ReferenceKindSpec {
 	label: string;
 	/** Which part of the "new source" menu it is listed in. */
 	group: string;
-	/** An SF Symbol. */
-	symbol: string;
+	/** A semantic icon name (src/ui/icons.js). */
+	icon: string;
 	fields: ReferenceFieldSpec[];
 	/** The contributor roles it offers, first one the default (`author`, `editor`…). */
 	roles: string[];
@@ -3603,6 +3873,11 @@ export interface RevealSearchResultCommand {
 	nodeId?: string;
 	/** A notes-scope match names the note. */
 	noteId?: string;
+}
+
+/** Show an event in a timeline view — the one open, or the next to open. */
+export interface RevealTimelineEventCommand {
+	eventId: string;
 }
 
 /** Keep the book's typeset as it is now, under a name. */
@@ -3976,8 +4251,9 @@ export interface SetParagraphTypesetCommand {
 }
 
 /**
- * Show a document as pages, or as the continuous editor: the one named — a pane's own
- * toggle names the document in it — or else the active one.
+ * Write's page view on or off: the prose written on its pages, or in the continuous
+ * editor. Typeset always shows pages, so turning them off there goes back to Write.
+ * The view is the project's; `doc_path` is accepted for the shells that name one.
  */
 export interface SetPrintLayoutCommand {
 	enabled: boolean;
@@ -4040,6 +4316,17 @@ export interface SetTextStyleCommand {
 	style?: string;
 }
 
+/** Switch the time lens on or off, or its window's dragging; `None` leaves either be. */
+export interface SetTimeLensCommand {
+	on?: boolean;
+	editing?: boolean;
+}
+
+/** Show or hide the handles for dragging where passages start and stop. */
+export interface SetTimelineRangeEditingCommand {
+	on: boolean;
+}
+
 /**
  * How Typeset shows its pages: in spreads, with the baseline grid drawn, with the proof
  * marks. Each field present is set.
@@ -4079,6 +4366,7 @@ export enum SidebarTab {
 	Notes = "notes",
 	History = "history",
 	References = "references",
+	Timeline = "timeline",
 }
 
 /**
@@ -4148,6 +4436,97 @@ export interface StoryFolderPreset {
 export interface StoryFolderAncestor {
 	preset: StoryFolderPreset;
 	path: string;
+}
+
+/** Where an event happens: a pin (or another item) on a map, or a location document. */
+export interface TimelinePlace {
+	map?: string;
+	pin?: string;
+	/** What else on the map it is at: `region`, `route`, `label` or `body` (with `item`). */
+	kind?: string;
+	item?: string;
+	doc?: string;
+}
+
+/** What an event links to, by path — kept right through renames by `timelineLinks.js`. */
+export enum TimelineLinkKind {
+	/** Passages in a text document (`doc`); the ranges themselves are in that document. */
+	Text = "text",
+	/** A map journey's leg (`map`, `traveler`, `leg`): the event leaves when it does. */
+	MapLeg = "mapLeg",
+	/** A card on a canvas (`path`, `node`). */
+	Canvas = "canvas",
+	/** A note in a document (`doc`, `noteId`). */
+	Note = "note",
+}
+
+export interface TimelineLink {
+	kind: TimelineLinkKind;
+	doc?: string;
+	map?: string;
+	traveler?: string;
+	leg?: string;
+	path?: string;
+	node?: string;
+	noteId?: string;
+}
+
+/** A note on an event: on the whole of it, or on one moment in it (`at`, a day). */
+export interface TimelineEventNote {
+	id: string;
+	text: string;
+	at?: number | null;
+}
+
+export interface TimelineEvent {
+	id: string;
+	title: string;
+	summary: string;
+	color?: string | null;
+	laneId?: string | null;
+	tagIds: string[];
+	/** A fractional-index key: events in sequence are events sorted by it, as strings. */
+	order: string;
+	/** The day it starts; null when it is undated and placed by `order` alone. */
+	start?: number | null;
+	/** The day a window ends; null for a moment. */
+	end?: number | null;
+	/** Tree paths of the documents (characters, mostly) taking part. */
+	participants: string[];
+	place?: TimelinePlace | null;
+	links: TimelineLink[];
+	notes: TimelineEventNote[];
+}
+
+/** A swimlane: a plotline, a point of view. */
+export interface TimelineLane {
+	id: string;
+	name: string;
+	color?: string | null;
+}
+
+/** A span drawn behind everything: a war, a reign, a winter. */
+export interface TimelineEra {
+	id: string;
+	name: string;
+	color?: string | null;
+	start: number;
+	end: number;
+}
+
+export interface TimelineTag {
+	id: string;
+	name: string;
+	color?: string | null;
+}
+
+/** `.story/timeline.json`. */
+export interface StoryTimeline {
+	version: number;
+	events: TimelineEvent[];
+	lanes: TimelineLane[];
+	eras: TimelineEra[];
+	tags: TimelineTag[];
 }
 
 /**
@@ -4220,6 +4599,18 @@ export interface VersionEntry {
 }
 
 /**
+ * A passage of a text document attached to an event: ProseMirror positions, and the
+ * text they covered when last saved. Held in the document's `timeline` array.
+ */
+export interface TimelineRange {
+	id: string;
+	eventId: string;
+	from: number;
+	to: number;
+	anchor: string;
+}
+
+/**
  * The JSON written to `<projectRoot>/<path/to/doc>.json`.
  * 
  * `saveDocument` whitelists exactly these keys, which is why the document kind is
@@ -4242,10 +4633,92 @@ export interface TextDocument {
 	 * (`bridge::references`). Absent until either is set.
 	 */
 	citations?: DocumentCitations;
+	/**
+	 * Passages attached to timeline events (`types::timeline`), in document order.
+	 * Absent until one is.
+	 */
+	timeline?: TimelineRange[];
 }
 
 export interface TileRef {
 	id: string;
+}
+
+/** How a view lays the chronology out. */
+export enum TimelineScale {
+	/** Along the calendar. */
+	Time = "time",
+	/** Every event one step apart, dated or not. */
+	Sequence = "sequence",
+	/** Passages in reading order, each joined to when it happens. */
+	Manuscript = "manuscript",
+}
+
+export interface TimelineChromeState {
+	/** The surface commands go back to. */
+	surfaceId: string;
+	docPath: string;
+	scale: TimelineScale;
+	canUndo: boolean;
+	canRedo: boolean;
+	hasSelection: boolean;
+	lensOn: boolean;
+	/** The inspector, as the map's is built. */
+	panel: MapPanel;
+	/** Bumped when the page wants the inspector shown (an event just added or opened). */
+	revealPanel: number;
+	/** The view is the active document, so the toolbar is its. */
+	active?: boolean;
+}
+
+/** The active timeline view's toolbar and inspector, or `None` when no view is showing. */
+export interface TimelineChromeChanged {
+	state?: TimelineChromeState;
+}
+
+/** Run a command on a timeline view. */
+export interface TimelineCommandRequest {
+	surfaceId: string;
+	command: string;
+	detail?: unknown;
+}
+
+/** The lens's and the handles' switches, for the shell's menus. */
+export interface TimelineCursorChanged {
+	lensOn: boolean;
+	lensEditing: boolean;
+	editingRanges: boolean;
+}
+
+/**
+ * A document's passages, as its editor now has them. Positions, like a quote note's:
+ * an event, which the rule about bare positions does not cover.
+ */
+export interface TimelineRangesChanged {
+	docPath: string;
+	ranges: TimelineRange[];
+}
+
+export interface TimelineViewFilter {
+	lanes: string[];
+	tags: string[];
+	participants: string[];
+	text: string;
+}
+
+/** `<name>.timeline.json`: one document's view of the chronology. */
+export interface TimelineViewFile {
+	/** Always `timeline-view`: what a save checks before writing over a file. */
+	type: string;
+	version: number;
+	scale: TimelineScale;
+	/** The folder the manuscript scale reads, in tree order; empty for the project. */
+	manuscriptFolder?: string;
+	/** The days shown last, `[from, to]`, on a date scale. */
+	range?: number[] | null;
+	filter: TimelineViewFilter;
+	collapsedLanes: string[];
+	showJourneys: boolean;
 }
 
 /**
@@ -4459,7 +4932,7 @@ export interface VersionRow {
 	name?: string;
 	auto: boolean;
 	sessionId?: string;
-	/** `hsl(…)`, the same hue the page's timeline gives this session. */
+	/** `var(--ink-…)`, the same ink the page's timeline gives this session. */
 	sessionColor: string;
 	delta: WordDelta;
 	/**
@@ -4549,6 +5022,7 @@ export interface WritingSession {
 export enum DocKind {
 	Canvas = "canvas",
 	Map = "map",
+	Timeline = "timeline",
 	Text = "text",
 }
 

@@ -25,9 +25,9 @@ export default function FontSelect({ value, onChange, projectFamilies = [], labe
   return (
     <select className="ui-select fin-font" aria-label={label} value={current} onChange={(event) => onChange(event.target.value)}>
       {!known.has(current) && current ? <option value={current}>{current}</option> : null}
-      {projectFamilies.length ? <optgroup label="In This Project">{projectFamilies.map((f) => <option key={`p-${f}`} value={f}>{f}</option>)}</optgroup> : null}
+      {projectFamilies.length ? <optgroup label="In this project">{projectFamilies.map((f) => <option key={`p-${f}`} value={f}>{f}</option>)}</optgroup> : null}
       {suggested.length ? <optgroup label="Suggested">{suggested.map((f) => <option key={`s-${f}`} value={f} style={{ fontFamily: `"${f}"` }}>{f}</option>)}</optgroup> : null}
-      <optgroup label="All Fonts">{installed.map((f) => <option key={f} value={f}>{f}</option>)}</optgroup>
+      <optgroup label="All fonts">{installed.map((f) => <option key={f} value={f}>{f}</option>)}</optgroup>
     </select>
   )
 }

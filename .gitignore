@@ -3,6 +3,10 @@
 *.onnx.data
 *.onnx.tmp
 
+# Native builds (the iOS framework and its Xcode project's per-user state)
+native/build/
+xcuserdata/
+
 # Node / Vite
 node_modules/
 dist/

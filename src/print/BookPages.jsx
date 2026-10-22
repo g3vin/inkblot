@@ -19,6 +19,7 @@ import { PAGE_GAP } from './printLayoutConstants'
 import { pageLeftMargin, pageMetrics } from './pageSetup'
 import { preparePrint } from './printJob'
 import { baselineGridStyle } from './typography'
+import { snapToDevicePixel } from './zoom'
 import { bookAuthor, getPrintScope, getTypesetPreview, setTypesetDisplay, usePrintLayoutStore } from './printLayoutStore'
 import { previewBook, previewContent, TYPESET_PREVIEW_EVENT } from './useTypesetHistory'
 
@@ -36,12 +37,40 @@ const trimmed = (page) => {
   return inner
 }
 
-/** Printed pages, shown at the zoom, one under the other. */
-function PageStack({ pages, zoom, onOpen }) {
+/**
+ * Pages `fill` puts in, laid out at their real size and scaled by the zoom, as the live
+ * chapter's stage is. Not CSS `zoom`: under it WebKit holds type to a minimum size, so
+ * zoomed out, a page's text grew against the page and ran off its lines.
+ */
+function ZoomedPages({ className, zoom, fill, style, onOpen }) {
   const ref = useRef(null)
+  // The pages' size unscaled; the box they take on the desk is this times the zoom.
+  const [size, setSize] = useState(null)
   useLayoutEffect(() => {
     const host = ref.current
     if (!host) return
+    fill(host)
+    setSize({ width: host.offsetWidth, height: host.offsetHeight })
+  }, [fill])
+  const onClick = (event) => {
+    const item = event.target.closest?.('.book-page')?.dataset.item
+    if (item) onOpen(item)
+  }
+  return (
+    <div
+      className={`book-zoomed ${className} print-scope`}
+      style={size ? { width: `${snapToDevicePixel(size.width * zoom)}px`, height: `${snapToDevicePixel(size.height * zoom)}px` } : undefined}
+      onClick={onClick}
+      role="presentation"
+    >
+      <div ref={ref} className="book-zoomed-pages" style={{ ...style, transform: `scale(${zoom})` }} />
+    </div>
+  )
+}
+
+/** Printed pages, shown at the zoom, one under the other. */
+function PageStack({ pages, zoom, onOpen }) {
+  const fill = useCallback((host) => {
     host.replaceChildren(...pages.map((page) => {
       const frame = document.createElement('div')
       frame.className = 'book-page'
@@ -50,18 +79,14 @@ function PageStack({ pages, zoom, onOpen }) {
       return frame
     }))
   }, [pages])
-  const onClick = (event) => {
-    const item = event.target.closest?.('.book-page')?.dataset.item
-    if (item) onOpen(item)
-  }
   if (!pages.length) return null
   return (
-    <div
-      ref={ref}
-      className="book-pages-stack print-scope"
-      style={{ zoom, gap: `${PAGE_GAP}px`, paddingBottom: `${PAGE_GAP}px` }}
-      onClick={onClick}
-      role="presentation"
+    <ZoomedPages
+      className="book-pages-stack"
+      zoom={zoom}
+      fill={fill}
+      style={{ gap: `${PAGE_GAP}px`, paddingBottom: `${PAGE_GAP}px` }}
+      onOpen={onOpen}
     />
   )
 }
@@ -72,10 +97,7 @@ function PageStack({ pages, zoom, onOpen }) {
  * block ruled at the leading.
  */
 function SpreadStack({ pages, zoom, setup, showGrid, onOpen }) {
-  const ref = useRef(null)
-  useLayoutEffect(() => {
-    const host = ref.current
-    if (!host) return
+  const fill = useCallback((host) => {
     const metrics = setup ? pageMetrics(setup) : null
     const grid = showGrid && setup?.typography ? baselineGridStyle(setup.typography) : null
     const frameFor = (page, physical) => {
@@ -111,13 +133,7 @@ function SpreadStack({ pages, zoom, setup, showGrid, onOpen }) {
     }
     host.replaceChildren(...rows)
   }, [pages, setup, showGrid])
-  const onClick = (event) => {
-    const item = event.target.closest?.('.book-page')?.dataset.item
-    if (item) onOpen(item)
-  }
-  return (
-    <div ref={ref} className="book-spreads print-scope" style={{ zoom, gap: `${PAGE_GAP}px` }} onClick={onClick} role="presentation" />
-  )
+  return <ZoomedPages className="book-spreads" zoom={zoom} fill={fill} style={{ gap: `${PAGE_GAP}px` }} onOpen={onOpen} />
 }
 
 export default function BookPages({ projectName, docPath, editor, placement, zoom, scrollEl, spread = false, showGrid = false, setup = null, renderLive }) {
@@ -153,7 +169,7 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
       .then((prepared) => { if (live) setPreviewPages((prepared?.elements || []).map(trimmed)) })
       .catch((error) => console.error('[typeset] previewing failed:', error))
     return () => { live = false }
-  }, [preview?.id, preview?.snapshot, projectName, docPath]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [preview?.id, preview?.snapshot, projectName, docPath]) // eslint-disable-line react-hooks/exhaustive-deps -- keyed on the preview; the placement and editor are read as they stand then
 
   const compose = useCallback(async () => {
     const run = ++runRef.current
@@ -220,14 +236,16 @@ export default function BookPages({ projectName, docPath, editor, placement, zoo
     return () => editor.off('transaction', onTransaction)
   }, [editor, schedule])
 
-  // The live chapter holds still on screen while the pages before it change.
+  // The live chapter holds still on screen while the pages before it change. Not when
+  // the zoom moved it: the zoom keeps its own place (PrintLayoutView's settle).
   useLayoutEffect(() => {
     const live = liveRef.current
     if (!live || !scrollEl) return
     const top = live.offsetTop
-    if (anchorRef.current != null && anchorRef.current !== top) scrollEl.scrollTop += top - anchorRef.current
-    anchorRef.current = top
-  }, [composed.before, scrollEl])
+    const last = anchorRef.current
+    if (last && last.zoom === zoom && last.top !== top) scrollEl.scrollTop += top - last.top
+    anchorRef.current = { top, zoom }
+  }, [composed.before, scrollEl, zoom])
 
   const open = useCallback((id) => {
     if (id && id !== itemId) window.dispatchEvent(new CustomEvent(OPEN_BOOK_ITEM_EVENT, { detail: { id } }))

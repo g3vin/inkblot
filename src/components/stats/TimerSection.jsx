@@ -4,7 +4,7 @@
  * controls for it.
  */
 import { Button, SelectMenu } from '../../ui'
-import SFIcon from '../SFIcon'
+import Icon from '../../ui/Icon.jsx'
 import { segmentTitle } from '../../stats/routines.js'
 import { formatDuration, formatNumber } from '../../stats/day.js'
 import { routineOptions, routinePlan, timerClock, timerWords } from './statsText.js'
@@ -22,7 +22,7 @@ export function RunningTimer({ stats }) {
   return (
     <div className="stats-timer-running" data-state={timer.state} data-kind={segment.kind}>
       <div className="stats-timer-head">
-        <span className="stats-timer-title"><SFIcon name={segment.kind === 'write' ? 'pencil' : 'cup.and.saucer'} size={13} />{segmentTitle(segment)}</span>
+        <span className="stats-timer-title"><Icon name={segment.kind === 'write' ? 'edit' : 'break'} />{segmentTitle(segment)}</span>
         <span className="stats-muted">{timer.position}</span>
       </div>
       <div className="stats-timer-clock">{timerClock(timer, stats.now())}</div>
@@ -38,17 +38,17 @@ export function TimerControls({ stats }) {
   return (
     <div className="stats-timer-controls">
       {timer.state === 'waiting' ? (
-        <Button variant="filled" onClick={() => timer.proceed()}><SFIcon name="play" size={11} />Start {segment ? segmentTitle(segment) : ''}</Button>
+        <Button variant="filled" onClick={() => timer.proceed()}><Icon name="play" />Start {segment ? segmentTitle(segment) : ''}</Button>
       ) : timer.state === 'paused' ? (
-        <Button variant="filled" onClick={() => timer.resume()}><SFIcon name="play" size={11} />Resume</Button>
+        <Button variant="filled" onClick={() => timer.resume()}><Icon name="play" />Resume</Button>
       ) : (
-        <Button onClick={() => timer.pause()}><SFIcon name="pause" size={11} />Pause</Button>
+        <Button onClick={() => timer.pause()}><Icon name="pause" />Pause</Button>
       )}
       {timer.state !== 'waiting' ? (
-        <Button onClick={() => timer.skip()} title="End this segment now and go on to the next"><SFIcon name="forward.end" size={11} />Skip</Button>
+        <Button onClick={() => timer.skip()} title="End this segment now and go on to the next"><Icon name="skip" />Skip</Button>
       ) : null}
       <span className="stats-grow" />
-      <Button variant="destructive" onClick={() => timer.stop()} title="Stop the routine. What you wrote still counts."><SFIcon name="stop" size={11} />Stop</Button>
+      <Button variant="destructive" onClick={() => timer.stop()} title="Stop the routine. What you wrote still counts."><Icon name="stop" />Stop</Button>
     </div>
   )
 }
@@ -71,7 +71,7 @@ function RoutineStarter({ stats }) {
       </div>
       <div className="stats-timer-start">
         <span className="stats-muted">{routinePlan(routine)}</span>
-        <Button variant="filled" onClick={() => stats.startTimer(routine)}><SFIcon name="play" size={11} />Start</Button>
+        <Button variant="filled" onClick={() => stats.startTimer(routine)}><Icon name="play" />Start</Button>
       </div>
       {last && stats.now() - last.end < 3_600_000 ? (
         <p className="stats-note">Last run: {last.routine.name}, {formatNumber(last.wordsWritten)} words in {formatDuration(last.writeSecs)}.</p>

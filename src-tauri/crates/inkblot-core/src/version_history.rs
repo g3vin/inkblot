@@ -23,6 +23,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::js_string::JS_WHITESPACE_CLASS;
+use crate::types::note::INK_IDS;
 use crate::types::{
     CanvasDiff, CanvasEdge, CanvasFile, CanvasNode, CanvasNodeChange, DiffChunk, DiffOp,
     DiffOpType, HtmlBlock, MergeChoice, VersionEntry, VersionRow, WordDelta,
@@ -32,7 +33,7 @@ use crate::types::{
 Editing sessions
 ============================================================ */
 
-/// Stable session → hue. Same session, same color, across reloads of the panel.
+/// Stable session → ink. Same session, same color, across reloads of the panel.
 ///
 /// The hash runs over UTF-16 code units, because `charCodeAt` does; iterating Rust
 /// `char`s would give a different hue for any id containing an astral character.
@@ -49,8 +50,8 @@ pub fn session_color(session_id: &str) -> String {
 
     // i32::MIN has no positive counterpart; JS does this in doubles and gets
     // 2147483648, so widen before taking the absolute value.
-    let hue = (i64::from(hash)).abs() % 360;
-    format!("hsl({hue}, 55%, 55%)")
+    let ink = INK_IDS[((i64::from(hash)).abs() % INK_IDS.len() as i64) as usize];
+    format!("var(--ink-{ink})")
 }
 
 /* ============================================================
@@ -113,6 +114,7 @@ pub fn text_words(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// Whitespace-separated words in `html_or_text`, read as HTML when `is_html`.
 pub fn count_words(html_or_text: &str, is_html: bool) -> u32 {
     let text = if is_html {
         html_to_text(html_or_text)
@@ -837,9 +839,21 @@ mod tests {
         assert_eq!(rows[0].summary.as_deref(), Some("+1 place · 1 edited"));
         assert_eq!(rows[1].summary.as_deref(), Some("Snapshot · 1 place"));
         // "Old Harbour" + "Keep" against "Harbour".
-        assert_eq!(rows[0].delta, WordDelta { added: 2, removed: 0 });
+        assert_eq!(
+            rows[0].delta,
+            WordDelta {
+                added: 2,
+                removed: 0
+            }
+        );
         assert!(rows[0].snippet.is_empty());
-        assert_eq!(span_delta(&versions, 0, 1), WordDelta { added: 3, removed: 0 });
+        assert_eq!(
+            span_delta(&versions, 0, 1),
+            WordDelta {
+                added: 3,
+                removed: 0
+            }
+        );
     }
 
     #[test]
@@ -918,7 +932,7 @@ mod tests {
     fn session_color_hashes_utf16_code_units() {
         assert_eq!(session_color(""), "var(--text-subtle)");
         // An astral character is two code units; hashing chars would give another hue.
-        assert!(session_color("🎨").starts_with("hsl("));
+        assert!(session_color("🎨").starts_with("var(--ink-"));
         assert_eq!(session_color("abc"), session_color("abc"));
     }
 

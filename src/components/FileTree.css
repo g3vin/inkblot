@@ -21,10 +21,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  background: var(--tile-color);
+  background: var(--surface-1);
   border-bottom: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: var(--sidebar-control-shadow);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
   padding: 4px;
   min-height: 36px;
   margin: 0 0 8px;
@@ -57,11 +57,10 @@
   padding: 0 4px;
 }
 
-.file-tree-action,
 .file-tree-add {
   background: transparent;
   color: var(--text-subtle);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   min-width: 28px;
   min-height: 28px;
   padding: 3px;
@@ -73,23 +72,6 @@
   flex-shrink: 0;
 }
 
-/* Anchors the "Other" menu, so it opens under the row rather than the button. */
-.file-tree-actions {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-}
-
-/* The contextual "New Character"/"New Chapter" button — held to the far end so
-   it appearing and disappearing never shifts the fixed four. */
-.file-tree-action-smart {
-  margin-left: auto;
-  color: var(--accent-foreground);
-}
-
 .new-file-input {
   padding: 3px 8px;
 }
@@ -99,7 +81,7 @@
   background: var(--surface-2);
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 3px 5px;
   font-size: 15px;
   line-height: 1.25;
@@ -111,7 +93,7 @@
   gap: var(--space-3);
   min-height: 32px;
   padding: 0 var(--space-4);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: var(--control-bg);
   transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
@@ -147,7 +129,7 @@
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-muted);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
@@ -158,52 +140,11 @@
   border-color: var(--accent-border);
 }
 
-.file-tree-create-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 20;
-  min-width: 180px;
-  padding: 4px;
-  border-radius: var(--floating-note-radius);
-  border: 1px solid var(--floating-note-border);
-  background: var(--floating-note-bg);
-  box-shadow: var(--floating-note-shadow);
-  color: var(--text-primary);
-}
-
-.file-tree-create-option {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 15px;
-  line-height: 1.2;
-  text-align: left;
-  cursor: pointer;
-}
-
-.file-tree-create-option:hover {
-  background: var(--accent-surface);
-  color: var(--accent-foreground);
-}
-
-.file-tree-create-icon {
-  width: 13px;
-  height: 13px;
-  flex: 0 0 auto;
-}
-
 .file-item {
   min-height: 23px;
   padding: 2px 6px;
   cursor: pointer;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   display: flex;
   align-items: center;
@@ -264,8 +205,8 @@
   gap: 6px;
   width: 100%;
   padding: 4px 8px;
-  border: 1px dashed var(--file-tree-border, rgba(128, 128, 128, 0.3));
-  border-radius: 6px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
   background: transparent;
   color: inherit;
   font-size: 11px;
@@ -275,7 +216,7 @@
 
 .new-project-location:hover {
   opacity: 1;
-  background: rgba(128, 128, 128, 0.08);
+  background: var(--surface-hover);
 }
 
 .new-project-location-icon {
@@ -305,6 +246,17 @@
   white-space: nowrap;
 }
 
+/* A locked entry (docLocks.ts); inside a locked folder, more quietly. */
+.file-item-lock {
+  flex: none;
+  margin-left: var(--space-1);
+  color: var(--text-muted);
+}
+
+.file-item-lock.is-inherited {
+  color: var(--text-subtle);
+}
+
 .file-item.folder {
   font-weight: 600;
 }
@@ -317,12 +269,22 @@
   position: sticky;
   top: var(--folder-sticky-top, 0);
   z-index: calc(12 + var(--folder-sticky-depth, 0));
-  background: var(--sidebar-sticky-bg);
+  background: var(--sheet-bg);
   box-shadow: none;
 }
 
+/* On the tray's gradient a stuck folder can't match what it covers, so at rest (when
+   nothing is under it) it is bare, and only once the list scrolls does it cover the
+   rows passing beneath with the tray's flat middle. */
+.left-sidebar .file-node.folder-node > .file-item.folder:not(:hover) {
+  background: transparent;
+}
+.left-sidebar .file-list[data-scrolled] .file-node.folder-node > .file-item.folder:not(:hover) {
+  background: var(--sheet-bg);
+}
+
 .left-sidebar .file-node.folder-node > .file-item.folder:hover {
-  background: var(--accent-surface);
+  background: var(--surface-hover);
 }
 
 .file-item.project {
@@ -330,18 +292,20 @@
 }
 
 .file-item:hover {
-  background: var(--accent-surface);
-  color: var(--accent-foreground);
+  background: var(--surface-hover);
 }
 
 .file-tree.dragging .file-item:hover {
   background: transparent;
 }
 
-.file-item.active {
-  background: var(--accent-surface-strong);
-  color: var(--accent-foreground);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
+/* The open document is lifted out of the tray onto the card's own paper: no tint,
+   no border, a soft shadow. A document open in the other pane is half lifted. */
+.file-item.active,
+.file-item.active:hover {
+  background: var(--app-bg);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lift);
 }
 
 .file-item.drag-over {
@@ -349,9 +313,8 @@
 }
 
 .file-item.secondary {
-  background: var(--accent-surface);
-  color: var(--accent-foreground);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-color) 20%, transparent);
+  background: color-mix(in srgb, var(--app-bg) 55%, transparent);
+  color: var(--text-primary);
 }
 
 .file-item.is-drag-source {
@@ -369,7 +332,7 @@
 .file-drop-slot-inner {
   width: 100%;
   min-height: 18px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px dashed var(--accent-border);
   background: var(--accent-surface);
 }
@@ -384,7 +347,7 @@
   min-width: 140px;
   max-width: min(320px, calc(100vw - 40px));
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--accent-border);
   background: var(--popover-bg);
   color: var(--text-primary);
@@ -417,7 +380,7 @@
 .folder-open-divider {
   width: 100%;
   height: 1px;
-  background: var(--sidebar-divider-line);
+  background: var(--border-strong);
   transform-origin: left center;
 }
 
@@ -446,41 +409,110 @@
   grid-template-columns: repeat(var(--sidebar-tab-count, 4), minmax(0, 1fr));
   gap: 4px;
   border-bottom: 1px solid var(--border-color);
-  background: var(--tile-color);
-  box-shadow: var(--sidebar-control-shadow);
-  padding: 4px;
-  min-height: 36px;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-float);
+  /* A fixed 30px, the same in both sidebars whatever holds it. The 4px side
+     padding is what SidebarTabs sizes the indicator against. */
+  box-sizing: border-box;
+  height: 30px;
+  padding: 3px 4px;
   margin-bottom: 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   isolation: isolate;
 }
 
 .sidebar-tabs-indicator {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
+  top: 3px;
+  bottom: 3px;
   left: 4px;
+  z-index: 0;
+  /* Grab it and drag it to another tab (SidebarTabs). It sits under the active tab,
+     whose button lets the pointer through to it. */
+  cursor: grab;
+  touch-action: none;
+}
+
+/* What is drawn. Held or swiped, it lifts out of the strip and grows past its
+   edges, as macOS's segmented controls do, and shrinks back as it lands. It grows
+   by its insets rather than a scale, so the border keeps its weight. */
+.sidebar-tabs-indicator-pill {
+  position: absolute;
+  inset: 0;
   box-sizing: border-box;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--accent-border);
   background: var(--accent-surface-strong);
-  pointer-events: none;
-  z-index: 0;
+  transition:
+    inset var(--sidebar-tabs-grow-duration, 260ms) var(--sidebar-tabs-grow-easing, ease),
+    box-shadow 160ms ease;
 }
 
-.right-sidebar .sidebar-tabs {
-  overflow: hidden;
-  border-bottom-color: transparent;
-  box-shadow: none;
+.sidebar-tabs-indicator.is-lifted .sidebar-tabs-indicator-pill {
+  inset: -4px -5px;
+  box-shadow: var(--shadow-float);
 }
 
-.right-sidebar .sidebar-tabs-indicator {
-  box-shadow: none;
+.sidebar-tabs.is-grabbing,
+.sidebar-tabs.is-grabbing .sidebar-tabs-indicator {
+  cursor: grabbing;
+}
+
+/* In the sidebars the strip is engraved into the panel: the strip is a channel, with the tabs and the indicator on
+   its floor. A kerf all round, and pills, so the indicator's ends are concentric
+   with the channel's. Not clipped: the pill, dragged or swiped past the first
+   or last tab, stays drawn over the padding (SidebarTabs caps how far it goes). */
+.right-sidebar .sidebar-tabs,
+.left-sidebar .sidebar-tabs {
+  padding: var(--inlay-kerf);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--inlay-floor);
+  box-shadow: var(--inlay-wall), var(--inlay-lip);
+}
+
+/* At rest the indicator sits a kerf inside the channel. Grabbed, it grows past the
+   channel's top and bottom edges (.is-lifted, below). On the move it squashes and stretches with its speed, as Liquid Glass's selector
+   does: SidebarTabs sets --sidebar-tabs-squash (px off the top and bottom) and
+   --sidebar-tabs-stretch (px added to each end) from how fast it is travelling. */
+.right-sidebar .sidebar-tabs-indicator,
+.left-sidebar .sidebar-tabs-indicator {
+  top: calc(var(--inlay-kerf) + var(--sidebar-tabs-squash, 0px));
+  bottom: calc(var(--inlay-kerf) + var(--sidebar-tabs-squash, 0px));
+  left: var(--inlay-kerf);
+  box-sizing: content-box;
+  padding-inline: var(--sidebar-tabs-stretch, 0px);
+  margin-left: calc(-1 * var(--sidebar-tabs-stretch, 0px));
+}
+
+/* The indicator keeps its clear accent tint, sitting in the channel. */
+.right-sidebar .sidebar-tabs-indicator-pill,
+.left-sidebar .sidebar-tabs-indicator-pill {
+  border-radius: var(--radius-pill);
+}
+
+/* Lifted, it stands 6px proud of the channel's top and bottom edges. */
+.right-sidebar .sidebar-tabs-indicator.is-lifted .sidebar-tabs-indicator-pill,
+.left-sidebar .sidebar-tabs-indicator.is-lifted .sidebar-tabs-indicator-pill {
+  inset: calc(-1 * (var(--inlay-kerf) + 6px)) -5px;
+}
+
+.right-sidebar .sidebar-tabs button,
+.left-sidebar .sidebar-tabs button {
+  border: 0;
+  border-radius: var(--radius-pill);
+}
+
+/* On the floor, a hover only darkens it a little: the paper is for the active tab. */
+.right-sidebar .sidebar-tabs button:hover,
+.left-sidebar .sidebar-tabs button:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
 }
 
 .sidebar-tabs button {
-  min-height: 28px;
-  padding: 4px;
+  min-height: 0;
+  padding: 0 4px;
   font-size: 11px;
   cursor: pointer;
   position: relative;
@@ -488,7 +520,7 @@
   background: transparent;
   color: var(--text-subtle);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-family: inherit;
   font-weight: 600;
   letter-spacing: 0.4px;
@@ -517,24 +549,4 @@
 .sidebar-tabs.is-gesture-active button {
   pointer-events: none;
 }
-
-.sf-icon {
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  align-items: center;
-  justify-content: center;
-}
-
-.sf-icon > svg {
-  display: block;
-  pointer-events: all;
-}
-
-.sf-icon img {
-  width: 16px;
-  height: 16px;
-  display: block;
-}
-
 

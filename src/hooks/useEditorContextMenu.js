@@ -16,7 +16,9 @@ import { fileTreeMenu } from './contextMenu/fileTreeMenu'
 import { canvasMenu } from './contextMenu/canvasMenu'
 import { mapMenu } from './contextMenu/mapMenu'
 import { editorMenu } from './contextMenu/editorMenu'
+import { timelineMenu } from './contextMenu/timelineMenu'
 import { commonMenu } from './contextMenu/commonMenu'
+import { helpMenu } from './contextMenu/helpMenu'
 
 export function useEditorContextMenu(props) {
   const {
@@ -43,7 +45,9 @@ export function useEditorContextMenu(props) {
       if (await mapMenu(ctx)) return
 
       await editorMenu(ctx)
+      await timelineMenu(ctx)
       await commonMenu(ctx)
+      await helpMenu(ctx)
 
       const menu = await ctx.Menu.new({ items: ctx.items })
       await menu.popup()

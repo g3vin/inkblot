@@ -168,3 +168,114 @@
 }
 
 .ds .ib-panel .ib-card { margin-bottom: var(--space-4); }
+
+/* The panel's own controls: inlaid (one slot, engraved into the panel) or floating, to
+   compare. The slot lays the inlaid row out itself. */
+.ds-panel-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.ds-panel-footer.ib-inlay-slot { gap: var(--inlay-kerf); }
+
+.ds-filter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--size-capsule);
+  padding: 0 var(--space-3);
+  color: var(--text-secondary);
+}
+
+.ds-filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--text-sm) var(--font-ui);
+}
+
+/* Inlay states, side by side on a sidebar's paper. Focus can only show on one control
+   at a time, so the inked state is drawn as a still. */
+.ds-inlay-sheet {
+  --sheet-bg: var(--app-bg);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.ds-inlay-state .ds-panel-footer { margin: var(--space-2) 0 var(--space-3); }
+
+.ds-inlay-state .ib-inlay.ds-inked .ib-icon { color: var(--accent-foreground); }
+
+.ds-inlay-state .ds-lifted { visibility: hidden; }
+
+/* The window's tray, a docked sidebar on it, the document card, and a sidebar hovering
+   over the card. */
+.ds-tray.ib-tray {
+  position: relative;
+  display: flex;
+  gap: 0;
+  height: 180px;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-attachment: scroll;
+  --text-muted: color-mix(in srgb, var(--text-primary) var(--tray-text-muted-mix), var(--tray-sheet));
+}
+
+.ds-tray-dock {
+  width: 160px;
+  padding: var(--space-3) var(--space-4);
+}
+
+.ds-tray-card {
+  flex: 1;
+  padding: var(--space-4);
+  background: var(--app-bg);
+  border: var(--hairline) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.ds-tray-veil {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  bottom: var(--space-1);
+  width: 140px;
+  padding: var(--space-3) var(--space-4);
+  border: var(--hairline) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+/* Inspector panel on the tray */
+.ds-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 300px;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+}
+.ds-inspector-head { display: flex; align-items: center; justify-content: space-between; min-height: var(--size-capsule); }
+.ds-inspector-rows { display: flex; flex-direction: column; gap: 2px; font: var(--text-sm) var(--font-ui); }
+.ds-inspector-rows > div { padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); }
+.ds-lifted { background: var(--app-bg); box-shadow: var(--shadow-lift); }
+
+/* The project search card, still, over a busy strip so its veil shows. */
+.ds-search { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-6); }
+.ds-search > .project-search-card { width: 360px; background-color: var(--search-veil-bg); }
+.ds-search-foot { justify-content: space-between; width: 240px; }

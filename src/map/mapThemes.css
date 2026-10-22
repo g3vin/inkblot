@@ -1,0 +1,134 @@
+/* ==== Map themes ====
+ *
+ * The colours a map is drawn in, chosen per map ([data-map-theme]). They are the
+ * map's content, like a printed page's paper and ink, so they hold raw values and
+ * `npm run lint:design` skips this file (docs/DESIGN.md → Guardrails). `clean`
+ * follows the app's light/dark theme; parchment, ink and night are fixed palettes,
+ * because a map drawn on parchment should not turn dark when the OS does.
+ */
+
+.map-surface,
+.map-inspector-panel {
+  --map-ink: #1b1f27;
+  --map-land: #e7e3d6;
+  --map-land-edge: #9c937e;
+  --map-water: #cfe1ee;
+  --map-border: rgba(80, 70, 60, 0.45);
+  --map-route: #b3462f;
+  --map-pin: #c0392b;
+  --map-region: #6d9c5a;
+  --map-label-font: 'Iowan Old Style', 'Palatino', Georgia, serif;
+  /* Space behind a 3D view, and behind a galaxy's picture. */
+  --map-space: #03050b;
+}
+
+:root[data-theme='dark'] .map-surface[data-map-theme='clean'] {
+  --map-ink: #eef1f6;
+  --map-land: #2e3a33;
+  --map-land-edge: #6f8a78;
+  --map-water: #16232e;
+  --map-border: rgba(210, 220, 230, 0.35);
+  --map-route: #f08a6c;
+  --map-pin: #ff7a66;
+}
+
+.map-surface[data-map-theme='parchment'] {
+  --map-paper: #d8c8a2;
+  --map-sheet: #efe2c1;
+  --map-ink: #3b2a1a;
+  --map-land: #e8d7ad;
+  --map-land-edge: #6b4f2e;
+  --map-water: #b9c9bf;
+  --map-border: rgba(90, 60, 30, 0.55);
+  --map-route: #7a2e1d;
+  --map-pin: #8c2f1f;
+  --map-region: #7c8b4f;
+}
+
+.map-surface[data-map-theme='ink'] {
+  --map-paper: #f4f1ea;
+  --map-sheet: #fbfaf6;
+  --map-ink: #121212;
+  --map-land: #fbfaf6;
+  --map-land-edge: #121212;
+  --map-water: #fbfaf6;
+  --map-border: rgba(18, 18, 18, 0.7);
+  --map-route: #121212;
+  --map-pin: #121212;
+  --map-region: #121212;
+}
+
+.map-surface[data-map-theme='night'] {
+  --map-paper: #0b1020;
+  --map-sheet: #111833;
+  --map-ink: #dbe4ff;
+  --map-land: #1c2747;
+  --map-land-edge: #7f9cff;
+  --map-water: #0b1020;
+  --map-border: rgba(127, 156, 255, 0.45);
+  --map-route: #ffcf6e;
+  --map-pin: #ffcf6e;
+  --map-region: #7f9cff;
+  --map-label-font: 'Avenir Next', 'Helvetica Neue', sans-serif;
+}
+
+
+/* A star system in 3D (the Cinematic look) is drawn against space whatever the
+   theme, so what is written over it is light. */
+.map-surface.is-space {
+  --map-ink: #e3e9f7;
+  --map-ink-soft: rgba(227, 233, 247, 0.6);
+  --map-route: #ffcf6e;
+  --map-pin: #ffcf6e;
+  --map-region: #7f9cff;
+  --map-halo: rgba(3, 5, 11, 0.85);
+  --map-space: #03050b;
+}
+
+/* ---- 3D looks (style.look) ----
+ * Cinematic is the night sky as rendered. Atlas and Ink lay it on paper: the scene's
+ * canvas is turned negative on the GPU (Atlas keeping its hues, Ink in one ink), so
+ * the same scene reads as a plate — and the names and places over it change ink to
+ * match. A printed plate in vector is the plotter's (space/plot/). */
+.map-surface.is-space[data-space-look='atlas'] {
+  --map-ink: #1b1f27;
+  --map-ink-soft: rgba(27, 31, 39, 0.6);
+  --map-route: #b3462f;
+  --map-pin: #c0392b;
+  --map-region: #3f6fd8;
+  --map-halo: rgba(248, 246, 240, 0.9);
+  --map-space: #f8f6f0;
+}
+
+.map-surface.is-space[data-space-look='atlas'] .map-space-canvas {
+  filter: invert(1) hue-rotate(180deg) saturate(1.25);
+}
+
+.map-surface.is-space[data-space-look='ink'] {
+  --map-ink: #111111;
+  --map-ink-soft: rgba(17, 17, 17, 0.6);
+  --map-route: #111111;
+  --map-pin: #111111;
+  --map-region: #111111;
+  --map-halo: rgba(255, 255, 255, 0.92);
+  --map-space: #ffffff;
+}
+
+.map-surface.is-space[data-space-look='ink'] .map-space-canvas {
+  filter: grayscale(1) invert(1) contrast(1.25);
+}
+
+/* Ink on parchment is sepia. */
+.map-surface.is-space[data-space-look='ink'][data-map-theme='parchment'] {
+  --map-ink: #3b2a17;
+  --map-ink-soft: rgba(59, 42, 23, 0.6);
+  --map-route: #3b2a17;
+  --map-pin: #3b2a17;
+  --map-region: #3b2a17;
+  --map-halo: rgba(244, 236, 216, 0.92);
+  --map-space: #f4ecd8;
+}
+
+.map-surface.is-space[data-space-look='ink'][data-map-theme='parchment'] .map-space-canvas {
+  filter: grayscale(1) invert(1) contrast(1.2) sepia(0.6);
+}

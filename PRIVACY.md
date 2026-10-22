@@ -1,6 +1,6 @@
 # Inkblot Privacy Policy
 
-Last updated: September 24, 2026
+Last updated: October 14, 2026
 
 Inkblot is a local-first writing application. This Privacy Policy explains what information Inkblot handles, where that information is stored, and when information may be sent to third-party services as part of features you choose to use.
 
@@ -10,7 +10,7 @@ For purposes of this policy, "Inkblot," "we," "us," and "our" refer to the devel
 
 Inkblot is designed so your writing stays on your device by default. We do not operate user accounts, advertising systems, analytics trackers, or cloud synchronization servers for Inkblot. We do not sell your personal information.
 
-Some optional features may contact third-party services to provide the feature you requested, such as dictionary lookups, looking up the details of a source you cite, Pinterest previews and searches, or downloading local machine-learning model files. Those third-party services may receive technical information such as your IP address and request details, and their own privacy policies apply.
+Some optional features may contact third-party services to provide the feature you requested, such as dictionary lookups, looking up the details of a source you cite, online maps (satellite pictures, street detail, terrain and place search), Pinterest previews and searches, or downloading local machine-learning model files. Those third-party services may receive technical information such as your IP address and request details, and their own privacy policies apply.
 
 ## Information Inkblot Stores Locally
 
@@ -68,6 +68,20 @@ When you add a source by pasting a DOI, ISBN, arXiv or PubMed identifier, or a w
 
 Citation and bibliography formatting runs on your device.
 
+## Online Maps
+
+Maps work offline: the Earth's coastlines and borders are bundled with the app, and planets, star systems and galaxies are drawn on your device. Online maps are off until you turn them on, either when Inkblot asks the first time you choose satellite pictures, street detail or terrain, or in Settings › Maps.
+
+When online maps are on and an Earth map shows them, Inkblot downloads map tiles for the part of the world you are looking at:
+
+- Satellite pictures from EOX (Sentinel-2 cloudless, `tiles.maps.eox.at`), or from the provider you choose in Settings › Maps (MapTiler, Mapbox, Google Maps Platform, or a tile address you enter). If a provider needs an API key, the key is stored in Inkblot's preferences on your device, never in a project, and is sent only to that provider.
+- Street detail and place names from OpenFreeMap (`tiles.openfreemap.org`), built from OpenStreetMap data.
+- Terrain heights from the Terrain Tiles dataset hosted on Amazon Web Services (`s3.amazonaws.com`).
+
+When you search a map for a real place, the words you type are sent to Photon (`photon.komoot.io`), run by komoot, which returns matching places.
+
+These services receive which tiles are requested (and so roughly which part of the world you are viewing and at what zoom), your search words when you search, your IP address and normal request metadata. Nothing from your project — the places, routes, regions or notes you add to a map — is sent. Turn online maps off in Settings › Maps to stop all of these requests.
+
 ## Pinterest Features
 
 Inkblot can open Pinterest searches and embed or preview Pinterest boards when you paste or use Pinterest URLs. When you use these features, Inkblot may contact Pinterest domains, Pinterest widget services, Pinterest image CDNs, or open Pinterest in a separate app webview.
@@ -84,6 +98,7 @@ Depending on the features you use, Inkblot may interact with:
 - `dictionaryapi.dev`, for dictionary definitions.
 - `doi.org`, Crossref, Open Library, Google Books, arXiv, PubMed, YouTube and Vimeo, and the web pages you cite, for looking up source details.
 - Google, when you choose to search the web for selected text.
+- EOX, OpenFreeMap, Amazon Web Services and Photon (komoot), and the satellite provider you choose (MapTiler, Mapbox, Google Maps Platform, or your own), for online maps when you turn them on.
 - GitHub, for downloading local model files the first time a feature needs them.
 - Hugging Face or model-library infrastructure, for downloading local speech, dictation or tokenizer model files when needed.
 - Your operating system, for microphone permission, clipboard access, file storage, audio playback, and system speech.
@@ -147,7 +162,7 @@ For App Store privacy disclosures, Inkblot's current intended posture is:
 - Data used for tracking: none.
 - Data linked to the user by the developer: none.
 - User content stored on device: documents, notes, images, voice memos, cited sources, clipboard history, dictation output, and version history.
-- Third-party requests: optional feature requests to Pinterest, `dictionaryapi.dev`, the source lookup services listed above, Google web search, GitHub, Hugging Face/model hosts, and operating-system services as described in this policy.
+- Third-party requests: optional feature requests to Pinterest, `dictionaryapi.dev`, the source lookup services listed above, the online map services listed above, Google web search, GitHub, Hugging Face/model hosts, and operating-system services as described in this policy.
 
 Confirm these disclosures before submission if you add analytics, accounts, crash reporting, cloud sync, payments, or other networked features.
 

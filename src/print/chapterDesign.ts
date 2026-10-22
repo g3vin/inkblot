@@ -53,7 +53,7 @@ export const designFor = (
   return {
     ...DEFAULT_CHAPTER_DESIGN,
     showNumber: numbered,
-    // Numbered chapters used to keep their title only when asked to.
+    // Before designs, the numbering's includeTitle (on unless turned off) kept a numbered chapter's title.
     showTitle: !numbered || book?.chapterNumbering?.includeTitle !== false,
     chapterBreak: setup?.chapterStartsOnRecto ? ChapterBreak.NewRightPage : ChapterBreak.NewPage,
   }
@@ -125,7 +125,7 @@ export const editCovers = <B extends Partial<BookSettings>>(
   switch (action) {
     case 'add': return withCovers(book, [...covers, { id: newId, name: unique(name?.trim() || 'Cover'), fit: CoverFit.Fill }], newId)
     case 'duplicate':
-      return target ? withCovers(book, [...covers, { ...target, id: newId, name: unique(`${target.name} Copy`) }], newId) : book
+      return target ? withCovers(book, [...covers, { ...target, id: newId, name: unique(`${target.name} copy`) }], newId) : book
     case 'rename':
       return target && name?.trim() ? withCovers(book, covers.map((c) => (c === target ? { ...c, name: name.trim() } : c)), activeCover) : book
     case 'delete': {

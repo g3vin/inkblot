@@ -179,7 +179,7 @@ export function useReferences({ projectName, activeDoc, panes }) {
       return () => editor.off('update', read)
     })
     return () => cleanups.forEach((cleanup) => cleanup())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `panes` changes identity every render; its editors are what matter
   }, [openKey, ...(panes || []).map((pane) => pane.editor)])
 
   useEffect(() => {

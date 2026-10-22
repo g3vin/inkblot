@@ -1,17 +1,17 @@
 /**
  * ConversationTile.js — embeddable fake text-message conversation node.
  *
- * A block node that renders an iMessage-style chat mockup for writing
- * dialogue: named participants (1:1 or group), editable message bubbles
- * with photos and read receipts, per-side colors, and alignment/width
- * controls. All state lives in node attributes (messages/participants
+ * A block node that renders a chat mockup for writing dialogue: named
+ * participants (1:1 or group), editable message bubbles with photos and read
+ * receipts, a style (Inkblot, iMessage or Generic; conversationStyles.ts), and
+ * alignment/width controls. All state lives in node attributes (messages/participants
  * serialized as JSON strings), and the node renders a static HTML
  * "snapshot" attribute so saved documents can display the tile without
  * the interactive node view.
  */
 import { Node } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
-import { createResizeIconElement } from '../lib/resizeIcon'
+import iconElement from '../ui/iconElement.js'
 
 import {
   DEFAULT_ATTRS,
@@ -19,7 +19,6 @@ import {
   DEFAULT_MESSAGES,
   DEFAULT_PARTICIPANTS,
   DEFAULT_WIDTH,
-  MAX_SNAPSHOT_WIDTH,
   MESSAGE_RECEIPTS,
   MESSAGE_RECEIPT_LABELS,
   MIN_WIDTH,
@@ -34,7 +33,15 @@ import {
   safeJsonParse,
 } from './conversationModel'
 import { buildSnapshot, estimateSnapshotHeight } from './conversationSnapshot'
-import { makeButton, makeColorInput, makeTextInput, readImageFile } from './conversationWidgets'
+import { makeButton, makeSelect, makeTextInput, readImageFile } from './conversationWidgets'
+import {
+  CONVERSATION_STYLES,
+  CONVERSATION_STYLE_IDS,
+  LEGACY_CONVERSATION_STYLE,
+  conversationLook,
+  conversationVars,
+  normalizeConversationStyle,
+} from './conversationStyles'
 import { createMessageDragController } from './conversationMessageDrag'
 
 const ConversationTile = Node.create({
@@ -73,6 +80,13 @@ const ConversationTile = Node.create({
         default: null,
         parseHTML: element => parseNumber(element.getAttribute('data-snapshot-height'), null),
         renderHTML: attributes => attributes.snapshotHeight ? { 'data-snapshot-height': attributes.snapshotHeight } : {},
+      },
+      // Absent on a tile saved before styles existed, which keeps the iMessage look;
+      // insertConversationTile gives a new tile the default (Inkblot).
+      style: {
+        default: LEGACY_CONVERSATION_STYLE,
+        parseHTML: element => normalizeConversationStyle(element.getAttribute('data-conversation-style'), LEGACY_CONVERSATION_STYLE),
+        renderHTML: attributes => ({ 'data-conversation-style': normalizeConversationStyle(attributes.style, LEGACY_CONVERSATION_STYLE) }),
       },
       groupChat: {
         default: false,
@@ -191,7 +205,7 @@ const ConversationTile = Node.create({
       const resizeHandle = document.createElement('span')
       resizeHandle.className = 'conversation-resize-handle'
       resizeHandle.contentEditable = 'false'
-      resizeHandle.appendChild(createResizeIconElement())
+      resizeHandle.appendChild(iconElement('resize'))
 
       const selectNode = () => {
         const pos = typeof getPos === 'function' ? getPos() : null
@@ -326,7 +340,7 @@ const ConversationTile = Node.create({
       }
 
       const addGroupMember = () => {
-        const baseName = 'New Person'
+        const baseName = 'New person'
         const existingNames = new Set(currentAttrs.groupMembers.map(member => member.name))
         let name = baseName
         let count = 2
@@ -442,7 +456,7 @@ const ConversationTile = Node.create({
             snapshot: '',
           })
         })
-        groupLabel.append(groupCheckbox, document.createTextNode('Group'))
+        groupLabel.append(groupCheckbox, document.createTextNode('Group chat'))
 
         const timeLabel = document.createElement('label')
         timeLabel.className = 'conversation-toggle-control'
@@ -455,7 +469,7 @@ const ConversationTile = Node.create({
           saved: false,
           snapshot: '',
         }))
-        timeLabel.append(timeCheckbox, document.createTextNode('Time'))
+        timeLabel.append(timeCheckbox, document.createTextNode('Times'))
 
         const receiptsLabel = document.createElement('label')
         receiptsLabel.className = 'conversation-toggle-control'
@@ -470,12 +484,12 @@ const ConversationTile = Node.create({
         }))
         receiptsLabel.append(receiptsCheckbox, document.createTextNode('Receipts'))
 
-        const outgoingColor = makeColorInput('Outgoing bubble color', currentAttrs.outgoingColor, value => {
-          commitAttributes({ outgoingColor: value, saved: false, snapshot: '' })
-        })
-        const incomingColor = makeColorInput('Incoming bubble color', currentAttrs.incomingColor, value => {
-          commitAttributes({ incomingColor: value, saved: false, snapshot: '' })
-        })
+        const styleSelect = makeSelect(
+          'Style',
+          currentAttrs.style,
+          CONVERSATION_STYLE_IDS.map(id => ({ value: id, label: CONVERSATION_STYLES[id].label })),
+          style => commitAttributes({ style, saved: false, snapshot: '' })
+        )
 
         const membersControl = document.createElement('div')
         membersControl.className = 'conversation-members-control'
@@ -519,7 +533,7 @@ const ConversationTile = Node.create({
 
             const photoLabel = document.createElement('label')
             photoLabel.className = 'conversation-member-photo'
-            photoLabel.textContent = member.avatarSrc ? 'Change PFP' : 'Add PFP'
+            photoLabel.textContent = member.avatarSrc ? 'Change photo' : 'Add photo'
             const photoInput = document.createElement('input')
             photoInput.type = 'file'
             photoInput.accept = 'image/*'
@@ -544,7 +558,7 @@ const ConversationTile = Node.create({
           })
 
           membersMenu.appendChild(
-            makeButton('+ Member', 'Add group member', addGroupMember, 'conversation-add-member-button')
+            makeButton('+ Member', 'Add member', addGroupMember, 'conversation-add-member-button')
           )
           membersControl.appendChild(membersMenu)
         }
@@ -554,8 +568,7 @@ const ConversationTile = Node.create({
           currentAttrs.groupChat ? membersControl : document.createTextNode(''),
           timeLabel,
           receiptsLabel,
-          outgoingColor,
-          incomingColor,
+          styleSelect,
         )
       }
 
@@ -662,8 +675,6 @@ const ConversationTile = Node.create({
 
         const bubble = document.createElement('div')
         bubble.className = 'conversation-bubble'
-        bubble.style.background = isOutgoing ? currentAttrs.outgoingColor : currentAttrs.incomingColor
-        bubble.style.color = isOutgoing ? currentAttrs.outgoingTextColor : currentAttrs.incomingTextColor
 
         if (message.imageSrc) {
           const imageWrap = document.createElement('div')
@@ -703,7 +714,7 @@ const ConversationTile = Node.create({
 
         const imageLabel = document.createElement('label')
         imageLabel.className = 'conversation-attach-image conversation-bubble-attach'
-        imageLabel.textContent = 'Attach Image'
+        imageLabel.textContent = 'Attach image'
         imageLabel.setAttribute('aria-label', 'Attach image')
         imageLabel.addEventListener('pointerdown', event => event.stopPropagation())
         const imageInput = document.createElement('input')
@@ -836,8 +847,6 @@ const ConversationTile = Node.create({
 
           const bubble = document.createElement('div')
           bubble.className = 'conversation-saved-bubble'
-          bubble.style.background = isOutgoing ? currentAttrs.outgoingColor : currentAttrs.incomingColor
-          bubble.style.color = isOutgoing ? currentAttrs.outgoingTextColor : currentAttrs.incomingTextColor
 
           if (message.imageSrc) {
             const image = document.createElement('img')
@@ -894,6 +903,8 @@ const ConversationTile = Node.create({
           isSelected ? 'is-selected' : '',
         ].filter(Boolean).join(' ')
         container.style.width = `${currentAttrs.width}px`
+        Object.entries(conversationVars(conversationLook(currentAttrs)))
+          .forEach(([name, value]) => container.style.setProperty(name, value))
 
         toolbar.style.display = isSelected ? 'flex' : 'none'
         resizeHandle.style.display = isSelected ? 'inline-flex' : 'none'

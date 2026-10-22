@@ -30,17 +30,17 @@ export const needsTabBar = (tabs) => (tabs?.length ?? 0) > 1 || Boolean(tabs?.[0
 
 /** The file's own name, without the kind suffix routing reads. */
 export function tabName(docPath) {
-  if (!docPath) return 'New Tab'
+  if (!docPath) return 'New tab'
   const leaf = docPath.split('/').pop() ?? docPath
   for (const suffix of ['.canvas', '.map']) if (leaf.endsWith(suffix)) return leaf.slice(0, -suffix.length)
   return leaf
 }
 
-export function tabSymbol(docPath) {
-  if (!docPath) return 'plus'
-  if (docPath.endsWith('.canvas')) return 'rectangle.on.rectangle'
+export function tabIcon(docPath) {
+  if (!docPath) return 'add'
+  if (docPath.endsWith('.canvas')) return 'group'
   if (docPath.endsWith('.map')) return 'map'
-  return 'doc.text'
+  return 'document'
 }
 
 const folderOf = (docPath) => {
@@ -69,3 +69,8 @@ export function adjacentTab(tabs, activeId, offset) {
   const from = Math.max(0, tabs.findIndex((tab) => tab.id === activeId))
   return tabs[((from + offset) % tabs.length + tabs.length) % tabs.length]
 }
+
+/** Whether a point in the page lies outside the window altogether: a tab let go there pops out. */
+export const outsideWindow = (point, width = window.innerWidth, height = window.innerHeight) => Boolean(point) && (
+  point.x < 0 || point.y < 0 || point.x > width || point.y > height
+)

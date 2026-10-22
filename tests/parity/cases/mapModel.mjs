@@ -27,8 +27,8 @@ const WRONG = [null, 7, -3, 0, 'text', '', true, [], [1], {}, { nested: 1 }]
 /** Every section of a map, each given every wrong type in turn. */
 function* wrongTypedMaps() {
   const sections = [
-    'mapKind', 'scale', 'background', 'earth', 'system', 'pins', 'routes', 'regions', 'terrains',
-    'labels', 'transports', 'travelers', 'timeline', 'style', 'viewport',
+    'mapKind', 'scale', 'background', 'earth', 'surface', 'system', 'galaxy', 'universe', 'model', 'pins', 'routes',
+    'regions', 'terrains', 'labels', 'transports', 'travelers', 'layers', 'views', 'timeline', 'style', 'viewport',
   ]
   for (const section of sections) {
     for (const value of WRONG) yield { [section]: value }
@@ -58,7 +58,7 @@ export const FULL = {
       { name: 'unnamed id' },
       { id: 'sun', name: 'duplicate' },
     ],
-    display: { radial: 'spiral', pxPerAU: 250 },
+    display: { radial: 'spiral', pxPerAU: 250, view: '3d' },
   },
   pins: [
     { id: 'harbour', name: 'Old Harbour', at: [120.5, 88], doc: 'Settings/Harbour', glow: true },
@@ -123,7 +123,44 @@ export const FULL = {
   viewport: { x: -40.25, y: 12, zoom: 0 },
 }
 
+/** The 3D kinds, every new key given good values, bad values and none. */
+export const SPACE = {
+  mapKind: 'system',
+  earth: { projection: 'orthographic', view: 'sideways', imagery: 'satellite', terrain3d: 1 },
+  surface: {
+    radiusKm: -1, axialTiltDeg: 400, dayHours: 0, terrainFromRegions: false, atmosphere: 'thin', moons: 2,
+    look: { kind: 'lava', seed: 'abc', seaLevel: 1.4, roughness: -0.2, palette: 7, texture: '.assets/x.png', temperatureK: 3000, extra: true },
+  },
+  galaxy: { type: 'SBb', seed: 42.5, radiusLy: 0, thicknessLy: 800, params: { arms: 4 }, tilt: 12 },
+  universe: { seed: [], extentMpc: 120 },
+  model: { asset: '.assets/station.glb', metresPerUnit: 0, up: 'x' },
+  system: {
+    dynamics: 'nbody',
+    plane: { tiltDeg: 23.5, headingDeg: 'north' },
+    nbody: { stepDays: -1, softeningAU: 0.01, horizonDays: 'forever' },
+    bodies: [
+      { id: 'a', kind: 'star', state: { pos: [0.97, -0.24, 0], vel: [0.0080, 0.0075, 0] }, axialTiltDeg: 7.25, rotationHours: 609 },
+      { id: 'b', kind: 'star', state: { pos: [-0.97, 0.24], vel: [0, 0, 0] }, rings: { innerKm: 5, outerKm: 2 } },
+      { id: 'c', parent: 'a', orbit: { aAU: 2, inclinationDeg: 12, ascendingNodeDeg: 'up' }, rings: { innerKm: 70000, outerKm: 140000, color: 3 }, surface: 'Worlds/C' },
+      { id: 'd', state: 'still', surface: 9 },
+    ],
+  },
+  pins: [
+    { id: 'p3', at: [1, 2, 3], layer: 'ships', from: 4, until: 'later', fromEvent: 'e1', untilEvent: 2, doc: 'Systems/Sol.map' },
+    { id: 'p4', at: [1, 2, 'z'] },
+    { id: 'p5', at: [1, 2, 3, 4] },
+  ],
+  routes: [{ id: 'lane', nodes: [{ pin: 'p3' }, { at: [9, 9, 9] }], layer: 7, from: 1.5 }],
+  regions: [{ id: 'zone', rings: [[[0, 0, 1], [1, 0, 1], [1, 1]]], until: 10 }],
+  labels: [{ id: 'l', text: 'Deep', at: [0, 0, -5], fromEvent: 'e9' }],
+  layers: [{ id: 'ships', name: 'Ships', visible: false }, { name: 7, locked: 'yes' }, 'layer', { id: 'ships' }],
+  views: [{ id: 'v', name: 'Approach', camera: { position: [1, 2, 3], ortho: true }, day: 40 }, { camera: 'top' }],
+  style: { look: 'noir', legend: { show: true, at: [0.1, 0.2, 0.3] } },
+}
+
 const RAW_MAPS = [
+  SPACE,
+  { ...SPACE, mapKind: 'galaxy' },
   null,
   undefined,
   7,

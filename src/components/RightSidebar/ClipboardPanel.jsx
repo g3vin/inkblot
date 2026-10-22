@@ -1,17 +1,23 @@
 /**
  * ClipboardPanel.jsx — the Clipboard tab of the right sidebar.
  *
- * Shows the copy history as draggable tiles: dragging a tile into an editor
- * pane moves the text into the document, and dropping editor selections or
- * external text onto this panel adds a clipboard entry.
+ * Shows the copy history as pieces straight on the panel, one per section, each
+ * collapsible: copied text, or a copied image shown as itself. Each piece's header
+ * holds its actions: make it a note, copy it, delete it. Dragging a piece of text carries it into an editor
+ * pane (useClipboardPieceDrag), and dropping editor selections or external text onto
+ * this panel adds a clipboard entry.
  *
- * This panel and the editor are the two ends of one drag, and they meet on
- * `bridge/dragHandoff`. A drop both of them can see is *claimed*, so which one handles
- * it does not depend on the order their listeners run in.
+ * Drops onto the panel meet the editor on `bridge/dragHandoff`. A drop both of them
+ * can see is *claimed*, so which one handles it does not depend on the order their
+ * listeners run in.
  */
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { dragHandoff, DragPayloadKind } from '../../bridge'
-import SFIcon from '../SFIcon'
+import IconButton from '../../ui/IconButton.jsx'
+import Section from '../../ui/Section.jsx'
+import { EmptyState } from '../../ui/Surfaces.jsx'
+import { useClipboardPieceDrag } from './useClipboardPieceDrag'
 
 const formatTimestamp = (iso) => {
   if (!iso) return ''
@@ -24,14 +30,33 @@ const formatTimestamp = (iso) => {
   }
 }
 
-export default function ClipboardPanel({ entries = [], query = '', onDropToClipboard }) {
+const firstLine = (text = '') => text.trim().split('\n')[0]
+
+const isImage = (entry) => entry?.kind === 'image'
+
+// The clipboard takes images as PNG; anything else is redrawn as one.
+const imageAsPng = async (src) => {
+  const blob = await (await fetch(src)).blob()
+  if (blob.type === 'image/png') return blob
+  const bitmap = await createImageBitmap(blob)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  canvas.getContext('2d').drawImage(bitmap, 0, 0)
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((png) => (png ? resolve(png) : reject(new Error('Could not redraw the image'))), 'image/png')
+  })
+}
+
+export default function ClipboardPanel({ entries = [], query = '', onDropToClipboard, onRemoveEntry, onMakeNote }) {
   const [copiedId, setCopiedId] = useState('')
   const [dropActive, setDropActive] = useState(false)
   const panelRef = useRef(null)
+  const { ghost, ghostRef, onPointerDown } = useClipboardPieceDrag()
   const normalizedQuery = query.trim().toLowerCase()
   const visibleEntries = normalizedQuery
     ? entries.filter((entry) => (
-        `${entry.docName || ''} ${entry.text || ''} ${entry.timestamp || ''}`
+        `${entry.docName || ''} ${isImage(entry) ? 'image' : entry.text || ''} ${entry.timestamp || ''}`
           .toLowerCase()
           .includes(normalizedQuery)
       ))
@@ -50,62 +75,20 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     )
   }
 
-  useEffect(() => {
-    return () => {
-      // Unmounting mid-drag ends it: there is no longer a source to move from.
-      if (dragHandoff.current()?.kind === DragPayloadKind.ClipboardEntry) dragHandoff.end()
-    }
-  }, [])
-
   const copyEntry = async (entry) => {
-    if (!entry?.text) return
+    if (isImage(entry) ? !entry.src : !entry?.text) return
     try {
-      await navigator.clipboard.writeText(entry.text)
+      if (isImage(entry)) {
+        // The item takes the promise, so the write still counts as the click's.
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': imageAsPng(entry.src) })])
+      } else {
+        await navigator.clipboard.writeText(entry.text)
+      }
       setCopiedId(entry.id)
       window.setTimeout(() => setCopiedId(''), 1100)
     } catch (e) {
       console.error('Failed to copy clipboard entry:', e)
     }
-  }
-
-  const beginTileDrag = (entry) => dragHandoff.begin({
-    kind: DragPayloadKind.ClipboardEntry,
-    text: entry.text || '',
-    sourceId: entry.id,
-  })
-
-  const startTileDrag = (event, entry) => {
-    beginTileDrag(entry)
-    try {
-      const payload = JSON.stringify({ id: entry.id, text: entry.text })
-      event.dataTransfer?.setData(
-        'application/x-inkblot-clipboard-entry',
-        payload
-      )
-      event.dataTransfer?.setData('text/plain', entry.text || '')
-      if (event.dataTransfer) {
-        event.dataTransfer.effectAllowed = 'move'
-      }
-    } catch (e) {}
-  }
-
-  // The pointer can reach a tile before `dragstart` fires, and the drop caret needs
-  // the payload during `dragover` — where dataTransfer is unreadable.
-  const primeTileDrag = (entry) => { beginTileDrag(entry) }
-
-  const endTileDrag = (event, entry) => {
-    const point = dragHandoff.point()
-    const x = event?.clientX ?? point?.x ?? null
-    const y = event?.clientY ?? point?.y ?? null
-
-    try {
-      window.dispatchEvent(new CustomEvent('inkblot:clipboard-dragend-drop', {
-        detail: { id: entry.id, text: entry.text || '', x, y },
-      }))
-    } catch (e) {}
-
-    dragHandoff.end({ x, y })
-    setDropActive(false)
   }
 
   const handleDragOver = (event) => {
@@ -265,6 +248,7 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     <div
       ref={panelRef}
       className={`sidebar-panel clipboard-panel${dropActive ? ' drop-active' : ''}`}
+      data-help="clipboard.panel"
       onDragOverCapture={handleDragOver}
       onDragEnterCapture={() => setDropActive(true)}
       onDragLeaveCapture={handleDragLeave}
@@ -272,41 +256,68 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     >
       <div className={`clipboard-list${visibleEntries.length === 0 ? ' is-empty' : ''}`}>
         {visibleEntries.length === 0 ? (
-          <div className="notes-empty clipboard-empty-state">
-            {entries.length === 0 ? 'Copy text or drag selected text here.' : 'No matching clipboard items.'}
-          </div>
+          entries.length === 0 ? (
+            <EmptyState
+              className="clipboard-empty-state"
+              icon="clipboard"
+              title="Nothing copied yet."
+              hint="Copy some text or an image, or drag a selection here, to keep it to hand."
+              dropActive={dropActive}
+            />
+          ) : <EmptyState compact title="No matching clipboard items." />
         ) : (
-          visibleEntries.map((entry) => (
-            <div
-              key={entry.id}
-              className="tile clipboard-item"
-              draggable
-              onMouseDown={() => primeTileDrag(entry)}
-              onDragStart={(event) => startTileDrag(event, entry)}
-              onDragEnd={(event) => endTileDrag(event, entry)}
-            >
-              <div className="clipboard-item-header">
-                <span className="clipboard-meta">
-                  {entry.docName || 'Untitled'} {entry.timestamp ? `• ${formatTimestamp(entry.timestamp)}` : ''}
-                </span>
-              </div>
-
-              <div className="clipboard-text">{entry.text}</div>
-
-              <div className="clipboard-actions">
-                <button
-                  className="clipboard-icon-btn panel-action-btn panel-icon-btn"
-                  onClick={() => copyEntry(entry)}
-                  title={copiedId === entry.id ? 'Copied' : 'Copy'}
-                  aria-label={copiedId === entry.id ? 'Copied' : 'Copy'}
+          visibleEntries.map((entry) => {
+            const copied = copiedId === entry.id
+            const image = isImage(entry)
+            const meta = [entry.docName || 'Untitled', formatTimestamp(entry.timestamp)].filter(Boolean).join(' · ')
+            return (
+              <div
+                key={entry.id}
+                className={`clipboard-item${image ? ' is-image' : ''}`}
+                onPointerDown={(event) => {
+                  // Only words can be dropped into the page.
+                  if (image) return
+                  const open = event.currentTarget.querySelector('.ui-section')?.dataset.open === 'true'
+                  onPointerDown(event, entry, event.currentTarget.querySelector(open ? '.clipboard-text' : '.clipboard-peek'))
+                }}
+              >
+                <Section
+                  title={(
+                    <>
+                      <span className="clipboard-peek">{image ? 'Image' : firstLine(entry.text)}</span>
+                      <span className="clipboard-meta">{meta}</span>
+                    </>
+                  )}
+                  accessory={(
+                    <>
+                      <IconButton icon="note" label="Make a note" size="circle" onClick={() => onMakeNote?.(entry)} />
+                      <IconButton
+                        icon={copied ? 'check' : 'copy'}
+                        label={copied ? 'Copied' : 'Copy'}
+                        size="circle"
+                        onClick={() => copyEntry(entry)}
+                      />
+                      <IconButton icon="delete" label="Delete" size="circle" onClick={() => onRemoveEntry?.(entry.id)} />
+                    </>
+                  )}
                 >
-                  <SFIcon name={copiedId === entry.id ? 'checkmark' : 'doc.on.doc'} />
-                </button>
+                  {image ? (
+                    <img className="clipboard-image" src={entry.src} alt="Copied image" draggable={false} />
+                  ) : (
+                    <div className="clipboard-text">{entry.text}</div>
+                  )}
+                </Section>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
+      {ghost ? createPortal(
+        <div ref={ghostRef} className="clipboard-ghost" style={{ width: ghost.width }} aria-hidden="true">
+          {ghost.text}
+        </div>,
+        document.body,
+      ) : null}
     </div>
   )
 }

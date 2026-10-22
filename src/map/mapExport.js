@@ -13,8 +13,9 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import mapCss from './Map.css?raw'
 import MapLayers, { MapDefs } from './MapLayers'
-import { CompassRose } from './mapGlyphs'
-import { scaleBarFor } from './mapChromeMath'
+import { CompassRose, MapKey } from './mapGlyphs'
+import { NO_NORTH, scaleBarFor } from './mapChromeMath'
+import { legendEntries } from './mapLegend'
 import { assetUrl } from '../lib/assets'
 import { projectedEarth } from '../lib/map/earthData'
 import { earthLevelFor } from './mapRender'
@@ -52,10 +53,11 @@ const escapeXml = (text) => String(text).replace(/[<>&"]/g, (char) => ({ '<': '&
 /**
  * The map as an SVG string. `frame` is what to show — `'view'` (the visible part,
  * given the view's `viewport` and pixel `viewSize`) or `'all'` (the whole sheet, world
- * or system) — and `scale` multiplies the pixel size.
+ * or system) — and `scale` multiplies the pixel size. A globe or a 3D view passes
+ * its own picture as `backdrop` (a data URL), drawn under the places and labels.
  */
 export async function buildMapSvg({
-  map, projector, space, day, schedules, projectName, surface, viewport, viewSize, frame = 'view', scale = 1,
+  map, projector, space, day, schedules, projectName, surface, viewport, viewSize, frame = 'view', scale = 1, backdrop = null,
 }) {
   let rect
   if (frame === 'all') rect = projector.bounds
@@ -91,7 +93,14 @@ export async function buildMapSvg({
   const chrome = []
   const at = (fraction) => [fraction[0] * pixelWidth, fraction[1] * pixelHeight]
   const { style } = map
-  if (style.compass.show && map.mapKind !== 'system') {
+  if (style.legend.show) {
+    const entries = legendEntries(map, day)
+    if (entries.length) {
+      const [x, y] = at(style.legend.at)
+      chrome.push(`<g transform="translate(${x} ${y}) scale(${scale})">${renderToStaticMarkup(createElement(MapKey, { entries }))}</g>`)
+    }
+  }
+  if (style.compass.show && !NO_NORTH.has(map.mapKind)) {
     const [x, y] = at(style.compass.at)
     const size = style.compass.size * scale
     chrome.push(`<g transform="translate(${x - size / 2} ${y - size / 2})" style="color:var(--map-ink)">${renderToStaticMarkup(createElement(CompassRose, { size, variant: style.compass.style }))}</g>`)
@@ -130,6 +139,7 @@ export async function buildMapSvg({
       `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${pixelWidth}" height="${pixelHeight}" viewBox="0 0 ${pixelWidth} ${pixelHeight}">` +
       `<style>svg{${variables}--map-inv-zoom:${1 / drawnZoom};}${worldCss()}</style>` +
       `<rect width="100%" height="100%" fill="var(--map-paper)"/>` +
+      (backdrop ? `<image href="${backdrop}" x="0" y="0" width="${pixelWidth}" height="${pixelHeight}" preserveAspectRatio="none"/>` : '') +
       `<g transform="translate(${-rect.x * drawnZoom} ${-rect.y * drawnZoom}) scale(${drawnZoom})">${layers}</g>` +
       chrome.join('') +
       `</svg>`,

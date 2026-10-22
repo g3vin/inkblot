@@ -17,6 +17,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
+use crate::types::json::JsonValue;
+
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -24,7 +26,15 @@ pub enum MapKind {
     Blank,
     Image,
     Earth,
+    /// A planet or a star of the writer's own: a globe of `surface`.
+    Planet,
     System,
+    /// Star systems placed in a galaxy, in light-years.
+    Galaxy,
+    /// Galaxies placed in a universe, in megaparsecs.
+    Universe,
+    /// A 3D model (a station, a ship) to look around and pin.
+    Model,
 }
 
 #[typeshare]
@@ -100,6 +110,82 @@ pub struct MapEarth {
     pub borders: bool,
     /// `auto`, `110m` or `50m`.
     pub detail: String,
+    /// `globe` (the zoomable globe) or `flat` (`projection`).
+    pub view: String,
+    /// `map`, `satellite` or `hybrid`; anything but `map` is fetched online.
+    pub imagery: String,
+    /// Mountains raised in 3D on the globe (online elevation).
+    pub terrain3d: bool,
+}
+
+/// What a planet's or star's ground looks like.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapSurfaceLook {
+    /// `generated`, `texture`, `gas`, `ice` or `star`.
+    pub kind: String,
+    /// Every generated surface is its seed's own.
+    pub seed: f64,
+    /// 0–1: how much of a generated world is under water.
+    pub sea_level: f64,
+    /// 0–1: how rugged its land is.
+    pub roughness: f64,
+    pub palette: String,
+    /// An equirectangular picture in `.assets/`, for `texture`.
+    #[typeshare(typescript(type = "string | null"))]
+    pub texture: Option<String>,
+    /// A star's surface temperature, which sets its colour.
+    pub temperature_k: f64,
+}
+
+/// A planet or star map's globe.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapSurface {
+    pub radius_km: f64,
+    pub axial_tilt_deg: f64,
+    pub day_hours: f64,
+    pub look: MapSurfaceLook,
+    /// Regions drawn as land raise the generated ground.
+    pub terrain_from_regions: bool,
+    pub atmosphere: bool,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapGalaxy {
+    /// A Hubble class (`E0`…`E7`, `S0`, `Sa`…`Sd`, `SBa`…`SBd`) or `ring`, `irregular`,
+    /// `dwarf`, `peculiar`.
+    #[serde(rename = "type")]
+    pub galaxy_type: String,
+    pub seed: f64,
+    pub radius_ly: f64,
+    pub thickness_ly: f64,
+    /// Shape settings the writer pinned; the seed decides the rest.
+    pub params: HashMap<String, JsonValue>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapUniverse {
+    pub seed: f64,
+    pub extent_mpc: f64,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapModel {
+    /// A `.glb` in `.assets/`.
+    #[typeshare(typescript(type = "string | null"))]
+    pub asset: Option<String>,
+    pub metres_per_unit: f64,
+    /// `y` or `z`: which way is up in the model's file.
+    pub up: String,
 }
 
 #[typeshare]
@@ -131,6 +217,29 @@ pub struct MapOrbit {
     #[typeshare(typescript(type = "number | null"))]
     pub period_days: Option<f64>,
     pub retrograde: bool,
+    /// Tilt of the orbit out of the system's plane.
+    pub inclination_deg: f64,
+    /// Where the orbit crosses the plane going up.
+    pub ascending_node_deg: f64,
+}
+
+/// An N-body body's start: position (AU) and velocity (AU a day) on day 0.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapBodyState {
+    pub pos: Vec<f64>,
+    pub vel: Vec<f64>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapRings {
+    pub inner_km: f64,
+    pub outer_km: f64,
+    #[typeshare(typescript(type = "string | null"))]
+    pub color: Option<String>,
 }
 
 #[typeshare]
@@ -150,6 +259,17 @@ pub struct MapBody {
     pub color: Option<String>,
     #[typeshare(typescript(type = "MapOrbit | null"))]
     pub orbit: Option<MapOrbit>,
+    /// Where it starts when the system is N-body rather than Kepler.
+    #[typeshare(typescript(type = "MapBodyState | null"))]
+    pub state: Option<MapBodyState>,
+    pub axial_tilt_deg: f64,
+    #[typeshare(typescript(type = "number | null"))]
+    pub rotation_hours: Option<f64>,
+    #[typeshare(typescript(type = "MapRings | null"))]
+    pub rings: Option<MapRings>,
+    /// The planet or model map this body opens into.
+    #[typeshare(typescript(type = "string | null"))]
+    pub surface: Option<String>,
 }
 
 #[typeshare]
@@ -160,6 +280,8 @@ pub struct MapSystemDisplay {
     pub radial: String,
     #[serde(rename = "pxPerAU")]
     pub px_per_au: f64,
+    /// `3d` or `flat`.
+    pub view: String,
 }
 
 #[typeshare]
@@ -168,6 +290,30 @@ pub struct MapSystemDisplay {
 pub struct MapSystem {
     pub bodies: Vec<MapBody>,
     pub display: MapSystemDisplay,
+    /// How the system's plane sits in its galaxy.
+    pub plane: MapSystemPlane,
+    /// `kepler` (nested orbits) or `nbody` (bodies pulling on each other).
+    pub dynamics: String,
+    pub nbody: MapNbody,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapSystemPlane {
+    pub tilt_deg: f64,
+    pub heading_deg: f64,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapNbody {
+    pub step_days: f64,
+    #[serde(rename = "softeningAU")]
+    pub softening_au: f64,
+    /// How far ahead the simulation runs.
+    pub horizon_days: f64,
 }
 
 #[typeshare]
@@ -189,6 +335,21 @@ pub struct MapPin {
     pub icon: String,
     #[typeshare(typescript(type = "string | null"))]
     pub color: Option<String>,
+    /// The layer it is on.
+    #[typeshare(typescript(type = "string | null"))]
+    pub layer: Option<String>,
+    /// The story day it appears; null: always there.
+    #[typeshare(typescript(type = "number | null"))]
+    pub from: Option<f64>,
+    /// The story day it goes; null: never.
+    #[typeshare(typescript(type = "number | null"))]
+    pub until: Option<f64>,
+    /// A timeline event `from` follows.
+    #[typeshare(typescript(type = "string | null"))]
+    pub from_event: Option<String>,
+    /// A timeline event `until` follows.
+    #[typeshare(typescript(type = "string | null"))]
+    pub until_event: Option<String>,
 }
 
 /// One stop on a route: a pin (which the route then follows when it moves) or a
@@ -226,6 +387,21 @@ pub struct MapRoute {
     /// `linear` or `catmullRom`.
     pub smooth: String,
     pub style: MapLineStyle,
+    /// The layer it is on.
+    #[typeshare(typescript(type = "string | null"))]
+    pub layer: Option<String>,
+    /// The story day it appears; null: always there.
+    #[typeshare(typescript(type = "number | null"))]
+    pub from: Option<f64>,
+    /// The story day it goes; null: never.
+    #[typeshare(typescript(type = "number | null"))]
+    pub until: Option<f64>,
+    /// A timeline event `from` follows.
+    #[typeshare(typescript(type = "string | null"))]
+    pub from_event: Option<String>,
+    /// A timeline event `until` follows.
+    #[typeshare(typescript(type = "string | null"))]
+    pub until_event: Option<String>,
 }
 
 #[typeshare]
@@ -245,6 +421,21 @@ pub struct MapRegion {
     pub hatch: String,
     #[typeshare(typescript(type = "string | null"))]
     pub stroke: Option<String>,
+    /// The layer it is on.
+    #[typeshare(typescript(type = "string | null"))]
+    pub layer: Option<String>,
+    /// The story day it appears; null: always there.
+    #[typeshare(typescript(type = "number | null"))]
+    pub from: Option<f64>,
+    /// The story day it goes; null: never.
+    #[typeshare(typescript(type = "number | null"))]
+    pub until: Option<f64>,
+    /// A timeline event `from` follows.
+    #[typeshare(typescript(type = "string | null"))]
+    pub from_event: Option<String>,
+    /// A timeline event `until` follows.
+    #[typeshare(typescript(type = "string | null"))]
+    pub until_event: Option<String>,
 }
 
 #[typeshare]
@@ -279,6 +470,21 @@ pub struct MapLabel {
     pub min_zoom: f64,
     #[typeshare(typescript(type = "number | null"))]
     pub max_zoom: Option<f64>,
+    /// The layer it is on.
+    #[typeshare(typescript(type = "string | null"))]
+    pub layer: Option<String>,
+    /// The story day it appears; null: always there.
+    #[typeshare(typescript(type = "number | null"))]
+    pub from: Option<f64>,
+    /// The story day it goes; null: never.
+    #[typeshare(typescript(type = "number | null"))]
+    pub until: Option<f64>,
+    /// A timeline event `from` follows.
+    #[typeshare(typescript(type = "string | null"))]
+    pub from_event: Option<String>,
+    /// A timeline event `until` follows.
+    #[typeshare(typescript(type = "string | null"))]
+    pub until_event: Option<String>,
 }
 
 #[typeshare]
@@ -393,6 +599,31 @@ pub struct MapStyle {
     pub compass: MapCompass,
     pub scale_bar: MapOrnament,
     pub cartouche: MapCartouche,
+    pub legend: MapOrnament,
+    /// How a 3D map is drawn: `cinematic`, `atlas` or `ink`.
+    pub look: String,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapLayer {
+    pub id: String,
+    pub name: String,
+    pub visible: bool,
+    pub locked: bool,
+}
+
+/// A saved view: the camera (as its view kind wrote it) and, optionally, a day.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapView {
+    pub id: String,
+    pub name: String,
+    pub camera: HashMap<String, JsonValue>,
+    #[typeshare(typescript(type = "number | null"))]
+    pub day: Option<f64>,
 }
 
 #[typeshare]
@@ -418,7 +649,11 @@ pub struct MapFile {
     pub scale: MapScale,
     pub background: MapBackground,
     pub earth: MapEarth,
+    pub surface: MapSurface,
     pub system: MapSystem,
+    pub galaxy: MapGalaxy,
+    pub universe: MapUniverse,
+    pub model: MapModel,
     pub pins: Vec<MapPin>,
     pub routes: Vec<MapRoute>,
     pub regions: Vec<MapRegion>,
@@ -427,6 +662,8 @@ pub struct MapFile {
     /// Custom transports; one sharing a built-in's id replaces it on this map.
     pub transports: Vec<MapTransport>,
     pub travelers: Vec<MapTraveler>,
+    pub layers: Vec<MapLayer>,
+    pub views: Vec<MapView>,
     pub timeline: MapTimeline,
     pub style: MapStyle,
     pub viewport: MapViewport,

@@ -66,9 +66,9 @@ for (const display of L.TOOLBAR_DISPLAY_MODES) {
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.format.font', ctx: { ...empty, display: 'icon' } })))
 ok('with no live editor an item is disabled, not gone', container.querySelector('select')?.disabled === true)
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.format.text-style', ctx: { ...empty, display: 'iconAndLabel' } })))
-ok('Icon and Text puts the label under the item', container.querySelector('.tb-item-label')?.textContent === 'Text Style')
+ok('Icon and Text puts the label under the item', container.querySelector('.tb-item-label')?.textContent === 'Text style')
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.insert.table', ctx: { ...empty, display: 'label' } })))
-ok('Text Only draws the label instead of the icon', container.querySelector('button')?.textContent === 'Insert Table' && !container.querySelector('svg'))
+ok('Text Only draws the label instead of the icon', container.querySelector('button')?.textContent === 'Insert table' && !container.querySelector('svg'))
 
 const sent = []
 const live = { ...empty, display: 'icon', toolbar: { ...empty.toolbar, target: 'primary' }, send: (type, payload) => sent.push({ type, payload }) }
@@ -105,7 +105,13 @@ ok('the palette dims what is in the toolbar, not spacers', inToolbar(base, 'a') 
 prefs.removePreference(L.toolbarLayoutKey('document'))
 await act(async () => root.render(React.createElement(ToolbarHost, { context: 'document', hasProject: true })))
 const rendered = () => [...container.querySelectorAll('.tb-row [data-item]')].map((el) => el.dataset.item)
-ok('the host draws the default set', rendered().join() === L.DEFAULT_TOOLBARS.document.filter((id) => !L.isSpacer(id)).join())
+ok('the host draws the default set', rendered().join() === L.DEFAULT_TOOLBARS.document.filter((id) => !L.isSpacer(id) && id !== L.MORE).join())
+const overflowed = () => [...container.querySelectorAll('.tb-row [data-overflowed="true"] [data-item]')].map((el) => el.dataset.item)
+ok('with room, the whole default set sits on the surface', overflowed().length === 0 && !container.querySelector('.tb-overflow'))
+
+await act(async () => { writeToolbarItems('document', ['inkblot.format.font', 'more', 'inkblot.format.highlight']) })
+ok('a placed More puts what follows it behind »', overflowed().join() === 'inkblot.format.highlight' && container.querySelector('.tb-overflow'))
+ok('and leaves what comes before it', !overflowed().includes('inkblot.format.font'))
 
 await act(async () => { writeToolbarItems('document', ['inkblot.format.font', 'inkblot.edit.undo-redo']) })
 ok('a saved layout shows straight away', rendered().join() === 'inkblot.format.font,inkblot.edit.undo-redo')
@@ -120,9 +126,9 @@ await act(async () => document.querySelector('.tb-palette .ui-button[data-varian
 ok('Done closes it', !document.querySelector('.tb-palette'))
 
 const menu = toolbarMenuItems('icon')
-ok('the right-click menu offers the three display modes', menu.slice(0, 3).map((item) => item.text).join() === 'Icon and Text,Icon Only,Text Only')
+ok('the right-click menu offers the three display modes', menu.slice(0, 3).map((item) => item.text).join() === 'Icon and text,Icon only,Text only')
 ok('with the current one checked', menu[1].checked === true && menu[0].checked === false)
-ok('and both Customize items', menu.some((item) => item.text === 'Customize Toolbar…') && menu.some((item) => item.text === 'Customize Inspector Layout…'))
+ok('and both Customize items', menu.some((item) => item.text === 'Customize toolbar…') && menu.some((item) => item.text === 'Customize inspector layout…'))
 await act(async () => menu[0].action())
 ok('choosing a display mode saves it', readDisplayMode() === 'iconAndLabel' && prefs.getPreference(L.TOOLBAR_DISPLAY_MODE_KEY) === 'iconAndLabel')
 ok('and the toolbar redraws in it', container.querySelector('.tb-row')?.dataset.display === 'iconAndLabel')

@@ -3,6 +3,7 @@
  * documents exist (to link pins and travellers to them, and to notice a link that
  * points at nothing), and the story calendar its dates are written in.
  */
+import { PROJECT_FILES_CHANGED } from '../lib/projectFiles'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { listProjectTree } from '../lib/FileSystem'
 import { getDocDisplayName, getDocKind } from '../lib/docKind'
@@ -45,11 +46,15 @@ export function useProjectDocs(projectName) {
     // A rename or a new document elsewhere shows up when the window comes back.
     const onFocus = () => void refresh()
     window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
+    window.addEventListener(PROJECT_FILES_CHANGED, onFocus)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener(PROJECT_FILES_CHANGED, onFocus)
+    }
   }, [refresh])
 
   const paths = useMemo(() => new Set(state.docs.map((doc) => doc.path)), [state.docs])
-  return { ...state, paths, refresh }
+  return useMemo(() => ({ ...state, paths, refresh }), [paths, refresh, state])
 }
 
 /** The project's story calendar, kept in step with every other open map. */

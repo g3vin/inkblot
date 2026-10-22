@@ -131,6 +131,6 @@ export function routineOptions(config) {
   const own = routines.filter((routine) => !isBuiltIn(routine))
   const builtIn = routines.filter(isBuiltIn).map((routine) => ({ value: routine.id, label: routine.name }))
   return own.length
-    ? [{ label: 'Built In', options: builtIn }, { label: 'My Routines', options: own.map((routine) => ({ value: routine.id, label: routine.name })) }]
+    ? [{ label: 'Built in', options: builtIn }, { label: 'My routines', options: own.map((routine) => ({ value: routine.id, label: routine.name })) }]
     : builtIn
 }

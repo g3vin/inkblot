@@ -5,7 +5,7 @@
 import { SplitOrientation, VersionAction } from '../../../types'
 import { inspectorTab } from '../../../lib/chromeLayout'
 import { ItemFrame, MenuButton, ToolButton } from '../ToolbarControls'
-import SFIcon from '../../SFIcon'
+import Icon from '../../../ui/Icon.jsx'
 import { useStats } from '../../../stats/useStats.js'
 import { timerMenuItems } from '../../../stats/timerMenu.js'
 import { timerClock } from '../../stats/statsText.js'
@@ -14,7 +14,7 @@ export function SnapshotItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton
-        symbol="clock"
+        icon="clock"
         label={spec.label}
         title="Save the current state as a version you can name"
         display={ctx.display}
@@ -31,7 +31,7 @@ export function PanelItem({ ctx, spec, tab }) {
   const title = inspectorTab(tab)?.title ?? spec.label
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol={spec.symbol} label={title} title={`Show the ${title} panel`} display={ctx.display} active={on} onClick={() => ctx.panel?.toggle?.(tab)} />
+      <ToolButton icon={spec.icon} label={title} title={`Show the ${title} panel`} display={ctx.display} active={on} onClick={() => ctx.panel?.toggle?.(tab)} />
     </ItemFrame>
   )
 }
@@ -45,11 +45,11 @@ export function TimerItem({ ctx, spec }) {
   const timer = stats.timer
   const active = timer.isActive && timer.segment
   const clock = active ? timerClock(timer, stats.now()) : null
-  const symbol = !active ? 'timer' : timer.state === 'paused' ? 'pause' : timer.segment.kind === 'write' ? 'pencil' : 'cup.and.saucer'
+  const icon = !active ? 'timer' : timer.state === 'paused' ? 'pause' : timer.segment.kind === 'write' ? 'edit' : 'break'
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <MenuButton
-        symbol={symbol}
+        icon={icon}
         label={spec.label}
         title={active ? 'The writing timer' : 'Start a writing timer'}
         display={ctx.display}
@@ -57,7 +57,7 @@ export function TimerItem({ ctx, spec }) {
       >
         {active ? (
           <span className="tb-timer" data-state={timer.state}>
-            <SFIcon name={symbol} size={14} />
+            <Icon name={icon} />
             <span className="tb-timer-clock">{clock}</span>
           </span>
         ) : undefined}
@@ -69,7 +69,7 @@ export function TimerItem({ ctx, spec }) {
 export function NewTabItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton symbol={spec.symbol} label={spec.label} title="Open a new tab (⌘T)" display={ctx.display} disabled={!ctx.hasProject} onClick={() => ctx.send('newTab', {})} />
+      <ToolButton icon={spec.icon} label={spec.label} title="Open a new tab (⌘T)" display={ctx.display} disabled={!ctx.hasProject} onClick={() => ctx.send('newTab', {})} />
     </ItemFrame>
   )
 }
@@ -79,14 +79,14 @@ export function SplitItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <MenuButton
-        symbol="rectangle.split.2x1"
+        icon="split-columns"
         label={spec.label}
         display={ctx.display}
         disabled={!ctx.hasProject}
         items={() => [
-          { text: 'Split Right', enabled: split !== 'columns', action: () => ctx.send('openInSplit', { orientation: SplitOrientation.Columns }) },
-          { text: 'Split Down', enabled: split !== 'rows', action: () => ctx.send('openInSplit', { orientation: SplitOrientation.Rows }) },
-          { text: 'Close Split', enabled: Boolean(split), action: () => ctx.send('closeSplit', {}) },
+          { text: 'Split right', enabled: split !== 'columns', action: () => ctx.send('openInSplit', { orientation: SplitOrientation.Columns }) },
+          { text: 'Split down', enabled: split !== 'rows', action: () => ctx.send('openInSplit', { orientation: SplitOrientation.Rows }) },
+          { text: 'Close split', enabled: Boolean(split), action: () => ctx.send('closeSplit', {}) },
         ]}
       />
     </ItemFrame>

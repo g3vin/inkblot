@@ -13,17 +13,15 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
+        "create": false,
         "title": "Inkblot",
         "width": 1200,
         "height": 800,
         "resizable": true,
         "fullscreen": false,
         "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "trafficLightPosition": {
-          "x": 20,
-          "y": 30
-        }
+        "hiddenTitle": true
       }
     ],
     "security": {

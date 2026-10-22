@@ -19,13 +19,15 @@ import type { MapCollection, StoredMap } from '../types'
 const HISTORY_LIMIT = 100
 
 /** The sections of a map that are one object rather than a list. */
-export type MapSection = 'scale' | 'background' | 'earth' | 'system' | 'style' | 'timeline'
+export type MapSection = 'scale' | 'background' | 'earth' | 'system' | 'surface' | 'galaxy' | 'universe' | 'model' | 'style' | 'timeline'
 
 export interface ActionMeta {
   /** Loading a document is not an edit — it resets the stacks instead of pushing. */
   silent?: boolean
   /** Edits sharing a key collapse into the one history entry they started. */
   coalesce?: string | null
+  /** Not the writer's edit (a linked document moved), so a locked document takes it too. */
+  upkeep?: boolean
 }
 
 type Item = { id: string } & Record<string, unknown>
@@ -85,6 +87,7 @@ const renormalize = (map: StoredMap): StoredMap =>
     throw new Error('mapReducer: an item lost its id')
   }) as StoredMap
 
+/** One edit to the document, without history. */
 export function docReducer(map: StoredMap, action: MapDocAction): StoredMap {
   switch (action.type) {
     case 'doc/replace':
@@ -136,6 +139,7 @@ export const createHistory = (map: StoredMap): MapHistory => ({
   coalesceKey: null,
 })
 
+/** `docReducer` with undo and redo: edits push a snapshot (or join a coalesced one), silent ones reset the stacks. */
 export function historyReducer(history: MapHistory, action: MapAction): MapHistory {
   if (action.type === 'history/undo') {
     if (!history.past.length) return history

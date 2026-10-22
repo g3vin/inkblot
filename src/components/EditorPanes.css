@@ -29,11 +29,13 @@
   min-width: 0;
 }
 
+/* A sidebar's title: the eyebrow (.ib-eyebrow), at a tighter line. */
 .panel-header-label {
   display: block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
   line-height: 1;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -160,9 +162,9 @@
   z-index: 5;
   background: linear-gradient(
     to bottom,
-    var(--sidebar-fade-solid) 0%,
-    var(--sidebar-fade-strong) 42%,
-    var(--sidebar-fade-soft) 76%,
+    var(--app-bg) 0%,
+    color-mix(in srgb, var(--app-bg) 78%, transparent) 42%,
+    color-mix(in srgb, var(--app-bg) 32%, transparent) 76%,
     transparent 100%
   );
 }
@@ -201,7 +203,7 @@
   background: transparent;
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   padding: 6px 12px;
   font-size: 12px;
   line-height: 1;
@@ -318,7 +320,7 @@
 .split-resizer-grip {
   width: 2px;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--border-color);
   transition: background-color 160ms ease, height 160ms ease, width 160ms ease;
 }
@@ -349,4 +351,18 @@
   min-width: 0;
   min-height: 0;
   position: relative;
+}
+
+/* A panel with nothing in it shows its EmptyState in the middle of the panel, not at
+   the top: everything between the page and it grows to fill the height. A compact
+   one (inside a section, or "no matches") stays where it is. */
+.sidebar-panel-page :has(.ib-empty:not(.ib-empty--compact)) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar-panel-page .ib-empty:not(.ib-empty--compact) {
+  flex: 1 1 auto;
+  justify-content: center;
 }

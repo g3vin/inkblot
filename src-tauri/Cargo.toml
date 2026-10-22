@@ -68,3 +68,7 @@ tauri-plugin-notification = "2"
 # only be driven from native code.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
+# trackpad.rs: the NSEvent monitor's handler is a block.
+block2 = "0.6"
+# app_windows.rs: a webview configuration with Writing Tools turned off.
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "WKWebViewConfiguration"] }

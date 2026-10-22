@@ -87,6 +87,9 @@ pub(crate) fn extract_attr(tag: &str, attr: &str) -> Option<String> {
     Some(rest[..end].to_string())
 }
 
+/// Fetch a public board's HTML and read up to `max_pins` pins from it (default 30,
+/// at most 200). A URL that is not on pinterest.com returns an empty result without a
+/// request.
 pub async fn scrape_pinterest_html(
     url: String,
     max_pins: Option<usize>,

@@ -117,11 +117,20 @@ fn an_autosave_carries_the_archive_and_the_citations_forward() {
     let citations = json!({ "style": "mla", "bibliography": { "include": "cited", "annotated": false, "inPrint": true } });
     let archive = json!([{ "id": "x1", "archivedAt": "", "kind": "bubble", "title": "t" }]);
     store
-        .write_document_raw("Novel", "Chapter One", &json!({ "content": [], "notes": [], "archive": archive, "citations": citations }))
+        .write_document_raw(
+            "Novel",
+            "Chapter One",
+            &json!({ "content": [], "notes": [], "archive": archive, "citations": citations }),
+        )
         .unwrap();
-    store.save_document("Novel", "Chapter One", &body(json!([2]), json!([])), None).unwrap();
+    store
+        .save_document("Novel", "Chapter One", &body(json!([2]), json!([])), None)
+        .unwrap();
 
-    let document = store.load_document("Novel", "Chapter One").unwrap().unwrap();
+    let document = store
+        .load_document("Novel", "Chapter One")
+        .unwrap()
+        .unwrap();
     assert_eq!(document["content"], json!([2]));
     assert_eq!(document["archive"], archive);
     assert_eq!(document["citations"], citations);
@@ -162,17 +171,31 @@ fn a_map_is_neither_saved_as_text_nor_written_over_text() {
     store.save_map_document("Novel", "World.map", &map).unwrap();
     let refused = store.save_document("Novel", "World.map", &body(json!([]), json!([])), None);
     assert!(matches!(refused, Err(StoreError::Refused(_))));
-    assert_eq!(store.load_document("Novel", "World.map").unwrap().unwrap(), map);
+    assert_eq!(
+        store.load_document("Novel", "World.map").unwrap().unwrap(),
+        map
+    );
 
     // A text document from before maps existed, whose name happens to end in `.map`.
     let writing = json!({ "content": { "type": "doc", "content": [] }, "notes": [] });
-    store.write_document_raw("Novel", "Treasure.map", &writing).unwrap();
+    store
+        .write_document_raw("Novel", "Treasure.map", &writing)
+        .unwrap();
     let refused = store.save_map_document("Novel", "Treasure.map", &map);
     assert!(matches!(refused, Err(StoreError::Refused(_))));
-    assert_eq!(store.load_document("Novel", "Treasure.map").unwrap().unwrap(), writing);
+    assert_eq!(
+        store
+            .load_document("Novel", "Treasure.map")
+            .unwrap()
+            .unwrap(),
+        writing
+    );
 
     // And only a `.map` path takes a map at all.
-    assert!(matches!(store.save_map_document("Novel", "Chapter", &map), Err(StoreError::Refused(_))));
+    assert!(matches!(
+        store.save_map_document("Novel", "Chapter", &map),
+        Err(StoreError::Refused(_))
+    ));
 }
 
 #[test]
@@ -180,12 +203,26 @@ fn a_map_versions_into_the_sidecar_and_its_copy_stays_a_map() {
     let app_data = TempDir::new();
     let store = store(&app_data);
     store.create_project("Novel", None).unwrap();
-    store.save_map_document("Novel", "World.map", &crate::map::model::create_empty_map("blank")).unwrap();
+    store
+        .save_map_document(
+            "Novel",
+            "World.map",
+            &crate::map::model::create_empty_map("blank"),
+        )
+        .unwrap();
 
-    store.append_version_entry("Novel", "World.map", entry("m1", "<p>a</p>")).unwrap();
+    store
+        .append_version_entry("Novel", "World.map", entry("m1", "<p>a</p>"))
+        .unwrap();
     let root = store.project_root("Novel");
     assert!(PathBuf::from(paths::versions_sidecar_path(&root, "World.map")).exists());
-    assert_eq!(store.duplicate_entry("Novel", "World.map").unwrap().as_deref(), Some("World copy.map"));
+    assert_eq!(
+        store
+            .duplicate_entry("Novel", "World.map")
+            .unwrap()
+            .as_deref(),
+        Some("World copy.map")
+    );
 }
 
 #[test]
@@ -592,7 +629,7 @@ fn linking_repairs_a_project_that_moved_behind_the_apps_back() {
     assert_eq!((name.as_str(), already), ("Cloud", false));
     assert_eq!(store.list_projects(), ["Cloud"]);
     // Linking the same place twice says so rather than failing.
-    assert_eq!(store.link_project(&moved_to).unwrap().unwrap().1, true);
+    assert!(store.link_project(&moved_to).unwrap().unwrap().1);
 }
 
 #[test]
@@ -724,4 +761,81 @@ fn deleting_a_project_takes_its_directory_and_its_registry_entry() {
     assert!(store.list_projects().is_empty());
     // And again, on a project that is already gone.
     store.delete_project("Cloud").unwrap();
+}
+
+#[test]
+fn an_autosave_keeps_a_document_locked() {
+    let app_data = TempDir::new();
+    let store = store(&app_data);
+    store.create_project("Novel", None).unwrap();
+
+    store
+        .write_document_raw(
+            "Novel",
+            "Chapter One",
+            &json!({ "content": [1], "notes": [], "locked": true }),
+        )
+        .unwrap();
+    let version = VersionRequest {
+        content_html: Some("<p>2</p>".into()),
+        content_json: None,
+        name: None,
+        auto: true,
+    };
+    store
+        .save_document(
+            "Novel",
+            "Chapter One",
+            &body(json!([2]), json!([{ "id": "n" }])),
+            Some(version),
+        )
+        .unwrap();
+
+    let document = store
+        .load_document("Novel", "Chapter One")
+        .unwrap()
+        .unwrap();
+    assert_eq!(document["notes"], json!([{ "id": "n" }]));
+    assert_eq!(document["locked"], json!(true));
+}
+
+#[test]
+fn locked_entries_finds_flagged_documents_and_marked_folders() {
+    let app_data = TempDir::new();
+    let store = store(&app_data);
+    store.create_project("Novel", None).unwrap();
+
+    store
+        .write_document_raw("Novel", "Open", &json!({ "content": [], "notes": [] }))
+        .unwrap();
+    store
+        .write_document_raw(
+            "Novel",
+            "Shut",
+            &json!({ "content": [], "notes": [], "locked": true }),
+        )
+        .unwrap();
+    store
+        .write_document_raw("Novel", "Odd", &json!({ "content": [], "locked": "yes" }))
+        .unwrap();
+    store
+        .write_document_raw(
+            "Novel",
+            "Drafts/Board.canvas",
+            &json!({ "nodes": [], "edges": [], "locked": true }),
+        )
+        .unwrap();
+    let root = store.project_root("Novel");
+    std::fs::write(
+        format!("{root}/Drafts/{}", paths::FOLDER_FILE),
+        r#"{"locked":true}"#,
+    )
+    .unwrap();
+
+    let found = store.locked_entries("Novel");
+    assert_eq!(
+        found.documents,
+        vec!["Drafts/Board.canvas".to_string(), "Shut".to_string()]
+    );
+    assert_eq!(found.folders, vec!["Drafts".to_string()]);
 }

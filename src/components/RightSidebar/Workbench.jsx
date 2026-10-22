@@ -10,6 +10,7 @@ import POSTile from '../tiles/POSTile.jsx'
 import SynonymTile from '../tiles/SynonymTile.jsx'
 import DefinitionTile from '../tiles/DefinitionTile.jsx'
 import RhymeTile from '../tiles/RhymeTile.jsx'
+import { EmptyState, MenuItem, MoreMenu, PanelActions } from '../../ui'
 
 export default function Workbench({
   tiles,
@@ -43,17 +44,19 @@ export default function Workbench({
   }
 
   return (
-    <div className="sidebar-panel workbench-panel">
-      {tiles.length > 0 && (
-        <div className="panel-header panel-header-actions-only workbench-header">
-          <button className="panel-action-btn" onClick={() => setTiles([])}>
-            Clear All
-          </button>
-        </div>
-      )}
+    <div className="sidebar-panel workbench-panel" data-help="workbench.panel">
+      {tiles.length > 0 ? (
+        <PanelActions>
+          <MoreMenu label="More workbench options">
+            <MenuItem icon="close" danger onSelect={() => setTiles([])}>Clear the workbench</MenuItem>
+          </MoreMenu>
+        </PanelActions>
+      ) : null}
       <div className="sidebar-list workbench-list">
-        {visibleTiles.length === 0 && tiles.length > 0 ? (
-          <div className="notes-empty">No matching workbench items.</div>
+        {tiles.length === 0 ? (
+          <EmptyState icon="hammer" title="The workbench is empty." hint="Right-click a word in your writing to look up its synonyms, rhymes or definition here." />
+        ) : visibleTiles.length === 0 ? (
+          <EmptyState compact title="No matching workbench items." />
         ) : null}
         {visibleTiles.map(tile => {
           switch (tile.type) {

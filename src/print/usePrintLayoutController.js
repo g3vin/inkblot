@@ -55,6 +55,7 @@ import {
   getStoredBook,
   getTypesetDisplay,
   getEditorMode,
+  getPageView,
   getTypesetView,
   getLastExport,
   getMeasurement,
@@ -63,10 +64,12 @@ import {
   getSelectedBookItem,
   isShowingCover,
   isPrintLayoutEnabled,
+  isTypesetMode,
   setAuthorProfile,
   setBookSettings,
   setDisplayPointsPerInch,
   setEditorMode,
+  setPageView,
   setTypesetView,
   setTypesetDisplay,
   setStoredBook,
@@ -91,14 +94,14 @@ import { actualSizeZoom } from './zoom'
 
 /** The tokens a running head or foot can hold, for the inspector's token menu. */
 export const RUNNING_TOKENS = [
-  { token: '{page}', label: 'Page Number' },
-  { token: '{pages}', label: 'Page Count' },
+  { token: '{page}', label: 'Page number' },
+  { token: '{pages}', label: 'Page count' },
   { token: '{title}', label: 'Title' },
   { token: '{chapter}', label: 'Chapter' },
   { token: '{author}', label: 'Author' },
-  { token: '{surname}', label: 'Author’s Surname' },
-  { token: '{words}', label: 'Word Count' },
-  { token: '{date}', label: 'Today’s Date' },
+  { token: '{surname}', label: 'Author’s surname' },
+  { token: '{words}', label: 'Word count' },
+  { token: '{date}', label: 'Today’s date' },
 ]
 
 export const PAGE_LAYOUT_CATALOG = {
@@ -361,11 +364,19 @@ export default function usePrintLayoutController({
   // A setup sent before the document's editor was there to take it: applied when it is.
   const pendingSetup = useRef(null)
 
-  // Pages on or off is the window's mode now: Typeset shows every text pane as pages.
+  // Pages on or off is Write's page view. Typeset only shows pages, so turning them
+  // off there goes back to Write's continuous editor.
   const togglePrintLayout = useCallback((enabled) => {
     const { projectName: project } = stateRef.current
-    const typeset = enabled ?? getEditorMode(project) !== 'typeset'
-    setEditorMode(project, typeset ? 'typeset' : 'write')
+    const typeset = isTypesetMode(project)
+    const shown = enabled ?? !(typeset || getPageView(project))
+    if (typeset) {
+      if (shown) return
+      setPageView(project, false)
+      setEditorMode(project, 'write')
+      return
+    }
+    setPageView(project, shown)
   }, [])
 
   const publish = useCallback(() => {
@@ -780,18 +791,11 @@ export default function usePrintLayoutController({
     return () => window.removeEventListener(OPEN_BOOK_ITEM_EVENT, onOpenItem)
   }, [currentBook])
 
-  // The menus (App.jsx) and keys.
+  // The menus and the commands (App.jsx; ⌘P and ⌥⌘P are theirs).
   useEffect(() => {
     const onToggle = (event) => togglePrintLayout(undefined, event?.detail?.docPath)
     const onPrintEvent = (event) => stateRef.current.onPrint?.({ scope: 'document', bound: false, ...(event.detail || {}) })
     const onExportEvent = (event) => stateRef.current.onExport?.({ scope: 'document', bound: false, ...(event.detail || {}) })
-    // ⌥⌘P toggles pages, as it does in Word; ⌘P prints.
-    const onKeyDown = (event) => {
-      if (!event.metaKey || event.ctrlKey || event.shiftKey || event.code !== 'KeyP') return
-      event.preventDefault()
-      if (event.altKey) togglePrintLayout()
-      else stateRef.current.onPrint?.({ scope: 'document', bound: false })
-    }
     // File ▸ Write As, in a shell whose menus are the page's (DocWritingFormat.js).
     const onWritingFormat = (event) => {
       stateRef.current.activeEditor?.chain().focus().setWritingFormat(event.detail?.format).run()
@@ -800,13 +804,11 @@ export default function usePrintLayoutController({
     window.addEventListener('inkblot:print-layout-toggle', onToggle)
     window.addEventListener('inkblot:print', onPrintEvent)
     window.addEventListener('inkblot:export', onExportEvent)
-    window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('inkblot:writing-format', onWritingFormat)
       window.removeEventListener('inkblot:print-layout-toggle', onToggle)
       window.removeEventListener('inkblot:print', onPrintEvent)
       window.removeEventListener('inkblot:export', onExportEvent)
-      window.removeEventListener('keydown', onKeyDown)
     }
   }, [togglePrintLayout])
 

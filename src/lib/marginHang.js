@@ -18,6 +18,7 @@
  * `--hang-width` on the wrapper is the indicator's width, its left margin included: the
  * indicator's stylesheet sets it where the width is fixed, its plugin where it is not.
  */
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration } from '@tiptap/pm/view'
 
 const hangInMargin = (indicator, beforeSpace) => {
@@ -40,15 +41,63 @@ const spaceAt = (doc, pos) => {
  * The decorations for an indicator at `pos`: the widget `toDOM` draws, hung in the
  * margin, and the space after it if there is one. `spec` is the widget's, `key` included.
  *
- * Mapped through an edit they stay true: the widget sits with the text after it, so
- * typing at its place goes before it, and deleting what follows it deletes it too.
+ * The widget belongs to the word before it (side -1): the caret at its place is drawn
+ * after it, so a writer can put the cursor after a dot and type there, and arrowing
+ * right from the word steps over it. Mapped through an edit it stays with that word.
  */
 export const marginHangDecorations = (doc, pos, toDOM, spec) => {
   const beforeSpace = spaceAt(doc, pos)
   const widget = Decoration.widget(pos, (view, getPos) => hangInMargin(toDOM(view, getPos), beforeSpace), {
     ...spec,
+    side: -1,
     key: `${spec.key}:${beforeSpace ? 'space' : 'none'}`,
   })
   return beforeSpace ? [widget, Decoration.inline(pos, pos + 1, { class: 'margin-hang-after' })] : [widget]
 }
 
+
+/** The indicator hung at a document position, if there is one. */
+const hangAt = (view, pos) => {
+  for (const hang of view.dom.querySelectorAll('.margin-hang')) {
+    try {
+      if (view.posAtDOM(hang, 0) === pos) return hang
+    } catch {
+      // Not in the document any more.
+    }
+  }
+  return null
+}
+
+/**
+ * The caret at an indicator's place is drawn after it, not before. The browser would
+ * put it at the end of the word, left of the dot, though typing there goes after it;
+ * now what you see is where it goes. ArrowLeft from there steps back into the word,
+ * rather than stopping a second time on the dot's other side. One plugin for every
+ * indicator (notes' dots and bubbles' chips); NoteAnnotation registers it.
+ */
+export const marginHangCaret = () => new Plugin({
+  key: new PluginKey('marginHangCaret'),
+  props: {
+    handleKeyDown(view, event) {
+      if (event.key !== 'ArrowLeft' || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return false
+      const { selection } = view.state
+      if (!selection.empty || selection.head <= 1 || !hangAt(view, selection.head)) return false
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, selection.head - 1)).scrollIntoView())
+      return true
+    },
+  },
+  view: () => ({
+    update(view) {
+      const { selection } = view.state
+      if (!selection.empty || !view.hasFocus()) return
+      const hang = hangAt(view, selection.head)
+      const dom = view.dom.ownerDocument.getSelection()
+      if (!hang || !dom) return
+      const range = view.dom.ownerDocument.createRange()
+      range.setStartAfter(hang)
+      range.collapse(true)
+      dom.removeAllRanges()
+      dom.addRange(range)
+    },
+  }),
+})

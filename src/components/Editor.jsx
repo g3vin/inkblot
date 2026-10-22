@@ -12,9 +12,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import EditorLayout from './EditorLayout'
 import { loadDocument, listProjects, documentExists } from '../lib/FileSystem'
+import { PROJECT_FILES_CHANGED } from '../lib/projectFiles'
 import { readDetachedTarget } from '../lib/docWindow'
 import { normalizeNotes } from '../lib/noteUtils'
-import SFIcon from './SFIcon'
 
 import './Editor.css'
 
@@ -26,17 +26,17 @@ import { useEntryOperations } from '../hooks/useEntryOperations'
 import { useClipboardHistory } from '../hooks/useClipboardHistory'
 import {
   CLIPBOARD_PERSIST_KEY,
-  MAX_CLIPBOARD_ENTRIES,
   PERSIST_KEY,
-  RIGHT_SIDEBAR_TAB_IDS,
   loadClipboardHistory,
   loadSession,
   normalizeProjectSession,
 } from '../lib/editorSession'
 import { setPreference, setSessionValue } from '../lib/preferences'
 import { setOpenProject, clearOpenProject } from '../lib/projectContext'
-import { dragHandoff, documentSurface, DragPayloadKind } from '../bridge'
+import { dragHandoff, documentSurface, DragPayloadKind, editorRegistry } from '../bridge'
 import { getProjectRoot } from '../lib/projectPaths'
+import { useWindowPop } from '../hooks/useWindowPop'
+import DetachedWindowBar from './DetachedWindowBar'
 
 /** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
@@ -92,6 +92,12 @@ export default function Editor({
   const [activeTabId, setActiveTabId] = useState(null)
   const refreshFilesRef = useRef(null)
   const draggedSelectionRef = useRef(null)
+  // A document written outside the tree (lib/projectFiles.js) appears in it.
+  useEffect(() => {
+    const refresh = () => void refreshFilesRef.current?.()
+    window.addEventListener(PROJECT_FILES_CHANGED, refresh)
+    return () => window.removeEventListener(PROJECT_FILES_CHANGED, refresh)
+  }, [])
 
   // Switch to a project (or back to the landing page when passed a falsy name),
   // restoring that project's persisted docs/tiles/sidebar state.
@@ -198,6 +204,15 @@ export default function Editor({
 
   // The tabs, published for the tab bar, and their shortcuts.
   useTabShortcuts()
+  // Documents popping out into windows of their own and back (docWindow.js).
+  const windowPop = useWindowPop({
+    detached: Boolean(detachedTarget),
+    projectName,
+    currentDoc,
+    setCurrentDoc,
+    openDocInTab,
+    openProject,
+  })
   useTabsPublisher({
     projectName,
     tabs,
@@ -235,6 +250,8 @@ export default function Editor({
     getClipboardDropZoneRect,
     isPointInAnyEditorPane,
     addClipboardEntry,
+    addClipboardImage,
+    removeClipboardEntry,
     clearClipboardHistory,
     moveClipboardEntryToEditor,
     handleDropToClipboard,
@@ -589,9 +606,31 @@ export default function Editor({
       return ''
     }
 
+    // The images in what is being copied. In a page that is the editor's selection,
+    // which sees a selected picture (its DOM selection need not hold the img);
+    // anywhere else, the images inside the window's selection.
+    const getSelectedImages = (target) => {
+      const live = editorRegistry.active()?.editor
+      if (live?.view?.dom?.contains?.(target)) {
+        const { from, to } = live.state.selection
+        const sources = []
+        live.state.doc.nodesBetween(from, to, (node) => {
+          if (node.type.name === 'image' && node.attrs.src) sources.push(node.attrs.src)
+        })
+        return sources
+      }
+
+      const selection = window.getSelection?.()
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return []
+      const fragment = selection.getRangeAt(0).cloneContents()
+      return Array.from(fragment.querySelectorAll('img'), (img) => img.getAttribute('src')).filter(Boolean)
+    }
+
     const onCopy = (event) => {
       const text = getSelectedText(event?.target)
       addClipboardEntry(text)
+      // Oldest first, so the first image in the selection ends up on top.
+      getSelectedImages(event?.target).reverse().forEach(addClipboardImage)
     }
 
     window.addEventListener('copy', onCopy, true)
@@ -599,7 +638,7 @@ export default function Editor({
     return () => {
       window.removeEventListener('copy', onCopy, true)
     }
-  }, [addClipboardEntry])
+  }, [addClipboardEntry, addClipboardImage])
 
   // Cmd+Shift+V: paste clipboard contents as plain text (HTML/styles stripped).
   useEffect(() => {
@@ -669,6 +708,7 @@ export default function Editor({
   }
 
   return (
+    <>
       <EditorLayout
         splitView={splitView}
         setSplitView={setSplitView}
@@ -718,11 +758,16 @@ export default function Editor({
         clearClipboardHistory={clearClipboardHistory}
         onDropToClipboard={handleDropToClipboard}
         onMoveClipboardEntryToEditor={moveClipboardEntryToEditor}
+        onRemoveClipboardEntry={removeClipboardEntry}
         showWordCountBadge={showWordCountBadge}
 
         loadDocument={loadDocument}
         refreshFiles={() => refreshFilesRef.current?.()}
         registerRefreshFiles={(fn) => { refreshFilesRef.current = fn }}
       />
+      {detachedTarget ? (
+        <DetachedWindowBar onTop={windowPop.onTop} onKeepOnTop={windowPop.keepOnTop} onDock={windowPop.dock} />
+      ) : null}
+    </>
   )
 }

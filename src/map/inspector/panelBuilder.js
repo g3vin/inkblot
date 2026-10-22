@@ -20,8 +20,8 @@ const clamp = (value, min, max) => {
 }
 
 /** A button as the protocol has it (`MapPanelButton`). */
-const buttonOf = (id, label, { role = 'normal', disabled = false, symbol, help } = {}) => ({
-  id, label, role, disabled: Boolean(disabled), symbol, help,
+const buttonOf = (id, label, { role = 'normal', disabled = false, icon, help } = {}) => ({
+  id, label, role, disabled: Boolean(disabled), icon, help,
 })
 
 export function createPanelBuilder() {
@@ -131,6 +131,22 @@ export function createPanelBuilder() {
     table: (columns, rows) => field('table', { columns, rows }),
 
     preview: (width, height, path, filled) => field('preview', { width, height, path, filled }),
+
+    /** A line over days (`points` are `[day, value]`); picking a point sends its day to `onPick`. */
+    chart: (id, { points, marker = null, xFrom, xTo, yMin, yMax, summary }, onPick) =>
+      field('chart', {
+        id: on(id, (day) => {
+          const number = Number(day)
+          if (Number.isFinite(number)) onPick?.(number)
+        }),
+        points: points.map(([x, y]) => ({ x, y })),
+        marker: Number.isFinite(marker) ? marker : undefined,
+        xFrom,
+        xTo,
+        yMin,
+        yMax,
+        summary,
+      }),
 
     group: (id, title, fields, { actions = [], swatch, collapsible = false } = {}) =>
       field('group', { id, title, swatch, actions: actions.filter(Boolean), fields: fields.flat().filter(Boolean), collapsible }),

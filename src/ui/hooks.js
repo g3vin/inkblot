@@ -90,7 +90,7 @@ export function useFocusTrap(active, containerRef, initialFocusRef) {
         previouslyFocused.focus({ preventScroll: true })
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable; the trap follows `active`
   }, [active])
 }
 

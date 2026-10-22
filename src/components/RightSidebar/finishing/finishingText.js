@@ -17,7 +17,7 @@ export const cssFamily = (name) => {
 }
 
 /** A native file chooser for a picture or a font, as a path. Null when cancelled. */
-export async function choosePath({ title = 'Choose a File', extensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'tif', 'tiff', 'heic'], name = 'Images' } = {}) {
+export async function choosePath({ title = 'Choose a file', extensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'tif', 'tiff', 'heic'], name = 'Images' } = {}) {
   try {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const path = await open({ title, multiple: false, directory: false, filters: [{ name, extensions }] })

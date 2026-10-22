@@ -132,11 +132,30 @@ Notable changes to Inkblot. The format follows
   edition's, and an e-book edition shows as the e-book. Export All Editions writes every
   print edition's interior and cover PDFs and every e-book's EPUB into a folder. A
   typeset version can be duplicated as an edition from the typeset history.
+- **Timeline:** one chronology per project, shown by timeline documents three ways —
+  along the story calendar (real or a world's own), evenly in order for a story with
+  few or no dates, and as the manuscript, each passage joined to when it happens so
+  flashbacks and flash-forwards show. Lanes, eras, tags and filters; events that are
+  moments or windows, with notes on the whole or on one moment. Drag to move, resize,
+  reorder, change lane, date or undate — and everything follows: passages attached to
+  events in the text (with handles to drag where they start and end), the time lens
+  that highlights every passage in a window of time, map journeys and the events shown
+  at their places, and event cards on canvases. One undo takes back an edit and the
+  map leg it moved.
+
 - **Map version history:** maps compare and merge like canvases — place by place,
   route by route, with whole-map settings (style, scale, timeline, …) as their own
   differences — and their history rows say what changed ("+2 places · 3 moved ·
   Style"), in the native sidebar as well as the page. Filtering a map's history
   finds versions by the names written on the map.
+
+### Fixed
+
+- **Renaming a project** onto a name another project already holds is refused,
+  wherever that project is kept. Before, a project in a custom folder could be renamed
+  onto an AppData project's name, and the AppData one could no longer be opened.
+- **A document with a damaged note** opens with that note empty, rather than failing
+  to load.
 
 ## [0.1.0] - 2026-09-24
 

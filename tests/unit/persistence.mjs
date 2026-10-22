@@ -2,7 +2,7 @@
  * Document persistence: canvases and text documents written side by side, and the guard
  * that stops a stray text autosave from overwriting a canvas with an empty document.
  */
-import { files } from './stub-fs.mjs'
+import { files, mkdir } from './stub-fs.mjs'
 const SRC = '../../src/lib'
 const { saveDocument, loadDocument, getVersions } = await import(`${SRC}/FileSystem.js`)
 const { saveCanvasDocument, loadCanvasDocument } = await import(`${SRC}/canvasFileSystem.js`)
@@ -51,3 +51,17 @@ ok('spec: top-level nodes[] / edges[]', Array.isArray(raw.nodes) && Array.isArra
 ok('spec: node has x/y/width/height', ['x','y','width','height'].every(k => typeof raw.nodes[0][k] === 'number'))
 ok('spec: edge has fromNode/fromSide/toNode/toSide', raw.edges[0].fromSide === 'right' && raw.edges[0].toSide === 'left')
 ok('inkblot extras quarantined under .inkblot', raw.inkblot.viewport.zoom === 1.5)
+
+// --- Renaming a project onto a name another project holds, wherever that one lives.
+// A custom-located project answers to its name through the registry, not through a
+// directory beside the AppData projects, so the check must ask by name.
+const { renameProject } = await import(`${SRC}/FileSystem.js`)
+const { setProjectLocation } = await import(`${SRC}/projectLocations.js`)
+await mkdir('/appdata/Novel')
+await setProjectLocation('Elsewhere', '/cloud/Elsewhere')
+files.set('/cloud/Elsewhere/notes.json', '{"content":[],"notes":[]}')
+ok('renaming onto a custom-located project\'s name is refused', (await renameProject(P, 'Elsewhere')) === null)
+ok('…and the project stays where it was', files.has('/appdata/Novel/Structure/chapter-one.json'))
+ok('…and nothing appears under AppData by that name', ![...files.keys()].some((key) => key.startsWith('/appdata/Elsewhere/')))
+ok('renaming a custom-located project onto an AppData project\'s name is refused', (await renameProject('Elsewhere', P)) === null)
+ok('…and it stays where it was', files.has('/cloud/Elsewhere/notes.json'))

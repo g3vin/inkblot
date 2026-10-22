@@ -2,7 +2,8 @@
  * App.jsx — application root.
  *
  * Owns app-wide chrome and preferences that live above the editor:
- * theme (light/dark/system), accent colour (an ink from lib/palette.ts), and the
+ * theme (light/dark/system), accent colour (an ink from lib/palette.ts), window colour
+ * (the tray behind the panels, another ink), and the
  * word-count badge toggle. Wires those preferences into the native Tauri menus and
  * persists them through lib/preferences.ts. Renders the Editor, the Settings sheet,
  * the timer capsule, and the command palette (⌘K) with the app-level commands.
@@ -13,12 +14,16 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
-import { resolveTheme, setAccentAttribute, setThemeAttribute, watchSystemTheme } from './lib/theme'
-import { ACCENT_PRESETS, DEFAULT_ACCENT } from './lib/palette'
+import { resolveTheme, setAccentAttribute, setThemeAttribute, setTrayAttribute, watchSystemTheme } from './lib/theme'
+import { ACCENT_PRESETS, DEFAULT_ACCENT, DEFAULT_TRAY, TRAY_INKS } from './lib/palette'
 import { useCommands } from './lib/commands'
+import { useKeybindings } from './lib/keybindings'
+import UpdateBanner from './components/UpdateBanner'
 import CommandPalette from './ui/CommandPalette.jsx'
 import { documentSurface } from './bridge'
 import SettingsSheet from './components/settings/SettingsSheet.jsx'
+import HelpSheet from './components/help/HelpSheet.jsx'
+import { installHelpContextMenu } from './ui/useNativeMenu.js'
 import TimerCapsule from './components/stats/TimerCapsule.jsx'
 import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
 import { OPEN_SETTINGS, primaryTimerAction } from './stats/timerMenu.js'
@@ -28,6 +33,7 @@ import { buildFormatMenu, buildInsertMenu, fileExtraItems, pasteAndMatchStyleIte
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
+const TRAY_STORAGE_KEY = 'inkblot-tray-color'
 const WORD_COUNT_BADGE_STORAGE_KEY = 'inkblot-show-word-count-badge'
 
 const EXPORT_FORMATS = [
@@ -54,10 +60,10 @@ async function buildTimerMenu({ MenuItem, Submenu, PredefinedMenuItem }) {
   const stats = getStatsRuntime()
   const timer = stats.timer
   const primary = await MenuItem.new({ id: 'timer-primary', text: primaryTimerAction(stats).text, action: () => primaryTimerAction(stats).action() })
-  const skip = await MenuItem.new({ id: 'timer-skip', text: 'Skip to Next Segment', enabled: false, action: () => timer.skip() })
+  const skip = await MenuItem.new({ id: 'timer-skip', text: 'Skip to next segment', enabled: false, action: () => timer.skip() })
   const stop = await MenuItem.new({ id: 'timer-stop', text: 'Stop', enabled: false, action: () => timer.stop() })
   const routines = await Submenu.new({
-    text: 'Start Routine',
+    text: 'Start routine',
     items: await Promise.all(allRoutines(stats.config).map((routine) => MenuItem.new({ text: routine.name, action: () => stats.startTimer(routine) }))),
   })
   let last = ''
@@ -77,8 +83,8 @@ async function buildTimerMenu({ MenuItem, Submenu, PredefinedMenuItem }) {
       await PredefinedMenuItem.new({ item: 'Separator' }),
       routines,
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      await MenuItem.new({ id: 'timer-show-stats', text: 'Show Stats', action: () => stats.showStats() }),
-      await MenuItem.new({ id: 'timer-edit-routines', text: 'Edit Routines…', action: () => openSettings('timers') }),
+      await MenuItem.new({ id: 'timer-show-stats', text: 'Show stats', action: () => stats.showStats() }),
+      await MenuItem.new({ id: 'timer-edit-routines', text: 'Edit routines…', action: () => openSettings('timers') }),
     ],
   })
 }
@@ -92,6 +98,7 @@ export default function App() {
   const currentThemeRef = useRef('system')
   const showWordCountBadgeRef = useRef(true)
   const [accent, setAccent] = useState(DEFAULT_ACCENT)
+  const [tray, setTray] = useState(DEFAULT_TRAY)
   const [theme, setTheme] = useState('system')
   useStatsRuntime()
   const [showWordCountBadge, setShowWordCountBadge] = useState(true)
@@ -102,7 +109,7 @@ export default function App() {
   // Keep the native View-menu labels/checkmarks in sync with the active theme.
   const updateMenu = useCallback((theme) => {
     const resolved = getResolvedTheme(theme)
-    const toggleLabel = resolved === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'
+    const toggleLabel = resolved === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
 
     if (menuRefs.current.toggleItem) {
       menuRefs.current.toggleItem.setText(toggleLabel)
@@ -135,6 +142,12 @@ export default function App() {
     setAccent(id)
   }, [])
 
+  const applyTray = useCallback((nextTray) => {
+    const id = setTrayAttribute(nextTray)
+    setPreference(TRAY_STORAGE_KEY, id)
+    setTray(id)
+  }, [])
+
   const applyWordCountBadgeVisibility = useCallback((visible) => {
     const nextVisible = Boolean(visible)
     showWordCountBadgeRef.current = nextVisible
@@ -151,6 +164,9 @@ export default function App() {
   useEffect(() => {
     documentSurface.publishViewOptions({ wordCountVisible: showWordCountBadge })
   }, [showWordCountBadge])
+
+  // A right-click on anything with a help topic offers it (lib/help.ts).
+  useEffect(() => installHelpContextMenu(), [])
 
   // Backend-initiated Pinterest searches (e.g. from a native menu) open the scraper window.
   useEffect(() => {
@@ -175,6 +191,7 @@ export default function App() {
     const storedWordCountBadge = getPreference(WORD_COUNT_BADGE_STORAGE_KEY)
     const showStoredWordCountBadge = storedWordCountBadge !== 'false'
     applyAccent(storedAccent)
+    applyTray(getPreference(TRAY_STORAGE_KEY))
     applyTheme(stored)
     applyWordCountBadgeVisibility(showStoredWordCountBadge)
 
@@ -199,7 +216,7 @@ export default function App() {
 
       const toggleItem = await MenuItem.new({
         id: 'theme-toggle',
-        text: 'Switch to Dark',
+        text: 'Switch to dark mode',
         action: () => {
           const resolved = getResolvedTheme(currentThemeRef.current)
           applyTheme(resolved === 'dark' ? 'light' : 'dark')
@@ -215,7 +232,7 @@ export default function App() {
 
       const wordCountItem = await CheckMenuItem.new({
         id: 'word-count-badge-toggle',
-        text: 'Show Word Count',
+        text: 'Show word count',
         checked: showWordCountBadgeRef.current,
         action: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current),
       })
@@ -224,18 +241,18 @@ export default function App() {
       menuRefs.current.systemItem = systemItem
       menuRefs.current.wordCountItem = wordCountItem
 
-      // Print Layout, printing and export act on the active document; the pane that
+      // Page view, printing and export act on the active document; the pane that
       // owns it listens for these (usePrintLayoutController).
       const printEvent = (type, detail) => () => window.dispatchEvent(new CustomEvent(type, { detail }))
       const printLayoutItem = await MenuItem.new({
         id: 'print-layout-toggle',
-        text: 'Print Layout  ⌥⌘P',
+        text: 'Page view  ⌥⌘P',
         action: printEvent('inkblot:print-layout-toggle'),
       })
       const exportItems = (scope, labelSuffix = '') => Promise.all([
         MenuItem.new({ id: `export-pdf-${scope}`, text: `PDF${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'pdf', scope }) }),
         ...(scope === 'folder'
-          ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for Binding…', action: printEvent('inkblot:export', { format: 'pdf', scope, bound: true }) })]
+          ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for binding…', action: printEvent('inkblot:export', { format: 'pdf', scope, bound: true }) })]
           : []),
         MenuItem.new({ id: `export-epub-${scope}`, text: `EPUB${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'epub', scope }) }),
         MenuItem.new({ id: `export-docx-${scope}`, text: `Word (.docx)${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'docx', scope }) }),
@@ -248,18 +265,18 @@ export default function App() {
       ])
       const fileItems = [
         await PredefinedMenuItem.new({ item: 'Separator' }),
-        await MenuItem.new({ id: 'page-setup', text: 'Page Setup…', action: printEvent('inkblot:page-setup') }),
+        await MenuItem.new({ id: 'page-setup', text: 'Page setup…', action: printEvent('inkblot:page-setup') }),
         await Submenu.new({
-          text: 'Write As',
-          items: await Promise.all([['prose', 'Prose'], ['screenplay', 'Screenplay'], ['stageplay', 'Stage Play']].map(([format, text]) => (
+          text: 'Write as',
+          items: await Promise.all([['prose', 'Prose'], ['screenplay', 'Screenplay'], ['stageplay', 'Stage play']].map(([format, text]) => (
             MenuItem.new({ id: `write-as-${format}`, text, action: printEvent('inkblot:writing-format', { format }) })
           ))),
         }),
         await MenuItem.new({ id: 'print-document', text: 'Print…  ⌘P', action: printEvent('inkblot:print', { scope: 'document' }) }),
         await MenuItem.new({ id: 'print-book', text: 'Print Book…', action: printEvent('inkblot:print', { scope: 'folder' }) }),
-        await MenuItem.new({ id: 'print-book-bound', text: 'Print Book for Binding…', action: printEvent('inkblot:print', { scope: 'folder', bound: true }) }),
+        await MenuItem.new({ id: 'print-book-bound', text: 'Print book for binding…', action: printEvent('inkblot:print', { scope: 'folder', bound: true }) }),
         await PredefinedMenuItem.new({ item: 'Separator' }),
-        await MenuItem.new({ id: 'import-fountain', text: 'Import Fountain Script…', action: printEvent('inkblot:import-script') }),
+        await MenuItem.new({ id: 'import-fountain', text: 'Import Fountain script…', action: printEvent('inkblot:import-script') }),
         await Submenu.new({ text: 'Export', items: await exportItems('document') }),
         await Submenu.new({ text: 'Export Book', items: await exportItems('folder') }),
       ]
@@ -271,18 +288,18 @@ export default function App() {
         await PredefinedMenuItem.new({ item: 'Separator' }),
         await MenuItem.new({
           id: 'accent-color-picker',
-          text: 'Accent Colour…',
+          text: 'Accent colour…',
           action: () => openSettings('general'),
         }),
         await MenuItem.new({
           id: 'command-palette',
-          text: 'Command Palette…  ⌘K',
+          text: 'Command palette…  ⌘K',
           action: () => dispatchAppEvent('inkblot:command-palette'),
         }),
       ]
       const tabBarItem = await CheckMenuItem.new({
         id: 'tab-bar-toggle',
-        text: 'Show Tab Bar',
+        text: 'Show tab bar',
         checked: showsTabBar(),
         action: () => {
           setShowsTabBar(!showsTabBar())
@@ -325,7 +342,7 @@ export default function App() {
     }
 
     setupMenu()
-  }, [applyAccent, applyTheme, applyWordCountBadgeVisibility, getResolvedTheme, updateMenu])
+  }, [applyAccent, applyTray, applyTheme, applyWordCountBadgeVisibility, getResolvedTheme, updateMenu])
 
   // Follow the OS when the theme is 'system', and keep the menu labels in step.
   useEffect(() => watchSystemTheme(() => {
@@ -334,20 +351,24 @@ export default function App() {
     updateMenu('system')
   }), [updateMenu])
 
+  // The shortcuts: every bound key runs its command (keybindings.ts).
+  useKeybindings()
+
   // App-level commands for the palette (⌘K). Features register their own where they live.
   useCommands(() => [
-    { id: 'app.settings', section: 'App', title: 'Open settings', icon: 'settings', shortcut: '⌘,', keywords: ['preferences', 'options'], run: () => openSettings() },
+    { id: 'app.settings', section: 'App', title: 'Open settings', icon: 'settings', keys: 'Mod+,', keywords: ['preferences', 'options'], run: () => openSettings() },
     { id: 'view.theme.light', section: 'View', title: 'Use light theme', icon: 'sun', keywords: ['paper', 'appearance', 'mode'], run: () => applyTheme('light') },
     { id: 'view.theme.dark', section: 'View', title: 'Use dark theme', icon: 'moon', keywords: ['ink', 'appearance', 'mode', 'night'], run: () => applyTheme('dark') },
-    { id: 'view.theme.system', section: 'View', title: 'Match system theme', icon: 'settings', keywords: ['appearance', 'auto'], run: () => applyTheme('system') },
+    { id: 'view.theme.system', section: 'View', title: 'Match system theme', icon: 'theme', keywords: ['appearance', 'auto'], run: () => applyTheme('system') },
     { id: 'view.accent', section: 'View', title: 'Change accent colour…', icon: 'palette', keywords: ['color', 'tint', 'highlight'], run: () => openSettings('general') },
-    { id: 'view.word-count', section: 'View', title: 'Show or hide word count', icon: 'gauge', keywords: ['words', 'stats', 'badge'], run: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current) },
-    { id: 'view.tab-bar', section: 'View', title: 'Show or hide tab bar', icon: 'sidebar', keywords: ['tabs'], run: () => setShowsTabBar(!showsTabBar()) },
+    { id: 'view.window-colour', section: 'View', title: 'Change window colour…', icon: 'palette', keywords: ['color', 'tint', 'tray', 'background', 'gradient', 'sidebar'], run: () => openSettings('general') },
+    { id: 'view.word-count', section: 'View', title: 'Show or hide word count', icon: 'number', keywords: ['words', 'stats', 'badge'], run: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current) },
+    { id: 'view.tab-bar', section: 'View', title: 'Show or hide tab bar', icon: 'tabs', keywords: ['tabs'], run: () => setShowsTabBar(!showsTabBar()) },
     { id: 'timer.stats', section: 'Writing', title: 'Show writing stats', icon: 'chart', keywords: ['words', 'goals', 'progress'], run: () => getStatsRuntime().showStats() },
     { id: 'timer.routines', section: 'Writing', title: 'Edit timer routines…', icon: 'timer', keywords: ['pomodoro', 'sprint'], run: () => openSettings('timers') },
-    { id: 'print.layout', section: 'Print & export', title: 'Toggle print layout', icon: 'print', shortcut: '⌥⌘P', keywords: ['pages', 'preview', 'book', 'typeset'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
+    { id: 'print.layout', section: 'View', title: 'Show or hide page view', icon: 'book-pages', keys: 'Mod+Alt+P', keywords: ['pages', 'print layout', 'preview', 'write'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
     { id: 'print.page-setup', section: 'Print & export', title: 'Page setup…', icon: 'sliders', keywords: ['margins', 'trim', 'paper size'], run: () => dispatchAppEvent('inkblot:page-setup') },
-    { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', shortcut: '⌘P', run: () => dispatchAppEvent('inkblot:print', { scope: 'document' }) },
+    { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', keys: 'Mod+P', run: () => dispatchAppEvent('inkblot:print', { scope: 'document' }) },
     { id: 'print.book', section: 'Print & export', title: 'Print book…', icon: 'books', keywords: ['folder', 'manuscript'], run: () => dispatchAppEvent('inkblot:print', { scope: 'folder' }) },
     ...EXPORT_FORMATS.map(([format, label]) => ({
       id: `export.document.${format}`,
@@ -394,6 +415,10 @@ export default function App() {
     onAccent: applyAccent,
     accentPresets: ACCENT_PRESETS,
     defaultAccent: DEFAULT_ACCENT,
+    tray,
+    onTray: applyTray,
+    trayInks: TRAY_INKS,
+    defaultTray: DEFAULT_TRAY,
     wordCount: showWordCountBadge,
     onWordCount: applyWordCountBadgeVisibility,
   }
@@ -402,8 +427,10 @@ export default function App() {
     <>
       <Editor showWordCountBadge={showWordCountBadge} />
       <SettingsSheet appearance={appearance} />
+      <HelpSheet />
       <TimerCapsule />
       <CommandPalette />
+      <UpdateBanner />
     </>
   )
 }

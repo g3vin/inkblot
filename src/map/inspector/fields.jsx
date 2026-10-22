@@ -6,6 +6,8 @@
  * ("1.") never reaches the map.
  */
 import { useEffect, useRef, useState } from 'react'
+import { resolveInkHex } from '../../lib/palette'
+import { MAP_DEFAULT_COLORS } from '../../lib/map/mapColors'
 
 export function Field({ label, children, title }) {
   return (
@@ -134,11 +136,11 @@ export function CheckField({ label, checked, onChange }) {
   )
 }
 
-export function ColorField({ label, value, fallback = '#c0392b', onChange }) {
+export function ColorField({ label, value, fallback = MAP_DEFAULT_COLORS.pin, onChange }) {
   return (
     <Field label={label}>
       <span className="map-row">
-        <input type="color" value={value || fallback} onChange={(event) => onChange(event.target.value)} />
+        <input type="color" value={resolveInkHex(value || fallback, resolveInkHex(fallback))} onChange={(event) => onChange(event.target.value)} />
         {value ? (
           <button type="button" className="map-button" onClick={() => onChange(null)}>Reset</button>
         ) : null}
@@ -166,20 +168,4 @@ export function Stat({ label, children }) {
       <span>{children}</span>
     </div>
   )
-}
-
-/** A select of project documents: `preferred` first, then everything else. */
-export function DocField({ label, value, docs, preferred, preferredLabel, onChange, noneLabel = 'None' }) {
-  const own = docs.filter((doc) => preferred(doc))
-  const rest = docs.filter((doc) => !preferred(doc) && doc.kind === 'text')
-  const others = docs.filter((doc) => !preferred(doc) && doc.kind !== 'text')
-  const known = docs.some((doc) => doc.path === value)
-  const options = [
-    { value: '', label: noneLabel },
-    ...(value && !known ? [{ value, label: `${value} (missing)` }] : []),
-    ...(own.length ? [{ group: preferredLabel, options: own.map((doc) => ({ value: doc.path, label: doc.path })) }] : []),
-    ...(rest.length ? [{ group: 'Other documents', options: rest.map((doc) => ({ value: doc.path, label: doc.path })) }] : []),
-    ...(others.length ? [{ group: 'Maps and canvases', options: others.map((doc) => ({ value: doc.path, label: doc.path })) }] : []),
-  ]
-  return <SelectField label={label} value={value || ''} options={options} onChange={(next) => onChange(next || null)} />
 }

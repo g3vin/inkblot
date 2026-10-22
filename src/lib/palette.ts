@@ -113,6 +113,13 @@ export const normalizeAccent = (value: unknown): InkId => {
   return id && ACCENT_PRESETS.some((preset) => preset.id === id) ? id : DEFAULT_ACCENT
 }
 
+/** Window (tray) colours: every ink. Keep in sync with the [data-tray] rules in tokens.css. */
+export const TRAY_INKS: readonly InkId[] = INKS.map((ink) => ink.id)
+export const DEFAULT_TRAY: InkId = 'blue'
+
+/** A stored tray colour → an ink id. */
+export const normalizeTray = (value: unknown): InkId => (isInkId(value) ? value : DEFAULT_TRAY)
+
 /** Note colours, in picker order. Amber reads as "a note" at a glance. */
 export const NOTE_INKS: readonly InkId[] = ['amber', 'red', 'blue', 'green', 'violet', 'rust', 'teal', 'slate']
 export const DEFAULT_NOTE_INK: InkId = 'amber'
@@ -143,3 +150,10 @@ export const POS_INKS: Readonly<Record<string, string>> = {
   Preposition: 'var(--text-muted)',
   Unknown: 'var(--text-subtle)',
 }
+
+/**
+ * The writer's text colour and highlighter, as stored in the document's marks. They are
+ * the document's own colours (like a printed page's), so they stay literal.
+ */
+export const DEFAULT_TEXT_COLOR = '#000000'
+export const DEFAULT_HIGHLIGHT_COLOR = '#ffff00'

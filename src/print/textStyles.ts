@@ -35,14 +35,14 @@ const look = (id: string, name: string, over: Partial<TextStyleLook>): TextStyle
 /** The app's own looks, in the order the menu lists them. */
 export const BUILTIN_TEXT_STYLES: TextStyleLook[] = [
   look('letter', 'Letter', { indentEm: 2, spaceLines: 1, flush: true }),
-  look('textMessage', 'Text Message', { fontFamily: SANS, size: 0.88, indentEm: 2, spaceLines: 0.5, flush: true, align: TextStyleAlign.Left }),
+  look('textMessage', 'Text message', { fontFamily: SANS, size: 0.88, indentEm: 2, spaceLines: 0.5, flush: true, align: TextStyleAlign.Left }),
   look('email', 'Email', { fontFamily: SANS, size: 0.9, indentEm: 1, spaceLines: 1, flush: true, align: TextStyleAlign.Left }),
   look('verse', 'Verse', { indentEm: 3, spaceLines: 1, flush: true, align: TextStyleAlign.Left }),
-  look('blockQuote', 'Block Quote', { size: 0.95, indentEm: 2, spaceLines: 1, flush: true }),
-  look('journal', 'Journal Entry', { italic: true, indentEm: 1, spaceLines: 1 }),
+  look('blockQuote', 'Block quote', { size: 0.95, indentEm: 2, spaceLines: 1, flush: true }),
+  look('journal', 'Journal entry', { italic: true, indentEm: 1, spaceLines: 1 }),
   look('sign', 'Sign', { smallCaps: true, align: TextStyleAlign.Center, spaceLines: 1, flush: true, boxed: true }),
   look('centered', 'Centered', { align: TextStyleAlign.Center, flush: true }),
-  look('flushLeft', 'Flush Left', { align: TextStyleAlign.Left, flush: true }),
+  look('flushLeft', 'Flush left', { align: TextStyleAlign.Left, flush: true }),
 ]
 
 const finite = (v: unknown, d: number, min: number, max: number) => {
@@ -84,8 +84,6 @@ export const textStylesOf = (book: Partial<BookSettings> | null | undefined): Te
   }
   return out
 }
-
-export const isBuiltinTextStyle = (id: string): boolean => BUILTIN_TEXT_STYLES.some((b) => b.id === id)
 
 const cssIdent = (id: string) => id.replace(/["\\]/g, '')
 

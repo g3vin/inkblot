@@ -19,6 +19,7 @@ pub const VERSION_CAP: usize = 200;
 pub enum DocKind {
     Canvas,
     Map,
+    Timeline,
     Text,
 }
 
@@ -120,6 +121,10 @@ pub struct TextDocument {
     /// (`bridge::references`). Absent until either is set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub citations: Option<DocumentCitations>,
+    /// Passages attached to timeline events (`types::timeline`), in document order.
+    /// Absent until one is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeline: Option<Vec<super::timeline::TimelineRange>>,
 }
 
 /// A document's part of the references. The sources, and which documents each is

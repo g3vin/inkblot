@@ -16,19 +16,40 @@ use serde_json::{json, Value};
 
 fn page_setup() -> crate::types::PageSetup {
     use crate::types::{PageMargins, PageNumberFormat, PageOrientation, PageSetup, RunningText};
-    let blank = RunningText { left: String::new(), center: String::new(), right: String::new() };
+    let blank = RunningText {
+        left: String::new(),
+        center: String::new(),
+        right: String::new(),
+    };
     PageSetup {
         preset_id: "trade-6x9".into(),
         width_mm: 152.4,
         height_mm: 228.6,
         orientation: PageOrientation::Portrait,
-        margins: PageMargins { top_mm: 19.05, bottom_mm: 19.05, inside_mm: 15.875, outside_mm: 15.875, gutter_mm: 3.175 },
+        margins: PageMargins {
+            top_mm: 19.05,
+            bottom_mm: 19.05,
+            inside_mm: 15.875,
+            outside_mm: 15.875,
+            gutter_mm: 3.175,
+        },
         mirror_margins: true,
         columns: 1,
         column_gap_mm: 6.35,
-        header: RunningText { left: String::new(), center: "{chapter}".into(), right: String::new() },
-        footer: RunningText { left: String::new(), center: "{page}".into(), right: String::new() },
-        verso_header: Some(RunningText { center: "{title}".into(), ..blank.clone() }),
+        header: RunningText {
+            left: String::new(),
+            center: "{chapter}".into(),
+            right: String::new(),
+        },
+        footer: RunningText {
+            left: String::new(),
+            center: "{page}".into(),
+            right: String::new(),
+        },
+        verso_header: Some(RunningText {
+            center: "{title}".into(),
+            ..blank.clone()
+        }),
         verso_footer: None,
         header_distance_mm: 9.525,
         footer_distance_mm: 9.525,
@@ -59,7 +80,10 @@ fn typography() -> crate::types::PrintTypography {
         chapter_sink_mm: 25.4,
         no_indent_after_break: true,
         images: Some(crate::types::ImageTypesetting::default()),
-        composition: Some(crate::types::Composition { baseline_grid: true, ..Default::default() }),
+        composition: Some(crate::types::Composition {
+            baseline_grid: true,
+            ..Default::default()
+        }),
         features: None,
     }
 }
@@ -91,9 +115,20 @@ fn book() -> crate::types::BookSettings {
             start_at: 0,
             show_in_tree: true,
         },
-        front_matter: crate::types::FrontMatter { half_title: true, dedication: "For M.".into(), contents: true, ..Default::default() },
-        back_matter: crate::types::BackMatter { about_the_author: "A. Writer lives by the sea.".into(), ..Default::default() },
-        publishing: crate::types::PublishingTarget { service: crate::types::PublishingService::Kdp, paper: crate::types::PaperStock::Cream },
+        front_matter: crate::types::FrontMatter {
+            half_title: true,
+            dedication: "For M.".into(),
+            contents: true,
+            ..Default::default()
+        },
+        back_matter: crate::types::BackMatter {
+            about_the_author: "A. Writer lives by the sea.".into(),
+            ..Default::default()
+        },
+        publishing: crate::types::PublishingTarget {
+            service: crate::types::PublishingService::Kdp,
+            paper: crate::types::PaperStock::Cream,
+        },
         chapter_design: Some(crate::types::ChapterDesign {
             show_number: true,
             ornament: crate::types::OrnamentKind::Glyph,
@@ -113,7 +148,10 @@ fn book() -> crate::types::BookSettings {
                 matter: Some(crate::types::MatterKind::Dedication),
                 generated: None,
                 chapter_type: None,
-                page: Some(crate::types::PageOptions { position: crate::types::PagePosition::Sunk, ..Default::default() }),
+                page: Some(crate::types::PageOptions {
+                    position: crate::types::PagePosition::Sunk,
+                    ..Default::default()
+                }),
             },
             crate::types::BookItem {
                 id: "c1".into(),
@@ -139,11 +177,30 @@ fn book() -> crate::types::BookSettings {
             made_for_spine_mm: Some(12.4),
         }],
         active_cover: Some("v1".into()),
-        digital: crate::types::DigitalOptions { drop_caps: false, ..Default::default() },
-        notes: crate::types::NotesOptions { placement: crate::types::NotePlacement::Chapter, ..Default::default() },
-        editions: vec![crate::types::Edition { id: "e1".into(), name: "Large Print".into(), kind: crate::types::EditionKind::LargePrint, page_setup: None, cover_set_id: Some("v1".into()) }],
+        digital: crate::types::DigitalOptions {
+            drop_caps: false,
+            ..Default::default()
+        },
+        notes: crate::types::NotesOptions {
+            placement: crate::types::NotePlacement::Chapter,
+            ..Default::default()
+        },
+        editions: vec![crate::types::Edition {
+            id: "e1".into(),
+            name: "Large Print".into(),
+            kind: crate::types::EditionKind::LargePrint,
+            page_setup: None,
+            cover_set_id: Some("v1".into()),
+        }],
         active_edition: Some("e1".into()),
-        text_styles: vec![crate::types::TextStyleLook { id: "sign".into(), name: "Sign".into(), small_caps: true, boxed: true, align: crate::types::TextStyleAlign::Center, ..Default::default() }],
+        text_styles: vec![crate::types::TextStyleLook {
+            id: "sign".into(),
+            name: "Sign".into(),
+            small_caps: true,
+            boxed: true,
+            align: crate::types::TextStyleAlign::Center,
+            ..Default::default()
+        }],
     }
 }
 
@@ -165,7 +222,10 @@ where
 /// The `type` tag of an adjacently-tagged value, as it appears on the wire.
 fn tag_of<T: serde::Serialize>(value: &T) -> String {
     let wire = serde_json::to_value(value).expect("serialize");
-    wire["type"].as_str().expect("a string `type` tag").to_string()
+    wire["type"]
+        .as_str()
+        .expect("a string `type` tag")
+        .to_string()
 }
 
 /* ---------------- the literal wire shape ---------------- */
@@ -312,7 +372,10 @@ fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::ReplaceRanges(ReplaceRangesCommand {
             target: EditorTarget::Primary,
-            edits: vec![RangeEdit { anchor: anchor(), text: "she paused".into() }],
+            edits: vec![RangeEdit {
+                anchor: anchor(),
+                text: "she paused".into(),
+            }],
         }),
         NativeCommand::SetCaretAtDocPos(SetCaretAtDocPosCommand {
             target: EditorTarget::Primary,
@@ -342,6 +405,30 @@ fn every_command() -> Vec<NativeCommand> {
             command: "panel-field".into(),
             detail: Some(json!({ "id": "pin.name", "value": "Harrowgate" })),
         }),
+        NativeCommand::TimelineCommand(TimelineCommandRequest {
+            surface_id: "timeline-surface-0".into(),
+            command: "scale".into(),
+            detail: Some(json!({ "value": "manuscript" })),
+        }),
+        NativeCommand::AttachTimelineEvent(AttachTimelineEventCommand {
+            target: EditorTarget::Primary,
+            anchor: anchor(),
+            event_id: None,
+            title: Some("The siege".into()),
+        }),
+        NativeCommand::JumpToTimelinePassage(JumpToTimelinePassageCommand {
+            doc_path: "chapters/one.md".into(),
+            event_id: "e1".into(),
+            range_id: None,
+        }),
+        NativeCommand::RevealTimelineEvent(RevealTimelineEventCommand {
+            event_id: "e1".into(),
+        }),
+        NativeCommand::SetTimeLens(SetTimeLensCommand {
+            on: Some(true),
+            editing: None,
+        }),
+        NativeCommand::SetTimelineRangeEditing(SetTimelineRangeEditingCommand { on: true }),
         NativeCommand::CanvasDropDoc(CanvasDropDocCommand {
             surface_id: "surface-1".into(),
             path: "chapters/one.md".into(),
@@ -386,22 +473,40 @@ fn every_command() -> Vec<NativeCommand> {
             path: "Part One/Chapter 1".into(),
             is_folder: false,
         }),
-        NativeCommand::DuplicateEntry(DuplicateEntryCommand { path: "Part One/Chapter 1".into() }),
+        NativeCommand::DuplicateEntry(DuplicateEntryCommand {
+            path: "Part One/Chapter 1".into(),
+        }),
         NativeCommand::UpdateNote(UpdateNoteCommand {
             doc_path: "one".into(),
             note_id: "n1".into(),
-            patch: NotePatch { pinned: Some(true), ..Default::default() },
+            patch: NotePatch {
+                pinned: Some(true),
+                ..Default::default()
+            },
         }),
-        NativeCommand::RemoveNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
-        NativeCommand::JumpToNote(NoteRef { doc_path: "one".into(), note_id: "n1".into() }),
-        NativeCommand::ClipboardDrop(ClipboardDropCommand { text: "moved".into() }),
+        NativeCommand::RemoveNote(NoteRef {
+            doc_path: "one".into(),
+            note_id: "n1".into(),
+        }),
+        NativeCommand::JumpToNote(NoteRef {
+            doc_path: "one".into(),
+            note_id: "n1".into(),
+        }),
+        NativeCommand::ClipboardDrop(ClipboardDropCommand {
+            text: "moved".into(),
+        }),
         NativeCommand::RemoveClipboardEntries(RemoveClipboardEntriesCommand { ids: None }),
         NativeCommand::InsertClipboardEntry(InsertClipboardEntryCommand {
             id: "c1".into(),
             target: EditorTarget::Primary,
         }),
-        NativeCommand::RemoveTiles(RemoveTilesCommand { ids: Some(vec!["t1".into()]) }),
-        NativeCommand::ReplaceTileWord(ReplaceTileWordCommand { id: "t1".into(), word: "paused".into() }),
+        NativeCommand::RemoveTiles(RemoveTilesCommand {
+            ids: Some(vec!["t1".into()]),
+        }),
+        NativeCommand::ReplaceTileWord(ReplaceTileWordCommand {
+            id: "t1".into(),
+            word: "paused".into(),
+        }),
         NativeCommand::SelectTileWord(TileRef { id: "t1".into() }),
         NativeCommand::VersionAction(VersionActionCommand {
             doc_path: "one".into(),
@@ -419,13 +524,33 @@ fn every_command() -> Vec<NativeCommand> {
             node_id: None,
             note_id: None,
         }),
-        NativeCommand::AddReply(AddReplyCommand { doc_path: "one".into(), parent_note_id: "n1".into() }),
-        NativeCommand::OpenProject(OpenProjectCommand { project_name: "Novel".into() }),
-        NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::Heading1 }),
-        NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::SceneHeading }),
-        NativeCommand::SetWritingFormat(SetWritingFormatCommand { target: EditorTarget::Primary, format: WritingFormat::Screenplay }),
-        NativeCommand::ToggleList(ToggleListCommand { target: EditorTarget::Primary, list: ListKind::Ordered }),
-        NativeCommand::EditorHistory(EditorHistoryCommand { target: EditorTarget::Primary, action: HistoryAction::Undo }),
+        NativeCommand::AddReply(AddReplyCommand {
+            doc_path: "one".into(),
+            parent_note_id: "n1".into(),
+        }),
+        NativeCommand::OpenProject(OpenProjectCommand {
+            project_name: "Novel".into(),
+        }),
+        NativeCommand::SetBlockType(SetBlockTypeCommand {
+            target: EditorTarget::Primary,
+            block: BlockType::Heading1,
+        }),
+        NativeCommand::SetBlockType(SetBlockTypeCommand {
+            target: EditorTarget::Primary,
+            block: BlockType::SceneHeading,
+        }),
+        NativeCommand::SetWritingFormat(SetWritingFormatCommand {
+            target: EditorTarget::Primary,
+            format: WritingFormat::Screenplay,
+        }),
+        NativeCommand::ToggleList(ToggleListCommand {
+            target: EditorTarget::Primary,
+            list: ListKind::Ordered,
+        }),
+        NativeCommand::EditorHistory(EditorHistoryCommand {
+            target: EditorTarget::Primary,
+            action: HistoryAction::Undo,
+        }),
         NativeCommand::SetFocusMode(SetFocusModeCommand { open: true }),
         NativeCommand::SetWordCountVisible(SetWordCountVisibleCommand { visible: false }),
         NativeCommand::AddReference(AddReferenceCommand {
@@ -434,21 +559,37 @@ fn every_command() -> Vec<NativeCommand> {
             input: "10.1038/nature14539".into(),
             cite: false,
         }),
-        NativeCommand::CreateReference(CreateReferenceCommand { id: "r2".into(), doc_path: None, kind: "book".into() }),
+        NativeCommand::CreateReference(CreateReferenceCommand {
+            id: "r2".into(),
+            doc_path: None,
+            kind: "book".into(),
+        }),
         NativeCommand::UpdateReference(UpdateReferenceCommand {
             id: "r1".into(),
-            patch: ReferencePatch { note: Some("check p. 4".into()), ..Default::default() },
+            patch: ReferencePatch {
+                note: Some("check p. 4".into()),
+                ..Default::default()
+            },
         }),
         NativeCommand::DeleteReference(ReferenceRef { id: "r1".into() }),
         NativeCommand::RetryReferenceLookup(ReferenceRef { id: "r1".into() }),
-        NativeCommand::ChooseReferenceCandidate(ChooseReferenceCandidateCommand { id: "r1".into(), index: 2 }),
-        NativeCommand::SetReferenceAttached(SetReferenceAttachedCommand { doc_path: "a".into(), id: "r1".into(), attached: true }),
+        NativeCommand::ChooseReferenceCandidate(ChooseReferenceCandidateCommand {
+            id: "r1".into(),
+            index: 2,
+        }),
+        NativeCommand::SetReferenceAttached(SetReferenceAttachedCommand {
+            doc_path: "a".into(),
+            id: "r1".into(),
+            attached: true,
+        }),
         NativeCommand::InsertCitation(InsertCitationCommand {
             target: None,
             ref_ids: vec!["r1".into()],
             locator: Some("42".into()),
         }),
-        NativeCommand::InsertBibliography(InsertBibliographyCommand { target: Some(EditorTarget::Primary) }),
+        NativeCommand::InsertBibliography(InsertBibliographyCommand {
+            target: Some(EditorTarget::Primary),
+        }),
         NativeCommand::SetCitationStyle(SetCitationStyleCommand {
             doc_path: Some("a".into()),
             style: "mla".into(),
@@ -458,9 +599,17 @@ fn every_command() -> Vec<NativeCommand> {
             doc_path: "a".into(),
             options: bibliography_options(),
         }),
-        NativeCommand::SetEditorMode(SetEditorModeCommand { mode: EditorMode::Typeset }),
-        NativeCommand::MoveBookItem(MoveBookItemCommand { id: "c:Novel/One".into(), before: Some("d1".into()) }),
-        NativeCommand::SetBookItemHidden(SetBookItemHiddenCommand { id: "c:Novel/One".into(), hidden: true }),
+        NativeCommand::SetEditorMode(SetEditorModeCommand {
+            mode: EditorMode::Typeset,
+        }),
+        NativeCommand::MoveBookItem(MoveBookItemCommand {
+            id: "c:Novel/One".into(),
+            before: Some("d1".into()),
+        }),
+        NativeCommand::SetBookItemHidden(SetBookItemHiddenCommand {
+            id: "c:Novel/One".into(),
+            hidden: true,
+        }),
         NativeCommand::AddBookItem(AddBookItemCommand {
             matter: Some(crate::types::MatterKind::AboutAuthor),
             generated: None,
@@ -477,70 +626,192 @@ fn every_command() -> Vec<NativeCommand> {
             page: None,
         }),
         NativeCommand::OpenBookItem(OpenBookItemCommand { id: "d1".into() }),
-        NativeCommand::ApplyBookStyle(ApplyBookStyleCommand { id: "classic".into() }),
-        NativeCommand::SetChapterMeta(SetChapterMetaCommand {
-            meta: crate::types::ChapterMeta { subtitle: "In which it rains".into(), ..Default::default() },
+        NativeCommand::ApplyBookStyle(ApplyBookStyleCommand {
+            id: "classic".into(),
         }),
-        NativeCommand::SetHeadImage(SetHeadImageCommand { target: HeadImageTarget::Ornament, path: Some("/Users/a/fleuron.png".into()) }),
-        NativeCommand::SetFolderBookOptions(SetFolderBookOptionsCommand { folder: "Novel".into(), number_in_tree: Some(true), start_at: Some(0), continuous: None }),
-        NativeCommand::SetTypesetView(SetTypesetViewCommand { view: TypesetView::Digital }),
-        NativeCommand::SetParagraphTypeset(SetParagraphTypesetCommand { anchor: Some(anchor()), nudge_tracking: Some(-5), ..Default::default() }),
+        NativeCommand::SetChapterMeta(SetChapterMetaCommand {
+            meta: crate::types::ChapterMeta {
+                subtitle: "In which it rains".into(),
+                ..Default::default()
+            },
+        }),
+        NativeCommand::SetHeadImage(SetHeadImageCommand {
+            target: HeadImageTarget::Ornament,
+            path: Some("/Users/a/fleuron.png".into()),
+        }),
+        NativeCommand::SetFolderBookOptions(SetFolderBookOptionsCommand {
+            folder: "Novel".into(),
+            number_in_tree: Some(true),
+            start_at: Some(0),
+            continuous: None,
+        }),
+        NativeCommand::SetTypesetView(SetTypesetViewCommand {
+            view: TypesetView::Digital,
+        }),
+        NativeCommand::SetParagraphTypeset(SetParagraphTypesetCommand {
+            anchor: Some(anchor()),
+            nudge_tracking: Some(-5),
+            ..Default::default()
+        }),
         NativeCommand::ShowProofIssue(ShowProofIssueCommand { anchor: anchor() }),
-        NativeCommand::SetTypesetDisplay(SetTypesetDisplayCommand { spread: Some(true), ..Default::default() }),
-        NativeCommand::AddProjectFont(AddProjectFontCommand { path: "/Users/a/Fonts/Garamond.otf".into() }),
-        NativeCommand::SetTextStyle(SetTextStyleCommand { style: Some("letter".into()) }),
-        NativeCommand::InsertFootnote(InsertFootnoteCommand { target: EditorTarget::Primary }),
-        NativeCommand::EditEditions(EditEditionsCommand { action: EditionAction::Add, id: None, name: None, kind: Some(crate::types::EditionKind::LargePrint), cover_set_id: None }),
+        NativeCommand::SetTypesetDisplay(SetTypesetDisplayCommand {
+            spread: Some(true),
+            ..Default::default()
+        }),
+        NativeCommand::AddProjectFont(AddProjectFontCommand {
+            path: "/Users/a/Fonts/Garamond.otf".into(),
+        }),
+        NativeCommand::SetTextStyle(SetTextStyleCommand {
+            style: Some("letter".into()),
+        }),
+        NativeCommand::InsertFootnote(InsertFootnoteCommand {
+            target: EditorTarget::Primary,
+        }),
+        NativeCommand::EditEditions(EditEditionsCommand {
+            action: EditionAction::Add,
+            id: None,
+            name: None,
+            kind: Some(crate::types::EditionKind::LargePrint),
+            cover_set_id: None,
+        }),
         NativeCommand::ExportAllEditions(ExportAllEditionsCommand {}),
-        NativeCommand::SetCoverImage(SetCoverImageCommand { set_id: None, part: crate::types::CoverPart::Spine, path: Some("/Users/a/spine.png".into()) }),
-        NativeCommand::EditCoverSets(EditCoverSetsCommand { action: CoverSetAction::Rename, id: Some("v1".into()), name: Some("Hardcover".into()), fit: None }),
-        NativeCommand::SaveTypesetVersion(SaveTypesetVersionCommand { name: "Sent to KDP".into() }),
+        NativeCommand::SetCoverImage(SetCoverImageCommand {
+            set_id: None,
+            part: crate::types::CoverPart::Spine,
+            path: Some("/Users/a/spine.png".into()),
+        }),
+        NativeCommand::EditCoverSets(EditCoverSetsCommand {
+            action: CoverSetAction::Rename,
+            id: Some("v1".into()),
+            name: Some("Hardcover".into()),
+            fit: None,
+        }),
+        NativeCommand::SaveTypesetVersion(SaveTypesetVersionCommand {
+            name: "Sent to KDP".into(),
+        }),
         NativeCommand::RestoreTypesetVersion(TypesetVersionRef { id: "v1".into() }),
-        NativeCommand::RenameTypesetVersion(RenameTypesetVersionCommand { id: "v1".into(), name: "Proof 2".into() }),
+        NativeCommand::RenameTypesetVersion(RenameTypesetVersionCommand {
+            id: "v1".into(),
+            name: "Proof 2".into(),
+        }),
         NativeCommand::DeleteTypesetVersion(TypesetVersionRef { id: "v1".into() }),
-        NativeCommand::PreviewTypesetVersion(PreviewTypesetVersionCommand { id: Some("v1".into()), compare: true }),
-        NativeCommand::SetPrintLayout(SetPrintLayoutCommand { enabled: true, doc_path: Some("a.md".into()) }),
-        NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Book }),
+        NativeCommand::PreviewTypesetVersion(PreviewTypesetVersionCommand {
+            id: Some("v1".into()),
+            compare: true,
+        }),
+        NativeCommand::SetPrintLayout(SetPrintLayoutCommand {
+            enabled: true,
+            doc_path: Some("a.md".into()),
+        }),
+        NativeCommand::SetPageSetup(SetPageSetupCommand {
+            setup: page_setup(),
+            target: PageSetupTarget::Book,
+        }),
         NativeCommand::SetBookSettings(SetBookSettingsCommand { settings: book() }),
-        NativeCommand::SetPrintZoom(SetPrintZoomCommand { zoom: Some(1.25), fit: None, doc_path: None }),
-        NativeCommand::SetDisplayDensity(SetDisplayDensityCommand { points_per_inch: 127.0 }),
-        NativeCommand::InsertBreak(InsertBreakCommand { target: EditorTarget::Primary, kind: PageBreakKind::Recto }),
+        NativeCommand::SetPrintZoom(SetPrintZoomCommand {
+            zoom: Some(1.25),
+            fit: None,
+            doc_path: None,
+        }),
+        NativeCommand::SetDisplayDensity(SetDisplayDensityCommand {
+            points_per_inch: 127.0,
+        }),
+        NativeCommand::InsertBreak(InsertBreakCommand {
+            target: EditorTarget::Primary,
+            kind: PageBreakKind::Recto,
+        }),
         NativeCommand::GoToPage(GoToPageCommand { page: 12 }),
-        NativeCommand::PrintDocument(PrintDocumentCommand { scope: PrintScope::Folder, bound: true, options: PrintOptions::default() }),
+        NativeCommand::PrintDocument(PrintDocumentCommand {
+            scope: PrintScope::Folder,
+            bound: true,
+            options: PrintOptions::default(),
+        }),
         NativeCommand::PrintDocument(PrintDocumentCommand {
             scope: PrintScope::Document,
             bound: false,
-            options: PrintOptions { range: PrintRange::CurrentChapter, pages: "3-7, 10".into(), watermark: "DRAFT".into(), recipients: vec![], scenes: vec![], highlight_character: "MARY".into() },
+            options: PrintOptions {
+                range: PrintRange::CurrentChapter,
+                pages: "3-7, 10".into(),
+                watermark: "DRAFT".into(),
+                recipients: vec![],
+                scenes: vec![],
+                highlight_character: "MARY".into(),
+            },
         }),
-        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Epub, scope: PrintScope::Project, bound: false, options: PrintOptions::default() }),
-        NativeCommand::ExportDocument(ExportDocumentCommand { format: ExportFormat::Docx, scope: PrintScope::Folder, bound: false, options: PrintOptions::default() }),
-        NativeCommand::ApplyFormat(ApplyFormatCommand { format_id: "manuscript".into(), target: PageSetupTarget::Document }),
+        NativeCommand::ExportDocument(ExportDocumentCommand {
+            format: ExportFormat::Epub,
+            scope: PrintScope::Project,
+            bound: false,
+            options: PrintOptions::default(),
+        }),
+        NativeCommand::ExportDocument(ExportDocumentCommand {
+            format: ExportFormat::Docx,
+            scope: PrintScope::Folder,
+            bound: false,
+            options: PrintOptions::default(),
+        }),
+        NativeCommand::ApplyFormat(ApplyFormatCommand {
+            format_id: "manuscript".into(),
+            target: PageSetupTarget::Document,
+        }),
         NativeCommand::UseSetupForBook(UseSetupForBookCommand {}),
         NativeCommand::ClearBookSetup(ClearBookSetupCommand {}),
         NativeCommand::RefreshBookChapters(RefreshBookChaptersCommand {}),
-        NativeCommand::SetPrintScope(SetPrintScopeCommand { scope: PrintScope::Project }),
-        NativeCommand::SetAuthorProfile(SetAuthorProfileCommand {
-            profile: crate::types::AuthorProfile { byline: "A. Writer".into(), email: "a@example.com".into(), ..Default::default() },
+        NativeCommand::SetPrintScope(SetPrintScopeCommand {
+            scope: PrintScope::Project,
         }),
-        NativeCommand::SetBookCover(SetBookCoverCommand { path: Some("/Users/a/cover.jpg".into()) }),
+        NativeCommand::SetAuthorProfile(SetAuthorProfileCommand {
+            profile: crate::types::AuthorProfile {
+                byline: "A. Writer".into(),
+                email: "a@example.com".into(),
+                ..Default::default()
+            },
+        }),
+        NativeCommand::SetBookCover(SetBookCoverCommand {
+            path: Some("/Users/a/cover.jpg".into()),
+        }),
         NativeCommand::ExportAgain(ExportAgainCommand {}),
-        NativeCommand::SelectTab(TabRef { tab_id: "tab-1".into() }),
-        NativeCommand::CloseTab(TabRef { tab_id: "tab-1".into() }),
-        NativeCommand::SetTabOrder(SetTabOrderCommand { tab_ids: vec!["tab-2".into(), "tab-1".into()] }),
+        NativeCommand::SelectTab(TabRef {
+            tab_id: "tab-1".into(),
+        }),
+        NativeCommand::CloseTab(TabRef {
+            tab_id: "tab-1".into(),
+        }),
+        NativeCommand::SetTabOrder(SetTabOrderCommand {
+            tab_ids: vec!["tab-2".into(), "tab-1".into()],
+        }),
         NativeCommand::NewTab(NewTabCommand {}),
-        NativeCommand::OpenDocInTab(OpenDocInTabCommand { doc_path: "Act One/Scene".into() }),
-        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand { doc_path: "Act One/Scene".into() }),
-        NativeCommand::OpenInSplit(OpenInSplitCommand { doc_path: Some("Notes".into()), orientation: SplitOrientation::Columns }),
+        NativeCommand::OpenDocInTab(OpenDocInTabCommand {
+            doc_path: "Act One/Scene".into(),
+        }),
+        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand {
+            doc_path: "Act One/Scene".into(),
+            at: None,
+        }),
+        NativeCommand::OpenInSplit(OpenInSplitCommand {
+            doc_path: Some("Notes".into()),
+            orientation: SplitOrientation::Columns,
+        }),
         NativeCommand::CloseSplit(CloseSplitCommand {}),
         NativeCommand::MeasureBook(MeasureBookCommand {}),
         NativeCommand::ImportScript(ImportScriptCommand {}),
-        NativeCommand::SetSceneNumbers(SetSceneNumbersCommand { mode: SceneNumbering::Locked }),
-        NativeCommand::ScriptReport(ScriptReportCommand { report: ScriptReportKind::Scenes, output: ReportOutput::Csv }),
+        NativeCommand::SetSceneNumbers(SetSceneNumbersCommand {
+            mode: SceneNumbering::Locked,
+        }),
+        NativeCommand::ScriptReport(ScriptReportCommand {
+            report: ScriptReportKind::Scenes,
+            output: ReportOutput::Csv,
+        }),
     ]
 }
 
 fn bibliography_options() -> BibliographyOptions {
-    BibliographyOptions { include: BibliographyInclude::Cited, annotated: true, in_print: true, title: None }
+    BibliographyOptions {
+        include: BibliographyInclude::Cited,
+        annotated: true,
+        in_print: true,
+        title: None,
+    }
 }
 
 fn a_reference() -> Reference {
@@ -548,17 +819,33 @@ fn a_reference() -> Reference {
         id: "r1".into(),
         kind: "journalArticle".into(),
         contributors: vec![
-            Contributor { role: "author".into(), family: Some("LeCun".into()), given: Some("Yann".into()), literal: None },
-            Contributor { role: "author".into(), family: None, given: None, literal: Some("NASA".into()) },
+            Contributor {
+                role: "author".into(),
+                family: Some("LeCun".into()),
+                given: Some("Yann".into()),
+                literal: None,
+            },
+            Contributor {
+                role: "author".into(),
+                family: None,
+                given: None,
+                literal: Some("NASA".into()),
+            },
         ],
-        fields: [("title".to_string(), "Deep learning".to_string()), ("issued".to_string(), "2015-05-28".to_string())]
-            .into_iter()
-            .collect(),
+        fields: [
+            ("title".to_string(), "Deep learning".to_string()),
+            ("issued".to_string(), "2015-05-28".to_string()),
+        ]
+        .into_iter()
+        .collect(),
         annotation: "".into(),
         note: "".into(),
         tags: vec![],
         status: ReferenceStatus::Complete,
-        origin: Some(ReferenceOrigin { kind: "doi".into(), input: "10.1038/nature14539".into() }),
+        origin: Some(ReferenceOrigin {
+            kind: "doi".into(),
+            input: "10.1038/nature14539".into(),
+        }),
         candidates: vec![],
         error: None,
         created_at: "2026-09-23T12:00:00.000Z".into(),
@@ -572,8 +859,15 @@ fn a_reference_is_camel_case_and_keeps_csl_field_names() {
     assert_eq!(value["createdAt"], json!("2026-09-23T12:00:00.000Z"));
     assert_eq!(value["status"], json!("complete"));
     assert_eq!(value["fields"]["title"], json!("Deep learning"));
-    assert_eq!(value["contributors"][1], json!({ "role": "author", "literal": "NASA" }));
-    let patch = serde_json::to_value(ReferencePatch { annotation: Some("x".into()), ..Default::default() }).unwrap();
+    assert_eq!(
+        value["contributors"][1],
+        json!({ "role": "author", "literal": "NASA" })
+    );
+    let patch = serde_json::to_value(ReferencePatch {
+        annotation: Some("x".into()),
+        ..Default::default()
+    })
+    .unwrap();
     assert_eq!(patch, json!({ "annotation": "x" }));
 }
 
@@ -581,15 +875,29 @@ fn bubble_session() -> BubbleSession {
     BubbleSession {
         id: "b1".into(),
         words: vec![
-            BubbleWord { id: "w1".into(), text: "She".into() },
-            BubbleWord { id: "w2".into(), text: "hesitated at the door".into() },
+            BubbleWord {
+                id: "w1".into(),
+                text: "She".into(),
+            },
+            BubbleWord {
+                id: "w2".into(),
+                text: "hesitated at the door".into(),
+            },
         ],
-        aside: vec![BubbleAside { id: "w3".into(), text: "quietly".into(), x: 0.02, y: 0.5 }],
+        aside: vec![BubbleAside {
+            id: "w3".into(),
+            text: "quietly".into(),
+            x: 0.02,
+            y: 0.5,
+        }],
         original: "She quietly hesitated at the door".into(),
         mode: Some(BubbleMode::Clauses),
         forms: vec![BubbleForm {
             id: "f1".into(),
-            words: vec![BubbleWord { id: "w2".into(), text: "hesitated at the door".into() }],
+            words: vec![BubbleWord {
+                id: "w2".into(),
+                text: "hesitated at the door".into(),
+            }],
             aside: vec![],
             mode: None,
         }],
@@ -615,7 +923,8 @@ fn an_archived_item_is_camel_case_and_names_its_kind() {
     assert_eq!(value["bubble"]["id"], json!("b1"));
     let bare: ArchivedItem = serde_json::from_value(
         json!({ "id": "x2", "archivedAt": "", "kind": "bubble", "title": "" }),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(bare.bubble, None);
 }
 
@@ -625,7 +934,7 @@ fn map_button(id: &str, label: &str) -> MapPanelButton {
         label: label.into(),
         role: MapButtonRole::Normal,
         disabled: false,
-        symbol: None,
+        icon: None,
         help: None,
     }
 }
@@ -656,26 +965,66 @@ fn map_chrome() -> MapChromeState {
             id: "route.dash".into(),
             label: "Style".into(),
             value: "solid".into(),
-            options: vec![MapChoice { value: "solid".into(), label: "Solid".into(), group: None }],
+            options: vec![MapChoice {
+                value: "solid".into(),
+                label: "Solid".into(),
+                group: None,
+            }],
             help: None,
         }),
-        MapPanelField::Toggle(MapToggleInput { id: "route.arrow".into(), label: "Arrow at end".into(), value: false }),
-        MapPanelField::Color(MapColorInput { id: "pin.color".into(), label: "Colour".into(), value: None, fallback: "#c0392b".into() }),
-        MapPanelField::Stat(MapStatRow { label: "Length".into(), value: "42 km".into(), action: None }),
-        MapPanelField::Note(MapNoteText { text: "Tip".into(), tone: MapNoteTone::Warning, swatch: None, action: None }),
+        MapPanelField::Toggle(MapToggleInput {
+            id: "route.arrow".into(),
+            label: "Arrow at end".into(),
+            value: false,
+        }),
+        MapPanelField::Color(MapColorInput {
+            id: "pin.color".into(),
+            label: "Colour".into(),
+            value: None,
+            fallback: "#c0392b".into(),
+        }),
+        MapPanelField::Stat(MapStatRow {
+            label: "Length".into(),
+            value: "42 km".into(),
+            action: None,
+        }),
+        MapPanelField::Note(MapNoteText {
+            text: "Tip".into(),
+            tone: MapNoteTone::Warning,
+            swatch: None,
+            action: None,
+        }),
         MapPanelField::Button(map_button("pin.open", "Open")),
-        MapPanelField::Buttons(MapButtonRow { buttons: vec![map_button("theme.clean", "Clean")] }),
-        MapPanelField::ListRow(MapListRow { id: "places.p1".into(), title: "Harrowgate".into(), subtitle: None, swatch: None, indent: 0 }),
+        MapPanelField::Buttons(MapButtonRow {
+            buttons: vec![map_button("theme.clean", "Clean")],
+        }),
+        MapPanelField::ListRow(MapListRow {
+            id: "places.p1".into(),
+            title: "Harrowgate".into(),
+            subtitle: None,
+            swatch: None,
+            indent: 0,
+        }),
         MapPanelField::Markers(MapMarkerInput {
             id: "pin.icon".into(),
             value: "city".into(),
             color: None,
-            options: vec![MapChoice { value: "city".into(), label: "City".into(), group: None }],
+            options: vec![MapChoice {
+                value: "city".into(),
+                label: "City".into(),
+                group: None,
+            }],
         }),
         MapPanelField::Date(MapDateInput {
             id: "traveler.startDay".into(),
             label: "On".into(),
-            value: Some(MapDateParts { year: 1850.0, month: 3.0, day: 1.0, hour: 9.0, minute: 30.0 }),
+            value: Some(MapDateParts {
+                year: 1850.0,
+                month: 3.0,
+                day: 1.0,
+                hour: 9.0,
+                minute: 30.0,
+            }),
             mode: MapCalendarMode::Gregorian,
             months: vec!["January".into()],
             allow_empty: false,
@@ -685,10 +1034,19 @@ fn map_chrome() -> MapChromeState {
             columns: vec!["Harrowgate".into()],
             rows: vec![MapTableRowView {
                 label: "Harrowgate".into(),
-                cells: vec![MapTableCell { text: "—".into(), detail: None, strong: false }],
+                cells: vec![MapTableCell {
+                    text: "—".into(),
+                    detail: None,
+                    strong: false,
+                }],
             }],
         }),
-        MapPanelField::Preview(MapShapePreview { width: 100.0, height: 50.0, path: "M0 0L10 10Z".into(), filled: true }),
+        MapPanelField::Preview(MapShapePreview {
+            width: 100.0,
+            height: 50.0,
+            path: "M0 0L10 10Z".into(),
+            filled: true,
+        }),
         MapPanelField::Group(MapPanelGroup {
             id: "leg.l1".into(),
             title: "Leg 1".into(),
@@ -713,10 +1071,23 @@ fn map_chrome() -> MapChromeState {
             problems: 0,
             tabs: vec![],
             tab: None,
-            sections: vec![MapPanelSection { id: "place".into(), title: "Place".into(), actions: vec![], fields }],
+            sections: vec![MapPanelSection {
+                id: "place".into(),
+                title: "Place".into(),
+                actions: vec![],
+                fields,
+            }],
         },
         reveal_panel: 1,
         active: true,
+        map_kind: Some(crate::types::map::MapKind::Earth),
+        view_menu: vec![MapMenuItem {
+            id: "earth.view.globe".into(),
+            label: "Globe".into(),
+            checked: true,
+            disabled: false,
+            separator: false,
+        }],
     }
 }
 
@@ -776,7 +1147,38 @@ fn every_event() -> Vec<WebviewEvent> {
                 record_elapsed_ms: 0.0,
             }),
         }),
-        WebviewEvent::MapChromeChanged(MapChromeChanged { state: Some(map_chrome()) }),
+        WebviewEvent::MapChromeChanged(MapChromeChanged {
+            state: Some(map_chrome()),
+        }),
+        WebviewEvent::TimelineChromeChanged(TimelineChromeChanged {
+            state: Some(TimelineChromeState {
+                surface_id: "timeline-surface-0".into(),
+                doc_path: "Plot/Main.timeline".into(),
+                scale: crate::types::TimelineScale::Manuscript,
+                can_undo: true,
+                can_redo: false,
+                has_selection: true,
+                lens_on: false,
+                panel: map_chrome().panel,
+                reveal_panel: 1,
+                active: true,
+            }),
+        }),
+        WebviewEvent::TimelineCursorChanged(TimelineCursorChanged {
+            lens_on: true,
+            lens_editing: false,
+            editing_ranges: false,
+        }),
+        WebviewEvent::TimelineRangesChanged(TimelineRangesChanged {
+            doc_path: "chapters/one.md".into(),
+            ranges: vec![crate::types::TimelineRange {
+                id: "r1".into(),
+                event_id: "e1".into(),
+                from: 3,
+                to: 12,
+                anchor: "hesitated".into(),
+            }],
+        }),
         WebviewEvent::ReadAloudPayload(ReadAloudPayloadEvent {
             doc_path: "chapters/one.md".into(),
             payload: Default::default(),
@@ -785,8 +1187,13 @@ fn every_event() -> Vec<WebviewEvent> {
             project_name: Some("Novel".into()),
             project_root: Some("/Users/me/Novel".into()),
         }),
-        WebviewEvent::ShowSidebarTab(ShowSidebarTab { tab: SidebarTab::History }),
-        WebviewEvent::ViewOptions(ViewOptions { focus_mode: false, word_count_visible: true }),
+        WebviewEvent::ShowSidebarTab(ShowSidebarTab {
+            tab: SidebarTab::History,
+        }),
+        WebviewEvent::ViewOptions(ViewOptions {
+            focus_mode: false,
+            word_count_visible: true,
+        }),
         WebviewEvent::ReferencesChanged(ReferencesChanged {
             doc_path: Some("a".into()),
             style: "apa".into(),
@@ -809,7 +1216,7 @@ fn every_event() -> Vec<WebviewEvent> {
                 id: "book".into(),
                 label: "Book".into(),
                 group: "Books".into(),
-                symbol: "book.closed".into(),
+                icon: "book-closed".into(),
                 fields: vec![ReferenceFieldSpec {
                     key: "title".into(),
                     label: "Title".into(),
@@ -819,7 +1226,10 @@ fn every_event() -> Vec<WebviewEvent> {
                 }],
                 roles: vec!["author".into()],
             }],
-            roles: vec![ContributorRoleSpec { id: "author".into(), label: "Author".into() }],
+            roles: vec![ContributorRoleSpec {
+                id: "author".into(),
+                label: "Author".into(),
+            }],
             styles: vec![CitationStyleSpec {
                 id: "apa".into(),
                 label: "APA 7th edition".into(),
@@ -843,9 +1253,23 @@ fn every_event() -> Vec<WebviewEvent> {
                 anchor: TextAnchor::new(120, 136, "and so it ended."),
                 fixes: vec![ProofFix::Tighten, ProofFix::RunLong],
             }],
-            paragraph: Some(ParagraphTypeset { tracking: -5, ..Default::default() }),
-            project_fonts: vec![ProjectFont { family: "EB Garamond".into(), path: ".assets/fonts/EBGaramond.otf".into(), embeddable: true }],
-            text_styles: vec![crate::types::TextStyleLook { id: "letter".into(), name: "Letter".into(), indent_em: 2.0, flush: true, space_lines: 1.0, ..Default::default() }],
+            paragraph: Some(ParagraphTypeset {
+                tracking: -5,
+                ..Default::default()
+            }),
+            project_fonts: vec![ProjectFont {
+                family: "EB Garamond".into(),
+                path: ".assets/fonts/EBGaramond.otf".into(),
+                embeddable: true,
+            }],
+            text_styles: vec![crate::types::TextStyleLook {
+                id: "letter".into(),
+                name: "Letter".into(),
+                indent_em: 2.0,
+                flush: true,
+                space_lines: 1.0,
+                ..Default::default()
+            }],
             doc_path: Some("Manuscript/one".into()),
             setup: page_setup(),
             ready: true,
@@ -877,7 +1301,10 @@ fn every_event() -> Vec<WebviewEvent> {
                 legacy: false,
             }],
             selected_book_item: Some("c:Manuscript/one".into()),
-            chapter_meta: Some(crate::types::ChapterMeta { subtitle: "In which it rains".into(), ..Default::default() }),
+            chapter_meta: Some(crate::types::ChapterMeta {
+                subtitle: "In which it rains".into(),
+                ..Default::default()
+            }),
             cover: Some(CoverState {
                 sets: vec![],
                 active: None,
@@ -894,10 +1321,17 @@ fn every_event() -> Vec<WebviewEvent> {
             chapter_image_file: None,
             ornament_image_file: None,
             suggested_inside_margin_mm: 12.7,
-            author: crate::types::AuthorProfile { byline: "A. Writer".into(), ..Default::default() },
+            author: crate::types::AuthorProfile {
+                byline: "A. Writer".into(),
+                ..Default::default()
+            },
             word_count: 71_400,
             cover_file: Some("/Users/a/Novel/.assets/ab12.jpg".into()),
-            last_export: Some(LastExport { format: ExportFormat::Docx, scope: PrintScope::Folder, path: "/Users/a/Book.docx".into() }),
+            last_export: Some(LastExport {
+                format: ExportFormat::Docx,
+                scope: PrintScope::Folder,
+                path: "/Users/a/Book.docx".into(),
+            }),
             has_selection: true,
             publishing: Some(PublishingReport {
                 page_count: 212,
@@ -918,11 +1352,21 @@ fn every_event() -> Vec<WebviewEvent> {
                 format: WritingFormat::Screenplay,
                 scene_numbers: SceneNumbering::Locked,
                 characters: vec!["MARY".into(), "JOHN".into()],
-                scenes: vec![SceneSummary { number: Some("12A".into()), heading: "INT. KITCHEN - NIGHT".into(), page: 14 }],
+                scenes: vec![SceneSummary {
+                    number: Some("12A".into()),
+                    heading: "INT. KITCHEN - NIGHT".into(),
+                    page: 14,
+                }],
             }),
         }),
         WebviewEvent::PageLayoutCatalog(PageLayoutCatalog {
-            presets: vec![PageSizeOption { id: "a4".into(), label: "A4".into(), group: "ISO A".into(), width_mm: 210.0, height_mm: 297.0 }],
+            presets: vec![PageSizeOption {
+                id: "a4".into(),
+                label: "A4".into(),
+                group: "ISO A".into(),
+                width_mm: 210.0,
+                height_mm: 297.0,
+            }],
             formats: vec![FormatOption {
                 id: "manuscript".into(),
                 label: "Standard Manuscript".into(),
@@ -930,8 +1374,14 @@ fn every_event() -> Vec<WebviewEvent> {
                 summary: "What agents and editors ask for.".into(),
                 kind: FormatKind::Prose,
             }],
-            signature_advice: vec![SignatureAdvice { sheets: 4, label: "Standard".into() }],
-            tokens: vec![RunningToken { token: "{page}".into(), label: "Page Number".into() }],
+            signature_advice: vec![SignatureAdvice {
+                sheets: 4,
+                label: "Standard".into(),
+            }],
+            tokens: vec![RunningToken {
+                token: "{page}".into(),
+                label: "Page Number".into(),
+            }],
             default_typography: typography(),
             book_styles: vec![],
         }),
@@ -945,7 +1395,9 @@ fn every_event() -> Vec<WebviewEvent> {
             message: None,
             path: None,
         }),
-        WebviewEvent::TypesetFocus(TypesetFocus { section_id: "page.size".into() }),
+        WebviewEvent::TypesetFocus(TypesetFocus {
+            section_id: "page.size".into(),
+        }),
         WebviewEvent::TypesetHistoryChanged(TypesetHistoryChanged {
             folder: "Novel".into(),
             rows: vec![TypesetVersionRow {
@@ -961,8 +1413,18 @@ fn every_event() -> Vec<WebviewEvent> {
         }),
         WebviewEvent::TabsChanged(TabsChanged {
             tabs: vec![
-                DocTab { id: "tab-1".into(), doc_path: Some("Act One/Scene".into()), secondary_doc: Some("Notes".into()), split: Some(SplitOrientation::Rows) },
-                DocTab { id: "tab-2".into(), doc_path: None, secondary_doc: None, split: None },
+                DocTab {
+                    id: "tab-1".into(),
+                    doc_path: Some("Act One/Scene".into()),
+                    secondary_doc: Some("Notes".into()),
+                    split: Some(SplitOrientation::Rows),
+                },
+                DocTab {
+                    id: "tab-2".into(),
+                    doc_path: None,
+                    secondary_doc: None,
+                    split: None,
+                },
             ],
             active_tab_id: Some("tab-1".into()),
         }),
@@ -997,6 +1459,12 @@ fn every_command_has_its_documented_wire_name() {
             "syncNotes",
             "canvasCommand",
             "mapCommand",
+            "timelineCommand",
+            "attachTimelineEvent",
+            "jumpToTimelinePassage",
+            "revealTimelineEvent",
+            "setTimeLens",
+            "setTimelineRangeEditing",
             "canvasDropDoc",
             "canvasDropNote",
             "canvasReveal",
@@ -1114,6 +1582,9 @@ fn every_event_has_its_documented_wire_name() {
             "activeEditorChanged",
             "canvasToolbarChanged",
             "mapChromeChanged",
+            "timelineChromeChanged",
+            "timelineCursorChanged",
+            "timelineRangesChanged",
             "readAloudPayload",
             "projectChanged",
             "showSidebarTab",
@@ -1149,7 +1620,9 @@ fn every_event_survives_a_round_trip() {
 fn every_request_and_reply_survives_a_round_trip() {
     let requests = vec![
         BridgeRequest::GetSelectionContext(EditorQuery::default()),
-        BridgeRequest::GetToolbarState(EditorQuery { target: Some(EditorTarget::Secondary) }),
+        BridgeRequest::GetToolbarState(EditorQuery {
+            target: Some(EditorTarget::Secondary),
+        }),
         BridgeRequest::GetReadAloudPayload(ReadAloudQuery {
             target: None,
             selection_only: true,
@@ -1159,7 +1632,12 @@ fn every_request_and_reply_survives_a_round_trip() {
     let names: Vec<String> = requests.iter().map(tag_of).collect();
     assert_eq!(
         names,
-        vec!["getSelectionContext", "getToolbarState", "getReadAloudPayload", "getDocumentText"]
+        vec![
+            "getSelectionContext",
+            "getToolbarState",
+            "getReadAloudPayload",
+            "getDocumentText"
+        ]
     );
     for request in &requests {
         round_trip(request);
@@ -1257,12 +1735,21 @@ fn envelope_sequence_numbers_survive_the_wire() {
 fn a_bubble_session_is_camel_case_and_an_empty_aside_may_be_omitted() {
     let session = bubble_session();
     let value = serde_json::to_value(&session).unwrap();
-    assert_eq!(value["words"][1], json!({ "id": "w2", "text": "hesitated at the door" }));
-    assert_eq!(value["aside"][0], json!({ "id": "w3", "text": "quietly", "x": 0.02, "y": 0.5 }));
+    assert_eq!(
+        value["words"][1],
+        json!({ "id": "w2", "text": "hesitated at the door" })
+    );
+    assert_eq!(
+        value["aside"][0],
+        json!({ "id": "w3", "text": "quietly", "x": 0.02, "y": 0.5 })
+    );
     assert_eq!(value["mode"], json!("clauses"));
-    assert_eq!(value["forms"][0], json!({
-        "id": "f1", "words": [{ "id": "w2", "text": "hesitated at the door" }], "aside": [],
-    }));
+    assert_eq!(
+        value["forms"][0],
+        json!({
+            "id": "f1", "words": [{ "id": "w2", "text": "hesitated at the door" }], "aside": [],
+        })
+    );
 
     // A session written before anything was set aside, or any form saved, still reads.
     let bare: BubbleSession =
@@ -1276,12 +1763,18 @@ fn a_bubble_session_is_camel_case_and_an_empty_aside_may_be_omitted() {
 
 #[test]
 fn the_toolbar_items_speak_camel_case() {
-    let command = NativeCommand::SetBlockType(SetBlockTypeCommand { target: EditorTarget::Primary, block: BlockType::Heading2 });
+    let command = NativeCommand::SetBlockType(SetBlockTypeCommand {
+        target: EditorTarget::Primary,
+        block: BlockType::Heading2,
+    });
     assert_eq!(
         serde_json::to_value(&command).unwrap(),
         json!({ "type": "setBlockType", "payload": { "target": "primary", "block": "heading2" } })
     );
-    let event = WebviewEvent::ViewOptions(ViewOptions { focus_mode: true, word_count_visible: false });
+    let event = WebviewEvent::ViewOptions(ViewOptions {
+        focus_mode: true,
+        word_count_visible: false,
+    });
     assert_eq!(
         serde_json::to_value(&event).unwrap(),
         json!({ "type": "viewOptions", "payload": { "focusMode": true, "wordCountVisible": false } })
@@ -1290,7 +1783,10 @@ fn the_toolbar_items_speak_camel_case() {
 
 #[test]
 fn a_page_setup_crosses_the_wire_in_millimetres_and_camel_case() {
-    let command = NativeCommand::SetPageSetup(SetPageSetupCommand { setup: page_setup(), target: PageSetupTarget::Document });
+    let command = NativeCommand::SetPageSetup(SetPageSetupCommand {
+        setup: page_setup(),
+        target: PageSetupTarget::Document,
+    });
     let wire = serde_json::to_value(&command).unwrap();
     assert_eq!(wire["type"], "setPageSetup");
     let setup = &wire["payload"]["setup"];
@@ -1341,7 +1837,10 @@ fn a_job_status_leaves_out_what_it_does_not_have() {
 
 #[test]
 fn a_page_setup_carries_its_typography_in_camel_case() {
-    use crate::types::{ChapterOpening, LineSpacing, PrintAlignment, PrintTypography, TitlePageOptions, TitlePageStyle};
+    use crate::types::{
+        ChapterOpening, LineSpacing, PrintAlignment, PrintTypography, TitlePageOptions,
+        TitlePageStyle,
+    };
     let mut setup = page_setup();
     setup.typography = Some(PrintTypography {
         font_family: "\"Courier Prime\", Courier, monospace".into(),
@@ -1360,7 +1859,11 @@ fn a_page_setup_carries_its_typography_in_camel_case() {
         composition: None,
         features: None,
     });
-    setup.title_page = Some(TitlePageOptions { style: TitlePageStyle::Manuscript, show_contact: true, show_word_count: true });
+    setup.title_page = Some(TitlePageOptions {
+        style: TitlePageStyle::Manuscript,
+        show_contact: true,
+        show_word_count: true,
+    });
     let wire = serde_json::to_value(&setup).unwrap();
     assert_eq!(wire["typography"]["lineSpacing"], "double");
     assert_eq!(wire["typography"]["chapterOpening"], "dropCapAndSmallCaps");
@@ -1370,12 +1873,24 @@ fn a_page_setup_carries_its_typography_in_camel_case() {
 
 #[test]
 fn a_script_element_is_a_block_type_and_an_old_toolbar_is_prose() {
-    assert_eq!(serde_json::to_value(BlockType::StageDirection).unwrap(), "stageDirection");
-    assert_eq!(serde_json::to_value(WritingFormat::Stageplay).unwrap(), "stageplay");
-    let mut toolbar = serde_json::to_value(every_event().into_iter().find_map(|e| match e {
-        WebviewEvent::ToolbarState(state) => Some(state),
-        _ => None,
-    }).unwrap()).unwrap();
+    assert_eq!(
+        serde_json::to_value(BlockType::StageDirection).unwrap(),
+        "stageDirection"
+    );
+    assert_eq!(
+        serde_json::to_value(WritingFormat::Stageplay).unwrap(),
+        "stageplay"
+    );
+    let mut toolbar = serde_json::to_value(
+        every_event()
+            .into_iter()
+            .find_map(|e| match e {
+                WebviewEvent::ToolbarState(state) => Some(state),
+                _ => None,
+            })
+            .unwrap(),
+    )
+    .unwrap();
     toolbar.as_object_mut().unwrap().remove("writingFormat");
     let read: ToolbarState = serde_json::from_value(toolbar).unwrap();
     assert_eq!(read.writing_format, WritingFormat::Prose);
@@ -1383,18 +1898,32 @@ fn a_script_element_is_a_block_type_and_an_old_toolbar_is_prose() {
 
 #[test]
 fn a_print_from_an_older_shell_has_no_options() {
-    let old: PrintDocumentCommand = serde_json::from_value(json!({ "scope": "document", "bound": false })).unwrap();
+    let old: PrintDocumentCommand =
+        serde_json::from_value(json!({ "scope": "document", "bound": false })).unwrap();
     assert_eq!(old.options, PrintOptions::default());
     let wire = serde_json::to_value(ExportFormat::PlainText).unwrap();
     assert_eq!(wire, "plainText");
-    assert_eq!(serde_json::to_value(ExportFormat::Fountain).unwrap(), "fountain");
+    assert_eq!(
+        serde_json::to_value(ExportFormat::Fountain).unwrap(),
+        "fountain"
+    );
     assert_eq!(serde_json::to_value(ExportFormat::Fdx).unwrap(), "fdx");
     let partial: PrintOptions = serde_json::from_value(json!({ "watermark": "DRAFT" })).unwrap();
     assert_eq!(partial.range, PrintRange::All);
     assert!(partial.pages.is_empty());
     assert!(partial.scenes.is_empty() && partial.highlight_character.is_empty());
-    let sides: PrintOptions = serde_json::from_value(json!({ "range": "scenes", "scenes": [2, 5], "highlightCharacter": "MARY" })).unwrap();
-    assert_eq!((sides.range, sides.scenes, sides.highlight_character.as_str()), (PrintRange::Scenes, vec![2, 5], "MARY"));
+    let sides: PrintOptions = serde_json::from_value(
+        json!({ "range": "scenes", "scenes": [2, 5], "highlightCharacter": "MARY" }),
+    )
+    .unwrap();
+    assert_eq!(
+        (
+            sides.range,
+            sides.scenes,
+            sides.highlight_character.as_str()
+        ),
+        (PrintRange::Scenes, vec![2, 5], "MARY")
+    );
 }
 
 #[test]
@@ -1405,26 +1934,48 @@ fn a_book_saved_before_compiling_reads_with_everything_in() {
     }
     let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
     assert!(read.excluded.is_empty());
-    assert_eq!(read.chapter_numbering.style, crate::types::ChapterNumberStyle::None);
+    assert_eq!(
+        read.chapter_numbering.style,
+        crate::types::ChapterNumberStyle::None
+    );
     assert!(!read.front_matter.contents);
     let wire = serde_json::to_value(book()).unwrap();
     assert_eq!(wire["chapterNumbering"]["style"], "words");
     assert_eq!(wire["frontMatter"]["halfTitle"], true);
-    assert_eq!(wire["backMatter"]["aboutTheAuthor"], "A. Writer lives by the sea.");
+    assert_eq!(
+        wire["backMatter"]["aboutTheAuthor"],
+        "A. Writer lives by the sea."
+    );
 }
 
 #[test]
 fn a_book_saved_before_typesetting_reads_with_no_design_contents_or_covers() {
     let mut old = serde_json::to_value(book()).unwrap();
-    for key in ["chapterDesign", "partDesign", "items", "continuous", "covers", "activeCover"] {
+    for key in [
+        "chapterDesign",
+        "partDesign",
+        "items",
+        "continuous",
+        "covers",
+        "activeCover",
+    ] {
         old.as_object_mut().unwrap().remove(key);
     }
-    old["chapterNumbering"].as_object_mut().unwrap().remove("startAt");
-    old["chapterNumbering"].as_object_mut().unwrap().remove("showInTree");
+    old["chapterNumbering"]
+        .as_object_mut()
+        .unwrap()
+        .remove("startAt");
+    old["chapterNumbering"]
+        .as_object_mut()
+        .unwrap()
+        .remove("showInTree");
     let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
     assert!(read.chapter_design.is_none() && read.items.is_empty() && read.covers.is_empty());
     assert!(!read.continuous);
-    assert_eq!(read.chapter_numbering.start_at, 1, "an old book counts from one");
+    assert_eq!(
+        read.chapter_numbering.start_at, 1,
+        "an old book counts from one"
+    );
     assert!(!read.chapter_numbering.show_in_tree);
 
     let wire = serde_json::to_value(book()).unwrap();
@@ -1434,14 +1985,19 @@ fn a_book_saved_before_typesetting_reads_with_no_design_contents_or_covers() {
     assert_eq!(wire["items"][0]["page"]["position"], "sunk");
     assert_eq!(wire["items"][1]["chapterType"], "prologue");
     assert_eq!(wire["covers"][0]["madeForSpineMm"], 12.4);
-    let design: crate::types::ChapterDesign = serde_json::from_value(json!({ "showNumber": true })).unwrap();
-    assert!(design.show_title && design.show_number, "a partial design fills the rest in");
+    let design: crate::types::ChapterDesign =
+        serde_json::from_value(json!({ "showNumber": true })).unwrap();
+    assert!(
+        design.show_title && design.show_number,
+        "a partial design fills the rest in"
+    );
     assert_eq!(design.chapter_break, crate::types::ChapterBreak::NewPage);
 }
 
 #[test]
 fn an_author_profile_missing_fields_reads_as_blank() {
-    let profile: crate::types::AuthorProfile = serde_json::from_value(json!({ "byline": "A. Writer" })).unwrap();
+    let profile: crate::types::AuthorProfile =
+        serde_json::from_value(json!({ "byline": "A. Writer" })).unwrap();
     assert_eq!(profile.byline, "A. Writer");
     assert!(profile.email.is_empty());
 }
@@ -1471,7 +2027,35 @@ fn a_map_tool_and_its_chrome_speak_camel_case() {
     assert_eq!(value["surfaceId"], json!("map-surface-0"));
     assert_eq!(value["revealPanel"], json!(1));
     assert_eq!(value["panel"]["canGoBack"], json!(true));
-    assert_eq!(value["panel"]["sections"][0]["fields"][0]["payload"]["focusKey"], json!(0));
+    assert_eq!(
+        value["panel"]["sections"][0]["fields"][0]["payload"]["focusKey"],
+        json!(0)
+    );
     // A panel with no tab chosen says nothing about one.
     assert!(value["panel"].get("tab").is_none());
+}
+
+#[test]
+fn a_tab_dragged_out_says_where_its_window_goes() {
+    let dropped: NativeCommand = serde_json::from_value(serde_json::json!({
+        "type": "openDocInWindow",
+        "payload": { "docPath": "Act One/Scene", "at": { "x": 640, "y": -20 } },
+    }))
+    .unwrap();
+    assert_eq!(
+        dropped,
+        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand {
+            doc_path: "Act One/Scene".into(),
+            at: Some(ScreenPoint { x: 640, y: -20 }),
+        })
+    );
+    let menu = serde_json::to_value(NativeCommand::OpenDocInWindow(OpenDocInWindowCommand {
+        doc_path: "A".into(),
+        at: None,
+    }))
+    .unwrap();
+    assert_eq!(
+        menu,
+        serde_json::json!({ "type": "openDocInWindow", "payload": { "docPath": "A" } })
+    );
 }

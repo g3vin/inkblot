@@ -1,0 +1,7 @@
+/* In the pane, bottom right: the word count's row (WordCountBadge.css), its other end. */
+.detached-window-bar {
+  position: absolute;
+  right: 10px;
+  bottom: var(--pane-status-bottom);
+  z-index: 5;
+}

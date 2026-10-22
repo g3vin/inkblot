@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use crate::types::json::JsonValue;
+use crate::types::map::MapKind;
 
 /* ---------------- the toolbar and the panel ---------------- */
 
@@ -60,11 +61,38 @@ pub struct MapChromeState {
     /// The map is the active document, so the toolbar is its.
     #[serde(default)]
     pub active: bool,
+    /// What kind of map it is, so the toolbar offers what fits: the scale tool only on
+    /// a sheet or a picture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map_kind: Option<MapKind>,
+    /// The View menu: how the map is shown (globe or flat, the projection, satellite,
+    /// terrain, the camera's angle). Chosen items go back as
+    /// `mapCommand { command: "view-option", detail: { id } }`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub view_menu: Vec<MapMenuItem>,
 }
 
-/// The map's tools, as the toolbar offers them. `Pan` and `Calibrate` are not on the
-/// toolbar — the space bar and the Scale section reach them — but either can be the
-/// tool in hand.
+/// One entry in a map's menu, laid out by the page.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapMenuItem {
+    /// What it does, sent back when chosen. Empty for a separator.
+    pub id: String,
+    pub label: String,
+    /// Shown with a check: the current choice, or an option that is on.
+    #[serde(default)]
+    pub checked: bool,
+    #[serde(default)]
+    pub disabled: bool,
+    /// A rule above this item.
+    #[serde(default)]
+    pub separator: bool,
+}
+
+/// The map's tools, as the toolbar offers them. `Pan` is not on the toolbar — the
+/// space bar and the middle button reach it — but it can be the tool in hand.
+/// `Calibrate` (set the scale from two points) is, on a sheet or a picture.
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -138,6 +166,7 @@ pub enum MapPanelField {
     Date(MapDateInput),
     Table(MapTableView),
     Preview(MapShapePreview),
+    Chart(MapChartView),
     Group(MapPanelGroup),
 }
 
@@ -281,9 +310,9 @@ pub struct MapPanelButton {
     pub label: String,
     pub role: MapButtonRole,
     pub disabled: bool,
-    /// An SF Symbol name, for a button that shows one.
+    /// A semantic icon name (src/ui/icons.js), for a button that shows one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub symbol: Option<String>,
+    pub icon: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub help: Option<String>,
 }
@@ -403,6 +432,35 @@ pub struct MapShapePreview {
     pub height: f64,
     pub path: String,
     pub filled: bool,
+}
+
+/// A line over the story's days: the distance between two things, say. Picking a
+/// point on it sends its day back under `id`.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapChartView {
+    pub id: String,
+    pub points: Vec<MapChartPoint>,
+    /// The day the story is at, marked on the line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marker: Option<f64>,
+    /// The first and last days, written in the story calendar.
+    pub x_from: String,
+    pub x_to: String,
+    /// The least and greatest values, written for reading.
+    pub y_min: String,
+    pub y_max: String,
+    /// The chart in words, for VoiceOver and for a glance.
+    pub summary: String,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapChartPoint {
+    pub x: f64,
+    pub y: f64,
 }
 
 /// Rows that belong to one thing — a leg of a journey, a terrain — with their own

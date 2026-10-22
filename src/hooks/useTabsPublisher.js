@@ -51,9 +51,9 @@ export function useTabsPublisher({
       documentSurface.onCommand('openDocInTab', ({ docPath }) => {
         if (docPath) act().openDocInTab(docPath)
       }),
-      documentSurface.onCommand('openDocInWindow', ({ docPath }) => {
+      documentSurface.onCommand('openDocInWindow', ({ docPath, at }) => {
         const { projectName } = latest.current
-        if (docPath && projectName) openDocumentWindow(projectName, docPath)
+        if (docPath && projectName) openDocumentWindow(projectName, docPath, { at })
       }),
       documentSurface.onCommand('openInSplit', ({ docPath, orientation }) => (
         act().openDocInSplit(docPath || null, orientation)

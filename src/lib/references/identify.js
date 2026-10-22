@@ -34,7 +34,7 @@ export function identify(raw) {
     ? (/^https?:\/\//i.test(input) ? input : `https://${input}`)
     : null
   if (url) {
-    let parsed = null
+    let parsed
     try {
       parsed = new URL(url)
     } catch {

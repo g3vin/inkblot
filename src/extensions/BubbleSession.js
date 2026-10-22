@@ -24,7 +24,7 @@
  */
 import { Mark, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { DecorationSet } from '@tiptap/pm/view'
 import { Fragment, Slice } from '@tiptap/pm/model'
 import { normalizeSession, reconcileSession, composeSentence } from '../lib/bubbleText'
 import { formPage, formPages, formsStateOf, showFormPage, withFormsState } from '../lib/bubbleForms'
@@ -229,7 +229,7 @@ const buildChips = (doc, editor) => {
         }))
       }
       return chip
-    }, { side: 1, key: `bubble-chip:${entry.id}:${count}:${page}/${pages}`, ignoreSelection: true }))
+    }, { key: `bubble-chip:${entry.id}:${count}:${page}/${pages}`, ignoreSelection: true }))
   }
   return DecorationSet.create(doc, decorations)
 }

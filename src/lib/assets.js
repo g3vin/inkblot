@@ -36,12 +36,31 @@ const EXT_BY_MIME = {
   'audio/mpeg': 'mp3',
   'audio/wav': 'wav',
   'audio/aac': 'aac',
+  // 3D models for model maps: a binary glTF, or a self-contained glTF.
+  'model/gltf-binary': 'glb',
+  'model/gltf+json': 'gltf',
 }
 
 /** `audio/webm;codecs=opus` → `webm`. Returns '' for a mime we don't store. */
 export const mimeToExt = (mimeType) => EXT_BY_MIME[String(mimeType || '').split(';')[0].trim()] || ''
 
 export const IMAGE_EXTENSIONS_LIST = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'heic']
+export const MODEL_EXTENSIONS_LIST = ['glb', 'gltf']
+
+/**
+ * Why a glTF cannot be used on its own, or null: one that points at outside
+ * files (its buffers or textures beside it) would arrive without them.
+ */
+export function gltfProblem(bytes) {
+  let json
+  try {
+    json = JSON.parse(new TextDecoder().decode(bytes))
+  } catch {
+    return 'That file is not a readable glTF model.'
+  }
+  const outside = [...(json.buffers || []), ...(json.images || [])].some((entry) => entry?.uri && !String(entry.uri).startsWith('data:'))
+  return outside ? 'This model keeps its parts in separate files. Export it as a single .glb file, then try again.' : null
+}
 
 const IMAGE_EXTENSIONS = new Set(IMAGE_EXTENSIONS_LIST)
 const AUDIO_EXTENSIONS = new Set(['webm', 'ogg', 'm4a', 'mp3', 'wav', 'aac'])
@@ -102,6 +121,11 @@ export async function writeAsset(projectName, bytes, ext = 'png') {
 export async function importAssetFromPath(projectName, sourcePath) {
   const bytes = await readFile(sourcePath)
   const ext = extensionOf(sourcePath) || 'png'
+  if (ext === 'gltf') {
+    const problem = gltfProblem(bytes)
+    // Said as is to the writer (`forWriter`): it tells them what to do.
+    if (problem) throw Object.assign(new Error(problem), { forWriter: true })
+  }
   return writeAsset(projectName, bytes, ext === 'jpeg' ? 'jpg' : ext)
 }
 
@@ -129,6 +153,7 @@ export async function writeAssetFromBlob(projectName, blob, fallbackExt = 'webm'
  */
 const urlCache = new Map()
 
+/** A URL the web view can load for a project asset (`.assets/…`), cached per path. */
 export async function assetUrl(projectName, relativePath) {
   const key = `${projectName}::${relativePath}`
   if (urlCache.has(key)) return urlCache.get(key)

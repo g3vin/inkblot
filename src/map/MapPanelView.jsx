@@ -4,9 +4,10 @@
  * It draws the form `useMapPanel` builds, and nothing else: every field calls the
  * handler filed under its id.
  */
-import SFIcon from '../components/SFIcon'
+import Icon from '../ui/Icon.jsx'
 import { PinGlyph } from './mapGlyphs'
 import { CheckField, ColorField, Field, NumberField, Section, SelectField, Stat, TextField } from './inspector/fields'
+import { inkColor } from '../lib/palette'
 
 const buttonClass = (button) =>
   `map-button${button.role === 'primary' ? ' is-primary' : button.role === 'destructive' ? ' is-danger' : ''}`
@@ -43,8 +44,42 @@ function selectOptions(options) {
 }
 
 const Swatch = ({ color, round = true }) => (
-  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: round ? 5 : 2, background: color, marginRight: 6 }} />
+  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: round ? 5 : 2, background: inkColor(color), marginRight: 6 }} />
 )
+
+const CHART_W = 300
+const CHART_H = 100
+
+/** A line over days; a click picks the day under it. */
+function ChartField({ field, pick }) {
+  const { points, marker, xFrom, xTo, yMin, yMax, summary } = field
+  if (!points.length) return <p className="map-note">{summary}</p>
+  const x0 = points[0].x
+  const x1 = points[points.length - 1].x
+  const ys = points.map((point) => point.y)
+  const low = Math.min(...ys)
+  const high = Math.max(...ys)
+  const sx = (x) => ((x - x0) / Math.max(x1 - x0, 1e-9)) * CHART_W
+  const sy = (y) => CHART_H - 4 - ((y - low) / Math.max(high - low, 1e-9)) * (CHART_H - 8)
+  const line = points.map((point) => `${sx(point.x).toFixed(1)},${sy(point.y).toFixed(1)}`).join(' ')
+  const onClick = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    pick(x0 + ((event.clientX - rect.left) / rect.width) * (x1 - x0))
+  }
+  return (
+    <div className="map-chart">
+      <div className="map-chart-y" aria-hidden="true"><span>{yMax}</span><span>{yMin}</span></div>
+      <svg className="map-chart-plot" viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none" role="img" aria-label={summary} onClick={onClick}>
+        <polyline points={line} fill="none" stroke="var(--accent-color)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        {Number.isFinite(marker) && marker >= x0 && marker <= x1 ? (
+          <line x1={sx(marker)} x2={sx(marker)} y1={0} y2={CHART_H} stroke="var(--text-secondary)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+        ) : null}
+      </svg>
+      <div className="map-chart-x" aria-hidden="true"><span>{xFrom}</span><span>{xTo}</span></div>
+      <p className="map-note">{summary}</p>
+    </div>
+  )
+}
 
 function DateField({ field, commit }) {
   const { label, value, mode, months, allowEmpty, placeholder } = field
@@ -210,6 +245,8 @@ function PanelField({ field: { type, payload: field }, commit, run }) {
           />
         </svg>
       )
+    case 'chart':
+      return <ChartField field={field} pick={set} />
     case 'group': {
       const fields = field.fields.map((inner, index) => <PanelField key={inner.payload?.id || index} field={inner} commit={commit} run={run} />)
       if (field.collapsible) {
@@ -248,18 +285,18 @@ export default function MapPanelView({ panel, handlers, onClose }) {
       <div className="map-inspector-header">
         {panel.canGoBack ? (
           <button type="button" className="map-tool" style={{ marginLeft: 0 }} title="Back to the map" aria-label="Back to the map" onClick={() => handlers.get('@back')?.()}>
-            <SFIcon name="chevron.left" size={14} />
+            <Icon name="chevron-left" />
           </button>
         ) : null}
         <span>{panel.title}</span>
         {panel.problems ? (
           <span title={`${panel.problems} problem${panel.problems === 1 ? '' : 's'} in the journeys`} style={{ color: 'var(--status-warning)' }}>
-            <SFIcon name="exclamationmark.triangle" size={14} />
+            <Icon name="warning" />
           </span>
         ) : null}
         {onClose ? (
           <button type="button" className="map-tool" title="Hide the inspector" aria-label="Hide the inspector" onClick={onClose}>
-            <SFIcon name="xmark" size={14} />
+            <Icon name="close" />
           </button>
         ) : null}
       </div>

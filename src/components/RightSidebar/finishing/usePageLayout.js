@@ -56,7 +56,6 @@ const setSharedPrintOptions = (next) => {
   sharedPrintOptions = next
   for (const listener of [...printOptionListeners]) listener(next)
 }
-export const currentPrintOptions = () => printOptionsOf(sharedPrintOptions)
 
 export default function usePageLayout() {
   const state = useLatestBridgeState('pageLayoutState', null)

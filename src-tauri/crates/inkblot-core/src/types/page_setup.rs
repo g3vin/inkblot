@@ -201,7 +201,13 @@ pub struct Composition {
 
 impl Default for Composition {
     fn default() -> Self {
-        Self { balance: true, hanging_punctuation: true, hyphen_limit_lines: 2, hyphen_min_word: 6, baseline_grid: false }
+        Self {
+            balance: true,
+            hanging_punctuation: true,
+            hyphen_limit_lines: 2,
+            hyphen_min_word: 6,
+            baseline_grid: false,
+        }
     }
 }
 
@@ -223,7 +229,13 @@ pub struct OpenTypeFeatures {
 
 impl Default for OpenTypeFeatures {
     fn default() -> Self {
-        Self { ligatures: true, discretionary_ligatures: false, old_style_figures: false, kerning: true, swashes: false }
+        Self {
+            ligatures: true,
+            discretionary_ligatures: false,
+            old_style_figures: false,
+            kerning: true,
+            swashes: false,
+        }
     }
 }
 
@@ -255,7 +267,12 @@ pub struct ImageTypesetting {
 
 impl Default for ImageTypesetting {
     fn default() -> Self {
-        Self { max_width_pct: 100.0, align: ImageAlign::Center, keep_with_caption: true, min_dpi: 300 }
+        Self {
+            max_width_pct: 100.0,
+            align: ImageAlign::Center,
+            keep_with_caption: true,
+            min_dpi: 300,
+        }
     }
 }
 
@@ -518,7 +535,12 @@ pub struct NotesOptions {
 
 impl Default for NotesOptions {
     fn default() -> Self {
-        Self { placement: NotePlacement::Page, numbering: NoteNumbering::PerChapter, marks: NoteMarks::Numbers, heading: "Notes".into() }
+        Self {
+            placement: NotePlacement::Page,
+            numbering: NoteNumbering::PerChapter,
+            marks: NoteMarks::Numbers,
+            heading: "Notes".into(),
+        }
     }
 }
 

@@ -21,6 +21,7 @@ import { useDocPreview, filePathToDocPath } from './useDocPreview'
 import { useCanvasPreview } from './useCanvasPreview'
 import CanvasNoteNode from './CanvasNoteNode'
 import CanvasAudioNode from './CanvasAudioNode'
+import CanvasTimelineEventNode from './CanvasTimelineEventNode'
 
 /**
  * A card referencing another CANVAS, drawn as a minimap of its shapes. Obsidian shows
@@ -138,6 +139,9 @@ export default function CanvasFileNode({ node, projectName }) {
   // A note card is a file node that also names ONE note inside that file — it shows
   // the note, not the document.
   if (node.inkblotNoteId) return <CanvasNoteNode node={node} />
+
+  // So is a timeline event card: it names one event in the project's chronology.
+  if (node.inkblotTimelineEventId) return <CanvasTimelineEventNode node={node} projectName={projectName} />
 
   if (isImagePath(node.file)) return <CanvasImageNode node={node} projectName={projectName} />
 

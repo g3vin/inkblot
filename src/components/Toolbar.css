@@ -46,9 +46,8 @@
 }
 
 /* ---- Segmented groups -------------------------------------------------
-   The group owns the background and border; its members are transparent
-   until hovered or active, so a cluster reads as one control while each
-   button stays individually toggleable. */
+   Bare on the page: a group is only spacing, and its members show a fill
+   when hovered or active, so the toolbar reads as icons on the paper. */
 
 /* border-box so the group measures 28px overall and lines up with the align
    trigger, which is a <button> and therefore border-box from the UA sheet. */
@@ -60,8 +59,8 @@
   height: 28px;
   padding: 3px;
   border: 0;
-  border-radius: 9px;
-  background: var(--control-bg);
+  border-radius: var(--radius-md);
+  background: transparent;
 }
 
 .toolbar-group-divider {
@@ -86,7 +85,7 @@
   min-height: 22px;
   padding: 0 5px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: transparent;
   box-shadow: none;
   font-size: 11px;
@@ -112,16 +111,18 @@
 
 /* ---- Font & size selects ---- */
 
+/* A menu, so it looks like one at rest: the control fill, not bare text that reads
+   as a label beside the icon buttons. */
 .toolbar-select {
-  height: 22px;
-  min-height: 22px;
-  padding: 0 4px;
+  height: var(--size-capsule);
+  min-height: var(--size-capsule);
+  padding: 0 var(--space-3);
   border: 0;
-  border-radius: 6px;
-  background: transparent;
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
   color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   outline: none;
   cursor: pointer;
   appearance: none;
@@ -130,10 +131,8 @@
   transition: background 120ms ease;
 }
 
-.toolbar-select:hover,
-.toolbar-select:focus-visible {
-  background: var(--surface-active);
-}
+.toolbar-select:hover { background: var(--control-hover-bg); }
+.toolbar-select:focus-visible { background: var(--control-hover-bg); box-shadow: var(--focus-ring); }
 
 /* Font names come from the OS and can be any length, so clip long ones rather
    than letting the control stretch the titlebar. */
@@ -143,7 +142,8 @@
 }
 
 .toolbar-select-size {
-  width: 34px;
+  width: 40px;
+  padding: 0;
   text-align: center;
 }
 
@@ -161,7 +161,7 @@
   gap: 1px;
   width: 26px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 120ms ease;
 }
@@ -189,8 +189,8 @@
 .toolbar-color-bar {
   width: 16px;
   height: 3px;
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--border-color);
   pointer-events: none;
 }
 
@@ -205,81 +205,6 @@
   cursor: pointer;
 }
 
-/* ---- Alignment dropdown ---- */
-
-.toolbar-align {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.toolbar-align-trigger {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  height: 28px;
-  min-height: 28px;
-  padding: 0 5px 0 7px;
-  border: 0;
-  border-radius: 9px;
-  background: var(--control-bg);
-  color: var(--text-primary);
-  font-size: 11px;
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.toolbar-align-trigger:hover,
-.toolbar-align-trigger.open {
-  background: var(--accent-surface);
-  color: var(--accent-foreground);
-}
-
-.toolbar-align-caret {
-  opacity: 0.6;
-}
-
-.toolbar-align-menu {
-  position: fixed;
-  top: var(--align-menu-top, 52px);
-  left: var(--align-menu-left, 16px);
-  z-index: 95;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--floating-note-border);
-  border-radius: 10px;
-  background: var(--floating-note-bg);
-  box-shadow: var(--floating-note-shadow);
-  pointer-events: auto;
-  animation: dictation-pop 140ms ease-out both;
-}
-
-.toolbar-align-menu > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 24px;
-  padding: 0 5px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-primary);
-}
-
-.toolbar-align-menu > button:hover {
-  background: var(--surface-active);
-}
-
-.toolbar-align-menu > button.active {
-  background: var(--accent-surface-strong);
-  color: var(--accent-foreground);
-}
-
 .dictation-control {
   position: relative;
   display: inline-flex;
@@ -292,7 +217,7 @@
   min-width: 28px;
   min-height: 24px;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: none;
   gap: 6px;
   overflow: hidden;
@@ -332,7 +257,7 @@
   width: 2px;
   height: var(--bar-height, 6px);
   max-height: 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: currentColor;
   opacity: 0.74;
   transform-origin: center;
@@ -343,24 +268,6 @@
 
 .dictation-mic-btn:not(.active):not(.loading) .dictation-button-wave-bar {
   opacity: 0.38;
-}
-
-.dictation-popover {
-  position: fixed;
-  top: var(--dictation-popover-top, 52px);
-  right: var(--dictation-popover-right, 16px);
-  width: min(320px, calc(100vw - 24px));
-  padding: 10px;
-  border-radius: var(--floating-note-radius);
-  border: 1px solid var(--floating-note-border);
-  background: var(--floating-note-bg);
-  box-shadow: var(--floating-note-shadow);
-  color: var(--text-primary);
-  pointer-events: auto;
-  z-index: 90;
-  transform: translate(var(--dictation-popover-x, 0), var(--dictation-popover-y, 0));
-  animation: dictation-pop 180ms ease-out both;
-  user-select: none;
 }
 
 @keyframes dictation-pop {
@@ -378,105 +285,6 @@
   }
 }
 
-.dictation-popover-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 30px;
-  margin-bottom: 10px;
-  cursor: grab;
-  touch-action: none;
-}
-
-.dictation-popover-header:active {
-  cursor: grabbing;
-}
-
-.dictation-status-cluster {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.dictation-menu-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  color: var(--floating-note-title);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.dictation-live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--status-success);
-  box-shadow: 0 0 0 4px rgba(109, 240, 168, 0.12);
-}
-
-.dictation-popover.loading .dictation-live-dot {
-  background: var(--status-warning);
-  box-shadow: 0 0 0 4px rgba(255, 213, 79, 0.13);
-}
-
-.dictation-popover.error .dictation-live-dot {
-  background: var(--status-error);
-  box-shadow: 0 0 0 4px rgba(255, 143, 143, 0.13);
-}
-
-.dictation-close-btn {
-  width: 22px;
-  height: 22px;
-  min-width: 22px;
-  min-height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dictation-close-btn:hover {
-  color: var(--text-primary);
-  background: var(--surface-active);
-}
-
-.dictation-wave {
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 3px;
-  min-width: 36px;
-  padding: 0 0 0 1px;
-  border-radius: 999px;
-  background: transparent;
-}
-
-.dictation-wave-bar {
-  width: 3px;
-  height: var(--bar-height, 10px);
-  border-radius: 999px;
-  background: var(--accent-color);
-  opacity: 0.78;
-  transform-origin: center;
-  transition:
-    height 90ms ease-out,
-    opacity 140ms ease;
-}
-
-.dictation-popover:not(.listening) .dictation-wave-bar {
-  opacity: 0.34;
-}
-
 .read-aloud-control {
   position: relative;
   display: inline-flex;
@@ -489,7 +297,7 @@
   min-width: 28px;
   min-height: 24px;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: none;
 }
 
@@ -499,7 +307,7 @@
 
 .read-aloud-btn.error {
   color: var(--status-error-soft);
-  border-color: rgba(255, 143, 143, 0.48);
+  border-color: color-mix(in srgb, var(--status-danger) 48%, transparent);
 }
 
 .read-aloud-popover {
@@ -508,11 +316,11 @@
   right: var(--read-aloud-popover-right, 16px);
   width: min(320px, calc(100vw - 24px));
   padding: 10px;
-  border-radius: var(--floating-note-radius);
-  border: 1px solid var(--floating-note-border);
-  background: var(--floating-note-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--menu-border);
+  background: var(--surface-float);
   color: var(--text-primary);
-  box-shadow: var(--floating-note-shadow);
+  box-shadow: var(--shadow-float);
   pointer-events: auto;
   z-index: 90;
   animation: dictation-pop 180ms ease-out both;
@@ -532,7 +340,7 @@
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--floating-note-title);
+  color: var(--accent-foreground);
 }
 
 .read-aloud-subtitle {
@@ -550,7 +358,7 @@
   gap: 3px;
   min-width: 54px;
   padding: 3px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--control-bg);
 }
@@ -558,7 +366,7 @@
 .read-aloud-wave-bar {
   width: 3px;
   height: var(--bar-height, 8px);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-color);
   opacity: 0.8;
   transition:
@@ -585,7 +393,7 @@
   width: 100%;
   height: 38px;
   padding: 0 11px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--control-bg);
   color: var(--text-primary);
@@ -607,7 +415,7 @@
 .read-aloud-status {
   min-height: 36px;
   padding: 9px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: var(--control-bg);
   color: var(--text-primary);
@@ -623,8 +431,9 @@
   width: 100%;
   min-height: 36px;
   margin-top: 10px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--accent-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--accent-surface-strong);
   color: var(--accent-foreground);
   font-size: 12px;
@@ -635,38 +444,6 @@
 
 .read-aloud-action:hover {
   background: var(--accent-surface);
-}
-
-.dictation-preview {
-  min-height: 46px;
-  max-height: 112px;
-  overflow: auto;
-  padding: 10px 11px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: var(--control-bg);
-  color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.dictation-popover.error .dictation-preview {
-  color: var(--status-error-soft);
-}
-
-.dictation-flight {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 16px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: rgba(109, 240, 168, 0.14);
-  color: #d8ffe8;
-  font-size: 13px;
-  line-height: 1.35;
-  pointer-events: none;
-  animation: dictation-flight 380ms ease-in forwards;
 }
 
 @keyframes dictation-flight {

@@ -2,7 +2,7 @@
  * typography.css — the three voices of Inkblot type. See docs/DESIGN.md → Typography.
  *
  *   Inter          (--font-ui)     everything in the chrome
- *   Courier Prime  (--font-type)   small accent labels only — .ib-eyebrow, .ib-meta
+ *   Courier Prime  (--font-type)   small typewritten accents only — .ib-meta, Kbd
  *   Literata       (--font-editor) the writer's words
  */
 
@@ -14,11 +14,12 @@
   font-family: var(--editor-font-family, var(--font-editor));
 }
 
-/* A small uppercase typewriter label above a group: panel sections, dialog kickers. */
+/* A small uppercase label above a group: panel titles, section heads, dialog kickers.
+   Inter, bold and tracked, as the sidebars' titles are. */
 .ib-eyebrow {
-  font-family: var(--font-type);
+  font-family: var(--font-ui);
   font-size: var(--text-xs);
-  font-weight: var(--weight-regular);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
   line-height: var(--leading-tight);

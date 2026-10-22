@@ -25,8 +25,9 @@ export default defineConfig([
     },
     rules: {
       'no-empty': ['error', { allowEmptyCatch: true }],
+      // `_` marks a name kept only to leave it out of a rest: `{ dropped: _dropped, ...kept }`.
       'no-unused-vars': ['error', {
-        varsIgnorePattern: '^([A-Z_]|motion$)',
+        varsIgnorePattern: '^_',
         caughtErrors: 'none',
       }],
       'react-hooks/immutability': 'off',
@@ -42,7 +43,7 @@ export default defineConfig([
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['error', {
-        varsIgnorePattern: '^([A-Z_]|motion$)',
+        varsIgnorePattern: '^_',
         argsIgnorePattern: '^_',
         caughtErrors: 'none',
       }],

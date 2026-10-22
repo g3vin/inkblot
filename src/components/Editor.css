@@ -26,7 +26,6 @@
 @import '../extensions/ResizableImage.css';
 @import '../extensions/ConversationTile.css';
 @import '../extensions/PinterestBoard.css';
-@import './RightSidebar/SidebarSearch.css';
 @import './RightSidebar/ClipboardPanel.css';
 @import './Notes.css';
 @import './EditorPanes.css';

@@ -16,7 +16,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import '../Toolbar.css'
 import './Toolbar.customize.css'
-import { FLEXIBLE_SPACE, SPACE, isSpacer, toolbarItem } from '../../lib/chromeLayout'
+import { FLEXIBLE_SPACE, MORE, SPACE, isSpacer, toolbarItem } from '../../lib/chromeLayout'
 import { CUSTOMIZE_TOOLBAR_EVENT, useToolbarContext } from './toolbarContext'
 import ToolbarItem from './ToolbarItem'
 import usePointerReorder from '../../ui/usePointerReorder'
@@ -78,8 +78,9 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
     ? (() => {
         const id = draggingIndex !== null ? items[draggingIndex] : String(drag.dragging).slice(2)
         if (id === SPACE) return 'Space'
-        if (id === FLEXIBLE_SPACE) return 'Flexible Space'
-        if (id === 'defaults') return 'Default Set'
+        if (id === FLEXIBLE_SPACE) return 'Flexible space'
+        if (id === MORE) return 'More'
+        if (id === 'defaults') return 'Default set'
         return toolbarItem(id)?.label ?? id
       })()
     : null
@@ -87,6 +88,11 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
   // Where the dragged item would land, drawn as a caret between tokens.
   const caretAt = drag.dragging && drag.inside ? drag.insertIndex : null
   const shown = items.map((id, index) => ({ id, index })).filter(({ index }) => index !== draggingIndex)
+  // Behind »: what does not fit, and everything after the More marker (while not
+  // customizing, when the marker is a token like any other).
+  const moreAt = customizing ? -1 : shown.findIndex(({ id }) => id === MORE)
+  const visible = moreAt === -1 ? fitting : Math.min(fitting, moreAt)
+  const hidden = shown.slice(visible).filter(({ id }) => !isSpacer(id) && id !== MORE)
 
   return (
     <div className="toolbar-wrapper">
@@ -102,8 +108,8 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
           <div
             key={`${id}:${index}`}
             className={`tb-slot${isSpacer(id) ? ' is-spacer' : ''}${id === FLEXIBLE_SPACE ? ' is-flexible' : ''}`}
-            data-overflowed={position >= fitting ? 'true' : undefined}
-            aria-hidden={position >= fitting ? 'true' : undefined}
+            data-overflowed={position >= visible ? 'true' : undefined}
+            aria-hidden={position >= visible ? 'true' : undefined}
             data-reorder-id={customizing ? `t:${index}` : undefined}
             onPointerDown={customizing ? (event) => drag.onPointerDown(event, `t:${index}`) : undefined}
             onClickCapture={customizing ? (event) => { event.preventDefault(); event.stopPropagation() } : undefined}
@@ -113,7 +119,7 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
           </div>
         ))}
         {caretAt !== null && caretAt >= shown.length ? <span className="tb-caret-line is-end" aria-hidden="true" /> : null}
-        {fitting < shown.length ? (
+        {hidden.length ? (
           <button
             ref={overflowRef}
             type="button"
@@ -128,9 +134,9 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
           </button>
         ) : null}
       </div>
-      <Popover anchorRef={overflowRef} open={overflowOpen && fitting < shown.length} onClose={() => setOverflowOpen(false)} align="end" className="tb-overflow-popover">
+      <Popover anchorRef={overflowRef} open={overflowOpen && hidden.length > 0} onClose={() => setOverflowOpen(false)} align="end" className="tb-overflow-popover">
         <div className="toolbar tb-overflow-list" data-display={display} role="toolbar" aria-label="More toolbar items">
-          {shown.slice(fitting).filter(({ id }) => !isSpacer(id)).map(({ id, index }) => (
+          {hidden.map(({ id, index }) => (
             <div key={`${id}:${index}`} className="tb-slot"><ToolbarItem id={id} ctx={ctx} /></div>
           ))}
         </div>

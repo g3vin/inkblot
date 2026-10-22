@@ -143,7 +143,7 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
   useEffect(() => {
     applyViewport(viewportRef.current)
     settle()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, [])
 
   /**

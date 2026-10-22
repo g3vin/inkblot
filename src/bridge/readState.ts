@@ -13,13 +13,14 @@
 import { Alignment, BlockType, WritingFormat } from '../types'
 import type { ActiveMarks, SelectionContext, ToolbarState, EditorTarget } from '../types'
 import { isEditorReady } from '../lib/editorUtils'
+import { DEFAULT_HIGHLIGHT_COLOR, DEFAULT_TEXT_COLOR } from '../lib/palette'
 import { fromCssFontFamily } from '../lib/systemFonts'
 import { readSelectionAnchor } from './anchors'
 
 /** What `readToolbarState` falls back to, spelled once. */
 export const TOOLBAR_DEFAULTS = {
-  color: '#000000',
-  highlight: '#ffff00',
+  color: DEFAULT_TEXT_COLOR,
+  highlight: DEFAULT_HIGHLIGHT_COLOR,
   font: 'Literata',
   fontSize: '18px',
 } as const
@@ -96,6 +97,7 @@ const isMarkActive = (editor: PmEditor, markName: string): boolean => {
   return marks.some((mark) => mark.type === markType)
 }
 
+/** The marks and nodes at the selection the toolbar shows as on; all off with no live editor. */
 export function readActiveMarks(editor: unknown): ActiveMarks {
   if (!isEditorReady(editor)) {
     return {

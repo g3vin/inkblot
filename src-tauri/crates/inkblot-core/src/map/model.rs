@@ -17,19 +17,60 @@ use serde_json::{json, Map, Value};
 
 use crate::version_history::text_words;
 
-pub const MAP_FORMAT_VERSION: u32 = 1;
+pub const MAP_FORMAT_VERSION: u32 = 2;
 
-pub const MAP_KINDS: [&str; 4] = ["blank", "image", "earth", "system"];
-pub const EARTH_PROJECTIONS: [&str; 5] =
-    ["equalEarth", "equirectangular", "mercator", "naturalEarth", "orthographic"];
+pub const MAP_KINDS: [&str; 8] = [
+    "blank", "image", "earth", "planet", "system", "galaxy", "universe", "model",
+];
+pub const EARTH_VIEWS: [&str; 2] = ["globe", "flat"];
+pub const EARTH_IMAGERY: [&str; 3] = ["map", "satellite", "hybrid"];
+pub const SURFACE_LOOKS: [&str; 5] = ["generated", "texture", "gas", "ice", "star"];
+pub const SYSTEM_DYNAMICS: [&str; 2] = ["kepler", "nbody"];
+pub const GALAXY_TYPES: [&str; 17] = [
+    "E0",
+    "E3",
+    "E5",
+    "E7",
+    "S0",
+    "Sa",
+    "Sb",
+    "Sc",
+    "Sd",
+    "SBa",
+    "SBb",
+    "SBc",
+    "SBd",
+    "ring",
+    "irregular",
+    "dwarf",
+    "peculiar",
+];
+pub const SPACE_LOOKS: [&str; 3] = ["cinematic", "atlas", "ink"];
+pub const EARTH_PROJECTIONS: [&str; 5] = [
+    "equalEarth",
+    "equirectangular",
+    "mercator",
+    "naturalEarth",
+    "orthographic",
+];
 pub const EARTH_DETAIL: [&str; 3] = ["auto", "110m", "50m"];
 pub const ROUTE_SMOOTHING: [&str; 2] = ["linear", "catmullRom"];
 pub const LINE_DASHES: [&str; 5] = ["solid", "dashed", "dotted", "inked", "rough"];
 pub const HATCHES: [&str; 6] = ["none", "diagonal", "cross", "dots", "waves", "mountains"];
 pub const TRANSPORT_MEDIA: [&str; 4] = ["land", "water", "air", "space"];
 pub const MAP_THEMES: [&str; 4] = ["clean", "parchment", "ink", "night"];
-pub const BODY_KINDS: [&str; 7] = ["star", "planet", "dwarf", "moon", "belt", "station", "barycenter"];
+pub const BODY_KINDS: [&str; 7] = [
+    "star",
+    "planet",
+    "dwarf",
+    "moon",
+    "belt",
+    "station",
+    "barycenter",
+];
 pub const RADIAL_MODES: [&str; 2] = ["linear", "log"];
+/// How a star system is shown: in three dimensions, or laid flat on the page.
+pub const SYSTEM_VIEWS: [&str; 2] = ["3d", "flat"];
 
 /// A blank map is a sheet this big, in map units, until something says otherwise.
 pub const BLANK_SHEET_WIDTH: f64 = 4000.0;
@@ -55,7 +96,9 @@ fn get<'a>(object: &'a Object, key: &str) -> Option<&'a Value> {
 
 /// `Number.isFinite(value)` — JSON numbers are always finite, so any number qualifies.
 fn finite(value: Option<&Value>) -> Option<f64> {
-    value.and_then(Value::as_f64).filter(|number| number.is_finite())
+    value
+        .and_then(Value::as_f64)
+        .filter(|number| number.is_finite())
 }
 
 /// A number the way JS would write it back: the raw JSON value when it is one, so an
@@ -99,11 +142,13 @@ fn clamp(value: f64, low: f64, high: f64) -> f64 {
 }
 
 fn non_empty_string(value: Option<&Value>) -> Option<&str> {
-    value.and_then(Value::as_str).filter(|text| !text.is_empty())
+    value
+        .and_then(Value::as_str)
+        .filter(|text| !text.is_empty())
 }
 
 /// `[x, y]` from anything; `None` unless both are numbers. Extra entries drop.
-pub fn read_point(value: Option<&Value>) -> Option<Value> {
+pub fn read_point2(value: Option<&Value>) -> Option<Value> {
     let items = value?.as_array()?;
     if items.len() < 2 {
         return None;
@@ -113,25 +158,57 @@ pub fn read_point(value: Option<&Value>) -> Option<Value> {
     Some(Value::Array(vec![items[0].clone(), items[1].clone()]))
 }
 
+/// A stored point: `[x, y]`, or `[x, y, z]` when a third number follows. Anything
+/// past z drops.
+pub fn read_point(value: Option<&Value>) -> Option<Value> {
+    let mut point = read_point2(value)?;
+    let items = value?.as_array()?;
+    if finite(items.get(2)).is_some() {
+        point.as_array_mut()?.push(items[2].clone());
+    }
+    Some(point)
+}
+
+/// `[x, y, z]`: exactly three numbers, or `None`.
+pub fn read_vector(value: Option<&Value>) -> Option<Value> {
+    let items = value?.as_array()?;
+    if items.len() < 3 || (0..3).any(|index| finite(items.get(index)).is_none()) {
+        return None;
+    }
+    Some(Value::Array(items[..3].to_vec()))
+}
+
 fn read_points(value: Option<&Value>) -> Vec<Value> {
     value
         .and_then(Value::as_array)
-        .map(|items| items.iter().filter_map(|item| read_point(Some(item))).collect())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| read_point(Some(item)))
+                .collect()
+        })
         .unwrap_or_default()
 }
+
+/// One list item normalized, given the id source for its own children; `None` drops it.
+type ItemNormalizer<'a> = dyn FnMut(Object, &mut dyn FnMut() -> String) -> Option<Object> + 'a;
 
 /// Normalize an array of items that each carry an `id` — see `readList` in JS. The id
 /// is drawn before `normalize_item` runs, so a dropped item still consumes one.
 fn read_list(
     value: Option<&Value>,
     next_id: &mut dyn FnMut() -> String,
-    normalize_item: &mut dyn FnMut(Object, &mut dyn FnMut() -> String) -> Option<Object>,
+    normalize_item: &mut ItemNormalizer,
 ) -> Vec<Value> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
-    let Some(items) = value.and_then(Value::as_array) else { return out };
+    let Some(items) = value.and_then(Value::as_array) else {
+        return out;
+    };
     for item in items {
-        let Some(item) = item.as_object() else { continue };
+        let Some(item) = item.as_object() else {
+            continue;
+        };
         let id = match non_empty_string(item.get("id")) {
             Some(id) => id.to_string(),
             None => next_id(),
@@ -141,7 +218,9 @@ fn read_list(
         }
         let mut with_id = item.clone();
         with_id.insert("id".into(), Value::String(id.clone()));
-        let Some(normalized) = normalize_item(with_id, next_id) else { continue };
+        let Some(normalized) = normalize_item(with_id, next_id) else {
+            continue;
+        };
         seen.insert(id);
         out.push(Value::Object(normalized));
     }
@@ -149,7 +228,9 @@ fn read_list(
 }
 
 fn ids_of(list: &[Value]) -> HashSet<String> {
-    list.iter().filter_map(|item| item["id"].as_str().map(str::to_string)).collect()
+    list.iter()
+        .filter_map(|item| item["id"].as_str().map(str::to_string))
+        .collect()
 }
 
 fn set(object: &mut Object, key: &str, value: Value) {
@@ -169,20 +250,32 @@ fn reference(value: Option<&Value>, ids: &HashSet<String>) -> Value {
 fn read_scale(raw: Option<&Value>) -> Value {
     let scale = object_or(raw);
     let calibration = object_or(scale.get("calibration"));
-    let a = read_point(calibration.get("a"));
-    let b = read_point(calibration.get("b"));
+    let a = read_point2(calibration.get("a"));
+    let b = read_point2(calibration.get("b"));
     let distance = positive(calibration.get("distance")).cloned();
 
     let mut out = scale.clone();
-    set(&mut out, "kmPerUnit", positive_or(scale.get("kmPerUnit"), json!(1)));
-    set(&mut out, "displayUnit", string_or(scale.get("displayUnit"), json!("km")));
+    set(
+        &mut out,
+        "kmPerUnit",
+        positive_or(scale.get("kmPerUnit"), json!(1)),
+    );
+    set(
+        &mut out,
+        "displayUnit",
+        string_or(scale.get("displayUnit"), json!("km")),
+    );
     let calibration_value = match (a, b, distance) {
         (Some(a), Some(b), Some(distance)) => {
             let mut next = calibration.clone();
             set(&mut next, "a", a);
             set(&mut next, "b", b);
             set(&mut next, "distance", distance);
-            set(&mut next, "unit", string_or(calibration.get("unit"), json!("km")));
+            set(
+                &mut next,
+                "unit",
+                string_or(calibration.get("unit"), json!("km")),
+            );
             Value::Object(next)
         }
         _ => Value::Null,
@@ -195,10 +288,16 @@ fn read_scale(raw: Option<&Value>) -> Value {
             units
                 .iter()
                 .filter_map(Value::as_object)
-                .filter(|unit| non_empty_string(unit.get("id")).is_some() && positive(unit.get("km")).is_some())
+                .filter(|unit| {
+                    non_empty_string(unit.get("id")).is_some() && positive(unit.get("km")).is_some()
+                })
                 .map(|unit| {
                     let mut next = unit.clone();
-                    set(&mut next, "name", string_or(unit.get("name"), unit["id"].clone()));
+                    set(
+                        &mut next,
+                        "name",
+                        string_or(unit.get("name"), unit["id"].clone()),
+                    );
                     Value::Object(next)
                 })
                 .collect()
@@ -212,9 +311,21 @@ fn read_background(raw: Option<&Value>) -> Value {
     let background = object_or(raw);
     let opacity = finite(background.get("opacity")).unwrap_or(1.0);
     let mut out = background.clone();
-    set(&mut out, "image", string_or(background.get("image"), Value::Null));
-    set(&mut out, "width", positive_or(background.get("width"), Value::Null));
-    set(&mut out, "height", positive_or(background.get("height"), Value::Null));
+    set(
+        &mut out,
+        "image",
+        string_or(background.get("image"), Value::Null),
+    );
+    set(
+        &mut out,
+        "width",
+        positive_or(background.get("width"), Value::Null),
+    );
+    set(
+        &mut out,
+        "height",
+        positive_or(background.get("height"), Value::Null),
+    );
     // Keep a number that is already in range as it was written (an integer 1 stays 1).
     let opacity_value = if (0.0..=1.0).contains(&opacity) {
         number_or(background.get("opacity"), json!(1))
@@ -222,19 +333,182 @@ fn read_background(raw: Option<&Value>) -> Value {
         json!(clamp(opacity, 0.0, 1.0))
     };
     set(&mut out, "opacity", opacity_value);
-    set(&mut out, "trace", string_or(background.get("trace"), Value::Null));
-    set(&mut out, "showImage", bool_or(background.get("showImage"), true));
+    set(
+        &mut out,
+        "trace",
+        string_or(background.get("trace"), Value::Null),
+    );
+    set(
+        &mut out,
+        "showImage",
+        bool_or(background.get("showImage"), true),
+    );
     Value::Object(out)
 }
 
 fn read_earth(raw: Option<&Value>) -> Value {
     let earth = object_or(raw);
     let mut out = earth.clone();
-    set(&mut out, "projection", one_of(earth.get("projection"), &EARTH_PROJECTIONS, "equalEarth"));
-    set(&mut out, "rotate", read_point(earth.get("rotate")).unwrap_or_else(|| json!([0, 0])));
+    set(
+        &mut out,
+        "projection",
+        one_of(earth.get("projection"), &EARTH_PROJECTIONS, "equalEarth"),
+    );
+    set(
+        &mut out,
+        "rotate",
+        read_point2(earth.get("rotate")).unwrap_or_else(|| json!([0, 0])),
+    );
     set(&mut out, "graticule", bool_or(earth.get("graticule"), true));
     set(&mut out, "borders", bool_or(earth.get("borders"), true));
-    set(&mut out, "detail", one_of(earth.get("detail"), &EARTH_DETAIL, "auto"));
+    set(
+        &mut out,
+        "detail",
+        one_of(earth.get("detail"), &EARTH_DETAIL, "auto"),
+    );
+    // A map from before the globe opened flat — unless it was already a globe.
+    let was_globe = earth.get("projection").and_then(Value::as_str) == Some("orthographic");
+    set(
+        &mut out,
+        "view",
+        one_of(
+            earth.get("view"),
+            &EARTH_VIEWS,
+            if was_globe { "globe" } else { "flat" },
+        ),
+    );
+    set(
+        &mut out,
+        "imagery",
+        one_of(earth.get("imagery"), &EARTH_IMAGERY, "map"),
+    );
+    set(
+        &mut out,
+        "terrain3d",
+        bool_or(earth.get("terrain3d"), false),
+    );
+    Value::Object(out)
+}
+
+/// A planet's or a star's own globe: how big, how it turns, what its ground looks like.
+fn read_surface(raw: Option<&Value>) -> Value {
+    let surface = object_or(raw);
+    let look = object_or(surface.get("look"));
+    let mut look_out = look.clone();
+    set(
+        &mut look_out,
+        "kind",
+        one_of(look.get("kind"), &SURFACE_LOOKS, "generated"),
+    );
+    set(&mut look_out, "seed", number_or(look.get("seed"), json!(1)));
+    set(
+        &mut look_out,
+        "seaLevel",
+        clamped_number(look.get("seaLevel"), 0.55, 0.0, 1.0),
+    );
+    set(
+        &mut look_out,
+        "roughness",
+        clamped_number(look.get("roughness"), 0.5, 0.0, 1.0),
+    );
+    set(
+        &mut look_out,
+        "palette",
+        string_or(look.get("palette"), json!("temperate")),
+    );
+    set(
+        &mut look_out,
+        "texture",
+        string_or(look.get("texture"), Value::Null),
+    );
+    set(
+        &mut look_out,
+        "temperatureK",
+        positive_or(look.get("temperatureK"), json!(5772)),
+    );
+    let mut out = surface.clone();
+    set(
+        &mut out,
+        "radiusKm",
+        positive_or(surface.get("radiusKm"), json!(6371)),
+    );
+    set(
+        &mut out,
+        "axialTiltDeg",
+        clamped_number(surface.get("axialTiltDeg"), 0.0, 0.0, 180.0),
+    );
+    set(
+        &mut out,
+        "dayHours",
+        positive_or(surface.get("dayHours"), json!(24)),
+    );
+    set(&mut out, "look", Value::Object(look_out));
+    set(
+        &mut out,
+        "terrainFromRegions",
+        bool_or(surface.get("terrainFromRegions"), true),
+    );
+    set(
+        &mut out,
+        "atmosphere",
+        bool_or(surface.get("atmosphere"), true),
+    );
+    Value::Object(out)
+}
+
+fn read_galaxy(raw: Option<&Value>) -> Value {
+    let galaxy = object_or(raw);
+    let mut out = galaxy.clone();
+    set(
+        &mut out,
+        "type",
+        one_of(galaxy.get("type"), &GALAXY_TYPES, "Sb"),
+    );
+    set(&mut out, "seed", number_or(galaxy.get("seed"), json!(1)));
+    set(
+        &mut out,
+        "radiusLy",
+        positive_or(galaxy.get("radiusLy"), json!(50000)),
+    );
+    set(
+        &mut out,
+        "thicknessLy",
+        positive_or(galaxy.get("thicknessLy"), json!(1000)),
+    );
+    set(
+        &mut out,
+        "params",
+        Value::Object(object_or(galaxy.get("params")).clone()),
+    );
+    Value::Object(out)
+}
+
+fn read_universe(raw: Option<&Value>) -> Value {
+    let universe = object_or(raw);
+    let mut out = universe.clone();
+    set(&mut out, "seed", number_or(universe.get("seed"), json!(1)));
+    set(
+        &mut out,
+        "extentMpc",
+        positive_or(universe.get("extentMpc"), json!(50)),
+    );
+    Value::Object(out)
+}
+
+fn read_model(raw: Option<&Value>) -> Value {
+    let model = object_or(raw);
+    let mut out = model.clone();
+    set(
+        &mut out,
+        "asset",
+        string_or(model.get("asset"), Value::Null),
+    );
+    set(
+        &mut out,
+        "metresPerUnit",
+        positive_or(model.get("metresPerUnit"), json!(1)),
+    );
+    set(&mut out, "up", one_of(model.get("up"), &["y", "z"], "y"));
     Value::Object(out)
 }
 
@@ -248,35 +522,143 @@ fn clamped_number(value: Option<&Value>, fallback: f64, low: f64, high: f64) -> 
 }
 
 fn read_orbit(raw: Option<&Value>) -> Value {
-    let Some(orbit) = raw.and_then(Value::as_object) else { return Value::Null };
-    let Some(a_au) = positive(orbit.get("aAU")).cloned() else { return Value::Null };
+    let Some(orbit) = raw.and_then(Value::as_object) else {
+        return Value::Null;
+    };
+    let Some(a_au) = positive(orbit.get("aAU")).cloned() else {
+        return Value::Null;
+    };
     let mut out = orbit.clone();
     set(&mut out, "aAU", a_au);
     // Past 0.99 the Kepler solve stops converging in a fixed number of steps.
-    set(&mut out, "e", clamped_number(orbit.get("e"), 0.0, 0.0, 0.99));
-    set(&mut out, "periapsisDeg", number_or(orbit.get("periapsisDeg"), json!(0)));
-    set(&mut out, "meanAnomalyDeg", number_or(orbit.get("meanAnomalyDeg"), json!(0)));
-    set(&mut out, "periodDays", positive_or(orbit.get("periodDays"), Value::Null));
-    set(&mut out, "retrograde", bool_or(orbit.get("retrograde"), false));
+    set(
+        &mut out,
+        "e",
+        clamped_number(orbit.get("e"), 0.0, 0.0, 0.99),
+    );
+    set(
+        &mut out,
+        "periapsisDeg",
+        number_or(orbit.get("periapsisDeg"), json!(0)),
+    );
+    set(
+        &mut out,
+        "meanAnomalyDeg",
+        number_or(orbit.get("meanAnomalyDeg"), json!(0)),
+    );
+    set(
+        &mut out,
+        "periodDays",
+        positive_or(orbit.get("periodDays"), Value::Null),
+    );
+    set(
+        &mut out,
+        "retrograde",
+        bool_or(orbit.get("retrograde"), false),
+    );
+    set(
+        &mut out,
+        "inclinationDeg",
+        number_or(orbit.get("inclinationDeg"), json!(0)),
+    );
+    set(
+        &mut out,
+        "ascendingNodeDeg",
+        number_or(orbit.get("ascendingNodeDeg"), json!(0)),
+    );
     Value::Object(out)
+}
+
+/// Where an N-body body starts (AU) and how it is moving (AU a day); both, or neither.
+fn read_state(raw: Option<&Value>) -> Value {
+    let Some(state) = raw.and_then(Value::as_object) else {
+        return Value::Null;
+    };
+    match (read_vector(state.get("pos")), read_vector(state.get("vel"))) {
+        (Some(pos), Some(vel)) => {
+            let mut out = state.clone();
+            set(&mut out, "pos", pos);
+            set(&mut out, "vel", vel);
+            Value::Object(out)
+        }
+        _ => Value::Null,
+    }
+}
+
+fn read_rings(raw: Option<&Value>) -> Value {
+    let Some(rings) = raw.and_then(Value::as_object) else {
+        return Value::Null;
+    };
+    match (
+        positive(rings.get("innerKm")),
+        positive(rings.get("outerKm")),
+    ) {
+        (Some(inner), Some(outer)) if outer.as_f64() > inner.as_f64() => {
+            let mut out = rings.clone();
+            set(&mut out, "innerKm", inner.clone());
+            set(&mut out, "outerKm", outer.clone());
+            set(
+                &mut out,
+                "color",
+                string_or(rings.get("color"), Value::Null),
+            );
+            Value::Object(out)
+        }
+        _ => Value::Null,
+    }
 }
 
 fn read_body(body: Object) -> Object {
     let mut out = body.clone();
     set(&mut out, "name", string_or(body.get("name"), json!("")));
-    set(&mut out, "kind", one_of(body.get("kind"), &BODY_KINDS, "planet"));
-    set(&mut out, "parent", string_or(body.get("parent"), Value::Null));
-    set(&mut out, "massSun", positive_or(body.get("massSun"), Value::Null));
-    set(&mut out, "radiusKm", positive_or(body.get("radiusKm"), Value::Null));
+    set(
+        &mut out,
+        "kind",
+        one_of(body.get("kind"), &BODY_KINDS, "planet"),
+    );
+    set(
+        &mut out,
+        "parent",
+        string_or(body.get("parent"), Value::Null),
+    );
+    set(
+        &mut out,
+        "massSun",
+        positive_or(body.get("massSun"), Value::Null),
+    );
+    set(
+        &mut out,
+        "radiusKm",
+        positive_or(body.get("radiusKm"), Value::Null),
+    );
     set(&mut out, "color", string_or(body.get("color"), Value::Null));
     set(&mut out, "orbit", read_orbit(body.get("orbit")));
+    set(&mut out, "state", read_state(body.get("state")));
+    set(
+        &mut out,
+        "axialTiltDeg",
+        number_or(body.get("axialTiltDeg"), json!(0)),
+    );
+    set(
+        &mut out,
+        "rotationHours",
+        positive_or(body.get("rotationHours"), Value::Null),
+    );
+    set(&mut out, "rings", read_rings(body.get("rings")));
+    set(
+        &mut out,
+        "surface",
+        string_or(body.get("surface"), Value::Null),
+    );
     out
 }
 
 fn read_system(raw: Option<&Value>, next_id: &mut dyn FnMut() -> String) -> Value {
     let system = object_or(raw);
     let display = object_or(system.get("display"));
-    let mut bodies = read_list(system.get("bodies"), next_id, &mut |body, _| Some(read_body(body)));
+    let mut bodies = read_list(system.get("bodies"), next_id, &mut |body, _| {
+        Some(read_body(body))
+    });
     // A parent that is not a body here (or is the body itself) orbits nothing.
     let ids = ids_of(&bodies);
     for body in &mut bodies {
@@ -291,21 +673,97 @@ fn read_system(raw: Option<&Value>, next_id: &mut dyn FnMut() -> String) -> Valu
     }
 
     let mut display_out = display.clone();
-    set(&mut display_out, "radial", one_of(display.get("radial"), &RADIAL_MODES, "log"));
-    set(&mut display_out, "pxPerAU", positive_or(display.get("pxPerAU"), json!(100)));
+    set(
+        &mut display_out,
+        "radial",
+        one_of(display.get("radial"), &RADIAL_MODES, "log"),
+    );
+    set(
+        &mut display_out,
+        "pxPerAU",
+        positive_or(display.get("pxPerAU"), json!(100)),
+    );
+    set(
+        &mut display_out,
+        "view",
+        one_of(display.get("view"), &SYSTEM_VIEWS, "flat"),
+    );
+
+    let plane = object_or(system.get("plane"));
+    let mut plane_out = plane.clone();
+    set(
+        &mut plane_out,
+        "tiltDeg",
+        number_or(plane.get("tiltDeg"), json!(0)),
+    );
+    set(
+        &mut plane_out,
+        "headingDeg",
+        number_or(plane.get("headingDeg"), json!(0)),
+    );
+    let nbody = object_or(system.get("nbody"));
+    let mut nbody_out = nbody.clone();
+    set(
+        &mut nbody_out,
+        "stepDays",
+        positive_or(nbody.get("stepDays"), json!(0.25)),
+    );
+    set(
+        &mut nbody_out,
+        "softeningAU",
+        positive_or(nbody.get("softeningAU"), json!(0.001)),
+    );
+    set(
+        &mut nbody_out,
+        "horizonDays",
+        positive_or(nbody.get("horizonDays"), json!(3650)),
+    );
 
     let mut out = system.clone();
     set(&mut out, "bodies", Value::Array(bodies));
     set(&mut out, "display", Value::Object(display_out));
+    set(&mut out, "plane", Value::Object(plane_out));
+    set(
+        &mut out,
+        "dynamics",
+        one_of(system.get("dynamics"), &SYSTEM_DYNAMICS, "kepler"),
+    );
+    set(&mut out, "nbody", Value::Object(nbody_out));
     Value::Object(out)
+}
+
+/// What every placed item may carry: the layer it is on, and the story days it is on
+/// the map between (null: always), each optionally following a timeline event.
+fn set_placement(out: &mut Object, item: &Object) {
+    set(out, "layer", string_or(item.get("layer"), Value::Null));
+    set(out, "from", number_or(item.get("from"), Value::Null));
+    set(out, "until", number_or(item.get("until"), Value::Null));
+    set(
+        out,
+        "fromEvent",
+        string_or(item.get("fromEvent"), Value::Null),
+    );
+    set(
+        out,
+        "untilEvent",
+        string_or(item.get("untilEvent"), Value::Null),
+    );
 }
 
 fn read_line_style(raw: Option<&Value>) -> Value {
     let style = object_or(raw);
     let mut out = style.clone();
-    set(&mut out, "stroke", string_or(style.get("stroke"), Value::Null));
+    set(
+        &mut out,
+        "stroke",
+        string_or(style.get("stroke"), Value::Null),
+    );
     set(&mut out, "width", positive_or(style.get("width"), json!(2)));
-    set(&mut out, "dash", one_of(style.get("dash"), &LINE_DASHES, "solid"));
+    set(
+        &mut out,
+        "dash",
+        one_of(style.get("dash"), &LINE_DASHES, "solid"),
+    );
     set(&mut out, "arrow", bool_or(style.get("arrow"), false));
     Value::Object(out)
 }
@@ -315,24 +773,40 @@ fn read_pin(pin: Object) -> Option<Object> {
     let body = pin.get("body").and_then(Value::as_str).map(str::to_string);
     // Somewhere to be is the one thing a pin cannot do without. (`!body` in JS: an
     // empty string is no body either.)
-    if at.is_none() && body.as_deref().is_none_or(str::is_empty) {
+    if at.is_none() && body.as_deref().map_or(true, str::is_empty) {
         return None;
     }
     let mut out = pin.clone();
     set(&mut out, "name", string_or(pin.get("name"), Value::Null));
     set(&mut out, "doc", string_or(pin.get("doc"), Value::Null));
     set(&mut out, "at", at.unwrap_or(Value::Null));
-    set(&mut out, "body", body.map(Value::String).unwrap_or(Value::Null));
+    set(
+        &mut out,
+        "body",
+        body.map(Value::String).unwrap_or(Value::Null),
+    );
     set(&mut out, "icon", string_or(pin.get("icon"), json!("pin")));
     set(&mut out, "color", string_or(pin.get("color"), Value::Null));
+    set_placement(&mut out, &pin);
     Some(out)
 }
 
 fn read_route(route: Object, pin_ids: &HashSet<String>) -> Option<Object> {
     let mut nodes = Vec::new();
-    for node in route.get("nodes").and_then(Value::as_array).into_iter().flatten() {
-        let Some(node) = node.as_object() else { continue };
-        if node.get("pin").and_then(Value::as_str).is_some_and(|pin| pin_ids.contains(pin)) {
+    for node in route
+        .get("nodes")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(node) = node.as_object() else {
+            continue;
+        };
+        if node
+            .get("pin")
+            .and_then(Value::as_str)
+            .is_some_and(|pin| pin_ids.contains(pin))
+        {
             let mut rest = node.clone();
             rest.remove("at");
             nodes.push(Value::Object(rest));
@@ -352,8 +826,13 @@ fn read_route(route: Object, pin_ids: &HashSet<String>) -> Option<Object> {
     let mut out = route.clone();
     set(&mut out, "name", string_or(route.get("name"), Value::Null));
     set(&mut out, "nodes", Value::Array(nodes));
-    set(&mut out, "smooth", one_of(route.get("smooth"), &ROUTE_SMOOTHING, "linear"));
+    set(
+        &mut out,
+        "smooth",
+        one_of(route.get("smooth"), &ROUTE_SMOOTHING, "linear"),
+    );
     set(&mut out, "style", read_line_style(route.get("style")));
+    set_placement(&mut out, &route);
     Some(out)
 }
 
@@ -373,10 +852,23 @@ fn read_region(region: Object) -> Option<Object> {
     let mut out = region.clone();
     set(&mut out, "name", string_or(region.get("name"), Value::Null));
     set(&mut out, "rings", Value::Array(rings));
-    set(&mut out, "terrain", string_or(region.get("terrain"), Value::Null));
+    set(
+        &mut out,
+        "terrain",
+        string_or(region.get("terrain"), Value::Null),
+    );
     set(&mut out, "fill", string_or(region.get("fill"), Value::Null));
-    set(&mut out, "hatch", one_of(region.get("hatch"), &HATCHES, "none"));
-    set(&mut out, "stroke", string_or(region.get("stroke"), Value::Null));
+    set(
+        &mut out,
+        "hatch",
+        one_of(region.get("hatch"), &HATCHES, "none"),
+    );
+    set(
+        &mut out,
+        "stroke",
+        string_or(region.get("stroke"), Value::Null),
+    );
+    set_placement(&mut out, &region);
     Some(out)
 }
 
@@ -392,8 +884,16 @@ fn read_multipliers(raw: Option<&Value>) -> Value {
 
 fn read_terrain(terrain: Object) -> Object {
     let mut out = terrain.clone();
-    set(&mut out, "name", string_or(terrain.get("name"), terrain["id"].clone()));
-    set(&mut out, "multipliers", read_multipliers(terrain.get("multipliers")));
+    set(
+        &mut out,
+        "name",
+        string_or(terrain.get("name"), terrain["id"].clone()),
+    );
+    set(
+        &mut out,
+        "multipliers",
+        read_multipliers(terrain.get("multipliers")),
+    );
     out
 }
 
@@ -408,25 +908,91 @@ fn read_label(label: Object, route_ids: &HashSet<String>) -> Option<Object> {
     set(&mut out, "text", string_or(label.get("text"), json!("")));
     set(&mut out, "at", at.unwrap_or(Value::Null));
     set(&mut out, "route", route);
-    set(&mut out, "path", if path.len() >= 2 { Value::Array(path) } else { Value::Null });
-    set(&mut out, "startOffset", clamped_number(label.get("startOffset"), 0.5, 0.0, 1.0));
+    set(
+        &mut out,
+        "path",
+        if path.len() >= 2 {
+            Value::Array(path)
+        } else {
+            Value::Null
+        },
+    );
+    set(
+        &mut out,
+        "startOffset",
+        clamped_number(label.get("startOffset"), 0.5, 0.0, 1.0),
+    );
     set(&mut out, "size", positive_or(label.get("size"), json!(18)));
-    set(&mut out, "rotation", number_or(label.get("rotation"), json!(0)));
-    set(&mut out, "font", string_or(label.get("font"), json!("serif")));
-    set(&mut out, "minZoom", number_or(label.get("minZoom"), json!(0)));
-    set(&mut out, "maxZoom", positive_or(label.get("maxZoom"), Value::Null));
+    set(
+        &mut out,
+        "rotation",
+        number_or(label.get("rotation"), json!(0)),
+    );
+    set(
+        &mut out,
+        "font",
+        string_or(label.get("font"), json!("serif")),
+    );
+    set(
+        &mut out,
+        "minZoom",
+        number_or(label.get("minZoom"), json!(0)),
+    );
+    set(
+        &mut out,
+        "maxZoom",
+        positive_or(label.get("maxZoom"), Value::Null),
+    );
+    set_placement(&mut out, &label);
     Some(out)
+}
+
+fn read_layer(layer: Object) -> Object {
+    let mut out = layer.clone();
+    set(
+        &mut out,
+        "name",
+        string_or(layer.get("name"), json!("Layer")),
+    );
+    set(&mut out, "visible", bool_or(layer.get("visible"), true));
+    set(&mut out, "locked", bool_or(layer.get("locked"), false));
+    out
+}
+
+/// A saved view: a name, the camera (kept as written), a day.
+fn read_view(view: Object) -> Object {
+    let mut out = view.clone();
+    set(&mut out, "name", string_or(view.get("name"), json!("View")));
+    set(
+        &mut out,
+        "camera",
+        Value::Object(object_or(view.get("camera")).clone()),
+    );
+    set(&mut out, "day", number_or(view.get("day"), Value::Null));
+    out
 }
 
 fn read_transport(transport: Object) -> Object {
     let fraction_c = finite(transport.get("fractionC"));
     let mut out = transport.clone();
-    set(&mut out, "name", string_or(transport.get("name"), transport["id"].clone()));
+    set(
+        &mut out,
+        "name",
+        string_or(transport.get("name"), transport["id"].clone()),
+    );
     set(&mut out, "kmh", positive_or(transport.get("kmh"), json!(5)));
     let hours = positive_or(transport.get("hoursPerDay"), json!(8));
-    let hours = if hours.as_f64().unwrap_or(8.0) > 24.0 { json!(24) } else { hours };
+    let hours = if hours.as_f64().unwrap_or(8.0) > 24.0 {
+        json!(24)
+    } else {
+        hours
+    };
     set(&mut out, "hoursPerDay", hours);
-    set(&mut out, "medium", one_of(transport.get("medium"), &TRANSPORT_MEDIA, "land"));
+    set(
+        &mut out,
+        "medium",
+        one_of(transport.get("medium"), &TRANSPORT_MEDIA, "land"),
+    );
     let fraction = match fraction_c {
         Some(fraction) if fraction > 0.0 && fraction < 1.0 => transport["fractionC"].clone(),
         _ => Value::Null,
@@ -440,10 +1006,26 @@ fn read_leg(leg: Object, route_ids: &HashSet<String>, pin_ids: &HashSet<String>)
     set(&mut out, "route", reference(leg.get("route"), route_ids));
     set(&mut out, "from", reference(leg.get("from"), pin_ids));
     set(&mut out, "to", reference(leg.get("to"), pin_ids));
-    set(&mut out, "transport", string_or(leg.get("transport"), json!("walk")));
-    set(&mut out, "departDay", number_or(leg.get("departDay"), Value::Null));
+    set(
+        &mut out,
+        "transport",
+        string_or(leg.get("transport"), json!("walk")),
+    );
+    set(
+        &mut out,
+        "departDay",
+        number_or(leg.get("departDay"), Value::Null),
+    );
     let rest = finite(leg.get("restDays")).unwrap_or(0.0);
-    set(&mut out, "restDays", if rest >= 0.0 { number_or(leg.get("restDays"), json!(0)) } else { json!(0) });
+    set(
+        &mut out,
+        "restDays",
+        if rest >= 0.0 {
+            number_or(leg.get("restDays"), json!(0))
+        } else {
+            json!(0)
+        },
+    );
     out
 }
 
@@ -455,11 +1037,29 @@ fn read_traveler(
 ) -> Object {
     let mut out = traveler.clone();
     set(&mut out, "doc", string_or(traveler.get("doc"), Value::Null));
-    set(&mut out, "name", string_or(traveler.get("name"), Value::Null));
-    set(&mut out, "color", string_or(traveler.get("color"), Value::Null));
-    set(&mut out, "startPin", reference(traveler.get("startPin"), pin_ids));
-    set(&mut out, "startDay", number_or(traveler.get("startDay"), json!(0)));
-    let legs = read_list(traveler.get("legs"), next_id, &mut |leg, _| Some(read_leg(leg, route_ids, pin_ids)));
+    set(
+        &mut out,
+        "name",
+        string_or(traveler.get("name"), Value::Null),
+    );
+    set(
+        &mut out,
+        "color",
+        string_or(traveler.get("color"), Value::Null),
+    );
+    set(
+        &mut out,
+        "startPin",
+        reference(traveler.get("startPin"), pin_ids),
+    );
+    set(
+        &mut out,
+        "startDay",
+        number_or(traveler.get("startDay"), json!(0)),
+    );
+    let legs = read_list(traveler.get("legs"), next_id, &mut |leg, _| {
+        Some(read_leg(leg, route_ids, pin_ids))
+    });
     set(&mut out, "legs", Value::Array(legs));
     out
 }
@@ -472,7 +1072,11 @@ fn read_ornament(raw: Option<&Value>, show: bool, at: [f64; 2], extra: &[(&str, 
         set(&mut out, key, value.clone());
     }
     set(&mut out, "show", bool_or(ornament.get("show"), show));
-    set(&mut out, "at", read_point(ornament.get("at")).unwrap_or_else(|| json!(at)));
+    set(
+        &mut out,
+        "at",
+        read_point2(ornament.get("at")).unwrap_or_else(|| json!(at)),
+    );
     Value::Object(out)
 }
 
@@ -481,7 +1085,11 @@ fn read_style(raw: Option<&Value>) -> Value {
     let compass = object_or(style.get("compass"));
     let cartouche = object_or(style.get("cartouche"));
     let mut out = style.clone();
-    set(&mut out, "theme", one_of(style.get("theme"), &MAP_THEMES, "clean"));
+    set(
+        &mut out,
+        "theme",
+        one_of(style.get("theme"), &MAP_THEMES, "clean"),
+    );
     set(
         &mut out,
         "compass",
@@ -495,7 +1103,11 @@ fn read_style(raw: Option<&Value>) -> Value {
             ],
         ),
     );
-    set(&mut out, "scaleBar", read_ornament(style.get("scaleBar"), true, [0.05, 0.94], &[]));
+    set(
+        &mut out,
+        "scaleBar",
+        read_ornament(style.get("scaleBar"), true, [0.05, 0.94], &[]),
+    );
     set(
         &mut out,
         "cartouche",
@@ -505,9 +1117,22 @@ fn read_style(raw: Option<&Value>) -> Value {
             [0.08, 0.08],
             &[
                 ("title", string_or(cartouche.get("title"), Value::Null)),
-                ("subtitle", string_or(cartouche.get("subtitle"), Value::Null)),
+                (
+                    "subtitle",
+                    string_or(cartouche.get("subtitle"), Value::Null),
+                ),
             ],
         ),
+    );
+    set(
+        &mut out,
+        "legend",
+        read_ornament(style.get("legend"), false, [0.05, 0.16], &[]),
+    );
+    set(
+        &mut out,
+        "look",
+        one_of(style.get("look"), &SPACE_LOOKS, "cinematic"),
     );
     Value::Object(out)
 }
@@ -534,36 +1159,73 @@ pub fn normalize_map_with(raw: &Value, mut next_id: impl FnMut() -> String) -> V
 
     let pins = read_list(source.get("pins"), next_id, &mut |pin, _| read_pin(pin));
     let pin_ids = ids_of(&pins);
-    let routes = read_list(source.get("routes"), next_id, &mut |route, _| read_route(route, &pin_ids));
+    let routes = read_list(source.get("routes"), next_id, &mut |route, _| {
+        read_route(route, &pin_ids)
+    });
     let route_ids = ids_of(&routes);
 
     let mut out = source.clone();
     set(&mut out, "type", json!("map"));
     set(&mut out, "formatVersion", json!(MAP_FORMAT_VERSION));
-    set(&mut out, "mapKind", one_of(source.get("mapKind"), &MAP_KINDS, "blank"));
+    set(
+        &mut out,
+        "mapKind",
+        one_of(source.get("mapKind"), &MAP_KINDS, "blank"),
+    );
     set(&mut out, "scale", read_scale(source.get("scale")));
-    set(&mut out, "background", read_background(source.get("background")));
+    set(
+        &mut out,
+        "background",
+        read_background(source.get("background")),
+    );
     set(&mut out, "earth", read_earth(source.get("earth")));
-    set(&mut out, "system", read_system(source.get("system"), next_id));
+    set(&mut out, "surface", read_surface(source.get("surface")));
+    set(
+        &mut out,
+        "system",
+        read_system(source.get("system"), next_id),
+    );
+    set(&mut out, "galaxy", read_galaxy(source.get("galaxy")));
+    set(&mut out, "universe", read_universe(source.get("universe")));
+    set(&mut out, "model", read_model(source.get("model")));
     set(&mut out, "pins", Value::Array(pins));
     set(&mut out, "routes", Value::Array(routes));
-    let regions = read_list(source.get("regions"), next_id, &mut |region, _| read_region(region));
+    let regions = read_list(source.get("regions"), next_id, &mut |region, _| {
+        read_region(region)
+    });
     set(&mut out, "regions", Value::Array(regions));
-    let terrains = read_list(source.get("terrains"), next_id, &mut |terrain, _| Some(read_terrain(terrain)));
+    let terrains = read_list(source.get("terrains"), next_id, &mut |terrain, _| {
+        Some(read_terrain(terrain))
+    });
     set(&mut out, "terrains", Value::Array(terrains));
-    let labels = read_list(source.get("labels"), next_id, &mut |label, _| read_label(label, &route_ids));
+    let labels = read_list(source.get("labels"), next_id, &mut |label, _| {
+        read_label(label, &route_ids)
+    });
     set(&mut out, "labels", Value::Array(labels));
-    let transports =
-        read_list(source.get("transports"), next_id, &mut |transport, _| Some(read_transport(transport)));
+    let transports = read_list(source.get("transports"), next_id, &mut |transport, _| {
+        Some(read_transport(transport))
+    });
     set(&mut out, "transports", Value::Array(transports));
     let travelers = read_list(source.get("travelers"), next_id, &mut |traveler, ids| {
         Some(read_traveler(traveler, &route_ids, &pin_ids, ids))
     });
     set(&mut out, "travelers", Value::Array(travelers));
+    let layers = read_list(source.get("layers"), next_id, &mut |layer, _| {
+        Some(read_layer(layer))
+    });
+    set(&mut out, "layers", Value::Array(layers));
+    let views = read_list(source.get("views"), next_id, &mut |view, _| {
+        Some(read_view(view))
+    });
+    set(&mut out, "views", Value::Array(views));
 
     let timeline = object_or(source.get("timeline"));
     let mut timeline_out = timeline.clone();
-    set(&mut timeline_out, "day", number_or(timeline.get("day"), json!(0)));
+    set(
+        &mut timeline_out,
+        "day",
+        number_or(timeline.get("day"), json!(0)),
+    );
     set(&mut out, "timeline", Value::Object(timeline_out));
     set(&mut out, "style", read_style(source.get("style")));
     set(&mut out, "viewport", read_map_viewport(raw));
@@ -574,11 +1236,18 @@ pub fn normalize_map_with(raw: &Value, mut next_id: impl FnMut() -> String) -> V
 pub fn new_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|elapsed| elapsed.as_nanos()).unwrap_or(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or(0);
     let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    format!("{:016x}", (nanos as u64) ^ count.wrapping_mul(0x9e37_79b9_7f4a_7c15))
+    format!(
+        "{:016x}",
+        (nanos as u64) ^ count.wrapping_mul(0x9e37_79b9_7f4a_7c15)
+    )
 }
 
+/// [`normalize_map_with`], drawing new ids at random.
 pub fn normalize_map(raw: &Value) -> Value {
     normalize_map_with(raw, new_id)
 }
@@ -595,7 +1264,11 @@ pub fn is_map_payload(raw: Option<&Value>) -> bool {
 
 /// A new, empty map of `map_kind` (anything unknown is `blank`).
 pub fn create_empty_map(map_kind: &str) -> Value {
-    let kind = if MAP_KINDS.contains(&map_kind) { map_kind } else { "blank" };
+    let kind = if MAP_KINDS.contains(&map_kind) {
+        map_kind
+    } else {
+        "blank"
+    };
     let mut base = json!({ "mapKind": kind });
     if kind == "blank" {
         base["background"] = json!({ "width": BLANK_SHEET_WIDTH, "height": BLANK_SHEET_HEIGHT });
@@ -608,28 +1281,55 @@ pub fn create_empty_map(map_kind: &str) -> Value {
 /// Every piece of text written onto a map — names, labels and the cartouche — in the
 /// order `count_map_words` and `map_text` read them.
 fn map_strings(map: &Value) -> Vec<&str> {
-    let Some(object) = map.as_object() else { return Vec::new() };
+    let Some(object) = map.as_object() else {
+        return Vec::new();
+    };
     let mut out = Vec::new();
     for key in ["pins", "routes", "regions", "travelers"] {
-        for item in object.get(key).and_then(Value::as_array).into_iter().flatten() {
-            if let Some(name) = item.as_object().and_then(|item| item.get("name")).and_then(Value::as_str) {
+        for item in object
+            .get(key)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(name) = item
+                .as_object()
+                .and_then(|item| item.get("name"))
+                .and_then(Value::as_str)
+            {
                 out.push(name);
             }
         }
     }
-    for label in object.get("labels").and_then(Value::as_array).into_iter().flatten() {
-        if let Some(text) = label.as_object().and_then(|label| label.get("text")).and_then(Value::as_str) {
+    for label in object
+        .get("labels")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        if let Some(text) = label
+            .as_object()
+            .and_then(|label| label.get("text"))
+            .and_then(Value::as_str)
+        {
             out.push(text);
         }
     }
     let cartouche = object_or(object_or(object.get("style")).get("cartouche"));
-    out.extend(["title", "subtitle"].into_iter().filter_map(|key| cartouche.get(key).and_then(Value::as_str)));
+    out.extend(
+        ["title", "subtitle"]
+            .into_iter()
+            .filter_map(|key| cartouche.get(key).and_then(Value::as_str)),
+    );
     out
 }
 
 /// Words written onto a map — names and labels. Mirrors `count_canvas_words`.
 pub fn count_map_words(map: &Value) -> u32 {
-    map_strings(map).into_iter().map(|text| text_words(text).len()).sum::<usize>() as u32
+    map_strings(map)
+        .into_iter()
+        .map(|text| text_words(text).len())
+        .sum::<usize>() as u32
 }
 
 /// The text written onto a map, space-separated — what filtering a map's history
@@ -638,17 +1338,28 @@ pub fn map_text(map: &Value) -> String {
     map_strings(map).join(" ")
 }
 
-/// Every doc the map links to, deduplicated, in first-seen order.
+/// Every doc the map links to — pins, travellers, bodies' surfaces — deduplicated,
+/// in first-seen order.
 pub fn map_doc_refs(map: &Value) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    for key in ["pins", "travelers"] {
-        for item in map.get(key).and_then(Value::as_array).into_iter().flatten() {
-            if let Some(doc) = non_empty_string(item.get("doc")) {
-                if !out.iter().any(|seen| seen == doc) {
-                    out.push(doc.to_string());
-                }
+    let mut add = |path: Option<&str>| {
+        if let Some(path) = path {
+            if !out.iter().any(|seen| seen == path) {
+                out.push(path.to_string());
             }
         }
+    };
+    for key in ["pins", "travelers"] {
+        for item in map.get(key).and_then(Value::as_array).into_iter().flatten() {
+            add(non_empty_string(item.get("doc")));
+        }
+    }
+    let bodies = map
+        .get("system")
+        .and_then(|system| system.get("bodies"))
+        .and_then(Value::as_array);
+    for body in bodies.into_iter().flatten() {
+        add(non_empty_string(body.get("surface")));
     }
     out
 }
@@ -702,7 +1413,10 @@ mod tests {
         });
         let map = normalize_map_with(&raw, counter());
         assert_eq!(map["routes"].as_array().unwrap().len(), 1);
-        assert_eq!(map["routes"][0]["nodes"], json!([{ "pin": "a" }, { "at": [9, 9] }]));
+        assert_eq!(
+            map["routes"][0]["nodes"],
+            json!([{ "pin": "a" }, { "at": [9, 9] }])
+        );
         let traveler = &map["travelers"][0];
         assert_eq!(traveler["id"], "gen0");
         assert_eq!(traveler["startPin"], Value::Null);
@@ -715,7 +1429,9 @@ mod tests {
         assert!(is_map_payload(None));
         assert!(is_map_payload(Some(&json!(null))));
         assert!(is_map_payload(Some(&json!({ "type": "map" }))));
-        assert!(!is_map_payload(Some(&json!({ "content": [], "notes": [] }))));
+        assert!(!is_map_payload(Some(
+            &json!({ "content": [], "notes": [] })
+        )));
     }
 
     #[test]
@@ -746,7 +1462,11 @@ mod tests {
         );
         let typed: crate::types::MapFile = serde_json::from_value(map).expect("fits the schema");
         assert_eq!(typed.pins.len(), 1);
-        assert_eq!(create_empty_map("blank")["background"]["width"], json!(BLANK_SHEET_WIDTH));
-        serde_json::from_value::<crate::types::MapFile>(create_empty_map("system")).expect("empty fits");
+        assert_eq!(
+            create_empty_map("blank")["background"]["width"],
+            json!(BLANK_SHEET_WIDTH)
+        );
+        serde_json::from_value::<crate::types::MapFile>(create_empty_map("system"))
+            .expect("empty fits");
     }
 }

@@ -11,16 +11,19 @@ import { createEmptyCanvas } from './canvasModel'
 import { stripDocSuffix, withDocSuffix } from './docKind'
 import { saveMapDocument } from './map/mapFileSystem'
 import { createEmptyMap } from './map/mapModel'
+import { saveTimelineView } from './timeline/timelineFileSystem'
+import { createEmptyTimelineView } from './timeline/timelineModel'
 
 /** The kinds a user can create, as the UI lists them. */
 export const DOCUMENT_KINDS = [
-  { id: 'doc', label: 'Document', icon: 'doc.text', hint: 'A page for writing' },
+  { id: 'file', label: 'Document', icon: 'document', hint: 'A page for writing' },
   { id: 'canvas', label: 'Canvas', icon: 'canvas', hint: 'An open board for cards' },
   { id: 'map', label: 'Map', icon: 'map', hint: 'Places, routes and journeys' },
+  { id: 'timeline', label: 'Timeline', icon: 'timeline', hint: 'When everything happens' },
 ]
 
 /** The kind id a caller passes, normalized: the shell says `document`, the page `doc`/`file`. */
-const docKindOf = (kind) => (kind === 'canvas' || kind === 'map' ? kind : 'text')
+const docKindOf = (kind) => (kind === 'canvas' || kind === 'map' || kind === 'timeline' ? kind : 'text')
 
 /** A typed name → the tree name for `kind`: any kind suffix it carries swapped for the right one. */
 export const nameForKind = (name, kind) => withDocSuffix(stripDocSuffix(String(name || '').trim()), docKindOf(kind))
@@ -38,6 +41,8 @@ export async function createDocumentOfKind(projectName, path, kind) {
       return saveCanvasDocument(projectName, path, createEmptyCanvas())
     case 'map':
       return saveMapDocument(projectName, path, createEmptyMap('blank', { setupPending: true }))
+    case 'timeline':
+      return saveTimelineView(projectName, path, createEmptyTimelineView())
     default:
       return saveDocument(projectName, path, { content: [] })
   }

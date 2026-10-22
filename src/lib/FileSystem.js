@@ -3,7 +3,9 @@
  *
  * Storage layout:
  *   <projectRoot>/                      one directory per project
- *   <projectRoot>/<path/to/doc>.json    { content, notes, versions?, archive? }
+ *   <projectRoot>/<path/to/doc>.json    { content, notes, versions?, archive?, locked? }
+ *   <projectRoot>/<folder>/.inkblot-folder.json
+ *                                       { locked: true } on a locked folder (docLocks.ts)
  *   <projectRoot>/.versions/…           canvas version sidecars (a canvas file is
  *                                       spec-shaped JSON Canvas, so its history
  *                                       cannot ride inside it); also read as the
@@ -31,8 +33,8 @@ import {
   remove,
 } from '@tauri-apps/plugin-fs'
 import { getDocKind, isTextDoc, stripDocSuffix, withDocSuffix } from './docKind'
-import { EDIT_SESSION_ID } from './versionHistory'
 import {
+  FOLDER_FILE,
   ORDER_FILE,
   appDataRoot,
   getProjectRoot,
@@ -51,9 +53,8 @@ import {
   versionsSidecarPath,
 } from './versionStore'
 
-/* This was one 956-line module. Paths, the per-document write lock and version
-   history now live in their own files; they are re-exported here so the call
-   sites that import them from FileSystem keep working. */
+/* Paths, the per-document write lock and version history live in their own modules;
+   they are re-exported so callers can take the whole document layer from here. */
 export { getProjectRoot } from './projectPaths'
 export {
   buildTextVersionEntry,
@@ -84,8 +85,22 @@ import {
 export async function writeDocumentRaw(projectName, docName, data) {
   // Under the document's lock like every other write to it, so something that needs
   // the last write to have landed — a rename, see entryOperations.ts — can wait for it.
-  return withDocLock(projectName, docName, () => writeDocumentUnlocked(projectName, docName, data))
+  return withDocLock(projectName, docName, async () => {
+    const existing = await loadDocument(projectName, docName)
+    await writeDocumentUnlocked(projectName, docName, keepLock(data, existing))
+  })
 }
+
+/**
+ * The writer's lock (docLocks.ts) rides in the document's own file, and no saver
+ * knows about it: each write keeps the flag the file already had. Only
+ * setDocumentLockFlag changes it.
+ */
+const keepLock = (data, existing) => (
+  existing?.locked === true && data && typeof data === 'object' && !('locked' in data)
+    ? { ...data, locked: true }
+    : data
+)
 
 /**
  * writeDocumentRaw, but only when `accepts(existing)` says the file there now may be
@@ -97,7 +112,7 @@ export async function writeDocumentRawIf(projectName, docName, data, accepts) {
   return withDocLock(projectName, docName, async () => {
     const existing = await loadDocument(projectName, docName)
     if (!accepts(existing)) return false
-    await writeDocumentUnlocked(projectName, docName, data)
+    await writeDocumentUnlocked(projectName, docName, keepLock(data, existing))
     return true
   })
 }
@@ -121,6 +136,30 @@ async function writeDocumentUnlocked(projectName, docName, data) {
  * outright rather than silently overwritten with an empty text document — they
  * go through saveCanvasDocument (canvasFileSystem.js) instead.
  */
+/**
+ * Replace only a document's timeline passages (TimelineAnchors.js), keeping its content,
+ * notes and history. Attaching a passage, or dragging where one starts, changes no
+ * text, so the text autosave never hears of it; this writes it on its own.
+ */
+export async function saveDocumentTimeline(projectName, docName, ranges) {
+  if (!isTextDoc(docName)) return false
+  return withDocLock(projectName, docName, async () => {
+    try {
+      const existing = await loadDocument(projectName, docName)
+      if (!existing) return false
+      const { timeline: _previous, ...rest } = existing
+      await writeDocumentUnlocked(projectName, docName, {
+        ...rest,
+        ...(Array.isArray(ranges) && ranges.length ? { timeline: ranges } : {}),
+      })
+      return true
+    } catch (error) {
+      console.error('Failed to save document timeline passages:', error)
+      return false
+    }
+  })
+}
+
 /**
  * Replace only a document's `notes`, preserving its content and version history.
  *
@@ -155,6 +194,17 @@ export async function saveDocumentNotes(projectName, docName, notes) {
   })
 }
 
+const timelineRangesFor = (docData, existing) => {
+  const ranges = Array.isArray(docData.timeline) ? docData.timeline : existing?.timeline
+  return Array.isArray(ranges) && ranges.length ? { timeline: ranges } : {}
+}
+
+/**
+ * Write a text document, carrying forward what the file already holds (versions,
+ * archive, citations, timeline passages, lock), and add a version when `docData`
+ * asks with `_appendVersion`. Refuses any path that is not a text document: a canvas
+ * or map written here would be wiped.
+ */
 export async function saveDocument(projectName, docName, docData) {
   if (!isTextDoc(docName)) {
     console.error(
@@ -207,6 +257,11 @@ export async function saveDocument(projectName, docName, docData) {
           ...(Array.isArray(existing?.archive) && existing.archive.length ? { archive: existing.archive } : {}),
           // So is the document's part of the references (`referenceStore.js`).
           ...(existing?.citations && typeof existing.citations === 'object' ? { citations: existing.citations } : {}),
+          // Passages attached to timeline events (TimelineAnchors.js): the editor's own
+          // when it passes them, otherwise whatever the file had.
+          ...timelineRangesFor(docData, existing),
+          // And the writer's lock (docLocks.ts).
+          ...(existing?.locked === true ? { locked: true } : {}),
         })
       )
 
@@ -245,6 +300,46 @@ export async function createDocumentFromVersion(projectName, docName, version, l
   } catch (e) {
     console.error('[createDocumentFromVersion] failed:', e)
     return null
+  }
+}
+
+/**
+ * Lock or unlock a document (docLocks.ts): `locked: true` in its own file, so the lock
+ * travels with it. Resolves to false when there is no such document.
+ */
+export async function setDocumentLockFlag(projectName, docName, locked) {
+  return withDocLock(projectName, docName, async () => {
+    const existing = await loadDocument(projectName, docName)
+    if (!existing || typeof existing !== 'object') return false
+    const { locked: _previous, ...rest } = existing
+    await writeDocumentUnlocked(projectName, docName, locked ? { ...rest, locked: true } : rest)
+    return true
+  })
+}
+
+/** Lock or unlock a folder: a marker file inside it, which moves with the folder. */
+export async function setFolderLockFlag(projectName, folderPath, locked) {
+  try {
+    const root = await getProjectRoot(projectName)
+    const markerPath = joinPath(root, folderPath, FOLDER_FILE)
+    if (locked) await writeTextFile(markerPath, JSON.stringify({ locked: true }))
+    else if (await exists(markerPath)) await remove(markerPath)
+    return true
+  } catch (error) {
+    console.error('Failed to change the folder lock:', error)
+    return false
+  }
+}
+
+/** Whether a folder holds the locked marker. */
+export async function readFolderLockFlag(projectName, folderPath) {
+  try {
+    const root = await getProjectRoot(projectName)
+    const markerPath = joinPath(root, folderPath, FOLDER_FILE)
+    if (!(await exists(markerPath))) return false
+    return JSON.parse(await readTextFile(markerPath))?.locked === true
+  } catch {
+    return false
   }
 }
 
@@ -385,6 +480,7 @@ export async function linkProject(projectDir) {
   }
 }
 
+/** Delete a project's folder, wherever it lives, and its registry entry. True on success. */
 export async function deleteProject(projectName) {
   try {
     const root = await getProjectRoot(projectName)
@@ -399,6 +495,7 @@ export async function deleteProject(projectName) {
   }
 }
 
+/** The project's new name, or null when it is missing, the name is taken or the rename fails. */
 export async function renameProject(projectName, newName) {
   try {
     const currentName = projectName?.trim()
@@ -410,6 +507,9 @@ export async function renameProject(projectName, newName) {
     const projectExists = await exists(oldRoot)
     if (!projectExists) return null
 
+    // Nothing already answering to the new name, wherever it lives: a project kept
+    // elsewhere is found by its registry entry, not by a folder beside this one.
+    if (await exists(await getProjectRoot(nextName))) return null
     const newRoot = joinPath(parentOf(oldRoot), nextName)
     const targetExists = await exists(newRoot)
     if (targetExists) return null
@@ -527,6 +627,11 @@ async function relocateSidecar(root, fromRel, toRel) {
   }
 }
 
+/**
+ * Remove a file or folder with its version sidecar and attachments. Call it through
+ * `entryOperations`, which closes the panes showing the entry first: a pane's last
+ * autosave would otherwise write the file back.
+ */
 export async function deleteEntry(projectName, entryPath, type = 'file') {
   try {
     const root = await getProjectRoot(projectName)
@@ -590,6 +695,11 @@ export async function duplicateEntry(projectName, entryPath) {
   }
 }
 
+/**
+ * Rename in place, moving the version sidecar, attachments and book entries with it.
+ * Returns the new path, or null on failure. Call it through `entryOperations` (see
+ * `deleteEntry`).
+ */
 export async function renameEntry(projectName, entryPath, newName, type = 'file') {
   try {
     const root = await getProjectRoot(projectName)
@@ -625,6 +735,7 @@ export async function renameEntry(projectName, entryPath, newName, type = 'file'
   }
 }
 
+/** `renameEntry`, into another folder under the same name. */
 export async function moveEntry(projectName, entryPath, targetFolderPath, type = 'file') {
   try {
     const root = await getProjectRoot(projectName)
@@ -671,7 +782,7 @@ export async function listProjectTree(projectName) {
     const dirPath = relativePath ? joinPath(root, relativePath) : root
     const dirExists = await exists(dirPath)
     if (!dirExists) return []
-    let entries = []
+    let entries
     try {
       entries = await readDir(dirPath)
     } catch (e) {

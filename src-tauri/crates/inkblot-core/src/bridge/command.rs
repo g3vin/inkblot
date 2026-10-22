@@ -9,39 +9,47 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-use super::references::{
-    AddReferenceCommand, ChooseReferenceCandidateCommand, CreateReferenceCommand, InsertBibliographyCommand,
-    InsertCitationCommand, ReferenceRef, SetBibliographyOptionsCommand, SetCitationStyleCommand,
-    SetReferenceAttachedCommand, UpdateReferenceCommand,
+use super::common::{
+    Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit,
+    TextAnchor, WritingFormat,
 };
-use super::common::{Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit, TextAnchor, WritingFormat};
-use crate::types::json::JsonValue;
 use super::map::MapCommandRequest;
+use super::print::{
+    AddBookItemCommand, AddProjectFontCommand, ApplyBookStyleCommand, ApplyFormatCommand,
+    ClearBookSetupCommand, EditBookItemCommand, EditCoverSetsCommand, EditEditionsCommand,
+    ExportAgainCommand, ExportAllEditionsCommand, ExportDocumentCommand, GoToPageCommand,
+    ImportScriptCommand, InsertBreakCommand, InsertFootnoteCommand, MeasureBookCommand,
+    MoveBookItemCommand, OpenBookItemCommand, PreviewTypesetVersionCommand, PrintDocumentCommand,
+    RefreshBookChaptersCommand, RemoveBookItemCommand, RenameTypesetVersionCommand,
+    SaveTypesetVersionCommand, ScriptReportCommand, SetAuthorProfileCommand, SetBookCoverCommand,
+    SetBookItemHiddenCommand, SetBookSettingsCommand, SetChapterMetaCommand, SetCoverImageCommand,
+    SetDisplayDensityCommand, SetEditorModeCommand, SetFolderBookOptionsCommand,
+    SetHeadImageCommand, SetPageSetupCommand, SetParagraphTypesetCommand, SetPrintLayoutCommand,
+    SetPrintScopeCommand, SetPrintZoomCommand, SetSceneNumbersCommand, SetTextStyleCommand,
+    SetTypesetDisplayCommand, SetTypesetViewCommand, ShowProofIssueCommand, TypesetVersionRef,
+    UseSetupForBookCommand,
+};
+use super::references::{
+    AddReferenceCommand, ChooseReferenceCandidateCommand, CreateReferenceCommand,
+    InsertBibliographyCommand, InsertCitationCommand, ReferenceRef, SetBibliographyOptionsCommand,
+    SetCitationStyleCommand, SetReferenceAttachedCommand, UpdateReferenceCommand,
+};
 use super::sidebar::{
     AddReplyCommand, ClipboardDropCommand, InsertClipboardEntryCommand, NoteRef,
     RemoveClipboardEntriesCommand, RemoveTilesCommand, RenameVersionCommand,
     ReplaceTileWordCommand, RevealSearchResultCommand, TileRef, UpdateNoteCommand,
     VersionActionCommand,
 };
-use super::tabs::{CloseSplitCommand, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand, OpenInSplitCommand, SetTabOrderCommand, TabRef};
-use crate::types::note::Note;
-use super::print::{
-    ApplyFormatCommand, ClearBookSetupCommand, ExportAgainCommand, ExportDocumentCommand,
-    GoToPageCommand, ImportScriptCommand, InsertBreakCommand, MeasureBookCommand,
-    ScriptReportCommand, SetSceneNumbersCommand, PrintDocumentCommand,
-    RefreshBookChaptersCommand, SetBookSettingsCommand, SetDisplayDensityCommand,
-    SetPageSetupCommand, SetPrintLayoutCommand, SetAuthorProfileCommand,
-    SetBookCoverCommand, SetEditorModeCommand, SetPrintScopeCommand, SetPrintZoomCommand,
-    UseSetupForBookCommand, MoveBookItemCommand, SetBookItemHiddenCommand,
-    AddBookItemCommand, RemoveBookItemCommand, EditBookItemCommand, OpenBookItemCommand,
-    ApplyBookStyleCommand, SetChapterMetaCommand, SetHeadImageCommand,
-    SaveTypesetVersionCommand, TypesetVersionRef, RenameTypesetVersionCommand,
-    PreviewTypesetVersionCommand, SetCoverImageCommand, EditCoverSetsCommand,
-    SetFolderBookOptionsCommand, SetTypesetViewCommand, SetParagraphTypesetCommand,
-    ShowProofIssueCommand, SetTypesetDisplayCommand, AddProjectFontCommand,
-    SetTextStyleCommand, InsertFootnoteCommand, EditEditionsCommand,
-    ExportAllEditionsCommand,
+use super::tabs::{
+    CloseSplitCommand, NewTabCommand, OpenDocInTabCommand, OpenDocInWindowCommand,
+    OpenInSplitCommand, SetTabOrderCommand, TabRef,
 };
+use super::timeline::{
+    AttachTimelineEventCommand, JumpToTimelinePassageCommand, RevealTimelineEventCommand,
+    SetTimeLensCommand, SetTimelineRangeEditingCommand, TimelineCommandRequest,
+};
+use crate::types::json::JsonValue;
+use crate::types::note::Note;
 
 /// A command aimed at an editor with nothing else to say.
 #[typeshare]
@@ -340,10 +348,11 @@ pub enum EntryKind {
     Document,
     Canvas,
     Map,
+    Timeline,
     Folder,
 }
 
-/// Create a document, canvas, map or folder in the open project, and open it if it is
+/// Create a document, canvas, map, timeline or folder in the open project, and open it if it is
 /// not a folder.
 ///
 /// The page does the writing, not the shell, for the same reason as every command
@@ -356,7 +365,7 @@ pub enum EntryKind {
 pub struct CreateEntryCommand {
     /// Tree path of the folder to create in; empty for the project root.
     pub parent_folder: String,
-    /// The bare name. For a canvas or map the page adds the `.canvas` or `.map` suffix.
+    /// The bare name. For a canvas, map or timeline the page adds its suffix.
     pub name: String,
     pub kind: EntryKind,
 }
@@ -399,7 +408,7 @@ pub struct DeleteEntryCommand {
     pub is_folder: bool,
 }
 
-/// Copy a document beside itself as "<name> copy", and open the copy.
+/// Copy a document beside itself as "`<name>` copy", and open the copy.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -484,6 +493,8 @@ pub struct SetWordCountVisibleCommand {
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+// As InboundMessage (envelope.rs): boxing would change the generated TypeScript.
+#[allow(clippy::large_enum_variant)]
 pub enum NativeCommand {
     ApplyMark(ApplyMarkCommand),
     SetColor(SetColorCommand),
@@ -511,6 +522,14 @@ pub enum NativeCommand {
     CanvasRestore(CanvasRestoreCommand),
     /// Run a command on a map (`map.rs`).
     MapCommand(MapCommandRequest),
+    /// Run a command on a timeline view (`timeline.rs`).
+    TimelineCommand(TimelineCommandRequest),
+    /// Attach a passage to a timeline event.
+    AttachTimelineEvent(AttachTimelineEventCommand),
+    JumpToTimelinePassage(JumpToTimelinePassageCommand),
+    RevealTimelineEvent(RevealTimelineEventCommand),
+    SetTimeLens(SetTimeLensCommand),
+    SetTimelineRangeEditing(SetTimelineRangeEditingCommand),
     InsertPlainText(InsertPlainTextCommand),
     CreateEntry(CreateEntryCommand),
     RenameEntry(RenameEntryCommand),
