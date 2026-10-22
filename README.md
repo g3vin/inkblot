@@ -109,5 +109,9 @@ Branch naming, commit messages and the pull request flow are in
 
 ## License
 
-Copyright (c) 2026 Gavin Bowden. All rights reserved. Inkblot is proprietary software;
-see [LICENSE](LICENSE).
+Inkblot is open source under the [Apache License 2.0](LICENSE). Copyright 2026 Gavin
+Bowden and contributors (see [NOTICE](NOTICE)).
+
+The Inkblot name, the ib monogram, the wordmark and the app icon are trademarks and
+aren't covered by the licence. If you distribute a modified version, give it its own
+name and icon; [TRADEMARKS.md](TRADEMARKS.md) has the details.

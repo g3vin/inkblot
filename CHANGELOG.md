@@ -6,6 +6,12 @@ Notable changes to Inkblot. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **License:** Inkblot is open source under the Apache License 2.0. The name and logo
+  stay trademarks; see TRADEMARKS.md. Contributions are signed off under the
+  Developer Certificate of Origin.
+
 ### Added
 
 - **Typeset and Print & Export:** the Finishing layout's Page, Book and Publish tabs

@@ -1,6 +1,7 @@
 # Contributing
 
-Inkblot is proprietary software (see [LICENSE](LICENSE)). These are the working conventions for everyone with access to the repository.
+Inkblot is open source under the [Apache License 2.0](LICENSE). Thank you for helping.
+These are the working conventions for everyone who works on it.
 
 Before changing anything that crosses a boundary (chrome ↔ document surface,
 JavaScript ↔ Rust), read [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -10,6 +11,34 @@ JavaScript ↔ Rust), read [ARCHITECTURE.md](ARCHITECTURE.md).
 Install the prerequisites in the [README](README.md#prerequisites), then `npm install`
 and `npm run tauri dev`. `npm run dev` alone serves the page in a browser, without
 the Tauri commands; `/?design` there is the design showcase.
+
+## Licensing your contribution
+
+By contributing you agree that your work is licensed under the
+[Apache License 2.0](LICENSE), the same as the rest of Inkblot (section 5 of the
+licence). You keep the copyright in what you write. There is no CLA to sign.
+
+To confirm you have the right to contribute it, sign off every commit under the
+[Developer Certificate of Origin](https://developercertificate.org/):
+
+```sh
+git commit -s
+```
+
+This adds a line with your real name and email to the commit message:
+
+```text
+Signed-off-by: Your Name <you@example.com>
+```
+
+- **Only contribute work you have the right to give.** If your employer or school
+  might own what you write, check with them first.
+- **Code from elsewhere** must be under a licence compatible with Apache 2.0 (MIT,
+  BSD, ISC, Apache 2.0, or the OFL for fonts). Keep its notice and say where it came
+  from in the pull request. Nothing GPL, AGPL or under a "non-commercial" licence.
+- **Generated code** follows the same rule. You are responsible for its origin.
+- **The name and logo** aren't covered by the code licence. Forks and rebuilds follow
+  [TRADEMARKS.md](TRADEMARKS.md).
 
 ## Branches
 
@@ -48,7 +77,8 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## Pull requests
 
-1. Rebase on `main` and run the checks in the [README](README.md#checks). CI runs the
+1. Fork the repository (or branch, if you have write access), rebase on `main`, sign
+   off your commits and run the checks in the [README](README.md#checks). CI runs the
    web, Rust and generated-type checks. `npm run test:layout` is local only, so run it
    yourself when you touch `src/print/`.
 2. Fill in the pull request template.
