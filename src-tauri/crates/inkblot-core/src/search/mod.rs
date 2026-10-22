@@ -65,8 +65,7 @@ pub fn build_preview(text: &str, from: usize, to: usize, radius: usize) -> Strin
 /// The last segment of a path, or the whole path when it has none.
 pub fn get_entry_label(path: &str) -> String {
     path.split('/')
-        .filter(|segment| !segment.is_empty())
-        .next_back()
+        .rfind(|segment| !segment.is_empty())
         .unwrap_or(path)
         .to_string()
 }

@@ -110,8 +110,7 @@ pub fn strip_doc_suffix(name: &str) -> String {
 pub fn get_doc_display_name(path: &str) -> String {
     let last = path
         .split('/')
-        .filter(|segment| !segment.is_empty())
-        .next_back()
+        .rfind(|segment| !segment.is_empty())
         .unwrap_or("");
     strip_doc_suffix(last)
 }

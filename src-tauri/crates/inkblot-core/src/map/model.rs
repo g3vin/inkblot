@@ -190,12 +190,15 @@ fn read_points(value: Option<&Value>) -> Vec<Value> {
         .unwrap_or_default()
 }
 
+/// One list item normalized, given the id source for its own children; `None` drops it.
+type ItemNormalizer<'a> = dyn FnMut(Object, &mut dyn FnMut() -> String) -> Option<Object> + 'a;
+
 /// Normalize an array of items that each carry an `id` — see `readList` in JS. The id
 /// is drawn before `normalize_item` runs, so a dropped item still consumes one.
 fn read_list(
     value: Option<&Value>,
     next_id: &mut dyn FnMut() -> String,
-    normalize_item: &mut dyn FnMut(Object, &mut dyn FnMut() -> String) -> Option<Object>,
+    normalize_item: &mut ItemNormalizer,
 ) -> Vec<Value> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();

@@ -1838,7 +1838,7 @@ export interface DocumentText {
 	text: string;
 }
 
-/** Copy a document beside itself as "<name> copy", and open the copy. */
+/** Copy a document beside itself as "`<name>` copy", and open the copy. */
 export interface DuplicateEntryCommand {
 	path: string;
 }

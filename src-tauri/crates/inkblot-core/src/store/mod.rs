@@ -704,8 +704,7 @@ impl ProjectStore {
 
         let name = dir
             .split(['/', '\\'])
-            .filter(|part| !part.is_empty())
-            .next_back()
+            .rfind(|part| !part.is_empty())
             .unwrap_or("");
         // A dotted directory is skipped by list_projects, so linking one would
         // "succeed" into a project that never appears.
@@ -864,7 +863,7 @@ impl ProjectStore {
         Ok(())
     }
 
-    /// Copy a document beside itself as "<name> copy", then "copy 2", …
+    /// Copy a document beside itself as "`<name>` copy", then "copy 2", …
     ///
     /// The bytes are copied verbatim rather than round-tripped through load and save,
     /// because that pair whitelists the keys of a *text* document and would quietly
@@ -915,11 +914,7 @@ impl ProjectStore {
     ) -> Result<Option<String>> {
         let rel = normalize_path(entry_path);
         let target_folder = normalize_path(target_folder_path);
-        let base_name = rel
-            .split('/')
-            .filter(|part| !part.is_empty())
-            .next_back()
-            .unwrap_or("");
+        let base_name = rel.split('/').rfind(|part| !part.is_empty()).unwrap_or("");
         let next_path = if target_folder.is_empty() {
             base_name.to_string()
         } else {

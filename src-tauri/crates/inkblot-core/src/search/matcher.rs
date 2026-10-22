@@ -17,7 +17,7 @@
 //! does not consider `é` a word character.
 //!
 //! So the pattern is **translated** before it is compiled: the eight JS class escapes
-//! are rewritten to the explicit sets JS means by them ([`translate_js_classes`]).
+//! are rewritten to the explicit sets JS means by them (`translate_js_classes`).
 //! What that does not cover is documented on that function, and `npm run parity`
 //! checks the whole matcher against the real `RegExp` over several hundred patterns.
 //!
