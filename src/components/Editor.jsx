@@ -15,7 +15,6 @@ import { loadDocument, listProjects, documentExists } from '../lib/FileSystem'
 import { PROJECT_FILES_CHANGED } from '../lib/projectFiles'
 import { readDetachedTarget } from '../lib/docWindow'
 import { normalizeNotes } from '../lib/noteUtils'
-import Icon from '../ui/Icon.jsx'
 
 import './Editor.css'
 
@@ -27,7 +26,6 @@ import { useEntryOperations } from '../hooks/useEntryOperations'
 import { useClipboardHistory } from '../hooks/useClipboardHistory'
 import {
   CLIPBOARD_PERSIST_KEY,
-  MAX_CLIPBOARD_ENTRIES,
   PERSIST_KEY,
   loadClipboardHistory,
   loadSession,
