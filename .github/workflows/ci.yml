@@ -43,15 +43,23 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      - name: cargo fmt
+        working-directory: src-tauri
+        run: cargo fmt --all --check
       - run: npm ci
       # tauri::generate_context! embeds dist/, so it has to exist before cargo runs.
       - run: npm run build
       - name: cargo build
         working-directory: src-tauri
         run: cargo build --workspace --locked
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: cargo test
         working-directory: src-tauri
         run: cargo test --workspace --locked

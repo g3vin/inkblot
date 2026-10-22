@@ -83,4 +83,5 @@ These must pass before you commit (what each catches: [README → Checks](README
 - `npm run lint` (0 errors and 0 warnings), `npm run lint:design`, `npm run typecheck`,
   `npm test`, `npm run build`
 - When you touch Rust or a mirrored module: `npm run parity`, `npm run types:check`,
-  and `cd src-tauri && cargo build --workspace && cargo test --workspace`
+  `cd src-tauri && cargo build --workspace && cargo test --workspace`, and
+  `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings`

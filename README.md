@@ -83,6 +83,7 @@ Run these before every commit. Each catches failures the others can't. CI
 | `npm run types:check` | The generated TypeScript types are current | A Rust type change that was never regenerated |
 | `npm run test:layout` | Print Layout in real WebKit (needs `playwright-core` and its WebKit; see `tests/layout/run.mjs`) | Page breaks that differ between jsdom and a real browser |
 | `cd src-tauri && cargo build --workspace && cargo test --workspace` | The Rust crates and their tests | Linker errors: `cargo check` does not link |
+| `cd src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings` | Rust formatting and lints | Code rustfmt would rewrite; an API newer than the declared `rust-version` |
 
 The one ignored Rust test runs the rhyme index against the real pronouncing
 dictionary: `INKBLOT_CMUDICT=/path/to/cmudict.dict cargo test -p inkblot-models -- --ignored`.
