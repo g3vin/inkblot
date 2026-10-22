@@ -742,12 +742,11 @@ impl ProjectStore {
 
     /// Returns the new name, or `None` when the project is missing or the name is taken.
     ///
-    /// **Stricter than the JS**, deliberately. `renameProject` only checks whether a
-    /// directory already sits at the new path *inside the same parent*, so a
-    /// custom-located project can be renamed onto a name an AppData project already
-    /// holds. Both then answer to that name, `getProjectRoot` resolves to the registry
-    /// entry, and the AppData project becomes unreachable — the exact stranding
-    /// `link_project` refuses to cause. This checks the name, not just the path.
+    /// The name is checked, not just the path beside the old directory: a
+    /// custom-located project renamed onto an AppData project's name would leave both
+    /// answering to it, the registry entry would win, and the AppData project would be
+    /// unreachable — the stranding `link_project` refuses to cause. `renameProject` in
+    /// JS makes the same check.
     pub fn rename_project(&self, project_name: &str, new_name: &str) -> Result<Option<String>> {
         let (current, next) = (project_name.trim(), new_name.trim());
         if current.is_empty() || next.is_empty() {
