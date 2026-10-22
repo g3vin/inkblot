@@ -770,7 +770,7 @@ fn read_pin(pin: Object) -> Option<Object> {
     let body = pin.get("body").and_then(Value::as_str).map(str::to_string);
     // Somewhere to be is the one thing a pin cannot do without. (`!body` in JS: an
     // empty string is no body either.)
-    if at.is_none() && body.as_deref().is_none_or(str::is_empty) {
+    if at.is_none() && body.as_deref().map_or(true, str::is_empty) {
         return None;
     }
     let mut out = pin.clone();
