@@ -18,7 +18,7 @@ export async function loadManuscriptPassages(projectName, folder = '') {
   const docs = []
   const passages = []
   if (!projectName) return { docs, passages }
-  let paths = []
+  let paths
   try {
     paths = await listBookChapters(projectName, folder)
   } catch (error) {

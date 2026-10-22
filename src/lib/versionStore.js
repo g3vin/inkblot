@@ -194,7 +194,7 @@ async function readVersionStore(projectName, docName) {
     return { root, store: 'sidecar', doc: null, versions: await readSidecarVersions(root, docName) }
   }
 
-  let doc = null
+  let doc
   try {
     const raw = await readTextFile(joinPath(root, `${docName}.json`))
     doc = JSON.parse(raw || '{}')

@@ -779,7 +779,7 @@ export async function listProjectTree(projectName) {
     const dirPath = relativePath ? joinPath(root, relativePath) : root
     const dirExists = await exists(dirPath)
     if (!dirExists) return []
-    let entries = []
+    let entries
     try {
       entries = await readDir(dirPath)
     } catch (e) {

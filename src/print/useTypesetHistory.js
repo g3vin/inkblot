@@ -51,7 +51,6 @@ const bookDocuments = async (projectName, folder, liveContent) => {
 const applyToEditor = (editor, typeset) => {
   const { state } = editor
   const tr = state.tr
-  let orphans = 0
   const found = new Set()
   state.doc.descendants((node, pos) => {
     const id = node.attrs?.typesetId
@@ -64,7 +63,7 @@ const applyToEditor = (editor, typeset) => {
       if (node.attrs[key] !== value) tr.setNodeAttribute(pos, key, value)
     }
   })
-  orphans = Object.keys(typeset?.blocks || {}).filter((id) => !found.has(id)).length
+  const orphans = Object.keys(typeset?.blocks || {}).filter((id) => !found.has(id)).length
   tr.setDocAttribute('pageSetup', typeset?.pageSetup ?? null)
   tr.setDocAttribute('chapter', typeset?.chapter ?? null)
   tr.setMeta(TYPESET_META, true)

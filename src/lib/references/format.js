@@ -208,7 +208,7 @@ export function formatLibrary({ styleId, references }) {
     out.set(entry.id, { entryHtml: entry.html, entryText: htmlToText(entry.html), inText: '' })
   }
   for (const ref of references) {
-    let inText = ''
+    let inText
     try {
       inText = htmlToText(engine.previewCitationCluster(
         { citationItems: [{ id: ref.id }], properties: { noteIndex: spec.noteStyle ? 1 : 0 } }, [], [], 'html'

@@ -92,7 +92,7 @@ const measureImages = async (images, urls) => {
   for (const img of images) {
     const url = urls.get(img.src) || img.src
     let bytes
-    let size = null
+    let size
     try {
       const response = await fetch(url)
       bytes = (await response.blob()).size
