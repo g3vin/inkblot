@@ -23,18 +23,13 @@ const SPEEDS = [
   { value: 365.25, label: '1 year/s' },
 ]
 
-/**
- * Centred in the part of the map the shell's panels leave uncovered (`box`), and to
- * the left of the page's own inspector when that is open.
- */
-function timelinePlacement(box, inspectorOpen) {
-  if (!box?.surfaceWidth) return inspectorOpen ? { left: 'calc(50% - 146px)' } : undefined
-  const reserved = inspectorOpen ? 292 : 0
-  const width = Math.max(0, box.width - reserved)
-  return { left: `${box.left + width / 2}px`, width: `min(720px, ${Math.max(0, width - 40)}px)`, minWidth: 0 }
+/** Centred in the part of the map the shell's panels leave uncovered (`box`). */
+function timelinePlacement(box) {
+  if (!box?.surfaceWidth) return undefined
+  return { left: `${box.left + box.width / 2}px`, width: `min(720px, ${Math.max(0, box.width - 40)}px)`, minWidth: 0 }
 }
 
-export default function MapTimeline({ day, onDay, extent, calendar, conflicts, isSystem, inspectorOpen, box }) {
+export default function MapTimeline({ day, onDay, extent, calendar, conflicts, isSystem, box }) {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(isSystem ? 30 : 1)
   const dayRef = useRef(day)
@@ -95,7 +90,7 @@ export default function MapTimeline({ day, onDay, extent, calendar, conflicts, i
   return (
     <div
       className="map-floating map-timeline"
-      style={timelinePlacement(box, inspectorOpen)}
+      style={timelinePlacement(box)}
       aria-label="Story timeline"
     >
       <div className="map-timeline-row">

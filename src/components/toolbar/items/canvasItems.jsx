@@ -3,10 +3,9 @@
  * while its own toolbar is up (no card being edited) and takes these back as canvas
  * commands by surface id. With no canvas state every item is there but disabled.
  */
-import { useRef, useState } from 'react'
 import { formatDuration } from '../../../lib/audioNotes'
 import { CANVAS_PRESET_INKS } from '../../../lib/palette'
-import { Button, InkPicker, Popover } from '../../../ui'
+import { InkWheel } from '../../../ui'
 import { Glyph, ItemFrame, MenuButton, ToolButton } from '../ToolbarControls'
 
 const command = (ctx, name, detail) => {
@@ -75,30 +74,21 @@ export function CanvasRecordMemoItem({ ctx, spec }) {
 const PRESET_FOR_INK = Object.fromEntries(Object.entries(CANVAS_PRESET_INKS).map(([preset, ink]) => [ink, preset]))
 
 export function CanvasColorItem({ ctx, spec }) {
-  const [open, setOpen] = useState(false)
-  const anchorRef = useRef(null)
-  const apply = (color) => {
-    command(ctx, 'apply-color', color ? { color } : {})
-    setOpen(false)
-  }
+  // JSON Canvas stores its six presets as '1'–'6'; each is one of the inks. The colour
+  // of a mixed selection isn't known, so no ink is marked as the current one.
+  const apply = (ink) => command(ctx, 'apply-color', ink ? { color: PRESET_FOR_INK[ink] } : {})
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <button
-        ref={anchorRef}
-        type="button"
-        aria-label={spec.label}
-        aria-expanded={open}
-        title={spec.label}
+      <InkWheel
+        label={spec.label}
+        value={undefined}
+        inks={Object.values(CANVAS_PRESET_INKS)}
+        none={{ label: 'No colour' }}
+        onChange={apply}
         disabled={!editing(ctx) || !ctx.canvas?.hasSelection}
-        onClick={() => setOpen((was) => !was)}
-      >
-        <Glyph icon="palette" label={spec.label} display={ctx.display} />
-      </button>
-      <Popover anchorRef={anchorRef} open={open} onClose={() => setOpen(false)} align="center" className="tb-canvas-colors">
-        {/* JSON Canvas stores its six presets as '1'–'6'; each is one of the inks. */}
-        <InkPicker label="Card colour" value={null} inks={Object.values(CANVAS_PRESET_INKS)} onChange={(ink) => apply(PRESET_FOR_INK[ink])} />
-        <Button onClick={() => apply(null)}>No colour</Button>
-      </Popover>
+        as="button"
+        triggerProps={{ title: spec.label, children: <Glyph icon="palette" label={spec.label} display={ctx.display} /> }}
+      />
     </ItemFrame>
   )
 }

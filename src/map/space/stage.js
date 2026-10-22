@@ -181,11 +181,19 @@ export function createStage(container, { saved, background, bloomBackground = nu
     sizeComposer()
     camera.aspect = size.width / size.height
     camera.updateProjectionMatrix()
-    invalidate()
   }
-  const observer = new ResizeObserver(resize)
+  // A new size is drawn at once, not on the next frame: resizing the canvas clears
+  // it, and the observer runs before the browser paints, so waiting shows a blank frame.
+  const observer = new ResizeObserver(() => {
+    if (container.clientWidth === size.width && container.clientHeight === size.height) return
+    resize()
+    if (disposed || recording) return
+    cancelAnimationFrame(frame)
+    draw()
+  })
   observer.observe(container)
   resize()
+  invalidate()
 
   /** Glide the camera to look at `target` from `position` (Vector3s). */
   function moveTo(target, position, { duration = 600, onStep } = {}) {

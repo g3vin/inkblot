@@ -1,5 +1,6 @@
 /**
- * MapPanelView.jsx — the map inspector as the page draws it, down the right of a map.
+ * MapPanelView.jsx — the map inspector's form, drawn in the inspector's Map tab
+ * (and down the right of a timeline).
  *
  * It draws the form `useMapPanel` builds, and nothing else: every field calls the
  * handler filed under its id.

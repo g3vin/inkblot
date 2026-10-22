@@ -6,7 +6,8 @@
  * ("1.") never reaches the map.
  */
 import { useEffect, useRef, useState } from 'react'
-import { resolveInkHex } from '../../lib/palette'
+import { INKS, inkColor, isInkId, legacyInkFor, resolveInkHex } from '../../lib/palette'
+import InkWheel from '../../ui/InkWheel.jsx'
 import { MAP_DEFAULT_COLORS } from '../../lib/map/mapColors'
 
 export function Field({ label, children, title }) {
@@ -136,17 +137,33 @@ export function CheckField({ label, checked, onChange }) {
   )
 }
 
+/**
+ * A colour from the ink palette, or the default back. A map stores literal colours (its
+ * content is drawn by SVG, a 2D canvas and exported as GeoJSON), so where the default
+ * is a hex the pick is stored as one; elsewhere (the timeline) as the ink's id.
+ */
 export function ColorField({ label, value, fallback = MAP_DEFAULT_COLORS.pin, onChange }) {
+  const asHex = !isInkId(fallback)
+  const ink = value ? inkFor(value) : null
   return (
     <Field label={label}>
-      <span className="map-row">
-        <input type="color" value={resolveInkHex(value || fallback, resolveInkHex(fallback))} onChange={(event) => onChange(event.target.value)} />
-        {value ? (
-          <button type="button" className="map-button" onClick={() => onChange(null)}>Reset</button>
-        ) : null}
-      </span>
+      <InkWheel
+        label={label}
+        value={value ? ink ?? value : null}
+        none={{ label: 'Default', color: inkColor(fallback) }}
+        onChange={(id) => onChange(id === null ? null : asHex ? resolveInkHex(id) : id)}
+      />
     </Field>
   )
+}
+
+/** The ink a stored colour is: an id, an old palette's hex, or an ink's hex as picked here. */
+const inkFor = (value) => {
+  if (isInkId(value)) return value
+  const legacy = legacyInkFor(value)
+  if (legacy) return legacy
+  const hex = String(value).trim().toLowerCase()
+  return INKS.find((ink) => resolveInkHex(ink.id, '').toLowerCase() === hex)?.id ?? null
 }
 
 export function Section({ title, children, actions }) {
