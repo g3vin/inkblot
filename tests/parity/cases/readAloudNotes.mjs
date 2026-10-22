@@ -61,16 +61,13 @@ const payloadWithoutOffsets = (text) => ({
   words: [...text.matchAll(/\S+/g)].map((match) => ({ text: match[0] })),
 })
 
-/**
- * Objects only. `normalizeNote(note = {})` defaults on `undefined` and not on `null`,
- * so `normalizeNotes([null])` throws in JS — a pre-existing bug on a function
- * documented as safe for untrusted data, and a plausible crash on a corrupt document.
- * The Rust version returns a default note instead; the divergence is pinned by
- * `notes::tests::a_note_that_is_not_an_object_is_still_a_note` rather than compared
- * here, because there is nothing on the JS side to compare against.
- */
+/** Notes as a corrupt or old document might hold them. A non-object is an empty note on both sides. */
 const RAW_NOTES = [
   {},
+  null,
+  'a string',
+  7,
+  ['an', 'array'],
   { id: 'n1' },
   { id: '', type: 'quote', from: 3, to: 9, anchor: 'the quick', content: 'a comment' },
   { id: 'n2', type: 'QUOTE' },

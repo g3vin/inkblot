@@ -361,10 +361,6 @@ harness:
 Deliberate divergences, each documented where it lives:
 - `normalize_canvas` drops an edge whose endpoints are not strings.
 - `diff_canvases` compares parsed content rather than serialized JSON.
-- `store::rename_project` refuses a name any project already holds.
-- `normalize_note` accepts a non-object.
-
-The last two fix bugs the JS still has. Whether to fix the JS too is an open decision.
 
 ## Recipes
 

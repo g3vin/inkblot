@@ -149,6 +149,14 @@ Notable changes to Inkblot. The format follows
   Style"), in the native sidebar as well as the page. Filtering a map's history
   finds versions by the names written on the map.
 
+### Fixed
+
+- **Renaming a project** onto a name another project already holds is refused,
+  wherever that project is kept. Before, a project in a custom folder could be renamed
+  onto an AppData project's name, and the AppData one could no longer be opened.
+- **A document with a damaged note** opens with that note empty, rather than failing
+  to load.
+
 ## [0.1.0] - 2026-09-24
 
 The first tagged version: the writing app, its shared Rust core, and a native Swift
