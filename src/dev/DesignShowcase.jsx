@@ -12,7 +12,7 @@ import { useCommands } from '../lib/commands'
 import {
   AppIcon, Mark, Wordmark,
   Breadcrumb, Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
-  FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, Input, Kbd, Menu, MenuItem,
+  FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, InkWheel, Input, Kbd, Menu, MenuItem,
   MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented,
   SelectMenu, Sheet, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
 } from '../ui'
@@ -40,6 +40,8 @@ export default function DesignShowcase() {
   const [accent, setAccent] = useState(document.documentElement.dataset.accent || 'blue')
   const [tray, setTray] = useState(document.documentElement.dataset.tray || 'blue')
   const [ink, setInk] = useState('amber')
+  const [fill, setFill] = useState(null)
+  const [pinColor, setPinColor] = useState(null)
   const [segment, setSegment] = useState('prose')
   const [dsScope, setDsScope] = useState('document')
   const [dsView, setDsView] = useState('today')
@@ -227,6 +229,23 @@ export default function DesignShowcase() {
           </div>
         </ShowcaseSection>
 
+        <ShowcaseSection title="Ink wheel">
+          {/* Press a dot: the inks bloom round it. Swipe the middle dot onto one to swap,
+              let go to take it; swipe back to undo. */}
+          <div className="ds-row">
+            <InkWheel label="Note colour" value={ink} onChange={setInk} />
+            <InkWheel
+              label="Cell fill"
+              value={fill}
+              none={{ label: 'No fill' }}
+              onChange={setFill}
+              as={IconButton}
+              triggerProps={{ icon: 'cell-fill', label: 'Cell fill', filled: Boolean(fill) }}
+            />
+            <InkWheel label="Pin colour" value={pinColor} none={{ label: 'Default', color: inkVar('rust') }} onChange={setPinColor} />
+          </div>
+        </ShowcaseSection>
+
         <ShowcaseSection title="Menus, popovers, dialogs">
           <div className="ds-row">
             <Button ref={menuRef} variant="tinted" onClick={() => setMenu(!menu)}>More <Icon name="chevron-down" /></Button>
@@ -238,10 +257,10 @@ export default function DesignShowcase() {
               <MenuSeparator />
               <MenuItem icon="delete" danger>Delete note</MenuItem>
             </Menu>
-            <Button ref={popRef} variant="tinted" onClick={() => setPopover(!popover)}><Icon name="palette" /> Note colour</Button>
-            <Popover open={popover} onClose={() => setPopover(false)} anchorRef={popRef} aria-label="Note colour">
-              <p className="ib-eyebrow ds-pop-label">Note colour</p>
-              <InkPicker label="Note colour" value={ink} onChange={setInk} />
+            <Button ref={popRef} variant="tinted" onClick={() => setPopover(!popover)}><Icon name="palette" /> Folder colour</Button>
+            <Popover open={popover} onClose={() => setPopover(false)} anchorRef={popRef} aria-label="Folder colour">
+              <p className="ib-eyebrow ds-pop-label">Folder colour</p>
+              <InkPicker label="Folder colour" value={ink} onChange={setInk} />
             </Popover>
             <Button variant="tinted" onClick={() => setDialog(true)}>Open dialog</Button>
             <Button variant="tinted" onClick={() => setSheet(true)}>Open sheet</Button>

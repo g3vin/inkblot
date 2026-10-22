@@ -279,10 +279,10 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   The tracer runs in a module worker and falls back to the main thread if the worker
   will not start under `inkblot://`.
 - **The inspector is a form the page builds** (`useMapPanel`, `inspector/panelBuilder.js`):
-  sections of typed fields named by id (`MapPanel`, `bridge/map.rs`), drawn by the
-  map's floating panel and the inspector's Map tab (`MapPanelView.jsx`), each edit sent
+  sections of typed fields named by id (`MapPanel`, `bridge/map.rs`), drawn in the
+  inspector's Map tab (`MapPanelView.jsx`), each edit sent
   back as `mapCommand { panel-field | panel-action, id }`. Add a field in the builder
-  and both have it; add a field *type* in `map.rs` and draw it in `MapPanelView`.
+  and the tab has it; add a field *type* in `map.rs` and draw it in `MapPanelView`.
 - **What a map draws over itself** — the scale bar, compass, title, key, tool hint and
   timeline — is placed in `useVisibleBox`.
 - **Hidden means not drawn.** Layers and an item's days (`from`, `until`, or the

@@ -29,7 +29,6 @@ const { createRoot } = await import('react-dom/client')
 const MapPane = (await import('../../src/map/MapPane.jsx')).default
 const ToolbarHost = (await import('../../src/components/toolbar/ToolbarHost.jsx')).default
 const MapInspectorPanel = (await import('../../src/components/RightSidebar/MapInspectorPanel.jsx')).default
-const { setInspectorOpen } = await import('../../src/lib/inspectorPresence.js')
 const { documentSurface } = await import('../../src/bridge/index.ts')
 const { mapDelegates } = await import('../../src/bridge/mapDelegates.ts')
 // As EditorCanvas installs them: a map command finds its map by surface id.
@@ -81,15 +80,8 @@ ok('a finished map does not ask what it is', !document.querySelector('.map-setup
 /* ---- the inspector's Map tab ---- */
 
 const tabPanel = () => document.querySelector('.test-inspector .map-inspector')
-const floating = () => document.querySelector('.map-surface .map-inspector')
-ok('the Map tab draws the map’s panel from what it publishes', !!tabPanel()
-  && tabPanel().querySelector('.map-inspector-header')?.textContent === floating()?.querySelector('.map-inspector-header')?.textContent)
-await act(async () => { setInspectorOpen(true) })
-await settle()
-ok('with the window’s inspector open, the map floats no panel of its own', !floating() && !!tabPanel())
-await act(async () => { setInspectorOpen(false) })
-await settle()
-ok('and floats it again once the inspector shuts', !!floating())
+ok('the Map tab draws the map’s panel from what it publishes', !!tabPanel()?.querySelector('.map-inspector-header')?.textContent)
+ok('the map floats no panel of its own', !document.querySelector('.map-surface .map-inspector'))
 
 /* ---- place a pin with the tool bar ---- */
 

@@ -27,6 +27,7 @@ export { Panel, PanelHeader, PanelBody, FadeScrim, Card, Tag, EmptyState, Tabs }
 export { Inlay, InlaySlot } from './Inlay.jsx'
 export { PanelActions, PanelActionsProvider, ScopeMenu, MoreMenu } from './PanelActions.jsx'
 export { default as InkPicker } from './InkPicker.jsx'
+export { default as InkWheel } from './InkWheel.jsx'
 export { default as CommandPalette } from './CommandPalette.jsx'
 export { default as useNativeMenu, popUpNativeMenu, installHelpContextMenu } from './useNativeMenu.js'
 export { default as usePointerReorder, insertionIndex, moveTo } from './usePointerReorder.js'

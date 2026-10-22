@@ -18,8 +18,8 @@ speaks. The short version:
 
 - Build from the primitives in `src/ui/` (`Button`, `IconButton`, `Segmented`, `Menu`,
   `Popover`, `Sheet`, `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`,
-  `Panel`, `Card`, `EmptyState`, `InkPicker`, `FloatingCapsule`, …). Don't restyle bare
-  elements or write one-off modals, menus or colour pickers.
+  `Panel`, `Card`, `EmptyState`, `InkWheel`, `InkPicker`, `FloatingCapsule`, …). Don't
+  restyle bare elements or write one-off modals, menus or colour pickers.
 - Never hard-code a colour, font, radius or shadow. Use the tokens in
   `src/styles/tokens.css`. Anything a writer colours uses an ink id from
   `src/lib/palette.ts`, drawn with `inkColor()`.

@@ -7,6 +7,7 @@
  * `insets` is how much of the window's edges something floating covers; none, today.
  */
 import { useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 const NO_INSETS = Object.freeze({ leading: 0, trailing: 0, top: 0 })
 
@@ -20,7 +21,7 @@ export function useVisibleBox(surfaceRef, insets = NO_INSETS) {
   useEffect(() => {
     const element = surfaceRef.current
     if (!element) return undefined
-    const measure = () => {
+    const measure = (sync = false) => {
       const rect = element.getBoundingClientRect()
       const viewWidth = document.documentElement.clientWidth || window.innerWidth
       // The panels cover the web view's edges; clip them to this surface, which in a
@@ -36,15 +37,20 @@ export function useVisibleBox(surfaceRef, insets = NO_INSETS) {
         surfaceWidth: element.clientWidth,
         surfaceHeight: element.clientHeight,
       }
-      setBox((current) => (same(current, next) ? current : next))
+      const update = () => setBox((current) => (same(current, next) ? current : next))
+      if (sync) flushSync(update)
+      else update()
     }
+    // A resize is rendered before the browser paints it, or what sits on the map
+    // trails the map by a frame and flickers while the window is dragged.
+    const onResize = () => measure(true)
     measure()
-    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null
     observer?.observe(element)
-    window.addEventListener('resize', measure)
+    window.addEventListener('resize', onResize)
     return () => {
       observer?.disconnect()
-      window.removeEventListener('resize', measure)
+      window.removeEventListener('resize', onResize)
     }
   }, [insets.leading, insets.top, insets.trailing, surfaceRef])
 

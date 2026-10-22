@@ -44,9 +44,6 @@ import { nearestOnPolyline } from '../lib/map/mapGeometry'
 import MapLayers, { MapDefs } from './MapLayers'
 import { earthLevelFor } from './mapRender'
 import { MAP_TOOLS, TOOL_HINTS, formatZoom } from './mapOptions'
-import MapPanelView from './MapPanelView'
-import Icon from '../ui/Icon.jsx'
-import { useInspectorOpen } from '../lib/inspectorPresence'
 import { useMapPanel } from './inspector/useMapPanel'
 import { runPanelCommand } from './inspector/panelBuilder'
 import MapTimeline from './MapTimeline'
@@ -141,13 +138,9 @@ export default function MapSurface({
   const [draft, setDraft] = useState(null)
   const [hover, setHover] = useState(null)
   const [focusBody, setFocusBody] = useState(null)
-  const [inspectorOpen, setInspectorOpen] = useState(true)
-  // Under a shell that draws the inspector, asking for it is a count it watches.
+  // The map's panel is the window inspector's Map tab; asking for it is a count it watches.
   const [revealPanel, setRevealPanel] = useState(0)
-  const showInspector = useCallback(() => {
-    setInspectorOpen(true)
-    setRevealPanel((count) => count + 1)
-  }, [])
+  const showInspector = useCallback(() => setRevealPanel((count) => count + 1), [])
   const [renameRequest, setRenameRequest] = useState(0)
   const [isPanning, setIsPanning] = useState(false)
   const [calibration, setCalibration] = useState(null)
@@ -1438,10 +1431,6 @@ export default function MapSurface({
   const hint = TOOL_HINTS[tool]
     ? draft?.tool === tool && draft.nodes.length ? TOOL_HINTS[`${tool}-drawing`] || TOOL_HINTS[tool] : TOOL_HINTS[tool]
     : null
-  // The map's own floating panel: only while the window's inspector is shut. With it
-  // open the panel is the inspector's Map tab (MapInspectorPanel), from what is published.
-  const windowInspector = useInspectorOpen()
-  const pageInspector = !windowInspector && inspectorOpen
 
   const { surfaceRef, worldRef, viewportRef, viewport, settledZoom } = view
   // Whether the view can film itself is the stage's to say; it answers once it is up.
@@ -1575,28 +1564,12 @@ export default function MapSurface({
 
       <MapChrome map={map} projector={projector} space={space} viewport={viewport} box={box} bearing={isGlobe ? globeView.camera.bearing : 0} day={day} />
 
-      {!windowInspector && !inspectorOpen ? (
-        <button
-          type="button"
-          className="map-floating map-inspector-toggle"
-          title="Show the inspector"
-          aria-label="Show the inspector"
-          onClick={() => setInspectorOpen(true)}
-        >
-          <Icon name="sidebar" />
-        </button>
-      ) : null}
-
       {hint ? (
         <div
           className="map-floating map-hint"
         >
           {hint}
         </div>
-      ) : null}
-
-      {pageInspector ? (
-        <MapPanelView panel={mapPanel.panel} handlers={mapPanel.handlers} onClose={() => setInspectorOpen(false)} />
       ) : null}
 
       {showTimeline ? (
@@ -1607,7 +1580,6 @@ export default function MapSurface({
           calendar={calendar}
           conflicts={conflicts}
           isSystem={isSystem}
-          inspectorOpen={pageInspector}
           box={box}
         />
       ) : null}

@@ -12,14 +12,14 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import Icon from '../ui/Icon.jsx'
-import InkPicker from '../ui/InkPicker.jsx'
+import InkWheel from '../ui/InkWheel.jsx'
 import { useNoteCardDrag } from '../hooks/useNoteCardDrag'
 import NoteImageGallery from './NoteImageGallery'
 import { AudioClipList, AudioRecordButton } from './AudioNotes'
 import { pickNoteImages, readClipboardImages } from '../lib/noteImageUtils'
 import { trafficLightsBox } from '../lib/trafficLights'
 import { NOTE_CLOSE_MS, NOTE_POP_MS, STRING_CLOSE_MIN_MS, STRING_MIN_MS, closeSchedule, drawMs, lineStart, openTiming } from '../lib/noteReveal'
-import { NOTE_COLOR_OPTIONS, collectNoteBranchIds, createFreeNote, noteColor, noteInk, touchNote } from '../lib/noteUtils'
+import { NOTE_COLOR_OPTIONS, collectNoteBranchIds, createFreeNote, isNoteEmpty, noteColor, noteInk, touchNote } from '../lib/noteUtils'
 import {
   NOTE_HIGHLIGHT_EVENT,
   NOTE_PREVIEW_ENTER_EVENT,
@@ -59,6 +59,11 @@ const queryAnchorRect = (noteId, editorView) => {
 
 // The reveal's timing and the closing's (drawMs, lineStart, openTiming, closeSchedule)
 // are shared with the notes panel: lib/noteReveal.
+
+const NOTE_COLOR_TRIGGER = {
+  className: 'note-tool-btn note-preview-tool note-preview-color',
+  children: <span className="note-preview-color-dot" aria-hidden="true" />,
+}
 
 export default function NoteHoverPreview({
   notesByDoc = {},
@@ -129,20 +134,6 @@ export default function NoteHoverPreview({
   // the strings run between the centres of the cards as drawn, and stop at their edges.
   const [drawnSizes, setDrawnSizes] = useState({})
   const layerRef = useRef(null)
-  const [colorNoteId, setColorNoteId] = useState(null)
-
-  // The colour picker: its own colour focused as it opens, closed by a press outside it.
-  useEffect(() => {
-    if (!colorNoteId) return undefined
-    document.querySelector('.note-preview-ink-pill [aria-checked="true"]')?.focus()
-    const close = (event) => {
-      if (event.target instanceof Element && event.target.closest('.note-preview-ink-pill')) return
-      setColorNoteId(null)
-    }
-    window.addEventListener('pointerdown', close, true)
-    return () => window.removeEventListener('pointerdown', close, true)
-  }, [colorNoteId])
-
 
   const clearHideTimeout = useCallback(() => {
     if (hideTimeoutRef.current) {
@@ -363,7 +354,7 @@ export default function NoteHoverPreview({
     const handlePointerDown = (event) => {
       if (!preview?.locked) return
       if (dragStateRef.current) return
-      if (event.target instanceof Element && event.target.closest('.note-preview-card, .note-marker')) {
+      if (event.target instanceof Element && event.target.closest('.note-preview-card, .note-marker, [data-ink-wheel]')) {
         return
       }
       setPreview(null)
@@ -741,10 +732,10 @@ export default function NoteHoverPreview({
   const handleDeleteNote = useCallback(async (noteId) => {
     if (!preview?.docName || !setNotesForDoc) return
 
-    const ok = await confirm('Delete note branch?')
-    if (!ok) return
-
     const branchIds = new Set(collectNoteBranchIds(docNotes, noteId))
+    const blank = docNotes.every((note) => !branchIds.has(note.id) || isNoteEmpty(note))
+    if (!blank && !(await confirm('Delete note branch?'))) return
+
     setNotesForDoc(preview.docName, (currentNotes) => currentNotes.filter((note) => !branchIds.has(note.id)))
 
     if (noteId === rootNote?.id) {
@@ -883,44 +874,15 @@ export default function NoteHoverPreview({
           >
             {/* The band across the top moves the card; a click outside closes it. */}
             <div className="note-preview-header">
-              {colorNoteId === note.id ? (
-                // The note's own colour stays where its dot was; the others run out
-                // to its right in a pill. Picking one, or a press elsewhere, closes it.
-                <div
-                  className="note-preview-ink-pill"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Escape') return
-                    event.stopPropagation()
-                    setColorNoteId(null)
-                  }}
-                >
-                  <InkPicker
-                    label="Note colour"
-                    value={noteInk(note)}
-                    inks={[noteInk(note), ...NOTE_COLOR_OPTIONS.filter((ink) => ink !== noteInk(note))]}
-                    onChange={(ink) => {
-                      updateNote(note.id, (current) => touchNote(current, { color: ink }))
-                      setColorNoteId(null)
-                    }}
-                  />
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="note-tool-btn note-preview-tool note-preview-color"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    lockPreview()
-                    setColorNoteId(note.id)
-                  }}
-                  aria-label="Note colour"
-                  title="Note colour"
-                  aria-expanded={false}
-                >
-                  <span className="note-preview-color-dot" aria-hidden="true" />
-                </button>
-              )}
+              <InkWheel
+                label="Note colour"
+                value={noteInk(note)}
+                inks={NOTE_COLOR_OPTIONS}
+                onOpenChange={(open) => { if (open) lockPreview() }}
+                onChange={(ink) => updateNote(note.id, (current) => touchNote(current, { color: ink }))}
+                as="button"
+                triggerProps={NOTE_COLOR_TRIGGER}
+              />
               <button
                 type="button"
                 className="note-tool-btn note-preview-tool"

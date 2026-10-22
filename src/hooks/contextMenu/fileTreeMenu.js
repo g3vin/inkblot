@@ -10,6 +10,7 @@ import { deleteEntry, duplicateEntry } from '../../lib/entryOperations'
 import { allFolderPresets, openFolderPresets } from '../../lib/folderPresets'
 import { openDocumentWindow } from '../../lib/docWindow'
 import { lockReason, setDocumentLocked, setFolderLocked } from '../../lib/docLocks'
+import { isEntryEmpty } from '../../lib/emptiness'
 
 export async function fileTreeMenu(ctx) {
   const {
@@ -205,7 +206,7 @@ export async function fileTreeMenu(ctx) {
         await MenuItem.new({
           text: 'Delete',
           action: async () => {
-            const ok = await confirmDelete(`Delete "${entryName}"?`)
+            const ok = await isEntryEmpty(projectName, entryPath, entryType) || await confirmDelete(`Delete "${entryName}"?`)
             if (!ok) return
             await deleteEntry(projectName, entryPath, entryType)
             await refreshFiles?.()
@@ -266,7 +267,7 @@ export async function fileTreeMenu(ctx) {
       await MenuItem.new({
         text: isFolder ? 'Delete folder' : 'Delete file',
         action: async () => {
-          const ok = await confirmDelete(`Delete "${entryName}"?`)
+          const ok = await isEntryEmpty(projectName, entryPath, entryType) || await confirmDelete(`Delete "${entryName}"?`)
           if (ok) {
             await deleteEntry(projectName, entryPath, entryType)
             await refreshFiles?.()

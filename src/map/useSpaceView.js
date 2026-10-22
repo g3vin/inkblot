@@ -13,6 +13,7 @@
  * A map without a saved camera calls `onReady` once the scene is up, to be framed.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { readSpaceCamera } from './space/spaceMath'
 
 const IDENTITY = Object.freeze({ x: 0, y: 0, zoom: 1 })
@@ -40,6 +41,7 @@ export function useSpaceView({ surfaceRef, initialCamera, onCameraChange, onRead
   const [api, setApi] = useState(null)
   const [camera, setCamera] = useState(initial)
   const [size, setSize] = useState({ width: 0, height: 0 })
+  const sizeRef = useRef(size)
   const onCameraChangeRef = useRef(onCameraChange)
   const onReadyRef = useRef(onReady)
   useEffect(() => {
@@ -59,8 +61,14 @@ export function useSpaceView({ surfaceRef, initialCamera, onCameraChange, onRead
     if (!cameraRef.current) requestAnimationFrame(() => onReadyRef.current?.())
     return next.subscribe(
       (frame) => {
-        setCamera(frame.camera)
-        setSize((current) => (current.width === frame.width && current.height === frame.height ? current : { width: frame.width, height: frame.height }))
+        const resized = frame.width !== sizeRef.current.width || frame.height !== sizeRef.current.height
+        const update = () => {
+          setCamera(frame.camera)
+          if (resized) setSize((sizeRef.current = { width: frame.width, height: frame.height }))
+        }
+        // A new size is rendered before the paint, so the overlay doesn't trail the scene.
+        if (resized) flushSync(update)
+        else update()
       },
       (settled) => {
         cameraRef.current = settled

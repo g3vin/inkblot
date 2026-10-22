@@ -134,6 +134,9 @@ export default function GlobeView({ view, map, space, day, selection, surfaceRef
         fadeDuration: 150,
         maxTileCacheZoomLevels: 6,
         cancelPendingTileRequestsWhileZooming: true,
+        // Its own tracking redraws at most every 50ms, so a window being dragged wider
+        // shows the old canvas stretched or bare edges between; the observer below doesn't.
+        trackResize: false,
       })
     } catch (error) {
       console.error('[map] the globe could not start:', error)
@@ -141,6 +144,13 @@ export default function GlobeView({ view, map, space, day, selection, surfaceRef
       return undefined
     }
     gl.addControl(new AttributionControl({ compact: true }), 'bottom-left')
+    // Drawn at once: resizing clears the canvas, and the observer runs before the paint.
+    const observer = new ResizeObserver(() => {
+      const canvas = gl.getCanvas()
+      if (container.clientWidth === canvas.clientWidth && container.clientHeight === canvas.clientHeight) return
+      gl.resize().redraw()
+    })
+    observer.observe(container)
     glRef.current = gl
     const detach = view.attach(gl)
     gl.on('error', (event) => console.warn('[map] globe:', event?.error?.message || event))
@@ -155,6 +165,7 @@ export default function GlobeView({ view, map, space, day, selection, surfaceRef
       })
     })
     return () => {
+      observer.disconnect()
       detach?.()
       view.attach(null)
       glRef.current = null

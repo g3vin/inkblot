@@ -187,6 +187,16 @@ export const createClipboardNote = (entry = {}) => {
   return touchNote(note, { images: [{ src: entry.src, mimeType }] })
 }
 
+/**
+ * No words, pictures or voice memos, so deleting it needs no confirmation. A quote
+ * note's anchor is the document's text, not the note's.
+ */
+export const isNoteEmpty = (note) => (
+  !String(note?.content || '').trim()
+  && !(Array.isArray(note?.images) && note.images.length)
+  && !(Array.isArray(note?.audio) && note.audio.length)
+)
+
 /** Collect a note's id plus all descendant note ids (children via parentNoteId). */
 export const collectNoteBranchIds = (notes = [], rootId) => {
   if (!rootId) return []
