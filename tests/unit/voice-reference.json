@@ -1,0 +1,470 @@
+{
+ "about": "misaki 0.9.4, gold dictionary only, no fallback. Regenerate with scripts/dev/misaki-reference.py.",
+ "cases": [
+  {
+   "text": "Hello, world!",
+   "us": "həlˈO, wˈɜɹld!",
+   "gb": "həlˈQ, wˈɜːld!"
+  },
+  {
+   "text": "The lamplighter came down the street at dusk, as he had every evening for thirty years, and the children followed him.",
+   "us": "ðə lˈæmplˌITəɹ kˈAm dˌWn ðə stɹˈit æt dˈʌsk, æz hi hæd ˈɛvəɹi ˈivnɪŋ fɔɹ θˈɜɹTi jˈɪɹz, ænd ðə ʧˈɪldɹᵊn fˈɑlOd hˌɪm.",
+   "gb": "ðə lˈamplˌItə kˈAm dˌWn ðə stɹˈiːt at dˈʌsk, az hiː had ˈɛvəɹi ˈiːvnɪŋ fɔː θˈɜːti jˈɪəz, and ðə ʧˈɪldɹᵊn fˈɒlQd hˌɪm."
+  },
+  {
+   "text": "I don't think it's well-known, but she's been there before.",
+   "us": "ˌI dˈOnt θˈɪŋk ɪts wˌɛlnˈOn, bˌʌt ʃiz bɪn ðɛɹ bəfˈɔɹ.",
+   "gb": "ˌI dˈQnt θˈɪŋk ɪts wˌɛlnˈQn, bˌʌt ʃiːz biːn ðɛː bɪfˈɔː."
+  },
+  {
+   "text": "They'd gone to the market; we hadn't.",
+   "us": "ðˌAd ɡɔn tə ðə mˈɑɹkət; wi hˈædᵊnt.",
+   "gb": "ðˌAd ɡɒn tə ðə mˈɑːkɪt; wiː hˈadᵊnt."
+  },
+  {
+   "text": "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness.",
+   "us": "ˌɪt wʌz ðə bˈɛst ʌv tˈImz, ɪt wʌz ðə wˈɜɹst ʌv tˈImz, ɪt wʌz ði ˈAʤ ʌv wˈɪzdəm, ɪt wʌz ði ˈAʤ ʌv fˈulɪʃnəs.",
+   "gb": "ˌɪt wɒz ðə bˈɛst ɒv tˈImz, ɪt wɒz ðə wˈɜːst ɒv tˈImz, ɪt wɒz ði ˈAʤ ɒv wˈɪzdəm, ɪt wɒz ði ˈAʤ ɒv fˈuːlɪʃnɪs."
+  },
+  {
+   "text": "Call me Ishmael. Some years ago, never mind how long precisely, having little or no money in my purse, I thought I would sail about a little and see the watery part of the world.",
+   "us": "kˈɔl mˌi ˈɪʃmAᵊl. sˌʌm jˈɪɹz əɡˈO, nˈɛvəɹ mˈInd hˌW lˈɔŋ pɹisˈIsli, hˌævɪŋ lˈɪTᵊl ɔɹ nˈO mˈʌni ɪn mI pˈɜɹs, ˌI θˈɔt ˌI wʊd sˈAl əbˈWt ɐ lˈɪTᵊl ænd sˈi ðə wˈɔTəɹi pˈɑɹt ʌv ðə wˈɜɹld.",
+   "gb": "kˈɔːl mˌiː ˈɪʃmAᵊl. sˌʌm jˈɪəz əɡˈQ, nˈɛvə mˈInd hˌW lˈɒŋ pɹɪsˈIsli, hˌavɪŋ lˈɪtᵊl ɔː nˈQ mˈʌni ɪn mI pˈɜːs, ˌI θˈɔːt ˌI wʊd sˈAl əbˈWt ɐ lˈɪtᵊl and sˈiː ðə wˈɔːtəɹi pˈɑːt ɒv ðə wˈɜːld."
+  },
+  {
+   "text": "The rain in Spain stays mainly in the plain.",
+   "us": "ðə ɹˈAn ɪn spˈAn stˈAz mˈAnli ɪn ðə plˈAn.",
+   "gb": "ðə ɹˈAn ɪn spˈAn stˈAz mˈAnli ɪn ðə plˈAn."
+  },
+  {
+   "text": "She sells seashells by the seashore.",
+   "us": "ʃˌi sˈɛlz sˈiʃˌɛlz bI ðə sˈiʃˌɔɹ.",
+   "gb": "ʃˌiː sˈɛlz sˈiːʃɛlz bI ðə sˈiːʃɔː."
+  },
+  {
+   "text": "An apple a day keeps the doctor away.",
+   "us": "ɐn ˈæpᵊl ɐ dˈA kˈips ðə dˈɑktəɹ əwˈA.",
+   "gb": "ɐn ˈapᵊl ɐ dˈA kˈiːps ðə dˈɒktə əwˈA."
+  },
+  {
+   "text": "A quick brown fox jumps over the lazy dog.",
+   "us": "ɐ kwˈɪk bɹˈWn fˈɑks ʤˈʌmps ˈOvəɹ ðə lˈAzi dˈɔɡ.",
+   "gb": "ɐ kwˈɪk bɹˈWn fˈɒks ʤˈʌmps ˈQvə ðə lˈAzi dˈɒɡ."
+  },
+  {
+   "text": "Where are you going? Into the woods.",
+   "us": "wˌɛɹ ɑɹ ju ɡˈOɪŋ? ˈɪntu ðə wˈʊdz.",
+   "gb": "wˌɛː ɑː juː ɡˈQɪŋ? ˈɪntuː ðə wˈʊdz."
+  },
+  {
+   "text": "He walked, then ran, then stopped.",
+   "us": "hˌi wˈɔkt, ðˈɛn ɹˈæn, ðˈɛn stˈɑpt.",
+   "gb": "hˌiː wˈɔːkt, ðˈɛn ɹˈan, ðˈɛn ."
+  },
+  {
+   "text": "The cats' toys were scattered across the children's room.",
+   "us": "ðə kˈæts tˈYz wɜɹ skˈæTəɹd əkɹˈɔs ðə ʧˈɪldɹᵊnz ɹˈum.",
+   "gb": "ðə kˈats tˈYz wɜː skˈatəd əkɹˈɒs ðə ʧˈɪldɹᵊnz ɹˈuːm."
+  },
+  {
+   "text": "It cost $5 and £12.",
+   "us": "ˌɪt kˈɔst fˈIv dˈɑləɹz ænd twˈɛlv pˈWndz.",
+   "gb": "ˌɪt kˈɒst fˈIv dˈɒləz and twˈɛlv pˈWndz."
+  },
+  {
+   "text": "It cost $1.5 million.",
+   "us": "ˌɪt kˈɔst wˈʌn pYnt fˈIv mˈɪljᵊn dˈɑləɹz.",
+   "gb": "ˌɪt kˈɒst wˈʌn pYnt fˈIv mˈɪljən dˈɒləz."
+  },
+  {
+   "text": "Chapter 21 begins on page 304.",
+   "us": "ʧˈæptəɹ twˈɛnti wˈʌn bəɡˈɪnz ˌɔn pˈAʤ θɹˈi hˈʌndɹəd fˈɔɹ.",
+   "gb": "ʧˈaptə twˈɛnti wˈʌn bɪɡˈɪnz ˌɒn pˈAʤ θɹˈiː hˈʌndɹəd fˈɔː."
+  },
+  {
+   "text": "In 1984 there were 1,234 of them.",
+   "us": "ɪn nˌIntˈin ˈATi fˈɔɹ ðɛɹ wɜɹ wˈʌn θˈWzᵊnd tˈu hˈʌndɹəd θˈɜɹTi fˈɔɹ ʌv ðˌɛm.",
+   "gb": "ɪn nˌIntˈiːn ˈAti fˈɔː ðɛː wɜː wˈʌn θˈWzᵊnd tˈuː hˈʌndɹəd θˈɜːti fˈɔː ɒv ðˌɛm."
+  },
+  {
+   "text": "The 21st century began in 2001.",
+   "us": "ðə twˈɛnti fˈɜɹst sˈɛnʧəɹi bəɡˈæn ɪn tˈu θˈWzᵊnd wˈʌn.",
+   "gb": "ðə twˈɛnti fˈɜːst sˈɛnʧʊɹi bɪɡˈan ɪn tˈuː θˈWzᵊnd wˈʌn."
+  },
+  {
+   "text": "She was the 3rd person in line, and he was the 100th.",
+   "us": "ʃˌi wʌz ðə θˈɜɹd pˈɜɹsᵊn ɪn lˈIn, ænd hi wʌz ðə wˈʌn hˈʌndɹədθ.",
+   "gb": "ʃˌiː wɒz ðə θˈɜːd pˈɜːsᵊn ɪn lˈIn, and hiː wɒz ðə wˈʌn hˈʌndɹədθ."
+  },
+  {
+   "text": "pi is 3.14 and e is about 2.718.",
+   "us": "pˈI ɪz θɹˈi pYnt wˈʌn fˈɔɹ ænd ˈi ɪz əbˈWt tˈu pYnt sˈɛvən wˈʌn ˈAt.",
+   "gb": "pˈI ɪz θɹˈiː pYnt wˈʌn fˈɔː and ˈiː ɪz əbˈWt tˈuː pYnt sˈɛvᵊn wˈʌn ˈAt."
+  },
+  {
+   "text": "The U.S. and the U.K. signed it.",
+   "us": "ðə jˌuˈɛs ænd ðə jˌukˈA sˈInd ɪt.",
+   "gb": "ðə jˌuːˈɛs and ðə jˌuːkˈA sˈInd ɪt."
+  },
+  {
+   "text": "NASA and the FBI both said no.",
+   "us": "nˈæsə ænd ði ˌɛfbˌiˈI bˈOθ sˈɛd nˈO.",
+   "gb": "nˈasə and ði ˌɛfbˌiːˈI bˈQθ sˈɛd nˈQ."
+  },
+  {
+   "text": "Mr. Smith met Dr. Jones at 10 Downing Street.",
+   "us": "mˈɪstəɹ smˈɪθ mˈɛt dˈɑktəɹ ʤˈOnz æt tˈɛn dˌWnɪŋ stɹˈit.",
+   "gb": "mˈɪstə smˈɪθ mˈɛt dˈɒktə ʤˈQnz at tˈɛn dˌWnɪŋ stɹˈiːt."
+  },
+  {
+   "text": "Rock-and-roll is a well-worn phrase.",
+   "us": "ɹˈɑkændɹˈOl ɪz ɐ wˌɛlwˈɔɹn fɹˈAz.",
+   "gb": "ɹˈɒkandɹˈQl ɪz ɐ wˌɛlwˈɔːn fɹˈAz."
+  },
+  {
+   "text": "The wind was too strong to wind the clock.",
+   "us": "ðə wˈɪnd wʌz tˈu stɹˈɔŋ tə wˈInd ðə klˈɑk.",
+   "gb": "ðə wˈɪnd wɒz tˈuː stɹˈɒŋ tə wˈInd ðə klˈɒk."
+  },
+  {
+   "text": "I used to live there, and I used it often.",
+   "us": "ˌI jˈust tə lˈɪv ðˈɛɹ, ænd ˌI jˈuzd ɪt ˈɔfᵊn.",
+   "gb": "ˌI jˈuːst tə lˈɪv ðˈɛː, and ˌI jˈuːzd ɪt ˈɒfᵊn."
+  },
+  {
+   "text": "We need to record the record.",
+   "us": "wˌi nˈid tə ɹəkˈɔɹd ðə ɹˈɛkəɹd.",
+   "gb": "wˌiː nˈiːd tə ɹɪkˈɔːd ðə ɹˈɛkɔːd."
+  },
+  {
+   "text": "Tears ran down her face as she tried not to tear the page.",
+   "us": "tˈɪɹz ɹˈæn dˌWn hɜɹ fˈAs æz ʃi tɹˈId nˌɑt tə tˈɛɹ ðə pˈAʤ.",
+   "gb": "tˈɪəz ɹˈan dˌWn hɜː fˈAs az ʃiː tɹˈId nˌɒt tə tˈɛː ðə pˈAʤ."
+  },
+  {
+   "text": "The quick-thinking officer jumped.",
+   "us": "ðə kwˌɪkθˈɪŋkɪŋ ˈɔfəsəɹ ʤˈʌmpt.",
+   "gb": "ðə kwˌɪkθˈɪŋkɪŋ ˈɒfɪsə ʤˈʌmpt."
+  },
+  {
+   "text": "What's the matter with you?",
+   "us": "wˌʌts ðə mˈæTəɹ wɪð ju?",
+   "gb": "wˌɒts ðə mˈatə wɪð juː?"
+  },
+  {
+   "text": "I am here, and I am not leaving.",
+   "us": "ˌI ɐm hˈɪɹ, ænd ˌI ɐm nˌɑt lˈivɪŋ.",
+   "gb": "ˌI ɐm hˈɪə, and ˌI ɐm nˌɒt lˈiːvɪŋ."
+  },
+  {
+   "text": "It's 50% off, plus tax.",
+   "us": "ˌɪts fˈɪfti pəɹsˈɛnt ˈɔf, plˈʌs tˈæks.",
+   "gb": "ˌɪts fˈɪfti pəsˈɛnt ˈɒf, plˈʌs tˈaks."
+  },
+  {
+   "text": "Tom & Jerry",
+   "us": "tˈɑm ænd ",
+   "gb": "tˈɒm and ʤˈɛɹi"
+  },
+  {
+   "text": "She whispered, \"Come here.\"",
+   "us": "ʃˌi wˈɪspəɹd, “kˈʌm hˈɪɹ.”",
+   "gb": "ʃˌiː wˈɪspəd, “kˈʌm hˈɪə.”"
+  },
+  {
+   "text": "\"Quoted,\" he said quietly.",
+   "us": "“kwˈOTᵻd,” hi sˈɛd kwˈIətli.",
+   "gb": "“kwˈQtɪd,” hiː sˈɛd kwˈIətli."
+  },
+  {
+   "text": "Twenty-two dogs and thirty-three cats.",
+   "us": "twˈɛntitˌu dˈɔɡz ænd θˈɜɹTiθɹˌi kˈæts.",
+   "gb": "twˈɛntitˌuː dˈɒɡz and θˈɜːtiθɹˌiː kˈats."
+  },
+  {
+   "text": "The old man and the sea.",
+   "us": "ði ˈOld mˈæn ænd ðə sˈi.",
+   "gb": "ði ˈQld mˈan and ðə sˈiː."
+  },
+  {
+   "text": "to be or not to be",
+   "us": "tə bi ɔɹ nˌɑt tə bˈi",
+   "gb": "tə biː ɔː nˌɒt tə bˈiː"
+  },
+  {
+   "text": "Running, jumping, and swimming are fun.",
+   "us": "ɹˈʌnɪŋ, ʤˈʌmpɪŋ, ænd swˈɪmɪŋ ɑɹ fˈʌn.",
+   "gb": "ɹˈʌnɪŋ, ʤˈʌmpɪŋ, and swˈɪmɪŋ ɑː fˈʌn."
+  },
+  {
+   "text": "The boxes were stacked in the garages.",
+   "us": "ðə bˈɑksᵻz wɜɹ stˈækt ɪn ðə ɡəɹˈɑʒᵻz.",
+   "gb": "ðə bˈɒksɪz wɜː stˈakt ɪn ðə ɡˈaɹɑːʤɪz."
+  },
+  {
+   "text": "He wanted to wait, but she waited.",
+   "us": "hˌi wˈɑntᵻd tə wˈAt, bˌʌt ʃi wˈATᵻd.",
+   "gb": "hˌiː wˈɒntɪd tə wˈAt, bˌʌt ʃiː wˈAtɪd."
+  },
+  {
+   "text": "Who are you, and what do you want with me?",
+   "us": "hˌu ɑɹ ju, ænd wˌʌt dˈu ju wˈɑnt wɪð mˌi?",
+   "gb": "hˌuː ɑː juː, and wˌɒt dˈuː juː wˈɒnt wɪð mˌiː?"
+  },
+  {
+   "text": "OK, let's go.",
+   "us": "ˌOkˈA, lˈɛts ɡˌO.",
+   "gb": "ˌQkˈA, lˈɛts ɡˌQ."
+  },
+  {
+   "text": "The '90s were a strange decade.",
+   "us": "ðə nˈIndiz wɜɹ ɐ stɹˈAnʤ dˈɛkˌAd.",
+   "gb": "ðə nˈIntiz wɜː ɐ stɹˈAnʤ dˈɛkAd."
+  },
+  {
+   "text": "Mary's lamb followed her to school one day.",
+   "us": "mˈɛɹiz lˈæm fˈɑlOd hɜɹ tə skˈul wˈʌn dˈA.",
+   "gb": "mˈɛːɹiz lˈam fˈɒlQd hɜː tə skˈuːl wˈʌn dˈA."
+  },
+  {
+   "text": "The lights flickered; the house groaned.",
+   "us": "ðə lˈIts flˈɪkəɹd; ðə hˈWs ɡɹˈOnd.",
+   "gb": "ðə lˈIts flˈɪkəd; ðə hˈWs ɡɹˈQnd."
+  },
+  {
+   "text": "Lead the way, said the general.",
+   "us": "lˈid ðə wˈA, sˈɛd ðə ʤˈɛnəɹəl.",
+   "gb": "lˈiːd ðə wˈA, sˈɛd ðə ʤˈɛnəɹəl."
+  },
+  {
+   "text": "I can't, won't, and shouldn't.",
+   "us": "ˌI kˈænt, wˈOnt, ænd ʃˈʊdᵊnt.",
+   "gb": "ˌI kˈɑːnt, wˈQnt, and ʃˈʊdᵊnt."
+  },
+  {
+   "text": "Everything changed when the fire nation attacked.",
+   "us": "ˈɛvəɹiθˌɪŋ ʧˈAnʤd wˌɛn ðə fˈIəɹ nˈAʃən ətˈækt.",
+   "gb": "ˈɛvɹɪθɪŋ ʧˈAnʤd wˌɛn ðə fˈIə nˈAʃᵊn ətˈakt."
+  },
+  {
+   "text": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+   "us": "ˌɪt ɪz ɐ tɹˈuθ jˌunəvˈɜɹsəli əknˈɑləʤd, ðæt ɐ sˈɪŋɡᵊl mˈæn ɪn pəzˈɛʃən ʌv ɐ ɡˈʊd fˈɔɹʧən, mˈʌst bi ɪn wˈɑnt ʌv ɐ wˈIf.",
+   "gb": "ˌɪt ɪz ɐ tɹˈuːθ jˌuːnɪvˈɜːsəli əknˈɒlɪʤd, ðat ɐ sˈɪŋɡᵊl mˈan ɪn pəzˈɛʃᵊn ɒv ɐ ɡˈʊd fˈɔːʧuːn, mˈʌst biː ɪn wˈɒnt ɒv ɐ wˈIf."
+  },
+  {
+   "text": "However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered the rightful property of some one or other of their daughters.",
+   "us": "hWˈɛvəɹ lˈɪTᵊl nˈOn ðə fˈilɪŋz ɔɹ vjˈuz ʌv sˈʌʧ ɐ mˈæn mˈA bi ˌɔn hɪz fˈɜɹst ˈɛntəɹɪŋ ɐ nˈAbəɹhˌʊd, ðɪs tɹˈuθ ɪz sˌO wˈɛl fˈɪkst ɪn ðə mˈIndz ʌv ðə səɹˈWndɪŋ fˈæmᵊliz, ðæt hi ɪz kənsˈɪdəɹd ðə ɹˈItfᵊl pɹˈɑpəɹTi ʌv sˌʌm wˈʌn ɔɹ ˈʌðəɹ ʌv ðɛɹ dˈɔTəɹz.",
+   "gb": "hWˈɛvə lˈɪtᵊl nˈQn ðə fˈiːlɪŋz ɔː vjˈuːz ɒv sˈʌʧ ɐ mˈan mˈA biː ˌɒn hɪz fˈɜːst  ɐ nˈAbəhʊd, ðɪs tɹˈuːθ ɪz sˌQ wˈɛl fˈɪkst ɪn ðə mˈIndz ɒv ðə səɹˈWndɪŋ fˈamɪliz, ðat hiː ɪz kənsˈɪdəd ðə ɹˈItfʊl pɹˈɒpəti ɒv sˌʌm wˈʌn ɔː ˈʌðə ɒv ðɛː dˈɔːtəz."
+  },
+  {
+   "text": "\"My dear Mr. Bennet,\" said his lady to him one day, \"have you heard that Netherfield Park is let at last?\"",
+   "us": "“mˌI dˈɪɹ mˈɪstəɹ ,” sˈɛd hɪz lˈAdi tə hˌɪm wˈʌn dˈA, “hæv ju hˈɜɹd ðæt  pˈɑɹk ɪz lˈɛt æt lˈæst?”",
+   "gb": "“mˌI dˈɪə mˈɪstə ,” sˈɛd hɪz lˈAdi tə hˌɪm wˈʌn dˈA, “hav juː hˈɜːd ðat  pˈɑːk ɪz lˈɛt at lˈɑːst?”"
+  },
+  {
+   "text": "Happy families are all alike; every unhappy family is unhappy in its own way.",
+   "us": "hˈæpi fˈæmᵊliz ɑɹ ˈɔl əlˈIk; ˈɛvəɹi ˌʌnhˈæpi fˈæmᵊli ɪz ˌʌnhˈæpi ɪn ɪts ˈOn wˈA.",
+   "gb": "hˈapi fˈamɪliz ɑː ˈɔːl əlˈIk; ˈɛvəɹi ʌnhˈapi fˈamɪli ɪz ʌnhˈapi ɪn ɪts ˈQn wˈA."
+  },
+  {
+   "text": "In a hole in the ground there lived a hobbit.",
+   "us": "ɪn ɐ hˈOl ɪn ðə ɡɹˈWnd ðɛɹ lˈɪvd ɐ hˈɑbət.",
+   "gb": "ɪn ɐ hˈQl ɪn ðə ɡɹˈWnd ðɛː lˈɪvd ɐ hˈɒbɪt."
+  },
+  {
+   "text": "Not a nasty, dirty, wet hole, filled with the ends of worms and an oozy smell, nor yet a dry, bare, sandy hole with nothing in it to sit down on or to eat: it was a hobbit-hole, and that means comfort.",
+   "us": "nˌɑt ɐ nˈæsti, dˈɜɹTi, wˈɛt hˈOl, fˈɪld wɪð ði ˈɛndz ʌv wˈɜɹmz ænd ɐn ˈuzi smˈɛl, nˈɔɹ jˈɛt ɐ dɹˈI, bˈɛɹ, sˈændi hˈOl wɪð nˈʌθɪŋ ɪn ɪt tə sˈɪt dˌWn ˌɔn ɔɹ tʊ ˈit: ɪt wʌz ɐ hˈɑbəthˌOl, ænd ðˈæt mˈinz kˈʌmfəɹt.",
+   "gb": "nˌɒt ɐ nˈɑːsti, dˈɜːti, wˈɛt hˈQl, fˈɪld wɪð ði ˈɛndz ɒv wˈɜːmz and ɐn ˈuːzi smˈɛl, nˈɔː jˈɛt ɐ dɹˈI, bˈɛː, sˈandi hˈQl wɪð nˈʌθɪŋ ɪn ɪt tə sˈɪt dˌWn ˌɒn ɔː tʊ ˈiːt: ɪt wɒz ɐ hˈɒbɪthˌQl, and ðˈat mˈiːnz kˈʌmfət."
+  },
+  {
+   "text": "It was a bright cold day in April, and the clocks were striking thirteen.",
+   "us": "ˌɪt wʌz ɐ bɹˈIt kˈOld dˈA ɪn ˈApɹəl, ænd ðə klˈɑks wɜɹ stɹˈIkɪŋ θˌɜɹtˈin.",
+   "gb": "ˌɪt wɒz ɐ bɹˈIt kˈQld dˈA ɪn ˈApɹɪl, and ðə klˈɒks wɜː stɹˈIkɪŋ θˌɜːtˈiːn."
+  },
+  {
+   "text": "All happy families resemble one another—but not all of them know it.",
+   "us": "ˈɔl hˈæpi fˈæmᵊliz ɹəzˈɛmbᵊl wˈʌn ənˈʌðəɹ—bˌʌt nˌɑt ˈɔl ʌv ðˌɛm nˈO ɪt.",
+   "gb": "ˈɔːl hˈapi fˈamɪliz ɹɪzˈɛmbᵊl wˈʌn ənˈʌðə—bˌʌt nˌɒt ˈɔːl ɒv ðˌɛm nˈQ ɪt."
+  },
+  {
+   "text": "She paused... then, slowly, she turned around.",
+   "us": "ʃˌi pˈɔzd... ðˈɛn, slˈOli, ʃi tˈɜɹnd əɹˈWnd.",
+   "gb": "ʃˌiː pˈɔːzd... ðˈɛn, slˈQli, ʃiː tˈɜːnd əɹˈWnd."
+  },
+  {
+   "text": "\"Wait!\" he cried. \"Don't go!\"",
+   "us": "“wˈAt!” hi kɹˈId. “dˈOnt ɡˌO!”",
+   "gb": "“wˈAt!” hiː kɹˈId. “dˈQnt ɡˌQ!”"
+  },
+  {
+   "text": "The year was 1066; the battle, Hastings.",
+   "us": "ðə jˈɪɹ wʌz tˈɛn sˈɪksti sˈɪks; ðə bˈæTᵊl, hˈAstɪŋz.",
+   "gb": "ðə jˈɪə wɒz tˈɛn sˈɪksti sˈɪks; ðə bˈatᵊl, ."
+  },
+  {
+   "text": "There were 3 apples, 12 pears and 100 plums.",
+   "us": "ðˌɛɹ wɜɹ θɹˈi ˈæpᵊlz, twˈɛlv pˈɛɹz ænd wˈʌn hˈʌndɹəd plˈʌmz.",
+   "gb": "ðˌɛː wɜː θɹˈiː ˈapᵊlz, twˈɛlv pˈɛːz and wˈʌn hˈʌndɹəd plˈʌmz."
+  },
+  {
+   "text": "He was born on the 4th of July, 1776.",
+   "us": "hˌi wʌz bˈɔɹn ˌɔn ðə fˈɔɹθ ʌv ʤəlˈI, sˌɛvəntˈin sˈɛvənti sˈɪks.",
+   "gb": "hˌiː wɒz bˈɔːn ˌɒn ðə fˈɔːθ ɒv ʤʊlˈI, sˌɛvntˈiːn sˈɛvnti sˈɪks."
+  },
+  {
+   "text": "Version 2.0 is out.",
+   "us": "vˈɜɹʒən tˈu ɪz ˈWt.",
+   "gb": "vˈɜːʃᵊn tˈuː ɪz ˈWt."
+  },
+  {
+   "text": "Call 555-0199 for details.",
+   "us": "kˈɔl fˈIv hˈʌndɹəd fˈɪfti fˈIvwˌʌn nˌIndi nˌIn fɔɹ dətˈAlz.",
+   "gb": "kˈɔːl fˈIv hˈʌndɹəd fˈɪfti fˈIvwˌʌn nˌInti nˌIn fɔː dˈiːtAlz."
+  },
+  {
+   "text": "She scored 98% on the test.",
+   "us": "ʃˌi skˈɔɹd nˈIndi ˈAt pəɹsˈɛnt ˌɔn ðə tˈɛst.",
+   "gb": "ʃˌiː skˈɔːd nˈInti ˈAt pəsˈɛnt ˌɒn ðə tˈɛst."
+  },
+  {
+   "text": "The temperature dropped to -5 degrees.",
+   "us": "ðə tˈɛmpɹəʧəɹ dɹˈɑpt tə mˈInəs fˈIv dəɡɹˈiz.",
+   "gb": "ðə tˈɛmpɹɪʧə dɹˈɒpt tə mˈInəs fˈIv dɪɡɹˈiːz."
+  },
+  {
+   "text": "He's twenty-one and she's nineteen.",
+   "us": "hˌiz twˌɛntiwˈʌn ænd ʃiz nˌIntˈin.",
+   "gb": "hˌiːz twˈɛntiwˌʌn and ʃiːz nˌIntˈiːn."
+  },
+  {
+   "text": "WHAT ARE YOU DOING?",
+   "us": "wˈʌt ˈɑɹ jˈu dˈuɪŋ?",
+   "gb": "wˈɒt ˈɑː jˈuː dˈuːɪŋ?"
+  },
+  {
+   "text": "The BBC reported it first.",
+   "us": "ðə bˌibˌisˈi ɹəpˈɔɹTᵻd ɪt fˈɜɹst.",
+   "gb": "ðə bˌiːbˌiːsˈiː ɹɪpˈɔːtɪd ɪt fˈɜːst."
+  },
+  {
+   "text": "It's a T-shirt, not a sweater.",
+   "us": "ˌɪts ɐ tˈiʃˌɜɹt, nˌɑt ɐ swˈɛTəɹ.",
+   "gb": "ˌɪts ɐ tˈiːʃəːt, nˌɒt ɐ swˈɛtə."
+  },
+  {
+   "text": "We'll see, won't we?",
+   "us": "wˌil sˈi, wOnt wi?",
+   "gb": "wˌiːl sˈiː, wQnt wiː?"
+  },
+  {
+   "text": "Isn't it lovely?",
+   "us": "ˈɪzᵊnt ɪt lˈʌvli?",
+   "gb": "ˈɪzᵊnt ɪt lˈʌvli?"
+  },
+  {
+   "text": "The knight's sword gleamed.",
+   "us": "ðə nˈIts sˈɔɹd ɡlˈimd.",
+   "gb": "ðə nˈIts sˈɔːd ɡlˈiːmd."
+  },
+  {
+   "text": "I've never been to the Alps.",
+   "us": "ˌIv nˈɛvəɹ bɪn tə ði ˈælps.",
+   "gb": "ˌIv nˈɛvə biːn tə ði ˈalps."
+  },
+  {
+   "text": "It's 5 o'clock somewhere.",
+   "us": "ˌɪts fˈIv əklˈɑk sˈʌmhwˌɛɹ.",
+   "gb": "ˌɪts fˈIv əklˈɒk sˈʌmwɛː."
+  },
+  {
+   "text": "Ladies and gentlemen, welcome aboard.",
+   "us": "lˈAdiz ænd ʤˈɛntəlmɛn, wˈɛlkəm əbˈɔɹd.",
+   "gb": "lˈAdɪz and ʤˈɛntᵊlmɛn, wˈɛlkəm əbˈɔːd."
+  },
+  {
+   "text": "The house stood on a hill—empty, silent, waiting.",
+   "us": "ðə hˈWs stˈʊd ˌɔn ɐ hˈɪl—ˈɛmpti, sˈIlənt, wˈATɪŋ.",
+   "gb": "ðə hˈWs stˈʊd ˌɒn ɐ hˈɪl—ˈɛmpti, sˈIlənt, wˈAtɪŋ."
+  },
+  {
+   "text": "He opened the door (it creaked) and stepped inside.",
+   "us": "hˌi ˈOpᵊnd ðə dˈɔɹ (ɪt kɹˈikt) ænd stˈɛpt ɪnsˈId.",
+   "gb": "hˌiː ˈQpᵊnd ðə dˈɔː (ɪt kɹˈiːkt) and stˈɛpt ˌɪnsˈId."
+  },
+  {
+   "text": "They sailed from Liverpool to New York in 1912.",
+   "us": "ðˌA sˈAld fɹʌm lˈɪvəɹpˌul tə nˈu jˈɔɹk ɪn nˌIntˈin twˈɛlv.",
+   "gb": "ðˌA sˈAld fɹɒm lˈɪvəpuːl tə njˈuː jˈɔːk ɪn nˌIntˈiːn twˈɛlv."
+  },
+  {
+   "text": "Mother said, \"Supper's ready.\"",
+   "us": "mˈʌðəɹ sˈɛd, “sˈʌpəɹz ɹˈɛdi.”",
+   "gb": "mˈʌðə sˈɛd, “sˈʌpəz ɹˈɛdi.”"
+  },
+  {
+   "text": "Her eyes were the colour of the sea after a storm.",
+   "us": "hˌɜɹ ˈIz wɜɹ ðə kˈʌləɹ ʌv ðə sˈi ˈæftəɹ ɐ stˈɔɹm.",
+   "gb": "hˌɜː ˈIz wɜː ðə kˈʌlə ɒv ðə sˈiː ˈɑːftə ɐ stˈɔːm."
+  },
+  {
+   "text": "The children laughed, and the dog barked, and the whole house seemed alive again.",
+   "us": "ðə ʧˈɪldɹᵊn lˈæft, ænd ðə dˈɔɡ bˈɑɹkt, ænd ðə hˈOl hˈWs sˈimd əlˈIv əɡˈɛn.",
+   "gb": "ðə ʧˈɪldɹᵊn lˈɑːft, and ðə dˈɒɡ bˈɑːkt, and ðə hˈQl hˈWs sˈiːmd əlˈIv əɡˈɛn."
+  },
+  {
+   "text": "No, thank you.",
+   "us": "nˈO, θˈæŋk ju.",
+   "gb": "nˈQ, θˈaŋk juː."
+  },
+  {
+   "text": "Number 10 is the prime minister's house.",
+   "us": "nˈʌmbəɹ tˈɛn ɪz ðə pɹˈIm mˈɪnəstəɹz hˈWs.",
+   "gb": "nˈʌmbə tˈɛn ɪz ðə pɹˈIm mˈɪnɪstəz hˈWs."
+  },
+  {
+   "text": "The re-elected mayor smiled.",
+   "us": "ðə ɹˌiəlˈɛktᵻd mˈAəɹ smˈIld.",
+   "gb": "ðə ɹˌiːɪlˈɛktɪd mˈɛː smˈIld."
+  },
+  {
+   "text": "E-mail me the self-addressed envelope.",
+   "us": "ˈimˌAl mˌi ðə sˌɛlfədɹˈɛst ˈɛnvəlˌOp.",
+   "gb": "ˈiːmˌAl mˌiː ðə sˌɛlfədɹˈɛst ˈɛnvəlQp."
+  },
+  {
+   "text": "$100 is a lot of money for a book.",
+   "us": "wˈʌn hˈʌndɹəd dˈɑləɹz ɪz ɐ lˈɑt ʌv mˈʌni fɔɹ ɐ bˈʊk.",
+   "gb": "wˈʌn hˈʌndɹəd dˈɒləz ɪz ɐ lˈɒt ɒv mˈʌni fɔː ɐ bˈʊk."
+  },
+  {
+   "text": "The 1990s and the 2000s were different.",
+   "us": "ðə nˌIntˈin nˈIndiz ænd ðə tˈu θˈWzᵊndz wɜɹ dˈɪfəɹənt.",
+   "gb": "ðə nˌIntˈiːn nˈIntiz and ðə tˈuː θˈWzᵊndz wɜː dˈɪfəɹənt."
+  },
+  {
+   "text": "Ms. Lee and Mrs. Patel arrived early.",
+   "us": "mˈɪz lˈi ænd mˈɪsɪz  əɹˈIvd ˈɜɹli.",
+   "gb": "mˈɪz lˈiː and mˈɪsɪz  əɹˈIvd ˈɜːli."
+  },
+  {
+   "text": "The present was wrapped in gold paper; she wanted to present it herself.",
+   "us": "ðə pɹˈɛzᵊnt wʌz ɹˈæpt ɪn ɡˈOld pˈApəɹ; ʃi wˈɑntᵻd tə pɹizˈɛnt ɪt həɹsˈɛlf.",
+   "gb": "ðə pɹˈɛzᵊnt wɒz ɹˈapt ɪn ɡˈQld pˈApə; ʃiː wˈɒntɪd tə pɹɪzˈɛnt ɪt həːsˈɛlf."
+  },
+  {
+   "text": "I object to that object.",
+   "us": "ˌI əbʤˈɛkt tə ðˈæt ˈɑbʤəkt.",
+   "gb": "ˌI əbʤˈɛkt tə ðˈat ˈɒbʤɛkt."
+  },
+  {
+   "text": "They refuse to take out the refuse.",
+   "us": "ðˌA ɹəfjˈuz tə tˈAk ˈWt ðə ɹˈɛfjˌus.",
+   "gb": "ðˌA ɹɪfjˈuːz tə tˈAk ˈWt ðə ɹˈɛfjuːs."
+  },
+  {
+   "text": "I live in a live music venue.",
+   "us": "ˌI lˈɪv ɪn ɐ lˈIv mjˈuzɪk vˈɛnjˌu.",
+   "gb": "ˌI lˈɪv ɪn ɐ lˈIv mjˈuːzɪk vˈɛnjuː."
+  }
+ ]
+}

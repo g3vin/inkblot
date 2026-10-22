@@ -1,13 +1,14 @@
 /**
  * Node ESM loader for the canvas suites.
  *
- * Four jobs:
+ * Six jobs:
  *   1. map the @tauri-apps modules onto the in-memory stubs
  *   2. resolve the extensionless relative imports Vite allows but Node does not
  *   3. transpile .jsx and .ts, so a suite can mount a real component or import a
  *      converted module
  *   4. neutralize `import.meta.glob`, which is Vite's and has no Node equivalent
  *   5. serve a `?raw` import as the file's text, the way Vite does (the citation styles)
+ *   6. import JSON without an import attribute, as Vite does
  *
  * (3) is what lets the `dom` suite render CanvasSurface itself. esbuild comes with
  * Vite, so this adds no dependency. The automatic JSX runtime is used, matching the
@@ -73,6 +74,13 @@ export async function load(url, context, next) {
   // CSS is imported for its side effect only (CanvasPane imports Canvas.css).
   if (url.endsWith('.css')) {
     return { format: 'module', source: 'export default {}', shortCircuit: true }
+  }
+
+  // Vite imports JSON without `with { type: 'json' }`, and so do packages built for
+  // it (phonemize), which Node refuses.
+  if (url.endsWith('.json') && context.importAttributes?.type !== 'json') {
+    const text = readFileSync(fileURLToPath(url), 'utf8')
+    return { format: 'module', source: `export default ${text}`, shortCircuit: true }
   }
 
   const ext = url.slice(url.lastIndexOf('.'))

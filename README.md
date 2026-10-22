@@ -98,7 +98,7 @@ dictionary: `INKBLOT_CMUDICT=/path/to/cmudict.dict cargo test -p inkblot-models 
 | `tests/unit/` | The jsdom suites (`npm test`) |
 | `tests/parity/` | The JS/Rust differential harness (`npm run parity`) |
 | `tests/layout/` | Print Layout in real WebKit (`npm run test:layout`) |
-| `scripts/` | Type generation |
+| `scripts/` | Type generation, the pronouncing dictionaries (`npm run lexicon`) |
 
 ## Contributing
 

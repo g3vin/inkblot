@@ -1,25 +1,14 @@
 /**
- * readAloudVoice.ts — text to phoneme token ids, for the native speech path.
+ * readAloudVoice.ts — text to phoneme token ids, for Kokoro.
  *
- * The Kokoro model runs through `ort` in Rust (`inkblot-models/src/kokoro_speech.rs`).
- * This is the webview's half of the pipeline:
+ * The Kokoro model runs through `ort` in Rust (`inkblot-models/src/kokoro_speech.rs`),
+ * or in the webview when there is no native backend. This is the half before it:
  *
- *   text -> normalize -> phonemize -> token ids  ->  Rust: ONNX -> samples
+ *   text -> phonemes (lib/g2p) -> token ids  ->  Rust: ONNX -> samples
  *
- * Phonemization lives here because a correct English grapheme-to-phoneme pass is a
- * lexicon and several thousand rules, `phonemizer` already implements one, and none
- * of it needs a subprocess — so it works on every platform the app targets.
- *
- * ## Why this is a transcription, and how it is checked
- *
- * `kokoro-js` does the same normalization before phonemizing, in a module-private
- * function it does not export. Reaching it would mean loading the whole TTS class,
- * which loads the model into the webview.
- *
- * So it is transcribed. Transcription is exactly where a silent error lives, so the
- * `voice` suite runs this side by side with the real function, pulled out of
- * kokoro-js's own bundle at test time, over a corpus of the inputs it exists to
- * handle. Do not "tidy" a regex here: every one of them is that function's.
+ * The phonemes come from a port of misaki, the grapheme-to-phoneme pass Kokoro was
+ * trained with, over its gold dictionary for the voice's dialect. It is plain
+ * JavaScript, so the same path works on every platform the app targets.
  *
  * ## The vocabulary is never transcribed
  *
@@ -28,157 +17,52 @@
  * produce confident, fluent, wrong audio.
  */
 import { invoke } from '@tauri-apps/api/core'
-import { phonemize } from 'phonemizer'
 
-/**
- * A voice's first letter: 'a' for American English, 'b' for British. It picks both
- * the eSpeak dialect and one of the post-phonemize fixes.
- */
+import { createG2P, type G2P } from './g2p/g2p'
+import type { LexiconData } from './g2p/lexicon'
+
+/** A voice's first letter: 'a' for American English, 'b' for British. */
 export type VoiceLanguage = 'a' | 'b'
 
 /** The model's phoneme → token id map, as `kokoro_vocab` returns it. */
 export type KokoroVocab = Record<string, number>
 
-/** Split on punctuation runs; those are kept verbatim rather than phonemized. */
-const PUNCTUATION = ';:,.!?¡¿—…"«»“”(){}[]'
-const PUNCTUATION_SPLIT = new RegExp(
-  `(\\s*[${PUNCTUATION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]+\\s*)+`,
-  'g'
-)
+/* ---------------- phonemes ---------------- */
 
-/** A year or a time: "1984" -> "19 84", "3:05" -> "3 oh 5". */
-const speakNumber = (value: string): string => {
-  if (value.includes('.')) return value
-  if (value.includes(':')) {
-    const [hour, minute] = value.split(':').map(Number)
-    if (minute === 0) return `${hour} o'clock`
-    return minute < 10 ? `${hour} oh ${minute}` : `${hour} ${minute}`
-  }
+// Each dialect's dictionary is a 2.5 MB asset of its own, fetched the first time a voice
+// of that dialect speaks. As a plain asset rather than an imported module: Vite would
+// otherwise turn its 90,000 keys into named exports.
+const LEXICONS: Record<VoiceLanguage, () => Promise<{ default: string }>> = {
+  a: () => import('./g2p/data/us_gold.json?url'),
+  b: () => import('./g2p/data/gb_gold.json?url'),
+}
+const g2ps = new Map<VoiceLanguage, Promise<G2P>>()
 
-  const year = parseInt(value.slice(0, 4), 10)
-  if (year < 1100 || year % 1000 < 10) return value
-
-  const century = value.slice(0, 2)
-  const rest = parseInt(value.slice(2, 4), 10)
-  const plural = value.endsWith('s') ? 's' : ''
-
-  if (year % 1000 >= 100 && year % 1000 <= 999) {
-    if (rest === 0) return `${century} hundred${plural}`
-    if (rest < 10) return `${century} oh ${rest}${plural}`
-  }
-  return `${century} ${rest}${plural}`
+async function loadLexicon(language: VoiceLanguage): Promise<LexiconData> {
+  const { default: url } = await LEXICONS[language]()
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`Couldn't load the pronunciation dictionary (HTTP ${response.status}).`)
+  return response.json()
 }
 
-/** "$12.50" -> "12 dollars and 50 cents". */
-const speakMoney = (value: string): string => {
-  const unit = value[0] === '$' ? 'dollar' : 'pound'
-  if (isNaN(Number(value.slice(1)))) return `${value.slice(1)} ${unit}s`
-
-  if (!value.includes('.')) {
-    const plural = value.slice(1) === '1' ? '' : 's'
-    return `${value.slice(1)} ${unit}${plural}`
+function getG2P(language: VoiceLanguage): Promise<G2P> {
+  let g2p = g2ps.get(language)
+  if (!g2p) {
+    g2p = loadLexicon(language).then((data) => createG2P(data, { british: language === 'b' }))
+    g2p.catch(() => g2ps.delete(language))
+    g2ps.set(language, g2p)
   }
-
-  const [whole, fraction] = value.slice(1).split('.')
-  const minor = parseInt(fraction.padEnd(2, '0'), 10)
-  const minorUnit = value[0] === '$'
-    ? (minor === 1 ? 'cent' : 'cents')
-    : (minor === 1 ? 'penny' : 'pence')
-  return `${whole} ${unit}${whole === '1' ? '' : 's'} and ${minor} ${minorUnit}`
-}
-
-/** "3.14" -> "3 point 1 4". */
-const speakDecimal = (value: string): string => {
-  const [whole, fraction] = value.split('.')
-  return `${whole} point ${fraction.split('').join(' ')}`
-}
-
-/** The pre-phonemize pass. Every replacement below is kokoro-js's, in its order. */
-export const normalizeForSpeech = (text: string): string =>
-  String(text)
-    .replace(/[‘’]/g, "'")
-    .replace(/«/g, '“')
-    .replace(/»/g, '”')
-    .replace(/[“”]/g, '"')
-    .replace(/\(/g, '«')
-    .replace(/\)/g, '»')
-    .replace(/、/g, ', ')
-    .replace(/。/g, '. ')
-    .replace(/！/g, '! ')
-    .replace(/，/g, ', ')
-    .replace(/：/g, ': ')
-    .replace(/；/g, '; ')
-    .replace(/？/g, '? ')
-    .replace(/[^\S \n]/g, ' ')
-    .replace(/  +/, ' ')
-    .replace(/(?<=\n) +(?=\n)/g, '')
-    .replace(/\bD[Rr]\.(?= [A-Z])/g, 'Doctor')
-    .replace(/\b(?:Mr\.|MR\.(?= [A-Z]))/g, 'Mister')
-    .replace(/\b(?:Ms\.|MS\.(?= [A-Z]))/g, 'Miss')
-    .replace(/\b(?:Mrs\.|MRS\.(?= [A-Z]))/g, 'Mrs')
-    .replace(/\betc\.(?! [A-Z])/gi, 'etc')
-    .replace(/\b(y)eah?\b/gi, "$1e'a")
-    .replace(/\d*\.\d+|\b\d{4}s?\b|(?<!:)\b(?:[1-9]|1[0-2]):[0-5]\d\b(?!:)/g, speakNumber)
-    .replace(/(?<=\d),(?=\d)/g, '')
-    .replace(/[$£]\d+(?:\.\d+)?(?: hundred| thousand| (?:[bm]|tr)illion)*\b|[$£]\d+\.\d\d?\b/gi, speakMoney)
-    .replace(/\d*\.\d+/g, speakDecimal)
-    .replace(/(?<=\d)-(?=\d)/g, ' to ')
-    .replace(/(?<=\d)S/g, ' S')
-    .replace(/(?<=[BCDFGHJ-NP-TV-Z])'?s\b/g, "'S")
-    .replace(/(?<=X')S\b/g, 's')
-    .replace(/(?:[A-Za-z]\.){2,} [a-z]/g, (run) => run.replace(/\./g, '-'))
-    .replace(/(?<=[A-Z])\.(?=[A-Z])/gi, '-')
-    .trim()
-
-/** Split into the runs that get phonemized and the punctuation that does not. */
-const splitOnPunctuation = (text: string): { match: boolean; text: string }[] => {
-  const parts: { match: boolean; text: string }[] = []
-  let cursor = 0
-  for (const match of text.matchAll(PUNCTUATION_SPLIT)) {
-    if (cursor < match.index) parts.push({ match: false, text: text.slice(cursor, match.index) })
-    if (match[0].length > 0) parts.push({ match: true, text: match[0] })
-    cursor = match.index + match[0].length
-  }
-  if (cursor < text.length) parts.push({ match: false, text: text.slice(cursor) })
-  return parts
-}
-
-/** Fixes applied after phonemizing, again kokoro-js's and in its order. */
-const fixPhonemes = (phonemes: string, language: VoiceLanguage): string => {
-  let fixed = phonemes
-    .replace(/kəkˈoːɹoʊ/g, 'kˈoʊkəɹoʊ')
-    .replace(/kəkˈɔːɹəʊ/g, 'kˈəʊkəɹəʊ')
-    .replace(/ʲ/g, 'j')
-    .replace(/r/g, 'ɹ')
-    .replace(/x/g, 'k')
-    .replace(/ɬ/g, 'l')
-    .replace(/(?<=[a-zɹː])(?=hˈʌndɹɪd)/g, ' ')
-    .replace(/ z(?=[;:,.!?¡¿—…"«»“” ]|$)/g, 'z')
-
-  if (language === 'a') fixed = fixed.replace(/(?<=nˈaɪn)ti(?!ː)/g, 'di')
-  return fixed.trim()
+  return g2p
 }
 
 /**
- * Text → IPA phonemes.
+ * Text → Kokoro's phonemes.
  *
  * `language` is the voice's first letter: 'a' for American English, 'b' for British.
  */
-export async function textToPhonemes(
-  text: string,
-  language: VoiceLanguage = 'a',
-  normalize: boolean = true,
-): Promise<string> {
-  const prepared = normalize ? normalizeForSpeech(text) : String(text)
-  const dialect = language === 'a' ? 'en-us' : 'en'
-
-  const parts = await Promise.all(
-    splitOnPunctuation(prepared).map(async (part) =>
-      part.match ? part.text : (await phonemize(part.text, dialect)).join(' ')
-    )
-  )
-
-  return fixPhonemes(parts.join(''), language)
+export async function textToPhonemes(text: string, language: VoiceLanguage = 'a'): Promise<string> {
+  const g2p = await getG2P(language)
+  return g2p(String(text))
 }
 
 /* ---------------- the vocabulary ---------------- */

@@ -7,10 +7,9 @@
  *  - Split that text into speakable chunks at paragraph/sentence/clause
  *    boundaries (Kokoro degrades on long inputs).
  *  - Generate audio with the Kokoro TTS model: prefers the native Rust
- *    backend (kokoro_commands), falling back to kokoro-js running in WASM.
- *    Voice .bin files ship in the app bundle (see KOKORO_VOICE_ASSETS) and
- *    fetches for them are patched to resolve locally instead of hitting
- *    HuggingFace.
+ *    backend (kokoro_commands), falling back to the same model run in WASM by
+ *    transformers.js. Both take their phonemes from lib/readAloudVoice.ts.
+ *    Voice .bin files ship in the app bundle (see KOKORO_VOICE_ASSETS).
  */
 import { invoke } from '@tauri-apps/api/core'
 
@@ -94,9 +93,8 @@ const READ_ALOUD_SENTENCE_END_PATTERN = /[.!?]+["')\]}»”’]*$/
 const READ_ALOUD_CLAUSE_END_PATTERN = /[,;:]["')\]}»”’]*$/
 
 let kokoroPromise = null
-let kokoroVoiceFetchPatched = false
-let kokoroVoiceCachePatched = false
 let transformersConfigured = false
+const voiceStyles = new Map()
 
 /**
  * Flatten the editor doc (or current selection) into plain text plus:
@@ -184,21 +182,28 @@ export function getReadableEditorPayload(editor, { scope = 'auto' } = {}) {
   }
 }
 
-export async function getKokoroTTS(onProgress) {
-  installKokoroVoiceFetchPatch()
-  installKokoroVoiceCachePatch()
+/**
+ * Kokoro in the webview, for when the native backend isn't there (`npm run dev` in a
+ * browser). The model and tokenizer come from the same Hugging Face repository the
+ * native backend downloads.
+ */
+async function getWebviewKokoro(onProgress) {
   await configureTransformersForTauri()
 
   if (!kokoroPromise) {
-    kokoroPromise = import('kokoro-js')
-      .then(({ KokoroTTS }) => withTimeout(
-        KokoroTTS.from_pretrained(KOKORO_MODEL_ID, {
-          ...KOKORO_OPTIONS,
-          progress_callback: onProgress,
-        }),
+    kokoroPromise = import('@huggingface/transformers')
+      .then(({ StyleTextToSpeech2Model, AutoTokenizer }) => withTimeout(
+        Promise.all([
+          StyleTextToSpeech2Model.from_pretrained(KOKORO_MODEL_ID, {
+            ...KOKORO_OPTIONS,
+            progress_callback: onProgress,
+          }),
+          AutoTokenizer.from_pretrained(KOKORO_MODEL_ID, { progress_callback: onProgress }),
+        ]),
         KOKORO_MODEL_LOAD_TIMEOUT_MS,
         'Kokoro model load timed out. The first load needs to download the on-device model once; check your connection or install the model locally.'
       ))
+      .then(([model, tokenizer]) => ({ model, tokenizer }))
       .catch((error) => {
         kokoroPromise = null
         throw error
@@ -206,6 +211,48 @@ export async function getKokoroTTS(onProgress) {
   }
 
   return kokoroPromise
+}
+
+/** A voice's style vectors, one 256-float row per utterance length, from the bundled file. */
+function getVoiceStyles(voice) {
+  if (!voiceStyles.has(voice)) {
+    const url = getLocalKokoroVoiceUrl(voice)
+    const styles = url
+      ? fetch(url).then((response) => response.arrayBuffer()).then((buffer) => new Float32Array(buffer))
+      : Promise.reject(new Error(`Voice "${voice}" isn't bundled with Inkblot.`))
+    styles.catch(() => voiceStyles.delete(voice))
+    voiceStyles.set(voice, styles)
+  }
+  return voiceStyles.get(voice)
+}
+
+/**
+ * Synthesize `text` with the webview model. The style row is picked by the number of
+ * phoneme tokens, without the two padding ids, and capped at the voice file's last row.
+ */
+async function generateWebviewKokoroAudio(kokoro, text, { voice, speed }) {
+  const [{ Tensor }, { textToPhonemes }] = await Promise.all([
+    import('@huggingface/transformers'),
+    import('./readAloudVoice'),
+  ])
+  const language = String(voice || 'a').charAt(0) === 'b' ? 'b' : 'a'
+  const phonemes = await textToPhonemes(text, language)
+  const { input_ids: inputIds } = kokoro.tokenizer(phonemes, { truncation: true })
+  const row = Math.min(Math.max(inputIds.dims.at(-1) - 2, 0), 509) * 256
+  const styles = await getVoiceStyles(voice)
+  const { waveform } = await kokoro.model({
+    input_ids: inputIds,
+    style: new Tensor('float32', styles.slice(row, row + 256), [1, 256]),
+    speed: new Tensor('float32', [speed], [1]),
+  })
+
+  return {
+    audio: waveform.data,
+    sampling_rate: 24000,
+    engine: 'kokoro-wasm',
+    graphemes: [],
+    phonemes: [phonemes],
+  }
 }
 
 async function configureTransformersForTauri() {
@@ -264,17 +311,14 @@ export async function generateReadAloudAudio(text, {
     }
   }
 
-  installKokoroVoiceFetchPatch()
-  installKokoroVoiceCachePatch()
-
   onPhase?.('Preparing Kokoro...')
   const finalizingTimer = window.setTimeout(() => {
     onPhase?.('Finalizing Kokoro setup...')
   }, 1500)
 
-  let tts = null
+  let kokoro = null
   try {
-    tts = await getKokoroTTS(onProgress)
+    kokoro = await getWebviewKokoro(onProgress)
   } finally {
     window.clearTimeout(finalizingTimer)
   }
@@ -284,7 +328,7 @@ export async function generateReadAloudAudio(text, {
 
   try {
     return await withTimeout(
-      Promise.resolve().then(() => tts.generate(text, { voice, speed })),
+      generateWebviewKokoroAudio(kokoro, text, { voice, speed }),
       KOKORO_GENERATE_TIMEOUT_MS,
       'Kokoro got stuck while generating audio. Switching to the built-in system voice.',
       KOKORO_GENERATE_TIMEOUT_CODE
@@ -315,9 +359,9 @@ export async function prewarmReadAloud({ voice = DEFAULT_READ_ALOUD_VOICE } = {}
 /**
  * The native path: phonemize here, synthesize in Rust.
  *
- * The grapheme-to-phoneme pass runs in the webview, where `phonemizer` provides one,
- * and only the model runs natively; nothing here needs a subprocess, so the same path
- * can work on iOS. See lib/readAloudVoice.ts.
+ * The grapheme-to-phoneme pass runs in the webview (lib/g2p, through
+ * lib/readAloudVoice.ts) and only the model runs natively; nothing here needs a
+ * subprocess, so the same path can work on iOS.
  */
 async function generateNativeKokoroAudio(text, {
   voice = DEFAULT_READ_ALOUD_VOICE,
@@ -374,72 +418,12 @@ function yieldToBrowser() {
   })
 }
 
-export function getLocalKokoroVoiceUrl(voice) {
+function getLocalKokoroVoiceUrl(voice) {
   const matchingEntry = Object.entries(KOKORO_VOICE_ASSETS).find(([filePath]) => (
     filePath.endsWith(`/${voice}.bin`)
   ))
 
   return matchingEntry?.[1] || ''
-}
-
-function installKokoroVoiceFetchPatch() {
-  if (kokoroVoiceFetchPatched || typeof window === 'undefined' || typeof window.fetch !== 'function') {
-    return
-  }
-
-  kokoroVoiceFetchPatched = true
-  const originalFetch = window.fetch.bind(window)
-
-  window.fetch = (input, init) => {
-    const url = typeof input === 'string'
-      ? input
-      : input instanceof URL
-        ? input.href
-        : input?.url
-
-    const voice = getKokoroVoiceFromUrl(url)
-    const localVoiceUrl = voice ? getLocalKokoroVoiceUrl(voice) : ''
-
-    if (localVoiceUrl) {
-      return originalFetch(localVoiceUrl)
-    }
-
-    return originalFetch(input, init)
-  }
-}
-
-function installKokoroVoiceCachePatch() {
-  if (kokoroVoiceCachePatched || typeof window === 'undefined' || !window.caches?.open) {
-    return
-  }
-
-  kokoroVoiceCachePatched = true
-  const originalOpen = window.caches.open.bind(window.caches)
-
-  window.caches.open = (cacheName) => {
-    if (cacheName === 'kokoro-voices') {
-      return Promise.resolve({
-        match: async () => undefined,
-        put: async () => undefined,
-      })
-    }
-
-    return originalOpen(cacheName)
-  }
-}
-
-function getKokoroVoiceFromUrl(url) {
-  if (!url || typeof url !== 'string') return ''
-
-  try {
-    const parsedUrl = new URL(url, window.location.href)
-    const voiceMatch = parsedUrl.pathname.match(/\/voices\/([^/]+)\.bin$/)
-    if (!voiceMatch) return ''
-
-    return READ_ALOUD_VOICES.some((voice) => voice.id === voiceMatch[1]) ? voiceMatch[1] : ''
-  } catch {
-    return ''
-  }
 }
 
 export function splitReadAloudText(text, maxLength = MAX_READ_ALOUD_CHUNK_LENGTH) {

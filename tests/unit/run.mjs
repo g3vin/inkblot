@@ -29,8 +29,8 @@
  *          drop indicator goes
  *   prefs  the preference store's webview half: which file a key lands in, that reads
  *          are synchronous after hydration, and that a failed write is survivable
- *   voice  the Read Aloud text normalizer, against the one inside kokoro-js — a
- *          transcription, so it is compared with its original rather than trusted
+ *   voice  Read Aloud's grapheme-to-phoneme pass, against misaki's own answers — a
+ *          port, so it is compared with its original rather than trusted
  *   bridge the bridge protocol client, both ends: that a command reaches the editor
  *          it names, that a request is always answered rather than left hanging, that
  *          coalescing drops intermediate values and never the last one, that the

@@ -3,14 +3,15 @@
 //! The work splits across the process boundary:
 //!
 //! ```text
-//!   webview:  text -> normalize -> phonemize -> token ids   (src/lib/readAloudVoice.ts)
+//!   webview:  text -> phonemes -> token ids   (src/lib/readAloudVoice.ts, src/lib/g2p)
 //!   native:   token ids + voice + speed -> ONNX -> f32 @ 24kHz
 //! ```
 //!
 //! Phonemization lives in the webview because a correct English grapheme-to-phoneme
-//! pass is a lexicon plus several thousand rules, and `phonemizer` provides one there.
-//! No step needs a subprocess, so the pipeline can run on iOS. When the native path is
-//! unavailable the page falls back to kokoro-js's in-browser WASM build.
+//! pass is a pronouncing dictionary plus rules, and `src/lib/g2p` (a port of misaki,
+//! the G2P Kokoro was trained with) provides one there. No step needs a subprocess, so
+//! the pipeline can run on iOS. When the native path is unavailable the page runs the
+//! same model in WASM through transformers.js.
 //!
 //! ## The model is downloaded, not bundled
 //!

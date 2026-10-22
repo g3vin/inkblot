@@ -11,6 +11,11 @@ Notable changes to Inkblot. The format follows
 - **License:** Inkblot is open source under the Apache License 2.0. The name and logo
   stay trademarks; see TRADEMARKS.md. Contributions are signed off under the
   Developer Certificate of Origin.
+- **Read Aloud pronunciation:** text is turned into speech sounds by a port of misaki,
+  the pronouncing dictionary and rules Kokoro's voices were trained with, instead of
+  eSpeak NG. Numbers, money, years and times read naturally, words like "read",
+  "record" and "live" follow the words around them, and names the dictionary doesn't
+  know are still spoken. Read Aloud no longer ships any GPL code.
 
 ### Added
 
