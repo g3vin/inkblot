@@ -114,6 +114,9 @@
   --z-dialog: 80;
   --z-toast: 90;
   --z-tooltip: 100;
+  /* A gesture in progress (the ink wheel) is over everything, including the layers
+     that predate this scale (hover notes, legacy popovers, the tab bar). */
+  --z-gesture: 5000;
 
   /* The fade scrim under chrome that overlays the document: solid for the first
      --scrim-solid-stop of its height, then clear. Text scrolls under and dissolves. */

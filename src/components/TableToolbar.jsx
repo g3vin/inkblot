@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, FloatingToolbar, IconButton, InkPicker, Menu, MenuItem, MenuSeparator, Popover, ToolbarSeparator } from '../ui'
+import { FloatingToolbar, IconButton, InkWheel, Menu, MenuItem, MenuSeparator, ToolbarSeparator } from '../ui'
 import { useCommands } from '../lib/commands'
 import { TABLE_BORDERS, tableAt } from '../extensions/TableStyles'
 import './TableToolbar.css'
@@ -47,7 +47,6 @@ export default function TableToolbar({ editor }) {
   const [menu, setMenu] = useState(null)
   const [position, setPosition] = useState(null)
   const barRef = useRef(null)
-  const fillRef = useRef(null)
   const bordersRef = useRef(null)
   const moreRef = useRef(null)
 
@@ -180,15 +179,18 @@ export default function TableToolbar({ editor }) {
         <IconButton icon="cell-merge" label="Merge cells" size="capsule" disabled={!table.canMerge} onClick={act.merge} />
         <IconButton icon="cell-split" label="Split cell" size="capsule" disabled={!table.canSplit} onClick={act.split} />
         <ToolbarSeparator />
-        <IconButton ref={fillRef} icon="cell-fill" label="Cell fill" size="capsule" filled={Boolean(table.fill)} aria-haspopup="dialog" aria-expanded={menu === 'fill'} onClick={() => setMenu(menu === 'fill' ? null : 'fill')} />
+        <InkWheel
+          label="Cell fill"
+          value={table.fill}
+          none={{ label: 'No fill' }}
+          onChange={(ink) => act.fill(ink)}
+          onOpenChange={(open) => setMenu(open ? 'fill' : null)}
+          as={IconButton}
+          triggerProps={{ icon: 'cell-fill', label: 'Cell fill', size: 'capsule', filled: Boolean(table.fill) }}
+        />
         <IconButton ref={bordersRef} icon="borders" label="Borders" size="capsule" aria-haspopup="menu" aria-expanded={menu === 'borders'} onClick={() => setMenu(menu === 'borders' ? null : 'borders')} />
         <IconButton ref={moreRef} icon="more" label="More table tools" size="capsule" aria-haspopup="menu" aria-expanded={menu === 'more'} onClick={() => setMenu(menu === 'more' ? null : 'more')} />
       </FloatingToolbar>
-
-      <Popover anchorRef={fillRef} open={menu === 'fill'} onClose={closeMenu} className="table-fill-popover">
-        <InkPicker label="Cell fill" value={table.fill} onChange={(ink) => act.fill(ink)} />
-        <Button disabled={!table.fill} onClick={() => act.fill(null)}>No fill</Button>
-      </Popover>
 
       <Menu open={menu === 'borders'} onClose={closeMenu} anchorRef={bordersRef} label="Borders">
         {TABLE_BORDERS.map((borders) => (

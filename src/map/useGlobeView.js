@@ -13,6 +13,7 @@
  * most every 50 ms (`camera`), and it is saved (not as an edit) when it stops.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { centralAngle } from '../lib/map/geodesy'
 import { unwrapLongitudes } from '../lib/map/globeFeatures'
 import { ITEM_LAYERS } from '../lib/map/globeStyle'
@@ -102,14 +103,16 @@ export function useGlobeView({ surfaceRef, initialCamera, onCameraChange, enable
       cameraRef.current = read()
       onCameraChangeRef.current?.(cameraRef.current)
     }
-    const onResize = () => {
+    const readSize = () => {
       const canvas = gl.getCanvas()
       setSize({ width: canvas.clientWidth, height: canvas.clientHeight })
     }
+    // Rendered with the redraw that follows, so the overlay doesn't trail the globe.
+    const onResize = () => flushSync(readSize)
     gl.on('move', onMove)
     gl.on('moveend', onEnd)
     gl.on('resize', onResize)
-    onResize()
+    readSize()
     tick()
     return () => {
       window.clearTimeout(timer)

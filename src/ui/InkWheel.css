@@ -1,0 +1,178 @@
+/*
+ * InkWheel — the ring of ink dots that blooms out of a colour control. No surface
+ * behind it: each dot floats on its own shadow. Every dot is placed by InkWheel.jsx
+ * (--tx, --ty, --scale, --opacity); this file says how fast it gets there, and how
+ * its face stretches on the way.
+ */
+
+.ib-ink-wheel-trigger {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+.ib-ink-wheel-trigger:hover { background: var(--control-hover-bg); }
+.ib-ink-wheel-trigger:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ib-ink-wheel-trigger:disabled { cursor: default; opacity: 0.5; }
+
+.ib-ink-wheel-trigger-dot {
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+.ib-ink-wheel-trigger-dot[data-empty='true'] { box-shadow: inset 0 0 0 1.5px var(--text-secondary); }
+
+/* Over everything while open (a hover note included), so a press anywhere is the
+   wheel's. */
+.ib-ink-wheel {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-gesture);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* The middle dot is the pointer now. */
+.ib-ink-wheel[data-mode='mouse'] { cursor: none; }
+.ib-ink-wheel[data-phase='closing'],
+.ib-ink-wheel[data-phase='settling'] { pointer-events: none; }
+
+.ib-ink-wheel-ring {
+  position: absolute;
+  width: 0;
+  height: 0;
+  outline: none;
+}
+
+.ib-ink-wheel-dot {
+  --dot: 24px;
+  position: absolute;
+  left: calc(var(--dot) / -2);
+  top: calc(var(--dot) / -2);
+  width: var(--dot);
+  height: var(--dot);
+  opacity: var(--opacity, 1);
+  transform: translate(var(--tx, 0), var(--ty, 0)) scale(var(--scale, 1));
+  /* Blooming: one after another, clockwise. */
+  transition:
+    transform var(--dur-base) var(--ease-out) calc(var(--open-order) * 18ms),
+    opacity var(--dur-fast) var(--ease-out) calc(var(--open-order) * 18ms);
+}
+
+/* The dot itself, inside the element that places it, so it can stretch along the way it
+   travels (--axis) without moving. */
+.ib-ink-wheel-face {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow:
+    var(--shadow-float),
+    inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 10%, transparent);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* Once open, the hand moves the dots: InkWheel paints them every frame, and a swap
+   animates on top (the translate property, and the face), so the transform itself never
+   eases. The held dot follows from the start, even mid-bloom. */
+[data-phase='ready'] .ib-ink-wheel-dot,
+[data-phase='open'] .ib-ink-wheel-held {
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+/* The taken ink settles in the middle. */
+[data-phase='settling'] .ib-ink-wheel-dot[data-picked='true'] {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+/* Folding back the way it came: counter-clockwise and faster, while the new colour
+   moves to the middle; then the new colour sinks into the control. */
+[data-phase='settling'] .ib-ink-wheel-dot:not([data-picked='true']),
+[data-phase='closing'] .ib-ink-wheel-dot {
+  transition:
+    transform var(--dur-fast) var(--ease-in) calc(var(--close-order) * 8ms),
+    opacity var(--dur-fast) var(--ease-in) calc(var(--close-order) * 8ms);
+}
+
+/* Each dot stretches along its path as it travels and rounds off as it lands. The held
+   dot only travels when it folds from the place it was swapped into. Two names, so the
+   taken ink stretches again as it sinks into the control. */
+@keyframes ib-ink-stretch {
+  from, to { transform: rotate(var(--axis, 0deg)) scale(1, 1) rotate(calc(var(--axis, 0deg) * -1)); }
+  40% { transform: rotate(var(--axis, 0deg)) scale(1.3, 0.8) rotate(calc(var(--axis, 0deg) * -1)); }
+}
+@keyframes ib-ink-stretch-home {
+  from, to { transform: rotate(var(--axis, 0deg)) scale(1, 1) rotate(calc(var(--axis, 0deg) * -1)); }
+  40% { transform: rotate(var(--axis, 0deg)) scale(1.3, 0.8) rotate(calc(var(--axis, 0deg) * -1)); }
+}
+[data-phase='open'] .ib-ink-wheel-dot:not(.ib-ink-wheel-held) .ib-ink-wheel-face {
+  animation: ib-ink-stretch var(--dur-base) var(--ease-out) calc(var(--open-order) * 18ms) both;
+}
+[data-phase='settling'] .ib-ink-wheel-dot[data-picked='true'] .ib-ink-wheel-face {
+  animation: ib-ink-stretch var(--dur-fast) var(--ease-out) both;
+}
+[data-phase='settling'] .ib-ink-wheel-dot:not([data-picked='true']):not(.ib-ink-wheel-held) .ib-ink-wheel-face,
+[data-phase='settling'] .ib-ink-wheel-held[data-taken='true'] .ib-ink-wheel-face,
+[data-phase='closing'] .ib-ink-wheel-dot:not([data-picked='true']):not(.ib-ink-wheel-held) .ib-ink-wheel-face,
+[data-phase='closing'] .ib-ink-wheel-held[data-taken='true'] .ib-ink-wheel-face {
+  animation: ib-ink-stretch var(--dur-fast) var(--ease-in) calc(var(--close-order) * 8ms) both;
+}
+[data-phase='closing'] .ib-ink-wheel-dot[data-picked='true'] .ib-ink-wheel-face {
+  animation: ib-ink-stretch-home var(--dur-fast) var(--ease-in) both;
+}
+
+/* The ink the keyboard is on. (A hand's target says so by leaning in instead.) */
+[data-mode='keyboard'] .ib-ink-wheel-dot[data-target='true'] .ib-ink-wheel-face {
+  box-shadow:
+    var(--shadow-float),
+    0 0 0 2px var(--app-bg),
+    0 0 0 3.5px var(--swatch);
+}
+
+/* The current ink's own place, empty while it sits in the middle. */
+.ib-ink-wheel-dot[data-socket='true'] .ib-ink-wheel-face {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--swatch);
+}
+[data-mode='keyboard'] .ib-ink-wheel-dot[data-socket='true'][data-target='true'] .ib-ink-wheel-face {
+  box-shadow: inset 0 0 0 2px var(--swatch), 0 0 0 2px var(--app-bg), 0 0 0 3.5px var(--swatch);
+}
+
+/* "No colour": a hollow dot with a stroke through it. "Default" keeps its colour and
+   is ringed with a dashed edge instead. */
+.ib-ink-wheel-dot[data-empty='true'] .ib-ink-wheel-face {
+  background: var(--app-bg);
+  box-shadow: var(--shadow-float), inset 0 0 0 1.5px var(--swatch);
+}
+.ib-ink-wheel-dot[data-empty='true'] .ib-ink-wheel-face::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 15%;
+  width: 1.5px;
+  height: 70%;
+  margin-left: -0.75px;
+  background: var(--swatch);
+  transform: rotate(45deg);
+}
+.ib-ink-wheel-dot[data-none='true']:not([data-empty='true']) .ib-ink-wheel-face {
+  outline: 1.5px dashed var(--text-secondary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No bloom, no stretch and no flight: the dots are simply there, then gone. */
+  .ib-ink-wheel .ib-ink-wheel-dot { transition-delay: 0s !important; }
+  .ib-ink-wheel .ib-ink-wheel-face { animation: none !important; }
+}

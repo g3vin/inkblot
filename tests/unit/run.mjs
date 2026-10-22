@@ -61,6 +61,8 @@
  *          one blur token, no prefers-color-scheme duplicates
  *   ui     the shared controls (src/ui): reorder and placement math, native menus,
  *          and the controls mounted
+ *   inkwheel the ink wheel: the ring and drag arithmetic, the swap and its undo, and
+ *          the control driven by keyboard and by a mouse drag
  *   icons  every icon name in src/ is registered in src/ui/icons.js, and each means one
  *          thing: trash deletes, × closes, the magnifier finds, no glyph has two names
  *   help   every help topic a control points at exists in src/lib/help.ts
@@ -93,6 +95,7 @@
  *   presets the writer's own folder types: matching, saved with the project, the sheet
  *   updates after an update: once per version, highlights from a release, the banner
  *   windows a tab dragged out into a window of its own, put back, kept on top
+ *   emptiness which notes, documents and folders are blank enough to delete without asking
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -111,7 +114,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows', 'emptiness']
 
 const failures = []
 

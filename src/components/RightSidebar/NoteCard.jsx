@@ -16,8 +16,10 @@ import Icon from '../../ui/Icon.jsx'
 import NoteImageGallery from '../NoteImageGallery'
 import { AudioClipList, AudioRecordButton } from '../AudioNotes'
 import { pickNoteImages, readClipboardImages } from '../../lib/noteImageUtils'
-import { NOTE_COLOR_OPTIONS, noteColor, noteInk } from '../../lib/noteUtils'
-import InkPicker from '../../ui/InkPicker.jsx'
+import { NOTE_COLOR_OPTIONS, isNoteEmpty, noteColor, noteInk } from '../../lib/noteUtils'
+import InkWheel from '../../ui/InkWheel.jsx'
+
+const NOTE_COLOR_TRIGGER = { className: 'note-tool-btn', children: <span className="note-color-dot" aria-hidden="true" /> }
 
 export default function NoteCard({
   note,
@@ -38,22 +40,7 @@ export default function NoteCard({
   motion = null,
 }) {
   const textareaRef = useRef(null)
-  const pillRef = useRef(null)
   const [editing, setEditing] = useState(false)
-  const [pickingColor, setPickingColor] = useState(false)
-
-  // The colour picker opens in the note, as a hover note's does: its own colour focused
-  // as it opens, closed by a pick, Escape, or a press anywhere outside it.
-  useEffect(() => {
-    if (!pickingColor) return undefined
-    pillRef.current?.querySelector('[aria-checked="true"]')?.focus()
-    const close = (event) => {
-      if (event.target instanceof Element && pillRef.current?.contains(event.target)) return
-      setPickingColor(false)
-    }
-    window.addEventListener('pointerdown', close, true)
-    return () => window.removeEventListener('pointerdown', close, true)
-  }, [pickingColor])
 
   // Grow the textarea to fit its content; when not editing, cap at the CSS max-height.
   const resizeTextarea = useCallback(() => {
@@ -93,7 +80,7 @@ export default function NoteCard({
   return (
     <div
       id={`note-${note.id}`}
-      className={`note-tile${note.pinned ? ' pinned' : ''}${pickingColor ? ' is-picking-color' : ''}${motion?.state ? ` is-${motion.state}` : ''}`}
+      className={`note-tile${note.pinned ? ' pinned' : ''}${motion?.state ? ` is-${motion.state}` : ''}`}
       style={{
         '--note-color': noteColor(note.color),
         ...(motion?.card ? { '--card-delay': `${motion.card.delay}ms`, '--card-ms': `${motion.card.ms}ms` } : null),
@@ -101,45 +88,14 @@ export default function NoteCard({
       onClick={note.type === 'quote' ? onJump : undefined}
     >
       <div className="note-tile-header">
-        {pickingColor ? (
-          // The note's own colour stays where its dot was; the others run out to its
-          // right in a pill. A press in it is not a drag of the note or a jump to it.
-          <div
-            ref={pillRef}
-            className="note-preview-ink-pill"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => {
-              if (event.key !== 'Escape') return
-              event.stopPropagation()
-              setPickingColor(false)
-            }}
-          >
-            <InkPicker
-              label="Note colour"
-              value={noteInk(note)}
-              inks={[noteInk(note), ...NOTE_COLOR_OPTIONS.filter((ink) => ink !== noteInk(note))]}
-              onChange={(ink) => {
-                onChangeColor?.(ink)
-                setPickingColor(false)
-              }}
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="note-tool-btn"
-            onClick={(event) => {
-              event.stopPropagation()
-              setPickingColor(true)
-            }}
-            aria-label="Note colour"
-            title="Note colour"
-            aria-expanded={false}
-          >
-            <span className="note-color-dot" aria-hidden="true" />
-          </button>
-        )}
+        <InkWheel
+          label="Note colour"
+          value={noteInk(note)}
+          inks={NOTE_COLOR_OPTIONS}
+          onChange={(ink) => onChangeColor?.(ink)}
+          as="button"
+          triggerProps={NOTE_COLOR_TRIGGER}
+        />
 
         <div className="note-tile-header-end">
           <div className="note-timestamp ib-meta">
@@ -164,7 +120,7 @@ export default function NoteCard({
             className="note-tool-btn"
             onClick={async (event) => {
               event.stopPropagation()
-              const ok = await confirm('Delete note?')
+              const ok = isNoteEmpty(note) || await confirm('Delete note?')
               if (ok) onRemove()
             }}
             aria-label="Delete note"

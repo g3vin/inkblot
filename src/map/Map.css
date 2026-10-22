@@ -353,19 +353,6 @@
   font: 13px/1.35 var(--font-ui);
 }
 
-.map-inspector-toggle {
-  top: 12px;
-  right: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--size-circle);
-  height: var(--size-circle);
-  padding: 0;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-
 .map-tool {
   display: inline-flex;
   align-items: center;

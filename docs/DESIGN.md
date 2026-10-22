@@ -18,7 +18,7 @@ For anyone short on time, human or agent. The rest of this document explains eac
 
 1. **Build from `src/ui/`.** Use `Button`, `IconButton`, `Segmented`, `Menu`, `Popover`,
    `Sheet`, `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`, `Panel`,
-   `Card`, `EmptyState`, `InkPicker` and the others. Don't restyle a bare `<button>` or
+   `Card`, `EmptyState`, `InkWheel`, `InkPicker` and the others. Don't restyle a bare `<button>` or
    write a new modal.
 2. **Never hard-code a design value.** Colours, fonts, radii, shadows, durations and
    spacing come from tokens (`var(--…)`). `npm run lint:design` fails on a new raw
@@ -181,7 +181,29 @@ style={{ '--card-color': inkColor(note.color) }}
 ```
 
 `resolveInkHex()` returns the current literal hex, for the rare API that cannot take a
-CSS variable (`<input type="color">`, a 2D canvas context).
+CSS variable (a 2D canvas context, or content that stores literal colours, like a map).
+
+**Picking an ink.** A thing on the page (a note, a table cell, a canvas card, a map pin,
+a timeline lane) is coloured with `InkWheel`. The control is the thing's own colour, and
+pressing it blooms the inks out of it into a ring of floating dots: no surface behind
+them, only their shadows. Every ink always opens in the same place, so a hand learns the
+ring, and the current ink's place shows as an empty socket.
+
+- **The middle dot is what you move.** Swipe toward an ink and the held dot gives a
+  little while that ink leans in to meet it. Go far enough and they trade places: the
+  ink slides straight in under the held colour, which goes out over it to the ink's
+  place. At rest, no dot covers another. Let go and the new colour settles in the middle while the rest fold
+  back. Swipe back toward the middle before letting go to trade them back.
+- **Mouse.** The cursor is hidden while the ring is open: the middle dot stands in for
+  it. Pointer Lock puts the cursor back where it started. A click opens the ring and a
+  second click lets go.
+- **Touch and pen.** Drag the same way, or tap an ink.
+- **Keyboard.** Enter, Space or ↓ opens the ring. The arrows (or 1–9) move round it,
+  Enter takes and Escape leaves.
+- **No colour, or Default.** Pass `none` and the ring gets a hollow last place for it.
+
+A labelled choice inside a form (the accent, the window colour, a folder type) stays an
+inline `InkPicker` row, because there the names help more than speed does.
 
 ### Status
 
@@ -364,7 +386,9 @@ and `.ib-prose` (any element that shows the writer's text).
   is lifted out of its surface onto `--app-bg` with `--shadow-lift`, with no tint and no
   border. The accent marks focus and controls that are on, not where you are.
 - **Layers.** Use `--z-chrome` < `--z-panel` < `--z-popover` < `--z-dialog` < `--z-toast`
-  < `--z-tooltip`. Don't invent z-indexes.
+  < `--z-tooltip`, and `--z-gesture` for a gesture in progress (the ink wheel), which
+  sits over everything, including older layers outside this scale. Don't invent
+  z-indexes.
 - **Reading width.** Prose stays near 65–75 characters. The editor's `max-width`
   handles this; don't widen it for chrome.
 
@@ -411,7 +435,23 @@ changes, `--dur-base` (180ms) for popovers, dialogs and panels, and `--dur-slow`
 for sheets. The easing is `--ease-out` (`--ease-standard` is the same curve). There is no bounce or overshoot, and no looping
 or attention-seeking animation. Motion explains where something came from and never
 decorates. `prefers-reduced-motion` is honoured globally (`base.css`); framer-motion
-components also check `useReducedMotion()`.
+components also check `useReducedMotion()`. A staggered entrance (the ink wheel's
+bloom) must also drop its `transition-delay` under reduced motion, which `base.css`
+doesn't reset.
+
+The ink wheel's motion:
+- **Bloom.** The dots open clockwise in `--dur-base`, 18ms apart.
+- **Following the hand.** Once open, the dots are painted every frame with no
+  transition, so nothing lags behind the hand.
+- **Trade.** A trade is a straight slide in `--dur-base` with `--ease-out`, animated on
+  the `translate` property on top of the painted position, so a dot lands on the hand
+  wherever it has moved to.
+- **Stretch.** A moving dot stretches along its path, to about 1.3 × 0.8 at 40% of the
+  way, and rounds off as it lands. This applies to the bloom, the trade and the fold.
+  The stretch is on an inner face, never on the element that is positioned, and
+  there's none under reduced motion.
+- **Close.** The ring folds back counter-clockwise in `--dur-fast`, 8ms apart, while the
+  taken ink moves to the middle. That ink then sinks into the control.
 
 ---
 
@@ -479,7 +519,8 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `Card` | A bordered block in a panel | `ink` applies the card recipe |
 | `Tag` | Small categorical labels | Takes an ink |
 | `EmptyState` | Any list or panel with nothing in it | Icon, typewritten line and plain hint, centred; in a panel it sits in the middle of the panel's height. At most one action. `compact` for a section or "no matches" (stays in place); `dropActive` washes it in the accent while something is dragged over |
-| `InkPicker` | **Every** colour choice | Notes, cards, accent (Settings → General). Don't build another swatch row |
+| `InkWheel` | Colouring a thing on the page | Notes, table fill, canvas cards, map and timeline colours. `none` adds "No fill" / "Default"; `as` + `triggerProps` draw the control as an `IconButton` or a tool button |
+| `InkPicker` | A labelled colour choice in a form | Accent and window colour (Settings → General), folder types. Don't build another swatch row |
 | `FloatingCapsule` | A readout floating over the page (word count, zoom, tab bar) | The floating-capsule surface; glass on iOS |
 | `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips (formatting, canvas, map) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS |
 | `FloatingActionButton` | One round primary action over the document | Glass on iOS |
