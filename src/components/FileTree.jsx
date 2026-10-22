@@ -20,7 +20,7 @@ import {
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
 import Icon from '../ui/Icon.jsx'
-import { IconButton, Inlay, InlaySlot, popUpNativeMenu } from '../ui'
+import { IconButton, Inlay, InlaySlot, popUpMenu } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, TREE_KINDS, applyTreeFilter, folderPaths } from '../lib/treeFilter'
@@ -720,7 +720,7 @@ export default function FileTree({
   // shut, and which kinds of file it lists.
   const openNewMenu = (event) => {
     const contextLabel = storyFolderContext?.preset.entryLabel.toLowerCase()
-    popUpNativeMenu(event, [
+    popUpMenu(event, [
       { text: 'New document', action: () => beginNewEntry('file', '') },
       { text: 'New canvas', action: () => beginNewEntry('canvas', '') },
       { text: 'New map', action: () => beginNewEntry('map', '') },

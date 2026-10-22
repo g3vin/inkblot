@@ -464,7 +464,7 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `Tooltip` | Naming a control in a richer way than `title` | Short, no period, after a 500ms delay, with an optional shortcut. Never holds anything a user must read to succeed |
 | `Kbd` | Showing a shortcut | Courier Prime |
 | `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in; Tab closes it. `danger` items go last, after a separator. See *Pop-ups* below |
-| `useNativeMenu`, `popUpNativeMenu` | Context menus and menus a native window menu would show | The OS menu, built from the same items |
+| `popUpMenu`, `useNativeMenu` | Any menu built from a plain list of items | A right-click gets the OS's menu; a button gets an in-page `Menu` from the same items. See *Pop-ups* |
 | `Popover` | Small forms and pickers anchored to a control, or to a place in the text | **The one pop-up shell.** `eyebrow`, `align`, `anchorRect`, `onEscape`. See *Pop-ups* below |
 | `Dialog` | **The one modal**: a decision, a form, an editor, Settings | See *Dialogs* below |
 | `NavSheet` | A large `Dialog` of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
@@ -516,18 +516,20 @@ There is one modal, `Dialog` (decided in design review round 01, 2026-10-20; see
 - **Focus:** the first control inside, never the ×. Tab stays inside, the app behind is
   inert, and focus goes back where it was.
 
+The **command palette** (⌘K) is a Dialog in behaviour: the scrim, the motion in and out, an
+inert app behind, focus trapped and returned (round 02b). Its body is its own: a search
+field over a list, with no header or footer.
+
 **Declared exceptions:**
 
 - **Customize toolbar** drops from under the titlebar (`placement="top"`), and the app
   behind it is not made inert, because its toolbar is what items are dragged into.
-- **The command palette** has its own surface and scrim (`CommandPalette`). It hasn't been
-  reviewed yet (design review round 02b, menus).
 
 ### Pop-ups
 
 Anything anchored to a control (or a place in the text) that floats until it's dismissed
-is a `Popover` or a `Menu` (decided in design review round 02, 2026-10-21; see
-`docs/design-review/rounds/02-popups.md`). Don't build another floating box: the footnote
+is a `Popover` or a `Menu` (decided in design review rounds 02 and 02b, 2026-10-21; see
+`docs/design-review/rounds/02-popups.md` and `02b-menus.md`). Don't build another floating box: the footnote
 editor, read aloud, the e-book Reader, Typeset's page pickers and the citation editor
 (plain DOM, with the same classes) are all Popovers.
 
@@ -547,6 +549,16 @@ editor, read aloud, the e-book Reader, Typeset's page pickers and the citation e
   A menu focuses its first item, arrows move, and Tab closes it.
 - **Inside a dialog,** a pop-up renders in the dialog's layer (`layer.js`), above it, and
   Escape closes the pop-up before the dialog.
+- **Menus: native for a right-click, in the page for a button** (round 02b, 2026-10-21).
+  A right-click gets the OS's menu; a menu a button opens is an in-page `Menu`. Both come
+  from one description through `popUpMenu`, so a submenu in the list becomes a labelled
+  group in the page.
+- **The toolbar's »** is a labelled list: each item that didn't fit, its control and then
+  its name, as every other "More" has words.
+- **A pop-up opened from a pop-up opens inside it.** Read aloud in » turns » into read
+  aloud: its button stays, pressed, the other items go, and » grows to hold it. Pressing
+  the button again comes back; Escape or a click outside closes it all. `Popover` does this
+  for any Popover opened inside another.
 
 **If a component doesn't exist yet,** build it in `src/ui/` from tokens, add it to the
 showcase (`src/dev/DesignShowcase.jsx`) and to this table, in the same PR.

@@ -13,7 +13,7 @@ import {
   AppIcon, Mark, Wordmark,
   Breadcrumb, Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
   FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, Input, Kbd, Menu, MenuItem,
-  MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented,
+  MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented, popUpMenu,
   SelectMenu, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
 } from '../ui'
 import NavSheet from '../ui/NavSheet.jsx'
@@ -242,6 +242,11 @@ export default function DesignShowcase() {
             <Popover open={popover} onClose={() => setPopover(false)} anchorRef={popRef} eyebrow="Note colour" aria-label="Note colour">
               <InkPicker label="Note colour" value={ink} onChange={setInk} />
             </Popover>
+            <Button variant="tinted" onClick={(event) => popUpMenu(event, [
+              { text: 'Sort', items: [{ text: 'By name', checked: true }, { text: 'By date', checked: false }] },
+              { separator: true },
+              { text: 'New folder…', accelerator: 'CmdOrCtrl+Shift+N' },
+            ])}>A button’s menu <Icon name="chevron-down" /></Button>
             <Button variant="tinted" onClick={() => setDialog(true)}>Open a small decision</Button>
             <Button variant="tinted" onClick={() => setSheet(true)}>Open a medium dialog</Button>
           </div>

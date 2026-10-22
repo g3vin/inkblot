@@ -2,15 +2,18 @@
  * CommandPalette.jsx — ⌘K (Ctrl+K elsewhere): search every action in the app.
  *
  * Mounted once, in App. Lists what src/lib/commands.ts holds, grouped by section,
- * fuzzy-matched as you type. ↑/↓ move, Enter runs, Escape closes.
+ * fuzzy-matched as you type. ↑/↓ move, Enter runs, Escape closes. It behaves as a Dialog
+ * does (the scrim, the motion in and out, an inert app behind); its body is its own: a
+ * search field over a list (docs/DESIGN.md §9 → Dialogs).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { runCommand, scoreCommand, useCommandList } from '../lib/commands'
 import { shortcutLabel, useKeybindingOverrides } from '../lib/keybindings'
-import { useFocusTrap } from './hooks'
+import { useExitAnimation, useFocusTrap } from './hooks'
 import Icon from './Icon'
 import Kbd from './Kbd'
+import './Dialog.css'
 import './Popover.css'
 import './CommandPalette.css'
 
@@ -46,7 +49,17 @@ function PaletteDialog({ onClose }) {
   const ref = useRef(null)
   const inputRef = useRef(null)
   const listRef = useRef(null)
+  const scrimRef = useRef(null)
   useFocusTrap(true, ref, inputRef)
+
+  // A Dialog's behaviour (DESIGN.md §9 → Dialogs): it leaves the way it came, and the app
+  // behind is inert while it's open.
+  useExitAnimation(scrimRef)
+  useEffect(() => {
+    const root = document.getElementById('root')
+    root?.setAttribute('inert', '')
+    return () => root?.removeAttribute('inert')
+  }, [])
 
   const results = useMemo(() => {
     const scored = commands
@@ -78,7 +91,7 @@ function PaletteDialog({ onClose }) {
 
   let lastSection = null
   return createPortal(
-    <div className="ib-palette-scrim" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div ref={scrimRef} className="ib-palette-scrim" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <div ref={ref} role="dialog" aria-modal="true" aria-label="Command palette" className="ib-palette ib-menu" onKeyDown={onKeyDown}>
         <div className="ib-palette-search">
           <Icon name="search" size={20} />

@@ -9,8 +9,8 @@
  */
 // A round's family, while its options are being reviewed:
 //   name: { decisions: { 1: 'header', … }, install: (picks) => { variants.X = … } }
-// Round 01 (modals) was applied on 2026-10-20, and round 02 (pop-ups) on 2026-10-21; their
-// prototypes are removed.
+// Rounds 01 (modals), 02 (pop-ups) and 02b (menus) are applied; their prototypes are
+// removed.
 const FAMILIES = {}
 
 /** `modals:1B,3C` → { modals: { 1: 'B', 3: 'C' } }. */

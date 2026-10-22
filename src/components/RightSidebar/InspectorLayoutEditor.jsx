@@ -8,7 +8,7 @@ import { useRef } from 'react'
 import Icon from '../../ui/Icon.jsx'
 import { Button, Dialog } from '../../ui'
 import usePointerReorder from '../../ui/usePointerReorder'
-import { popUpNativeMenu } from '../../ui/useNativeMenu'
+import { popUpMenu } from '../../ui/useNativeMenu'
 import { INSPECTOR_LAYOUT_INFO, INSPECTOR_LAYOUT_KINDS, inspectorTab, rowsFor, tabsOf } from '../../lib/chromeLayout'
 import { useInspectorLayouts } from './useInspectorLayout'
 import './InspectorLayout.css'
@@ -87,7 +87,7 @@ export default function InspectorLayoutEditor({ onClose }) {
         <>
           <Button
             variant="plain"
-            onClick={(event) => popUpNativeMenu(event, [
+            onClick={(event) => popUpMenu(event, [
               { text: 'Both layouts', action: () => restore('both') },
               { text: 'Write', action: () => restore('drafting') },
               { text: 'Typeset', action: () => restore('finishing') },

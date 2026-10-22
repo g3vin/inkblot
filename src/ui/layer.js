@@ -5,3 +5,6 @@
 import { createContext } from 'react'
 
 export const LayerContext = createContext(null)
+
+/** The Popover a Popover was opened from: the inner one opens inside it (Popover.jsx). */
+export const PopoverNestContext = createContext(null)

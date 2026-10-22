@@ -11,7 +11,7 @@
  */
 import { useRef, useState } from 'react'
 import { Button, Dialog, Field, Input, MenuItem, MenuLabel, MenuSeparator, MoreMenu, PanelActions, Popover, ScopeMenu, SelectMenu, TextArea } from '../../../ui'
-import { popUpNativeMenu } from '../../../ui/useNativeMenu'
+import { popUpMenu } from '../../../ui/useNativeMenu'
 import { exportMenuItems } from '../../toolbar/items/exportMenu'
 import { describeJob } from '../../../print/usePrintJobStatus'
 import Icon from '../../../ui/Icon.jsx'
@@ -90,7 +90,7 @@ export default function FinishingHeader({ layout, showsActions = true }) {
             variant="tinted"
             className="fin-grow"
             disabled={!layout.hasDocument || running(layout.job)}
-            onClick={(event) => popUpNativeMenu(event, exportMenuItems(ctx, { bindable }))}
+            onClick={(event) => popUpMenu(event, exportMenuItems(ctx, { bindable }))}
           >
             Export <Icon name="chevron-down" />
           </Button>

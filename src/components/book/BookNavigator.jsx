@@ -18,7 +18,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { Button, Dialog, IconButton, Inlay, InlaySlot, usePointerReorder } from '../../ui'
-import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
+import { popUpMenu } from '../../ui/useNativeMenu.js'
 import Icon from '../../ui/Icon.jsx'
 import { SECTION_TITLES, addMenu, moveTarget, rowMenu } from './bookMenu.js'
 import './BookNavigator.css'
@@ -107,7 +107,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
           title="Add front matter, back matter or a part"
           size="circle"
           aria-haspopup="menu"
-          onClick={(event) => popUpNativeMenu(event, addMenu(rows))}
+          onClick={(event) => popUpMenu(event, addMenu(rows))}
         />
       </Inlay>
     </InlaySlot>
@@ -138,7 +138,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
                   onPointerDown={(event) => { if (!event.target.closest('.book-row-eye')) onPointerDown(event, row.id) }}
                   onClick={() => open(row.id)}
                   onKeyDown={(event) => { if (event.key === 'Enter') open(row.id) }}
-                  onContextMenu={(event) => popUpNativeMenu(event, rowMenu(row, actions))}
+                  onContextMenu={(event) => popUpMenu(event, rowMenu(row, actions))}
                 >
                   <span className="book-row-leading"><Leading row={row} /></span>
                   <span className="book-row-text">

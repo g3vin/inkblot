@@ -25,7 +25,7 @@ const { act, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { insertionIndex, moveTo } = await import('../../src/ui/usePointerReorder.js')
 const { placePopover } = await import('../../src/ui/placePopover.js')
-const { buildNativeMenu } = await import('../../src/ui/useNativeMenu.js')
+const { buildNativeMenu, popUpMenu } = await import('../../src/ui/useNativeMenu.js')
 const { default: Segmented } = await import('../../src/ui/Segmented.jsx')
 const { default: Section } = await import('../../src/ui/Section.jsx')
 const { SECTIONS_KEY } = await import('../../src/ui/sectionState.js')
@@ -166,7 +166,46 @@ ok('a popover opened in a dialog renders in its layer', inner?.parentElement?.cl
 inner?.focus()
 await act(async () => inner.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
 ok('and Escape closes the popover, not the dialog', dialogClosed === 0 && !document.body.querySelector('.ib-popover:not(.is-leaving)'))
+// A Popover opened from inside another opens in it: its button pressed, the outer grown.
+function Nested() {
+  const outerRef = React.useRef(null)
+  const innerRef = React.useRef(null)
+  const [inner, setInner] = useState(false)
+  return React.createElement(React.Fragment, null,
+    React.createElement('button', { ref: outerRef }, 'More'),
+    React.createElement(Popover, { open: true, anchorRef: outerRef, onClose: () => {} },
+      React.createElement('button', { ref: innerRef, onClick: () => setInner((was) => !was) }, 'Read aloud'),
+      React.createElement(Popover, { open: inner, anchorRef: innerRef, onClose: () => setInner(false) }, React.createElement('button', null, 'Read'))))
+}
+await act(async () => root.render(React.createElement(Nested)))
+const readAloud = () => [...document.body.querySelectorAll('button')].find((b) => b.textContent === 'Read aloud')
+await act(async () => readAloud().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
+const morph = document.body.querySelector('.ib-popover:not(.is-leaving)')
+ok('a popover opened from a popover opens inside it', morph?.querySelector('.ib-popover-slot .ib-popover-inline') !== null && document.body.querySelectorAll('.ib-popover:not(.is-leaving)').length === 1)
+ok('its button is pressed and the outer one says so', readAloud().hasAttribute('data-opener') && morph?.hasAttribute('data-morphed'))
+await act(async () => readAloud().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
+ok('pressing it again goes back', !readAloud().hasAttribute('data-opener') && !morph?.hasAttribute('data-morphed'))
+
 await act(async () => root.render(React.createElement('div')))
 anchor.remove()
+
+// A menu a button opens is drawn in the page; a right-click's is the OS's.
+const opener = document.createElement('button')
+opener.setAttribute('aria-label', 'Alignment')
+document.body.append(opener)
+let picked = null
+await act(async () => { await popUpMenu({ type: 'click', currentTarget: opener }, [{ text: 'Align left', checked: true, action: () => {} }, { separator: true }, { text: 'Align right', action: () => { picked = 'right' } }]) })
+const inPage = document.body.querySelector('.ib-menu[aria-label="Alignment"]')
+ok('a button opens an in-page menu', inPage?.getAttribute('aria-label') === 'Alignment' && inPage.querySelectorAll('[role^="menuitem"]').length === 2)
+await act(async () => [...inPage.querySelectorAll('[role^="menuitem"]')].find((b) => b.textContent.includes('Align right')).dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('and its items run', picked === 'right' && !document.body.querySelector('.ib-menu:not(.is-leaving)'))
+const warn = console.warn
+console.warn = () => {}
+await act(async () => { await popUpMenu({ type: 'contextmenu', target: opener }, [{ text: 'Copy' }]) })
+console.warn = warn
+ok('a right-click does not draw one', !document.body.querySelector('.ib-menu:not(.is-leaving)'))
+opener.remove()
 
 await act(async () => root.unmount())

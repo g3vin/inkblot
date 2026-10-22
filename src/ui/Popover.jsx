@@ -14,13 +14,22 @@
  *   Opened from inside a Dialog, it renders in the dialog's layer, above it.
  *   `onEscape` is for a pop-up whose Escape means something other than close (the
  *   footnote's "leave it as it was").
+ * - Opened from inside another Popover (read aloud in the toolbar's »), it opens *in*
+ *   that one: its button stays, pressed (`data-opener`), the outer pop-up grows to hold it
+ *   and the caller hides the other items. That button again goes back; Escape or a click
+ *   outside closes both.
  */
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { focusableWithin, trapTab, useExitAnimation } from './hooks'
-import { LayerContext } from './layer'
+import { LayerContext, PopoverNestContext } from './layer'
 import { placePopover } from './placePopover.js'
 import './Popover.css'
+
+const NO_REF = { current: null }
+
+const placeBy = (anchor, node, align) =>
+  placePopover(anchor, { width: node.offsetWidth, height: node.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }, align)
 
 export default function Popover({ open, ...props }) {
   return open ? <OpenPopover {...props} /> : null
@@ -34,16 +43,58 @@ function OpenPopover({ anchorRef, anchorRect, onClose, onEscape, align = 'start'
   const handlers = useRef({ onClose, onEscape })
   useEffect(() => { handlers.current = { onClose, onEscape } })
 
-  // Placed once, when it opens.
-  useLayoutEffect(() => {
-    const anchor = anchorRect ?? anchorRef?.current?.getBoundingClientRect()
+  // A Popover opened from inside this one renders into `slot`, and this one is `morphed`.
+  const outer = useContext(PopoverNestContext)
+  const inline = Boolean(outer?.slot)
+  const [slot, setSlot] = useState(null)
+  const [morphed, setMorphed] = useState(false)
+  const inner = useRef(new Set())
+  const nest = useMemo(() => ({
+    slot,
+    add(node, opener) {
+      inner.current.add(node)
+      opener?.setAttribute('data-opener', '')
+      setMorphed(true)
+    },
+    remove(node, opener) {
+      inner.current.delete(node)
+      // After StrictMode's trial unmount and remount, so only a real close counts.
+      queueMicrotask(() => {
+        if (inner.current.size) return
+        opener?.removeAttribute('data-opener')
+        setMorphed(false)
+      })
+    },
+  }), [slot])
+  useEffect(() => {
+    if (!inline) return undefined
     const node = ref.current
-    if (!anchor || !node) return
-    setPosition(placePopover(anchor, { width: node.offsetWidth, height: node.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }, align))
+    const opener = anchorRef?.current
+    outer.add(node, opener)
+    return () => outer.remove(node, opener)
+  }, [inline, outer, anchorRef])
+
+  // Placed when it opens, and again when it grows or shrinks to hold an inner pop-up.
+  const lastHeight = useRef(0)
+  useLayoutEffect(() => {
+    const node = ref.current
+    const anchor = anchorRect ?? anchorRef?.current?.getBoundingClientRect()
+    if (inline || !anchor || !node) return
+    setPosition(placeBy(anchor, node, align))
+    const from = lastHeight.current
+    const to = node.offsetHeight
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true
+    if (from && to !== from && !still && node.animate) {
+      const duration = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-base')) || 180
+      node.animate([{ height: `${from}px`, overflow: 'hidden' }, { height: `${to}px`, overflow: 'hidden' }], { duration, easing: 'ease-out' })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [align])
+  }, [align, morphed])
+  useLayoutEffect(() => { lastHeight.current = ref.current?.offsetHeight ?? 0 })
 
   useEffect(() => {
+    // Opened inside another pop-up, that one closes it and keeps Tab.
+    if (inline) return undefined
     const node = ref.current
     const onKey = (event) => {
       if (event.key === 'Escape') {
@@ -64,7 +115,7 @@ function OpenPopover({ anchorRef, anchorRect, onClose, onEscape, align = 'start'
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('pointerdown', onDown, true)
     }
-  }, [anchorRef])
+  }, [anchorRef, inline])
 
   // Focus the first control inside; on close, back to the opener (or where focus was).
   useEffect(() => {
@@ -84,18 +135,28 @@ function OpenPopover({ anchorRef, anchorRect, onClose, onEscape, align = 'start'
     }
   }, [anchorRef])
 
-  useExitAnimation(ref)
+  useExitAnimation(inline ? NO_REF : ref)
 
+  if (inline) {
+    return createPortal(
+      <div ref={ref} className={['ib-popover-inline', className].filter(Boolean).join(' ')} {...rest}>
+        {children}
+      </div>,
+      outer.slot,
+    )
+  }
   return createPortal(
     <div
       ref={ref}
       tabIndex={-1}
       className={['ib-popover', className].filter(Boolean).join(' ')}
+      data-morphed={morphed || undefined}
       style={position ? { left: position.left, top: position.top } : { left: -9999, top: -9999 }}
       {...rest}
     >
       {eyebrow ? <p className="ib-eyebrow ib-popover-eyebrow">{eyebrow}</p> : null}
-      {children}
+      <PopoverNestContext.Provider value={nest}>{children}</PopoverNestContext.Provider>
+      <div ref={setSlot} className="ib-popover-slot" />
     </div>,
     layer,
   )

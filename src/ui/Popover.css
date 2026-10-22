@@ -26,6 +26,15 @@
 
 .ib-popover-eyebrow { margin: 0 0 var(--space-3); }
 
+/* A pop-up opened from inside this one opens here, under a hairline (Popover.jsx). */
+.ib-popover-slot:empty { display: none; }
+.ib-popover-slot {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--hairline) solid var(--border-muted);
+}
+.ib-popover-inline { animation: ib-float-in var(--dur-base) var(--ease-out); }
+
 /* Leaving the way it came (useExitAnimation's copy). */
 :is(.ib-popover, .ib-menu).is-leaving {
   animation: ib-float-out var(--dur-fast) var(--ease-in) forwards;

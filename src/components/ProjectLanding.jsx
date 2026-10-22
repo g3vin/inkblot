@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createProject, getProjectRoot, linkProject, listProjects, moveProject } from '../lib/FileSystem'
 import { Button, Dialog, EmptyState } from '../ui'
-import { popUpNativeMenu } from '../ui/useNativeMenu.js'
+import { popUpMenu } from '../ui/useNativeMenu.js'
 import Icon from '../ui/Icon.jsx'
 import { AppIcon, Wordmark } from '../ui/Brand.jsx'
 import './ProjectLanding.css'
@@ -183,7 +183,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
               type="button"
               className="picker-chevron"
               aria-label="New project options"
-              onClick={(event) => popUpNativeMenu(event, [
+              onClick={(event) => popUpMenu(event, [
                 { text: 'New project…', action: () => setCreating(true) },
                 { text: 'New project in folder…', action: () => setCreating('folder') },
               ])}
@@ -220,7 +220,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
               onDoubleClick={() => onOpenProject(name)}
               onContextMenu={(event) => {
                 setSelection(name)
-                popUpNativeMenu(event, [
+                popUpMenu(event, [
                   { text: 'Open', action: () => onOpenProject(name) },
                   { text: 'Show in Finder', action: () => reveal(name) },
                   { separator: true },

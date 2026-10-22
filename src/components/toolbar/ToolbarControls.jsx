@@ -10,7 +10,7 @@
  * formatting toolbar has always used.
  */
 import Icon from '../../ui/Icon.jsx'
-import { popUpNativeMenu } from '../../ui/useNativeMenu'
+import { popUpMenu } from '../../ui/useNativeMenu'
 
 export function ItemFrame({ id, label, display, grouped = true, className = '', children }) {
   return (
@@ -55,7 +55,7 @@ export function MenuButton({ icon, label, title, display, disabled, items, child
       onClick={(event) => {
         const rect = event.currentTarget.getBoundingClientRect()
         const list = typeof items === 'function' ? items() : items
-        void popUpNativeMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.bottom }, list)
+        void popUpMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.bottom, target: event.currentTarget }, list)
       }}
     >
       {children ?? <Glyph icon={icon} label={label} display={display} />}

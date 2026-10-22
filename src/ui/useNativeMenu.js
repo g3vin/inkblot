@@ -1,20 +1,21 @@
 /**
- * useNativeMenu — pop up a native (Tauri) menu from a plain description, for
- * right-clicks and "…" buttons:
+ * useNativeMenu — menus from a plain description:
  *
- *   const popUp = useNativeMenu()
- *   popUp(event, [
+ *   popUpMenu(event, [
  *     { text: 'Icon and Text', checked: mode === 'iconAndLabel', action: () => setMode('iconAndLabel') },
  *     { separator: true },
  *     { text: 'More', items: [ … ] },
  *   ])
  *
- * Built the way contextMenu/menuContext.js builds the editor's menus. A right-click
- * on something with a help topic (data-help) gets "Help: …" at the foot. Outside
- * Tauri (tests, a plain browser) it does nothing.
+ * A right-click gets the OS's menu (Tauri), built the way contextMenu/menuContext.js
+ * builds the editor's; on something with a help topic (data-help) it ends with "Help: …".
+ * A menu a button opens is an in-page `Menu` (MenuFromItems), anchored to that button
+ * (docs/DESIGN.md §9 → Pop-ups). Outside Tauri a right-click menu does nothing.
  */
-import { useCallback } from 'react'
+import { createElement, useCallback } from 'react'
+import { createRoot } from 'react-dom/client'
 import { helpMenuItem } from '../lib/help'
+import MenuFromItems from './MenuFromItems.jsx'
 
 export async function buildNativeMenu(items, api) {
   const { Menu, MenuItem, CheckMenuItem, PredefinedMenuItem, Submenu } = api
@@ -29,9 +30,38 @@ export async function buildNativeMenu(items, api) {
   return Menu.new({ items: await build(items) })
 }
 
-export async function popUpNativeMenu(event, items) {
+let host = null
+let root = null
+let opened = 0
+
+/** A button's menu: drawn in the page, under the button (or at the event's point). */
+function popUpInPage(event, items) {
+  const target = event?.currentTarget instanceof Element ? event.currentTarget : event?.target
+  const anchor = target instanceof Element ? target.closest('button, [role="button"]') ?? target : null
+  if (!root) {
+    host = document.createElement('div')
+    host.className = 'ib-menu-host'
+    document.body.append(host)
+    root = createRoot(host)
+  }
+  opened += 1
+  root.render(createElement(MenuFromItems, {
+    key: opened,
+    anchor,
+    point: { x: event?.clientX ?? 0, y: event?.clientY ?? 0 },
+    items,
+    onClose: () => root.render(null),
+  }))
+}
+
+export async function popUpMenu(event, items) {
   event?.preventDefault?.()
   event?.stopPropagation?.()
+  const rightClick = event?.type === 'contextmenu' || event?.type === 'fallback'
+  if (!rightClick) {
+    popUpInPage(event, items.filter(Boolean))
+    return
+  }
   // A right-click on something with a help topic also offers it, last.
   const help = event?.type === 'contextmenu' ? helpMenuItem(event.target) : null
   const list = help ? [...items, { separator: true }, help] : items
@@ -45,7 +75,7 @@ export async function popUpNativeMenu(event, items) {
 }
 
 export default function useNativeMenu() {
-  return useCallback((event, items) => popUpNativeMenu(event, items), [])
+  return useCallback((event, items) => popUpMenu(event, items), [])
 }
 
 /**
@@ -58,7 +88,7 @@ export function installHelpContextMenu() {
     if (event.defaultPrevented) return
     const help = helpMenuItem(event.target)
     if (!help) return
-    void popUpNativeMenu({ preventDefault: () => event.preventDefault(), stopPropagation: () => {}, type: 'fallback', target: event.target }, [help])
+    void popUpMenu({ preventDefault: () => event.preventDefault(), stopPropagation: () => {}, type: 'fallback', target: event.target }, [help])
     event.preventDefault()
   }
   document.addEventListener('contextmenu', onContextMenu)

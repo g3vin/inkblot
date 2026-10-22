@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { FormRow, Popover, Button } from '../../../ui'
-import { popUpNativeMenu } from '../../../ui/useNativeMenu'
+import { popUpMenu } from '../../../ui/useNativeMenu'
 import Icon from '../../../ui/Icon.jsx'
 import FinishingSection from './FinishingSection'
 import { Caution, LengthRow, Note, PickerRow, ToggleRow } from './controls'
@@ -37,7 +37,7 @@ export function ScriptProductionSection({ layout, script }) {
         options={[{ value: '', label: 'No one' }, ...script.characters.map((name) => ({ value: name, label: name.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w+/g, (w) => w.toLowerCase()) }))]}
       />
       <FormRow label="Reports">
-        <Button onClick={(event) => popUpNativeMenu(event, [report('characters'), report('scenes'), report('locations')])}>Report <Icon name="chevron-down" /></Button>
+        <Button onClick={(event) => popUpMenu(event, [report('characters'), report('scenes'), report('locations')])}>Report <Icon name="chevron-down" /></Button>
       </FormRow>
       <FormRow label="Sides">
         <Button ref={sidesRef} disabled={!script.scenes.length} onClick={() => setSides(true)}>Print sides…</Button>
@@ -166,7 +166,7 @@ export function CoverSection({ layout }) {
               className={`fin-cover-card${set.id === cover.active ? ' is-current' : ''}`}
               title={set.id === cover.active ? 'The cover in use' : 'Use this version'}
               onClick={() => layout.editCovers('activate', { id: set.id })}
-              onContextMenu={(event) => popUpNativeMenu(event, [
+              onContextMenu={(event) => popUpMenu(event, [
                 { text: 'Rename…', action: () => setRenaming(set.id) },
                 { text: 'Duplicate', action: () => layout.editCovers('duplicate', { id: set.id }) },
                 { text: 'Delete…', action: () => { if (window.confirm?.(`Delete the cover “${set.name}”? Its pictures stay in the project.`) ?? true) layout.editCovers('delete', { id: set.id }) } },

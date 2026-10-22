@@ -15,7 +15,7 @@ import { useState } from 'react'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { EditionAction, TypesetVersionKind } from '../../types'
 import { Button, EmptyState, IconButton, Input, PanelActions } from '../../ui'
-import { popUpNativeMenu } from '../../ui/useNativeMenu'
+import { popUpMenu } from '../../ui/useNativeMenu'
 import Icon from '../../ui/Icon.jsx'
 import './TypesetHistory.css'
 import { byDay } from '../../lib/historyDays'
@@ -42,7 +42,7 @@ export default function TypesetHistoryView() {
 
   const ask = (message) => window.confirm?.(message) ?? true
 
-  const menu = (event, row) => popUpNativeMenu(event, [
+  const menu = (event, row) => popUpMenu(event, [
     { text: 'Name…', action: () => setNaming({ id: row.id, name: row.name ?? '' }) },
     { text: 'Duplicate as edition', action: () => send('editEditions', { action: EditionAction.FromTypesetVersion, id: row.id, name: row.name }) },
     { separator: true },

@@ -94,6 +94,8 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
   const visible = moreAt === -1 ? fitting : Math.min(fitting, moreAt)
   const hidden = shown.slice(visible).filter(({ id }) => !isSpacer(id) && id !== MORE)
 
+  // », a labelled list: every item behind it shows its name (DESIGN.md §9 → Pop-ups).
+  const listed = { ...ctx, display: 'iconAndLabel' }
   return (
     <div className="toolbar-wrapper">
       <div
@@ -135,9 +137,9 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
         ) : null}
       </div>
       <Popover anchorRef={overflowRef} open={overflowOpen && hidden.length > 0} onClose={() => setOverflowOpen(false)} align="end" className="tb-overflow-popover">
-        <div className="toolbar tb-overflow-list" data-display={display} role="toolbar" aria-label="More toolbar items">
+        <div className="toolbar tb-overflow-list" data-display="iconAndLabel" role="toolbar" aria-orientation="vertical" aria-label="More toolbar items">
           {hidden.map(({ id, index }) => (
-            <div key={`${id}:${index}`} className="tb-slot"><ToolbarItem id={id} ctx={ctx} /></div>
+            <div key={`${id}:${index}`} className="tb-slot"><ToolbarItem id={id} ctx={listed} /></div>
           ))}
         </div>
       </Popover>

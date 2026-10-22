@@ -70,6 +70,18 @@ _Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-m
   an InkPicker.
 - Menus leave the way they came too (`useExitAnimation`).
 
+**Design review round 02b: menus** (`design/round-02b-menus`, see
+`docs/design-review/rounds/02b-menus.md`)
+
+- `popUpNativeMenu` is now `popUpMenu`. A right-click still gets the OS's menu; a menu a
+  button opens is an in-page `Menu` (`MenuFromItems`), drawn in its own React root under
+  `.ib-menu-host`, anchored to the button. Give a keyboard-built event a `target`
+  (`ToolbarControls`' `MenuButton` does) so it has something to anchor to.
+- » is a labelled list (`Toolbar.customize.css`), and a Popover opened inside another
+  opens in it (`Popover.jsx`, `PopoverNestContext` in `layer.js`): the outer one gets
+  `data-morphed`, the inner one's button `data-opener`. The » CSS hides the other items.
+- The command palette has a Dialog's scrim, motion, exit and inert app.
+
 ## The logo (done)
 
 The user chose the **"ib" monogram** in a brand review held in October 2026. It
@@ -173,6 +185,9 @@ black on white.
 - **Content colours** (exports, the printed page, map worlds and themes, conversation
   looks) are content, so `lint:design` skips those paths (`IGNORED` in
   `scripts/lint-design.mjs`). Chrome never goes on that list.
+- **A button's menu is in the page now, so a test can click it** (`.ib-menu`), but a
+  right-click's is still the OS's: in the mock it's recorded in `window.__ibMenus`, and in
+  a plain browser it does nothing.
 - **A closing dialog, popover or menu leaves a copy behind for `--dur-fast`.**
   `useExitAnimation` clones it to play the exit; the copy has no `role` or ids, is inert,
   has `.is-leaving` and goes in about 120ms. Query by role, or by
