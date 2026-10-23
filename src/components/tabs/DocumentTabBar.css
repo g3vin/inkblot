@@ -7,7 +7,7 @@
   top: var(--tab-bar-top, 0px);
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: var(--z-chrome);
   box-sizing: border-box;
   display: flex;
   align-items: center;

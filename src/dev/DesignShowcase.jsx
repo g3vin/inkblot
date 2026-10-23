@@ -5,7 +5,7 @@
  * change to src/styles or src/ui in both themes before it ships, and as the visual
  * companion to docs/DESIGN.md.
  */
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ACCENT_PRESETS, INKS, TRAY_INKS, inkVar } from '../lib/palette'
 import { setAccentAttribute, setThemeAttribute, setTrayAttribute } from '../lib/theme'
 import { useCommands } from '../lib/commands'
@@ -13,18 +13,64 @@ import {
   AppIcon, Mark, Wordmark,
   Breadcrumb, Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
   FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, InkWheel, Input, Kbd, Menu, MenuItem,
-  MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented,
-  SelectMenu, Sheet, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
+  MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented, popUpMenu,
+  SelectMenu, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
 } from '../ui'
 import NavSheet from '../ui/NavSheet.jsx'
+import { ToolbarDockContext } from '../ui/layer'
 import { ICONS } from '../ui/icons'
 import '../components/search/ProjectSearch.css'
+import '../components/Toolbar.css'
+import '../components/toolbar/Toolbar.customize.css'
 import './DesignShowcase.css'
 
 const SURFACES = ['--app-bg', '--surface-1', '--surface-2', '--surface-float', '--surface-sunken']
 const TEXTS = ['--text-primary', '--text-secondary', '--text-muted', '--text-subtle', '--text-placeholder']
 const SPACES = ['--space-1', '--space-2', '--space-3', '--space-4', '--space-6', '--space-8', '--space-12']
 const RADII = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-pill']
+
+/** The dynamic toolbar (DESIGN.md §6): a choice opens in place, a form takes the toolbar. */
+function DockDemo() {
+  const [whole, setWhole] = useState(null)
+  const rowRef = useRef(null)
+  const colourRef = useRef(null)
+  const voiceRef = useRef(null)
+  const [open, setOpen] = useState(null)
+  const dock = useMemo(() => (whole ? {
+    whole,
+    owns: (anchor) => Boolean(rowRef.current?.contains(anchor)),
+    inlineFor: (anchor) => anchor.closest('.tb-slot')?.querySelector(':scope > .tb-dock-inline') ?? null,
+    watch: () => () => {},
+  } : null), [whole])
+  const toggle = (which) => setOpen((was) => (was === which ? null : which))
+  return (
+    <ToolbarDockContext.Provider value={dock}>
+      <div ref={setWhole} className="toolbar-wrapper ds-dock-demo">
+        <div ref={rowRef} className="toolbar tb-row">
+          <div className="tb-slot">
+            <div className="toolbar-group">
+              <button ref={colourRef} type="button" aria-label="Card colour" onClick={() => toggle('colour')}><Icon name="palette" /></button>
+            </div>
+            <div className="tb-dock-inline" />
+          </div>
+          <div className="tb-slot">
+            <div className="toolbar-group">
+              <button ref={voiceRef} type="button" aria-label="Read aloud" onClick={() => toggle('voice')}><Icon name="read-aloud" /></button>
+            </div>
+            <div className="tb-dock-inline" />
+          </div>
+        </div>
+        <Popover open={open === 'colour'} anchorRef={colourRef} onClose={() => setOpen(null)} eyebrow="Card colour">
+          <InkPicker label="Card colour" value={null} inks={['red', 'blue', 'green']} onChange={() => setOpen(null)} />
+        </Popover>
+        <Popover open={open === 'voice'} anchorRef={voiceRef} onClose={() => setOpen(null)} eyebrow="Read aloud">
+          <Field label="Voice"><SelectMenu label="Voice" value="heart" onChange={() => {}} options={[{ value: 'heart', label: 'Heart' }, { value: 'river', label: 'River' }]} /></Field>
+          <Button variant="filled">Read</Button>
+        </Popover>
+      </div>
+    </ToolbarDockContext.Provider>
+  )
+}
 
 function ShowcaseSection({ title, children }) {
   return (
@@ -63,7 +109,7 @@ export default function DesignShowcase() {
 
   useCommands(() => [
     { id: 'ds.dialog', section: 'Showcase', title: 'Open a dialog', icon: 'info', run: () => setDialog(true) },
-    { id: 'ds.sheet', section: 'Showcase', title: 'Open a sheet', icon: 'sidebar', run: () => setSheet(true) },
+    { id: 'ds.sheet', section: 'Showcase', title: 'Open a medium dialog', icon: 'sidebar', run: () => setSheet(true) },
     { id: 'ds.theme', section: 'View', title: 'Toggle theme', icon: 'moon', shortcut: '⌘⇧L', run: () => switchTheme(theme === 'dark' ? 'light' : 'dark') },
   ], [theme])
 
@@ -258,12 +304,16 @@ export default function DesignShowcase() {
               <MenuItem icon="delete" danger>Delete note</MenuItem>
             </Menu>
             <Button ref={popRef} variant="tinted" onClick={() => setPopover(!popover)}><Icon name="palette" /> Folder colour</Button>
-            <Popover open={popover} onClose={() => setPopover(false)} anchorRef={popRef} aria-label="Folder colour">
-              <p className="ib-eyebrow ds-pop-label">Folder colour</p>
+            <Popover open={popover} onClose={() => setPopover(false)} anchorRef={popRef} eyebrow="Folder colour" aria-label="Folder colour">
               <InkPicker label="Folder colour" value={ink} onChange={setInk} />
             </Popover>
-            <Button variant="tinted" onClick={() => setDialog(true)}>Open dialog</Button>
-            <Button variant="tinted" onClick={() => setSheet(true)}>Open sheet</Button>
+            <Button variant="tinted" onClick={(event) => popUpMenu(event, [
+              { text: 'Sort', items: [{ text: 'By name', checked: true }, { text: 'By date', checked: false }] },
+              { separator: true },
+              { text: 'New folder…', accelerator: 'CmdOrCtrl+Shift+N' },
+            ])}>A button’s menu <Icon name="chevron-down" /></Button>
+            <Button variant="tinted" onClick={() => setDialog(true)}>Open a small decision</Button>
+            <Button variant="tinted" onClick={() => setSheet(true)}>Open a medium dialog</Button>
           </div>
         </ShowcaseSection>
 
@@ -287,15 +337,20 @@ export default function DesignShowcase() {
             tabs={[{ value: 'notes', label: 'Notes', icon: 'note' }, { value: 'history', label: 'History', icon: 'history' }, { value: 'workbench', label: 'Workbench', icon: 'hammer' }]} />
         </ShowcaseSection>
 
+        <ShowcaseSection title="The dynamic toolbar">
+          <DockDemo />
+        </ShowcaseSection>
+
         <ShowcaseSection title="Floating chrome (glass on iOS)">
           <div className="ds-row ds-floating-demo">
+            {/* A strip of buttons is --size-toolbar; a readout --size-circle (DESIGN.md §7). */}
             <FloatingToolbar label="Formatting">
-              <IconButton icon="bold" label="Bold" size="circle" />
-              <IconButton icon="italic" label="Italic" size="circle" />
-              <IconButton icon="underline" label="Underline" size="circle" />
+              <IconButton icon="bold" label="Bold" size="capsule" />
+              <IconButton icon="italic" label="Italic" size="capsule" />
+              <IconButton icon="underline" label="Underline" size="capsule" />
               <ToolbarSeparator />
-              <IconButton icon="note" label="Add note" size="circle" />
-              <IconButton icon="more" label="More" size="circle" />
+              <IconButton icon="note" label="Add note" size="capsule" />
+              <IconButton icon="more" label="More" size="capsule" />
             </FloatingToolbar>
             <FloatingActionButton icon="add" label="New note" />
             <FloatingCapsule><span className="ib-meta">1,204 words</span></FloatingCapsule>
@@ -438,17 +493,19 @@ export default function DesignShowcase() {
         )}
       </Panel>
 
-      <Dialog open={dialog} onClose={() => setDialog(false)} eyebrow="Document" title="Delete this chapter?"
+      {/* A small dialog: its two footer buttons share the width, and Cancel is its way out. */}
+      <Dialog open={dialog} onClose={() => setDialog(false)} size="small" eyebrow="Document" title="Delete this chapter?"
         description="It moves to the archive, where you can restore it for 30 days."
         footer={<><Button onClick={() => setDialog(false)}>Cancel</Button><Button variant="destructive" onClick={() => setDialog(false)}>Delete</Button></>}>
         <Checkbox label="Also delete its notes" checked={check} onChange={setCheck} />
       </Dialog>
-      <Sheet open={sheet} onClose={() => setSheet(false)} title="Page setup"
-        footer={<><span className="ui-sheet-footer-spacer" /><Button variant="filled" onClick={() => setSheet(false)}>Done</Button></>}>
+      {/* A medium dialog with a leading utility; Done closes it, so no ×. */}
+      <Dialog open={sheet} onClose={() => setSheet(false)} size="medium" eyebrow="Typeset" title="Page setup"
+        footer={<><Button>Restore defaults</Button><span className="ib-dialog-footer-spacer" /><Button variant="filled" onClick={() => setSheet(false)}>Done</Button></>}>
         <FormRow label="Trim size">
           <SelectMenu label="Trim size" value={trim} onChange={setTrim} options={[{ value: '6x9', label: '6 × 9 in' }, { value: 'a5', label: 'A5' }]} />
         </FormRow>
-      </Sheet>
+      </Dialog>
       {navSheet ? (
         <NavSheet title="Help" items={[{ id: 'a', title: 'Using help', group: 'Getting around' }, { id: 'b', title: 'Sidebars', group: 'Getting around' }, { id: 'c', title: 'Accent colour', group: 'Settings' }]} value={navPage} onChange={setNavPage} onClose={() => setNavSheet(false)}>
           <p className="ib-eyebrow">A page</p>

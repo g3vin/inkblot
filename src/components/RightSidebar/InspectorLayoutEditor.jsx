@@ -6,9 +6,9 @@
  */
 import { useRef } from 'react'
 import Icon from '../../ui/Icon.jsx'
-import { Button, Sheet } from '../../ui'
+import { Button, Dialog } from '../../ui'
 import usePointerReorder from '../../ui/usePointerReorder'
-import { popUpNativeMenu } from '../../ui/useNativeMenu'
+import { popUpMenu } from '../../ui/useNativeMenu'
 import { INSPECTOR_LAYOUT_INFO, INSPECTOR_LAYOUT_KINDS, inspectorTab, rowsFor, tabsOf } from '../../lib/chromeLayout'
 import { useInspectorLayouts } from './useInspectorLayout'
 import './InspectorLayout.css'
@@ -77,16 +77,17 @@ function LayoutColumn({ layout, layouts, setShown, move }) {
 export default function InspectorLayoutEditor({ onClose }) {
   const { layouts, setShown, move, restore } = useInspectorLayouts()
   return (
-    <Sheet
+    <Dialog
+      eyebrow="Inspector"
       title="Customize inspector layout"
-      width={560}
+      size="medium"
       onClose={onClose}
       className="inspector-editor"
       footer={(
         <>
           <Button
             variant="plain"
-            onClick={(event) => popUpNativeMenu(event, [
+            onClick={(event) => popUpMenu(event, [
               { text: 'Both layouts', action: () => restore('both') },
               { text: 'Write', action: () => restore('drafting') },
               { text: 'Typeset', action: () => restore('finishing') },
@@ -94,7 +95,7 @@ export default function InspectorLayoutEditor({ onClose }) {
           >
             Restore Defaults…
           </Button>
-          <span className="ui-sheet-footer-spacer" />
+          <span className="ib-dialog-footer-spacer" />
           <Button variant="filled" onClick={onClose}>Done</Button>
         </>
       )}
@@ -105,6 +106,6 @@ export default function InspectorLayoutEditor({ onClose }) {
           <LayoutColumn key={layout} layout={layout} layouts={layouts} setShown={setShown} move={move} />
         ))}
       </div>
-    </Sheet>
+    </Dialog>
   )
 }

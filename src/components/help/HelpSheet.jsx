@@ -56,7 +56,6 @@ export default function HelpSheet() {
       value={topic.id}
       onChange={setCurrent}
       onClose={() => setOpen(false)}
-      width={720}
       className="help-sheet"
       aside={(
         <Input

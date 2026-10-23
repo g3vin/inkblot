@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Button, FormRow, Segmented } from '../../../ui'
-import { popUpNativeMenu } from '../../../ui/useNativeMenu'
+import { popUpMenu } from '../../../ui/useNativeMenu'
 import Icon from '../../../ui/Icon.jsx'
 import IconButton from '../../../ui/IconButton.jsx'
 import FinishingSection from './FinishingSection'
@@ -183,7 +183,7 @@ function RunningTextEditor({ title, value, onCommit, tokens, resolve }) {
       onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}
     />
   )
-  const insert = (event) => popUpNativeMenu(event, tokens.map((token) => ({
+  const insert = (event) => popUpMenu(event, tokens.map((token) => ({
     text: token.label,
     action: () => {
       const next = { ...latest.current.draft, [slot]: latest.current.draft[slot] + token.token }
@@ -246,7 +246,7 @@ export function HeaderFooterSection({ layout }) {
 
 export function TextFlowSection({ layout, toolbarTarget, send }) {
   const { setup } = layout
-  const insertBreak = (event) => popUpNativeMenu(event, [
+  const insertBreak = (event) => popUpMenu(event, [
     { text: 'Page break', action: () => send('insertBreak', { target: toolbarTarget, kind: 'page' }) },
     { text: 'Column break', action: () => send('insertBreak', { target: toolbarTarget, kind: 'column' }) },
     { text: 'Break to next right-hand page', action: () => send('insertBreak', { target: toolbarTarget, kind: 'recto' }) },
@@ -351,7 +351,7 @@ export function TypographySection({ layout }) {
           <ToggleRow label="No indent after a heading or break" checked={t.noIndentAfterBreak} onChange={(noIndentAfterBreak) => edit({ noIndentAfterBreak })} />
           <FormRow label="Scene break">
             <CommitText className="fin-centered" value={t.sceneBreak} placeholder="* * *" label="Scene break" onCommit={(sceneBreak) => edit({ sceneBreak })} />
-            <IconButton icon="chevron-down" label="Common scene breaks" size="capsule" onClick={(event) => popUpNativeMenu(event, SCENE_BREAKS.map((glyph) => ({ text: glyph, action: () => edit({ sceneBreak: glyph }) })))} />
+            <IconButton icon="chevron-down" label="Common scene breaks" size="capsule" onClick={(event) => popUpMenu(event, SCENE_BREAKS.map((glyph) => ({ text: glyph, action: () => edit({ sceneBreak: glyph }) })))} />
           </FormRow>
         </>
       ) : null}

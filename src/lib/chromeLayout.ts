@@ -12,8 +12,8 @@
 
 /* ---------------- toolbars ---------------- */
 
-export type ToolbarContext = 'document' | 'canvas' | 'map' | 'typeset'
-export const TOOLBAR_CONTEXTS: ToolbarContext[] = ['document', 'canvas', 'map', 'typeset']
+export type ToolbarContext = 'document' | 'canvas' | 'map' | 'timeline' | 'typeset'
+export const TOOLBAR_CONTEXTS: ToolbarContext[] = ['document', 'canvas', 'map', 'timeline', 'typeset']
 
 export type ToolbarDisplayMode = 'iconAndLabel' | 'icon' | 'label'
 export const TOOLBAR_DISPLAY_MODES: ToolbarDisplayMode[] = ['iconAndLabel', 'icon', 'label']
@@ -41,7 +41,7 @@ export type ToolbarItemSpec = {
   contexts: ToolbarContext[]
 }
 
-const ALL: ToolbarContext[] = ['document', 'canvas', 'map', 'typeset']
+const ALL: ToolbarContext[] = ['document', 'canvas', 'map', 'timeline', 'typeset']
 
 /** Every toolbar item, in the order the palette shows them. */
 export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
@@ -80,6 +80,14 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.map.zoom', label: 'Zoom', icon: 'zoom-in', contexts: ['map'] },
   { id: 'inkblot.map.delete', label: 'Delete', icon: 'delete', contexts: ['map'] },
   { id: 'inkblot.map.view', label: 'View', icon: 'map-view', contexts: ['map'] },
+
+  { id: 'inkblot.timeline.add-event', label: 'Add event', icon: 'add', contexts: ['timeline'] },
+  { id: 'inkblot.timeline.show-as', label: 'Show as', icon: 'calendar', contexts: ['timeline'] },
+  { id: 'inkblot.timeline.undo-redo', label: 'Undo/Redo', icon: 'undo', contexts: ['timeline'] },
+  { id: 'inkblot.timeline.zoom', label: 'Zoom', icon: 'zoom-in', contexts: ['timeline'] },
+  { id: 'inkblot.timeline.lens', label: 'Time lens', icon: 'timeline', contexts: ['timeline'] },
+  { id: 'inkblot.timeline.delete', label: 'Delete', icon: 'delete', contexts: ['timeline'] },
+  { id: 'inkblot.timeline.inspector', label: 'Inspector', icon: 'sidebar', contexts: ['timeline'] },
 
   { id: 'inkblot.history.snapshot', label: 'Snapshot now', icon: 'history', contexts: ALL },
   { id: 'inkblot.panel.clipboard', label: 'Clipboard', icon: 'clipboard', contexts: ALL },
@@ -148,6 +156,13 @@ export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
     'inkblot.map.drawing-tools', 'inkblot.map.measure-tools', SPACE,
     'inkblot.map.undo-redo', SPACE,
     'inkblot.map.zoom', 'inkblot.map.view',
+  ],
+  timeline: [
+    'inkblot.timeline.add-event', SPACE,
+    'inkblot.timeline.show-as', SPACE,
+    'inkblot.timeline.undo-redo', SPACE,
+    'inkblot.timeline.zoom', SPACE,
+    'inkblot.timeline.lens', 'inkblot.timeline.inspector',
   ],
   typeset: [
     'inkblot.view.editor-mode',

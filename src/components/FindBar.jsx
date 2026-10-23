@@ -1,10 +1,11 @@
 /**
  * FindBar.jsx — find and replace in the open document (⌘F).
  *
- * A slim bar at the top of the document card, under the toolbar's rule, as a
- * browser's find bar sits: the field, "2 of 5", previous and next, and — a click away
- * — the replace field. Enter goes to the next match, Shift+Enter the previous; Escape
- * puts the bar away and gives the document back its caret.
+ * While it is open it is the card's toolbar (DESIGN.md §6), as an address bar becomes a
+ * find field: the field, "2 of 5", previous and next, close, and a click away the
+ * replace field beside it. The toolbar's tools stay mounted, hidden, and come back as
+ * they were. Enter goes to the next match, Shift+Enter the previous; Escape puts the
+ * bar away and gives the document back its caret.
  *
  * It opens on FIND_EVENT (requestFind, from ⌘F or the project search's "Find all in
  * this document"), with what was selected or searched for already in the field.

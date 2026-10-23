@@ -127,73 +127,8 @@
   color: var(--text-primary);
 }
 
-/* ---------- Sheet ---------- */
-
-.ui-sheet-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: ui-fade-in var(--dur-fast) var(--ease-standard);
-}
-
-.ui-sheet-scrim[data-placement='top'] {
-  top: var(--app-titlebar-height, 44px);
-  align-items: flex-start;
-}
-.ui-sheet-scrim[data-placement='top'] .ui-sheet {
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  animation-name: ui-sheet-drop;
-}
-@keyframes ui-sheet-drop { from { transform: translateY(-16px); opacity: 0; } }
-
-.ui-sheet {
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 64px);
-  border: 1px solid var(--popover-border);
-  border-radius: var(--radius-card);
-  background: var(--popover-bg);
-  box-shadow: var(--shadow-3);
-  color: var(--text-primary);
-  font-family: var(--font-ui);
-  animation: ui-sheet-in var(--dur-base) var(--ease-standard);
-}
-.ui-sheet:focus { outline: none; }
-.ui-sheet-header { padding: var(--space-5) var(--space-6) var(--space-3); }
-.ui-sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
-.ui-sheet-body { flex: 1; min-height: 0; overflow: auto; padding: var(--space-3) var(--space-6); }
-.ui-sheet-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-6) var(--space-5);
-}
-.ui-sheet-footer-spacer { flex: 1; }
-
+/* The Bubble editor's fade (src/components/bubble). Modals are Dialog.css; pop-ups Popover.css. */
 @keyframes ui-fade-in { from { opacity: 0; } }
-@keyframes ui-sheet-in { from { opacity: 0; transform: translateY(-8px) scale(0.98); } }
-
-/* ---------- Popover ---------- */
-
-.ui-popover {
-  position: fixed;
-  z-index: 2100;
-  box-sizing: border-box;
-  min-width: 160px;
-  padding: var(--space-2);
-  border: 1px solid var(--menu-border);
-  border-radius: var(--menu-radius);
-  background: var(--menu-bg);
-  box-shadow: var(--menu-shadow);
-  color: var(--text-primary);
-  font: 13px/1.35 var(--font-ui);
-}
 
 /* ---------- Section and form rows ---------- */
 

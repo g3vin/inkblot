@@ -103,11 +103,13 @@
   left: 50%;
   bottom: var(--space-5);
   transform: translateX(-50%);
-  z-index: 60;
+  z-index: var(--z-chrome);
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 3px 4px 3px 3px;
+  box-sizing: border-box;
+  height: var(--size-toolbar);
+  padding: var(--space-1);
   overflow: hidden;
   font-family: var(--font-ui);
 }

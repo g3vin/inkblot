@@ -171,20 +171,41 @@ body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
 .tb-slot[data-overflowed='true'] { position: absolute; visibility: hidden; pointer-events: none; }
 .tb-overflow {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-left: auto;
-  width: 28px;
-  height: 28px;
+  width: var(--size-capsule);
+  height: var(--size-capsule);
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-secondary);
-  font: 600 16px/1 var(--font-ui);
+  color: var(--text-primary);
   cursor: pointer;
 }
-.tb-overflow:hover, .tb-overflow[aria-expanded='true'] { background: var(--hover-bg); color: var(--text-primary); }
-.tb-overflow-popover { padding: var(--space-2); }
-.tb-overflow-list.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); max-width: 360px; height: auto; padding: 0; margin: 0; justify-content: flex-start; }
+.tb-overflow:hover { background: var(--surface-active); }
+/* », the toolbar's second page: what didn't fit, in place of what did, with ‹ first. */
+.tb-row > .tb-overflow.is-back { margin-left: 0; margin-right: var(--space-2); }
+
+/* A pop-up from the row opens in the toolbar (Popover.jsx, DESIGN.md §6). Taking the
+   whole toolbar, the row stays mounted, hidden, as it does for find. */
+.toolbar-wrapper:has(> .ib-dock[data-mode='whole']) > :not(.ib-dock) { display: none; }
+.toolbar-wrapper > .ib-dock[data-mode='whole'] { margin: 0 auto; }
+/* A narrow card (iPad, both sidebars docked): the controls get the room, not the title. */
+.toolbar-wrapper { container-type: inline-size; }
+@container (max-width: 480px) {
+  .ib-dock[data-mode='whole'] > .ib-dock-eyebrow { display: none; }
+}
+/* In place: beside its item, pushing what follows along (and behind »). */
+.tb-dock-inline:empty { display: none; }
+.tb-slot:has(> .tb-dock-inline:not(:empty)) { gap: var(--space-1); }
+/* The button it opened from stays pressed. */
+.tb-row [data-opener] { background: var(--accent-surface-strong); color: var(--accent-foreground); }
+/* A button's menu as a row of its items (MenuRow.jsx): words, groups apart. */
+.tb-menu-row { gap: 2px; }
+.tb-menu-row > button { padding: 0 var(--space-3); }
+.tb-menu-row-group { flex: none; margin: 0 var(--space-1); }
 
 /* The More marker: a token while customizing; everything after it goes behind ». */
 .tb-more-marker {
