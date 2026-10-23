@@ -57,7 +57,7 @@ function chapter({ title, body, notes = [] }) {
     const at = blocks.findIndex((b) => b.content[0].text.includes(note.anchor))
     if (at < 0) throw new Error(`Note anchor not in chapter: "${note.anchor}"`)
     const from = starts[at] + 1 + blocks[at].content[0].text.indexOf(note.anchor)
-    return { id: `n${i + 1}`, type: 'quote', from, to: from + note.anchor.length, anchor: note.anchor, content: note.content, color: 'teal' }
+    return { id: `n${i + 1}`, type: 'quote', from, to: from + note.anchor.length, anchor: note.anchor, content: note.content, color: 'amber' }
   })
   return JSON.stringify({ content: { type: 'doc', content: blocks }, notes: anchored })
 }
