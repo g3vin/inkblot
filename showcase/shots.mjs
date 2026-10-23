@@ -101,14 +101,17 @@ export const SHOTS = [
       await page.mouse.move(4, 996)
       await page.waitForTimeout(900)
     },
-    // The passage and its note, not the window.
+    // The passage and its note, not the window: whole paragraphs, from the one beside
+    // the card's top to the chapter's last line.
     async clip(page) {
       const column = await page.locator('.ProseMirror').first().boundingBox()
-      const before = await page.locator('.ProseMirror p', { hasText: 'The stairs turned' }).boundingBox()
-      const after = await page.locator('.ProseMirror p', { hasText: 'Her hands knew' }).boundingBox()
       const card = await page.locator('.note-preview-card').first().boundingBox()
-      const top = Math.min(before.y, card.y) - 40
-      const bottom = Math.max(after.y + after.height, card.y + card.height) + 40
+      const paragraphs = await page.locator('.ProseMirror p').evaluateAll((ps) => ps.map((p) => { const r = p.getBoundingClientRect(); return { top: r.top, bottom: r.bottom } }))
+      const i = Math.max(0, paragraphs.findLastIndex((p) => p.top <= card.y))
+      const last = paragraphs.at(-1)
+      // Cut in the middle of the gap above it, clear of the line before.
+      const top = i > 0 ? (paragraphs[i - 1].bottom + paragraphs[i].top) / 2 : paragraphs[0].top - 28
+      const bottom = Math.max(last.bottom, card.y + card.height) + 32
       const right = Math.min(card.x + card.width + 40, page.viewportSize().width - 12)
       return { x: column.x - 56, y: top, width: right - (column.x - 56), height: bottom - top }
     },
