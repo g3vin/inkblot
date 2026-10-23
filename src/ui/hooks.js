@@ -3,12 +3,14 @@
  *
  *   useDismiss         close on Escape or a pointer-down outside
  *   useFocusTrap       keep Tab inside a dialog; restore focus on close
+ *   trapTab            keep one Tab keypress inside a container (dialogs, popovers)
  *   useRovingFocus     arrow keys / Home / End / typeahead across a list of items
  *   useAnchoredPosition place a floating element beside its anchor, kept on screen
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-const FOCUSABLE = [
+/** What can take focus with Tab. */
+export const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
   'input:not([disabled]):not([type="hidden"])',
@@ -19,7 +21,7 @@ const FOCUSABLE = [
 ].join(',')
 
 export const focusableWithin = (root) =>
-  root ? [...root.querySelectorAll(FOCUSABLE)].filter((el) => !el.closest('[inert]') && el.offsetParent !== null) : []
+  root ? [...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter((el) => !el.closest('[inert]') && el.offsetParent !== null) : []
 
 /**
  * Call `onDismiss` on Escape or on a pointer-down outside every ref in `refs`.
@@ -55,6 +57,29 @@ export function useDismiss(active, onDismiss, refs) {
 }
 
 /**
+ * If `event` is a Tab that would leave `container`, wrap it round to the other end.
+ * Only what Tab reaches counts: a roving group (a row of swatches) is one stop.
+ */
+export function trapTab(event, container) {
+  if (event.key !== 'Tab') return
+  const items = focusableWithin(container).filter((el) => el.tabIndex >= 0)
+  if (items.length === 0) {
+    event.preventDefault()
+    return
+  }
+  const first = items[0]
+  const last = items[items.length - 1]
+  const at = document.activeElement
+  if (event.shiftKey && (at === first || !items.includes(at) && at === container)) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && at === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+/**
  * While active: focus the first focusable (or `initialFocusRef`), wrap Tab inside
  * `containerRef`, and on deactivate return focus to whatever had it before.
  */
@@ -66,23 +91,7 @@ export function useFocusTrap(active, containerRef, initialFocusRef) {
     const first = initialFocusRef?.current || focusableWithin(container)[0] || container
     first?.focus?.({ preventScroll: true })
 
-    const onKey = (event) => {
-      if (event.key !== 'Tab' || !container) return
-      const items = focusableWithin(container)
-      if (items.length === 0) {
-        event.preventDefault()
-        return
-      }
-      const firstItem = items[0]
-      const lastItem = items[items.length - 1]
-      if (event.shiftKey && document.activeElement === firstItem) {
-        event.preventDefault()
-        lastItem.focus()
-      } else if (!event.shiftKey && document.activeElement === lastItem) {
-        event.preventDefault()
-        firstItem.focus()
-      }
-    }
+    const onKey = (event) => { if (container) trapTab(event, container) }
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)
@@ -191,4 +200,34 @@ export function useAnchoredPosition(open, floatingRef, { anchorRef, point, place
   }, [open, update])
 
   return style
+}
+
+/**
+ * Let `ref`'s element leave the way it came when its component unmounts: a copy is put
+ * back in the body with `leavingClass`, plays that class's animation, and is removed.
+ * The caller unmounts as usual and needs no "closing" state. Skipped under reduced
+ * motion, and where there's no matchMedia (tests). The copy keeps no ids or roles. (Under
+ * StrictMode's trial unmount the element is still in the page, so no copy is made.)
+ */
+export function useExitAnimation(ref, leavingClass = 'is-leaving') {
+  useLayoutEffect(() => {
+    const node = ref.current
+    return () => {
+      queueMicrotask(() => {
+        if (!node || node.isConnected) return
+        // No matchMedia means no real browser (tests); reduced motion means no motion.
+        if (!window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+        const ghost = node.cloneNode(true)
+        // A copy, not the thing: nothing in it can be found as a dialog or by its id.
+        for (const el of [ghost, ...ghost.querySelectorAll('[id], [role]')]) { el.removeAttribute('id'); el.removeAttribute('role') }
+        ghost.classList.add(leavingClass)
+        ghost.setAttribute('aria-hidden', 'true')
+        ghost.inert = true
+        document.body.append(ghost)
+        const done = () => ghost.remove()
+        ghost.addEventListener('animationend', (event) => { if (event.target === ghost) done() })
+        setTimeout(done, 400)
+      })
+    }
+  }, [ref, leavingClass])
 }

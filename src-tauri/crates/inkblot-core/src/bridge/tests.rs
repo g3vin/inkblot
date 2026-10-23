@@ -1162,6 +1162,7 @@ fn every_event() -> Vec<WebviewEvent> {
                 panel: map_chrome().panel,
                 reveal_panel: 1,
                 active: true,
+                inspector_open: true,
             }),
         }),
         WebviewEvent::TimelineCursorChanged(TimelineCursorChanged {

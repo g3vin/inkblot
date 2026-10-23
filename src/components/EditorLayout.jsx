@@ -37,7 +37,7 @@ import RightSidebar from './RightSidebar/RightSidebar'
 import FindBar from './FindBar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useEditorContextMenu } from '../hooks/useEditorContextMenu'
-import { isCanvasDoc, isMapDoc, isTextDoc } from '../lib/docKind'
+import { isCanvasDoc, isMapDoc, isTextDoc, isTimelineDoc } from '../lib/docKind'
 import { requestCanvasReveal } from '../canvas/canvasEvents'
 import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
@@ -169,17 +169,20 @@ export default function EditorLayout(props) {
     ? (activeEditorInfo.target === EditorTarget.CanvasCard ? liveActiveEditor : null)
     : (liveActiveEditor || getLiveEditor(editor) || getLiveEditor(props.secondaryEditor))
 
-  // Which toolbar is up: a canvas's own while no card is being edited, a map's, the
-  // Typeset toolbar for a document in Typeset mode, else the document's.
+  // Which toolbar is up: a canvas's own while no card is being edited, a map's, a
+  // timeline's, the Typeset toolbar for a document in Typeset mode, else the document's.
   const pageLayoutState = useLatestBridgeState('pageLayoutState', null)
   const activeIsMap = isMapDoc(activeDoc || currentDoc)
+  const activeIsTimeline = isTimelineDoc(activeDoc || currentDoc)
   const toolbarContext = activeIsCanvas
     ? (toolbarEditor ? 'document' : 'canvas')
     : activeIsMap
       ? 'map'
-      : toolbarEditor
-        ? (pageLayoutState?.mode === 'typeset' ? 'typeset' : 'document')
-        : null
+      : activeIsTimeline
+        ? 'timeline'
+        : toolbarEditor
+          ? (pageLayoutState?.mode === 'typeset' ? 'typeset' : 'document')
+          : null
   // Customize Inspector Layout…, from the toolbar's menu or the inspector's own.
   const [customizingInspector, setCustomizingInspector] = useState(false)
   useEffect(() => {
@@ -807,10 +810,9 @@ export default function EditorLayout(props) {
               ) : (
                 <div className="toolbar-placeholder" data-tauri-drag-region />
               )}
+              {comparing || activeIsMap ? null : <FindBar editor={props.activeEditor} />}
             </div>
           </div>
-
-          {comparing || activeIsMap ? null : <FindBar editor={props.activeEditor} />}
 
           <EditorCanvas
             {...props}

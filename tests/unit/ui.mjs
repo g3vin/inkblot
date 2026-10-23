@@ -1,7 +1,7 @@
 /**
  * The shared controls (src/ui): the reorder and placement math, the native-menu
  * builder, and the controls mounted — a Segmented moved with the keyboard, a Section
- * that remembers being closed, a Sheet that Escape closes.
+ * that remembers being closed, a Dialog that Escape closes, a Popover that takes focus.
  */
 import { JSDOM } from 'jsdom'
 import { installGlobals } from './install-globals.mjs'
@@ -25,11 +25,14 @@ const { act, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { insertionIndex, moveTo } = await import('../../src/ui/usePointerReorder.js')
 const { placePopover } = await import('../../src/ui/placePopover.js')
-const { buildNativeMenu } = await import('../../src/ui/useNativeMenu.js')
+const { buildNativeMenu, popUpMenu } = await import('../../src/ui/useNativeMenu.js')
 const { default: Segmented } = await import('../../src/ui/Segmented.jsx')
 const { default: Section } = await import('../../src/ui/Section.jsx')
 const { SECTIONS_KEY } = await import('../../src/ui/sectionState.js')
-const { default: Sheet } = await import('../../src/ui/Sheet.jsx')
+const { default: Dialog } = await import('../../src/ui/Dialog.jsx')
+const { default: Popover } = await import('../../src/ui/Popover.jsx')
+const { ToolbarDockContext } = await import('../../src/ui/layer.js')
+const { default: Button } = await import('../../src/ui/Button.jsx')
 const { Stepper } = await import('../../src/ui/FormRow.jsx')
 
 /* ---------------- reorder math ---------------- */
@@ -111,10 +114,115 @@ await act(async () => container.querySelector('[aria-label="Increase Margin"]').
 ok('a stepper steps', stepped === 1.25)
 
 let closed = 0
-await act(async () => root.render(React.createElement(Sheet, { title: 'Customize', onClose: () => { closed += 1 } }, React.createElement('button', null, 'Inside'))))
-ok('a sheet is a modal dialog in the body', document.body.querySelector('[role="dialog"][aria-modal="true"]') !== null)
-ok('and takes focus', document.activeElement?.textContent === 'Inside')
+await act(async () => root.render(React.createElement(Dialog, { title: 'Customize', onClose: () => { closed += 1 } }, React.createElement('button', null, 'Inside'))))
+ok('a dialog is a modal dialog in the body', document.body.querySelector('[role="dialog"][aria-modal="true"]') !== null)
+ok('and focuses its first control, not the ×', document.activeElement?.textContent === 'Inside')
+ok('with no footer, it shows a ×', document.body.querySelector('.ib-dialog-close') !== null)
+ok('and the app behind is inert', !document.getElementById('root') || document.getElementById('root').hasAttribute('inert'))
 await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
 ok('Escape closes it', closed === 1)
+
+const footer = React.createElement(React.Fragment, null, React.createElement(Button, null, 'Cancel'), React.createElement(Button, { variant: 'filled' }, 'Rename'))
+await act(async () => root.render(React.createElement(Dialog, { title: 'Rename', size: 'small', footer, onClose: () => {} }, 'body')))
+ok('a footer that closes it means no ×', document.body.querySelector('.ib-dialog-close') === null)
+ok('a small dialog with two footer buttons is the shared-width kind', document.body.querySelector('.ib-dialog--small .ib-dialog-footer')?.children.length === 2)
+ok('sizes are named', document.body.querySelector('.ib-dialog--small') !== null)
+await act(async () => root.render(React.createElement(Dialog, { title: 'Export', footer, footerCloses: false, onClose: () => {} }, 'body')))
+ok('a footer that does not close it keeps the ×', document.body.querySelector('.ib-dialog-close') !== null)
+
+// A Popover: the one surface, an eyebrow, focus inside, Escape.
+const anchor = document.createElement('button')
+document.body.append(anchor)
+const anchorRef = { current: anchor }
+let popClosed = 0
+let escaped = 0
+await act(async () => root.render(React.createElement(Popover, { open: true, anchorRef, eyebrow: 'Cell fill', onClose: () => { popClosed += 1 } }, React.createElement('button', null, 'Blue'))))
+await act(async () => new Promise((resolve) => requestAnimationFrame(resolve)))
+const pop = document.body.querySelector('.ib-popover')
+ok('a popover is the one pop-up surface', pop !== null && !document.body.querySelector('.ui-popover'))
+ok('with its eyebrow', pop?.querySelector('.ib-popover-eyebrow')?.textContent === 'Cell fill')
+ok('and focus moves into it', pop?.contains(document.activeElement))
+await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+ok('Escape closes it', popClosed === 1)
+await act(async () => root.render(React.createElement(Popover, { open: false, anchorRef, onClose: () => {} })))
+ok('closed, it is gone (only its leaving copy stays a moment)', document.body.querySelector('.ib-popover:not(.is-leaving)') === null)
+ok('and that copy is inert', document.body.querySelector('.ib-popover.is-leaving')?.inert !== false)
+ok('and focus is back on the opener', document.activeElement === anchor)
+await act(async () => root.render(React.createElement(Popover, { open: true, anchorRect: { left: 10, right: 10, top: 10, bottom: 10, width: 0, height: 0 }, onClose: () => { popClosed += 1 }, onEscape: () => { escaped += 1 } }, 'note')))
+await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+ok('onEscape replaces closing on Escape', escaped === 1 && popClosed === 1)
+// Opened inside a dialog, a popover is in the dialog's layer, and Escape closes it first.
+let dialogClosed = 0
+function InDialog() {
+  const ref = React.useRef(null)
+  const [open, setOpen] = useState(false)
+  return React.createElement(Dialog, { title: 'Page setup', onClose: () => { dialogClosed += 1 } },
+    React.createElement('button', { ref, onClick: () => setOpen(true) }, 'Units'),
+    React.createElement(Popover, { open, anchorRef: ref, onClose: () => setOpen(false) }, React.createElement('button', null, 'Inches')))
+}
+await act(async () => root.render(React.createElement(InDialog)))
+await act(async () => [...document.body.querySelectorAll('button')].find((b) => b.textContent === 'Units').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+const inner = document.body.querySelector('.ib-popover:not(.is-leaving)')
+ok('a popover opened in a dialog renders in its layer', inner?.parentElement?.classList.contains('ib-dialog-scrim'))
+inner?.focus()
+await act(async () => inner.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+ok('and Escape closes the popover, not the dialog', dialogClosed === 0 && !document.body.querySelector('.ib-popover:not(.is-leaving)'))
+// Opened from a toolbar's row, a Popover opens in the toolbar (DESIGN.md §6): a choice
+// in place beside its button, a form across the whole toolbar.
+const whole = document.createElement('div')
+const besideItem = document.createElement('div')
+document.body.append(whole, besideItem)
+let pushedOut = null
+const toolbarDock = {
+  whole,
+  owns: () => true,
+  inlineFor: () => besideItem,
+  watch: (_anchor, onOut) => { pushedOut = onOut; return () => { pushedOut = null } },
+}
+function InToolbar({ form }) {
+  const ref = React.useRef(null)
+  const [open, setOpen] = useState(false)
+  return React.createElement(ToolbarDockContext.Provider, { value: toolbarDock },
+    React.createElement('button', { ref, onClick: () => setOpen((was) => !was) }, 'Colour'),
+    React.createElement(Popover, { open, anchorRef: ref, onClose: () => setOpen(false), eyebrow: 'Card colour' },
+      form ? React.createElement('input', { 'aria-label': 'Voice' }) : React.createElement('button', null, 'Red')))
+}
+const colour = () => [...document.body.querySelectorAll('button')].find((b) => b.textContent === 'Colour')
+await act(async () => root.render(React.createElement(InToolbar, { form: false })))
+await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('a choice opens in place, beside its button', besideItem.querySelector('.ib-dock[data-mode="inline"]') !== null && !document.body.querySelector('.ib-popover:not(.is-leaving)'))
+ok('and its button stays pressed', colour().hasAttribute('data-opener'))
+await act(async () => pushedOut?.())
+ok('pushed out of the row, it takes the toolbar', whole.querySelector('.ib-dock[data-mode="whole"]') !== null && !besideItem.querySelector('.ib-dock'))
+await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('pressing its button again closes it', !whole.querySelector('.ib-dock') && !colour().hasAttribute('data-opener'))
+await act(async () => root.render(React.createElement(InToolbar, { form: true, key: 'form' })))
+await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+const formDock = whole.querySelector('.ib-dock[data-mode="whole"]')
+ok('a form takes the whole toolbar, with a close button', formDock !== null && [...formDock.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === 'Close'))
+await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+ok('and Escape puts it away', !whole.querySelector('.ib-dock'))
+whole.remove()
+besideItem.remove()
+
+await act(async () => root.render(React.createElement('div')))
+anchor.remove()
+
+// A menu a button opens is drawn in the page; a right-click's is the OS's.
+const opener = document.createElement('button')
+opener.setAttribute('aria-label', 'Alignment')
+document.body.append(opener)
+let picked = null
+await act(async () => { await popUpMenu({ type: 'click', currentTarget: opener }, [{ text: 'Align left', checked: true, action: () => {} }, { separator: true }, { text: 'Align right', action: () => { picked = 'right' } }]) })
+const inPage = document.body.querySelector('.ib-menu[aria-label="Alignment"]')
+ok('a button opens an in-page menu', inPage?.getAttribute('aria-label') === 'Alignment' && inPage.querySelectorAll('[role^="menuitem"]').length === 2)
+await act(async () => [...inPage.querySelectorAll('[role^="menuitem"]')].find((b) => b.textContent.includes('Align right')).dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('and its items run', picked === 'right' && !document.body.querySelector('.ib-menu:not(.is-leaving)'))
+const warn = console.warn
+console.warn = () => {}
+await act(async () => { await popUpMenu({ type: 'contextmenu', target: opener }, [{ text: 'Copy' }]) })
+console.warn = warn
+ok('a right-click does not draw one', !document.body.querySelector('.ib-menu:not(.is-leaving)'))
+opener.remove()
 
 await act(async () => root.unmount())

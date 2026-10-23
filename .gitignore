@@ -37,3 +37,6 @@ npm-debug.log*
 showcase/out/
 showcase/.dist/
 showcase/.tmp/
+
+# Design review screenshots (reproducible from the sha in docs/design-review/state.md)
+design-review/out/

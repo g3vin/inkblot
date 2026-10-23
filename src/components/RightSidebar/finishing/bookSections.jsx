@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { shellBridge } from '../../../bridge'
 import { Button, FormRow, Segmented } from '../../../ui'
-import { popUpNativeMenu } from '../../../ui/useNativeMenu'
+import { popUpMenu } from '../../../ui/useNativeMenu'
 import { DEFAULT_CHAPTER_DESIGN } from '../../../print/chapterDesign'
 import { chapterLabel } from '../../../print/bookMatter'
 import Icon from '../../../ui/Icon.jsx'
@@ -153,7 +153,7 @@ export function EditionsSection({ layout }) {
   const active = book.activeEdition
   const sets = state.cover?.sets ?? []
   const [renaming, setRenaming] = useState(null)
-  const add = (event) => popUpNativeMenu(event, [
+  const add = (event) => popUpMenu(event, [
     { text: 'Paperback', action: () => layout.editEditions('add', { kind: 'paperback' }) },
     { text: 'Hardcover', action: () => layout.editEditions('add', { kind: 'hardcover' }) },
     { text: 'Large print', action: () => layout.editEditions('add', { kind: 'largePrint' }) },
@@ -174,7 +174,7 @@ export function EditionsSection({ layout }) {
           {sets.length ? (
             <Button
               title="The cover this edition prints and exports with"
-              onClick={(event) => popUpNativeMenu(event, [
+              onClick={(event) => popUpMenu(event, [
                 { text: 'The book’s cover', action: () => layout.editEditions('setCover', { id: edition.id }) },
                 { separator: true },
                 ...sets.map((set) => ({ text: set.name, checked: set.id === edition.coverSetId, action: () => layout.editEditions('setCover', { id: edition.id, coverSetId: set.id }) })),
@@ -187,7 +187,7 @@ export function EditionsSection({ layout }) {
             icon="more"
             label="Edition actions"
             size="capsule"
-            onClick={(event) => popUpNativeMenu(event, [
+            onClick={(event) => popUpMenu(event, [
               { text: 'Rename…', action: () => setRenaming(edition.id) },
               { text: 'Duplicate', action: () => layout.editEditions('duplicate', { id: edition.id }) },
               { separator: true },
@@ -406,7 +406,7 @@ export function ChapterOpeningsSection({ layout }) {
       {design.ornament === 'glyph' ? (
         <FormRow label="Glyph">
           <CommitText className="fin-centered" value={design.ornamentGlyph} placeholder="❦" label="Glyph" onCommit={(ornamentGlyph) => edit({ ornamentGlyph })} />
-          <IconButton icon="chevron-down" label="Glyphs" size="capsule" onClick={(event) => popUpNativeMenu(event, HEAD_GLYPHS.map((glyph) => ({ text: glyph, action: () => edit({ ornamentGlyph: glyph }) })))} />
+          <IconButton icon="chevron-down" label="Glyphs" size="capsule" onClick={(event) => popUpMenu(event, HEAD_GLYPHS.map((glyph) => ({ text: glyph, action: () => edit({ ornamentGlyph: glyph }) })))} />
         </FormRow>
       ) : null}
       {design.ornament === 'image' ? (

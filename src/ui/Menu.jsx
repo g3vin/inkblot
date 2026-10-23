@@ -8,16 +8,18 @@
  *     <MenuItem icon="delete" danger onSelect={remove}>Delete note</MenuItem>
  *   </Menu>
  *
- * Arrow keys, Home/End and typeahead move between items; Enter/Space select; Escape
- * or an outside click closes and focus returns to the anchor. The "More" overflow
+ * Arrow keys, Home/End and typeahead move between items; Enter/Space select; Escape,
+ * Tab or an outside click closes it, and focus returns to the anchor. It floats in over
+ * `--dur-fast` and leaves the way it came. The "More" overflow
  * menu on every toolbar is this component — it is how advanced tools stay one step
  * away without crowding the surface (docs/DESIGN.md → Progressive disclosure).
  */
 import { createContext, useContext, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useAnchoredPosition, useDismiss, useRovingFocus } from './hooks'
+import { useAnchoredPosition, useDismiss, useExitAnimation, useRovingFocus } from './hooks'
 import Icon from './Icon'
 import Kbd from './Kbd'
+import { LayerContext } from './layer'
 import './Popover.css'
 import './Menu.css'
 
@@ -25,23 +27,28 @@ const MenuContext = createContext({ close: () => {} })
 
 const ITEM_SELECTOR = '[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"]'
 
-export default function Menu({ open, onClose, anchorRef, point, placement = 'bottom-start', label, className, children }) {
+export default function Menu({ open, ...props }) {
+  return open ? <OpenMenu {...props} /> : null
+}
+
+function OpenMenu({ onClose, anchorRef, point, placement = 'bottom-start', label, className, children }) {
   const ref = useRef(null)
-  const style = useAnchoredPosition(open, ref, { anchorRef, point, placement })
-  useDismiss(open, onClose, anchorRef ? [ref, anchorRef] : [ref])
+  // Opened from inside a dialog, it goes in the dialog's layer, so it isn't under it.
+  const layer = useContext(LayerContext) ?? document.body
+  const style = useAnchoredPosition(true, ref, { anchorRef, point, placement })
+  useDismiss(true, onClose, anchorRef ? [ref, anchorRef] : [ref])
   const onKeyDown = useRovingFocus(ref, ITEM_SELECTOR)
+  useExitAnimation(ref)
 
   useEffect(() => {
-    if (!open) return undefined
     const anchor = anchorRef?.current
     const frame = window.requestAnimationFrame(() => ref.current?.querySelector(ITEM_SELECTOR)?.focus())
     return () => {
       window.cancelAnimationFrame(frame)
       anchor?.focus?.({ preventScroll: true })
     }
-  }, [open, anchorRef])
+  }, [anchorRef])
 
-  if (!open) return null
   return createPortal(
     <div
       ref={ref}
@@ -58,7 +65,7 @@ export default function Menu({ open, onClose, anchorRef, point, placement = 'bot
         {typeof children === 'function' ? children({ close: onClose }) : children}
       </MenuContext.Provider>
     </div>,
-    document.body,
+    layer,
   )
 }
 

@@ -1,4 +1,4 @@
-/* The one pop-up surface: Popover, Menu, CommandPalette. */
+/* The one pop-up surface: Popover, Menu, CommandPalette (docs/DESIGN.md §9 → Pop-ups). */
 .ib-popover,
 .ib-menu {
   z-index: var(--z-popover);
@@ -13,13 +13,68 @@
   animation: ib-float-in var(--dur-fast) var(--ease-out);
 }
 
+/* Popover owns its padding; call sites don't add their own. */
 .ib-popover {
+  position: fixed;
   padding: var(--space-4);
   min-width: 200px;
   max-width: min(360px, calc(100vw - 16px));
+  animation-duration: var(--dur-base);
+}
+
+.ib-popover:focus { outline: none; }
+
+.ib-popover-eyebrow { margin: 0 0 var(--space-3); }
+
+/* In a toolbar's row (DESIGN.md §6 → the dynamic toolbar): its eyebrow, its controls
+   in a row, and, taking the whole toolbar, a close button. The toolbar places it. */
+.ib-dock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  color: var(--text-primary);
+  font: var(--text-sm) var(--font-ui);
+  white-space: nowrap;
+  animation: ib-float-in var(--dur-base) var(--ease-out);
+}
+.ib-dock:focus { outline: none; }
+.ib-dock-eyebrow { margin: 0; flex: none; }
+.ib-dock-body { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.ib-dock[data-mode='whole'] {
+  width: min(760px, 100%);
+  height: 100%;
+  padding: 0 var(--space-4);
+}
+/* Narrower than its controls (a docked card on iPad), the row scrolls, as the toolbar's
+   own row does; close stays in view. */
+.ib-dock[data-mode='whole'] > .ib-dock-body {
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ib-dock[data-mode='whole'] > .ib-dock-body::-webkit-scrollbar { display: none; }
+.ib-dock[data-mode='whole'] > :not(.ib-dock-body) { flex: none; }
+/* Its controls keep their size: a squeezed field would spill under its neighbour. */
+.ib-dock-body > * { flex: none; }
+.ib-dock[data-mode='inline'] {
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+}
+/* A field in a row: its label beside it. */
+.ib-dock .ib-field { flex-direction: row; align-items: center; gap: var(--space-2); }
+
+/* Leaving the way it came (useExitAnimation's copy). */
+:is(.ib-popover, .ib-menu).is-leaving {
+  animation: ib-float-out var(--dur-fast) var(--ease-in) forwards;
+  pointer-events: none;
 }
 
 @keyframes ib-float-in {
   from { opacity: 0; transform: translateY(-2px) scale(0.99); }
   to { opacity: 1; transform: none; }
 }
+
+@keyframes ib-float-out { to { opacity: 0; transform: translateY(-2px) scale(0.99); } }

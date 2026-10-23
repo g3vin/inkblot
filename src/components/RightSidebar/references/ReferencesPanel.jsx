@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from 'react'
 import { shellBridge, useBridgeEvent, useLatestBridgeState } from '../../../bridge'
 import { BibliographyInclude } from '../../../types'
 import { Button, EmptyState, FormRow, IconButton, MenuItem, MenuLabel, MenuSeparator, MoreMenu, PanelActions, ScopeMenu, Section, SelectMenu, Toggle } from '../../../ui'
-import { popUpNativeMenu } from '../../../ui/useNativeMenu'
+import { popUpMenu } from '../../../ui/useNativeMenu'
 import Icon from '../../../ui/Icon.jsx'
 import ReferenceEditor from './ReferenceEditor'
 import { badgesFor, newReferenceId, referenceTitle, sourceUrl, visibleReferences } from './referenceText'
@@ -91,7 +91,7 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
 
   const kinds = schema?.kinds ?? []
   const groups = [...new Set(kinds.map((kind) => kind.group))]
-  const newSource = (event) => popUpNativeMenu(event, groups.flatMap((group, index) => [
+  const newSource = (event) => popUpMenu(event, groups.flatMap((group, index) => [
     index ? { separator: true } : null,
     { text: group, enabled: false },
     ...kinds.filter((kind) => kind.group === group).map((kind) => ({
@@ -189,7 +189,7 @@ function ReferenceRow({ view, schema, scope, docPath, highlighted, expanded, onT
   const resolving = reference.status === 'resolving' && (!view.entryHtml || !referenceTitle(reference))
   const url = sourceUrl(reference)
 
-  const menu = (event) => popUpNativeMenu(event, [
+  const menu = (event) => popUpMenu(event, [
     { text: 'Cite', action: onCite },
     { text: expanded ? 'Done editing' : 'Edit', action: onToggle },
     { separator: true },

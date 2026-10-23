@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { shellBridge } from '../../../bridge'
-import { popUpNativeMenu } from '../../../ui/useNativeMenu'
+import { popUpMenu } from '../../../ui/useNativeMenu'
 import Icon from '../../../ui/Icon.jsx'
 import { displayName, isOrganization, referencePatch } from './referenceText'
 
@@ -68,7 +68,7 @@ export default function ReferenceEditor({ view, schema }) {
   const personMenu = (event, index) => {
     const person = draft.contributors[index]
     const allRoles = roles.includes(person.role) ? roles : [person.role, ...roles]
-    popUpNativeMenu(event, [
+    popUpMenu(event, [
       ...allRoles.map((role) => ({ text: roleLabel(role), checked: person.role === role, action: () => setPerson(index, { ...person, role }) })),
       { separator: true },
       {
@@ -89,7 +89,7 @@ export default function ReferenceEditor({ view, schema }) {
     ])
   }
 
-  const addPerson = (event) => popUpNativeMenu(event, [
+  const addPerson = (event) => popUpMenu(event, [
     ...roles.map((role) => ({ text: roleLabel(role), action: () => change({ contributors: [...draft.contributors, { role, family: '', given: '' }] }) })),
     { separator: true },
     { text: 'Organization', action: () => change({ contributors: [...draft.contributors, { role: roles[0], literal: '' }] }) },

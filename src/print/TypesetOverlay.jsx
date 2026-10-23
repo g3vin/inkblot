@@ -21,13 +21,14 @@
  * then a note offers to undo it. Picking a handle also tells the inspector
  * (`typesetFocus`), which opens the section where the same thing is set exactly.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { pageLeftMargin } from './pageSetup'
 import { mmToPx } from './pageSizes'
 import { anchorBlock } from './TypesetAnchors'
 import { TYPESET_META } from './TypesetLock'
+import Popover from '../ui/Popover.jsx'
 
 const PX_PER_MM = mmToPx(1)
 const SNAP_MM = 0.5
@@ -402,24 +403,24 @@ export default function TypesetOverlay({ pages, metrics, setup, zoom, editor, ty
       {drag?.kind === 'pictureSize' ? <div className="to-tip" style={{ left: headBox?.x + headBox?.w / 2, top: headBox?.y - 26 }}>{drag.value}% of the text width</div> : null}
       {drag?.kind === 'pictureSlot' ? <div className="to-tip" style={{ left: headBox?.x + headBox?.w / 2, top: headBox?.y - 26 }}>{drag.value === 'above' ? 'Above the number' : drag.value === 'between' ? 'Between number and title' : 'Below the title'}</div> : null}
 
-      {popover ? <Popover popover={popover} setup={setup} typeset={typeset} close={() => setPopover(null)} /> : null}
+      {popover ? <PagePicker key={`${popover.kind}:${popover.x}:${popover.y}`} popover={popover} setup={setup} typeset={typeset} close={() => setPopover(null)} /> : null}
     </div>
   )
 }
 
-/** The small editors a click on the page opens: what a head or a folio says, a glyph. */
-function Popover({ popover, setup, typeset, close }) {
-  const ref = useRef(null)
-  useEffect(() => {
-    const away = (event) => { if (!ref.current?.contains(event.target)) close() }
-    const escape = (event) => { if (event.key === 'Escape') close() }
-    window.addEventListener('pointerdown', away, true)
-    window.addEventListener('keydown', escape, true)
-    return () => {
-      window.removeEventListener('pointerdown', away, true)
-      window.removeEventListener('keydown', escape, true)
-    }
-  }, [close])
+const PICKER_EYEBROWS = { sceneBreak: 'Scene break', opening: 'Chapter opening', number: 'Chapter number', ornament: 'Ornament' }
+
+/**
+ * The small editors a click on the page opens: what a head or a folio says, a glyph. A
+ * Popover under a mark set where the click was (the page scrolls and zooms, so the mark
+ * lives in the overlay and the pop-up reads its rect).
+ */
+function PagePicker({ popover, setup, typeset, close }) {
+  const [mark, setMark] = useState(null)
+  const markRef = useMemo(() => ({ current: mark }), [mark])
+  const eyebrow = popover.kind === 'running'
+    ? `${popover.which === 'header' ? 'Running head' : 'Foot'}${popover.verso ? ', left-hand pages' : ''}`
+    : PICKER_EYEBROWS[popover.kind]
 
   const body = (() => {
     if (popover.kind === 'sceneBreak') {
@@ -505,7 +506,6 @@ function Popover({ popover, setup, typeset, close }) {
     const set = (slot, value) => typeset.editSetup({ ...setup, [key]: { ...text, [slot]: value } }, popover.which === 'header' ? 'Running head' : 'Folio')
     return (
       <div className="to-list to-running-editor">
-        <strong>{popover.which === 'header' ? 'Running head' : 'Foot'}{popover.verso ? ', left-hand pages' : ''}</strong>
         {['left', 'center', 'right'].map((slot) => (
           <label key={slot} className="to-field">{slot[0].toUpperCase() + slot.slice(1)}
             <input defaultValue={text[slot]} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} onBlur={(e) => { if (e.target.value !== text[slot]) set(slot, e.target.value) }} />
@@ -526,9 +526,12 @@ function Popover({ popover, setup, typeset, close }) {
   })()
 
   return (
-    <div ref={ref} className="to-popover" style={{ left: popover.x, top: popover.y }} onPointerDown={(e) => e.stopPropagation()}>
-      {body}
-    </div>
+    <>
+      <span ref={setMark} className="to-mark" style={{ left: popover.x, top: popover.y }} />
+      <Popover open={Boolean(mark)} anchorRef={markRef} onClose={close} align="center" eyebrow={eyebrow} className="to-popover">
+        {body}
+      </Popover>
+    </>
   )
 }
 

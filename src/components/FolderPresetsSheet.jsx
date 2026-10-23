@@ -9,7 +9,7 @@
  * Opened from ⌘K, the file tree's + and its context menu (`openFolderPresets`).
  */
 import { useEffect, useRef, useState } from 'react'
-import { Button, Field, IconButton, InkPicker, Input, Sheet } from '../ui'
+import { Button, Dialog, Field, IconButton, InkPicker, Input } from '../ui'
 import Icon from '../ui/Icon.jsx'
 import { inkColor } from '../lib/palette'
 import { useCommands } from '../lib/commands'
@@ -125,7 +125,7 @@ export default function FolderPresetsSheet({ projectName }) {
   const editing = form && form !== 'new' ? saved.find((preset) => preset.id === form) : null
 
   return (
-    <Sheet title="Folder types" onClose={() => setOpen(false)} width={520}>
+    <Dialog eyebrow="Files" title="Folder types" onClose={() => setOpen(false)} size="medium">
       {form ? (
         <PresetForm
           key={form}
@@ -156,6 +156,6 @@ export default function FolderPresetsSheet({ projectName }) {
           <Button variant="tinted" onClick={() => setForm('new')}><Icon name="add" />New folder type</Button>
         </div>
       )}
-    </Sheet>
+    </Dialog>
   )
 }

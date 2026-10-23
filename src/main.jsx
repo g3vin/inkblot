@@ -21,6 +21,15 @@ import { setAccentAttribute, setThemeAttribute, setTrayAttribute } from './lib/t
 import { applyPlatformAttribute } from './ui/platform'
 import { placeTrafficLights } from './lib/trafficLights'
 
+// Dev only: `?mock` runs the page against scripts/dev/tauri-mock.js so it opens in a
+// plain browser, and `?variant=<family>:<picks>` turns on a design-review prototype
+// (src/dev/variants, docs/design-review). Production builds drop this block.
+if (import.meta.env.DEV) {
+  const params = new URLSearchParams(window.location.search)
+  if (params.has('mock')) await import('../scripts/dev/tauri-mock.js')
+  if (params.has('variant')) (await import('./dev/variants/index.js')).installVariants(params.get('variant'))
+}
+
 // A theme before anything else paints — the OS's until the saved one is known.
 setThemeAttribute('system')
 applyPlatformAttribute()

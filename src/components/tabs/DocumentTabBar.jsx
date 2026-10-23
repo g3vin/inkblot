@@ -19,7 +19,7 @@ import { useEffect, useRef } from 'react'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
 import { FloatingCapsule, IconButton, usePointerReorder } from '../../ui'
 import { moveTo } from '../../ui/usePointerReorder.js'
-import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
+import { popUpMenu } from '../../ui/useNativeMenu.js'
 import Icon from '../../ui/Icon.jsx'
 import { lockReason, toggleDocumentLock, useLocks } from '../../lib/docLocks'
 import { adjacentTab, needsTabBar, outsideWindow, tabIcon, tabName, tabTitle, useShowsTabBar } from './tabBarState.js'
@@ -122,7 +122,7 @@ export default function DocumentTabBar({ activeDoc }) {
                   }
                   if (event.key === 'Delete' || event.key === 'Backspace') send('closeTab', { tabId: tab.id })
                 }}
-                onContextMenu={(event) => popUpNativeMenu(event, tabMenu(tab, tabs, activeDoc, locks))}
+                onContextMenu={(event) => popUpMenu(event, tabMenu(tab, tabs, activeDoc, locks))}
               >
                 <button
                   type="button"

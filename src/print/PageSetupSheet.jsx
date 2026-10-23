@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { getPreference, setPreference } from '../lib/preferences'
-import { Button, FormRow, Input, Section, Segmented, SelectMenu, Sheet, Toggle } from '../ui'
+import { Button, Dialog, FormRow, Input, Section, Segmented, SelectMenu, Toggle } from '../ui'
 import { applyFormat, FORMAT_PRESETS, formatOf, writingFormatOf } from './formats'
 import { SIGNATURE_GUIDANCE } from './imposition'
 import { normalizePageSetup, resolvePageSetup, suggestedInsideMarginMm } from './pageSetup'
@@ -178,15 +178,16 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
   const applyType = (patch) => apply({ typography: { ...typography, ...patch } })
 
   return (
-    <Sheet
+    <Dialog
+      eyebrow="Typeset"
       title="Page setup"
       onClose={onClose}
-      width={440}
+      size="medium"
       className="pss-sheet"
       footer={(
         <>
           <SelectMenu label="Units" value={unit} onChange={setUnit} options={UNITS} />
-          <span className="ui-sheet-footer-spacer" />
+          <span className="ib-dialog-footer-spacer" />
           <Button variant="filled" onClick={onClose}>Done</Button>
         </>
       )}
@@ -502,6 +503,6 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
           </>
         ) : null}
       </Section>
-    </Sheet>
+    </Dialog>
   )
 }

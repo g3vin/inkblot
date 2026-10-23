@@ -22,6 +22,8 @@
 .fin-print-options-body,
 .fin-form,
 .fin-sides-body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-2); font-size: 12px; }
+/* In a Popover, which owns the padding. */
+.ib-popover :is(.fin-print-options-body, .fin-sides-body) { padding: 0; }
 .fin-goto form { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; }
 .fin-goto input { width: 56px; }
 .fin-field { display: flex; flex-direction: column; gap: 3px; }

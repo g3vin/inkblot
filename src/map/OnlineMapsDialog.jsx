@@ -13,6 +13,7 @@ export default function OnlineMapsDialog({ open, onAllow, onCancel }) {
       open={open}
       onClose={onCancel}
       eyebrow="Maps"
+      size="medium"
       title="Use online maps?"
       description="Satellite pictures, street detail and terrain are downloaded as you look around. The services that send them see which part of the world you are looking at. Nothing from your project leaves this computer."
       footer={
