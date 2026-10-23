@@ -166,3 +166,42 @@ lead's words, the date, and the commit sha.
 - **Reason:** not given
 - **Date:** 2026-10-22
 - **Commit:** `9fee21d` on `design/round-03-toolbars`
+
+## Round 03b: The dynamic toolbar ([03b-dynamic-toolbar.md](rounds/03b-dynamic-toolbar.md))
+
+Asked for by the design lead on 2026-10-22: "all toolbar pop-ups to be like the new find
+in document thing which appears in the toolbar … Not everything necessarily needs to take
+up the entire toolbar, but all settings/configs for the button that are there already
+should be there." Supersedes 02b.2 and, for the toolbar, 02b.3.
+
+### 03b.1 The » glyph
+
+- **Options:** A control (a typed ») · B `more` (⋯) · C » drawn from the icon set
+- **Pick:** C
+- **Reason:** in the design lead's words, "it doesn't match the style of all the other icons" (of A)
+- **Date:** 2026-10-22
+- **Commit:** `dd0198f` on `design/round-03b-dynamic-toolbar`
+
+### 03b.2 How a toolbar pop-up opens
+
+- **Options:** A control (below the button) · B takes the toolbar · C in place · D by kind: a form takes the toolbar, a choice opens in place
+- **Pick:** D
+- **Reason:** "Not everything necessarily needs to take up the entire toolbar" (from the request)
+- **Date:** 2026-10-22
+- **Commit:** `dd0198f` on `design/round-03b-dynamic-toolbar`
+
+### 03b.3 Menus from the toolbar
+
+- **Options:** A control (menus stay menus) · B a row of their items in the toolbar
+- **Pick:** B
+- **Reason:** "all toolbar pop-ups" (from the request)
+- **Date:** 2026-10-22
+- **Commit:** `dd0198f` on `design/round-03b-dynamic-toolbar`
+
+### 03b.4 » in a dynamic toolbar
+
+- **Options:** A control (the labelled list, 02b.2B) · B the toolbar's second page
+- **Pick:** B
+- **Reason:** not given
+- **Date:** 2026-10-22
+- **Commit:** `dd0198f` on `design/round-03b-dynamic-toolbar`
