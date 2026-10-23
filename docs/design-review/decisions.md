@@ -132,3 +132,37 @@ lead's words, the date, and the commit sha.
 - **Reason:** not given
 - **Date:** 2026-10-21
 - **Commit:** `0e717c3` on `design/round-02b-menus`
+
+## Round 03: Toolbars and capsules ([03-toolbars.md](rounds/03-toolbars.md))
+
+### 03.1 The timeline's tools
+
+- **Options:** A control (text tools in the card's toolbar, the timeline's in a band under it) · B in the card's toolbar, as the map's are · C a floating strip at the top of the timeline
+- **Pick:** B
+- **Reason:** not given
+- **Date:** 2026-10-22
+- **Commit:** `9fee21d` on `design/round-03-toolbars`
+
+### 03.2 The card toolbar's buttons
+
+- **Options:** A control (16px on 26×22) · B 16px on 26×26, the card's toolbar named dense · C 20px on 28×28
+- **Pick:** B
+- **Reason:** not given
+- **Date:** 2026-10-22
+- **Commit:** `9fee21d` on `design/round-03-toolbars`
+
+### 03.3 Capsules: height, inset and layer
+
+- **Options:** A control · B readouts 28, strips 36, all on `--z-chrome` · C one height, 32, for every capsule
+- **Pick:** B
+- **Reason:** not given
+- **Date:** 2026-10-22
+- **Commit:** `9fee21d` on `design/round-03-toolbars`
+
+### 03.4 The find bar
+
+- **Options:** A control (a floating card) · B a floating strip · C in the card's toolbar while open
+- **Pick:** C
+- **Reason:** not given
+- **Date:** 2026-10-22
+- **Commit:** `9fee21d` on `design/round-03-toolbars`
