@@ -114,7 +114,7 @@ by the design lead on 2026-10-20:
 | [02](rounds/02-popups.md) | Pop-ups: shell and behaviour | Applied on `design/round-02-popups` (1B, 2C, 3C, 4C, 5C); [PR #80](https://github.com/g3vin/inkblot/pull/80) open, stacked on #79 |
 | [02b](rounds/02b-menus.md) | Pop-ups: menus (native vs in-page, », a pop-up from a pop-up, the command palette) | Applied on `design/round-02b-menus` (1B, 2B, 3D, 4B); [PR #84](https://github.com/g3vin/inkblot/pull/84) open, stacked on #80 |
 | [03](rounds/03-toolbars.md) | Toolbars and capsules (the timeline's tools, the card toolbar's buttons, capsules, the find bar) | Applied on `design/round-03-toolbars` (1B, 2B, 3B, 4C); [PR #86](https://github.com/g3vin/inkblot/pull/86) open, stacked on #84 |
-| [03b](rounds/03b-dynamic-toolbar.md) | The dynamic toolbar: a toolbar button's pop-up opens in the toolbar, as find does; the » glyph. Asked for by the design lead on 2026-10-22. Reopens 02b.2 (» as a list) and 02b.3 (a pop-up opened inside a pop-up) | Applied on `design/round-03b-dynamic-toolbar` (1C, 2D, 3B, 4B); PR open, stacked on #86 |
+| [03b](rounds/03b-dynamic-toolbar.md) | The dynamic toolbar: a toolbar button's pop-up opens in the toolbar, as find does; the » glyph. Asked for by the design lead on 2026-10-22. Reopens 02b.2 (» as a list) and 02b.3 (a pop-up opened inside a pop-up) | Applied on `design/round-03b-dynamic-toolbar` (1C, 2D, 3B, 4B); [PR #115](https://github.com/g3vin/inkblot/pull/115) open, stacked on #86 |
 
 The design lead confirmed the order above on 2026-10-20.
 
