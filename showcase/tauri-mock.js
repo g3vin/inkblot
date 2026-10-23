@@ -6,7 +6,8 @@
  * opens, reads, saves and lists a real-looking project. capture.mjs sets
  * `window.__SHOWCASE__ = { files, prefs }` before this runs:
  *
- *   files  { '/mock/<project>/<file>': '<text>' } — everything under the projects folder
+ *   files  { '/mock/<project>/<file>': '<text>' | { base64, type } } — everything under the
+ *          projects folder; a binary file (a voice memo) is base64 with its media type
  *   prefs  what preferences_load answers (the theme, the accent, …)
  *
  * Commands it doesn't know answer null, as in the dev mock. Set `__SHOWCASE__.log` to
@@ -15,7 +16,9 @@
 (() => {
   const ROOT = '/mock'
   const setup = window.__SHOWCASE__ || {}
-  const files = new Map(Object.entries(setup.files || {}))
+  // Text stays a string; a binary file becomes { data: Uint8Array, type }.
+  const decodeBinary = ({ base64, type }) => ({ data: Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)), type })
+  const files = new Map(Object.entries(setup.files || {}).map(([p, v]) => [p, typeof v === 'string' ? v : decodeBinary(v)]))
   const dirs = new Set([ROOT])
   const prefs = { ...(setup.prefs || {}) }
   const log = !!setup.log
@@ -42,7 +45,8 @@
     return norm(`${ROOT}/${p}`)
   }
   const fromHeaders = (opts) => resolve(decodeURIComponent(opts?.headers?.path || ''))
-  const bytes = (text) => Array.from(new TextEncoder().encode(text))
+  const raw = (content) => (typeof content === 'string' ? new TextEncoder().encode(content) : content.data)
+  const bytes = (content) => Array.from(raw(content))
   const decode = (data) => new TextDecoder().decode(data instanceof Uint8Array ? data : Uint8Array.from(data || []))
   const missing = (p) => { throw new Error(`No such file or directory (os error 2): ${p}`) }
 
@@ -57,7 +61,7 @@
     const isFile = files.has(p)
     if (!isFile && !dirs.has(p)) missing(p)
     const t = Date.parse(setup.now || '2026-10-21T09:00:00Z')
-    return { isFile, isDirectory: !isFile, isSymlink: false, size: isFile ? files.get(p).length : 0, mtime: t, atime: t, birthtime: t, readonly: false }
+    return { isFile, isDirectory: !isFile, isSymlink: false, size: isFile ? raw(files.get(p)).length : 0, mtime: t, atime: t, birthtime: t, readonly: false }
   }
 
   const fs = {
@@ -151,7 +155,13 @@
     metadata: { currentWindow: { label: 'main' }, currentWebview: { windowLabel: 'main', label: 'main' } },
     transformCallback: (cb) => { const n = nextId++; window[`_${n}`] = cb; return n },
     unregisterCallback: () => {},
-    convertFileSrc: (p) => p,
+    // The shell serves project files over its asset protocol; here a binary fixture is a blob URL.
+    convertFileSrc: (p) => {
+      const content = files.get(norm(p))
+      if (!content || typeof content === 'string') return p
+      content.url ??= URL.createObjectURL(new Blob([content.data], { type: content.type }))
+      return content.url
+    },
     invoke: async (cmd, args, opts) => {
       try {
         const result = answer(cmd, args, opts)

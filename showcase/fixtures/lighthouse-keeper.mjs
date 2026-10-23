@@ -3,9 +3,19 @@
  * text the website's book spread shows (inkblot-site src/data/home.ts), so the window
  * title and the prose agree wherever the site uses them.
  *
- * Exports `files` ({ '/mock/<project>/<file>': text }) and `prefs` for the mock.
+ * `book({ notes })` returns `{ files, prefs }` for the mock. Chapter 3 carries one set
+ * of notes per shot: 'review' (a beta reader's margin notes) or 'research' (the
+ * writer's own note on "light it at dusk", with a photo and a voice memo).
+ *
+ * assets/lamp.jpg: the lens and lamp of Faro de Punta Tuna, Puerto Rico, from the
+ * Historic American Engineering Record (HAER PR,57-EMAG,1-27), public domain, cropped.
+ * https://commons.wikimedia.org/wiki/File:Detail_view_of_interior_of_lens_showing_bulb_-_Faro_de_Punta_Tuna,_Punta_Tuna,_Emajagua,_Maunabo_Municipio,_PR_HAER_PR,57-EMAG,1-27.tif
+ * assets/lamp-memo.webm: 42 s of quiet wind, made with ffmpeg (anoisesrc).
  */
+import fs from 'node:fs'
+
 export const PROJECT = 'The Lighthouse Keeper'
+const asset = (name) => fs.readFileSync(new URL(`./assets/${name}`, import.meta.url))
 
 const CHAPTERS = {
   'Chapter 1': {
@@ -32,19 +42,30 @@ const CHAPTERS = {
       'Her hands knew the brass before her eyes did. The wick, the trimmer, the little door that stuck in wet weather and had to be persuaded with the heel of a palm. She struck the match and held it there until it burned her fingers, and then a moment longer.',
       'Out on the water, something answered.',
     ],
-    // A beta reader's margin notes, for the review shot.
-    notes: [
-      { anchor: 'a cathedral of glass', content: 'This image stopped me. Keep it.' },
-      { anchor: 'Nobody ever looked up at a lighthouse until it went out.', content: 'Lovely line, but could it close the chapter instead?' },
-      { anchor: 'and then a moment longer', content: 'I felt this in my own hand.' },
-    ],
+    notes: {
+      // A beta reader's margin notes.
+      review: [
+        { anchor: 'a cathedral of glass', content: 'This image stopped me. Keep it.' },
+        { anchor: 'Nobody ever looked up at a lighthouse until it went out.', content: 'Lovely line, but could it close the chapter instead?' },
+        { anchor: 'and then a moment longer', content: 'I felt this in my own hand.' },
+      ],
+      // The writer's own note, from a visit to a real lighthouse.
+      research: [
+        {
+          anchor: 'light it at dusk',
+          content: 'From the lighthouse tour. The keeper on lighting it, in his words.',
+          images: [{ id: 'lamp', src: `data:image/jpeg;base64,${asset('lamp.jpg').toString('base64')}`, mimeType: 'image/jpeg' }],
+          audio: [{ id: 'memo', src: '.assets/lamp-memo.webm', mimeType: 'audio/webm', durationMs: 42000, createdAt: '2026-10-18T16:20:00Z' }],
+        },
+      ],
+    },
   },
 }
 
 const text = (t) => [{ type: 'text', text: t }]
 
 /** A chapter as the app stores it: the TipTap document, with notes anchored by position. */
-function chapter({ title, body, notes = [] }) {
+function chapter({ title, body, notes = {} }, set) {
   const blocks = [
     { type: 'heading', attrs: { level: 1 }, content: text(title) },
     ...body.map((t) => ({ type: 'paragraph', content: text(t) })),
@@ -53,19 +74,22 @@ function chapter({ title, body, notes = [] }) {
   const starts = []
   let pos = 0
   for (const b of blocks) { starts.push(pos); pos += b.content[0].text.length + 2 }
-  const anchored = notes.map((note, i) => {
+  const anchored = (notes[set] ?? []).map((note, i) => {
     const at = blocks.findIndex((b) => b.content[0].text.includes(note.anchor))
     if (at < 0) throw new Error(`Note anchor not in chapter: "${note.anchor}"`)
     const from = starts[at] + 1 + blocks[at].content[0].text.indexOf(note.anchor)
-    return { id: `n${i + 1}`, type: 'quote', from, to: from + note.anchor.length, anchor: note.anchor, content: note.content, color: 'amber' }
+    return { id: `n${i + 1}`, type: 'quote', from, to: from + note.anchor.length, ...note, color: 'amber' }
   })
   return JSON.stringify({ content: { type: 'doc', content: blocks }, notes: anchored })
 }
 
-export const files = Object.fromEntries(
-  Object.entries(CHAPTERS).map(([name, c]) => [`/mock/${PROJECT}/${name}.json`, chapter(c)]),
-)
-
-export const prefs = {
-  [`inkblot-order:${PROJECT}`]: JSON.stringify({ '': Object.keys(CHAPTERS).map((n) => `file:${n}`) }),
+export function book({ notes = 'review' } = {}) {
+  const files = Object.fromEntries(
+    Object.entries(CHAPTERS).map(([name, c]) => [`/mock/${PROJECT}/${name}.json`, chapter(c, notes)]),
+  )
+  files[`/mock/${PROJECT}/.assets/lamp-memo.webm`] = { base64: asset('lamp-memo.webm').toString('base64'), type: 'audio/webm' }
+  const prefs = {
+    [`inkblot-order:${PROJECT}`]: JSON.stringify({ '': Object.keys(CHAPTERS).map((n) => `file:${n}`) }),
+  }
+  return { files, prefs }
 }

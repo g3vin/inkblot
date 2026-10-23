@@ -26,7 +26,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { SHOTS } from './shots.mjs'
-import * as book from './fixtures/lighthouse-keeper.mjs'
+import { book } from './fixtures/lighthouse-keeper.mjs'
 import { loadPlaywright, openPage, repo, serve } from './session.mjs'
 import { parseChangelog } from './changelog.mjs'
 
@@ -78,10 +78,11 @@ function avif(input, output, width, crf = 30) {
 }
 
 /** A still: AVIF and WebP at 1× and 2×. */
-function encodeStill(png, base, viewport) {
+function encodeStill(png, base, dims) {
   const images = []
   for (const scale of [1, 2]) {
-    const width = viewport.width * scale
+    // Even widths: the encoders work in 4:2:0.
+    const width = 2 * Math.round((dims.width * scale) / 2)
     const out = { width, avif: `${base}@${scale}x.avif`, webp: `${base}@${scale}x.webp` }
     avif(png, out.avif, width)
     webp(png, out.webp, width)
@@ -90,7 +91,7 @@ function encodeStill(png, base, viewport) {
     }
     images.push({ width, avif: rel(out.avif), webp: rel(out.webp), bytes: size(out.avif) })
   }
-  return { width: viewport.width, height: viewport.height, images }
+  return { width: dims.width, height: dims.height, images }
 }
 
 /**
@@ -134,13 +135,16 @@ function encodeLoop(recording, base, { lead, seconds, viewport }) {
 
 /* ---------------- capture ---------------- */
 
+const roundRect = (r) => ({ x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) })
+
 async function captureOne(browser, url, shot, theme) {
-  const prefs = { ...book.prefs, 'inkblot-theme': theme, ...(shot.accent ? { 'inkblot-accent-color': shot.accent } : {}) }
+  const fixture = book(shot.fixture)
+  const prefs = { ...fixture.prefs, 'inkblot-theme': theme, ...(shot.accent ? { 'inkblot-accent-color': shot.accent } : {}) }
   const loop = shot.kind === 'loop'
   const videoDir = path.join(TMP, `${shot.id}-${theme}`)
   const started = Date.now()
   const { context, page, errors } = await openPage(browser, url, {
-    files: book.files,
+    files: fixture.files,
     prefs,
     viewport: shot.viewport,
     scale: loop ? 1 : 2,
@@ -171,9 +175,11 @@ async function captureOne(browser, url, shot, theme) {
   if (!loop) {
     const png = path.join(TMP, `${shot.id}-${theme}.png`)
     await page.mouse.move(0, shot.viewport.height - 1)
-    await page.screenshot({ path: png })
+    // A shot may keep only part of the window (`clip`), e.g. a passage and its note.
+    const clip = shot.clip ? roundRect(await shot.clip(page)) : null
+    await page.screenshot({ path: png, ...(clip ? { clip } : {}) })
     await context.close()
-    return encodeStill(png, base, shot.viewport)
+    return encodeStill(png, base, clip ?? shot.viewport)
   }
   if (recordAt == null) throw new Error(`Loop "${shot.id}" never called h.record()`)
   const video = page.video()
@@ -203,11 +209,12 @@ const results = { ...previous }
 let failed = 0
 try {
   for (const shot of shots) {
-    const entry = { kind: shot.kind, aspect: `${shot.viewport.width} / ${shot.viewport.height}`, themes: {} }
+    const entry = { kind: shot.kind, aspect: null, themes: {} }
     for (const theme of shot.themes) {
       const t = Date.now()
       try {
         entry.themes[theme] = await captureOne(browser, server.url, shot, theme)
+        entry.aspect ??= `${entry.themes[theme].width} / ${entry.themes[theme].height}`
         console.log(`✓ ${shot.id} · ${theme} (${((Date.now() - t) / 1000).toFixed(0)} s)`)
       } catch (error) {
         failed++
