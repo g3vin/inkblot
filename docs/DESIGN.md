@@ -116,7 +116,7 @@ mark (half the wordmark's height around the wordmark). The mark is legible from 
 and the wordmark from 72px wide; below that, use the mark alone.
 
 **Brand vs accent.** The logo is black and white. `--accent-color` is the writer's
-choice: Ink Blue by default, or one of five other inks. It marks interactive states
+choice: Sage by default, or one of six inks. It marks interactive states
 (selection, focus, primary buttons, the active tab).
 
 **Don't** recolour the logo, add effects (shadows, gradients, glass), stretch it,
@@ -160,7 +160,7 @@ from it. No feature invents its own set.
 
 | Id | Label | Typical use |
 |---|---|---|
-| `blue` | Ink Blue | Default accent, brand |
+| `blue` | Ink Blue | Brand |
 | `teal` | Teal | |
 | `green` | Green | Success |
 | `amber` | Amber | Default note colour, warnings |
@@ -168,6 +168,11 @@ from it. No feature invents its own set.
 | `red` | Red | Danger |
 | `violet` | Violet | |
 | `slate` | Slate | Neutral category |
+
+**Sage** (`--ink-sage`, the website's brand green) is the default accent and window
+colour. It is a chrome colour only, not a ninth ink: no note, card, lane or tag takes
+it, so `INK_IDS` stays eight and colours hashed over it (version history) don't move.
+In code it is `CHROME_INKS` / `ChromeInkId` in `src/lib/palette.ts`.
 
 In code:
 

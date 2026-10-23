@@ -99,26 +99,47 @@ export const resolveInkHex = (value: unknown, fallback = '#000000'): string => {
   return /^#[0-9a-f]{6}$/i.test(hex) ? hex : fallback
 }
 
-/* ---- Per-feature assignments -------------------------------------------- */
+/* ---- Chrome: the accent and the window --------------------------------- */
+
+/**
+ * The colours the app's own chrome can take: the inks, and Sage, the brand's green,
+ * which is the default for both the accent and the window. Sage is chrome only — never
+ * a note, card, lane or tag colour — so INKS (and the Rust INK_IDS, which version
+ * history hashes over) stay eight, and nothing already coloured changes.
+ */
+export type ChromeInkId = InkId | 'sage'
+export interface ChromeInk {
+  id: ChromeInkId
+  label: string
+}
+export const SAGE: ChromeInk = { id: 'sage', label: 'Sage' }
+export const CHROME_INKS: readonly ChromeInk[] = [SAGE, ...INKS]
+
+const isChromeInkId = (value: unknown): value is ChromeInkId => value === 'sage' || isInkId(value)
+
+/** The CSS value for a chrome colour, e.g. `var(--ink-sage)`. */
+export const chromeInkVar = (id: ChromeInkId): string => `var(--ink-${id})`
 
 /** Accent presets. Keep in sync with the [data-accent] rules in tokens.css. */
-export const ACCENT_PRESETS: readonly Ink[] = INKS.filter((ink) =>
-  ['blue', 'teal', 'green', 'amber', 'rust', 'violet'].includes(ink.id))
+export const ACCENT_PRESETS: readonly ChromeInk[] = CHROME_INKS.filter((ink) =>
+  ['sage', 'blue', 'teal', 'green', 'amber', 'rust', 'violet'].includes(ink.id))
 
-export const DEFAULT_ACCENT: InkId = 'blue'
+export const DEFAULT_ACCENT: ChromeInkId = 'sage'
 
-/** A stored accent (an ink id, or a hex from before the ink palette) → a preset id. */
-export const normalizeAccent = (value: unknown): InkId => {
-  const id = isInkId(value) ? value : legacyInkFor(value)
+/** A stored accent (an id, or a hex from before the ink palette) → a preset id. */
+export const normalizeAccent = (value: unknown): ChromeInkId => {
+  const id = isChromeInkId(value) ? value : legacyInkFor(value)
   return id && ACCENT_PRESETS.some((preset) => preset.id === id) ? id : DEFAULT_ACCENT
 }
 
-/** Window (tray) colours: every ink. Keep in sync with the [data-tray] rules in tokens.css. */
-export const TRAY_INKS: readonly InkId[] = INKS.map((ink) => ink.id)
-export const DEFAULT_TRAY: InkId = 'blue'
+/** Window (tray) colours: Sage and every ink. Keep in sync with the [data-tray] rules in tokens.css. */
+export const TRAY_INKS: readonly ChromeInkId[] = CHROME_INKS.map((ink) => ink.id)
+export const DEFAULT_TRAY: ChromeInkId = 'sage'
 
-/** A stored tray colour → an ink id. */
-export const normalizeTray = (value: unknown): InkId => (isInkId(value) ? value : DEFAULT_TRAY)
+/** A stored tray colour → a chrome colour id. */
+export const normalizeTray = (value: unknown): ChromeInkId => (isChromeInkId(value) ? value : DEFAULT_TRAY)
+
+/* ---- Per-feature assignments -------------------------------------------- */
 
 /** Note colours, in picker order. Amber reads as "a note" at a glance. */
 export const NOTE_INKS: readonly InkId[] = ['amber', 'red', 'blue', 'green', 'violet', 'rust', 'teal', 'slate']
