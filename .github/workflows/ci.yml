@@ -44,7 +44,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # No prompts, no extras, and a limit of its own: a stuck mirror fails fast.
+      - name: Install ffmpeg
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: sudo apt-get update -o Acquire::Retries=3 && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: npm i --no-save playwright-core@1.64.1 && npx playwright-core install --with-deps webkit
       - run: npm run showcase -- --stills-only
 
