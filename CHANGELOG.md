@@ -6,6 +6,8 @@ Notable changes to Inkblot. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-23
+
 ### Added
 
 - **Typeset and Print & Export:** the Finishing layout's Page, Book and Publish tabs
@@ -149,6 +151,12 @@ Notable changes to Inkblot. The format follows
   Style"), in the native sidebar as well as the page. Filtering a map's history
   finds versions by the names written on the map.
 
+### Changed
+
+- **Accent and window colour:** Sage, Inkblot's green, is the default for both, in
+  place of Ink Blue. Ink Blue is still in Settings → Appearance; anyone who has opened
+  Inkblot before keeps the colour they had.
+
 ### Fixed
 
 - **Renaming a project** onto a name another project already holds is refused,
@@ -187,5 +195,6 @@ shell beside the Tauri app.
   bridge protocol) and `inkblot-models` (on-device models) in Rust, shared by both
   apps; types generated into TypeScript and Swift; a JS/Rust parity harness.
 
-[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/g3vin/inkblot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/g3vin/inkblot/releases/tag/v0.1.0

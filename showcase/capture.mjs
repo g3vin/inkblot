@@ -234,7 +234,8 @@ const manifest = {
     version: pkg.version,
     tag,
     date: released?.date ?? null,
-    commit: git('rev-parse', 'HEAD'),
+    // In CI's container git may be missing or refuse the checkout; the workflow passes the commit.
+    commit: process.env.SHOWCASE_COMMIT || git('rev-parse', 'HEAD'),
     capturedAt: new Date().toISOString(),
   },
   changelog: changelog.filter((r) => r.version !== 'Unreleased'),
