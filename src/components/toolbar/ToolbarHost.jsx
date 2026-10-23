@@ -1,10 +1,10 @@
 /**
  * ToolbarHost — one toolbar, drawn from its saved layout.
  *
- * Four toolbars (lib/chromeLayout.ts): a document's, a canvas's, a map's and
- * Typeset's. Each item is its own component (registry.jsx) and reads the state the
+ * Five toolbars (lib/chromeLayout.ts): a document's, a canvas's, a map's, a
+ * timeline's and Typeset's. Each item is its own component (registry.jsx) and reads the state the
  * page publishes — `toolbarState`, `canvasToolbarChanged`, `mapChromeChanged`,
- * `pageLayoutState`, `viewOptions` — and sends back commands over the bridge. So the
+ * `timelineChromeChanged`, `pageLayoutState`, `viewOptions` — and sends back commands over the bridge. So the
  * host needs nothing from the document but the live editor, which the voice controls
  * keep.
  *

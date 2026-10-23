@@ -113,7 +113,8 @@ by the design lead on 2026-10-20:
 | [01](rounds/01-modals.md) | Modals: shell and behaviour | Applied on `design/round-01-modals` (1B, 2C, 3C, 4C, 5B, 6C); [PR #79](https://github.com/g3vin/inkblot/pull/79) open, waiting to merge |
 | [02](rounds/02-popups.md) | Pop-ups: shell and behaviour | Applied on `design/round-02-popups` (1B, 2C, 3C, 4C, 5C); [PR #80](https://github.com/g3vin/inkblot/pull/80) open, stacked on #79 |
 | [02b](rounds/02b-menus.md) | Pop-ups: menus (native vs in-page, », a pop-up from a pop-up, the command palette) | Applied on `design/round-02b-menus` (1B, 2B, 3D, 4B); [PR #84](https://github.com/g3vin/inkblot/pull/84) open, stacked on #80 |
+| [03](rounds/03-toolbars.md) | Toolbars and capsules (the timeline's tools, the card toolbar's buttons, capsules, the find bar) | Picked 2026-10-22 (1B, 2B, 3B, 4C) on `design/round-03-toolbars` (stacked on 02b); ready to apply |
 
 The design lead confirmed the order above on 2026-10-20.
 
-**Next step:** review and merge round 01's PR, then round 02's (it's stacked on 01). Each merge sha becomes the control in turn: recapture and update this file. Then round 02b's (stacked on 02). After that, round 03: toolbars and capsules.
+**Next step:** review and merge round 01's PR, then round 02's (it's stacked on 01). Each merge sha becomes the control in turn: recapture and update this file. Then round 02b's (stacked on 02). Meanwhile, `/design-review apply 03`.

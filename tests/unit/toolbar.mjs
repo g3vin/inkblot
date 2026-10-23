@@ -82,6 +82,14 @@ await act(async () => container.querySelector('button').dispatchEvent(new MouseE
 ok('a canvas item sends a canvas command by surface id', sent[0]?.type === 'canvasCommand' && sent[0].payload.surfaceId === 'canvas-surface-9' && sent[0].payload.command === 'add-card')
 
 sent.length = 0
+const timeline = { surfaceId: 'timeline-surface-3', scale: 'time', canUndo: false, canRedo: false, hasSelection: false, lensOn: false, inspectorOpen: true, active: true }
+await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.timeline.show-as', ctx: { ...live, timeline } })))
+await act(async () => container.querySelector('[data-value="sequence"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('a timeline item sends a timeline command by surface id', sent[0]?.type === 'timelineCommand' && sent[0].payload.surfaceId === 'timeline-surface-3' && sent[0].payload.command === 'scale' && sent[0].payload.detail?.value === 'sequence')
+await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.timeline.inspector', ctx: { ...live, timeline } })))
+ok('and its inspector button is lit while the inspector shows', container.querySelector('button').getAttribute('aria-pressed') === 'true')
+
+sent.length = 0
 const toggled = []
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.panel.notes', ctx: { ...live, panel: { tab: 'notes', open: true, toggle: (tab) => toggled.push(tab) } } })))
 ok('a panel item is lit while its panel shows', container.querySelector('button').getAttribute('aria-pressed') === 'true')

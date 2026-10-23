@@ -82,6 +82,19 @@ _Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-m
   `data-morphed`, the inner one's button `data-opener`. The » CSS hides the other items.
 - The command palette has a Dialog's scrim, motion, exit and inert app.
 
+**Design review round 03: toolbars and capsules** (`design/round-03-toolbars`, see
+`docs/design-review/rounds/03-toolbars.md`)
+
+- A timeline's tools are the card's toolbar: a `timeline` context in `chromeLayout.ts`,
+  its items in `toolbar/items/timelineItems.jsx`. The active timeline publishes
+  `timelineChromeChanged` (with `inspectorOpen`, added to the Rust type) and takes
+  `timelineCommand`s back, as a map does. `TimelineToolbar.jsx` and its band are gone.
+- The card toolbar's buttons are `--size-capsule` square (`Toolbar.css`); 16px icons.
+- Capsules: readouts `--size-circle`, strips of buttons `--size-toolbar`, all on
+  `--z-chrome` (DESIGN.md §7).
+- Find (⌘F) renders in the toolbar's slot and hides the toolbar's items with
+  `:has()` while open; they stay mounted.
+
 ## The logo (done)
 
 The user chose the **"ib" monogram** in a brand review held in October 2026. It
@@ -206,6 +219,9 @@ black on white.
 - **Toolbar layout ids are storage keys.** A layout saved before an item existed gets it
   through `normalizeToolbar` (`src/lib/chromeLayout.ts`); check the migrations in
   `tests/unit/chromeLayout.mjs` before changing a default.
+- **A view's toolbar state goes over the bridge.** Toolbar items read only what the
+  page publishes (`toolbarContext.js`), never the view's React state. Publish only on a
+  change: a canvas, map or timeline re-renders on every frame of a pan.
 
 ---
 

@@ -59,6 +59,9 @@ pub struct TimelineChromeState {
     /// The view is the active document, so the toolbar is its.
     #[serde(default)]
     pub active: bool,
+    /// The view's own inspector is showing, so its toolbar button is on.
+    #[serde(default)]
+    pub inspector_open: bool,
 }
 
 /// Run a command on a timeline view.

@@ -14,7 +14,7 @@ const DISPLAY_OPTIONS = [
   { value: 'label', label: 'Text only' },
 ]
 
-const CONTEXT_TITLES = { document: 'the document toolbar', canvas: 'the canvas toolbar', map: 'the map toolbar', typeset: 'the Typeset toolbar' }
+const CONTEXT_TITLES = { document: 'the document toolbar', canvas: 'the canvas toolbar', map: 'the map toolbar', timeline: 'the timeline toolbar', typeset: 'the Typeset toolbar' }
 
 export default function ToolbarPalette({ context, items, ctx, display, onDisplay, onReset, onDragStart, onClose }) {
   const offered = [
@@ -30,6 +30,7 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
     toolbar: { ...ctx.toolbar, target: ctx.toolbar.target ?? 'primary' },
     canvas: ctx.canvas ?? { surfaceId: '', zoom: 1, locked: false, canGroup: true, hasSelection: true, canUndo: true, canRedo: true, canRecord: true },
     map: ctx.map ?? { surfaceId: '', tool: 'select', zoomLabel: '100%', canUndo: true, canRedo: true, hasSelection: true },
+    timeline: ctx.timeline ?? { surfaceId: '', scale: 'time', canUndo: true, canRedo: true, hasSelection: true, lensOn: false, inspectorOpen: false },
     layout: ctx.layout ?? { docPath: 'preview', mode: context === 'typeset' ? 'typeset' : 'write', zoom: 1, paragraph: {} },
     activeDoc: ctx.activeDoc ?? 'preview',
     hasProject: true,

@@ -325,9 +325,9 @@
 /* The zoom bar, bottom-right. */
 .pl-status {
   position: absolute;
-  right: 10px;
+  right: var(--space-3);
   bottom: var(--pane-status-bottom);
-  z-index: 5;
+  z-index: var(--z-chrome);
   display: flex;
   align-items: center;
   gap: 2px;

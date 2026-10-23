@@ -1,36 +1,22 @@
-/* The find bar: floating at the top of the document card, under the toolbar's rule,
-   on its inner right, as a browser's sits. It is the pop-up surface (one of the
-   floating things that cast a shadow). */
+/* The find bar: while it is open it is the card's toolbar (DESIGN.md §6), in the
+   toolbar's slot, on the toolbar's paper. The toolbar's own tools stay mounted beside
+   it, hidden. */
+.app-titlebar-toolbar:has(> .find-bar) > :not(.find-bar) { display: none; }
+
 .find-bar {
-  position: absolute;
-  top: calc(var(--app-titlebar-height) + var(--space-2));
-  right: var(--space-4);
-  z-index: var(--z-chrome);
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  width: min(420px, calc(100% - var(--space-8)));
+  align-items: center;
+  gap: var(--space-2);
+  width: min(720px, 100%);
+  height: 100%;
   box-sizing: border-box;
-  padding: var(--space-1) var(--space-2);
-  border: var(--hairline) solid var(--menu-border);
-  border-radius: var(--menu-radius);
-  background: var(--menu-bg);
-  box-shadow: var(--menu-shadow);
+  padding: 0 var(--space-4);
   font: var(--text-sm) var(--font-ui);
-  animation: find-bar-in var(--dur-fast) var(--ease-out) both;
-}
-
-@keyframes find-bar-in {
-  from { opacity: 0; transform: translateY(calc(var(--space-2) * -1)); }
-  to { opacity: 1; transform: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .find-bar { animation: none; }
 }
 
 .find-bar-row {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 2px;
   min-width: 0;
@@ -64,6 +50,5 @@
 .find-bar-input::placeholder { color: var(--text-placeholder); }
 .find-bar-count { flex: none; color: var(--text-muted); white-space: nowrap; }
 
-/* Replace sits under find, its field in line with find's. */
-.find-bar-replace { padding-left: calc(var(--size-capsule) + 2px); }
+/* Replace opens beside find, in the same row. */
 .find-bar-replace .ui-button { flex: none; }

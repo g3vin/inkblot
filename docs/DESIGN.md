@@ -315,7 +315,11 @@ and `.ib-prose` (any element that shows the writer's text).
   it, clean against the rule: no fade or shadow below it. Its icon
   controls are bare on the paper: a fill only on hover, and the accent tint for a
   control that is on. Its menus (text style, font, size) carry the quiet control fill
-  (`--control-bg`), so they read as menus rather than labels.
+  (`--control-bg`), so they read as menus rather than labels. It is a dense toolbar
+  (§8): 16px icons on `--size-capsule` buttons. Every view's tools are this toolbar,
+  one context each (`chromeLayout.ts`: document, canvas, map, timeline, Typeset), and
+  the writer can customise each. A view never adds a second band of tools under the
+  rule.
 - **The fade scrim.** Other chrome that overlays the document (a bottom bar, the tab
   bar, the word count and page capsules at the foot of a pane) sits on a gradient from solid `--app-bg` to transparent, so text scrolling
   underneath dissolves instead of hitting a hard line. Use `FadeScrim`. Don't give that
@@ -348,9 +352,11 @@ and `.ib-prose` (any element that shows the writer's text).
   centred. The card and its preview are the pop-up surface veiled
   (`--search-veil-bg` over `var(--blur-over-page)`), with a hairline edge and the
   float shadow (§12).
-- **The find bar.** Find and replace in the open document (⌘F) floats at the top of
-  the document card, under the toolbar's rule, on its inner right (`FindBar.jsx`):
-  the field, "2 of 5", previous and next, and a click away the replace field.
+- **The find bar.** Find and replace in the open document (⌘F) takes the card's
+  toolbar while it is open, as an address bar becomes a find field (`FindBar.jsx`):
+  the field, "2 of 5", previous, next and close, and a click away the replace field
+  beside it. Escape puts it away and the toolbar's tools come back as they were.
+  Nothing floats over the text being searched.
 
   Nothing in a panel sits in a band, a filled strip or a bordered box of its own.
   `Card` is for things the writer made (a note, a source, a version, a tile), never
@@ -389,6 +395,11 @@ Lay out siblings with flex/grid and `gap`, not margins.
 icon buttons) and `--size-toolbar` (36px). Don't go smaller. Beginners and touch users
 need the target.
 
+**Capsules** over the page come in two heights. A **readout** (the word and page count,
+the locked badge, the tab bar, the zoom bar) is `--size-circle`, level with the file
+tree's foot. A **strip of buttons** (the table toolbar, the timer) is `--size-toolbar`:
+`--size-capsule` buttons in a `--space-1` inset. Every capsule is on `--z-chrome`.
+
 **Radius is soft:**
 
 | Token | px | For |
@@ -423,8 +434,9 @@ components also check `useReducedMotion()`.
 - **Phosphor** (MIT), through `src/ui/Icon.jsx`: `<Icon name="note" />`.
 - **Weight:** Light at rest, Fill for an active or selected state (`active`).
   `IconButton` does this for you.
-- **Size:** 16px inline, in menus and in dense toolbars; 20px in primary toolbars,
-  empty states and FABs. Nothing else.
+- **Size:** 16px inline, in menus and in dense toolbars (the card's toolbar and every
+  floating strip are dense); 20px in primary toolbars, empty states and FABs. Nothing
+  else.
 - **Colour:** `currentColor`, usually `--text-muted` at rest and `--text-primary` on
   hover.
 - **Names mean something.** Register icons by meaning in `src/ui/icons.js` (`history`,
@@ -482,8 +494,8 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `Tag` | Small categorical labels | Takes an ink |
 | `EmptyState` | Any list or panel with nothing in it | Icon, typewritten line and plain hint, centred; in a panel it sits in the middle of the panel's height. At most one action. `compact` for a section or "no matches" (stays in place); `dropActive` washes it in the accent while something is dragged over |
 | `InkPicker` | **Every** colour choice | Notes, cards, accent (Settings → General). Don't build another swatch row |
-| `FloatingCapsule` | A readout floating over the page (word count, zoom, tab bar) | The floating-capsule surface; glass on iOS |
-| `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips (formatting, canvas, map) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS |
+| `FloatingCapsule` | A readout floating over the page (word count, zoom, tab bar) | The floating-capsule surface; glass on iOS. `--size-circle` tall, on `--z-chrome` (§7) |
+| `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips over the page (the table's tools) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS. `--size-toolbar` tall (§7). A view's own tools go in the card's toolbar (§6), not a strip |
 | `FloatingActionButton` | One round primary action over the document | Glass on iOS |
 | `usePointerReorder` | Drag-to-reorder lists (toolbar items, inspector layout) | |
 | `CommandPalette` | Mounted once in `App` | Features register commands; they don't render this |

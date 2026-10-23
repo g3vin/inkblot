@@ -274,13 +274,14 @@ export default function DesignShowcase() {
 
         <ShowcaseSection title="Floating chrome (glass on iOS)">
           <div className="ds-row ds-floating-demo">
+            {/* A strip of buttons is --size-toolbar; a readout --size-circle (DESIGN.md §7). */}
             <FloatingToolbar label="Formatting">
-              <IconButton icon="bold" label="Bold" size="circle" />
-              <IconButton icon="italic" label="Italic" size="circle" />
-              <IconButton icon="underline" label="Underline" size="circle" />
+              <IconButton icon="bold" label="Bold" size="capsule" />
+              <IconButton icon="italic" label="Italic" size="capsule" />
+              <IconButton icon="underline" label="Underline" size="capsule" />
               <ToolbarSeparator />
-              <IconButton icon="note" label="Add note" size="circle" />
-              <IconButton icon="more" label="More" size="circle" />
+              <IconButton icon="note" label="Add note" size="capsule" />
+              <IconButton icon="more" label="More" size="capsule" />
             </FloatingToolbar>
             <FloatingActionButton icon="add" label="New note" />
             <FloatingCapsule><span className="ib-meta">1,204 words</span></FloatingCapsule>

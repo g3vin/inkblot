@@ -31,6 +31,7 @@
     { "id": "editor-screenplay", "family": "editor", "title": "Writing as a screenplay", "steps": [{ "open": "editor" }, { "command": "Write as a screenplay" }, { "wait": 1000 }] },
     { "id": "editor-locked", "family": "editor", "title": "A locked document", "steps": [{ "open": "editor" }, { "command": "Lock document" }, { "wait": 800 }] },
     { "id": "editor-find", "family": "toolbar", "title": "Find bar", "steps": [{ "open": "editor-focused" }, { "press": "Meta+f" }, { "type": "April" }] },
+    { "id": "editor-find-replace", "family": "toolbar", "title": "Find bar with replace", "steps": [{ "open": "editor-focused" }, { "press": "Meta+f" }, { "type": "April" }, { "click": ".find-bar button[aria-label='Replace']" }] },
     { "id": "editor-note-hover", "root": ".note-preview-card", "family": "card", "title": "Note hover card", "steps": [{ "open": "editor" }, { "hover": ".note-marker" }, { "wait": 900 }] },
     { "id": "editor-table", "family": "toolbar", "title": "A table and its toolbar", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label='Insert table']" }, { "wait": 800 }] },
     { "id": "editor-table-fill", "root": ".ib-popover", "family": "popover", "title": "Table cell fill", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label='Insert table']" }, { "wait": 600 }, { "click": "button[aria-label='Cell fill']" }] },
