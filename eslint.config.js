@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
   // .claude/worktrees holds other checkouts of this repo; each lints itself.
-  globalIgnores(['dist', 'src-tauri/target', '.claude']),
+  globalIgnores(['dist', 'src-tauri/target', '.claude', 'showcase/.dist', 'showcase/.tmp', 'showcase/out']),
   {
     files: ['**/*.{js,jsx,mjs,ts,tsx}'],
     extends: [
@@ -75,7 +75,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['scripts/**/*.{js,mjs}', 'tests/**/*.mjs', 'vite.config.js', 'eslint.config.js'],
+    files: ['scripts/**/*.{js,mjs}', 'tests/**/*.mjs', 'showcase/**/*.mjs', 'vite.config.js', 'eslint.config.js'],
     languageOptions: {
       globals: globals.node,
     },

@@ -32,3 +32,8 @@ npm-debug.log*
 
 # Coverage output
 *.profraw
+
+# Showcase captures (showcase/capture.mjs): built by the release workflow, never committed
+showcase/out/
+showcase/.dist/
+showcase/.tmp/
