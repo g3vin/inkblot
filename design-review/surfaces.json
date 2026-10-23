@@ -42,7 +42,7 @@
     { "id": "editor-citation", "family": "panel", "title": "Insert citation (opens References, searching)", "steps": [{ "open": "editor-focused" }, { "menuItem": "Insert citation…" }, { "wait": 800 }] },
     { "id": "editor-context-menu", "family": "menu", "title": "Editor right-click menu", "menu": true, "steps": [{ "open": "editor" }, { "rightclick": ".ProseMirror p >> nth=1" }] },
 
-    { "id": "toolbar-more", "root": ".ib-popover", "family": "popover", "title": "More toolbar items", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }] },
+    { "id": "toolbar-more", "family": "popover", "title": "More toolbar items", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }] },
     { "id": "toolbar-alignment", "family": "menu", "title": "Alignment menu", "menu": true, "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": "button[aria-label^='Alignment']" }] },
     { "id": "toolbar-read-aloud", "root": ".read-aloud-popover", "family": "popover", "title": "Read aloud options", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": ".read-aloud-btn" }] },
     { "id": "toolbar-read-aloud-clicked", "root": ".read-aloud-popover", "family": "popover", "title": "Read aloud, after a click inside it (a pop-up opened from »)", "steps": [{ "open": "editor-focused" }, { "click": ".tb-overflow" }, { "click": ".read-aloud-btn" }, { "wait": 300 }, { "click": ".read-aloud-popover .ib-field-label" }, { "wait": 300 }] },
@@ -80,6 +80,8 @@
     { "id": "typeset-reader", "root": ".digital-reader", "family": "popover", "title": "E-book preview: Reader options", "steps": [{ "open": "typeset" }, { "click": "button[aria-label='Digital']" }, { "wait": 1200 }, { "click": ".digital-reader-button" }, { "wait": 300 }] },
     { "id": "typeset-spreads", "viewports": ["desktop"], "family": "print", "title": "Spreads", "steps": [{ "open": "typeset" }, { "click": "button[aria-label='Spreads']" }, { "wait": 1200 }] },
     { "id": "typeset-insert", "viewports": ["desktop"], "family": "menu", "title": "Typeset Insert menu", "menu": true, "steps": [{ "open": "typeset" }, { "click": ".ProseMirror p >> nth=1" }, { "click": "button[aria-label='Insert']" }] },
+    { "id": "toolbar-typeset-export", "viewports": ["desktop"], "family": "menu", "title": "Typeset toolbar Export menu", "menu": true, "steps": [{ "open": "typeset" }, { "click": ".ProseMirror p >> nth=1" }, { "click": ".app-titlebar button[aria-label='Export']" }] },
+    { "id": "map-zoom-menu", "viewports": ["desktop"], "family": "menu", "title": "Map toolbar Zoom menu", "menu": true, "steps": [{ "open": "map-setup" }, { "click": ".map-setup-option:has-text('A blank sheet')" }, { "click": ".map-setup-choices .map-button:has-text('A region')" }, { "wait": 1500 }, { "click": ".app-titlebar button[aria-label='Zoom']" }] },
     { "id": "typeset-more-menu", "root": ".ib-menu", "family": "menu", "menu": true, "title": "More typeset options (in-page menu)", "steps": [{ "open": "typeset" }, { "click": "button[aria-label='More typeset options']" }] },
     { "id": "typeset-scope-menu", "root": ".ib-menu", "family": "menu", "menu": true, "title": "Work on: scope menu (in-page)", "steps": [{ "open": "typeset" }, { "click": "button[aria-label^='Work on']" }] },
     { "id": "typeset-author-details", "root": ".ib-dialog", "family": "modal", "title": "Author details", "steps": [{ "open": "typeset" }, { "click": "button[aria-label='More typeset options']" }, { "click": ".ib-menu >> text=Author details…" }] },

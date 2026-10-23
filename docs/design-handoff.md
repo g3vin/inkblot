@@ -75,11 +75,10 @@ _Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-m
 
 - `popUpNativeMenu` is now `popUpMenu`. A right-click still gets the OS's menu; a menu a
   button opens is an in-page `Menu` (`MenuFromItems`), drawn in its own React root under
-  `.ib-menu-host`, anchored to the button. Give a keyboard-built event a `target`
-  (`ToolbarControls`' `MenuButton` does) so it has something to anchor to.
-- » is a labelled list (`Toolbar.customize.css`), and a Popover opened inside another
-  opens in it (`Popover.jsx`, `PopoverNestContext` in `layer.js`): the outer one gets
-  `data-morphed`, the inner one's button `data-opener`. The » CSS hides the other items.
+  `.ib-menu-host`, anchored to the button. Give a keyboard-built event a `target` so it
+  has something to anchor to.
+- (» as a labelled list and a Popover opening inside another were replaced in round
+  03b.)
 - The command palette has a Dialog's scrim, motion, exit and inert app.
 
 **Design review round 03: toolbars and capsules** (`design/round-03-toolbars`, see
@@ -94,6 +93,21 @@ _Last updated: 2026-10-09, after the inspector-panel audit on `refactor/design-m
   `--z-chrome` (DESIGN.md §7).
 - Find (⌘F) renders in the toolbar's slot and hides the toolbar's items with
   `:has()` while open; they stay mounted.
+
+**Design review round 03b: the dynamic toolbar** (`design/round-03b-dynamic-toolbar`,
+see `docs/design-review/rounds/03b-dynamic-toolbar.md`)
+
+- `ToolbarHost` provides `ToolbarDockContext` (`layer.js`). A `Popover` whose anchor is in
+  the row opens in the toolbar: a form (an `input`, `select` or `textarea` inside) takes
+  the whole toolbar (`.ib-dock[data-mode=whole]` in `.toolbar-wrapper`, which hides the
+  row with `:has()`); anything else opens in place, in the item's `.tb-dock-inline`, and
+  moves to the whole toolbar when the row pushes its item behind » (`watch`).
+- `MenuButton` opens a `MenuRow` in a Popover, not `popUpMenu`.
+- » is the `overflow` icon, and turns the row to its second page (`paged`). The » list
+  pop-up is gone, and so is Popover's opened-inside mechanism (`PopoverNestContext`),
+  which only » used.
+- A docked pop-up has no exit motion: the toolbar comes back as it closes.
+
 
 ## The logo (done)
 

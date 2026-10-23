@@ -294,9 +294,16 @@
   border-color: color-mix(in srgb, var(--status-danger) 48%, transparent);
 }
 
-/* Read aloud's Popover: the voice and its live waveform (its signature), then the form. */
-.read-aloud-popover { width: min(320px, calc(100vw - 24px)); display: grid; gap: var(--space-4); }
+/* Read aloud: the voice and its live waveform (its signature), then the form. In the
+   card's toolbar it is a row (a form takes the whole toolbar, DESIGN.md §6); its hint
+   shows there only when it says what's happening. */
+.ib-popover.read-aloud-popover { width: min(320px, calc(100vw - 24px)); display: grid; gap: var(--space-4); }
 .read-aloud-popover .ib-popover-eyebrow { margin: 0; }
+.ib-dock .read-aloud-head { gap: var(--space-2); }
+.ib-dock .read-aloud-voice { display: none; }
+.ib-dock.read-aloud-popover .ui-select { min-width: 180px; }
+.ib-dock .read-aloud-status { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.ib-dock.read-aloud-popover:not(.playing, .loading, .error) .read-aloud-status { display: none; }
 
 .read-aloud-head {
   display: flex;

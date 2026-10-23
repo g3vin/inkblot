@@ -320,6 +320,17 @@ and `.ib-prose` (any element that shows the writer's text).
   one context each (`chromeLayout.ts`: document, canvas, map, timeline, Typeset), and
   the writer can customise each. A view never adds a second band of tools under the
   rule.
+- **The dynamic toolbar** (round 03b, 2026-10-22). What a toolbar button opens, it opens
+  in the toolbar, with every setting it has as a pop-up. A **form** (something to fill
+  in: read aloud's voice, find) takes the whole toolbar: its eyebrow, its controls in a
+  row and a close button; Escape or close brings the tools back as they were. A
+  **choice** (swatches, a menu's items) opens **in place**, on the control fill beside
+  its button, pushing what follows along and behind »; if it doesn't fit there, it takes
+  the whole toolbar. Either way the button stays pressed while it's open, focus goes to
+  its first control and back to the button. A button's menu opens as a row of its items
+  (`MenuRow`), groups apart, the checked item pressed. **»** (`overflow`) turns the row
+  to its second page, the items that didn't fit in place of those that did, with ‹ first
+  to come back (or Escape). Pop-ups opened from a panel or from the text still float.
 - **The fade scrim.** Other chrome that overlays the document (a bottom bar, the tab
   bar, the word count and page capsules at the foot of a pane) sits on a gradient from solid `--app-bg` to transparent, so text scrolling
   underneath dissolves instead of hitting a hard line. Use `FadeScrim`. Don't give that
@@ -453,6 +464,7 @@ components also check `useReducedMotion()`.
   | Put away, recoverably | `archive` | |
   | Add an item to this list | `add` (+) | |
   | Rarer options | `more` (⋯) | |
+  | What didn't fit the toolbar (») | `overflow` | `more` |
   | Find | `search` | zoom |
   | Zoom | `zoom-in` / `zoom-out` | `search` |
   | App settings | `settings` (gear) | theme, colour or a panel's own options |
@@ -477,7 +489,7 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `Kbd` | Showing a shortcut | Courier Prime |
 | `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in; Tab closes it. `danger` items go last, after a separator. See *Pop-ups* below |
 | `popUpMenu`, `useNativeMenu` | Any menu built from a plain list of items | A right-click gets the OS's menu; a button gets an in-page `Menu` from the same items. See *Pop-ups* |
-| `Popover` | Small forms and pickers anchored to a control, or to a place in the text | **The one pop-up shell.** `eyebrow`, `align`, `anchorRect`, `onEscape`. See *Pop-ups* below |
+| `Popover` | Small forms and pickers anchored to a control, or to a place in the text | **The one pop-up shell.** `eyebrow`, `align`, `anchorRect`, `onEscape`. Opened from the card's toolbar, it opens in the toolbar (§6, `ToolbarDockContext`). See *Pop-ups* below |
 | `Dialog` | **The one modal**: a decision, a form, an editor, Settings | See *Dialogs* below |
 | `NavSheet` | A large `Dialog` of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
 | `Section` | A collapsible group in an inspector panel | Remembers open/closed per `id`. `accessory` is its one action, beside the title. `help` names its help topic |
@@ -550,7 +562,7 @@ editor, read aloud, the e-book Reader, Typeset's page pickers and the citation e
 - **Title:** an eyebrow (`eyebrow`) over a pop-up of more than one control, naming it:
   Read aloud, Footnote, Cell fill, Card colour, Print options, Print sides, Reader, Citation,
   and Typeset's pickers (Chapter number, Running head…). A one-line form (Go to page) or a
-  strip of tools (») has none.
+  strip of tools has none.
 - **Insides:** `src/ui` controls (`Field`, `SelectMenu`, `TextArea`, `Button`, `FormRow` +
   `Toggle`, `Segmented`). A pop-up's one bespoke visual is its signature (read aloud's
   live waveform).
@@ -564,13 +576,11 @@ editor, read aloud, the e-book Reader, Typeset's page pickers and the citation e
 - **Menus: native for a right-click, in the page for a button** (round 02b, 2026-10-21).
   A right-click gets the OS's menu; a menu a button opens is an in-page `Menu`. Both come
   from one description through `popUpMenu`, so a submenu in the list becomes a labelled
-  group in the page.
-- **The toolbar's »** is a labelled list: each item that didn't fit, its control and then
-  its name, as every other "More" has words.
-- **A pop-up opened from a pop-up opens inside it.** Read aloud in » turns » into read
-  aloud: its button stays, pressed, the other items go, and » grows to hold it. Pressing
-  the button again comes back; Escape or a click outside closes it all. `Popover` does this
-  for any Popover opened inside another.
+  group in the page. The one exception is a toolbar button's menu: it opens in the
+  toolbar, as a row of its items (§6).
+- **In the card's toolbar, a pop-up opens in the toolbar** (round 03b, 2026-10-22). See
+  §6 → *The dynamic toolbar*. `Popover` does it wherever a `ToolbarDockContext` holds
+  the button that opened it.
 
 **If a component doesn't exist yet,** build it in `src/ui/` from tokens, add it to the
 showcase (`src/dev/DesignShowcase.jsx`) and to this table, in the same PR.

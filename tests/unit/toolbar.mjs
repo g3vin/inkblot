@@ -120,6 +120,10 @@ ok('with room, the whole default set sits on the surface', overflowed().length =
 await act(async () => { writeToolbarItems('document', ['inkblot.format.font', 'more', 'inkblot.format.highlight']) })
 ok('a placed More puts what follows it behind »', overflowed().join() === 'inkblot.format.highlight' && container.querySelector('.tb-overflow'))
 ok('and leaves what comes before it', !overflowed().includes('inkblot.format.font'))
+await act(async () => container.querySelector('.tb-overflow').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('» turns the row to its second page: what was behind it, in place of what was not', overflowed().join() === 'inkblot.format.font' && !!container.querySelector('.tb-overflow.is-back'))
+await act(async () => container.querySelector('.tb-overflow.is-back').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('and ‹ turns it back', overflowed().join() === 'inkblot.format.highlight' && !container.querySelector('.tb-overflow.is-back'))
 
 await act(async () => { writeToolbarItems('document', ['inkblot.format.font', 'inkblot.edit.undo-redo']) })
 ok('a saved layout shows straight away', rendered().join() === 'inkblot.format.font,inkblot.edit.undo-redo')

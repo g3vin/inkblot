@@ -31,6 +31,7 @@ const { default: Section } = await import('../../src/ui/Section.jsx')
 const { SECTIONS_KEY } = await import('../../src/ui/sectionState.js')
 const { default: Dialog } = await import('../../src/ui/Dialog.jsx')
 const { default: Popover } = await import('../../src/ui/Popover.jsx')
+const { ToolbarDockContext } = await import('../../src/ui/layer.js')
 const { default: Button } = await import('../../src/ui/Button.jsx')
 const { Stepper } = await import('../../src/ui/FormRow.jsx')
 
@@ -166,27 +167,43 @@ ok('a popover opened in a dialog renders in its layer', inner?.parentElement?.cl
 inner?.focus()
 await act(async () => inner.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
 ok('and Escape closes the popover, not the dialog', dialogClosed === 0 && !document.body.querySelector('.ib-popover:not(.is-leaving)'))
-// A Popover opened from inside another opens in it: its button pressed, the outer grown.
-function Nested() {
-  const outerRef = React.useRef(null)
-  const innerRef = React.useRef(null)
-  const [inner, setInner] = useState(false)
-  return React.createElement(React.Fragment, null,
-    React.createElement('button', { ref: outerRef }, 'More'),
-    React.createElement(Popover, { open: true, anchorRef: outerRef, onClose: () => {} },
-      React.createElement('button', { ref: innerRef, onClick: () => setInner((was) => !was) }, 'Read aloud'),
-      React.createElement(Popover, { open: inner, anchorRef: innerRef, onClose: () => setInner(false) }, React.createElement('button', null, 'Read'))))
+// Opened from a toolbar's row, a Popover opens in the toolbar (DESIGN.md §6): a choice
+// in place beside its button, a form across the whole toolbar.
+const whole = document.createElement('div')
+const besideItem = document.createElement('div')
+document.body.append(whole, besideItem)
+let pushedOut = null
+const toolbarDock = {
+  whole,
+  owns: () => true,
+  inlineFor: () => besideItem,
+  watch: (_anchor, onOut) => { pushedOut = onOut; return () => { pushedOut = null } },
 }
-await act(async () => root.render(React.createElement(Nested)))
-const readAloud = () => [...document.body.querySelectorAll('button')].find((b) => b.textContent === 'Read aloud')
-await act(async () => readAloud().dispatchEvent(new MouseEvent('click', { bubbles: true })))
-await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
-const morph = document.body.querySelector('.ib-popover:not(.is-leaving)')
-ok('a popover opened from a popover opens inside it', morph?.querySelector('.ib-popover-slot .ib-popover-inline') !== null && document.body.querySelectorAll('.ib-popover:not(.is-leaving)').length === 1)
-ok('its button is pressed and the outer one says so', readAloud().hasAttribute('data-opener') && morph?.hasAttribute('data-morphed'))
-await act(async () => readAloud().dispatchEvent(new MouseEvent('click', { bubbles: true })))
-await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
-ok('pressing it again goes back', !readAloud().hasAttribute('data-opener') && !morph?.hasAttribute('data-morphed'))
+function InToolbar({ form }) {
+  const ref = React.useRef(null)
+  const [open, setOpen] = useState(false)
+  return React.createElement(ToolbarDockContext.Provider, { value: toolbarDock },
+    React.createElement('button', { ref, onClick: () => setOpen((was) => !was) }, 'Colour'),
+    React.createElement(Popover, { open, anchorRef: ref, onClose: () => setOpen(false), eyebrow: 'Card colour' },
+      form ? React.createElement('input', { 'aria-label': 'Voice' }) : React.createElement('button', null, 'Red')))
+}
+const colour = () => [...document.body.querySelectorAll('button')].find((b) => b.textContent === 'Colour')
+await act(async () => root.render(React.createElement(InToolbar, { form: false })))
+await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('a choice opens in place, beside its button', besideItem.querySelector('.ib-dock[data-mode="inline"]') !== null && !document.body.querySelector('.ib-popover:not(.is-leaving)'))
+ok('and its button stays pressed', colour().hasAttribute('data-opener'))
+await act(async () => pushedOut?.())
+ok('pushed out of the row, it takes the toolbar', whole.querySelector('.ib-dock[data-mode="whole"]') !== null && !besideItem.querySelector('.ib-dock'))
+await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('pressing its button again closes it', !whole.querySelector('.ib-dock') && !colour().hasAttribute('data-opener'))
+await act(async () => root.render(React.createElement(InToolbar, { form: true, key: 'form' })))
+await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+const formDock = whole.querySelector('.ib-dock[data-mode="whole"]')
+ok('a form takes the whole toolbar, with a close button', formDock !== null && [...formDock.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === 'Close'))
+await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+ok('and Escape puts it away', !whole.querySelector('.ib-dock'))
+whole.remove()
+besideItem.remove()
 
 await act(async () => root.render(React.createElement('div')))
 anchor.remove()

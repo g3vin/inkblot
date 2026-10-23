@@ -5,7 +5,7 @@
  * change to src/styles or src/ui in both themes before it ships, and as the visual
  * companion to docs/DESIGN.md.
  */
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ACCENT_PRESETS, INKS, TRAY_INKS, inkVar } from '../lib/palette'
 import { setAccentAttribute, setThemeAttribute, setTrayAttribute } from '../lib/theme'
 import { useCommands } from '../lib/commands'
@@ -17,14 +17,60 @@ import {
   SelectMenu, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
 } from '../ui'
 import NavSheet from '../ui/NavSheet.jsx'
+import { ToolbarDockContext } from '../ui/layer'
 import { ICONS } from '../ui/icons'
 import '../components/search/ProjectSearch.css'
+import '../components/Toolbar.css'
+import '../components/toolbar/Toolbar.customize.css'
 import './DesignShowcase.css'
 
 const SURFACES = ['--app-bg', '--surface-1', '--surface-2', '--surface-float', '--surface-sunken']
 const TEXTS = ['--text-primary', '--text-secondary', '--text-muted', '--text-subtle', '--text-placeholder']
 const SPACES = ['--space-1', '--space-2', '--space-3', '--space-4', '--space-6', '--space-8', '--space-12']
 const RADII = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-pill']
+
+/** The dynamic toolbar (DESIGN.md §6): a choice opens in place, a form takes the toolbar. */
+function DockDemo() {
+  const [whole, setWhole] = useState(null)
+  const rowRef = useRef(null)
+  const colourRef = useRef(null)
+  const voiceRef = useRef(null)
+  const [open, setOpen] = useState(null)
+  const dock = useMemo(() => (whole ? {
+    whole,
+    owns: (anchor) => Boolean(rowRef.current?.contains(anchor)),
+    inlineFor: (anchor) => anchor.closest('.tb-slot')?.querySelector(':scope > .tb-dock-inline') ?? null,
+    watch: () => () => {},
+  } : null), [whole])
+  const toggle = (which) => setOpen((was) => (was === which ? null : which))
+  return (
+    <ToolbarDockContext.Provider value={dock}>
+      <div ref={setWhole} className="toolbar-wrapper ds-dock-demo">
+        <div ref={rowRef} className="toolbar tb-row">
+          <div className="tb-slot">
+            <div className="toolbar-group">
+              <button ref={colourRef} type="button" aria-label="Card colour" onClick={() => toggle('colour')}><Icon name="palette" /></button>
+            </div>
+            <div className="tb-dock-inline" />
+          </div>
+          <div className="tb-slot">
+            <div className="toolbar-group">
+              <button ref={voiceRef} type="button" aria-label="Read aloud" onClick={() => toggle('voice')}><Icon name="read-aloud" /></button>
+            </div>
+            <div className="tb-dock-inline" />
+          </div>
+        </div>
+        <Popover open={open === 'colour'} anchorRef={colourRef} onClose={() => setOpen(null)} eyebrow="Card colour">
+          <InkPicker label="Card colour" value={null} inks={['red', 'blue', 'green']} onChange={() => setOpen(null)} />
+        </Popover>
+        <Popover open={open === 'voice'} anchorRef={voiceRef} onClose={() => setOpen(null)} eyebrow="Read aloud">
+          <Field label="Voice"><SelectMenu label="Voice" value="heart" onChange={() => {}} options={[{ value: 'heart', label: 'Heart' }, { value: 'river', label: 'River' }]} /></Field>
+          <Button variant="filled">Read</Button>
+        </Popover>
+      </div>
+    </ToolbarDockContext.Provider>
+  )
+}
 
 function ShowcaseSection({ title, children }) {
   return (
@@ -270,6 +316,10 @@ export default function DesignShowcase() {
         <ShowcaseSection title="Tabs">
           <Tabs label="Inspector" value={tab} onChange={setTab}
             tabs={[{ value: 'notes', label: 'Notes', icon: 'note' }, { value: 'history', label: 'History', icon: 'history' }, { value: 'workbench', label: 'Workbench', icon: 'hammer' }]} />
+        </ShowcaseSection>
+
+        <ShowcaseSection title="The dynamic toolbar">
+          <DockDemo />
         </ShowcaseSection>
 
         <ShowcaseSection title="Floating chrome (glass on iOS)">

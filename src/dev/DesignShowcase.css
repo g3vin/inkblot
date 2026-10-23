@@ -115,6 +115,11 @@
 .ds-card-text { margin: var(--space-3) 0; font-size: 15px; }
 
 
+.ds-dock-demo {
+  border-bottom: var(--hairline) solid var(--border-color);
+  background: var(--app-bg);
+}
+
 .ds-floating-demo {
   padding: var(--space-6);
   border-radius: var(--radius-lg);

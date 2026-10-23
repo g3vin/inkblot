@@ -26,7 +26,7 @@
   "src/components/settings/Settings.css": 9,
   "src/components/stats/Stats.css": 29,
   "src/components/tabs/DocumentTabBar.css": 6,
-  "src/components/toolbar/Toolbar.customize.css": 10,
+  "src/components/toolbar/Toolbar.customize.css": 9,
   "src/dev/DesignShowcase.css": 4,
   "src/extensions/ConversationTile.css": 56,
   "src/extensions/PinterestBoard.css": 9,

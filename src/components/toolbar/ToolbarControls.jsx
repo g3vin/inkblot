@@ -4,13 +4,15 @@
  *
  *   - ItemFrame: the item's control(s), with its label under them in Icon and Text.
  *   - ToolButton: one button, drawn as its icon, or its label in Text Only.
- *   - MenuButton: a button that pops up a native menu.
+ *   - MenuButton: a button whose menu opens in the toolbar, as a row of its items.
  *
  * Buttons sit in a `.toolbar-group` (Toolbar.css), the segmented capsule the
  * formatting toolbar has always used.
  */
+import { useRef, useState } from 'react'
 import Icon from '../../ui/Icon.jsx'
-import { popUpMenu } from '../../ui/useNativeMenu'
+import Popover from '../../ui/Popover.jsx'
+import MenuRow from './MenuRow'
 
 export function ItemFrame({ id, label, display, grouped = true, className = '', children }) {
   return (
@@ -42,24 +44,33 @@ export function ToolButton({ icon, label, title, display, active, disabled, onCl
   )
 }
 
-/** `items` is a list for useNativeMenu, or a function returning one (built on click). */
+/**
+ * `items` is a list for useNativeMenu, or a function returning one (built on click). It
+ * opens as a MenuRow in a Popover, which the card's toolbar takes in (DESIGN.md §6).
+ */
 export function MenuButton({ icon, label, title, display, disabled, items, children }) {
+  const ref = useRef(null)
+  const [open, setOpen] = useState(null)
   return (
-    <button
-      type="button"
-      className="tb-menu-button"
-      aria-label={label}
-      aria-haspopup="menu"
-      title={title ?? label}
-      disabled={disabled}
-      onClick={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect()
-        const list = typeof items === 'function' ? items() : items
-        void popUpMenu({ preventDefault() {}, stopPropagation() {}, clientX: rect.left, clientY: rect.bottom, target: event.currentTarget }, list)
-      }}
-    >
-      {children ?? <Glyph icon={icon} label={label} display={display} />}
-      <Icon name="chevron-down" className="tb-caret" />
-    </button>
+    <>
+      <button
+        ref={ref}
+        type="button"
+        className="tb-menu-button"
+        aria-label={label}
+        aria-haspopup="true"
+        aria-expanded={Boolean(open)}
+        title={title ?? label}
+        disabled={disabled}
+        onClick={() => setOpen((was) => (was ? null : typeof items === 'function' ? items() : items))}
+      >
+        {children ?? <Glyph icon={icon} label={label} display={display} />}
+        <Icon name="chevron-down" className="tb-caret" />
+      </button>
+      {/* A label may carry the current value ("Alignment: Align left"); the eyebrow is the name. */}
+      <Popover open={Boolean(open)} anchorRef={ref} onClose={() => setOpen(null)} eyebrow={label.split(':')[0]}>
+        <MenuRow label={label} items={open ?? []} onDone={() => setOpen(null)} />
+      </Popover>
+    </>
   )
 }
