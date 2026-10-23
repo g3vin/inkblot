@@ -1,0 +1,39 @@
+name: Showcase setup
+description: >
+  ffmpeg and playwright-core for showcase/capture.mjs, inside the Playwright image
+  (mcr.microsoft.com/playwright), which already holds WebKit and its system libraries.
+  Nothing comes from apt, so a slow Ubuntu mirror can't stall CI or a release (it did,
+  23 Oct 2026). Keep PLAYWRIGHT in step with the image tag in ci.yml and release.yml.
+
+runs:
+  using: composite
+  steps:
+    # A static ffmpeg with every encoder the capture uses (libx264, libvpx-vp9,
+    # libaom-av1, libwebp), pinned to one dated build and checked against its sum.
+    - name: ffmpeg
+      shell: bash
+      env:
+        FFMPEG_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-22-13-06/ffmpeg-n8.1.3-23-g5c4f5744cd-linux64-gpl-8.1.tar.xz
+        FFMPEG_SHA256: 1aa0c5526768bf4db3e62cba954169e3e0be38327c9cbbb6c5675794df6c03df
+      run: |
+        set -euo pipefail
+        missing=""
+        for tool in curl xz; do command -v "$tool" >/dev/null || missing="$missing $tool"; done
+        if [ -n "$missing" ]; then
+          echo "Installing:$missing"
+          apt-get update -o Acquire::Retries=3
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl xz-utils ca-certificates
+        fi
+        curl -fsSL --retry 3 -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL"
+        echo "$FFMPEG_SHA256  /tmp/ffmpeg.tar.xz" | sha256sum -c -
+        mkdir -p /opt/ffmpeg
+        tar -xJf /tmp/ffmpeg.tar.xz -C /opt/ffmpeg --strip-components=1
+        echo /opt/ffmpeg/bin >> "$GITHUB_PATH"
+        /opt/ffmpeg/bin/ffmpeg -hide_banner -version | head -1
+
+    # The image's WebKit (in PLAYWRIGHT_BROWSERS_PATH) is the one this version expects.
+    - name: playwright-core
+      shell: bash
+      env:
+        PLAYWRIGHT: 1.64.1
+      run: npm i --no-save "playwright-core@$PLAYWRIGHT"
