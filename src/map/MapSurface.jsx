@@ -1432,9 +1432,12 @@ export default function MapSurface({
     ? draft?.tool === tool && draft.nodes.length ? TOOL_HINTS[`${tool}-drawing`] || TOOL_HINTS[tool] : TOOL_HINTS[tool]
     : null
 
+  const { surfaceRef, worldRef, viewportRef, viewport, settledZoom } = view
+  // Whether the view can film itself is the stage's to say; it answers once it is up.
+  const recorder = view.canRecord?.() ? view : null
   return (
     <div
-      ref={view.surfaceRef}
+      ref={surfaceRef}
       className={`map-surface${isPanning ? ' is-panning' : ''}${isActive ? ' is-active' : ''}${isGlobe ? ' is-globe' : ''}${isSpace ? ' is-space' : ''}`}
       data-map-theme={map.style.theme}
       data-space-look={isSpace ? map.style.look : undefined}
@@ -1455,7 +1458,7 @@ export default function MapSurface({
             space={space}
             day={day}
             selection={selection}
-            surfaceRef={view.surfaceRef}
+            surfaceRef={surfaceRef}
             onError={() => setGlobeFailed(true)}
           />
         </Suspense>
@@ -1471,7 +1474,7 @@ export default function MapSurface({
             selection={selection}
             projectName={projectName}
             skySeed={docPath}
-            surfaceRef={view.surfaceRef}
+            surfaceRef={surfaceRef}
             onError={() => setSpaceFailed(true)}
           />
         </Suspense>
@@ -1510,7 +1513,7 @@ export default function MapSurface({
           onAddWorld={addWorld}
           onClose={() => {
             setSearchOpen(false)
-            view.surfaceRef.current?.focus({ preventScroll: true })
+            surfaceRef.current?.focus({ preventScroll: true })
           }}
         />
       ) : null}
@@ -1524,13 +1527,13 @@ export default function MapSurface({
       <svg className="map-svg" xmlns="http://www.w3.org/2000/svg">
         <MapDefs idPrefix={idPrefix} />
         {/* A new group when the view changes: the flat view's transform must not stay on the globe's overlay. */}
-        <g ref={view.worldRef} key={viewKind}>
+        <g ref={worldRef} key={viewKind}>
           <MapLayers
             map={map}
             projector={projector}
             space={space}
             day={day}
-            zoom={view.settledZoom}
+            zoom={settledZoom}
             schedules={schedules}
             selection={selection}
             missingDocs={missingDocs}
@@ -1559,7 +1562,7 @@ export default function MapSurface({
         </div>
       ) : null}
 
-      <MapChrome map={map} projector={projector} space={space} viewport={view.viewport} box={box} bearing={isGlobe ? globeView.camera.bearing : 0} day={day} />
+      <MapChrome map={map} projector={projector} space={space} viewport={viewport} box={box} bearing={isGlobe ? globeView.camera.bearing : 0} day={day} />
 
       {hint ? (
         <div
@@ -1602,10 +1605,10 @@ export default function MapSurface({
           day={day}
           projectName={projectName}
           docPath={docPath}
-          surfaceRef={view.surfaceRef}
-          viewportRef={view.viewportRef}
+          surfaceRef={surfaceRef}
+          viewportRef={viewportRef}
           picture={view.native ? (scale) => view.picture(scale, { filter: lookFilter() }) : null}
-          recorder={view.canRecord?.() ? view : null}
+          recorder={recorder}
           plotCamera={isSpace && PLOTTABLE_KINDS.has(map.mapKind) ? () => spaceView.cameraRef.current || spaceView.camera : null}
           plotObject={map.mapKind === 'model' ? spaceView.plotObject : null}
         />

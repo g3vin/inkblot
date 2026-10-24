@@ -32,7 +32,7 @@ export default function TimelineAxis({ timeline, calendar, axis, toX, toUnit, px
     return toUnit(clientX - rect.left)
   }
 
-  const startDrag = (kind) => (event) => {
+  const startDrag = (kind, event) => {
     if (event.button !== 0) return
     event.stopPropagation()
     event.currentTarget.setPointerCapture?.(event.pointerId)
@@ -68,7 +68,7 @@ export default function TimelineAxis({ timeline, calendar, axis, toX, toUnit, px
         <div
           ref={trackRef}
           className={`timeline-axis-track${axis === 'time' ? ' can-scrub' : ''}`}
-          onPointerDown={axis === 'time' ? startDrag('scrub') : undefined}
+          onPointerDown={axis === 'time' ? (e) => startDrag('scrub', e) : undefined}
           onPointerMove={onMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
@@ -105,7 +105,7 @@ export default function TimelineAxis({ timeline, calendar, axis, toX, toUnit, px
           <div
             className={`timeline-lens${lens.editing ? ' is-editing' : ''}`}
             style={{ left: toX(lens.from), width: Math.max(2, toX(lens.to) - toX(lens.from)) }}
-            onPointerDown={lens.editing ? startDrag('lens') : undefined}
+            onPointerDown={lens.editing ? (e) => startDrag('lens', e) : undefined}
             onPointerMove={onMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
@@ -113,8 +113,8 @@ export default function TimelineAxis({ timeline, calendar, axis, toX, toUnit, px
           >
             {lens.editing ? (
               <>
-                <span className="timeline-lens-edge is-from" onPointerDown={startDrag('lens-from')} />
-                <span className="timeline-lens-edge is-to" onPointerDown={startDrag('lens-to')} />
+                <span className="timeline-lens-edge is-from" onPointerDown={(e) => startDrag('lens-from', e)} />
+                <span className="timeline-lens-edge is-to" onPointerDown={(e) => startDrag('lens-to', e)} />
               </>
             ) : null}
           </div>

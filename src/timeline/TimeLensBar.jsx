@@ -38,7 +38,7 @@ export default function TimeLensBar({ projectName }) {
   }
   const step = scale === 'sequence' ? 1 : span > 3650 ? 30 : 1
 
-  const startDrag = (kind) => (pointer) => {
+  const startDrag = (kind, pointer) => {
     if (!lens.editing || pointer.button !== 0) return
     pointer.preventDefault()
     pointer.stopPropagation()
@@ -78,12 +78,12 @@ export default function TimeLensBar({ projectName }) {
         <div
           className={`timeline-lens-window${lens.editing ? ' is-editing' : ''}`}
           style={{ left: pct(Math.max(from, lensWindow.from)), width: `${(Math.max(0, Math.min(to, lensWindow.to) - Math.max(from, lensWindow.from)) / span) * 100}%` }}
-          onPointerDown={startDrag('move')}
+          onPointerDown={(e) => startDrag('move', e)}
         >
           {lens.editing ? (
             <>
-              <span className="timeline-lens-edge is-from" onPointerDown={startDrag('from')} />
-              <span className="timeline-lens-edge is-to" onPointerDown={startDrag('to')} />
+              <span className="timeline-lens-edge is-from" onPointerDown={(e) => startDrag('from', e)} />
+              <span className="timeline-lens-edge is-to" onPointerDown={(e) => startDrag('to', e)} />
             </>
           ) : null}
         </div>

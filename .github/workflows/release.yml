@@ -1,0 +1,96 @@
+name: Release
+
+# Tagging a version (v0.2.0) captures every website shot from the app, attaches them to
+# the GitHub Release as site-content.zip, and tells inkblot-site to rebuild from it.
+# Signed builds and the download manifest (the site's SITE_PLAN, stage 3) join this
+# workflow as further jobs.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: An existing tag to recapture (e.g. v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  capture:
+    name: Capture the website's shots
+    runs-on: ubuntu-latest
+    # WebKit and its libraries come with the image (see .github/actions/showcase-setup).
+    container: mcr.microsoft.com/playwright:v1.64.1-noble
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The website shows package.json's version and CHANGELOG.md's date for it, so a tag
+      # that disagrees with them would put the wrong version on the site.
+      - name: Check the tag matches the version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          case "$TAG" in
+            "v$VERSION"|"v$VERSION"-*) ;;
+            *) echo "::error::Tag $TAG but package.json says $VERSION. Bump the version (package.json, src-tauri/tauri.conf.json, Cargo.toml) before tagging."; exit 1 ;;
+          esac
+          grep -q "^## \[$VERSION\] - " CHANGELOG.md || echo "::warning::CHANGELOG.md has no dated '## [$VERSION] - YYYY-MM-DD' heading; the site will show the capture date."
+      - run: npm ci
+      - uses: ./.github/actions/showcase-setup
+      - name: Capture
+        run: npm run showcase
+        env:
+          SHOWCASE_TAG: ${{ env.TAG }}
+          SHOWCASE_COMMIT: ${{ github.sha }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-content
+          path: showcase/out
+          if-no-files-found: error
+
+  # On the runner itself, where gh and zip are.
+  publish:
+    name: Attach to the release, rebuild the website
+    needs: capture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-content
+          path: out
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          (cd out && zip -qr ../site-content.zip .)
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --notes "See CHANGELOG.md."
+          gh release upload "$TAG" site-content.zip --clobber
+
+      - name: Rebuild the website
+        env:
+          GH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::SITE_DISPATCH_TOKEN is not set; the website will pick this release up on its daily build."
+            exit 0
+          fi
+          gh api repos/g3vin/inkblot-site/dispatches \
+            -f event_type=release-published \
+            -f "client_payload[tag]=$TAG"

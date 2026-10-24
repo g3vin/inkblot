@@ -1838,7 +1838,7 @@ export interface DocumentText {
 	text: string;
 }
 
-/** Copy a document beside itself as "<name> copy", and open the copy. */
+/** Copy a document beside itself as "`<name>` copy", and open the copy. */
 export interface DuplicateEntryCommand {
 	path: string;
 }
@@ -4669,6 +4669,8 @@ export interface TimelineChromeState {
 	revealPanel: number;
 	/** The view is the active document, so the toolbar is its. */
 	active?: boolean;
+	/** The view's own inspector is showing, so its toolbar button is on. */
+	inspectorOpen?: boolean;
 }
 
 /** The active timeline view's toolbar and inspector, or `None` when no view is showing. */

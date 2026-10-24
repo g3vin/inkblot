@@ -22,6 +22,8 @@ const EXPECTED_IDS = [
   'inkblot.canvas.snap-to-grid', 'inkblot.canvas.zoom', 'inkblot.canvas.delete',
   'inkblot.map.drawing-tools', 'inkblot.map.measure-tools', 'inkblot.map.undo-redo', 'inkblot.map.zoom',
   'inkblot.map.delete', 'inkblot.map.view',
+  'inkblot.timeline.add-event', 'inkblot.timeline.show-as', 'inkblot.timeline.undo-redo', 'inkblot.timeline.zoom',
+  'inkblot.timeline.lens', 'inkblot.timeline.delete', 'inkblot.timeline.inspector',
   'inkblot.history.snapshot', 'inkblot.panel.clipboard', 'inkblot.panel.workbench', 'inkblot.panel.notes',
   'inkblot.panel.history', 'inkblot.panel.references', 'inkblot.panel.stats', 'inkblot.timer',
   'inkblot.tabs.split',
@@ -36,7 +38,7 @@ ok('the item ids are the ones layouts were saved under', JSON.stringify(ids) ===
 ok('no two items share an id', new Set(ids).size === ids.length)
 ok('every id is namespaced', ids.every((id) => id.startsWith('inkblot.')))
 ok('every item has a label and an icon', L.TOOLBAR_ITEMS.every((item) => item.label && item.icon && item.contexts.length))
-ok('the toolbars save apart', new Set(L.TOOLBAR_CONTEXTS.map(L.toolbarLayoutKey)).size === 4)
+ok('the toolbars save apart', new Set(L.TOOLBAR_CONTEXTS.map(L.toolbarLayoutKey)).size === 5)
 
 for (const context of L.TOOLBAR_CONTEXTS) {
   const offered = new Set(L.toolbarItemsFor(context).map((item) => item.id))

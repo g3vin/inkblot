@@ -14,6 +14,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { assetUrl, isAssetPath, measureImage } from '../lib/assets'
+import { FormRow, Toggle } from '../ui/FormRow.jsx'
+import Icon from '../ui/Icon.jsx'
+import Popover from '../ui/Popover.jsx'
+import Segmented from '../ui/Segmented.jsx'
 import { getPreference, setPreference } from '../lib/preferences'
 import { OPEN_BOOK_ITEM_EVENT } from './BookPages'
 import { activeCoverOf } from './chapterDesign'
@@ -92,7 +96,7 @@ const measureImages = async (images, urls) => {
   for (const img of images) {
     const url = urls.get(img.src) || img.src
     let bytes
-    let size = null
+    let size
     try {
       const response = await fetch(url)
       bytes = (await response.blob()).size
@@ -109,7 +113,8 @@ const measureImages = async (images, urls) => {
   return out
 }
 
-function Segmented({ value, options, onChange, label }) {
+/** The preview bar's own switch (the toolbars round reviews the bar). */
+function BarSegmented({ value, options, onChange, label }) {
   return (
     <div className="digital-segmented" role="radiogroup" aria-label={label}>
       {options.map(([id, name]) => (
@@ -425,16 +430,8 @@ export default function DigitalPreview({ projectName, docPath, editor, placement
           <button type="button" disabled={scaleIndex <= 0} onClick={() => changeReader({ scale: READER_SCALES[scaleIndex - 1] })} title="Smaller type">A</button>
           <button type="button" disabled={scaleIndex >= READER_SCALES.length - 1} onClick={() => changeReader({ scale: READER_SCALES[scaleIndex + 1] })} title="Larger type" className="is-large">A</button>
         </div>
-        <Segmented label="Theme" value={reader.theme} onChange={(theme) => changeReader({ theme })} options={Object.entries(READER_THEMES).map(([id, t]) => [id, t.name])} />
-        <details className="digital-more">
-          <summary>Reader</summary>
-          <div className="digital-more-panel">
-            <label><input type="checkbox" checked={reader.publisherFont} onChange={(e) => changeReader({ publisherFont: e.target.checked })} /> Publisher font</label>
-            <div>Spacing <Segmented label="Line spacing" value={reader.spacing} onChange={(spacing) => changeReader({ spacing })} options={[['tight', 'Tight'], ['publisher', 'Book'], ['loose', 'Loose']]} /></div>
-            <div>Margins <Segmented label="Margins" value={reader.margins} onChange={(margins) => changeReader({ margins })} options={[['narrow', 'Narrow'], ['normal', 'Normal'], ['wide', 'Wide']]} /></div>
-            <div>Alignment <Segmented label="Alignment" value={reader.align} onChange={(align) => changeReader({ align })} options={[['left', 'Left'], ['publisher', 'Book'], ['justify', 'Justified']]} /></div>
-          </div>
-        </details>
+        <BarSegmented label="Theme" value={reader.theme} onChange={(theme) => changeReader({ theme })} options={Object.entries(READER_THEMES).map(([id, t]) => [id, t.name])} />
+        <ReaderOptions reader={reader} changeReader={changeReader} />
         <span className="digital-sep" />
         <button type="button" className={`digital-checks-toggle${checks.some((c) => c.severity !== 'note') ? ' has-warnings' : ''}`} onClick={() => setShowChecks((s) => !s)}>
           Checks{checks.length ? ` (${checks.length})` : ''}
@@ -485,5 +482,24 @@ export default function DigitalPreview({ projectName, docPath, editor, placement
         </div>
       ) : null}
     </div>
+  )
+}
+
+/** The reader's own settings (as a reading app offers them): a button and a Popover. */
+function ReaderOptions({ reader, changeReader }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  return (
+    <>
+      <button ref={ref} type="button" className="digital-reader-button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+        Reader <Icon name="chevron-down" size={16} />
+      </button>
+      <Popover open={open} anchorRef={ref} onClose={() => setOpen(false)} eyebrow="Reader" className="digital-reader">
+        <FormRow label="Publisher font"><Toggle label="Publisher font" checked={reader.publisherFont} onChange={(publisherFont) => changeReader({ publisherFont })} /></FormRow>
+        <FormRow label="Spacing"><Segmented label="Line spacing" value={reader.spacing} onChange={(spacing) => changeReader({ spacing })} options={[{ value: 'tight', label: 'Tight' }, { value: 'publisher', label: 'Book' }, { value: 'loose', label: 'Loose' }]} /></FormRow>
+        <FormRow label="Margins"><Segmented label="Margins" value={reader.margins} onChange={(margins) => changeReader({ margins })} options={[{ value: 'narrow', label: 'Narrow' }, { value: 'normal', label: 'Normal' }, { value: 'wide', label: 'Wide' }]} /></FormRow>
+        <FormRow label="Alignment"><Segmented label="Alignment" value={reader.align} onChange={(align) => changeReader({ align })} options={[{ value: 'left', label: 'Left' }, { value: 'publisher', label: 'Book' }, { value: 'justify', label: 'Justified' }]} /></FormRow>
+      </Popover>
+    </>
   )
 }

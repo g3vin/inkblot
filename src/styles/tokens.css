@@ -84,6 +84,10 @@
   --size-toolbar: 36px;
   --size-bubble: 42px;
   --size-trash: 56px;
+  /* Dialog widths (docs/DESIGN.md §9): decisions, forms and lists, pages. */
+  --dialog-sm: 400px;
+  --dialog-md: 560px;
+  --dialog-lg: 720px;
   --icon-sm: 16px;
   --icon-md: 20px;
   --hairline: 1px;
@@ -202,6 +206,9 @@
   --ink-red: #e8877b;
   --ink-violet: #b79ce6;
   --ink-slate: #a7b0ba;
+  /* Sage: the brand's green, for the window and accent only (palette.ts → CHROME_INKS),
+     never a categorical ink. The website's Sage at night. */
+  --ink-sage: #a7bc94;
   --on-ink: #14120f;
 
   /* Semantic */
@@ -271,7 +278,7 @@
   --status-error: var(--status-danger);
   --status-error-soft: color-mix(in srgb, var(--ink-red) 70%, white);
 
-  --accent-color: var(--ink-blue);
+  --accent-color: var(--ink-sage);
   --accent-foreground: color-mix(in srgb, var(--accent-color) 80%, white);
 
   /* The page in Print Layout, on screen: a dark sheet the shade of the toolbar's bar
@@ -327,6 +334,7 @@
   --ink-red: #a23b32;
   --ink-violet: #664a98;
   --ink-slate: #56606b;
+  --ink-sage: #3f5a3a;
   --on-ink: #ffffff;
 
   --surface-3: rgba(40, 32, 20, 0.045);
@@ -481,7 +489,7 @@
    ============================================================ */
 :root {
   /* Accent presets: the accent is always one of the ink hues (src/lib/palette.ts),
-     chosen with data-accent on <html>. Ink Blue is the default. */
+     chosen with data-accent on <html>. Sage is the default. */
   --accent-surface: color-mix(in srgb, var(--accent-color) 16%, transparent);
   --accent-surface-strong: color-mix(in srgb, var(--accent-color) 26%, transparent);
   --accent-border: color-mix(in srgb, var(--accent-color) 45%, transparent);
@@ -544,12 +552,12 @@
 /*
  * The tray: the window behind the docked panels and the document card, as in Arc and
  * Dia. A soft gradient in the ink the writer picks (Settings → Window colour), set with
- * data-tray on <html>; Ink Blue is the default. The gradient is drawn by the `.ib-tray`
+ * data-tray on <html>; Sage is the default. The gradient is drawn by the `.ib-tray`
  * recipe (src/ui/Surfaces.css) from these stops. A tab strip can't cut from a gradient, so a
  * panel on the tray takes --tray-sheet, the gradient's flat middle, as its paper.
  */
 :root {
-  --tray-ink: var(--ink-blue);
+  --tray-ink: var(--ink-sage);
   --tray-glow: color-mix(in srgb, var(--tray-ink) var(--tray-glow-mix), var(--tray-base));
   --tray-top: color-mix(in srgb, var(--tray-ink) var(--tray-top-mix), var(--tray-base));
   --tray-bottom: color-mix(in srgb, var(--tray-ink) var(--tray-bottom-mix), var(--tray-base));
@@ -559,7 +567,8 @@
   --tray-veil-alpha: 86%;
 }
 
-/* Tray inks. Keep in sync with TRAY_INKS in src/lib/palette.ts. */
+/* Tray inks. Keep in sync with TRAY_INKS in src/lib/palette.ts. Sage is the default. */
+:root[data-tray='blue'] { --tray-ink: var(--ink-blue); }
 :root[data-tray='teal'] { --tray-ink: var(--ink-teal); }
 :root[data-tray='green'] { --tray-ink: var(--ink-green); }
 :root[data-tray='amber'] { --tray-ink: var(--ink-amber); }
@@ -568,7 +577,8 @@
 :root[data-tray='violet'] { --tray-ink: var(--ink-violet); }
 :root[data-tray='slate'] { --tray-ink: var(--ink-slate); }
 
-/* Accent presets. Keep in sync with ACCENT_PRESETS in src/lib/palette.ts. */
+/* Accent presets. Keep in sync with ACCENT_PRESETS in src/lib/palette.ts. Sage is the default. */
+:root[data-accent='blue'] { --accent-color: var(--ink-blue); }
 :root[data-accent='teal'] { --accent-color: var(--ink-teal); }
 :root[data-accent='green'] { --accent-color: var(--ink-green); }
 :root[data-accent='amber'] { --accent-color: var(--ink-amber); }

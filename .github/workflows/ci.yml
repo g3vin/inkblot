@@ -31,6 +31,26 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  showcase:
+    name: Showcase (every website shot still runs)
+    # The website shows the app through showcase/shots.mjs. A UI change that breaks a
+    # shot fails here, in the app's PR, not in the site's next release build.
+    runs-on: ubuntu-latest
+    # WebKit and its libraries come with the image (see .github/actions/showcase-setup).
+    container: mcr.microsoft.com/playwright:v1.64.1-noble
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/showcase-setup
+      - run: npm run showcase -- --stills-only
+        env:
+          SHOWCASE_COMMIT: ${{ github.sha }}
+
   rust:
     name: Rust (build, tests, parity, generated types)
     # macOS: the crates link CoreText, Metal and Accelerate.
@@ -43,15 +63,23 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      - name: cargo fmt
+        working-directory: src-tauri
+        run: cargo fmt --all --check
       - run: npm ci
       # tauri::generate_context! embeds dist/, so it has to exist before cargo runs.
       - run: npm run build
       - name: cargo build
         working-directory: src-tauri
         run: cargo build --workspace --locked
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: cargo test
         working-directory: src-tauri
         run: cargo test --workspace --locked

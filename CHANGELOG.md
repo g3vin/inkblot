@@ -23,7 +23,6 @@ Notable changes to Inkblot. The format follows
   bubble is put in its document's archive rather than written anywhere.
   Bubbles are set aside on a shelf along the top instead of against any edge, so the
   sentence uses more of the width in a narrow split.
-
 - **License:** Inkblot is open source under the Apache License 2.0. The name and logo
   stay trademarks; see TRADEMARKS.md. Contributions are signed off under the
   Developer Certificate of Origin.
@@ -56,6 +55,41 @@ Notable changes to Inkblot. The format follows
   Panels and menus are set apart by fine Ember lines rather than shadows, and note and
   accent colours are dimmed. System still picks Light or Dark; Midnight is only chosen
   by hand.
+
+### Fixed
+
+- **Split view preview:** holding a document over the page no longer shows a loading
+  placeholder on top of the previewed document until it is dropped.
+
+## [0.3.0] - 2026-10-23
+
+### Changed
+
+- **Dialogs:** every window that asks you something (Settings, New project, Rename,
+  Help, …) is the same kind of dialog. A heading says where it came from, there is one
+  way out, and the buttons sit at the trailing edge; a small decision's two buttons
+  share the width. Focus starts on the first control and stays inside until it closes,
+  and a dialog leaves the way it came.
+- **Pop-ups:** Read Aloud, the footnote editor, the e-book reader, Typeset's page
+  pickers and the citation editor open in the same kind of pop-up, with a heading, and
+  Tab stays inside it. A menu a button opens is drawn in the page; right-click menus
+  stay the system's own.
+- **The toolbar:** a button's pop-up opens in the toolbar itself: a choice beside its
+  button, a form across the whole toolbar. A button's menu opens as a row of its items,
+  and » turns the toolbar to its second page, with ‹ to come back.
+- **Timeline:** its tools are in the card's toolbar, where they can be customised like
+  a document's.
+- **Find (⌘F)** opens in the card's toolbar, with Replace beside it.
+
+### Fixed
+
+- **Synonyms for a verb:** looking one up ("grumbled") no longer fails, and its
+  opposites come in the word's own form ("rejoiced", "praising").
+
+## [0.2.0] - 2026-10-23
+
+### Added
+
 - **Typeset and Print & Export:** the Finishing layout's Page, Book and Publish tabs
   are two tabs in the order a book is made — Typeset (what is in the book, the page,
   the type, how chapters open, the running heads, the front and back matter), then
@@ -197,10 +231,19 @@ Notable changes to Inkblot. The format follows
   Style"), in the native sidebar as well as the page. Filtering a map's history
   finds versions by the names written on the map.
 
+### Changed
+
+- **Accent and window colour:** Sage, Inkblot's green, is the default for both, in
+  place of Ink Blue. Ink Blue is still in Settings → Appearance; anyone who has opened
+  Inkblot before keeps the colour they had.
+
 ### Fixed
 
-- **Split view preview:** holding a document over the page no longer shows a loading
-  placeholder on top of the previewed document until it is dropped.
+- **Renaming a project** onto a name another project already holds is refused,
+  wherever that project is kept. Before, a project in a custom folder could be renamed
+  onto an AppData project's name, and the AppData one could no longer be opened.
+- **A document with a damaged note** opens with that note empty, rather than failing
+  to load.
 
 ## [0.1.0] - 2026-09-24
 
@@ -232,5 +275,7 @@ shell beside the Tauri app.
   bridge protocol) and `inkblot-models` (on-device models) in Rust, shared by both
   apps; types generated into TypeScript and Swift; a JS/Rust parity harness.
 
-[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/g3vin/inkblot/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/g3vin/inkblot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/g3vin/inkblot/releases/tag/v0.1.0

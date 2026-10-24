@@ -268,6 +268,7 @@ export default function NotesPanel({
 
   const [motion, setMotion] = useState(null)
   const motionRef = useRef(null)
+  // eslint-disable-next-line react-hooks/refs -- the latest motion, for finishMotion when a timer or callback calls it; set in render so it is current before any can
   motionRef.current = motion
   const motionTimerRef = useRef(0)
   // Each reply's line length, by id, as last measured.

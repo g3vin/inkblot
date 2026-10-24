@@ -15,10 +15,10 @@
 .pane-status {
   position: absolute;
   bottom: var(--pane-status-bottom);
-  left: 10px;
-  z-index: 5;
+  left: var(--space-3);
+  z-index: var(--z-chrome);
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   pointer-events: none;
 }
 
@@ -27,14 +27,15 @@
 .pane-bottom-scrim { --scrim-height: 56px; z-index: 4; }
 .pane-scroll.is-print-layout ~ .pane-bottom-scrim { display: none; }
 
-/* A floating capsule, as tall as the file tree's filter and level with it. */
+/* A readout capsule (DESIGN.md §9): --size-circle, as tall as the file tree's filter
+   and level with it. */
 .word-count {
   margin: 0;
   display: flex;
   align-items: center;
   height: var(--size-circle);
   box-sizing: border-box;
-  padding: 0 10px;
+  padding: 0 var(--space-3);
   font: 12px var(--font-ui);
   font-variant-numeric: tabular-nums;
   border-radius: var(--radius-lg);
@@ -46,7 +47,7 @@
    middle of the window. Send it to the outer edge instead. */
 .split-active:not(.split-rows) .secondary-pane .pane-status {
   left: auto;
-  right: 10px;
+  right: var(--space-3);
   flex-direction: row-reverse;
 }
 

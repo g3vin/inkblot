@@ -101,7 +101,9 @@ const normalizeNoteImages = (images = []) => (
 )
 
 /** Fill in defaults/coerce every note field; safe to call on untrusted or legacy data. */
-export const normalizeNote = (note = {}) => {
+export const normalizeNote = (raw = {}) => {
+  // Anything that is not an object is an empty note, not a crash or its characters as keys.
+  const note = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
   const fallbackDate = nowIso()
   const createdAt = normalizeDate(note.createdAt, normalizeDate(note.updatedAt, fallbackDate))
   const updatedAt = normalizeDate(note.updatedAt, createdAt)

@@ -9,6 +9,7 @@
 import * as D from './items/documentItems'
 import * as C from './items/canvasItems'
 import * as M from './items/mapItems'
+import * as TL from './items/timelineItems'
 import * as T from './items/typesetItems'
 import * as S from './items/sharedItems'
 
@@ -58,6 +59,13 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.map.zoom': M.MapZoomItem,
   'inkblot.map.delete': M.MapDeleteItem,
   'inkblot.map.view': M.MapViewItem,
+  'inkblot.timeline.add-event': TL.TimelineAddItem,
+  'inkblot.timeline.show-as': TL.TimelineShowAsItem,
+  'inkblot.timeline.undo-redo': TL.TimelineUndoRedoItem,
+  'inkblot.timeline.zoom': TL.TimelineZoomItem,
+  'inkblot.timeline.lens': TL.TimelineLensItem,
+  'inkblot.timeline.delete': TL.TimelineDeleteItem,
+  'inkblot.timeline.inspector': TL.TimelineInspectorItem,
 
   'inkblot.history.snapshot': S.SnapshotItem,
   'inkblot.panel.clipboard': panel('clipboard'),

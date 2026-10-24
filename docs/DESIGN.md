@@ -17,7 +17,7 @@ new feature from its first commit.
 For anyone short on time, human or agent. The rest of this document explains each one.
 
 1. **Build from `src/ui/`.** Use `Button`, `IconButton`, `Segmented`, `Menu`, `Popover`,
-   `Sheet`, `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`, `Panel`,
+   `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`, `Panel`,
    `Card`, `EmptyState`, `InkWheel`, `InkPicker` and the others. Don't restyle a bare `<button>` or
    write a new modal.
 2. **Never hard-code a design value.** Colours, fonts, radii, shadows, durations and
@@ -117,7 +117,7 @@ mark (half the wordmark's height around the wordmark). The mark is legible from 
 and the wordmark from 72px wide; below that, use the mark alone.
 
 **Brand vs accent.** The logo is black and white. `--accent-color` is the writer's
-choice: Ink Blue by default, or one of five other inks. It marks interactive states
+choice: Sage by default, or one of six inks. It marks interactive states
 (selection, focus, primary buttons, the active tab).
 
 **Don't** recolour the logo, add effects (shadows, gradients, glass), stretch it,
@@ -173,7 +173,7 @@ from it. No feature invents its own set.
 
 | Id | Label | Typical use |
 |---|---|---|
-| `blue` | Ink Blue | Default accent, brand |
+| `blue` | Ink Blue | Brand |
 | `teal` | Teal | |
 | `green` | Green | Success |
 | `amber` | Amber | Default note colour, warnings |
@@ -181,6 +181,11 @@ from it. No feature invents its own set.
 | `red` | Red | Danger |
 | `violet` | Violet | |
 | `slate` | Slate | Neutral category |
+
+**Sage** (`--ink-sage`, the website's brand green) is the default accent and window
+colour. It is a chrome colour only, not a ninth ink: no note, card, lane or tag takes
+it, so `INK_IDS` stays eight and colours hashed over it (version history) don't move.
+In code it is `CHROME_INKS` / `ChromeInkId` in `src/lib/palette.ts`.
 
 In code:
 
@@ -303,7 +308,7 @@ Weights are 400 (body), 500 (controls and labels), 600 (titles) and 700 (eyebrow
 sentence case everywhere; only eyebrows are uppercase.
 
 **The eyebrow** (`.ib-eyebrow`) is the small label above a group: a sidebar's or panel's
-title ("NOVEL", "STATS"), a section head in a sheet, a dialog's kicker. It is Inter
+title ("NOVEL", "STATS"), a section head in a dialog, a dialog's kicker. It is Inter
 at `--text-xs`, bold (`--weight-bold`), in capitals, tracked by `--tracking-eyebrow`,
 in `--text-muted`. Sidebar titles (`.panel-header-label`) are the same style.
 
@@ -364,7 +369,22 @@ and `.ib-prose` (any element that shows the writer's text).
   it, clean against the rule: no fade or shadow below it. Its icon
   controls are bare on the paper: a fill only on hover, and the accent tint for a
   control that is on. Its menus (text style, font, size) carry the quiet control fill
-  (`--control-bg`), so they read as menus rather than labels.
+  (`--control-bg`), so they read as menus rather than labels. It is a dense toolbar
+  (§8): 16px icons on `--size-capsule` buttons. Every view's tools are this toolbar,
+  one context each (`chromeLayout.ts`: document, canvas, map, timeline, Typeset), and
+  the writer can customise each. A view never adds a second band of tools under the
+  rule.
+- **The dynamic toolbar** (round 03b, 2026-10-22). What a toolbar button opens, it opens
+  in the toolbar, with every setting it has as a pop-up. A **form** (something to fill
+  in: read aloud's voice, find) takes the whole toolbar: its eyebrow, its controls in a
+  row and a close button; Escape or close brings the tools back as they were. A
+  **choice** (swatches, a menu's items) opens **in place**, on the control fill beside
+  its button, pushing what follows along and behind »; if it doesn't fit there, it takes
+  the whole toolbar. Either way the button stays pressed while it's open, focus goes to
+  its first control and back to the button. A button's menu opens as a row of its items
+  (`MenuRow`), groups apart, the checked item pressed. **»** (`overflow`) turns the row
+  to its second page, the items that didn't fit in place of those that did, with ‹ first
+  to come back (or Escape). Pop-ups opened from a panel or from the text still float.
 - **Split view: two cards.** Two documents side by side (or stacked) are two cards on
   the tray, not one card divided. The toolbar steps out into a card of its own across
   the top, and the tray shows between all three, as wide a gap as round the outside
@@ -421,9 +441,11 @@ and `.ib-prose` (any element that shows the writer's text).
   centred. The card and its preview are the pop-up surface veiled
   (`--search-veil-bg` over `var(--blur-over-page)`), with a hairline edge and the
   float shadow (§12).
-- **The find bar.** Find and replace in the open document (⌘F) floats at the top of
-  the document card, under the toolbar's rule, on its inner right (`FindBar.jsx`):
-  the field, "2 of 5", previous and next, and a click away the replace field.
+- **The find bar.** Find and replace in the open document (⌘F) takes the card's
+  toolbar while it is open, as an address bar becomes a find field (`FindBar.jsx`):
+  the field, "2 of 5", previous, next and close, and a click away the replace field
+  beside it. Escape puts it away and the toolbar's tools come back as they were.
+  Nothing floats over the text being searched.
 
   Nothing in a panel sits in a band, a filled strip or a bordered box of its own.
   `Card` is for things the writer made (a note, a source, a version, a tile), never
@@ -464,13 +486,18 @@ Lay out siblings with flex/grid and `gap`, not margins.
 icon buttons) and `--size-toolbar` (36px). Don't go smaller. Beginners and touch users
 need the target.
 
+**Capsules** over the page come in two heights. A **readout** (the word and page count,
+the locked badge, the zoom bar) is `--size-circle`, level with the file
+tree's foot. A **strip of buttons** (the table toolbar, the timer) is `--size-toolbar`:
+`--size-capsule` buttons in a `--space-1` inset. Every capsule is on `--z-chrome`.
+
 **Radius is soft:**
 
 | Token | px | For |
 |---|---|---|
 | `--radius-xs`, `--radius-sm` | 4 | Inputs, selects, chips, small controls, menu items |
 | `--radius-md` | 8 | Buttons, segmented controls, steppers, cards, rows |
-| `--radius-lg`, `--radius-card` | 12 | Floating panels and capsules, popovers, menus, dialogs, sheets |
+| `--radius-lg`, `--radius-card` | 12 | Floating panels and capsules, popovers, menus, dialogs |
 | `--radius-pill` | 999 | Tags and toggles **only** (and round icon buttons) |
 
 **Depth.** Only floating things cast shadows: panels, menus, popovers and floating
@@ -482,9 +509,13 @@ is a sidebar's engraved tab strip (§6), the only place inside a panel with a sh
 highlight.
 
 **Motion is subtle and quick.** Use `--dur-fast` (120ms) for hovers and small state
-changes, `--dur-base` (180ms) for popovers, dialogs and panels, and `--dur-slow` (240ms)
-for sheets. The easing is `--ease-out` (`--ease-standard` is the same curve). There is no bounce or overshoot, and no looping
-or attention-seeking animation, with one exception: a skeleton's sheen (see Content arriving, below). Motion explains where something came from and never
+changes and menus, `--dur-base` (180ms) for popovers, panels and small dialogs, and
+`--dur-slow` (240ms) for medium and large dialogs. Things arrive on `--ease-out`
+(`--ease-standard` is the same curve). Dialogs, popovers and menus also leave the way they
+came, quicker (`--dur-fast`) and easing in (`--ease-in`); `useExitAnimation` does this
+without the caller keeping it mounted. There is no bounce or overshoot, and no looping
+or attention-seeking animation, with one exception: a skeleton's sheen (see Content arriving,
+below). Motion explains where something came from and never
 decorates. `prefers-reduced-motion` is honoured globally (`base.css`); framer-motion
 components also check `useReducedMotion()`. A staggered motion (the ink wheel's
 fold) must also drop its `transition-delay` under reduced motion, which `base.css`
@@ -559,8 +590,9 @@ needs in `src/ui/motion.js`.
 - **Phosphor** (MIT), through `src/ui/Icon.jsx`: `<Icon name="note" />`.
 - **Weight:** Light at rest, Fill for an active or selected state (`active`).
   `IconButton` does this for you.
-- **Size:** 16px inline, in menus and in dense toolbars; 20px in primary toolbars,
-  empty states and FABs. Nothing else.
+- **Size:** 16px inline, in menus and in dense toolbars (the card's toolbar and every
+  floating strip are dense); 20px in primary toolbars, empty states and FABs. Nothing
+  else.
 - **Colour:** `currentColor`, usually `--text-muted` at rest and `--text-primary` on
   hover.
 - **Names mean something.** Register icons by meaning in `src/ui/icons.js` (`history`,
@@ -577,6 +609,7 @@ needs in `src/ui/motion.js`.
   | Put away, recoverably | `archive` | |
   | Add an item to this list | `add` (+) | |
   | Rarer options | `more` (⋯) | |
+  | What didn't fit the toolbar (») | `overflow` | `more` |
   | Find | `search` | zoom |
   | Zoom | `zoom-in` / `zoom-out` | `search` |
   | App settings | `settings` (gear) | theme, colour or a panel's own options |
@@ -599,12 +632,11 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `iconElement` | An icon in code that builds DOM by hand (TipTap node views) | `iconElement('add')` returns the same glyph `Icon` draws, as an `<svg>` element |
 | `Tooltip` | Naming a control in a richer way than `title` | Short, no period, after a 500ms delay, with an optional shortcut. Never holds anything a user must read to succeed |
 | `Kbd` | Showing a shortcut | Courier Prime |
-| `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in. `danger` items go last, after a separator |
-| `useNativeMenu`, `popUpNativeMenu` | Context menus and menus a native window menu would show | The OS menu, built from the same items |
-| `Popover` | Small forms and pickers anchored to a control | Same surface as a menu. `align` start/end |
-| `Dialog` | A decision, or a small setting | Eyebrow + title + description, then the body, then the footer (secondary left, primary right) |
-| `Sheet` | Larger settings and editors (Customize Toolbar, page setup) | Centred, or dropped from under the titlebar with `placement="top"` |
-| `NavSheet` | A sheet of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
+| `Menu`, `MenuItem`, `MenuLabel`, `MenuSeparator` | In-page lists of actions, "More" overflow menus | Arrow keys, typeahead and Escape built in; Tab closes it. `danger` items go last, after a separator. See *Pop-ups* below |
+| `popUpMenu`, `useNativeMenu` | Any menu built from a plain list of items | A right-click gets the OS's menu; a button gets an in-page `Menu` from the same items. See *Pop-ups* |
+| `Popover` | Small forms and pickers anchored to a control, or to a place in the text | **The one pop-up shell.** `eyebrow`, `align`, `anchorRect`, `onEscape`. Opened from the card's toolbar, it opens in the toolbar (§6, `ToolbarDockContext`). See *Pop-ups* below |
+| `Dialog` | **The one modal**: a decision, a form, an editor, Settings | See *Dialogs* below |
+| `NavSheet` | A large `Dialog` of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
 | `Section` | A collapsible group in an inspector panel | Remembers open/closed per `id`. `accessory` is its one action, beside the title. `help` names its help topic |
 | `FormRow` + `Toggle` / `Stepper` / `SelectMenu` | Inspector and settings rows | Label left (as wide as it needs, up to about half), control right; `stacked` for wide controls. `Toggle` applies immediately. `help` names its help topic |
 | `PanelActions`, `ScopeMenu`, `MoreMenu` | A panel's scope and ⋯, in its header row | The panel anatomy (§6). `PanelActions` puts its children in the shell's header slot, only for the panel showing |
@@ -620,8 +652,8 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `EmptyState` | Any list or panel with nothing in it | Icon, typewritten line and plain hint, centred; in a panel it sits in the middle of the panel's height. At most one action. `compact` for a section or "no matches" (stays in place); `dropActive` washes it in the accent while something is dragged over |
 | `InkWheel` | Colouring a thing on the page | Notes, table fill, canvas cards, map and timeline colours. `none` adds "No fill" / "Default"; `as` + `triggerProps` draw the control as an `IconButton` or a tool button |
 | `InkPicker` | A labelled colour choice in a form | Accent and window colour (Settings → General), folder types. Don't build another swatch row |
-| `FloatingCapsule` | A readout floating over the page (word count, zoom) | The floating-capsule surface; glass on iOS |
-| `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips (formatting, canvas, map) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS |
+| `FloatingCapsule` | A readout floating over the page (word count, zoom) | The floating-capsule surface; glass on iOS. `--size-circle` tall, on `--z-chrome` (§7) |
+| `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips over the page (the table's tools) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS. `--size-toolbar` tall (§7). A view's own tools go in the card's toolbar (§6), not a strip |
 | `FloatingActionButton` | One round primary action over the document | Glass on iOS |
 | `usePointerReorder` | Drag-to-reorder lists (toolbar items, inspector layout) | |
 | `CommandPalette` | Mounted once in `App` | Features register commands; they don't render this |
@@ -634,6 +666,72 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 Behaviour hooks (`src/ui/hooks.js`) are `useDismiss`, `useFocusTrap`, `useRovingFocus`
 and `useAnchoredPosition` (`placePopover.js` is the placement maths `Popover` uses). Use them when building anything floating or list-like
 instead of re-implementing focus handling.
+
+### Dialogs
+
+There is one modal, `Dialog` (decided in design review round 01, 2026-10-20; see
+`docs/design-review/rounds/01-modals.md`). Every modal is built the same way:
+
+- **Header:** an eyebrow saying where the dialog came from (`Book`, `Typeset`,
+  `Inspector`, `Toolbar`, `Files`, `Timer`, `Map`), the title in `.ib-title`
+  (`--text-lg`), and a one-line description when it needs one. New project, Settings
+  and Help have no eyebrow.
+- **One visible way out.** The footer's Cancel or Done is it. A dialog with no footer, or
+  whose footer doesn't close it (`footerCloses={false}`: Export map, Folder types), shows
+  a × at the top right. Escape and a click on the scrim always close a dialog.
+- **Footer:** the actions at the trailing edge, secondary then primary. A leading utility
+  (Units, Restore defaults, Show) goes first, before `<span
+  className="ib-dialog-footer-spacer" />`. In a small dialog, a footer of exactly two
+  buttons shares the width between them.
+- **Size:** `small` (`--dialog-sm`, 400) for decisions and short forms, `medium`
+  (`--dialog-md`, 560) for forms and lists, `large` (`--dialog-lg`, 720) for pages
+  (Settings, Help, Customize toolbar).
+- **Layer and motion:** on `--z-dialog`, over `--scrim-bg`. It fades in (§7) and leaves the
+  way it came. Reduced motion stills both.
+- **Focus:** the first control inside, never the ×. Tab stays inside, the app behind is
+  inert, and focus goes back where it was.
+
+The **command palette** (⌘K) is a Dialog in behaviour: the scrim, the motion in and out, an
+inert app behind, focus trapped and returned (round 02b). Its body is its own: a search
+field over a list, with no header or footer.
+
+**Declared exceptions:**
+
+- **Customize toolbar** drops from under the titlebar (`placement="top"`), and the app
+  behind it is not made inert, because its toolbar is what items are dragged into.
+
+### Pop-ups
+
+Anything anchored to a control (or a place in the text) that floats until it's dismissed
+is a `Popover` or a `Menu` (decided in design review rounds 02 and 02b, 2026-10-21; see
+`docs/design-review/rounds/02-popups.md` and `02b-menus.md`). Don't build another floating box: the footnote
+editor, read aloud, the e-book Reader, Typeset's page pickers and the citation editor
+(plain DOM, with the same classes) are all Popovers.
+
+- **Surface:** `.ib-popover` (`Popover.css`), the menu's surface, on `--z-popover`, with a
+  hairline edge. It owns its padding (`--space-4`); call sites add none.
+- **Title:** an eyebrow (`eyebrow`) over a pop-up of more than one control, naming it:
+  Read aloud, Footnote, Cell fill, Card colour, Print options, Print sides, Reader, Citation,
+  and Typeset's pickers (Chapter number, Running head…). A one-line form (Go to page) or a
+  strip of tools has none.
+- **Insides:** `src/ui` controls (`Field`, `SelectMenu`, `TextArea`, `Button`, `FormRow` +
+  `Toggle`, `Segmented`). A pop-up's one bespoke visual is its signature (read aloud's
+  live waveform).
+- **Motion:** a popover floats in over `--dur-base`, a menu over `--dur-fast`, and both
+  leave the way they came (§7).
+- **Focus:** a popover moves focus to its first control; Tab and ⇧Tab stay inside it;
+  Escape or a click outside closes it, and focus goes back to the control that opened it.
+  A menu focuses its first item, arrows move, and Tab closes it.
+- **Inside a dialog,** a pop-up renders in the dialog's layer (`layer.js`), above it, and
+  Escape closes the pop-up before the dialog.
+- **Menus: native for a right-click, in the page for a button** (round 02b, 2026-10-21).
+  A right-click gets the OS's menu; a menu a button opens is an in-page `Menu`. Both come
+  from one description through `popUpMenu`, so a submenu in the list becomes a labelled
+  group in the page. The one exception is a toolbar button's menu: it opens in the
+  toolbar, as a row of its items (§6).
+- **In the card's toolbar, a pop-up opens in the toolbar** (round 03b, 2026-10-22). See
+  §6 → *The dynamic toolbar*. `Popover` does it wherever a `ToolbarDockContext` holds
+  the button that opened it.
 
 **If a component doesn't exist yet,** build it in `src/ui/` from tokens, add it to the
 showcase (`src/dev/DesignShowcase.jsx`) and to this table, in the same PR.
@@ -739,7 +837,7 @@ little see-through too, its 0.5px ring over a light `var(--blur-note)`, so the l
 is about stays in view; the strings between notes stop at their edges. The project
 search card and its preview are veiled the same way as a hovering sidebar
 (`--search-veil-bg` over `var(--blur-over-page)`, falling back to the opaque menu
-surface under reduced transparency): a veil, not glass. Don't extend glass to panels, menus, dialogs, sheets or scrims, and don't add
+surface under reduced transparency): a veil, not glass. Don't extend glass to panels, menus, dialogs or scrims, and don't add
 per-platform styling elsewhere. Touch targets are already comfortable (32px minimum;
 FABs are 44px).
 
@@ -750,7 +848,10 @@ FABs are 44px).
 - **Contrast:** AA, as in §3. Never rely on colour alone.
 - **Keyboard:** Every action is reachable by keyboard. Focus is always visible
   (`--focus-ring`). Menus, tabs, segmented controls and swatches use arrow keys.
-  Dialogs trap focus and return it on close.
+  Dialogs focus their first control (never the ×), trap focus, make the app behind
+  inert, and return focus on close. Popovers focus their first control, keep Tab inside
+  and return focus to their opener; menus close on Tab. A roving group (swatches,
+  segments) is one Tab stop.
 - **Names:** Icon-only controls have `label`s. Decorative icons are `aria-hidden`.
 - **Motion:** Honour `prefers-reduced-motion` (global in `base.css`).
 - **Text:** Nothing important below `--text-xs` (11px). Don't disable zoom.

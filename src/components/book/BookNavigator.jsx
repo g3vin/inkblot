@@ -17,8 +17,8 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { shellBridge, useLatestBridgeState } from '../../bridge'
-import { Button, IconButton, Inlay, InlaySlot, Sheet, usePointerReorder } from '../../ui'
-import { popUpNativeMenu } from '../../ui/useNativeMenu.js'
+import { Button, Dialog, IconButton, Inlay, InlaySlot, usePointerReorder } from '../../ui'
+import { popUpMenu } from '../../ui/useNativeMenu.js'
 import Icon from '../../ui/Icon.jsx'
 import { SECTION_TITLES, addMenu, moveTarget, rowMenu } from './bookMenu.js'
 import './BookNavigator.css'
@@ -107,7 +107,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
           title="Add front matter, back matter or a part"
           size="circle"
           aria-haspopup="menu"
-          onClick={(event) => popUpNativeMenu(event, addMenu(rows))}
+          onClick={(event) => popUpMenu(event, addMenu(rows))}
         />
       </Inlay>
     </InlaySlot>
@@ -138,7 +138,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
                   onPointerDown={(event) => { if (!event.target.closest('.book-row-eye')) onPointerDown(event, row.id) }}
                   onClick={() => open(row.id)}
                   onKeyDown={(event) => { if (event.key === 'Enter') open(row.id) }}
-                  onContextMenu={(event) => popUpNativeMenu(event, rowMenu(row, actions))}
+                  onContextMenu={(event) => popUpMenu(event, rowMenu(row, actions))}
                 >
                   <span className="book-row-leading"><Leading row={row} /></span>
                   <span className="book-row-text">
@@ -163,7 +163,7 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
       </div>
       {footerSlot === undefined ? footer : footerSlot ? createPortal(footer, footerSlot) : null}
       {renaming ? (
-        <Sheet title="Rename" width={340} onClose={() => setRenaming(null)} footer={(
+        <Dialog eyebrow="Book" title="Rename" size="small" onClose={() => setRenaming(null)} footer={(
           <>
             <Button onClick={() => setRenaming(null)}>Cancel</Button>
             <Button variant="filled" onClick={() => { send('editBookItem', { id: renaming.id, title }); setRenaming(null) }}>Rename</Button>
@@ -176,17 +176,17 @@ export default function BookNavigator({ hasProject, onShowFiles, footerSlot }) {
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => { if (event.key === 'Enter') { send('editBookItem', { id: renaming.id, title }); setRenaming(null) } }}
           />
-        </Sheet>
+        </Dialog>
       ) : null}
       {removing ? (
-        <Sheet title={`Remove “${removing.title}” from the book?`} width={380} onClose={() => setRemoving(null)} footer={(
+        <Dialog eyebrow="Book" title={`Remove “${removing.title}” from the book?`} size="small" onClose={() => setRemoving(null)} footer={(
           <>
             <Button onClick={() => setRemoving(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => { send('removeBookItem', { id: removing.id }); setRemoving(null) }}>Remove</Button>
           </>
         )}>
           <p className="book-note">{removing.kind === 'matter' ? 'Its page is deleted with it. This can’t be undone.' : 'You can add it again from the + menu.'}</p>
-        </Sheet>
+        </Dialog>
       ) : null}
     </div>
   )

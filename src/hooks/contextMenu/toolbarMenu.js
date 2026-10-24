@@ -3,7 +3,7 @@
  * Customize Toolbar…, and Customize Inspector Layout…. The same menu wherever in the
  * band it lands, items and gaps alike (as ToolbarContextMenu.swift had it).
  */
-import { popUpNativeMenu } from '../../ui/useNativeMenu'
+import { popUpMenu } from '../../ui/useNativeMenu'
 import { readDisplayMode, writeDisplayMode } from '../../components/toolbar/useToolbarLayout'
 import { CUSTOMIZE_TOOLBAR_EVENT } from '../../components/toolbar/toolbarContext'
 
@@ -23,5 +23,5 @@ export function toolbarMenuItems(display = readDisplayMode()) {
 export function popUpToolbarMenu(event) {
   // A text field in the band keeps its own Cut/Copy/Paste menu.
   if (event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return
-  void popUpNativeMenu(event, toolbarMenuItems())
+  void popUpMenu(event, toolbarMenuItems())
 }

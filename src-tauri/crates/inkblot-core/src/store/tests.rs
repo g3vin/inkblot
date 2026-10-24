@@ -629,7 +629,7 @@ fn linking_repairs_a_project_that_moved_behind_the_apps_back() {
     assert_eq!((name.as_str(), already), ("Cloud", false));
     assert_eq!(store.list_projects(), ["Cloud"]);
     // Linking the same place twice says so rather than failing.
-    assert_eq!(store.link_project(&moved_to).unwrap().unwrap().1, true);
+    assert!(store.link_project(&moved_to).unwrap().unwrap().1);
 }
 
 #[test]

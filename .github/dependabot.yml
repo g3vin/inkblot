@@ -1,0 +1,48 @@
+# Dependabot: one pull request per ecosystem per week, not one per package.
+#
+# Version updates arrive together on Monday morning. Security fixes are grouped the
+# same way but don't wait for Monday: Dependabot opens them as soon as an advisory
+# lands. A group that fails CI holds every update in it, so when one package breaks
+# the build, pin or ignore that one (`ignore:` below) and let the rest through.
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Indiana/Indianapolis"
+    groups:
+      npm:
+        applies-to: version-updates
+        patterns: ["*"]
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Indiana/Indianapolis"
+    groups:
+      cargo:
+        applies-to: version-updates
+        patterns: ["*"]
+      cargo-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  # The actions the workflows use (actions/checkout, setup-node, …).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]

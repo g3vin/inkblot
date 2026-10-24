@@ -5,7 +5,7 @@
  * through this, so the same gesture looks the same everywhere.
  */
 import { useRef } from 'react'
-import { INKS, inkVar } from '../lib/palette'
+import { CHROME_INKS, INKS, chromeInkVar } from '../lib/palette'
 import { useRovingFocus } from './hooks'
 import Icon from './Icon'
 import './InkPicker.css'
@@ -17,7 +17,8 @@ import './InkPicker.css'
 export default function InkPicker({ value, onChange, label, inks, showLabels = false }) {
   const ref = useRef(null)
   const onKeyDown = useRovingFocus(ref, '[role="radio"]', { orientation: 'horizontal', typeahead: false })
-  const options = inks ? INKS.filter((ink) => inks.includes(ink.id)).sort((a, b) => inks.indexOf(a.id) - inks.indexOf(b.id)) : INKS
+  // Sage is offered only where it's asked for (the accent and window pickers); without a list, the eight inks.
+  const options = inks ? CHROME_INKS.filter((ink) => inks.includes(ink.id)).sort((a, b) => inks.indexOf(a.id) - inks.indexOf(b.id)) : INKS
   const hasSelection = options.some((ink) => ink.id === value)
   return (
     <div ref={ref} role="radiogroup" aria-label={label} className={['ib-ink-picker', showLabels && 'has-labels'].filter(Boolean).join(' ')} onKeyDown={onKeyDown}>
@@ -33,7 +34,7 @@ export default function InkPicker({ value, onChange, label, inks, showLabels = f
             title={ink.label}
             tabIndex={selected || (!hasSelection && index === 0) ? 0 : -1}
             className="ib-ink-swatch"
-            style={{ '--swatch': inkVar(ink.id) }}
+            style={{ '--swatch': chromeInkVar(ink.id) }}
             onClick={() => onChange?.(ink.id)}
           >
             <span className="ib-ink-dot">{selected ? <Icon name="check" size={12} active /> : null}</span>

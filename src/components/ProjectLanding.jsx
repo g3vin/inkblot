@@ -10,9 +10,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createProject, getProjectRoot, linkProject, listProjects, moveProject } from '../lib/FileSystem'
-import { Button, EmptyState, Sheet, Skeleton, staggerStyle, useReveal } from '../ui'
+import { Button, Dialog, EmptyState, Skeleton, staggerStyle, useReveal } from '../ui'
 import { prefetchProject, recallProjects, rememberProjects } from '../lib/projectPrefetch'
-import { popUpNativeMenu } from '../ui/useNativeMenu.js'
+import { popUpMenu } from '../ui/useNativeMenu.js'
 import Icon from '../ui/Icon.jsx'
 import { AppIcon, Wordmark } from '../ui/Brand.jsx'
 import './ProjectLanding.css'
@@ -55,7 +55,7 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
     onCreated(trimmed)
   }
   return (
-    <Sheet title="New project" width={400} onClose={onClose} footer={(
+    <Dialog title="New project" size="small" onClose={onClose} footer={(
       <>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="filled" disabled={!name.trim()} onClick={submit}>Create</Button>
@@ -76,7 +76,7 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
         </button>
         {error ? <p className="picker-error" role="alert">{error}</p> : null}
       </form>
-    </Sheet>
+    </Dialog>
   )
 }
 
@@ -213,7 +213,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
               type="button"
               className="picker-chevron"
               aria-label="New project options"
-              onClick={(event) => popUpNativeMenu(event, [
+              onClick={(event) => popUpMenu(event, [
                 { text: 'New project…', action: () => setCreating(true) },
                 { text: 'New project in folder…', action: () => setCreating('folder') },
               ])}
@@ -262,7 +262,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
               onPointerEnter={() => prefetch(name)}
               onContextMenu={(event) => {
                 setSelection(name)
-                popUpNativeMenu(event, [
+                popUpMenu(event, [
                   { text: 'Open', action: () => onOpenProject(name) },
                   { text: 'Show in Finder', action: () => reveal(name) },
                   { separator: true },

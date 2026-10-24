@@ -13,13 +13,15 @@
  * view, highlighted passage, map and canvas card. A drag previews the chronology
  * everywhere and commits on release.
  *
- * Under a shell that draws the toolbar and inspector (`timelineChrome`), they are
- * published instead of drawn, and come back as `timelineCommand`s by id.
+ * Its tools are the card's toolbar (the `timeline` context, toolbar/items/timelineItems):
+ * the active view publishes what they show (`timelineChromeChanged`), and they come back
+ * as `timelineCommand`s by id. A shell that draws its own toolbar reads the same.
  *
  * A locked view (docLocks.ts) still pans, zooms and filters, but saves none of it, and
  * changes no events: commits, undo and redo are refused, and a drag springs back.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { documentSurface } from '../bridge'
 import { getDocDisplayName } from '../lib/docKind'
 import { loadProjectMaps } from '../lib/timeline/journeys'
 import { loadManuscriptPassages } from '../lib/timeline/manuscript'
@@ -40,7 +42,6 @@ import { requestCanvasReveal } from '../canvas/canvasEvents'
 import TimelineAxis from './TimelineAxis'
 import TimelineLanes from './TimelineLanes'
 import TimelineManuscript from './TimelineManuscript'
-import TimelineToolbar from './TimelineToolbar'
 import { registerTimelineSurface, TIMELINE_COMMAND_EVENT, TIMELINE_REVEAL_EVENT, takePendingTimelineReveal } from './timelineEvents'
 import { useTimelinePanel } from './useTimelinePanel'
 import { useStoryCursor, useStoryTimeline } from './useStoryTimeline'
@@ -453,6 +454,33 @@ export default function TimelineSurface({
     return () => window.removeEventListener(TIMELINE_REVEAL_EVENT, onReveal)
   }, [docPath, revealEvent, timeline])
 
+  // Published while this view is the active one, and only when something the toolbar
+  // or inspector shows changed: a pan re-renders the view and changes none of it.
+  const panelKey = JSON.stringify(panel.panel)
+  useEffect(() => {
+    if (!isActive) return undefined
+    return () => documentSurface.publishTimelineChrome({})
+  }, [isActive])
+  useEffect(() => {
+    const surfaceId = surfaceRef.current?.dataset.surfaceId
+    if (!isActive || !surfaceId) return
+    documentSurface.publishTimelineChrome({
+      state: {
+        surfaceId,
+        docPath,
+        scale,
+        canUndo: history.canUndo,
+        canRedo: history.canRedo,
+        hasSelection: Boolean(selection),
+        lensOn: Boolean(cursor.lens.on),
+        panel: panelRef.current.panel,
+        revealPanel: 0,
+        active: true,
+        inspectorOpen,
+      },
+    })
+  }, [cursor.lens.on, docPath, history.canRedo, history.canUndo, inspectorOpen, isActive, panelKey, scale, selection])
+
   /* ---------------- drawing ---------------- */
 
   const shared = {
@@ -484,22 +512,6 @@ export default function TimelineSurface({
       onKeyDown={onKeyDown}
       onPointerDown={() => onActivate?.()}
     >
-      <TimelineToolbar
-        scale={scale}
-        onScale={(next) => patchView({ scale: next })}
-        onAdd={() => runCommand('add-event')}
-        onUndo={undo}
-        onRedo={redo}
-        canUndo={history.canUndo}
-        canRedo={history.canRedo}
-        onZoomIn={() => zoomAt(1.5)}
-        onZoomOut={() => zoomAt(1 / 1.5)}
-        onFit={fitAll}
-        lensOn={Boolean(cursor.lens.on)}
-        onLens={() => runCommand('lens')}
-        inspectorOpen={inspectorOpen}
-        onToggleInspector={() => setInspectorOpen((open) => !open)}
-      />
 
       <div ref={plotRef} className="timeline-plot">
         {!timeline ? (

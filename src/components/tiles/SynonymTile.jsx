@@ -38,6 +38,22 @@ const formatBytes = (bytes) => {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`
 }
 
+/** compromise's gerund comes with its auxiliary ("is praising"); the tile wants the word. */
+const AUXILIARY = /^(?:is|are|am|was|were|will be) /
+
+/**
+ * The compromise method (`verbs().toPastTense()`, …) that puts a verb in `word`'s form.
+ * A bare verb ("grumble") is tagged PresentTense too, so only an -s form takes the
+ * present; anything else plain is the infinitive.
+ */
+function verbConjugation(docWord, word) {
+  if (docWord.has("#PastTense")) return "toPastTense"
+  if (docWord.has("#Gerund")) return "toGerund"
+  if (docWord.has("#FutureTense")) return "toFutureTense"
+  if (docWord.has("#PresentTense") && /s$/i.test(word)) return "toPresentTense"
+  return "toInfinitive"
+}
+
 /**
  * Inflect a candidate antonym to match the input word's tense/form using compromise
  */
@@ -49,8 +65,7 @@ function inflectToMatch(word, candidate) {
 
   // Determine part-of-speech
   if (docWord.has("#Verb")) {
-    const verbForm = docWord.verbs().data()[0]?.tense || "PresentTense"
-    return docCand.verbs()[verbForm.toLowerCase()]()?.text() || candidate
+    return docCand.verbs()[verbConjugation(docWord, word)]().text().replace(AUXILIARY, "") || candidate
   }
 
   if (docWord.has("#Adjective")) {

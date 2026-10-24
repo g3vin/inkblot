@@ -6,12 +6,12 @@
 import Icon from '../../ui/Icon.jsx'
 import SidebarTabs from './SidebarTabs'
 import { INSPECTOR_LAYOUT_INFO } from '../../lib/chromeLayout'
-import { popUpNativeMenu } from '../../ui/useNativeMenu'
+import { popUpMenu } from '../../ui/useNativeMenu'
 import { CUSTOMIZE_INSPECTOR_EVENT } from '../../hooks/contextMenu/toolbarMenu'
 
 export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLayout, visualProgress, gestureActive, reducedMotion, onIndicatorDrag, onIndicatorDrop }) {
   const other = layout === 'finishing' ? 'drafting' : 'finishing'
-  const menu = (event) => popUpNativeMenu(event, [
+  const menu = (event) => popUpMenu(event, [
     { text: 'Write layout', checked: layout === 'drafting', action: () => onChooseLayout('drafting') },
     { text: 'Typeset layout', checked: layout === 'finishing', action: () => onChooseLayout('finishing') },
     { separator: true },

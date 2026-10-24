@@ -527,6 +527,9 @@ export async function renameProject(projectName, newName) {
     const projectExists = await exists(oldRoot)
     if (!projectExists) return null
 
+    // Nothing already answering to the new name, wherever it lives: a project kept
+    // elsewhere is found by its registry entry, not by a folder beside this one.
+    if (await exists(await getProjectRoot(nextName))) return null
     const newRoot = joinPath(parentOf(oldRoot), nextName)
     const targetExists = await exists(newRoot)
     if (targetExists) return null
@@ -799,7 +802,7 @@ export async function listProjectTree(projectName) {
   // a slow or synced disk, a tree read serially is as slow as its folder count.
   const readDirectory = async (relativePath = '') => {
     const dirPath = relativePath ? joinPath(root, relativePath) : root
-    let entries = []
+    let entries
     try {
       entries = await readDir(dirPath)
     } catch (e) {

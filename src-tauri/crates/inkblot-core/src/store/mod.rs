@@ -704,8 +704,7 @@ impl ProjectStore {
 
         let name = dir
             .split(['/', '\\'])
-            .filter(|part| !part.is_empty())
-            .next_back()
+            .rfind(|part| !part.is_empty())
             .unwrap_or("");
         // A dotted directory is skipped by list_projects, so linking one would
         // "succeed" into a project that never appears.
@@ -743,12 +742,11 @@ impl ProjectStore {
 
     /// Returns the new name, or `None` when the project is missing or the name is taken.
     ///
-    /// **Stricter than the JS**, deliberately. `renameProject` only checks whether a
-    /// directory already sits at the new path *inside the same parent*, so a
-    /// custom-located project can be renamed onto a name an AppData project already
-    /// holds. Both then answer to that name, `getProjectRoot` resolves to the registry
-    /// entry, and the AppData project becomes unreachable — the exact stranding
-    /// `link_project` refuses to cause. This checks the name, not just the path.
+    /// The name is checked, not just the path beside the old directory: a
+    /// custom-located project renamed onto an AppData project's name would leave both
+    /// answering to it, the registry entry would win, and the AppData project would be
+    /// unreachable — the stranding `link_project` refuses to cause. `renameProject` in
+    /// JS makes the same check.
     pub fn rename_project(&self, project_name: &str, new_name: &str) -> Result<Option<String>> {
         let (current, next) = (project_name.trim(), new_name.trim());
         if current.is_empty() || next.is_empty() {
@@ -864,7 +862,7 @@ impl ProjectStore {
         Ok(())
     }
 
-    /// Copy a document beside itself as "<name> copy", then "copy 2", …
+    /// Copy a document beside itself as "`<name>` copy", then "copy 2", …
     ///
     /// The bytes are copied verbatim rather than round-tripped through load and save,
     /// because that pair whitelists the keys of a *text* document and would quietly
@@ -915,11 +913,7 @@ impl ProjectStore {
     ) -> Result<Option<String>> {
         let rel = normalize_path(entry_path);
         let target_folder = normalize_path(target_folder_path);
-        let base_name = rel
-            .split('/')
-            .filter(|part| !part.is_empty())
-            .next_back()
-            .unwrap_or("");
+        let base_name = rel.split('/').rfind(|part| !part.is_empty()).unwrap_or("");
         let next_path = if target_folder.is_empty() {
             base_name.to_string()
         } else {

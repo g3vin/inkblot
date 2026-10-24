@@ -100,7 +100,7 @@ impl DictationEngine {
 
         self.service
             .lock()
-            .load_model(resolved.to_string_lossy().to_string())
+            .load_model(resolved.to_string_lossy())
             .map_err(|err| err.to_string())
     }
 

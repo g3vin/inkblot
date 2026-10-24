@@ -34,6 +34,7 @@ export default function Tooltip({ content, shortcut, placement = 'bottom', child
     setOpen(false)
   }
 
+  // eslint-disable-next-line react-hooks/refs -- cloneElement only attaches these; the ref callback and handlers run after render
   const child = cloneElement(children, {
     ref: (node) => {
       anchorRef.current = node

@@ -17,7 +17,7 @@ and follow it.** It is the single source of truth for how Inkblot looks, feels a
 speaks. The short version:
 
 - Build from the primitives in `src/ui/` (`Button`, `IconButton`, `Segmented`, `Menu`,
-  `Popover`, `Sheet`, `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`,
+  `Popover`, `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`,
   `Panel`, `Card`, `EmptyState`, `InkWheel`, `InkPicker`, `FloatingCapsule`, …). Don't
   restyle bare elements or write one-off modals, menus or colour pickers.
 - Never hard-code a colour, font, radius or shadow. Use the tokens in
@@ -83,4 +83,5 @@ These must pass before you commit (what each catches: [README → Checks](README
 - `npm run lint` (0 errors and 0 warnings), `npm run lint:design`, `npm run typecheck`,
   `npm test`, `npm run build`
 - When you touch Rust or a mirrored module: `npm run parity`, `npm run types:check`,
-  and `cd src-tauri && cargo build --workspace && cargo test --workspace`
+  `cd src-tauri && cargo build --workspace && cargo test --workspace`, and
+  `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings`

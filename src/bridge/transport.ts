@@ -46,7 +46,8 @@ const copy = <T>(message: T): T => {
     return JSON.parse(JSON.stringify(message)) as T
   } catch (error) {
     throw new TypeError(
-      `Bridge message is not serializable — it cannot cross a process boundary: ${String(error)}`
+      `Bridge message is not serializable — it cannot cross a process boundary: ${String(error)}`,
+      { cause: error }
     )
   }
 }

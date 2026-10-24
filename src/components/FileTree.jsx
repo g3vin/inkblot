@@ -21,7 +21,7 @@ import { readProjectTree, recallProjects, recallTree, rememberProjects, remember
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocDisplayName, getDocKind, stripDocSuffix } from '../lib/docKind'
 import Icon from '../ui/Icon.jsx'
-import { IconButton, Inlay, InlaySlot, SkeletonOverlay, SkeletonRows, popUpNativeMenu, useReveal, useRevealReady } from '../ui'
+import { IconButton, Inlay, InlaySlot, SkeletonOverlay, SkeletonRows, popUpMenu, useReveal, useRevealReady } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { deriveFileNodeState, docKindIcon } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, TREE_KINDS, applyTreeFilter, folderPaths } from '../lib/treeFilter'
@@ -531,6 +531,27 @@ export default function FileTree({
   )
 
   // Render one tree node (file or folder) plus its drop slots and children.
+  const orderedRoot = useMemo(() => {
+    const result = applyOrderToTree(tree, { ...order })
+    return result
+  }, [tree, order])
+
+  // The tree narrowed to one kind of file, fully open while it is.
+  const shownRoot = useMemo(
+    () => (filtering ? applyTreeFilter(orderedRoot, { ...EMPTY_FILTER, kind }) : orderedRoot),
+    [filtering, orderedRoot, kind],
+  )
+  const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
+
+  // A kept split shows while both its documents are in the tree; a split is showing
+  // when the panes are split and one of the kept ones is what they show.
+  const filePaths = useMemo(() => filePathsIn(tree), [tree])
+  const shownSplits = useMemo(
+    () => (treeFor === projectName ? splits.filter((split) => filePaths.has(split.primaryDoc) && filePaths.has(split.secondaryDoc)) : NO_SPLITS),
+    [filePaths, projectName, splits, treeFor],
+  )
+  const splitShowing = splitView === 'editor' && Boolean(activeSplitId)
+
   const renderNode = (node, depth = 0, siblings = []) => {
     if (!node) return null
     // Every decision this row makes lives in fileTreeNodeState.js; what is left
@@ -725,27 +746,6 @@ export default function FileTree({
     )
   }
 
-  const orderedRoot = useMemo(() => {
-    const result = applyOrderToTree(tree, { ...order })
-    return result
-  }, [tree, order])
-
-  // The tree narrowed to one kind of file, fully open while it is.
-  const shownRoot = useMemo(
-    () => (filtering ? applyTreeFilter(orderedRoot, { ...EMPTY_FILTER, kind }) : orderedRoot),
-    [filtering, orderedRoot, kind],
-  )
-  const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
-
-  // A kept split shows while both its documents are in the tree; a split is showing
-  // when the panes are split and one of the kept ones is what they show.
-  const filePaths = useMemo(() => filePathsIn(tree), [tree])
-  const shownSplits = useMemo(
-    () => (treeFor === projectName ? splits.filter((split) => filePaths.has(split.primaryDoc) && filePaths.has(split.secondaryDoc)) : NO_SPLITS),
-    [filePaths, projectName, splits, treeFor],
-  )
-  const splitShowing = splitView === 'editor' && Boolean(activeSplitId)
-
   // What the search offers as recent files: documents as they are opened.
   useEffect(() => { noteOpened(projectName, activeDoc) }, [projectName, activeDoc])
 
@@ -779,7 +779,7 @@ export default function FileTree({
   // shut, and which kinds of file it lists.
   const openNewMenu = (event) => {
     const contextLabel = storyFolderContext?.preset.entryLabel.toLowerCase()
-    popUpNativeMenu(event, [
+    popUpMenu(event, [
       { text: 'New document', action: () => beginNewEntry('file', '') },
       { text: 'New canvas', action: () => beginNewEntry('canvas', '') },
       { text: 'New map', action: () => beginNewEntry('map', '') },

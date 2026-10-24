@@ -316,7 +316,7 @@ export async function generateReadAloudAudio(text, {
     onPhase?.('Finalizing Kokoro setup...')
   }, 1500)
 
-  let kokoro = null
+  let kokoro
   try {
     kokoro = await getWebviewKokoro(onProgress)
   } finally {

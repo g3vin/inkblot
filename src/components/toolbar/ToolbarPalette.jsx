@@ -4,7 +4,7 @@
  * toolbar shows its items.
  */
 import { DEFAULT_TOOLBARS, FLEXIBLE_SPACE, MORE, SPACE, toolbarItemsFor } from '../../lib/chromeLayout'
-import { Button, SelectMenu, Sheet } from '../../ui'
+import { Button, Dialog, SelectMenu } from '../../ui'
 import ToolbarItem from './ToolbarItem'
 import { inToolbar } from './toolbarEdits'
 
@@ -14,7 +14,7 @@ const DISPLAY_OPTIONS = [
   { value: 'label', label: 'Text only' },
 ]
 
-const CONTEXT_TITLES = { document: 'the document toolbar', canvas: 'the canvas toolbar', map: 'the map toolbar', typeset: 'the Typeset toolbar' }
+const CONTEXT_TITLES = { document: 'the document toolbar', canvas: 'the canvas toolbar', map: 'the map toolbar', timeline: 'the timeline toolbar', typeset: 'the Typeset toolbar' }
 
 export default function ToolbarPalette({ context, items, ctx, display, onDisplay, onReset, onDragStart, onClose }) {
   const offered = [
@@ -30,6 +30,7 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
     toolbar: { ...ctx.toolbar, target: ctx.toolbar.target ?? 'primary' },
     canvas: ctx.canvas ?? { surfaceId: '', zoom: 1, locked: false, canGroup: true, hasSelection: true, canUndo: true, canRedo: true, canRecord: true },
     map: ctx.map ?? { surfaceId: '', tool: 'select', zoomLabel: '100%', canUndo: true, canRedo: true, hasSelection: true },
+    timeline: ctx.timeline ?? { surfaceId: '', scale: 'time', canUndo: true, canRedo: true, hasSelection: true, lensOn: false, inspectorOpen: false },
     layout: ctx.layout ?? { docPath: 'preview', mode: context === 'typeset' ? 'typeset' : 'write', zoom: 1, paragraph: {} },
     activeDoc: ctx.activeDoc ?? 'preview',
     hasProject: true,
@@ -39,9 +40,10 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
   }
 
   return (
-    <Sheet
+    <Dialog
+      eyebrow="Toolbar"
       title={`Drag the items you use into ${CONTEXT_TITLES[context] ?? 'the toolbar'}`}
-      width={720}
+      size="large"
       placement="top"
       onClose={onClose}
       className="tb-palette"
@@ -52,7 +54,7 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
             <SelectMenu value={display} onChange={onDisplay} options={DISPLAY_OPTIONS} label="Show" />
           </label>
           <Button variant="plain" onClick={onReset}>Restore default set</Button>
-          <span className="ui-sheet-footer-spacer" />
+          <span className="ib-dialog-footer-spacer" />
           <Button variant="filled" onClick={onClose}>Done</Button>
         </>
       )}
@@ -88,6 +90,6 @@ export default function ToolbarPalette({ context, items, ctx, display, onDisplay
           </div>
         ))}
       </div>
-    </Sheet>
+    </Dialog>
   )
 }

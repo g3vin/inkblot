@@ -408,7 +408,7 @@ pub struct DeleteEntryCommand {
     pub is_folder: bool,
 }
 
-/// Copy a document beside itself as "<name> copy", and open the copy.
+/// Copy a document beside itself as "`<name>` copy", and open the copy.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -493,6 +493,8 @@ pub struct SetWordCountVisibleCommand {
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+// As InboundMessage (envelope.rs): boxing would change the generated TypeScript.
+#[allow(clippy::large_enum_variant)]
 pub enum NativeCommand {
     ApplyMark(ApplyMarkCommand),
     SetColor(SetColorCommand),

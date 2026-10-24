@@ -244,6 +244,8 @@ pub struct ProjectChanged {
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+// As InboundMessage (envelope.rs): boxing would change the generated TypeScript.
+#[allow(clippy::large_enum_variant)]
 pub enum WebviewEvent {
     ToolbarState(ToolbarState),
     SelectionContext(SelectionContext),

@@ -10,9 +10,9 @@
  *   5. serve a `?raw` import as the file's text, the way Vite does (the citation styles)
  *   6. import JSON without an import attribute, as Vite does
  *
- * (3) is what lets the `dom` suite render CanvasSurface itself. esbuild comes with
- * Vite, so this adds no dependency. The automatic JSX runtime is used, matching the
- * app's Vite config — no `import React` needed in a component.
+ * (3) is what lets the `dom` suite render CanvasSurface itself. esbuild is a dev
+ * dependency in its own right; Vite does not provide it. The automatic JSX runtime is used,
+ * matching the app's Vite config — no `import React` needed in a component.
  *
  * .ts is erased rather than checked — esbuild does not typecheck, and nothing here
  * should. `npm run typecheck` is what looks at the types; this only has to make a

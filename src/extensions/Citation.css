@@ -110,30 +110,24 @@
 
 /* ---------------- the popover ---------------- */
 
+/* The one pop-up surface (.ib-popover) and src/ui's controls, drawn by citationPopover.js. */
 .citation-popover {
-  position: fixed;
-  z-index: 1000;
   width: 300px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: var(--radius-lg);
-  background: var(--popover-bg);
-  border: 1px solid var(--popover-border);
-  box-shadow: var(--shadow-popover);
-  color: var(--text-primary);
-  font: 13px/1.35 -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  gap: var(--space-3);
 }
+
+.citation-popover .ib-popover-eyebrow { margin: 0; }
 
 .citation-popover-source {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .citation-popover-name {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -141,60 +135,16 @@
 
 .citation-popover-row {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
-.citation-popover input[type='text'],
-.citation-popover select {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 7px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background: var(--control-bg);
-  color: inherit;
-  font: inherit;
-}
-
-.citation-popover select {
-  flex: 0 0 auto;
-}
-
-.citation-popover-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-}
+.citation-popover-row .ib-input { flex: 1; min-width: 0; }
+.citation-popover-row .ui-select { flex: none; }
 
 .citation-popover-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   align-items: center;
 }
 
-.citation-popover-actions button {
-  border: 0;
-  border-radius: var(--radius-md);
-  padding: 5px 10px;
-  font: inherit;
-  cursor: pointer;
-  background: var(--control-bg);
-  color: inherit;
-}
-
-.citation-popover-link {
-  margin-right: auto;
-  background: transparent !important;
-  color: var(--accent-foreground) !important;
-  padding-left: 0 !important;
-}
-
-.citation-popover-remove {
-  color: var(--status-error) !important;
-}
-
-.citation-popover-done {
-  background: var(--accent-color) !important;
-  color: var(--text-on-accent) !important;
-}
+.citation-popover-link { margin-right: auto; }
