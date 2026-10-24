@@ -17,12 +17,13 @@ import {
   listProjectTree,
   createFolder,
 } from '../lib/FileSystem'
+import { readProjectTree, recallProjects, recallTree, rememberProjects, rememberTree } from '../lib/projectPrefetch'
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
-import { getDocKind, stripDocSuffix } from '../lib/docKind'
+import { getDocDisplayName, getDocKind, stripDocSuffix } from '../lib/docKind'
 import Icon from '../ui/Icon.jsx'
-import { IconButton, Inlay, InlaySlot, popUpNativeMenu } from '../ui'
+import { IconButton, Inlay, InlaySlot, SkeletonOverlay, SkeletonRows, popUpNativeMenu, useReveal, useRevealReady } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
-import { deriveFileNodeState } from '../lib/fileTreeNodeState'
+import { deriveFileNodeState, docKindIcon } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, TREE_KINDS, applyTreeFilter, folderPaths } from '../lib/treeFilter'
 import { noteOpened } from '../lib/recentDocs'
 import { lockReason, refreshLocks, useLocks } from '../lib/docLocks'
@@ -58,6 +59,15 @@ import {
 
 
 
+const NO_SPLITS = []
+
+/** The paths of every document in a tree. */
+const filePathsIn = (node, into = new Set()) => {
+  if (node.type === 'file') into.add(node.path)
+  for (const child of node.children || []) filePathsIn(child, into)
+  return into
+}
+
 /** Marks a scrolled list, so its stuck folder rows know to cover what passes under them. */
 const markScrolled = (event) => {
   event.currentTarget.toggleAttribute('data-scrolled', event.currentTarget.scrollTop > 0)
@@ -71,6 +81,12 @@ export default function FileTree({
   activeDoc,
   onSelectDoc,
   onSelectProject,
+  // The splits kept above the files (editorSession's SavedSplit), the one showing, and
+  // what choosing one or its × does.
+  splits = NO_SPLITS,
+  activeSplitId = null,
+  onOpenSplit,
+  onForgetSplit,
   registerRefreshFiles,
   // Where the + goes: under the list when not given; into this element
   // when given (the left sidebar keeps them at its foot, still while Files and Book
@@ -81,8 +97,11 @@ export default function FileTree({
   const locks = useLocks()
   const presets = useFolderPresets()
   const [view, setView] = useState('files')
-  const [projects, setProjects] = useState([])
-  const [tree, setTree] = useState({ type: 'folder', name: '', path: '', children: [] })
+  const [projects, setProjects] = useState(() => recallProjects()?.names ?? null)
+  // A project opened before this session shows the tree it last had at once; the read
+  // below then brings it up to date. `treeFor` is whose tree is showing.
+  const [tree, setTree] = useState(() => recallTree(projectName) ?? { type: 'folder', name: '', path: '', children: [] })
+  const [treeFor, setTreeFor] = useState(() => (recallTree(projectName) ? projectName : ''))
   const [expanded, setExpanded] = useState(new Set(['']))
   // Which kinds of file the tree shows (the + menu's Show). Finding by name is the
   // search's, beside the + at the sidebar's foot.
@@ -116,18 +135,21 @@ export default function FileTree({
 
   const refreshProjects = useCallback(async () => {
     const list = await listProjects()
+    rememberProjects(list)
     setProjects(list)
   }, [])
 
   const refreshTree = useCallback(async () => {
     if (!projectName) return
     const nextOrder = loadOrder(projectName)
-    const rawTree = await listProjectTree(projectName)
+    const rawTree = await readProjectTree(projectName)
     const orderedTree = applyOrderToTree(rawTree, nextOrder)
     saveOrder(projectName, nextOrder)
     orderRef.current = nextOrder
     setOrder(nextOrder)
     setTree(orderedTree)
+    setTreeFor(projectName)
+    rememberTree(projectName, orderedTree)
     // Whatever changed the tree may have moved, copied or removed something locked.
     void refreshLocks(projectName)
   }, [projectName])
@@ -147,6 +169,22 @@ export default function FileTree({
   useEffect(() => {
     refreshTree()
   }, [refreshTree])
+
+  // Switched to a project this session has shown before: its last tree, until the read lands.
+  const [recalledFor, setRecalledFor] = useState(projectName)
+  if (recalledFor !== projectName) {
+    setRecalledFor(projectName)
+    const recalled = recallTree(projectName)
+    if (recalled) {
+      setTree(recalled)
+      setTreeFor(projectName)
+    }
+  }
+
+  const treeReady = Boolean(projectName) && treeFor === projectName
+  useRevealReady('tree', treeReady)
+  const treeReveal = useReveal(treeReady)
+  const projectsReveal = useReveal(projects !== null, { gated: false })
 
   useEffect(() => {
     if (!projectName) return
@@ -533,6 +571,9 @@ export default function FileTree({
       siblings,
       splitView,
     })
+    // While a kept split is showing, the split's own row is the selection; its two
+    // documents are only marked as being in it.
+    const inShownSplit = splitShowing && (isPrimary || isSecondary)
     // Locked itself, or inside a locked folder (docLocks.ts), which marks it more quietly.
     const lock = lockReason(node.path, locks)
     const lockInherited = lock?.by === 'folder' && lock.folder !== node.path
@@ -553,7 +594,7 @@ export default function FileTree({
 
         <MotionDiv
           layout="position"
-          className={`file-item${isFolder ? ' folder' : ''}${isPrimary ? ' active' : ''}${isSecondary ? ' secondary' : ''}${isDragOver ? ' drag-over' : ''}${isDragSource ? ' is-drag-source' : ''}`}
+          className={`file-item${isFolder ? ' folder' : ''}${inShownSplit ? ' in-split' : `${isPrimary ? ' active' : ''}${isSecondary ? ' secondary' : ''}`}${isDragOver ? ' drag-over' : ''}${isDragSource ? ' is-drag-source' : ''}`}
           data-entry-type={node.type}
           data-entry-path={node.path}
           data-entry-parent={parentPath}
@@ -567,6 +608,8 @@ export default function FileTree({
             e.preventDefault()
             // A filtered tree hides siblings, so there is nowhere certain to drop.
             if (e.button !== 0 || filtering) return
+            // The ghost is the row itself, lifted: its size, and held where it was grabbed.
+            const rowRect = e.currentTarget.getBoundingClientRect()
             manualDragRef.current = {
               path: node.path,
               type: node.type,
@@ -575,6 +618,13 @@ export default function FileTree({
               iconFilled,
               startX: e.clientX,
               startY: e.clientY,
+              box: {
+                width: rowRect.width,
+                height: rowRect.height,
+                grabX: e.clientX - rowRect.left,
+                grabY: e.clientY - rowRect.top,
+                paddingLeft: getComputedStyle(e.currentTarget).paddingLeft,
+              },
             }
             manualDragActiveRef.current = false
             dragInsertRef.current = null
@@ -686,6 +736,15 @@ export default function FileTree({
     [filtering, orderedRoot, kind],
   )
   const shownExpanded = useMemo(() => (filtering ? folderPaths(shownRoot) : expanded), [filtering, shownRoot, expanded])
+
+  // A kept split shows while both its documents are in the tree; a split is showing
+  // when the panes are split and one of the kept ones is what they show.
+  const filePaths = useMemo(() => filePathsIn(tree), [tree])
+  const shownSplits = useMemo(
+    () => (treeFor === projectName ? splits.filter((split) => filePaths.has(split.primaryDoc) && filePaths.has(split.secondaryDoc)) : NO_SPLITS),
+    [filePaths, projectName, splits, treeFor],
+  )
+  const splitShowing = splitView === 'editor' && Boolean(activeSplitId)
 
   // What the search offers as recent files: documents as they are opened.
   useEffect(() => { noteOpened(projectName, activeDoc) }, [projectName, activeDoc])
@@ -832,11 +891,12 @@ export default function FileTree({
               </button>
             </div>
           )}
-          <div className="file-list">
-            {projects.length === 0 ? (
+          <div className="file-list-frame">
+          <div className="file-list" {...projectsReveal.contentProps}>
+            {projects?.length === 0 ? (
               <div className="file-tree-empty">No projects yet.</div>
             ) : (
-              projects.map(project => {
+              (projects || []).map(project => {
                 const isRenamingProject =
                   renamingEntry && renamingEntry.type === 'project' && renamingEntry.path === project
 
@@ -863,44 +923,115 @@ export default function FileTree({
               })
             )}
           </div>
+          <SkeletonOverlay visible={projectsReveal.skeleton} label="Loading projects">
+            <SkeletonRows count={4} className="file-tree-skeleton" />
+          </SkeletonOverlay>
+          </div>
         </>
       )}
 
       {view === 'files' && (
         <>
+          <div className="file-list-frame">
           {/* Stuck folders paint a background only once the list has scrolled under them. */}
-          <MotionDiv className="file-list" layout onScroll={markScrolled}>
+          {/* The rows mount when the tree is revealed, so their own entrance (the stagger
+              in itemRevealVariants) plays then; the list itself does not fade over it. */}
+          <MotionDiv className="file-list" layout onScroll={markScrolled} aria-busy={treeReveal.contentProps['aria-busy']}>
+            {treeReveal.phase === 'hidden' ? null : (<>
+            {shownSplits.length ? (
+              <div className="file-split-list" role="list" aria-label="Splits" data-reveal={treeReveal.phase}>
+                {shownSplits.map((split) => {
+                  const showing = splitShowing && split.id === activeSplitId
+                  const first = getDocDisplayName(split.primaryDoc)
+                  const second = getDocDisplayName(split.secondaryDoc)
+                  const half = (docPath, name) => (
+                    <span className="split-entry-doc">
+                      <Icon name={docKindIcon(docPath)} className="file-item-icon" />
+                      <span className="split-entry-name">{name}</span>
+                    </span>
+                  )
+                  return (
+                    <div
+                      key={split.id}
+                      role="listitem"
+                      className={`file-item split-entry${showing ? ' active' : ''}`}
+                      style={{ paddingLeft: `${TREE_ROOT_INDENT}px` }}
+                      title={`${first} beside ${second}`}
+                      onClick={(event) => {
+                        if (event.target instanceof Element && event.target.closest('button')) return
+                        onOpenSplit?.(split.id)
+                      }}
+                    >
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="split-entry-open"
+                        aria-current={showing || undefined}
+                        aria-label={`${first} beside ${second}`}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          onOpenSplit?.(split.id)
+                        }}
+                      >
+                        {half(split.primaryDoc, first)}
+                        <span className="split-entry-rule" aria-hidden="true" />
+                        {half(split.secondaryDoc, second)}
+                      </span>
+                      <IconButton
+                        icon="close"
+                        size="circle"
+                        label="Close split"
+                        className="split-entry-close"
+                        onClick={() => onForgetSplit?.(split.id)}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            ) : null}
             {isAddingEntry && newEntryParent === '' && renderNewEntryInput()}
             {(shownRoot.children || []).length === 0 ? (
-              <div className="file-tree-empty">
+              <div className="file-tree-empty" data-reveal={treeReveal.phase}>
                 {!filtering ? 'No files yet.' : `No ${TREE_KINDS.find((entry) => entry.value === kind)?.label.toLowerCase()} yet.`}
               </div>
             ) : (
-              <AnimatePresence initial={false}>
+              <AnimatePresence initial={treeReveal.phase === 'shown'}>
                 {(shownRoot.children || []).map(child => renderNode(child, 0, shownRoot.children || []))}
                 {dragInsert && dragInsert.parentPath === '' && dragInsert.index === (orderedRoot.children || []).length
                   ? renderDropSlot(TREE_ROOT_INDENT)
                   : null}
               </AnimatePresence>
             )}
+            </>)}
           </MotionDiv>
+          <SkeletonOverlay visible={treeReveal.skeleton} label="Loading files">
+            <SkeletonRows count={7} className="file-tree-skeleton" />
+          </SkeletonOverlay>
+          </div>
           {footerSlot === undefined ? footer : footerSlot ? createPortal(footer, footerSlot) : null}
         </>
       )}
 
-      <AnimatePresence>
+      {/* On the body: the sidebar's sliding track is transformed, which would hold a
+          fixed ghost inside the sidebar instead of letting it follow the pointer out. */}
+      {createPortal(<AnimatePresence>
         {dragPreview ? (
           <MotionDiv
             className="file-tree-drag-ghost"
             initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.94 }}
-            animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1 }}
+            // Settled, the document is in the split it opened, not under the pointer.
+            animate={prefersReducedMotion ? undefined : (dragPreview.settled ? { opacity: 0, scale: 0.94 } : { opacity: 1, scale: 1 })}
             exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.94 }}
-            // The ghost hangs off the pointer rather than sitting away from it: the
-            // cursor rides just inside its leading edge, level with its middle.
+            // The ghost is the row lifted out of the tree, held where it was grabbed.
             // (Offset in px, not a transform — framer owns this element's transform.)
             style={{
-              left: dragPreview.x - 10,
-              top: dragPreview.y - 18,
+              left: dragPreview.x - (dragPreview.box?.grabX ?? 10),
+              top: dragPreview.y - (dragPreview.box?.grabY ?? 12),
+              width: dragPreview.box?.width,
+              height: dragPreview.box?.height,
+              paddingLeft: dragPreview.box?.paddingLeft,
+              visibility: prefersReducedMotion && dragPreview.settled ? 'hidden' : undefined,
             }}
           >
             {dragPreview.iconName ? (
@@ -909,7 +1040,7 @@ export default function FileTree({
             <span className="file-tree-drag-ghost-label">{dragPreview.name}</span>
           </MotionDiv>
         ) : null}
-      </AnimatePresence>
+      </AnimatePresence>, document.body)}
     </div>
   )
 }

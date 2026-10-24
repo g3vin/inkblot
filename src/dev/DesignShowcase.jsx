@@ -5,7 +5,7 @@
  * change to src/styles or src/ui in both themes before it ships, and as the visual
  * companion to docs/DESIGN.md.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ACCENT_PRESETS, INKS, TRAY_INKS, inkVar } from '../lib/palette'
 import { setAccentAttribute, setThemeAttribute, setTrayAttribute } from '../lib/theme'
 import { useCommands } from '../lib/commands'
@@ -14,9 +14,11 @@ import {
   Breadcrumb, Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
   FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, InkWheel, Input, Kbd, Menu, MenuItem,
   MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented,
-  SelectMenu, Sheet, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
+  SelectMenu, Sheet, Skeleton, SkeletonOverlay, SkeletonRows, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
+  staggerStyle, useReveal,
 } from '../ui'
 import NavSheet from '../ui/NavSheet.jsx'
+import { CanvasSkeleton, MapSkeleton, TimelineSkeleton } from '../canvas/PaneSkeletons'
 import { ICONS } from '../ui/icons'
 import '../components/search/ProjectSearch.css'
 import './DesignShowcase.css'
@@ -32,6 +34,34 @@ function ShowcaseSection({ title, children }) {
       <h2 className="ib-eyebrow ds-section-title">{title}</h2>
       {children}
     </section>
+  )
+}
+
+const DEMO_ROWS = ['Chapter one', 'Chapter two', 'The lighthouse', 'Interlude', 'Chapter three']
+
+/** A list that loads in `ms`, to see the reveal's timing: under 150 ms, no skeleton at all. */
+function RevealDemo({ ms, label }) {
+  const [run, setRun] = useState(0)
+  const [ready, setReady] = useState(true)
+  useEffect(() => {
+    if (!run) return undefined
+    setReady(false)
+    const timer = window.setTimeout(() => setReady(true), ms)
+    return () => window.clearTimeout(timer)
+  }, [ms, run])
+  const reveal = useReveal(ready)
+  return (
+    <Card>
+      <Button onClick={() => setRun((n) => n + 1)}>{label}</Button>
+      <div className="ds-reveal-frame">
+        <div className="ds-reveal-list ib-stagger" {...reveal.contentProps}>
+          {DEMO_ROWS.map((row, index) => <div key={row} className="ds-reveal-row" style={staggerStyle(index)}>{row}</div>)}
+        </div>
+        <SkeletonOverlay visible={reveal.skeleton}>
+          <SkeletonRows count={DEMO_ROWS.length} className="ds-reveal-skeleton" />
+        </SkeletonOverlay>
+      </div>
+    </Card>
   )
 }
 
@@ -64,7 +94,7 @@ export default function DesignShowcase() {
   useCommands(() => [
     { id: 'ds.dialog', section: 'Showcase', title: 'Open a dialog', icon: 'info', run: () => setDialog(true) },
     { id: 'ds.sheet', section: 'Showcase', title: 'Open a sheet', icon: 'sidebar', run: () => setSheet(true) },
-    { id: 'ds.theme', section: 'View', title: 'Toggle theme', icon: 'moon', shortcut: '⌘⇧L', run: () => switchTheme(theme === 'dark' ? 'light' : 'dark') },
+    { id: 'ds.theme', section: 'View', title: 'Toggle theme', icon: 'moon', shortcut: '⌘⇧L', run: () => switchTheme(theme === 'light' ? 'dark' : 'light') },
   ], [theme])
 
   const switchTheme = (next) => { setThemeAttribute(next); setTheme(next) }
@@ -80,7 +110,7 @@ export default function DesignShowcase() {
           <span className="ib-meta">design language · v1</span>
           <span className="ds-spacer" />
           <Segmented label="Theme" value={theme} onChange={switchTheme}
-            options={[{ value: 'light', label: 'Paper' }, { value: 'dark', label: 'Ink' }]} />
+            options={[{ value: 'light', label: 'Paper' }, { value: 'dark', label: 'Ink' }, { value: 'midnight', label: 'Midnight' }]} />
           <Button onClick={() => window.dispatchEvent(new CustomEvent('inkblot:command-palette'))}>
             Commands <Kbd>⌘K</Kbd>
           </Button>
@@ -279,6 +309,28 @@ export default function DesignShowcase() {
             <Card>
               <EmptyState icon="note" title="No notes yet." hint="Select some text and press ⌥⌘N to leave yourself a note." />
             </Card>
+          </div>
+        </ShowcaseSection>
+
+        <ShowcaseSection title="Content arriving · skeleton, reveal, stagger">
+          <div className="ds-grid">
+            <RevealDemo ms={80} label="Quick load (80 ms)" />
+            <RevealDemo ms={1200} label="Slow load (1.2 s)" />
+            <Card>
+              <p className="ib-meta">Skeleton</p>
+              <SkeletonOverlay visible className="ds-skeleton-static">
+                <Skeleton width="45%" height="1.2em" />
+                <SkeletonRows count={3} />
+              </SkeletonOverlay>
+            </Card>
+            {[['Canvas', <CanvasSkeleton />], ['Map', <MapSkeleton />], ['Timeline', <TimelineSkeleton />]].map(([name, skeleton]) => (
+              <Card key={name}>
+                <p className="ib-meta">{name}</p>
+                <div className="ds-pane-skeleton">
+                  <SkeletonOverlay visible label={`${name} skeleton`}>{skeleton}</SkeletonOverlay>
+                </div>
+              </Card>
+            ))}
           </div>
         </ShowcaseSection>
 

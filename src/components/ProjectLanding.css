@@ -115,3 +115,15 @@
 }
 .picker-location span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-location strong { font-weight: 500; color: var(--accent-foreground); }
+
+/* A placeholder row is a real row's box with bars for its words, so it is exactly as
+   tall: the bars sit in the text's line boxes rather than replacing them. */
+.picker-row-placeholder .picker-row-text { flex: 1; }
+.picker-row-placeholder .ib-skeleton { display: inline-block; vertical-align: middle; }
+
+/* Opening a project: the start screen fades out over the editor opening beneath it. */
+.landing-page.picker.is-leaving {
+  z-index: var(--z-dialog);
+  pointer-events: none;
+  animation: ib-reveal-out var(--dur-reveal) var(--ease-out) forwards;
+}

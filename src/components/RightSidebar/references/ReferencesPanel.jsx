@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { shellBridge, useBridgeEvent, useLatestBridgeState } from '../../../bridge'
 import { BibliographyInclude } from '../../../types'
-import { Button, EmptyState, FormRow, IconButton, MenuItem, MenuLabel, MenuSeparator, MoreMenu, PanelActions, ScopeMenu, Section, SelectMenu, Toggle } from '../../../ui'
+import { Button, EmptyState, FormRow, IconButton, MenuItem, MenuLabel, MenuSeparator, MoreMenu, PanelActions, ScopeMenu, Section, SelectMenu, SkeletonRows, Toggle, useReveal } from '../../../ui'
 import { popUpNativeMenu } from '../../../ui/useNativeMenu'
 import Icon from '../../../ui/Icon.jsx'
 import ReferenceEditor from './ReferenceEditor'
@@ -27,6 +27,8 @@ const send = (type, payload) => shellBridge.send(type, payload)
 
 export default function ReferencesPanel({ query: panelQuery = '' }) {
   const state = useLatestBridgeState('referencesChanged', null)
+  // The panel lives inside an open project, so no state yet means not yet published.
+  const listReveal = useReveal(state !== null)
   const schema = useLatestBridgeState('referenceSchema', null)
   const [scope, setScope] = useState('document')
   const [input, setInput] = useState('')
@@ -160,8 +162,12 @@ export default function ReferencesPanel({ query: panelQuery = '' }) {
         {input ? <IconButton icon="close" label="Clear" size="capsule" onClick={() => setInput('')} /> : null}
       </div>
 
-      <div ref={listRef} className="references-list sidebar-list">
-        {shown.length ? shown.map((view) => (
+      <div ref={listRef} className="references-list sidebar-list" data-reveal={listReveal.phase === 'hidden' ? undefined : listReveal.phase}>
+        {listReveal.phase === 'hidden' ? (
+          <div className="ib-skeleton-host" data-visible={listReveal.skeleton ? 'true' : 'false'} aria-busy="true">
+            <SkeletonRows count={4} />
+          </div>
+        ) : shown.length ? shown.map((view) => (
           <ReferenceRow
             key={view.reference.id}
             view={view}

@@ -63,6 +63,8 @@ import { dispatchCanvasRestore } from '../canvas/canvasEvents'
 import { dispatchMapRestore } from '../map/mapEvents'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
 import Icon from '../ui/Icon.jsx'
+import { Skeleton, SkeletonOverlay, SkeletonRows } from '../ui/Reveal.jsx'
+import { useReveal } from '../ui/revealState.js'
 import './VersionComparePane.css'
 
 const CURRENT = 'current'
@@ -182,6 +184,7 @@ export default function VersionComparePane({
   refreshFiles,
   onOpenDocInTab,
   setVersions,
+  initialVersions,
 }) {
   const isCanvas = isCanvasDoc(docName)
   const isMap = isMapDoc(docName)
@@ -189,7 +192,12 @@ export default function VersionComparePane({
   const isStructured = isCanvas || isMap
   const toolbarSlot = useContext(CompareToolbarSlotContext)
 
-  const [versions, setLocalVersions] = useState([])
+  // The open document's versions, when the pane that opened it already holds them:
+  // the comparison is then right on its first frame, with no read.
+  const [versions, setLocalVersions] = useState(() => (Array.isArray(initialVersions) ? initialVersions : []))
+  // Until the versions are read, a side naming one has nothing to show, and a diff
+  // drawn from that would be wrong; whose list `versions` is says when it is right.
+  const [versionsReadFor, setVersionsReadFor] = useState(() => (Array.isArray(initialVersions) ? docName : null))
   const [leftId, setLeftId] = useState(String(initialLeftId ?? CURRENT))
   const [rightId, setRightId] = useState(String(initialRightId ?? CURRENT))
   const [mergeMode, setMergeMode] = useState(false)
@@ -212,10 +220,15 @@ export default function VersionComparePane({
       setVersions?.(docName, next || [])
     } catch {
       void 0
+    } finally {
+      setVersionsReadFor(docName)
     }
   }, [docName, projectName, setVersions])
 
+  const initialVersionsRef = useRef(initialVersions)
   useEffect(() => {
+    // Given the versions, the `versions:changed` listener below is what keeps them current.
+    if (Array.isArray(initialVersionsRef.current)) return
     void refreshVersions()
   }, [refreshVersions])
 
@@ -534,7 +547,11 @@ export default function VersionComparePane({
         : 'Loading…')
     : `${changedCount} difference${changedCount === 1 ? '' : 's'} · +${textStats.added} −${textStats.removed} words · ${textWords(htmlToText(left.html)).length} → ${textWords(htmlToText(right.html)).length}`
 
-  const canApply = isMap ? Boolean(mapDiff) : isCanvas ? Boolean(canvasDiff) : Boolean(editor && chunks)
+  const ready = versionsReadFor === docName && (!isStructured || (isMap ? currentMap : currentCanvas) !== null)
+  const reveal = useReveal(ready, { gated: false })
+  const showBody = ready && reveal.phase !== 'hidden'
+
+  const canApply = ready && (isMap ? Boolean(mapDiff) : isCanvas ? Boolean(canvasDiff) : Boolean(editor && chunks))
 
   const sideOptions = (
     <>
@@ -820,7 +837,7 @@ export default function VersionComparePane({
         </div>
 
         <div className="vcp-stats">
-          {statsLine}
+          {showBody ? statsLine : <Skeleton width="40%" className="vcp-stats-skeleton" />}
           {mergeMode ? (
             <span className="vcp-stats-hint">Unpicked differences keep the right side.</span>
           ) : null}
@@ -828,17 +845,23 @@ export default function VersionComparePane({
 
         {/* The "no differences" notice belongs up here rather than in the diff area:
             down there it would land in the middle of the columns, across the divider. */}
-        {identical ? (
+        {showBody && identical ? (
           <div className="vcp-notice">These two states are identical.</div>
         ) : null}
 
         <div ref={bodyRef} className="vcp-body">
-          <div className="vcp-scroll">
-            {renderBody()}
+          <div className="vcp-scroll" {...reveal.contentProps}>
+            {showBody ? renderBody() : null}
           </div>
+          <SkeletonOverlay visible={reveal.skeleton} label="Comparing versions">
+            <div className="vcp-skeleton">
+              <SkeletonRows count={6} />
+              <SkeletonRows count={6} widths={['64%', '70%', '48%', '58%', '44%', '66%']} />
+            </div>
+          </SkeletonOverlay>
           {/* Nothing to divide when there are no columns below — a bare line down an
               empty pane reads as a rendering fault. */}
-          {hasBodyContent ? (
+          {showBody && hasBodyContent ? (
             <div
               className="vcp-divider"
               role="separator"

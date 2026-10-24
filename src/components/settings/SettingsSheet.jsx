@@ -31,7 +31,7 @@ const PANES = [
   { id: 'shortcuts', title: 'Shortcuts', icon: 'keyboard' },
 ]
 
-const THEMES = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'system', label: 'System' }]
+const THEMES = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'midnight', label: 'Midnight' }, { value: 'system', label: 'System' }]
 
 function GeneralPane({ appearance }) {
   const { theme, onTheme, accent, onAccent, accentPresets, defaultAccent, tray, onTray, trayInks, defaultTray, wordCount, onWordCount } = appearance

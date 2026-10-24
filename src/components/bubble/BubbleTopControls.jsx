@@ -1,10 +1,9 @@
 /**
- * BubbleTopControls — the bar at the top: how the text is split (Sentences, Clauses,
- * Words) and Archive; and, in its own green circle beside it, Done.
+ * BubbleTopControls — the bubble editor's bar, in the card's toolbar while it is open:
+ * how the text is split (Sentences, Clauses, Words), Archive, and Done.
  */
 import { BubbleMode } from '../../types'
-import Segmented from '../../ui/Segmented'
-import { ArchiveIcon } from '../RightSidebar/ArchivePanel'
+import { Button, Icon, IconButton, Segmented } from '../../ui'
 
 /** Sentences first: the widest grouping, for reordering a paragraph. */
 const MODES = [
@@ -15,30 +14,24 @@ const MODES = [
 
 export default function BubbleTopControls({ mode, onMode, onArchive, onDone }) {
   return (
-    <div className="bubble-editor-top" onPointerDown={(event) => event.stopPropagation()}>
-      <header className="bubble-editor-bar floating-capsule">
-        <Segmented value={mode} onChange={onMode} options={MODES} label="Split into" className="bubble-modes" />
-        <button
-          type="button"
-          className="bubble-editor-button is-icon"
-          onClick={onArchive}
-          title="Write the sentence into the document and archive this session — it can be restored from History ▸ Archive"
-          aria-label="Archive"
-        >
-          <ArchiveIcon size={15} />
-        </button>
-      </header>
-      <button
-        type="button"
+    <div className="bubble-editor-top" role="toolbar" aria-label="Bubble" onPointerDown={(event) => event.stopPropagation()}>
+      <Segmented value={mode} onChange={onMode} options={MODES} label="Split into" className="bubble-modes" />
+      <IconButton
+        icon="archive"
+        label="Archive"
+        title="Write the sentence into the document and archive this session — it can be restored from History ▸ Archive"
+        onClick={onArchive}
+      />
+      <Button
+        variant="filled"
+        size="toolbar"
         className="bubble-editor-done"
         onClick={onDone}
-        title="Done — write the sentence into the document and keep this session (⌘↩)"
-        aria-label="Done"
+        title="Write the sentence into the document and keep this session (⌘↩)"
       >
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+        <Icon name="check" size={16} />
+        Done
+      </Button>
     </div>
   )
 }

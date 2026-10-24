@@ -4,9 +4,9 @@
  *   - drag a bubble between two others to move it there
  *   - touch it against another bubble to join the two (with a space), on the side it
  *     touched
- *   - drop it at, or throw it toward, any edge of the window to set it aside (the edge
- *     it would land against glows); set-aside bubbles stay where they were put and
- *     come back with the session
+ *   - drop it on, or throw it up to, the shelf along the top to set it aside (the shelf
+ *     glows); set-aside bubbles stay where they were put along it and come back with
+ *     the session
  *   - drop it on the bin to delete it
  *   - type anywhere to make a new word; double-click a bubble to edit it
  *   - Sentences / Clauses / Words regroup the whole text — Sentences to reorder a
@@ -25,15 +25,17 @@
  * puts the session away in the document's archive (History ▸ Archive). Escape steps back
  * one thing at a time: out of typing, then off the selection, then out of the editor.
  *
- * It covers the whole window, sidebars and toolbar included: portaled to the body, and
- * `html.bubble-open` takes the toolbar away while it is up.
+ * It takes the place of the pane it was opened from, its bubbles straight on the tray,
+ * and the rest of the window stays: the sidebars, and in a split the other document. Its
+ * bar is the card's toolbar, which it takes over while it is up (`toolbarSlot`). If the
+ * pane is given another document while it is open (`detached`), the session can't be
+ * written back, so it is put in its own document's archive instead.
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LayoutGroup, MotionConfig } from 'framer-motion'
 import {
   applyDrop,
-  asidePoint,
   clamp,
   findBubble,
   touchTarget,
@@ -41,8 +43,8 @@ import {
   gapAt,
   inside,
   insertion,
-  nearEdge,
-  nearestEdge,
+  nearShelf,
+  shelfPoint,
   throwLanding,
   velocityOf,
   without,
@@ -121,7 +123,7 @@ function historyReducer(state, action) {
 
 /* ---------------- the editor ---------------- */
 
-export default function BubbleEditor({ session, onClose }) {
+export default function BubbleEditor({ session, onClose, toolbarSlot = null, detached = false }) {
   const [history, dispatch] = useReducer(historyReducer, session, initHistory)
   const { words, aside, mode } = history.present
   const [selectedId, setSelectedId] = useState(null)
@@ -149,12 +151,6 @@ export default function BubbleEditor({ session, onClose }) {
   // A gesture in flight when the editor closes must not leave its listeners behind.
   useEffect(() => () => gestureRef.current?.stop?.(), [])
 
-  // The editor is the window while it is up: the toolbar goes, and nothing behind it
-  // takes a scroll or a click.
-  useEffect(() => {
-    document.documentElement.classList.add('bubble-open')
-    return () => document.documentElement.classList.remove('bubble-open')
-  }, [])
 
   /* ---------------- pinching and swiping ---------------- */
 
@@ -207,6 +203,15 @@ export default function BubbleEditor({ session, onClose }) {
     onClose?.(withFormsState(session, history.present), archive)
   }
 
+  // The pane has another document now: keep the work in this one's archive.
+  const presentForDetach = useRef(null)
+  useEffect(() => {
+    presentForDetach.current = () => onClose?.(withFormsState(session, history.present), true, { detached: true })
+  })
+  useEffect(() => {
+    if (detached) presentForDetach.current()
+  }, [detached])
+
   /* ---------------- dragging ---------------- */
 
   const measure = (id) => {
@@ -231,9 +236,7 @@ export default function BubbleEditor({ session, onClose }) {
     const rect = { left, top, right: left + gesture.width, bottom: top + gesture.height }
     const touched = touchTarget(rect, [...geometry.row, ...geometry.aside])
     if (touched) return { kind: 'join', ...touched }
-    if (nearEdge(geometry.stage, x, y)) {
-      return { kind: 'aside', ...asidePoint(geometry.stage, x, y, gesture), edge: nearestEdge(geometry.stage, x, y) }
-    }
+    if (nearShelf(geometry.stage, y)) return { kind: 'aside', ...shelfPoint(geometry.stage, x, gesture) }
     const slot = insertion(geometry, x, y)
     // Back into the slot it came from: nothing would change, so nothing is shown.
     if (slot.index === gesture.rowIndex) return { kind: 'stay' }
@@ -299,11 +302,11 @@ export default function BubbleEditor({ session, onClose }) {
       const x = upEvent.clientX
       const y = upEvent.clientY
       let target = hitTest(gesture, x, y)
-      // A throw: released moving, and heading for an edge. It lands where it was going.
+      // A throw: released moving, and heading for the shelf. It lands where it was going.
       if (target.kind !== 'trash' && target.kind !== 'join') {
         const { stage } = gesture.geometry
         const landing = throwLanding(stage, { x, y }, velocityOf(gesture.samples))
-        if (landing) target = { kind: 'aside', ...asidePoint(stage, landing.x, landing.y, gesture), edge: nearestEdge(stage, landing.x, landing.y) }
+        if (landing) target = { kind: 'aside', ...shelfPoint(stage, landing.x, gesture) }
       }
       setDrag(null)
       if (target.kind === 'stay') return
@@ -402,7 +405,7 @@ export default function BubbleEditor({ session, onClose }) {
     if (!element || !stage) return
     const rect = element.getBoundingClientRect()
     const slot = aside.length % 6
-    const point = asidePoint(stage, stage.left, stage.top + stage.height * (0.22 + slot * 0.11), rect)
+    const point = shelfPoint(stage, stage.left + stage.width * (0.1 + slot * 0.16), rect)
     update((present) => applyDrop(present, id, { kind: 'aside', ...point }))
     setDroppedId(id)
     setSelectedId(null)
@@ -570,27 +573,29 @@ export default function BubbleEditor({ session, onClose }) {
     ))
   }
 
-  return createPortal(
+  const topControls = <BubbleTopControls mode={mode} onMode={regroup} onArchive={() => close(true)} onDone={() => close(false)} />
+
+  return (
     <MotionConfig reducedMotion="user">
       <div
         ref={overlayRef}
         className={[
           'bubble-editor',
-          'scrim',
           drag ? 'is-dragging' : '',
           target?.kind === 'aside' ? 'is-aside-armed' : '',
         ].filter(Boolean).join(' ')}
-        data-edge={target?.kind === 'aside' ? target.edge : undefined}
         tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
+        role="region"
         aria-label="Bubble"
         onKeyDown={onKeyDown}
         onPointerDown={() => setSelectedId(null)}
+        // The pane under it hands focus to its (hidden) editor on these; typing is ours.
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className="bubble-editor-edges" aria-hidden="true" />
+        <div className="bubble-editor-shelf" aria-hidden="true" />
 
-        <BubbleTopControls mode={mode} onMode={regroup} onArchive={() => close(true)} onDone={() => close(false)} />
+        {toolbarSlot ? createPortal(topControls, toolbarSlot) : topControls}
 
         <LayoutGroup>
           <main className="bubble-stage" style={slide}>
@@ -650,8 +655,7 @@ export default function BubbleEditor({ session, onClose }) {
           <TrashGlyph size={22} />
         </div>
       </div>
-    </MotionConfig>,
-    document.body,
+    </MotionConfig>
   )
 }
 

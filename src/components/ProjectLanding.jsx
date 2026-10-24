@@ -10,13 +10,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createProject, getProjectRoot, linkProject, listProjects, moveProject } from '../lib/FileSystem'
-import { Button, EmptyState, Sheet } from '../ui'
+import { Button, EmptyState, Sheet, Skeleton, staggerStyle, useReveal } from '../ui'
+import { prefetchProject, recallProjects, rememberProjects } from '../lib/projectPrefetch'
 import { popUpNativeMenu } from '../ui/useNativeMenu.js'
 import Icon from '../ui/Icon.jsx'
 import { AppIcon, Wordmark } from '../ui/Brand.jsx'
 import './ProjectLanding.css'
 
 const DRAG_HEIGHT = 52
+/** Most placeholder rows the list holds while it is read; the list scrolls past about this many. */
+const MAX_PLACEHOLDER_ROWS = 6
 const DRAG_BLOCKERS = 'button, input, select, textarea, a, label, [role="button"], [role="option"]'
 
 /** Where a project lives, as the Finder would say it: the folder that holds it. */
@@ -77,9 +80,12 @@ function NewProjectSheet({ existing, pickFolder, onCreated, onClose }) {
   )
 }
 
-export default function ProjectLanding({ projectSessions, onOpenProject, onCreateProject }) {
-  const [projects, setProjects] = useState([])
-  const [roots, setRoots] = useState({})
+export default function ProjectLanding({ projectSessions, onOpenProject, onCreateProject, leaving = false, onLeft }) {
+  // null until read: the names and where each lives arrive together, so no row
+  // gains its location line after it is drawn.
+  // The list as last read this session draws at once; the read below replaces it.
+  const [projects, setProjects] = useState(() => recallProjects()?.names ?? null)
+  const [roots, setRoots] = useState(() => recallProjects()?.roots ?? {})
   const [home, setHome] = useState('')
   const [version, setVersion] = useState('')
   const [selection, setSelection] = useState(null)
@@ -89,9 +95,11 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
 
   const refresh = useCallback(async () => {
     const names = await listProjects()
-    setProjects(names)
     const entries = await Promise.all(names.map(async (name) => [name, await getProjectRoot(name).catch(() => '')]))
-    setRoots(Object.fromEntries(entries))
+    const nextRoots = Object.fromEntries(entries)
+    rememberProjects(names, nextRoots)
+    setRoots(nextRoots)
+    setProjects(names)
   }, [])
 
   useEffect(() => {
@@ -103,10 +111,25 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
   // Newest first, by when the page last had each open; then by name.
   const sorted = useMemo(() => {
     const opened = (name) => new Date(projectSessions?.[name]?.updatedAt || 0).getTime() || 0
-    return [...projects].sort((a, b) => (opened(b) - opened(a)) || a.localeCompare(b, undefined, { numeric: true }))
+    return [...(projects || [])].sort((a, b) => (opened(b) - opened(a)) || a.localeCompare(b, undefined, { numeric: true }))
   }, [projects, projectSessions])
 
   const selected = selection && sorted.includes(selection) ? selection : sorted[0] ?? null
+
+  // A project pointed at, or chosen with the keys, starts loading before it is opened.
+  const prefetch = useCallback((name) => prefetchProject(name, projectSessions?.[name]?.currentDoc || ''), [projectSessions])
+  useEffect(() => {
+    if (selected) prefetch(selected)
+  }, [prefetch, selected])
+
+  const loaded = projects !== null
+  const listReveal = useReveal(loaded)
+  // The list's box is part of the window, so it stays; placeholder rows hold its height
+  // until the projects take their place, one after another.
+  const showPlaceholders = listReveal.phase === 'hidden'
+  // As many placeholder rows as there are projects this window remembers, so the list
+  // is already the height it will be.
+  const placeholderRows = Math.min(Math.max(Object.keys(projectSessions || {}).length, 1), MAX_PLACEHOLDER_ROWS)
 
   useEffect(() => {
     listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' })
@@ -167,12 +190,19 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
   }
 
   return (
-    <div className="landing-page picker" onMouseDownCapture={onDragArea} data-tauri-drag-region>
+    <div
+      className={`landing-page picker${leaving ? ' is-leaving' : ''}`}
+      onMouseDownCapture={onDragArea}
+      onAnimationEnd={(event) => { if (leaving && event.target === event.currentTarget) onLeft?.() }}
+      inert={leaving || undefined}
+      data-tauri-drag-region
+    >
       <div className="picker-column">
         <header className="picker-header">
           <AppIcon className="picker-logo" size={98} label="" />
           <h1 className="picker-wordmark"><Wordmark height={40} /></h1>
-          {version ? <p>Version {version}</p> : null}
+          {/* The line is held while the version is asked for, so the header never grows. */}
+          <p aria-hidden={version ? undefined : true}>{version ? `Version ${version}` : '\u00a0'}</p>
         </header>
 
         <div className="picker-actions">
@@ -197,20 +227,31 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
 
         <div
           ref={listRef}
-          className="picker-list"
+          className="picker-list ib-stagger"
           role="listbox"
           aria-label="Projects"
           tabIndex={0}
           aria-activedescendant={selected ? `picker-${selected}` : undefined}
+          data-reveal={showPlaceholders ? undefined : listReveal.phase}
+          aria-busy={loaded ? undefined : true}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') { event.preventDefault(); moveSelection(1) }
             if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1) }
             if (event.key === 'Enter' && selected) { event.preventDefault(); onOpenProject(selected) }
           }}
         >
-          {sorted.length === 0 ? <EmptyState icon="folder" title="No projects yet." hint="Start one with New project, or open a folder you already write in." /> : sorted.map((name) => (
+          {showPlaceholders ? Array.from({ length: placeholderRows }, (_, index) => (
+            <div key={index} className="picker-row picker-row-placeholder ib-skeleton-host" data-visible={listReveal.skeleton ? 'true' : 'false'} aria-hidden="true">
+              <span className="picker-row-icon"><Skeleton width={20} height={20} /></span>
+              <span className="picker-row-text">
+                <strong><Skeleton width={`${54 - index * 7}%`} /></strong>
+                <small><Skeleton width={`${38 + index * 5}%`} height="0.7em" /></small>
+              </span>
+            </div>
+          )) : sorted.length === 0 ? <EmptyState icon="folder" title="No projects yet." hint="Start one with New project, or open a folder you already write in." /> : sorted.map((name, index) => (
             <div
               key={name}
+              style={staggerStyle(index)}
               id={`picker-${name}`}
               role="option"
               aria-selected={name === selected}
@@ -218,6 +259,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
               data-project-name={name}
               onClick={() => { setSelection(name); listRef.current?.focus() }}
               onDoubleClick={() => onOpenProject(name)}
+              onPointerEnter={() => prefetch(name)}
               onContextMenu={(event) => {
                 setSelection(name)
                 popUpNativeMenu(event, [
@@ -240,7 +282,7 @@ export default function ProjectLanding({ projectSessions, onOpenProject, onCreat
 
       {creating ? (
         <NewProjectSheet
-          existing={projects}
+          existing={projects || []}
           pickFolder={creating === 'folder'}
           onClose={() => setCreating(false)}
           onCreated={async (name) => {

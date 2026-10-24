@@ -10,6 +10,8 @@
  * mapFileSystem.js).
  */
 import { useEffect, useState } from 'react'
+import { useReveal } from '../ui/revealState.js'
+import { MapSkeleton, PaneSurfaceReveal } from '../canvas/PaneSkeletons'
 import { getDocDisplayName } from '../lib/docKind'
 import { useLockReason } from '../lib/docLocks'
 import DocLockBadge from '../components/DocLockBadge'
@@ -23,10 +25,9 @@ export default function MapPane({
   docPath,
   onActivate,
   onOpenDoc,
-  showHeader = false,
-  onClose,
   isActive = true,
   chromeWhileInactive = false,
+  onLoaded,
 }) {
   const locked = useLockReason(docPath) !== null
   const [result, setResult] = useState(null)
@@ -46,15 +47,14 @@ export default function MapPane({
     }
   }, [docPath, projectName])
 
+  useEffect(() => {
+    if (loaded) onLoaded?.(docPath)
+  }, [loaded, docPath, onLoaded])
+  const reveal = useReveal(Boolean(loaded))
+
   return (
     <div className="map-pane">
-      {showHeader ? (
-        <div className="pane-header pane-header-centered">
-          <span>{getDocDisplayName(docPath)}</span>
-          <button onClick={onClose}>×</button>
-        </div>
-      ) : null}
-
+      <PaneSurfaceReveal reveal={reveal} loaded={Boolean(loaded)} backdrop={<div className="map-surface is-loading" />} skeleton={<MapSkeleton />} label="Opening map">
       {loaded?.foreign ? (
         <div className="map-foreign" role="status">
           <h2>This isn’t a map</h2>
@@ -77,10 +77,9 @@ export default function MapPane({
           isActive={isActive}
           chromeWhileInactive={chromeWhileInactive}
         />
-      ) : (
-        <div className="map-surface is-loading" />
-      )}
-      <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} />
+      ) : null}
+      {loaded ? <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} /> : null}
+      </PaneSurfaceReveal>
     </div>
   )
 }

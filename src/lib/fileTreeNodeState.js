@@ -28,6 +28,12 @@ import { STORY_FOLDER_PRESETS, getStoryFolderPresetForEntry } from './storyStruc
  *                 is what the drop indicators are positioned against), and the
  *                 folder `presets` (the built-ins and the writer's, folderPresets.ts)
  */
+/** The icon for a document's kind: a canvas, a map, a timeline, or a plain document. */
+export const docKindIcon = (docPath) => {
+  const kind = getDocKind(docPath)
+  return kind === 'canvas' ? 'canvas' : kind === 'map' ? 'map' : kind === 'timeline' ? 'timeline' : 'document'
+}
+
 export function deriveFileNodeState(node, context = {}) {
   const {
     activeDoc = null,
@@ -58,11 +64,12 @@ export function deriveFileNodeState(node, context = {}) {
   const isSecondary = splitView === 'editor' && secondaryDoc === node.path
 
   const storyPreset = getStoryFolderPresetForEntry(node.path, node.type, presets)
+  // A plain document has no icon in the tree: the icons mark the other kinds.
   const kind = isFolder ? null : getDocKind(node.path)
-  const isCanvas = kind === 'canvas'
   const iconName = isFolder
     ? (storyPreset?.folderIcon || (isExpanded ? 'folder-open' : 'folder'))
-    : (isCanvas ? 'canvas' : kind === 'map' ? 'map' : kind === 'timeline' ? 'timeline' : null)
+    : (kind === 'text' ? null : docKindIcon(node.path))
+  const isCanvas = kind === 'canvas'
   const hasEntryIcon = Boolean(iconName)
   // Only a document's icon fills in; an open folder shows its open glyph instead.
   const iconFilled = !isFolder && isActive && hasEntryIcon

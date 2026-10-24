@@ -312,6 +312,82 @@
   outline: 1px dashed var(--accent-color);
 }
 
+/* A document in the split that is showing: the split's own row is lifted, so this
+   is only marked, a shade off the tray. */
+.file-item.in-split {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* The kept splits, above the files. A row is the split itself: its two documents side
+   by side, each with its kind's icon, ruled apart by a hairline, as the panes are. Its
+   × shows on hover, and the second name makes room for it. */
+.file-split-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-2);
+}
+.split-entry-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  align-self: stretch;
+  cursor: pointer;
+}
+.split-entry-open:focus { outline: none; }
+.split-entry-open:focus-visible {
+  border-radius: var(--radius-sm);
+  box-shadow: var(--focus-ring);
+}
+.split-entry-doc {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.split-entry-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.split-entry-rule {
+  flex: none;
+  align-self: stretch;
+  width: var(--hairline);
+  margin-block: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--border-color);
+}
+.split-entry .split-entry-close {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  width: var(--space-6);
+  height: var(--space-6);
+  color: var(--text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.split-entry:hover .split-entry-close,
+.split-entry:focus-within .split-entry-close {
+  opacity: 1;
+  pointer-events: auto;
+}
+.split-entry .split-entry-close:hover { color: var(--text-primary); }
+.split-entry:hover .split-entry-doc:last-child,
+.split-entry:focus-within .split-entry-doc:last-child {
+  padding-right: calc(var(--space-6) + var(--space-1));
+}
+@media (prefers-reduced-motion: reduce) {
+  .split-entry .split-entry-close { transition: none; }
+}
+
 .file-item.secondary {
   background: color-mix(in srgb, var(--app-bg) 55%, transparent);
   color: var(--text-primary);
@@ -341,26 +417,26 @@
   position: fixed;
   z-index: 130;
   pointer-events: none;
-  display: inline-flex;
+  box-sizing: border-box;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 140px;
-  max-width: min(320px, calc(100vw - 40px));
-  padding: 8px 10px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--accent-border);
-  background: var(--popover-bg);
+  gap: 5px;
+  padding: 2px 6px;
+  border-radius: var(--radius-md);
+  /* The row lifted out of the tree, as the open document's row is (.file-item.active). */
+  background: var(--app-bg);
   color: var(--text-primary);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-lift);
+  font-size: 15px;
+  line-height: 1.22;
 }
 
 .file-tree-drag-ghost-label {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
-  font-weight: 600;
 }
 
 .file-tree.dragging {
@@ -491,6 +567,15 @@
   border-radius: var(--radius-pill);
 }
 
+/* On Midnight the strip is drawn in Ember, the page's ink, not the accent: the most-used
+   control in the sidebars stays as quiet as the words. */
+:root[data-theme='midnight'] .sidebar-tabs {
+  --accent-surface: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  --accent-surface-strong: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  --accent-border: color-mix(in srgb, var(--text-primary) 36%, transparent);
+  --accent-foreground: var(--text-primary);
+}
+
 /* Lifted, it stands 6px proud of the channel's top and bottom edges. */
 .right-sidebar .sidebar-tabs-indicator.is-lifted .sidebar-tabs-indicator-pill,
 .left-sidebar .sidebar-tabs-indicator.is-lifted .sidebar-tabs-indicator-pill {
@@ -550,3 +635,18 @@
   pointer-events: none;
 }
 
+
+/* Holds the list and, over it, its skeleton while a slow tree is read. */
+.file-list-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* In the rhythm of the tree's rows (.file-item), at its root indent. */
+.file-tree-skeleton {
+  --skeleton-row-h: 27px;
+  padding: 0 var(--space-4);
+}

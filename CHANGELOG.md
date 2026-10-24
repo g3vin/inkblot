@@ -8,6 +8,22 @@ Notable changes to Inkblot. The format follows
 
 ### Changed
 
+- **Focus mode:** its controls are now a bar at the top of the document, shaped like
+  the toolbar, that slides in when you point at the top and hides again on its own.
+  Before and After are steppers, and text sizes are under one Text size button.
+  Focus mode puts both sidebars away and keeps the window colour showing round the
+  page; the sidebars still slide in from the edges, the buttons in the bar's corners
+  keep them open, and leaving focus mode brings back the ones that were open. Focus
+  mode is on the document toolbar by default, beside Page view.
+- **Bubble:** it opens in place of the document it came from instead of over the
+  whole window. The bubbles sit straight on the window colour, the toolbar becomes
+  the Sentences · Clauses · Words bar, and the sidebars stay. In a split it stays on
+  its own side. "Bubble the selection" and "Bubble this paragraph" are in the command
+  palette. If the pane is switched to another document while a bubble is open, the
+  bubble is put in its document's archive rather than written anywhere.
+  Bubbles are set aside on a shelf along the top instead of against any edge, so the
+  sentence uses more of the width in a narrow split.
+
 - **License:** Inkblot is open source under the Apache License 2.0. The name and logo
   stay trademarks; see TRADEMARKS.md. Contributions are signed off under the
   Developer Certificate of Origin.
@@ -16,9 +32,30 @@ Notable changes to Inkblot. The format follows
   eSpeak NG. Numbers, money, years and times read naturally, words like "read",
   "record" and "live" follow the words around them, and names the dictionary doesn't
   know are still spoken. Read Aloud no longer ships any GPL code.
+- **Opening a project:** the file tree, the document, the toolbar and the tabs arrive
+  together in one fade instead of popping in one by one, and nothing shifts as they
+  land. A quick open shows no loading state at all; a slow one (a project on a synced
+  drive) shows placeholders shaped like what is coming. Panels no longer say "Nothing
+  archived" or "No project open" while they are still loading. Pointing at a project
+  on the start screen starts reading it, reopening one shows its sidebar at once, and
+  switching back to a document already open in the session is instant. The project
+  tree is read in parallel rather than one folder at a time.
+- **Loading, everywhere else:** the start screen fades into the project instead of
+  cutting to it, and the file tree's rows arrive one after another. Canvases, maps and
+  timelines show their empty surface at once and, when slow, a placeholder shaped like
+  the document. Comparing versions never shows a wrong diff or "identical" while it is
+  still reading. The toolbar fades between a document's, a canvas's and a map's
+  instead of being rebuilt. The project list shows as last seen while it is re-read,
+  and the word count and lock badge arrive with their document.
 
 ### Added
 
+- **Midnight theme:** a theme for writing in the dark, in Settings › Appearance, the
+  View menu and ⌘K. The page and the window are true black, so the black pixels of an
+  OLED or mini-LED screen switch off, and the words are warm Ember instead of white.
+  Panels and menus are set apart by fine Ember lines rather than shadows, and note and
+  accent colours are dimmed. System still picks Light or Dark; Midnight is only chosen
+  by hand.
 - **Typeset and Print & Export:** the Finishing layout's Page, Book and Publish tabs
   are two tabs in the order a book is made — Typeset (what is in the book, the page,
   the type, how chapters open, the running heads, the front and back matter), then
@@ -159,6 +196,11 @@ Notable changes to Inkblot. The format follows
   differences — and their history rows say what changed ("+2 places · 3 moved ·
   Style"), in the native sidebar as well as the page. Filtering a map's history
   finds versions by the names written on the map.
+
+### Fixed
+
+- **Split view preview:** holding a document over the page no longer shows a loading
+  placeholder on top of the previewed document until it is dropped.
 
 ## [0.1.0] - 2026-09-24
 

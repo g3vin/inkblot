@@ -13,7 +13,7 @@
  *     document's archive (`lib/archiveStore.js`) — forms, set-aside words and all. The
  *     History panel's archive can put it back (`restoreArchivedBubble`).
  *
- * `open` is what EditorLayout renders `BubbleEditor` from.
+ * `open` is what EditorCanvas renders `BubbleEditor` from, in the pane it was opened in.
  *
  * A new session holds a `TextAnchor` for its sentence until it closes; a reopened one is
  * found by its id, which the mark carries, so it survives any edit in between.
@@ -177,12 +177,25 @@ export function useBubbleSessions({ docPath, projectName }) {
     }
   }, [])
 
-  const close = useCallback((session, archive) => {
+  /**
+   * `detached`: the editor holds another document now, so nothing is written to it; the
+   * session goes to its own document's archive, from where it can be put back.
+   */
+  const close = useCallback((session, archive, { detached = false } = {}) => {
     const current = openRef.current
     if (!current || !session || current.session.id !== session.id) return
     openRef.current = null
     setOpen(null)
-    finish(current.editor, current.anchor, normalizeSession(session), archive, current.docPath)
+    const settled = normalizeSession(session)
+    if (detached) {
+      archiveItem(projectNameRef.current, current.docPath, {
+        kind: 'bubble',
+        title: snippet(composeSentence(settled.words, settled.original) || settled.original || ''),
+        bubble: settled,
+      })
+      return
+    }
+    finish(current.editor, current.anchor, settled, archive, current.docPath)
   }, [finish])
 
   /** Archive a session from the document, without opening it: its text stays as it is. */

@@ -67,6 +67,9 @@ export interface ProjectSession {
   tiles: unknown[]
   docTabs: DocTab[]
   activeTabId: string | null
+  /** The splits kept in the file tree, and the one showing. */
+  splits: SavedSplit[]
+  activeSplitId: string | null
   updatedAt: string | null
 }
 
@@ -128,6 +131,8 @@ export const normalizeProjectSession = (session: Loose<ProjectSession> = {}): Pr
   tiles: Array.isArray(session.tiles) ? session.tiles : [],
   docTabs: normalizeTabs(session.docTabs),
   activeTabId: (session.activeTabId || null) as string | null,
+  splits: normalizeSavedSplits(session.splits),
+  activeSplitId: (session.activeSplitId || null) as string | null,
   updatedAt: (session.updatedAt || null) as string | null,
 })
 
@@ -275,6 +280,154 @@ export const recordSplitIn = (tabs: DocTab[], tabId: string | null, split: PaneS
       ? { ...item, secondaryDoc, ...(splitOrientation ? { splitOrientation } : {}) }
       : item
   ))
+}
+
+/** Which side of a split a document goes: the first pane (left or top), or the second. */
+export type SplitSide = 'start' | 'end'
+
+/**
+ * Put a document in one side of a split, as a document dragged from the file tree onto
+ * the page does. With no split it opens one, beside the document showing; in a split
+ * it takes that side's pane. A document already in the other pane trades places with
+ * it, and one already on that side changes nothing. A document never splits against
+ * itself.
+ *
+ * The first pane is the tab's own document, so putting a document there moves the tab
+ * onto it: onto the tab that document already has, if it has one, so no two tabs show
+ * the same document.
+ */
+export const placeDocIn = (ws: TabWorkspace, docPath: string, side: SplitSide): TabWorkspace => {
+  if (!docPath) return ws
+  const current = ws.currentDoc
+  if (!current) return { ...ws, currentDoc: docPath, activeDoc: docPath }
+
+  const split = splitOfPanes(ws)
+  const other = split?.secondaryDoc ?? null
+  let pair: [string, string]
+  if (side === 'end') {
+    if (docPath === other) return ws
+    if (docPath === current) {
+      if (!other) return ws
+      pair = [other, current]
+    } else {
+      pair = [current, docPath]
+    }
+  } else {
+    if (docPath === current) return ws
+    pair = docPath === other ? [other, current] : [docPath, other ?? current]
+  }
+
+  const [primary, secondary] = pair
+  return showPanesIn(ws, primary, secondary, split?.splitOrientation ?? 'columns', docPath)
+}
+
+/**
+ * Show `primary` in the first pane and `secondary` (or nothing) beside it. The first
+ * pane is the tab's own document, so a new one there moves the tab onto it: onto the
+ * tab that document already has, if it has one, so no two tabs show the same document.
+ */
+const showPanesIn = (
+  ws: TabWorkspace,
+  primary: string,
+  secondary: string | null,
+  splitOrientation: SplitOrientation,
+  activeDoc: string,
+): TabWorkspace => {
+  const shown = {
+    ...ws,
+    secondaryDoc: secondary,
+    splitView: (secondary ? 'editor' : null) as SplitView,
+    splitOrientation,
+    activeDoc,
+  }
+  if (primary === ws.currentDoc) return shown
+
+  const owner = ws.tabs.find(tab => tab.docPath === primary && tab.id !== ws.activeTabId)
+  const tabId = owner?.id ?? ws.activeTabId
+  const record = { docPath: primary, ephemeral: false, secondaryDoc: secondary, splitOrientation }
+  const tabs = tabId && ws.tabs.some(tab => tab.id === tabId)
+    ? ws.tabs.map(tab => (tab.id === tabId ? { ...tab, ...record } : tab))
+    : [...ws.tabs, { id: createTabId(), ...record }]
+  return {
+    ...shown,
+    tabs,
+    activeTabId: tabId && tabs.some(tab => tab.id === tabId) ? tabId : tabs[tabs.length - 1].id,
+    currentDoc: primary,
+  }
+}
+
+/** Show one document on its own, as choosing it in the file tree does, leaving any split. */
+export const openAloneIn = (ws: TabWorkspace, docPath: string): TabWorkspace => (
+  docPath ? showPanesIn(ws, docPath, null, ws.splitOrientation, docPath) : ws
+)
+
+/**
+ * A split the writer has made, kept in the file tree so they can leave it for another
+ * document and come back. Its two documents are in the panes it names.
+ */
+export interface SavedSplit {
+  id: string
+  primaryDoc: string
+  secondaryDoc: string
+  splitOrientation: SplitOrientation
+  splitRatio: number
+}
+
+/** Show a kept split again. */
+export const showSplitIn = (ws: TabWorkspace, split: SavedSplit): TabWorkspace => (
+  showPanesIn(ws, split.primaryDoc, split.secondaryDoc, split.splitOrientation, split.primaryDoc)
+)
+
+export const createSplitId = (): string =>
+  `split-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+
+/**
+ * Keep the split showing in the list. The one being shown (`activeId`) follows what its
+ * panes show; a split opened fresh is the one with the same two documents, or else a
+ * new entry. With no split showing, none is active. Returns the inputs unchanged when
+ * nothing needs to happen, so this is safe to run from an effect.
+ */
+export const recordSavedSplit = (
+  splits: SavedSplit[],
+  activeId: string | null,
+  live: { primaryDoc: string, secondaryDoc: string, splitOrientation: SplitOrientation, splitRatio: number } | null,
+): { splits: SavedSplit[], activeId: string | null } => {
+  if (!live || !live.primaryDoc) return activeId === null ? { splits, activeId } : { splits, activeId: null }
+
+  const same = (split: SavedSplit) => (
+    split.primaryDoc === live.primaryDoc && split.secondaryDoc === live.secondaryDoc
+    && split.splitOrientation === live.splitOrientation && split.splitRatio === live.splitRatio
+  )
+  const active = splits.find(split => split.id === activeId)
+  if (active) {
+    if (same(active)) return { splits, activeId }
+    return { splits: splits.map(split => (split.id === active.id ? { ...split, ...live } : split)), activeId }
+  }
+  const match = splits.find(split => split.primaryDoc === live.primaryDoc && split.secondaryDoc === live.secondaryDoc)
+  if (match) {
+    return {
+      splits: same(match) ? splits : splits.map(split => (split.id === match.id ? { ...split, ...live } : split)),
+      activeId: match.id,
+    }
+  }
+  const added = { id: createSplitId(), ...live }
+  return { splits: [...splits, added], activeId: added.id }
+}
+
+/** Drop kept splits that are malformed, or that name one document twice. */
+export const normalizeSavedSplits = (splits: unknown): SavedSplit[] => {
+  if (!Array.isArray(splits)) return []
+  return splits
+    .filter((split): split is Loose<SavedSplit> => Boolean(split) && typeof split?.id === 'string')
+    .filter(split => typeof split.primaryDoc === 'string' && typeof split.secondaryDoc === 'string'
+      && split.primaryDoc && split.secondaryDoc && split.primaryDoc !== split.secondaryDoc)
+    .map(split => ({
+      id: split.id as string,
+      primaryDoc: split.primaryDoc as string,
+      secondaryDoc: split.secondaryDoc as string,
+      splitOrientation: split.splitOrientation === 'rows' ? 'rows' : 'columns',
+      splitRatio: clampSplitRatio(split.splitRatio ?? 0.5),
+    }))
 }
 
 /**

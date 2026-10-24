@@ -78,7 +78,6 @@
  *          reminders, rhythm and the config, on clocks of their own
  *   statsdom the stats running in the page: the tracker fed by the bridge, the Stats
  *          tab, the timer capsule and the settings sheet
- *   tabbar the tab bar: drawn from tabsChanged, commands, shortcuts, names
  *   book   the Book navigator: the book's rows, commands, where a drop lands
  *   notegeom where a note's hover card goes
  *   timeline the story's chronology: sequence keys, dated and undated events in one order,
@@ -96,6 +95,9 @@
  *   updates after an update: once per version, highlights from a release, the banner
  *   windows a tab dragged out into a window of its own, put back, kept on top
  *   emptiness which notes, documents and folders are blank enough to delete without asking
+ *   reveal content arriving: a quick load shows no skeleton, a slow one holds it long
+ *          enough not to flicker, a gate waits for every piece, and the parallel tree
+ *          read and the prefetch read what they should, once
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -114,7 +116,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'tabbar', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows', 'emptiness']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows', 'emptiness', 'reveal']
 
 const failures = []
 

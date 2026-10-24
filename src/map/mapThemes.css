@@ -22,7 +22,8 @@
   --map-space: #03050b;
 }
 
-:root[data-theme='dark'] .map-surface[data-map-theme='clean'] {
+:root[data-theme='dark'] .map-surface[data-map-theme='clean'],
+:root[data-theme='midnight'] .map-surface[data-map-theme='clean'] {
   --map-ink: #eef1f6;
   --map-land: #2e3a33;
   --map-land-edge: #6f8a78;

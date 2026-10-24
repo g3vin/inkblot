@@ -11,9 +11,10 @@
  *   3. Semantic tokens: what a surface, a line of text, a border or a shadow IS.
  *   4. Recipes: accent derivations, the card wash, the menu surface, glass.
  *
- * Themes: `data-theme` on <html> is ALWAYS 'light' or 'dark' — "System" is resolved
- * in JS (src/lib/theme.ts) before first paint — so each theme is written once, and no
- * stylesheet needs a OS media-query block.
+ * Themes: `data-theme` on <html> is ALWAYS 'light', 'dark' or 'midnight' — "System"
+ * is resolved in JS (src/lib/theme.ts) before first paint — so each theme is written
+ * once, and no stylesheet needs a OS media-query block. Midnight overrides Ink, so a
+ * stylesheet's dark rule must name both (`[data-theme='dark'], [data-theme='midnight']`).
  */
 
 /* ============================================================
@@ -100,6 +101,12 @@
   --ease-in: cubic-bezier(0.8, 0, 0.8, 0.3);
   --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
   --ease-standard: var(--ease-out);
+  /* Content arriving (ui/Reveal.jsx). The waits that decide whether a skeleton shows
+     at all are in ui/motion.js, which mirrors these. */
+  --dur-reveal: var(--dur-base);
+  --reveal-rise: 4px;
+  --reveal-stagger: 24ms;
+  --dur-shimmer: 1600ms;
 
   /* The blurs (tests/unit/css.mjs allows no other backdrop-filter value): Liquid
      Glass on iOS/iPadOS floating chrome, and the slight softening of the page behind
@@ -381,6 +388,92 @@
   --glass-highlight: rgba(255, 255, 255, 0.55);
   --glass-shadow: 0 8px 28px rgba(40, 32, 20, 0.14);
 
+}
+
+/* Midnight: true black for OLED and mini-LED screens, whose black pixels switch off,
+   with the words in warm Ember rather than white, which blooms on black and tires the
+   eyes. It inherits the rest from Ink. A shadow can't show on black, so depth comes from
+   the tone steps (raised, float) and Ember hairlines. Every text token is AA on every
+   surface step and every ink is AA on black (tests/unit/css.mjs checks both). */
+:root[data-theme='midnight'] {
+  color-scheme: dark;
+
+  /* The tray is black too, whatever the window colour: no lit pixels round the page,
+     which the card's Ember hairline (--shadow-card) parts from the tray. */
+  --tray-glow-mix: 0%;
+  --tray-top-mix: 0%;
+  --tray-bottom-mix: 0%;
+  --tray-text-muted-mix: 80%;
+  --tray-text-subtle-mix: 76%;
+
+  /* Neutrals — black paper, Ember ink. */
+  --paper-0: #000000;
+  --paper-1: #0b0a09;
+  --paper-2: #12100e;
+  --paper-3: #1a1714;
+  --ink-0: #c9a273;
+  --ink-1: #b38f66;
+  --ink-2: #a08060;
+  --ink-3: #9a7b5c;
+
+  /* Ink's inks dimmed to about 5:1 on black: still AA, but none glows beside the Ember
+     words. The accent and the window colour are inks, so they dim with them. */
+  --brand-ink: #6b7eac;
+  --brand-ink-strong: #8197cf;
+  --ink-blue: #6b7eac;
+  --ink-teal: #54878a;
+  --ink-green: #5c886a;
+  --ink-amber: #987a3d;
+  --ink-rust: #aa714d;
+  --ink-red: #b66960;
+  --ink-violet: #8975ad;
+  --ink-slate: #797f87;
+  --on-ink: #000000;
+
+  --surface-3: rgba(201, 162, 115, 0.05);
+  --surface-hover: rgba(201, 162, 115, 0.07);
+  --surface-active: rgba(201, 162, 115, 0.11);
+  --surface-sunken: #000000;
+
+  --text-placeholder: #8e7256;
+  --text-on-accent: #000000;
+  /* Ink lifts the accent toward white for text; on black that would undo the dimming. */
+  --accent-foreground: var(--accent-color);
+
+  --border-color: rgba(201, 162, 115, 0.16);
+  --border-muted: rgba(201, 162, 115, 0.1);
+  --border-strong: rgba(201, 162, 115, 0.26);
+
+  --overlay-bg: rgba(0, 0, 0, 0.4);
+  --modal-overlay-bg: rgba(0, 0, 0, 0.6);
+  --popover-border: rgba(201, 162, 115, 0.22);
+  --control-bg: rgba(201, 162, 115, 0.06);
+  --control-hover-bg: rgba(201, 162, 115, 0.09);
+
+  /* Each shadow leads with an Ember hairline, which is what shows; the dark falloff
+     behind it only tells where something overlaps a raised surface. */
+  --shadow-color: rgba(0, 0, 0, 0.6);
+  --shadow-float:
+    0 0 0 1px rgba(201, 162, 115, 0.22),
+    0 12px 28px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 0 0 1px rgba(201, 162, 115, 0.14);
+  --shadow-lift: 0 0 0 1px rgba(201, 162, 115, 0.16);
+  --inlay-depth: 50%;
+  --inlay-lip: inset 0 -0.5px 0 rgba(201, 162, 115, 0.14);
+  --shadow-dialog:
+    0 0 0 1px rgba(201, 162, 115, 0.26),
+    0 24px 60px rgba(0, 0, 0, 0.7);
+  --shadow-canvas-card: 0 0 0 1px rgba(201, 162, 115, 0.12);
+  --shadow-canvas-card-hover: 0 0 0 1px rgba(201, 162, 115, 0.24);
+
+  --page-faint: rgba(201, 162, 115, 0.3);
+  --page-blank: rgba(201, 162, 115, 0.25);
+  --page-shadow: 0 0 0 1px rgba(201, 162, 115, 0.18);
+
+  --glass-fill: rgba(0, 0, 0, 0.55);
+  --glass-rim: rgba(201, 162, 115, 0.2);
+  --glass-highlight: rgba(201, 162, 115, 0.08);
+  --glass-shadow: 0 0 0 1px rgba(201, 162, 115, 0.16);
 }
 
 /* ============================================================

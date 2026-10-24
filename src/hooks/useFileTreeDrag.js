@@ -11,7 +11,24 @@ import { moveEntry } from '../lib/entryOperations'
 import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
 import { dispatchMapDropDoc, mapSurfaceAt } from '../map/mapEvents'
 import { getParentPath, moveInOrder, remapOrderForFolder } from '../lib/fileTreeOrder'
-import { shellBridge } from '../bridge'
+import { SPLIT_DWELL_MS, SPLIT_DWELL_TOLERANCE, splitDropTarget } from '../lib/splitDropTarget'
+
+// What makes things in the page open on hover (a note's card, a link's preview).
+const HOVER_EVENTS = ['mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'pointermove']
+
+/**
+ * While a document is carried out of the tree, the page under it is only somewhere to
+ * put it: nothing there opens on hover. Stopped at the window before anything else
+ * sees them. The drag itself follows `mousemove`, which is left alone.
+ */
+function muteHovers() {
+  const stop = (event) => {
+    if (event.target instanceof Element && event.target.closest('.left-sidebar')) return
+    event.stopPropagation()
+  }
+  for (const type of HOVER_EVENTS) window.addEventListener(type, stop, true)
+  return () => { for (const type of HOVER_EVENTS) window.removeEventListener(type, stop, true) }
+}
 
 export function useFileTreeDrag({
   dragInsert,
@@ -108,7 +125,8 @@ export function useFileTreeDrag({
     const el = document.elementFromPoint(clientX, clientY)
     if (!el) return
 
-    const item = el.closest('.file-item')
+    // The kept splits sit above the files, and nothing goes in among them.
+    const item = el.closest('.file-item:not(.split-entry)')
     if (item) {
       const entryType = item.getAttribute('data-entry-type')
       const entryPath = item.getAttribute('data-entry-path')
@@ -156,6 +174,35 @@ export function useFileTreeDrag({
     }
   }, [order, dragInsertRef, dragOverFolderRef, setDragInsert, setDragOverFolder, setDragOverPath])
 
+  // A document held over the page: its side is outlined, and resting there opens the
+  // split for real while the drag goes on. Moving on puts the panes back and the
+  // document back under the pointer, so a wrong file costs nothing.
+  const updateSplitDrag = useCallback((drag, x, y) => {
+    const target = splitDropTarget()
+    if (drag.type !== 'file' || !target) return
+    if (drag.sprungAt) {
+      if (Math.hypot(x - drag.sprungAt.x, y - drag.sprungAt.y) <= SPLIT_DWELL_TOLERANCE) return
+      drag.sprungAt = null
+      target.unspring()
+      setDragPreview((current) => current ? { ...current, settled: false } : current)
+    }
+    clearTimeout(drag.dwell)
+    if (!target.hover(x, y, drag.path)) return
+    // Over the page the document is going there, not to a place in the tree.
+    dragInsertRef.current = null
+    dragOverFolderRef.current = null
+    setDragInsert(null)
+    setDragOverFolder(null)
+    setDragOverPath(null)
+    drag.dwell = setTimeout(() => {
+      if (manualDragRef.current !== drag) return
+      const point = dragPointRef.current
+      if (!point || !splitDropTarget()?.spring(point.x, point.y, drag.path)) return
+      drag.sprungAt = { ...point }
+      setDragPreview((current) => current ? { ...current, settled: true } : current)
+    }, SPLIT_DWELL_MS)
+  }, [dragInsertRef, dragOverFolderRef, dragPointRef, manualDragRef, setDragInsert, setDragOverFolder, setDragOverPath, setDragPreview])
+
   // Mouse-driven drag & drop (not HTML5 DnD): a drag arms on item mousedown
   // and activates after ~4px of movement, showing a ghost preview; mouseup
   // commits the move.
@@ -169,6 +216,7 @@ export function useFileTreeDrag({
       if (!manualDragActiveRef.current) {
         if (dx + dy < 4) return
         manualDragActiveRef.current = true
+        drag.unmuteHovers = muteHovers()
         setIsDragging(true)
         setDragSourceId(`${drag.type}:${drag.path}`)
         setDragPreview({
@@ -177,6 +225,7 @@ export function useFileTreeDrag({
           name: drag.name,
           iconName: drag.iconName,
           iconFilled: drag.iconFilled,
+          box: drag.box,
         })
       }
       setDragPreview((current) => current ? {
@@ -185,6 +234,7 @@ export function useFileTreeDrag({
         y: event.clientY,
       } : current)
       updateManualDrag(event.clientX, event.clientY)
+      updateSplitDrag(drag, event.clientX, event.clientY)
     }
 
     const onUp = async () => {
@@ -194,6 +244,8 @@ export function useFileTreeDrag({
       const insert = dragInsertRef.current
       const folder = dragOverFolderRef.current
       const point = dragPointRef.current
+      clearTimeout(drag.dwell)
+      drag.unmuteHovers?.()
 
       manualDragRef.current = null
       manualDragActiveRef.current = false
@@ -206,6 +258,7 @@ export function useFileTreeDrag({
       setDragOverFolder(null)
 
       if (!didDrag) return
+      splitDropTarget()?.clear()
 
       // A drop onto an open canvas adds a card there, and MUST NOT fall through to
       // performMove — the pointer never left the tree's own drag state, so the tree
@@ -214,11 +267,9 @@ export function useFileTreeDrag({
       // Canvases are droppable too (they render as a minimap and open on
       // double-click); the surface itself refuses a canvas dropped onto ITSELF.
       if (point && drag.type === 'file') {
-        // Onto the tab bar: the document in a tab of its own.
-        if (document.elementFromPoint(point.x, point.y)?.closest('.document-tab-bar')) {
-          shellBridge.send('openDocInTab', { docPath: drag.path })
-          return
-        }
+        // Onto a side of the page: the document in a split there (or the split it
+        // opened while held stays).
+        if (splitDropTarget()?.drop(point.x, point.y, drag.path)) return
         const surface = canvasSurfaceAt(point.x, point.y)
         if (surface) {
           dispatchCanvasDropDoc(surface, {
@@ -248,7 +299,7 @@ export function useFileTreeDrag({
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-  }, [dragInsert, dragOverFolder, performMove, updateManualDrag, dragInsertRef, dragOverFolderRef, dragPointRef, manualDragActiveRef, manualDragRef, setDragInsert, setDragOverFolder, setDragOverPath, setDragPreview, setDragSourceId, setIsDragging])
+  }, [dragInsert, dragOverFolder, performMove, updateManualDrag, updateSplitDrag, dragInsertRef, dragOverFolderRef, dragPointRef, manualDragActiveRef, manualDragRef, setDragInsert, setDragOverFolder, setDragOverPath, setDragPreview, setDragSourceId, setIsDragging])
 
   return { handleDrop, updateManualDrag }
 }

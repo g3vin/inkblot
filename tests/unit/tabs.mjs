@@ -22,7 +22,8 @@ const React = (await import('react')).default
 const { act, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const {
-  closeTabIn, ensureTabsForOpenDocs, normalizeTabs, orderTabsIn, recordSplitIn, selectTabIn,
+  closeTabIn, ensureTabsForOpenDocs, normalizeSavedSplits, normalizeTabs, openAloneIn, orderTabsIn, placeDocIn,
+  recordSavedSplit, recordSplitIn, selectTabIn, showSplitIn,
 } = await import('../../src/lib/editorSession.ts')
 const { useTabs } = await import('../../src/hooks/useTabs.js')
 const { useTabsPublisher } = await import('../../src/hooks/useTabsPublisher.js')
@@ -97,6 +98,64 @@ ok('closing the split is recorded too, keeping how it was laid out',
   recorded[1].secondaryDoc === null && recorded[1].splitOrientation === 'rows')
 ok('no tab, nothing recorded', recordSplitIn(tabs, null, { secondaryDoc: 'Z', splitOrientation: 'rows' }) === tabs)
 
+/* ---------------- a document dropped on a side ---------------- */
+
+next = placeDocIn(ws(), 'X', 'end')
+ok('dropped on the right, it opens beside the document showing',
+  next.currentDoc === 'A' && next.secondaryDoc === 'X' && next.splitView === 'editor' && next.activeDoc === 'X'
+  && next.activeTabId === 'a' && next.tabs[0].docPath === 'A')
+next = placeDocIn(ws(), 'X', 'start')
+ok('dropped on the left, it takes the tab and the document showing goes beside it',
+  next.currentDoc === 'X' && next.secondaryDoc === 'A' && next.activeTabId === 'a'
+  && next.tabs[0].docPath === 'X' && next.tabs[0].secondaryDoc === 'A' && next.splitOrientation === 'columns')
+next = placeDocIn(ws(), 'C', 'start')
+ok('a document with a tab of its own is shown in that tab, not in a second one',
+  next.activeTabId === 'c' && next.currentDoc === 'C' && next.secondaryDoc === 'A'
+  && next.tabs.filter(t => t.docPath === 'C').length === 1 && next.tabs[0].docPath === 'A')
+const alone = ws()
+ok('a document never splits against itself',
+  placeDocIn(alone, 'A', 'end') === alone && placeDocIn(alone, 'A', 'start') === alone)
+
+const splitWs = ws({ secondaryDoc: 'N', splitView: 'editor', splitOrientation: 'rows' })
+next = placeDocIn(splitWs, 'X', 'end')
+ok('in a split it takes the pane it is dropped on, keeping the layout',
+  next.currentDoc === 'A' && next.secondaryDoc === 'X' && next.splitOrientation === 'rows')
+next = placeDocIn(splitWs, 'X', 'start')
+ok('dropped on the first pane, it replaces that document', next.currentDoc === 'X' && next.secondaryDoc === 'N')
+next = placeDocIn(splitWs, 'N', 'start')
+ok('dropped on the other pane, the two trade places', next.currentDoc === 'N' && next.secondaryDoc === 'A')
+ok('dropped where it already is, nothing changes', placeDocIn(splitWs, 'N', 'end') === splitWs)
+
+/* ---------------- kept splits ---------------- */
+
+const liveAB = { primaryDoc: 'A', secondaryDoc: 'B', splitOrientation: 'columns', splitRatio: 0.5 }
+let kept = recordSavedSplit([], null, liveAB)
+ok('a split made is kept, and is the one showing', kept.splits.length === 1 && kept.activeId === kept.splits[0].id && kept.splits[0].secondaryDoc === 'B')
+const firstId = kept.activeId
+let again = recordSavedSplit(kept.splits, kept.activeId, liveAB)
+ok('recording what is already kept changes nothing', again.splits === kept.splits && again.activeId === firstId)
+again = recordSavedSplit(kept.splits, kept.activeId, { ...liveAB, secondaryDoc: 'C', splitRatio: 0.3 })
+ok('the one showing follows its panes', again.splits.length === 1 && again.splits[0].secondaryDoc === 'C' && again.splits[0].splitRatio === 0.3)
+again = recordSavedSplit(kept.splits, kept.activeId, null)
+ok('leaving the split keeps it, showing none', again.splits === kept.splits && again.activeId === null)
+again = recordSavedSplit(kept.splits, null, liveAB)
+ok('making the same split again finds the one kept', again.splits.length === 1 && again.activeId === firstId)
+again = recordSavedSplit(kept.splits, null, { ...liveAB, secondaryDoc: 'C' })
+ok('a different split is kept beside it', again.splits.length === 2 && again.activeId !== firstId)
+ok('malformed splits, and one naming a document twice, are dropped',
+  normalizeSavedSplits([kept.splits[0], { id: 'x', primaryDoc: 'A', secondaryDoc: 'A' }, { id: 'y' }, null]).length === 1
+  && normalizeSavedSplits('nope').length === 0)
+
+next = showSplitIn(ws(), { id: 's', primaryDoc: 'X', secondaryDoc: 'A', splitOrientation: 'rows', splitRatio: 0.4 })
+ok('a kept split shows its two documents as it was laid out',
+  next.currentDoc === 'X' && next.secondaryDoc === 'A' && next.splitView === 'editor' && next.splitOrientation === 'rows'
+  && next.tabs[0].docPath === 'X')
+next = openAloneIn(ws({ secondaryDoc: 'N', splitView: 'editor' }), 'C')
+ok('choosing a document shows it alone, on the tab it has', next.currentDoc === 'C' && next.secondaryDoc === null
+  && next.splitView === null && next.activeTabId === 'c' && next.activeDoc === 'C')
+next = openAloneIn(ws({ secondaryDoc: 'N', splitView: 'editor' }), 'A')
+ok('…even one of the split\'s own', next.currentDoc === 'A' && next.splitView === null)
+
 /* ---------------- order ---------------- */
 
 const order = (list) => list.map((t) => t.id).join('')
@@ -143,14 +202,18 @@ function Harness() {
   const [activeDoc, setActiveDoc] = useState('One')
   const [splitView, setSplitView] = useState(null)
   const [splitOrientation, setSplitOrientation] = useState('columns')
-  const [, setSplitRatioState] = useState(0.5)
-  Object.assign(panes, { currentDoc, secondaryDoc, splitView, splitOrientation, setCurrentDoc })
+  const [splitRatio, setSplitRatioState] = useState(0.5)
+  const [splits, setSplits] = useState([])
+  const [activeSplitId, setActiveSplitId] = useState(null)
+  Object.assign(panes, { currentDoc, secondaryDoc, splitView, splitOrientation, setCurrentDoc, splits, activeSplitId })
 
   const actions = useTabs({
     activeDoc, activeTabId, currentDoc, secondaryDoc, splitView, splitOrientation,
     setActiveDoc, setActiveTabId, setCurrentDoc, setSecondaryDoc,
     setSplitOrientation, setSplitRatioState, setSplitView, setTabs, tabs,
+    splitRatio, splits, setSplits, activeSplitId, setActiveSplitId,
   })
+  panes.actions = actions
   useTabsPublisher({ projectName: 'P', tabs, activeTabId, actions: { ...actions } })
   return null
 }
@@ -181,8 +244,28 @@ ok('opening a document that has a tab lands on that tab, with its own split',
   last().activeTabId === 't3' && panes.splitView === null)
 
 await send('selectTab', { tabId: 't1' })
+const showingSplit = () => panes.splits.find((split) => split.id === panes.activeSplitId)
+ok('a split showing is kept for the file tree', showingSplit()?.primaryDoc === 'One' && showingSplit()?.secondaryDoc === 'Two')
+const keptId = panes.activeSplitId
+const keptCount = panes.splits.length
+await act(async () => { panes.actions.openDocAlone('Three') })
+await frame()
+ok('choosing another document leaves the split but keeps it', panes.splitView === null && panes.currentDoc === 'Three'
+  && panes.splits.length === keptCount && panes.activeSplitId === null)
+await act(async () => { panes.actions.openSavedSplit(keptId) })
+await frame()
+ok('choosing the kept split shows it again', panes.currentDoc === 'One' && panes.secondaryDoc === 'Two'
+  && panes.splitView === 'editor' && panes.activeSplitId === keptId)
+await act(async () => { panes.actions.forgetSplit(keptId) })
+await frame()
+ok('its × closes it for good, leaving its first document open',
+  !panes.splits.some((split) => split.id === keptId) && panes.splitView === null && panes.currentDoc === 'One')
+
+await send('openInSplit', { orientation: 'rows' })
+const closingId = panes.activeSplitId
 await send('closeSplit')
 ok('closeSplit is recorded in the tab', panes.splitView === null && byDoc('One').secondaryDoc === undefined)
+ok('and takes the split out of the tree', Boolean(closingId) && !panes.splits.some((split) => split.id === closingId))
 
 await send('setTabOrder', { tabIds: ['t3', 't1'] })
 ok('setTabOrder reorders', last().tabs.map((t) => t.id).join() === 't3,t1,t2')

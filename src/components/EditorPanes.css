@@ -235,20 +235,64 @@
   padding-right: 0;
 }
 
-/* The split-view and resizer rules below also sat under the "History panel"
-   banner. Same misfiling; they belong with the panes they size. */
-
-/* The split is a three-track grid: pane, divider, pane. EditorCanvas sizes the
-   two outer tracks from the split ratio; the gutter track is the divider itself,
-   so dragging it never has to reason about a separate gap. */
+/*
+ * Split view: two documents, each in a card of its own on the tray, with the toolbar
+ * in a third card above them both (the frame is in Editor.titlebar.css). The cards
+ * are not joined: the tray shows between them, as much of it as round the outside.
+ *
+ * The split is a three-track grid: pane, gap, pane. EditorCanvas sizes the two outer
+ * tracks from the split ratio; the middle track is the divider itself, so dragging it
+ * never has to reason about a separate gap.
+ */
 .editor-container.split-active {
-  --split-gutter: 1px;
+  --split-gutter: var(--space-3);
   display: grid;
   grid-template-columns: var(--split-primary, 1fr) var(--split-gutter) var(--split-secondary, 1fr);
   gap: 0;
   height: 100%;
-  overflow: hidden;
+  min-height: 0;
+  box-sizing: border-box;
+  /* The panes start below the toolbar's card (and the tab bar, when it shows), a gap
+     away. Inside them nothing floats over the top, so nothing needs clearing. */
+  padding-top: calc(var(--app-titlebar-height) + var(--split-gutter));
+  /* The cards' shadows fall on the tray round them. */
+  overflow: visible;
 }
+
+.editor-container.split-active > .pane {
+  --app-titlebar-height: 0px;
+  background: var(--app-bg);
+  border-radius: var(--radius-lg);
+  isolation: isolate;
+}
+
+/* The cards are cut from one sheet: their shadows lie on the tray beneath all three,
+   never across a neighbour. Each pane's shadow is a pseudo-element in its grid cell,
+   under the cards (the toolbar's is in Editor.titlebar.css). */
+.editor-container.split-active::before,
+.editor-container.split-active::after {
+  content: '';
+  position: relative;
+  z-index: -1;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  pointer-events: none;
+}
+
+/* The pane a bubble is open in gives up its card: the bubbles lie on the tray. */
+.editor-container.split-active > .pane.is-bubbling { background: transparent; }
+.editor-container.split-active.bubble-in-primary::before,
+.editor-container.split-active.bubble-in-secondary::after { box-shadow: none; }
+
+.editor-container.split-active > .primary-pane,
+.editor-container.split-active::before { grid-area: 1 / 1; }
+.editor-container.split-active > .split-resizer { grid-area: 1 / 2; }
+.editor-container.split-active > .secondary-pane,
+.editor-container.split-active::after { grid-area: 1 / 3; }
+
+.editor-container.split-active.split-rows > .split-resizer { grid-area: 2 / 1; }
+.editor-container.split-active.split-rows > .secondary-pane,
+.editor-container.split-active.split-rows::after { grid-area: 3 / 1; }
 
 /* Vertical split: the panes stack instead of sitting side by side. */
 .editor-container.split-active.split-rows {
@@ -271,75 +315,115 @@
   pointer-events: none;
 }
 
-/* The divider is a hairline, as a split in any Mac app is; it lights up to be dragged.
-   Above the panes, so its wider hit area (below) reaches over their edges. */
+/* The divider is the tray between the cards. Pointed at, a small rounded grip shows
+   in it, as between two windows tiled on a Mac. */
 .split-resizer {
   position: relative;
   z-index: 6;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--border-color);
+  background: transparent;
   cursor: col-resize;
   touch-action: none;
-  transition: background-color 160ms ease;
-}
-
-.split-resizer:hover,
-.is-split-resizing > .split-resizer {
-  background: var(--accent-color);
 }
 
 .split-rows .split-resizer {
   cursor: row-resize;
 }
 
-/* The hit area is wider than the 1px track, so the divider is easy to grab
-   without stealing clicks from the text next to it. */
+.split-resizer:focus { outline: none; }
+.split-resizer:focus-visible .split-resizer-grip { box-shadow: var(--focus-ring); }
+
+/* A little wider than the gap, so the grip is easy to catch without stealing clicks
+   from the text beside it. */
 .split-resizer::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -4px;
-  right: -4px;
+  left: calc(-1 * var(--space-1));
+  right: calc(-1 * var(--space-1));
 }
 
 .split-rows .split-resizer::before {
-  top: -4px;
-  bottom: -4px;
+  top: calc(-1 * var(--space-1));
+  bottom: calc(-1 * var(--space-1));
   left: 0;
   right: 0;
 }
 
-/* The line is the divider now; the grip it once carried would only thicken it. */
 .split-resizer-grip {
-  display: none;
-}
-
-.split-resizer-grip {
-  width: 2px;
-  height: 34px;
+  width: var(--space-1);
+  height: var(--space-8);
   border-radius: var(--radius-pill);
-  background: var(--border-color);
-  transition: background-color 160ms ease, height 160ms ease, width 160ms ease;
+  background: var(--text-subtle);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 
 .split-rows .split-resizer-grip {
-  width: 34px;
-  height: 2px;
+  width: var(--space-8);
+  height: var(--space-1);
 }
 
 .split-resizer:hover .split-resizer-grip,
-.is-split-resizing .split-resizer-grip {
-  background: var(--accent-color);
-  height: 52px;
+.split-resizer:focus-visible .split-resizer-grip,
+.is-split-resizing > .split-resizer .split-resizer-grip {
+  opacity: 1;
 }
 
-.split-rows .split-resizer:hover .split-resizer-grip,
-.split-rows .is-split-resizing .split-resizer-grip {
-  width: 52px;
-  height: 2px;
+.is-split-resizing > .split-resizer .split-resizer-grip {
+  background: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .split-resizer-grip { transition: none; }
+}
+
+/* A document from the file tree held over the page: the pane it would take, outlined.
+   Over a single document that is one half of it; in a split, the pane under it. */
+.split-drop-outline {
+  position: absolute;
+  top: calc(var(--app-titlebar-height) + var(--space-3));
+  bottom: var(--space-3);
+  left: var(--space-3);
+  right: var(--space-3);
+  z-index: var(--z-chrome);
+  box-sizing: border-box;
+  /* As fine as a note card's edge. */
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
+  pointer-events: none;
+  animation: split-drop-outline-in var(--dur-fast) var(--ease-out);
+}
+
+.split-drop-outline.is-start { right: calc(50% + var(--space-3) / 2); }
+.split-drop-outline.is-end { left: calc(50% + var(--space-3) / 2); }
+/* A pane in a split is a card already: the outline is the whole card, to its edges. */
+.split-drop-outline.is-pane {
+  inset: 0;
+  border-radius: var(--radius-lg);
+}
+
+/* The split a held drag opened, before the pointer lets go: the new document shows
+   dimmed under the outline, so it reads as a preview that moving away takes back.
+   A filter, not `opacity`: it multiplies with each child's own opacity, so what the
+   pane's reveal holds hidden (an idle skeleton, a document still loading) stays hidden. */
+.pane.is-provisional > :not(.split-drop-outline) {
+  filter: opacity(0.5);
+  transition: filter var(--dur-fast) var(--ease-out);
+}
+
+@keyframes split-drop-outline-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .split-drop-outline { animation: none; }
+  .pane.is-provisional > :not(.split-drop-outline) { transition: none; }
 }
 
 .pane {
@@ -365,4 +449,28 @@
 .sidebar-panel-page .ib-empty:not(.ib-empty--compact) {
   flex: 1 1 auto;
   justify-content: center;
+}
+
+/* A slow document's skeleton, set in the prose column's measure and padding
+   (Editor.prose.css) so its lines sit where the text will. */
+.pane-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-10);
+  font-family: var(--editor-font-family, var(--font-editor));
+  font-size: var(--text-lg);
+}
+
+.pane-skeleton > .ib-skeleton:first-child {
+  margin-bottom: var(--space-4);
+}
+
+/* The second paragraph begins at the sixth bar: a heading, then four lines. */
+.pane-skeleton > .pane-skeleton-paragraph:nth-child(6) {
+  margin-top: var(--space-4);
 }

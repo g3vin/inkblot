@@ -8,8 +8,9 @@
 //! AppKit's own offset inside the titlebar, so the page could not line a row up with it. Here the page says
 //! where the buttons' centre line is, and the buttons are put there exactly: the
 //! titlebar container is made twice that tall and the buttons centred in it. AppKit
-//! (and tao) lay the titlebar out again on a resize and on leaving fullscreen, so the
-//! window's last placement is kept and re-applied after each.
+//! (and tao) lay the titlebar out again on a resize, on leaving fullscreen and at other
+//! times of their own, so the window's last placement is kept and re-applied after a
+//! resize and whenever the titlebar's container or buttons move.
 
 use tauri::WebviewWindow;
 
@@ -123,8 +124,17 @@ mod macos {
         "NSWindowDidExitFullScreenNotification",
     ];
 
+    // Posted for any view whose frame changes; the titlebar's container and its buttons
+    // are matched by hand, as AppKit can swap them out (leaving fullscreen does).
+    const FRAME_CHANGED_NOTIFICATION: &str = "NSViewFrameDidChangeNotification";
+
     /// Each window's last placement, by label, and whether it is being watched.
     static PLACEMENTS: Mutex<Option<HashMap<String, (Placement, bool)>>> = Mutex::new(None);
+
+    thread_local! {
+        // Set while `apply` moves the views, whose own frame changes would call it again.
+        static APPLYING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    }
 
     /// Record the placement, watch the window if it isn't yet, and apply it now.
     pub fn place(label: &str, ns_window: usize, placement: Placement) {
@@ -171,7 +181,57 @@ mod macos {
                     usingBlock: &*block
                 ];
             }
+
+            // AppKit also lays the titlebar out on its own (on focus, a screen or scale
+            // change, an appearance change), shrinking the container back under the
+            // buttons and clipping them at the window's top. Any move of the container or
+            // a button puts them back.
+            let block = RcBlock::new(move |note: NonNull<AnyObject>| {
+                if APPLYING.with(|applying| applying.get()) {
+                    return;
+                }
+                let view: *mut AnyObject = msg_send![note.as_ptr(), object];
+                if !view.is_null() && is_titlebar_view(ns_window as *mut AnyObject, view) {
+                    reapply(&label, ns_window);
+                }
+            });
+            let Ok(cname) = CString::new(FRAME_CHANGED_NOTIFICATION) else {
+                return;
+            };
+            let ns_name: *mut AnyObject =
+                msg_send![class!(NSString), stringWithUTF8String: cname.as_ptr()];
+            let _token: *mut AnyObject = msg_send![
+                center,
+                addObserverForName: ns_name,
+                object: std::ptr::null_mut::<AnyObject>(),
+                queue: std::ptr::null_mut::<AnyObject>(),
+                usingBlock: &*block
+            ];
         }
+    }
+
+    /// Whether `view` is the window's titlebar container or one of its buttons.
+    unsafe fn is_titlebar_view(ns_window: *mut AnyObject, view: *mut AnyObject) -> bool {
+        let owner: *mut AnyObject = msg_send![view, window];
+        if owner != ns_window {
+            return false;
+        }
+        let close: *mut AnyObject = msg_send![ns_window, standardWindowButton: BUTTONS[0]];
+        if close.is_null() {
+            return false;
+        }
+        if BUTTONS.iter().any(|&kind| {
+            let button: *mut AnyObject = msg_send![ns_window, standardWindowButton: kind];
+            button == view
+        }) {
+            return true;
+        }
+        let titlebar: *mut AnyObject = msg_send![close, superview];
+        if titlebar.is_null() {
+            return false;
+        }
+        let container: *mut AnyObject = msg_send![titlebar, superview];
+        container == view
     }
 
     /// Apply the window's last placement, if it has one.
@@ -187,6 +247,12 @@ mod macos {
     }
 
     unsafe fn apply(ns_window: *mut AnyObject, placement: Placement) {
+        APPLYING.with(|applying| applying.set(true));
+        place_buttons(ns_window, placement);
+        APPLYING.with(|applying| applying.set(false));
+    }
+
+    unsafe fn place_buttons(ns_window: *mut AnyObject, placement: Placement) {
         if ns_window.is_null() {
             return;
         }

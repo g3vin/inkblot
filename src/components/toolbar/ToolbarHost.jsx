@@ -24,6 +24,7 @@ import useToolbarLayout from './useToolbarLayout'
 import { applyToolbarDrop } from './toolbarEdits'
 import ToolbarPalette from './ToolbarPalette'
 import Popover from '../../ui/Popover'
+import { useRevealOnChange } from '../../ui/revealState.js'
 import { fittingCount } from './toolbarEdits'
 
 export default function ToolbarHost({ context, editor, activeDoc, hasProject, panel, split, timer }) {
@@ -54,6 +55,16 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
   const [fitting, setFitting] = useState(Infinity)
   const [overflowOpen, setOverflowOpen] = useState(false)
   const overflowRef = useRef(null)
+  // One host for every toolbar: switching between a document, a canvas, a map and
+  // Typeset keeps it (and what it measured), closes Customize and the overflow, and
+  // fades the new toolbar's items in.
+  const [shownContext, setShownContext] = useState(context)
+  if (shownContext !== context) {
+    setShownContext(context)
+    setCustomizing(false)
+    setOverflowOpen(false)
+  }
+  const contextReveal = useRevealOnChange(context)
   useLayoutEffect(() => {
     const row = listRef.current
     if (!row || customizing) { setFitting(Infinity); return undefined }
@@ -101,12 +112,13 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
         className={`toolbar tb-row${customizing ? ' is-customizing' : ''}${drag.dragging && !drag.inside ? ' is-removing' : ''}`}
         data-context={context}
         data-display={display}
+        data-reveal={contextReveal}
         role="toolbar"
         aria-label="Toolbar"
       >
         {shown.map(({ id, index }, position) => (
           <div
-            key={`${id}:${index}`}
+            key={`${context}:${id}:${index}`}
             className={`tb-slot${isSpacer(id) ? ' is-spacer' : ''}${id === FLEXIBLE_SPACE ? ' is-flexible' : ''}`}
             data-overflowed={position >= visible ? 'true' : undefined}
             aria-hidden={position >= visible ? 'true' : undefined}
@@ -137,7 +149,7 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
       <Popover anchorRef={overflowRef} open={overflowOpen && hidden.length > 0} onClose={() => setOverflowOpen(false)} align="end" className="tb-overflow-popover">
         <div className="toolbar tb-overflow-list" data-display={display} role="toolbar" aria-label="More toolbar items">
           {hidden.map(({ id, index }) => (
-            <div key={`${id}:${index}`} className="tb-slot"><ToolbarItem id={id} ctx={ctx} /></div>
+            <div key={`${context}:${id}:${index}`} className="tb-slot"><ToolbarItem id={id} ctx={ctx} /></div>
           ))}
         </div>
       </Popover>

@@ -392,6 +392,39 @@ export const collectDescendantIds = (
   return ids
 }
 
+/**
+ * How high each card in a branch stacks: a card sits lower the more strings lie between
+ * it and the focus (the held card, or the root when none is), so the focus is on top,
+ * parents cover their children, and a held card's ancestors and descendants fall away
+ * from it a step at a time on either side.
+ */
+export const getStackOrder = (
+  notes: Array<Pick<Note, 'id' | 'parentNoteId'>>,
+  focusId: string | null | undefined,
+): Map<string, number> => {
+  const parentOf = new Map(notes.map((note) => [note.id, note.parentNoteId || null]))
+  const chainOf = (id: string) => {
+    const chain: string[] = []
+    for (let at: string | null | undefined = id; at && parentOf.has(at) && !chain.includes(at); at = parentOf.get(at)) {
+      chain.push(at)
+    }
+    return chain
+  }
+  const root = notes.find((note) => !note.parentNoteId || !parentOf.has(note.parentNoteId))?.id
+  const focus = focusId && parentOf.has(focusId) ? focusId : root
+  const focusChain = focus ? chainOf(focus) : []
+  const stepsFromFocus = new Map(focusChain.map((id, steps) => [id, steps]))
+
+  const order = new Map<string, number>()
+  notes.forEach((note) => {
+    const chain = chainOf(note.id)
+    const meet = chain.findIndex((id) => stepsFromFocus.has(id))
+    const distance = meet < 0 ? chain.length + focusChain.length : meet + (stepsFromFocus.get(chain[meet]) ?? 0)
+    order.set(note.id, notes.length - distance)
+  })
+  return order
+}
+
 export const areRectsEqual = (
   left: AnchorRect | null | undefined,
   right: AnchorRect | null | undefined,

@@ -42,6 +42,7 @@ import {
   getDotPoint,
   getCardCenter,
   getDefaultChildOffset,
+  getStackOrder,
   getStringPath,
   isSamePreviewIdentity,
   hasStoredChildOffset,
@@ -114,6 +115,7 @@ export default function NoteHoverPreview({
   }, [beginClose])
   const [dragLayouts, setDragLayouts] = useState({})
   const [cardSizes, setCardSizes] = useState({})
+  const [heldNoteId, setHeldNoteId] = useState(null)
   const [focusNoteId, setFocusNoteId] = useState(null)
   const [elasticPositions, setElasticPositions] = useState({})
   const hideTimeoutRef = useRef(null)
@@ -271,6 +273,7 @@ export default function NoteHoverPreview({
       if (currentPreview?.note?.id !== detail.note.id) {
         setDragLayouts({})
         setCardSizes({})
+        setHeldNoteId(null)
         setElasticPositions({})
         elasticPositionsRef.current = {}
         elasticVelocityRef.current = {}
@@ -726,6 +729,7 @@ export default function NoteHoverPreview({
     setCardSizes,
     setDragLayouts,
     setElasticPositions,
+    setHeldNoteId,
     startElasticLoop,
   })
 
@@ -768,6 +772,11 @@ export default function NoteHoverPreview({
     lockPreview()
     handleAddImages(noteId, images)
   }, [handleAddImages, lockPreview])
+
+  const stackOrder = useMemo(
+    () => getStackOrder(layout?.nodes.map(({ note }) => note) ?? [], heldNoteId),
+    [heldNoteId, layout],
+  )
 
   if (!preview || !layout || !rootNote) return null
 
@@ -855,6 +864,7 @@ export default function NoteHoverPreview({
               top: `${renderPosition.y}px`,
               width: `${size.width}px`,
               minHeight: `${size.height}px`,
+              zIndex: stackOrder.get(note.id),
               '--note-color': noteColor(note.color),
               '--note-reveal-delay': `${revealDelay}ms`,
               '--note-pop-ms': `${NOTE_POP_MS}ms`,

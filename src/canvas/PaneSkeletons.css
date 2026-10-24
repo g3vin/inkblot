@@ -1,0 +1,83 @@
+/* ============================================================
+   Pane skeletons (PaneSkeletons.jsx): a canvas, map or timeline being read
+   ============================================================ */
+
+.pane-skeleton-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.pane-skeleton-block.ib-skeleton {
+  border-radius: var(--radius-lg);
+}
+
+.canvas-skeleton,
+.map-skeleton,
+.timeline-skeleton {
+  position: relative;
+  width: min(440px, 70%);
+  aspect-ratio: 16 / 10;
+}
+
+/* Compound with .ib-skeleton to outrank its `position: relative`. */
+.canvas-skeleton-card.ib-skeleton,
+.map-skeleton-pin.ib-skeleton,
+.timeline-skeleton-event.ib-skeleton,
+.timeline-skeleton-axis.ib-skeleton {
+  position: absolute;
+}
+
+.canvas-skeleton-card.is-a { left: 0; top: 4%; }
+.canvas-skeleton-card.is-b { right: 2%; top: 0; }
+.canvas-skeleton-card.is-c { left: 40%; bottom: 0; }
+
+.map-skeleton-pin.is-a { left: 28%; top: 36%; }
+.map-skeleton-pin.is-b { left: 61%; top: 24%; }
+.map-skeleton-pin.is-c { left: 48%; top: 66%; }
+
+/* Pins sit on the sheet in the sheet's own colour, so they read as marks on it. */
+.map-skeleton-pin.ib-skeleton {
+  background: var(--surface-0);
+}
+
+/* A fixed height, so the events clear the axis however narrow the pane. */
+.timeline-skeleton {
+  aspect-ratio: auto;
+  height: 96px;
+}
+
+.timeline-skeleton-axis {
+  top: 47px;
+  left: 0;
+}
+
+/* Events alternate above and below the axis, as the timeline lays them out. */
+.timeline-skeleton-event { top: 12px; }
+.timeline-skeleton-event.is-1,
+.timeline-skeleton-event.is-3 { top: 62px; }
+.timeline-skeleton-event.is-0 { left: 0; }
+.timeline-skeleton-event.is-1 { left: 20%; }
+.timeline-skeleton-event.is-2 { left: 40%; }
+.timeline-skeleton-event.is-3 { left: 60%; }
+.timeline-skeleton-event.is-4 { right: 0; }
+
+/* The loaded surface, laid over the empty one that stands in for it while it loads. */
+.pane-surface-reveal {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.pane-surface-reveal > .pane-surface-content,
+.pane-surface-reveal > .pane-surface-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-surface-backdrop > * {
+  flex: 1;
+}

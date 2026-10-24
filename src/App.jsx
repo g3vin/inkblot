@@ -14,7 +14,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openPinterest } from './lib/openPinterest'
 import Editor from './components/Editor.jsx'
 import { getPreference, setPreference, removePreference } from './lib/preferences'
-import { resolveTheme, setAccentAttribute, setThemeAttribute, setTrayAttribute, watchSystemTheme } from './lib/theme'
+import { isDarkTheme, resolveTheme, setAccentAttribute, setThemeAttribute, setTrayAttribute, watchSystemTheme } from './lib/theme'
 import { ACCENT_PRESETS, DEFAULT_ACCENT, DEFAULT_TRAY, TRAY_INKS } from './lib/palette'
 import { useCommands } from './lib/commands'
 import { useKeybindings } from './lib/keybindings'
@@ -28,8 +28,7 @@ import TimerCapsule from './components/stats/TimerCapsule.jsx'
 import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
 import { OPEN_SETTINGS, primaryTimerAction } from './stats/timerMenu.js'
 import { allRoutines } from './stats/config.js'
-import { setShowsTabBar, showsTabBar } from './components/tabs/tabBarState.js'
-import { buildFormatMenu, buildInsertMenu, fileExtraItems, pasteAndMatchStyleItem, viewItems, windowTabItems } from './menus/appMenus.js'
+import { buildFormatMenu, buildInsertMenu, fileExtraItems, pasteAndMatchStyleItem, viewItems } from './menus/appMenus.js'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -93,6 +92,7 @@ export default function App() {
   const menuRefs = useRef({
     toggleItem: null,
     systemItem: null,
+    midnightItem: null,
     wordCountItem: null,
   })
   const currentThemeRef = useRef('system')
@@ -109,13 +109,16 @@ export default function App() {
   // Keep the native View-menu labels/checkmarks in sync with the active theme.
   const updateMenu = useCallback((theme) => {
     const resolved = getResolvedTheme(theme)
-    const toggleLabel = resolved === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+    const toggleLabel = isDarkTheme(resolved) ? 'Switch to light mode' : 'Switch to dark mode'
 
     if (menuRefs.current.toggleItem) {
       menuRefs.current.toggleItem.setText(toggleLabel)
     }
     if (menuRefs.current.systemItem) {
       menuRefs.current.systemItem.setChecked(theme === 'system')
+    }
+    if (menuRefs.current.midnightItem) {
+      menuRefs.current.midnightItem.setChecked(theme === 'midnight')
     }
   }, [getResolvedTheme])
 
@@ -219,8 +222,15 @@ export default function App() {
         text: 'Switch to dark mode',
         action: () => {
           const resolved = getResolvedTheme(currentThemeRef.current)
-          applyTheme(resolved === 'dark' ? 'light' : 'dark')
+          applyTheme(isDarkTheme(resolved) ? 'light' : 'dark')
         },
+      })
+
+      const midnightItem = await CheckMenuItem.new({
+        id: 'theme-midnight',
+        text: 'Midnight',
+        checked: currentThemeRef.current === 'midnight',
+        action: () => applyTheme(currentThemeRef.current === 'midnight' ? 'dark' : 'midnight'),
       })
 
       const systemItem = await CheckMenuItem.new({
@@ -239,6 +249,7 @@ export default function App() {
 
       menuRefs.current.toggleItem = toggleItem
       menuRefs.current.systemItem = systemItem
+      menuRefs.current.midnightItem = midnightItem
       menuRefs.current.wordCountItem = wordCountItem
 
       // Page view, printing and export act on the active document; the pane that
@@ -283,7 +294,7 @@ export default function App() {
       if (fileSubmenu) await fileSubmenu.append(fileItems)
       else await menu.append(await Submenu.new({ text: 'File', items: fileItems.slice(1) }))
 
-      const themeItems = [toggleItem, systemItem]
+      const themeItems = [toggleItem, midnightItem, systemItem]
       const accentItems = [
         await PredefinedMenuItem.new({ item: 'Separator' }),
         await MenuItem.new({
@@ -297,16 +308,7 @@ export default function App() {
           action: () => dispatchAppEvent('inkblot:command-palette'),
         }),
       ]
-      const tabBarItem = await CheckMenuItem.new({
-        id: 'tab-bar-toggle',
-        text: 'Show tab bar',
-        checked: showsTabBar(),
-        action: () => {
-          setShowsTabBar(!showsTabBar())
-          tabBarItem.setChecked(showsTabBar())
-        },
-      })
-      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, tabBarItem, printLayoutItem]
+      const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, printLayoutItem]
 
       const pageItems = await viewItems({ MenuItem, Submenu, PredefinedMenuItem })
       if (viewSubmenu) {
@@ -330,7 +332,6 @@ export default function App() {
       const extras = await fileExtraItems(api)
       if (fileSubmenu) await fileSubmenu.insert(extras, 0)
       await named('Edit')?.append([await PredefinedMenuItem.new({ item: 'Separator' }), await pasteAndMatchStyleItem(api)])
-      await named('Window')?.insert(await windowTabItems(api), 0)
       // Insert, Format and Timer before Window, where a Mac app has them.
       const added = [await buildInsertMenu(api), await buildFormatMenu(api), await buildTimerMenu(api)]
       const windowAt = submenus.findIndex(([text]) => text === 'Window')
@@ -359,11 +360,11 @@ export default function App() {
     { id: 'app.settings', section: 'App', title: 'Open settings', icon: 'settings', keys: 'Mod+,', keywords: ['preferences', 'options'], run: () => openSettings() },
     { id: 'view.theme.light', section: 'View', title: 'Use light theme', icon: 'sun', keywords: ['paper', 'appearance', 'mode'], run: () => applyTheme('light') },
     { id: 'view.theme.dark', section: 'View', title: 'Use dark theme', icon: 'moon', keywords: ['ink', 'appearance', 'mode', 'night'], run: () => applyTheme('dark') },
+    { id: 'view.theme.midnight', section: 'View', title: 'Use Midnight theme', icon: 'midnight', keywords: ['black', 'oled', 'night', 'appearance', 'mode', 'ember'], run: () => applyTheme('midnight') },
     { id: 'view.theme.system', section: 'View', title: 'Match system theme', icon: 'theme', keywords: ['appearance', 'auto'], run: () => applyTheme('system') },
     { id: 'view.accent', section: 'View', title: 'Change accent colour…', icon: 'palette', keywords: ['color', 'tint', 'highlight'], run: () => openSettings('general') },
     { id: 'view.window-colour', section: 'View', title: 'Change window colour…', icon: 'palette', keywords: ['color', 'tint', 'tray', 'background', 'gradient', 'sidebar'], run: () => openSettings('general') },
     { id: 'view.word-count', section: 'View', title: 'Show or hide word count', icon: 'number', keywords: ['words', 'stats', 'badge'], run: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current) },
-    { id: 'view.tab-bar', section: 'View', title: 'Show or hide tab bar', icon: 'tabs', keywords: ['tabs'], run: () => setShowsTabBar(!showsTabBar()) },
     { id: 'timer.stats', section: 'Writing', title: 'Show writing stats', icon: 'chart', keywords: ['words', 'goals', 'progress'], run: () => getStatsRuntime().showStats() },
     { id: 'timer.routines', section: 'Writing', title: 'Edit timer routines…', icon: 'timer', keywords: ['pomodoro', 'sprint'], run: () => openSettings('timers') },
     { id: 'print.layout', section: 'View', title: 'Show or hide page view', icon: 'book-pages', keys: 'Mod+Alt+P', keywords: ['pages', 'print layout', 'preview', 'write'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },

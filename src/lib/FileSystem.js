@@ -24,14 +24,15 @@
  */
 import {
   writeTextFile,
-  readTextFile,
+  readTextFile as readTextFileNow,
   copyFile,
   mkdir,
-  exists,
-  readDir,
+  exists as existsNow,
+  readDir as readDirNow,
   rename,
   remove,
 } from '@tauri-apps/plugin-fs'
+import { slowed } from './devLatency'
 import { getDocKind, isTextDoc, stripDocSuffix, withDocSuffix } from './docKind'
 import {
   FOLDER_FILE,
@@ -52,6 +53,11 @@ import {
   pushVersionEntry,
   versionsSidecarPath,
 } from './versionStore'
+
+// The reads opening a project waits on, slowable in development (devLatency.js).
+const readTextFile = slowed(readTextFileNow)
+const exists = slowed(existsNow)
+const readDir = slowed(readDirNow)
 
 /* Paths, the per-document write lock and version history live in their own modules;
    they are re-exported so callers can take the whole document layer from here. */
@@ -351,10 +357,15 @@ export async function loadDocument(projectName, docName) {
     const root = await getProjectRoot(projectName)
     const filePath = joinPath(root, `${docName}.json`)
 
-    const fileExists = await exists(filePath)
+    // Asked together so opening a document costs one round trip, not two. The
+    // existence check is what tells "no such document" (null, quietly) from a read
+    // that failed.
+    const [fileExists, contents] = await Promise.all([
+      exists(filePath),
+      readTextFile(filePath).catch((error) => ({ error })),
+    ])
     if (!fileExists) return null
-
-    const contents = await readTextFile(filePath)
+    if (contents?.error) throw contents.error
     return JSON.parse(contents)
   } catch (error) {
     console.error('Failed to load document:', error)
@@ -372,7 +383,20 @@ export async function documentExists(projectName, docName) {
   }
 }
 
-export async function listProjects() {
+let projectListing = null
+
+/**
+ * Every project's name. Calls made while one listing is in flight share it: opening
+ * a project asks from several places at once.
+ */
+export function listProjects() {
+  if (!projectListing) {
+    projectListing = readProjectNames().finally(() => { projectListing = null })
+  }
+  return projectListing
+}
+
+async function readProjectNames() {
   try {
     // Default projects: subdirectories of the AppData root.
     const root = await appDataRoot()
@@ -390,14 +414,10 @@ export async function listProjects() {
 
     // Custom-located projects: registry entries whose directory still exists.
     const external = await listLocations()
-    const externalNames = []
-    for (const [name, absPath] of Object.entries(external)) {
-      try {
-        if (await exists(absPath)) externalNames.push(name)
-      } catch {
-        void 0
-      }
-    }
+    const reachable = await Promise.all(
+      Object.entries(external).map(([name, absPath]) => exists(absPath).then((found) => (found ? name : null), () => null)),
+    )
+    const externalNames = reachable.filter(Boolean)
 
     return Array.from(new Set([...appDataProjects, ...externalNames]))
   } catch (e) {
@@ -775,10 +795,10 @@ export async function moveEntry(projectName, entryPath, targetFolderPath, type =
 export async function listProjectTree(projectName) {
   const root = await getProjectRoot(projectName)
 
+  // Every folder is read at once rather than one after another: on a project kept on
+  // a slow or synced disk, a tree read serially is as slow as its folder count.
   const readDirectory = async (relativePath = '') => {
     const dirPath = relativePath ? joinPath(root, relativePath) : root
-    const dirExists = await exists(dirPath)
-    if (!dirExists) return []
     let entries = []
     try {
       entries = await readDir(dirPath)
@@ -787,38 +807,37 @@ export async function listProjectTree(projectName) {
       return []
     }
 
-    const children = []
-
-    for (const entry of entries) {
-      if (!entry.name || entry.name.startsWith('.')) continue
-      if (entry.name === ORDER_FILE) continue
+    const children = await Promise.all(entries.map(async (entry) => {
+      if (!entry.name || entry.name.startsWith('.')) return null
+      if (entry.name === ORDER_FILE) return null
 
       if (entry.isDirectory) {
         const folderPath = relativePath ? `${relativePath}/${entry.name}` : entry.name
-        children.push({
+        return {
           type: 'folder',
           name: entry.name,
           path: folderPath,
           children: await readDirectory(folderPath),
-        })
-      } else if (entry.isFile && entry.name.endsWith('.json')) {
+        }
+      }
+      if (entry.isFile && entry.name.endsWith('.json')) {
         const baseName = entry.name.replace(/\.json$/, '')
-        const filePath = relativePath ? `${relativePath}/${baseName}` : baseName
-        children.push({
+        return {
           type: 'file',
           name: baseName,
-          path: filePath,
-        })
+          path: relativePath ? `${relativePath}/${baseName}` : baseName,
+        }
       }
-    }
+      return null
+    }))
 
-    return children
+    return children.filter(Boolean)
   }
 
   return {
     type: 'folder',
     name: projectName,
     path: '',
-    children: await readDirectory(''),
+    children: (await exists(root)) ? await readDirectory('') : [],
   }
 }

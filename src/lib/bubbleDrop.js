@@ -7,12 +7,13 @@
  */
 import { clampAside, joinText } from './bubbleText'
 
-/** How close to an edge of the window a drop sets the bubble aside. */
-export const EDGE_BAND = 88
-/** How far a set-aside bubble rests from the edge it was put against. */
-export const EDGE_MARGIN = 18
-/** A set-aside bubble against the top edge rests below the editor's controls. */
-export const TOP_CLEARANCE = 76
+/**
+ * How deep the shelf along the top is: a drop this close to the top sets the bubble
+ * aside. The editor keeps the sentence out of it (`--bubble-shelf`, BubbleEditor.css).
+ */
+export const SHELF_DEPTH = 88
+/** How far a set-aside bubble rests from the top and sides of the editor. */
+export const SHELF_MARGIN = 18
 export const ROW_GAP = 12
 
 export const findBubble = (present, id) =>
@@ -115,34 +116,20 @@ export const bubbleAt = (items, x, y) => items.find((item) => inside(item.rect, 
 
 export const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 
-export const nearEdge = (stage, x, y) =>
-  x - stage.left < EDGE_BAND || stage.right - x < EDGE_BAND
-  || y - stage.top < EDGE_BAND || stage.bottom - y < EDGE_BAND
+/** Whether a point is over the shelf along the top, where a drop sets a bubble aside. */
+export const nearShelf = (stage, y) => y - stage.top < SHELF_DEPTH
 
-/** Where a bubble set aside at (x, y) rests: against the nearest edge, where it was put. */
-export const asidePoint = (stage, x, y, size) => {
-  const localX = x - stage.left
-  const localY = y - stage.top
+/**
+ * Where a bubble set aside at `x` rests: on the shelf, as far along it as it was put,
+ * kept inside the editor. Only the top, so the sentence can use the whole width of a
+ * narrow pane.
+ */
+export const shelfPoint = (stage, x, size) => {
   const halfW = size.width / 2
-  const halfH = size.height / 2
-  const minX = EDGE_MARGIN + halfW
-  const maxX = Math.max(minX, stage.width - EDGE_MARGIN - halfW)
-  const minY = EDGE_MARGIN + halfH
-  const maxY = Math.max(minY, stage.height - EDGE_MARGIN - halfH)
-  const distances = {
-    left: localX,
-    right: stage.width - localX,
-    top: localY,
-    bottom: stage.height - localY,
-  }
-  const edge = Object.keys(distances).reduce((best, key) => (distances[key] < distances[best] ? key : best))
-  let cx = clamp(localX, minX, maxX)
-  let cy = clamp(localY, Math.max(minY, TOP_CLEARANCE + halfH), maxY)
-  if (edge === 'left') cx = minX
-  if (edge === 'right') cx = maxX
-  if (edge === 'top') cy = Math.min(maxY, TOP_CLEARANCE + halfH)
-  if (edge === 'bottom') cy = maxY
-  return { x: cx / stage.width, y: cy / stage.height }
+  const minX = SHELF_MARGIN + halfW
+  const maxX = Math.max(minX, stage.width - SHELF_MARGIN - halfW)
+  const cy = Math.min(SHELF_MARGIN + size.height / 2, stage.height / 2)
+  return { x: clamp(x - stage.left, minX, maxX) / stage.width, y: cy / stage.height }
 }
 
 /** Which slot of the sentence a pointer is over, and where to draw the caret for it. */
@@ -204,20 +191,15 @@ export const THROW_REACH = 120
 
 /**
  * Where a bubble released at `point` moving at `velocity` (px/ms) lands, when that is a
- * throw toward an edge: projected `THROW_PROJECTION_MS` on, kept inside the stage, more
- * than `THROW_REACH` away, and near an edge. Otherwise null — it lands where it was let go.
+ * throw up onto the shelf: projected `THROW_PROJECTION_MS` on, kept inside the stage,
+ * more than `THROW_REACH` away, and over the shelf. Otherwise null — it lands where it
+ * was let go.
  */
 export const throwLanding = (stage, point, velocity) => {
   const x = clamp(point.x + velocity.x * THROW_PROJECTION_MS, stage.left, stage.right)
   const y = clamp(point.y + velocity.y * THROW_PROJECTION_MS, stage.top, stage.bottom)
   if (Math.hypot(x - point.x, y - point.y) <= THROW_REACH) return null
-  return nearEdge(stage, x, y) ? { x, y } : null
-}
-
-/** The edge a point is nearest, for the glow that shows where a drop sets a bubble aside. */
-export const nearestEdge = (stage, x, y) => {
-  const distances = { left: x - stage.left, right: stage.right - x, top: y - stage.top, bottom: stage.bottom - y }
-  return Object.keys(distances).reduce((best, key) => (distances[key] < distances[best] ? key : best))
+  return nearShelf(stage, y) ? { x, y } : null
 }
 
 /* ---------------- swiping between forms ---------------- */

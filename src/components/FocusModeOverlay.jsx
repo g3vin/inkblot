@@ -4,27 +4,22 @@
  * Fullscreen overlay that mirrors the active editor's text one sentence at a
  * time (with optional surrounding context or full-paragraph view). The user
  * can scroll/arrow between sentences, click to reposition the caret, and tune
- * font sizes and context window via the control bar. All edits still happen
- * in the underlying TipTap editor; this overlay only renders a view of it and
- * moves its selection.
+ * font sizes and context window from the bar that floats in at the card's top
+ * (FocusModeBar). All edits still happen in the underlying TipTap editor; this
+ * overlay only renders a view of it and moves its selection.
  */
 import { Fragment as ReactFragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TextSelection } from '@tiptap/pm/state'
 import { isEditorReady } from '../lib/editorUtils'
-import { getPreference, setPreference } from '../lib/preferences'
+import FocusModeBar from './FocusModeBar'
+import { loadFocusModeSettings, normalizeFocusModeSetting, saveFocusModeSettings } from './focusModeSettings'
 
-const FOCUS_MODE_SETTINGS_KEY = 'inkblot-focus-mode-settings'
+/** Where focus mode's own chrome is: its keys and wheel are the chrome's, not the text's. */
+const FOCUS_MODE_CHROME = '.focus-mode-bar-zone, .focus-mode-popover'
 const FOCUS_MODE_WHEEL_SENTENCE_PX = 92
 const FOCUS_MODE_WHEEL_RESET_MS = 180
 const FOCUS_MODE_WHEEL_MAX_SENTENCES = 8
 const FOCUS_MODE_OPENING_MS = 1200
-const DEFAULT_FOCUS_MODE_SETTINGS = {
-  before: 0,
-  after: 0,
-  fontSize: 42,
-  contextFontSize: 28,
-  paragraphContext: false,
-}
 
 const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -33,34 +28,6 @@ const normalizeWheelDeltaY = (event) => {
   if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 16
   if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return event.deltaY * window.innerHeight
   return event.deltaY
-}
-
-/** Load persisted focus-mode settings, clamping each value to its valid range. */
-const loadFocusModeSettings = () => {
-  try {
-    const parsed = JSON.parse(getPreference(FOCUS_MODE_SETTINGS_KEY) || '{}')
-    return {
-      before: clampNumber(Number(parsed.before) || DEFAULT_FOCUS_MODE_SETTINGS.before, 0, 6),
-      after: clampNumber(Number(parsed.after) || DEFAULT_FOCUS_MODE_SETTINGS.after, 0, 6),
-      fontSize: clampNumber(Number(parsed.fontSize) || DEFAULT_FOCUS_MODE_SETTINGS.fontSize, 28, 72),
-      contextFontSize: clampNumber(
-        Number(parsed.contextFontSize) || DEFAULT_FOCUS_MODE_SETTINGS.contextFontSize,
-        18,
-        56
-      ),
-      paragraphContext: Boolean(parsed.paragraphContext),
-    }
-  } catch {
-    return DEFAULT_FOCUS_MODE_SETTINGS
-  }
-}
-
-const saveFocusModeSettings = (settings) => {
-  try {
-    setPreference(FOCUS_MODE_SETTINGS_KEY, JSON.stringify(settings))
-  } catch {
-    // Ignore storage failures; focus mode can still use the in-memory settings.
-  }
 }
 
 /** Split text into sentence spans ({ start, end, text }), keeping punctuation with the sentence. */
@@ -232,7 +199,7 @@ const getOffsetFromClick = (event, text) => {
   return event.clientX < rect.left + rect.width / 2 ? 0 : text.length
 }
 
-export default function FocusModeOverlay({ editor, onExit }) {
+export default function FocusModeOverlay({ editor, onExit, sidebars }) {
   const [settings, setSettings] = useState(loadFocusModeSettings)
   const [visibleSentences, setVisibleSentences] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -301,16 +268,7 @@ export default function FocusModeOverlay({ editor, onExit }) {
   // Update one setting, clamping to its allowed range, and persist the result.
   const updateSetting = useCallback((key, value) => {
     setSettings((current) => {
-      const next = {
-        ...current,
-        [key]: key === 'fontSize'
-          ? clampNumber(Number(value), 28, 72)
-          : key === 'contextFontSize'
-            ? clampNumber(Number(value), 18, 56)
-            : key === 'paragraphContext'
-              ? Boolean(value)
-              : clampNumber(Number(value), 0, 6),
-      }
+      const next = { ...current, [key]: normalizeFocusModeSetting(key, value) }
       saveFocusModeSettings(next)
       return next
     })
@@ -396,7 +354,7 @@ export default function FocusModeOverlay({ editor, onExit }) {
   // Wheel scrolling steps between sentences: accumulate deltas into whole
   // sentence steps, resetting the remainder after a pause or direction change.
   const handleFocusWheel = useCallback((event) => {
-    if (event.target instanceof Element && event.target.closest('.focus-mode-control-zone')) return
+    if (event.target instanceof Element && event.target.closest(FOCUS_MODE_CHROME)) return
 
     const deltaY = normalizeWheelDeltaY(event)
     if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 1) return
@@ -464,6 +422,8 @@ export default function FocusModeOverlay({ editor, onExit }) {
   // Escape exits focus mode; arrow keys step between sentences.
   useEffect(() => {
     const handleKeyDown = (event) => {
+      // The bar's popover closes on Escape itself; focus mode stays.
+      if (event.target instanceof Element && event.target.closest('.focus-mode-popover')) return
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
@@ -473,7 +433,7 @@ export default function FocusModeOverlay({ editor, onExit }) {
       }
 
       if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-      if (event.target instanceof Element && event.target.closest('.focus-mode-control-zone')) return
+      if (event.target instanceof Element && event.target.closest(FOCUS_MODE_CHROME)) return
 
       event.preventDefault()
       event.stopPropagation()
@@ -610,77 +570,12 @@ export default function FocusModeOverlay({ editor, onExit }) {
         )}
       </div>
 
-      <div className="focus-mode-control-zone" onMouseDown={(event) => event.stopPropagation()}>
-        <div className={`focus-mode-controls${settings.paragraphContext ? ' is-paragraph-mode' : ''}`}>
-          <div className="focus-mode-display-toggle" role="group" aria-label="Focus mode display">
-            <button
-              type="button"
-              className={!settings.paragraphContext ? 'active' : ''}
-              onClick={() => updateSetting('paragraphContext', false)}
-            >
-              Sentence
-            </button>
-            <button
-              type="button"
-              className={settings.paragraphContext ? 'active' : ''}
-              onClick={() => updateSetting('paragraphContext', true)}
-            >
-              Paragraph
-            </button>
-          </div>
-          {!settings.paragraphContext ? (
-            <>
-              <label className="focus-mode-slider">
-                <span>Before</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="6"
-                  value={settings.before}
-                  onChange={(event) => updateSetting('before', event.target.value)}
-                />
-                <strong>{settings.before}</strong>
-              </label>
-              <label className="focus-mode-slider">
-                <span>After</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="6"
-                  value={settings.after}
-                  onChange={(event) => updateSetting('after', event.target.value)}
-                />
-                <strong>{settings.after}</strong>
-              </label>
-            </>
-          ) : null}
-          <label className="focus-mode-slider focus-mode-slider-wide">
-            <span>Focus</span>
-            <input
-              type="range"
-              min="28"
-              max="72"
-              value={settings.fontSize}
-              onChange={(event) => updateSetting('fontSize', event.target.value)}
-            />
-            <strong>{settings.fontSize}</strong>
-          </label>
-          <label className="focus-mode-slider focus-mode-slider-wide">
-            <span>Context</span>
-            <input
-              type="range"
-              min="18"
-              max="56"
-              value={settings.contextFontSize}
-              onChange={(event) => updateSetting('contextFontSize', event.target.value)}
-            />
-            <strong>{settings.contextFontSize}</strong>
-          </label>
-          <button className="focus-mode-exit" type="button" onClick={onExit}>
-            Exit
-          </button>
-        </div>
-      </div>
+      <FocusModeBar
+        settings={settings}
+        onSetting={updateSetting}
+        onExit={onExit}
+        sidebars={sidebars}
+      />
     </div>
   )
 }

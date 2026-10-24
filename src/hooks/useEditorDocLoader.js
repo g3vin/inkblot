@@ -20,7 +20,8 @@
  */
 import { useEffect } from 'react'
 
-import { loadDocument, getVersions } from '../lib/FileSystem'
+import { getVersions } from '../lib/FileSystem'
+import { readDocument } from '../lib/projectPrefetch'
 import { isEditorReady } from '../lib/editorUtils'
 import { isTextDoc } from '../lib/docKind'
 
@@ -38,6 +39,7 @@ export function useEditorDocLoader({
 }) {
   const {
     beginPaneLoad,
+    canRestoreFromCache,
     endPaneLoad,
     forgetDoc,
     restoreEditorStateForDoc,
@@ -53,12 +55,31 @@ export function useEditorDocLoader({
     if (!isTextDoc(currentDoc)) return
     let cancelled = false
 
+    // A document this pane has held before comes back from its stashed state, which
+    // is all a read would be used for: no disk, so switching back to it is instant.
+    // Its versions are already in hand from the first visit.
+    if (canRestoreFromCache(currentDoc, 'primary')) {
+      beginPaneLoad('primary')
+      forgetDoc(currentDoc, 'primary')
+      try {
+        restoreEditorStateForDoc(editor, currentDoc, 'primary', null)
+        if (editor.isEmpty) editor.commands.focus('start')
+        onPaneLoaded('primary', editor, currentDoc)
+      } finally {
+        endPaneLoad('primary')
+      }
+      return () => {
+        flushPane('primary')
+        stashEditorState(editor, currentDoc, 'primary')
+      }
+    }
+
     const load = async () => {
       beginPaneLoad('primary')
       forgetDoc(currentDoc, 'primary')
 
       try {
-        const doc = await loadDocument(projectName, currentDoc)
+        const doc = await readDocument(projectName, currentDoc)
         if (cancelled || !isEditorReady(editor)) return
 
         restoreEditorStateForDoc(editor, currentDoc, 'primary', doc)
@@ -69,11 +90,15 @@ export function useEditorDocLoader({
         if (editor.isEmpty) {
           editor.commands.focus('start')
         }
-        onPaneLoaded('primary', editor)
+        onPaneLoaded('primary', editor, currentDoc)
 
-        // load versions for the right sidebar
+        // The versions ride in the document just read; only an old document whose
+        // history is still in a sidecar needs another read.
         try {
-          const vs = await getVersions(projectName, currentDoc)
+          const vs = Array.isArray(doc?.versions) && doc.versions.length
+            ? doc.versions
+            : await getVersions(projectName, currentDoc)
+          if (cancelled) return
           setVersions?.(currentDoc, vs)
         } catch (e) {
           console.error('Failed to load versions:', e)
@@ -92,6 +117,7 @@ export function useEditorDocLoader({
     }
   }, [
     beginPaneLoad,
+    canRestoreFromCache,
     currentDoc,
     editor,
     endPaneLoad,
@@ -111,16 +137,31 @@ export function useEditorDocLoader({
     if (!isTextDoc(secondaryDoc)) return
     let cancelled = false
 
+    if (canRestoreFromCache(secondaryDoc, 'secondary')) {
+      beginPaneLoad('secondary')
+      forgetDoc(secondaryDoc, 'secondary')
+      try {
+        restoreEditorStateForDoc(secondaryEditor, secondaryDoc, 'secondary', null)
+        onPaneLoaded('secondary', secondaryEditor, secondaryDoc)
+      } finally {
+        endPaneLoad('secondary')
+      }
+      return () => {
+        flushPane('secondary')
+        stashEditorState(secondaryEditor, secondaryDoc, 'secondary')
+      }
+    }
+
     const load = async () => {
       beginPaneLoad('secondary')
       forgetDoc(secondaryDoc, 'secondary')
 
       try {
-        const doc = await loadDocument(projectName, secondaryDoc)
+        const doc = await readDocument(projectName, secondaryDoc)
         if (cancelled || !isEditorReady(secondaryEditor)) return
 
         restoreEditorStateForDoc(secondaryEditor, secondaryDoc, 'secondary', doc)
-        onPaneLoaded('secondary', secondaryEditor)
+        onPaneLoaded('secondary', secondaryEditor, secondaryDoc)
       } finally {
         endPaneLoad('secondary')
       }
@@ -134,6 +175,7 @@ export function useEditorDocLoader({
     }
   }, [
     beginPaneLoad,
+    canRestoreFromCache,
     endPaneLoad,
     flushPane,
     forgetDoc,

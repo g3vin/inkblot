@@ -232,13 +232,13 @@ ok('trash removes it from wherever it was', same(texts(trashed.words), ['She', '
 
 const rect = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const stage = rect(0, 0, 1000, 800)
-ok('near an edge is the aside band; the middle is not',
-  drop.nearEdge(stage, 40, 400) && drop.nearEdge(stage, 500, 780) && !drop.nearEdge(stage, 500, 400))
-const leftRest = drop.asidePoint(stage, 30, 400, { width: 80, height: 40 })
-ok('set aside against the nearest edge, where it was put along it',
-  leftRest.x === (drop.EDGE_MARGIN + 40) / 1000 && leftRest.y === 0.5)
-const topRest = drop.asidePoint(stage, 500, 5, { width: 80, height: 40 })
-ok('against the top edge it rests below the controls', topRest.y * 800 === drop.TOP_CLEARANCE + 20)
+ok('the shelf is along the top only',
+  drop.nearShelf(stage, 40) && !drop.nearShelf(stage, 400) && !drop.nearShelf(stage, 780))
+const shelfRest = drop.shelfPoint(stage, 500, { width: 80, height: 40 })
+ok('set aside on the shelf, where it was put along it',
+  shelfRest.x === 0.5 && shelfRest.y * 800 === drop.SHELF_MARGIN + 20)
+const cornerRest = drop.shelfPoint(stage, 5, { width: 80, height: 40 })
+ok('kept inside the editor at the ends of the shelf', cornerRest.x === (drop.SHELF_MARGIN + 40) / 1000)
 const row = [
   { id: 'a', rect: rect(100, 100, 60, 40) },
   { id: 'b', rect: rect(170, 100, 60, 40) },
@@ -266,10 +266,11 @@ ok('velocity over the last moments of a drag', v.x > 1 && v.y === 0)
 
 // A throw lands where it was heading, if that is far enough away and near an edge.
 const stage800 = { left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800 }
-ok('a fast release toward an edge is a throw', same(drop.throwLanding(stage800, { x: 500, y: 400 }, { x: 2, y: 0 }), { x: 1000, y: 400 }))
-ok('a slow one is not: it lands where it was let go', drop.throwLanding(stage800, { x: 500, y: 400 }, { x: 0.3, y: 0 }) === null)
-ok('nor a fast one that stays in the middle', drop.throwLanding(stage800, { x: 200, y: 400 }, { x: 1, y: 0 }) === null)
-ok('the edge a point is nearest', drop.nearestEdge(stage800, 30, 400) === 'left' && drop.nearestEdge(stage800, 500, 790) === 'bottom')
+ok('a fast release up toward the shelf is a throw', same(drop.throwLanding(stage800, { x: 500, y: 400 }, { x: 0, y: -2 }), { x: 500, y: 0 }))
+ok('a slow one is not: it lands where it was let go', drop.throwLanding(stage800, { x: 500, y: 400 }, { x: 0, y: -0.3 }) === null)
+ok('nor a fast one toward the sides or the bottom',
+  drop.throwLanding(stage800, { x: 500, y: 400 }, { x: 2, y: 0 }) === null
+  && drop.throwLanding(stage800, { x: 500, y: 400 }, { x: 0, y: 2 }) === null)
 
 // A swipe between forms turns the page when it ends: far enough, or a flick that way.
 const slow = (to, ms) => [{ t: 0, x: 0 }, { t: ms, x: to }]
@@ -566,8 +567,8 @@ ok('punctuation bubbles are the round ones',
   [...overlay.querySelectorAll('.bubble-row .bubble.is-punctuation .bubble-text')].map((node) => node.textContent).join('') === ',.')
 ok('and the set-aside word where it was left', overlay.querySelector('.bubble-aside-layer .bubble-text')?.textContent === 'quietly')
 ok('it takes the keyboard from the document', document.activeElement === overlay)
-ok('it covers the whole window: portaled to the body', overlay.parentElement === document.body)
-ok('and takes the toolbar away while it is up', document.documentElement.classList.contains('bubble-open'))
+ok('it stays in the pane it is drawn in, not over the window', overlay.parentElement !== document.body)
+ok('with no toolbar to take, its bar is drawn in it', Boolean(overlay.querySelector('.bubble-editor-top')))
 
 await press('n')
 const draft = overlay.querySelector('.bubble.is-draft input')
@@ -592,9 +593,9 @@ ok('Words splits it back', rowTexts().length === 11)
 await click(button('Sentences'))
 ok('Sentences groups it by sentence', same(rowTexts(), ['She hesitated at the door, then she left.', 'Now']))
 await click(button('Words'))
-ok('there is no title in the bar', !overlay.querySelector('.bubble-editor-bar').textContent.includes('Bubble'))
-ok('Done is its own round button beside the bar',
-  !!overlay.querySelector('.bubble-editor-top > .bubble-editor-done') && !overlay.querySelector('.bubble-editor-bar .bubble-editor-done'))
+ok('there is no title in the bar', !overlay.querySelector('.bubble-editor-top').textContent.includes('Bubble'))
+ok('Done is the bar\'s one filled button, last in it',
+  overlay.querySelector('.bubble-editor-top > :last-child')?.matches('.bubble-editor-done[data-variant="filled"]'))
 
 // Select a bubble with a press and release, then delete it from the keyboard.
 const first = overlay.querySelector('.bubble-row .bubble')
@@ -672,4 +673,28 @@ ok('Archive hands it back to be archived', closed?.archive === true)
 }
 
 await act(async () => { editorRoot.unmount() })
-ok('closing gives the toolbar back', !document.documentElement.classList.contains('bubble-open'))
+
+// In the app its bar takes the card's toolbar, and a pane given another document gives
+// the session up to the archive rather than writing it into that document.
+{
+  const slot = document.getElementById('root').appendChild(document.createElement('div'))
+  const host = document.getElementById('root').appendChild(document.createElement('div'))
+  const paneRoot = createRoot(host)
+  let ended = null
+  const mount = (detached) => act(async () => {
+    paneRoot.render(React.createElement(BubbleEditor, {
+      session: text.createSession('She left.'),
+      toolbarSlot: slot,
+      detached,
+      onClose: (value, archive, options) => { ended = { value, archive, options } },
+    }))
+  })
+  await mount(false)
+  ok('its bar is drawn in the toolbar it is given', Boolean(slot.querySelector('.bubble-editor-top')) && !host.querySelector('.bubble-editor-top'))
+  ok('and nothing closes it while its pane keeps the document', ended === null)
+  await mount(true)
+  ok('a pane showing another document archives it, detached, unwritten',
+    ended?.archive === true && ended?.options?.detached === true && text.composeSentence(ended.value.words, ended.value.original) === 'She left.')
+  await act(async () => { paneRoot.unmount() })
+  ok('closing takes its bar out of the toolbar', !slot.querySelector('.bubble-editor-top'))
+}

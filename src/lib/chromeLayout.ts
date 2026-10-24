@@ -89,7 +89,6 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.panel.references', label: 'References', icon: 'books', contexts: ALL },
   { id: 'inkblot.panel.stats', label: 'Stats', icon: 'chart', contexts: ALL },
   { id: 'inkblot.timer', label: 'Timer', icon: 'timer', contexts: ALL },
-  { id: 'inkblot.tabs.new-tab', label: 'New tab', icon: 'add', contexts: ALL },
   { id: 'inkblot.tabs.split', label: 'Split', icon: 'split-columns', contexts: ALL },
 
   { id: 'inkblot.view.editor-mode', label: 'Mode', icon: 'write', contexts: ['document', 'typeset'] },
@@ -128,7 +127,7 @@ export function toolbarItemsFor(context: ToolbarContext): ToolbarItemSpec[] {
 export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
   // The essentials first, so they are the last to go behind » when the window narrows.
   document: [
-    'inkblot.view.page-view', SPACE,
+    'inkblot.view.page-view', 'inkblot.view.focus-mode', SPACE,
     'inkblot.format.text-style', 'inkblot.format.paragraph-style', SPACE,
     'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', SPACE,
     'inkblot.insert.note', 'inkblot.edit.undo-redo', SPACE,
@@ -158,12 +157,23 @@ export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
   ],
 }
 
-export type ToolbarLayout = { version: 1; items: string[]; known: string[] }
+export type ToolbarLayout = { version: number; items: string[]; known: string[] }
+
+/** The version layouts are saved at now. */
+export const TOOLBAR_LAYOUT_VERSION = 2
+
+/**
+ * Items that were palette-only and later joined a default set, with the layout version
+ * that added them. `known` can't carry these in: every saved layout already knows them.
+ */
+const PROMOTED_TO_DEFAULT: { id: string; context: ToolbarContext; version: number }[] = [
+  { id: 'inkblot.view.focus-mode', context: 'document', version: 2 },
+]
 
 const defaultIds = (context: ToolbarContext) => DEFAULT_TOOLBARS[context].filter((id) => !isSpacer(id) && id !== MORE)
 
 export function defaultToolbarLayout(context: ToolbarContext): ToolbarLayout {
-  return { version: 1, items: [...DEFAULT_TOOLBARS[context]], known: toolbarItemsFor(context).map((item) => item.id) }
+  return { version: TOOLBAR_LAYOUT_VERSION, items: [...DEFAULT_TOOLBARS[context]], known: toolbarItemsFor(context).map((item) => item.id) }
 }
 
 /**
@@ -218,9 +228,15 @@ export function normalizeToolbar(context: ToolbarContext, raw: unknown): Toolbar
   if (!tidy.some((id) => !isSpacer(id) && id !== MORE)) return defaultToolbarLayout(context)
 
   const known = Array.isArray(stored.known) ? new Set(stored.known) : null
-  const newDefaults = known ? defaultIds(context).filter((id) => !known.has(id)) : []
+  // Only a layout that says which version saved it is migrated: a write from Customize
+  // toolbar carries none and is taken as the user left it.
+  const savedVersion = Number((stored as Partial<ToolbarLayout>).version)
+  const promoted = known && Number.isFinite(savedVersion)
+    ? PROMOTED_TO_DEFAULT.filter((item) => item.context === context && savedVersion < item.version).map((item) => item.id)
+    : []
+  const newDefaults = known ? [...defaultIds(context).filter((id) => !known.has(id)), ...promoted] : []
   return {
-    version: 1,
+    version: TOOLBAR_LAYOUT_VERSION,
     items: adding(newDefaults, tidy, DEFAULT_TOOLBARS[context]),
     known: toolbarItemsFor(context).map((item) => item.id),
   }

@@ -6,6 +6,8 @@
  * ending in `.timeline` that holds something else is shown as such and never written.
  */
 import { useEffect, useState } from 'react'
+import { useReveal } from '../ui/revealState.js'
+import { PaneSurfaceReveal, TimelineSkeleton } from '../canvas/PaneSkeletons'
 import { getDocDisplayName } from '../lib/docKind'
 import { useLockReason } from '../lib/docLocks'
 import DocLockBadge from '../components/DocLockBadge'
@@ -19,34 +21,33 @@ export default function TimelinePane({
   docPath,
   onActivate,
   onOpenDoc,
-  showHeader = false,
-  onClose,
   isActive = true,
+  onLoaded,
 }) {
   const locked = useLockReason(docPath) !== null
-  const [loaded, setLoaded] = useState(null)
+  const [result, setResult] = useState(null)
+  // What was loaded, only for the path it was loaded from, as in MapPane.
+  const loaded = result?.docPath === docPath ? result.loaded : null
 
   useEffect(() => {
     if (!projectName || !docPath) return undefined
     let cancelled = false
-    setLoaded(null)
-    loadTimelineView(projectName, docPath).then((result) => {
-      if (!cancelled) setLoaded(result)
+    loadTimelineView(projectName, docPath).then((next) => {
+      if (!cancelled) setResult({ docPath, loaded: next })
     })
     return () => {
       cancelled = true
     }
   }, [docPath, projectName])
 
+  useEffect(() => {
+    if (loaded) onLoaded?.(docPath)
+  }, [loaded, docPath, onLoaded])
+  const reveal = useReveal(Boolean(loaded))
+
   return (
     <div className="timeline-pane">
-      {showHeader ? (
-        <div className="pane-header pane-header-centered">
-          <span>{getDocDisplayName(docPath)}</span>
-          <button onClick={onClose}>×</button>
-        </div>
-      ) : null}
-
+      <PaneSurfaceReveal reveal={reveal} loaded={Boolean(loaded)} backdrop={<div className="timeline-surface is-loading" />} skeleton={<TimelineSkeleton />} label="Opening timeline">
       {loaded?.foreign ? (
         <div className="map-foreign" role="status">
           <h2>This isn’t a timeline</h2>
@@ -67,10 +68,9 @@ export default function TimelinePane({
           onOpenDoc={onOpenDoc}
           isActive={isActive}
         />
-      ) : (
-        <div className="timeline-surface is-loading" />
-      )}
-      <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} />
+      ) : null}
+      {loaded ? <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} /> : null}
+      </PaneSurfaceReveal>
     </div>
   )
 }

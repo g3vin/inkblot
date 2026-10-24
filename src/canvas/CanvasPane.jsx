@@ -12,8 +12,9 @@
  * canvasFileSystem.js.
  */
 import { useEffect, useState } from 'react'
+import { useReveal } from '../ui/revealState.js'
+import { CanvasSkeleton, PaneSurfaceReveal } from './PaneSkeletons'
 import { loadCanvasDocument } from '../lib/canvasFileSystem'
-import { getDocDisplayName } from '../lib/docKind'
 import { useLockReason } from '../lib/docLocks'
 import DocLockBadge from '../components/DocLockBadge'
 import { CanvasNotesProvider } from './CanvasNotesContext'
@@ -25,13 +26,12 @@ export default function CanvasPane({
   docPath,
   onActivate,
   onOpenDoc,
-  showHeader = false,
-  onClose,
   setActiveEditor,
   notesByDoc,
   setNotesForDoc,
   openDocs,
   isActive = true,
+  onLoaded,
 }) {
   const locked = useLockReason(docPath) !== null
   const [result, setResult] = useState(null)
@@ -53,15 +53,14 @@ export default function CanvasPane({
     }
   }, [docPath, projectName])
 
+  useEffect(() => {
+    if (doc) onLoaded?.(docPath)
+  }, [doc, docPath, onLoaded])
+  const reveal = useReveal(Boolean(doc))
+
   return (
     <div className="canvas-pane">
-      {showHeader ? (
-        <div className="pane-header pane-header-centered">
-          <span>{getDocDisplayName(docPath)}</span>
-          <button onClick={onClose}>×</button>
-        </div>
-      ) : null}
-
+      <PaneSurfaceReveal reveal={reveal} loaded={Boolean(doc)} backdrop={<div className="canvas-surface" />} skeleton={<CanvasSkeleton />} label="Opening canvas">
       {doc ? (
         // Note cards reach the app's notes through context, not props: CanvasNode is
         // memoized on its node, and threading notesByDoc through it would re-render
@@ -85,10 +84,9 @@ export default function CanvasPane({
             isActive={isActive}
           />
         </CanvasNotesProvider>
-      ) : (
-        <div className="canvas-surface" />
-      )}
-      <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} />
+      ) : null}
+      {doc ? <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} /> : null}
+      </PaneSurfaceReveal>
     </div>
   )
 }

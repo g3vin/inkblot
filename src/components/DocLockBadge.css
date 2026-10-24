@@ -41,5 +41,5 @@
 /* No caret in a locked document: typing would do nothing. Selecting still works,
    so a note can be added. */
 .pane[data-locked='true'] .ProseMirror {
-  caret-color: transparent;
+  --caret-ink: transparent;
 }

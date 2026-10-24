@@ -12,7 +12,7 @@ export const HYSTERESIS = 6
 /** A ring dot's drawn size, the middle dot's, and how far from a dot's centre a finger
  * or click still lands on it (a 44px target). */
 export const DOT = 24
-export const CENTRE = 28
+export const CENTRE = 20
 export const HIT = 22
 
 /** The ring's radius: wider for nine slots so the dots keep the same spacing. */

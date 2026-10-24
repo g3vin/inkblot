@@ -1,92 +1,73 @@
 /**
  * BubbleEditor.css — the bubble editor, and the chip that marks an open session.
  *
- * Flat, with one exception the design system allows: the bubbles and bars float over
- * the page, so they are floating capsules (.floating-capsule, the one blur token), over
- * the editor's scrim (.scrim). Colours come from the tokens only.
+ * Flat, with one exception the design system allows: the bubbles float, so they are
+ * floating capsules (the one blur token). The editor has no surface of its own: it
+ * takes its pane's place, and the bubbles sit straight on the window's tray. Colours
+ * come from the tokens only.
  */
 
 .bubble-editor {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-chrome);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* The shelf along the top (SHELF_DEPTH, lib/bubbleDrop.js) and the forms bar at the
+     bottom keep the sentence out; the sides only need a gutter. */
+  --bubble-shelf: 88px;
+  box-sizing: border-box;
+  padding: var(--bubble-shelf) var(--space-4);
   overflow: hidden;
+  border-radius: var(--radius-lg);
   color: var(--text-primary);
+  /* On the tray, the paper's muted greys fall below AA; let the main text colour down
+     toward it instead, as the sidebars do (Sidebar.css). */
+  --text-muted: color-mix(in srgb, var(--text-primary) var(--tray-text-muted-mix), var(--tray-sheet));
+  --text-subtle: color-mix(in srgb, var(--text-primary) var(--tray-text-subtle-mix), var(--tray-sheet));
   outline: none;
   animation: ui-fade-in var(--dur-fast) var(--ease-standard);
   user-select: none;
   -webkit-user-select: none;
 }
 
-/* While it is up the toolbar goes; the window's drag region stays. */
-html.bubble-open .app-titlebar-toolbar { visibility: hidden; }
+/* A single document's pane reaches up under the toolbar; a split's starts below it. */
+.editor-container:not(.split-active) > .pane > .bubble-editor {
+  top: calc(var(--app-titlebar-height) + var(--space-3));
+}
 
-/* ---------------- the bar ---------------- */
+/* The pane's own document stays mounted under it (the session is written back into
+   it), out of sight. */
+.pane.is-bubbling > :not(.bubble-editor) { visibility: hidden; }
 
-/* The bar and, beside it in its own circle, Done. */
+/* ---------------- the bar, in the toolbar ---------------- */
+
+.bubble-toolbar-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
 .bubble-editor-top {
-  position: absolute;
-  top: var(--space-5);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-}
-
-.bubble-editor-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1);
   white-space: nowrap;
+  animation: ui-fade-in var(--dur-fast) var(--ease-standard);
 }
 
-.bubble-editor-done {
-  appearance: none;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--on-ink);
-  background: var(--status-success);
-  box-shadow: var(--shadow-1);
-  cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease-standard);
-}
-.bubble-editor-done:hover { transform: scale(1.06); border-color: transparent; }
-.bubble-editor-done:focus-visible { outline: 2px solid var(--accent-border); outline-offset: 2px; }
-
-.bubble-editor-button {
-  appearance: none;
-  display: grid;
-  place-items: center;
-  width: var(--size-circle);
-  height: var(--size-circle);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  background: transparent;
-  cursor: pointer;
-}
-.bubble-editor-button:hover { background: var(--hover-bg); color: var(--text-primary); border-color: transparent; }
-.bubble-editor-button:focus-visible { outline: 2px solid var(--accent-border); }
+.bubble-editor-done { gap: var(--space-2); }
 
 /* ---------------- the sentence ---------------- */
 
 .bubble-stage {
   position: relative;
   z-index: 1;
-  width: min(880px, calc(100% - 240px));
+  width: min(880px, 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -263,19 +244,16 @@ html.bubble-open .app-titlebar-toolbar { visibility: hidden; }
 }
 .bubble-aside-layer .bubble { pointer-events: auto; }
 
-/* The edge a drop would set the bubble aside against glows — only that one. */
-.bubble-editor-edges {
+/* The shelf glows while a drop would set the bubble aside on it. */
+.bubble-editor-shelf {
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  transition: opacity var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+  box-shadow: inset 0 3px 0 var(--accent-color), inset 0 48px 48px -32px var(--accent-glow);
+  transition: opacity var(--dur-fast) ease;
 }
-.bubble-editor.is-aside-armed .bubble-editor-edges { opacity: 1; }
-.bubble-editor[data-edge='left'] .bubble-editor-edges { box-shadow: inset 3px 0 0 var(--accent-color), inset 48px 0 48px -32px var(--accent-glow); }
-.bubble-editor[data-edge='right'] .bubble-editor-edges { box-shadow: inset -3px 0 0 var(--accent-color), inset -48px 0 48px -32px var(--accent-glow); }
-.bubble-editor[data-edge='top'] .bubble-editor-edges { box-shadow: inset 0 3px 0 var(--accent-color), inset 0 48px 48px -32px var(--accent-glow); }
-.bubble-editor[data-edge='bottom'] .bubble-editor-edges { box-shadow: inset 0 -3px 0 var(--accent-color), inset 0 -48px 48px -32px var(--accent-glow); }
+.bubble-editor.is-aside-armed .bubble-editor-shelf { opacity: 1; }
 
 .bubble-caret {
   position: absolute;

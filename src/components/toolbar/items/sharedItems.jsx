@@ -66,14 +66,6 @@ export function TimerItem({ ctx, spec }) {
   )
 }
 
-export function NewTabItem({ ctx, spec }) {
-  return (
-    <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <ToolButton icon={spec.icon} label={spec.label} title="Open a new tab (⌘T)" display={ctx.display} disabled={!ctx.hasProject} onClick={() => ctx.send('newTab', {})} />
-    </ItemFrame>
-  )
-}
-
 export function SplitItem({ ctx, spec }) {
   const split = ctx.split
   return (

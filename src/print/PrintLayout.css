@@ -203,7 +203,7 @@
   box-sizing: border-box;
   /* The text block ends where the last page does; nothing below it to click. */
   padding-bottom: 0;
-  caret-color: var(--pl-ink);
+  --caret-ink: var(--pl-ink);
 }
 
 :is(.print-layout, .print-scope) .editor .ProseMirror img {
@@ -1109,12 +1109,12 @@
    promise that typing will do anything. */
 .is-typeset-locked .ProseMirror {
   cursor: default;
-  caret-color: transparent;
+  --caret-ink: transparent;
 }
 
 .is-typeset-locked .ProseMirror > h1:first-child {
   cursor: text;
-  caret-color: auto;
+  --caret-ink: auto;
 }
 
 .typeset-edit-text {

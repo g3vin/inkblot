@@ -1,0 +1,130 @@
+/* ============================================================
+   Reveal — content arriving (Reveal.jsx, docs/DESIGN.md §7)
+   Only opacity and `translate` move: `translate` is its own property, so a region
+   framer-motion is already transforming (a layout animation) can still rise.
+   ============================================================ */
+
+[data-reveal='hidden'] {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+[data-reveal='shown'] {
+  animation: ib-reveal-in var(--dur-reveal) var(--ease-out) both;
+}
+
+@keyframes ib-reveal-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--reveal-rise);
+  }
+}
+
+/* The same entrance under a second name, so a value that changes twice runs it twice
+   (useRevealOnChange). */
+[data-reveal='shown-again'] {
+  animation: ib-reveal-in-again var(--dur-reveal) var(--ease-out) both;
+}
+
+@keyframes ib-reveal-in-again {
+  from {
+    opacity: 0;
+    translate: 0 var(--reveal-rise);
+  }
+}
+
+/* A screen handing over to the one beneath it (the start screen to the editor). */
+@keyframes ib-reveal-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* A list whose items arrive one after another: the items move, not the list. */
+.ib-stagger[data-reveal='shown'] {
+  animation: none;
+}
+
+.ib-stagger[data-reveal='shown'] > * {
+  animation: ib-reveal-in var(--dur-reveal) var(--ease-out) both;
+  animation-delay: calc(var(--reveal-index, 0) * var(--reveal-stagger));
+}
+
+/* ---------- Skeleton ---------- */
+
+/* Anything holding skeletons: hidden until its load has been slow for REVEAL.delay. */
+.ib-skeleton-host {
+  opacity: 0;
+  transition: opacity var(--dur-reveal) var(--ease-out);
+}
+
+.ib-skeleton-host[data-visible='true'] {
+  opacity: 1;
+}
+
+.ib-skeleton-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ib-skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--surface-active);
+}
+
+.ib-skeleton--sm {
+  border-radius: var(--radius-sm);
+}
+
+.ib-skeleton--pill {
+  border-radius: var(--radius-pill);
+}
+
+/* The one looping animation in the app (DESIGN.md §7): a skeleton only appears once a
+   load is genuinely slow, and there a still block reads as broken. The sheen is the
+   surface's own colour passing over the bar, so it is quiet in both themes. It runs
+   only while its skeleton is showing. */
+.ib-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface-0) 55%, transparent), transparent);
+  translate: -100% 0;
+}
+
+.ib-skeleton-host[data-visible='true'] .ib-skeleton::after {
+  animation: ib-shimmer var(--dur-shimmer) var(--ease-in-out) infinite;
+}
+
+@keyframes ib-shimmer {
+  to {
+    translate: 100% 0;
+  }
+}
+
+.ib-skeleton-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.ib-skeleton-row {
+  display: flex;
+  align-items: center;
+  height: var(--skeleton-row-h, var(--row-h));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* base.css shortens durations but keeps delays, and a stagger is all delay. */
+  .ib-stagger[data-reveal='shown'] > * {
+    animation-delay: 0s;
+  }
+
+  .ib-skeleton::after {
+    display: none;
+  }
+}

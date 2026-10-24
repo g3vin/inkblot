@@ -15,6 +15,75 @@
   margin: 0 auto;
 }
 
+/* The caret is drawn as tall as the text (extensions/TextCaret.js): WebKit's own runs
+   the full line pitch, up through the leading. A field inside the document keeps its
+   own. Where the caret is coloured or hidden, set --caret-ink, not caret-color. */
+.has-text-caret {
+  caret-color: transparent;
+}
+
+.has-text-caret :is(input, textarea, [contenteditable]:not(.has-text-caret)) {
+  caret-color: auto;
+}
+
+.text-caret {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.text-caret.is-blinking {
+  animation: text-caret-blink 1.06s steps(1) infinite;
+}
+
+@keyframes text-caret-blink {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-caret.is-blinking { animation: none; }
+}
+
+/* The selection is drawn as rounded bands (extensions/SelectionHighlight.js): the
+   browser's can't be rounded, and leaves gaps behind a note's dot or a bubble's chip.
+   A field inside the document keeps its own. */
+.has-drawn-selection::selection,
+.has-drawn-selection :not(input, textarea)::selection {
+  background: transparent;
+}
+
+.selection-highlight {
+  --selection-radius: var(--radius-xs);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.selection-highlight-shape {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+}
+
+.selection-highlight-shape path {
+  fill: var(--selection-bg);
+}
+
+/* Kept while the writer is in a panel or a menu, quieter, as the native highlight is. */
+.selection-highlight.is-inactive .selection-highlight-shape {
+  opacity: 0.6;
+}
+
 .editor .ProseMirror .tableWrapper {
   overflow-x: auto;
   margin: 1.25em 0;

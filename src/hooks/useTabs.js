@@ -17,9 +17,13 @@ import {
   closeTabIn,
   createTabId,
   ensureTabsForOpenDocs,
+  openAloneIn,
   orderTabsIn,
+  placeDocIn,
+  recordSavedSplit,
   recordSplitIn,
   selectTabIn,
+  showSplitIn,
   splitOfPanes,
   splitOfTab,
 } from '../lib/editorSession'
@@ -43,7 +47,12 @@ export function useTabs({
   setSplitRatioState,
   setSplitView,
   setTabs,
+  splitRatio,
   tabs,
+  splits,
+  setSplits,
+  activeSplitId,
+  setActiveSplitId,
 }) {
 
   /* ---------------- Tabs ---------------- */
@@ -174,10 +183,72 @@ export function useTabs({
     setSplitView('editor')
   }, [activeTabId, currentDoc, secondaryDoc, tabs, setSecondaryDoc, setSplitOrientation, setSplitView])
 
-  const closeSplit = useCallback(() => {
+  /* ---------------- Kept splits ---------------- */
+
+  // The file tree keeps every split made, to leave and come back to; the one showing
+  // follows what its panes show (recordSavedSplit).
+  useEffect(() => {
+    const live = splitView === 'editor' && secondaryDoc && currentDoc
+      ? { primaryDoc: currentDoc, secondaryDoc, splitOrientation, splitRatio }
+      : null
+    const next = recordSavedSplit(splits, activeSplitId, live)
+    if (next.splits !== splits) setSplits(next.splits)
+    if (next.activeId !== activeSplitId) setActiveSplitId(next.activeId)
+  }, [activeSplitId, currentDoc, secondaryDoc, splitOrientation, splitRatio, splitView, splits, setActiveSplitId, setSplits])
+
+  /** Show a kept split again, as it was left. */
+  const openSavedSplit = useCallback((splitId) => {
+    const split = splits.find(item => item.id === splitId)
+    if (!split) return
+    setActiveSplitId(split.id)
+    applyTabs(ws => showSplitIn(ws, split))
+    setSplitRatioState(split.splitRatio)
+  }, [applyTabs, splits, setActiveSplitId, setSplitRatioState])
+
+  /** Leave whatever split is showing for one document on its own. It stays in the tree. */
+  const openDocAlone = useCallback((docPath) => {
+    applyTabs(ws => openAloneIn(ws, docPath))
+  }, [applyTabs])
+
+  /** Close a kept split for good. If it is showing, its first document stays open. */
+  const forgetSplit = useCallback((splitId) => {
+    setSplits(prev => prev.filter(item => item.id !== splitId))
+    if (splitId !== activeSplitId) return
+    setActiveSplitId(null)
     setSecondaryDoc(null)
     setSplitView(null)
-  }, [setSecondaryDoc, setSplitView])
+  }, [activeSplitId, setActiveSplitId, setSecondaryDoc, setSplitView, setSplits])
+
+  /** Close the split showing, which takes it out of the tree too. */
+  const closeSplit = useCallback(() => {
+    if (activeSplitId) setSplits(prev => prev.filter(item => item.id !== activeSplitId))
+    setActiveSplitId(null)
+    setSecondaryDoc(null)
+    setSplitView(null)
+  }, [activeSplitId, setActiveSplitId, setSecondaryDoc, setSplitView, setSplits])
+
+  /**
+   * Put a document on one side of the split (placeDocIn), as a drop from the file tree
+   * does, and return what the panes showed before, for `restorePanes`. A split it
+   * opens starts even, as the outline the drop showed did.
+   */
+  const placeDocBeside = useCallback((docPath, side) => {
+    const before = {
+      tabs, activeTabId, currentDoc: currentDoc || '', secondaryDoc, activeDoc: activeDoc || '', splitView, splitOrientation, splitRatio, splits, activeSplitId,
+    }
+    applyTabs(ws => placeDocIn(ws, docPath, side))
+    if (splitView !== 'editor') setSplitRatioState(0.5)
+    return before
+  }, [activeDoc, activeSplitId, activeTabId, applyTabs, currentDoc, secondaryDoc, splitOrientation, splitRatio, splitView, splits, tabs, setSplitRatioState])
+
+  /** Put the panes, tabs and kept splits back as `placeDocBeside` found them. */
+  const restorePanes = useCallback((before) => {
+    if (!before) return
+    applyTabs(() => before)
+    setSplitRatioState(before.splitRatio)
+    setSplits(before.splits)
+    setActiveSplitId(before.activeSplitId)
+  }, [applyTabs, setActiveSplitId, setSplitRatioState, setSplits])
 
   /** Where the divider sits, as the primary pane's share of the split. */
   const setSplitRatio = useCallback((ratio) => {
@@ -197,6 +268,11 @@ export function useTabs({
     adoptDraftDoc,
     openDocInSplit,
     closeSplit,
+    placeDocBeside,
+    restorePanes,
+    openSavedSplit,
+    openDocAlone,
+    forgetSplit,
     draftTabActive,
     setSplitRatio,
   }

@@ -8,7 +8,8 @@
  * the buttons in the card's top corners pin and unpin them. Also hosts
  * cross-cutting UI behaviors: the custom window-drag titlebar, fullscreen
  * chrome detection, the right-click context menu, "jump to text" for notes
- * and search results, and the Bubble editor.
+ * and search results, and the Bubble editor's sessions (EditorCanvas draws one in its
+ * pane, and its bar takes over the toolbar).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { resolveAnchor } from '../bridge/anchors'
@@ -42,12 +43,12 @@ import { requestCanvasReveal } from '../canvas/canvasEvents'
 import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
-import BubbleEditor from './bubble/BubbleEditor'
-import { useBubbleSessions } from '../hooks/useBubbleSessions'
+import { paragraphForBubble, selectionForBubble, useBubbleSessions } from '../hooks/useBubbleSessions'
 import { useReferences } from '../hooks/useReferences'
 import NoteHoverPreview from './NoteHoverPreview'
 import ToolbarHost from './toolbar/ToolbarHost'
 import IconButton from '../ui/IconButton'
+import { useReveal, useRevealReady } from '../ui/revealState.js'
 import { readDisplayMode, TOOLBAR_LAYOUT_CHANGED } from './toolbar/useToolbarLayout'
 import { CUSTOMIZE_INSPECTOR_EVENT, popUpToolbarMenu } from '../hooks/contextMenu/toolbarMenu'
 import InspectorLayoutEditor from './RightSidebar/InspectorLayoutEditor'
@@ -57,7 +58,7 @@ import { requestDraftKind } from '../lib/draftDocument'
 import { requestFind, requestMapFind } from '../lib/sidebarSearch'
 import { refreshFolderPresets } from '../lib/folderPresets'
 import FolderPresetsSheet from './FolderPresetsSheet'
-import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason } from '../lib/docLocks'
+import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason, useLocks } from '../lib/docLocks'
 import { currentTrafficLights, DEFAULT_TRAFFIC_LIGHTS, placeTrafficLights, TRAFFIC_LIGHT_DIAMETER, TRAFFIC_LIGHT_SPACING } from '../lib/trafficLights'
 
 // Room in the card's toolbar row for a corner's pin button.
@@ -143,7 +144,34 @@ export default function EditorLayout(props) {
   useEffect(() => {
     documentSurface.publishViewOptions({ focusMode: focusModeOpen })
   }, [focusModeOpen])
+  // Focus mode opens with both sidebars put away (they still hover in from the window's
+  // edges, and its bar can pin them), and gives back the ones that were docked when it
+  // closes.
+  const sidebarsRef = useRef({ left, right })
+  useEffect(() => { sidebarsRef.current = { left, right } })
+  const dockedBeforeFocusRef = useRef(null)
+  useEffect(() => {
+    const { left: leftSide, right: rightSide } = sidebarsRef.current
+    if (focusModeOpen) {
+      dockedBeforeFocusRef.current = { left: leftSide.pinned, right: rightSide.pinned }
+      leftSide.collapse()
+      rightSide.collapse()
+      return
+    }
+    const docked = dockedBeforeFocusRef.current
+    if (!docked) return
+    dockedBeforeFocusRef.current = null
+    if (docked.left && !leftSide.pinned) leftSide.togglePin()
+    if (docked.right && !rightSide.pinned) rightSide.togglePin()
+  }, [focusModeOpen])
   const bubbles = useBubbleSessions({ docPath: activeDoc || currentDoc, projectName: props.projectName })
+  // While a bubble is open its bar is the toolbar, portaled into this slot.
+  const [bubbleToolbarSlot, setBubbleToolbarSlot] = useState(null)
+  const bubbling = Boolean(bubbles.open)
+  // A bubble takes the place of its pane, which focus mode is drawn over.
+  useEffect(() => {
+    if (bubbling) setFocusModeOpen(false)
+  }, [bubbling])
   // Citations format in every open editor; the References panel is the shell's.
   useReferences({
     projectName: props.projectName,
@@ -198,6 +226,8 @@ export default function EditorLayout(props) {
   // so a formatting toolbar would drive something nobody can see. Handing the canvas
   // a null slot is what stops the two from both mounting a toolbar there.
   const comparing = Boolean(props.compare)
+  // The toolbar arrives with the document it acts on (Editor's RevealGate), not on its own.
+  const toolbarReveal = useReveal(comparing || Boolean(toolbarContext) || !(activeDoc || currentDoc))
 
   // Custom titlebar: a left-click anywhere in the drag strip moves the window,
   // unless it landed on something interactive. Bound to the window rather than
@@ -367,6 +397,8 @@ export default function EditorLayout(props) {
     void refreshLocks(props.projectName)
     void refreshFolderPresets(props.projectName)
   }, [props.projectName])
+  // A locked document opens with its badge, never gains it a moment later (Editor's RevealGate).
+  useRevealReady('locks', useLocks().project === props.projectName)
   const lockTarget = activeDoc || currentDoc
   const lock = useLockReason(lockTarget)
 
@@ -390,6 +422,8 @@ export default function EditorLayout(props) {
       { id: 'notes.add', section: 'Notes', title: 'Add note', icon: 'note', keys: 'Mod+Alt+N', keywords: ['comment', 'annotate'], when: () => activeIsText, run: addNote },
       { id: 'clipboard.make-note', section: 'Notes', title: 'Make a note of the last copy', icon: 'note', keywords: ['clipboard', 'paste', 'copied'], when: () => activeIsText && Boolean(lastCopy), run: () => makeNoteFromClipboard(lastCopy) },
       { id: 'search.find', section: 'Search', title: 'Find…', icon: 'search', keys: 'Mod+F', keywords: ['search', 'look for', 'replace', 'selection'], run: findInDocument },
+      { id: 'writing.bubble', section: 'Writing', title: 'Bubble the selection', icon: 'chats', keywords: ['rearrange', 'reorder', 'words', 'sentence'], when: () => activeIsText && !bubbling && Boolean(selectionForBubble(getLiveEditor(props.activeEditor))), run: () => bubbles.openFromSelection(getLiveEditor(props.activeEditor)) },
+      { id: 'writing.bubble-paragraph', section: 'Writing', title: 'Bubble this paragraph', icon: 'chats', keywords: ['rearrange', 'reorder', 'sentences'], when: () => activeIsText && !bubbling && Boolean(paragraphForBubble(getLiveEditor(props.activeEditor))), run: () => bubbles.openParagraph(getLiveEditor(props.activeEditor)) },
       { id: 'view.focus-mode', section: 'View', title: focusModeOpen ? 'Leave focus mode' : 'Enter focus mode', icon: 'crosshair', keywords: ['distraction free', 'zen', 'full screen'], when: () => activeIsText, run: () => setFocusModeOpen((open) => !open) },
       { id: 'view.sidebar', section: 'View', title: left.pinned ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', keywords: ['files', 'file tree', 'left panel', 'pin', 'unpin'], run: left.togglePin },
       { id: 'view.inspector', section: 'View', title: right.pinned ? 'Hide inspector' : 'Show inspector', icon: 'sidebar', keywords: ['right panel', 'panels', 'pin', 'unpin'], run: right.togglePin },
@@ -403,7 +437,7 @@ export default function EditorLayout(props) {
       { id: 'history.open', section: 'Document', title: 'Show version history', icon: 'history', keywords: ['versions', 'snapshots', 'restore', 'undo'], run: () => openRightSidebarTab('history') },
       { id: 'view.typeset', section: 'Print & export', title: editorMode === 'typeset' ? 'Back to Write' : 'Typeset the book', icon: editorMode === 'typeset' ? 'write' : 'type-style', keywords: ['pages', 'layout', 'print', 'book', 'write'], when: () => activeIsText, run: () => send('setEditorMode', { mode: editorMode === 'typeset' ? 'write' : 'typeset' }) },
     ]
-  }, [props.projectName, activeIsText, addNote, lastCopy, makeNoteFromClipboard, focusModeOpen, leftShown, rightOpen, left, right, split, editorMode, openRightSidebarTab, lock, lockTarget, findInDocument])
+  }, [props.projectName, props.activeEditor, bubbles, bubbling, activeIsText, addNote, lastCopy, makeNoteFromClipboard, focusModeOpen, leftShown, rightOpen, left, right, split, editorMode, openRightSidebarTab, lock, lockTarget, findInDocument])
 
   const handleContextMenu = useEditorContextMenu({
     editor: props.activeEditor,
@@ -718,6 +752,11 @@ export default function EditorLayout(props) {
   }, [isFullscreenChrome, leftShowing, left.pinned])
   useEffect(() => () => placeTrafficLights({ visible: true }), [])
 
+  const focusSidebars = useMemo(() => ({
+    left: { pinned: left.pinned, togglePin: left.togglePin },
+    right: { pinned: right.pinned, togglePin: right.togglePin },
+  }), [left.pinned, left.togglePin, right.pinned, right.togglePin])
+
   // The card's top-left holds only its pin button: the traffic lights go with the left
   // sidebar and never sit over the card.
   const cardLeftChrome = CARD_TOGGLE_WIDTH
@@ -760,7 +799,7 @@ export default function EditorLayout(props) {
         />
 
         <div
-          className={`document-card${left.pinned ? ' has-left-dock' : ''}${right.pinned ? ' has-right-dock' : ''}${left.gliding ? ' is-left-gliding' : ''}${right.gliding ? ' is-right-gliding' : ''}`}
+          className={`document-card${props.splitView === 'editor' && !comparing && !focusModeOpen ? ' is-split' : ''}${bubbling && !comparing ? ' is-bubbling' : ''}${left.pinned ? ' has-left-dock' : ''}${right.pinned ? ' has-right-dock' : ''}${left.gliding ? ' is-left-gliding' : ''}${right.gliding ? ' is-right-gliding' : ''}`}
         >
           <div
             onContextMenu={comparing ? undefined : popUpToolbarMenu}
@@ -791,12 +830,13 @@ export default function EditorLayout(props) {
                 onClick={right.togglePin}
               />
             </div>
-            <div className="app-titlebar-toolbar">
+            <div className="app-titlebar-toolbar" {...toolbarReveal.contentProps}>
               {comparing ? (
                 <div className="canvas-toolbar-slot" ref={setCompareToolbarSlot} />
+              ) : bubbling ? (
+                <div className="bubble-toolbar-slot" ref={setBubbleToolbarSlot} />
               ) : toolbarContext ? (
                 <ToolbarHost
-                  key={toolbarContext}
                   context={toolbarContext}
                   editor={toolbarEditor}
                   activeDoc={activeDoc || currentDoc}
@@ -816,6 +856,10 @@ export default function EditorLayout(props) {
             {...props}
             focusModeOpen={focusModeOpen}
             onExitFocusMode={() => setFocusModeOpen(false)}
+            focusSidebars={focusSidebars}
+            bubble={comparing ? null : bubbles.open}
+            onCloseBubble={bubbles.close}
+            bubbleToolbarSlot={bubbleToolbarSlot}
           />
         </div>
 
@@ -859,14 +903,6 @@ export default function EditorLayout(props) {
           refreshFiles={props.refreshFiles}
           onOpenDocInTab={props.onOpenDocInTab}
         />
-
-        {bubbles.open ? (
-          <BubbleEditor
-            key={bubbles.open.session.id}
-            session={bubbles.open.session}
-            onClose={bubbles.close}
-          />
-        ) : null}
 
         <NoteHoverPreview
           notesByDoc={props.notesByDoc}

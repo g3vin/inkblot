@@ -41,6 +41,7 @@ export function useNoteCardDrag({
   setCardSizes,
   setDragLayouts,
   setElasticPositions,
+  setHeldNoteId,
   startElasticLoop,
 }) {
 
@@ -88,6 +89,7 @@ export function useNoteCardDrag({
       setElasticPositions(nextElasticPositions)
     }
 
+    setHeldNoteId(noteId)
     dragStateRef.current = {
       mode: 'move',
       noteId,
@@ -148,6 +150,7 @@ export function useNoteCardDrag({
       removePointerListeners()
       releasePointerCaptureSafely(dragTarget, event.pointerId)
       upEvent?.preventDefault?.()
+      setHeldNoteId(null)
 
       if (!dragState) return
       const finalLayout = dragLayoutsRef.current[dragState.noteId]
@@ -168,7 +171,7 @@ export function useNoteCardDrag({
     }
 
     const removePointerListeners = addPointerDragListeners(dragTarget, handlePointerMove, handlePointerUp)
-  }, [childMap, commitLayout, layout, lockPreview, noteById, preview, startElasticLoop, elasticPositionsRef, elasticVelocityRef, setElasticPositions, dragStateRef, cardSizesRef, dragLayoutsRef, setDragLayouts])
+  }, [childMap, commitLayout, layout, lockPreview, noteById, preview, startElasticLoop, elasticPositionsRef, elasticVelocityRef, setElasticPositions, setHeldNoteId, dragStateRef, cardSizesRef, dragLayoutsRef, setDragLayouts])
 
   // Resizing from a left or top edge moves the card too, so its far edges stay put.
   const handleResizeStart = useCallback((noteId, edges, event) => {
@@ -188,6 +191,7 @@ export function useNoteCardDrag({
     const box = { ...position, width: currentSize.width, height: currentSize.height }
     const movesOrigin = edges.includes('n') || edges.includes('w')
 
+    setHeldNoteId(noteId)
     dragStateRef.current = { mode: 'resize', noteId }
 
     const handlePointerMove = (moveEvent) => {
@@ -215,6 +219,7 @@ export function useNoteCardDrag({
       removePointerListeners()
       releasePointerCaptureSafely(dragTarget, event.pointerId)
       upEvent?.preventDefault?.()
+      setHeldNoteId(null)
 
       if (dragState?.mode !== 'resize') return
       commitSize(noteId, cardSizesRef.current[noteId] || currentSize)
@@ -223,7 +228,7 @@ export function useNoteCardDrag({
     }
 
     const removePointerListeners = addPointerDragListeners(dragTarget, handlePointerMove, handlePointerUp)
-  }, [commitLayout, commitSize, layout, lockPreview, noteById, dragStateRef, cardSizesRef, setCardSizes, dragLayoutsRef, setDragLayouts])
+  }, [commitLayout, commitSize, layout, lockPreview, noteById, dragStateRef, cardSizesRef, setCardSizes, setHeldNoteId, dragLayoutsRef, setDragLayouts])
 
   /** A press on a card: move it from the top band, resize it from an edge or corner. */
   const handleCardPointerDown = useCallback((noteId, event) => {

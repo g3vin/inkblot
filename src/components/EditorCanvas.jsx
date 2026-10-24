@@ -42,32 +42,61 @@ import { useEditorDocCache } from '../hooks/useEditorDocCache'
 import { useEditorDocLoader } from '../hooks/useEditorDocLoader'
 import { useEditorNotes } from '../hooks/useEditorNotes'
 import { useEditorTimeline } from '../hooks/useEditorTimeline'
+import { useSplitDrop } from '../hooks/useSplitDrop'
 import { formatWordStats, useEditorWordCount } from '../hooks/useEditorWordCount'
 import DraftTabPane from './DraftTabPane'
 import FocusModeOverlay from './FocusModeOverlay'
+import BubbleEditor from './bubble/BubbleEditor'
 import VersionComparePane from './VersionComparePane'
 import Icon from '../ui/Icon.jsx'
-import DocumentTabBar from './tabs/DocumentTabBar'
-import { useShowsTabBar } from './tabs/tabBarState'
 import PaneEditorSurface from '../print/PaneEditorSurface'
 import DocLockBadge from './DocLockBadge'
 import TableToolbar from './TableToolbar'
 import { lockReason, useLocks } from '../lib/docLocks'
 import { setEditorLock } from '../extensions/DocumentLock'
 import { FadeScrim } from '../ui/Surfaces.jsx'
+import { Skeleton, SkeletonOverlay } from '../ui/Reveal.jsx'
+import { useDelayedFlag, useReveal, useRevealReady } from '../ui/revealState.js'
+import { MapSkeleton } from '../canvas/PaneSkeletons'
 
 // A map is a heavy editor (and its globe and space views heavier still): loaded the
 // first time one opens, never for a writer who only writes.
 const LazyMapPane = lazy(() => import('../map/MapPane'))
+
+/** The map's paper while its code loads; its skeleton only if that is slow. */
+function MapLoadingFallback() {
+  const slow = useDelayedFlag(true)
+  return (
+    <>
+      <div className="map-surface is-loading" />
+      <SkeletonOverlay visible={slow} label="Opening map"><MapSkeleton /></SkeletonOverlay>
+    </>
+  )
+}
+/** Lines in the prose column's measure, for a text pane whose document is slow to arrive. */
+function DocumentSkeleton({ visible }) {
+  return (
+    <SkeletonOverlay visible={visible} label="Opening document">
+      <div className="pane-skeleton">
+        <Skeleton width="38%" height="1.5em" />
+        {['100%', '96%', '99%', '62%'].map((width, index) => <Skeleton key={`a${index}`} width={width} />)}
+        {['97%', '100%', '84%'].map((width, index) => <Skeleton key={`b${index}`} width={width} className="pane-skeleton-paragraph" />)}
+      </div>
+    </SkeletonOverlay>
+  )
+}
+
 function MapPane(props) {
   return (
-    <Suspense fallback={<div className="map-surface is-loading" />}>
+    <Suspense fallback={<MapLoadingFallback />}>
       <LazyMapPane {...props} />
     </Suspense>
   )
 }
 
 const EMPTY_NOTES = []
+// How far one arrow press moves the split divider, as a share of the split.
+const SPLIT_KEY_STEP = 0.05
 
 export default function EditorCanvas({
   setEditor,
@@ -93,12 +122,19 @@ export default function EditorCanvas({
   activeEditor,
   focusModeOpen = false,
   onExitFocusMode,
+  focusSidebars,
+  bubble = null,
+  onCloseBubble,
+  bubbleToolbarSlot = null,
   draftTabActive = false,
   onDraftCreated,
   refreshFiles,
   compare = null,
   closeCompare,
   onOpenDocInTab,
+  onPlaceDocBeside,
+  onRestorePanes,
+  versions,
 }) {
   // A draft tab holds the primary pane without holding a document: the pane is
   // "open" (and any split stays up) while DraftTabPane asks what it should be.
@@ -107,7 +143,6 @@ export default function EditorCanvas({
   const secondaryPaneRef = useRef(null)
   const splitContainerRef = useRef(null)
   const [isResizingSplit, setIsResizingSplit] = useState(false)
-  const tabBarShown = useShowsTabBar()
   const [dragCaret, setDragCaret] = useState(null)
   // The pane's live view of notesByDoc. The hooks below run from editor events and
   // debounced timers, so they must read the notes as they are when the save fires,
@@ -452,12 +487,27 @@ export default function EditorCanvas({
     splitView,
   })
 
+  // Which document each pane last finished loading. A pane shows the document it is
+  // named for only once this says so; until then what it holds is the last one, or
+  // nothing.
+  const [loadedPanes, setLoadedPanes] = useState({ primary: '', secondary: '' })
+  const markPaneLoaded = useCallback((paneId, docPath) => {
+    const key = `${projectName}::${docPath}`
+    setLoadedPanes((prev) => (prev[paneId] === key ? prev : { ...prev, [paneId]: key }))
+  }, [projectName])
+  const markPrimaryLoaded = useCallback((docPath) => markPaneLoaded('primary', docPath), [markPaneLoaded])
+  const markSecondaryLoaded = useCallback((docPath) => markPaneLoaded('secondary', docPath), [markPaneLoaded])
+  const onPaneLoaded = useCallback((paneId, paneEditor, docPath) => {
+    syncWordStats(paneId, paneEditor)
+    markPaneLoaded(paneId, docPath)
+  }, [markPaneLoaded, syncWordStats])
+
   useEditorDocLoader({
     currentDoc,
     docCache,
     editor,
     flushPane,
-    onPaneLoaded: syncWordStats,
+    onPaneLoaded,
     projectName,
     secondaryDoc,
     secondaryEditor,
@@ -489,19 +539,23 @@ export default function EditorCanvas({
     docCache,
   })
 
+  // A document dragged in from the file tree opens a split on the side it is held over.
+  const { outline: splitDropOutline, provisional: provisionalPane } = useSplitDrop({
+    enabled: Boolean(
+      hasActiveDoc && currentDoc && !focusModeOpen
+      && !(compare && (compare.docName === currentDoc || compare.docName === secondaryDoc))
+    ),
+    split: splitView === 'editor',
+    splitOrientation,
+    currentDoc,
+    secondaryDoc,
+    containerRef: splitContainerRef,
+    secondaryPaneRef,
+    onPlaceDocBeside,
+    onRestorePanes,
+  })
+
   /* ---------------- Render ---------------- */
-
-  const closeSecondary = () => {
-    setSecondaryDoc?.(null)
-    setSplitView?.(null)
-  }
-
-  const closePrimary = () => {
-    if (secondaryDoc) {
-      setCurrentDoc?.(secondaryDoc)
-    }
-    closeSecondary()
-  }
 
   const focusEditor = (target) => {
     if (!isEditorReady(target)) return
@@ -604,6 +658,15 @@ export default function EditorCanvas({
   const primaryIsStructured = primaryKind !== 'text'
   const secondaryIsStructured = secondaryKind !== 'text'
 
+  // Each pane is one of the pieces opening a project waits for (Editor's RevealGate).
+  const holds = (paneId, docPath) => loadedPanes[paneId] === `${projectName}::${docPath}`
+  const primaryReady = !currentDoc || holds('primary', currentDoc)
+  const secondaryReady = splitView !== 'editor' || !secondaryDoc || holds('secondary', secondaryDoc)
+  useRevealReady('primary', primaryReady)
+  useRevealReady('secondary', secondaryReady)
+  const primaryReveal = useReveal(primaryReady)
+  const secondaryReveal = useReveal(secondaryReady)
+
   if (!hasActiveDoc) {
     return (
       <div className="middle-section">
@@ -640,15 +703,32 @@ export default function EditorCanvas({
     compare && (compare.docName === currentDoc || compare.docName === secondaryDoc)
   )
 
-  const splitClassName = `${comparing ? ' is-comparing' : ''}${
+  // The pane a bubble was opened in, by its editor (or, for a canvas card's, by the
+  // document the pane shows). It is drawn there in the editor's place, and is
+  // `detached` once that pane shows another document.
+  const isSplit = splitView === 'editor'
+  const bubblePane = !bubble ? null
+    : bubble.editor === liveSecondaryEditor && isSplit ? 'secondary'
+      : bubble.editor === liveEditor ? 'primary'
+        : isSplit && bubble.docPath === secondaryDoc ? 'secondary'
+          : 'primary'
+  const bubblePaneDoc = bubblePane === 'secondary' ? secondaryDoc : currentDoc
+  const renderBubble = (pane) => (bubblePane === pane ? (
+    <BubbleEditor
+      key={bubble.session.id}
+      session={bubble.session}
+      onClose={onCloseBubble}
+      toolbarSlot={bubbleToolbarSlot}
+      detached={Boolean(bubble.docPath) && bubble.docPath !== bubblePaneDoc}
+    />
+  ) : null)
+
+  const splitClassName = `${comparing ? ' is-comparing' : ''}${bubblePane ? ` has-bubble bubble-in-${bubblePane}` : ''}${
     splitView && !comparing
       ? ` split-active${splitOrientation === 'rows' ? ' split-rows' : ''}${isResizingSplit ? ' is-split-resizing' : ''}`
       : ''
   }`
   const showDraftPane = draftTabActive && !currentDoc
-  // A split pane names its document above it, with a × to close it — unless the shell
-  // draws the tabs, whose split tab names both documents, the first pane's first.
-  const paneHeaders = splitView === 'editor' && !tabBarShown
   const primaryPaneOwnsFocus = primaryIsStructured || showDraftPane
 
   // The divider is a track in the split grid, so the two panes are sized by the
@@ -697,14 +777,23 @@ export default function EditorCanvas({
     window.addEventListener('mouseup', onUp)
   }
 
+  // The divider from the keyboard: the arrows along it move it, Enter evens it out.
+  const nudgeSplit = (event) => {
+    const rows = splitOrientation === 'rows'
+    const step = { [rows ? 'ArrowUp' : 'ArrowLeft']: -SPLIT_KEY_STEP, [rows ? 'ArrowDown' : 'ArrowRight']: SPLIT_KEY_STEP }[event.key]
+    if (step) setSplitRatio?.(splitRatio + step)
+    else if (event.key === 'Enter') setSplitRatio?.(0.5)
+    else return
+    event.preventDefault()
+  }
+
   return (
     <div className="middle-section">
-      <DocumentTabBar activeDoc={currentDoc} />
       <div ref={splitContainerRef} className={`editor-container${splitClassName}`} style={splitStyle}>
 
         <div
           ref={primaryPaneRef}
-          className="pane primary-pane"
+          className={`pane primary-pane${provisionalPane === 'primary' ? ' is-provisional' : ''}${bubblePane === 'primary' ? ' is-bubbling' : ''}`}
           data-locked={primaryLocked}
           // A canvas owns its own wheel/pointer handling and stops propagation, so
           // it activates its pane itself rather than through these editor handlers.
@@ -717,6 +806,10 @@ export default function EditorCanvas({
           onClick={primaryPaneOwnsFocus ? undefined : () => focusEditor(liveEditor)}
           onMouseMove={primaryPaneOwnsFocus ? undefined : () => activatePane(currentDoc, liveEditor, EditorTarget.Primary)}
         >
+          {provisionalPane === 'primary' ? <div className="split-drop-outline is-pane" aria-hidden="true" /> : null}
+          {splitDropOutline?.pane === 'primary' ? (
+            <div className={`split-drop-outline is-${splitView === 'editor' ? 'pane' : splitDropOutline.side}`} aria-hidden="true" />
+          ) : null}
           {dragCaret?.pane === 'primary' ? (
             <div
               className="drag-drop-caret"
@@ -743,9 +836,8 @@ export default function EditorCanvas({
               notesByDoc={notesByDoc}
               setNotesForDoc={setNotesForDoc}
               openDocs={openDocs}
-              showHeader={paneHeaders}
-              onClose={closePrimary}
               isActive={activeDoc === currentDoc}
+              onLoaded={markPrimaryLoaded}
             />
           ) : primaryKind === 'map' ? (
             <MapPane
@@ -754,9 +846,8 @@ export default function EditorCanvas({
               setActiveEditor={setActiveEditor}
               onActivate={() => activatePane(currentDoc, null)}
               onOpenDoc={(docPath) => openDocFromCanvas('primary', docPath)}
-              showHeader={paneHeaders}
-              onClose={closePrimary}
               isActive={activeDoc === currentDoc}
+              onLoaded={markPrimaryLoaded}
               // Its inspector panel stays while the other pane is worked in — unless
               // that is a map too, whose panel it then is.
               chromeWhileInactive={secondaryKind !== 'map'}
@@ -767,32 +858,23 @@ export default function EditorCanvas({
               docPath={currentDoc}
               onActivate={() => activatePane(currentDoc, null)}
               onOpenDoc={(docPath) => openDocBesideTimeline('primary', docPath)}
-              showHeader={paneHeaders}
-              onClose={closePrimary}
               isActive={activeDoc === currentDoc}
+              onLoaded={markPrimaryLoaded}
             />
           ) : (
             <PaneEditorSurface
               editor={liveEditor}
               projectName={projectName}
               docPath={currentDoc}
+              revealProps={primaryReveal.contentProps}
               onOpenDoc={(path) => openDocFromCanvas('primary', path)}
-              header={(
-                <>
-                  {paneHeaders ? (
-                    <div className="pane-header pane-header-centered">
-                      <span>{currentDoc}</span>
-                      <button onClick={closePrimary}>×</button>
-                    </div>
-                  ) : null}
-                  <TimeLensBar projectName={projectName} />
-                </>
-              )}
+              header={<TimeLensBar projectName={projectName} />}
             />
           )}
+          {!primaryIsStructured && !showDraftPane ? <DocumentSkeleton visible={primaryReveal.skeleton} /> : null}
           {!primaryIsStructured && !showDraftPane ? <FadeScrim edge="bottom" height={56} className="pane-bottom-scrim" /> : null}
           {!primaryIsStructured && !showDraftPane ? (
-            <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName}>
+            <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName} data-reveal={primaryReveal.phase}>
               {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(primaryWordStats)}</div> : null}
               <DocLockBadge projectName={projectName} docPath={currentDoc} />
             </div>
@@ -800,6 +882,7 @@ export default function EditorCanvas({
           {!primaryIsStructured && !showDraftPane ? (
             <TableToolbar editor={liveEditor} />
           ) : null}
+          {renderBubble('primary')}
         </div>
 
         {splitView === 'editor' && (
@@ -808,9 +891,14 @@ export default function EditorCanvas({
             role="separator"
             aria-orientation={splitOrientation === 'rows' ? 'horizontal' : 'vertical'}
             aria-label="Resize split"
+            aria-valuenow={Math.round(splitRatio * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            tabIndex={0}
             title="Drag to resize · double-click to even out"
             onMouseDown={startSplitResize}
             onDoubleClick={() => setSplitRatio?.(0.5)}
+            onKeyDown={nudgeSplit}
           >
             <span className="split-resizer-grip" />
           </div>
@@ -819,7 +907,7 @@ export default function EditorCanvas({
         {splitView === 'editor' && (
           <div
             ref={secondaryPaneRef}
-            className="pane secondary-pane"
+            className={`pane secondary-pane${provisionalPane === 'secondary' ? ' is-provisional' : ''}${bubblePane === 'secondary' ? ' is-bubbling' : ''}`}
             data-locked={secondaryLocked}
             onFocus={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
             onMouseEnter={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
@@ -828,6 +916,10 @@ export default function EditorCanvas({
             onClick={secondaryIsStructured ? undefined : () => focusEditor(liveSecondaryEditor)}
             onMouseMove={secondaryIsStructured ? undefined : () => activatePane(secondaryDoc, liveSecondaryEditor, EditorTarget.Secondary)}
           >
+            {provisionalPane === 'secondary' ? <div className="split-drop-outline is-pane" aria-hidden="true" /> : null}
+            {splitDropOutline?.pane === 'secondary' ? (
+              <div className="split-drop-outline is-pane" aria-hidden="true" />
+            ) : null}
             {dragCaret?.pane === 'secondary' ? (
               <div
                 className="drag-drop-caret"
@@ -848,9 +940,8 @@ export default function EditorCanvas({
                 notesByDoc={notesByDoc}
                 setNotesForDoc={setNotesForDoc}
                 openDocs={openDocs}
-                showHeader={paneHeaders}
-                onClose={closeSecondary}
                 isActive={activeDoc === secondaryDoc}
+                onLoaded={markSecondaryLoaded}
               />
             ) : secondaryKind === 'map' ? (
               <MapPane
@@ -859,9 +950,8 @@ export default function EditorCanvas({
                 setActiveEditor={setActiveEditor}
                 onActivate={() => activatePane(secondaryDoc, null)}
                 onOpenDoc={(docPath) => openDocFromCanvas('secondary', docPath)}
-                showHeader={paneHeaders}
-                onClose={closeSecondary}
                 isActive={activeDoc === secondaryDoc}
+                onLoaded={markSecondaryLoaded}
                 chromeWhileInactive={primaryKind !== 'map'}
               />
             ) : secondaryKind === 'timeline' ? (
@@ -870,32 +960,23 @@ export default function EditorCanvas({
                 docPath={secondaryDoc}
                 onActivate={() => activatePane(secondaryDoc, null)}
                 onOpenDoc={(docPath) => openDocBesideTimeline('secondary', docPath)}
-                showHeader={paneHeaders}
-                onClose={closeSecondary}
                 isActive={activeDoc === secondaryDoc}
+                onLoaded={markSecondaryLoaded}
               />
             ) : (
               <PaneEditorSurface
                 editor={liveSecondaryEditor}
                 projectName={projectName}
                 docPath={secondaryDoc}
+                revealProps={secondaryReveal.contentProps}
                 onOpenDoc={(path) => openDocFromCanvas('secondary', path)}
-                header={(
-                  <>
-                    {paneHeaders ? (
-                      <div className="pane-header split-header pane-header-centered">
-                        <span>{secondaryDoc}</span>
-                        <button onClick={closeSecondary}>×</button>
-                      </div>
-                    ) : null}
-                    <TimeLensBar projectName={projectName} />
-                  </>
-                )}
+                header={<TimeLensBar projectName={projectName} />}
               />
             )}
+            {!secondaryIsStructured ? <DocumentSkeleton visible={secondaryReveal.skeleton} /> : null}
             {!secondaryIsStructured ? <FadeScrim edge="bottom" height={56} className="pane-bottom-scrim" /> : null}
             {!secondaryIsStructured ? (
-              <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName}>
+              <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName} data-reveal={secondaryReveal.phase}>
                 {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}
                 <DocLockBadge projectName={projectName} docPath={secondaryDoc} />
               </div>
@@ -903,6 +984,7 @@ export default function EditorCanvas({
             {!secondaryIsStructured ? (
               <TableToolbar editor={liveSecondaryEditor} />
             ) : null}
+            {renderBubble('secondary')}
           </div>
         )}
         {comparing ? (
@@ -916,6 +998,7 @@ export default function EditorCanvas({
             refreshFiles={refreshFiles}
             onOpenDocInTab={onOpenDocInTab}
             setVersions={setVersions}
+            initialVersions={versions?.[compare.docName]}
           />
         ) : null}
 
@@ -924,6 +1007,7 @@ export default function EditorCanvas({
           <FocusModeOverlay
             editor={focusModeEditor}
             onExit={onExitFocusMode}
+            sidebars={focusSidebars}
           />
         ) : null}
       </div>

@@ -1,6 +1,6 @@
 /**
  * The menu bar's own items: Insert, Format, the View menu's mode, pages and split
- * items, Window's tab navigation, Edit ▸ Paste and Match Style, and File's extras.
+ * items, Edit ▸ Paste and Match Style, and File's extras.
  *
  * Every item acts at the moment it is chosen on the state the page last published —
  * the toolbar's target, the page layout, the tabs — and sends the command the toolbar
@@ -10,7 +10,6 @@ import { documentSurface, latestBridgeEvent, shellBridge } from '../bridge'
 import { CITE_SOURCE_EVENT } from '../components/RightSidebar/references/citeEvent'
 import { CUSTOMIZE_TOOLBAR_EVENT } from '../components/toolbar/toolbarContext'
 import { CUSTOMIZE_INSPECTOR_EVENT } from '../hooks/contextMenu/toolbarMenu'
-import { adjacentTab } from '../components/tabs/tabBarState'
 
 const send = (type, payload) => shellBridge.send(type, payload)
 const target = () => latestBridgeEvent('toolbarState')?.target ?? null
@@ -112,25 +111,9 @@ export async function viewItems(api) {
   ])
 }
 
-/** Window ▸ the next and previous tab, where Safari and Xcode put them. */
-export async function windowTabItems(api) {
-  const step = (offset) => () => {
-    const state = latestBridgeEvent('tabsChanged')
-    const next = adjacentTab(state?.tabs ?? [], state?.activeTabId, offset)
-    if (next) send('selectTab', { tabId: next.id })
-  }
-  return items(api, [
-    { text: 'Show previous tab', action: step(-1) },
-    { text: 'Show next tab', action: step(1) },
-    { separator: true },
-  ])
-}
-
-/** File ▸ New Tab, Export Again, Print and Export Whole Project. */
+/** File ▸ Export Again, Print and Export Whole Project. */
 export async function fileExtraItems(api) {
   return items(api, [
-    { text: 'New tab', action: () => send('newTab', {}) },
-    { separator: true },
     { text: 'Export again', accelerator: 'CmdOrCtrl+Shift+E', action: () => send('exportAgain', {}) },
     { text: 'Print whole project…', action: () => send('printDocument', { scope: 'project', bound: false }) },
     { text: 'Export whole project', items: [

@@ -54,6 +54,11 @@ export default function LeftSidebar({
   activeEditor,
   notesByDoc,
   onOpenSearchTarget,
+  splits,
+  activeSplitId,
+  onOpenSavedSplit,
+  onOpenDocAlone,
+  onForgetSplit,
 }) {
   // The project's files, or the book's contents in the book's own order. The mode
   // chooses — Typeset shows the book — and the switch overrides it until the mode
@@ -128,10 +133,15 @@ export default function LeftSidebar({
   const handleSelectProject = useCallback((nextProject) => {
     setProjectName?.(nextProject)
   }, [setProjectName])
+  // Choosing a document shows it on its own; a split it leaves stays in the tree.
   const handleSelectDoc = useCallback((doc) => {
+    if (onOpenDocAlone) {
+      onOpenDocAlone(doc)
+      return
+    }
     setActiveDoc?.(doc)
     setCurrentDoc(doc)
-  }, [setActiveDoc, setCurrentDoc])
+  }, [onOpenDocAlone, setActiveDoc, setCurrentDoc])
   const showFiles = useCallback(() => selectView('files'), [selectView])
 
   // Creating or renaming happens in the file tree's inline box, so bring Files up for
@@ -150,9 +160,13 @@ export default function LeftSidebar({
       onSelectProject={handleSelectProject}
       registerRefreshFiles={registerRefreshFiles}
       onSelectDoc={handleSelectDoc}
+      splits={splits}
+      activeSplitId={activeSplitId}
+      onOpenSplit={onOpenSavedSplit}
+      onForgetSplit={onForgetSplit}
       footerSlot={hasBook && view !== 'files' ? null : footerSlot}
     />
-  ), [activeDoc, currentDoc, footerSlot, handleSelectDoc, handleSelectProject, hasBook, projectName, registerRefreshFiles, secondaryDoc, splitView, view])
+  ), [activeDoc, activeSplitId, currentDoc, footerSlot, handleSelectDoc, handleSelectProject, hasBook, onForgetSplit, onOpenSavedSplit, projectName, registerRefreshFiles, secondaryDoc, splitView, splits, view])
   const bookView = useMemo(() => (
     <BookNavigator hasProject={hasBook} onShowFiles={showFiles} footerSlot={view === 'book' ? footerSlot : null} />
   ), [footerSlot, hasBook, showFiles, view])

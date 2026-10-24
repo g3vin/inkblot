@@ -16,13 +16,13 @@ import { PROJECT_FILES_CHANGED } from '../lib/projectFiles'
 import { readDetachedTarget } from '../lib/docWindow'
 import { normalizeNotes } from '../lib/noteUtils'
 import Icon from '../ui/Icon.jsx'
+import { RevealGate } from '../ui/Reveal.jsx'
 
 import './Editor.css'
 
 import ProjectLanding from './ProjectLanding'
 import { useTabs } from '../hooks/useTabs'
 import { useTabsPublisher } from '../hooks/useTabsPublisher'
-import useTabShortcuts from './tabs/useTabShortcuts.js'
 import { useEntryOperations } from '../hooks/useEntryOperations'
 import { useClipboardHistory } from '../hooks/useClipboardHistory'
 import {
@@ -39,6 +39,16 @@ import { dragHandoff, documentSurface, DragPayloadKind, editorRegistry } from '.
 import { getProjectRoot } from '../lib/projectPaths'
 import { useWindowPop } from '../hooks/useWindowPop'
 import DetachedWindowBar from './DetachedWindowBar'
+
+/**
+ * What opening a project waits for before any of it is shown (ui/Reveal.jsx): the file
+ * tree, both panes' documents, the project's locks (so a lock badge arrives with its
+ * document), and the check that the restored tabs still exist, so a tab never
+ * vanishes after it is drawn.
+ */
+const REVEAL_PIECES = ['tree', 'primary', 'secondary', 'locks', 'session']
+const SESSION_CHECKED = ['session']
+const NOTHING_CHECKED = []
 
 /** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
@@ -88,6 +98,9 @@ export default function Editor({
   const [splitOrientation, setSplitOrientation] = useState('columns') // 'columns' (side by side) | 'rows' (stacked)
   const [splitRatio, setSplitRatioState] = useState(0.5) // share of the split taken by the primary pane
   const [secondaryDoc, setSecondaryDoc] = useState(null) // The name of the second file
+  // The splits kept in the file tree (editorSession's SavedSplit), and the one showing.
+  const [splits, setSplits] = useState([])
+  const [activeSplitId, setActiveSplitId] = useState(null)
   // Open tabs. A tab is { id, docPath }, where docPath: null is a draft —
   // a tab that has not decided what document it is yet (see DraftTabPane).
   const [tabs, setTabs] = useState([])
@@ -115,6 +128,8 @@ export default function Editor({
       setSplitRatioState(0.5)
       setTabs([])
       setActiveTabId(null)
+      setSplits([])
+      setActiveSplitId(null)
       setSidebarTab('workbench')
       setTiles([])
       setNotesByDoc({})
@@ -149,6 +164,8 @@ export default function Editor({
     setSplitRatioState(projectSession.splitRatio)
     setTabs(projectSession.docTabs)
     setActiveTabId(projectSession.activeTabId)
+    setSplits(projectSession.splits)
+    setActiveSplitId(projectSession.activeSplitId)
     setSidebarTab(projectSession.sidebarTab)
     setTiles(projectSession.tiles)
     setNotesByDoc({})
@@ -184,6 +201,11 @@ export default function Editor({
     adoptDraftDoc,
     openDocInSplit,
     closeSplit,
+    placeDocBeside,
+    restorePanes,
+    openSavedSplit,
+    openDocAlone,
+    forgetSplit,
     draftTabActive,
     setSplitRatio,
   } = useTabs({
@@ -201,11 +223,14 @@ export default function Editor({
     setSplitRatioState,
     setSplitView,
     setTabs,
+    splitRatio,
     tabs,
+    splits,
+    setSplits,
+    activeSplitId,
+    setActiveSplitId,
   })
 
-  // The tabs, published for the tab bar, and their shortcuts.
-  useTabShortcuts()
   // Documents popping out into windows of their own and back (docWindow.js).
   const windowPop = useWindowPop({
     detached: Boolean(detachedTarget),
@@ -295,14 +320,39 @@ export default function Editor({
   const docRef = useRef(currentDoc)
   useEffect(() => { docRef.current = currentDoc }, [currentDoc])
 
+  // Opening a project from the start screen: the start screen fades out over the
+  // editor, which mounts beneath it at once so its loads are already under way. The
+  // timer ends it should the fade never report (an animation that did not run).
+  const [landingLeaving, setLandingLeaving] = useState(false)
+  const [shownProject, setShownProject] = useState(projectName)
+  if (shownProject !== projectName) {
+    setShownProject(projectName)
+    setLandingLeaving(Boolean(!shownProject && projectName && !detachedTarget))
+  }
+  const endLanding = useCallback(() => setLandingLeaving(false), [])
+  useEffect(() => {
+    if (!landingLeaving) return undefined
+    const timer = window.setTimeout(endLanding, 1000)
+    return () => window.clearTimeout(timer)
+  }, [endLanding, landingLeaving])
+
   // Validate the restored session against disk: bail out to the landing page if the
   // project vanished, and close docs that no longer exist.
+  const [validatedProject, setValidatedProject] = useState('')
   useEffect(() => {
     let cancelled = false
 
     const validateSession = async () => {
       if (!projectName) return
-      const projects = await listProjects()
+      const tabDocs = tabs.map(tab => tab.docPath).filter(Boolean)
+      // One round of reads rather than one after another: opening the project waits
+      // on this answer (the 'session' piece of its RevealGate).
+      const [projects, currentExists, secondaryExists, tabExistence] = await Promise.all([
+        listProjects(),
+        currentDoc ? documentExists(projectName, currentDoc) : true,
+        secondaryDoc ? documentExists(projectName, secondaryDoc) : true,
+        Promise.all(tabDocs.map(docPath => documentExists(projectName, docPath))),
+      ])
       if (cancelled) return
 
       if (!projects.includes(projectName)) {
@@ -316,38 +366,23 @@ export default function Editor({
         return
       }
 
-      if (currentDoc) {
-        const exists = await documentExists(projectName, currentDoc)
-        if (!exists && !cancelled) {
-          setCurrentDoc('')
-          setActiveDoc('')
-          setSecondaryDoc(null)
-          setSplitView(null)
-        }
-      }
-
-      if (secondaryDoc) {
-        const existsSecondary = await documentExists(projectName, secondaryDoc)
-        if (!existsSecondary && !cancelled) {
-          setSecondaryDoc(null)
-          setSplitView(null)
-        }
+      if (!currentExists) {
+        setCurrentDoc('')
+        setActiveDoc('')
+        setSecondaryDoc(null)
+        setSplitView(null)
+      } else if (!secondaryExists) {
+        setSecondaryDoc(null)
+        setSplitView(null)
       }
 
       // A tab whose document was deleted (or renamed) elsewhere would open
       // nothing, so it is dropped. Drafts have no document to check.
-      const tabDocs = tabs.map(tab => tab.docPath).filter(Boolean)
-      if (tabDocs.length) {
-        const existence = await Promise.all(
-          tabDocs.map(docPath => documentExists(projectName, docPath))
-        )
-        if (cancelled) return
-
-        const missing = new Set(tabDocs.filter((docPath, index) => !existence[index]))
-        if (missing.size) {
-          setTabs(prev => prev.filter(tab => !tab.docPath || !missing.has(tab.docPath)))
-        }
+      const missing = new Set(tabDocs.filter((docPath, index) => !tabExistence[index]))
+      if (missing.size) {
+        setTabs(prev => prev.filter(tab => !tab.docPath || !missing.has(tab.docPath)))
       }
+      setValidatedProject(projectName)
     }
 
     validateSession()
@@ -394,6 +429,8 @@ export default function Editor({
       tiles,
       docTabs: tabs,
       activeTabId,
+      splits,
+      activeSplitId,
       updatedAt: now,
     })
 
@@ -410,7 +447,7 @@ export default function Editor({
       setPreference(PERSIST_KEY, JSON.stringify(payload))
       return nextProjectSessions
     })
-  }, [detachedTarget, projectName, currentDoc, secondaryDoc, splitView, splitOrientation, splitRatio, activeDoc, sidebarTab, tiles, tabs, activeTabId])
+  }, [detachedTarget, projectName, currentDoc, secondaryDoc, splitView, splitOrientation, splitRatio, activeDoc, sidebarTab, tiles, tabs, activeTabId, splits, activeSplitId])
 
   useEffect(() => {
     setPreference(CLIPBOARD_PERSIST_KEY, JSON.stringify(clipboardHistory))
@@ -699,18 +736,23 @@ export default function Editor({
     return () => window.removeEventListener('keydown', handlePastePlain, { capture: true })
   }, [activeEditor, editor, secondaryEditor])
 
-  if (!projectName) {
-    return (
-      <ProjectLanding
-        projectSessions={projectSessions}
-        onOpenProject={openProject}
-        onCreateProject={createAndOpenProject}
-      />
-    )
-  }
+  const landing = !projectName || landingLeaving ? (
+    <ProjectLanding
+      key="landing"
+      projectSessions={projectSessions}
+      onOpenProject={openProject}
+      onCreateProject={createAndOpenProject}
+      leaving={Boolean(projectName)}
+      onLeft={endLanding}
+    />
+  ) : null
+
+  if (!projectName) return <>{landing}</>
 
   return (
     <>
+    {landing}
+    <RevealGate keys={REVEAL_PIECES} resetKey={projectName} ready={validatedProject === projectName ? SESSION_CHECKED : NOTHING_CHECKED}>
       <EditorLayout
         splitView={splitView}
         setSplitView={setSplitView}
@@ -722,6 +764,13 @@ export default function Editor({
         onOpenDocInTab={openDocInTab}
         onOpenDocInSplit={openDocInSplit}
         onCloseSplit={closeSplit}
+        onPlaceDocBeside={placeDocBeside}
+        onRestorePanes={restorePanes}
+        splits={splits}
+        activeSplitId={activeSplitId}
+        onOpenSavedSplit={openSavedSplit}
+        onOpenDocAlone={openDocAlone}
+        onForgetSplit={forgetSplit}
         onDraftCreated={adoptDraftDoc}
 
         editor={editor}
@@ -770,6 +819,7 @@ export default function Editor({
       {detachedTarget ? (
         <DetachedWindowBar onTop={windowPop.onTop} onKeepOnTop={windowPop.keepOnTop} onDock={windowPop.dock} />
       ) : null}
+    </RevealGate>
     </>
   )
 }

@@ -1,8 +1,6 @@
 /**
- * Documents in windows of their own (docWindow.js, useWindowPop.js, the tab bar).
+ * Documents in windows of their own (docWindow.js, useWindowPop.js).
  *
- *   - a tab let go outside the window opens its document in a window where it was let
- *     go, and leaves the tab bar; one let go inside does not;
  *   - a detached window's document goes back: its pending save is written first, then
  *     the main window is told, then the window closes;
  *   - the main window opens a document given back in a tab;
@@ -42,42 +40,12 @@ window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} }
 const React = (await import('react')).default
 const { act } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { documentSurface } = await import('../../src/bridge/index.ts')
-const T = await import('../../src/components/tabs/tabBarState.js')
-const { default: DocumentTabBar } = await import('../../src/components/tabs/DocumentTabBar.jsx')
 const { useWindowPop } = await import('../../src/hooks/useWindowPop.js')
 const { DOCK_EVENT } = await import('../../src/lib/docWindow.js')
 const { withDocLock } = await import('../../src/lib/docLock.ts')
 const { runCommand } = await import('../../src/lib/commands.ts')
 
-ok('a point past any edge is outside the window', T.outsideWindow({ x: -5, y: 10 }, 800, 600) && T.outsideWindow({ x: 10, y: 601 }, 800, 600))
-ok('a point in it is not', !T.outsideWindow({ x: 400, y: 300 }, 800, 600) && !T.outsideWindow(null, 800, 600))
-
-/* ---------------- dragging a tab out ---------------- */
-
-const commands = []
-for (const type of ['openDocInWindow', 'closeTab', 'setTabOrder']) {
-  documentSurface.onCommand(type, (payload) => commands.push({ type, payload }))
-}
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-const host = document.getElementById('root').appendChild(document.createElement('div'))
-const root = createRoot(host)
-await act(async () => { documentSurface.publishTabsChanged({ tabs: [{ id: 't1', docPath: 'One' }, { id: 't2', docPath: 'Two' }], activeTabId: 't1' }); await wait(40) })
-await act(async () => root.render(React.createElement(DocumentTabBar, { activeDoc: 'One' })))
-const tab = () => host.querySelector('[data-reorder-id="t2"]')
-const drag = async (to) => {
-  await act(async () => { tab().dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 100, clientY: 20 })) })
-  await act(async () => { window.dispatchEvent(new window.PointerEvent('pointermove', { bubbles: true, clientX: to.x, clientY: to.y })) })
-  await act(async () => { window.dispatchEvent(new window.PointerEvent('pointerup', { bubbles: true, clientX: to.x, clientY: to.y })) })
-}
-await drag({ x: 300, y: 400 })
-ok('let go inside the window, nothing pops out', !commands.some((c) => c.type === 'openDocInWindow'))
-await drag({ x: 300, y: -60 })
-const popped = commands.find((c) => c.type === 'openDocInWindow')
-ok('let go outside, its document opens in a window', popped?.payload.docPath === 'Two')
-ok('where it was let go', Number.isInteger(popped?.payload.at?.x) && popped.payload.at.y === (window.screenY || 0) - 60 - 20)
-ok('and the tab leaves', commands.at(-1)?.type === 'closeTab' && commands.at(-1).payload.tabId === 't2')
-await act(async () => root.unmount())
 
 /* ---------------- a detached window ---------------- */
 

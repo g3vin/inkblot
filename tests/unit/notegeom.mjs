@@ -89,4 +89,19 @@ const anchor = (left, top) => ({ left, top, right: left + 8, bottom: top + 16, w
   const overlaps = (a, b) => a.x < b.x + b.width && a.x + 200 > b.x && a.y < b.y + b.height && a.y + 100 > b.y
   ok('new note: somewhere else when that is taken', !overlaps(second, taken) && !overlaps(second, parent))
 }
+{
+  // root ─ a ─ a1 ─ a1x
+  //      └ b
+  const notes = [
+    { id: 'root' }, { id: 'a', parentNoteId: 'root' }, { id: 'a1', parentNoteId: 'a' },
+    { id: 'a1x', parentNoteId: 'a1' }, { id: 'b', parentNoteId: 'root' },
+  ]
+  const at = G.getStackOrder(notes, null)
+  ok('stacking: parents cover their children', at.get('root') > at.get('a') && at.get('a') > at.get('a1') && at.get('a1') > at.get('a1x'))
+  const held = G.getStackOrder(notes, 'a1')
+  ok('stacking: a held note is on top', [...held.values()].every((z) => z <= held.get('a1')) && [...held.keys()].filter((id) => held.get(id) === held.get('a1')).length === 1)
+  ok('stacking: falls a step per string either side of it',
+    held.get('a') === held.get('a1') - 1 && held.get('root') === held.get('a1') - 2 && held.get('a1x') === held.get('a1') - 1)
+  ok('stacking: other branches sit lower still', held.get('b') === held.get('a1') - 3)
+}
 globalThis.window = saved

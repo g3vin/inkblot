@@ -79,6 +79,13 @@ export function useEditorDocCache({ hasNotesForDoc, projectName, setNotesForDoc 
     docStateCacheRef.current.set(cacheKey, targetEditor.state)
   }, [getDocCacheKey])
 
+  // Whether a pane can take this doc back without reading it: its state is stashed,
+  // and its notes, the other thing a read seeds, are already held.
+  const canRestoreFromCache = useCallback((docName, paneId) => {
+    const cacheKey = getDocCacheKey(docName, paneId)
+    return Boolean(cacheKey && docStateCacheRef.current.has(cacheKey) && hasNotesForDoc(docName))
+  }, [getDocCacheKey, hasNotesForDoc])
+
   // Install a doc into a pane: prefer the cached state, else build one from
   // the loaded content; also seed the doc's notes on first open.
   const restoreEditorStateForDoc = useCallback((targetEditor, docName, paneId, loadedDoc) => {
@@ -102,6 +109,7 @@ export function useEditorDocCache({ hasNotesForDoc, projectName, setNotesForDoc 
 
   return {
     beginPaneLoad,
+    canRestoreFromCache,
     endPaneLoad,
     forgetDoc,
     isDocLoaded,

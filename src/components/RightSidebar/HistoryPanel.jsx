@@ -45,6 +45,8 @@ import Section from '../../ui/Section.jsx'
 import Segmented from '../../ui/Segmented'
 import IconButton from '../../ui/IconButton.jsx'
 import { EmptyState } from '../../ui/Surfaces.jsx'
+import { SkeletonRows } from '../../ui/Reveal.jsx'
+import { staggerStyle, useReveal } from '../../ui/revealState.js'
 import { PanelActions } from '../../ui/PanelActions.jsx'
 import ArchivePanel from './ArchivePanel'
 import './HistoryPanel.css'
@@ -127,6 +129,9 @@ export default function HistoryPanel({
     [localVersions, versions]
   )
 
+  // Which document the panel has read versions for itself. `versions` from above,
+  // when present, counts as read: the pane that opened the document passed them on.
+  const [readFor, setReadFor] = useState(null)
   const refresh = useCallback(async () => {
     if (!projectName || !docName) return
     try {
@@ -135,16 +140,25 @@ export default function HistoryPanel({
       setVersions?.(docName, nextVersions || [])
     } catch {
       // ignore
+    } finally {
+      setReadFor(docName)
     }
   }, [projectName, docName, setVersions])
 
+  const versionsRef = useRef(versions)
+  useEffect(() => { versionsRef.current = versions }, [versions])
   useEffect(() => {
     setLocalVersions([])
     setExpandedGroups(new Set())
     setRenamingId(null)
     setConfirmDeleteId(null)
-    void refresh()
+    // The open document's versions arrive with it; reading the file again for them
+    // would parse its whole history a second time.
+    if (!Array.isArray(versionsRef.current)) void refresh()
   }, [refresh])
+
+  const versionsReady = Array.isArray(versions) || readFor === docName
+  const listReveal = useReveal(versionsReady)
 
   useEffect(() => {
     const handler = (event) => {
@@ -461,12 +475,16 @@ export default function HistoryPanel({
         />
       </div>
 
-      {sections.length === 0 ? (
+      {!versionsReady || listReveal.phase === 'hidden' ? (
+        <div className="ib-skeleton-host history-skeleton" data-visible={listReveal.skeleton ? 'true' : 'false'} aria-busy="true">
+          <SkeletonRows count={5} />
+        </div>
+      ) : sections.length === 0 ? (
         <EmptyState compact={displayedVersions.length > 0} icon={displayedVersions.length === 0 ? 'history' : undefined} title={emptyMessage.title} hint={emptyMessage.hint} />
       ) : (
-        <div className="sidebar-list history-list">
-          {sections.map((section) => (
-            <div key={section.dayKey} className="history-day">
+        <div className="sidebar-list history-list ib-stagger" data-reveal={listReveal.phase}>
+          {sections.map((section, index) => (
+            <div key={section.dayKey} className="history-day" style={staggerStyle(index)}>
               <div className="history-day-label">{section.dayLabel}</div>
               {section.groups.map((group) => renderGroup(group))}
             </div>

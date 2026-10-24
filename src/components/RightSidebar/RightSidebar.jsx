@@ -257,7 +257,8 @@ export default function RightSidebar({
 
     const textHistory = (
       <HistoryPanel
-        versions={versions?.[activeDoc] || []}
+        // Absent, not empty, until the document's versions are in: History tells the two apart.
+        versions={versions?.[activeDoc]}
         setVersions={setVersions}
         // The history acts on the ACTIVE document, which may live in either pane.
         editor={activeDoc === secondaryDoc && activeDoc !== currentDoc ? secondaryEditor : editor}

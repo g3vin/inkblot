@@ -28,7 +28,9 @@ import { TimelineAnchors } from '../extensions/TimelineAnchors'
 import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import ResizableImage from '../extensions/ResizableImage'
+import { SelectionHighlight } from '../extensions/SelectionHighlight'
 import TabIndent from '../extensions/TabIndent'
+import { TextCaret } from '../extensions/TextCaret'
 import { ChapterHead } from '../print/ChapterHead'
 import { ChapterHeadDecorations } from '../print/ChapterHeadDecorations'
 import { DocChapterMeta } from '../print/DocChapterMeta'
@@ -60,6 +62,8 @@ const sharedExtensions = () => [
   ReadAloudHighlight,
   DictationInline,
   TabIndent,
+  TextCaret,
+  SelectionHighlight,
   TextAlign.configure({
     types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
   }),

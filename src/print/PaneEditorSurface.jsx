@@ -64,7 +64,7 @@ const useAssetUrls = (projectName, sources) => {
   return urls
 }
 
-export default function PaneEditorSurface({ editor, projectName, docPath, header = null, scrollRef, onOpenDoc }) {
+export default function PaneEditorSurface({ editor, projectName, docPath, header = null, scrollRef, onOpenDoc, revealProps }) {
   usePrintLayoutStore()
   const [scrollEl, setScrollEl] = useState(null)
   const ownSetup = useDocPageSetup(editor)
@@ -188,6 +188,7 @@ export default function PaneEditorSurface({ editor, projectName, docPath, header
       ref={setScroll}
       className={`pane-scroll${printLayout ? ' is-print-layout' : ''}${locked ? ' is-typeset-locked' : ''}${digital ? ' is-digital' : ''}`}
       tabIndex={printLayout ? -1 : undefined}
+      {...revealProps}
     >
       {header}
       <TypesetEditText editor={editor} projectName={projectName} docPath={docPath} typesetting={typesetting} />

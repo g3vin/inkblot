@@ -128,6 +128,46 @@
     margin-right var(--dur-slow) var(--ease-out);
 }
 
+/* Split view: the card steps back to a frame holding three cards of its own: the
+   toolbar's across the top, and one for each document under it (EditorPanes.css).
+   Nothing is clipped, so their shadows fall on the tray. A bubble open does the same:
+   its pane gives up its card, and the bubbles lie on the tray under the toolbar's. */
+.document-card.is-split,
+.document-card.is-bubbling {
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+}
+/* Not clipping, a flex item grows to its content: the column must still fit the card. */
+.document-card.is-split > .middle-section,
+.document-card.is-bubbling > .middle-section {
+  min-height: 0;
+  overflow: visible;
+}
+.document-card.is-split .app-titlebar::before,
+.document-card.is-bubbling .app-titlebar::before {
+  border-bottom: none;
+  border-radius: var(--radius-lg);
+}
+/* The toolbar card's shadow, under every card rather than over the panes below it
+   (EditorPanes.css draws theirs the same way). */
+.document-card.is-split > .middle-section::before,
+.document-card.is-bubbling > .middle-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--app-titlebar-height);
+  z-index: -1;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  pointer-events: none;
+}
+.document-card.is-split .find-bar {
+  top: calc(var(--app-titlebar-height) + var(--space-3) + var(--space-2));
+}
+
 /* A transition runs on the state being entered, so each docked side drops its own: a
    sidebar pinned to the tray from a peek moves the card at once, and one put away
    lets it glide back out. One pinned from hidden glides in with the card. */
@@ -153,9 +193,9 @@
   .document-card { transition: none; }
 }
 
-.editor-page-wrapper.is-focus-mode .app-titlebar,
-.editor-page-wrapper.is-focus-mode .left-sidebar,
-.editor-page-wrapper.is-focus-mode .right-sidebar {
+/* Focus mode's own bar (FocusModeBar) floats in where the toolbar was. The sidebars stay:
+   put away as it opens, they hover in from the edges and can be docked as ever. */
+.editor-page-wrapper.is-focus-mode .app-titlebar {
   display: none;
 }
 
@@ -179,6 +219,5 @@
 .titlebar-toggle.is-left { grid-row: 1; grid-column: 1; justify-content: flex-end; }
 .titlebar-toggle.is-right { grid-row: 1; grid-column: 3; justify-content: flex-start; }
 .titlebar-toggle .is-mirrored .ui-icon-button-icon { transform: scaleX(-1); }
-.editor-page-wrapper.is-focus-mode .titlebar-toggle { display: none; }
 .titlebar-toggle .ui-button { color: var(--text-secondary); }
 .titlebar-toggle .ui-button:hover { color: var(--text-primary); }

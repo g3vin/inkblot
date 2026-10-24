@@ -50,28 +50,6 @@
   flex-direction: row-reverse;
 }
 
-.pane-header-centered {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-align: center;
-  margin-top: 60px;
-  margin-bottom: 4px;
-}
-
-.pane-header-centered button {
-  position: static;
-  font-size: 12px;
-  padding: 0 6px;
-  line-height: 1.2;
-}
-
-/* Stacked, the lower pane's header has no titlebar to clear. */
-.split-rows .secondary-pane .pane-header-centered {
-  margin-top: 14px;
-}
-
 /* The seam between the panes is the draggable divider, not a pane border. */
 .secondary-pane {
   position: relative;

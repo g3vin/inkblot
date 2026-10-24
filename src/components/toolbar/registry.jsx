@@ -67,7 +67,6 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.panel.references': panel('references'),
   'inkblot.panel.stats': panel('stats'),
   'inkblot.timer': S.TimerItem,
-  'inkblot.tabs.new-tab': S.NewTabItem,
   'inkblot.tabs.split': S.SplitItem,
 
   'inkblot.typeset.view': T.TypesetViewItem,

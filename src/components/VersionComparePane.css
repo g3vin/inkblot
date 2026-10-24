@@ -325,3 +325,20 @@
 .vcp-map-field {
   color: var(--text-subtle);
 }
+
+/* ---- Loading ----
+   The skeleton's two columns are the comparison's: the same ratio, gap and padding. */
+.vcp-skeleton {
+  display: grid;
+  grid-template-columns:
+    calc(var(--vcp-ratio, 0.5) * 100% - var(--vcp-gap) / 2)
+    1fr;
+  gap: var(--vcp-gap);
+  padding: var(--space-4) var(--vcp-pad);
+}
+
+/* Held in the stats line's own line box, so the line keeps its height. */
+.vcp-stats-skeleton.ib-skeleton {
+  display: inline-block;
+  vertical-align: middle;
+}

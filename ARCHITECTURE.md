@@ -9,7 +9,7 @@ in its header comment. This document covers what spans modules.
 ```mermaid
 flowchart LR
   subgraph page["The page (src/)"]
-    chrome["The chrome<br/>toolbar, file tree, inspector,<br/>tab bar, menus, settings, stats"]
+    chrome["The chrome<br/>toolbar, file tree, inspector,<br/>menus, settings, stats"]
     surface["The document surface<br/>panes, editors, canvases,<br/>maps, timelines"]
     chrome -- "commands, requests<br/>(shellBridge)" --> surface
     surface -- "events, replies<br/>(documentSurface)" --> chrome
@@ -59,6 +59,7 @@ round-tripped through JSON (`src/bridge/transport.ts`).
 | Timeline store | The project's one chronology, with previews and undo | `src/lib/timeline/timelineStore.js` |
 | `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/mod.rs` |
 | UI primitives | Every control the chrome is built from | `src/ui/`, [docs/DESIGN.md](docs/DESIGN.md) |
+| Reveal gate | Opening a project shows the file tree, both panes, the toolbar and the checked tabs together; each reports ready | `Editor.jsx` (`RevealGate`), `src/ui/Reveal.jsx`, `src/lib/projectPrefetch.js` |
 
 ### A keystroke, end to end
 
@@ -174,10 +175,11 @@ Everything is drawn by the page, from what the document surface publishes:
 |---|---|
 | Toolbar | Customizable (`components/toolbar/`): four saved layouts — a document's, a canvas's, a map's and Typeset's (`lib/chromeLayout.ts`), with item ids that are storage keys. Each item reads `toolbarState`, `canvasToolbarChanged`, `mapChromeChanged`, `pageLayoutState` or `viewOptions` and sends commands. Items that do not fit go behind ». |
 | Inspector | A selector bar over the panels (Clipboard, Workbench, Notes, References, History, Stats, Typeset, Print & Export, and a map's panel), in two layouts — drafting and finishing — the writer arranges (Customize Layout…). The panels' edits are commands (`useSidebarCommands`). |
-| Tab bar | Floats over the page column (`components/tabs/`), drawn from `tabsChanged` (`useTabsPublisher`) and changed by command. A tab owns its split. |
+| Tabs | There is no tab bar and there are no tab shortcuts or menu items: the file tree is how documents are found. Tabs are still the page's state (`useTabs`), published as `tabsChanged` (`useTabsPublisher`) and changed by command, for the native shells. A tab owns its split. |
+| Split view | Two cards on the tray under the toolbar's own card (`.document-card.is-split`). Every split made is kept (`splits` in the project session, `recordSavedSplit` in `editorSession.ts`, kept up to date by `useTabs`) and listed above the files in the tree, where choosing it shows it again (`openSavedSplit`) and choosing a document leaves it (`openDocAlone`). A document dragged from the file tree outlines the side it would take (`useSplitDrop`, asked by `useFileTreeDrag` through `lib/splitDropTarget`); held there, the split opens for real, and moving on puts the panes back (`placeDocBeside` / `restorePanes` in `useTabs`, `placeDocIn` in `editorSession.ts`). |
 | File tree and Book | The left sidebar shows the project's files (with a filter bar, `lib/treeFilter.ts`) or, in Typeset mode, the book's contents from `pageLayoutState.bookItems`. |
 | Stats, timer, settings | `src/stats/`: the tracker, the writing timer and goals, recorded through the `stats_*` Tauri commands; the Stats panel, a floating timer capsule, a Timer menu and the Settings sheet (⌘,). |
-| Floating surfaces | The tab bar, word count, the pages' zoom, the timer and the note cards are the one translucent, blurred surface over the page (`.floating-capsule`); everything else is flat. `tests/unit/css.mjs` keeps it that way. |
+| Floating surfaces | The word count, the pages' zoom, the timer and the note cards are the one translucent, blurred surface over the page (`.floating-capsule`); everything else is flat. `tests/unit/css.mjs` keeps it that way. |
 
 ## Print Layout
 
@@ -402,7 +404,7 @@ mind:
 3. The chrome renders the latest event (`useLatestBridgeState`) and sends commands. It
    never keeps a second copy of the state.
 
-`useTabsPublisher` and the tab bar are the worked example.
+`useTabsPublisher` is the worked example.
 
 **A toolbar item.** See `src/lib/chromeLayout.ts` and `components/toolbar/registry.jsx`.
 1. Add it to `TOOLBAR_ITEMS` with an id `inkblot.<area>.<name>`, a label, a semantic
@@ -486,10 +488,9 @@ to prove the case can fail.
 
 **Not yet verified by hand**
 - **The web chrome in the running app.** It was checked in Chromium and in the unit
-  suites: the tab bar (a tab's context menu, drag to reorder, a document dropped from
-  the file tree), the toolbar's » overflow, the menus (Insert, Format, Timer, View),
+  suites: a document dragged from the file tree into a split, the toolbar's » overflow, the menus (Insert, Format, Timer, View),
   notifications and the tray title, and the timer's sounds.
-- **Windows of their own:** a tab dragged out of the window, Move back to the main
+- **Windows of their own:** Open in new window, Move back to the main
   window, and Keep on top, in the running app (the `windows` suite drives the real
   Tauri modules against a stand-in IPC). Detached windows (`doc-*`) share the main
   window's capability.

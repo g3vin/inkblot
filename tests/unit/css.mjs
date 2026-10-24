@@ -33,6 +33,7 @@ const FUNCTIONAL_GRADIENTS = [
   '.ib-fade-scrim',                 // content fading under chrome that overlays it (src/ui FadeScrim)
   '.ib-tray',                       // the window's tray, in the writer's window colour (src/ui Surfaces.css)
   '.note-range',                    // a noted passage's highlight, a flat band sized to its words
+  '.ib-skeleton::after',            // the sheen over a skeleton while a slow load runs (src/ui Reveal.css)
 ]
 
 const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
@@ -53,6 +54,10 @@ const declarationAt = (css, index) => {
 
 const gradientProblems = []
 const blurProblems = []
+// Opacity set on every child of a pane overrides the hidden states of what the pane
+// reveals (src/ui/Reveal.css): an idle skeleton and a loading document would show
+// through. Dimming a pane's contents is `filter: opacity()`, which multiplies instead.
+const dimProblems = []
 let radiusLiterals = 0
 
 for (const file of cssFiles(src)) {
@@ -66,6 +71,11 @@ for (const file of cssFiles(src)) {
     const selector = selectorAt(css, m.index)
     if (FUNCTIONAL_GRADIENTS.some((allowed) => selector.includes(allowed))) continue
     gradientProblems.push(`${name}:${line(m.index)} ${selector}`)
+  }
+
+  for (const m of css.matchAll(/(?:^|[\s;{])opacity\s*:/g)) {
+    const selector = selectorAt(css, m.index)
+    if (/\.pane\b/.test(selector) && />\s*(?:\*|:not\([^)]*\))\s*$/.test(selector)) dimProblems.push(`${name}:${line(m.index)} ${selector}`)
   }
 
   for (const m of css.matchAll(/(?:-webkit-)?backdrop-filter\s*:\s*([^;}]*)/g)) {
@@ -82,6 +92,9 @@ for (const file of cssFiles(src)) {
 for (const problem of gradientProblems) console.log(`      decorative gradient: ${problem}`)
 ok('no decorative gradients', gradientProblems.length === 0)
 
+for (const problem of dimProblems) console.log(`      dims through opacity: ${problem}`)
+ok('a pane dims its contents with filter: opacity(), never opacity on its children', dimProblems.length === 0)
+
 for (const problem of blurProblems) console.log(`      blur: ${problem}`)
 ok('every backdrop-filter is a --blur-* token', blurProblems.length === 0)
 
@@ -94,3 +107,38 @@ const index = readFileSync(join(src, 'index.css'), 'utf8')
 ok('no prefers-color-scheme duplicates: data-theme is always set',
   cssFiles(src).every((file) => !readFileSync(file, 'utf8').includes('prefers-color-scheme')))
 ok('no Vite starter colours left', !/#646cff|#535bf2|#747bff/i.test(index))
+
+// Midnight: every text token is AA (4.5:1) on every surface step, and every ink is AA on
+// black, with --on-ink AA on it. Its values are plain hexes, so they're read straight
+// from the block.
+const midnight = Object.fromEntries([...(tokens.match(/:root\[data-theme='midnight'\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? '')
+  .matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\s*;/gi)].map(([, name, value]) => [name, value]))
+const luminance = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const v = parseInt(hex.slice(i, i + 2), 16) / 255
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+const midnightSurfaces = ['--paper-0', '--paper-1', '--paper-2'].map((name) => midnight[name])
+const midnightText = ['--ink-0', '--ink-1', '--ink-2', '--ink-3'].map((name) => midnight[name])
+const midnightInks = ['blue', 'teal', 'green', 'amber', 'rust', 'red', 'violet', 'slate'].map((id) => midnight[`--ink-${id}`])
+ok('Midnight is true black', midnight['--paper-0'] === '#000000' && midnight['--surface-sunken'] === '#000000')
+ok('Midnight text is AA on every surface',
+  midnightText.every(Boolean) && midnightSurfaces.every(Boolean)
+  && midnightText.every((text) => midnightSurfaces.every((surface) => contrast(text, surface) >= 4.5)))
+ok('Midnight inks are AA on black, and --on-ink is AA on each',
+  midnightInks.every(Boolean)
+  && midnightInks.every((ink) => contrast(ink, '#000000') >= 4.5 && contrast(midnight['--on-ink'], ink) >= 4.5))
+
+// Midnight overrides Ink, so a stylesheet's dark rule must name it too.
+const darkOnly = cssFiles(src).filter((file) => !file.endsWith('tokens.css')).filter((file) => {
+  const css = strip(readFileSync(file, 'utf8'))
+  return (css.match(/\[data-theme='dark'\]/g) ?? []).length > (css.match(/\[data-theme='midnight'\]/g) ?? []).length
+})
+for (const file of darkOnly) console.log(`      dark rule without Midnight: ${relative(root, file)}`)
+ok('every dark-theme rule also covers Midnight', darkOnly.length === 0)

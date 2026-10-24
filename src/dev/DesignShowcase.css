@@ -279,3 +279,35 @@
 .ds-search { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-6); }
 .ds-search > .project-search-card { width: 360px; background-color: var(--search-veil-bg); }
 .ds-search-foot { justify-content: space-between; width: 240px; }
+
+/* Content arriving */
+.ds-reveal-frame {
+  position: relative;
+  margin-top: var(--space-3);
+}
+
+.ds-reveal-row {
+  display: flex;
+  align-items: center;
+  height: 27px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.ds-reveal-skeleton {
+  --skeleton-row-h: 27px;
+}
+
+.ds-skeleton-static {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.ds-pane-skeleton {
+  position: relative;
+  height: 160px;
+  margin-top: var(--space-3);
+}

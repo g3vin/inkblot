@@ -102,6 +102,7 @@ favicon and the desktop and iOS icons.
 | App icon, favicon, any brand tile | `--brand-mark` (black) | `--brand-tile` (white) |
 | On paper (light theme) | `--brand-mark` or `--text-primary` | the page |
 | On ink (dark theme) | `--text-primary` (the page's ink colour) | the page |
+| On Midnight | `--text-primary` (Ember), never on a tile | the page |
 
 The logo never takes Ink Blue, another ink or the accent. Ink Blue (`--brand-ink`) is
 the interface's colour: the default accent, links, focus.
@@ -132,6 +133,18 @@ the name in any face other than Courier Prime.
 The light theme is **paper** and the dark theme is **ink**. Both are warm, not pure
 white or pure black, which is easier on the eyes over long sessions. Don't use `#000`,
 `#fff` or cool greys.
+
+**Midnight** is the exception, chosen by hand: true black (`#000`) paper, so the pixels of
+an OLED or mini-LED screen switch off, with the words in warm **Ember** (`#c9a273`), never
+white, which blooms on black. The page, the tray (whatever the window colour) and
+wells are all `#000`; raised surfaces step up to `#0b0a09` and floating ones to
+`#12100e`, and the hairlines are Ember at low strength. A shadow can't show on black, so
+Midnight's `--shadow-*` tokens lead with an Ember hairline: depth is drawn as a
+wireframe, and the document card is parted from the tray by its hairline alone. The inks
+are dimmed to about 5:1 on black (still AA), so notes keep their colour without glowing,
+and the accent dims with them; `--accent-foreground` is the accent itself, not lifted
+toward white, and `--on-ink` is black. The sidebar tab strip's selector is drawn in
+Ember, not the accent.
 
 | Token | Use |
 |---|---|
@@ -187,7 +200,9 @@ CSS variable (a 2D canvas context, or content that stores literal colours, like 
 a timeline lane) is coloured with `InkWheel`. The control is the thing's own colour, and
 pressing it blooms the inks out of it into a ring of floating dots: no surface behind
 them, only their shadows. Every ink always opens in the same place, so a hand learns the
-ring, and the current ink's place shows as an empty socket.
+ring, and the current ink's place shows as an empty socket. The dot in the middle is a
+size smaller than the ring's (20px to their 24px) and haloed in grey, so it reads as the
+one in hand.
 
 - **The middle dot is what you move.** Swipe toward an ink and the held dot gives a
   little while that ink leans in to meet it. Go far enough and they trade places: the
@@ -221,25 +236,31 @@ resolve where they are declared.
 
 ### Contrast
 
-Body text meets WCAG AA (4.5:1) against every surface it sits on, in both themes. That
+Body text meets WCAG AA (4.5:1) against every surface it sits on, in every theme. That
 includes the ink palette on `--app-bg` and `--on-ink` on every ink; the current values
 all pass. Large display text and icons need 3:1. Re-check whenever you change a value
-in `tokens.css`.
+in `tokens.css`; `tests/unit/css.mjs` checks Midnight's text and inks.
 
 ---
 
 ## 4. Themes
 
-There are three choices: **Light** (paper), **Dark** (ink) and **System**.
+There are four choices: **Light** (paper), **Dark** (ink), **Midnight** (true black,
+Ember text) and **System**, in Settings › Appearance and ⌘K. System picks Light or Dark;
+Midnight is only ever chosen by hand.
 
-`<html data-theme>` is **always** `light` or `dark`. "System" is resolved in JS
-(`src/lib/theme.ts`) before first paint, and re-resolved when the OS changes. So:
+`<html data-theme>` is **always** `light`, `dark` or `midnight`. "System" is resolved in
+JS (`src/lib/theme.ts`) before first paint, and re-resolved when the OS changes. So:
 
 - Write each theme's values **once**, in `tokens.css`, under
-  `:root[data-theme='light']` / `[data-theme='dark']`.
+  `:root[data-theme='light']` / `[data-theme='dark']` / `[data-theme='midnight']`.
+  Midnight overrides Ink, so it lists only what differs.
 - **Never** write `@media (prefers-color-scheme)` in a stylesheet.
 - A component rarely needs theme-specific CSS, because the tokens already switch. If one
-  does, scope it with `:root[data-theme='dark'] .thing { … }` and use tokens inside.
+  does, scope it with `:root[data-theme='dark'] .thing, :root[data-theme='midnight']
+  .thing { … }` and use tokens inside. In JS, ask `isDarkTheme()`, never `=== 'dark'`.
+- The printed page stays print in every theme: page previews and what goes to the
+  printer use `--print-*`.
 - The accent is `data-accent` on `<html>` (absent means Ink Blue), set by
   `setAccentAttribute()`.
 
@@ -300,6 +321,12 @@ and `.ib-prose` (any element that shows the writer's text).
   `--space-3`, and no border: it stands off the tray by its shadow alone). Inside the card the editor background is
   `--app-bg` and seamless: there is no separate "page" sheet in the writing view. Print
   Layout is the one place pages appear, because there the page *is* the subject.
+- **The caret and the selection are drawn, not the browser's.** The caret is a 2px bar
+  as tall as the text, not the line (`TextCaret`). The selection is a `--selection-bg`
+  band a line tall behind each line, notes' dots and bubbles' chips included, and a
+  paragraph's bands are one solid shape with every corner rounded `--radius-xs`,
+  inside and out (`SelectionHighlight`). Colour or hide the
+  caret with `--caret-ink`, never `caret-color`.
 - **Docked or hovering sidebars.** The file tree (left) and inspector (right) are
   either **docked** (pinned) or **hidden**. Docked, a sidebar is part of the tray: no
   sheet, border or shadow of its own, and it pushes the card over, so the card's top
@@ -338,6 +365,30 @@ and `.ib-prose` (any element that shows the writer's text).
   controls are bare on the paper: a fill only on hover, and the accent tint for a
   control that is on. Its menus (text style, font, size) carry the quiet control fill
   (`--control-bg`), so they read as menus rather than labels.
+- **Split view: two cards.** Two documents side by side (or stacked) are two cards on
+  the tray, not one card divided. The toolbar steps out into a card of its own across
+  the top, and the tray shows between all three, as wide a gap as round the outside
+  (`--space-3`). The gap is the divider: pointed at or dragged, a small rounded grip
+  shows in it, as between two windows tiled on a Mac (the arrows move it too). The panes carry
+  no title bar. Every split made is kept in the file tree, pinned above the files: one
+  row holding both documents side by side, each left-aligned with its kind's icon and
+  ruled apart by a hairline (`--border-color`), as the panes are; its × shows at its
+  right on hover and closes it. Choosing the row shows the split; choosing a document shows that document
+  on its own, and the split waits in its row. While a split shows, its row is the
+  lifted selection and its two documents are only shaded (`--surface-hover`). A document dragged from the file
+  tree onto the page outlines, in grey, the side it would take; resting there opens the
+  split for real, the new document dimmed under the outline until the pointer lets go
+  (that is what keeps it), and moving on puts it back with the document under the pointer again,
+  as a clipboard piece settles into the page and lifts out.
+- **Modes that take the card over.** Focus mode keeps the card on the tray, inset
+  `--space-3` all round, and puts both sidebars away as it opens (they hover in from
+  the edges as ever, and come back docked when it closes). Its controls are the
+  toolbar row itself — the same height, paper and rule, the sidebar buttons in its
+  corners — floating in over the card's top while the pointer is there, and never
+  pinned (`FocusModeBar`). A bubble takes its pane's place: the pane gives up its card
+  so the bubbles lie on the tray, the toolbar steps out into a card of its own as in
+  split view and holds the bubble's bar, and in a split the other document stays a
+  card beside it.
 - **The fade scrim.** Other chrome that overlays the document (a bottom bar, the tab
   bar, the word count and page capsules at the foot of a pane) sits on a gradient from solid `--app-bg` to transparent, so text scrolling
   underneath dissolves instead of hitting a hard line. Use `FadeScrim`. Don't give that
@@ -433,14 +484,14 @@ highlight.
 **Motion is subtle and quick.** Use `--dur-fast` (120ms) for hovers and small state
 changes, `--dur-base` (180ms) for popovers, dialogs and panels, and `--dur-slow` (240ms)
 for sheets. The easing is `--ease-out` (`--ease-standard` is the same curve). There is no bounce or overshoot, and no looping
-or attention-seeking animation. Motion explains where something came from and never
+or attention-seeking animation, with one exception: a skeleton's sheen (see Content arriving, below). Motion explains where something came from and never
 decorates. `prefers-reduced-motion` is honoured globally (`base.css`); framer-motion
-components also check `useReducedMotion()`. A staggered entrance (the ink wheel's
-bloom) must also drop its `transition-delay` under reduced motion, which `base.css`
+components also check `useReducedMotion()`. A staggered motion (the ink wheel's
+fold) must also drop its `transition-delay` under reduced motion, which `base.css`
 doesn't reset.
 
 The ink wheel's motion:
-- **Bloom.** The dots open clockwise in `--dur-base`, 18ms apart.
+- **Bloom.** The dots all open at once in `--dur-base`, as they fold back.
 - **Following the hand.** Once open, the dots are painted every frame with no
   transition, so nothing lags behind the hand.
 - **Trade.** A trade is a straight slide in `--dur-base` with `--ease-out`, animated on
@@ -452,6 +503,54 @@ The ink wheel's motion:
   there's none under reduced motion.
 - **Close.** The ring folds back counter-clockwise in `--dur-fast`, 8ms apart, while the
   taken ink moves to the middle. That ink then sinks into the control.
+
+### Content arriving
+
+Content that loads arrives in a few deliberate stages, never as a dozen independent
+pops, and a load that is quick never shows it was loading. The primitives are in
+`src/ui/Reveal.jsx` and `revealState.js`; the timings are the `--dur-reveal`,
+`--reveal-rise`, `--reveal-stagger` and `--dur-shimmer` tokens, with the waits script
+needs in `src/ui/motion.js`.
+
+- **Stages.** The window's frame (tray, card, sidebars, titlebar) is drawn at once.
+  The primary content of a screen waits behind a `RevealGate` until every piece has
+  reported, then arrives together. Opening a project gates the file tree, both panes'
+  documents, the toolbar, the word count and lock badges (with the project's locks)
+  and the check that restored tabs still exist. Secondary content (inspector panels)
+  waits for the gate, then arrives as its own data does.
+- **Screens hand over by crossfade.** Opening a project fades the start screen out
+  over the editor, which mounts beneath it at once so its loads are already running.
+- **Don't punish fast loads.** A skeleton shows only after a load has taken
+  `REVEAL.delay` (150ms), and then stays at least `REVEAL.minVisible` (300ms).
+  `useDelayedFlag` is that rule for any other indicator. A region reloading content it
+  has shown before (another document in the same pane) keeps the old content up until
+  the skeleton is due, so a quick switch is a plain swap.
+- **Reserve space.** Content stays mounted and keeps its layout while hidden; the
+  skeleton lies over it (`SkeletonOverlay`), or in a list sized by its content,
+  placeholder rows use the real row's box. Nothing moves when the data lands.
+- **The hand-off.** Content fades in and rises `--reveal-rise` over `--dur-reveal`.
+  Lists stagger their items `--reveal-stagger` apart (`.ib-stagger` and
+  `staggerStyle(index)`), capped so a long list never trails off. Only `opacity` and
+  `translate` move; `translate` is its own property, so it composes with a framer-motion
+  `transform`.
+- **The sheen.** A showing skeleton carries a slow sheen in the surface's own colour.
+  A skeleton only appears once a load is genuinely slow, and there a still block reads
+  as broken. It stops under reduced motion, where reveals are instant and staggers drop
+  their delays.
+- **Never a false empty state.** An `EmptyState` speaks only once the data it describes
+  has been read. Until then the region is loading, not empty.
+- **Spatial documents.** A canvas, map or timeline has no layout to copy before it is
+  read, so its empty surface (the dot grid, the map's paper) shows at once and its
+  skeleton suggests the kind: a few cards, a sheet with pins, an axis with events
+  (`src/canvas/PaneSkeletons.jsx`, `PaneSurfaceReveal`).
+- **Changing in place.** Something that swaps rather than loads, like the toolbar
+  moving from a document to a canvas, stays mounted and replays its entrance
+  (`useRevealOnChange`), never remounts.
+- **What was shown last shows first.** A list re-read every time (the projects, a
+  project's tree) draws as it was last read this session and is replaced in place.
+- **Dimming.** Dim a region that may hold loading content with `filter: opacity()`,
+  never by setting `opacity` on its children: that overrides the reveal's hidden
+  states, and an idle skeleton shows through (`tests/unit/css.mjs` checks panes).
 
 ---
 
@@ -521,11 +620,16 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `EmptyState` | Any list or panel with nothing in it | Icon, typewritten line and plain hint, centred; in a panel it sits in the middle of the panel's height. At most one action. `compact` for a section or "no matches" (stays in place); `dropActive` washes it in the accent while something is dragged over |
 | `InkWheel` | Colouring a thing on the page | Notes, table fill, canvas cards, map and timeline colours. `none` adds "No fill" / "Default"; `as` + `triggerProps` draw the control as an `IconButton` or a tool button |
 | `InkPicker` | A labelled colour choice in a form | Accent and window colour (Settings → General), folder types. Don't build another swatch row |
-| `FloatingCapsule` | A readout floating over the page (word count, zoom, tab bar) | The floating-capsule surface; glass on iOS |
+| `FloatingCapsule` | A readout floating over the page (word count, zoom) | The floating-capsule surface; glass on iOS |
 | `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips (formatting, canvas, map) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS |
 | `FloatingActionButton` | One round primary action over the document | Glass on iOS |
 | `usePointerReorder` | Drag-to-reorder lists (toolbar items, inspector layout) | |
 | `CommandPalette` | Mounted once in `App` | Features register commands; they don't render this |
+| `RevealGate` | A screen whose pieces load separately | Holds them until all report (`useRevealReady`), or `REVEAL.gateTimeout`. See §7, Content arriving |
+| `useReveal` | Any region whose content loads | Its `phase` and `skeleton`; spread `contentProps` on the content. `gated: false` ignores the gate |
+| `Skeleton`, `SkeletonRows`, `SkeletonOverlay` | Standing in for slow content | Bars sized like what they replace. Over the content, or in an `.ib-skeleton-host` that sets `data-visible` |
+| `useRevealOnChange` | Something that changes in place (the toolbar's kind) | Spread its value as `data-reveal`; the entrance replays on each change |
+| `CanvasSkeleton`, `MapSkeleton`, `TimelineSkeleton`, `PaneSurfaceReveal` | A spatial pane being read (`src/canvas/PaneSkeletons.jsx`) | The empty surface shows at once, the loaded one fades in over it, the skeleton only when slow |
 
 Behaviour hooks (`src/ui/hooks.js`) are `useDismiss`, `useFocusTrap`, `useRovingFocus`
 and `useAnchoredPosition` (`placePopover.js` is the placement maths `Popover` uses). Use them when building anything floating or list-like

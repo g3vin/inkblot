@@ -2,7 +2,7 @@
  * InkWheel.jsx — choose an ink for a thing on the page (a note, a cell, a card, a pin).
  *
  * The control is the thing's own colour. Pressing it blooms the palette out of it,
- * one dot after another clockwise from twelve o'clock, into a ring of floating dots.
+ * every dot at once, into a ring of floating dots.
  * Every ink always opens in the same place, so a hand learns where each one is; the
  * current ink's place is an empty socket while it sits in the middle.
  *
@@ -414,13 +414,13 @@ export default function InkWheel({ value, onChange, label, inks, none, as: Trigg
                 data-socket={index === s.startIndex ? 'true' : undefined}
                 data-target={index === s.target && s.swapped === null && s.picked === null ? 'true' : undefined}
                 data-in-hand={index === s.swapped ? 'true' : undefined}
+                data-centre={index === s.swapped ? 'true' : undefined}
                 data-picked={index === s.picked ? 'true' : undefined}
                 data-empty={option.color ? undefined : 'true'}
                 data-none={option.id === null ? 'true' : undefined}
                 style={{
                   '--swatch': option.color ?? 'var(--text-secondary)',
                   '--axis': `${slotAngle(index, count) - 90}deg`,
-                  '--open-order': index,
                   '--close-order': index === s.picked ? 0 : count - 1 - index,
                 }}
               >
@@ -433,10 +433,10 @@ export default function InkWheel({ value, onChange, label, inks, none, as: Trigg
               aria-hidden="true"
               data-empty={s.startColor ? undefined : 'true'}
               data-taken={s.picked !== null ? 'true' : undefined}
+              data-centre={s.swapped === null ? 'true' : undefined}
               style={{
                 '--swatch': s.startColor ?? 'var(--text-secondary)',
                 '--axis': s.picked !== null ? `${slotAngle(s.picked, count) - 90}deg` : '0deg',
-                '--open-order': 0,
                 // The old colour folds from the place it was swapped into, or last of all
                 // if nothing was taken.
                 '--close-order': s.picked !== null ? count - 1 - s.picked : count,

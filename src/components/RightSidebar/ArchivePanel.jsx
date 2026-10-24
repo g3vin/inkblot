@@ -11,6 +11,8 @@ import { formatFullTimestamp } from '../../lib/versionHistory'
 import { restoreArchivedItem } from '../../lib/archiveRestore'
 import Icon from '../../ui/Icon.jsx'
 import { EmptyState } from '../../ui/Surfaces.jsx'
+import { SkeletonRows } from '../../ui/Reveal.jsx'
+import { staggerStyle, useReveal } from '../../ui/revealState.js'
 
 const KIND_LABELS = { bubble: 'Bubble' }
 
@@ -29,10 +31,16 @@ export function ArchiveIcon({ size = 14 }) {
 export default function ArchivePanel({ projectName, docName, editor, onBack }) {
   const [items, setItems] = useState([])
   const [missing, setMissing] = useState(null)
+  // Whose archive `items` is, so "Nothing archived" is said only once it is known.
+  const [readFor, setReadFor] = useState(null)
 
   const refresh = useCallback(async () => {
-    setItems(await getArchive(projectName, docName))
+    const next = await getArchive(projectName, docName)
+    setItems(next)
+    setReadFor(`${projectName}::${docName}`)
   }, [projectName, docName])
+  const ready = readFor === `${projectName}::${docName}`
+  const listReveal = useReveal(ready, { gated: false })
 
   useEffect(() => {
     void refresh()
@@ -67,12 +75,16 @@ export default function ArchivePanel({ projectName, docName, editor, onBack }) {
         </button>
         <span className="history-archive-title">Archive</span>
       </div>
-      {items.length === 0 ? (
+      {!ready || listReveal.phase === 'hidden' ? (
+        <div className="ib-skeleton-host history-skeleton" data-visible={listReveal.skeleton ? 'true' : 'false'} aria-busy="true">
+          <SkeletonRows count={3} />
+        </div>
+      ) : items.length === 0 ? (
         <EmptyState icon="archive" title="Nothing archived." hint="Things you put away out of this document, like a bubble, are kept here." />
       ) : (
-        <div className="sidebar-list history-list">
-          {items.map((item) => (
-            <div key={item.id} className="history-archive-item">
+        <div className="sidebar-list history-list ib-stagger" data-reveal={listReveal.phase}>
+          {items.map((item, index) => (
+            <div key={item.id} className="history-archive-item" style={staggerStyle(index)}>
               <div className="history-archive-meta">
                 <span className="history-archive-kind">{KIND_LABELS[item.kind] ?? item.kind}</span>
                 <span className="history-timestamp">{formatFullTimestamp(item.archivedAt)}</span>
