@@ -8,7 +8,8 @@
  *
  *   files  { '/mock/<project>/<file>': '<text>' | { base64, type } } — everything under the
  *          projects folder; a binary file (a voice memo) is base64 with its media type
- *   prefs  what preferences_load answers (the theme, the accent, …)
+ *   prefs  what preferences_load answers (the theme, the accent, the editor session, …)
+ *   ipc    fixed answers for native commands a shot needs, by name (get_synonyms, …)
  *
  * Commands it doesn't know answer null, as in the dev mock. Set `__SHOWCASE__.log` to
  * print every call (for writing a new shot).
@@ -132,18 +133,48 @@
   // (trafficLightsBox), so captures made on Linux CI must look like one too.
   Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' })
 
+  // preferences_load answers scope → { key: value }, as lib/preferences.ts reads it;
+  // the scope of a key is the same rule as its scopeFor.
+  const scopeFor = (key) => (key.startsWith('inkblot:pinterest-preview:') ? 'pinterest-cache'
+    : key.startsWith('inkblot-order:') || key.startsWith('inkblot-expanded:') ? 'file-tree' : 'app')
+  const scoped = (flat) => {
+    const out = { app: {}, 'file-tree': {}, 'pinterest-cache': {} }
+    for (const [key, value] of Object.entries(flat)) out[scopeFor(key)][key] = String(value)
+    return out
+  }
+
+  // The shell draws context menus natively; here a shot picks an item by its label,
+  // the way the shell answers a click: a message on the item's action channel.
+  const menuItems = []
+  window.__SHOWCASE_MENU__ = {
+    labels: () => menuItems.map((item) => item.text),
+    choose(text) {
+      const item = [...menuItems].reverse().find((i) => i.text === text)
+      if (!item || item.channel == null) throw new Error(`No menu item "${text}"`)
+      window[`_${item.channel}`]({ index: 0, message: item.rid })
+    },
+  }
+
   let nextId = 1
   const answer = (cmd, args, opts) => {
     const [plugin, name] = cmd.startsWith('plugin:') ? cmd.slice(7).split('|') : [null, cmd]
     if (plugin === 'fs' && fs[name]) return fs[name](args, opts)
     if (plugin === 'path' && path[name]) return path[name](args)
     if (plugin === 'event') return nextId++
-    if (plugin === 'menu') return name === 'items' ? [] : [nextId++, 'x']
+    if (plugin === 'menu') {
+      if (name === 'items') return []
+      const rid = nextId++
+      // A native menu item: remembered with its action's channel, so a shot can choose it.
+      if (name === 'new' && args?.options?.text) menuItems.push({ rid, text: args.options.text, channel: args.handler?.id })
+      return [rid, 'x']
+    }
     if (cmd === 'plugin:window|is_fullscreen') return false
-    if (cmd === 'preferences_load') return { ...prefs }
+    if (cmd === 'preferences_load') return scoped(prefs)
     if (cmd === 'preferences_set') { prefs[args?.key] = args?.value; return null }
     if (cmd === 'preferences_remove') { delete prefs[args?.key]; return null }
     if (cmd === 'window_traffic_lights') { placeLights(args); return null }
+    // A shot's fixed answers for native commands (the language tools' models, …).
+    if (setup.ipc && cmd in setup.ipc) return setup.ipc[cmd]
     if (cmd === 'list_system_fonts') return []
     if (cmd === 'project_locations' || cmd === 'project_locks') return null
     return null
@@ -151,6 +182,8 @@
 
   window.__SHOWCASE_FS__ = { files, dirs }
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} }
+  // The shell sets this (tauri.conf.json: withGlobalTauri); some tiles test for it.
+  window.__TAURI__ = {}
   window.__TAURI_INTERNALS__ = {
     metadata: { currentWindow: { label: 'main' }, currentWebview: { windowLabel: 'main', label: 'main' } },
     transformCallback: (cb) => { const n = nextId++; window[`_${n}`] = cb; return n },

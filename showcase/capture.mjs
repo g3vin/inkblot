@@ -26,7 +26,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { SHOTS } from './shots.mjs'
-import { book } from './fixtures/lighthouse-keeper.mjs'
+import { book } from './fixtures/books.mjs'
 import { loadPlaywright, openPage, repo, serve } from './session.mjs'
 import { parseChangelog } from './changelog.mjs'
 
@@ -98,11 +98,42 @@ function encodeStill(png, base, dims) {
  * A loop: cut [lead, lead + seconds] from the recording and fold its last SEAM seconds
  * over its first, so the end runs into the start. The result is seconds − SEAM long.
  */
-function encodeLoop(recording, base, { lead, seconds, viewport }) {
-  // The recording's frame rate varies; xfade needs both sides at one constant rate.
-  const seam = `[0]split[x][y];` +
-    `[x]trim=start=${lead + SEAM}:end=${lead + seconds},setpts=PTS-STARTPTS,fps=30[a];` +
-    `[y]trim=start=${lead}:end=${lead + SEAM},setpts=PTS-STARTPTS,fps=30[b];` +
+/**
+ * A camera move for a loop: zoompan, eased between the shot's zoom keyframes
+ * ({ t, over, rect } — a rect to frame, or null for the whole window). `in` is the
+ * frame number at 30 fps from the loop's start.
+ */
+function zoomFilter(zooms, { width: W, height: H }) {
+  if (!zooms?.length) return ''
+  const states = [{ t: 0, over: 1, z: 1, cx: W / 2, cy: H / 2 }]
+  for (const { t, over, rect } of zooms) {
+    states.push(rect
+      ? { t, over, z: Math.min(W / rect.width, H / rect.height), cx: rect.x + rect.width / 2, cy: rect.y + rect.height / 2 }
+      : { t, over, z: 1, cx: W / 2, cy: H / 2 })
+  }
+  const T = 'in/30'
+  const eased = (key) => {
+    let expr = `${states[0][key]}`
+    for (let i = 1; i < states.length; i++) {
+      const a = states[i - 1][key].toFixed(4)
+      const delta = (states[i][key] - states[i - 1][key]).toFixed(4)
+      const u = `clip((${T}-${states[i].t.toFixed(3)})/${states[i].over},0,1)`
+      expr = `if(lt(${T},${states[i].t.toFixed(3)}),${expr},${a}+${delta}*${u}*${u}*(3-2*${u}))`
+    }
+    return expr
+  }
+  return `,zoompan=z='${eased('z')}'` +
+    `:x='max(0,min(iw-iw/zoom,${eased('cx')}-iw/zoom/2))'` +
+    `:y='max(0,min(ih-ih/zoom,${eased('cy')}-ih/zoom/2))'` +
+    `:d=1:s=${W}x${H}:fps=30`
+}
+
+function encodeLoop(recording, base, { lead, seconds, viewport, zooms }) {
+  // The loop is cut (and any camera move made) first, then its last SEAM seconds are
+  // folded over its first. The recording's frame rate varies; xfade needs one rate.
+  const seam = `[0]trim=start=${lead}:end=${lead + seconds},setpts=PTS-STARTPTS,fps=30${zoomFilter(zooms, viewport)},split[x][y];` +
+    `[x]trim=start=${SEAM},setpts=PTS-STARTPTS,fps=30[a];` +
+    `[y]trim=end=${SEAM},setpts=PTS-STARTPTS,fps=30[b];` +
     `[a][b]xfade=transition=fade:duration=${SEAM}:offset=${seconds - 2 * SEAM},format=yuv420p[v]`
   const master = path.join(TMP, `${path.basename(base)}.master.mkv`)
   ffmpeg('-i', recording, '-filter_complex', seam, '-map', '[v]', '-c:v', 'libx264', '-crf', '12', '-preset', 'veryfast', master)
@@ -139,19 +170,23 @@ const roundRect = (r) => ({ x: Math.round(r.x), y: Math.round(r.y), width: Math.
 
 async function captureOne(browser, url, shot, theme) {
   const fixture = book(shot.fixture)
-  const prefs = { ...fixture.prefs, 'inkblot-theme': theme, ...(shot.accent ? { 'inkblot-accent-color': shot.accent } : {}) }
+  const prefs = { ...fixture.prefs, ...shot.prefs, 'inkblot-theme': theme, ...(shot.accent ? { 'inkblot-accent-color': shot.accent } : {}) }
   const loop = shot.kind === 'loop'
   const videoDir = path.join(TMP, `${shot.id}-${theme}`)
   const started = Date.now()
   const { context, page, errors } = await openPage(browser, url, {
     files: fixture.files,
     prefs,
+    ipc: shot.ipc,
+    routes: shot.routes,
     viewport: shot.viewport,
     scale: loop ? 1 : 2,
     video: loop ? videoDir : undefined,
     log: flag('--log'),
   })
   let recordAt = null
+  const zooms = []
+  const now = () => (Date.now() - started) / 1000 - recordAt
   const h = {
     /** Everything from here on is the loop. */
     record: async () => { recordAt = (Date.now() - started) / 1000 },
@@ -161,6 +196,10 @@ async function captureOne(browser, url, shot, theme) {
       if (left < 0) console.warn(`  ${shot.id}: the script ran ${(-left).toFixed(1)} s past ${s} s; the loop is cut there`)
       else await page.waitForTimeout(left * 1000)
     },
+    /** From now, move the camera in to frame `rect` (CSS px) over `over` seconds. */
+    zoom: (rect, over = 1.2) => { zooms.push({ t: now(), over, rect }) },
+    /** From now, back out to the whole window. */
+    zoomOut: (over = 1.2) => { zooms.push({ t: now(), over, rect: null }) },
   }
   try {
     await shot.run(page, h)
@@ -184,7 +223,7 @@ async function captureOne(browser, url, shot, theme) {
   if (recordAt == null) throw new Error(`Loop "${shot.id}" never called h.record()`)
   const video = page.video()
   await context.close()
-  return encodeLoop(await video.path(), base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport })
+  return encodeLoop(await video.path(), base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport, zooms })
 }
 
 const git = (...a) => { try { return execFileSync('git', a, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return null } }
