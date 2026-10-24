@@ -6,6 +6,8 @@ Notable changes to Inkblot. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-24
+
 ### Changed
 
 - **Focus mode:** its controls are now a bar at the top of the document, shaped like
@@ -55,6 +57,14 @@ Notable changes to Inkblot. The format follows
   Panels and menus are set apart by fine Ember lines rather than shadows, and note and
   accent colours are dimmed. System still picks Light or Dark; Midnight is only chosen
   by hand.
+- **Drag to split:** drag a document from the file tree onto one side of the page and
+  the side it would take is outlined; hold it there and the window splits for real,
+  and letting go keeps it. Moving on puts the panes back. In a split, a document
+  dropped on a pane takes that pane; over a canvas or a map, only a band along the
+  outer edge splits, so dropping onto them still adds a card or a pin.
+- **Kept splits:** every split you make is kept in the file tree, above the files.
+  Open another document and the split steps aside; click it to have both back as you
+  left them, or ✕ to let it go. They replace the tab bar.
 
 ### Fixed
 
@@ -275,7 +285,8 @@ shell beside the Tauri app.
   bridge protocol) and `inkblot-models` (on-device models) in Rust, shared by both
   apps; types generated into TypeScript and Swift; a JS/Rust parity harness.
 
-[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/g3vin/inkblot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/g3vin/inkblot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/g3vin/inkblot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/g3vin/inkblot/releases/tag/v0.1.0
