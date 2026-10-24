@@ -136,10 +136,18 @@ function zoomFilter(zooms, { width: W, height: H }) {
     `:d=1:s=${W}x${H}:fps=30`
 }
 
-function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fold = SEAM, marks = {}, rest }) {
-  // The loop is cut (and any camera move made) first, then its last `fold` seconds are
-  // folded over its first. The recording's frame rate varies; xfade needs one rate.
-  const cut = `[0]trim=start=${lead}:end=${lead + seconds},setpts=PTS-STARTPTS,fps=30${zoomFilter(zooms, viewport)}`
+function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fold = SEAM, marks = {}, rest, focus }) {
+  // The loop is cut (and any camera move made, or the part to keep cropped: h.focus) first,
+  // then its last `fold` seconds are folded over its first. The recording's frame rate
+  // varies; xfade needs one rate.
+  let crop = null
+  if (focus) {
+    crop = roundRect(focus)
+    crop.width -= crop.width % 2
+    crop.height -= crop.height % 2
+  }
+  const dims = crop ? { width: crop.width, height: crop.height } : viewport
+  const cut = `[0]trim=start=${lead}:end=${lead + seconds},setpts=PTS-STARTPTS,fps=30${zoomFilter(zooms, viewport)}${crop ? `,crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}` : ''}`
   const seam = fold > 0
     ? `${cut},split[x][y];` +
       `[x]trim=start=${fold},setpts=PTS-STARTPTS,fps=30[a];` +
@@ -164,7 +172,7 @@ function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fol
   fit((q) => ffmpeg('-i', master, '-an', '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', String(36 + q * 4), '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', webm), webm)
 
   const poster = `${base}.poster.webp`
-  webp(master, poster, viewport.width)
+  webp(master, poster, dims.width)
   // The frame that stands for the loop where nothing moves (reduced motion).
   let still = null
   if (rest) {
@@ -172,14 +180,16 @@ function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fol
     const frame = path.join(TMP, `${path.basename(base)}.rest.png`)
     ffmpeg('-ss', String(shift(marks[rest])), '-i', master, '-frames:v', '1', frame)
     const out = { avif: `${base}.rest.avif`, webp: `${base}.rest.webp` }
-    avif(frame, out.avif, viewport.width)
-    webp(frame, out.webp, viewport.width)
+    avif(frame, out.avif, dims.width)
+    webp(frame, out.webp, dims.width)
     still = { avif: rel(out.avif), webp: rel(out.webp) }
   }
   fs.rmSync(master)
   return {
-    width: viewport.width,
-    height: viewport.height,
+    width: dims.width,
+    height: dims.height,
+    // Cut from a part of the window: which, for a page to lay it over a still of the whole.
+    ...(crop ? { window: { width: viewport.width, height: viewport.height }, focus: crop } : {}),
     seconds: seconds - fold,
     mp4: rel(mp4),
     webm: rel(webm),
@@ -391,7 +401,7 @@ async function captureOne(browser, url, shot, theme) {
   await context.close()
   const recording = await video.path()
   if (shot.kind === 'sequence') return encodeSequence(recording, base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport, focus, moving, marks, quality: shot.quality })
-  return encodeLoop(recording, base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport, zooms, seam: shot.seam, marks, rest: shot.rest })
+  return encodeLoop(recording, base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport, zooms, seam: shot.seam, marks, rest: shot.rest, focus })
 }
 
 const git = (...a) => { try { return execFileSync('git', a, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return null } }

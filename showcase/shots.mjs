@@ -176,6 +176,13 @@ async function noteClip(page) {
   return { x: column.x - 56, y: top, width: right - (column.x - 56), height: bottom - top }
 }
 
+/** The ink wheel's tour: every note ink once, Teal first, home to Amber (the note's own). */
+const WHEEL_TOUR = ['Teal', 'Violet', 'Rust', 'Ink Blue', 'Green', 'Red', 'Slate', 'Amber']
+/** Seconds per swap in the tour: press, bloom, swipe, let go, back to the colour, a pause. */
+const SWAP = 2.8
+/** The rest before the first press: the loop starts (and ends) on the note at rest, the hand on its colour. */
+const LEAD = 0.6
+
 export const SHOTS = [
   {
     id: 'editor',
@@ -470,14 +477,17 @@ export const SHOTS = [
     },
   })),
   {
-    // The Sage window, closer: the first note's colour pressed, the inks bloom, the hand
-    // swipes to Teal and lets go, and the note and its phrase take it. Kept to the note
-    // and its phrase; the site plays it as the reader scrolls.
+    // The Sage window, closer, kept to the note and its phrase: the hand on the note's
+    // colour presses, the inks bloom, it swipes to one and lets go, and the note and its
+    // phrase take it; back on the colour, a moment, and again, through every ink and home
+    // to Amber, where it began, so it repeats with no seam. The site plays it once its
+    // zoom lands on the note, and until the reader moves on.
     id: 'inks-wheel',
-    kind: 'sequence',
+    kind: 'loop',
     themes: ['light', 'dark'],
     viewport: { width: 1440, height: 900 },
-    seconds: 2.7,
+    seconds: LEAD + SWAP * WHEEL_TOUR.length,
+    seam: 0,
     cursor: true,
     prefs: { ...session(PROJECT, CHAPTERS.pilgrims, { sidebarTab: 'notes' }), 'inkblot-tray-color': 'sage' },
     async run(page, h) {
@@ -488,26 +498,26 @@ export const SHOTS = [
       const tile = await card.boundingBox()
       // The ring blooms about the colour dot; leave it room.
       const reach = { x: tile.x - 90, y: tile.y - 90, width: tile.width + 180, height: tile.height + 180 }
-      const rect = frame([tile, marker, reach], page.viewportSize(), 24)
-      h.focus(rect)
-      // The hand is already on the note's colour when the site's zoom lands, and presses
-      // at once.
-      const away = { x: rect.x - 60, y: rect.y + rect.height + 60 }
+      h.focus(frame([tile, marker, reach], page.viewportSize(), 24))
+      // The hand is already on the note's colour when the site's zoom lands.
       await card.hover()
-      const dot = await card.getByRole('button', { name: /^Note colour/ }).first().boundingBox()
-      await h.point(centre(dot))
+      const dot = centre(await card.getByRole('button', { name: /^Note colour/ }).first().boundingBox())
+      await h.point(dot)
       await page.waitForTimeout(500)
       await h.record()
-      await page.waitForTimeout(120)
-      await page.mouse.down()
-      await page.waitForTimeout(550)
-      const teal = await page.locator('.ib-ink-wheel-ring [role="option"][aria-label="Teal"]').first().boundingBox()
-      await h.glide(centre(teal), 0.6)
-      await page.waitForTimeout(350)
-      await page.mouse.up()
-      await page.waitForTimeout(250)
-      await h.glide(away, 0.7)
-      await h.until(2.7)
+      for (const [i, ink] of WHEEL_TOUR.entries()) {
+        await h.until(LEAD + i * SWAP)
+        await page.mouse.down()
+        await page.waitForTimeout(480)
+        const option = await page.locator(`.ib-ink-wheel-ring [role="option"][aria-label="${ink}"]`).first().boundingBox()
+        await h.glide(centre(option), 0.55)
+        await page.waitForTimeout(260)
+        await page.mouse.up()
+        await page.waitForTimeout(340)
+        // Back on the colour, for the next.
+        await h.glide(dot, 0.45)
+      }
+      await h.until(LEAD + SWAP * WHEEL_TOUR.length)
     },
   },
 ]
