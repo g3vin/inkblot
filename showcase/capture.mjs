@@ -16,8 +16,9 @@
  *          frame. Over the size budget, it is re-encoded smaller; still over at the
  *          smallest, the run fails. Its `marks` (h.mark) say when each step happens, and
  *          `rest` names the mark whose frame stands in for it without motion.
- *   sequence  the frames of a short recording, cropped to `h.focus`, as numbered WebPs:
- *          for a page to play by scrolling, forward and back.
+ *   sequence  the frames of a short recording, cropped to `h.focus`, as numbered WebPs,
+ *          with its `marks` and `motion` (the stretches, in seconds, when anything moves):
+ *          for a page to play in parts, or by scrolling.
  *
  * out/manifest.json lists every file with the app's version, commit and changelog. The
  * release workflow zips out/ as site-content.zip and the website builds from it.
@@ -27,7 +28,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { SHOTS } from './shots.mjs'
 import { book } from './fixtures/books.mjs'
@@ -135,10 +136,18 @@ function zoomFilter(zooms, { width: W, height: H }) {
     `:d=1:s=${W}x${H}:fps=30`
 }
 
-function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fold = SEAM, marks = {}, rest }) {
-  // The loop is cut (and any camera move made) first, then its last `fold` seconds are
-  // folded over its first. The recording's frame rate varies; xfade needs one rate.
-  const cut = `[0]trim=start=${lead}:end=${lead + seconds},setpts=PTS-STARTPTS,fps=30${zoomFilter(zooms, viewport)}`
+function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fold = SEAM, marks = {}, rest, focus }) {
+  // The loop is cut (and any camera move made, or the part to keep cropped: h.focus) first,
+  // then its last `fold` seconds are folded over its first. The recording's frame rate
+  // varies; xfade needs one rate.
+  let crop = null
+  if (focus) {
+    crop = roundRect(focus)
+    crop.width -= crop.width % 2
+    crop.height -= crop.height % 2
+  }
+  const dims = crop ? { width: crop.width, height: crop.height } : viewport
+  const cut = `[0]trim=start=${lead}:end=${lead + seconds},setpts=PTS-STARTPTS,fps=30${zoomFilter(zooms, viewport)}${crop ? `,crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}` : ''}`
   const seam = fold > 0
     ? `${cut},split[x][y];` +
       `[x]trim=start=${fold},setpts=PTS-STARTPTS,fps=30[a];` +
@@ -163,7 +172,7 @@ function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fol
   fit((q) => ffmpeg('-i', master, '-an', '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', String(36 + q * 4), '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', webm), webm)
 
   const poster = `${base}.poster.webp`
-  webp(master, poster, viewport.width)
+  webp(master, poster, dims.width)
   // The frame that stands for the loop where nothing moves (reduced motion).
   let still = null
   if (rest) {
@@ -171,14 +180,16 @@ function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fol
     const frame = path.join(TMP, `${path.basename(base)}.rest.png`)
     ffmpeg('-ss', String(shift(marks[rest])), '-i', master, '-frames:v', '1', frame)
     const out = { avif: `${base}.rest.avif`, webp: `${base}.rest.webp` }
-    avif(frame, out.avif, viewport.width)
-    webp(frame, out.webp, viewport.width)
+    avif(frame, out.avif, dims.width)
+    webp(frame, out.webp, dims.width)
     still = { avif: rel(out.avif), webp: rel(out.webp) }
   }
   fs.rmSync(master)
   return {
-    width: viewport.width,
-    height: viewport.height,
+    width: dims.width,
+    height: dims.height,
+    // Cut from a part of the window: which, for a page to lay it over a still of the whole.
+    ...(crop ? { window: { width: viewport.width, height: viewport.height }, focus: crop } : {}),
     seconds: seconds - fold,
     mp4: rel(mp4),
     webm: rel(webm),
@@ -193,24 +204,54 @@ function encodeLoop(recording, base, { lead, seconds, viewport, zooms, seam: fol
  * A sequence: [lead, lead + seconds] of the recording, cropped to `focus` (CSS px, at 1×:
  * WebKit records at 1× whatever the scale), as numbered WebPs at SEQUENCE_FPS.
  */
-function encodeSequence(recording, base, { lead, seconds, viewport, focus }) {
+function encodeSequence(recording, base, { lead, seconds, viewport, focus, moving, marks = {}, quality = 78 }) {
   if (!focus) throw new Error('a sequence needs h.focus(rect) to say what to keep')
-  const crop = roundRect(focus)
-  crop.width -= crop.width % 2
-  crop.height -= crop.height % 2
+  const even = (r) => { const c = roundRect(r); c.width -= c.width % 2; c.height -= c.height % 2; return c }
+  const crop = even(focus)
   const dir = base
   fs.rmSync(dir, { recursive: true, force: true })
   fs.mkdirSync(dir, { recursive: true })
+  const cut = `trim=start=${lead}:end=${lead + seconds},setpts=PTS-STARTPTS,fps=${SEQUENCE_FPS}`
+  // Only part of it moves (h.moving): one picture of the whole kept part, from the first
+  // frame, and every frame cut to the part that moves, to be drawn over it.
+  const part = moving ? even(moving) : crop
+  let picture = null
+  if (moving) {
+    const first = path.join(TMP, `${path.basename(base)}-base.png`)
+    ffmpeg('-i', recording, '-vf', `${cut},crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}`, '-frames:v', '1', first)
+    picture = path.join(dir, 'base.webp')
+    webp(first, picture, crop.width, Math.max(quality, 82))
+    fs.rmSync(first)
+  }
   const frames = path.join(TMP, `${path.basename(base)}-%04d.png`)
-  ffmpeg('-i', recording, '-vf', `trim=start=${lead}:end=${lead + seconds},setpts=PTS-STARTPTS,fps=${SEQUENCE_FPS},crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}`, frames)
+  ffmpeg('-i', recording, '-vf', `${cut},crop=${part.width}:${part.height}:${part.x}:${part.y}`, frames)
+  // When it actually moves, read from the frames rather than the script's clock (the
+  // recording's frames can run a little behind it): how much each frame differs from the
+  // one before, and the stretches where that's more than noise.
+  const probe = spawnSync('ffmpeg', ['-hide_banner', '-i', recording, '-vf',
+    `${cut},crop=${part.width}:${part.height}:${part.x}:${part.y},tblend=all_mode=difference,signalstats,metadata=print:key=lavfi.signalstats.YAVG`,
+    '-f', 'null', '-'], { encoding: 'utf8' }).stderr
+  // tblend's frame n is the change from frame n to n + 1.
+  const change = [...probe.matchAll(/signalstats\.YAVG=([\d.]+)/g)].map((m) => +m[1])
+  const motion = []
+  for (let i = 0; i < change.length; i++) {
+    if (change[i] < 0.2) continue
+    const last = motion[motion.length - 1]
+    // A frame or two of quiet inside a motion (a slow string) doesn't end it.
+    if (last && i - last[1] <= 2) last[1] = i + 1
+    else motion.push([i, i + 1])
+  }
+  // A lone changed frame (something settling) isn't a motion. In seconds, from frame numbers.
+  const spans = motion.filter(([a, b]) => b - a >= 2).map(([a, b]) => [+(a / SEQUENCE_FPS).toFixed(2), +(b / SEQUENCE_FPS).toFixed(2)])
   const pngs = fs.readdirSync(TMP).filter((f) => f.startsWith(`${path.basename(base)}-`) && f.endsWith('.png')).sort()
   let total = 0
   for (const [i, png] of pngs.entries()) {
     const out = path.join(dir, `${String(i + 1).padStart(4, '0')}.webp`)
-    webp(path.join(TMP, png), out, crop.width, 78)
+    webp(path.join(TMP, png), out, part.width, quality)
     total += size(out)
     fs.rmSync(path.join(TMP, png))
   }
+  if (picture) total += size(picture)
   if (total > SEQUENCE_BUDGET) throw new Error(`${rel(dir)} is ${(total / 1048576).toFixed(1)} MB, over the 3 MB budget. Shorten it or keep less of the window.`)
   return {
     width: crop.width,
@@ -220,11 +261,53 @@ function encodeSequence(recording, base, { lead, seconds, viewport, focus }) {
     fps: SEQUENCE_FPS,
     frames: pngs.length,
     pattern: `${rel(dir)}/%04d.webp`,
+    motion: spans,
+    ...(picture ? { base: rel(picture), moving: { x: part.x - crop.x, y: part.y - crop.y, width: part.width, height: part.height } } : {}),
+    ...(Object.keys(marks).length ? { marks: Object.fromEntries(Object.entries(marks).map(([k, t]) => [k, +t.toFixed(2)])) } : {}),
     bytes: total,
   }
 }
 
 /* ---------------- capture ---------------- */
+
+/** A small seeded random generator: the same shot moves the same way every run. */
+function seeded(text) {
+  let seed = [...text].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261) >>> 0
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * Where a hand moving from `from` to `to` is at `u` (0–1 of the move's time). A person
+ * doesn't move a mouse in a straight line at an even pace: the path bows a little to one
+ * side, the hand sets off quickly and slows a long way into the target, on a long move it
+ * runs a touch past and comes back, and it's never perfectly steady. `bow`, `over` and the
+ * wobble's phases are the move's own (random per move); the time it takes is unchanged.
+ */
+function handAt(from, to, u, { bow, over, phase }) {
+  const dx = to.x - from.x, dy = to.y - from.y
+  const d = Math.hypot(dx, dy)
+  if (d < 1) return { ...to }
+  // Set off quickly, settle slowly: minimum-jerk on time pulled forward.
+  const v = u ** 0.82
+  let k = v * v * v * (10 - 15 * v + 6 * v * v)
+  // A long move runs past by a few percent near its end, then settles back.
+  if (d > 140) k += over * Math.sin(Math.PI * Math.min(1, Math.max(0, (u - 0.72) / 0.28)))
+  // Bowed to one side, most at the middle; less on short moves.
+  const side = bow * Math.min(d, 600) * Math.sin(Math.PI * Math.min(1, k))
+  const nx = -dy / d, ny = dx / d
+  // A faint, slow wobble, gone by the end.
+  const still = 1 - u
+  const wob = 0.7 * still * (Math.sin(u * 23 + phase) + 0.6 * Math.sin(u * 41 + phase * 1.7))
+  return {
+    x: from.x + dx * k + nx * (side + wob),
+    y: from.y + dy * k + ny * (side + wob),
+  }
+}
 
 const roundRect = (r) => ({ x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) })
 
@@ -249,8 +332,10 @@ async function captureOne(browser, url, shot, theme) {
   const zooms = []
   const marks = {}
   let focus = null
+  let moving = null
   // Where the pointer is (Playwright doesn't say), for glides from it.
   let hand = { x: shot.viewport.width - 4, y: shot.viewport.height - 4 }
+  const random = seeded(`${shot.id}-${theme}`)
   const now = () => (Date.now() - started) / 1000 - recordAt
   const h = {
     /** Everything from here on is the loop. */
@@ -269,16 +354,23 @@ async function captureOne(browser, url, shot, theme) {
     mark: (name, at = Date.now()) => { marks[name] = (at - started) / 1000 - recordAt },
     /** What a sequence keeps of the window (CSS px). */
     focus: (rect) => { focus = rect },
+    /** The only part of what's kept that changes (CSS px, inside the focus). */
+    moving: (rect) => { moving = rect },
     /** Put the pointer at `to` at once. */
     point: async (to) => { hand = { ...to }; await page.mouse.move(to.x, to.y) },
-    /** Move the pointer to `to` as a hand does: easing in and out, over `seconds`. */
+    /** Move the pointer to `to` as a hand does (handAt), arriving in `seconds`. */
     glide: async (to, seconds = 0.8) => {
       const from = hand
       const steps = Math.max(2, Math.round(seconds * 60))
       const t0 = Date.now()
+      const style = {
+        bow: (random() < 0.5 ? -1 : 1) * (0.04 + random() * 0.07),
+        over: 0.015 + random() * 0.03,
+        phase: random() * Math.PI * 2,
+      }
       for (let i = 1; i <= steps; i++) {
-        const u = i / steps, k = u * u * (3 - 2 * u)
-        await page.mouse.move(from.x + (to.x - from.x) * k, from.y + (to.y - from.y) * k)
+        const at = i === steps ? to : handAt(from, to, i / steps, style)
+        await page.mouse.move(at.x, at.y)
         const wait = t0 + (seconds * 1000 * i) / steps - Date.now()
         if (wait > 0) await page.waitForTimeout(wait)
       }
@@ -308,8 +400,8 @@ async function captureOne(browser, url, shot, theme) {
   const video = page.video()
   await context.close()
   const recording = await video.path()
-  if (shot.kind === 'sequence') return encodeSequence(recording, base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport, focus })
-  return encodeLoop(recording, base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport, zooms, seam: shot.seam, marks, rest: shot.rest })
+  if (shot.kind === 'sequence') return encodeSequence(recording, base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport, focus, moving, marks, quality: shot.quality })
+  return encodeLoop(recording, base, { lead: recordAt, seconds: shot.seconds, viewport: shot.viewport, zooms, seam: shot.seam, marks, rest: shot.rest, focus })
 }
 
 const git = (...a) => { try { return execFileSync('git', a, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return null } }
