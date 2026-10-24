@@ -25,7 +25,7 @@
     "parity": "node --experimental-loader ./tests/unit/loader.mjs tests/parity/run.mjs",
     "types": "./scripts/generate-types.sh",
     "types:check": "./scripts/generate-types.sh --check",
-    "showcase": "node showcase/capture.mjs",
+    "showcase": "node --no-warnings --experimental-loader ./tests/unit/loader.mjs showcase/capture.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

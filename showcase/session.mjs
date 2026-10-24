@@ -45,7 +45,7 @@ export const NOW = '2026-10-21T09:00:00Z'
  * A fresh page on `url` with `files` seeded and `prefs` loaded. Determinism: the clock
  * is installed at NOW and Math.random is seeded, so the same build gives the same frames.
  */
-export async function openPage(browser, url, { files, prefs = {}, viewport, scale = 2, video, log = false }) {
+export async function openPage(browser, url, { files, prefs = {}, ipc = {}, routes = [], viewport, scale = 2, video, log = false }) {
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: scale,
@@ -54,9 +54,13 @@ export async function openPage(browser, url, { files, prefs = {}, viewport, scal
     ...(video ? { recordVideo: { dir: video, size: viewport } } : {}),
   })
   await context.clock.install({ time: new Date(NOW) })
+  // Network the app reaches for (a dictionary, say), answered from the shot.
+  for (const { url: pattern, json } of routes) {
+    await context.route(pattern, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(json) }))
+  }
   await context.addInitScript({
     content: `
-      window.__SHOWCASE__ = ${JSON.stringify({ files, prefs, now: NOW, log })};
+      window.__SHOWCASE__ = ${JSON.stringify({ files, prefs, ipc, now: NOW, log })};
       (() => { let s = 0x2f4a8a; Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 } })();
       ${MOCK}`,
   })
