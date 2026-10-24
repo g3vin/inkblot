@@ -15,6 +15,7 @@
  *   seam      a loop's crossfade from its end into its start; 0 when it ends as it began
  *   cursor    draw the pointer in: for a shot whose story is a hand at work
  *   rest      a loop's mark whose frame stands in for it without motion
+ *   quality   a sequence's WebP quality (78 by default)
  *   fixture   options for the sample book, e.g. { notes: 'research' } (fixtures/)
  *   clip      a still that keeps only part of the window: returns the rectangle
  *   run       drives the app to the moment to capture. For a loop, everything after
@@ -107,6 +108,74 @@ async function write(page, text, { cps = 14 } = {}) {
   }
 }
 
+/**
+ * The notes shots' scene: Little Women's parlour passage, with the writer's research note
+ * pinned open and dragged out into the margin, level with its phrase (the app keeps it
+ * there, so it reopens in the same place).
+ */
+async function noteInMargin(page) {
+  await openChapter(page, CHAPTERS.pilgrims)
+  await page.getByRole('button', { name: 'Hide inspector' }).click()
+  await page.waitForTimeout(600)
+  const marker = page.locator('.note-marker').first()
+  await marker.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  await page.waitForTimeout(300)
+  await marker.click()
+  const card = page.locator('.note-preview-card').first()
+  await card.waitFor()
+  await page.waitForTimeout(600)
+  // The note opens beside its phrase, over the text; drag it out into the margin,
+  // level with the passage, as a writer would. Its string follows.
+  const column = await page.locator('.ProseMirror').first().boundingBox()
+  const dot = await marker.boundingBox()
+  const from = await card.boundingBox()
+  const grab = { x: from.x + from.width / 2, y: from.y + 10 }
+  // Level with the phrase: its line ends there, so the string runs out through open page.
+  const to = { x: grab.x + (column.x + column.width + 28 - from.x), y: grab.y + (dot.y - 70 - from.y) }
+  await page.mouse.move(grab.x, grab.y)
+  await page.mouse.down()
+  await page.mouse.move((grab.x + to.x) / 2, (grab.y + to.y) / 2, { steps: 10 })
+  await page.mouse.move(to.x, to.y, { steps: 10 })
+  await page.mouse.up()
+  await page.mouse.move(4, 996)
+  await page.waitForTimeout(900)
+}
+
+/**
+ * The passage and its note, not the window: from the gap two paragraphs above the noted
+ * one to the first break between lines below the card, like a cropped page.
+ */
+async function noteClip(page) {
+  const column = await page.locator('.ProseMirror').first().boundingBox()
+  const card = await page.locator('.note-preview-card').first().boundingBox()
+  const paragraphs = await page.locator('.ProseMirror p').evaluateAll((ps) => ps.map((p) => {
+    const r = p.getBoundingClientRect()
+    // One rect per line: the text's client rects, merged by their top.
+    const range = document.createRange()
+    range.selectNodeContents(p)
+    const lines = []
+    for (const rect of range.getClientRects()) {
+      const line = lines.find((l) => Math.abs(l.top - rect.top) < 4)
+      if (line) line.bottom = Math.max(line.bottom, rect.bottom)
+      else if (rect.height > 4) lines.push({ top: rect.top, bottom: rect.bottom })
+    }
+    return { top: r.top, bottom: r.bottom, lines: lines.sort((a, b) => a.top - b.top), noted: !!p.querySelector('.note-marker') }
+  }))
+  const gap = (i) => (paragraphs[i - 1].bottom + paragraphs[i].top) / 2
+  const noted = paragraphs.findIndex((p) => p.noted)
+  const top = Math.min(gap(Math.max(1, noted - 2)), card.y - 32)
+  // Every break between lines (and between paragraphs) below the noted paragraph.
+  const breaks = []
+  for (let i = noted; i < paragraphs.length; i++) {
+    const { lines } = paragraphs[i]
+    for (let k = 1; k < lines.length; k++) breaks.push((lines[k - 1].bottom + lines[k].top) / 2)
+    if (i + 1 < paragraphs.length) breaks.push(gap(i + 1))
+  }
+  const bottom = breaks.find((y) => y >= card.y + card.height + 24) ?? card.y + card.height + 32
+  const right = Math.min(card.x + card.width + 40, page.viewportSize().width - 12)
+  return { x: column.x - 56, y: top, width: right - (column.x - 56), height: bottom - top }
+}
+
 export const SHOTS = [
   {
     id: 'editor',
@@ -148,64 +217,56 @@ export const SHOTS = [
     // Wide enough that the text column (it stops growing) leaves a margin for the note.
     viewport: { width: 1800, height: 1000 },
     fixture: { notes: 'research' },
-    async run(page) {
-      await openChapter(page, CHAPTERS.pilgrims)
-      await page.getByRole('button', { name: 'Hide inspector' }).click()
-      await page.waitForTimeout(600)
-      const marker = page.locator('.note-marker').first()
-      await marker.evaluate((el) => el.scrollIntoView({ block: 'center' }))
-      await page.waitForTimeout(300)
-      await marker.click()
-      const card = page.locator('.note-preview-card').first()
-      await card.waitFor()
-      await page.waitForTimeout(600)
-      // The note opens beside its phrase, over the text; drag it out into the margin,
-      // level with the passage, as a writer would. Its string follows.
-      const column = await page.locator('.ProseMirror').first().boundingBox()
-      const dot = await marker.boundingBox()
-      const from = await card.boundingBox()
-      const grab = { x: from.x + from.width / 2, y: from.y + 10 }
-      // Level with the phrase: its line ends there, so the string runs out through open page.
-      const to = { x: grab.x + (column.x + column.width + 28 - from.x), y: grab.y + (dot.y - 70 - from.y) }
-      await page.mouse.move(grab.x, grab.y)
-      await page.mouse.down()
-      await page.mouse.move((grab.x + to.x) / 2, (grab.y + to.y) / 2, { steps: 10 })
-      await page.mouse.move(to.x, to.y, { steps: 10 })
-      await page.mouse.up()
-      await page.mouse.move(4, 996)
+    run: noteInMargin,
+    clip: noteClip,
+  },
+  {
+    // The same note, opening: the marker clicked, the string drawn out to the card where
+    // the writer left it in the margin, the card growing from its end; a moment open;
+    // then closed (Escape), shrinking back into its string. Kept to the still's crop; the
+    // site plays the opening as the section arrives and the closing as it leaves.
+    id: 'notes-open',
+    kind: 'sequence',
+    themes: ['light', 'dark'],
+    viewport: { width: 1800, height: 1000 },
+    fixture: { notes: 'research' },
+    seconds: 1.6,
+    async run(page, h) {
+      await noteInMargin(page)
+      const clip = await noteClip(page)
+      h.focus(clip)
+      // Only the phrase (it lights up), the string and the card move.
+      const boxes = [
+        await page.locator('.note-marker').first().boundingBox(),
+        await page.locator('.note-preview-card').first().boundingBox(),
+        ...(await page.locator('.note-range').evaluateAll((els) => els.flatMap((el) => [...el.getClientRects()].map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height }))))),
+      ]
+      const x0 = Math.max(clip.x, Math.min(...boxes.map((b) => b.x)) - 24)
+      const y0 = Math.max(clip.y, Math.min(...boxes.map((b) => b.y)) - 24)
+      const x1 = Math.min(clip.x + clip.width, Math.max(...boxes.map((b) => b.x + b.width)) + 24)
+      const y1 = Math.min(clip.y + clip.height, Math.max(...boxes.map((b) => b.y + b.height)) + 24)
+      h.moving({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
+      await page.keyboard.press('Escape')
       await page.waitForTimeout(900)
-    },
-    // The passage and its note, not the window: from the gap two paragraphs above the
-    // noted one to the first break between lines below the card, like a cropped page.
-    async clip(page) {
-      const column = await page.locator('.ProseMirror').first().boundingBox()
-      const card = await page.locator('.note-preview-card').first().boundingBox()
-      const paragraphs = await page.locator('.ProseMirror p').evaluateAll((ps) => ps.map((p) => {
-        const r = p.getBoundingClientRect()
-        // One rect per line: the text's client rects, merged by their top.
-        const range = document.createRange()
-        range.selectNodeContents(p)
-        const lines = []
-        for (const rect of range.getClientRects()) {
-          const line = lines.find((l) => Math.abs(l.top - rect.top) < 4)
-          if (line) line.bottom = Math.max(line.bottom, rect.bottom)
-          else if (rect.height > 4) lines.push({ top: rect.top, bottom: rect.bottom })
-        }
-        return { top: r.top, bottom: r.bottom, lines: lines.sort((a, b) => a.top - b.top), noted: !!p.querySelector('.note-marker') }
-      }))
-      const gap = (i) => (paragraphs[i - 1].bottom + paragraphs[i].top) / 2
-      const noted = paragraphs.findIndex((p) => p.noted)
-      const top = Math.min(gap(Math.max(1, noted - 2)), card.y - 32)
-      // Every break between lines (and between paragraphs) below the noted paragraph.
-      const breaks = []
-      for (let i = noted; i < paragraphs.length; i++) {
-        const { lines } = paragraphs[i]
-        for (let k = 1; k < lines.length; k++) breaks.push((lines[k - 1].bottom + lines[k].top) / 2)
-        if (i + 1 < paragraphs.length) breaks.push(gap(i + 1))
-      }
-      const bottom = breaks.find((y) => y >= card.y + card.height + 24) ?? card.y + card.height + 32
-      const right = Math.min(card.x + card.width + 40, page.viewportSize().width - 12)
-      return { x: column.x - 56, y: top, width: right - (column.x - 56), height: bottom - top }
+      const marker = await page.locator('.note-marker').first().boundingBox()
+      await h.point({ x: 4, y: 996 })
+      await page.waitForTimeout(300)
+      await h.record()
+      await page.waitForTimeout(80)
+      await page.mouse.click(marker.x + marker.width / 2, marker.y + marker.height / 2)
+      await page.mouse.move(4, 996)
+      h.mark('opening')
+      await page.locator('.note-preview-card').first().waitFor()
+      // Open in full: the string drawn and the card grown. The site holds it here.
+      await page.waitForTimeout(550)
+      h.mark('open')
+      // A still moment between, so the opening and the closing are two motions apart.
+      await page.waitForTimeout(260)
+      await page.keyboard.press('Escape')
+      h.mark('closing')
+      await page.waitForTimeout(400)
+      h.mark('closed')
+      await h.until(1.6)
     },
   },
   {
@@ -416,7 +477,7 @@ export const SHOTS = [
     kind: 'sequence',
     themes: ['light', 'dark'],
     viewport: { width: 1440, height: 900 },
-    seconds: 3.8,
+    seconds: 2.7,
     cursor: true,
     prefs: { ...session(PROJECT, CHAPTERS.pilgrims, { sidebarTab: 'notes' }), 'inkblot-tray-color': 'sage' },
     async run(page, h) {
@@ -429,16 +490,15 @@ export const SHOTS = [
       const reach = { x: tile.x - 90, y: tile.y - 90, width: tile.width + 180, height: tile.height + 180 }
       const rect = frame([tile, marker, reach], page.viewportSize(), 24)
       h.focus(rect)
-      // The pointer starts outside what's kept, so the first frame is the still's.
+      // The hand is already on the note's colour when the site's zoom lands, and presses
+      // at once.
       const away = { x: rect.x - 60, y: rect.y + rect.height + 60 }
-      await h.point(away)
-      await page.waitForTimeout(300)
-      await h.record()
-      await page.waitForTimeout(400)
-
-      await card.hover({ trial: true })
+      await card.hover()
       const dot = await card.getByRole('button', { name: /^Note colour/ }).first().boundingBox()
-      await h.glide(centre(dot), 0.7)
+      await h.point(centre(dot))
+      await page.waitForTimeout(500)
+      await h.record()
+      await page.waitForTimeout(120)
       await page.mouse.down()
       await page.waitForTimeout(550)
       const teal = await page.locator('.ib-ink-wheel-ring [role="option"][aria-label="Teal"]').first().boundingBox()
@@ -447,7 +507,7 @@ export const SHOTS = [
       await page.mouse.up()
       await page.waitForTimeout(250)
       await h.glide(away, 0.7)
-      await h.until(3.8)
+      await h.until(2.7)
     },
   },
 ]
