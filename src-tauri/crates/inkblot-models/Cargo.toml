@@ -26,10 +26,10 @@ ndarray = "0.17.2"
 ort = { version = "2.0.0-rc.11", features = ["ndarray"] }
 # No `http`: the tokenizer is always read from a file, and the http feature is what
 # made the first use of synonyms need the network.
-tokenizers = "0.15"
-parking_lot = "0.12"
+tokenizers = "0.23"
+parking_lot = "0.13"
 tokio = { version = "1", features = ["time", "sync", "rt"] }
-cpal = { version = "0.17.3", optional = true }
+cpal = { version = "0.18.2", optional = true }
 inkblot-dictation = { git = "https://github.com/g3vin/inkblot-dictation.git", branch = "main", optional = true }
 
 [dev-dependencies]

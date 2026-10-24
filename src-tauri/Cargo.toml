@@ -22,7 +22,7 @@ url = "2.5.8"
 regex = "1.11"
 # fancy-regex, not regex, for the search matcher: `regex` rejects backreferences and
 # lookaround outright, so a user's `(?=...)` would come back as "Invalid pattern".
-fancy-regex = "0.14"
+fancy-regex = "0.19"
 once_cell = "1.19"
 font-kit = "0.14"
 # The #[typeshare] attribute itself is a no-op proc macro; the `typeshare` CLI reads
