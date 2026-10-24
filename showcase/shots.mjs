@@ -8,7 +8,8 @@
  *   id        the website's id for it
  *   kind      'still' (a picture), 'loop' (a silent video that repeats) or 'sequence'
  *             (a recording's frames, for the site to play by scrolling)
- *   themes    the app themes to capture it in: 'light' (Paper), 'dark' (Ink), 'midnight'
+ *   themes    the app themes to capture it in: 'light' (Paper), 'dark' (Ink), 'midnight'.
+ *             Every shot has light and dark, so the site can follow the visitor's theme.
  *   accent    the ink, when not Ink Blue
  *   viewport  the window size in CSS pixels; its ratio is the site's aspect
  *   seconds   a loop's or sequence's length
@@ -128,7 +129,8 @@ export const SHOTS = [
   {
     id: 'editor-night',
     kind: 'still',
-    // Midnight: the app's pure black, for the site's "how it feels at night".
+    // Midnight: the app's pure black, for the site's "how it feels at night". The one shot
+    // in a single theme: Midnight is the feature, so the site shows it in light and dark.
     themes: ['midnight'],
     accent: 'amber',
     viewport: { width: 1440, height: 810 }, // 16 / 9
@@ -211,7 +213,7 @@ export const SHOTS = [
   {
     id: 'review',
     kind: 'still',
-    themes: ['light'],
+    themes: ['light', 'dark'],
     viewport: { width: 1680, height: 720 }, // 21 / 9
     async run(page) {
       await openChapter(page, CHAPTERS.pilgrims)
@@ -349,6 +351,36 @@ export const SHOTS = [
       // Word by word: the roster's line for it.
       await page.getByText('Words', { exact: true }).filter({ visible: true }).first().click()
       await page.waitForTimeout(1200)
+    },
+  },
+  {
+    // "Then it becomes a book.": Typeset (⌘K → Typeset the book), the chapter set as a
+    // printed page, with the book's details beside it.
+    id: 'typeset',
+    kind: 'still',
+    themes: ['light', 'dark'],
+    viewport: { width: 1200, height: 900 },
+    prefs: session(PROJECT, CHAPTERS.christmas, { sidebarTab: 'notes' }),
+    async run(page) {
+      await restored(page)
+      await page.keyboard.press('Meta+k')
+      await page.waitForTimeout(400)
+      await page.keyboard.type('Typeset the book')
+      await page.waitForTimeout(300)
+      await page.keyboard.press('Enter')
+      await page.getByPlaceholder('Your name').first().waitFor({ timeout: 15000 })
+      await page.waitForTimeout(3000)
+      await page.getByPlaceholder('Your name').first().fill('Louisa May Alcott')
+      // Done with the field, focus nowhere (Tab would put a caret in the page).
+      await page.evaluate(() => document.activeElement?.blur())
+      // Out to 75%, to see the chapter's opening page whole.
+      for (let i = 0; i < 2; i++) {
+        await page.getByRole('button', { name: 'Zoom out' }).last().click()
+        await page.waitForTimeout(400)
+      }
+      // A picture of the page, not of writing in it: no caret.
+      await page.evaluate(() => document.activeElement?.blur())
+      await page.waitForTimeout(2500)
     },
   },
   {
