@@ -6,6 +6,15 @@ Notable changes to Inkblot. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-24
+
+### Changed
+
+- **The website's pictures of the app:** nothing in the app itself changes in this
+  release. It refreshes what inkblot.page shows of it: Typesetting, a note opening and
+  closing, the ink wheel taking a note through every ink, and a dark version of every
+  picture so the site can follow your theme.
+
 ## [0.4.0] - 2026-10-24
 
 ### Changed
@@ -285,7 +294,8 @@ shell beside the Tauri app.
   bridge protocol) and `inkblot-models` (on-device models) in Rust, shared by both
   apps; types generated into TypeScript and Swift; a JS/Rust parity harness.
 
-[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/g3vin/inkblot/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/g3vin/inkblot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/g3vin/inkblot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/g3vin/inkblot/compare/v0.1.0...v0.2.0

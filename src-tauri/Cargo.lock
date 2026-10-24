@@ -2418,7 +2418,7 @@ dependencies = [
 
 [[package]]
 name = "inkblot"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "block2",
  "inkblot-core",
@@ -2439,7 +2439,7 @@ dependencies = [
 
 [[package]]
 name = "inkblot-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "fancy-regex",
  "font-kit",
@@ -2470,7 +2470,7 @@ dependencies = [
 
 [[package]]
 name = "inkblot-models"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "cpal",
  "inkblot-core",
