@@ -6,6 +6,31 @@ Notable changes to Inkblot. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-23
+
+### Changed
+
+- **Dialogs:** every window that asks you something (Settings, New project, Rename,
+  Help, …) is the same kind of dialog. A heading says where it came from, there is one
+  way out, and the buttons sit at the trailing edge; a small decision's two buttons
+  share the width. Focus starts on the first control and stays inside until it closes,
+  and a dialog leaves the way it came.
+- **Pop-ups:** Read Aloud, the footnote editor, the e-book reader, Typeset's page
+  pickers and the citation editor open in the same kind of pop-up, with a heading, and
+  Tab stays inside it. A menu a button opens is drawn in the page; right-click menus
+  stay the system's own.
+- **The toolbar:** a button's pop-up opens in the toolbar itself: a choice beside its
+  button, a form across the whole toolbar. A button's menu opens as a row of its items,
+  and » turns the toolbar to its second page, with ‹ to come back.
+- **Timeline:** its tools are in the card's toolbar, where they can be customised like
+  a document's.
+- **Find (⌘F)** opens in the card's toolbar, with Replace beside it.
+
+### Fixed
+
+- **Synonyms for a verb:** looking one up ("grumbled") no longer fails, and its
+  opposites come in the word's own form ("rejoiced", "praising").
+
 ## [0.2.0] - 2026-10-23
 
 ### Added
@@ -195,6 +220,7 @@ shell beside the Tauri app.
   bridge protocol) and `inkblot-models` (on-device models) in Rust, shared by both
   apps; types generated into TypeScript and Swift; a JS/Rust parity harness.
 
-[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/g3vin/inkblot/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/g3vin/inkblot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/g3vin/inkblot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/g3vin/inkblot/releases/tag/v0.1.0

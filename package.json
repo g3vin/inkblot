@@ -1,7 +1,7 @@
 {
   "name": "inkblot",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A local-first writing app: prose documents, canvases and maps, with notes, version history and on-device language tools.",
   "author": "Gavin Bowden",
   "license": "Apache-2.0",
