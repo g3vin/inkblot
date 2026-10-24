@@ -42,14 +42,34 @@ const MOCK = fs.readFileSync(path.join(here, 'tauri-mock.js'), 'utf8')
 export const NOW = '2026-10-21T09:00:00Z'
 
 /**
+ * The pointer, drawn into the page: a recording has no system cursor, and a drag or a
+ * click with no hand on screen reads as the window moving by itself. It follows the
+ * mouse Playwright moves, and takes no events (elementFromPoint looks through it).
+ */
+const CURSOR = `
+  addEventListener('DOMContentLoaded', () => {
+    const hand = document.createElement('div')
+    hand.setAttribute('aria-hidden', 'true')
+    hand.innerHTML = '<svg width="22" height="30" viewBox="0 0 22 30"><path d="M3 2.5v21.2l5.2-5 3.6 8.4 3.6-1.6-3.5-8.2h7.3z" fill="#111" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/></svg>'
+    Object.assign(hand.style, { position: 'fixed', left: '-3px', top: '-2px', zIndex: '2147483647', pointerEvents: 'none', filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,.35))', transform: 'translate(-60px, -60px)', transformOrigin: '3px 2px' })
+    document.documentElement.appendChild(hand)
+    let x = -60, y = -60, down = false
+    const place = () => { hand.style.transform = 'translate(' + x + 'px, ' + y + 'px)' + (down ? ' scale(0.88)' : '') }
+    addEventListener('mousemove', (e) => { x = e.clientX; y = e.clientY; place() }, true)
+    addEventListener('mousedown', () => { down = true; place() }, true)
+    addEventListener('mouseup', () => { down = false; place() }, true)
+  })`
+
+/**
  * A fresh page on `url` with `files` seeded and `prefs` loaded. Determinism: the clock
  * is installed at NOW and Math.random is seeded, so the same build gives the same frames.
+ * `cursor` draws the pointer in (see CURSOR).
  */
-export async function openPage(browser, url, { files, prefs = {}, ipc = {}, routes = [], viewport, scale = 2, video, log = false }) {
+export async function openPage(browser, url, { files, prefs = {}, ipc = {}, routes = [], viewport, scale = 2, video, cursor = false, log = false }) {
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: scale,
-    colorScheme: prefs['inkblot-theme'] === 'dark' ? 'dark' : 'light',
+    colorScheme: ['dark', 'midnight'].includes(prefs['inkblot-theme']) ? 'dark' : 'light',
     reducedMotion: 'no-preference',
     ...(video ? { recordVideo: { dir: video, size: viewport } } : {}),
   })
@@ -62,7 +82,8 @@ export async function openPage(browser, url, { files, prefs = {}, ipc = {}, rout
     content: `
       window.__SHOWCASE__ = ${JSON.stringify({ files, prefs, ipc, now: NOW, log })};
       (() => { let s = 0x2f4a8a; Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 } })();
-      ${MOCK}`,
+      ${MOCK}
+      ${cursor ? CURSOR : ''}`,
   })
   const page = await context.newPage()
   const errors = []
