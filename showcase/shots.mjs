@@ -6,15 +6,21 @@
  * site follows. Adding one is free.
  *
  *   id        the website's id for it
- *   kind      'still' (a picture) or 'loop' (a silent video that repeats)
- *   themes    the app themes to capture it in: 'light' (Paper) and/or 'dark' (Ink)
+ *   kind      'still' (a picture), 'loop' (a silent video that repeats) or 'sequence'
+ *             (a recording's frames, for the site to play by scrolling)
+ *   themes    the app themes to capture it in: 'light' (Paper), 'dark' (Ink), 'midnight'
  *   accent    the ink, when not Ink Blue
  *   viewport  the window size in CSS pixels; its ratio is the site's aspect
- *   seconds   a loop's length (the site plays it on repeat)
+ *   seconds   a loop's or sequence's length
+ *   seam      a loop's crossfade from its end into its start; 0 when it ends as it began
+ *   cursor    draw the pointer in: for a shot whose story is a hand at work
+ *   rest      a loop's mark whose frame stands in for it without motion
  *   fixture   options for the sample book, e.g. { notes: 'research' } (fixtures/)
  *   clip      a still that keeps only part of the window: returns the rectangle
  *   run       drives the app to the moment to capture. For a loop, everything after
- *             `h.record()` is the loop; everything before is trimmed away.
+ *             `h.record()` is the loop; everything before is trimmed away. h.glide moves
+ *             the pointer like a hand, h.mark notes when a step happens, h.focus says
+ *             what a sequence keeps.
  */
 import { CHAPTERS, EARNEST, LIGHTHOUSE, NEXT_LINE, PROJECT, session, tile } from './fixtures/books.mjs'
 
@@ -59,6 +65,40 @@ async function caretAfter(page, text) {
   await page.keyboard.press('End')
 }
 
+const centre = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
+
+/** A document's row in the file tree, where a hand would take hold of it. */
+async function treeRow(page, docPath) {
+  const box = await page.locator(`.file-item[data-entry-path="${docPath}"]`).first().boundingBox()
+  return { x: box.x + 48, y: box.y + box.height / 2 }
+}
+
+/** A click where the pointer is, as a hand makes one. */
+async function press(page) {
+  await page.mouse.down()
+  await page.waitForTimeout(90)
+  await page.mouse.up()
+}
+
+/**
+ * Carry `docPath` out of the file tree to `to` on the page and hold it there until the
+ * split opens under it (`opened`), then let go: the app's drag-to-split. Returns when
+ * the split opened, for the shot's marks.
+ */
+async function carry(page, h, docPath, to, opened) {
+  await h.glide(await treeRow(page, docPath), 0.9)
+  await page.waitForTimeout(200)
+  await page.mouse.down()
+  const from = await treeRow(page, docPath)
+  await h.glide({ x: from.x + 10, y: from.y + 3 }, 0.15)
+  await h.glide(to, 1.1)
+  await page.locator(opened).first().waitFor({ timeout: 5000 })
+  const at = Date.now()
+  await page.waitForTimeout(450)
+  await page.mouse.up()
+  return at
+}
+
 /** Type like a person: steady, with a pause after punctuation. */
 async function write(page, text, { cps = 14 } = {}) {
   for (const ch of text) {
@@ -88,7 +128,8 @@ export const SHOTS = [
   {
     id: 'editor-night',
     kind: 'still',
-    themes: ['dark'],
+    // Midnight: the app's pure black, for the site's "how it feels at night".
+    themes: ['midnight'],
     accent: 'amber',
     viewport: { width: 1440, height: 810 }, // 16 / 9
     async run(page) {
@@ -178,21 +219,65 @@ export const SHOTS = [
       await page.waitForTimeout(800)
     },
   },
-  /* ---- "The whole book, in one window": three panes, one window, the same chrome ---- */
-  ...[
-    ['split-prose', CHAPTERS.pilgrims, '.ProseMirror'],
-    ['split-canvas', 'The Marches.canvas', '.canvas-surface'],
-    ['split-map', 'Concord.map', '.map-pane, .map-surface, [class*="map-"]'],
-  ].map(([id, doc, selector]) => ({
-    id,
-    kind: 'still',
+  /*
+   * ---- "The whole story, in one window": the hero. One chapter; drag the cast canvas
+   * out of the file tree onto the page and hold it, and the window splits; drag the map
+   * onto the chapter's side, then the galaxy over the map; back to the chapter (the tree
+   * keeps the split) and close the split. Everything is the app's own motion, with the pointer
+   * drawn in. It ends as it began, so it repeats with no crossfade. ----
+   */
+  {
+    id: 'hero',
+    kind: 'loop',
     themes: ['light', 'dark'],
     viewport: { width: 1440, height: 900 }, // 16 / 10
-    prefs: session(PROJECT, doc, { sidebarTab: 'notes' }),
-    async run(page) {
-      await restored(page, selector)
+    seconds: 21,
+    seam: 0,
+    cursor: true,
+    rest: 'rest',
+    prefs: session(PROJECT, CHAPTERS.pilgrims, { sidebarTab: 'notes' }),
+    async run(page, h) {
+      await restored(page)
+      // At rest, the pointer waits in the page's right margin.
+      const home = { x: 1100, y: 700 }
+      await h.point(home)
+      await page.waitForTimeout(400)
+      await h.record()
+      h.mark('one')
+
+      await h.until(1)
+      const page1 = await page.locator('.pane').first().boundingBox()
+      h.mark('canvas', await carry(page, h, 'The Marches.canvas', { x: page1.x + page1.width * 0.78, y: 470 }, '.secondary-pane .canvas-surface'))
+      await h.glide({ x: 900, y: 760 }, 0.9)
+
+      await h.until(5.8)
+      const left = await page.locator('.pane.primary-pane').first().boundingBox()
+      h.mark('map', await carry(page, h, 'Concord.map', { x: left.x + left.width * 0.45, y: 470 }, '.primary-pane .map-surface'))
+      await h.glide({ x: 900, y: 780 }, 0.9)
+      await h.until(11.2)
+      h.mark('rest')
+
+      // The sky over them: the galaxy takes the map's side (on a map, its outer edge).
+      await h.until(11.4)
+      const map = await page.locator('.pane.primary-pane').first().boundingBox()
+      h.mark('any', await carry(page, h, 'The Milky Way.map', { x: map.x + 44, y: 470 }, '.primary-pane .map-space:not(.is-loading)'))
+      await h.glide({ x: 900, y: 780 }, 0.9)
+
+      // Back to the chapter (the tree keeps the split, above the files), and close it.
+      await h.until(16.6)
+      await h.glide(await treeRow(page, CHAPTERS.pilgrims), 0.8)
+      await press(page)
+      await h.until(17.6)
+      const entry = page.locator('.split-entry').first()
+      await h.glide(centre(await entry.boundingBox()), 0.6)
+      await page.waitForTimeout(250)
+      await h.glide(centre(await entry.getByRole('button', { name: 'Close split' }).boundingBox()), 0.35)
+      await press(page)
+      h.mark('closed')
+      await h.glide(home, 1)
+      await h.until(21)
     },
-  })),
+  },
 
   /* ---- The feature roster: what each one looks like at work. 4 / 3, like its frame. ---- */
   {
@@ -290,53 +375,79 @@ export const SHOTS = [
       await page.waitForTimeout(800)
     },
   },
-  /* ---- "Color it in.": every window colour, then a note takes a new ink. ---- */
-  {
-    id: 'inks',
-    kind: 'loop',
+  /*
+   * ---- "Color it in.": a window in each of the app's colours (Settings → Window colour),
+   * each on a different document; the site moves them with the scroll. Sage, the
+   * default, comes last: it is the first frame of `inks-wheel`. ----
+   */
+  ...[
+    ['blue', PROJECT, 'The year.timeline', 'timeline'],
+    ['teal', PROJECT, 'Concord.map', 'map'],
+    ['green', PROJECT, 'The Milky Way.map', 'galaxy'],
+    ['amber', PROJECT, CHAPTERS.christmas],
+    ['rust', EARNEST, 'Act One'],
+    ['red', PROJECT, CHAPTERS.laurence],
+    ['violet', LIGHTHOUSE, 'Time Passes'],
+    ['slate', LIGHTHOUSE, 'The Window'],
+    ['sage', PROJECT, CHAPTERS.pilgrims],
+  ].map(([ink, project, doc, kind]) => ({
+    id: `inks-${ink}`,
+    kind: 'still',
     themes: ['light', 'dark'],
     viewport: { width: 1440, height: 900 }, // 16 / 10
-    seconds: 16.5,
-    prefs: session(PROJECT, CHAPTERS.pilgrims, { sidebarTab: 'notes' }),
+    prefs: { ...session(project, doc, { sidebarTab: kind === 'timeline' ? 'timeline' : 'notes' }), 'inkblot-tray-color': ink },
+    async run(page) {
+      const surface = { timeline: '.timeline-surface, [class*="timeline-"]', map: '.map-surface', galaxy: '.map-space:not(.is-loading)' }[kind] ?? '.ProseMirror'
+      await restored(page, surface, project)
+      // A galaxy draws its stars over a moment after its view mounts.
+      if (kind === 'galaxy') await page.waitForTimeout(2500)
+      if (kind === 'timeline') {
+        await page.getByRole('button', { name: 'Inspector', exact: true }).filter({ visible: true }).first().click()
+        await page.getByRole('button', { name: 'Show everything' }).first().click()
+        await page.waitForTimeout(800)
+      }
+    },
+  })),
+  {
+    // The Sage window, closer: the first note's colour pressed, the inks bloom, the hand
+    // swipes to Teal and lets go, and the note and its phrase take it. Kept to the note
+    // and its phrase; the site plays it as the reader scrolls.
+    id: 'inks-wheel',
+    kind: 'sequence',
+    themes: ['light', 'dark'],
+    viewport: { width: 1440, height: 900 },
+    seconds: 3.8,
+    cursor: true,
+    prefs: { ...session(PROJECT, CHAPTERS.pilgrims, { sidebarTab: 'notes' }), 'inkblot-tray-color': 'sage' },
     async run(page, h) {
       await restored(page)
       const card = page.locator('.note-tile').first()
       await card.waitFor()
-      await h.record()
-
-      // The window colour (Settings → Window colour), through every ink and back to Sage.
-      // The setting is the root's data-tray, exactly as lib/theme.ts sets it.
-      const trays = ['blue', 'teal', 'green', 'amber', 'rust', 'red', 'violet', 'slate', 'sage']
-      for (const [i, ink] of trays.entries()) {
-        await h.until(0.8 + i * 0.85)
-        await page.evaluate((id) => {
-          if (id === 'sage') document.documentElement.removeAttribute('data-tray')
-          else document.documentElement.setAttribute('data-tray', id)
-        }, ink)
-      }
-
-      // In close on the first note and the place it's pinned (its marker).
-      const highlight = await page.locator('.note-marker').first().boundingBox()
+      const marker = await page.locator('.note-marker').first().boundingBox()
       const tile = await card.boundingBox()
-      await h.until(8.4)
-      h.zoom(frame([tile, highlight], page.viewportSize(), 48), 1.2)
+      // The ring blooms about the colour dot; leave it room.
+      const reach = { x: tile.x - 90, y: tile.y - 90, width: tile.width + 180, height: tile.height + 180 }
+      const rect = frame([tile, marker, reach], page.viewportSize(), 24)
+      h.focus(rect)
+      // The pointer starts outside what's kept, so the first frame is the still's.
+      const away = { x: rect.x - 60, y: rect.y + rect.height + 60 }
+      await h.point(away)
+      await page.waitForTimeout(300)
+      await h.record()
+      await page.waitForTimeout(400)
 
-      // Press its colour: the inks bloom. Swipe to Teal and let go: note and phrase take it.
-      await h.until(10)
-      await card.hover()
+      await card.hover({ trial: true })
       const dot = await card.getByRole('button', { name: /^Note colour/ }).first().boundingBox()
-      await page.mouse.move(dot.x + dot.width / 2, dot.y + dot.height / 2)
+      await h.glide(centre(dot), 0.7)
       await page.mouse.down()
-      await page.waitForTimeout(700)
+      await page.waitForTimeout(550)
       const teal = await page.locator('.ib-ink-wheel-ring [role="option"][aria-label="Teal"]').first().boundingBox()
-      await page.mouse.move(teal.x + teal.width / 2, teal.y + teal.height / 2, { steps: 24 })
-      await page.waitForTimeout(500)
+      await h.glide(centre(teal), 0.6)
+      await page.waitForTimeout(350)
       await page.mouse.up()
-      await page.mouse.move(4, page.viewportSize().height - 4)
-
-      await h.until(13.5)
-      h.zoomOut(1.2)
-      await h.until(16.5)
+      await page.waitForTimeout(250)
+      await h.glide(away, 0.7)
+      await h.until(3.8)
     },
   },
 ]

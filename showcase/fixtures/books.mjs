@@ -137,8 +137,9 @@ function castCanvas() {
     edge('beth', 'laurence', 'the piano'), edge('meg', 'brooke', 'courting'), edge('jo', 'aunt', 'companion'),
   ]
   const state = normalizeCanvas({ nodes: Object.values(cards), edges })
-  // The viewport is the world point at the pane's top-left: the cast, framed.
-  return JSON.stringify(serializeCanvas(state, { x: -380, y: -70, zoom: 0.55 }))
+  // The viewport is the world point at the pane's top-left: the family, framed for a
+  // pane half the window wide (the website's split), Aunt March and Amy just off it.
+  return JSON.stringify(serializeCanvas(state, { x: -20, y: -600, zoom: 0.46 }))
 }
 
 /** Concord as the book has it, drawn on a blank sheet. */
@@ -163,6 +164,12 @@ function concordMap() {
     viewport: { x: 560, y: 760, zoom: 0.34 },
   })
   return JSON.stringify(serializeMap(normalizeMap(map, seq('m'))))
+}
+
+/** The sky over Concord: our own galaxy, a barred spiral, as a map of its own. */
+function milkyWay() {
+  const map = createEmptyMap('galaxy', { galaxy: { type: 'SBb', seed: 1868, radiusLy: 52000, thicknessLy: 1000 } })
+  return JSON.stringify(serializeMap(normalizeMap(map, seq('g'))))
 }
 
 /** The March family's year, on the project's calendar. */
@@ -239,6 +246,7 @@ function littleWomen(notes) {
     [`${root}/${laurence.title}.json`]: chapterFile(prose(laurence.title, laurence.paragraphs.slice(0, 24))),
     [`${root}/The Marches.canvas.json`]: castCanvas(),
     [`${root}/Concord.map.json`]: concordMap(),
+    [`${root}/The Milky Way.map.json`]: milkyWay(),
     [`${root}/The year.timeline.json`]: tl.view,
     [`${root}/.story/timeline.json`]: tl.timeline,
     [`${root}/.story/calendar.json`]: tl.calendar,
@@ -286,7 +294,7 @@ export function book({ notes = 'review' } = {}) {
   counter = 0
   const files = { ...littleWomen(notes), ...earnest(), ...lighthouse() }
   const prefs = {
-    ...order(LITTLE_WOMEN, [pilgrims.title, christmas.title, laurence.title, 'The Marches.canvas', 'Concord.map', 'The year.timeline']),
+    ...order(LITTLE_WOMEN, [pilgrims.title, christmas.title, laurence.title, 'The Marches.canvas', 'Concord.map', 'The Milky Way.map', 'The year.timeline']),
     ...order(LIGHTHOUSE, ['The Window', 'Time Passes']),
   }
   return { files, prefs }
