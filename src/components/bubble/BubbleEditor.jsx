@@ -305,7 +305,7 @@ export default function BubbleEditor({ session, onClose, toolbarSlot = null, det
       // A throw: released moving, and heading for the shelf. It lands where it was going.
       if (target.kind !== 'trash' && target.kind !== 'join') {
         const { stage } = gesture.geometry
-        const landing = throwLanding(stage, { x, y }, velocityOf(gesture.samples))
+        const landing = throwLanding(stage, { x, y }, velocityOf(gesture.samples, upEvent.timeStamp))
         if (landing) target = { kind: 'aside', ...shelfPoint(stage, landing.x, gesture) }
       }
       setDrag(null)

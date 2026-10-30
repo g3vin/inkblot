@@ -631,37 +631,55 @@ A spring is described the way Apple describes one, by a perceptual `duration` an
 | `smooth` | 300ms, 0 | Popovers, panels, sidebars, dialogs, content arriving |
 | `gentle` | 550ms, 0 | The long carry: a landing sheet becoming the card, focus mode's zoom, the map's camera |
 | `exit` | 160ms, 0 | Something leaving the way it came, quicker than it arrived |
-| `momentum` | 350ms, 0.15 | Landing after a flick or a drag, from the hand's speed |
+| `momentum` | 350ms, up to 0.15 | Landing after a flick or a drag, from the hand's speed (`releaseSpring`) |
 | `tether` | 330ms, 0.48 | Things hanging from what the hand moves: a dragged note's children |
 
 The durations are perceptual. `--spring-<role>-dur` is the settle time, which is
-longer: a `quick` spring looks done by about 120ms and is still by 240ms.
+longer: a `quick` spring looks done by about 120ms and is still by 272ms. A spring is
+settled once it stays within 0.2% of its target, so a bouncy one's overshoot is part of
+its curve rather than cut off before it.
 
 **Bounce only rewards momentum.** A state change (a menu opening, a panel sliding) is
 critically damped: bounce 0, with no overshoot. Only motion that a gesture with
-momentum drives may overshoot, and only a little (`momentum`, bounce 0.15). Apple's
-Music works the same way: tap-to-open is fully damped, while swipe-to-dismiss is 80%
-damped. `tether` is the one exception, because the hand is still moving the things it
-swings. Never go past bounce 0.4.
+momentum drives may overshoot, and only as much as the throw earned:
+`releaseSpring(speed)` scales the bounce from 0 for a let-go slower than a flick
+(0.3px/ms) up to `momentum`'s 0.15 at 1.5px/ms. A slow drop lands dead, and a hard flick
+lands with a little bounce. Apple's Music works the same way: tap-to-open is fully
+damped, while swipe-to-dismiss is 80% damped. `tether` is the one exception, because the
+hand is still moving the things it swings. Never go past bounce 0.4.
 
 **Gestures:**
 
+- **Decide before moving.** A press becomes a drag only past the slop (`pastSlop`:
+  4px for a pointer, 10px for a finger, measured straight-line). A press that hasn't
+  gone that far is still a click. Every drag uses the same slop (`GESTURE`).
 - **Track one to one.** A dragged thing stays under the hand, at the point it was
   grabbed, never snapped to its centre. While held it has no transition at all.
-- **Hand the speed over.** Measure the release speed over the last ~90ms
-  (`velocityFrom`, with `trackSample` keeping the path), never from the last two
-  events, and give it to the spring that takes over (`SpringValue.set(target,
-  { velocity })`).
-- **Project where a flick lands.** A flick goes to the target nearest where it would
+- **Hand the speed over.** Measure the release speed at the moment of release
+  (`velocityFrom(samples, window, at)`, with `trackSample` keeping the path). It is
+  fitted over the last ~90ms, never taken from the last two events. A hand that held
+  still before lifting has no speed, so a drag that stops and then lets go is never
+  thrown. Give the speed to the spring that takes over (`SpringValue.set(target,
+  { velocity, spring: releaseSpring(velocity) })`).
+- **Project where a flick lands.** A release goes to the target nearest where it would
   coast to, not to where it was let go: `project(v) = v · rate / (1 − rate)` at
-  UIScrollView's rates (`DECELERATION.normal` 0.998 a ms, `.fast` 0.99), and
-  `nearestTarget`. A thrown bubble lands this way.
+  UIScrollView's rates (`DECELERATION.normal` 0.998 a ms, `.fast` 0.99), through
+  `settleOnTargets`. One rule decides both a flick and a slow drop, with no separate
+  speed threshold: 0.3px/ms from a tenth of the way turns a page, as on iOS. `maxStep`
+  limits a page view to one page per flick.
+- **Act on a pause, not a timer.** A drag that does something when the hand stops (a
+  dwell over a folder) reads the stop from the samples (`isPausing`): a sharp fall in
+  speed shows sooner than any timeout.
 - **Coast.** A view thrown while panning (the canvas, the map) carries on under the same
   friction and stops at the next touch (`coast`). A trackpad already coasts on its own,
   so wheel input never gets a second coast.
 - **Rubber-band the edges.** Past a limit, movement gives less and less, as
-  `rubberBand(offset, dimension) = (1 − 1 / (offset·0.55 / dimension + 1)) · dimension`,
-  and springs back on release. This applies to the sidebar resize, the split
+  `rubberBand(offset, dimension, c) = c·x·d / (d + c·x)`, and springs back on release.
+  `c` depends on what is pulling (`rubberCoefficient`, UIKit's values): 0.55 for a
+  finger, 0.4 for a mouse, 0.17 for a trackpad. A pointer moving over the content gets
+  a stiffer edge than a finger dragging it. An edge caught while it springs back is held
+  where it is drawn (`rubberUnclamp`), and a release past an edge hands over the speed
+  the edge was drawn at (`rubberSlope`). This applies to the sidebar resize, the split
   divider, the panels' swipe and focus mode's scrolling.
 - **Land a drop.** Let go of a dragged item and it springs from under the hand into its
   new place, at the speed it was let go, while the items that moved for it spring

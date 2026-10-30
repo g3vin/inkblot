@@ -85,8 +85,20 @@ export const committedIndex = (position, origin, commitAt = 0.5) => {
   return Math.round(origin) + Math.sign(travel) * Math.floor(Math.abs(travel) + 1 - commitAt)
 }
 
-/** The fingers' speed over the last moments of the gesture, in px/ms. */
-export const liftVelocity = (samples) => velocityFrom(samples, SWIPE_VELOCITY_WINDOW_MS).x
+/**
+ * How long after the last wheel event the lift may be heard and still be the same
+ * moment: AppKit's phase crosses the bridge after the deltas it ends. A longer gap is
+ * the fingers resting on the trackpad before they lift, which slows the swipe.
+ */
+export const SWIPE_LIFT_LATENCY_MS = 48
+
+/**
+ * The fingers' speed over the last moments of the gesture, in px/ms, as they were at
+ * `at` (the lift; the last event by default).
+ */
+export const liftVelocity = (samples, at = samples[samples.length - 1]?.t ?? 0) => (
+  velocityFrom(samples, SWIPE_VELOCITY_WINDOW_MS, at).x
+)
 
 /**
  * `targetRef` is the element whose wheel events drive it. They are listened for
@@ -184,7 +196,10 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
       const at = g.origin + g.x / g.width
       const lastAt = g.samples.length ? g.samples[g.samples.length - 1].t : g.startedAt
       const flicked = lastAt - g.startedAt < SWIPE_HOLD_MS
-      const velocity = liftVelocity(g.samples)
+      // Without phases the lift is only guessed from the quiet after the last event, so
+      // that event is the lift.
+      const liftedAt = phased ? Math.min(performance.now(), lastAt + SWIPE_LIFT_LATENCY_MS) : lastAt
+      const velocity = liftVelocity(g.samples, liftedAt)
       const settled = settleIndex(at, velocity, total, g.origin, latest.current.commitAt)
       // A flick turns one panel from where it set off, never two.
       const target = flicked ? clamp(settled, g.origin - 1, g.origin + 1) : settled

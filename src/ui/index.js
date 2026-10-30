@@ -35,8 +35,10 @@ export { RevealGate, Skeleton, SkeletonOverlay, SkeletonRows } from './Reveal.js
 export { useRevealGateOpen, useRevealReady, useDelayedFlag, useReveal, useRevealOnChange, staggerStyle } from './revealState.js'
 export { REVEAL } from './motion.js'
 export {
-  SPRINGS, DECELERATION, spring, springAt, settleTime, progressOf, springEasing, toFramer, project, decayAt,
-  nearestTarget, rubberBand, rubberClamp, velocityFrom, trackSample, prefersReducedMotion,
+  SPRINGS, DECELERATION, RUBBER_BANDS, GESTURE, spring, springAt, settleTime, progressOf, springEasing,
+  releaseSpring, toFramer, project, decayAt, nearestTarget, settleOnTargets, rubberCoefficient, rubberBand,
+  unRubberBand, rubberClamp, rubberUnclamp, rubberSlope, pastSlop, velocityFrom, isPausing, trackSample,
+  prefersReducedMotion,
 } from './physics.js'
 export { SpringValue, coast, springLayout, springTiming, springTransition, useSpring } from './useSpring.js'
 export { PaperSheet, PaperPile } from './Paper.jsx'

@@ -10,10 +10,18 @@
  * render.
  */
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { DECELERATION, SPRINGS, decayAt, prefersReducedMotion, spring, springAt, springEasing } from './physics.js'
+import { DECELERATION, SPRINGS, decayAt, prefersReducedMotion, releaseSpring, spring, springAt, springEasing } from './physics.js'
 
 /** Slower than this (px/ms) a coast has stopped: a twentieth of a pixel a frame. */
 const COAST_MIN_SPEED = 0.003
+
+/**
+ * Without a `precision`, a spring has arrived within this fraction of the distance it
+ * set off over, as the CSS curves do (physics.js), so script and CSS land together.
+ * The floor is for a spring set off only by a release, with no distance to go.
+ */
+const RELATIVE_PRECISION = 0.002
+const PRECISION_FLOOR = 0.001
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
 
@@ -43,10 +51,12 @@ const supportsLinear = () => (
  * A CSS transition's timing (`'<ms>ms linear(…)'`) for a spring from `from` to `to`
  * setting off at `velocity` (units/ms): a release handed to the compositor with its
  * speed kept, so nothing is stepped in script. Where `linear()` isn't supported, or
- * there is no distance to go, it is the preset's token from rest.
+ * there is no distance to go, it is the preset's token from rest: a cubic-bézier
+ * can't start at speed, so on those webviews a release eases out from a standstill.
  */
 export function springTransition(preset, { from, to, velocity = 0 }) {
-  const name = Object.keys(SPRINGS).find((key) => SPRINGS[key] === preset) ?? 'smooth'
+  const name = Object.keys(SPRINGS).find((key) => SPRINGS[key] === preset)
+    ?? (preset.bounce > 0 ? 'momentum' : 'smooth')
   const resting = `var(--spring-${name}-dur) var(--spring-${name})`
   const distance = to - from
   if (!supportsLinear() || Math.abs(distance) < 1e-6) return resting
@@ -74,11 +84,11 @@ export function springTiming(preset = SPRINGS.smooth) {
  * One number moving on a spring. `set` aims it somewhere new and keeps its current
  * velocity, unless a release velocity is given; `jump` puts it there at once.
  *
- *   precision   how close (in the value's units) counts as arrived; 0.1 suits pixels,
- *               0.001 a scale or an opacity
+ *   precision   how close (in the value's units) counts as arrived; by default a
+ *               fraction of the distance it set off over, as the CSS curves settle
  */
 export class SpringValue {
-  constructor(value = 0, { spring: preset = SPRINGS.smooth, precision = 0.1, onChange, onRest } = {}) {
+  constructor(value = 0, { spring: preset = SPRINGS.smooth, precision, onChange, onRest } = {}) {
     this.onChange = onChange
     this.onRest = onRest
     this.precision = precision
@@ -142,8 +152,10 @@ export class SpringValue {
 
   step(time) {
     this.sync(time)
-    const arrived = Math.abs(this.current - this.target) <= this.precision
-      && Math.abs(this.speed) * 16 <= this.precision
+    const precision = this.precision
+      ?? Math.max(PRECISION_FLOOR, RELATIVE_PRECISION * Math.abs(this.target - this.origin.value))
+    const arrived = Math.abs(this.current - this.target) <= precision
+      && Math.abs(this.speed) * 16 <= precision
     if (arrived) {
       running.delete(this)
       this.current = this.target
@@ -225,7 +237,7 @@ export function springLayout(list, selector, idOf) {
       const paint = () => {
         element.style.translate = offset.x || offset.y ? `${offset.x}px ${offset.y}px` : ''
       }
-      const preset = moved ? SPRINGS.momentum : SPRINGS.smooth
+      const preset = moved ? releaseSpring(Math.hypot(velocity.x, velocity.y)) : SPRINGS.smooth
       const axis = (key, v) => new SpringValue(offset[key], {
         spring: preset,
         precision: 0.5,
