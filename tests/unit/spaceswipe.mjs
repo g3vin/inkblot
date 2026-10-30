@@ -123,6 +123,17 @@ const landed = () => wait(800)
 }
 
 {
+  act(() => { view.jumpTo(4) })
+  phase('began')
+  for (let i = 0; i < 2; i += 1) wheel(4, 0, 8)
+  ok('a swipe that catches the panels mid-glide holds them where they are drawn, not where they were going',
+    view.dragging && view.progress > 1.9 && view.progress < 2.5)
+  phase('ended')
+  await landed()
+  clock += 1000
+}
+
+{
   phase('began')
   const steps = []
   for (let i = 0; i < 90; i += 1) { wheel(5, 0, 16); steps.push(view.progress) }
@@ -215,6 +226,8 @@ pointer('pointermove', 100 + STEP * 1.5)
 ok('dragged, the panels follow the indicator', strip.dragging && Math.abs(strip.progress - 1.5) < 0.01)
 ok('and the strip shows it is held', !!document.querySelector('.sidebar-tabs.is-grabbing'))
 pointer('pointermove', 100 + STEP * 2.3)
+// Held still before letting go, so the release has no speed to flick with.
+await act(() => new Promise((resolve) => setTimeout(resolve, 150)))
 pointer('pointerup', 100 + STEP * 2.3)
 await act(() => new Promise((resolve) => setTimeout(resolve, 800)))
 ok('letting go chooses the tab it is over', strip.index === 2 && strip.progress === 2 && !strip.dragging)
@@ -228,5 +241,11 @@ ok('and lands on the first', strip.index === 0)
 pointer('pointerdown', 100)
 pointer('pointerup', 100)
 ok('a press without a drag changes nothing', strip.index === 0 && !strip.dragging)
+
+pointer('pointerdown', 100)
+pointer('pointermove', 100 + STEP * 0.3)
+pointer('pointerup', 100 + STEP * 0.3)
+await act(() => new Promise((resolve) => setTimeout(resolve, 800)))
+ok('a flick a third of the way still turns to the next tab', strip.index === 1)
 
 await act(async () => { stripRoot.unmount() })

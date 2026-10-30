@@ -305,7 +305,7 @@ export default function RightSidebar({
       onMouseEnter={handleSidebarMouseEnter}
       onMouseLeave={handleSidebarMouseLeave}
     >
-      <div className="resizer resizer-left" onMouseDown={onResize} />
+      <div className="resizer resizer-left" onPointerDown={onResize} />
 
       <div className="sidebar-topbar">
         <div className="right-sidebar-global-title" aria-hidden="true">

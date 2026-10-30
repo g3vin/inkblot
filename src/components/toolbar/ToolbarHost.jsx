@@ -300,7 +300,9 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
     '--tb-swipe-floor': SWIPE_FADE_FLOOR,
     width: `${count * 100}%`,
     transform: `translateX(calc(-${(current * 100) / count}% + ${lean}px))`,
-    transition: swipe.dragging || reducedMotion ? 'none' : 'transform var(--spring-momentum-dur) var(--spring-momentum)',
+    // The swipe's own landing: the fingers' speed in it when let go, the quick spring
+    // from rest for a click or a key.
+    transition: swipe.dragging || reducedMotion ? 'none' : `transform ${swipe.snap}`,
   }
   const pillStyle = { '--tb-page-progress': clamp(swipe.progress, -0.3, count - 0.7) }
 

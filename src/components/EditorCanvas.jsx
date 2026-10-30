@@ -59,7 +59,7 @@ import { lockReason, useLocks } from '../lib/docLocks'
 import { setEditorLock } from '../extensions/DocumentLock'
 import { Skeleton, SkeletonOverlay } from '../ui/Reveal.jsx'
 import { SPLIT_RATIO_MAX, SPLIT_RATIO_MIN, clampSplitRatio } from '../lib/editorSession'
-import { SPRINGS, rubberClamp, trackSample, velocityFrom } from '../ui/physics.js'
+import { SPRINGS, rubberClamp, rubberCoefficient, rubberSlope, rubberUnclamp, trackSample, velocityFrom } from '../ui/physics.js'
 import { useSpring } from '../ui/useSpring.js'
 import { useDelayedFlag, useReveal, useRevealReady } from '../ui/revealState.js'
 import { MapSkeleton } from '../canvas/PaneSkeletons'
@@ -803,31 +803,45 @@ export default function EditorCanvas({
     if (!container) return
 
     setIsResizingSplit(true)
+    const band = rubberCoefficient(event.pointerType)
+    const ratioAt = (pointer) => {
+      const rect = container.getBoundingClientRect()
+      return splitOrientation === 'rows'
+        ? (pointer.clientY - rect.top) / rect.height
+        : (pointer.clientX - rect.left) / rect.width
+    }
+    // Held where it was grabbed, and where it is drawn if caught mid-spring: the hand
+    // is wherever it would have to be for the divider to be drawn there.
+    const drawn = divider.moving ? divider.value : drawnRatio ?? splitRatio
     divider.stop()
+    const offset = rubberUnclamp(drawn, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE, band) - ratioAt(event)
     const samples = []
+    let hand = null
 
     const onMove = (moveEvent) => {
-      const rect = container.getBoundingClientRect()
-      const ratio = splitOrientation === 'rows'
-        ? (moveEvent.clientY - rect.top) / rect.height
-        : (moveEvent.clientX - rect.left) / rect.width
-      trackSample(samples, { t: performance.now(), x: ratio })
-      divider.jump(rubberClamp(ratio, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE))
+      hand = ratioAt(moveEvent) + offset
+      trackSample(samples, { t: moveEvent.timeStamp, x: hand })
+      divider.jump(rubberClamp(hand, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE, band))
       // Editor owns the clamp, so the ratio can never strand a pane off screen.
-      setSplitRatio?.(ratio)
+      setSplitRatio?.(hand)
     }
 
-    const onUp = () => {
+    const onUp = (upEvent) => {
       setIsResizingSplit(false)
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      // Past a limit it springs back; the band gave only part of the hand's speed.
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      if (hand === null) return
+      // Past a limit it springs back, at the speed it was drawn moving: the hand's,
+      // slowed by the band. Inside them it stays where it was let go.
       const banded = divider.value !== clampSplitRatio(divider.value)
-      glideSplit(divider.value, banded ? velocityFrom(samples).x * 0.3 : 0)
+      const speed = banded && upEvent.type !== 'pointercancel' ? velocityFrom(samples, undefined, upEvent.timeStamp).x : 0
+      glideSplit(divider.value, speed * rubberSlope(hand, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE, band))
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   // The divider from the keyboard: the arrows along it move it, Enter evens it out.
@@ -959,7 +973,7 @@ export default function EditorCanvas({
             aria-valuemax={100}
             tabIndex={0}
             title="Drag to resize · double-click to even out"
-            onMouseDown={startSplitResize}
+            onPointerDown={startSplitResize}
             onDoubleClick={() => glideSplit(0.5)}
             onKeyDown={nudgeSplit}
           >

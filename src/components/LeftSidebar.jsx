@@ -250,7 +250,7 @@ export default function LeftSidebar({
           onOpenChange={setSearching}
         />
       </div>
-      <div className="resizer resizer-right" onMouseDown={onResize} />
+      <div className="resizer resizer-right" onPointerDown={onResize} />
     </aside>
   )
 }

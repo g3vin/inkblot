@@ -6,6 +6,11 @@
  * `viewportRef.current` for the live value. What React holds is the zoom alone,
  * rounded to a percent, for the readout: a pan leaves it unchanged, so a pan renders
  * nothing, and mid-zoom it is refreshed at most every 100ms and again on settling.
+ *
+ * The view moves on its own after a thrown pan (it coasts) and for a command (zoom in,
+ * fit, centre: it springs there, the middle of the view gliding as the zoom eases
+ * between its scales). Any touch of the view, a press anywhere on it or a wheel, stops
+ * either where it is.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -18,8 +23,8 @@ import {
   zoomAt,
   zoomTo,
 } from '../lib/canvasGeometry'
-import { trackSample, velocityFrom } from '../ui/physics.js'
-import { coast } from '../ui/useSpring.js'
+import { SPRINGS, trackSample, velocityFrom } from '../ui/physics.js'
+import { SpringValue, coast } from '../ui/useSpring.js'
 
 /** World units. Exported so snap-to-grid lands on the grid the user can see. */
 export const GRID_SIZE = 24
@@ -50,7 +55,7 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
   const worldRef = useRef(null)
   const gridRef = useRef(null)
   const viewportRef = useRef(initialViewport)
-  /** Stops the coast after a thrown pan; any new touch of the view stops it. */
+  /** Stops the view moving on its own (a coast, a command's glide); any new touch of it does. */
   const stopCoastRef = useRef(() => {})
   useEffect(() => {
     const coasting = stopCoastRef
@@ -383,6 +388,16 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     return true
   }, [applyViewport])
 
+  // A press anywhere on the view, a card or the empty canvas, catches it if it is moving:
+  // a card pressed mid-coast must not slide out from under the hand.
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface) return undefined
+    const catchView = () => stopCoastRef.current()
+    surface.addEventListener('pointerdown', catchView, true)
+    return () => surface.removeEventListener('pointerdown', catchView, true)
+  }, [])
+
   /* ---------------- zoom commands ---------------- */
 
   const surfaceSize = useCallback(() => {
@@ -390,16 +405,50 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     return { width: rect?.width || 0, height: rect?.height || 0 }
   }, [])
 
-  /** A command's jump (zoom in, fit, centre): the whole gesture at once, so it settles at once. */
+  /**
+   * A command's move (zoom in, fit, centre): the view springs there from wherever it is
+   * drawn, so a second command mid-way redirects it. The middle of the view travels in
+   * a straight line and the zoom by equal ratios, so a fit reads as one movement.
+   */
+  // Where a command's glide is going: a second step (zoom in twice) steps from there.
+  const goalRef = useRef(null)
   const jumpTo = useCallback((next) => {
-    applyViewport(next)
-    window.clearTimeout(settleTimerRef.current)
-    settle()
-  }, [applyViewport, settle])
+    stopCoastRef.current()
+    goalRef.current = next
+    const from = viewportRef.current
+    const { width, height } = surfaceSize()
+    const middle = (view) => ({ x: view.x + width / (2 * view.zoom), y: view.y + height / (2 * view.zoom) })
+    const a = middle(from)
+    const b = middle(next)
+    const at = (p) => {
+      const zoom = from.zoom * (next.zoom / from.zoom) ** p
+      const cx = a.x + (b.x - a.x) * p
+      const cy = a.y + (b.y - a.y) * p
+      return { zoom, x: cx - width / (2 * zoom), y: cy - height / (2 * zoom) }
+    }
+    const done = () => {
+      goalRef.current = null
+      applyViewport(next)
+      window.clearTimeout(settleTimerRef.current)
+      settle()
+    }
+    const glide = new SpringValue(0, {
+      spring: SPRINGS.smooth,
+      onChange: (p) => applyViewport(at(p)),
+      onRest: done,
+    })
+    glide.set(1)
+    if (glide.moving) {
+      stopCoastRef.current = () => {
+        goalRef.current = null
+        glide.stop()
+      }
+    } else done()
+  }, [applyViewport, settle, surfaceSize])
 
   const zoomBy = useCallback((factor) => {
     const { width, height } = surfaceSize()
-    jumpTo(zoomAt(viewportRef.current, factor, width / 2, height / 2))
+    jumpTo(zoomAt(goalRef.current ?? viewportRef.current, factor, width / 2, height / 2))
   }, [jumpTo, surfaceSize])
 
   const zoomIn = useCallback(() => zoomBy(ZOOM_STEP), [zoomBy])

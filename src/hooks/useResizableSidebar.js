@@ -9,12 +9,16 @@
  * component itself decides when a peek ends (see onAutoCollapse usage).
  *
  * Dragging the resizer adjusts width within [min, max]; pulled past either, it gives
- * as a rubber band and springs back when let go. Dragging past the collapse threshold
- * hides the sidebar.
+ * as a rubber band (stiffer for a mouse than a finger) and springs back when let go,
+ * and caught as it springs back it is held where it is drawn. Dragging past the
+ * collapse threshold hides the sidebar, and so does letting go of it thrown toward its
+ * edge hard enough to coast there.
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { getPreference, setPreference } from '../lib/preferences'
-import { SPRINGS, rubberClamp, trackSample, velocityFrom } from '../ui/physics.js'
+import {
+  DECELERATION, SPRINGS, project, rubberClamp, rubberCoefficient, rubberSlope, rubberUnclamp, trackSample, velocityFrom,
+} from '../ui/physics.js'
 import { SpringValue } from '../ui/useSpring.js'
 
 /** How close to its window edge a drag must come to hide the sidebar. */
@@ -49,6 +53,10 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
   // saved meanwhile, so quitting mid-way still reopens the writer's own layout.
   const [stowed, setStowed] = useState(null)
   const draggingRef = useRef(false)
+  // The drag under way: how far the hand is from the edge it holds, and what it is.
+  const grabRef = useRef({ offset: 0, band: rubberCoefficient('mouse') })
+  // The width as drawn, which a hand that catches it mid-spring takes over from.
+  const shownRef = useRef(saved.width)
 
   /** Hide it: unpinned and not hovering. */
   const collapse = useCallback(() => {
@@ -97,48 +105,67 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
 
   useEffect(() => {
     if (!resizing) return undefined
-    const samples = []
-    let shown = null
+    let samples = []
+    let hand = null
+    const show = (value) => {
+      shownRef.current = value
+      setWidth(value)
+    }
     // Still resizing until the spring back has landed, so the width is kept once.
     const back = new SpringValue(0, {
-      spring: SPRINGS.momentum,
-      onChange: (value) => setWidth(value),
+      spring: SPRINGS.smooth,
+      onChange: show,
       onRest: () => setResizing(false),
     })
-    const onMouseMove = (e) => {
+    const handAt = (e) => (side === 'left' ? e.clientX : window.innerWidth - e.clientX) + grabRef.current.offset
+    const onPointerMove = (e) => {
       if (!draggingRef.current) return
-      // Grabbed again mid-spring: the hand has it.
-      back.stop()
-      const value = side === 'left' ? e.clientX : window.innerWidth - e.clientX
+      if (back.moving) {
+        // Caught mid-spring: held where it is drawn, the hand taking over from there.
+        back.stop()
+        samples = []
+        grabRef.current.offset += rubberUnclamp(shownRef.current, min, max, RESIZE_GIVE, grabRef.current.band) - handAt(e)
+      }
+      const value = handAt(e)
       if (value <= COLLAPSE_THRESHOLD) {
         draggingRef.current = false
         setResizing(false)
         collapse()
         return
       }
-      trackSample(samples, { t: performance.now(), x: value })
-      shown = rubberClamp(value, min, max, RESIZE_GIVE)
-      setWidth(shown)
+      hand = value
+      trackSample(samples, { t: e.timeStamp, x: value })
+      show(rubberClamp(value, min, max, RESIZE_GIVE, grabRef.current.band))
     }
-    const onMouseUp = () => {
+    const onPointerUp = (e) => {
       if (!draggingRef.current) return
       draggingRef.current = false
-      const resting = shown === null ? null : Math.min(max, Math.max(min, shown))
-      if (resting === null || resting === shown) {
+      const shown = shownRef.current
+      const speed = e.type === 'pointercancel' ? 0 : velocityFrom(samples, undefined, e.timeStamp).x
+      // Thrown toward its edge: where it would coast to decides, not where it was let go.
+      if (hand !== null && speed < 0 && hand + project(speed, DECELERATION.fast) <= COLLAPSE_THRESHOLD) {
+        setResizing(false)
+        collapse()
+        return
+      }
+      const resting = Math.min(max, Math.max(min, shown))
+      if (hand === null || resting === shown) {
         setResizing(false)
         return
       }
       back.jump(shown)
-      // The band gave only part of the hand's speed: hand on as much.
-      back.set(resting, { velocity: velocityFrom(samples).x * 0.3 })
+      // Past the edge it was drawn moving slower than the hand: that is its speed.
+      back.set(resting, { velocity: speed * rubberSlope(hand, min, max, RESIZE_GIVE, grabRef.current.band) })
       if (!back.moving) setResizing(false)
     }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerUp)
     return () => {
       back.stop()
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerUp)
     }
   }, [resizing, min, max, side, collapse])
 
@@ -165,7 +192,12 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
     /** The panel's width whether docked or hovering; the layout hides it otherwise. */
     width,
     resizing,
-    start: () => {
+    /** The resizer pressed: the drag holds the edge where it was grabbed. */
+    start: (event) => {
+      if (event && event.button !== undefined && event.button !== 0) return
+      event?.preventDefault?.()
+      const at = event ? (side === 'left' ? event.clientX : window.innerWidth - event.clientX) : shownRef.current
+      grabRef.current = { offset: shownRef.current - at, band: rubberCoefficient(event?.pointerType ?? 'mouse') }
       draggingRef.current = true
       setResizing(true)
     },

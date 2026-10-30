@@ -20,6 +20,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icon from '../../ui/Icon.jsx'
+import { GESTURE, trackSample, velocityFrom } from '../../ui/physics.js'
 import { RIGHT_SIDEBAR_TABS } from './sidebarTabsConfig'
 
 const TAB_GAP_PX = 4
@@ -29,7 +30,7 @@ const TAB_BAR_PADDING_PX = 6
  *  the panel's padding, never out past the panel's edge. */
 const INDICATOR_OVERSHOOT_PX = 8
 /** Travel before a press on the indicator becomes a drag. */
-const INDICATOR_DRAG_SLOP_PX = 3
+const INDICATOR_DRAG_SLOP_PX = GESTURE.slop.pointer
 /** The squash, px off the indicator's top and bottom, follows an arch along its
  *  path: none at either end, the most halfway. How deep the arch goes: for a snap
  *  (a click, or landing after a drag), SNAP_SQUASH_PX for a tab or more, less for a
@@ -71,6 +72,26 @@ const alongTabs = (x, slots) => {
     if (x <= b) return b === a ? 0 : (x - a) / (b - a)
   }
   return 1
+}
+
+/** Which tab `x` is over, as a fractional index: 1.5 is halfway from the second to the third. */
+const indexAt = (x, slots) => {
+  if (!slots || slots.length < 2) return 0
+  for (let i = 0; i < slots.length - 1; i += 1) {
+    if (x <= slots[i + 1].left || i === slots.length - 2) return i + alongTabs(x, [slots[i], slots[i + 1]])
+  }
+  return slots.length - 1
+}
+
+/**
+ * The tab an indicator let go at `position` (a fractional index) moving at `velocity`
+ * (px/ms) lands on: a flick goes on to the next tab that way, anything slower to the
+ * nearest, as a page view turns.
+ */
+const releasedOn = (position, velocity) => {
+  if (velocity >= GESTURE.flick) return Math.floor(position) + 1
+  if (velocity <= -GESTURE.flick) return Math.ceil(position) - 1
+  return Math.round(position)
 }
 
 const snapToDevicePixel = (value) => {
@@ -258,17 +279,26 @@ export default function SidebarTabs({
     event.preventDefault()
     event.currentTarget.setPointerCapture?.(event.pointerId)
     setPressed(true)
+    // Caught mid-glide, it stops where it is drawn and the drag carries on from there.
+    const drawn = measured && indicatorRef.current ? indexAt(readIndicatorX(indicatorRef.current), slots) : committedActiveIndex
+    const caught = Math.abs(drawn - committedActiveIndex) > 0.01
     dragRef.current = {
       startX: event.clientX,
-      origin: committedActiveIndex,
+      origin: caught ? drawn : committedActiveIndex,
       step: event.currentTarget.getBoundingClientRect().width + TAB_GAP_PX,
-      moved: false,
-      position: committedActiveIndex,
+      moved: caught,
+      position: caught ? drawn : committedActiveIndex,
+      samples: [{ t: event.timeStamp, x: event.clientX }],
+    }
+    if (caught) {
+      setGrabbing(true)
+      onIndicatorDrag?.(drawn)
     }
   }
   const onIndicatorPointerMove = (event) => {
     const drag = dragRef.current
     if (!drag) return
+    trackSample(drag.samples, { t: event.timeStamp, x: event.clientX })
     const dx = event.clientX - drag.startX
     if (!drag.moved && Math.abs(dx) < INDICATOR_DRAG_SLOP_PX) return
     if (!drag.moved) setGrabbing(true)
@@ -276,15 +306,26 @@ export default function SidebarTabs({
     drag.position = drag.origin + dx / Math.max(drag.step, 1)
     onIndicatorDrag?.(drag.position)
   }
-  const onIndicatorPointerUp = () => {
+  const finishDrag = (target) => {
+    if (onIndicatorDrop) onIndicatorDrop(target)
+    else if (tabs[target].id !== tab) setTab(tabs[target].id)
+  }
+  const onIndicatorPointerUp = (event) => {
     const drag = dragRef.current
     dragRef.current = null
     setGrabbing(false)
     setPressed(false)
     if (!drag?.moved) return
-    const target = clamp(Math.round(drag.position), 0, tabs.length - 1)
-    if (onIndicatorDrop) onIndicatorDrop(target)
-    else if (tabs[target].id !== tab) setTab(tabs[target].id)
+    const velocity = velocityFrom(drag.samples, undefined, event.timeStamp).x
+    finishDrag(clamp(releasedOn(drag.position, velocity), 0, tabs.length - 1))
+  }
+  // A drag the system took away chose nothing: back to the tab it set off from.
+  const onIndicatorPointerCancel = () => {
+    const drag = dragRef.current
+    dragRef.current = null
+    setGrabbing(false)
+    setPressed(false)
+    if (drag?.moved) finishDrag(committedActiveIndex)
   }
 
   return (
@@ -300,7 +341,7 @@ export default function SidebarTabs({
         onPointerDown={onIndicatorPointerDown}
         onPointerMove={onIndicatorPointerMove}
         onPointerUp={onIndicatorPointerUp}
-        onPointerCancel={onIndicatorPointerUp}
+        onPointerCancel={onIndicatorPointerCancel}
         style={{
           ...indicatorPlacement,
           transition: dragging || reducedMotion

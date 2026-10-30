@@ -23,7 +23,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isMomentumWheel, knowsTrackpadPhases, onTrackpadPhase } from '../lib/wheelPhase'
 import { HAPTIC_ALIGNMENT, HAPTIC_GENERIC, HAPTIC_LEVEL, performHaptic } from '../lib/haptics'
-import { SPRINGS, rubberBand as stretch, trackSample, velocityFrom } from '../ui/physics.js'
+import { SPRINGS, releaseSpring, rubberBand as stretch, settleTime, springAt, trackSample, velocityFrom } from '../ui/physics.js'
 import { springTransition } from '../ui/useSpring.js'
 
 /** A click's change of panel: the quick spring from rest. */
@@ -33,7 +33,11 @@ const CLICK_SNAP = 'var(--spring-quick-dur) var(--spring-quick)'
 export const SWIPE_LOCK_PX = 6
 /** How much more sideways than up-and-down a gesture must be to swipe. */
 export const SWIPE_HORIZONTAL_BIAS = 1.2
-/** Finger speed at the lift, in px/ms, that carries on to the next panel. */
+/**
+ * Finger speed at the lift, in px/ms, that carries on to the next panel: a speed
+ * threshold, as iOS pages, rather than a projection, which would carry a slow drift
+ * over too. Above GESTURE.flick because macOS speeds a trackpad's scroll deltas up.
+ */
 export const SWIPE_FLICK_VELOCITY = 0.5
 /** The stretch of the gesture its lift speed is measured over. */
 export const SWIPE_VELOCITY_WINDOW_MS = 80
@@ -131,11 +135,25 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
   useEffect(() => { latest.current = { index, count, panelWidth, onSettle, commitAt } }, [index, count, panelWidth, onSettle, commitAt])
 
   const followed = useRef([])
+  // The spring the panels are gliding on, if any: where the CSS transition has them.
+  const glideRef = useRef(null)
 
   /** Put the panels under the fingers. */
   const show = useCallback((value) => {
     progressRef.current = value
     setProgress(value)
+  }, [])
+
+  /**
+   * Where the panels are drawn now: mid-glide, part of the way along their spring, not
+   * at the panel they are going to. A swipe that catches them starts from here.
+   */
+  const drawnProgress = useCallback(() => {
+    const glide = glideRef.current
+    if (!glide) return progressRef.current
+    const t = performance.now() - glide.at
+    if (t >= glide.settle) return progressRef.current
+    return springAt(glide.preset, glide.from, glide.to, glide.velocity, t).value
   }, [])
 
   /**
@@ -146,13 +164,18 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
    * spring from rest. Never stepped here: that would render the whole sidebar every
    * frame, and a slow render would stall the panels mid-glide.
    */
-  const glideTo = useCallback((target, velocity) => {
-    const from = progressRef.current
-    setSnap(velocity === undefined
-      ? CLICK_SNAP
-      : springTransition(Math.abs(velocity) > 0.0005 ? SPRINGS.momentum : SPRINGS.smooth, { from, to: target, velocity }))
+  const glideTo = useCallback((target, velocity, pixelsPerPanel = FALLBACK_PIXELS_PER_PANEL) => {
+    const from = drawnProgress()
+    let preset = SPRINGS.quick
+    if (velocity === undefined) setSnap(CLICK_SNAP)
+    else {
+      preset = Math.abs(velocity) > 0.0005 ? releaseSpring(velocity * pixelsPerPanel) : SPRINGS.smooth
+      setSnap(springTransition(preset, { from, to: target, velocity }))
+    }
+    const speed = velocity ?? 0
+    glideRef.current = { from, to: target, velocity: speed, preset, at: performance.now(), settle: settleTime(preset, { from, to: target, velocity: speed }) }
     show(target)
-  }, [show])
+  }, [drawnProgress, show])
 
   // A tab chosen any other way (a click, a command, a map asking for its panel). A
   // swipe's own landing reports its panel too, and is already on its way there.
@@ -209,7 +232,7 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
       setDragging(false)
       // Fingers moving the panels left show the next one: the panels' speed is the
       // fingers' turned into panels per ms.
-      glideTo(target, velocity / g.width)
+      glideTo(target, velocity / g.width, g.width)
       settle?.(target)
     }
 
@@ -271,11 +294,16 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
         g.axis = 'y'
         return
       }
-      const { index: current, count: total, panelWidth: width } = latest.current
+      const { count: total, panelWidth: width } = latest.current
       g.mode = 'swipe'
       g.axis = 'x'
-      g.origin = clamp(Math.round(progressRef.current ?? current), 0, Math.max(0, total - 1))
       g.width = Number.isFinite(width) && width > 0 ? width : FALLBACK_PIXELS_PER_PANEL
+      // Caught mid-glide, the panels are held where they are drawn, not at the panel
+      // they were going to.
+      const drawn = drawnProgress()
+      glideRef.current = null
+      g.origin = clamp(Math.round(drawn), 0, Math.max(0, total - 1))
+      g.x += (drawn - g.origin) * g.width
       g.startedAt = event.timeStamp
       setDragging(true)
     } else if (g.mode === 'swipe') {
@@ -292,11 +320,10 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
     if (event.timeStamp - g.startedAt < SWIPE_HOLD_MS) g.x = clamp(g.x, -g.width, g.width)
 
     event.preventDefault()
-    g.samples.push({ t: event.timeStamp, x: g.x })
-    if (g.samples.length > 24) g.samples.shift()
+    trackSample(g.samples, { t: event.timeStamp, x: g.x })
 
     showFollowing(rubberBand(g.origin + g.x / g.width, latest.current.count))
-  }, [ignore, release, showFollowing])
+  }, [drawnProgress, ignore, release, showFollowing])
 
   useEffect(() => {
     const target = targetRef.current
@@ -317,6 +344,7 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
   /** The panels following something else being dragged (the selector's indicator). */
   const follow = useCallback((at) => {
     if (gesture.current.mode === 'swipe') return
+    glideRef.current = null
     setDragging(true)
     trackSample(followed.current, { t: performance.now(), x: at })
     showFollowing(rubberBand(at, latest.current.count))
@@ -329,7 +357,8 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
     land(next, current)
     hapticIndexRef.current = next
     setDragging(false)
-    glideTo(next, velocityFrom(followed.current).x)
+    const { panelWidth: width } = latest.current
+    glideTo(next, velocityFrom(followed.current).x, Number.isFinite(width) && width > 0 ? width : undefined)
     followed.current = []
     chosen?.(next)
   }, [glideTo, land])
@@ -337,6 +366,8 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
   /**
    * `moving`: the panels are on the hand, painted as it goes, so nothing may ease them.
    * `snap`: otherwise, the transition's timing that carries them to `progress`.
+   * `drawnProgress()`: where the panels are drawn this moment, for a drag that catches
+   * them mid-glide (the selector's indicator).
    */
-  return { progress, dragging, moving: dragging, snap, jumpTo, follow, settle }
+  return { progress, dragging, moving: dragging, snap, jumpTo, follow, settle, drawnProgress }
 }

@@ -17,9 +17,10 @@ import { isItemLocked } from '../lib/map/mapVisibility'
 import { arrowDays, startStateOf } from '../lib/map/nbody'
 import { panMapBy } from '../lib/map/mapViewport'
 import { nearestOnPolyline } from '../lib/map/mapGeometry'
+import { GESTURE, trackSample, velocityFrom } from '../ui/physics.js'
 
 /** Screen pixels a press may wander before it becomes a drag. */
-const DRAG_THRESHOLD = 4
+const DRAG_THRESHOLD = GESTURE.slop.pointer
 /** Two clicks this close in time and space finish a drawing. */
 const DOUBLE_CLICK_MS = 320
 
@@ -80,6 +81,8 @@ export function useMapInput({
       event.currentTarget.focus({ preventScroll: true })
       if (event.button !== 0 && event.button !== 1) return
 
+      // A press catches the map if it is still coasting from a throw.
+      view.stopCoast?.()
       const startX = event.clientX
       const startY = event.clientY
       const itemEl = event.target.closest('[data-map-item]')
@@ -110,7 +113,11 @@ export function useMapInput({
         const label = item.kind === 'label' ? map.labels.find((candidate) => candidate.id === item.id) : null
         if ((pin && pin.at && !pin.body) || (label && label.at)) {
           dragKind = 'move'
-          dragTarget = item
+          // Held where it was grabbed, not by its anchor: the press's offset from the
+          // anchor is kept for the whole drag.
+          const anchor = (pin ?? label).at
+          const grabbed = storedAt(startX, startY)
+          dragTarget = { ...item, offset: grabbed ? [anchor[0] - grabbed[0], anchor[1] - grabbed[1]] : [0, 0] }
         }
       }
 
@@ -120,6 +127,7 @@ export function useMapInput({
       let frame = 0
       let pending = null
       let inserted = false
+      const samples = [{ t: event.timeStamp, x: startX, y: startY }]
 
       const flush = () => {
         frame = 0
@@ -130,7 +138,8 @@ export function useMapInput({
         if (!at) return
         if (dragKind === 'move') {
           const collection = dragTarget.kind === 'pin' ? 'pins' : 'labels'
-          patchItem(collection, dragTarget.id, { at }, `move-${dragTarget.id}`)
+          const [dx, dy] = dragTarget.offset
+          patchItem(collection, dragTarget.id, { at: [at[0] + dx, at[1] + dy] }, `move-${dragTarget.id}`)
         } else if (dragKind === 'handle') {
           const current = mapRef.current
           if (dragTarget.ownerKind === 'route') {
@@ -189,6 +198,7 @@ export function useMapInput({
           if (!view.native) view.applyViewport(panMapBy(view.viewportRef.current, moveEvent.clientX - lastX, moveEvent.clientY - lastY))
           lastX = moveEvent.clientX
           lastY = moveEvent.clientY
+          trackSample(samples, { t: moveEvent.timeStamp, x: lastX, y: lastY })
           return
         }
         pending = { clientX: moveEvent.clientX, clientY: moveEvent.clientY }
@@ -205,6 +215,10 @@ export function useMapInput({
           if (pending) flush()
           setIsPanning(false)
           setDraggedFrom(null)
+          // Let go while moving, the map coasts on: the throw's speed under friction.
+          if (dragKind === 'pan' && !view.native && upEvent.type === 'pointerup') {
+            view.throwPan?.(velocityFrom(samples, undefined, upEvent.timeStamp))
+          }
           return
         }
         if (forcePan || handleEl) return
