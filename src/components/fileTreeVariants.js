@@ -3,6 +3,8 @@
  *
  * Data, not behaviour; lifted out so FileTree.jsx reads as component logic.
  */
+import { SPRINGS, toFramer } from '../ui/physics.js'
+
 export const itemRevealVariants = {
   collapsed: {
     opacity: 0,
@@ -11,11 +13,7 @@ export const itemRevealVariants = {
   expanded: (index = 0) => ({
     opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.2,
-      ease: 'easeOut',
-      delay: Math.min(index, 8) * 0.024,
-    },
+    transition: toFramer(SPRINGS.smooth, { delay: Math.min(index, 8) * 0.024 }),
   }),
 }
 
@@ -24,8 +22,7 @@ export const folderChildrenVariants = {
     height: 0,
     opacity: 0,
     transition: {
-      duration: 0.18,
-      ease: 'easeInOut',
+      ...toFramer(SPRINGS.exit),
       when: 'afterChildren',
       staggerChildren: 0.018,
       staggerDirection: -1,
@@ -35,8 +32,7 @@ export const folderChildrenVariants = {
     height: 'auto',
     opacity: 1,
     transition: {
-      duration: 0.24,
-      ease: 'easeOut',
+      ...toFramer(SPRINGS.smooth),
       when: 'beforeChildren',
       staggerChildren: 0.03,
       delayChildren: 0.02,

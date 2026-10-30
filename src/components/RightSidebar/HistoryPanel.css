@@ -107,7 +107,7 @@
   font-size: 11px;
   color: var(--text-subtle);
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 .history-version:hover .history-name.is-placeholder,
@@ -165,7 +165,7 @@
 .history-group-chevron {
   display: inline-flex;
   transform: rotate(-90deg);
-  transition: transform var(--dur-fast) var(--ease-out);
+  transition: transform var(--spring-quick-dur) var(--spring-quick);
   color: var(--text-muted);
 }
 

@@ -18,7 +18,9 @@ import NoteImageGallery from './NoteImageGallery'
 import { AudioClipList, AudioRecordButton } from './AudioNotes'
 import { pickNoteImages, readClipboardImages } from '../lib/noteImageUtils'
 import { trafficLightsBox } from '../lib/trafficLights'
+import { panelCardFor } from '../lib/notePanelCard'
 import { NOTE_CLOSE_MS, NOTE_POP_MS, STRING_CLOSE_MIN_MS, STRING_MIN_MS, closeSchedule, drawMs, lineStart, openTiming } from '../lib/noteReveal'
+import { SPRINGS, prefersReducedMotion, spring, springAt } from '../ui/physics.js'
 import { NOTE_COLOR_OPTIONS, collectNoteBranchIds, createFreeNote, isNoteEmpty, noteColor, noteInk, touchNote } from '../lib/noteUtils'
 import {
   NOTE_HIGHLIGHT_EVENT,
@@ -61,6 +63,9 @@ const queryAnchorRect = (noteId, editorView) => {
 // The reveal's timing and the closing's (drawMs, lineStart, openTiming, closeSchedule)
 // are shared with the notes panel: lib/noteReveal.
 
+/** A dragged card's children hang from it as on a string. */
+const TETHER = spring(SPRINGS.tether)
+
 const NOTE_COLOR_TRIGGER = {
   className: 'note-tool-btn note-preview-tool note-preview-color',
   children: <span className="note-preview-color-dot" aria-hidden="true" />,
@@ -70,8 +75,16 @@ export default function NoteHoverPreview({
   notesByDoc = {},
   setNotesForDoc,
   projectName,
+  notesPanelOpen = false,
 }) {
   const [preview, setPreviewState] = useState(null)
+  // A note the notes panel shows is strung to its card there instead (NotePanelTether).
+  const panelShowsRef = useRef(() => false)
+  useEffect(() => {
+    panelShowsRef.current = (note) => (
+      notesPanelOpen && Boolean(panelCardFor(note, notesByDoc?.[note?.docName] || []))
+    )
+  }, [notesByDoc, notesPanelOpen])
   const previewRef = useRef(null)
   // When each note's string starts drawing, by id, for the card now open (see layout).
   const [reveal] = useState(() => ({ rootId: null, timings: new Map(), closeTotal: 0 }))
@@ -266,6 +279,7 @@ export default function NoteHoverPreview({
   useEffect(() => {
     const openPreview = (detail, locked) => {
       if (!detail?.note || !detail?.anchorRect) return
+      if (panelShowsRef.current(detail.note)) return
       cancelClose()
 
       clearHideTimeout()
@@ -536,8 +550,15 @@ export default function NoteHoverPreview({
   // is being dragged ('move') and until they settle afterwards ('settle').
   const startElasticLoop = useCallback(() => {
     if (elasticFrameRef.current) return
+    let last = performance.now()
 
     const animate = () => {
+      // Stepped by the time since the last frame, never by the frame, so the cards
+      // swing alike at 60Hz and 120Hz; a long stall is taken as one short step.
+      const time = performance.now()
+      const dt = Math.min(64, Math.max(0, time - last))
+      last = time
+      const reduced = prefersReducedMotion()
       const dragState = dragStateRef.current
       const currentLayout = layoutRef.current
       const descendantIds = dragState?.descendantIds || null
@@ -572,21 +593,20 @@ export default function NoteHoverPreview({
           : settled
 
         const current = nextPositions[noteId] || { ...settled }
-        const velocity = nextVelocity[noteId] || { x: 0, y: 0 }
+        const speed = nextVelocity[noteId] || { x: 0, y: 0 }
 
-        velocity.x = (velocity.x + (target.x - current.x) * 0.12) * 0.72
-        velocity.y = (velocity.y + (target.y - current.y) * 0.12) * 0.72
-
-        const next = {
-          x: current.x + velocity.x,
-          y: current.y + velocity.y,
-        }
+        // The target moves every frame, so each frame is solved exactly with it held
+        // where it is now.
+        const sx = reduced ? { value: target.x, velocity: 0 } : springAt(TETHER, current.x, target.x, speed.x, dt)
+        const sy = reduced ? { value: target.y, velocity: 0 } : springAt(TETHER, current.y, target.y, speed.y, dt)
+        const next = { x: sx.value, y: sy.value }
+        const velocity = { x: sx.velocity, y: sy.velocity }
 
         if (
           Math.abs(settled.x - next.x) > 0.35 ||
           Math.abs(settled.y - next.y) > 0.35 ||
-          Math.abs(velocity.x) > 0.12 ||
-          Math.abs(velocity.y) > 0.12
+          Math.abs(velocity.x) * 16 > 0.12 ||
+          Math.abs(velocity.y) * 16 > 0.12
         ) {
           moving = true
           nextPositions[noteId] = next

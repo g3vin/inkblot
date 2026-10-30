@@ -1,3 +1,4 @@
+/* InkPicker.css — the InkPicker primitive: a row of ink swatches, with optional labels. */
 .ib-ink-picker {
   display: flex;
   flex-wrap: wrap;
@@ -44,7 +45,7 @@
   background: var(--swatch);
   color: var(--on-ink);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 10%, transparent);
-  transition: transform var(--dur-fast) var(--ease-out);
+  transition: transform var(--spring-quick-dur) var(--spring-quick);
 }
 
 .ib-ink-swatch:hover .ib-ink-dot { transform: scale(1.08); }

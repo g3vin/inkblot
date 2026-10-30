@@ -561,10 +561,10 @@ export default function BubbleEditor({ session, onClose, toolbarSlot = null, det
     )
   }
 
-  // Following the fingers while a swipe is under way; easing back if it stops short.
+  // Following the fingers while a swipe is under way; springing back if it stops short.
   const slide = swipe.offset
     ? { transform: `translateX(${swipe.offset}px)`, transition: 'none' }
-    : { transition: 'transform 220ms var(--ease-standard)' }
+    : { transition: 'transform var(--spring-momentum-dur) var(--spring-momentum)' }
   const shown = displayTexts(words, session?.original)
   const rowItems = words.map((word, index) => renderBubble(word, 'row', shown[index]))
   if (editing?.draft) {

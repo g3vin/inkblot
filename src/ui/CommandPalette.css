@@ -1,3 +1,4 @@
+/* CommandPalette.css — the ⌘K palette: its scrim, search input, result rows and empty state. */
 .ib-palette-scrim {
   position: fixed;
   inset: 0;
@@ -7,13 +8,13 @@
   align-items: flex-start;
   padding-top: 14vh;
   background: var(--scrim-bg);
-  animation: ib-fade-in var(--dur-base) var(--ease-out);
+  animation: ib-fade-in var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 /* Like a Dialog (Dialog.css): it drops in, and leaves the way it came. */
-.ib-palette-scrim .ib-palette { animation: ib-dialog-in var(--dur-slow) var(--ease-out); }
-.ib-palette-scrim.is-leaving { animation: ib-fade-out var(--dur-fast) var(--ease-in) forwards; pointer-events: none; }
-.ib-palette-scrim.is-leaving .ib-palette { animation: ib-dialog-out var(--dur-fast) var(--ease-in) forwards; }
+.ib-palette-scrim .ib-palette { animation: ib-dialog-in var(--spring-smooth-dur) var(--spring-smooth); }
+.ib-palette-scrim.is-leaving { animation: ib-fade-out var(--spring-exit-dur) var(--spring-exit) forwards; pointer-events: none; }
+.ib-palette-scrim.is-leaving .ib-palette { animation: ib-dialog-out var(--spring-exit-dur) var(--spring-exit) forwards; }
 
 .ib-palette.ib-menu {
   width: min(560px, calc(100vw - 32px));

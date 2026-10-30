@@ -32,7 +32,7 @@
 .stats-ring-dial > svg { position: absolute; inset: 0; }
 .stats-ring[data-met='true'] .stats-ring-dial { color: var(--accent-color); }
 .stats-ring-track { fill: none; stroke: var(--border-muted); stroke-width: 6; }
-.stats-ring-fill { fill: none; stroke: var(--accent-color); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset var(--dur-base) var(--ease-standard); }
+.stats-ring-fill { fill: none; stroke: var(--accent-color); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset var(--spring-smooth-dur) var(--spring-smooth); }
 .stats-ring-value { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .stats-ring-label { font-size: 10px; color: var(--text-muted); }
 
@@ -82,7 +82,7 @@
 .stats-badge[data-tone='warn'] { color: var(--status-warning); }
 
 .stats-progress { height: 4px; border-radius: var(--radius-pill); background: var(--border-muted); overflow: hidden; }
-.stats-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--accent-color); transition: width var(--dur-base) var(--ease-standard); }
+.stats-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--accent-color); transition: width var(--spring-smooth-dur) var(--spring-smooth); }
 
 /* ---------------- the timer, in the panel ---------------- */
 
@@ -138,7 +138,7 @@
   height: 2px;
   background: var(--accent-color);
   transform-origin: left center;
-  transition: transform var(--dur-base) linear;
+  transition: transform var(--spring-smooth-dur) linear;
   pointer-events: none;
 }
 .timer-capsule[data-kind='rest'] .timer-capsule-progress { background: var(--text-muted); }

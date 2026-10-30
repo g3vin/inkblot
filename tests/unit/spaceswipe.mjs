@@ -22,6 +22,10 @@ const { createRoot } = await import('react-dom/client')
 const swipeModule = await import('../../src/hooks/useSpaceSwipe.js')
 const { default: useSpaceSwipe, settleIndex, rubberBand, liftVelocity, SWIPE_IDLE_END_MS } = swipeModule
 const { simulateTrackpadPhase, knowsTrackpadPhases } = await import('../../src/lib/wheelPhase.js')
+const { SPRINGS, springEasing } = await import('../../src/ui/physics.js')
+// The webview springs a release in CSS with linear(), which jsdom doesn't know.
+const realSupports = globalThis.CSS?.supports?.bind(globalThis.CSS)
+globalThis.CSS = { ...globalThis.CSS, supports: (property, value) => /^linear\(/.test(value ?? '') || Boolean(realSupports?.(property, value)) }
 
 import { ok } from './assert.mjs'
 
@@ -31,6 +35,12 @@ ok('a slow lift settles on the nearest panel', settleIndex(1.4, 0.1, 5) === 1 &&
 ok('a flick goes on to the next panel that way', settleIndex(1.2, 1, 5) === 2 && settleIndex(1.8, -1, 5) === 1)
 ok('a flick from rest still turns one panel', settleIndex(2, 1, 5) === 3 && settleIndex(2, -1, 5) === 1)
 ok('a flick past the ends stays inside', settleIndex(4.1, 2, 5) === 4 && settleIndex(-0.1, -2, 5) === 0)
+const { committedIndex } = swipeModule
+ok('by default a swipe is on the next panel from halfway', committedIndex(1.5, 1) === 2 && committedIndex(1.49, 1) === 1)
+ok('committing at two thirds, a swipe stays put until then', committedIndex(1.6, 1, 2 / 3) === 1 && committedIndex(1.7, 1, 2 / 3) === 2)
+ok('and the same going back', committedIndex(0.4, 1, 2 / 3) === 1 && committedIndex(0.3, 1, 2 / 3) === 0)
+ok('held further, each panel along commits at two thirds too', committedIndex(2.6, 1, 2 / 3) === 2 && committedIndex(2.7, 1, 2 / 3) === 3)
+ok('a slow lift short of two thirds goes back', settleIndex(1.6, 0, 5, 1, 2 / 3) === 1 && settleIndex(1.7, 0, 5, 1, 2 / 3) === 2)
 ok('the panels give past the ends, but never far', rubberBand(-3, 5) > -0.3 && rubberBand(-0.1, 5) < 0 && rubberBand(2.5, 5) === 2.5)
 ok('the lift speed is the last moments, not the whole swipe',
   Math.abs(liftVelocity([{ t: 0, x: 0 }, { t: 500, x: 50 }, { t: 540, x: 90 }, { t: 560, x: 110 }]) - 1) < 0.01)
@@ -61,6 +71,8 @@ const wheel = (deltaX, deltaY = 0, gap = 16) => {
 }
 const phase = (name) => act(() => { simulateTrackpadPhase(name) })
 const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms)))
+// Long enough for the panels' spring to land, however it was let go.
+const landed = () => wait(800)
 
 // In a browser there are no phases: a pause in the wheel stands in for the lift.
 {
@@ -69,6 +81,7 @@ const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms))
   ok('without phases, the panels follow the fingers', view.dragging && view.progress > 0.2)
   await wait(SWIPE_IDLE_END_MS + 40)
   ok('and a pause lets go: the quick swipe turned one panel', !view.dragging && view.index === 1)
+  await landed()
   clock += 1000
 }
 
@@ -78,7 +91,11 @@ const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms))
   for (let i = 0; i < 4; i += 1) wheel(15, 0, 8)
   ok('a quick swipe moves the panels a little', view.progress > 1.1 && view.progress < 1.5 && view.index === 1)
   phase('ended')
-  ok('letting go turns exactly one panel', view.index === 2 && view.progress === 2 && !view.dragging)
+  ok('letting go turns exactly one panel', view.index === 2 && !view.dragging)
+  ok('and the panels are sent there at once, for the compositor to carry', view.progress === 2 && !view.moving)
+  ok('on a spring with the fingers\' speed in it, not one from rest',
+    /^\d+ms linear\(/.test(view.snap) && !view.snap.includes(springEasing(SPRINGS.momentum).easing))
+  await landed()
   phase('momentum')
   const coasts = [40, 35, 30, 25, 20, 15, 10, 5].map((dx) => wheel(dx, 0, 16))
   ok('its momentum is swallowed, not read as another swipe', coasts.every((event) => event.defaultPrevented) && view.index === 2)
@@ -92,6 +109,7 @@ const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms))
   ok('a very fast flick never shows more than the next panel', flick.every((p) => p <= 3))
   phase('ended')
   ok('and turns exactly one panel', view.index === 3)
+  await landed()
   phase('momentum')
   for (let i = 0; i < 6; i += 1) wheel(80, 0, 16)
   ok('its hard coast is swallowed too', view.index === 3)
@@ -100,6 +118,7 @@ const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms))
   for (let i = 0; i < 6; i += 1) wheel(-150, 0, 8)
   phase('ended')
   ok('a very fast flick back turns one panel back', view.index === 2)
+  await landed()
   clock += 1000
 }
 
@@ -110,6 +129,7 @@ const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms))
   ok('held down, a swipe travels through several panels', steps.some((p) => p > 3.5) && view.dragging)
   phase('ended')
   ok('and lifted slowly, it settles on the nearest', view.index === 4)
+  await landed()
   clock += 1000
 }
 
@@ -120,6 +140,7 @@ const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms))
   ok('held most of the way back, then flicked', view.progress < 2.5 && view.progress > 1.5)
   phase('ended')
   ok('the flick carries it one panel further', view.index === 1)
+  await landed()
   clock += 1000
 }
 
@@ -136,6 +157,7 @@ const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms))
   for (let i = 0; i < 30; i += 1) wheel(-8, 0, 16)
   ok('past the first panel the swipe gives a little', view.progress < 0 && view.progress > -0.3)
   phase('ended')
+  await landed()
   ok('and springs back', view.index === 0 && view.progress === 0)
   clock += 1000
 }
@@ -144,6 +166,7 @@ const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms))
   phase('began')
   for (let i = 0; i < 5; i += 1) wheel(6, 0, 16)
   act(() => { view.jumpTo(3) })
+  await landed()
   ok('a click mid-swipe goes straight there', view.progress === 3 && !view.dragging)
   phase('ended')
 }
@@ -193,6 +216,7 @@ ok('dragged, the panels follow the indicator', strip.dragging && Math.abs(strip.
 ok('and the strip shows it is held', !!document.querySelector('.sidebar-tabs.is-grabbing'))
 pointer('pointermove', 100 + STEP * 2.3)
 pointer('pointerup', 100 + STEP * 2.3)
+await act(() => new Promise((resolve) => setTimeout(resolve, 800)))
 ok('letting go chooses the tab it is over', strip.index === 2 && strip.progress === 2 && !strip.dragging)
 
 pointer('pointerdown', 100)

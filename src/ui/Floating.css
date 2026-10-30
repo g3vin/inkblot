@@ -31,7 +31,7 @@
   border-radius: 50%;
   color: var(--accent-foreground);
   cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease-out);
+  transition: transform var(--spring-quick-dur) var(--spring-quick);
 }
 
 :root[data-platform='ios'] .ib-fab { border-radius: 50%; }

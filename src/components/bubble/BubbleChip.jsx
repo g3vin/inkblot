@@ -3,6 +3,7 @@
  * selected one carries its actions in a capsule above it.
  */
 import { motion } from 'framer-motion'
+import { SPRINGS, toFramer } from '../../ui/physics.js'
 import { isPunctuation, tokenize } from '../../lib/bubbleText'
 
 export default function BubbleChip({
@@ -34,7 +35,7 @@ export default function BubbleChip({
   return (
     <motion.div
       layout={dropped ? false : 'position'}
-      transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+      transition={toFramer(SPRINGS.smooth)}
       className={className}
       style={style}
       data-bubble-id={word.id}

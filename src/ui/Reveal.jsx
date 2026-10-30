@@ -14,7 +14,7 @@
  *   Skeleton         one placeholder bar
  *
  * The hooks (useReveal, useRevealReady, useDelayedFlag, staggerStyle) are in
- * revealState.js; the timings in motion.js and the --dur-reveal tokens.
+ * revealState.js; the timings in motion.js and the --spring-smooth tokens.
  *
  * A region's content stays mounted while hidden: an editor has to exist to be loaded,
  * and a list that keeps its layout is what makes the hand-off shift-free.

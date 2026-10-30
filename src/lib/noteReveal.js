@@ -65,6 +65,4 @@ export const closeSchedule = (edges) => {
   return { schedule, total }
 }
 
-export const prefersReducedMotion = () => (
-  typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
-)
+export { prefersReducedMotion } from '../ui/physics.js'

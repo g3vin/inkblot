@@ -157,7 +157,8 @@ const press = (key) => act(async () => { wheel().dispatchEvent(new window.Keyboa
 await press('7')
 await press('Enter')
 ok('the fill wheel fills the cell', editor.getAttributes('tableCell').fill === 'violet')
-await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)) })
+// The taken ink springs to the middle, the ring folds on its spring, then it is gone.
+await act(async () => { await new Promise((resolve) => setTimeout(resolve, 800)) })
 ok('and folds away', !wheel())
 
 editor.storage.documentLock = { locked: true }

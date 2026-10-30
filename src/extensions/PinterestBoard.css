@@ -16,7 +16,7 @@
   box-shadow: var(--shadow-soft);
   overflow: hidden;
   position: relative;
-  transition: box-shadow 0.14s ease, border-color 0.14s ease;
+  transition: box-shadow var(--spring-quick-dur) var(--spring-quick), border-color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .pinterest-board-node:hover {
@@ -91,7 +91,7 @@
   display: block;
   border-radius: var(--radius-lg);
   box-shadow: 0 1px 2px var(--shadow-color);
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  transition: transform var(--spring-quick-dur) var(--spring-quick), box-shadow var(--spring-quick-dur) var(--spring-quick);
 }
 
 .pinterest-board-masonry-item:hover img {
@@ -127,7 +127,7 @@
   color: var(--text-subtle);
   cursor: pointer;
   line-height: 1;
-  transition: background 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick), opacity var(--spring-quick-dur) var(--spring-quick), transform var(--spring-quick-dur) var(--spring-quick);
 }
 
 .pinterest-board-refresh-btn:hover {

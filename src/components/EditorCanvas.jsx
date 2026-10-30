@@ -18,6 +18,7 @@
  * tests/unit/editor.mjs mounts this component and exercises all of them.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 
@@ -31,6 +32,8 @@ import { buildEditorExtensions } from '../lib/editorExtensions'
 import { setClipboardDropTarget } from '../lib/clipboardDropTarget'
 import { isEditorReady } from '../lib/editorUtils'
 import { getDocKind, isTextDoc } from '../lib/docKind'
+import { setPaneHandoff } from '../lib/paneHandoff'
+import { excerptOfNode, noteExcerpt } from '../lib/docExcerpts'
 import CanvasPane from '../canvas/CanvasPane'
 import TimelinePane from '../timeline/TimelinePane'
 import TimeLensBar from '../timeline/TimeLensBar'
@@ -54,10 +57,13 @@ import DocLockBadge from './DocLockBadge'
 import TableToolbar from './TableToolbar'
 import { lockReason, useLocks } from '../lib/docLocks'
 import { setEditorLock } from '../extensions/DocumentLock'
-import { FadeScrim } from '../ui/Surfaces.jsx'
 import { Skeleton, SkeletonOverlay } from '../ui/Reveal.jsx'
+import { SPLIT_RATIO_MAX, SPLIT_RATIO_MIN, clampSplitRatio } from '../lib/editorSession'
+import { SPRINGS, rubberClamp, trackSample, velocityFrom } from '../ui/physics.js'
+import { useSpring } from '../ui/useSpring.js'
 import { useDelayedFlag, useReveal, useRevealReady } from '../ui/revealState.js'
 import { MapSkeleton } from '../canvas/PaneSkeletons'
+import { FILETREE_NEW_ENTRY } from '../lib/appEvents'
 
 // A map is a heavy editor (and its globe and space views heavier still): loaded the
 // first time one opens, never for a writer who only writes.
@@ -97,6 +103,8 @@ function MapPane(props) {
 const EMPTY_NOTES = []
 // How far one arrow press moves the split divider, as a share of the split.
 const SPLIT_KEY_STEP = 0.05
+/** How far past its limits the divider could ever be pulled, as a share of the split. */
+const SPLIT_GIVE = 0.08
 
 export default function EditorCanvas({
   setEditor,
@@ -118,10 +126,12 @@ export default function EditorCanvas({
   setActiveDoc,
   setVersions,
   showWordCountBadge = true,
+  wordCountSlot = null,
   onMoveClipboardEntryToEditor,
   activeEditor,
-  focusModeOpen = false,
+  focusMode = 'closed',
   onExitFocusMode,
+  onFocusModeExited,
   focusSidebars,
   bubble = null,
   onCloseBubble,
@@ -143,6 +153,24 @@ export default function EditorCanvas({
   const secondaryPaneRef = useRef(null)
   const splitContainerRef = useRef(null)
   const [isResizingSplit, setIsResizingSplit] = useState(false)
+  // The divider where it is drawn while a hand or a spring moves it: past its limits
+  // on a rubber band, then springing to where the ratio was kept. Null at rest.
+  const [drawnRatio, setDrawnRatio] = useState(null)
+  const divider = useSpring(splitRatio, {
+    spring: SPRINGS.smooth,
+    precision: 0.0005,
+    onChange: setDrawnRatio,
+    onRest: () => setDrawnRatio(null),
+  })
+  /** Spring the divider to `ratio` and keep it there, from wherever it is drawn. */
+  const glideSplit = (ratio, velocity) => {
+    const target = clampSplitRatio(ratio)
+    if (!divider.moving) divider.jump(drawnRatio ?? splitRatio)
+    divider.set(target, velocity === undefined ? undefined : { velocity })
+    setSplitRatio?.(target)
+    // Already there: nothing to spring, so the kept ratio is drawn again.
+    if (!divider.moving) setDrawnRatio(null)
+  }
   const [dragCaret, setDragCaret] = useState(null)
   // The pane's live view of notesByDoc. The hooks below run from editor events and
   // debounced timers, so they must read the notes as they are when the save fires,
@@ -500,7 +528,9 @@ export default function EditorCanvas({
   const onPaneLoaded = useCallback((paneId, paneEditor, docPath) => {
     syncWordStats(paneId, paneEditor)
     markPaneLoaded(paneId, docPath)
-  }, [markPaneLoaded, syncWordStats])
+    // What the landing page's pile shows of it (lib/docExcerpts.js).
+    if (isTextDoc(docPath) && paneEditor?.state?.doc) noteExcerpt(projectName, docPath, excerptOfNode(paneEditor.state.doc))
+  }, [markPaneLoaded, projectName, syncWordStats])
 
   useEditorDocLoader({
     currentDoc,
@@ -514,6 +544,21 @@ export default function EditorCanvas({
     setVersions,
     splitView,
   })
+
+  // A rename or move keeps the open document on screen (lib/paneHandoff.js). Only a
+  // pane showing the document as text can hold it; anything else is closed instead.
+  const { beginPaneLoad, carryDoc, endPaneLoad, isDocLoaded } = docCache
+  useEffect(() => setPaneHandoff({
+    hold: (paneId, docPath) => {
+      if (!isTextDoc(docPath) || !isDocLoaded(docPath, paneId)) return false
+      if (paneId === 'secondary' && splitView !== 'editor') return false
+      flushPane(paneId)
+      beginPaneLoad(paneId)
+      return true
+    },
+    carry: (paneId, fromDoc, toDoc) => carryDoc(fromDoc, toDoc, paneId),
+    release: endPaneLoad,
+  }), [beginPaneLoad, carryDoc, endPaneLoad, flushPane, isDocLoaded, splitView])
 
   useEditorNotes({
     currentDoc,
@@ -542,7 +587,7 @@ export default function EditorCanvas({
   // A document dragged in from the file tree opens a split on the side it is held over.
   const { outline: splitDropOutline, provisional: provisionalPane } = useSplitDrop({
     enabled: Boolean(
-      hasActiveDoc && currentDoc && !focusModeOpen
+      hasActiveDoc && currentDoc && focusMode === 'closed'
       && !(compare && (compare.docName === currentDoc || compare.docName === secondaryDoc))
     ),
     split: splitView === 'editor',
@@ -678,7 +723,7 @@ export default function EditorCanvas({
                 className="empty-state-action"
                 onClick={() => {
                   window.dispatchEvent(
-                    new CustomEvent('filetree:new-entry', {
+                    new CustomEvent(FILETREE_NEW_ENTRY, {
                       detail: { type: 'file', parent: '' },
                     })
                   )
@@ -733,14 +778,15 @@ export default function EditorCanvas({
 
   // The divider is a track in the split grid, so the two panes are sized by the
   // ratio and the gutter never has to be accounted for twice.
+  const shownRatio = drawnRatio ?? splitRatio
   const splitStyle = splitView === 'editor' && !comparing
     ? (splitOrientation === 'rows'
       ? {
         gridTemplateColumns: '1fr',
-        gridTemplateRows: `${splitRatio}fr var(--split-gutter) ${1 - splitRatio}fr`,
+        gridTemplateRows: `${shownRatio}fr var(--split-gutter) ${1 - shownRatio}fr`,
       }
       : {
-        gridTemplateColumns: `${splitRatio}fr var(--split-gutter) ${1 - splitRatio}fr`,
+        gridTemplateColumns: `${shownRatio}fr var(--split-gutter) ${1 - shownRatio}fr`,
         gridTemplateRows: '1fr',
       })
     : undefined
@@ -757,12 +803,16 @@ export default function EditorCanvas({
     if (!container) return
 
     setIsResizingSplit(true)
+    divider.stop()
+    const samples = []
 
     const onMove = (moveEvent) => {
       const rect = container.getBoundingClientRect()
       const ratio = splitOrientation === 'rows'
         ? (moveEvent.clientY - rect.top) / rect.height
         : (moveEvent.clientX - rect.left) / rect.width
+      trackSample(samples, { t: performance.now(), x: ratio })
+      divider.jump(rubberClamp(ratio, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE))
       // Editor owns the clamp, so the ratio can never strand a pane off screen.
       setSplitRatio?.(ratio)
     }
@@ -771,6 +821,9 @@ export default function EditorCanvas({
       setIsResizingSplit(false)
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      // Past a limit it springs back; the band gave only part of the hand's speed.
+      const banded = divider.value !== clampSplitRatio(divider.value)
+      glideSplit(divider.value, banded ? velocityFrom(samples).x * 0.3 : 0)
     }
 
     window.addEventListener('mousemove', onMove)
@@ -781,14 +834,25 @@ export default function EditorCanvas({
   const nudgeSplit = (event) => {
     const rows = splitOrientation === 'rows'
     const step = { [rows ? 'ArrowUp' : 'ArrowLeft']: -SPLIT_KEY_STEP, [rows ? 'ArrowDown' : 'ArrowRight']: SPLIT_KEY_STEP }[event.key]
-    if (step) setSplitRatio?.(splitRatio + step)
-    else if (event.key === 'Enter') setSplitRatio?.(0.5)
+    if (step) glideSplit(splitRatio + step)
+    else if (event.key === 'Enter') glideSplit(0.5)
     else return
     event.preventDefault()
   }
 
+  // Docked, the inspector's foot holds the count: the active pane's, as one row has
+  // room for one number. A canvas, map or timeline has none to give.
+  const sidebarCountsSecondary = splitView === 'editor' && activeDoc === secondaryDoc && activeDoc !== currentDoc
+  const sidebarWordStats = sidebarCountsSecondary
+    ? (secondaryIsStructured ? null : secondaryWordStats)
+    : (primaryIsStructured || showDraftPane ? null : primaryWordStats)
+  const sidebarWordCount = wordCountSlot && showWordCountBadge && sidebarWordStats
+    ? createPortal(<div className="word-count">{formatWordStats(sidebarWordStats)}</div>, wordCountSlot)
+    : null
+
   return (
     <div className="middle-section">
+      {sidebarWordCount}
       <div ref={splitContainerRef} className={`editor-container${splitClassName}`} style={splitStyle}>
 
         <div
@@ -872,10 +936,9 @@ export default function EditorCanvas({
             />
           )}
           {!primaryIsStructured && !showDraftPane ? <DocumentSkeleton visible={primaryReveal.skeleton} /> : null}
-          {!primaryIsStructured && !showDraftPane ? <FadeScrim edge="bottom" height={56} className="pane-bottom-scrim" /> : null}
           {!primaryIsStructured && !showDraftPane ? (
             <div className="pane-status" data-pane="primary" data-doc={currentDoc} data-project={projectName} data-reveal={primaryReveal.phase}>
-              {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(primaryWordStats)}</div> : null}
+              {showWordCountBadge && !wordCountSlot ? <div className="word-count floating-capsule">{formatWordStats(primaryWordStats)}</div> : null}
               <DocLockBadge projectName={projectName} docPath={currentDoc} />
             </div>
           ) : null}
@@ -897,7 +960,7 @@ export default function EditorCanvas({
             tabIndex={0}
             title="Drag to resize · double-click to even out"
             onMouseDown={startSplitResize}
-            onDoubleClick={() => setSplitRatio?.(0.5)}
+            onDoubleClick={() => glideSplit(0.5)}
             onKeyDown={nudgeSplit}
           >
             <span className="split-resizer-grip" />
@@ -974,10 +1037,9 @@ export default function EditorCanvas({
               />
             )}
             {!secondaryIsStructured ? <DocumentSkeleton visible={secondaryReveal.skeleton} /> : null}
-            {!secondaryIsStructured ? <FadeScrim edge="bottom" height={56} className="pane-bottom-scrim" /> : null}
             {!secondaryIsStructured ? (
               <div className="pane-status" data-pane="secondary" data-doc={secondaryDoc} data-project={projectName} data-reveal={secondaryReveal.phase}>
-                {showWordCountBadge ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}
+                {showWordCountBadge && !wordCountSlot ? <div className="word-count floating-capsule">{formatWordStats(secondaryWordStats)}</div> : null}
                 <DocLockBadge projectName={projectName} docPath={secondaryDoc} />
               </div>
             ) : null}
@@ -1003,10 +1065,12 @@ export default function EditorCanvas({
         ) : null}
 
         {/* Focus Mode is a prose surface — it has nothing to show for a canvas, a map or a draft. */}
-        {focusModeOpen && !showDraftPane && isTextDoc(activeDoc || currentDoc) ? (
+        {focusMode !== 'closed' && !showDraftPane && isTextDoc(activeDoc || currentDoc) ? (
           <FocusModeOverlay
             editor={focusModeEditor}
             onExit={onExitFocusMode}
+            leaving={focusMode === 'leaving'}
+            onExited={onFocusModeExited}
             sidebars={focusSidebars}
           />
         ) : null}

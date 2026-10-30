@@ -26,8 +26,8 @@
   background: transparent;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard),
-    opacity var(--dur-fast) var(--ease-standard);
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick),
+    opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 .ui-button:hover { border-color: transparent; }
@@ -107,7 +107,7 @@
   color: var(--text-secondary);
   font: 500 12px/1 var(--font-ui);
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
 }
 .ui-segment:hover { background: var(--hover-bg); border-color: transparent; }
 .ui-segment:focus { outline: none; }
@@ -154,7 +154,7 @@
 .ui-section-header:hover { border-color: transparent; }
 .ui-section-header:focus { outline: none; }
 .ui-section-header:focus-visible { outline: 2px solid var(--accent-border); }
-.ui-section-chevron { display: inline-flex; color: var(--text-muted); transform: rotate(-90deg); transition: transform var(--dur-fast) var(--ease-standard); }
+.ui-section-chevron { display: inline-flex; color: var(--text-muted); transform: rotate(-90deg); transition: transform var(--spring-quick-dur) var(--spring-quick); }
 .ui-section[data-open='true'] .ui-section-chevron { transform: none; }
 .ui-section-title { flex: 1; }
 .ui-section-accessory { display: flex; align-items: center; gap: var(--space-1); flex: none; color: var(--text-muted); font-size: 12px; }
@@ -187,7 +187,7 @@
   border-radius: var(--radius-pill);
   background: var(--border-strong);
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-standard);
+  transition: background var(--spring-quick-dur) var(--spring-quick);
 }
 .ui-toggle::after {
   content: '';
@@ -199,7 +199,7 @@
   border-radius: var(--radius-pill);
   background: var(--surface-float);
   box-shadow: 0 1px 2px var(--shadow-color);
-  transition: transform var(--dur-fast) var(--ease-standard);
+  transition: transform var(--spring-quick-dur) var(--spring-quick);
 }
 .ui-toggle[aria-checked='true'] { background: var(--accent-color); }
 .ui-toggle[aria-checked='true']::after { transform: translateX(12px); }

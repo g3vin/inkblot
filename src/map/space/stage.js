@@ -24,6 +24,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { CAMERA_ANGLES, DEFAULT_SPACE_CAMERA, FLAT_FOV } from './spaceMath'
+import { SPRINGS, progressOf } from '../../ui/physics.js'
+
+/** The camera's glides between views: the long carry. */
+const CAMERA_GLIDE = progressOf(SPRINGS.gentle)
 
 const SETTLE_MS = 250
 const MAX_PIXEL_RATIO = 2
@@ -196,9 +200,9 @@ export function createStage(container, { saved, background, bloomBackground = nu
   invalidate()
 
   /** Glide the camera to look at `target` from `position` (Vector3s). */
-  function moveTo(target, position, { duration = 600, onStep } = {}) {
+  function moveTo(target, position, { instant = false, onStep } = {}) {
     cancelAnimationFrame(glide)
-    if (reducedMotion() || duration <= 0) {
+    if (reducedMotion() || instant) {
       controls.target.copy(target)
       camera.position.copy(position)
       onStep?.(1)
@@ -211,14 +215,14 @@ export function createStage(container, { saved, background, bloomBackground = nu
     const fromPosition = camera.position.clone()
     const start = performance.now()
     const step = () => {
-      const t = Math.min(1, (performance.now() - start) / duration)
-      const ease = 1 - (1 - t) ** 3
+      const elapsed = performance.now() - start
+      const ease = CAMERA_GLIDE.at(elapsed)
       controls.target.lerpVectors(fromTarget, target, ease)
       camera.position.lerpVectors(fromPosition, position, ease)
       onStep?.(ease)
       controls.update()
       invalidate()
-      if (t < 1) glide = requestAnimationFrame(step)
+      if (ease < 1) glide = requestAnimationFrame(step)
       else settle()
     }
     glide = requestAnimationFrame(step)
@@ -266,8 +270,8 @@ export function createStage(container, { saved, background, bloomBackground = nu
     }
     const start = performance.now()
     const step = () => {
-      const t = Math.min(1, (performance.now() - start) / 700)
-      apply(1 - (1 - t) ** 3)
+      const t = CAMERA_GLIDE.at(performance.now() - start)
+      apply(t)
       controls.update()
       invalidate()
       if (t < 1) glide = requestAnimationFrame(step)

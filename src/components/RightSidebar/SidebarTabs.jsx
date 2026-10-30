@@ -3,11 +3,15 @@
  * Files and Book). The active-tab indicator tracks fractional swipe progress so it
  * slides with the gesture, and can itself be grabbed and dragged to another tab: the
  * panels follow it (`onIndicatorDrag`) and letting go chooses the tab it is over
- * (`onIndicatorDrop`). While it is held or swiped (not a quick flick) it lifts and grows, as macOS's
+ * (`onIndicatorDrop`). While it is held or swiped it lifts and grows, as macOS's
  * segmented controls do, and settles back as it lands. Whenever it travels (a click
  * that sends it to another tab, a quick drag or swipe) it squashes vertically and
  * stretches along its path, as Liquid Glass's selector does: full size where it sets
  * off, flattest halfway, and back to full size as it reaches the tab it is bound for.
+ *
+ * Where it is comes from the panels' progress (useSpaceSwipe), and it goes there on
+ * the panels' own transition (`snap`): a click's quick spring, or a swipe's spring
+ * with the fingers' speed kept, so the pill and the panels land as one.
  *
  * It is placed from the buttons' measured boxes, rounded to whole device pixels,
  * rather than from a percentage of the strip: a fractional position is drawn one way
@@ -15,21 +19,12 @@
  * would nudge sideways after it had landed, more the further along the tab.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { SWIPE_HOLD_MS } from '../../hooks/useSpaceSwipe'
 import Icon from '../../ui/Icon.jsx'
 import { RIGHT_SIDEBAR_TABS } from './sidebarTabsConfig'
 
 const TAB_GAP_PX = 4
 // The strip's side padding, both sides: a kerf each in the sidebars (FileTree.css).
 const TAB_BAR_PADDING_PX = 6
-/** A snap takes longer the further it goes: SNAP_BASE_MS plus SNAP_PER_TAB_MS for
- *  each tab it crosses (380ms to the next tab), never more than SNAP_MAX_MS. */
-const TAB_SNAP_BASE_MS = 260
-const TAB_SNAP_PER_TAB_MS = 120
-const TAB_SNAP_MAX_MS = 650
-/** The pill's grow and shrink as it is held and let go. */
-const TAB_GROW_DURATION_MS = 260
-const TAB_SNAP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
 /** The furthest the indicator runs past the first or last tab: over the strip's and
  *  the panel's padding, never out past the panel's edge. */
 const INDICATOR_OVERSHOOT_PX = 8
@@ -83,14 +78,18 @@ const snapToDevicePixel = (value) => {
   return Math.round(value * ratio) / ratio
 }
 
-/** Each button's left edge and width inside the strip, in its own (untransformed) px. */
+/** Each button's left edge, width and height inside the strip, in its own (untransformed) px. */
 const measureSlots = (strip) => {
   const box = strip.getBoundingClientRect()
   // The sidebars slide and scale in: undo any transform above the strip.
   const scale = box.width > 0 && strip.offsetWidth > 0 ? strip.offsetWidth / box.width : 1
   return [...strip.querySelectorAll(':scope > button')].map((button) => {
     const rect = button.getBoundingClientRect()
-    return { left: (rect.left - box.left) * scale - strip.clientLeft, width: rect.width * scale }
+    return {
+      left: (rect.left - box.left) * scale - strip.clientLeft,
+      width: rect.width * scale,
+      height: rect.height * scale,
+    }
   })
 }
 
@@ -103,6 +102,8 @@ export default function SidebarTabs({
   setTab,
   visualProgress = 0,
   gestureActive = false,
+  following = false,
+  snap = 'var(--spring-quick-dur) var(--spring-quick)',
   reducedMotion = false,
   onIndicatorDrag,
   onIndicatorDrop,
@@ -126,7 +127,8 @@ export default function SidebarTabs({
       const next = measureSlots(strip)
       setSlots((previous) => (
         previous && previous.length === next.length
-          && previous.every((slot, i) => slot.left === next[i].left && slot.width === next[i].width)
+          && previous.every((slot, i) => slot.left === next[i].left
+            && slot.width === next[i].width && slot.height === next[i].height)
           ? previous
           : next
       ))
@@ -152,14 +154,20 @@ export default function SidebarTabs({
     const from = slots[Math.floor(restingProgress)]
     const to = slots[Math.ceil(restingProgress)]
     const along = restingProgress - Math.floor(restingProgress)
-    const width = from.width + (to.width - from.width) * along
+    const tabWidth = from.width + (to.width - from.width) * along
+    // Never narrower than it is tall: with many tabs it rounds to a circle centred
+    // on its tab, spilling into the gaps, rather than standing as a tall rectangle.
+    const width = Math.max(tabWidth, from.height)
     const give = clamp(overshoot * width, -INDICATOR_OVERSHOOT_PX, INDICATOR_OVERSHOOT_PX)
-    const x = from.left + (to.left - from.left) * along + give
+    const x = from.left + (to.left - from.left) * along + (tabWidth - width) / 2 + give
     targetX = snapToDevicePixel(x)
     indicatorPlacement = {
       left: 0,
       width: `${snapToDevicePixel(width)}px`,
       transform: `translateX(${snapToDevicePixel(x)}px)`,
+      // For the lifted pill's spread (FileTree.css), which keeps it at least round.
+      '--sidebar-tabs-indicator-width': `${snapToDevicePixel(width)}px`,
+      '--sidebar-tabs-indicator-height': `${from.height}px`,
     }
   } else {
     // Before the first measure: the same place, worked out from the strip's padding.
@@ -169,19 +177,8 @@ export default function SidebarTabs({
         + ` + clamp(-${INDICATOR_OVERSHOOT_PX}px, ${overshoot * 100}%, ${INDICATOR_OVERSHOOT_PX}px)))`,
     }
   }
-  // Grabbed, the pill lifts at once. A quick flick lands without it: a swipe only
-  // lifts it once held as long as a swipe takes to be more than a flick.
-  const swiping = !reducedMotion && gestureActive && !pressed
-  const [swipeLifted, setSwipeLifted] = useState(false)
-  useEffect(() => {
-    if (!swiping) {
-      setSwipeLifted(false)
-      return undefined
-    }
-    const timer = window.setTimeout(() => setSwipeLifted(true), SWIPE_HOLD_MS)
-    return () => window.clearTimeout(timer)
-  }, [swiping])
-  const lifted = !reducedMotion && (pressed || swipeLifted)
+  // Grabbed or swiped, the pill lifts at once.
+  const lifted = !reducedMotion && (pressed || gestureActive)
 
   // Watch where the indicator is drawn on its path — whether the snap's transition
   // or the fingers carry it — and squash it to match, frame by frame, until it
@@ -189,21 +186,7 @@ export default function SidebarTabs({
   // drag's, from one tab to the next, as deep as the drag is quick. Written
   // straight to its style: it changes every frame and React needn't know.
   const placementKey = `${indicatorPlacement.transform}|${indicatorPlacement.width}`
-  const dragging = gestureActive || grabbing
-
-  // Each snap's length, from how far it goes: from the last place the indicator was
-  // sent (or dragged) to the new one, in tabs.
-  const [snap, setSnap] = useState({ to: null, ms: TAB_SNAP_BASE_MS + TAB_SNAP_PER_TAB_MS })
-  if (targetX !== null && targetX !== snap.to) {
-    const step = measured && slots.length > 1 ? slots[1].left - slots[0].left : 0
-    const tabsCrossed = snap.to === null || step <= 0 ? 1 : Math.abs(targetX - snap.to) / step
-    setSnap({
-      to: targetX,
-      ms: dragging
-        ? snap.ms
-        : Math.min(TAB_SNAP_MAX_MS, TAB_SNAP_BASE_MS + TAB_SNAP_PER_TAB_MS * tabsCrossed),
-    })
-  }
+  const dragging = gestureActive || grabbing || following
   useEffect(() => {
     const element = indicatorRef.current
     const motion = motionRef.current
@@ -320,13 +303,13 @@ export default function SidebarTabs({
         onPointerCancel={onIndicatorPointerUp}
         style={{
           ...indicatorPlacement,
-          transition: gestureActive || reducedMotion
+          transition: dragging || reducedMotion
             ? 'none'
-            : `transform ${snap.ms}ms ${TAB_SNAP_EASING}`,
-          // The pill's grow (its insets, in the stylesheet) eases in and out on its
-          // own, even while the position follows the fingers without one.
-          '--sidebar-tabs-grow-duration': reducedMotion ? '0ms' : `${TAB_GROW_DURATION_MS}ms`,
-          '--sidebar-tabs-grow-easing': TAB_SNAP_EASING,
+            : `transform ${snap}`,
+          // The pill's grow (its insets, in the stylesheet) springs on its own, even
+          // while the position follows the fingers.
+          '--sidebar-tabs-grow-duration': reducedMotion ? '0ms' : 'var(--spring-smooth-dur)',
+          '--sidebar-tabs-grow-easing': 'var(--spring-smooth)',
         }}
       >
         <span className="sidebar-tabs-indicator-pill" />

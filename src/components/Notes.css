@@ -26,7 +26,7 @@
   cursor: pointer;
   border: var(--hairline) solid var(--border-strong);
   box-shadow: none;
-  transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+  transition: transform var(--spring-smooth-dur) var(--spring-smooth), opacity var(--spring-smooth-dur) var(--spring-smooth), box-shadow var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 .note-marker:hover .note-dot {
@@ -124,7 +124,7 @@
   opacity: 0;
   transform: scale(0.4);
   transform-origin: var(--note-grow-from, 0 0);
-  animation: note-card-pop var(--note-pop-ms, var(--dur-base)) var(--ease-out) forwards;
+  animation: note-card-pop var(--note-pop-ms, var(--spring-quick-dur)) var(--spring-quick) forwards;
   animation-delay: var(--note-reveal-delay, 0ms);
 }
 
@@ -143,7 +143,7 @@
   pointer-events: none;
   opacity: 1;
   transform: none;
-  animation: note-card-unpop var(--note-close-ms, 126ms) var(--ease-in) var(--note-close-delay, 0ms) forwards;
+  animation: note-card-unpop var(--note-close-ms, 126ms) var(--spring-exit) var(--note-close-delay, 0ms) forwards;
 }
 
 @keyframes note-card-unpop {
@@ -196,6 +196,13 @@
   color: var(--text-placeholder);
 }
 
+/* An empty note is blank paper until the hand comes to it: the prompt shows while
+   its card is hovered or being written in. */
+.note-preview-card:not(:hover, :focus-within) .note-preview-textarea::placeholder,
+.note-tile:not(:hover, :focus-within) .note-textarea::placeholder {
+  color: transparent;
+}
+
 /* The footer: memo and image at the left, the connected note in the middle, the
    branch's collapse in the right corner. */
 .note-preview-footer {
@@ -221,7 +228,7 @@
 .note-preview-card .note-tool-btn,
 .note-preview-card .audio-record.is-icon-only:not(.is-recording) {
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick), background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
 }
 .note-preview-card:hover .note-tool-btn,
 .note-preview-card:focus-within .note-tool-btn,
@@ -294,11 +301,11 @@
 .note-tile.is-opening {
   opacity: 0;
   transform: scale(0.4);
-  animation: note-card-pop var(--card-ms) var(--ease-out) var(--card-delay) forwards;
+  animation: note-card-pop var(--card-ms) var(--spring-quick) var(--card-delay) forwards;
 }
 .note-tile.is-closing {
   pointer-events: none;
-  animation: note-card-unpop var(--card-ms) var(--ease-in) var(--card-delay) forwards;
+  animation: note-card-unpop var(--card-ms) var(--spring-exit) var(--card-delay) forwards;
 }
 
 /* Reduced motion: the lines are there at once, and the replies fade, still in order. */
@@ -340,7 +347,7 @@
   pointer-events: none;
   transform: translateY(-50%) scale(0.22);
   transform-origin: 12px center;
-  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out), visibility 0s linear var(--dur-base);
+  transition: opacity var(--spring-smooth-dur) var(--spring-smooth), transform var(--spring-smooth-dur) var(--spring-smooth), visibility 0s linear var(--spring-smooth-dur);
 }
 
 .note-marker.has-preview:hover .note-dot-preview {
@@ -421,6 +428,14 @@
   box-shadow: 0 0 0 1px var(--border-strong);
 }
 
+/* Strung to its dot in the text (NotePanelTether): lit as a hovered note is, ringed
+   in its own colour where the string arrives. */
+.note-tile[data-tethered] {
+  background: color-mix(in srgb, color-mix(in srgb, var(--card-color) 16%, var(--card-base)) 90%, transparent);
+  border-color: var(--card-edge-hover);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--note-color) 45%, transparent);
+}
+
 /* A panel note's tools sit where a hover note's do (NoteCard.jsx): a header row with
    the colour dot, the time, the pin and delete, and a footer with memo and image, a
    connected note, and the collapse. Bare icons, shown while the note is hovered or
@@ -457,7 +472,7 @@
   cursor: pointer;
   border-radius: var(--radius-pill);
   line-height: 1;
-  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  transition: color var(--spring-quick-dur) var(--spring-quick), background var(--spring-quick-dur) var(--spring-quick);
 }
 
 .note-tool-btn:hover {
@@ -480,14 +495,14 @@
 .note-tile .note-tool-btn:not(.active),
 .note-tile .audio-record.is-icon-only:not(.is-recording) {
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick), background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
 }
 /* Trimmed to its figures, so they (not the line box round them) centre on the icons. */
 .note-tile .note-timestamp {
   margin-right: var(--space-1);
   text-box: trim-both cap alphabetic;
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 .note-tile:hover .note-timestamp,
 .note-tile:focus-within .note-timestamp,
@@ -573,7 +588,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 160ms ease, transform 160ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), transform var(--spring-quick-dur) var(--spring-quick);
 }
 
 .note-image-remove:hover {
@@ -637,7 +652,7 @@
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .audio-clip-play:hover:not(:disabled),
@@ -674,7 +689,7 @@
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick), border-color var(--spring-quick-dur) var(--spring-quick);
 }
 
 /* In the notes-panel footer the button sits beside the other per-note tools and has

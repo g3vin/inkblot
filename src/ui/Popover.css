@@ -10,7 +10,7 @@
   color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
-  animation: ib-float-in var(--dur-fast) var(--ease-out);
+  animation: ib-float-in var(--spring-quick-dur) var(--spring-quick);
 }
 
 /* Popover owns its padding; call sites don't add their own. */
@@ -19,15 +19,15 @@
   padding: var(--space-4);
   min-width: 200px;
   max-width: min(360px, calc(100vw - 16px));
-  animation-duration: var(--dur-base);
+  animation-duration: var(--spring-smooth-dur);
 }
 
 .ib-popover:focus { outline: none; }
 
 .ib-popover-eyebrow { margin: 0 0 var(--space-3); }
 
-/* In a toolbar's row (DESIGN.md §6 → the dynamic toolbar): its eyebrow, its controls
-   in a row, and, taking the whole toolbar, a close button. The toolbar places it. */
+/* In a toolbar's row (DESIGN.md §6 → the dynamic toolbar): its controls in a row, never
+   a heading, and, taking the whole toolbar, a close button. The toolbar places it. */
 .ib-dock {
   display: flex;
   align-items: center;
@@ -36,10 +36,9 @@
   color: var(--text-primary);
   font: var(--text-sm) var(--font-ui);
   white-space: nowrap;
-  animation: ib-float-in var(--dur-base) var(--ease-out);
+  animation: ib-float-in var(--spring-smooth-dur) var(--spring-smooth);
 }
 .ib-dock:focus { outline: none; }
-.ib-dock-eyebrow { margin: 0; flex: none; }
 .ib-dock-body { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .ib-dock[data-mode='whole'] {
   width: min(760px, 100%);
@@ -59,16 +58,27 @@
 .ib-dock-body > * { flex: none; }
 .ib-dock[data-mode='inline'] {
   height: var(--control-h);
-  padding: 0 var(--space-3);
+  max-width: 640px;
+  padding: 0 var(--space-1);
+  overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--control-bg);
+  animation: none;
+  transition: max-width var(--spring-smooth-dur) var(--spring-smooth), opacity var(--spring-smooth-dur) var(--spring-smooth);
+}
+/* It grows open from its button, pushing what follows along as it does. */
+@starting-style {
+  .ib-dock[data-mode='inline'] { max-width: 0; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ib-dock[data-mode='inline'] { transition: none; }
 }
 /* A field in a row: its label beside it. */
 .ib-dock .ib-field { flex-direction: row; align-items: center; gap: var(--space-2); }
 
 /* Leaving the way it came (useExitAnimation's copy). */
 :is(.ib-popover, .ib-menu).is-leaving {
-  animation: ib-float-out var(--dur-fast) var(--ease-in) forwards;
+  animation: ib-float-out var(--spring-exit-dur) var(--spring-exit) forwards;
   pointer-events: none;
 }
 

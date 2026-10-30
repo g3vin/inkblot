@@ -6,6 +6,7 @@
  * own.
  */
 import { clampAside, joinText } from './bubbleText'
+import { project, velocityFrom } from '../ui/physics.js'
 
 /**
  * How deep the shelf along the top is: a drop this close to the top sets the bubble
@@ -174,30 +175,22 @@ export const insertion = (geometry, x, y) => {
   }
 }
 
-export const velocityOf = (samples) => {
-  if (samples.length < 2) return { x: 0, y: 0 }
-  const last = samples[samples.length - 1]
-  const first = samples.find((sample) => last.t - sample.t <= 90) ?? samples[0]
-  const dt = Math.max(1, last.t - first.t)
-  return { x: (last.x - first.x) / dt, y: (last.y - first.y) / dt }
-}
+export const velocityOf = (samples) => velocityFrom(samples)
 
 /* ---------------- throwing ---------------- */
 
-/** How far ahead a release is projected: where it would come to rest, 0.25s on. */
-export const THROW_PROJECTION_MS = 250
 /** A release whose projection lands this far from the pointer is a throw. */
-export const THROW_REACH = 120
+export const THROW_REACH = 160
 
 /**
  * Where a bubble released at `point` moving at `velocity` (px/ms) lands, when that is a
- * throw up onto the shelf: projected `THROW_PROJECTION_MS` on, kept inside the stage,
- * more than `THROW_REACH` away, and over the shelf. Otherwise null — it lands where it
- * was let go.
+ * throw up onto the shelf: where it would coast to under friction (`project`), kept
+ * inside the stage, more than `THROW_REACH` away, and over the shelf. Otherwise null —
+ * it lands where it was let go.
  */
 export const throwLanding = (stage, point, velocity) => {
-  const x = clamp(point.x + velocity.x * THROW_PROJECTION_MS, stage.left, stage.right)
-  const y = clamp(point.y + velocity.y * THROW_PROJECTION_MS, stage.top, stage.bottom)
+  const x = clamp(point.x + project(velocity.x), stage.left, stage.right)
+  const y = clamp(point.y + project(velocity.y), stage.top, stage.bottom)
   if (Math.hypot(x - point.x, y - point.y) <= THROW_REACH) return null
   return nearShelf(stage, y) ? { x, y } : null
 }

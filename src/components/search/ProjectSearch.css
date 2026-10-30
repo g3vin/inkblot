@@ -154,7 +154,7 @@
   position: fixed;
   z-index: var(--z-popover);
   margin-bottom: var(--space-2);
-  animation: project-search-open-up var(--dur-fast) var(--ease-out) both;
+  animation: project-search-open-up var(--spring-quick-dur) var(--spring-quick) both;
 }
 
 @keyframes project-search-open-up {
@@ -171,7 +171,7 @@
   flex-direction: column;
   overflow: hidden;
   pointer-events: none;
-  animation: project-search-fade var(--dur-fast) var(--ease-out) both;
+  animation: project-search-fade var(--spring-quick-dur) var(--spring-quick) both;
 }
 
 @keyframes project-search-fade {
@@ -237,7 +237,7 @@
   left: var(--search-center-x, 50%);
   width: min(640px, calc(var(--search-zone-width, 100vw) - var(--space-12)), calc(100vw - var(--space-12)));
   transform: translate(-50%, -50%);
-  animation: project-search-pop var(--dur-base) var(--ease-out) both;
+  animation: project-search-pop var(--spring-smooth-dur) var(--spring-smooth) both;
 }
 
 .project-search-overlay-card .project-search-field { min-height: var(--size-trash); }
@@ -245,7 +245,7 @@
 /* Opened from the icon: start on it and grow into the middle, so it reads as the
    search moving rather than a second one appearing. */
 .project-search-overlay-card.is-flying {
-  animation: project-search-fly var(--dur-slow) var(--ease-out) both;
+  animation: project-search-fly var(--spring-smooth-dur) var(--spring-smooth) both;
 }
 
 @keyframes project-search-pop {

@@ -10,6 +10,10 @@
  *   - When the fingers lift, the speed they were moving at decides where it lands
  *     (`settleIndex`): a flick goes on to the next panel that way, anything slower
  *     settles on the nearest. A quick swipe-and-release therefore turns one panel.
+ *     The panels then spring there from the speed the fingers left them at, so the
+ *     swipe and its landing are one movement; a click or another swipe mid-way
+ *     redirects the spring rather than restarting it.
+ *   - Past the first or last panel they give as a rubber band (Apple's, physics.js).
  *   - The momentum after a lift is swallowed, never read as more swiping; the next
  *     swipe starts when the fingers come down again.
  *
@@ -18,7 +22,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isMomentumWheel, knowsTrackpadPhases, onTrackpadPhase } from '../lib/wheelPhase'
-import { HAPTIC_ALIGNMENT, HAPTIC_LEVEL, performHaptic } from '../lib/haptics'
+import { HAPTIC_ALIGNMENT, HAPTIC_GENERIC, HAPTIC_LEVEL, performHaptic } from '../lib/haptics'
+import { SPRINGS, rubberBand as stretch, trackSample, velocityFrom } from '../ui/physics.js'
+import { springTransition } from '../ui/useSpring.js'
+
+/** A click's change of panel: the quick spring from rest. */
+const CLICK_SNAP = 'var(--spring-quick-dur) var(--spring-quick)'
 
 /** Travel before a gesture is read as a swipe or a scroll. */
 export const SWIPE_LOCK_PX = 6
@@ -32,83 +41,136 @@ export const SWIPE_VELOCITY_WINDOW_MS = 80
 export const SWIPE_IDLE_END_MS = 120
 /** How long a swipe is held before it may travel past the next panel. */
 export const SWIPE_HOLD_MS = 220
-/** The furthest, in panels, a swipe stretches past the first or last. */
-export const SWIPE_RUBBER_BAND = 0.3
+/**
+ * A landing this soon after the tick for the same panel is felt as one with it: a fast
+ * swipe ticks onto the panel and lifts a moment later, and two taps that close read as
+ * a stutter, so the landing's is dropped.
+ */
+export const SWIPE_ONE_TAP_MS = 150
 /** Used when the sidebar's width is not known. */
 const FALLBACK_PIXELS_PER_PANEL = 240
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
-/** Past either end the panels give, but less and less. */
+/** The furthest, in panels, a swipe stretches past the first or last. */
+export const SWIPE_RUBBER_BAND = 0.3
+
+/** Past either end the panels give, less and less, never past SWIPE_RUBBER_BAND. */
 export const rubberBand = (position, count) => {
   const last = Math.max(0, count - 1)
-  if (position >= 0 && position <= last) return position
-  const over = position < 0 ? -position : position - last
-  const give = SWIPE_RUBBER_BAND * (1 - 1 / (1 + over * 2))
-  return position < 0 ? -give : last + give
+  if (position < 0) return stretch(position, SWIPE_RUBBER_BAND)
+  if (position > last) return last + stretch(position - last, SWIPE_RUBBER_BAND)
+  return position
 }
 
 /**
  * Where a swipe lands when the fingers lift at `position` (in panels) moving at
  * `velocity` (px/ms, positive toward the next panel).
  */
-export const settleIndex = (position, velocity, count) => {
+export const settleIndex = (position, velocity, count, origin = position, commitAt = 0.5) => {
   let target
   if (velocity >= SWIPE_FLICK_VELOCITY) target = Math.floor(position) + 1
   else if (velocity <= -SWIPE_FLICK_VELOCITY) target = Math.ceil(position) - 1
-  else target = Math.round(position)
+  else target = committedIndex(position, origin, commitAt)
   return clamp(target, 0, Math.max(0, count - 1))
 }
 
-/** The fingers' speed over the last moments of the gesture, in px/ms. */
-export const liftVelocity = (samples) => {
-  if (samples.length < 2) return 0
-  const last = samples[samples.length - 1]
-  let first = samples[0]
-  for (const sample of samples) {
-    if (last.t - sample.t <= SWIPE_VELOCITY_WINDOW_MS) { first = sample; break }
-  }
-  if (first === last) first = samples[samples.length - 2]
-  return (last.x - first.x) / Math.max(last.t - first.t, 1)
+/**
+ * The panel a swipe from `origin` that has reached `position` is on: each one along
+ * once the fingers are `commitAt` of the way to it (a half is the nearest).
+ */
+export const committedIndex = (position, origin, commitAt = 0.5) => {
+  if (commitAt === 0.5) return Math.round(position)
+  const travel = position - origin
+  return Math.round(origin) + Math.sign(travel) * Math.floor(Math.abs(travel) + 1 - commitAt)
 }
+
+/** The fingers' speed over the last moments of the gesture, in px/ms. */
+export const liftVelocity = (samples) => velocityFrom(samples, SWIPE_VELOCITY_WINDOW_MS).x
 
 /**
  * `targetRef` is the element whose wheel events drive it. They are listened for
  * directly rather than through React, whose wheel listeners are passive: a swipe
- * has to stop the panel under it scrolling sideways, and its coast too.
+ * has to stop the panel under it scrolling sideways, and its coast too. Wheel events
+ * from inside an element matching `ignore` (a strip that scrolls sideways itself) are
+ * left to it. `commitAt` is how far toward the next panel a swipe goes before it is on
+ * it (the tick, and where letting go lands): the nearest by default.
  */
-export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onSettle, enabled = true }) {
+export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onSettle, enabled = true, ignore = null, commitAt = 0.5 }) {
   const [progress, setProgress] = useState(index)
   const [dragging, setDragging] = useState(false)
+  // How the panels go to rest once nothing holds them: the consumers' CSS transition.
+  const [snap, setSnap] = useState(CLICK_SNAP)
 
   // 'idle' → 'pending' (not yet a swipe or a scroll) → 'swipe' | 'scroll' → 'spent'
   // (lifted; its coast is not ours) → 'idle' when the fingers come down again.
   const gesture = useRef({ mode: 'idle', axis: null, origin: index, startedAt: 0, x: 0, y: 0, samples: [], lastAt: 0, width: 0 })
   const progressRef = useRef(index)
   const hapticIndexRef = useRef(index)
+  const tickedAtRef = useRef(-Infinity)
+  /** The landing's tap, unless the tick onto `target` has only just been felt. */
+  const land = useCallback((target, from) => {
+    if (target === from) return
+    if (hapticIndexRef.current === target && performance.now() - tickedAtRef.current < SWIPE_ONE_TAP_MS) return
+    performHaptic(HAPTIC_LEVEL)
+  }, [])
   const idleTimerRef = useRef(0)
-  const latest = useRef({ index, count, panelWidth, onSettle })
-  useEffect(() => { latest.current = { index, count, panelWidth, onSettle } }, [index, count, panelWidth, onSettle])
+  const latest = useRef({ index, count, panelWidth, onSettle, commitAt })
+  useEffect(() => { latest.current = { index, count, panelWidth, onSettle, commitAt } }, [index, count, panelWidth, onSettle, commitAt])
 
+  const followed = useRef([])
+
+  /** Put the panels under the fingers. */
   const show = useCallback((value) => {
     progressRef.current = value
     setProgress(value)
   }, [])
 
-  // A tab chosen any other way (a click, a command, a map asking for its panel).
+  /**
+   * Go to a panel: put the panels there and let the consumers' CSS transition (`snap`)
+   * carry them, on the compositor, from wherever they are drawn. Let go of with
+   * `velocity` (panels/ms), the transition is that spring with the hand's speed baked
+   * in (springTransition); chosen any other way (a click, a command), it is the quick
+   * spring from rest. Never stepped here: that would render the whole sidebar every
+   * frame, and a slow render would stall the panels mid-glide.
+   */
+  const glideTo = useCallback((target, velocity) => {
+    const from = progressRef.current
+    setSnap(velocity === undefined
+      ? CLICK_SNAP
+      : springTransition(Math.abs(velocity) > 0.0005 ? SPRINGS.momentum : SPRINGS.smooth, { from, to: target, velocity }))
+    show(target)
+  }, [show])
+
+  // A tab chosen any other way (a click, a command, a map asking for its panel). A
+  // swipe's own landing reports its panel too, and is already on its way there.
   useEffect(() => {
     if (gesture.current.mode === 'swipe') return
     hapticIndexRef.current = index
-    show(index)
-  }, [index, show])
+    if (progressRef.current === index) return
+    glideTo(index)
+  }, [index, glideTo])
 
-  /** Show the panels part-way, ticking lightly as each one passes under the fingers. */
+  /**
+   * Show the panels part-way, ticking lightly as each one passes under the fingers. A
+   * swipe brought back toward where it set off (so letting go would stay there) taps
+   * differently, so going back is felt as going back. A quick swipe is felt not at all:
+   * until it has been held `SWIPE_HOLD_MS` nothing ticks, and one held past that ticks
+   * then for wherever it has got to.
+   */
   const showFollowing = useCallback((next) => {
     show(next)
-    const crossed = clamp(Math.round(next), 0, Math.max(0, latest.current.count - 1))
+    const g = gesture.current
+    const swiping = g.mode === 'swipe'
+    const lastAt = g.samples.length ? g.samples[g.samples.length - 1].t : g.startedAt
+    if (swiping && lastAt - g.startedAt < SWIPE_HOLD_MS) return
+    const reached = swiping ? committedIndex(next, g.origin, latest.current.commitAt) : Math.round(next)
+    const crossed = clamp(reached, 0, Math.max(0, latest.current.count - 1))
     if (crossed !== hapticIndexRef.current) {
+      const back = swiping && Math.abs(crossed - g.origin) < Math.abs(hapticIndexRef.current - g.origin)
       hapticIndexRef.current = crossed
-      performHaptic(HAPTIC_ALIGNMENT)
+      tickedAtRef.current = performance.now()
+      performHaptic(back ? HAPTIC_GENERIC : HAPTIC_ALIGNMENT)
     }
   }, [show])
 
@@ -119,16 +181,20 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
 
     if (g.mode === 'swipe') {
       const { count: total, onSettle: settle } = latest.current
-      const position = g.origin + g.x / g.width
+      const at = g.origin + g.x / g.width
       const lastAt = g.samples.length ? g.samples[g.samples.length - 1].t : g.startedAt
       const flicked = lastAt - g.startedAt < SWIPE_HOLD_MS
-      const settled = settleIndex(position, liftVelocity(g.samples), total)
+      const velocity = liftVelocity(g.samples)
+      const settled = settleIndex(at, velocity, total, g.origin, latest.current.commitAt)
       // A flick turns one panel from where it set off, never two.
       const target = flicked ? clamp(settled, g.origin - 1, g.origin + 1) : settled
-      if (target !== g.origin) performHaptic(HAPTIC_LEVEL)
+      // A flick turns the panel without a tap, as it ticked none on the way.
+      if (!flicked) land(target, g.origin)
       hapticIndexRef.current = target
       setDragging(false)
-      show(target)
+      // Fingers moving the panels left show the next one: the panels' speed is the
+      // fingers' turned into panels per ms.
+      glideTo(target, velocity / g.width)
       settle?.(target)
     }
 
@@ -136,7 +202,7 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
     // fingers come down again. Without them the pause that ended it was the coast's end.
     g.mode = phased && (g.mode === 'swipe' || g.mode === 'scroll') ? 'spent' : 'idle'
     g.samples = []
-  }, [show])
+  }, [glideTo, land])
 
   useEffect(() => onTrackpadPhase((phase) => {
     const g = gesture.current
@@ -151,6 +217,7 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
 
   const onWheel = useCallback((event) => {
     if (event.ctrlKey) return
+    if (ignore && gesture.current.mode !== 'swipe' && event.target?.closest?.(ignore)) return
     const g = gesture.current
     const phased = knowsTrackpadPhases()
 
@@ -214,7 +281,7 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
     if (g.samples.length > 24) g.samples.shift()
 
     showFollowing(rubberBand(g.origin + g.x / g.width, latest.current.count))
-  }, [release, showFollowing])
+  }, [ignore, release, showFollowing])
 
   useEffect(() => {
     const target = targetRef.current
@@ -229,26 +296,32 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
     gesture.current.mode = gesture.current.mode === 'spent' ? 'spent' : 'idle'
     hapticIndexRef.current = next
     setDragging(false)
-    show(next)
-  }, [show])
+    glideTo(next)
+  }, [glideTo])
 
   /** The panels following something else being dragged (the selector's indicator). */
-  const follow = useCallback((position) => {
+  const follow = useCallback((at) => {
     if (gesture.current.mode === 'swipe') return
     setDragging(true)
-    showFollowing(rubberBand(position, latest.current.count))
+    trackSample(followed.current, { t: performance.now(), x: at })
+    showFollowing(rubberBand(at, latest.current.count))
   }, [showFollowing])
 
   /** That drag let go over a panel: glide there and choose it. */
   const settle = useCallback((target) => {
     const { count: total, index: current, onSettle: chosen } = latest.current
     const next = clamp(target, 0, Math.max(0, total - 1))
-    if (next !== current) performHaptic(HAPTIC_LEVEL)
+    land(next, current)
     hapticIndexRef.current = next
     setDragging(false)
-    show(next)
+    glideTo(next, velocityFrom(followed.current).x)
+    followed.current = []
     chosen?.(next)
-  }, [show])
+  }, [glideTo, land])
 
-  return { progress, dragging, jumpTo, follow, settle }
+  /**
+   * `moving`: the panels are on the hand, painted as it goes, so nothing may ease them.
+   * `snap`: otherwise, the transition's timing that carries them to `progress`.
+   */
+  return { progress, dragging, moving: dragging, snap, jumpTo, follow, settle }
 }

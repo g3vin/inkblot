@@ -13,6 +13,15 @@
  *   size    font-size (or the font shorthand) in px → use --text-2xs … --text-3xl
  *   space   gap / padding / margin of 3px or more  → use --space-1 … --space-12
  *           (0, 1px and 2px hairline nudges are fine)
+ *   motion  a timed curve where a spring belongs (docs/DESIGN.md §7, "Motion is
+ *           physical"): the deprecated --dur-* / --ease-* tokens, cubic-bezier(),
+ *           the ease keywords, or a raw duration in a transition or animation with no
+ *           --spring-* beside it → use --spring-<role> and --spring-<role>-dur, or
+ *           physics.js / useSpring.js in script. A loop or a progress bar (infinite,
+ *           linear, steps()) is not motion between states and is left alone.
+ *
+ * It also fails if the --spring-* tokens in tokens.css no longer match the springs in
+ * src/ui/physics.js (scripts/gen-spring-tokens.mjs writes them).
  *
  * A raw shadow is caught by its colour (rgba(…) / #…) → use --shadow-float / --shadow-dialog.
  *
@@ -24,6 +33,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { currentBlock, springBlock } from './gen-spring-tokens.mjs'
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BASELINE = path.join(repo, 'scripts/design-baseline.json')
@@ -59,6 +69,11 @@ const stripComments = (text, isCss) => (isCss
   : text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`])\/\/.*$/gm, '$1'))
 
 const COLOR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/g
+const OLD_MOTION = /var\(--(?:dur-(?!shimmer)[a-z]+|ease-[a-z-]+)\)|cubic-bezier\(/
+const NOT_A_MOVE = /\binfinite\b|\blinear\b|steps\(|step-(?:start|end)|0\.01ms/
+const timedMotion = (value) => !NOT_A_MOVE.test(value) && (OLD_MOTION.test(value)
+  || (/(?:^|[\s,])ease(?:-in|-out|-in-out)?(?:[\s,]|$)/.test(value) && !/var\(--spring/.test(value))
+  || (/(?:^|[\s,(])(?!0m?s\b)\d+(?:\.\d+)?m?s\b/.test(value) && !/var\(--spring/.test(value)))
 
 function check(rel, text) {
   const isCss = rel.endsWith('.css')
@@ -81,8 +96,19 @@ function check(rel, text) {
       // In scripts only colour literals in strings are flagged (inline styles, palettes).
       const strings = line.match(/(['"`])(?:\\.|(?!\1).)*\1/g) || []
       if (strings.some((s) => /^.#[0-9a-fA-F]{3,8}.$|^.#[0-9a-fA-F]{6}\b|(?:rgba?|hsla?)\(/.test(s))) at('color', line)
+      // A timed curve in an inline style, a keyframe's timing or a framer transition.
+      if (strings.some((s) => OLD_MOTION.test(s)) || /\bease:\s*['"[]/.test(line)) at('motion', line)
     }
   })
+  if (isCss) {
+    // Whole declarations, as a transition often runs over several lines.
+    const stripped = stripComments(text, true)
+    for (const match of stripped.matchAll(/(?:^|[\s;{])((?:transition|animation)(?:-duration|-timing-function)?\s*:\s*([^;{}]*))/g)) {
+      if (!timedMotion(match[2].replace(/\s+/g, ' '))) continue
+      const line = stripped.slice(0, match.index).split('\n').length + (match[0].startsWith('\n') ? 1 : 0)
+      findings.push({ kind: 'motion', line, detail: match[1].replace(/\s+/g, ' ').trim().slice(0, 100) })
+    }
+  }
   return findings
 }
 
@@ -127,4 +153,8 @@ if (args.has('--update-baseline')) {
   if (better.length) console.log(`↓ ${better.length} file(s) improved — run \`npm run lint:design -- --update-baseline\` to lock it in.`)
   console.log(`${worse.length ? '✗' : '✓'} design lint: ${total} legacy findings remaining (see docs/DESIGN.md → Migration)`)
   if (worse.length) process.exitCode = 1
+  if (currentBlock(fs.readFileSync(path.join(repo, 'src/styles/tokens.css'), 'utf8')) !== springBlock()) {
+    console.error('✗ the --spring-* tokens are stale: run `node scripts/gen-spring-tokens.mjs`')
+    process.exitCode = 1
+  }
 }

@@ -3,6 +3,8 @@
  * styles/tokens.css. Durations and easing stay in CSS; what lives here is what only
  * script can act on: how long to wait before admitting something is loading.
  */
+import { SPRINGS, springEasing } from './physics.js'
+
 export const REVEAL = {
   /** A load quicker than this never shows a skeleton. */
   delay: 150,
@@ -14,4 +16,7 @@ export const REVEAL = {
   stagger: 24,
   /** Items past this many arrive with the last one rather than trailing off. */
   staggerCap: 8,
+  /** How long a sheet on the landing page takes to grow into the document card: the
+   *  gentle spring's settle time, as --spring-gentle-dur. */
+  arrive: springEasing(SPRINGS.gentle).duration,
 }

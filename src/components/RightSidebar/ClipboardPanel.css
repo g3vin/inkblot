@@ -42,7 +42,7 @@
    it so the keyboard can reach them; a touch screen has no hover and always shows them. */
 .clipboard-item .ui-section-accessory {
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 .clipboard-item:hover .ui-section-accessory,
 .clipboard-item:focus-within .ui-section-accessory { opacity: 1; }
@@ -121,7 +121,7 @@
   text-shadow: 0 0 4px var(--app-bg), 0 0 8px var(--app-bg);
   pointer-events: none;
   will-change: transform;
-  transition: opacity var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 /* Settled into the page as a preview: the page shows the words now. */
 .clipboard-ghost[data-settled='true'] { opacity: 0; }
@@ -141,7 +141,7 @@ html.is-dragging-clipboard * {
 
 .search-result {
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  transition: border-color var(--spring-quick-dur) var(--spring-quick), background var(--spring-quick-dur) var(--spring-quick), transform var(--spring-quick-dur) var(--spring-quick);
 }
 
 .search-result:hover {

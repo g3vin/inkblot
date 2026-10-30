@@ -208,7 +208,7 @@
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), border-color var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .panel-action-btn:hover {
@@ -359,7 +359,7 @@
   border-radius: var(--radius-pill);
   background: var(--text-subtle);
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick), background-color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .split-rows .split-resizer-grip {
@@ -396,7 +396,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-hover);
   pointer-events: none;
-  animation: split-drop-outline-in var(--dur-fast) var(--ease-out);
+  animation: split-drop-outline-in var(--spring-quick-dur) var(--spring-quick);
 }
 
 .split-drop-outline.is-start { right: calc(50% + var(--space-3) / 2); }
@@ -413,7 +413,7 @@
    pane's reveal holds hidden (an idle skeleton, a document still loading) stays hidden. */
 .pane.is-provisional > :not(.split-drop-outline) {
   filter: opacity(0.5);
-  transition: filter var(--dur-fast) var(--ease-out);
+  transition: filter var(--spring-quick-dur) var(--spring-quick);
 }
 
 @keyframes split-drop-outline-in {
