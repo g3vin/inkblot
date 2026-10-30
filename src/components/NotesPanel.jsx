@@ -18,6 +18,8 @@ import {
 } from '../lib/noteUtils'
 import { EmptyState } from '../ui/Surfaces.jsx'
 import { NOTE_POP_MS, closeSchedule, drawMs, lineStart, openTiming, prefersReducedMotion } from '../lib/noteReveal'
+import { SPRINGS } from '../ui/physics.js'
+import { springTiming } from '../ui/useSpring.js'
 
 const findBranch = (branches, id) => {
   for (const branch of branches) {
@@ -32,6 +34,28 @@ const findBranch = (branches, id) => {
 const visibleEdges = (branch, isRoot = true) => {
   if (!isRoot && branch.note.collapsedChildren) return []
   return branch.children.flatMap((child) => [[branch.note.id, child], ...visibleEdges(child, false)])
+}
+
+/**
+ * Open or close the room a branch's replies take, so the notes below slide rather
+ * than jump; the lines follow it (NoteBranchLines watches its container). The gap
+ * above the replies goes with them, or the notes below would jump it at the end.
+ * Returns how long it takes.
+ */
+const slideReplies = (container, opening) => {
+  const { duration: ms, easing } = springTiming(SPRINGS.smooth)
+  const gap = getComputedStyle(container.parentElement).rowGap || '0px'
+  const full = { height: `${container.offsetHeight}px`, marginTop: '0px' }
+  const none = { height: '0px', marginTop: `calc(-1 * ${gap})` }
+  container.style.overflow = 'hidden'
+  const animation = container.animate(opening ? [none, full] : [full, none], {
+    duration: ms,
+    easing,
+    // Closing, it stays shut until the branch folds and takes it away.
+    fill: opening ? 'none' : 'forwards',
+  })
+  if (opening) animation.onfinish = () => { container.style.overflow = '' }
+  return ms
 }
 
 /**
@@ -267,6 +291,10 @@ export default function NotesPanel({
      be measured (NoteBranchLines) before the timings are set, all before a paint. */
 
   const [motion, setMotion] = useState(null)
+  const listRef = useRef(null)
+  const repliesOf = (id) => listRef.current?.querySelector(
+    `.note-branch[data-note-id="${CSS.escape(String(id))}"] > .note-children`
+  ) ?? null
   const motionRef = useRef(null)
   // eslint-disable-next-line react-hooks/refs -- the latest motion, for finishMotion when a timer or callback calls it; set in render so it is current before any can
   motionRef.current = motion
@@ -308,7 +336,15 @@ export default function NotesPanel({
     const notesMotion = new Map()
     schedule.forEach(({ card, string }, noteId) => notesMotion.set(noteId, { state: 'closing', card, line: string }))
     setMotion({ kind: 'close', rootId: id, notes: notesMotion })
-    motionTimerRef.current = window.setTimeout(finishMotion, total)
+    // The replies gone, their room closes, then the branch folds.
+    motionTimerRef.current = window.setTimeout(() => {
+      const replies = repliesOf(id)
+      if (!replies) {
+        finishMotion()
+        return
+      }
+      motionTimerRef.current = window.setTimeout(finishMotion, slideReplies(replies, false))
+    }, total)
   }
 
   // The replies are in and measured: time the opening by their lines.
@@ -319,6 +355,10 @@ export default function NotesPanel({
       setMotion(null)
       return
     }
+    // Opening a folded branch, its room opens first and the replies draw into it; a
+    // reply added under others just draws in.
+    const replies = motion.only ? null : repliesOf(motion.rootId)
+    const slide = replies ? slideReplies(replies, true) : 0
     const timings = new Map()
     const notesMotion = new Map()
     let total = 0
@@ -330,10 +370,10 @@ export default function NotesPanel({
       timings.set(id, timing)
       notesMotion.set(id, {
         state: 'opening',
-        card: { delay: timing.pop, ms: NOTE_POP_MS },
-        line: { delay: timing.line, ms: timing.draw },
+        card: { delay: slide + timing.pop, ms: NOTE_POP_MS },
+        line: { delay: slide + timing.line, ms: timing.draw },
       })
-      total = Math.max(total, timing.pop + NOTE_POP_MS)
+      total = Math.max(total, slide + timing.pop + NOTE_POP_MS)
     })
     setMotion({ kind: 'open', rootId: motion.rootId, notes: notesMotion })
     motionTimerRef.current = window.setTimeout(finishMotion, total)
@@ -401,7 +441,7 @@ export default function NotesPanel({
 
   return (
     <div className="sidebar-panel notes-panel" data-help="notes.panel">
-      <div className="notes-list">
+      <div ref={listRef} className="notes-list">
         {noteTree.length === 0 ? (
           notes.length === 0
             ? <EmptyState icon="note" title="No notes yet." hint="Select some text and press ⌥⌘N to leave yourself a note." />
