@@ -20,7 +20,7 @@
  * The lift is AppKit's (wheelPhase.js); WKWebView's wheel events carry no phase. Where
  * the app is not there to say (a browser), a pause in the wheel events stands in.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { isMomentumWheel, knowsTrackpadPhases, onTrackpadPhase } from '../lib/wheelPhase'
 import { HAPTIC_ALIGNMENT, HAPTIC_GENERIC, HAPTIC_LEVEL, performHaptic } from '../lib/haptics'
 import { SPRINGS, releaseSpring, rubberBand as stretch, settleTime, springAt, trackSample, velocityFrom } from '../ui/physics.js'
@@ -113,7 +113,24 @@ export const liftVelocity = (samples, at = samples[samples.length - 1]?.t ?? 0) 
  * it (the tick, and where letting go lands): the nearest by default.
  */
 export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onSettle, enabled = true, ignore = null, commitAt = 0.5 }) {
-  const [progress, setProgress] = useState(index)
+  // Where the panels are, published to the parts that draw it (useSwipeProgress,
+  // SwipeTrack) rather than held as this hook's state: a sidebar re-rendered on every
+  // wheel event would reconcile all its panels each time.
+  const [store] = useState(() => {
+    const listeners = new Set()
+    return {
+      value: index,
+      set(value) {
+        if (value === this.value) return
+        this.value = value
+        listeners.forEach((listener) => listener())
+      },
+      subscribe: (listener) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+    }
+  })
   const [dragging, setDragging] = useState(false)
   // How the panels go to rest once nothing holds them: the consumers' CSS transition.
   const [snap, setSnap] = useState(CLICK_SNAP)
@@ -141,8 +158,8 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
   /** Put the panels under the fingers. */
   const show = useCallback((value) => {
     progressRef.current = value
-    setProgress(value)
-  }, [])
+    store.set(value)
+  }, [store])
 
   /**
    * Where the panels are drawn now: mid-glide, part of the way along their spring, not
@@ -369,5 +386,26 @@ export default function useSpaceSwipe({ targetRef, index, count, panelWidth, onS
    * `drawnProgress()`: where the panels are drawn this moment, for a drag that catches
    * them mid-glide (the selector's indicator).
    */
-  return { progress, dragging, moving: dragging, snap, jumpTo, follow, settle, drawnProgress }
+  const getProgress = useCallback(() => store.value, [store])
+  return {
+    subscribe: store.subscribe,
+    getProgress,
+    dragging,
+    moving: dragging,
+    snap,
+    jumpTo,
+    follow,
+    settle,
+    drawnProgress,
+  }
 }
+
+/**
+ * The swipe's progress (in panels) for the part that draws it, re-rendering only that
+ * part as the fingers move. `select` narrows it (the nearest panel, say) so a part that
+ * needs less re-renders less; it must return a plain value.
+ */
+export function useSwipeProgress(swipe, select = (progress) => progress) {
+  return useSyncExternalStore(swipe.subscribe, () => select(swipe.getProgress()))
+}
+

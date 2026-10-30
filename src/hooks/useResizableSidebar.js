@@ -107,15 +107,26 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
     if (!resizing) return undefined
     let samples = []
     let hand = null
+    // While it moves, the width is written to the sidebar itself: through React it
+    // would render the whole editor under the layout on every frame.
+    const element = document.querySelector(side === 'left' ? '.left-sidebar' : '.right-sidebar')
     const show = (value) => {
       shownRef.current = value
-      setWidth(value)
+      if (!element) return
+      element.style.width = `${value}px`
+      element.style.setProperty('--sidebar-w', `${value}px`)
     }
+    // Kept once, when the drag and any spring back are over.
+    const keep = (value) => {
+      setWidth(value)
+      setResizing(false)
+    }
+    const within = (value) => Math.min(max, Math.max(min, value))
     // Still resizing until the spring back has landed, so the width is kept once.
     const back = new SpringValue(0, {
       spring: SPRINGS.smooth,
       onChange: show,
-      onRest: () => setResizing(false),
+      onRest: keep,
     })
     const handAt = (e) => (side === 'left' ? e.clientX : window.innerWidth - e.clientX) + grabRef.current.offset
     const onPointerMove = (e) => {
@@ -129,7 +140,7 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
       const value = handAt(e)
       if (value <= COLLAPSE_THRESHOLD) {
         draggingRef.current = false
-        setResizing(false)
+        keep(within(shownRef.current))
         collapse()
         return
       }
@@ -144,19 +155,19 @@ export function useResizableSidebar(initial, min, max, side = 'left') {
       const speed = e.type === 'pointercancel' ? 0 : velocityFrom(samples, undefined, e.timeStamp).x
       // Thrown toward its edge: where it would coast to decides, not where it was let go.
       if (hand !== null && speed < 0 && hand + project(speed, DECELERATION.fast) <= COLLAPSE_THRESHOLD) {
-        setResizing(false)
+        keep(within(shown))
         collapse()
         return
       }
-      const resting = Math.min(max, Math.max(min, shown))
+      const resting = within(shown)
       if (hand === null || resting === shown) {
-        setResizing(false)
+        keep(shown)
         return
       }
       back.jump(shown)
       // Past the edge it was drawn moving slower than the hand: that is its speed.
       back.set(resting, { velocity: speed * rubberSlope(hand, min, max, RESIZE_GIVE, grabRef.current.band) })
-      if (!back.moving) setResizing(false)
+      if (!back.moving) keep(resting)
     }
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)

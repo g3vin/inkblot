@@ -4,12 +4,12 @@
  * and on right-click the two layouts and Customize Layout….
  */
 import Icon from '../../ui/Icon.jsx'
-import SidebarTabs from './SidebarTabs'
+import { SwipeSidebarTabs } from './SidebarTabs'
 import { INSPECTOR_LAYOUT_INFO } from '../../lib/chromeLayout'
 import { popUpMenu } from '../../ui/useNativeMenu'
 import { CUSTOMIZE_INSPECTOR_EVENT } from '../../hooks/contextMenu/toolbarMenu'
 
-export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLayout, visualProgress, gestureActive, reducedMotion, onIndicatorDrag, onIndicatorDrop }) {
+export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLayout, swipe, gestureActive, reducedMotion, onIndicatorDrag, onIndicatorDrop }) {
   const other = layout === 'finishing' ? 'drafting' : 'finishing'
   const menu = (event) => popUpMenu(event, [
     { text: 'Write layout', checked: layout === 'drafting', action: () => onChooseLayout('drafting') },
@@ -20,11 +20,11 @@ export default function InspectorHeader({ tabs, tab, setTab, layout, onChooseLay
 
   return (
     <div className="inspector-header" onContextMenu={menu}>
-      <SidebarTabs
+      <SwipeSidebarTabs
         tabs={tabs}
         tab={tab}
         setTab={setTab}
-        visualProgress={visualProgress}
+        swipe={swipe}
         gestureActive={gestureActive}
         reducedMotion={reducedMotion}
         onIndicatorDrag={onIndicatorDrag}

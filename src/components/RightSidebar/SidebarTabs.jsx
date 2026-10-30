@@ -21,6 +21,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icon from '../../ui/Icon.jsx'
 import { GESTURE, trackSample, velocityFrom } from '../../ui/physics.js'
+import { useSwipeProgress } from '../../hooks/useSpaceSwipe'
 import { RIGHT_SIDEBAR_TABS } from './sidebarTabsConfig'
 
 const TAB_GAP_PX = 4
@@ -374,4 +375,13 @@ export default function SidebarTabs({
       })}
     </div>
   )
+}
+
+/**
+ * The tabs of a sidebar that swipes (hooks/useSpaceSwipe), reading the swipe's progress
+ * themselves, so the sidebar around them isn't re-rendered as the fingers move.
+ */
+export function SwipeSidebarTabs({ swipe, ...props }) {
+  const visualProgress = useSwipeProgress(swipe)
+  return <SidebarTabs {...props} visualProgress={visualProgress} />
 }

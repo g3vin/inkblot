@@ -17,7 +17,7 @@
  *
  * tests/unit/editor.mjs mounts this component and exercises all of them.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
@@ -154,22 +154,45 @@ export default function EditorCanvas({
   const splitContainerRef = useRef(null)
   const [isResizingSplit, setIsResizingSplit] = useState(false)
   // The divider where it is drawn while a hand or a spring moves it: past its limits
-  // on a rubber band, then springing to where the ratio was kept. Null at rest.
-  const [drawnRatio, setDrawnRatio] = useState(null)
+  // on a rubber band, then springing to where the ratio was kept. Null at rest. Written
+  // straight to the split's grid every frame (paintSplit), never through React: a
+  // render of the whole canvas per frame would stall the divider under a slow one.
+  const drawnRef = useRef(null)
+  const paintSplit = (ratio) => {
+    const container = splitContainerRef.current
+    if (!container || splitView !== 'editor' || comparing) return
+    const tracks = `${ratio}fr var(--split-gutter) ${1 - ratio}fr`
+    if (splitOrientation === 'rows') container.style.gridTemplateRows = tracks
+    else container.style.gridTemplateColumns = tracks
+  }
   const divider = useSpring(splitRatio, {
     spring: SPRINGS.smooth,
     precision: 0.0005,
-    onChange: setDrawnRatio,
-    onRest: () => setDrawnRatio(null),
+    onChange: (ratio) => {
+      drawnRef.current = ratio
+      paintSplit(ratio)
+    },
+    onRest: (ratio) => {
+      drawnRef.current = null
+      paintSplit(ratio)
+    },
+  })
+  // A render while the divider is moving draws the kept ratio: put it back where it is
+  // drawn before the frame is painted.
+  useLayoutEffect(() => {
+    if (drawnRef.current !== null) paintSplit(drawnRef.current)
   })
   /** Spring the divider to `ratio` and keep it there, from wherever it is drawn. */
   const glideSplit = (ratio, velocity) => {
     const target = clampSplitRatio(ratio)
-    if (!divider.moving) divider.jump(drawnRatio ?? splitRatio)
+    if (!divider.moving) divider.jump(drawnRef.current ?? splitRatio)
     divider.set(target, velocity === undefined ? undefined : { velocity })
     setSplitRatio?.(target)
     // Already there: nothing to spring, so the kept ratio is drawn again.
-    if (!divider.moving) setDrawnRatio(null)
+    if (!divider.moving) {
+      drawnRef.current = null
+      paintSplit(target)
+    }
   }
   const [dragCaret, setDragCaret] = useState(null)
   // The pane's live view of notesByDoc. The hooks below run from editor events and
@@ -778,7 +801,7 @@ export default function EditorCanvas({
 
   // The divider is a track in the split grid, so the two panes are sized by the
   // ratio and the gutter never has to be accounted for twice.
-  const shownRatio = drawnRatio ?? splitRatio
+  const shownRatio = splitRatio
   const splitStyle = splitView === 'editor' && !comparing
     ? (splitOrientation === 'rows'
       ? {
@@ -812,7 +835,7 @@ export default function EditorCanvas({
     }
     // Held where it was grabbed, and where it is drawn if caught mid-spring: the hand
     // is wherever it would have to be for the divider to be drawn there.
-    const drawn = divider.moving ? divider.value : drawnRatio ?? splitRatio
+    const drawn = divider.moving ? divider.value : drawnRef.current ?? splitRatio
     divider.stop()
     const offset = rubberUnclamp(drawn, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE, band) - ratioAt(event)
     const samples = []
@@ -821,9 +844,8 @@ export default function EditorCanvas({
     const onMove = (moveEvent) => {
       hand = ratioAt(moveEvent) + offset
       trackSample(samples, { t: moveEvent.timeStamp, x: hand })
+      // Drawn as it goes; the ratio is kept once, when it is let go (glideSplit).
       divider.jump(rubberClamp(hand, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE, band))
-      // Editor owns the clamp, so the ratio can never strand a pane off screen.
-      setSplitRatio?.(hand)
     }
 
     const onUp = (upEvent) => {

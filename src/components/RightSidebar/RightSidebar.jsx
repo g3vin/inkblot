@@ -5,6 +5,7 @@
  * Tabs can be switched by clicking or by a horizontal trackpad swipe, which
  * moves between them the way Arc moves between spaces (hooks/useSpaceSwipe.js).
  */
+import usePeekSpring from '../../hooks/usePeekSpring'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import InspectorHeader from './InspectorHeader'
@@ -13,7 +14,8 @@ import ReferencesPanel from './references/ReferencesPanel'
 import StatsPanel from '../stats/StatsPanel'
 import { OutputPanel, TypesetPanel } from './finishing/FinishingPanels'
 import TypesetHistoryView from './TypesetHistoryView'
-import useSpaceSwipe from '../../hooks/useSpaceSwipe'
+import useSpaceSwipe, { useSwipeProgress } from '../../hooks/useSpaceSwipe'
+import SwipeTrack from '../SwipeTrack'
 import usePeekDismiss from '../../hooks/usePeekDismiss'
 import { sidebarTabsFor } from './sidebarTabsConfig'
 import useInspectorLayout from './useInspectorLayout'
@@ -32,6 +34,29 @@ import Icon from '../../ui/Icon.jsx'
 import { PanelActions, PanelActionsProvider, ScopeMenu } from '../../ui/PanelActions.jsx'
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+/**
+ * The panel titles, one per tab, sliding with the swipe. Reads the swipe's progress
+ * itself, so a frame of the swipe re-renders these labels and not the sidebar.
+ */
+function SwipeTitleTrack({ swipe, tabs, reducedMotion }) {
+  const progress = useSwipeProgress(swipe)
+  return (
+    <div
+      className="right-sidebar-global-title-track"
+      style={{
+        '--right-sidebar-title-progress': progress,
+        transition: swipe.moving || reducedMotion ? 'none' : `transform ${swipe.snap}`,
+      }}
+    >
+      {tabs.map(({ id, label }) => (
+        <span key={id} className="panel-header-label right-sidebar-global-title-label">
+          {label}
+        </span>
+      ))}
+    </div>
+  )
+}
 
 export default function RightSidebar({
   width,
@@ -109,6 +134,7 @@ export default function RightSidebar({
   const [actionsSlot, setActionsSlot] = useState(null)
   const hoveredRef = useRef(false)
   const sidebarRef = useRef(null)
+  usePeekSpring(sidebarRef, { side: 'right', docked: pinned, shown: peeked })
   const swipe = useSpaceSwipe({
     targetRef: sidebarRef,
     index: activeTabIndex,
@@ -119,8 +145,10 @@ export default function RightSidebar({
       if (nextTab && nextTab !== sidebarTab) setSidebarTab(nextTab)
     },
   })
-  const visualTabProgress = swipe.progress
   const gestureActive = swipe.dragging
+  // The panel the swipe is over, to mount its neighbours: read as the nearest, so this
+  // sidebar re-renders as the fingers cross a panel, not on every wheel event.
+  const visualIndex = useSwipeProgress(swipe, (progress) => clamp(Math.round(progress), 0, tabIds.length - 1))
 
   // A click past the next tab doesn't scroll the title through the tabs between:
   // the old title slides straight out and the new one in, as the panels between
@@ -169,22 +197,12 @@ export default function RightSidebar({
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [pinned, togglePin])
 
-  const panelTrackStyle = {
-    '--sidebar-pane-count': tabs.length,
-    width: `${tabs.length * 100}%`,
-    transform: `translateX(-${visualTabProgress * (100 / tabs.length)}%)`,
-    // On the fingers while they swipe; otherwise sprung there on the compositor, with
-    // a swipe's speed kept (useSpaceSwipe).
-    transition: swipe.moving || prefersReducedMotion ? 'none' : `transform ${swipe.snap}`,
-  }
-
   // Only mount the active panel — plus the neighbors while swiping, so
   // partially revealed panels have content.
   const renderedPanelIds = useMemo(() => {
     const ids = new Set([sidebarTab])
     if (!gestureActive) return ids
 
-    const visualIndex = clamp(Math.round(visualTabProgress), 0, tabIds.length - 1)
     ;[
       activeTabIndex,
       visualIndex - 1,
@@ -196,7 +214,7 @@ export default function RightSidebar({
     })
 
     return ids
-  }, [activeTabIndex, gestureActive, sidebarTab, tabIds, visualTabProgress])
+  }, [activeTabIndex, gestureActive, sidebarTab, tabIds, visualIndex])
 
   const renderPanel = (tabId) => {
     if (tabId === 'clipboard') {
@@ -324,19 +342,7 @@ export default function RightSidebar({
                 ))}
             </div>
           ) : (
-          <div
-            className="right-sidebar-global-title-track"
-            style={{
-              '--right-sidebar-title-progress': visualTabProgress,
-              transition: swipe.moving || prefersReducedMotion ? 'none' : `transform ${swipe.snap}`,
-            }}
-          >
-            {tabs.map(({ id, label }) => (
-              <span key={id} className="panel-header-label right-sidebar-global-title-label">
-                {label}
-              </span>
-            ))}
-          </div>
+          <SwipeTitleTrack swipe={swipe} tabs={tabs} reducedMotion={prefersReducedMotion} />
           )}
         </div>
         <div className="right-sidebar-panel-actions" ref={setActionsSlot} />
@@ -348,7 +354,7 @@ export default function RightSidebar({
         setTab={handleSelectTab}
         layout={inspector.layout}
         onChooseLayout={inspector.chooseLayout}
-        visualProgress={visualTabProgress}
+        swipe={swipe}
         gestureActive={gestureActive}
         following={swipe.moving}
         snap={swipe.snap}
@@ -372,7 +378,7 @@ export default function RightSidebar({
           </div>
         ) : null}
         <div hidden={showArchive || undefined} className={`sidebar-panels-viewport${gestureActive ? ' is-gesture-active' : ''}`}>
-          <div className="sidebar-panels-track" style={panelTrackStyle}>
+          <SwipeTrack className="sidebar-panels-track" swipe={swipe} count={tabs.length} reducedMotion={prefersReducedMotion}>
             {tabs.map(({ id }) => (
               <section
                 key={id}
@@ -386,7 +392,7 @@ export default function RightSidebar({
                 </div>
               </section>
             ))}
-          </div>
+          </SwipeTrack>
         </div>
       </div>
       {/* Level with the left sidebar's + and search, the archive in the outer corner as

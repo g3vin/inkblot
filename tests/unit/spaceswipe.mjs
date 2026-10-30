@@ -20,7 +20,7 @@ const React = (await import('react')).default
 const { act, useRef, useState, StrictMode } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const swipeModule = await import('../../src/hooks/useSpaceSwipe.js')
-const { default: useSpaceSwipe, settleIndex, rubberBand, liftVelocity, SWIPE_IDLE_END_MS } = swipeModule
+const { default: useSpaceSwipe, useSwipeProgress, settleIndex, rubberBand, liftVelocity, SWIPE_IDLE_END_MS } = swipeModule
 const { simulateTrackpadPhase, knowsTrackpadPhases } = await import('../../src/lib/wheelPhase.js')
 const { SPRINGS, springEasing } = await import('../../src/ui/physics.js')
 // The webview springs a release in CSS with linear(), which jsdom doesn't know.
@@ -53,7 +53,7 @@ function Harness() {
   const [index, setIndex] = useState(0)
   const targetRef = useRef(null)
   const swipe = useSpaceSwipe({ targetRef, index, count: 5, panelWidth: PANEL, onSettle: setIndex })
-  view = { index, ...swipe }
+  view = { index, ...swipe, progress: useSwipeProgress(swipe) }
   return React.createElement('div', { id: 'pane', ref: targetRef })
 }
 
@@ -184,6 +184,42 @@ const landed = () => wait(800)
 
 await act(async () => { root.unmount() })
 
+// The sidebar that owns a swipe is not re-rendered as the fingers move: only the parts
+// that draw the progress are (useSwipeProgress, SwipeTrack).
+{
+  let ownerRenders = 0
+  let trackRenders = 0
+  let owned = null
+  function Track({ swipe }) {
+    trackRenders += 1
+    return React.createElement('i', { 'data-progress': useSwipeProgress(swipe) })
+  }
+  function Owner() {
+    ownerRenders += 1
+    const targetRef = useRef(null)
+    const swipe = useSpaceSwipe({ targetRef, index: 0, count: 5, panelWidth: PANEL })
+    owned = swipe
+    return React.createElement('div', { id: 'owner', ref: targetRef }, React.createElement(Track, { swipe }))
+  }
+  const ownerRoot = createRoot(document.getElementById('root'))
+  await act(async () => { ownerRoot.render(React.createElement(Owner)) })
+  const owner = document.getElementById('owner')
+  const before = ownerRenders
+  phase('began')
+  for (let i = 0; i < 12; i += 1) {
+    clock += 16
+    const event = new dom.window.WheelEvent('wheel', { deltaX: 6, deltaY: 0, bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'timeStamp', { value: clock })
+    act(() => { owner.dispatchEvent(event) })
+  }
+  ok('a swipe re-renders the track as it goes, and its owner only as it starts',
+    ownerRenders - before <= 2 && trackRenders > 8 && owned.dragging)
+  phase('ended')
+  await landed()
+  await act(async () => { ownerRoot.unmount() })
+  clock += 1000
+}
+
 /* ---------------- the selector's indicator, grabbed and dragged ---------------- */
 
 const { default: SidebarTabs } = await import('../../src/components/RightSidebar/SidebarTabs.jsx')
@@ -200,12 +236,13 @@ function Strip() {
   const [index, setIndex] = useState(0)
   const targetRef = useRef(null)
   const swipe = useSpaceSwipe({ targetRef, index, count: TABS.length, panelWidth: PANEL, onSettle: setIndex })
-  strip = { index, ...swipe }
+  const progress = useSwipeProgress(swipe)
+  strip = { index, ...swipe, progress }
   return React.createElement('div', { ref: targetRef }, React.createElement(SidebarTabs, {
     tabs: TABS,
     tab: TABS[index].id,
     setTab: (id) => setIndex(TABS.findIndex((t) => t.id === id)),
-    visualProgress: swipe.progress,
+    visualProgress: progress,
     gestureActive: swipe.dragging,
     onIndicatorDrag: swipe.follow,
     onIndicatorDrop: swipe.settle,

@@ -69,7 +69,14 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
     const index = inside ? insertionIndex(point, rects, axis) : null
     const next = { ...current, point, inside, insertIndex: index, started: true }
     dragRef.current = next
-    setDrag(next)
+    // The caller's ghost (.ui-reorder-ghost), if it draws one, is moved with the pointer
+    // by writing its position: the list re-renders only when where it would drop changes.
+    const ghost = current.started ? document.querySelector('.ui-reorder-ghost') : null
+    if (ghost) {
+      ghost.style.left = `${point.x - next.grab.x}px`
+      ghost.style.top = `${point.y - next.grab.y}px`
+    }
+    if (!current.started || current.inside !== inside || current.insertIndex !== index) setDrag(next)
     handlers.current.onMove?.(next)
   }, [axis, measure, slop])
 

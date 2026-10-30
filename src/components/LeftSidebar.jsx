@@ -14,12 +14,14 @@
  * Its foot holds the showing view's + and, on the inner end, the project search
  * (search/ProjectSearch.jsx), which stays put while the views swipe.
  */
+import usePeekSpring from '../hooks/usePeekSpring'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import FileTree from './FileTree'
 import BookNavigator from './book/BookNavigator'
 import ProjectSearch from './search/ProjectSearch'
-import SidebarTabs from './RightSidebar/SidebarTabs'
+import { SwipeSidebarTabs } from './RightSidebar/SidebarTabs'
+import SwipeTrack from './SwipeTrack'
 import { useLatestBridgeState } from '../bridge'
 import useSpaceSwipe from '../hooks/useSpaceSwipe'
 import usePeekDismiss from '../hooks/usePeekDismiss'
@@ -72,6 +74,7 @@ export default function LeftSidebar({
 
   const hoveredRef = useRef(false)
   const sidebarRef = useRef(null)
+  usePeekSpring(sidebarRef, { side: 'left', docked: pinned, shown: peeked })
   // The foot of the sidebar, where the view showing puts its + (a state, not a ref,
   // so the views hear when it exists).
   const [footerSlot, setFooterSlot] = useState(null)
@@ -188,11 +191,11 @@ export default function LeftSidebar({
       </div>
       {projectName ? (
         <div className="left-sidebar-switch">
-          <SidebarTabs
+          <SwipeSidebarTabs
+            swipe={swipe}
             tabs={VIEWS}
             tab={view}
             setTab={selectView}
-            visualProgress={swipe.progress}
             gestureActive={swipe.dragging}
             following={swipe.moving}
             snap={swipe.snap}
@@ -205,17 +208,7 @@ export default function LeftSidebar({
       <div className={`sidebar-content${hasBook ? ' has-views' : ''}`}>
         {hasBook ? (
           <div className="sidebar-panels-viewport">
-            <div
-              className="sidebar-panels-track"
-              style={{
-                '--sidebar-pane-count': VIEWS.length,
-                width: `${VIEWS.length * 100}%`,
-                transform: `translateX(-${swipe.progress * (100 / VIEWS.length)}%)`,
-                // On the fingers while they swipe; otherwise sprung there on the
-                // compositor, with a swipe's speed kept (useSpaceSwipe).
-                transition: swipe.moving || prefersReducedMotion ? 'none' : `transform ${swipe.snap}`,
-              }}
-            >
+            <SwipeTrack className="sidebar-panels-track" swipe={swipe} count={VIEWS.length} reducedMotion={prefersReducedMotion}>
               {VIEWS.map(({ id }) => (
                 <section
                   key={id}
@@ -228,7 +221,7 @@ export default function LeftSidebar({
                   {id === 'book' ? bookView : filesView}
                 </section>
               ))}
-            </div>
+            </SwipeTrack>
           </div>
         ) : filesView}
       </div>
