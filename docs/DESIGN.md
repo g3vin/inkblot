@@ -715,7 +715,10 @@ hand is still moving the things it swings. Never go past bounce 0.4.
   whole motion to CSS with `springTransition`.
 - **Not springs:** loops and progress (a skeleton's sheen on `--dur-shimmer`, a caret's
   blink, a progress bar's `linear`, the drawing of a note's string) show time passing,
-  not something moving between states. They stay linear or stepped.
+  not something moving between states. They stay linear or stepped. A pulse that only
+  says something is live (a recording dot, the dictation button finishing, a toolbar
+  item wiggling while it can be moved) breathes on `ease-in-out`: it goes nowhere, and a
+  linear pulse reads as mechanical.
 
 `npm run lint:design` flags a timed curve where a spring belongs: the deprecated
 `--dur-*` / `--ease-*` aliases, `cubic-bezier()`, the `ease` keywords, a raw duration,

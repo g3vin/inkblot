@@ -29,7 +29,7 @@ const HOVER_EVENTS = ['mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'poin
 /**
  * While a document is carried out of the tree, the page under it is only somewhere to
  * put it: nothing there opens on hover. Stopped at the window before anything else
- * sees them. The drag itself follows `mousemove`, which is left alone.
+ * sees them, except the drag's own listeners on the window, which still hear them.
  */
 function muteHovers() {
   const stop = (event) => {
@@ -268,9 +268,10 @@ export function useFileTreeDrag({
     })
   }
 
-  // Mouse-driven drag & drop (not HTML5 DnD): a drag arms on item mousedown
-  // and activates after ~4px of movement, showing a ghost preview; mouseup
-  // commits the move.
+  // Pointer-driven drag & drop (not HTML5 DnD): a drag arms on a row's press and
+  // activates past the slop, showing a ghost preview; letting go commits the move, and
+  // a drag the system takes away (pointercancel) moves nothing. Heard at the window in
+  // the capture phase, beside muteHovers, which stops pointermove from going further.
   useEffect(() => {
     const onMove = (event) => {
       const drag = manualDragRef.current
@@ -278,7 +279,7 @@ export function useFileTreeDrag({
       dragPointRef.current = { x: event.clientX, y: event.clientY }
       drag.samples = trackSample(drag.samples ?? [], { t: event.timeStamp, x: event.clientX, y: event.clientY })
       if (!manualDragActiveRef.current) {
-        if (!pastSlop(event.clientX - drag.startX, event.clientY - drag.startY)) return
+        if (!pastSlop(event.clientX - drag.startX, event.clientY - drag.startY, event.pointerType)) return
         manualDragActiveRef.current = true
         // The last drop's ghost may still be landing: this drag has it now.
         landingRef.current?.()
@@ -330,7 +331,8 @@ export function useFileTreeDrag({
         setDragSourceId(null)
       }
 
-      if (!didDrag) {
+      if (!didDrag || event.type === 'pointercancel') {
+        if (didDrag) splitDropTarget()?.clear()
         putDown()
         return
       }
@@ -376,11 +378,13 @@ export function useFileTreeDrag({
       landGhost(placed[0] ?? drag.path, targetFolder, velocity, putDown)
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove, true)
+    window.addEventListener('pointerup', onUp, true)
+    window.addEventListener('pointercancel', onUp, true)
     return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('pointermove', onMove, true)
+      window.removeEventListener('pointerup', onUp, true)
+      window.removeEventListener('pointercancel', onUp, true)
     }
   }, [dragInsert, dragOverFolder, performMoves, updateManualDrag, updateSplitDrag, dragInsertRef, dragOverFolderRef, dragPointRef, manualDragActiveRef, manualDragRef, setDragInsert, setDragOverFolder, setDragOverPath, setDragPreview, setDragSourceId, setIsDragging])
 
