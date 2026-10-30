@@ -15,7 +15,7 @@
  * as it lands.
  */
 import { useCallback, useEffect, useRef } from 'react'
-import { prefersReducedMotion, releaseSpring, trackSample, velocityFrom } from '../ui/physics.js'
+import { pastSlop, prefersReducedMotion, releaseSpring, trackSample, velocityFrom } from '../ui/physics.js'
 import { SpringValue } from '../ui/useSpring.js'
 import { moveEntry } from '../lib/entryOperations'
 import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
@@ -276,11 +276,9 @@ export function useFileTreeDrag({
       const drag = manualDragRef.current
       if (!drag) return
       dragPointRef.current = { x: event.clientX, y: event.clientY }
-      const dx = Math.abs(event.clientX - drag.startX)
-      const dy = Math.abs(event.clientY - drag.startY)
       drag.samples = trackSample(drag.samples ?? [], { t: event.timeStamp, x: event.clientX, y: event.clientY })
       if (!manualDragActiveRef.current) {
-        if (dx + dy < 4) return
+        if (!pastSlop(event.clientX - drag.startX, event.clientY - drag.startY)) return
         manualDragActiveRef.current = true
         // The last drop's ghost may still be landing: this drag has it now.
         landingRef.current?.()

@@ -376,6 +376,7 @@ export default function DigitalPreview({ projectName, docPath, editor, placement
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
       setViewport((v) => {
         remember(DEVICE_KEY, v)
         return v
@@ -383,6 +384,7 @@ export default function DigitalPreview({ projectName, docPath, editor, placement
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
   }
 
   const preset = devicePreset(viewport.id)

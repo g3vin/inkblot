@@ -98,7 +98,7 @@
 }
 
 .ib-skeleton-host[data-visible='true'] .ib-skeleton::after {
-  animation: ib-shimmer var(--dur-shimmer) var(--ease-in-out) infinite;
+  animation: ib-shimmer var(--dur-shimmer) linear infinite;
 }
 
 @keyframes ib-shimmer {

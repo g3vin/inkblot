@@ -12,8 +12,8 @@
  * the drag must survive leaving the card's own DOM.
  */
 import { useCallback } from 'react'
+import { pastSlop } from '../ui/physics.js'
 import {
-  DRAG_MIN_DELTA,
   TILE_MIN_HEIGHT,
   TILE_WIDTH,
   addPointerDragListeners,
@@ -112,7 +112,7 @@ export function useNoteCardDrag({
         || noteById.get(dragState.noteId)?.previewSize
         || { width: TILE_WIDTH, height: TILE_MIN_HEIGHT }
       const hasMoved = dragState.hasMoved ||
-        Math.abs(moveEvent.clientX - dragState.originX) + Math.abs(moveEvent.clientY - dragState.originY) >= DRAG_MIN_DELTA
+        pastSlop(moveEvent.clientX - dragState.originX, moveEvent.clientY - dragState.originY, moveEvent.pointerType)
       dragState.hasMoved = hasMoved
       const nextPosition = clampPosition({
         x: moveEvent.clientX - dragState.pointerOffsetX,

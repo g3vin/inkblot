@@ -32,6 +32,7 @@
  * written back, so it is put in its own document's archive instead.
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { pastSlop } from '../../ui/physics.js'
 import { createPortal } from 'react-dom'
 import { LayoutGroup, MotionConfig } from 'framer-motion'
 import {
@@ -80,7 +81,6 @@ import BubbleTopControls from './BubbleTopControls'
 import useBubbleGestures from './useBubbleGestures'
 import './BubbleEditor.css'
 
-const DRAG_THRESHOLD = 4
 const HISTORY_LIMIT = 100
 
 /* ---------------- state ---------------- */
@@ -267,7 +267,7 @@ export default function BubbleEditor({ session, onClose, toolbarSlot = null, det
       const x = moveEvent.clientX
       const y = moveEvent.clientY
       if (!gesture.started) {
-        if (Math.hypot(x - gesture.startX, y - gesture.startY) < DRAG_THRESHOLD) return
+        if (!pastSlop(x - gesture.startX, y - gesture.startY, moveEvent.pointerType)) return
         gesture.started = true
         gesture.geometry = measure(gesture.id)
         setSelectedId(null)

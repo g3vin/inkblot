@@ -49,6 +49,9 @@ import { requestPassageJump } from './passageJump'
 import { GUTTER } from './timelineRows'
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+/** ⌘-wheel zoom: how much each px of delta zooms, and the most one event may give. */
+const WHEEL_ZOOM_SENSITIVITY = 0.01
+const MAX_ZOOM_WHEEL_DELTA = 20
 
 /** A window of the axis, fitted to `width` pixels: `{ origin, px }`. */
 const fit = (from, to, width) => {
@@ -222,12 +225,17 @@ export default function TimelineSurface({
     const onWheel = (event) => {
       const rect = element.getBoundingClientRect()
       const x = event.clientX - rect.left - GUTTER
+      // Lines and pages (a mouse wheel on some systems) in pixels, as a trackpad sends.
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientHeight : 1
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault()
-        zoomAt(Math.exp(-event.deltaY * 0.01), x)
+        // Clamped: a mouse notch is ~100px, which would zoom ×2.7 a click; a pinch sends
+        // a few px an event and is untouched.
+        const delta = clamp(event.deltaY * unit, -MAX_ZOOM_WHEEL_DELTA, MAX_ZOOM_WHEEL_DELTA)
+        zoomAt(Math.exp(-delta * WHEEL_ZOOM_SENSITIVITY), x)
       } else if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
         event.preventDefault()
-        panBy(event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX)
+        panBy((event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX) * unit)
       }
     }
     element.addEventListener('wheel', onWheel, { passive: false })

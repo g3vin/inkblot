@@ -10,13 +10,13 @@
  * and a small movement threshold, so a sloppy click still reads as a click.
  */
 import { useCallback, useRef } from 'react'
+import { pastSlop } from '../ui/physics.js'
 import { edgeGeometry, nodesBounds } from '../lib/canvasGeometry'
 import { groupFitRect, MIN_NODE_SIZE } from '../lib/canvasModel'
 import { computeSnap, paintGuides, snapCandidates, SNAP_THRESHOLD_PX } from './useCanvasSnapping'
 import { GRID_SIZE } from './useCanvasViewport'
 import { getPreference, setPreference } from '../lib/preferences'
 
-const DRAG_MIN_DELTA = 3
 
 /** Which edges of the node a handle moves. 'move' is the body. */
 const HANDLES = {
@@ -224,7 +224,7 @@ export function useCanvasDrag({ viewportRef, dispatch, stateRef, edgeElsRef, gui
       const dyScreen = moveEvent.clientY - startY
 
       if (!moved) {
-        if (Math.abs(dxScreen) < DRAG_MIN_DELTA && Math.abs(dyScreen) < DRAG_MIN_DELTA) return
+        if (!pastSlop(dxScreen, dyScreen, event.pointerType)) return
         moved = true
         draggingRef.current = true
       }
