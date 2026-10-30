@@ -1,4 +1,6 @@
 ---
+name: design-review
+disable-model-invocation: true
 description: Run a design review round on Inkblot's front end — capture the control, audit a pattern family, propose variants, wait for my picks, then unify.
 argument-hint: [setup | audit | round <family> | apply <round> | status]
 ---

@@ -1,4 +1,9 @@
 ---
+name: perf-review
+disable-model-invocation: true
+# A forked subagent runs the review: it reads and measures a lot, and only its report
+# needs to come back to the conversation.
+context: fork
 description: Senior-level compute performance review, optimized for low-end devices
 argument-hint: "[optional: path, feature, or focus area — e.g. src/feed, startup, memory]"
 allowed-tools: Read, Grep, Glob, Bash

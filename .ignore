@@ -1,0 +1,26 @@
+# Paths ripgrep skips on top of .gitignore. Claude Code's Grep tool and VS Code's search
+# both honour this file, so a search for a common word returns code rather than data.
+# The files stay in git and on disk; open them directly when you need them.
+
+# One-line data files: any match prints megabytes.
+src/lib/g2p/data/*.json
+src-tauri/resources/*.json
+
+# Citation style XML: matches "title", "date", "author" thousands of times.
+src/lib/references/csl-styles/
+
+# Generated from the Rust #[typeshare] types; search the Rust source instead.
+src/types/inkblot-core.ts
+
+package-lock.json
+src-tauri/Cargo.lock
+
+# Prose fixtures and media.
+showcase/fixtures/books/texts.json
+public/media/
+
+# Design-review rounds and the audit: options weighed, not current rules (those are in
+# docs/DESIGN.md and docs/design-review/decisions.md). The design-review skill still
+# writes and links them here.
+docs/design-review/rounds/
+docs/design-review/audit.md

@@ -12,6 +12,10 @@ Install the prerequisites in the [README](README.md#prerequisites), then `npm in
 and `npm run tauri dev`. `npm run dev` alone serves the page in a browser, without
 the Tauri commands; `/?design` there is the design showcase.
 
+If you use Claude Code, the project turns on its TypeScript and Rust code-intelligence
+plugins (`.claude/settings.json`). They need the language servers on your `PATH`:
+`npm i -g typescript-language-server typescript` and `rustup component add rust-analyzer`.
+
 ## Licensing your contribution
 
 By contributing you agree that your work is licensed under the
