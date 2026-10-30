@@ -10,6 +10,9 @@
  * recorded, resolved to its items, on `window.__ibMenus`, and `window.__ibMenuClick(text)`
  * runs the item of the last one with that text ('More › Rename…' reaches into a
  * submenu), or else any item with that text, such as one in the app's menu bar. Every other command answers null.
+ *
+ * The marketing showcase has its own mock (showcase/tauri-mock.js), seeded from fixtures
+ * per shot; change this one for `?mock` and the dev screenshots.
  */
 (() => {
   let id = 1

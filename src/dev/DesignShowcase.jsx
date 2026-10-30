@@ -12,8 +12,8 @@ import { useCommands } from '../lib/commands'
 import {
   AppIcon, Mark, Wordmark,
   Breadcrumb, Button, Card, Checkbox, CommandPalette, Dialog, EmptyState, FadeScrim, Field, FloatingActionButton,
-  FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, InkWheel, Input, Kbd, Menu, MenuItem,
-  MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, Popover, ScopeMenu, Section, Segmented, popUpMenu,
+  FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, InkWheel, ToolWheel, ToolWheelPreview, Input, Kbd, Menu, MenuItem,
+  MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, PaperPile, PaperSheet, Popover, ScopeMenu, Section, Segmented, popUpMenu,
   SelectMenu, Skeleton, SkeletonOverlay, SkeletonRows, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
   staggerStyle, useReveal,
 } from '../ui'
@@ -21,17 +21,41 @@ import NavSheet from '../ui/NavSheet.jsx'
 import { ToolbarDockContext } from '../ui/layer'
 import { CanvasSkeleton, MapSkeleton, TimelineSkeleton } from '../canvas/PaneSkeletons'
 import { ICONS } from '../ui/icons'
+import LandingBackdrop from '../components/landing/LandingBackdrop'
+import MotionShowcase from './MotionShowcase'
 import '../components/search/ProjectSearch.css'
 import '../components/Toolbar.css'
+import '../components/FileTree.css'
 import '../components/toolbar/Toolbar.customize.css'
 import './DesignShowcase.css'
+import { COMMAND_PALETTE } from '../lib/appEvents'
 
 const SURFACES = ['--app-bg', '--surface-1', '--surface-2', '--surface-float', '--surface-sunken']
 const TEXTS = ['--text-primary', '--text-secondary', '--text-muted', '--text-subtle', '--text-placeholder']
 const SPACES = ['--space-1', '--space-2', '--space-3', '--space-4', '--space-6', '--space-8', '--space-12']
 const RADII = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-pill']
 
-/** The dynamic toolbar (DESIGN.md §6): a choice opens in place, a form takes the toolbar. */
+const EXCERPT = [
+  { t: 'h1', x: 'The Lighthouse' },
+  { t: 'p', x: '“Yes, of course, if it’s fine tomorrow,” said Mrs Ramsay. “But you’ll have to be up with the lark,” she added.' },
+  { t: 'p', x: 'To her son these words conveyed an extraordinary joy, as if it were settled, the expedition were bound to take place.' },
+]
+const PILE = [
+  { id: 'one', title: 'The Lighthouse', blocks: EXCERPT },
+  { id: 'two', title: 'The Window', blocks: [{ t: 'p', x: 'Such were the extremes of emotion that Mrs Ramsay could hardly bear it.' }] },
+  { id: 'three', title: 'Notes on time', blocks: null },
+  { id: 'four', title: 'The Isle', kind: 'map' },
+]
+const PILE_MENU = [
+  { text: 'Open', action: () => {} },
+  { separator: true },
+  { text: 'Rename…', action: () => {} },
+  { text: 'Show in Finder', action: () => {} },
+  { separator: true },
+  { text: 'Delete…', danger: true, action: () => {} },
+]
+
+/** The dynamic toolbar (DESIGN.md §6): a choice opens in place, with no heading; a form asks for the whole toolbar. */
 function DockDemo() {
   const [whole, setWhole] = useState(null)
   const rowRef = useRef(null)
@@ -66,8 +90,10 @@ function DockDemo() {
           <InkPicker label="Card colour" value={null} inks={['red', 'blue', 'green']} onChange={() => setOpen(null)} />
         </Popover>
         <Popover open={open === 'voice'} anchorRef={voiceRef} onClose={() => setOpen(null)} eyebrow="Read aloud">
-          <Field label="Voice"><SelectMenu label="Voice" value="heart" onChange={() => {}} options={[{ value: 'heart', label: 'Heart' }, { value: 'river', label: 'River' }]} /></Field>
-          <Button variant="filled">Read</Button>
+          <div className="toolbar-group read-aloud-row">
+            <button type="button" aria-label="Read aloud"><Icon name="play" /></button>
+            <button type="button" className="read-aloud-voice" aria-label="Voice: Heart"><Icon name="voice" /><span className="tb-text">Heart</span></button>
+          </div>
         </Popover>
       </div>
     </ToolbarDockContext.Provider>
@@ -82,6 +108,20 @@ function ShowcaseSection({ title, children }) {
     </section>
   )
 }
+
+// The selection wheel's default tools, as it opens on plain text.
+const SHOWCASE_TOOLS = [
+  { id: 'highlight', label: 'Highlight', icon: 'highlight', submenu: [
+    { id: 'amber', label: 'Amber', color: 'var(--ink-amber)' },
+    { id: 'green', label: 'Green', color: 'var(--ink-green)' },
+    { id: 'blue', label: 'Ink Blue', color: 'var(--ink-blue)' },
+  ] },
+  { id: 'bold', label: 'Bold', icon: 'bold', active: true },
+  { id: 'hide', label: 'Hide', icon: 'hide' },
+  { id: 'strike', label: 'Strikethrough', icon: 'strikethrough' },
+  { id: 'bubble', label: 'Bubble', icon: 'chats', disabled: true },
+  { id: 'italic', label: 'Italic', icon: 'italic' },
+]
 
 const DEMO_ROWS = ['Chapter one', 'Chapter two', 'The lighthouse', 'Interlude', 'Chapter three']
 
@@ -118,6 +158,7 @@ export default function DesignShowcase() {
   const [ink, setInk] = useState('amber')
   const [fill, setFill] = useState(null)
   const [pinColor, setPinColor] = useState(null)
+  const [toolWheelAt, setToolWheelAt] = useState(null)
   const [segment, setSegment] = useState('prose')
   const [dsScope, setDsScope] = useState('document')
   const [dsView, setDsView] = useState('today')
@@ -157,7 +198,7 @@ export default function DesignShowcase() {
           <span className="ds-spacer" />
           <Segmented label="Theme" value={theme} onChange={switchTheme}
             options={[{ value: 'light', label: 'Paper' }, { value: 'dark', label: 'Ink' }, { value: 'midnight', label: 'Midnight' }]} />
-          <Button onClick={() => window.dispatchEvent(new CustomEvent('inkblot:command-palette'))}>
+          <Button onClick={() => window.dispatchEvent(new CustomEvent(COMMAND_PALETTE))}>
             Commands <Kbd>⌘K</Kbd>
           </Button>
           <IconButton icon="sidebar" label={panel ? 'Hide panel' : 'Show panel'} aria-pressed={panel} filled={panel} onClick={() => setPanel(!panel)} />
@@ -305,6 +346,20 @@ export default function DesignShowcase() {
           </div>
         </ShowcaseSection>
 
+        <ShowcaseSection title="Selection wheel">
+          {/* Open it to try the keyboard; in the app it opens on Option held over a selection. */}
+          <div className="ds-row">
+            <ToolWheelPreview label="Selection" items={SHOWCASE_TOOLS} target={1} />
+            <Button size="capsule" onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect()
+              setToolWheelAt({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+            }}>Open the wheel</Button>
+            {toolWheelAt ? (
+              <ToolWheel anchor={toolWheelAt} items={SHOWCASE_TOOLS} label="Selection" mode="keyboard" onPick={() => {}} onClose={() => setToolWheelAt(null)} />
+            ) : null}
+          </div>
+        </ShowcaseSection>
+
         <ShowcaseSection title="Ink wheel">
           {/* Press a dot: the inks bloom round it. Swipe the middle dot onto one to swap,
               let go to take it; swipe back to undo. */}
@@ -362,6 +417,26 @@ export default function DesignShowcase() {
           </div>
         </ShowcaseSection>
 
+        <ShowcaseSection title="Paper · sheets and piles (the landing page)">
+          <div className="ds-paper">
+            <LandingBackdrop still />
+            <div className="ds-paper-piles">
+              <PaperPile id="ds-pile" label="To the Lighthouse" meta="4 files · 8,120 words" sheets={PILE} menuItems={PILE_MENU} />
+              <PaperPile id="ds-empty" label="A new idea" meta="0 files · 0 words" sheets={[{ id: '', blank: true }]} menuItems={PILE_MENU} />
+              <PaperPile id="ds-new" dashed label="New project" menuItems={PILE_MENU} />
+            </div>
+          </div>
+          <div className="ds-row ds-align-end">
+            <div className="ds-paper-sheet"><PaperSheet title="The Lighthouse" blocks={EXCERPT} /></div>
+            <div className="ds-paper-sheet"><PaperSheet title="Notes on time" /></div>
+            <div className="ds-paper-sheet"><PaperSheet title="The Isle" kind="map" /></div>
+          </div>
+        </ShowcaseSection>
+
+        <ShowcaseSection title="Motion · springs, flicks, retargeting">
+          <MotionShowcase />
+        </ShowcaseSection>
+
         <ShowcaseSection title="Content arriving · skeleton, reveal, stagger">
           <div className="ds-grid">
             <RevealDemo ms={80} label="Quick load (80 ms)" />
@@ -406,6 +481,35 @@ export default function DesignShowcase() {
             </FloatingToolbar>
             <FloatingActionButton icon="add" label="New note" />
             <FloatingCapsule><span className="ib-meta">1,204 words</span></FloatingCapsule>
+          </div>
+        </ShowcaseSection>
+
+        <ShowcaseSection title="File tree · several rows chosen">
+          {/* ⌘-click and ⇧-click choose several rows (DESIGN.md "Selection is lifted
+              paper"): chosen rows that touch are one lifted sheet; the open document
+              keeps its own lift. */}
+          <div className="left-sidebar ds-tree-sample ib-tray ib-sheet">
+            <div className="file-list" aria-label="Files">
+              {[
+                ['folder', 'Part one', false, false, false],
+                ['file', 'Chapter one', true, false, true],
+                ['file', 'Chapter two', true, true, true],
+                ['file', 'Chapter three', true, true, false],
+                ['file', 'Notes', false, false, false],
+              ].map(([type, name, chosen, above, below]) => (
+                <div key={name} className="file-node">
+                  <div
+                    className={`file-item${type === 'folder' ? ' folder' : ''}${chosen ? ' selected' : ''}`}
+                    data-selected={chosen || undefined}
+                    data-joins-above={above || undefined}
+                    data-joins-below={below || undefined}
+                  >
+                    <Icon name={type === 'folder' ? 'folder' : 'document'} className="file-item-icon" />
+                    <span className="file-item-label">{name}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </ShowcaseSection>
 

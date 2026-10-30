@@ -59,7 +59,10 @@ round-tripped through JSON (`src/bridge/transport.ts`).
 | Timeline store | The project's one chronology, with previews and undo | `src/lib/timeline/timelineStore.js` |
 | `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/mod.rs` |
 | UI primitives | Every control the chrome is built from | `src/ui/`, [docs/DESIGN.md](docs/DESIGN.md) |
-| Reveal gate | Opening a project shows the file tree, both panes, the toolbar and the checked tabs together; each reports ready | `Editor.jsx` (`RevealGate`), `src/ui/Reveal.jsx`, `src/lib/projectPrefetch.js` |
+| Motion | The springs, projection, rubber band and coasting every motion is built from; CSS gets the same springs as generated `--spring-*` tokens, script drives them through one shared frame loop | `src/ui/physics.js`, `src/ui/useSpring.js`, `scripts/gen-spring-tokens.mjs` |
+| Reveal gate | Opening a project shows the file tree, both panes, the toolbar and the checked tabs together; each reports ready. Opened from a pile on the landing page, it also waits for the sheet's flight to land (`'arrival'`) | `Editor.jsx` (`RevealGate`), `src/ui/Reveal.jsx`, `src/lib/projectPrefetch.js` |
+| Landing caches | What the landing page draws without reading a document: each document's opening lines (noted on load and save, moved with renames and moves, dropped on delete), each project's files and words (counted when the writer leaves it, and when stale, one project at a time while idle), the recent documents, and where the card was (so a sheet's flight sets off before the editor mounts) | `src/lib/docExcerpts.js`, `projectSummaries.js`, `recentDocs.js`, `landingCard.js` |
+| Project lifecycle | Renaming or deleting a project moves or drops everything keyed by its name, then tells Editor (`PROJECT_RENAMED`, `PROJECT_DELETED`) to move or drop its session | `src/lib/projectLifecycle.js` |
 
 ### A keystroke, end to end
 
@@ -88,6 +91,11 @@ round-tripped through JSON (`src/bridge/transport.ts`).
   one chronology is shown, never events. See [Timeline](#timeline).
 - **Text documents** are `<path>.json`: `{ content, notes, versions?, archive?,
   citations?, timeline?, locked? }`. `timeline` is the passages attached to timeline events.
+  - Hidden text is a `hiddenText` mark (`extensions/HiddenText.js`). Which runs are
+    folded or open is view state, never saved. Print and export drop it where chapters
+    are loaded (`print/compile.ts` → `print/hiddenText.ts`), so every format agrees.
+    Static HTML (cards, previews) hides it by a rule in `styles/base.css`; Read Aloud
+    skips folded runs (`foldedRunAt`). Search, word counts and version history still see it.
   - `archive` holds bubble sessions the writer archived (`bridge/archive.rs`). A
     session still open lives in the text as a `bubbleSession` mark whose attributes
     are the whole session, so version history restores it.
@@ -173,7 +181,7 @@ Everything is drawn by the page, from what the document surface publishes:
 
 | Part | How |
 |---|---|
-| Toolbar | Customizable (`components/toolbar/`): four saved layouts — a document's, a canvas's, a map's and Typeset's (`lib/chromeLayout.ts`), with item ids that are storage keys. Each item reads `toolbarState`, `canvasToolbarChanged`, `mapChromeChanged`, `pageLayoutState` or `viewOptions` and sends commands. Items that do not fit go behind ». |
+| Toolbar | Customizable (`components/toolbar/`): four saved layouts — a document's, a canvas's, a map's and Typeset's (`lib/chromeLayout.ts`), with item ids that are storage keys. Each item reads `toolbarState`, `canvasToolbarChanged`, `mapChromeChanged`, `pageLayoutState` or `viewOptions` and sends commands. Its items are pages divided by `PAGE` breaks, swiped through with `useSpaceSwipe`; a page that does not fit the row carries on onto the next. |
 | Inspector | A selector bar over the panels (Clipboard, Workbench, Notes, References, History, Stats, Typeset, Print & Export, and a map's panel), in two layouts — drafting and finishing — the writer arranges (Customize Layout…). The panels' edits are commands (`useSidebarCommands`). |
 | Tabs | There is no tab bar and there are no tab shortcuts or menu items: the file tree is how documents are found. Tabs are still the page's state (`useTabs`), published as `tabsChanged` (`useTabsPublisher`) and changed by command, for the native shells. A tab owns its split. |
 | Split view | Two cards on the tray under the toolbar's own card (`.document-card.is-split`). Every split made is kept (`splits` in the project session, `recordSavedSplit` in `editorSession.ts`, kept up to date by `useTabs`) and listed above the files in the tree, where choosing it shows it again (`openSavedSplit`) and choosing a document leaves it (`openDocAlone`). A document dragged from the file tree outlines the side it would take (`useSplitDrop`, asked by `useFileTreeDrag` through `lib/splitDropTarget`); held there, the split opens for real, and moving on puts the panes back (`placeDocBeside` / `restorePanes` in `useTabs`, `placeDocIn` in `editorSession.ts`). |
@@ -333,10 +341,25 @@ Several domain modules exist twice:
 - JavaScript in `src/lib/`, which the page runs.
 - Rust in `inkblot-core`, which the Tauri commands call.
 
-The mirrored modules are `docKind`, `canvasGeometry`, `canvasModel`, `storyStructure`,
-the version-history diff engine, project paths, version storage, search, the Read
-Aloud chunker, and the note normalizers. `npm run parity` sends one corpus through
-both and fails on any difference. A green run means something only if the harness can
+The mirrored modules (each JS file names its twin on a `Mirrors:` line, which
+`npm run affected` reads). Rust paths are under `src-tauri/crates/inkblot-core/src/`:
+
+| JavaScript (`src/lib/`) | Rust |
+|---|---|
+| `docKind.js` | `doc_kind.rs` |
+| `canvasGeometry.js` | `canvas_geometry.rs` |
+| `canvasModel.js` | `canvas_model.rs` |
+| `storyStructure.js` | `story_structure.rs` |
+| `versionHistory.js` | `version_history.rs` |
+| `versionStore.js` | `store/versions.rs` |
+| `projectPaths.ts` | `store/paths.rs` |
+| `FileSystem.js`, `projectLocations.js` | `store/mod.rs`, `store/locations.rs` |
+| `sidebarSearch.js`, `canvasSearch.js` | `search/mod.rs` |
+| `readAloud.js` (the chunker) | `read_aloud.rs` |
+| `noteUtils.js`, `audioNotes.js` (the normalizers) | `notes.rs` |
+| `map/mapModel.js`, `map/mapDiff.js` | `map/model.rs`, `map/diff.rs` |
+
+`npm run parity` sends one corpus through both and fails on any difference. A green run means something only if the harness can
 fail, so after adding a case, break the Rust side on purpose and watch it fail.
 
 "The same arithmetic" is not the same arithmetic. Every one of these was found by the
@@ -407,9 +430,9 @@ mind:
    icon name (`src/ui/icons.js`) and its contexts. Ids are keys in people's saved layouts: never rename or reuse
    one; a removed item's id goes in `RETIRED_TOOLBAR_IDS`.
 2. Add its component to `registry.jsx`, built from `ToolbarControls.jsx`.
-3. Add it to a default set only if new users should have it: before `MORE` if nearly
-   everyone needs it (docs/DESIGN.md → Progressive disclosure), otherwise after it,
-   behind ». Register its action with `useCommands` too, so ⌘K finds it.
+3. Add it to a default set only if new users should have it: on the first page if nearly
+   everyone needs it (docs/DESIGN.md → Progressive disclosure), otherwise after a
+   `PAGE` break. Register its action with `useCommands` too, so ⌘K finds it.
 4. **Disable, never omit.** An item that returns nothing moves the rest of the layout.
 5. If it has on/off state, the surface publishes it: editor facts in
    `ToolbarState`/`ActiveMarks`, canvas facts in `CanvasToolbarState`, app settings in
@@ -449,14 +472,13 @@ to prove the case can fail.
 - **`pinterest_report_scrape` is reachable from pinterest.com** only because the app
   ships no Tauri permission manifest. Adding a `src-tauri/permissions/` directory
   breaks it; see `inkblot-models/src/scrape.rs`.
-- **`src/lib/g2p` is a port of misaki**, the grapheme-to-phoneme pass Kokoro was
-  trained with. Keep its control flow next to `en.py`'s: the `voice` suite compares it
-  with misaki's own answers (`tests/unit/voice-reference.json`, regenerated by
-  `scripts/dev/misaki-reference.py`). Its dictionaries come from
-  `scripts/fetch-lexicon.mjs`, pinned by commit and checksum. Nothing shipped may
-  import `phonemizer` or `kokoro-js` (eSpeak NG, GPL); the suite checks. Kokoro's
-  phoneme vocabulary is read from the downloaded model and must never be written out by
-  hand.
+- **A Pocket TTS voice is a state of the model, not a recording.** Each
+  `voices/*.safetensors` is the attention cache `flow_lm_main` reached after that
+  voice's audio prompt, so it only works with the weights it was computed with
+  (`english_2026-04`). Moving the graphs to another release means taking the voices,
+  tokenizer and `bundle.json` from that same release. The text rules and the stopping
+  rule in `inkblot-core/src/pocket_tts.rs` are Kyutai's: simplifying one does not fail,
+  it skips or repeats words.
 - **`Editor.css` is an ordered `@import` manifest**, and the order decides which of
   several duplicate selectors wins. Don't reorder it, or move a section's import into
   its component.
@@ -464,8 +486,11 @@ to prove the case can fail.
   a document flushes its pending autosave to the path it had, so a rename recreated the
   old file and a delete did not stick. Every caller goes through
   `lib/entryOperations`, which closes what an entry touches, waits for those writes on
-  the document locks, does the disk operation and reopens at the new paths. The lock
-  is a queue, not re-entrant: taking it twice hangs.
+  the document locks, does the disk operation and reopens at the new paths. A text
+  pane whose document is renamed or moved lets go in place instead
+  (`lib/paneHandoff.js`): it flushes, stops saving, and takes its own editor state back under the new path, so
+  the page stays on screen. The lock is a queue, not re-entrant: taking it twice
+  hangs.
 - **Suite timing.** Autosave debounces at 800 ms and the version checkpoint at 15 s.
   Suites don't wait these out. Switching documents flushes both, which is the path
   worth asserting on anyway.
@@ -484,7 +509,7 @@ to prove the case can fail.
 
 **Not yet verified by hand**
 - **The web chrome in the running app.** It was checked in Chromium and in the unit
-  suites: a document dragged from the file tree into a split, the toolbar's » overflow, the menus (Insert, Format, Timer, View),
+  suites: a document dragged from the file tree into a split, the toolbar's pages, the menus (Insert, Format, Timer, View),
   notifications and the tray title, and the timer's sounds.
 - **Windows of their own:** Open in new window, Move back to the main
   window, and Keep on top, in the running app (the `windows` suite drives the real
@@ -500,13 +525,12 @@ to prove the case can fail.
   layouts); not yet clicked through in the running app.
 - **Offline launch.** Launch the bundled `.app` with the network off, and check that
   the synonym model loads from AppData and dictation finds its model.
-- **Read Aloud's native voice** on a machine with no Python installed.
+- **Read Aloud's voices in the running app:** the download from the popover, and
+  playback with highlighting. The engine itself is tested against the real model
+  (`cargo test -p inkblot-models --release -- --ignored speaks`), and on iOS not at all.
 - **A Pinterest board scrape** against a live, logged-in session.
 
 **Not built**
-- **The Kokoro download.** The page never offers it (`download_kokoro_model` exists),
-  so native Read Aloud needs the model installed by other means and otherwise falls
-  back to running it in WASM through transformers.js.
 - **Timeline, still to come:** version history for the chronology, a timeline view in
   the window's toolbar and inspector (it keeps its own in the page), attaching an
   existing note to an event, continuity checks, relative dates, and export.

@@ -1,3 +1,4 @@
+/* DesignShowcase.css — layout of the ?design showcase (dev builds only); not app chrome. */
 .ds {
   position: relative;
   width: 100%;
@@ -278,6 +279,7 @@
 .ds-inspector-rows { display: flex; flex-direction: column; gap: 2px; font: var(--text-sm) var(--font-ui); }
 .ds-inspector-rows > div { padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); }
 .ds-lifted { background: var(--app-bg); box-shadow: var(--shadow-lift); }
+.ds-tree-sample { position: static; width: 260px; padding: var(--space-3); }
 
 /* The project search card, still, over a busy strip so its veil shows. */
 .ds-search { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-6); }
@@ -315,3 +317,56 @@
   height: 160px;
   margin-top: var(--space-3);
 }
+
+/* Paper: piles on the landing backdrop, and single sheets on the page. */
+.ds-paper {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: var(--space-6);
+  border-radius: var(--radius-lg);
+}
+
+.ds-paper-piles {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-10);
+  padding: var(--space-10) var(--space-6) var(--space-8);
+}
+
+.ds-paper-sheet {
+  position: relative;
+  width: var(--paper-sheet-w);
+  height: var(--paper-sheet-h);
+}
+
+/* Motion (MotionShowcase.jsx). */
+.ds-spring-curve { display: block; width: 100%; height: auto; margin: var(--space-3) 0; overflow: visible; }
+.ds-spring-rest { stroke: var(--border-color); stroke-width: var(--hairline); stroke-dasharray: 3 3; }
+.ds-spring-line { fill: none; stroke: var(--accent-color); stroke-width: 2; stroke-linejoin: round; }
+.ds-flick-rail {
+  position: relative;
+  height: var(--size-circle);
+  margin: var(--space-4) 0;
+  border-radius: var(--radius-pill);
+  background: var(--control-bg);
+}
+.ds-flick-stop {
+  position: absolute;
+  top: 50%;
+  width: var(--size-circle);
+  height: var(--hairline);
+  background: var(--border-color);
+}
+.ds-flick-puck,
+.ds-flick-ghost {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: var(--size-circle);
+  border-radius: var(--radius-pill);
+}
+.ds-flick-puck { background: var(--accent-color); cursor: grab; touch-action: none; box-shadow: var(--shadow-float); }
+.ds-flick-ghost { opacity: 0; box-shadow: inset 0 0 0 2px var(--accent-color); transition: opacity var(--spring-quick-dur) var(--spring-quick); }
+.ds-flick-ghost[data-shown='true'] { opacity: 0.5; }

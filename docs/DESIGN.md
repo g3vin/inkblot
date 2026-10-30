@@ -44,6 +44,10 @@ For anyone short on time, human or agent. The rest of this document explains eac
    `FloatingCapsule`).
 11. **Both themes, AA contrast, keyboard reachable, reduced motion honoured.** Every
     time.
+12. **All motion is physical.** Things move on springs, never on timed curves. A
+    gesture hands its speed to the motion it lets go, and anything moving can be
+    grabbed or redirected mid-way. Use the `--spring-*` tokens in CSS, and
+    `src/ui/physics.js` / `useSpring.js` in script (§7).
 
 ---
 
@@ -61,6 +65,10 @@ not through modes. There is no "beginner" or "pro" switch.
 
 **The document is the room.** The page is the whole window, not a sheet inside a frame.
 Tools float above it and step aside when they aren't wanted (§6).
+
+**Physical, not scripted.** Things move as if they had mass: they set off at the
+speed they were given, carry on when let go, and settle like an object coming to
+rest (§7). Nothing plays a timed animation at the writer.
 
 **One decision, everywhere.** A choice is made once and reused. There is one button,
 one menu, one card recipe, one palette, one way to pick a colour and one empty-state
@@ -115,6 +123,10 @@ draw inline in `currentColor`, so they follow the surface. Standalone files are 
 **Clear space and size.** Keep clear space of at least the splash's width around the
 mark (half the wordmark's height around the wordmark). The mark is legible from 16px
 and the wordmark from 72px wide; below that, use the mark alone.
+
+**On the landing page** the name is signed small: the `Wordmark` alone, 20px tall, in
+`--text-primary` in the bottom-left corner, with the version beside it in `.ib-meta`.
+The writer's projects are the page; the app icon is not on it.
 
 **Brand vs accent.** The logo is black and white. `--accent-color` is the writer's
 choice: Sage by default, or one of six inks. It marks interactive states
@@ -225,6 +237,35 @@ one in hand.
 A labelled choice inside a form (the accent, the window colour, a folder type) stays an
 inline `InkPicker` row, because there the names help more than speed does.
 
+**Acting on a selection.** Selected text is acted on with the selection wheel
+(`ToolWheel`, opened by `SelectionWheel`). It works on the same idea as the ink wheel:
+every tool always opens in the same place, so a hand learns the way. The ring is 40px
+tool discs around a still middle where nothing is chosen. The tool pointed at fills with
+the accent, and its name shows under the ring.
+
+- **Nothing appears by itself.** The wheel opens only when asked: hold Option (or the key
+  chosen in Settings) on its own over a selection, or use "Open selection wheel" in ⌘K.
+  A key held with anything else (⌥⇧→, ⌥-letters, a shortcut) is left alone.
+- **Hold.** The pointer stays visible. Its direction from where it was when the wheel
+  opened picks a tool, and letting go of the key takes it. Letting go at rest takes
+  nothing.
+- **Tap.** A quick tap of the key leaves the wheel open: click a tool, or press Escape or
+  click outside to leave.
+- **Keyboard.** The arrows (or 1–9) move round it and Enter takes.
+- **Touch.** Without a keyboard, a long press on the selection opens it under the
+  finger. Drag toward a tool and lift to use it. Lifted at rest, the wheel stays open to
+  tap.
+- **Options.** A tool with options (Highlight's inks) shows a small dot. Rest on it, or
+  press Space, and the ring blooms again as its options where the hand is. Backspace
+  goes back.
+- **Can't act here.** A tool that can't act on this selection keeps its place, dimmed,
+  so the ring never rearranges. One already on the selection (bold text) draws its icon
+  filled.
+
+Writers choose the tools and their order in Settings ▸ Selection wheel, up to eight,
+with `ToolWheelPreview` drawing the ring as it will open. A new tool goes in
+`lib/selectionTools.js`.
+
 ### Status
 
 `--status-danger` (red ink), `--status-warning` (amber) and `--status-success` (green).
@@ -301,7 +342,7 @@ It is never used for body copy, buttons, menu items, inputs or headings.
 | `--text-md` | 14 | Emphasised UI text, empty-state titles |
 | `--text-lg` | 16 | Dialog and panel titles (`.ib-title`) |
 | `--text-xl` | 20 | Section headings in large surfaces |
-| `--text-2xl` | 26 | Display (`.ib-display`), landing |
+| `--text-2xl` | 26 | Display (`.ib-display`) |
 | `--text-3xl` | 34 | Hero only |
 
 Weights are 400 (body), 500 (controls and labels), 600 (titles) and 700 (eyebrows). Use
@@ -365,8 +406,9 @@ and `.ib-prose` (any element that shows the writer's text).
   address bar, on the card's own paper and ruled off from the document by one thin
   border: a `--hairline` in `--border-color`, the full width of the card, under the
   toolbar row (`.app-titlebar`'s `border-bottom`). It is the one rule in the room, and
-  it is meant: it says where the chrome ends and the page begins. Text scrolls under
-  it, clean against the rule: no fade or shadow below it. Its icon
+  it is meant: it says where the chrome ends and the page begins. The document's scroller
+  starts at the rule, so text and the scrollbar stop clean against it: no fade or
+  shadow below it. Its icon
   controls are bare on the paper: a fill only on hover, and the accent tint for a
   control that is on. Its menus (text style, font, size) carry the quiet control fill
   (`--control-bg`), so they read as menus rather than labels. It is a dense toolbar
@@ -374,17 +416,31 @@ and `.ib-prose` (any element that shows the writer's text).
   one context each (`chromeLayout.ts`: document, canvas, map, timeline, Typeset), and
   the writer can customise each. A view never adds a second band of tools under the
   rule.
-- **The dynamic toolbar** (round 03b, 2026-10-22). What a toolbar button opens, it opens
-  in the toolbar, with every setting it has as a pop-up. A **form** (something to fill
-  in: read aloud's voice, find) takes the whole toolbar: its eyebrow, its controls in a
-  row and a close button; Escape or close brings the tools back as they were. A
-  **choice** (swatches, a menu's items) opens **in place**, on the control fill beside
-  its button, pushing what follows along and behind »; if it doesn't fit there, it takes
-  the whole toolbar. Either way the button stays pressed while it's open, focus goes to
-  its first control and back to the button. A button's menu opens as a row of its items
-  (`MenuRow`), groups apart, the checked item pressed. **»** (`overflow`) turns the row
-  to its second page, the items that didn't fit in place of those that did, with ‹ first
-  to come back (or Escape). Pop-ups opened from a panel or from the text still float.
+- **The dynamic toolbar** (round 03b, 2026-10-22; pages 2026-10-29). What a toolbar
+  button opens, it opens **in place**, on the control fill beside its button: it grows
+  open, pushing what follows along, and sets aside what no longer fits (what follows it
+  first, then what comes before), which comes back when it closes. It never carries a
+  heading: no eyebrow, no group titles. A choice that has an icon is its icon
+  (alignment is three icons, not words); a choice that's a value is its value (a font's
+  name in its face, a size, a paragraph style), and its button shows the current one.
+  A long choice (the fonts, the voices) scrolls within a bound. Read aloud is one row:
+  read or stop, its level meter, the voice (which swaps the row for the voices) and,
+  while it works, a line of what it's doing. Only a form that needs the row
+  (`dock="whole"`, as find) takes the whole toolbar, with a close button. The button
+  stays pressed while it's open, focus goes to its first control and back to the
+  button, and Escape closes it.
+- **Toolbar pages.** A toolbar's items are pages, divided by page breaks the writer
+  places in Customize toolbar (the document's default: writing, then inserting and the
+  voice). A page too wide for the row carries on onto the next. Dots at the row's end
+  show the pages; the current one is a pill. A two-finger swipe turns the page as the
+  sidebars' does, over a travel shorter than the row: the page leans a little the
+  fingers' way and fades as far as they've gone (never below a quarter, so it's still
+  there at the furthest), the swipe clicks onto the next page (a light tick)
+  once the fingers are halfway, and letting go from there turns the page (a firmer tick),
+  the new page fading up as it slides in; a flick turns it at once. A click on a dot, ⌃←/⌃→ or the palette's commands turn it too, without haptics;
+  Escape comes back to the first. Turning away from a page closes what's open on it.
+  Customizing works on the page that shows: swipe to another, drop an item on a dot to
+  move it there, add or remove a page.
 - **Split view: two cards.** Two documents side by side (or stacked) are two cards on
   the tray, not one card divided. The toolbar steps out into a card of its own across
   the top, and the tray shows between all three, as wide a gap as round the outside
@@ -405,13 +461,19 @@ and `.ib-prose` (any element that shows the writer's text).
   the edges as ever, and come back docked when it closes). Its controls are the
   toolbar row itself — the same height, paper and rule, the sidebar buttons in its
   corners — floating in over the card's top while the pointer is there, and never
-  pinned (`FocusModeBar`). A bubble takes its pane's place: the pane gives up its card
+  pinned (`FocusModeBar`). Its text is the writer's, in `--font-editor`, and the
+  sentence zooms between its place on the page and the centre as focus mode opens and
+  closes (`FocusModeOverlay`), so the page and the mode read as one surface. A mode's
+  Done is a round check (`IconButton icon="check" size="circle"`), labelled Done for
+  its tooltip and screen readers. A bubble takes its pane's place: the pane gives up its card
   so the bubbles lie on the tray, the toolbar steps out into a card of its own as in
   split view and holds the bubble's bar, and in a split the other document stays a
   card beside it.
 - **The fade scrim.** Other chrome that overlays the document (a bottom bar, the tab
-  bar, the word count and page capsules at the foot of a pane) sits on a gradient from solid `--app-bg` to transparent, so text scrolling
-  underneath dissolves instead of hitting a hard line. Use `FadeScrim`. Don't give that
+  bar) sits on a gradient from solid `--app-bg` to transparent, so text scrolling
+  underneath dissolves instead of hitting a hard line. The foot of a pane has none:
+  the text runs to the card's edge, and the word count and page capsules float over
+  it on their own. Use `FadeScrim`. Don't give that
   chrome a solid bar or a border: the card toolbar's hairline is the only rule over
   the document.
 - **The traffic lights never move.** On macOS they sit in one place from launch
@@ -430,6 +492,10 @@ and `.ib-prose` (any element that shows the writer's text).
   3. **Sections** (`Section`) straight on the panel, divided by hairlines. A section's
      one action goes in its `accessory`, at the right of its title.
   The inspector has no search of its own: finding is the project search's.
+- **The inspector's foot.** The left foot mirrored: the word count (while the
+  inspector is docked) on the inner end, the archive on the outer end, where the left
+  foot has its +. It stays the same whichever panel is showing, and the archive opens
+  over that panel, with a way back to it. Archive actions that come later go here too.
 - **The project search.** One search, at the left sidebar's foot: the view's + on the
   outer end, a bare search icon on the inner end (`search/ProjectSearch.jsx`). The
   icon opens a card upward, its left edge on the icon's, reaching out over the
@@ -455,9 +521,38 @@ and `.ib-prose` (any element that shows the writer's text).
   no border and no white box; focus draws the ring. A text button in a section is a
   control fill too, at the start of its line, never stretched across the panel.
 - **Selection is lifted paper.** The chosen row in a list (the open document in the
-  file tree, the chosen project on the landing page, the page showing in a `NavSheet`)
+  file tree, the page showing in a `NavSheet`)
   is lifted out of its surface onto `--app-bg` with `--shadow-lift`, with no tint and no
   border. The accent marks focus and controls that are on, not where you are.
+- **Several rows are one sheet.** In the file tree and the Book navigator, ⌘-click adds
+  or takes away a row, ⇧-click chooses the run from the last row clicked, ⌘A every
+  row showing, Escape lets go (`lib/treeSelection.js`). Chosen rows are lifted as the
+  open one is, and rows that touch join into one sheet: square corners between them,
+  no shadow across. The open row left out of a selection is only shaded
+  (`--surface-hover`). A chosen row's menu acts on all of them ("Delete 3 items"),
+  and dragging one carries them all, the ghost wearing a count in an accent pill.
+  A click focuses the list without a ring. A ring shows only when focus comes from the
+  keyboard, drawn inside the list so its frame can't clip it.
+- **The landing page.** With no project open, the window is a frosted pane of leaves
+  in summer light (`LandingBackdrop`): the website's footage, blurred once when it was
+  encoded and again by `--landing-blur` on the video itself, under a flat sheet of the
+  theme's paper (`--landing-scrim`). The scrim is as thick as `--text-primary` and
+  `--text-secondary` need to stay AA over the footage's darkest and brightest leaves
+  (`tests/unit/landing.mjs`), so text straight on it uses only those two. It is a
+  filter on the footage, never a `backdrop-filter`, and not glass: nothing in the
+  window is seen through it. It holds still on its poster under Reduce motion or
+  Save-Data, gives way to the plain tray under Reduce transparency, and pauses while
+  the window is hidden. The footage's credit sits small in the bottom-right corner.
+- **Piles of paper.** Each project on the landing page is a pile of the documents
+  lately written in it (`PaperPile`), most recently opened project first, in a centred
+  grid: the one it reopens on is on top, up to four opened before it beneath, each a
+  `PaperSheet` with its opening lines. Pointing at a pile fans it so every sheet can
+  be clicked; a click opens the project at that sheet's document, anywhere else on the
+  pile (or its name, or Enter) at the top one. Under it are the name, its files and
+  words in `.ib-meta`, and a ⋯ (`MoreMenu`) whose items a right-click offers too. The
+  grid's last place is an empty dashed pile for a new project. Nothing is read from
+  disk to draw a pile: excerpts and counts are remembered (`lib/docExcerpts.js`,
+  `lib/projectSummaries.js`).
 - **Layers.** Use `--z-chrome` < `--z-panel` < `--z-popover` < `--z-dialog` < `--z-toast`
   < `--z-tooltip`, and `--z-gesture` for a gesture in progress (the ink wheel), which
   sits over everything, including older layers outside this scale. Don't invent
@@ -508,38 +603,134 @@ surface is separated by hairlines and tonal shifts, never by shadow. The one exc
 is a sidebar's engraved tab strip (§6), the only place inside a panel with a shadow or a
 highlight.
 
-**Motion is subtle and quick.** Use `--dur-fast` (120ms) for hovers and small state
-changes and menus, `--dur-base` (180ms) for popovers, panels and small dialogs, and
-`--dur-slow` (240ms) for medium and large dialogs. Things arrive on `--ease-out`
-(`--ease-standard` is the same curve). Dialogs, popovers and menus also leave the way they
-came, quicker (`--dur-fast`) and easing in (`--ease-in`); `useExitAnimation` does this
-without the caller keeping it mounted. There is no bounce or overshoot, and no looping
-or attention-seeking animation, with one exception: a skeleton's sheen (see Content arriving,
-below). Motion explains where something came from and never
-decorates. `prefers-reduced-motion` is honoured globally (`base.css`); framer-motion
-components also check `useReducedMotion()`. A staggered motion (the ink wheel's
-fold) must also drop its `transition-delay` under reduced motion, which `base.css`
-doesn't reset.
+### Motion is physical
+
+Every motion in Inkblot is physics, as on Apple's platforms (WWDC18 *Designing Fluid
+Interfaces*, WWDC23 *Animate with springs*). Things move on **springs**, never on timed
+curves. A gesture hands its speed to the motion it lets go, and anything moving can be
+grabbed or redirected without a jump. Motion explains where something came from and
+never decorates; it is still subtle and quick.
+
+**The maths** lives in `src/ui/physics.js`, in milliseconds and units per millisecond.
+A spring is described the way Apple describes one, by a perceptual `duration` and a
+`bounce`, and solved exactly (mass 1):
+
+- stiffness `k = (2π / duration)²`
+- damping ratio `ζ = 1 − bounce` (bounce ≥ 0), or `1 / (1 + bounce)` (bounce < 0)
+- damping `c = 4π·ζ / duration`
+- `springAt(spring, from, to, velocity, t)` is the closed-form solution of
+  `x″ = −k(x − to) − c·x′`. It is a function of time, not of frames, so a spring moves
+  the same at 60Hz and 120Hz.
+
+**The springs, by role** (`SPRINGS` in physics.js; `--spring-<role>` and
+`--spring-<role>-dur` in CSS):
+
+| Role | Duration, bounce | For |
+|---|---|---|
+| `quick` | 200ms, 0 | Hovers, presses, small state changes, menus |
+| `smooth` | 300ms, 0 | Popovers, panels, sidebars, dialogs, content arriving |
+| `gentle` | 550ms, 0 | The long carry: a landing sheet becoming the card, focus mode's zoom, the map's camera |
+| `exit` | 160ms, 0 | Something leaving the way it came, quicker than it arrived |
+| `momentum` | 350ms, 0.15 | Landing after a flick or a drag, from the hand's speed |
+| `tether` | 330ms, 0.48 | Things hanging from what the hand moves: a dragged note's children |
+
+The durations are perceptual. `--spring-<role>-dur` is the settle time, which is
+longer: a `quick` spring looks done by about 120ms and is still by 240ms.
+
+**Bounce only rewards momentum.** A state change (a menu opening, a panel sliding) is
+critically damped: bounce 0, with no overshoot. Only motion that a gesture with
+momentum drives may overshoot, and only a little (`momentum`, bounce 0.15). Apple's
+Music works the same way: tap-to-open is fully damped, while swipe-to-dismiss is 80%
+damped. `tether` is the one exception, because the hand is still moving the things it
+swings. Never go past bounce 0.4.
+
+**Gestures:**
+
+- **Track one to one.** A dragged thing stays under the hand, at the point it was
+  grabbed, never snapped to its centre. While held it has no transition at all.
+- **Hand the speed over.** Measure the release speed over the last ~90ms
+  (`velocityFrom`, with `trackSample` keeping the path), never from the last two
+  events, and give it to the spring that takes over (`SpringValue.set(target,
+  { velocity })`).
+- **Project where a flick lands.** A flick goes to the target nearest where it would
+  coast to, not to where it was let go: `project(v) = v · rate / (1 − rate)` at
+  UIScrollView's rates (`DECELERATION.normal` 0.998 a ms, `.fast` 0.99), and
+  `nearestTarget`. A thrown bubble lands this way.
+- **Coast.** A view thrown while panning (the canvas, the map) carries on under the same
+  friction and stops at the next touch (`coast`). A trackpad already coasts on its own,
+  so wheel input never gets a second coast.
+- **Rubber-band the edges.** Past a limit, movement gives less and less, as
+  `rubberBand(offset, dimension) = (1 − 1 / (offset·0.55 / dimension + 1)) · dimension`,
+  and springs back on release. This applies to the sidebar resize, the split
+  divider, the panels' swipe and focus mode's scrolling.
+- **Land a drop.** Let go of a dragged item and it springs from under the hand into its
+  new place, at the speed it was let go, while the items that moved for it spring
+  from where they were drawn. Nothing jumps. `usePointerReorder` does this for the
+  toolbar, the inspector and the Book (`springLayout`). The file tree's ghost
+  springs onto the row it became.
+- **Interrupt anything.** Retargeting a running spring keeps its position and its
+  velocity (`SpringValue.set`). A click mid-swipe, a second zoom step or a regrab
+  mid-glide redirects the motion; it never restarts it.
+
+**Where to write it:**
+
+- **CSS** for motion nobody holds: `transition: opacity var(--spring-quick-dur)
+  var(--spring-quick)`. The tokens are `linear()` curves sampled from the same springs
+  by `scripts/gen-spring-tokens.mjs`, with a fitted `cubic-bezier` fallback where
+  `linear()` isn't supported. Edit `SPRINGS`, then run the script; never hand-edit the
+  block. A release's speed can go to CSS too: `springTransition(spring, { from, to,
+  velocity })` bakes it into a one-off `linear()` curve, so a let-go lands on the
+  compositor (the sidebars' panels and tab indicator do this).
+- **Script** for anything held, thrown or retargeted: `useSpring` / `SpringValue`
+  (one shared frame loop, values handed to a callback that writes the style, with no
+  render per frame). Use `springTiming(SPRINGS.x)` for Web Animations keyframes,
+  `progressOf` for a script-stepped 0→1 (the map library's camera takes one as its
+  easing), and `toFramer(SPRINGS.x)` for a framer-motion `transition`.
+- **Never step a spring through React state** on a big surface. It re-renders the
+  whole surface every frame, a slow render freezes the motion, and the time-based
+  spring then jumps ahead. Write the style from `SpringValue`'s callback, or hand the
+  whole motion to CSS with `springTransition`.
+- **Not springs:** loops and progress (a skeleton's sheen on `--dur-shimmer`, a caret's
+  blink, a progress bar's `linear`, the drawing of a note's string) show time passing,
+  not something moving between states. They stay linear or stepped.
+
+`npm run lint:design` flags a timed curve where a spring belongs: the deprecated
+`--dur-*` / `--ease-*` aliases, `cubic-bezier()`, the `ease` keywords, a raw duration,
+or framer's `ease:`. It also fails if the tokens are stale.
+
+**Leaving.** Dialogs, popovers and menus leave the way they came on `--spring-exit`.
+`useExitAnimation` does this without the caller keeping them mounted. There is no
+looping or attention-seeking animation, with one exception: a skeleton's sheen (see
+Content arriving, below). The landing page's footage loops, slowed and frosted, as a
+window's view does. It is the place, not the interface, and it stops for Reduce motion
+(§6).
+
+**Reduced motion.** `prefers-reduced-motion` is honoured globally (`base.css`), and
+script springs honour it too: `SpringValue` jumps to its target, `coast` doesn't coast,
+and `prefersReducedMotion()` (physics.js) is the one check. framer-motion components
+also check `useReducedMotion()`. A staggered motion (the ink wheel's fold) must also
+drop its `transition-delay` under reduced motion, which `base.css` doesn't reset.
 
 The ink wheel's motion:
-- **Bloom.** The dots all open at once in `--dur-base`, as they fold back.
+- **Bloom.** The dots all open at once on `--spring-smooth`, as they fold back.
 - **Following the hand.** Once open, the dots are painted every frame with no
   transition, so nothing lags behind the hand.
-- **Trade.** A trade is a straight slide in `--dur-base` with `--ease-out`, animated on
-  the `translate` property on top of the painted position, so a dot lands on the hand
-  wherever it has moved to.
+- **Trade.** A trade is a straight slide on the `smooth` spring (`springTiming`),
+  animated on the `translate` property on top of the painted position, so a dot lands
+  on the hand wherever it has moved to.
 - **Stretch.** A moving dot stretches along its path, to about 1.3 × 0.8 at 40% of the
   way, and rounds off as it lands. This applies to the bloom, the trade and the fold.
   The stretch is on an inner face, never on the element that is positioned, and
   there's none under reduced motion.
-- **Close.** The ring folds back counter-clockwise in `--dur-fast`, 8ms apart, while the
-  taken ink moves to the middle. That ink then sinks into the control.
+- **Close.** The taken ink springs to the middle (`--spring-quick`), and the ring folds
+  back counter-clockwise on `--spring-exit`, 8ms apart. That ink then sinks into the
+  control.
 
 ### Content arriving
 
 Content that loads arrives in a few deliberate stages, never as a dozen independent
 pops, and a load that is quick never shows it was loading. The primitives are in
-`src/ui/Reveal.jsx` and `revealState.js`; the timings are the `--dur-reveal`,
+`src/ui/Reveal.jsx` and `revealState.js`; the timings are the `--spring-smooth` spring and the
 `--reveal-rise`, `--reveal-stagger` and `--dur-shimmer` tokens, with the waits script
 needs in `src/ui/motion.js`.
 
@@ -549,8 +740,17 @@ needs in `src/ui/motion.js`.
   documents, the toolbar, the word count and lock badges (with the project's locks)
   and the check that restored tabs still exist. Secondary content (inspector panels)
   waits for the gate, then arrives as its own data does.
-- **Screens hand over by crossfade.** Opening a project fades the start screen out
-  over the editor, which mounts beneath it at once so its loads are already running.
+- **Opening a project from a pile, the sheet becomes the document.** The sheet
+  clicked lifts out of its pile and grows into the document card on the `gentle` spring,
+  turning square as it goes, its own face fading as the opening lines appear in the
+  editor's type exactly where the editor will draw them (`landing/SheetFlight`). The
+  other piles sink away at once; the frosted window then fades into the tray, the
+  docked sidebars slide in from their edges, and when the document is ready the flight
+  fades on `--spring-smooth` into it. The flight sets off before the editor mounts (aimed
+  where the card was last time, `lib/landingCard.js`) and bends onto the real card if
+  that is elsewhere. Under Reduce motion it is a plain fade. Anything else that opens a
+  project (a new project, a folder, a command) fades the start screen out over the
+  editor, which mounts beneath it at once so its loads are already running.
 - **Don't punish fast loads.** A skeleton shows only after a load has taken
   `REVEAL.delay` (150ms), and then stays at least `REVEAL.minVisible` (300ms).
   `useDelayedFlag` is that rule for any other indicator. A region reloading content it
@@ -559,7 +759,7 @@ needs in `src/ui/motion.js`.
 - **Reserve space.** Content stays mounted and keeps its layout while hidden; the
   skeleton lies over it (`SkeletonOverlay`), or in a list sized by its content,
   placeholder rows use the real row's box. Nothing moves when the data lands.
-- **The hand-off.** Content fades in and rises `--reveal-rise` over `--dur-reveal`.
+- **The hand-off.** Content fades in and rises `--reveal-rise` on `--spring-smooth`.
   Lists stagger their items `--reveal-stagger` apart (`.ib-stagger` and
   `staggerStyle(index)`), capped so a long list never trails off. Only `opacity` and
   `translate` move; `translate` is its own property, so it composes with a framer-motion
@@ -609,7 +809,6 @@ needs in `src/ui/motion.js`.
   | Put away, recoverably | `archive` | |
   | Add an item to this list | `add` (+) | |
   | Rarer options | `more` (⋯) | |
-  | What didn't fit the toolbar (») | `overflow` | `more` |
   | Find | `search` | zoom |
   | Zoom | `zoom-in` / `zoom-out` | `search` |
   | App settings | `settings` (gear) | theme, colour or a panel's own options |
@@ -639,7 +838,8 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `NavSheet` | A large `Dialog` of pages with a list down its left: Settings and Help | Groups, an `aside` above the list (Help's filter), ↑/↓ between pages; the page showing is lifted |
 | `Section` | A collapsible group in an inspector panel | Remembers open/closed per `id`. `accessory` is its one action, beside the title. `help` names its help topic |
 | `FormRow` + `Toggle` / `Stepper` / `SelectMenu` | Inspector and settings rows | Label left (as wide as it needs, up to about half), control right; `stacked` for wide controls. `Toggle` applies immediately. `help` names its help topic |
-| `PanelActions`, `ScopeMenu`, `MoreMenu` | A panel's scope and ⋯, in its header row | The panel anatomy (§6). `PanelActions` puts its children in the shell's header slot, only for the panel showing |
+| `PanelActions`, `ScopeMenu`, `MoreMenu` | A panel's scope and ⋯, in its header row | The panel anatomy (§6). `PanelActions` puts its children in the shell's header slot, only for the panel showing. `MoreMenu`'s `items` takes the plain list a right-click's menu takes, so the two share one |
+| `PaperSheet`, `PaperPile` | A project as a pile of its recent pages (the landing page) | A sheet is the card's paper (`--app-bg`) in miniature; a pile fans on hover and focus, opens a sheet's document on click, and carries a ⋯. `dashed` is an empty slot. See §6 |
 | `Field` + `Input` / `TextArea`, `Checkbox` | Forms in dialogs | Label above, hint below. Errors say how to fix |
 | `Segmented` | 2–4 exclusive, short options | Otherwise use `SelectMenu` |
 | `Tabs` | Views within a panel | Underline style |
@@ -652,6 +852,7 @@ Everything below is exported from `src/ui` (`import { Button, Menu } from '../ui
 | `EmptyState` | Any list or panel with nothing in it | Icon, typewritten line and plain hint, centred; in a panel it sits in the middle of the panel's height. At most one action. `compact` for a section or "no matches" (stays in place); `dropActive` washes it in the accent while something is dragged over |
 | `InkWheel` | Colouring a thing on the page | Notes, table fill, canvas cards, map and timeline colours. `none` adds "No fill" / "Default"; `as` + `triggerProps` draw the control as an `IconButton` or a tool button |
 | `InkPicker` | A labelled colour choice in a form | Accent and window colour (Settings → General), folder types. Don't build another swatch row |
+| `ToolWheel` | Acting on selected text | The selection wheel (`SelectionWheel`). Controlled: mount it at an `anchor` and unmount on `onClose`. `ToolWheelPreview` draws it still, for Settings |
 | `FloatingCapsule` | A readout floating over the page (word count, zoom) | The floating-capsule surface; glass on iOS. `--size-circle` tall, on `--z-chrome` (§7) |
 | `FloatingToolbar`, `ToolbarSeparator` | Floating tool strips over the page (the table's tools) | Floating-capsule surface with toolbar keyboard behaviour; glass on iOS. `--size-toolbar` tall (§7). A view's own tools go in the card's toolbar (§6), not a strip |
 | `FloatingActionButton` | One round primary action over the document | Glass on iOS |
@@ -717,7 +918,7 @@ editor, read aloud, the e-book Reader, Typeset's page pickers and the citation e
 - **Insides:** `src/ui` controls (`Field`, `SelectMenu`, `TextArea`, `Button`, `FormRow` +
   `Toggle`, `Segmented`). A pop-up's one bespoke visual is its signature (read aloud's
   live waveform).
-- **Motion:** a popover floats in over `--dur-base`, a menu over `--dur-fast`, and both
+- **Motion:** a popover floats in on `--spring-smooth`, a menu on `--spring-quick`, and both
   leave the way they came (§7).
 - **Focus:** a popover moves focus to its first control; Tab and ⇧Tab stay inside it;
   Escape or a click outside closes it, and focus goes back to the control that opened it.
@@ -731,7 +932,8 @@ editor, read aloud, the e-book Reader, Typeset's page pickers and the citation e
   toolbar, as a row of its items (§6).
 - **In the card's toolbar, a pop-up opens in the toolbar** (round 03b, 2026-10-22). See
   §6 → *The dynamic toolbar*. `Popover` does it wherever a `ToolbarDockContext` holds
-  the button that opened it.
+  the button that opened it: in place, without its eyebrow (which still names it for
+  assistive tech), or across the toolbar with `dock="whole"`.
 
 **If a component doesn't exist yet,** build it in `src/ui/` from tokens, add it to the
 showcase (`src/dev/DesignShowcase.jsx`) and to this table, in the same PR.
@@ -747,10 +949,9 @@ of these levels, and is always also in the command palette:
    italic, headings, lists, add note, undo. The default toolbar stays short.
 2. **One click away.** A "More" `Menu` at the end of the toolbar or panel, and the
    right-click context menu. Put the less-frequent but still general tools here. A
-   customisable toolbar shows every item that fits and puts the rest behind », so its
-   default set leads with the essentials. Writers who want a shorter surface place
-   the `MORE` marker (`src/lib/chromeLayout.ts`) in Customize toolbar: items after it
-   live behind » however wide the window is.
+   customisable toolbar's first page leads with the essentials, and the rest go on the
+   pages after it (`PAGE` breaks, `src/lib/chromeLayout.ts`), a swipe or a dot away.
+   Writers arrange the pages in Customize toolbar.
 3. **In an inspector panel.** Deep, stateful tools a professional keeps open: history,
    references, print setup, script reports, map layers.
 4. **Always: the command palette (⌘K).** Every action, searchable by name and by the
@@ -837,7 +1038,8 @@ little see-through too, its 0.5px ring over a light `var(--blur-note)`, so the l
 is about stays in view; the strings between notes stop at their edges. The project
 search card and its preview are veiled the same way as a hovering sidebar
 (`--search-veil-bg` over `var(--blur-over-page)`, falling back to the opaque menu
-surface under reduced transparency): a veil, not glass. Don't extend glass to panels, menus, dialogs or scrims, and don't add
+surface under reduced transparency): a veil, not glass. The landing page's frosted
+leaves are footage blurred by a filter under a sheet of paper (§6), not glass either. Don't extend glass to panels, menus, dialogs or scrims, and don't add
 per-platform styling elsewhere. Touch targets are already comfortable (32px minimum;
 FABs are 44px).
 

@@ -2,7 +2,13 @@
  * The webview's test suites, run headless under Node.
  *
  *   npm test                                               (from the repo root)
+ *   npm test -- landing focus                              (only those suites)
+ *   npm test -- --verbose                                  (every PASS line too)
  *   node --experimental-loader ./loader.mjs run.mjs        (from this directory)
+ *
+ * PASS lines are counted, not printed, unless --verbose (or TEST_VERBOSE=1): a full
+ * run makes about 3,000 of them and they bury the FAIL lines. Anything else a suite
+ * prints appears under that suite's heading.
  *
  * They cover the parts of the page where a bug is silent and expensive, and mount the
  * components whose failures nothing static can see (a component no test mounts can
@@ -29,8 +35,8 @@
  *          drop indicator goes
  *   prefs  the preference store's webview half: which file a key lands in, that reads
  *          are synchronous after hydration, and that a failed write is survivable
- *   voice  Read Aloud's grapheme-to-phoneme pass, against misaki's own answers — a
- *          port, so it is compared with its original rather than trusted
+ *   speech Read Aloud's speech from the page's side: the voices agree with Rust's, the
+ *          samples arrive intact, and a missing model is not mistaken for a missing backend
  *   bridge the bridge protocol client, both ends: that a command reaches the editor
  *          it names, that a request is always answered rather than left hanging, that
  *          coalescing drops intermediate values and never the last one, that the
@@ -49,8 +55,6 @@
  *          round trips, and the bibliography added on paper, a book numbered through
  *   finishing the Finishing tabs' page half: formats, which setup prints, what the
  *          controller publishes and when, and the print queue
- *   mapnative a map under a shell that draws its toolbar and inspector: what it
- *          publishes, when it withdraws it, and every click taken back by id
  *   print  Print Layout's pure logic: page sizes and geometry, where pages break,
  *          and signature imposition for binding
  *   typeset how a book's chapters open, its contents, covers and history, and what an
@@ -98,6 +102,19 @@
  *   reveal content arriving: a quick load shows no skeleton, a slow one holds it long
  *          enough not to flicker, a gate waits for every piece, and the parallel tree
  *          read and the prefetch read what they should, once
+ *   landing the landing page: excerpts and the recent list kept and moved with their
+ *          documents, a pile's sheets, a sheet's flight onto the card, the frost AA
+ *          over the footage, and the page mounted
+ *   focus  focus mode: the document as sentences and where the caret is among them,
+ *          and the overlay driving a real editor — ↑/↓ to the end and past it, a typed
+ *          space shown, its keys kept out of a palette over it
+ *   physics motion is physical: the spring against its equation, velocity kept through a
+ *          release and a retarget, the same at any refresh rate, Apple's projection and
+ *          rubber band, and the --spring-* tokens generated from the same springs
+ *   selection several rows chosen in the file tree and the Book: ⌘- and ⇧-clicks, entries
+ *          moved and deleted together, and the Book's selection menu
+ *   affected scripts/affected.mjs: the import graph, scanning suites, Mirrors: twins and
+ *          the Rust commands it prints for a set of changed files
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -116,12 +133,55 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'voice', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows', 'emptiness', 'reveal']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'speech', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows', 'emptiness', 'reveal', 'landing', 'selection', 'focus', 'physics', 'toolwheel', 'affected']
+
+const args = process.argv.slice(2)
+const verbose = args.includes('--verbose') || process.env.TEST_VERBOSE === '1'
+const chosen = args.filter((arg) => !arg.startsWith('--'))
+const unknown = chosen.filter((name) => !SUITES.includes(name))
+if (unknown.length) {
+  console.error(`No suite named ${unknown.join(', ')}. The suites: ${SUITES.join(', ')}`)
+  process.exit(1)
+}
+const toRun = chosen.length ? SUITES.filter((name) => chosen.includes(name)) : SUITES
+
+const print = { log: console.log, error: console.error, warn: console.warn }
+let current = null
+let headed = false
+let passes = 0
+const heading = () => {
+  if (headed || !current) return
+  headed = true
+  print.log(`\n=== ${current} ===`)
+}
+if (!verbose) {
+  console.log = (...parts) => {
+    if (typeof parts[0] === 'string' && parts[0].startsWith('PASS  ')) {
+      passes++
+      return
+    }
+    heading()
+    print.log(...parts)
+  }
+  // Expected warnings (a preference write the harness refuses, a guarded save) log an
+  // Error each; its message says what happened, and its stack is mostly React's.
+  const brief = (part) => (part instanceof Error ? `${part.name}: ${part.message}` : part)
+  console.warn = (...parts) => {
+    heading()
+    print.warn(...parts.map(brief))
+  }
+  console.error = (...parts) => {
+    heading()
+    print.error(...parts.map(brief))
+  }
+}
 
 const failures = []
 
-for (const suite of SUITES) {
-  console.log(`\n=== ${suite} ===`)
+for (const suite of toRun) {
+  current = suite
+  headed = false
+  if (verbose) heading()
 
   // Each suite reports by setting process.exitCode, so snapshot and clear it around
   // every import — otherwise the first failure masks each one after it.
@@ -131,17 +191,21 @@ for (const suite of SUITES) {
   } catch (error) {
     // A suite that throws must not take the rest of the run down with it, or one
     // broken suite would hide every suite after it.
-    console.error(`ERROR  ${suite} threw and was abandoned:`)
-    console.error(error)
+    heading()
+    print.error(`ERROR  ${suite} threw and was abandoned:`)
+    print.error(error)
     process.exitCode = 1
   }
   if (process.exitCode) failures.push(suite)
 }
+current = null
 
+const ran = `${toRun.length} suite${toRun.length === 1 ? '' : 's'}`
+const passed = verbose ? '' : `, ${passes} assertions passed`
 if (failures.length) {
-  console.log(`\nFAILURES in: ${failures.join(', ')}`)
+  print.log(`\nFAILURES in: ${failures.join(', ')} (${ran}${passed})`)
   process.exitCode = 1
 } else {
   process.exitCode = 0
-  console.log('\nAll suites passed.')
+  print.log(`\nAll ${ran} passed${passed}.`)
 }

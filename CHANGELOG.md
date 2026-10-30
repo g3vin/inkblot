@@ -8,6 +8,34 @@ Notable changes to Inkblot. The format follows
 
 ### Changed
 
+- **Motion:** everything moves on springs, as on Apple's platforms. Menus, popovers,
+  dialogs, sidebars and hovers settle like objects coming to rest, and a swipe, a drag
+  or a throw keeps its speed into the motion that follows. A swipe between sidebar
+  panels lands from the speed the fingers left it at. Pulling a sidebar past its
+  widest or narrowest stretches like a rubber band and springs back. The canvas and
+  the map coast after a thrown pan. A dragged note's children swing the same at any
+  refresh rate. Clicking or swiping mid-way redirects any of it. Something dropped in
+  the toolbar, the inspector, the Book or the file tree springs into its new place
+  from under your hand, and the others make way. The split divider stretches past its
+  limits and springs back, as does focus mode's scrolling past the first or last
+  sentence, and double-clicking the divider glides it to the middle.
+
+- **Toolbar:** its items are pages you swipe through with two fingers. The page fades
+  as you swipe; halfway, it clicks onto the next page with a tick, and letting go
+  turns the page with another. A quick flick turns it at once. Dots at the toolbar's end show the pages and turn them with a click, as do
+  ⌃← and ⌃→. In Customize toolbar each page is arranged on its own, an item dropped on a
+  dot moves to that page, and pages can be added and removed (a More marker placed
+  before becomes a page break). The document toolbar's default set is now Page view,
+  Focus, Undo and Redo, Bold to Strikethrough, the paragraph style, font and size, the
+  colours, alignment and lists, with inserting and the voice on a second page.
+- **Toolbar menus:** everything a toolbar button opens, it opens in place in the
+  toolbar, without a heading, moving other items aside only when there isn't room. The
+  paragraph style, font and size are rows of their choices (fonts in their own face),
+  alignment is three icons, the colours are the inks plus the system picker, and read
+  aloud is one compact row.
+
+- **Archive:** its button is in the inspector's bottom-right corner on every panel,
+  where the + is on the left, and opens the archive over the panel that's showing.
 - **Focus mode:** its controls are now a bar at the top of the document, shaped like
   the toolbar, that slides in when you point at the top and hides again on its own.
   Before and After are steppers, and text sizes are under one Text size button.
@@ -15,6 +43,10 @@ Notable changes to Inkblot. The format follows
   page; the sidebars still slide in from the edges, the buttons in the bar's corners
   keep them open, and leaving focus mode brings back the ones that were open. Focus
   mode is on the document toolbar by default, beside Page view.
+  Entering and leaving focus mode zooms the sentence between its place on the page
+  and the middle of the screen. Scrolling moves the text under your fingers and settles
+  on the sentence nearest the middle. Done is a round check button, in focus mode and
+  in Bubble.
 - **Bubble:** it opens in place of the document it came from instead of over the
   whole window. The bubbles sit straight on the window colour, the toolbar becomes
   the Sentences · Clauses · Words bar, and the sidebars stay. In a split it stays on
@@ -26,11 +58,11 @@ Notable changes to Inkblot. The format follows
 - **License:** Inkblot is open source under the Apache License 2.0. The name and logo
   stay trademarks; see TRADEMARKS.md. Contributions are signed off under the
   Developer Certificate of Origin.
-- **Read Aloud pronunciation:** text is turned into speech sounds by a port of misaki,
-  the pronouncing dictionary and rules Kokoro's voices were trained with, instead of
-  eSpeak NG. Numbers, money, years and times read naturally, words like "read",
-  "record" and "live" follow the words around them, and names the dictionary doesn't
-  know are still spoken. Read Aloud no longer ships any GPL code.
+- **Read Aloud voices:** Read Aloud speaks with Kyutai's Pocket TTS, which sounds
+  more natural than Kokoro, and offers six voices instead of twenty-eight. The voices
+  download once, about 440 MB, from Download voices in the read-aloud row, and then
+  work offline. The old Kokoro model is removed from disk. Read Aloud no longer ships
+  any GPL code.
 - **Opening a project:** the file tree, the document, the toolbar and the tabs arrive
   together in one fade instead of popping in one by one, and nothing shifts as they
   land. A quick open shows no loading state at all; a slow one (a project on a synced
@@ -49,6 +81,24 @@ Notable changes to Inkblot. The format follows
 
 ### Added
 
+- **Selection wheel:** select some text and hold Option, and a ring of tools opens under
+  the pointer. Move toward one and let go to use it: Highlight, Bold, Hide,
+  Strikethrough, Bubble or Italic to start with. Every tool keeps its place, so after a
+  while your hand knows the way. Tap Option instead and the wheel stays open for a click
+  or the arrow keys. Rest on Highlight to pick its colour. Choose the tools, their places
+  and the key in Settings ▸ Selection wheel, or open the wheel from ⌘K. On an iPad
+  without a keyboard, press and hold the selection, then drag to a tool and lift.
+- **Hide:** fold a passage out of sight without deleting it. It shrinks to a small •••
+  in the line; click it to open the passage in place, and click again to fold it. Hidden
+  text stays in the document and its history. It is left out of print, every export,
+  canvas cards and previews, and Read Aloud skips it while it's folded.
+  Hide from the selection wheel, the right-click menu or ⌘K.
+
+- **File ▸ All projects** (⇧⌘O, or "Go to all projects" in the command palette)
+  closes the open project and goes back to the project screen.
+- **Focus mode position:** a # button in focus mode's bar (and ⌘K) shows which
+  paragraph and sentence you're on in the top-left corner, such as "¶ 12 · Sentence 3
+  of 7".
 - **Midnight theme:** a theme for writing in the dark, in Settings › Appearance, the
   View menu and ⌘K. The page and the window are true black, so the black pixels of an
   OLED or mini-LED screen switch off, and the words are warm Ember instead of white.
@@ -58,6 +108,14 @@ Notable changes to Inkblot. The format follows
 
 ### Fixed
 
+- **Focus mode:** it opens with the sentence centred, not low on the screen, and it
+  stays centred while you type, step between sentences or dock a sidebar. The caret
+  shows where a typed space goes, stays solid while you type and blinks when you
+  stop. ↓ from the last sentence gives an empty line for the next one, and Home and End
+  go to the ends of the sentence. The text is set in the document's typeface. Arrow
+  keys and Escape work in the command palette and menus opened over focus mode.
+  Sidebars come back after you leave, even if the app quit while you were in it.
+  Selected text is highlighted.
 - **Split view preview:** holding a document over the page no longer shows a loading
   placeholder on top of the previewed document until it is dropped.
 
