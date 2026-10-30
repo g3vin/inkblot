@@ -10,6 +10,7 @@ import { BookItemKind } from '../types'
 import type { BookItem, BookSettings } from '../types'
 import { isTextDoc } from '../lib/docKind'
 import { listProjectTree, loadDocument } from '../lib/FileSystem'
+import { withoutHiddenText } from './hiddenText'
 import { applyOrderToTree, getParentPath } from '../lib/fileTreeOrder'
 import { loadOrder } from '../lib/fileTreeState'
 import type { TreeNode } from '../types'
@@ -93,7 +94,7 @@ export const loadChapters = async (
   const chapters: Chapter[] = []
   for (const path of paths) {
     const open = live(path)
-    const content = open || asDoc((await loadDocument(projectName, path))?.content)
+    const content = withoutHiddenText(open || asDoc((await loadDocument(projectName, path))?.content))
     chapters.push({ path, name: path.split('/').pop() || path, content })
   }
   return chapters
@@ -130,7 +131,7 @@ export const loadBookSections = async (
     const readable = (item.kind === BookItemKind.Chapter || item.kind === BookItemKind.Matter) && path && !isLegacyMatter(item)
     let content: Chapter['content'] | null = null
     if (readable) {
-      content = live(path) || asDoc((await loadDocument(projectName, path))?.content)
+      content = withoutHiddenText(live(path) || asDoc((await loadDocument(projectName, path))?.content))
     }
     const name = item.kind === BookItemKind.Chapter ? (path.split('/').pop() || path) : itemTitle(item)
     sections.push({ item, path: item.kind === BookItemKind.Part ? '' : path, name, content })

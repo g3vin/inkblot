@@ -3025,6 +3025,11 @@ export interface MeasureBookCommand {
 export interface MoveBookItemCommand {
 	id: string;
 	before?: string;
+	/**
+	 * A selection moved as one block, in the book's order (`id` among them). Empty
+	 * moves `id` alone.
+	 */
+	ids?: string[];
 }
 
 /** Move a file or folder into another folder. See `RenameEntryCommand`. */
@@ -3765,6 +3770,11 @@ export interface RefreshBookChaptersCommand {
  */
 export interface RemoveBookItemCommand {
 	id: string;
+	/**
+	 * A selection removed together (`id` among them); its chapters are skipped. Empty
+	 * removes `id` alone.
+	 */
+	ids?: string[];
 }
 
 /** Remove entries from the history. `None` clears it. */
@@ -4076,6 +4086,8 @@ export interface SetBookCoverCommand {
 export interface SetBookItemHiddenCommand {
 	id: string;
 	hidden: boolean;
+	/** A selection hidden or shown together (`id` among them). Empty changes `id` alone. */
+	ids?: string[];
 }
 
 /** Replace the settings of the book the active document belongs to. */

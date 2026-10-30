@@ -1,0 +1,142 @@
+/*
+ * ToolWheel — a ring of tool discs around a still middle, blooming where the hand is.
+ * ToolWheel.jsx places each disc (--tx, --ty); this file says how it gets there.
+ */
+
+/* Over everything while open, so a press anywhere is the wheel's. */
+.ib-tool-wheel {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-gesture);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ib-tool-wheel[data-phase='closing'] { pointer-events: none; }
+
+.ib-tool-wheel-preview {
+  position: relative;
+  flex: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ib-tool-wheel-ring {
+  position: absolute;
+  width: 0;
+  height: 0;
+  outline: none;
+}
+
+/* The rest: where the hand starts, and where nothing is chosen. */
+.ib-tool-wheel-hub {
+  position: absolute;
+  left: calc(var(--space-2) / -2);
+  top: calc(var(--space-2) / -2);
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-primary) 18%, transparent);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
+}
+
+.ib-tool-wheel-slot {
+  --disc: 40px;
+  position: absolute;
+  left: calc(var(--disc) / -2);
+  top: calc(var(--disc) / -2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--disc);
+  height: var(--disc);
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--surface-float);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-float), inset 0 0 0 1px var(--hairline-color);
+  transform: translate(var(--tx), var(--ty)) scale(1);
+  transition:
+    transform var(--spring-smooth-dur) var(--spring-smooth),
+    opacity var(--spring-quick-dur) var(--spring-quick),
+    background-color var(--spring-quick-dur) var(--spring-quick),
+    color var(--spring-quick-dur) var(--spring-quick);
+}
+
+/* Folded into the middle before the bloom, and on the way out. */
+[data-phase='enter'] .ib-tool-wheel-slot,
+[data-phase='closing'] .ib-tool-wheel-slot {
+  opacity: 0;
+  transform: translate(0, 0) scale(0.4);
+}
+[data-phase='enter'] .ib-tool-wheel-slot { transition: none; }
+[data-phase='closing'] .ib-tool-wheel-slot {
+  transition:
+    transform var(--spring-exit-dur) var(--spring-exit),
+    opacity var(--spring-exit-dur) var(--spring-exit);
+}
+[data-phase='closing'] .ib-tool-wheel-hub,
+[data-phase='closing'] .ib-tool-wheel-name { opacity: 0; }
+
+/* The tool the hand points at. */
+.ib-tool-wheel-slot[data-target='true'] {
+  background: var(--accent-color);
+  color: var(--text-on-accent);
+  transform: translate(var(--tx), var(--ty)) scale(1.12);
+}
+/* Already applied to the selection (bold text): the icon is filled, and ringed. */
+.ib-tool-wheel-slot[data-active='true']:not([data-target='true']) {
+  box-shadow: var(--shadow-float), inset 0 0 0 1.5px var(--accent-border);
+}
+.ib-tool-wheel-slot[data-disabled='true'] { color: var(--text-subtle); }
+.ib-tool-wheel-slot[data-disabled='true'][data-target='true'] {
+  background: var(--surface-hover);
+  color: var(--text-subtle);
+}
+
+.ib-tool-wheel-swatch {
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+[data-target='true'] > .ib-tool-wheel-swatch { box-shadow: 0 0 0 2px var(--text-on-accent); }
+
+/* This tool has options: rest on it to see them. */
+.ib-tool-wheel-more {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.ib-tool-wheel-name {
+  position: absolute;
+  left: 0;
+  top: var(--below);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-0);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-float);
+  box-shadow: var(--shadow-float);
+  color: var(--text-primary);
+  font: var(--weight-medium) var(--text-xs) / var(--leading-tight) var(--font-ui);
+  white-space: nowrap;
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
+}
+.ib-tool-wheel-preview .ib-tool-wheel-name { box-shadow: none; background: transparent; color: var(--text-secondary); }
+.ib-tool-wheel-hint { color: var(--text-secondary); font-weight: var(--weight-regular); }
+
+@media (prefers-reduced-motion: reduce) {
+  /* No bloom: the ring is simply there, then gone. */
+  .ib-tool-wheel-slot { transition: background-color var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick) !important; }
+}

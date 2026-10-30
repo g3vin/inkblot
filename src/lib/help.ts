@@ -78,6 +78,16 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Word count',
     body: ['When it is on, the count floats at the foot of each document. Select some text to count just that.'],
   },
+  {
+    id: 'settings.selection-wheel',
+    section: 'Settings',
+    title: 'Selection wheel',
+    body: [
+      'Select some text, hold the key and the wheel opens under the pointer. Move toward a tool and let go of the key to use it. Tap the key instead and the wheel stays open, so you can click a tool or turn round it with the arrow keys.',
+      'On an iPad without a keyboard, press and hold the selection instead, then drag toward a tool and lift.',
+      'Every tool keeps its place, so after a while your hand knows the way. Rest on Highlight to choose its colour.',
+    ],
+  },
 
   // ---------- Stats ----------
   {

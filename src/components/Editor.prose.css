@@ -36,12 +36,15 @@
   z-index: 3;
 }
 
+/* Blinks with `visibility`, not `opacity`: WebKit gives an opacity animation a layer of
+   its own, and in Print Layout that composites the scaled stage, so zoomed-in text is
+   a stretched 1× bitmap (PrintLayout.css, "Nothing inside the stage"). */
 .text-caret.is-blinking {
   animation: text-caret-blink 1.06s steps(1) infinite;
 }
 
 @keyframes text-caret-blink {
-  50% { opacity: 0; }
+  50% { visibility: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -212,3 +215,41 @@
 .editor li > p {
   margin: 0;
 }
+
+/* Hidden text (extensions/HiddenText.js). Folded, it is gone from the line and a pill
+   stands in for it; open, it is tinted so it reads as set apart, with a pill at its end
+   that folds it again. */
+.ProseMirror .hidden-text-folded { display: none; }
+.ProseMirror .hidden-text-open {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  text-decoration: underline dashed color-mix(in srgb, var(--text-primary) 35%, transparent);
+  text-underline-offset: 0.25em;
+}
+.hidden-text-pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.1em;
+  min-width: 2em;
+  margin: 0 2px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 9%, var(--surface-1));
+  color: var(--text-secondary);
+  font: var(--weight-bold) 0.7em / 1 var(--font-ui);
+  letter-spacing: 0.08em;
+  vertical-align: 0.1em;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
+}
+.hidden-text-pill:hover {
+  background: color-mix(in srgb, var(--accent-color) 22%, var(--surface-1));
+  color: var(--text-primary);
+}
+.hidden-text-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.hidden-text-pill[data-folded='false'] { min-width: 0; padding: 0 var(--space-1); }
+.hidden-text-pill .ib-icon { width: 1.1em; height: 1.1em; }

@@ -32,8 +32,11 @@ const lineHeightOf = (element) => {
   return Number.isFinite(lineHeight) ? lineHeight : parseFloat(style.fontSize) * 1.2
 }
 
-/** Each text node's and indicator's rects within `range`, the text ones with their line's height. */
-const measureRange = (range, root) => {
+/**
+ * Each text node's and indicator's rects within `range`, the text ones with their line's
+ * height. Rects are on screen, so the styles' lengths are taken onto it by `scale`.
+ */
+const measureRange = (range, root, scale) => {
   const pieces = []
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
     acceptNode: (node) => (range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
@@ -54,8 +57,8 @@ const measureRange = (range, root) => {
     const to = node === range.endContainer ? range.endOffset : node.data.length
     if (from >= to) continue
     const style = getComputedStyle(node.parentElement)
-    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2
-    const pad = parseFloat(style.fontSize) * PAD_EM
+    const lineHeight = (parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2) * scale
+    const pad = parseFloat(style.fontSize) * PAD_EM * scale
     const push = (start, end) => {
       const part = document.createRange()
       part.setStart(node, start)
@@ -277,8 +280,8 @@ class SelectionHighlightView {
     if (this.layer.firstChild) this.layer.replaceChildren()
   }
 
-  /** The bands for the selection, in screen pixels. */
-  measure() {
+  /** The bands for the selection, in screen pixels; `scale` is the page's on screen. */
+  measure(scale) {
     const { view } = this
     const { selection, doc } = view.state
     const { from, to } = selection
@@ -298,9 +301,9 @@ class SelectionHighlightView {
         if (node.content.size === 0 || end === pos + 1 + node.content.size) {
           try {
             const at = view.coordsAtPos(start)
-            const lineHeight = lineHeightOf(block)
+            const lineHeight = lineHeightOf(block) * scale
             const middle = (at.top + at.bottom) / 2
-            const width = parseFloat(getComputedStyle(block).fontSize) * EMPTY_LINE_EM
+            const width = parseFloat(getComputedStyle(block).fontSize) * EMPTY_LINE_EM * scale
             lines.push({ left: at.left, right: at.left + width, top: middle - lineHeight / 2, bottom: middle + lineHeight / 2 })
           } catch {
             // Not laid out.
@@ -314,7 +317,7 @@ class SelectionHighlightView {
         const b = view.domAtPos(end)
         range.setStart(a.node, a.offset)
         range.setEnd(b.node, b.offset)
-        lines.push(...toLines(measureRange(range, block)))
+        lines.push(...toLines(measureRange(range, block, scale)))
       } catch {
         // A position the view can't map to the DOM right now; the next draw has it.
       }
@@ -338,7 +341,7 @@ class SelectionHighlightView {
     const scale = parent.offsetWidth ? box.width / parent.offsetWidth : 1
     const radius = parseFloat(getComputedStyle(layer).getPropertyValue('--selection-radius')) || 4
     // Into the parent's own pixels, where the shape is drawn.
-    const lines = this.measure().map((line) => ({
+    const lines = this.measure(scale).map((line) => ({
       left: (line.left - box.left) / scale - parent.clientLeft + parent.scrollLeft,
       right: (line.right - box.left) / scale - parent.clientLeft + parent.scrollLeft,
       top: (line.top - box.top) / scale - parent.clientTop + parent.scrollTop,

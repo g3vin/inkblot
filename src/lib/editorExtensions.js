@@ -24,6 +24,7 @@ import { DocChangeReporter } from '../extensions/DocChangeReporter'
 import { NoteAnnotation } from '../extensions/NoteAnnotation'
 import { DocumentLock } from '../extensions/DocumentLock'
 import { DropPreview } from '../extensions/DropPreview'
+import { HiddenText } from '../extensions/HiddenText'
 import { TimelineAnchors } from '../extensions/TimelineAnchors'
 import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
@@ -68,6 +69,8 @@ const sharedExtensions = () => [
     types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
   }),
   Highlight.configure({ multicolor: true }),
+  // Text folded out of sight: in shared, so a card or preview holding it can still render.
+  HiddenText,
   // Cell fills and the table's borders on top of the stock table (TableStyles.js).
   StyledTable.configure({ resizable: true }),
   TableRow,
