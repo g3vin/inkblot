@@ -9,6 +9,8 @@
  *
  * Screen coordinates are always relative to the container's bounding rect, so
  * callers must subtract rect.left/rect.top before handing a pointer position in.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/canvas_geometry.rs`; `npm run parity` asserts they agree.
  */
 
 export const MIN_ZOOM = 0.1

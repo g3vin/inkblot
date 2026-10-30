@@ -11,6 +11,8 @@
  * card to carry — not `node.inkblotTipTap`. That keeps this a pure string walk (no
  * schema, no ProseMirror) and means a canvas authored in Obsidian is searchable too.
  * Cards written here keep the two in sync when they commit.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/search/mod.rs`; `npm run parity` asserts they agree.
  */
 
 const MATCH_PREVIEW_RADIUS = 34

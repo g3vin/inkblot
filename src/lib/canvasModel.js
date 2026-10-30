@@ -16,6 +16,8 @@
  * arrays: the maps give O(1) patching, the arrays give stable z-order. Nothing
  * here touches the filesystem or React — it is all pure, so the reducer can
  * rely on it.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/canvas_model.rs`; `npm run parity` asserts they agree.
  */
 import { nodesBounds, padRect, rectContains } from './canvasGeometry'
 import { CANVAS_PRESET_INKS, inkColor, inkVar } from './palette'

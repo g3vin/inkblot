@@ -46,6 +46,8 @@ export function useEditorDocCache({ hasNotesForDoc, projectName, setNotesForDoc 
   const loadedDocsRef = useRef(new Set())
   const docStateCacheRef = useRef(new Map())
   const loadingPanesRef = useRef({ primary: false, secondary: false })
+  // Old cache key to new, for a document renamed or moved while open (lib/paneHandoff.js).
+  const carriedRef = useRef(new Map())
 
   const getDocCacheKey = useCallback((docName, paneId) => (
     projectName && docName && paneId ? `${projectName}::${paneId}::${docName}` : ''
@@ -76,7 +78,21 @@ export function useEditorDocCache({ hasNotesForDoc, projectName, setNotesForDoc 
     if (!isEditorReady(targetEditor)) return
     const cacheKey = getDocCacheKey(docName, paneId)
     if (!cacheKey || !loadedDocsRef.current.has(cacheKey)) return
-    docStateCacheRef.current.set(cacheKey, targetEditor.state)
+    const carriedTo = carriedRef.current.get(cacheKey)
+    if (carriedTo) {
+      // Nothing may restore the old path's state: a new document can be made there.
+      carriedRef.current.delete(cacheKey)
+      docStateCacheRef.current.delete(cacheKey)
+    }
+    docStateCacheRef.current.set(carriedTo || cacheKey, targetEditor.state)
+  }, [getDocCacheKey])
+
+  // A document renamed or moved while open: the state the pane stashes as it leaves
+  // the old path is filed under the new one, which it then restores without a read.
+  const carryDoc = useCallback((fromDoc, toDoc, paneId) => {
+    const fromKey = getDocCacheKey(fromDoc, paneId)
+    const toKey = getDocCacheKey(toDoc, paneId)
+    if (fromKey && toKey) carriedRef.current.set(fromKey, toKey)
   }, [getDocCacheKey])
 
   // Whether a pane can take this doc back without reading it: its state is stashed,
@@ -110,6 +126,7 @@ export function useEditorDocCache({ hasNotesForDoc, projectName, setNotesForDoc 
   return {
     beginPaneLoad,
     canRestoreFromCache,
+    carryDoc,
     endPaneLoad,
     forgetDoc,
     isDocLoaded,

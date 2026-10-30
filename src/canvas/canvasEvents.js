@@ -4,7 +4,7 @@
  * The canvas is reached from three places that have no React path to it: the file
  * tree (drop a document), the search panel (reveal a node), and the native context
  * menu (run a command). All three use CustomEvents, matching the repo's existing
- * `filetree:*` / `open-note` convention.
+ * `filetree:*` convention.
  *
  * Commands and drops are dispatched ON THE SURFACE ELEMENT, not on window: split
  * view can show two canvases at once, and the element is what says which one the

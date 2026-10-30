@@ -9,6 +9,8 @@
  *
  * A registry value is the absolute path to the project directory itself, not
  * its parent. Projects stored in the default AppData location have no entry.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/store/locations.rs`; `npm run parity` asserts they agree.
  */
 import {
   writeTextFile,

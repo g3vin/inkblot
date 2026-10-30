@@ -8,6 +8,8 @@
  *
  * Retention: at most 200 unnamed entries, evicted oldest first; named versions are
  * never evicted.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/store/versions.rs`; `npm run parity` asserts they agree.
  */
 import { writeTextFile, readTextFile, mkdir } from '@tauri-apps/plugin-fs'
 import { isTextDoc } from './docKind'
@@ -15,6 +17,7 @@ import { EDIT_SESSION_ID, countWords, countCanvasWords } from './versionHistory'
 import { countMapWords } from './map/mapModel'
 import { getProjectRoot, joinPath, normalizePath, parentOf } from './projectPaths'
 import { withDocLock } from './docLock'
+import { VERSIONS_CHANGED } from './appEvents'
 
 
 // Unnamed checkpoints beyond this are dropped oldest-first. Named versions are
@@ -28,7 +31,7 @@ const newVersionId = () =>
 export const emitVersionsChanged = (projectName, docName) => {
   try {
     if (typeof window !== 'undefined' && window?.dispatchEvent) {
-      window.dispatchEvent(new CustomEvent('versions:changed', { detail: { projectName, docName } }))
+      window.dispatchEvent(new CustomEvent(VERSIONS_CHANGED, { detail: { projectName, docName } }))
     }
   } catch {
     void 0

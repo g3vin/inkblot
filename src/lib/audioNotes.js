@@ -13,6 +13,8 @@
  * The recording itself is plain MediaRecorder. `NSMicrophoneUsageDescription` is
  * already declared in Info.plist (dictation needs it), so the webview can prompt for
  * the mic without any new entitlement.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/notes.rs`; `npm run parity` asserts they agree.
  */
 import { writeAssetFromBlob } from './assets'
 

@@ -6,6 +6,8 @@
  * via parentNoteId, carry attached images and voice memos, and remember their
  * hover-preview layout/size. Everything entering app state should pass through
  * normalizeNote(s) so downstream code can rely on the shape.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/notes.rs`; `npm run parity` asserts they agree.
  */
 import { normalizeNoteAudio } from './audioNotes'
 import { DEFAULT_NOTE_INK, NOTE_INKS, inkColor, inkVar, isInkId, legacyInkFor } from './palette'
