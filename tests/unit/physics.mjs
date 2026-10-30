@@ -206,6 +206,25 @@ ok('past an edge the drawn speed is the hand\'s times the band\'s slope', (() =>
   return rubberSlope(50, 0, 100, 60, c) === 1 && near(rubberSlope(at, 0, 100, 60, c), numeric, 1e-3)
 })())
 
+/* ---------------- every drag ---------------- */
+
+// A drag the system takes away (a gesture, a dialog, the pointer leaving the window)
+// sends pointercancel, not pointerup: a drag that hears only pointerup stays on.
+ok('every drag that ends on pointerup also ends on pointercancel', (() => {
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = `${dir}/${entry.name}`
+    if (entry.isDirectory()) return walk(full)
+    return /\.(jsx?|tsx?)$/.test(entry.name) ? [full] : []
+  })
+  const src = new URL('../../src', import.meta.url).pathname
+  const missing = walk(src).filter((file) => {
+    const text = fs.readFileSync(file, 'utf8')
+    return /addEventListener\(\s*['"]pointerup['"]|onPointerUp=/.test(text) && !/pointercancel|onPointerCancel/.test(text)
+  })
+  if (missing.length) console.log('  no pointercancel:', missing.map((file) => file.slice(src.length + 1)).join(', '))
+  return missing.length === 0
+})())
+
 /* ---------------- CSS ---------------- */
 
 ok('every spring has a linear() curve from 0 to 1', Object.values(SPRINGS).every((preset) => {
