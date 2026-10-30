@@ -21,12 +21,12 @@ mod app_windows;
 mod core_commands;
 mod dictation_commands;
 mod haptics_commands;
-mod kokoro_commands;
 mod pinterest_commands;
 mod preferences_commands;
 mod print_commands;
 mod reference_commands;
 mod rhyme_commands;
+mod speech_commands;
 mod stats_commands;
 mod synonym_commands;
 mod trackpad;
@@ -40,15 +40,14 @@ use dictation_commands::{
 };
 use haptics_commands::perform_haptic;
 use inkblot_models::scrape::ScrapeChannels;
-use kokoro_commands::{
-    download_kokoro_model, generate_kokoro_speech, kokoro_model_status, kokoro_vocab,
-    prewarm_kokoro_speech, KokoroSpeechState,
-};
 use pinterest_commands::{pinterest_await_scrape, pinterest_begin_scrape, pinterest_report_scrape};
 use preferences_commands::{
     preferences_load, preferences_remove, preferences_rename_prefix, preferences_set,
 };
 use rhyme_commands::{download_rhyme_dictionary, get_rhymes, rhyme_dictionary_status, RhymeState};
+use speech_commands::{
+    download_speech_model, generate_speech, prewarm_speech, speech_model_status, SpeechState,
+};
 use stats_commands::{
     project_word_counts, stats_config, stats_daily, stats_move_entry, stats_record_session,
     stats_record_timer_run, stats_rename_entry, stats_rename_project, stats_reset, stats_sessions,
@@ -74,7 +73,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .manage(AppDictationState::default())
-        .manage(KokoroSpeechState::default())
+        .manage(SpeechState::default())
         .manage(SynonymState::default())
         .manage(RhymeState::default())
         .manage(ScrapeChannels::default())
@@ -105,11 +104,10 @@ pub fn run() {
             stop_dictation_session,
             cancel_dictation_session,
             dictation_status,
-            generate_kokoro_speech,
-            prewarm_kokoro_speech,
-            kokoro_model_status,
-            download_kokoro_model,
-            kokoro_vocab,
+            generate_speech,
+            prewarm_speech,
+            speech_model_status,
+            download_speech_model,
             preferences_load,
             preferences_set,
             preferences_remove,

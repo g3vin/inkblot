@@ -15,7 +15,7 @@
 //! | `doc_kind` | Which kind of document a path is |
 //! | `canvas_model`, `canvas_geometry`, `story_structure`, `notes`, `read_aloud` | Mirrors of the webview's JS (see below) |
 //! | `js_number`, `js_string` | JavaScript number formatting and string semantics |
-//! | `kokoro` | Kokoro's vocabulary and voice-style arithmetic (the model is in `inkblot-models`) |
+//! | `pocket_tts` | Pocket TTS's text rules, stopping rule and voice state (the model is in `inkblot-models`) |
 //! | `fonts`, `pinterest` | System font listing; public Pinterest board scraping |
 //!
 //! ## Generated types
@@ -42,10 +42,10 @@ pub mod doc_kind;
 pub mod fonts;
 pub mod js_number;
 pub mod js_string;
-pub mod kokoro;
 pub mod map;
 pub mod notes;
 pub mod pinterest;
+pub mod pocket_tts;
 pub mod read_aloud;
 pub mod search;
 pub mod store;

@@ -10,18 +10,18 @@ JavaScript and Rust dependency is under a permissive licence (MIT, BSD, ISC, Apa
 
 | Component | Licence | How it reaches you |
 |---|---|---|
-| [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (ONNX build by [onnx-community](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)) and its voices | Apache 2.0 | Model downloaded on first use; voices bundled, copied from the `kokoro-js` package at build time |
+| [Pocket TTS](https://huggingface.co/kyutai/pocket-tts), Copyright Kyutai, English model `english_2026-04` (ONNX export by [KevinAHM](https://huggingface.co/KevinAHM/pocket-tts-onnx)) and its tokenizer | CC BY 4.0 | Downloaded when you choose Download voices |
+| Pocket TTS voices, precomputed by Kyutai ([pocket-tts-without-voice-cloning](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning)) from the recordings in [tts-voices](https://huggingface.co/kyutai/tts-voices): Alba (Alba Mackenna, CC BY 4.0); Azelma, George, Mary ([VCTK](https://datashare.ed.ac.uk/handle/10283/3443), CC BY 4.0); Peter (Peter Yearsley), Stuart (Stuart Bell) (LibriVox recordings, CC0) | CC BY 4.0 / CC0 | Downloaded with the model |
 | [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) tokenizer (`src-tauri/resources/minilm-tokenizer.json`) | Apache 2.0 | Bundled |
 | Synonym model (`synonym.onnx`, from [inkblot-nlp-models](https://github.com/g3vin/inkblot-nlp-models)), built on all-MiniLM-L6-v2 | Apache 2.0 (base model). The licence of the Kaggle synonym and antonym training set is unconfirmed. | Downloaded on first use |
 | [Whisper](https://github.com/openai/whisper) `small.en` (ggml build) | MIT | Not bundled; installed by the user |
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | MIT | Compiled in |
 
-## Read Aloud's pronunciation
+## Read Aloud's code
 
 | Component | Licence | Notes |
 |---|---|---|
-| [misaki](https://github.com/hexgrad/misaki), Copyright hexgrad | Apache 2.0 | `src/lib/g2p` is a port of its English G2P (`misaki/en.py`), changed to run without spaCy. Its gold dictionaries (`us_gold.json`, `gb_gold.json`) are bundled unmodified from commit `fba1236`. The author describes them as built from IPA datasets with the author's own heuristics ([misaki#51](https://github.com/hexgrad/misaki/issues/51)); which datasets is an open question ([misaki#107](https://github.com/hexgrad/misaki/issues/107)). misaki's silver dictionaries are eSpeak NG output and are not used. |
-| [phonemize](https://github.com/hans00/phonemize), Copyright (c) 2025 Hans | MIT | Guesses words the dictionary doesn't have. Its data is built from ipa-dict (MIT) and CMUdict (BSD). |
+| [pocket-tts](https://github.com/kyutai-labs/pocket-tts), Copyright Kyutai | MIT | `src-tauri/crates/inkblot-core/src/pocket_tts.rs` ports its prompt preparation, sentence splitting and end-of-speech rule from `rust/src/text.rs` and `rust/src/model.rs`. |
 
 ## Fonts
 
@@ -29,6 +29,12 @@ JavaScript and Rust dependency is under a permissive licence (MIT, BSD, ISC, Apa
 and [Courier Prime](https://github.com/quoteunquoteapps/CourierPrime) are licensed under
 the [SIL Open Font License 1.1](https://openfontlicense.org/). They're bundled through
 `@fontsource`.
+
+## Media
+
+| Work | Licence | Notes |
+|---|---|---|
+| [*Leaves in summer*](https://commons.wikimedia.org/wiki/File:Leaves_in_summer.webm), by Joaquim Baeta | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | The landing page's backdrop (`public/media/landing/`). Changed: a 14-second excerpt, slowed to 0.7×, cropped to 16:9, looped with a 1.5-second crossfade (as on the website), then scaled to 480×270 and blurred. Credited on the landing page. |
 
 ## Copyleft components
 
