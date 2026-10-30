@@ -11,8 +11,9 @@
  */
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { getEntryFilePath, listProjectTree } from '../../lib/FileSystem'
-import { moveEntry } from '../../lib/entryOperations'
+import { canMoveInto, moveEntry } from '../../lib/entryOperations'
 import { getDocDisplayName } from '../../lib/docKind'
+import { FILETREE_NEW_ENTRY, FILETREE_SELECTION } from '../../lib/appEvents'
 
 export async function createMenuContext(e, props) {
   const { projectName, refreshFiles } = props
@@ -51,7 +52,7 @@ export async function createMenuContext(e, props) {
   const beginRename = (entryPath, entryType, entryName, entryParent) => {
     // FileTree owns renaming — it renames in place, in the tree.
     window.dispatchEvent(
-      new CustomEvent('filetree:new-entry', {
+      new CustomEvent(FILETREE_NEW_ENTRY, {
         detail: {
           rename: true,
           path: entryPath,
@@ -115,6 +116,32 @@ export async function createMenuContext(e, props) {
     return Submenu.new({ text: 'Move file to…', items: moveItems })
   }
 
+  /**
+   * "Move N items to…": the project's folders, less the chosen folders and what is in
+   * them, and less the one folder every chosen entry is already in.
+   */
+  const buildMoveSelectionToSubmenu = async (entries) => {
+    const folders = []
+    const walk = (node) => {
+      if (node?.type !== 'folder') return
+      folders.push(node.path || '')
+      ;(node.children || []).forEach(walk)
+    }
+    try {
+      walk(await listProjectTree(projectName))
+    } catch (err) {
+      console.warn('Failed to list folders for move:', err)
+    }
+    const destinations = folders.filter((folder) => entries.some((entry) => canMoveInto(entry, folder)))
+    const moveItems = destinations.length
+      ? await Promise.all(destinations.map((folder) => MenuItem.new({
+        text: folder || 'Project root',
+        action: () => window.dispatchEvent(new CustomEvent(FILETREE_SELECTION, { detail: { action: 'move', target: folder } })),
+      })))
+      : [await MenuItem.new({ text: 'No other folders', enabled: false })]
+    return Submenu.new({ text: `Move ${entries.length} items to…`, items: moveItems })
+  }
+
   const fileTree = e.target.closest('.file-tree')
   const leftSidebar = e.target.closest('.left-sidebar')
   const fileTreeEl = fileTree || leftSidebar?.querySelector('.file-tree')
@@ -137,6 +164,7 @@ export async function createMenuContext(e, props) {
     beginRename,
     buildCopyPathSubmenu,
     buildMoveToSubmenu,
+    buildMoveSelectionToSubmenu,
     fileTree,
     leftSidebar,
     fileTreeEl,

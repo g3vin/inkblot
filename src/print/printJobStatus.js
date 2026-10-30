@@ -7,6 +7,7 @@
  * reaching the console.
  */
 import { documentSurface } from '../bridge'
+import { PRINT_JOB } from '../lib/appEvents'
 
 export const newJobId = () => `job-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 
@@ -29,6 +30,6 @@ export const reportJob = (status) => {
     console.error('[print] could not report job status:', error)
   }
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('inkblot:print-job', { detail: payload }))
+    window.dispatchEvent(new CustomEvent(PRINT_JOB, { detail: payload }))
   }
 }

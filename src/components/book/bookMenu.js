@@ -81,8 +81,49 @@ export function rowMenu(row, actions) {
   return items
 }
 
-/** A drop, as "before this entry": the first entry at or after where it landed, not itself. */
-export function moveTarget(orderedIds, movingId, index) {
-  const rest = orderedIds.slice(index).filter((id) => id !== movingId)
+/**
+ * The menu for several rows chosen together (BookNavigator's selection), in the book's
+ * order: hide or show them, gather chapters under a new part, remove what can be.
+ *
+ * @param {object[]} rows
+ * @param {{ onGroup: (rows) => void, onRemove: (rows) => void }} actions
+ */
+export function selectionMenu(rows, actions) {
+  const ids = rows.map((row) => row.id)
+  const allHidden = rows.every((row) => row.hidden)
+  // Chapters are the manuscript's: they can be hidden, never removed.
+  const removable = rows.filter((row) => row.kind !== 'chapter')
+  const items = [
+    {
+      text: allHidden ? `Show ${rows.length} in the Book` : `Hide ${rows.length} from the Book`,
+      action: () => send('setBookItemHidden', { id: ids[0], ids, hidden: !allHidden }),
+    },
+  ]
+  if (rows.every((row) => row.kind === 'chapter')) items.push({ text: 'Group into a part', action: () => actions.onGroup(rows) })
+  items.push(
+    { separator: true },
+    {
+      text: removable.length ? `Remove ${removable.length} from the Book…` : 'Remove from the Book…',
+      enabled: removable.length > 0,
+      action: () => actions.onRemove(removable),
+    },
+  )
+  return items
+}
+
+/**
+ * A drop, as "before this entry": the first entry at or after where it landed that is
+ * not being moved. `moving` is one id, or the ids of a selection carried together.
+ */
+export function moveTarget(orderedIds, moving, index) {
+  const carried = new Set(Array.isArray(moving) ? moving : [moving])
+  const rest = orderedIds.slice(index).filter((id) => !carried.has(id))
   return rest[0] ?? null
+}
+
+/** Where a block gathers to stay where its first entry is: before the next entry not in it. */
+export function gatherTarget(orderedIds, block) {
+  const carried = new Set(block)
+  const first = orderedIds.findIndex((id) => carried.has(id))
+  return first < 0 ? null : moveTarget(orderedIds, block, first)
 }

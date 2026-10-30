@@ -9,9 +9,11 @@
  *   3. do the disk operation
  *   4. put everything back at the new paths: panes, tabs, notes, versions
  *
- * Step 1 closing the pane and step 4 reopening it means the editor reloads the
- * document from disk under its new name. That is a real reload, and it is correct:
- * the text on disk is the text the flush just wrote.
+ * A rename or move lets a text pane go in place instead (lib/paneHandoff.js): it
+ * flushes and stops saving in step 1, and in step 4 takes its own editor state back
+ * under the new path, so the page stays on screen. Anything else is closed in step 1
+ * and reopened from disk in step 4, which is correct: the text on disk is the text
+ * the flush just wrote.
  *
  * Also handles `createEntry` and the entry commands, because they need
  * the same state and the same refresh.
@@ -24,6 +26,7 @@ import { withDocLock } from '../lib/docLock'
 import { createFolder } from '../lib/FileSystem'
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocKind, stripDocSuffix } from '../lib/docKind'
+import { paneHandoff } from '../lib/paneHandoff'
 import { followMovedDoc } from '../lib/map/mapLinks'
 import { followMovedDocInTimeline } from '../lib/timeline/timelineLinks'
 import {
@@ -63,17 +66,21 @@ export function useEntryOperations({
 
   useEffect(() => {
     /** Steps 1–4 around one disk operation that resolves to the entry's next path. */
-    const relocate = async (projectNameArg, entryPath, type, operation) => {
+    const relocate = async (projectNameArg, entryPath, type, operation, { keepOpen = false } = {}) => {
       const { currentDoc: primary, secondaryDoc: secondary } = stateRef.current
       const closePrimary = touches(primary, entryPath, type)
       const closeSecondary = touches(secondary, entryPath, type)
 
-      // 1. Let go, now. flushSync commits synchronously and runs the panes' effect
-      //    cleanups before returning, which is where their autosaves flush.
-      if (closePrimary || closeSecondary) {
+      // 1. Let go, now: in place where a pane can hold the document, else by closing
+      //    it. flushSync commits synchronously and runs the panes' effect cleanups
+      //    before returning, which is where their autosaves flush.
+      const handoff = keepOpen ? paneHandoff() : null
+      const holdPrimary = closePrimary && Boolean(handoff?.hold('primary', primary))
+      const holdSecondary = closeSecondary && Boolean(handoff?.hold('secondary', secondary))
+      if ((closePrimary && !holdPrimary) || (closeSecondary && !holdSecondary)) {
         flushSync(() => {
-          if (closePrimary) setCurrentDoc('')
-          if (closeSecondary) setSecondaryDoc(null)
+          if (closePrimary && !holdPrimary) setCurrentDoc('')
+          if (closeSecondary && !holdSecondary) setSecondaryDoc(null)
         })
       }
 
@@ -103,13 +110,20 @@ export function useEntryOperations({
         return mapped === undefined ? docPath : mapped
       }
 
+      // A held pane takes its state to the new path, or saves again where it was.
+      const handBack = (paneId, docPath, reopened) => {
+        if (reopened && reopened !== docPath) handoff.carry(paneId, docPath, reopened)
+        else handoff.release(paneId)
+      }
       if (closePrimary) {
         const reopened = map(primary)
+        if (holdPrimary) handBack('primary', primary, reopened)
         setCurrentDoc(reopened || '')
         setActiveDoc(reopened || '')
       }
       if (closeSecondary) {
         const reopened = map(secondary)
+        if (holdSecondary) handBack('secondary', secondary, reopened)
         setSecondaryDoc(reopened || null)
         if (!reopened) setSplitView(null)
       }
@@ -137,11 +151,11 @@ export function useEntryOperations({
     const operations = {
       renameEntry: async (projectNameArg, entryPath, newName, type = 'file') =>
         followed(projectNameArg, entryPath, type, await relocate(projectNameArg, entryPath, type,
-          () => disk.renameEntry(projectNameArg, entryPath, newName, type))),
+          () => disk.renameEntry(projectNameArg, entryPath, newName, type), { keepOpen: true })),
 
       moveEntry: async (projectNameArg, entryPath, targetFolder, type = 'file') =>
         followed(projectNameArg, entryPath, type, await relocate(projectNameArg, entryPath, type,
-          () => disk.moveEntry(projectNameArg, entryPath, targetFolder, type))),
+          () => disk.moveEntry(projectNameArg, entryPath, targetFolder, type), { keepOpen: true })),
 
       deleteEntry: async (projectNameArg, entryPath, type = 'file') => {
         await relocate(projectNameArg, entryPath, type, async () => {
