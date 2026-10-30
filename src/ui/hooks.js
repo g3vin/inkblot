@@ -8,6 +8,8 @@
  *   useAnchoredPosition place a floating element beside its anchor, kept on screen
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { SPRINGS } from './physics.js'
+import { springTiming } from './useSpring.js'
 
 /** What can take focus with Tab. */
 export const FOCUSABLE_SELECTOR = [
@@ -231,17 +233,35 @@ export function useAnchoredPosition(open, floatingRef, { anchorRef, point, place
   return style
 }
 
+// The copies still leaving, by what they are copies of: a surface opened again while
+// its last copy is still on its way out takes that copy away, so the two never overlap.
+const leaving = new Map()
+const leavingKey = (node, leavingClass) => `${leavingClass}|${node.className}`
+
+/** Whether `node` is still part way through an animation (an entrance, a CSS one). */
+export const isAnimating = (node) => (node.getAnimations?.() ?? []).some((animation) => {
+  const { progress } = animation.effect?.getComputedTiming?.() ?? {}
+  return animation.playState === 'running' && progress !== null && progress < 1
+})
+
 /**
  * Let `ref`'s element leave the way it came when its component unmounts: a copy is put
  * back in the body with `leavingClass`, plays that class's animation, and is removed.
- * The caller unmounts as usual and needs no "closing" state. Skipped under reduced
- * motion, and where there's no matchMedia (tests). The copy keeps no ids or roles. (Under
+ * The caller unmounts as usual and needs no "closing" state. Closed while it was still
+ * arriving, the copy leaves from where it was drawn instead of from fully shown: it fades
+ * from that pose on the exit spring, so nothing jumps. Skipped under reduced motion, and
+ * where there's no matchMedia (tests). The copy keeps no ids or roles. (Under
  * StrictMode's trial unmount the element is still in the page, so no copy is made.)
  */
 export function useExitAnimation(ref, leavingClass = 'is-leaving') {
   useLayoutEffect(() => {
     const node = ref.current
+    if (node) leaving.get(leavingKey(node, leavingClass))?.()
     return () => {
+      // Read before it is taken out of the page: where an entrance has got to.
+      const midway = node?.isConnected && isAnimating(node)
+      const pose = midway ? getComputedStyle(node) : null
+      const from = pose ? { opacity: pose.opacity, transform: pose.transform, translate: pose.translate, scale: pose.scale } : null
       queueMicrotask(() => {
         if (!node || node.isConnected) return
         // No matchMedia means no real browser (tests); reduced motion means no motion.
@@ -249,13 +269,31 @@ export function useExitAnimation(ref, leavingClass = 'is-leaving') {
         const ghost = node.cloneNode(true)
         // A copy, not the thing: nothing in it can be found as a dialog or by its id.
         for (const el of [ghost, ...ghost.querySelectorAll('[id], [role]')]) { el.removeAttribute('id'); el.removeAttribute('role') }
-        ghost.classList.add(leavingClass)
         ghost.setAttribute('aria-hidden', 'true')
         ghost.inert = true
+        const key = leavingKey(node, leavingClass)
+        let timer = 0
+        const done = () => {
+          clearTimeout(timer)
+          ghost.remove()
+          if (leaving.get(key) === done) leaving.delete(key)
+        }
+        leaving.get(key)?.()
+        leaving.set(key, done)
+        if (from && ghost.animate) {
+          // Held in the pose it was drawn in, with its entrance's animation off, then faded.
+          ghost.style.animation = 'none'
+          Object.assign(ghost.style, from)
+          document.body.append(ghost)
+          const { duration, easing } = springTiming(SPRINGS.exit)
+          ghost.animate([{ opacity: from.opacity }, { opacity: 0 }], { duration, easing, fill: 'forwards' }).finished.then(done, done)
+          timer = setTimeout(done, duration + 100)
+          return
+        }
+        ghost.classList.add(leavingClass)
         document.body.append(ghost)
-        const done = () => ghost.remove()
         ghost.addEventListener('animationend', (event) => { if (event.target === ghost) done() })
-        setTimeout(done, 400)
+        timer = setTimeout(done, 400)
       })
     }
   }, [ref, leavingClass])

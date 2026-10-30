@@ -665,8 +665,13 @@ hand is still moving the things it swings. Never go past bounce 0.4.
   coast to, not to where it was let go: `project(v) = v · rate / (1 − rate)` at
   UIScrollView's rates (`DECELERATION.normal` 0.998 a ms, `.fast` 0.99), through
   `settleOnTargets`. One rule decides both a flick and a slow drop, with no separate
-  speed threshold: 0.3px/ms from a tenth of the way turns a page, as on iOS. `maxStep`
-  limits a page view to one page per flick.
+  speed threshold. A sidebar thrown toward its edge collapses this way.
+- **Turn pages by a flick's speed.** A page view (the sidebar panels, the toolbar's
+  pages, the tab indicator) turns as iOS pages: let go faster than a flick, it turns one
+  page that way however little it has moved, and slower, it lands on the nearest.
+  Projection would carry a slow drift over too. A pointer flicks at `GESTURE.flick`
+  (0.3px/ms, iOS's measured paging speed); a trackpad swipe at 0.5px/ms, because macOS
+  speeds its scroll deltas up.
 - **Act on a pause, not a timer.** A drag that does something when the hand stops (a
   dwell over a folder) reads the stop from the samples (`isPausing`): a sharp fall in
   speed shows sooner than any timeout.
@@ -716,8 +721,22 @@ hand is still moving the things it swings. Never go past bounce 0.4.
 `--dur-*` / `--ease-*` aliases, `cubic-bezier()`, the `ease` keywords, a raw duration,
 or framer's `ease:`. It also fails if the tokens are stale.
 
+**Pressing.** A control answers the moment the hand lands, not when it lifts: `Button`
+(and so `IconButton`), a segment and the floating action button give to
+`--press-scale` at once, with no transition, and spring back on `--spring-quick` when
+let go. The action itself still waits for the release, so a press dragged off cancels.
+
+**Turning round.** Something told to go back while it is still on its way goes back
+from where it is drawn, never from the start of the other animation. A popover or
+dialog closed while it opens fades from its pose. A hover note closed while it pops,
+or hovered again while it shrinks, turns round where it is. Leaving focus mode before
+its zoom has landed retraces the zoom. A keyframe animation restarts from its first
+frame, so anything that can be turned round mid-way reads its pose and is moved on
+from there by script.
+
 **Leaving.** Dialogs, popovers and menus leave the way they came on `--spring-exit`.
-`useExitAnimation` does this without the caller keeping them mounted. There is no
+`useExitAnimation` does this without the caller keeping them mounted, and a surface
+opened again while its last copy is still leaving takes that copy away. There is no
 looping or attention-seeking animation, with one exception: a skeleton's sheen (see
 Content arriving, below). The landing page's footage loops, slowed and frosted, as a
 window's view does. It is the place, not the interface, and it stops for Reduce motion

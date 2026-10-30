@@ -9,7 +9,7 @@
  * persisted onto each note (previewLayout/previewSize); dragging a card with
  * children pulls the descendants along on an elastic spring animation.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import Icon from '../ui/Icon.jsx'
 import InkWheel from '../ui/InkWheel.jsx'
@@ -21,6 +21,8 @@ import { trafficLightsBox } from '../lib/trafficLights'
 import { panelCardFor } from '../lib/notePanelCard'
 import { NOTE_CLOSE_MS, NOTE_POP_MS, STRING_CLOSE_MIN_MS, STRING_MIN_MS, closeSchedule, drawMs, lineStart, openTiming } from '../lib/noteReveal'
 import { SPRINGS, prefersReducedMotion, spring, springAt } from '../ui/physics.js'
+import { springTiming } from '../ui/useSpring.js'
+import { isAnimating } from '../ui/hooks.js'
 import { NOTE_COLOR_OPTIONS, collectNoteBranchIds, createFreeNote, isNoteEmpty, noteColor, noteInk, touchNote } from '../lib/noteUtils'
 import {
   NOTE_HIGHLIGHT_EVENT,
@@ -112,6 +114,32 @@ export default function NoteHoverPreview({
     }, total)
   }, [reveal])
   useEffect(() => () => window.clearTimeout(closeTimerRef.current), [])
+
+  // A note turned round mid-way (closed while it pops in, or hovered again while it
+  // shrinks away) carries on from where it is drawn, not from the start of the other
+  // keyframes: its pose is read, the stylesheet's animation set aside, and it is moved
+  // from there by script. Closing keeps its place in the cascade (its delay and time).
+  const wasClosingRef = useRef(closing)
+  useLayoutEffect(() => {
+    const turned = wasClosingRef.current !== closing
+    wasClosingRef.current = closing
+    const layer = layerRef.current
+    if (!turned || !layer || prefersReducedMotion()) return
+    layer.querySelectorAll('.note-preview-card').forEach((card) => {
+      if (card.style.animation !== 'none' && !isAnimating(card)) return
+      const pose = getComputedStyle(card)
+      const from = { opacity: pose.opacity, transform: pose.transform }
+      card.getAnimations().forEach((animation) => animation.cancel())
+      card.style.animation = 'none'
+      if (closing) {
+        const ms = parseFloat(card.style.getPropertyValue('--note-close-ms')) || NOTE_CLOSE_MS
+        const delay = parseFloat(card.style.getPropertyValue('--note-close-delay')) || 0
+        card.animate([from, { opacity: 0, transform: 'scale(0.4)' }], { duration: ms, delay, easing: springTiming(SPRINGS.exit).easing, fill: 'forwards' })
+      } else {
+        card.animate([from, { opacity: 1, transform: 'none' }], { ...springTiming(SPRINGS.quick), fill: 'forwards' })
+      }
+    })
+  }, [closing])
 
   /** As setState, but closing (to null) plays the closing first. Only opening a note
    *  (openPreview) calls a closing off; other updates, like the anchor following a

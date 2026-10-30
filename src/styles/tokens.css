@@ -102,6 +102,9 @@
 
   /* Motion is physical: springs, the --spring-* tokens in the generated block after this
      one (docs/DESIGN.md §7). Motion clarifies; it never performs. */
+  /* A press: how far a control gives under the hand. It gives at once and springs
+     back on release. */
+  --press-scale: 0.96;
   /* Content arriving (ui/Reveal.jsx). The waits that decide whether a skeleton shows
      at all are in ui/motion.js, which mirrors these. */
   --reveal-rise: 4px;

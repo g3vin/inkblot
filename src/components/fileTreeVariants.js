@@ -21,12 +21,9 @@ export const folderChildrenVariants = {
   collapsed: {
     height: 0,
     opacity: 0,
-    transition: {
-      ...toFramer(SPRINGS.exit),
-      when: 'afterChildren',
-      staggerChildren: 0.018,
-      staggerDirection: -1,
-    },
+    // Folded away in one movement, children with it, so a big folder closes as quickly
+    // as a small one and never slower than it opened.
+    transition: toFramer(SPRINGS.exit),
   },
   expanded: {
     height: 'auto',
