@@ -11,7 +11,8 @@
  *      the accent (extensions/DropPreview). Moving again takes it back out of the
  *      page to the pointer.
  *   4. Released over a pane, it is inserted and leaves the clipboard; anywhere else
- *      (or on Escape) it glides home.
+ *      (or on Escape) it glides home, and a press on it on the way catches it and
+ *      carries on the drag from there.
  *
  * The panes answer through lib/clipboardDropTarget; the drag's payload is on
  * bridge/dragHandoff like every other in-app drag.
@@ -19,10 +20,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { dragHandoff, DragPayloadKind } from '../../bridge'
 import { clipboardDropTarget } from '../../lib/clipboardDropTarget'
-import { SPRINGS, prefersReducedMotion, spring, springAt, trackSample, velocityFrom } from '../../ui/physics.js'
+import { SPRINGS, pastSlop, prefersReducedMotion, releaseSpring, spring, springAt, trackSample, velocityFrom } from '../../ui/physics.js'
 
 // How far the pointer travels before a press becomes a drag.
-const DRAG_THRESHOLD = 4
 // How long the pointer rests before the text settles into the page, and how far it
 // may wander while resting.
 const DWELL_MS = 650
@@ -30,7 +30,6 @@ const DWELL_TOLERANCE = 4
 // The glide to the pointer or into the page, and the glide home, which sets off at
 // the speed the hand let go at.
 const GLIDE = spring(SPRINGS.quick)
-const HOME = spring(SPRINGS.momentum)
 
 export function useClipboardPieceDrag() {
   // What the ghost shows. Its position is written straight to the element, not
@@ -91,6 +90,7 @@ export function useClipboardPieceDrag() {
     window.removeEventListener('pointerup', drag.onUp, true)
     window.removeEventListener('pointercancel', drag.onCancel, true)
     window.removeEventListener('keydown', drag.onKey, true)
+    window.removeEventListener('pointerdown', drag.onCatch, true)
     document.documentElement.classList.remove('is-dragging-clipboard')
     dragRef.current = null
     setGhost(null)
@@ -105,7 +105,23 @@ export function useClipboardPieceDrag() {
     clearTimeout(drag.dwell)
     // Thrown, it keeps the throw's speed on the way home.
     if (!drag.gliding) drag.v = velocityFrom(drag.samples)
-    glide(drag, () => drag.home, HOME, finish)
+    drag.returning = true
+    window.addEventListener('pointerdown', drag.onCatch, true)
+    glide(drag, () => drag.home, spring(releaseSpring(Math.hypot(drag.v.x, drag.v.y))), finish)
+  }
+
+  // Caught on its way home: the hand has it again, and it glides from where it is, at
+  // the speed it is going, to the pointer.
+  const catchAgain = (drag, event) => {
+    drag.returning = false
+    window.removeEventListener('pointerdown', drag.onCatch, true)
+    dragHandoff.begin({ kind: DragPayloadKind.ClipboardEntry, text: drag.entry.text || '', sourceId: drag.entry.id })
+    drag.pointer = { x: event.clientX, y: event.clientY }
+    drag.samples = []
+    window.addEventListener('pointermove', drag.onMove, true)
+    window.removeEventListener('pointerup', drag.onUp, true)
+    window.addEventListener('pointerup', drag.onUp, true)
+    glide(drag, () => atPointer(drag), GLIDE)
   }
 
   const settleIntoPage = (drag) => {
@@ -169,14 +185,14 @@ export function useClipboardPieceDrag() {
       overPage: false,
       previewAt: null,
       gliding: false,
+      returning: false,
       frame: 0,
       dwell: 0,
     }
 
     drag.onMove = (moveEvent) => {
       if (!drag.lifted) {
-        const travelled = Math.hypot(moveEvent.clientX - drag.start.x, moveEvent.clientY - drag.start.y)
-        if (travelled < DRAG_THRESHOLD) return
+        if (!pastSlop(moveEvent.clientX - drag.start.x, moveEvent.clientY - drag.start.y, moveEvent.pointerType)) return
         lift(drag)
       }
       moveEvent.preventDefault()
@@ -201,6 +217,15 @@ export function useClipboardPieceDrag() {
     }
 
     drag.onCancel = () => { if (drag.lifted) sendHome(drag); else finish() }
+    drag.onCatch = (downEvent) => {
+      const box = ghostRef.current?.getBoundingClientRect()
+      if (downEvent.button !== 0 || !box) return
+      const { clientX: x, clientY: y } = downEvent
+      if (x < box.left || x > box.right || y < box.top || y > box.bottom) return
+      downEvent.preventDefault()
+      downEvent.stopPropagation()
+      catchAgain(drag, downEvent)
+    }
     drag.onKey = (keyEvent) => {
       if (keyEvent.key !== 'Escape' || !drag.lifted) return
       keyEvent.preventDefault()
