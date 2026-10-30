@@ -29,7 +29,7 @@
  * Doc references (`pin.doc`, `traveler.doc`) are TREE paths, e.g.
  * `Settings/Rivertown`, never `.json` file paths.
  *
- * Mirrors `inkblot_core::map::model`; `npm run parity` asserts the two agree, so
+ * Mirrors: `src-tauri/crates/inkblot-core/src/map/model.rs`; `npm run parity` asserts the two agree, so
  * every check here is written the way the Rust reads it: a value of the wrong JSON
  * type is replaced by the default, never coerced.
  */
@@ -535,6 +535,10 @@ export function readMapViewport(raw) {
  *
  * Order matters for references: pins are read before routes (a route stop naming a
  * pin that is not here drops), routes before labels and travelers.
+ *
+ * @param {unknown} raw
+ * @param {() => string} [nextId]
+ * @returns {import('../../types').MapFile}
  */
 export function normalizeMap(raw, nextId = newId) {
   const source = isObject(raw) ? raw : {}
@@ -572,7 +576,11 @@ export function normalizeMap(raw, nextId = newId) {
   }
 }
 
-/** A map → what is written to disk, with the live viewport folded in. */
+/**
+ * A map → what is written to disk, with the live viewport folded in.
+ * @param {import('../../types').MapFile} map
+ * @param {import('../../types').MapViewport} [viewport]
+ */
 export function serializeMap(map, viewport = map?.viewport) {
   return { ...map, type: 'map', formatVersion: MAP_FORMAT_VERSION, viewport: readMapViewport({ viewport }) }
 }
@@ -584,7 +592,11 @@ export function serializeMap(map, viewport = map?.viewport) {
  */
 export const isMapPayload = (raw) => raw === null || raw === undefined || (isObject(raw) && raw.type === 'map')
 
-/** A new, empty map of `mapKind`. */
+/**
+ * A new, empty map of `mapKind`.
+ * @param {string} [mapKind] one of MAP_KINDS
+ * @returns {import('../../types').MapFile}
+ */
 export function createEmptyMap(mapKind = 'blank', overrides = {}) {
   const kind = oneOf(mapKind, MAP_KINDS, 'blank')
   const base = { mapKind: kind, ...overrides }
