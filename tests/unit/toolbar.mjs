@@ -29,7 +29,7 @@ const L = await import('../../src/lib/chromeLayout.ts')
 const { TOOLBAR_COMPONENTS } = await import('../../src/components/toolbar/registry.jsx')
 const { default: ToolbarItem } = await import('../../src/components/toolbar/ToolbarItem.jsx')
 const { default: ToolbarHost } = await import('../../src/components/toolbar/ToolbarHost.jsx')
-const { applyToolbarDrop, inToolbar } = await import('../../src/components/toolbar/toolbarEdits.js')
+const { applyToolbarDrop, applyPageDrop, moveToPage, removePage, fitPage, pushedAside, inToolbar } = await import('../../src/components/toolbar/toolbarEdits.js')
 const { toolbarMenuItems } = await import('../../src/hooks/contextMenu/toolbarMenu.js')
 const { CUSTOMIZE_TOOLBAR_EVENT } = await import('../../src/components/toolbar/toolbarContext.js')
 const { writeToolbarItems, readDisplayMode } = await import('../../src/components/toolbar/useToolbarLayout.js')
@@ -64,7 +64,7 @@ for (const display of L.TOOLBAR_DISPLAY_MODES) {
 }
 
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.format.font', ctx: { ...empty, display: 'icon' } })))
-ok('with no live editor an item is disabled, not gone', container.querySelector('select')?.disabled === true)
+ok('with no live editor an item is disabled, not gone', container.querySelector('.tb-menu-button')?.disabled === true)
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.format.text-style', ctx: { ...empty, display: 'iconAndLabel' } })))
 ok('Icon and Text puts the label under the item', container.querySelector('.tb-item-label')?.textContent === 'Text style')
 await act(async () => root.render(React.createElement(ToolbarItem, { id: 'inkblot.insert.table', ctx: { ...empty, display: 'label' } })))
@@ -107,23 +107,46 @@ ok('a spacer can go in again', applyToolbarDrop(base, { source: { kind: 'palette
 ok('an item already there moves rather than doubles', applyToolbarDrop(base, { source: { kind: 'palette', id: 'c' }, inside: true, index: 0 }).join() === 'c,a,space,b')
 ok('the default set replaces the layout', applyToolbarDrop(base, { source: { kind: 'defaults', items: ['z'] }, inside: true, index: 2 }).join() === 'z')
 ok('the palette dims what is in the toolbar, not spacers', inToolbar(base, 'a') && !inToolbar(base, 'space') && !inToolbar(base, 'x'))
+ok('nor page breaks', !inToolbar(['a', 'page', 'b'], 'page'))
+
+/* ---------------- a drag on one page ---------------- */
+
+const paged = ['a', 'b', 'page', 'c', 'd']
+ok('a drag reorders within its page', applyPageDrop(paged, 1, { source: { kind: 'toolbar', index: 1 }, inside: true, index: 0 }).join() === 'a,b,page,d,c')
+ok('a drag off the page removes it from the page', applyPageDrop(paged, 0, { source: { kind: 'toolbar', index: 0 }, inside: false }).join() === 'b,page,c,d')
+ok('an item from the palette that is on another page moves to this one', applyPageDrop(paged, 1, { source: { kind: 'palette', id: 'a' }, inside: true, index: 0 }).join() === 'b,page,a,c,d')
+ok('a page break dropped in splits the page', applyPageDrop(paged, 0, { source: { kind: 'palette', id: 'page' }, inside: true, index: 1 }).join() === 'a,page,b,page,c,d')
+ok('a drop on a page being made adds it', applyPageDrop(paged, 2, { source: { kind: 'palette', id: 'x' }, inside: true, index: 0 }).join() === 'a,b,page,c,d,page,x')
+ok('the default set replaces every page', applyPageDrop(paged, 1, { source: { kind: 'defaults', items: ['z'] }, inside: true, index: 0 }).join() === 'z')
+ok('dropped on a dot, an item moves to the end of that page', moveToPage(paged, 0, 0, 1).join() === 'b,page,c,d,a')
+ok('removing a page joins it to the one before', removePage(paged, 1).join() === 'a,b,space,c,d')
+ok('removing the first joins it to the next', removePage(paged, 0).join() === 'a,b,space,c,d')
+ok('the only page cannot be removed', removePage(['a'], 0).join() === 'a')
 
 /* ---------------- the host ---------------- */
 
 prefs.removePreference(L.toolbarLayoutKey('document'))
 await act(async () => root.render(React.createElement(ToolbarHost, { context: 'document', hasProject: true })))
 const rendered = () => [...container.querySelectorAll('.tb-row [data-item]')].map((el) => el.dataset.item)
-ok('the host draws the default set', rendered().join() === L.DEFAULT_TOOLBARS.document.filter((id) => !L.isSpacer(id) && id !== L.MORE).join())
-const overflowed = () => [...container.querySelectorAll('.tb-row [data-overflowed="true"] [data-item]')].map((el) => el.dataset.item)
-ok('with room, the whole default set sits on the surface', overflowed().length === 0 && !container.querySelector('.tb-overflow'))
+ok('the host draws the default set', rendered().join() === L.DEFAULT_TOOLBARS.document.filter((id) => !L.isSpacer(id) && id !== L.PAGE).join())
 
-await act(async () => { writeToolbarItems('document', ['inkblot.format.font', 'more', 'inkblot.format.highlight']) })
-ok('a placed More puts what follows it behind »', overflowed().join() === 'inkblot.format.highlight' && container.querySelector('.tb-overflow'))
-ok('and leaves what comes before it', !overflowed().includes('inkblot.format.font'))
-await act(async () => container.querySelector('.tb-overflow').dispatchEvent(new MouseEvent('click', { bubbles: true })))
-ok('» turns the row to its second page: what was behind it, in place of what was not', overflowed().join() === 'inkblot.format.font' && !!container.querySelector('.tb-overflow.is-back'))
-await act(async () => container.querySelector('.tb-overflow.is-back').dispatchEvent(new MouseEvent('click', { bubbles: true })))
-ok('and ‹ turns it back', overflowed().join() === 'inkblot.format.highlight' && !container.querySelector('.tb-overflow.is-back'))
+const pageOf = (item) => {
+  const el = container.querySelector(`[data-item="${item}"]`)?.closest('.tb-page')
+  return el && { inert: el.hasAttribute('inert') }
+}
+const dots = () => [...container.querySelectorAll('.tb-page-dot')]
+ok('the default set has two pages, with a dot each', dots().length === 2)
+ok('the first page shows, the second waits', !pageOf('inkblot.view.page-view').inert && pageOf('inkblot.insert.note').inert)
+
+await act(async () => { writeToolbarItems('document', ['inkblot.format.font', 'page', 'inkblot.format.highlight']) })
+ok('a page break puts what follows it on the next page', pageOf('inkblot.format.highlight').inert && !pageOf('inkblot.format.font').inert)
+await act(async () => dots()[1].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+ok('a dot turns to its page', !pageOf('inkblot.format.highlight').inert && pageOf('inkblot.format.font').inert && dots()[1].getAttribute('aria-current') === 'true')
+await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+ok('and Escape turns back to the first', !pageOf('inkblot.format.font').inert)
+await act(async () => container.querySelector('.tb-row').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', ctrlKey: true, bubbles: true })))
+ok('⌃→ turns to the next page', !pageOf('inkblot.format.highlight').inert)
+await act(async () => container.querySelector('.tb-row').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', ctrlKey: true, bubbles: true })))
 
 await act(async () => { writeToolbarItems('document', ['inkblot.format.font', 'inkblot.edit.undo-redo']) })
 ok('a saved layout shows straight away', rendered().join() === 'inkblot.format.font,inkblot.edit.undo-redo')
@@ -148,10 +171,17 @@ await act(async () => menu[1].action())
 
 await act(async () => root.unmount())
 
-/* ---------------- overflow ---------------- */
+/* ---------------- fitting a page to the row ---------------- */
 {
   const { fittingCount } = await import('../../src/components/toolbar/toolbarEdits.js')
-  ok('overflow: everything fits', fittingCount([40, 40, 40], 200, 4) === 3)
-  ok('overflow: what does not fit goes behind », with room for it', fittingCount([40, 40, 40, 40], 120, 4) === 2 && fittingCount([40, 40, 40, 40], 119, 4) === 1)
-  ok('overflow: a flexible space takes no room', fittingCount([40, 0, 40], 90, 4) === 3)
+  ok('fitting: everything fits', fittingCount([40, 40, 40], 200, 4) === 3)
+  ok('fitting: as many as fit, from the front', fittingCount([40, 40, 40, 40], 88, 4) === 2 && fittingCount([40, 40, 40, 40], 83, 4) === 1)
+  ok('fitting: a flexible space takes no room', fittingCount([40, 0, 40], 90, 4) === 3)
+  ok('a page too wide carries on in runs that fit', JSON.stringify(fitPage([40, 40, 40, 40, 40], 90, 4)) === '[[0,2],[2,4],[4,5]]')
+  ok('a slot wider than the row still gets a run', JSON.stringify(fitPage([200, 40], 90, 4)) === '[[0,1],[1,2]]')
+  ok('a page that fits is one run', JSON.stringify(fitPage([40, 40], 90, 4)) === '[[0,2]]')
+  ok('an open choice that fits sets nothing aside', pushedAside([40, 40, 40], 1, 20, 200, 4).size === 0)
+  ok('it sets aside what follows it first, from the end', [...pushedAside([40, 40, 40, 40], 1, 60, 200, 4)].join() === '3')
+  ok('then what comes before it', [...pushedAside([40, 40, 40], 1, 120, 170, 4)].sort().join() === '0,2')
+  ok('never itself', !pushedAside([40, 40], 0, 500, 100, 4).has(0))
 }

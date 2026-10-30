@@ -22,12 +22,22 @@ export const SPACE = 'space'
 export const FLEXIBLE_SPACE = 'flexible-space'
 export const isSpacer = (id: string) => id === SPACE || id === FLEXIBLE_SPACE
 /**
- * Everything after this marker lives behind the toolbar's » overflow, however wide
- * the window is. No default set uses it: writers place it in Customize toolbar
- * (docs/DESIGN.md → Progressive disclosure). At most one per toolbar; it is shown
- * only while customizing.
+ * A page break: the toolbar's items are pages of a row the writer swipes through
+ * (docs/DESIGN.md §6). Saved in the flat list between the pages it divides.
  */
-export const MORE = 'more'
+export const PAGE = 'page'
+/** The marker earlier layouts used for a second page behind ». It reads as a page break. */
+const LEGACY_MORE = 'more'
+
+/** A layout's items as its pages, the breaks between them dropped. */
+export function pagesOf(items: string[]): string[][] {
+  const pages: string[][] = [[]]
+  for (const id of items) {
+    if (id === PAGE) pages.push([])
+    else pages[pages.length - 1].push(id)
+  }
+  return pages
+}
 
 export const toolbarLayoutKey = (context: ToolbarContext) => `inkblot.toolbar.layout.${context}`
 export const TOOLBAR_DISPLAY_MODE_KEY = 'inkblot.toolbar.displayMode'
@@ -133,15 +143,17 @@ export function toolbarItemsFor(context: ToolbarContext): ToolbarItemSpec[] {
 
 /** Each toolbar's default set. */
 export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
-  // The essentials first, so they are the last to go behind » when the window narrows.
+  // Two pages: writing, then inserting and the voice. A window too narrow for a page
+  // carries the rest of it onto the page after.
   document: [
     'inkblot.view.page-view', 'inkblot.view.focus-mode', SPACE,
-    'inkblot.format.text-style', 'inkblot.format.paragraph-style', SPACE,
-    'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', SPACE,
-    'inkblot.insert.note', 'inkblot.edit.undo-redo', SPACE,
-    'inkblot.format.font', 'inkblot.format.font-size',
-    'inkblot.format.text-color', 'inkblot.format.highlight', 'inkblot.format.alignment',
-    'inkblot.insert.table', 'inkblot.insert.conversation',
+    'inkblot.edit.undo-redo', SPACE,
+    'inkblot.format.text-style', SPACE,
+    'inkblot.format.paragraph-style', 'inkblot.format.font', 'inkblot.format.font-size', SPACE,
+    'inkblot.format.text-color', 'inkblot.format.highlight', 'inkblot.format.alignment', SPACE,
+    'inkblot.format.bulleted-list', 'inkblot.format.numbered-list',
+    PAGE,
+    'inkblot.insert.note', 'inkblot.insert.table', 'inkblot.insert.conversation', SPACE,
     'inkblot.speech.dictation', 'inkblot.speech.read-aloud',
   ],
   canvas: [
@@ -175,7 +187,22 @@ export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
 export type ToolbarLayout = { version: number; items: string[]; known: string[] }
 
 /** The version layouts are saved at now. */
-export const TOOLBAR_LAYOUT_VERSION = 2
+export const TOOLBAR_LAYOUT_VERSION = 3
+
+/**
+ * The document's default set before version 3. A layout saved as exactly this was never
+ * arranged by hand, so it takes the current default set.
+ */
+const DOCUMENT_DEFAULT_V2 = [
+  'inkblot.view.page-view', 'inkblot.view.focus-mode', SPACE,
+  'inkblot.format.text-style', 'inkblot.format.paragraph-style', SPACE,
+  'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', SPACE,
+  'inkblot.insert.note', 'inkblot.edit.undo-redo', SPACE,
+  'inkblot.format.font', 'inkblot.format.font-size',
+  'inkblot.format.text-color', 'inkblot.format.highlight', 'inkblot.format.alignment',
+  'inkblot.insert.table', 'inkblot.insert.conversation',
+  'inkblot.speech.dictation', 'inkblot.speech.read-aloud',
+].join()
 
 /**
  * Items that were palette-only and later joined a default set, with the layout version
@@ -185,7 +212,8 @@ const PROMOTED_TO_DEFAULT: { id: string; context: ToolbarContext; version: numbe
   { id: 'inkblot.view.focus-mode', context: 'document', version: 2 },
 ]
 
-const defaultIds = (context: ToolbarContext) => DEFAULT_TOOLBARS[context].filter((id) => !isSpacer(id) && id !== MORE)
+const isItem = (id: string) => !isSpacer(id) && id !== PAGE
+const defaultIds = (context: ToolbarContext) => DEFAULT_TOOLBARS[context].filter(isItem)
 
 export function defaultToolbarLayout(context: ToolbarContext): ToolbarLayout {
   return { version: TOOLBAR_LAYOUT_VERSION, items: [...DEFAULT_TOOLBARS[context]], known: toolbarItemsFor(context).map((item) => item.id) }
@@ -219,9 +247,10 @@ const parse = (raw: unknown): unknown => {
 
 /**
  * A saved toolbar layout made usable: unknown and retired ids dropped, each item at
- * most once (spacers excepted), and default items added since it was saved put in
- * after the item they follow by default. Palette-only additions are never inserted.
- * Anything unreadable, or empty, is the default set.
+ * most once (spacers and page breaks excepted), and default items added since it was
+ * saved put in after the item they follow by default. Palette-only additions are never
+ * inserted. Each page is tidied (no spacer at its ends or doubled) and an empty page
+ * goes. Anything unreadable, or empty, is the default set.
  */
 export function normalizeToolbar(context: ToolbarContext, raw: unknown): ToolbarLayout {
   const value = parse(raw) as Partial<ToolbarLayout> | string[] | null
@@ -230,31 +259,46 @@ export function normalizeToolbar(context: ToolbarContext, raw: unknown): Toolbar
 
   const offered = new Set(toolbarItemsFor(context).map((item) => item.id))
   const seen = new Set<string>()
-  const items = stored.items.filter((id): id is string => {
-    if (typeof id !== 'string') return false
-    if (isSpacer(id)) return true
-    if ((id !== MORE && !offered.has(id)) || seen.has(id)) return false
-    seen.add(id)
-    return true
-  })
-  // Collapse runs of spacers and trim them from the ends.
-  const tidy = items.filter((id, i) => !(isSpacer(id) && (i === 0 || isSpacer(items[i - 1]))))
-  while (tidy.length && (isSpacer(tidy[tidy.length - 1]) || tidy[tidy.length - 1] === MORE)) tidy.pop()
-  if (!tidy.some((id) => !isSpacer(id) && id !== MORE)) return defaultToolbarLayout(context)
+  const items = stored.items
+    .map((id) => (id === LEGACY_MORE ? PAGE : id))
+    .filter((id): id is string => {
+      if (typeof id !== 'string') return false
+      if (!isItem(id)) return true
+      if (!offered.has(id) || seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+  const tidy = tidyPages(items)
+  if (!tidy.some(isItem)) return defaultToolbarLayout(context)
 
-  const known = Array.isArray(stored.known) ? new Set(stored.known) : null
   // Only a layout that says which version saved it is migrated: a write from Customize
   // toolbar carries none and is taken as the user left it.
   const savedVersion = Number((stored as Partial<ToolbarLayout>).version)
-  const promoted = known && Number.isFinite(savedVersion)
+  const migrating = Number.isFinite(savedVersion) && savedVersion < TOOLBAR_LAYOUT_VERSION
+  if (migrating && context === 'document' && stored.items.join() === DOCUMENT_DEFAULT_V2) return defaultToolbarLayout(context)
+
+  const known = Array.isArray(stored.known) ? new Set(stored.known) : null
+  const promoted = known && migrating
     ? PROMOTED_TO_DEFAULT.filter((item) => item.context === context && savedVersion < item.version).map((item) => item.id)
     : []
   const newDefaults = known ? [...defaultIds(context).filter((id) => !known.has(id)), ...promoted] : []
   return {
     version: TOOLBAR_LAYOUT_VERSION,
-    items: adding(newDefaults, tidy, DEFAULT_TOOLBARS[context]),
+    items: adding(newDefaults, tidy, defaultIds(context)),
     known: toolbarItemsFor(context).map((item) => item.id),
   }
+}
+
+/** Spacers tidied on each page, and empty pages dropped. */
+function tidyPages(items: string[]): string[] {
+  const pages = pagesOf(items)
+    .map((page) => {
+      const kept = page.filter((id, i) => !(isSpacer(id) && (i === 0 || isSpacer(page[i - 1]))))
+      while (kept.length && isSpacer(kept[kept.length - 1])) kept.pop()
+      return kept
+    })
+    .filter((page) => page.some(isItem))
+  return pages.flatMap((page, index) => (index ? [PAGE, ...page] : page))
 }
 
 export function normalizeDisplayMode(raw: unknown): ToolbarDisplayMode {

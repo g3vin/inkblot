@@ -21,7 +21,9 @@ import {
   togglePinnedFont,
 } from '../../../lib/systemFonts'
 import Icon from '../../../ui/Icon.jsx'
-import { Glyph, ItemFrame, MenuButton, ToolButton } from '../ToolbarControls'
+import { ChoiceButton, Glyph, ItemFrame, MenuButton, ToolButton } from '../ToolbarControls'
+import InkPicker from '../../../ui/InkPicker.jsx'
+import { INKS, resolveInkHex } from '../../../lib/palette'
 import { blockOptions } from './blockOptions'
 
 const sendTo = (ctx, type, payload = {}) => {
@@ -42,63 +44,56 @@ export function FontItem({ ctx, spec }) {
 
   const { sections, missingCurrentFont } = buildFontSections({ systemFonts, pinnedFonts, recentFonts, currentFont: toolbar.font })
   const pinned = pinnedFonts.includes(toolbar.font)
-  const disabled = !toolbar.target
+  const choose = (family) => {
+    setRecentFonts(rememberRecentFont(family))
+    sendTo(ctx, 'setFontFamily', { family })
+  }
+  const fontItem = (font) => ({
+    text: font,
+    style: { fontFamily: toCssFontFamily(font) },
+    checked: font === toolbar.font,
+    action: () => choose(font),
+  })
+  // Pin first, for the font in use; then each section, set apart. The document's font
+  // may not be installed here: it is listed anyway, so the row can show what is in use.
+  const items = [
+    { icon: pinned ? 'unpin' : 'pin', text: pinned ? `Unpin ${toolbar.font}` : `Pin ${toolbar.font}`, keepOpen: true, action: () => setPinnedFonts(togglePinnedFont(toolbar.font)) },
+    ...(missingCurrentFont ? [{ separator: true }, fontItem(toolbar.font)] : []),
+    ...sections.flatMap(({ fonts }) => [{ separator: true }, ...fonts.map(fontItem)]),
+  ]
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <select
-        className="toolbar-select toolbar-select-font"
-        value={toolbar.font}
-        disabled={disabled}
-        onChange={(e) => {
-          setRecentFonts(rememberRecentFont(e.target.value))
-          sendTo(ctx, 'setFontFamily', { family: e.target.value })
-        }}
-        aria-label="Font"
-        title={`Font: ${toolbar.font}`}
-      >
-        {/* The document's font may not be installed here. Keep it selectable so
-            opening the picker does not silently reassign it. */}
-        {missingCurrentFont && <option value={toolbar.font}>{toolbar.font}</option>}
-        {sections.map(({ label, fonts }) => (
-          <optgroup key={label} label={label}>
-            {fonts.map((font) => (
-              <option key={font} value={font} style={{ fontFamily: toCssFontFamily(font) }}>{font}</option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-      <button
-        type="button"
-        className={pinned ? 'active' : ''}
-        disabled={disabled}
-        onClick={() => setPinnedFonts(togglePinnedFont(toolbar.font))}
-        aria-pressed={pinned}
-        aria-label={pinned ? `Unpin ${toolbar.font}` : `Pin ${toolbar.font}`}
-        title={pinned ? `Unpin ${toolbar.font}` : `Pin ${toolbar.font}`}
-      >
-        <Icon name="pin" active={pinned} />
-      </button>
+      <MenuButton label={`Font: ${toolbar.font}`} display={ctx.display} disabled={!toolbar.target} items={items} rowClassName="tb-strip">
+        <span className="tb-text tb-value tb-value-font" style={{ fontFamily: toCssFontFamily(toolbar.font) }}>{toolbar.font}</span>
+      </MenuButton>
     </ItemFrame>
   )
 }
 
 const FONT_SIZES = ['14px', '16px', '18px', '20px', '24px', '28px', '32px', '36px']
 
+/** The size a step from `size` along FONT_SIZES: the next one past it either way. */
+const stepSize = (size, by) => {
+  const now = parseFloat(size) || 18
+  const sizes = by > 0 ? FONT_SIZES : [...FONT_SIZES].reverse()
+  return sizes.find((option) => (by > 0 ? parseFloat(option) > now : parseFloat(option) < now)) ?? null
+}
+
 export function FontSizeItem({ ctx, spec }) {
   const { toolbar } = ctx
-  const sizes = FONT_SIZES.includes(toolbar.fontSize) ? FONT_SIZES : [toolbar.fontSize, ...FONT_SIZES]
+  const smaller = stepSize(toolbar.fontSize, -1)
+  const larger = stepSize(toolbar.fontSize, 1)
+  const items = [
+    { icon: 'subtract', text: 'Smaller', enabled: Boolean(smaller), keepOpen: true, action: () => sendTo(ctx, 'setFontSize', { size: smaller }) },
+    { icon: 'add', text: 'Larger', enabled: Boolean(larger), keepOpen: true, action: () => sendTo(ctx, 'setFontSize', { size: larger }) },
+    { separator: true },
+    ...FONT_SIZES.map((size) => ({ text: String(parseInt(size, 10)), checked: size === toolbar.fontSize, action: () => sendTo(ctx, 'setFontSize', { size }) })),
+  ]
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <select
-        className="toolbar-select toolbar-select-size"
-        value={toolbar.fontSize}
-        disabled={!toolbar.target}
-        onChange={(e) => sendTo(ctx, 'setFontSize', { size: e.target.value })}
-        aria-label="Font size"
-        title="Font size"
-      >
-        {sizes.map((size) => <option key={size} value={size}>{parseInt(size, 10)}</option>)}
-      </select>
+      <MenuButton label={`Font size: ${parseInt(toolbar.fontSize, 10) || ''}`} display={ctx.display} disabled={!toolbar.target} items={items}>
+        <span className="tb-text tb-value tb-value-size">{parseInt(toolbar.fontSize, 10) || '–'}</span>
+      </MenuButton>
     </ItemFrame>
   )
 }
@@ -129,41 +124,51 @@ export function TextStyleItem({ ctx, spec }) {
   )
 }
 
-function ColorWell({ ctx, spec, value, glyph, onChange, onBlur }) {
+/** The ink a literal colour is, when it is one as picked here. */
+const inkOf = (hex) => INKS.find((ink) => resolveInkHex(ink.id, '').toLowerCase() === String(hex).toLowerCase())?.id ?? null
+
+/**
+ * The text colour and the highlighter: the inks, as the colour each shows as now (the
+ * document keeps literal colours), and any other colour from the system picker.
+ */
+function ColorChoice({ ctx, spec, value, glyph, onPick }) {
+  const disabled = !ctx.toolbar.target
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <label className="toolbar-color" title={spec.label} aria-disabled={!ctx.toolbar.target}>
-        {ctx.display === 'label'
-          ? <span className="tb-text">{spec.label}</span>
-          : <span className={`toolbar-color-glyph${glyph === 'A' ? ' toolbar-color-glyph-text' : ''}`} aria-hidden="true">{glyph === 'A' ? 'A' : <Icon name={glyph} />}</span>}
-        <span className="toolbar-color-bar" style={{ background: value }} aria-hidden="true" />
-        <input type="color" value={value} disabled={!ctx.toolbar.target} onChange={onChange} onBlur={onBlur} aria-label={spec.label} />
-      </label>
+      <ChoiceButton
+        label={spec.label}
+        disabled={disabled}
+        className="toolbar-color"
+        glyph={(
+          <>
+            {ctx.display === 'label'
+              ? <span className="tb-text">{spec.label}</span>
+              : <span className={`toolbar-color-glyph${glyph === 'A' ? ' toolbar-color-glyph-text' : ''}`} aria-hidden="true">{glyph === 'A' ? 'A' : <Icon name={glyph} />}</span>}
+            <span className="toolbar-color-bar" style={{ background: value }} aria-hidden="true" />
+          </>
+        )}
+      >
+        {(close) => (
+          <div className="tb-color-row">
+            <InkPicker label={spec.label} value={inkOf(value)} onChange={(id) => { onPick(resolveInkHex(id)); close() }} />
+            <span className="toolbar-group-divider" aria-hidden="true" />
+            <label className="tb-color-custom" title="Another colour">
+              <Icon name="palette" />
+              <input type="color" value={value} onChange={(e) => onPick(e.target.value)} aria-label="Another colour" />
+            </label>
+          </div>
+        )}
+      </ChoiceButton>
     </ItemFrame>
   )
 }
 
 export function TextColorItem({ ctx, spec }) {
-  return <ColorWell ctx={ctx} spec={spec} value={ctx.toolbar.color} glyph="A" onChange={(e) => sendTo(ctx, 'setColor', { color: e.target.value })} />
+  return <ColorChoice ctx={ctx} spec={spec} value={ctx.toolbar.color} glyph="A" onPick={(color) => sendTo(ctx, 'setColor', { color })} />
 }
 
 export function HighlightItem({ ctx, spec }) {
-  // The picker's value mid-drag: a pushed state arriving then would yank the swatch
-  // back and fight the picker, so while this is set it wins.
-  const [draft, setDraft] = useState(null)
-  return (
-    <ColorWell
-      ctx={ctx}
-      spec={spec}
-      value={draft ?? ctx.toolbar.highlight}
-      glyph="highlight"
-      onBlur={() => setDraft(null)}
-      onChange={(e) => {
-        setDraft(e.target.value)
-        sendTo(ctx, 'setHighlight', { color: e.target.value, remember: true })
-      }}
-    />
-  )
+  return <ColorChoice ctx={ctx} spec={spec} value={ctx.toolbar.highlight} glyph="highlight" onPick={(color) => sendTo(ctx, 'setHighlight', { color, remember: true })} />
 }
 
 const ALIGNMENTS = [
@@ -183,6 +188,7 @@ export function AlignmentItem({ ctx, spec }) {
         display={ctx.display}
         disabled={!toolbar.target}
         items={ALIGNMENTS.map((option) => ({
+          icon: option.icon,
           text: option.label,
           checked: option.value === toolbar.alignment,
           action: () => sendTo(ctx, 'setAlignment', { alignment: option.value }),
@@ -198,21 +204,24 @@ export function ParagraphStyleItem({ ctx, spec }) {
   const { toolbar } = ctx
   const format = toolbar.writingFormat || WritingFormat.Prose
   const options = blockOptions(format)
-  const title = format === WritingFormat.Prose ? 'Paragraph style' : 'Script element'
+  const prose = format === WritingFormat.Prose
+  const block = toolbar.blockType || BlockType.Paragraph
+  const current = options.find(([value]) => value === block)?.[1] ?? options[0][1]
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
-      <select
-        className="toolbar-select"
-        value={toolbar.blockType || BlockType.Paragraph}
+      <MenuButton
+        label={`${prose ? 'Paragraph style' : 'Script element'}: ${current}`}
+        display={ctx.display}
         disabled={!toolbar.target}
-        onChange={(e) => sendTo(ctx, 'setBlockType', { block: e.target.value })}
-        aria-label={title}
-        title={title}
+        items={options.map(([value, label], index) => ({
+          text: label,
+          title: prose ? label : `${label} (⌥⌘${index + 1})`,
+          checked: value === block,
+          action: () => sendTo(ctx, 'setBlockType', { block: value }),
+        }))}
       >
-        {options.map(([block, label], index) => (
-          <option key={block} value={block}>{format === WritingFormat.Prose ? label : `${label}  ⌥⌘${index + 1}`}</option>
-        ))}
-      </select>
+        <span className="tb-text tb-value">{current}</span>
+      </MenuButton>
     </ItemFrame>
   )
 }

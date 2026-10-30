@@ -1,5 +1,6 @@
 /**
- * ArchivePanel.jsx — a document's archive, opened from the History tab.
+ * ArchivePanel.jsx — a document's archive, opened from the inspector's foot over
+ * whichever panel is showing.
  *
  * Everything archived out of the document (`lib/archiveStore.js`), newest first, each
  * with its kind, when it was archived, Restore and Delete. For now the only kind is a
@@ -13,6 +14,7 @@ import Icon from '../../ui/Icon.jsx'
 import { EmptyState } from '../../ui/Surfaces.jsx'
 import { SkeletonRows } from '../../ui/Reveal.jsx'
 import { staggerStyle, useReveal } from '../../ui/revealState.js'
+import './HistoryPanel.css'
 
 const KIND_LABELS = { bubble: 'Bubble' }
 
@@ -28,7 +30,7 @@ export function ArchiveIcon({ size = 14 }) {
   )
 }
 
-export default function ArchivePanel({ projectName, docName, editor, onBack }) {
+export default function ArchivePanel({ projectName, docName, editor, backLabel, onBack }) {
   const [items, setItems] = useState([])
   const [missing, setMissing] = useState(null)
   // Whose archive `items` is, so "Nothing archived" is said only once it is known.
@@ -68,10 +70,10 @@ export default function ArchivePanel({ projectName, docName, editor, onBack }) {
           type="button"
           className="panel-action-btn panel-action-btn-small"
           onClick={onBack}
-          title="Back to the document's versions"
+          title={`Back to ${backLabel}`}
         >
           <Icon name="chevron-left" />
-          History
+          {backLabel}
         </button>
         <span className="history-archive-title">Archive</span>
       </div>

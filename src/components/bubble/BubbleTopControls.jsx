@@ -3,7 +3,7 @@
  * how the text is split (Sentences, Clauses, Words), Archive, and Done.
  */
 import { BubbleMode } from '../../types'
-import { Button, Icon, IconButton, Segmented } from '../../ui'
+import { IconButton, Segmented } from '../../ui'
 
 /** Sentences first: the widest grouping, for reordering a paragraph. */
 const MODES = [
@@ -22,16 +22,15 @@ export default function BubbleTopControls({ mode, onMode, onArchive, onDone }) {
         title="Write the sentence into the document and archive this session — it can be restored from History ▸ Archive"
         onClick={onArchive}
       />
-      <Button
+      <IconButton
+        icon="check"
+        label="Done"
         variant="filled"
-        size="toolbar"
+        size="circle"
         className="bubble-editor-done"
         onClick={onDone}
         title="Write the sentence into the document and keep this session (⌘↩)"
-      >
-        <Icon name="check" size={16} />
-        Done
-      </Button>
+      />
     </div>
   )
 }

@@ -4,34 +4,9 @@
  * (docs/DESIGN.md §9 → Pop-ups). A submenu becomes a labelled group.
  */
 import { useMemo } from 'react'
-import Menu, { MenuItem, MenuLabel, MenuSeparator } from './Menu.jsx'
+import Menu from './Menu.jsx'
+import { menuItemsOf } from './menuItemsOf.jsx'
 import { LayerContext } from './layer'
-
-/** `CmdOrCtrl+Shift+N` → `⌘⇧N`. */
-const shortcut = (accelerator) => accelerator
-  ?.replace(/(CmdOrCtrl|CommandOrControl|Cmd|Command)\+/g, '⌘')
-  .replace(/Shift\+/g, '⇧').replace(/(Alt|Option)\+/g, '⌥').replace(/Ctrl\+/g, '⌃')
-
-function itemsOf(list, path = '') {
-  const nodes = list.filter(Boolean).flatMap((item, index) => {
-    const key = `${path}${index}`
-    if (item.separator) return [<MenuSeparator key={key} />]
-    if (item.items) return [<MenuSeparator key={`${key}-`} />, <MenuLabel key={key}>{item.text}</MenuLabel>, ...itemsOf(item.items, `${key}.`)]
-    return [
-      <MenuItem
-        key={key}
-        checked={typeof item.checked === 'boolean' ? item.checked : undefined}
-        disabled={item.enabled === false}
-        shortcut={shortcut(item.accelerator)}
-        onSelect={() => item.action?.()}
-      >
-        {item.text}
-      </MenuItem>,
-    ]
-  })
-  while (nodes[0]?.type === MenuSeparator) nodes.shift()
-  return nodes
-}
 
 export default function MenuFromItems({ anchor, point, items, onClose }) {
   const anchorRef = useMemo(() => ({ current: anchor }), [anchor])
@@ -46,7 +21,7 @@ export default function MenuFromItems({ anchor, point, items, onClose }) {
         onClose={onClose}
         label={anchor?.getAttribute?.('aria-label') || anchor?.textContent?.trim() || 'Menu'}
       >
-        {itemsOf(items)}
+        {menuItemsOf(items)}
       </Menu>
     </LayerContext.Provider>
   )

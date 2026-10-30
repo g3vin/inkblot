@@ -88,7 +88,7 @@
   background: transparent;
   box-shadow: none;
   font-size: 11px;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .toolbar-group > button {
@@ -127,14 +127,26 @@
   appearance: none;
   -webkit-appearance: none;
   text-align: left;
-  transition: background 120ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick);
 }
 
 .toolbar-select:hover { background: var(--control-hover-bg); }
 .toolbar-select:focus-visible { background: var(--control-hover-bg); box-shadow: var(--focus-ring); }
 
-/* Font names come from the OS and can be any length, so clip long ones rather
-   than letting the control stretch the titlebar. */
+/* A menu button that shows its value (font, size, paragraph style) is a menu at rest
+   too: the control fill. Font names come from the OS and can be any length, so a long
+   one is clipped rather than stretching the titlebar. */
+.toolbar-group > .tb-menu-button:has(> .tb-value) {
+  gap: var(--space-1);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  background: var(--control-bg);
+}
+.toolbar-group > .tb-menu-button:has(> .tb-value):hover:not([data-opener]) { background: var(--control-hover-bg); }
+.tb-value { overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.tb-value-font { max-width: 96px; font-weight: 400; font-size: 13px; }
+.tb-value-size { min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+
+
 .toolbar-select-font {
   width: 104px;
   text-overflow: ellipsis;
@@ -147,8 +159,8 @@
 }
 
 /* ---- Color swatches ----
-   The native input covers the whole control and is invisible, so the glyph +
-   color bar act as the button while a click still opens the OS picker. */
+   The glyph over a bar of the colour in use; it opens the inks in place, and the last
+   of them, the OS picker (its native input covers it, invisible). */
 
 .toolbar-color {
   position: relative;
@@ -162,13 +174,14 @@
   height: 22px;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick);
 }
 
 .toolbar-color:hover,
 .toolbar-color:focus-within {
   background: var(--surface-active);
 }
+.toolbar-group > button.toolbar-color { flex-direction: column; gap: 1px; }
 
 .toolbar-color-glyph {
   display: inline-flex;
@@ -193,7 +206,23 @@
   pointer-events: none;
 }
 
-.toolbar-color input[type='color'] {
+.tb-color-row { display: flex; align-items: center; gap: var(--space-2); }
+.tb-color-row .ib-ink-picker { flex-wrap: nowrap; gap: var(--space-1); }
+.tb-color-custom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-capsule);
+  height: var(--size-capsule);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.tb-color-custom:hover,
+.tb-color-custom:focus-within { background: var(--surface-active); }
+
+:is(.toolbar-color, .tb-color-custom) input[type='color'] {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -260,9 +289,8 @@
   background: currentColor;
   opacity: 0.74;
   transform-origin: center;
-  transition:
-    height 90ms ease-out,
-    opacity 140ms ease;
+  transition: height var(--spring-quick-dur) var(--spring-quick),
+    opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 .dictation-mic-btn:not(.active):not(.loading) .dictation-button-wave-bar {
@@ -294,55 +322,37 @@
   border-color: color-mix(in srgb, var(--status-danger) 48%, transparent);
 }
 
-/* Read aloud: the voice and its live waveform (its signature), then the form. In the
-   card's toolbar it is a row (a form takes the whole toolbar, DESIGN.md §6); its hint
-   shows there only when it says what's happening. */
-.ib-popover.read-aloud-popover { width: min(320px, calc(100vw - 24px)); display: grid; gap: var(--space-4); }
-.read-aloud-popover .ib-popover-eyebrow { margin: 0; }
-.ib-dock .read-aloud-head { gap: var(--space-2); }
-.ib-dock .read-aloud-voice { display: none; }
-.ib-dock.read-aloud-popover .ui-select { min-width: 180px; }
-.ib-dock .read-aloud-status { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-.ib-dock.read-aloud-popover:not(.playing, .loading, .error) .read-aloud-status { display: none; }
-
-.read-aloud-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.read-aloud-voice { margin: 0; }
+/* Read aloud: read or stop, its live waveform (its signature), the voice, and what it's
+   doing while it does something. In the card's toolbar it is a row in place
+   (DESIGN.md §6); floating, the same row on the pop-up surface. */
+.ib-popover.read-aloud-popover { min-width: 0; padding: var(--space-2); }
+.read-aloud-row { gap: var(--space-1); padding: 0; }
+.read-aloud-row > .read-aloud-voice,
+.read-aloud-row > .read-aloud-download { gap: var(--space-1); padding: 0 var(--space-2); }
 
 .read-aloud-wave {
-  height: 30px;
+  height: var(--size-capsule);
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 3px;
-  min-width: 54px;
-  padding: 3px var(--space-3);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-color);
-  background: var(--control-bg);
+  gap: 2px;
+  padding: 0 var(--space-1);
 }
 
 .read-aloud-wave-bar {
-  width: 3px;
-  height: var(--bar-height, 8px);
+  width: 2px;
+  height: var(--bar-height, 6px);
   border-radius: var(--radius-pill);
   background: var(--accent-color);
   opacity: 0.8;
-  transition:
-    height 90ms ease-out,
-    opacity 140ms ease;
+  transition: height var(--spring-quick-dur) var(--spring-quick),
+    opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 .read-aloud-popover:not(.playing) .read-aloud-wave-bar { opacity: 0.36; }
 
-.read-aloud-status { margin: 0; }
+.read-aloud-status { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.read-aloud-status:empty { display: none; }
 .read-aloud-status.is-error { color: var(--status-danger); }
-.read-aloud-action { justify-content: center; }
 
 @keyframes dictation-flight {
   to {

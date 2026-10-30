@@ -1,3 +1,4 @@
+/* Menu.css — the in-page Menu primitive: items, icons, hints and group labels. */
 .ib-menu {
   display: flex;
   flex-direction: column;

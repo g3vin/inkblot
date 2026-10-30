@@ -42,7 +42,7 @@ ok('the toolbars save apart', new Set(L.TOOLBAR_CONTEXTS.map(L.toolbarLayoutKey)
 
 for (const context of L.TOOLBAR_CONTEXTS) {
   const offered = new Set(L.toolbarItemsFor(context).map((item) => item.id))
-  ok(`the ${context} default set is made of its own items`, L.DEFAULT_TOOLBARS[context].every((id) => L.isSpacer(id) || id === L.MORE || offered.has(id)))
+  ok(`the ${context} default set is made of its own items`, L.DEFAULT_TOOLBARS[context].every((id) => L.isSpacer(id) || id === L.PAGE || offered.has(id)))
   ok(`the ${context} palette offers the shared items`, offered.has('inkblot.timer') && offered.has('inkblot.panel.notes'))
 }
 ok('delete is palette-only on a canvas', !L.DEFAULT_TOOLBARS.canvas.includes('inkblot.canvas.delete'))
@@ -88,17 +88,39 @@ read = doc(JSON.stringify({ version: 1, items: ['inkblot.format.font', 'inkblot.
 ok('focus mode already placed is left where it is', read.items.join() === 'inkblot.format.font,inkblot.view.focus-mode')
 ok('the canvas toolbar is not given focus mode', !L.normalizeToolbar('canvas', JSON.stringify({ version: 1, items: ['inkblot.canvas.lock'], known: ids })).items.includes('inkblot.view.focus-mode'))
 
-/* ---------------- the More marker ---------------- */
+/* ---------------- pages ---------------- */
 
-ok('no default set hides items behind More', L.TOOLBAR_CONTEXTS.every((context) => !L.DEFAULT_TOOLBARS[context].includes(L.MORE)))
-const surface = L.DEFAULT_TOOLBARS.document.filter((id) => !L.isSpacer(id)).slice(0, 8)
-ok('the document toolbar leads with the essentials',
-  surface.join() === 'inkblot.view.page-view,inkblot.view.focus-mode,inkblot.format.text-style,inkblot.format.paragraph-style,inkblot.format.bulleted-list,inkblot.format.numbered-list,inkblot.insert.note,inkblot.edit.undo-redo')
-read = doc(JSON.stringify({ items: ['inkblot.format.font', 'more', 'inkblot.format.highlight', 'more'], known: ids }))
-ok('More is kept, once', read.items.join() === 'inkblot.format.font,more,inkblot.format.highlight')
-read = doc(JSON.stringify({ items: ['inkblot.format.font', 'more'], known: ids }))
-ok('a More with nothing after it is dropped', read.items.join() === 'inkblot.format.font')
-ok('More alone is the default set', doc(JSON.stringify({ items: ['more'] })).items.join() === defaults)
+const [writePage, insertPage, ...extraPages] = L.pagesOf(L.DEFAULT_TOOLBARS.document).map((page) => page.filter((id) => !L.isSpacer(id)))
+ok('the document toolbar has two pages', insertPage && extraPages.length === 0)
+ok('its first page leads with the view, undo/redo, then type',
+  writePage.slice(0, 7).join() === 'inkblot.view.page-view,inkblot.view.focus-mode,inkblot.edit.undo-redo,inkblot.format.text-style,inkblot.format.paragraph-style,inkblot.format.font,inkblot.format.font-size')
+ok('its second page is inserting and the voice', insertPage.join() === 'inkblot.insert.note,inkblot.insert.table,inkblot.insert.conversation,inkblot.speech.dictation,inkblot.speech.read-aloud')
+ok('the other toolbars are one page', ['canvas', 'map', 'timeline', 'typeset'].every((context) => !L.DEFAULT_TOOLBARS[context].includes(L.PAGE)))
+
+ok('pagesOf splits on page breaks', JSON.stringify(L.pagesOf(['a', 'page', 'b', 'c'])) === '[["a"],["b","c"]]')
+read = doc(JSON.stringify({ items: ['inkblot.format.font', 'page', 'page', 'inkblot.format.highlight', 'page'], known: ids }))
+ok('page breaks are kept, never doubled or trailing', read.items.join() === 'inkblot.format.font,page,inkblot.format.highlight')
+read = doc(JSON.stringify({ items: ['page', 'inkblot.format.font', 'space', 'page', 'space', 'page', 'space', 'inkblot.format.highlight'], known: ids }))
+ok('each page is tidied and an empty page goes', read.items.join() === 'inkblot.format.font,page,inkblot.format.highlight')
+read = doc(JSON.stringify({ items: ['inkblot.format.font', 'more', 'inkblot.format.highlight'], known: ids }))
+ok('an earlier More marker reads as a page break', read.items.join() === 'inkblot.format.font,page,inkblot.format.highlight')
+ok('a page break alone is the default set', doc(JSON.stringify({ items: ['page'] })).items.join() === defaults)
+
+const v2Default = [
+  'inkblot.view.page-view', 'inkblot.view.focus-mode', 'space',
+  'inkblot.format.text-style', 'inkblot.format.paragraph-style', 'space',
+  'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', 'space',
+  'inkblot.insert.note', 'inkblot.edit.undo-redo', 'space',
+  'inkblot.format.font', 'inkblot.format.font-size',
+  'inkblot.format.text-color', 'inkblot.format.highlight', 'inkblot.format.alignment',
+  'inkblot.insert.table', 'inkblot.insert.conversation',
+  'inkblot.speech.dictation', 'inkblot.speech.read-aloud',
+]
+ok('a layout saved as the old default set takes the new one', doc(JSON.stringify({ version: 2, items: v2Default, known: ids })).items.join() === defaults)
+const arranged = [...v2Default.slice(1), v2Default[0]]
+ok('a layout arranged by hand keeps its order', doc(JSON.stringify({ version: 2, items: arranged, known: ids })).items.join() === arranged.join())
+ok('a write from Customize toolbar is never upgraded', doc(JSON.stringify({ items: v2Default, known: null })).items.join() === v2Default.join())
+
 read = doc(JSON.stringify({ items: ['inkblot.format.font', 'inkblot.insert.conversation'], known: ids.filter((id) => id !== 'inkblot.insert.note') }))
 ok('Add Note reaches a layout saved before it existed', read.items.includes('inkblot.insert.note'))
 

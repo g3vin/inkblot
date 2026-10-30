@@ -7,7 +7,7 @@
  *   owns the padding; don't add your own.
  * - Title: an `eyebrow` over a pop-up of more than one control. A one-line form or a
  *   strip of tools has none.
- * - Motion: it floats in over `--dur-base` and leaves the way it came.
+ * - Motion: it floats in on `--spring-smooth` and leaves the way it came.
  * - Focus: the first control inside takes it; Tab and ⇧Tab stay inside; Escape or a
  *   click outside closes it, and focus goes back to the control that opened it.
  * - Anchor: `anchorRef` (an element), or `anchorRect` (a rect, for a place in the text).
@@ -15,10 +15,11 @@
  *   `onEscape` is for a pop-up whose Escape means something other than close (the
  *   footnote's "leave it as it was").
  * - Opened from a button in a toolbar that takes it (`ToolbarDockContext`, the card's
- *   toolbar), it opens *in* the toolbar (§6 → the dynamic toolbar): a form (a field to
- *   fill in) takes the whole toolbar, with a close button, as find does; a choice
- *   opens in place beside its button, and takes the toolbar if it doesn't fit there.
- *   The button stays pressed (`data-opener`) while it's open.
+ *   toolbar), it opens *in* the toolbar (§6 → the dynamic toolbar): in place beside its
+ *   button, with no eyebrow (the eyebrow names the group for assistive tech only), and
+ *   the toolbar sets aside what no longer fits. `dock="whole"` is for a form that needs
+ *   the whole row, with a close button, as find does. Turning the toolbar's page away
+ *   from it closes it. The button stays pressed (`data-opener`) while it's open.
  */
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -28,9 +29,6 @@ import { LayerContext, ToolbarDockContext } from './layer'
 import { placePopover } from './placePopover.js'
 import './Popover.css'
 
-/** What makes a pop-up a form, which needs the whole toolbar. */
-const FORM = 'input:not([type="color"]), select, textarea'
-
 const placeBy = (anchor, node, align) =>
   placePopover(anchor, { width: node.offsetWidth, height: node.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }, align)
 
@@ -38,7 +36,7 @@ export default function Popover({ open, ...props }) {
   return open ? <OpenPopover {...props} /> : null
 }
 
-function OpenPopover({ anchorRef, anchorRect, onClose, onEscape, align = 'start', eyebrow, className = '', children, ...rest }) {
+function OpenPopover({ anchorRef, anchorRect, onClose, onEscape, align = 'start', eyebrow, dock: dockAs = 'inline', className = '', children, ...rest }) {
   const ref = useRef(null)
   const [position, setPosition] = useState(null)
   // Opened from inside a dialog, it goes in the dialog's layer, so it isn't under it.
@@ -46,20 +44,19 @@ function OpenPopover({ anchorRef, anchorRect, onClose, onEscape, align = 'start'
   const handlers = useRef({ onClose, onEscape })
   useEffect(() => { handlers.current = { onClose, onEscape } })
 
-  // Opened from a toolbar's row, it opens in the toolbar: decided from what it holds,
-  // once it has rendered, and before it paints.
+  // Opened from a toolbar's row, it opens in the toolbar, before it paints.
   const toolbar = useContext(ToolbarDockContext)
   const [dock, setDock] = useState(null)
   useLayoutEffect(() => {
     const anchor = anchorRef?.current
     if (!toolbar || !anchor || !toolbar.owns(anchor)) return
-    const slot = ref.current?.querySelector(FORM) ? null : toolbar.inlineFor(anchor)
+    const slot = dockAs === 'whole' ? null : toolbar.inlineFor(anchor)
     setDock(slot ? { mode: 'inline', target: slot } : { mode: 'whole', target: toolbar.whole })
-  }, [toolbar, anchorRef])
-  // In place but pushed behind » for want of room: it takes the toolbar instead.
+  }, [toolbar, anchorRef, dockAs])
+  // In place, it makes room as it grows, and closes when its page is turned away.
   useEffect(() => {
     if (dock?.mode !== 'inline') return undefined
-    return toolbar.watch(anchorRef.current, () => setDock({ mode: 'whole', target: toolbar.whole }))
+    return toolbar.watch(anchorRef.current, () => handlers.current.onClose?.())
   }, [dock, toolbar, anchorRef])
   useEffect(() => {
     const opener = dock ? anchorRef?.current : null
@@ -133,7 +130,6 @@ function OpenPopover({ anchorRef, anchorRect, onClose, onEscape, align = 'start'
         aria-label={eyebrow || undefined}
         {...rest}
       >
-        {eyebrow ? <span className="ib-eyebrow ib-dock-eyebrow">{eyebrow}</span> : null}
         <div className="ib-dock-body">{children}</div>
         {dock.mode === 'whole'
           ? <IconButton icon="close" label="Close" title="Close (Esc)" size="capsule" onClick={() => handlers.current.onClose?.()} />

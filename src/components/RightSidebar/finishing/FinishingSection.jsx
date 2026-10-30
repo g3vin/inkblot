@@ -12,12 +12,13 @@ import Section from '../../../ui/Section'
 import { writeSectionState } from '../../../ui/sectionState'
 import { shellBridge } from '../../../bridge'
 import { Note } from './controls'
+import { FINISHING_SECTIONS } from '../../../lib/appEvents'
 
 export default function FinishingSection({ id, title, note, accessory, help, children }) {
   const [generation, setGeneration] = useState(0)
   useEffect(() => {
     const reread = () => setGeneration((g) => g + 1)
-    window.addEventListener('inkblot:finishing-sections', reread)
+    window.addEventListener(FINISHING_SECTIONS, reread)
     const unsubscribe = shellBridge.on('typesetFocus', ({ sectionId }) => {
       if (sectionId !== id) return
       writeSectionState(id, true)
@@ -27,7 +28,7 @@ export default function FinishingSection({ id, title, note, accessory, help, chi
       })
     })
     return () => {
-      window.removeEventListener('inkblot:finishing-sections', reread)
+      window.removeEventListener(FINISHING_SECTIONS, reread)
       unsubscribe()
     }
   }, [id])

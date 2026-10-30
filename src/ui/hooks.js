@@ -104,9 +104,31 @@ export function useFocusTrap(active, containerRef, initialFocusRef) {
 }
 
 /**
+ * The item a row above (`step` -1) or below (+1) `from`, nearest it across: for a grid
+ * whose rows are laid out by wrapping, so a row is the items sharing a top.
+ */
+function itemInNextRow(items, from, step) {
+  const rects = items.map((el) => el.getBoundingClientRect())
+  const here = rects[from]
+  const centre = here.left + here.width / 2
+  const rowTops = [...new Set(rects.map((rect) => Math.round(rect.top)))].sort((a, b) => a - b)
+  const row = rowTops[rowTops.indexOf(Math.round(here.top)) + step]
+  if (row === undefined) return from
+  let best = from
+  let distance = Infinity
+  rects.forEach((rect, index) => {
+    if (Math.round(rect.top) !== row) return
+    const gap = Math.abs(rect.left + rect.width / 2 - centre)
+    if (gap < distance) { distance = gap; best = index }
+  })
+  return best
+}
+
+/**
  * Roving focus over the items matched by `itemSelector` inside `containerRef`.
- * Returns an onKeyDown handler for the container.
- * @param {{ orientation?: 'vertical'|'horizontal', loop?: boolean, typeahead?: boolean }} [options]
+ * Returns an onKeyDown handler for the container. In a `grid`, ←/→ step through the
+ * items in order and ↑/↓ go to the nearest item in the row above or below.
+ * @param {{ orientation?: 'vertical'|'horizontal'|'grid', loop?: boolean, typeahead?: boolean }} [options]
  */
 export function useRovingFocus(containerRef, itemSelector, options = {}) {
   const { orientation = 'vertical', loop = true, typeahead = true } = options
@@ -125,6 +147,13 @@ export function useRovingFocus(containerRef, itemSelector, options = {}) {
     const focusAt = (i) => {
       const bounded = loop ? (i + items.length) % items.length : Math.max(0, Math.min(items.length - 1, i))
       items[bounded]?.focus()
+    }
+
+    if (orientation === 'grid' && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault()
+      if (index < 0) { focusAt(0); return }
+      items[itemInNextRow(items, index, event.key === 'ArrowUp' ? -1 : 1)]?.focus()
+      return
     }
 
     if (event.key === next) { event.preventDefault(); focusAt(index < 0 ? 0 : index + 1) }

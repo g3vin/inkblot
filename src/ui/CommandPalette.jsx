@@ -16,6 +16,7 @@ import Kbd from './Kbd'
 import './Dialog.css'
 import './Popover.css'
 import './CommandPalette.css'
+import { COMMAND_PALETTE } from '../lib/appEvents'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
 
@@ -31,10 +32,10 @@ export default function CommandPalette() {
     }
     const onOpen = () => setOpen(true)
     window.addEventListener('keydown', onKey)
-    window.addEventListener('inkblot:command-palette', onOpen)
+    window.addEventListener(COMMAND_PALETTE, onOpen)
     return () => {
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('inkblot:command-palette', onOpen)
+      window.removeEventListener(COMMAND_PALETTE, onOpen)
     }
   }, [])
 

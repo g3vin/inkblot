@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { shellBridge, useBridgeEvent, useLatestBridgeState } from '../../../bridge'
 import { PrintRange } from '../../../types'
 import { readUnit, writeUnit } from './units'
+import { PAGE_UNITS } from '../../../lib/appEvents'
 
 const send = (type, payload = {}) => shellBridge.send(type, payload)
 
@@ -66,10 +67,10 @@ export default function usePageLayout() {
 
   useEffect(() => {
     const onUnits = () => setUnitState(readUnit())
-    window.addEventListener('inkblot:page-units', onUnits)
+    window.addEventListener(PAGE_UNITS, onUnits)
     printOptionListeners.add(setPrintOptionsState)
     return () => {
-      window.removeEventListener('inkblot:page-units', onUnits)
+      window.removeEventListener(PAGE_UNITS, onUnits)
       printOptionListeners.delete(setPrintOptionsState)
     }
   }, [])

@@ -10,7 +10,6 @@
  *     Make a copy (materialize the version as a new document), Compare (opens
  *     the side-by-side diff/merge view in the editor area), Rename, Delete
  *   - Snapshot now, for deliberately pinning the current state between autosaves
- *   - the document's Archive (`ArchivePanel`): things put away out of it, to restore
  *
  * Storage and the diff engine live in lib/FileSystem.js and lib/versionHistory.js;
  * this file is only the timeline UI. Compare is VersionComparePane, which lives in
@@ -48,8 +47,8 @@ import { EmptyState } from '../../ui/Surfaces.jsx'
 import { SkeletonRows } from '../../ui/Reveal.jsx'
 import { staggerStyle, useReveal } from '../../ui/revealState.js'
 import { PanelActions } from '../../ui/PanelActions.jsx'
-import ArchivePanel from './ArchivePanel'
 import './HistoryPanel.css'
+import { VERSIONS_CHANGED } from '../../lib/appEvents'
 
 /** ±word-count badge. Hidden when the change was a wash. */
 function DeltaBadge({ added, removed }) {
@@ -112,7 +111,7 @@ export default function HistoryPanel({
 }) {
   const isCanvas = isCanvasDoc(docName)
   const isMap = isMapDoc(docName)
-  // A canvas or map: no editor to snapshot from, no archive, word counts from names.
+  // A canvas or map: no editor to snapshot from, word counts from names.
   const isStructured = !isTextDoc(docName)
   const [localVersions, setLocalVersions] = useState(Array.isArray(versions) ? versions : [])
   const [namedOnly, setNamedOnly] = useState(false)
@@ -121,7 +120,6 @@ export default function HistoryPanel({
   const [renameValue, setRenameValue] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [showArchive, setShowArchive] = useState(false)
   const renameInputRef = useRef(null)
 
   const displayedVersions = useMemo(
@@ -167,8 +165,8 @@ export default function HistoryPanel({
       void refresh()
     }
 
-    window.addEventListener('versions:changed', handler)
-    return () => window.removeEventListener('versions:changed', handler)
+    window.addEventListener(VERSIONS_CHANGED, handler)
+    return () => window.removeEventListener(VERSIONS_CHANGED, handler)
   }, [projectName, docName, refresh])
 
   useEffect(() => {
@@ -438,19 +436,6 @@ export default function HistoryPanel({
         ? { title: 'No named versions yet.', hint: 'Name a version from its row to keep it here.' }
         : { title: 'No matching versions.' })
 
-  if (showArchive && !isStructured) {
-    return (
-      <div className="sidebar-panel history-panel">
-        <ArchivePanel
-          projectName={projectName}
-          docName={docName}
-          editor={editor}
-          onBack={() => setShowArchive(false)}
-        />
-      </div>
-    )
-  }
-
   return (
     <div className="sidebar-panel history-panel" data-help="history.panel">
       <PanelActions>
@@ -461,9 +446,6 @@ export default function HistoryPanel({
           onClick={() => void snapshotNow()}
           disabled={busy || (!isStructured && !editor)}
         />
-        {isStructured ? null : (
-          <IconButton icon="archive" label="Show the archive" size="capsule" onClick={() => setShowArchive(true)} />
-        )}
       </PanelActions>
       <div className="history-toolbar">
         <Segmented
