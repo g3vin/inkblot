@@ -18,13 +18,14 @@ export const DEFAULT_FOCUS_MODE_SETTINGS = {
   fontSize: 42,
   contextFontSize: 28,
   paragraphContext: false,
+  showPosition: false,
 }
 
 const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value))
 
 /** One setting made valid: a number within its limits, or a boolean. */
 export const normalizeFocusModeSetting = (key, value) => {
-  if (key === 'paragraphContext') return Boolean(value)
+  if (key === 'paragraphContext' || key === 'showPosition') return Boolean(value)
   const limits = FOCUS_MODE_LIMITS[key]
   const number = Number(value)
   return clampNumber(Number.isFinite(number) ? number : DEFAULT_FOCUS_MODE_SETTINGS[key], limits.min, limits.max)

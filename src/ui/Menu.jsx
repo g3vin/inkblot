@@ -9,8 +9,8 @@
  *   </Menu>
  *
  * Arrow keys, Home/End and typeahead move between items; Enter/Space select; Escape,
- * Tab or an outside click closes it, and focus returns to the anchor. It floats in over
- * `--dur-fast` and leaves the way it came. The "More" overflow
+ * Tab or an outside click closes it, and focus returns to the anchor. It floats in on
+ * `--spring-quick` and leaves the way it came. The "More" overflow
  * menu on every toolbar is this component — it is how advanced tools stay one step
  * away without crowding the surface (docs/DESIGN.md → Progressive disclosure).
  */
@@ -42,10 +42,14 @@ function OpenMenu({ onClose, anchorRef, point, placement = 'bottom-start', label
 
   useEffect(() => {
     const anchor = anchorRef?.current
-    const frame = window.requestAnimationFrame(() => ref.current?.querySelector(ITEM_SELECTOR)?.focus())
+    const menu = ref.current
+    const frame = window.requestAnimationFrame(() => menu?.querySelector(ITEM_SELECTOR)?.focus())
     return () => {
       window.cancelAnimationFrame(frame)
-      anchor?.focus?.({ preventScroll: true })
+      // Only take focus back if the menu still had it: an item that opened a name box
+      // or a dialog has moved it there, and stealing it would blur that away.
+      const active = document.activeElement
+      if (!active || active === document.body || menu?.contains(active)) anchor?.focus?.({ preventScroll: true })
     }
   }, [anchorRef])
 
