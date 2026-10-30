@@ -29,6 +29,7 @@ import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
 import { OPEN_SETTINGS, primaryTimerAction } from './stats/timerMenu.js'
 import { allRoutines } from './stats/config.js'
 import { buildFormatMenu, buildInsertMenu, fileExtraItems, pasteAndMatchStyleItem, viewItems } from './menus/appMenus.js'
+import { CLOSE_PROJECT, COMMAND_PALETTE, EXPORT_EVENT, IMPORT_SCRIPT, PAGE_SETUP, PRINT_EVENT, PRINT_LAYOUT_TOGGLE, WRITING_FORMAT } from './lib/appEvents'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -258,36 +259,38 @@ export default function App() {
       const printLayoutItem = await MenuItem.new({
         id: 'print-layout-toggle',
         text: 'Page view  ⌥⌘P',
-        action: printEvent('inkblot:print-layout-toggle'),
+        action: printEvent(PRINT_LAYOUT_TOGGLE),
       })
       const exportItems = (scope, labelSuffix = '') => Promise.all([
-        MenuItem.new({ id: `export-pdf-${scope}`, text: `PDF${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'pdf', scope }) }),
+        MenuItem.new({ id: `export-pdf-${scope}`, text: `PDF${labelSuffix}…`, action: printEvent(EXPORT_EVENT, { format: 'pdf', scope }) }),
         ...(scope === 'folder'
-          ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for binding…', action: printEvent('inkblot:export', { format: 'pdf', scope, bound: true }) })]
+          ? [MenuItem.new({ id: 'export-pdf-bound', text: 'PDF for binding…', action: printEvent(EXPORT_EVENT, { format: 'pdf', scope, bound: true }) })]
           : []),
-        MenuItem.new({ id: `export-epub-${scope}`, text: `EPUB${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'epub', scope }) }),
-        MenuItem.new({ id: `export-docx-${scope}`, text: `Word (.docx)${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'docx', scope }) }),
-        MenuItem.new({ id: `export-md-${scope}`, text: `Markdown${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'markdown', scope }) }),
-        MenuItem.new({ id: `export-html-${scope}`, text: `HTML${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'html', scope }) }),
-        MenuItem.new({ id: `export-text-${scope}`, text: `Plain Text${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'plainText', scope }) }),
+        MenuItem.new({ id: `export-epub-${scope}`, text: `EPUB${labelSuffix}…`, action: printEvent(EXPORT_EVENT, { format: 'epub', scope }) }),
+        MenuItem.new({ id: `export-docx-${scope}`, text: `Word (.docx)${labelSuffix}…`, action: printEvent(EXPORT_EVENT, { format: 'docx', scope }) }),
+        MenuItem.new({ id: `export-md-${scope}`, text: `Markdown${labelSuffix}…`, action: printEvent(EXPORT_EVENT, { format: 'markdown', scope }) }),
+        MenuItem.new({ id: `export-html-${scope}`, text: `HTML${labelSuffix}…`, action: printEvent(EXPORT_EVENT, { format: 'html', scope }) }),
+        MenuItem.new({ id: `export-text-${scope}`, text: `Plain Text${labelSuffix}…`, action: printEvent(EXPORT_EVENT, { format: 'plainText', scope }) }),
         PredefinedMenuItem.new({ item: 'Separator' }),
-        MenuItem.new({ id: `export-fountain-${scope}`, text: `Fountain${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'fountain', scope }) }),
-        MenuItem.new({ id: `export-fdx-${scope}`, text: `Final Draft (.fdx)${labelSuffix}…`, action: printEvent('inkblot:export', { format: 'fdx', scope }) }),
+        MenuItem.new({ id: `export-fountain-${scope}`, text: `Fountain${labelSuffix}…`, action: printEvent(EXPORT_EVENT, { format: 'fountain', scope }) }),
+        MenuItem.new({ id: `export-fdx-${scope}`, text: `Final Draft (.fdx)${labelSuffix}…`, action: printEvent(EXPORT_EVENT, { format: 'fdx', scope }) }),
       ])
       const fileItems = [
         await PredefinedMenuItem.new({ item: 'Separator' }),
-        await MenuItem.new({ id: 'page-setup', text: 'Page setup…', action: printEvent('inkblot:page-setup') }),
+        await MenuItem.new({ id: 'close-project', text: 'All projects  ⇧⌘O', action: printEvent(CLOSE_PROJECT) }),
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        await MenuItem.new({ id: 'page-setup', text: 'Page setup…', action: printEvent(PAGE_SETUP) }),
         await Submenu.new({
           text: 'Write as',
           items: await Promise.all([['prose', 'Prose'], ['screenplay', 'Screenplay'], ['stageplay', 'Stage play']].map(([format, text]) => (
-            MenuItem.new({ id: `write-as-${format}`, text, action: printEvent('inkblot:writing-format', { format }) })
+            MenuItem.new({ id: `write-as-${format}`, text, action: printEvent(WRITING_FORMAT, { format }) })
           ))),
         }),
-        await MenuItem.new({ id: 'print-document', text: 'Print…  ⌘P', action: printEvent('inkblot:print', { scope: 'document' }) }),
-        await MenuItem.new({ id: 'print-book', text: 'Print Book…', action: printEvent('inkblot:print', { scope: 'folder' }) }),
-        await MenuItem.new({ id: 'print-book-bound', text: 'Print book for binding…', action: printEvent('inkblot:print', { scope: 'folder', bound: true }) }),
+        await MenuItem.new({ id: 'print-document', text: 'Print…  ⌘P', action: printEvent(PRINT_EVENT, { scope: 'document' }) }),
+        await MenuItem.new({ id: 'print-book', text: 'Print Book…', action: printEvent(PRINT_EVENT, { scope: 'folder' }) }),
+        await MenuItem.new({ id: 'print-book-bound', text: 'Print book for binding…', action: printEvent(PRINT_EVENT, { scope: 'folder', bound: true }) }),
         await PredefinedMenuItem.new({ item: 'Separator' }),
-        await MenuItem.new({ id: 'import-fountain', text: 'Import Fountain script…', action: printEvent('inkblot:import-script') }),
+        await MenuItem.new({ id: 'import-fountain', text: 'Import Fountain script…', action: printEvent(IMPORT_SCRIPT) }),
         await Submenu.new({ text: 'Export', items: await exportItems('document') }),
         await Submenu.new({ text: 'Export Book', items: await exportItems('folder') }),
       ]
@@ -305,7 +308,7 @@ export default function App() {
         await MenuItem.new({
           id: 'command-palette',
           text: 'Command palette…  ⌘K',
-          action: () => dispatchAppEvent('inkblot:command-palette'),
+          action: () => dispatchAppEvent(COMMAND_PALETTE),
         }),
       ]
       const displayItems = [await PredefinedMenuItem.new({ item: 'Separator' }), wordCountItem, printLayoutItem]
@@ -367,26 +370,26 @@ export default function App() {
     { id: 'view.word-count', section: 'View', title: 'Show or hide word count', icon: 'number', keywords: ['words', 'stats', 'badge'], run: () => applyWordCountBadgeVisibility(!showWordCountBadgeRef.current) },
     { id: 'timer.stats', section: 'Writing', title: 'Show writing stats', icon: 'chart', keywords: ['words', 'goals', 'progress'], run: () => getStatsRuntime().showStats() },
     { id: 'timer.routines', section: 'Writing', title: 'Edit timer routines…', icon: 'timer', keywords: ['pomodoro', 'sprint'], run: () => openSettings('timers') },
-    { id: 'print.layout', section: 'View', title: 'Show or hide page view', icon: 'book-pages', keys: 'Mod+Alt+P', keywords: ['pages', 'print layout', 'preview', 'write'], run: () => dispatchAppEvent('inkblot:print-layout-toggle') },
-    { id: 'print.page-setup', section: 'Print & export', title: 'Page setup…', icon: 'sliders', keywords: ['margins', 'trim', 'paper size'], run: () => dispatchAppEvent('inkblot:page-setup') },
-    { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', keys: 'Mod+P', run: () => dispatchAppEvent('inkblot:print', { scope: 'document' }) },
-    { id: 'print.book', section: 'Print & export', title: 'Print book…', icon: 'books', keywords: ['folder', 'manuscript'], run: () => dispatchAppEvent('inkblot:print', { scope: 'folder' }) },
+    { id: 'print.layout', section: 'View', title: 'Show or hide page view', icon: 'book-pages', keys: 'Mod+Alt+P', keywords: ['pages', 'print layout', 'preview', 'write'], run: () => dispatchAppEvent(PRINT_LAYOUT_TOGGLE) },
+    { id: 'print.page-setup', section: 'Print & export', title: 'Page setup…', icon: 'sliders', keywords: ['margins', 'trim', 'paper size'], run: () => dispatchAppEvent(PAGE_SETUP) },
+    { id: 'print.document', section: 'Print & export', title: 'Print document…', icon: 'print', keys: 'Mod+P', run: () => dispatchAppEvent(PRINT_EVENT, { scope: 'document' }) },
+    { id: 'print.book', section: 'Print & export', title: 'Print book…', icon: 'books', keywords: ['folder', 'manuscript'], run: () => dispatchAppEvent(PRINT_EVENT, { scope: 'folder' }) },
     ...EXPORT_FORMATS.map(([format, label]) => ({
       id: `export.document.${format}`,
       section: 'Print & export',
       title: `Export as ${label}…`,
       icon: 'export',
       keywords: ['save as', 'download', format],
-      run: () => dispatchAppEvent('inkblot:export', { format, scope: 'document' }),
+      run: () => dispatchAppEvent(EXPORT_EVENT, { format, scope: 'document' }),
     })),
-    { id: 'import.fountain', section: 'Document', title: 'Import Fountain script…', icon: 'download', keywords: ['screenplay', 'import'], run: () => dispatchAppEvent('inkblot:import-script') },
+    { id: 'import.fountain', section: 'Document', title: 'Import Fountain script…', icon: 'download', keywords: ['screenplay', 'import'], run: () => dispatchAppEvent(IMPORT_SCRIPT) },
     ...[['prose', 'prose'], ['screenplay', 'a screenplay'], ['stageplay', 'a stage play']].map(([format, label]) => ({
       id: `document.write-as.${format}`,
       section: 'Document',
       title: `Write as ${label}`,
       icon: format === 'prose' ? 'document' : 'story',
       keywords: ['format', 'script', format],
-      run: () => dispatchAppEvent('inkblot:writing-format', { format }),
+      run: () => dispatchAppEvent(WRITING_FORMAT, { format }),
     })),
   ], [applyTheme, applyWordCountBadgeVisibility])
 

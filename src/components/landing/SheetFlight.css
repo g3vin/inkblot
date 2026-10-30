@@ -1,0 +1,64 @@
+/* ============================================================
+   A sheet growing into the document card (SheetFlight.jsx)
+   ============================================================ */
+
+/* A point at the card's centre that everything turns and moves about. */
+.sheet-flight {
+  position: fixed;
+  z-index: var(--z-dialog);
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.sheet-flight.is-leaving {
+  animation: ib-reveal-out var(--spring-smooth-dur) var(--spring-smooth) forwards;
+}
+
+/* The card's own paper, at the card's size, scaled down to the sheet's to begin. */
+.sheet-flight-paper {
+  position: absolute;
+  overflow: hidden;
+  background: var(--app-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transform-origin: 50% 50%;
+}
+
+.sheet-flight-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.sheet-flight-page,
+.sheet-flight-sheet {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* The pile's sheet, flat now that the paper under it is the one that moves. */
+.sheet-flight-sheet .ib-paper-sheet {
+  box-shadow: none;
+  border-radius: 0;
+  transform: none;
+}
+
+/* The toolbar's rule, where the card will draw it. */
+.sheet-flight-titlebar {
+  position: absolute;
+  inset: 0 0 auto;
+  border-bottom: var(--hairline) solid var(--border-color);
+}
+
+.sheet-flight-words {
+  position: absolute;
+  color: var(--text-primary);
+}
+
+.sheet-flight-words p {
+  margin: var(--flight-gap, 1em) 0;
+  overflow-wrap: break-word;
+}

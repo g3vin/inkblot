@@ -22,11 +22,54 @@
  *             the pointer like a hand, h.mark notes when a step happens, h.focus says
  *             what a sequence keeps.
  */
-import { CHAPTERS, EARNEST, LIGHTHOUSE, NEXT_LINE, PROJECT, session, tile } from './fixtures/books.mjs'
+import { CHAPTERS, EARNEST, LIGHTHOUSE, NEXT_LINE, PROJECT, book, session, tile } from './fixtures/books.mjs'
+import { NOW } from './session.mjs'
+import { excerptOfContent } from '../src/lib/docExcerpts.js'
+
+/**
+ * Open `project` from the start screen, as a click on its pile does, and wait until the
+ * start screen has gone (its sheets name the same documents the file tree does).
+ */
+async function openFromLanding(page, project) {
+  await page.locator(`[data-pile-id="${project}"] .ib-paper-pile-title`).click()
+  await page.locator('.landing-page').waitFor({ state: 'detached', timeout: 15000 })
+}
+
+/**
+ * The start screen as a writer who has been at work finds it: the three books, each
+ * reopening on a chapter, their opening lines and their counts already known.
+ */
+function landingPrefs() {
+  const excerpts = {}
+  for (const [file, raw] of Object.entries(book().files)) {
+    const match = /^\/mock\/([^/]+)\/([^./][^/]*)\.json$/.exec(file)
+    if (!match || /\.(canvas|map|timeline)$/.test(match[2])) continue
+    ;(excerpts[match[1]] ||= {})[match[2]] = { v: 1, blocks: excerptOfContent(JSON.parse(raw).content), at: 1 }
+  }
+  const at = Date.parse(NOW)
+  const opened = (doc, hoursAgo) => ({ currentDoc: doc, activeDoc: doc, docTabs: [], updatedAt: new Date(at - hoursAgo * 3600_000).toISOString() })
+  return {
+    'inkblot-session': JSON.stringify({ lastProject: '', projects: {
+      [PROJECT]: opened(CHAPTERS.laurence, 1),
+      [LIGHTHOUSE]: opened('Time Passes', 26),
+      [EARNEST]: opened('Act One', 70),
+    } }),
+    'inkblot.tree.recent': JSON.stringify({
+      [PROJECT]: [CHAPTERS.laurence, CHAPTERS.christmas, CHAPTERS.pilgrims, 'The Marches.canvas'],
+      [LIGHTHOUSE]: ['Time Passes', 'The Window'],
+    }),
+    'inkblot.landing.excerpts': JSON.stringify(excerpts),
+    'inkblot.landing.summaries': JSON.stringify({
+      [PROJECT]: { files: 7, words: 14210, at },
+      [LIGHTHOUSE]: { files: 2, words: 8120, at },
+      [EARNEST]: { files: 1, words: 3020, at },
+    }),
+  }
+}
 
 /** Open a sample project and one of its documents. */
 async function openChapter(page, name, project = PROJECT) {
-  await page.getByText(project, { exact: true }).first().dblclick()
+  await openFromLanding(page, project)
   await page.getByText(name, { exact: true }).first().click()
   await page.locator('.ProseMirror').first().waitFor()
   await page.waitForTimeout(1200)
@@ -37,7 +80,7 @@ async function openChapter(page, name, project = PROJECT) {
  * `prefs`): the document, the inspector tab, the workbench. Then wait for `selector`.
  */
 async function restored(page, selector = '.ProseMirror', project = PROJECT) {
-  await page.getByText(project, { exact: true }).first().dblclick()
+  await openFromLanding(page, project)
   await page.locator(selector).first().waitFor({ timeout: 15000 })
   await page.waitForTimeout(1500)
 }
@@ -108,6 +151,18 @@ async function write(page, text, { cps = 14 } = {}) {
 }
 
 export const SHOTS = [
+  {
+    id: 'welcome',
+    kind: 'still',
+    // The start screen: each book a pile of the chapters lately written in it.
+    themes: ['light', 'dark'],
+    viewport: { width: 1440, height: 900 }, // 16 / 10
+    prefs: landingPrefs(),
+    async run(page) {
+      await page.locator(`[data-pile-id="${PROJECT}"]`).waitFor()
+      await page.waitForTimeout(1500)
+    },
+  },
   {
     id: 'editor',
     kind: 'loop',

@@ -1,129 +1,194 @@
 /* ============================================================
-   Project picker — the welcome window (ProjectPicker.swift)
+   The landing page (ProjectLanding.jsx, docs/DESIGN.md §6)
+   Piles of paper on a frosted window of leaves, the name signed small in a corner.
    ============================================================ */
 
 .landing-page.picker {
   position: fixed;
   inset: 0;
   display: flex;
-  justify-content: center;
-  overflow: auto;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
   background: var(--app-bg);
   color: var(--text-primary);
   font-family: var(--font-ui);
 }
 
-.picker-column {
+/* Clear of the traffic lights and the drag strip at the top, and of the signature at
+   the bottom; the piles fade as they scroll under either edge. */
+.landing-scroll {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  width: min(360px, calc(100vw - 48px));
-  padding: 76px 0 60px;
+  flex: 1;
   min-height: 0;
-}
-
-.picker-header { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.picker-logo {
-  width: 98px;
-  height: 98px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-float);
-}
-.picker-wordmark { display: flex; justify-content: center; color: var(--text-primary); }
-.picker-header h1 { margin: 12px 0 0; font-size: 20px; font-weight: 700; }
-.picker-header p { margin: 0; font-size: 14px; color: var(--text-secondary); }
-
-.picker-actions { display: flex; justify-content: center; gap: var(--space-2); margin-top: 15px; }
-.picker-capsule {
-  display: inline-flex;
-  align-items: center;
-  height: 36px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--control-bg);
-  color: var(--text-primary);
-  font: 500 13px var(--font-ui);
-  cursor: pointer;
-}
-.picker-capsule:hover, .picker-split:hover { background: var(--hover-bg); }
-.picker-split { padding: 0; overflow: hidden; }
-.picker-split > button {
-  height: 100%;
-  padding: 0 8px 0 18px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.picker-split > .picker-chevron { display: grid; place-items: center; width: 30px; padding: 0 6px 0 2px; }
-
-.picker-list {
-  /* As tall as its projects, up to the room there is; then it scrolls. */
-  flex: 0 1 auto;
-  min-height: 0;
-  margin-top: 16px;
-  padding: var(--space-2);
   overflow-y: auto;
-  border-radius: var(--radius-lg);
-  background: var(--control-bg);
-  outline: none;
+  padding: var(--space-12) var(--space-8) calc(var(--space-12) * 2);
+  -webkit-mask-image: linear-gradient(180deg, transparent, black var(--space-12), black calc(100% - var(--space-12) * 2), transparent);
+  mask-image: linear-gradient(180deg, transparent, black var(--space-12), black calc(100% - var(--space-12) * 2), transparent);
 }
-.picker-list:focus-visible { box-shadow: 0 0 0 3px var(--accent-ring); }
-.picker-row {
+
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, var(--paper-pile-w));
+  justify-content: center;
+  column-gap: var(--space-10);
+  row-gap: var(--space-8);
+  width: 100%;
+  max-width: calc(var(--paper-pile-w) * 5 + var(--space-10) * 4);
+  /* A few projects sit in the middle of the window; many scroll from the top. */
+  margin: auto;
+}
+
+.landing-cell {
+  display: flex;
+  justify-content: center;
+}
+
+.landing-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  width: var(--paper-pile-w);
+  padding-top: var(--space-5);
+}
+
+.landing-placeholder .landing-placeholder-sheet {
+  border-radius: var(--radius-sm);
+}
+
+.landing-failure {
+  max-width: 44ch;
+  margin: 0 auto var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--app-bg);
+  box-shadow: var(--shadow-lift);
+  color: var(--status-error);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+/* ---------- The signature and the footage's credit ---------- */
+
+.landing-footer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  cursor: default;
-  user-select: none;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  pointer-events: none;
 }
-/* The chosen project is lifted onto paper, as the open document is in the file tree. */
-.picker-row[aria-selected='true'] { background: var(--app-bg); box-shadow: var(--shadow-lift); }
-.picker-row-icon { display: grid; place-items: center; width: 32px; height: 32px; color: var(--accent-color); }
-.picker-row-text { display: flex; flex-direction: column; min-width: 0; }
-.picker-row-text strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker-row-text small { font-size: 11px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.picker-error { margin: 0; font-size: 12px; color: var(--status-error); }
-.picker-failure { margin-top: var(--space-3); text-align: center; }
-.picker-new { display: flex; flex-direction: column; gap: var(--space-3); }
-.picker-input {
-  height: 30px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-muted);
-  border-radius: var(--radius-sm);
-  background: var(--control-bg);
+.landing-signature {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
   color: var(--text-primary);
-  font: 13px var(--font-ui);
 }
-.picker-input:focus { outline: none; border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-ring); }
-.picker-location {
+
+.landing-signature .ib-meta,
+.landing-credit {
+  color: var(--text-secondary);
+}
+
+.landing-credit {
+  pointer-events: auto;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+.landing-credit:hover {
+  text-decoration: underline;
+}
+
+.landing-credit:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------- Renaming in place ---------- */
+
+.landing-rename {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.landing-rename-error {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  color: var(--status-error);
+  white-space: normal;
+}
+
+/* ---------- New project ---------- */
+
+.landing-new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.landing-new-location {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 6px var(--space-3);
-  border: 1px dashed var(--border-muted);
-  border-radius: var(--radius-sm);
-  background: transparent;
+  min-width: 0;
   color: var(--text-secondary);
-  font: 12px var(--font-ui);
-  text-align: left;
-  cursor: pointer;
+  font-size: var(--text-xs);
 }
-.picker-location span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker-location strong { font-weight: 500; color: var(--accent-foreground); }
 
-/* A placeholder row is a real row's box with bars for its words, so it is exactly as
-   tall: the bars sit in the text's line boxes rather than replacing them. */
-.picker-row-placeholder .picker-row-text { flex: 1; }
-.picker-row-placeholder .ib-skeleton { display: inline-block; vertical-align: middle; }
+.landing-new-location span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* Opening a project: the start screen fades out over the editor opening beneath it. */
+/* ---------- Opening a project ---------- */
+
+/* The start screen fades out over the editor opening beneath it. */
 .landing-page.picker.is-leaving {
   z-index: var(--z-dialog);
   pointer-events: none;
-  animation: ib-reveal-out var(--dur-reveal) var(--ease-out) forwards;
+  animation: ib-reveal-out var(--spring-smooth-dur) var(--spring-smooth) forwards;
+}
+
+/* A sheet has taken off for the card: the other piles sink away and the signature goes
+   at once. Then, with the editor beneath, the frosted window fades into its tray. */
+.landing-page.picker.is-leaving.is-flying {
+  animation-duration: var(--spring-smooth-dur);
+}
+
+.landing-page.is-launching .landing-grid > * {
+  animation: landing-sink var(--spring-exit-dur) var(--spring-exit) forwards;
+}
+
+.landing-page.is-launching .landing-footer {
+  animation: ib-reveal-out var(--spring-quick-dur) var(--spring-quick) forwards;
+}
+
+@keyframes landing-sink {
+  to {
+    opacity: 0;
+    translate: 0 var(--space-3);
+    scale: 0.98;
+  }
+}
+
+/* Reduce motion keeps the hand-over a fade (opacity only) rather than a cut. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-page.picker.is-leaving {
+    animation-duration: var(--spring-smooth-dur) !important;
+  }
 }
