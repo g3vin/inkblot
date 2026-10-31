@@ -49,6 +49,9 @@ const PAGE_STYLE_ID = 'print-page-style'
  * The text of a heading, with a line break read as a colon: a numbered chapter's
  * "Chapter One" over "The Storm" is "Chapter One: The Storm" in a running head.
  */
+
+/* ---------------- chapters and laying out pages ---------------- */
+
 const headingText = (node) => node.textBetween(0, node.content.size, '', (leaf) => (leaf.type.name === 'hardBreak' ? ': ' : '')).trim()
 
 /** Top-level H1s of a document, as { pos, text }: what a chapter's running head shows. */
@@ -171,6 +174,9 @@ const liveSource = (editor, setup, { footnotes = true } = {}) => {
  * chosen while a print is still on its way must still happen.
  */
 let queue = Promise.resolve()
+
+/* ---------------- the print root and the host ---------------- */
+
 const enqueue = (run) => {
   const job = queue.then(run)
   queue = job.catch(() => {})
@@ -227,6 +233,9 @@ const guideSheet = (imposition, widthPx, heightPx, title) => {
  * Printed page numbers typed as `3-7, 10`: a set of them, or null for every page.
  * A range written backwards is read forwards; anything unreadable is ignored.
  */
+
+/* ---------------- choosing pages ---------------- */
+
 export const parsePageRanges = (text) => {
   const wanted = new Set()
   for (const part of String(text || '').split(/[,;\s]+/)) {
@@ -327,6 +336,9 @@ export const highlightSpeeches = (pages, name) => {
 }
 
 /** Text set faintly across a page, corner to corner. */
+
+/* ---------------- marks and the book front ---------------- */
+
 const watermark = (text, pageWidth) => {
   const mark = document.createElement('div')
   mark.className = 'print-watermark'
@@ -467,6 +479,9 @@ const buildBookFront = async ({ sections, chapters, folios, setup, bookTitle, au
  * Build the printable pages (or sheets) for a job and mount them in #print-root.
  * Exposed apart from printing so Print Preview and tests can use the same pages.
  */
+
+/* ---------------- preparing a job ---------------- */
+
 export const preparePrint = async ({
   projectName,
   docPath,
@@ -686,6 +701,9 @@ export const preparePrint = async ({
  * and shell request as a document, so Print… and Export PDF work in both shells.
  * `markup` is the page's content; the page is `widthPx` × `heightPx`.
  */
+
+/* ---------------- running jobs ---------------- */
+
 export const printFigure = ({ markup, widthPx, heightPx, jobName, pdfPath }) => runJob({
   kind: pdfPath ? 'export' : 'print',
   format: pdfPath ? 'pdf' : undefined,

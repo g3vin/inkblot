@@ -40,17 +40,14 @@ import {
   HIDE_DELAY_MS,
   HOVER_INTENT_STALL_MS,
   hoverIntent,
-  clampPosition,
   findOpenSpot,
-  getInitialTilePosition,
-  getDotPoint,
   getCardCenter,
   getDefaultChildOffset,
   getStackOrder,
   getStringPath,
   isSamePreviewIdentity,
-  hasStoredChildOffset,
   areRectsEqual,
+  layoutNoteBranch,
 } from '../lib/notePreviewGeometry'
 
 /** Find the live bounding rect of a note's marker element in the editor DOM. */
@@ -429,73 +426,18 @@ export default function NoteHoverPreview({
       return null
     }
 
-    const rootBase = getInitialTilePosition(preview.anchorRect)
-    const getNoteSize = (note) => cardSizes[note.id] || note.previewSize || {
-      width: TILE_WIDTH,
-      height: TILE_MIN_HEIGHT,
-    }
-
-    // Kept in the window by the size each card is drawn at (its text can grow it past
-    // its stored size), and clear of the traffic lights.
-    const boundsOf = (note) => drawnSizes[note.id] || getNoteSize(note)
+    // Kept clear of the traffic lights.
     const lights = trafficLightsBox(VIEWPORT_PADDING)
-    const keepOut = lights ? [lights] : []
-
-    const rootOffset = dragLayouts[rootNote.id] || rootNote.previewLayout || { offsetX: 0, offsetY: 0 }
-    const rootPosition = clampPosition({
-      x: rootBase.x + (rootOffset.offsetX || 0),
-      y: rootBase.y + (rootOffset.offsetY || 0),
-    }, boundsOf(rootNote), keepOut)
-
-    const positions = new Map()
-    const sizes = new Map()
-    const nodes = []
-    const edges = [{
-      id: `anchor:${rootNote.id}`,
-      anchorPoint: getDotPoint(preview.anchorRect),
-      toNoteId: rootNote.id,
-      color: noteColor(rootNote.color),
-      depth: 0,
-    }]
-
-    const visit = (note, position, depth = 0) => {
-      const size = getNoteSize(note)
-      positions.set(note.id, position)
-      sizes.set(note.id, size)
-      const children = childMap.get(note.id) || []
-      nodes.push({
-        note,
-        position,
-        size,
-        depth,
-        childCount: children.length,
-      })
-
-      if (note.collapsedChildren) return
-
-      children.forEach((child, index) => {
-        const fallbackOffset = getDefaultChildOffset(index, children.length)
-        const storedOffset = dragLayouts[child.id]
-          || (hasStoredChildOffset(child) ? child.previewLayout : fallbackOffset)
-        const childPosition = clampPosition({
-          x: position.x + (storedOffset.offsetX || 0),
-          y: position.y + (storedOffset.offsetY || 0),
-        }, boundsOf(child), keepOut)
-
-        edges.push({
-          id: `${note.id}:${child.id}`,
-          fromNoteId: note.id,
-          toNoteId: child.id,
-          color: noteColor(child.color || note.color),
-          fromColor: noteColor(note.color),
-          depth: depth + 1,
-        })
-
-        visit(child, childPosition, depth + 1)
-      })
-    }
-
-    visit(rootNote, rootPosition, 0)
+    const { nodes, edges, positions, sizes, rootBase, rootPosition } = layoutNoteBranch({
+      anchorRect: preview.anchorRect,
+      rootNote,
+      childMap,
+      cardSizes,
+      drawnSizes,
+      dragLayouts,
+      keepOut: lights ? [lights] : [],
+      colorOf: noteColor,
+    })
 
     // The reveal, a generation at a time: the string to a note draws itself from its
     // parent (or the dot), taking longer the longer it is; the note pops in as it

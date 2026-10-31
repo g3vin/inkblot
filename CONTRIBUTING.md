@@ -120,6 +120,9 @@ Most features touch the same layers in the same order. Skip the ones yours doesn
 - **Lint clean.** `npm run lint` must report 0 errors and 0 warnings. Format Rust with
   `cargo fmt`.
 - **Comments follow the standard below.**
+- **Files stay small.** Under 700 lines (`npm run lint:size`); the larger files that
+  predate the rule may shrink but never grow. To add to one, split something out first.
+  How: `.claude/rules/file-size.md`.
 - **Generated files are never edited by hand.** `src/types/inkblot-core.ts` comes from
   `npm run types`.
 - **Mount it or it's untested.** A component with logic worth keeping is mounted by a

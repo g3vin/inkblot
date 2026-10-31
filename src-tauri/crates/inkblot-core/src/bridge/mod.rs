@@ -32,8 +32,8 @@
 //!    area, and add the variant to `NativeCommand` or `WebviewEvent`. An empty
 //!    payload still needs a struct (with no fields): adjacent tagging sends one for
 //!    every variant.
-//! 2. Re-export it below, and add an instance to `every_command` / `every_event` and
-//!    its wire name to the matching test in `tests.rs`.
+//! 2. Re-export it below, add an instance to `every_command` / `every_event` (in
+//!    `tests/fixtures.rs`), and its wire name to the matching test in `tests/mod.rs`.
 //! 3. `npm run types` to regenerate the TypeScript.
 //! 4. Handle it on the webview side: a command in `src/bridge/surface.ts` (or a
 //!    delegate the app registers, for anything that changes what the app is showing);

@@ -22,7 +22,7 @@
  * tree in the UI. A `versions:changed` window event fires whenever a document's
  * version list is updated.
  *
- * Mirrors: `src-tauri/crates/inkblot-core/src/store/mod.rs`; `npm run parity` asserts they agree.
+ * Mirrors: `src-tauri/crates/inkblot-core/src/store/mod.rs`, `src-tauri/crates/inkblot-core/src/store/documents.rs`, `src-tauri/crates/inkblot-core/src/store/entries.rs`, `src-tauri/crates/inkblot-core/src/store/projects.rs`; `npm run parity` asserts they agree.
  */
 import {
   writeTextFile,

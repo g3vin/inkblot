@@ -17,3 +17,11 @@ export const isEditorReady = (instance) => Boolean(
   instance.commands &&
   typeof instance.chain === 'function'
 )
+
+/** A ready editor's live ProseMirror view, or null while it is unmounted or destroyed. */
+export const getMountedEditorView = (instance) => {
+  if (!isEditorReady(instance)) return null
+  const view = instance.editorView || instance.view
+  if (!view || view.isDestroyed) return null
+  return view
+}

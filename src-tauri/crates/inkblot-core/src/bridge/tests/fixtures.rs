@@ -1,20 +1,10 @@
-//! What these tests are for.
-//!
-//! The generated TypeScript is checked by `npm run types:check`, which proves both
-//! languages describe the same *types*. It does not look at a single byte of JSON. But
-//! JSON is what actually crosses the seam, and any other shell would be written
-//! against the exact shape below — so the shape is asserted literally here,
-//! not derived from the same serde attributes it is meant to be checking.
-//!
-//! The exhaustive tag tests are the load-bearing ones. Adding a variant without
-//! deciding what it looks like on the wire fails them, which is the only moment that
-//! decision is cheap to make.
+//! One of everything for the bridge tests: a page setup, a book, an anchor, and an
+//! instance of every command and every event (`every_command` / `every_event`, which
+//! the exhaustive wire-name tests in `mod.rs` walk).
 
 use super::*;
-use crate::types::note::Note;
-use serde_json::{json, Value};
 
-fn page_setup() -> crate::types::PageSetup {
+pub(super) fn page_setup() -> crate::types::PageSetup {
     use crate::types::{PageMargins, PageNumberFormat, PageOrientation, PageSetup, RunningText};
     let blank = RunningText {
         left: String::new(),
@@ -64,7 +54,7 @@ fn page_setup() -> crate::types::PageSetup {
     }
 }
 
-fn typography() -> crate::types::PrintTypography {
+pub(super) fn typography() -> crate::types::PrintTypography {
     use crate::types::{ChapterOpening, LineSpacing, PrintAlignment, PrintTypography};
     PrintTypography {
         font_family: "Georgia, serif".into(),
@@ -88,7 +78,7 @@ fn typography() -> crate::types::PrintTypography {
     }
 }
 
-fn book() -> crate::types::BookSettings {
+pub(super) fn book() -> crate::types::BookSettings {
     use crate::types::{BindingSettings, BindingType, BookSettings, DuplexMode, SheetFit};
     BookSettings {
         folder: "Manuscript".into(),
@@ -204,116 +194,12 @@ fn book() -> crate::types::BookSettings {
     }
 }
 
-fn anchor() -> TextAnchor {
+pub(super) fn anchor() -> TextAnchor {
     TextAnchor::new(4, 17, "she hesitated")
 }
 
-/// Round-trip through JSON and back, the way both halves will.
-fn round_trip<T>(value: &T) -> T
-where
-    T: serde::Serialize + serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
-{
-    let text = serde_json::to_string(value).expect("serialize");
-    let back: T = serde_json::from_str(&text).expect("deserialize");
-    assert_eq!(value, &back, "value did not survive a JSON round trip");
-    back
-}
-
-/// The `type` tag of an adjacently-tagged value, as it appears on the wire.
-fn tag_of<T: serde::Serialize>(value: &T) -> String {
-    let wire = serde_json::to_value(value).expect("serialize");
-    wire["type"]
-        .as_str()
-        .expect("a string `type` tag")
-        .to_string()
-}
-
-/* ---------------- the literal wire shape ---------------- */
-
-#[test]
-fn a_command_is_type_and_payload_in_camel_case() {
-    let command = NativeCommand::SetHighlight(SetHighlightCommand {
-        target: EditorTarget::Primary,
-        color: "#ffff00".into(),
-        remember: true,
-    });
-
-    assert_eq!(
-        serde_json::to_value(&command).unwrap(),
-        json!({
-            "type": "setHighlight",
-            "payload": { "target": "primary", "color": "#ffff00", "remember": true }
-        })
-    );
-}
-
-#[test]
-fn an_event_is_type_and_payload_in_camel_case() {
-    let event = WebviewEvent::ActiveEditorChanged(ActiveEditorChanged {
-        target: Some(EditorTarget::CanvasCard),
-        doc_path: Some("chapters/one.canvas".into()),
-        surface_id: Some("surface-2".into()),
-    });
-
-    assert_eq!(
-        serde_json::to_value(&event).unwrap(),
-        json!({
-            "type": "activeEditorChanged",
-            "payload": {
-                "target": "canvasCard",
-                "docPath": "chapters/one.canvas",
-                "surfaceId": "surface-2"
-            }
-        })
-    );
-}
-
-/// A field that is `None` is absent, not `null`. The TypeScript side reads these as
-/// `field?: T`, and `"surfaceId": null` would be a present key holding nothing —
-/// which `if (payload.surfaceId)` treats the same way but `'surfaceId' in payload`
-/// does not.
-#[test]
-fn absent_optionals_are_omitted_rather_than_null() {
-    let event = WebviewEvent::ActiveEditorChanged(ActiveEditorChanged {
-        target: None,
-        doc_path: None,
-        surface_id: None,
-    });
-
-    assert_eq!(
-        serde_json::to_value(&event).unwrap(),
-        json!({ "type": "activeEditorChanged", "payload": {} })
-    );
-}
-
-#[test]
-fn an_envelope_wraps_without_flattening() {
-    let inbound = InboundMessage::Command(CommandEnvelope {
-        seq: 7,
-        command: NativeCommand::InsertConversationTile(TargetOnly {
-            target: EditorTarget::Secondary,
-        }),
-    });
-
-    assert_eq!(
-        serde_json::to_value(&inbound).unwrap(),
-        json!({
-            "kind": "command",
-            "message": {
-                "seq": 7,
-                "command": {
-                    "type": "insertConversationTile",
-                    "payload": { "target": "secondary" }
-                }
-            }
-        })
-    );
-}
-
-/* ---------------- every variant, named once ---------------- */
-
 /// One of each command, so that adding a variant means deciding its wire name here.
-fn every_command() -> Vec<NativeCommand> {
+pub(super) fn every_command() -> Vec<NativeCommand> {
     vec![
         NativeCommand::ApplyMark(ApplyMarkCommand {
             target: EditorTarget::Primary,
@@ -810,7 +696,7 @@ fn every_command() -> Vec<NativeCommand> {
     ]
 }
 
-fn bibliography_options() -> BibliographyOptions {
+pub(super) fn bibliography_options() -> BibliographyOptions {
     BibliographyOptions {
         include: BibliographyInclude::Cited,
         annotated: true,
@@ -819,7 +705,7 @@ fn bibliography_options() -> BibliographyOptions {
     }
 }
 
-fn a_reference() -> Reference {
+pub(super) fn a_reference() -> Reference {
     Reference {
         id: "r1".into(),
         kind: "journalArticle".into(),
@@ -858,25 +744,7 @@ fn a_reference() -> Reference {
     }
 }
 
-#[test]
-fn a_reference_is_camel_case_and_keeps_csl_field_names() {
-    let value = serde_json::to_value(a_reference()).unwrap();
-    assert_eq!(value["createdAt"], json!("2026-09-23T12:00:00.000Z"));
-    assert_eq!(value["status"], json!("complete"));
-    assert_eq!(value["fields"]["title"], json!("Deep learning"));
-    assert_eq!(
-        value["contributors"][1],
-        json!({ "role": "author", "literal": "NASA" })
-    );
-    let patch = serde_json::to_value(ReferencePatch {
-        annotation: Some("x".into()),
-        ..Default::default()
-    })
-    .unwrap();
-    assert_eq!(patch, json!({ "annotation": "x" }));
-}
-
-fn bubble_session() -> BubbleSession {
+pub(super) fn bubble_session() -> BubbleSession {
     BubbleSession {
         id: "b1".into(),
         words: vec![
@@ -910,7 +778,7 @@ fn bubble_session() -> BubbleSession {
     }
 }
 
-fn archived_bubble() -> ArchivedItem {
+pub(super) fn archived_bubble() -> ArchivedItem {
     ArchivedItem {
         id: "x1".into(),
         archived_at: "2026-09-23T12:00:00.000Z".into(),
@@ -920,20 +788,7 @@ fn archived_bubble() -> ArchivedItem {
     }
 }
 
-#[test]
-fn an_archived_item_is_camel_case_and_names_its_kind() {
-    let value = serde_json::to_value(archived_bubble()).unwrap();
-    assert_eq!(value["archivedAt"], json!("2026-09-23T12:00:00.000Z"));
-    assert_eq!(value["kind"], json!("bubble"));
-    assert_eq!(value["bubble"]["id"], json!("b1"));
-    let bare: ArchivedItem = serde_json::from_value(
-        json!({ "id": "x2", "archivedAt": "", "kind": "bubble", "title": "" }),
-    )
-    .unwrap();
-    assert_eq!(bare.bubble, None);
-}
-
-fn map_button(id: &str, label: &str) -> MapPanelButton {
+pub(super) fn map_button(id: &str, label: &str) -> MapPanelButton {
     MapPanelButton {
         id: id.into(),
         label: label.into(),
@@ -945,7 +800,7 @@ fn map_button(id: &str, label: &str) -> MapPanelButton {
 }
 
 /// A map's chrome with one of every kind of field, so each is on the wire at least once.
-fn map_chrome() -> MapChromeState {
+pub(super) fn map_chrome() -> MapChromeState {
     let fields = vec![
         MapPanelField::Text(MapTextInput {
             id: "pin.name".into(),
@@ -1096,7 +951,7 @@ fn map_chrome() -> MapChromeState {
     }
 }
 
-fn every_event() -> Vec<WebviewEvent> {
+pub(super) fn every_event() -> Vec<WebviewEvent> {
     vec![
         WebviewEvent::ToolbarState(ToolbarState {
             target: Some(EditorTarget::Primary),
@@ -1435,648 +1290,4 @@ fn every_event() -> Vec<WebviewEvent> {
             active_tab_id: Some("tab-1".into()),
         }),
     ]
-}
-
-#[test]
-fn every_command_has_its_documented_wire_name() {
-    let names: Vec<String> = every_command().iter().map(tag_of).collect();
-
-    assert_eq!(
-        names,
-        vec![
-            "applyMark",
-            "setColor",
-            "setHighlight",
-            "setFontFamily",
-            "setFontSize",
-            "setAlignment",
-            "insertTable",
-            "insertConversationTile",
-            "openDocument",
-            "setSelection",
-            "jumpToAnchor",
-            "setContent",
-            "replaceRanges",
-            "setCaretAtDocPos",
-            "dictationPartial",
-            "dictationFinal",
-            "dictationLevel",
-            "dictationCancel",
-            "syncNotes",
-            "canvasCommand",
-            "mapCommand",
-            "timelineCommand",
-            "attachTimelineEvent",
-            "jumpToTimelinePassage",
-            "revealTimelineEvent",
-            "setTimeLens",
-            "setTimelineRangeEditing",
-            "canvasDropDoc",
-            "canvasDropNote",
-            "canvasReveal",
-            "canvasRestore",
-            "insertPlainText",
-            "createEntry",
-            "renameEntry",
-            "moveEntry",
-            "deleteEntry",
-            "duplicateEntry",
-            "updateNote",
-            "removeNote",
-            "jumpToNote",
-            "clipboardDrop",
-            "removeClipboardEntries",
-            "insertClipboardEntry",
-            "removeTiles",
-            "replaceTileWord",
-            "selectTileWord",
-            "versionAction",
-            "renameVersion",
-            "revealSearchResult",
-            "addReply",
-            "openProject",
-            "setBlockType",
-            "setBlockType",
-            "setWritingFormat",
-            "toggleList",
-            "editorHistory",
-            "setFocusMode",
-            "setWordCountVisible",
-            "addReference",
-            "createReference",
-            "updateReference",
-            "deleteReference",
-            "retryReferenceLookup",
-            "chooseReferenceCandidate",
-            "setReferenceAttached",
-            "insertCitation",
-            "insertBibliography",
-            "setCitationStyle",
-            "setBibliographyOptions",
-            "setEditorMode",
-            "moveBookItem",
-            "setBookItemHidden",
-            "addBookItem",
-            "removeBookItem",
-            "editBookItem",
-            "openBookItem",
-            "applyBookStyle",
-            "setChapterMeta",
-            "setHeadImage",
-            "setFolderBookOptions",
-            "setTypesetView",
-            "setParagraphTypeset",
-            "showProofIssue",
-            "setTypesetDisplay",
-            "addProjectFont",
-            "setTextStyle",
-            "insertFootnote",
-            "editEditions",
-            "exportAllEditions",
-            "setCoverImage",
-            "editCoverSets",
-            "saveTypesetVersion",
-            "restoreTypesetVersion",
-            "renameTypesetVersion",
-            "deleteTypesetVersion",
-            "previewTypesetVersion",
-            "setPrintLayout",
-            "setPageSetup",
-            "setBookSettings",
-            "setPrintZoom",
-            "setDisplayDensity",
-            "insertBreak",
-            "goToPage",
-            "printDocument",
-            "printDocument",
-            "exportDocument",
-            "exportDocument",
-            "applyFormat",
-            "useSetupForBook",
-            "clearBookSetup",
-            "refreshBookChapters",
-            "setPrintScope",
-            "setAuthorProfile",
-            "setBookCover",
-            "exportAgain",
-            "selectTab",
-            "closeTab",
-            "setTabOrder",
-            "newTab",
-            "openDocInTab",
-            "openDocInWindow",
-            "openInSplit",
-            "closeSplit",
-            "measureBook",
-            "importScript",
-            "setSceneNumbers",
-            "scriptReport",
-        ]
-    );
-}
-
-#[test]
-fn every_event_has_its_documented_wire_name() {
-    let names: Vec<String> = every_event().iter().map(tag_of).collect();
-
-    assert_eq!(
-        names,
-        vec![
-            "toolbarState",
-            "selectionContext",
-            "docChanged",
-            "activeEditorChanged",
-            "canvasToolbarChanged",
-            "mapChromeChanged",
-            "timelineChromeChanged",
-            "timelineCursorChanged",
-            "timelineRangesChanged",
-            "readAloudPayload",
-            "projectChanged",
-            "showSidebarTab",
-            "viewOptions",
-            "referencesChanged",
-            "referenceSchema",
-            "revealReference",
-            "pageLayoutState",
-            "pageLayoutCatalog",
-            "printJobStatus",
-            "typesetFocus",
-            "typesetHistoryChanged",
-            "tabsChanged",
-        ]
-    );
-}
-
-#[test]
-fn every_command_survives_a_round_trip() {
-    for command in every_command() {
-        round_trip(&command);
-    }
-}
-
-#[test]
-fn every_event_survives_a_round_trip() {
-    for event in every_event() {
-        round_trip(&event);
-    }
-}
-
-#[test]
-fn every_request_and_reply_survives_a_round_trip() {
-    let requests = vec![
-        BridgeRequest::GetSelectionContext(EditorQuery::default()),
-        BridgeRequest::GetToolbarState(EditorQuery {
-            target: Some(EditorTarget::Secondary),
-        }),
-        BridgeRequest::GetReadAloudPayload(ReadAloudQuery {
-            target: None,
-            selection_only: true,
-        }),
-        BridgeRequest::GetDocumentText(EditorQuery::default()),
-    ];
-    let names: Vec<String> = requests.iter().map(tag_of).collect();
-    assert_eq!(
-        names,
-        vec![
-            "getSelectionContext",
-            "getToolbarState",
-            "getReadAloudPayload",
-            "getDocumentText"
-        ]
-    );
-    for request in &requests {
-        round_trip(request);
-    }
-
-    let reply = BridgeReply::Error(BridgeError {
-        code: BridgeErrorCode::NoEditor,
-        message: "no live editor".into(),
-    });
-    assert_eq!(
-        serde_json::to_value(&reply).unwrap(),
-        json!({
-            "type": "error",
-            "payload": { "code": "noEditor", "message": "no live editor" }
-        })
-    );
-    round_trip(&reply);
-}
-
-/* ---------------- the anchor rule ---------------- */
-
-/// The rule the protocol is built on: nothing carries a bare position. Every message
-/// that addresses a place in a document addresses it with a `TextAnchor`, which means
-/// every one of them carries the text to re-resolve by.
-///
-/// The exception is deliberate and is exactly one: `setCaretAtDocPos` takes a raw
-/// position, because a caret has no text to be about. It is named here so that the
-/// exception stays at one.
-#[test]
-fn only_set_caret_addresses_a_document_by_bare_position() {
-    let carries_bare_position = |command: &NativeCommand| {
-        fn scan(value: &Value, inside_anchor: bool) -> bool {
-            match value {
-                Value::Object(map) => map.iter().any(|(key, child)| {
-                    if !inside_anchor && (key == "from" || key == "to" || key == "pos") {
-                        return true;
-                    }
-                    scan(child, inside_anchor || key == "anchor")
-                }),
-                Value::Array(items) => items.iter().any(|item| scan(item, inside_anchor)),
-                _ => false,
-            }
-        }
-        scan(&serde_json::to_value(command).unwrap(), false)
-    };
-
-    let offenders: Vec<String> = every_command()
-        .iter()
-        .filter(|command| carries_bare_position(command))
-        .map(tag_of)
-        .collect();
-
-    assert_eq!(offenders, vec!["setCaretAtDocPos"]);
-}
-
-#[test]
-fn a_caret_anchor_is_empty_and_carries_no_text() {
-    let caret = TextAnchor::caret(12);
-    assert!(caret.is_empty());
-    assert_eq!(caret.from, 12);
-    assert_eq!(caret.to, 12);
-    assert_eq!(caret.text, "");
-}
-
-#[test]
-fn an_anchor_over_text_is_not_empty() {
-    assert!(!anchor().is_empty());
-}
-
-/// A sequence gap is the thing `seq` exists to make visible, so the field has to
-/// survive the round trip that a dropped message would otherwise hide.
-#[test]
-fn envelope_sequence_numbers_survive_the_wire() {
-    let outbound = OutboundMessage::Event(EventEnvelope {
-        seq: 41,
-        event: WebviewEvent::DocChanged(DocChanged {
-            pane: Pane::Primary,
-            doc_path: "chapters/one.md".into(),
-            user_edit: true,
-            word_count: 1,
-            char_count: 2,
-            inserted: 0,
-            deleted: 0,
-            paste: true,
-        }),
-    });
-
-    let OutboundMessage::Event(envelope) = round_trip(&outbound) else {
-        panic!("an event envelope came back as something else");
-    };
-    assert_eq!(envelope.seq, 41);
-}
-
-#[test]
-fn a_bubble_session_is_camel_case_and_an_empty_aside_may_be_omitted() {
-    let session = bubble_session();
-    let value = serde_json::to_value(&session).unwrap();
-    assert_eq!(
-        value["words"][1],
-        json!({ "id": "w2", "text": "hesitated at the door" })
-    );
-    assert_eq!(
-        value["aside"][0],
-        json!({ "id": "w3", "text": "quietly", "x": 0.02, "y": 0.5 })
-    );
-    assert_eq!(value["mode"], json!("clauses"));
-    assert_eq!(
-        value["forms"][0],
-        json!({
-            "id": "f1", "words": [{ "id": "w2", "text": "hesitated at the door" }], "aside": [],
-        })
-    );
-
-    // A session written before anything was set aside, or any form saved, still reads.
-    let bare: BubbleSession =
-        serde_json::from_value(json!({ "id": "b2", "words": [], "original": "" })).unwrap();
-    assert!(bare.aside.is_empty());
-    assert_eq!(bare.mode, None);
-    assert!(bare.forms.is_empty());
-    assert!(serde_json::to_value(&bare).unwrap().get("forms").is_none());
-    assert_eq!(bare.unsaved, None);
-}
-
-#[test]
-fn the_toolbar_items_speak_camel_case() {
-    let command = NativeCommand::SetBlockType(SetBlockTypeCommand {
-        target: EditorTarget::Primary,
-        block: BlockType::Heading2,
-    });
-    assert_eq!(
-        serde_json::to_value(&command).unwrap(),
-        json!({ "type": "setBlockType", "payload": { "target": "primary", "block": "heading2" } })
-    );
-    let event = WebviewEvent::ViewOptions(ViewOptions {
-        focus_mode: true,
-        word_count_visible: false,
-    });
-    assert_eq!(
-        serde_json::to_value(&event).unwrap(),
-        json!({ "type": "viewOptions", "payload": { "focusMode": true, "wordCountVisible": false } })
-    );
-}
-
-#[test]
-fn a_page_setup_crosses_the_wire_in_millimetres_and_camel_case() {
-    let command = NativeCommand::SetPageSetup(SetPageSetupCommand {
-        setup: page_setup(),
-        target: PageSetupTarget::Document,
-    });
-    let wire = serde_json::to_value(&command).unwrap();
-    assert_eq!(wire["type"], "setPageSetup");
-    let setup = &wire["payload"]["setup"];
-    assert_eq!(setup["presetId"], "trade-6x9");
-    assert_eq!(setup["widthMm"], 152.4);
-    assert_eq!(setup["margins"]["gutterMm"], 3.175);
-    assert_eq!(setup["pageNumberFormat"], "arabic");
-    assert_eq!(setup["versoHeader"]["center"], "{title}");
-    // An absent override is absent, not null: the page tests `setup.versoFooter`.
-    assert!(setup.get("versoFooter").is_none());
-}
-
-#[test]
-fn a_page_setup_without_verso_overrides_still_reads() {
-    let mut wire = serde_json::to_value(page_setup()).unwrap();
-    wire.as_object_mut().unwrap().remove("versoHeader");
-    let setup: crate::types::PageSetup = serde_json::from_value(wire).unwrap();
-    assert!(setup.verso_header.is_none());
-}
-
-#[test]
-fn a_page_setup_edit_from_an_older_shell_goes_to_the_document() {
-    let wire = json!({ "type": "setPageSetup", "payload": { "setup": serde_json::to_value(page_setup()).unwrap() } });
-    let command: NativeCommand = serde_json::from_value(wire).unwrap();
-    match command {
-        NativeCommand::SetPageSetup(edit) => assert_eq!(edit.target, PageSetupTarget::Document),
-        other => panic!("read as {other:?}"),
-    }
-}
-
-#[test]
-fn a_book_entry_command_from_an_older_shell_acts_on_its_one_entry() {
-    let wire = json!({ "type": "setBookItemHidden", "payload": { "id": "d1", "hidden": true } });
-    let command: NativeCommand = serde_json::from_value(wire).unwrap();
-    match &command {
-        NativeCommand::SetBookItemHidden(edit) => assert!(edit.ids.is_empty()),
-        other => panic!("read as {other:?}"),
-    }
-    let text = serde_json::to_string(&command).unwrap();
-    assert!(
-        !text.contains("ids"),
-        "an empty selection is left off the wire: {text}"
-    );
-}
-
-#[test]
-fn a_job_status_leaves_out_what_it_does_not_have() {
-    let event = WebviewEvent::PrintJobStatus(PrintJobStatus {
-        job_id: "p1".into(),
-        kind: PrintJobKind::Print,
-        format: None,
-        phase: PrintJobPhase::Done,
-        done: None,
-        total: None,
-        message: None,
-        path: None,
-    });
-    assert_eq!(
-        serde_json::to_value(&event).unwrap(),
-        json!({ "type": "printJobStatus", "payload": { "jobId": "p1", "kind": "print", "phase": "done" } })
-    );
-}
-
-#[test]
-fn a_page_setup_carries_its_typography_in_camel_case() {
-    use crate::types::{
-        ChapterOpening, LineSpacing, PrintAlignment, PrintTypography, TitlePageOptions,
-        TitlePageStyle,
-    };
-    let mut setup = page_setup();
-    setup.typography = Some(PrintTypography {
-        font_family: "\"Courier Prime\", Courier, monospace".into(),
-        font_size_pt: 12.0,
-        line_spacing: LineSpacing::Double,
-        line_value: 2.0,
-        first_line_indent_mm: 12.7,
-        paragraph_spacing_pt: 0.0,
-        alignment: PrintAlignment::Left,
-        hyphenate: false,
-        scene_break: "#".into(),
-        chapter_opening: ChapterOpening::DropCapAndSmallCaps,
-        chapter_sink_mm: 76.2,
-        no_indent_after_break: true,
-        images: None,
-        composition: None,
-        features: None,
-    });
-    setup.title_page = Some(TitlePageOptions {
-        style: TitlePageStyle::Manuscript,
-        show_contact: true,
-        show_word_count: true,
-    });
-    let wire = serde_json::to_value(&setup).unwrap();
-    assert_eq!(wire["typography"]["lineSpacing"], "double");
-    assert_eq!(wire["typography"]["chapterOpening"], "dropCapAndSmallCaps");
-    assert_eq!(wire["titlePage"]["style"], "manuscript");
-    round_trip(&setup);
-}
-
-#[test]
-fn a_script_element_is_a_block_type_and_an_old_toolbar_is_prose() {
-    assert_eq!(
-        serde_json::to_value(BlockType::StageDirection).unwrap(),
-        "stageDirection"
-    );
-    assert_eq!(
-        serde_json::to_value(WritingFormat::Stageplay).unwrap(),
-        "stageplay"
-    );
-    let mut toolbar = serde_json::to_value(
-        every_event()
-            .into_iter()
-            .find_map(|e| match e {
-                WebviewEvent::ToolbarState(state) => Some(state),
-                _ => None,
-            })
-            .unwrap(),
-    )
-    .unwrap();
-    toolbar.as_object_mut().unwrap().remove("writingFormat");
-    let read: ToolbarState = serde_json::from_value(toolbar).unwrap();
-    assert_eq!(read.writing_format, WritingFormat::Prose);
-}
-
-#[test]
-fn a_print_from_an_older_shell_has_no_options() {
-    let old: PrintDocumentCommand =
-        serde_json::from_value(json!({ "scope": "document", "bound": false })).unwrap();
-    assert_eq!(old.options, PrintOptions::default());
-    let wire = serde_json::to_value(ExportFormat::PlainText).unwrap();
-    assert_eq!(wire, "plainText");
-    assert_eq!(
-        serde_json::to_value(ExportFormat::Fountain).unwrap(),
-        "fountain"
-    );
-    assert_eq!(serde_json::to_value(ExportFormat::Fdx).unwrap(), "fdx");
-    let partial: PrintOptions = serde_json::from_value(json!({ "watermark": "DRAFT" })).unwrap();
-    assert_eq!(partial.range, PrintRange::All);
-    assert!(partial.pages.is_empty());
-    assert!(partial.scenes.is_empty() && partial.highlight_character.is_empty());
-    let sides: PrintOptions = serde_json::from_value(
-        json!({ "range": "scenes", "scenes": [2, 5], "highlightCharacter": "MARY" }),
-    )
-    .unwrap();
-    assert_eq!(
-        (
-            sides.range,
-            sides.scenes,
-            sides.highlight_character.as_str()
-        ),
-        (PrintRange::Scenes, vec![2, 5], "MARY")
-    );
-}
-
-#[test]
-fn a_book_saved_before_compiling_reads_with_everything_in() {
-    let mut old = serde_json::to_value(book()).unwrap();
-    for key in ["excluded", "chapterNumbering", "frontMatter", "backMatter"] {
-        old.as_object_mut().unwrap().remove(key);
-    }
-    let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
-    assert!(read.excluded.is_empty());
-    assert_eq!(
-        read.chapter_numbering.style,
-        crate::types::ChapterNumberStyle::None
-    );
-    assert!(!read.front_matter.contents);
-    let wire = serde_json::to_value(book()).unwrap();
-    assert_eq!(wire["chapterNumbering"]["style"], "words");
-    assert_eq!(wire["frontMatter"]["halfTitle"], true);
-    assert_eq!(
-        wire["backMatter"]["aboutTheAuthor"],
-        "A. Writer lives by the sea."
-    );
-}
-
-#[test]
-fn a_book_saved_before_typesetting_reads_with_no_design_contents_or_covers() {
-    let mut old = serde_json::to_value(book()).unwrap();
-    for key in [
-        "chapterDesign",
-        "partDesign",
-        "items",
-        "continuous",
-        "covers",
-        "activeCover",
-    ] {
-        old.as_object_mut().unwrap().remove(key);
-    }
-    old["chapterNumbering"]
-        .as_object_mut()
-        .unwrap()
-        .remove("startAt");
-    old["chapterNumbering"]
-        .as_object_mut()
-        .unwrap()
-        .remove("showInTree");
-    let read: crate::types::BookSettings = serde_json::from_value(old).unwrap();
-    assert!(read.chapter_design.is_none() && read.items.is_empty() && read.covers.is_empty());
-    assert!(!read.continuous);
-    assert_eq!(
-        read.chapter_numbering.start_at, 1,
-        "an old book counts from one"
-    );
-    assert!(!read.chapter_numbering.show_in_tree);
-
-    let wire = serde_json::to_value(book()).unwrap();
-    assert_eq!(wire["chapterDesign"]["chapterBreak"], "newRightPage");
-    assert_eq!(wire["chapterDesign"]["ornament"], "glyph");
-    assert_eq!(wire["items"][0]["matter"], "dedication");
-    assert_eq!(wire["items"][0]["page"]["position"], "sunk");
-    assert_eq!(wire["items"][1]["chapterType"], "prologue");
-    assert_eq!(wire["covers"][0]["madeForSpineMm"], 12.4);
-    let design: crate::types::ChapterDesign =
-        serde_json::from_value(json!({ "showNumber": true })).unwrap();
-    assert!(
-        design.show_title && design.show_number,
-        "a partial design fills the rest in"
-    );
-    assert_eq!(design.chapter_break, crate::types::ChapterBreak::NewPage);
-}
-
-#[test]
-fn an_author_profile_missing_fields_reads_as_blank() {
-    let profile: crate::types::AuthorProfile =
-        serde_json::from_value(json!({ "byline": "A. Writer" })).unwrap();
-    assert_eq!(profile.byline, "A. Writer");
-    assert!(profile.email.is_empty());
-}
-
-#[test]
-fn a_map_panel_field_is_type_and_payload_in_camel_case() {
-    let field = MapPanelField::ListRow(MapListRow {
-        id: "places.p1".into(),
-        title: "Harrowgate".into(),
-        subtitle: None,
-        swatch: Some("#aa3322".into()),
-        indent: 1,
-    });
-    assert_eq!(
-        serde_json::to_value(&field).unwrap(),
-        json!({
-            "type": "listRow",
-            "payload": { "id": "places.p1", "title": "Harrowgate", "swatch": "#aa3322", "indent": 1 }
-        })
-    );
-}
-
-#[test]
-fn a_map_tool_and_its_chrome_speak_camel_case() {
-    let value = serde_json::to_value(map_chrome()).unwrap();
-    assert_eq!(value["tool"], json!("pin"));
-    assert_eq!(value["surfaceId"], json!("map-surface-0"));
-    assert_eq!(value["revealPanel"], json!(1));
-    assert_eq!(value["panel"]["canGoBack"], json!(true));
-    assert_eq!(
-        value["panel"]["sections"][0]["fields"][0]["payload"]["focusKey"],
-        json!(0)
-    );
-    // A panel with no tab chosen says nothing about one.
-    assert!(value["panel"].get("tab").is_none());
-}
-
-#[test]
-fn a_tab_dragged_out_says_where_its_window_goes() {
-    let dropped: NativeCommand = serde_json::from_value(serde_json::json!({
-        "type": "openDocInWindow",
-        "payload": { "docPath": "Act One/Scene", "at": { "x": 640, "y": -20 } },
-    }))
-    .unwrap();
-    assert_eq!(
-        dropped,
-        NativeCommand::OpenDocInWindow(OpenDocInWindowCommand {
-            doc_path: "Act One/Scene".into(),
-            at: Some(ScreenPoint { x: 640, y: -20 }),
-        })
-    );
-    let menu = serde_json::to_value(NativeCommand::OpenDocInWindow(OpenDocInWindowCommand {
-        doc_path: "A".into(),
-        at: None,
-    }))
-    .unwrap();
-    assert_eq!(
-        menu,
-        serde_json::json!({ "type": "openDocInWindow", "payload": { "docPath": "A" } })
-    );
 }
