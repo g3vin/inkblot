@@ -345,4 +345,23 @@ mod tests {
         assert_eq!(status.missing.len(), MODEL_ASSETS.len());
         let _ = std::fs::remove_dir_all(dir);
     }
+
+    /// The model was trained on these ids, so a `tokenizers` upgrade must still read
+    /// the bundled file and encode it the same way.
+    #[test]
+    fn the_bundled_tokenizer_encodes_as_the_model_expects() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../resources/minilm-tokenizer.json"
+        );
+        let tokenizer = Tokenizer::from_file(path).unwrap();
+        let text = "The cat sat quietly";
+        let encoding = tokenizer.encode(text, true).unwrap();
+        let (ids, padding) = encoding.get_ids().split_at(6);
+        assert_eq!(ids, [101, 1996, 4937, 2938, 5168, 102]);
+        assert!(padding.iter().all(|&id| id == 0));
+        let mask = encoding.get_attention_mask();
+        assert_eq!(mask.iter().filter(|&&m| m == 1).count(), 6);
+        assert_eq!(find_target_position(&encoding, text, "sat"), 3);
+    }
 }
