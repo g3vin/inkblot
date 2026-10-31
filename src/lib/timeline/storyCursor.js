@@ -14,7 +14,7 @@
  * react to its own echo.
  */
 
-export const STORY_CURSOR_CHANGED_EVENT = 'story-cursor:changed'
+const STORY_CURSOR_CHANGED_EVENT = 'story-cursor:changed'
 
 const DEFAULT_LENS = { on: false, editing: false, from: 0, to: 7, scale: 'time' }
 

@@ -36,36 +36,36 @@
 
 import { describeMapDiff, diffMaps } from './mapDiff'
 
-export const MAP_FORMAT_VERSION = 2
+const MAP_FORMAT_VERSION = 2
 
 export const MAP_KINDS = ['blank', 'image', 'earth', 'planet', 'system', 'galaxy', 'universe', 'model']
 /** Kinds drawn in 3D (space/): the camera, not a pan and zoom, is how they are viewed. */
 export const SPACE_KINDS = ['planet', 'system', 'galaxy', 'universe', 'model']
-export const EARTH_VIEWS = ['globe', 'flat']
-export const EARTH_IMAGERY = ['map', 'satellite', 'hybrid']
-export const SURFACE_LOOKS = ['generated', 'texture', 'gas', 'ice', 'star']
-export const SYSTEM_DYNAMICS = ['kepler', 'nbody']
+const EARTH_VIEWS = ['globe', 'flat']
+const EARTH_IMAGERY = ['map', 'satellite', 'hybrid']
+const SURFACE_LOOKS = ['generated', 'texture', 'gas', 'ice', 'star']
+const SYSTEM_DYNAMICS = ['kepler', 'nbody']
 /** Hubble's classes, and the shapes outside them. */
 export const GALAXY_TYPES = [
   'E0', 'E3', 'E5', 'E7', 'S0', 'Sa', 'Sb', 'Sc', 'Sd', 'SBa', 'SBb', 'SBc', 'SBd', 'ring', 'irregular', 'dwarf', 'peculiar',
 ]
-export const SPACE_LOOKS = ['cinematic', 'atlas', 'ink']
+const SPACE_LOOKS = ['cinematic', 'atlas', 'ink']
 export const EARTH_PROJECTIONS = ['equalEarth', 'equirectangular', 'mercator', 'naturalEarth', 'orthographic']
-export const EARTH_DETAIL = ['auto', '110m', '50m']
-export const ROUTE_SMOOTHING = ['linear', 'catmullRom']
+const EARTH_DETAIL = ['auto', '110m', '50m']
+const ROUTE_SMOOTHING = ['linear', 'catmullRom']
 export const LINE_DASHES = ['solid', 'dashed', 'dotted', 'inked', 'rough']
 export const HATCHES = ['none', 'diagonal', 'cross', 'dots', 'waves', 'mountains']
-export const TRANSPORT_MEDIA = ['land', 'water', 'air', 'space']
+const TRANSPORT_MEDIA = ['land', 'water', 'air', 'space']
 export const MAP_THEMES = ['clean', 'parchment', 'ink', 'night']
-export const BODY_KINDS = ['star', 'planet', 'dwarf', 'moon', 'belt', 'station', 'barycenter']
-export const RADIAL_MODES = ['linear', 'log']
+const BODY_KINDS = ['star', 'planet', 'dwarf', 'moon', 'belt', 'station', 'barycenter']
+const RADIAL_MODES = ['linear', 'log']
 /** How a star system is shown: in three dimensions, or laid flat on the page. */
-export const SYSTEM_VIEWS = ['3d', 'flat']
+const SYSTEM_VIEWS = ['3d', 'flat']
 
 /** A blank map is a sheet this big, in map units, until something says otherwise. */
 export const BLANK_SHEET = { width: 4000, height: 3000 }
 
-export const DEFAULT_MAP_VIEWPORT = { x: 0, y: 0, zoom: 1 }
+const DEFAULT_MAP_VIEWPORT = { x: 0, y: 0, zoom: 1 }
 
 /** 16 hex chars, the same id style canvases use. */
 export const newId = () => {
@@ -85,7 +85,7 @@ const oneOf = (value, allowed, fallback) => (allowed.includes(value) ? value : f
 const objectOr = (value) => (isObject(value) ? value : {})
 
 /** `[x, y]` from anything; null unless both are finite numbers. Extra entries drop. */
-export const readPoint2 = (value) =>
+const readPoint2 = (value) =>
   Array.isArray(value) && value.length >= 2 && Number.isFinite(value[0]) && Number.isFinite(value[1])
     ? [value[0], value[1]]
     : null
@@ -101,7 +101,7 @@ export const readPoint = (value) => {
 }
 
 /** `[x, y, z]`: exactly three finite numbers, or null. */
-export const readVector = (value) =>
+const readVector = (value) =>
   Array.isArray(value) && value.length >= 3 && [0, 1, 2].every((index) => Number.isFinite(value[index]))
     ? [value[0], value[1], value[2]]
     : null

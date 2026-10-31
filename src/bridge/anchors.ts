@@ -63,7 +63,7 @@ export function findText(doc: AnchorDoc, needle: string): ResolvedRange | null {
 }
 
 /** Whether `from..to` still covers exactly the anchor's text. */
-export function anchorStillCovers(doc: AnchorDoc, anchor: TextAnchor): boolean {
+function anchorStillCovers(doc: AnchorDoc, anchor: TextAnchor): boolean {
   const { from, to, text } = anchor
   if (!Number.isFinite(from) || !Number.isFinite(to)) return false
   if (from < 0 || to > doc.content.size || from > to) return false

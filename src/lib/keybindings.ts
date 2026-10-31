@@ -160,7 +160,7 @@ function writeOverrides(next: Overrides) {
   listeners.forEach((listener) => listener())
 }
 
-export function subscribeKeybindings(listener: () => void): () => void {
+function subscribeKeybindings(listener: () => void): () => void {
   listeners.add(listener)
   return () => { listeners.delete(listener) }
 }
@@ -236,7 +236,7 @@ export function pauseKeybindings(on: boolean) {
  * The command a keystroke runs, if any: the first bound to it that can run now. A
  * binding shared by two commands goes to whichever is available.
  */
-export function commandForEvent(event: KeyboardEvent, commands: Command[] = listAllCommands()): Command | null {
+function commandForEvent(event: KeyboardEvent, commands: Command[] = listAllCommands()): Command | null {
   const binding = bindingFromEvent(event)
   if (!isBindable(binding)) return null
   const from = readOverrides()

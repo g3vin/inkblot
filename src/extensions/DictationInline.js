@@ -10,7 +10,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
-export const DICTATION_INLINE_PLUGIN_KEY = new PluginKey('dictationInline')
+const DICTATION_INLINE_PLUGIN_KEY = new PluginKey('dictationInline')
 
 const EMPTY_DECORATIONS = DecorationSet.empty
 const EMPTY_STATE = { range: null, status: 'idle', anchorAt: 0, tick: 0 }

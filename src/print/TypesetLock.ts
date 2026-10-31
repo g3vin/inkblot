@@ -36,7 +36,7 @@ export const TYPESET_META = 'typeset'
 /** The event a double-click on locked prose sends, for "Edit Text" to offer itself. */
 export const TYPESET_EDIT_TEXT_EVENT = 'inkblot:typeset-edit-text'
 
-export const typesetLockKey = new PluginKey('typesetLock')
+const typesetLockKey = new PluginKey('typesetLock')
 
 declare module '@tiptap/core' {
   interface Storage {
@@ -50,7 +50,7 @@ export const isMatterPath = (path: string | null | undefined): boolean => (
 )
 
 /** The chapter's title: its opening Heading 1, as a range of the document. */
-export const titleRange = (doc: PMNode): { from: number; to: number } | null => {
+const titleRange = (doc: PMNode): { from: number; to: number } | null => {
   const first = doc.firstChild
   if (!first || first.type.name !== 'heading' || first.attrs.level !== 1) return null
   return { from: 0, to: first.nodeSize }

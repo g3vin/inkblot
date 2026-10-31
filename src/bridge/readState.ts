@@ -98,7 +98,7 @@ const isMarkActive = (editor: PmEditor, markName: string): boolean => {
 }
 
 /** The marks and nodes at the selection the toolbar shows as on; all off with no live editor. */
-export function readActiveMarks(editor: unknown): ActiveMarks {
+function readActiveMarks(editor: unknown): ActiveMarks {
   if (!isEditorReady(editor)) {
     return {
       bold: false, italic: false, underline: false, strike: false, table: false,
@@ -219,7 +219,7 @@ export function readToolbarState(
  * `rangeHasMark` because the menu's rule is *touches*, not *covers*: a selection
  * overlapping the edge of a highlight offers to remove it.
  */
-export function selectionTouchesHighlight(editor: unknown): boolean {
+function selectionTouchesHighlight(editor: unknown): boolean {
   if (!isEditorReady(editor)) return false
   const live = asEditor(editor)
   const highlightMark = live.state.schema.marks.highlight

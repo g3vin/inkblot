@@ -17,9 +17,6 @@ import { normalizePageSetup } from './pageSetup'
 const PARTS = ['front', 'back', 'spine', 'wrap']
 const sizes = new Map()
 
-/** A cover picture's pixel size: known, loading (undefined), or unreadable (null). */
-export const pictureSize = (path) => sizes.get(path)
-
 /** Read the sizes of a book's cover pictures not read yet. Resolves true when any was. */
 export const loadCoverSizes = async (projectName, book) => {
   let read = false

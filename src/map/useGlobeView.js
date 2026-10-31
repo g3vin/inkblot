@@ -29,10 +29,10 @@ const IDENTITY = Object.freeze({ x: 0, y: 0, zoom: 1 })
 const HORIZON = (85 * Math.PI) / 180
 const FRAME_MS = 50
 
-export const DEFAULT_GLOBE_CAMERA = { center: [0, 20], zoom: 1.4, bearing: 0, pitch: 0 }
+const DEFAULT_GLOBE_CAMERA = { center: [0, 20], zoom: 1.4, bearing: 0, pitch: 0 }
 
 /** A saved camera, or the default for anything malformed. */
-export function readGlobeCamera(raw) {
+function readGlobeCamera(raw) {
   const camera = raw && typeof raw === 'object' ? raw : {}
   const center = Array.isArray(camera.center) && camera.center.length >= 2 && camera.center.every(Number.isFinite) ? camera.center.slice(0, 2) : DEFAULT_GLOBE_CAMERA.center
   const number = (value, fallback) => (Number.isFinite(value) ? value : fallback)
@@ -48,7 +48,7 @@ export function readGlobeCamera(raw) {
  * Where a `[lon, lat]` is on the surface, or null when it is round the back. The
  * projector the surface's layers, drafts and handles draw with on the globe.
  */
-export function globeProjector(gl, camera, size) {
+function globeProjector(gl, camera, size) {
   const centre = camera.center
   return {
     kind: 'globe',

@@ -13,7 +13,7 @@
 import { Extension } from '@tiptap/core'
 import { AllSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 
-export const SELECTION_HIGHLIGHT_PLUGIN_KEY = new PluginKey('selectionHighlight')
+const SELECTION_HIGHLIGHT_PLUGIN_KEY = new PluginKey('selectionHighlight')
 
 /** How far past the viewport a block is still measured, in pixels. */
 const OVERSCAN = 400

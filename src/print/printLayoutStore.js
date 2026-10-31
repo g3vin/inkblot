@@ -45,7 +45,7 @@ const zoomKey = (projectName, docPath) => `${ZOOM_KEY}:${projectName}/${docPath}
 /* ---------------- the window's mode ---------------- */
 
 const MODE_PREFIX = 'inkblot-editor-mode:'
-export const EDITOR_MODES = ['write', 'typeset']
+const EDITOR_MODES = ['write', 'typeset']
 
 /**
  * Write or Typeset, per project: the mode it was left in. Typeset shows every text
@@ -92,7 +92,7 @@ export const setPrintLayoutEnabled = (projectName, _docPath, enabled) => {
 }
 
 const VIEW_PREFIX = 'inkblot-typeset-view:'
-export const TYPESET_VIEWS = ['print', 'digital']
+const TYPESET_VIEWS = ['print', 'digital']
 
 /**
  * Typeset's view, per project: the printed pages, or the e-book as a reader shows it
@@ -221,9 +221,9 @@ export const DEFAULT_BINDING = {
   includeGuide: true,
 }
 
-export const DEFAULT_CHAPTER_NUMBERING = { style: 'none', prefix: 'Chapter', includeTitle: true, startAt: 1, showInTree: false }
+const DEFAULT_CHAPTER_NUMBERING = { style: 'none', prefix: 'Chapter', includeTitle: true, startAt: 1, showInTree: false }
 
-export const DEFAULT_FRONT_MATTER = {
+const DEFAULT_FRONT_MATTER = {
   halfTitle: false,
   copyright: '',
   dedication: '',
@@ -232,7 +232,7 @@ export const DEFAULT_FRONT_MATTER = {
   contents: false,
 }
 
-export const DEFAULT_BACK_MATTER = { acknowledgements: '', aboutTheAuthor: '', alsoBy: '' }
+const DEFAULT_BACK_MATTER = { acknowledgements: '', aboutTheAuthor: '', alsoBy: '' }
 
 const objectOr = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {})
 

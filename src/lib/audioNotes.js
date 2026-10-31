@@ -32,7 +32,7 @@ const PREFERRED_MIME_TYPES = [
   'audio/ogg;codecs=opus',
 ]
 
-export function pickRecorderMimeType() {
+function pickRecorderMimeType() {
   if (typeof MediaRecorder === 'undefined') return ''
   for (const type of PREFERRED_MIME_TYPES) {
     if (MediaRecorder.isTypeSupported?.(type)) return type

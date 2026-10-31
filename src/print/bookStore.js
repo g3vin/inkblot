@@ -19,7 +19,7 @@ import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { getPreference } from '../lib/preferences'
 import { relocateTypesetHistory } from './typesetHistoryStore'
 
-export const BOOKS_FILE = '.inkblot-books.json'
+const BOOKS_FILE = '.inkblot-books.json'
 const LEGACY_PREFIX = 'inkblot-book:'
 
 /** projectName → { books, loaded: Promise, writes: Promise } */

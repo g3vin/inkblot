@@ -27,7 +27,7 @@ import { applyChapterTypeset, restoreBook, sameSnapshot, snapshotOf, typesetDiff
 import { addTypesetEntry, deleteTypesetEntry, onTypesetHistoryChanged, renameTypesetEntry, typesetEntries } from './typesetHistoryStore'
 
 /** How long after the typesetting changes a version is kept. */
-export const AUTO_DELAY_MS = 15000
+const AUTO_DELAY_MS = 15000
 
 /** Tell the history a print or export was made: `{ label }`. */
 export const TYPESET_MILESTONE_EVENT = 'inkblot:typeset-milestone'

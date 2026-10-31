@@ -6,7 +6,7 @@ import { shellBridge } from '../../bridge'
 
 const send = (type, payload) => shellBridge.send(type, payload)
 
-export const FRONT_MATTER = [
+const FRONT_MATTER = [
   { label: 'Half Title', generated: 'halfTitle' },
   { label: 'Also By', matter: 'alsoBy' },
   { label: 'Title Page', generated: 'titlePage' },
@@ -19,7 +19,7 @@ export const FRONT_MATTER = [
   { label: 'Introduction', matter: 'introduction' },
 ]
 
-export const BACK_MATTER = [
+const BACK_MATTER = [
   { label: 'Afterword', matter: 'afterword' },
   { label: 'Acknowledgements', matter: 'acknowledgements' },
   { label: 'About the Author', matter: 'aboutAuthor' },
@@ -32,7 +32,7 @@ export const BACK_MATTER = [
 
 export const SECTION_TITLES = { front: 'Front matter', body: 'Chapters', back: 'Back matter' }
 
-export const CHAPTER_TYPES = [
+const CHAPTER_TYPES = [
   ['chapter', 'Chapter'], ['prologue', 'Prologue'], ['epilogue', 'Epilogue'], ['interlude', 'Interlude'], ['unnumbered', 'Unnumbered'],
 ]
 

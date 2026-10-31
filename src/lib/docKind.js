@@ -16,9 +16,9 @@
  * Mirrors: `src-tauri/crates/inkblot-core/src/doc_kind.rs`; `npm run parity` asserts they agree.
  */
 
-export const CANVAS_SUFFIX = '.canvas'
+const CANVAS_SUFFIX = '.canvas'
 export const MAP_SUFFIX = '.map'
-export const TIMELINE_SUFFIX = '.timeline'
+const TIMELINE_SUFFIX = '.timeline'
 
 /** The suffix each structured kind carries; a text document carries none. */
 const KIND_SUFFIX = { canvas: CANVAS_SUFFIX, map: MAP_SUFFIX, timeline: TIMELINE_SUFFIX }

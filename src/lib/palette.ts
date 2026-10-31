@@ -112,7 +112,7 @@ export interface ChromeInk {
   id: ChromeInkId
   label: string
 }
-export const SAGE: ChromeInk = { id: 'sage', label: 'Sage' }
+const SAGE: ChromeInk = { id: 'sage', label: 'Sage' }
 export const CHROME_INKS: readonly ChromeInk[] = [SAGE, ...INKS]
 
 const isChromeInkId = (value: unknown): value is ChromeInkId => value === 'sage' || isInkId(value)

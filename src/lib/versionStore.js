@@ -140,7 +140,7 @@ export const versionsSidecarPath = (root, docName) => {
 }
 
 /** The sidecar's versions; [] when there is none or it does not parse. */
-export async function readSidecarVersions(root, docName) {
+async function readSidecarVersions(root, docName) {
   try {
     const raw = await readTextFile(versionsSidecarPath(root, docName))
     const parsed = JSON.parse(raw || '[]')
@@ -150,7 +150,7 @@ export async function readSidecarVersions(root, docName) {
   }
 }
 
-export async function writeSidecarVersions(root, docName, versions) {
+async function writeSidecarVersions(root, docName, versions) {
   const filePath = versionsSidecarPath(root, docName)
   await mkdir(parentOf(filePath), { recursive: true })
   await writeTextFile(filePath, JSON.stringify(versions))

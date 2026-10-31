@@ -19,7 +19,7 @@ import { readSpaceCamera } from './space/spaceMath'
 const IDENTITY = Object.freeze({ x: 0, y: 0, zoom: 1 })
 
 /** The projector the surface's layers draw with over the scene. */
-export function spaceProjector(api, camera, size) {
+function spaceProjector(api, camera, size) {
   return {
     kind: 'space',
     bounds: { x: 0, y: 0, width: size.width || 1, height: size.height || 1 },

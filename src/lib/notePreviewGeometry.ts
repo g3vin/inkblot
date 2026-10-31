@@ -19,14 +19,14 @@ export const TILE_MIN_RESIZE_HEIGHT = 64
 export const VIEWPORT_PADDING = 8
 export const HIDE_DELAY_MS = 110
 /** How far in from a card's edge a press resizes it, from that edge or corner. */
-export const RESIZE_GRIP = 6
+const RESIZE_GRIP = 6
 /** The band across a card's top that moves it, as a window's titlebar does. */
-export const MOVE_BAND = 28
+const MOVE_BAND = 28
 /** Leaving a note's dot or card: how far the pointer may drift back from every card
  *  before they close, and how long it may pause on the way to one. */
-export const HOVER_INTENT_SLACK = 6
+const HOVER_INTENT_SLACK = 6
 export const HOVER_INTENT_STALL_MS = 450
-export const CHILD_OFFSET_X = 0
+const CHILD_OFFSET_X = 0
 export const CHILD_OFFSET_Y = 184
 
 /**
@@ -49,7 +49,7 @@ export interface PreviewIdentity {
   editorView?: unknown
 }
 
-export const clamp = (value: number, min: number, max: number): number =>
+const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
 /** A rect, as a card's position and size. */
@@ -166,18 +166,6 @@ export const getDefaultChildOffset = (
   offsetX: (index - (total - 1) / 2) * 48 + CHILD_OFFSET_X,
   offsetY: CHILD_OFFSET_Y,
 })
-
-/** Quadratic bezier "string" between two points, bowing upward with distance. */
-export const getCurvePath = (fromPoint: Point, toPoint: Point): string => {
-  const distance = Math.hypot(toPoint.x - fromPoint.x, toPoint.y - fromPoint.y)
-  const sway = clamp(distance * 0.12, 18, 70)
-  const controlPoint = {
-    x: (fromPoint.x + toPoint.x) / 2,
-    y: (fromPoint.y + toPoint.y) / 2 - sway,
-  }
-
-  return `M ${fromPoint.x} ${fromPoint.y} Q ${controlPoint.x} ${controlPoint.y} ${toPoint.x} ${toPoint.y}`
-}
 
 const insideBox = (point: Point, box: Box): boolean => (
   point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height
@@ -370,7 +358,7 @@ export const addPointerDragListeners = (
   }
 }
 
-export const hasStoredChildOffset = (note: Pick<BranchNote, 'previewLayout'> | null | undefined): boolean => (
+const hasStoredChildOffset = (note: Pick<BranchNote, 'previewLayout'> | null | undefined): boolean => (
   Math.abs(note?.previewLayout?.offsetX || 0) > 1 ||
   Math.abs(note?.previewLayout?.offsetY || 0) > 1
 )

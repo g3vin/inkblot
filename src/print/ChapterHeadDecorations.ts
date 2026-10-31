@@ -32,7 +32,7 @@ import type { ChapterHeadValue } from './bookMatter'
 import { chapterHeadSpec, renderSpec } from './ChapterHead'
 import { readChapterMeta } from './DocChapterMeta'
 
-export const chapterHeadKey = new PluginKey('chapterHeadDecorations')
+const chapterHeadKey = new PluginKey('chapterHeadDecorations')
 
 /** What a pane asks to be drawn: the book's design, the chapter's label and name. */
 export interface LiveHead {

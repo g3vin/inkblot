@@ -20,14 +20,14 @@ import {
 } from './conversationModel'
 import { conversationLook } from './conversationStyles'
 
-export const escapeHtml = (value = '') => String(value)
+const escapeHtml = (value = '') => String(value)
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
   .replaceAll('>', '&gt;')
   .replaceAll('"', '&quot;')
   .replaceAll("'", '&#39;')
 
-export const messageRowsHtml = (attrs) => {
+const messageRowsHtml = (attrs) => {
   const messages = normalizeMessages(attrs.messages, attrs.participants)
   const groupMembers = normalizeGroupMembers(attrs.groupMembers, attrs.participants, messages)
   const getAvatar = name => groupMembers.find(member => member.name === name)?.avatarSrc || ''

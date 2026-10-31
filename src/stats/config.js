@@ -10,7 +10,7 @@
 import { BUILT_IN_ROUTINES, SPRINT, normalizeRoutine } from './routines.js'
 import { GOAL_METRICS, defaultQuietHours, emptyDayGoal, emptyGoalPlan, REMINDER_KINDS } from './goals.js'
 
-export const STATS_CONFIG_VERSION = 1
+const STATS_CONFIG_VERSION = 1
 
 export function defaultStatsConfig() {
   return {

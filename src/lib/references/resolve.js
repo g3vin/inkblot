@@ -29,7 +29,7 @@ const CROSSREF_TYPES = {
 
 /* ---------------- one per identifier ---------------- */
 
-export async function resolveDoi(doi, fetcher) {
+async function resolveDoi(doi, fetcher) {
   const item = await json(fetcher, `https://doi.org/${encodeURI(doi)}`, CSL_ACCEPT)
   const record = fromCsl({ ...item, type: CROSSREF_TYPES[item.type] || item.type })
   record.fields.DOI = record.fields.DOI || doi
@@ -38,7 +38,7 @@ export async function resolveDoi(doi, fetcher) {
   return record
 }
 
-export async function resolveIsbn(isbn, fetcher) {
+async function resolveIsbn(isbn, fetcher) {
   try {
     const data = await json(fetcher, `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`)
     const book = data[`ISBN:${isbn}`]
@@ -71,7 +71,7 @@ export async function resolveIsbn(isbn, fetcher) {
   return { kind: 'book', contributors: (info.authors || []).map((name) => parseName(name)).filter(Boolean), fields }
 }
 
-export async function resolveArxiv(id, fetcher) {
+async function resolveArxiv(id, fetcher) {
   const result = await fetcher(`https://export.arxiv.org/api/query?id_list=${encodeURIComponent(id)}`, {})
   const doc = new DOMParser().parseFromString(result.body, 'application/xml')
   const entry = doc.getElementsByTagName('entry')[0]
@@ -101,7 +101,7 @@ export async function resolveArxiv(id, fetcher) {
   }
 }
 
-export async function resolvePmid(pmid, fetcher) {
+async function resolvePmid(pmid, fetcher) {
   const data = await json(fetcher, `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmid}&retmode=json`)
   const item = data.result?.[pmid]
   if (!item?.title) throw new Error('No PubMed record with that id was found')
@@ -133,7 +133,7 @@ const OEMBED = [
   [/(^|\.)vimeo\.com$/, (url) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`],
 ]
 
-export async function resolveUrl(url, fetcher, { today = todayIso() } = {}) {
+async function resolveUrl(url, fetcher, { today = todayIso() } = {}) {
   const host = new URL(url).hostname.replace(/^www\.|^m\./, '')
   let page = null
   let error = null
@@ -190,7 +190,7 @@ const crossrefToRecord = (item) => {
   return record
 }
 
-export async function searchTitle(query, fetcher) {
+async function searchTitle(query, fetcher) {
   const q = encodeURIComponent(query)
   const [crossref, books] = await Promise.allSettled([
     json(fetcher, `https://api.crossref.org/works?rows=4&query.bibliographic=${q}&select=DOI,title,author,editor,issued,container-title,type,publisher,volume,issue,page,ISBN`),

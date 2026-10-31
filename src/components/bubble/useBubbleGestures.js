@@ -18,11 +18,11 @@ import { SWIPE_DISTANCE, SWIPE_LOCK, decideFormSwipe, swipeOffset } from '../../
 import { hasEndedWheelPhase, isMomentumWheel, wheelPhases } from '../../lib/wheelPhase'
 
 /** A pause this long ends a wheel gesture that reports no phases (Chromium). */
-export const GESTURE_IDLE_MS = 200
+const GESTURE_IDLE_MS = 200
 /** Ctrl-wheel travel that makes a pinch. */
-export const PINCH_TRAVEL = 24
+const PINCH_TRAVEL = 24
 /** A WebKit pinch this far from 1 makes a pinch. */
-export const PINCH_SCALE = 1.2
+const PINCH_SCALE = 1.2
 
 export default function useBubbleGestures(overlayRef, { onPinch, onSwipe, onTurn, canTurn, enabled = true }) {
   const handlers = useRef({ onPinch, onSwipe, onTurn, canTurn })

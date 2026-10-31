@@ -19,7 +19,7 @@ import type { NotesOptions } from '../types'
 
 type PMNode = { type: string; attrs?: Record<string, unknown>; content?: PMNode[]; text?: string; marks?: unknown[] }
 
-export const DEFAULT_NOTES: NotesOptions = {
+const DEFAULT_NOTES: NotesOptions = {
   placement: NotePlacement.Page,
   numbering: NoteNumbering.PerChapter,
   marks: NoteMarks.Numbers,
@@ -36,7 +36,7 @@ export const notesOptionsOf = (book: { notes?: Partial<NotesOptions> | null } | 
   }
 }
 
-export const NOTE_SYMBOLS = ['*', '†', '‡', '§', '‖', '¶']
+const NOTE_SYMBOLS = ['*', '†', '‡', '§', '‖', '¶']
 
 /** The mark of note `n` (from 1): its number, or its symbol — doubled after six. */
 export const noteMark = (n: number, marks: NoteMarks | string = NoteMarks.Numbers): string => {
@@ -52,7 +52,7 @@ export interface Note {
 }
 
 /** A document's notes in order, with where each is. */
-export const footnotesOf = (doc: PMNode): Array<{ id: string; text: string }> => {
+const footnotesOf = (doc: PMNode): Array<{ id: string; text: string }> => {
   const out: Array<{ id: string; text: string }> = []
   const walk = (node: PMNode) => {
     if (node.type === 'footnote') out.push({ id: String(node.attrs?.id || ''), text: String(node.attrs?.text || '') })
@@ -63,7 +63,7 @@ export const footnotesOf = (doc: PMNode): Array<{ id: string; text: string }> =>
 }
 
 /** A copy of `doc` with each note given its mark, from `start`; and the notes, in order. */
-export const markNotes = (doc: PMNode, start: number, options: NotesOptions, end: boolean): { doc: PMNode; notes: Note[]; next: number } => {
+const markNotes = (doc: PMNode, start: number, options: NotesOptions, end: boolean): { doc: PMNode; notes: Note[]; next: number } => {
   let n = start
   const notes: Note[] = []
   const walk = (node: PMNode): PMNode => {
@@ -83,14 +83,14 @@ export const markNotes = (doc: PMNode, start: number, options: NotesOptions, end
 const text = (value: string): PMNode => ({ type: 'text', text: value })
 
 /** Notes as paragraphs: "1. The text." — for a chapter's end, or the book's. */
-export const noteParagraphs = (notes: Note[]): PMNode[] => notes.map((note) => ({
+const noteParagraphs = (notes: Note[]): PMNode[] => notes.map((note) => ({
   type: 'paragraph',
   attrs: { styleName: null, noteId: note.id },
   content: [text(`${note.mark}. `), ...(note.text ? [text(note.text)] : [])],
 }))
 
 /** The notes after a chapter: a heading, and each note. */
-export const withChapterNotes = (doc: PMNode, notes: Note[], heading: string): PMNode => (notes.length ? {
+const withChapterNotes = (doc: PMNode, notes: Note[], heading: string): PMNode => (notes.length ? {
   ...doc,
   content: [
     ...(doc.content || []),

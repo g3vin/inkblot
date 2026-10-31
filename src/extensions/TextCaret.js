@@ -13,7 +13,7 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 
-export const TEXT_CARET_PLUGIN_KEY = new PluginKey('textCaret')
+const TEXT_CARET_PLUGIN_KEY = new PluginKey('textCaret')
 
 /** A rect taller than this many font sizes is a line box (an empty line's), not a glyph's. */
 const MAX_GLYPH_EM = 1.4

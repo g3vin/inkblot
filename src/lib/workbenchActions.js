@@ -14,7 +14,7 @@ export function editorForTile(tile, { editor, secondaryEditor, secondaryDoc }) {
   return editor
 }
 
-export function findTileRange(targetEditor, tile) {
+function findTileRange(targetEditor, tile) {
   if (!targetEditor || !tile) return null
   const text = tile.anchor || tile.text
   if (!text) return null

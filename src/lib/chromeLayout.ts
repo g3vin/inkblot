@@ -130,9 +130,6 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.speech.read-aloud', label: 'Read aloud', icon: 'read-aloud', contexts: ['document'] },
 ]
 
-/** Ids saved layouts may still name, which are dropped as they are read. */
-export const RETIRED_TOOLBAR_IDS = ['inkblot.window.inspector-toggle']
-
 const ITEM_BY_ID = new Map(TOOLBAR_ITEMS.map((item) => [item.id, item]))
 export const toolbarItem = (id: string) => ITEM_BY_ID.get(id)
 
@@ -342,9 +339,9 @@ export const DEFAULT_INSPECTOR_TABS: Record<InspectorLayoutKind, InspectorTab[]>
 export const layoutForMode = (mode: string): InspectorLayoutKind => (mode === 'typeset' ? 'finishing' : 'drafting')
 
 /** Tabs that became others: Page and Book are Typeset now, Publish is Print & Export. */
-export const RENAMED_TABS: Record<string, InspectorTab> = { page: 'typeset', book: 'typeset', publish: 'output' }
+const RENAMED_TABS: Record<string, InspectorTab> = { page: 'typeset', book: 'typeset', publish: 'output' }
 /** Tabs added after layouts could first be saved. */
-export const ADDED_LATER: InspectorTab[] = ['stats', 'typeset', 'output', 'timeline']
+const ADDED_LATER: InspectorTab[] = ['stats', 'typeset', 'output', 'timeline']
 
 export type InspectorLayouts = {
   version: 1
@@ -354,7 +351,7 @@ export type InspectorLayouts = {
 }
 
 /** A saved list of tab names as tabs: renamed ones as what they became, each once, never the map's. */
-export function tabsFrom(raw: unknown[]): InspectorTab[] {
+function tabsFrom(raw: unknown[]): InspectorTab[] {
   const seen = new Set<InspectorTab>()
   const out: InspectorTab[] = []
   for (const name of raw) {
@@ -367,7 +364,7 @@ export function tabsFrom(raw: unknown[]): InspectorTab[] {
   return out
 }
 
-export const defaultInspectorLayouts = (): InspectorLayouts => ({ version: 1, layouts: {}, known: [...ARRANGEABLE_TABS], last: {} })
+const defaultInspectorLayouts = (): InspectorLayouts => ({ version: 1, layouts: {}, known: [...ARRANGEABLE_TABS], last: {} })
 
 /** The tabs `layout` shows: as saved, or its defaults. Never empty. */
 export function tabsOf(layouts: InspectorLayouts, layout: InspectorLayoutKind): InspectorTab[] {

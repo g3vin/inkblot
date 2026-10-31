@@ -19,7 +19,7 @@ const PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
 const CACHE_VERSION = 1
 const CACHE_MAX_ITEMS = 80
 
-export const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
 
 /**
  * A Pinterest BOARD url, normalized — or null if `text` is anything else (a pin, a

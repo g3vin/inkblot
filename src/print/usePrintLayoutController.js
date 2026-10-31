@@ -94,7 +94,7 @@ import { actualSizeZoom } from './zoom'
 import { EXPORT_EVENT, IMPORT_SCRIPT, PRINT_EVENT, PRINT_LAYOUT_TOGGLE, WRITING_FORMAT } from '../lib/appEvents'
 
 /** The tokens a running head or foot can hold, for the inspector's token menu. */
-export const RUNNING_TOKENS = [
+const RUNNING_TOKENS = [
   { token: '{page}', label: 'Page number' },
   { token: '{pages}', label: 'Page count' },
   { token: '{title}', label: 'Title' },
@@ -105,7 +105,7 @@ export const RUNNING_TOKENS = [
   { token: '{date}', label: 'Today’s date' },
 ]
 
-export const PAGE_LAYOUT_CATALOG = {
+const PAGE_LAYOUT_CATALOG = {
   presets: PAGE_SIZE_PRESETS.map((p) => ({
     id: p.id,
     label: p.label,

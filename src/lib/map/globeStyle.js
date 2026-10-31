@@ -30,7 +30,7 @@ export function themeColors(element) {
 }
 
 /** Every 10°, as lines: the graticule. */
-export function graticule() {
+function graticule() {
   const lines = []
   for (let lon = -180; lon < 180; lon += 10) {
     const coords = []
@@ -45,7 +45,7 @@ export function graticule() {
   return { type: 'FeatureCollection', features: lines }
 }
 
-export const EMPTY = { type: 'FeatureCollection', features: [] }
+const EMPTY = { type: 'FeatureCollection', features: [] }
 
 /** Ids of the layers the writer's items are drawn in; GlobeView hit-tests these. */
 export const ITEM_LAYERS = {

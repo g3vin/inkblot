@@ -16,7 +16,7 @@ import { BOOK_TYPOGRAPHY } from './typography'
 
 type Book = Partial<BookSettings> & Record<string, unknown>
 
-export const EDITION_NAMES: Record<EditionKind, string> = {
+const EDITION_NAMES: Record<EditionKind, string> = {
   [EditionKind.Paperback]: 'Paperback',
   [EditionKind.Hardcover]: 'Hardcover',
   [EditionKind.LargePrint]: 'Large print',
@@ -30,7 +30,7 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
  * for its stiffer binding; large print's 16 pt type, loosely leaded, ragged, unhyphenated
  * (as the large-print guidelines ask); an e-book's none — a reader sets its own page.
  */
-export const presetPageSetup = (kind: EditionKind, base: PageSetup | null | undefined): PageSetup | undefined => {
+const presetPageSetup = (kind: EditionKind, base: PageSetup | null | undefined): PageSetup | undefined => {
   if (kind === EditionKind.Ebook) return undefined
   const setup = normalizePageSetup(clone(base || {})) as PageSetup
   if (kind === EditionKind.Hardcover) {

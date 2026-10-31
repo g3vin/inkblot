@@ -27,10 +27,10 @@ const COLLAPSE_THRESHOLD = 40
 const RESIZE_GIVE = 60
 
 /** Where a sidebar's width and whether it is pinned are kept: inkblot.sidebar.left / right. */
-export const sidebarKey = (side) => `inkblot.sidebar.${side}`
+const sidebarKey = (side) => `inkblot.sidebar.${side}`
 
 /** The saved width and pin, within [min, max]; the defaults for anything unreadable. */
-export function readSidebar(side, initial, min, max) {
+function readSidebar(side, initial, min, max) {
   try {
     const saved = JSON.parse(getPreference(sidebarKey(side)) || 'null')
     const width = Number.isFinite(saved?.width) ? Math.min(max, Math.max(min, saved.width)) : initial

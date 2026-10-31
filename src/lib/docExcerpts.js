@@ -144,7 +144,7 @@ export function dropProjectExcerpts(projectName) {
 }
 
 /** Follow an entry renamed, moved or deleted (`nextPath` null) in the tree. */
-export function remapExcerpts(projectName, entryPath, nextPath, type) {
+function remapExcerpts(projectName, entryPath, nextPath, type) {
   const all = load()
   const project = all[projectName]
   if (!project) return
@@ -159,12 +159,6 @@ export function pruneExcerpts(projectNames) {
   const stale = Object.keys(all).filter((name) => !keep.has(name))
   if (!stale.length) return
   commit(Object.fromEntries(Object.entries(all).filter(([name]) => keep.has(name))))
-}
-
-/** For tests: start again from what the preferences hold. */
-export function resetExcerptsForTests() {
-  state = null
-  window.clearTimeout(saveTimer)
 }
 
 let observing = null

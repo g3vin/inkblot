@@ -13,7 +13,7 @@ export interface StatsScope {
   docPath?: string | null
 }
 
-export const EMPTY_TOTALS: StatsTotals = {
+const EMPTY_TOTALS: StatsTotals = {
   sessions: 0, openSecs: 0, activeSecs: 0, wordsAdded: 0, wordsDeleted: 0, wordsPasted: 0,
   longestSessionSecs: 0, daysWritten: 0,
 }
@@ -60,5 +60,3 @@ export const statsService = {
   loadConfig: () => read<string | null>('stats_config', {}, null),
   saveConfig: (json: string) => write('stats_set_config', { json }),
 }
-
-export type StatsService = typeof statsService

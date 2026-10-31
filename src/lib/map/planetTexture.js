@@ -18,13 +18,13 @@
  */
 import { fbm3, random } from './seeded'
 
-export const MASK_NONE = 0
+const MASK_NONE = 0
 export const MASK_LAND = 1
 export const MASK_WATER = 2
-export const MASK_MOUNTAINS = 3
-export const MASK_ICE = 4
-export const MASK_DESERT = 5
-export const MASK_FOREST = 6
+const MASK_MOUNTAINS = 3
+const MASK_ICE = 4
+const MASK_DESERT = 5
+const MASK_FOREST = 6
 
 /** Which mask a region's terrain paints (terrains.js ids). */
 export const TERRAIN_MASK = {

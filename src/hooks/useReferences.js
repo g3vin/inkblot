@@ -70,7 +70,7 @@ const settle = (ref, found) => {
   return { ...next, status: settledStatus(next) }
 }
 
-export async function lookUp(projectName, id, input) {
+async function lookUp(projectName, id, input) {
   let found
   try {
     found = await resolveInput(input, (url, options) => fetchText(url, options))

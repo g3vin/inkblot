@@ -56,7 +56,7 @@ export function governQuality(times, step) {
   return sorted[Math.floor(sorted.length / 2)] > FRAME_BUDGET_MS ? step + 1 : step
 }
 
-export const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
 
 /**
  * Set up a stage in `container`, the camera where `saved` says. Throws if WebGL is

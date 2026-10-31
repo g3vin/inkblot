@@ -13,7 +13,7 @@ import { getPreference, setPreference } from './preferences'
 
 const KEY = 'inkblot.landing.summaries'
 const IDLE_GAP_MS = 200
-export const SUMMARY_STALE_MS = 6 * 60 * 60 * 1000
+const SUMMARY_STALE_MS = 6 * 60 * 60 * 1000
 
 /** @typedef {{ files: number, words: number, at: number }} ProjectSummary */
 
@@ -48,7 +48,7 @@ export const summariesSnapshot = () => load()
 /** @returns {ProjectSummary | null} */
 export const summaryFor = (projectName) => load()[projectName] ?? null
 
-export function setSummary(projectName, files, words) {
+function setSummary(projectName, files, words) {
   if (!projectName) return
   const known = load()[projectName]
   if (known && known.files === files && known.words === words) {

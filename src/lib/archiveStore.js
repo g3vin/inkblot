@@ -17,7 +17,7 @@ import { withDocLock } from './docLock'
 
 export const ARCHIVE_CHANGED_EVENT = 'archive:changed'
 
-export const newArchiveId = () => `archive-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+const newArchiveId = () => `archive-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
 const emitArchiveChanged = (projectName, docName) => {
   try {

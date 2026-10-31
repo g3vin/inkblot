@@ -207,7 +207,7 @@ export const FORMAT_PRESETS: FormatPreset[] = [
 
 const BY_ID = new Map(FORMAT_PRESETS.map((f) => [f.id, f]))
 
-export const getFormat = (id: string | null | undefined): FormatPreset | null => (id && BY_ID.get(id)) || null
+const getFormat = (id: string | null | undefined): FormatPreset | null => (id && BY_ID.get(id)) || null
 
 /** What a format makes a document written as: a script's, or null for prose. */
 export const writingFormatOf = (id: string | null | undefined): 'screenplay' | 'stageplay' | null => {

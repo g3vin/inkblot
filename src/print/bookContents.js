@@ -29,7 +29,7 @@ export const currentBookItems = async (projectName, folder) => {
 }
 
 /** Legacy matter written out as documents, each in place of its text. */
-export const materializeMatter = async (projectName, folder, items) => {
+const materializeMatter = async (projectName, folder, items) => {
   if (!items.some(isLegacyMatter)) return items
   const book = getBookSettings(projectName, folder)
   const author = bookAuthor(book)
@@ -68,7 +68,7 @@ let editing = Promise.resolve()
  * start from the same contents and the later write would undo the earlier (a selection
  * gathered and then given a part, say).
  */
-export const editBookItems = (projectName, folder, change) => {
+const editBookItems = (projectName, folder, change) => {
   const edit = editing.then(() => applyEdit(projectName, folder, change))
   editing = edit.catch(() => {})
   return edit

@@ -12,7 +12,7 @@ export const FOCUS_MODE_LIMITS = {
   contextFontSize: { min: 18, max: 56 },
 }
 
-export const DEFAULT_FOCUS_MODE_SETTINGS = {
+const DEFAULT_FOCUS_MODE_SETTINGS = {
   before: 0,
   after: 0,
   fontSize: 42,

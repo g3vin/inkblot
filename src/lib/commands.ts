@@ -78,7 +78,7 @@ export function useAllCommands(): Command[] {
   return useSyncExternalStore(subscribeCommands, () => snapshot, () => snapshot)
 }
 
-export function subscribeCommands(listener: () => void): () => void {
+function subscribeCommands(listener: () => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
 }

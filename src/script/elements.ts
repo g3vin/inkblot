@@ -21,7 +21,7 @@ export interface ElementSpec {
   upper: boolean
 }
 
-export const SCREENPLAY_ELEMENTS: ElementSpec[] = [
+const SCREENPLAY_ELEMENTS: ElementSpec[] = [
   { id: 'sceneHeading', label: 'Scene heading', upper: true },
   { id: 'action', label: 'Action', upper: false },
   { id: 'character', label: 'Character', upper: true },
@@ -32,7 +32,7 @@ export const SCREENPLAY_ELEMENTS: ElementSpec[] = [
   { id: 'centered', label: 'Centered', upper: false },
 ]
 
-export const STAGEPLAY_ELEMENTS: ElementSpec[] = [
+const STAGEPLAY_ELEMENTS: ElementSpec[] = [
   { id: 'actHeading', label: 'Act', upper: true },
   { id: 'sceneTitle', label: 'Scene', upper: true },
   { id: 'stageDirection', label: 'Stage direction', upper: false },
@@ -139,7 +139,7 @@ export const nextOnTab = (element: ScriptElementType, back = false, format: Writ
 /* ---------------- recognising what was typed ---------------- */
 
 /** A scene heading's opening: INT., EXT., INT./EXT., I/E, EST. */
-export const SCENE_HEADING = /^(INT|EXT|EST|INT\.?\/EXT|I\/E)[.\s]/i
+const SCENE_HEADING = /^(INT|EXT|EST|INT\.?\/EXT|I\/E)[.\s]/i
 
 /** What a line typed as action turns out to be, from its first characters. */
 export const recognise = (element: ScriptElementType, text: string): ScriptElementType | null => {

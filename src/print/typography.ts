@@ -15,7 +15,7 @@ import { ChapterOpening, ImageAlign, LineSpacing, PrintAlignment } from '../type
 import type { Composition, ImageTypesetting, OpenTypeFeatures, PrintTypography } from '../types'
 
 /** Single spacing, as a multiple of the font size. */
-export const SINGLE_LEADING = 1.15
+const SINGLE_LEADING = 1.15
 
 export const BOOK_TYPOGRAPHY: PrintTypography = {
   fontFamily: 'Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif',
@@ -91,7 +91,7 @@ export const normalizeTypography = (raw: unknown): PrintTypography | undefined =
  * no more than two hyphens in a row, none in a word under six letters. On in every
  * style — a book set without them looks set by a word processor.
  */
-export const DEFAULT_COMPOSITION: Composition = {
+const DEFAULT_COMPOSITION: Composition = {
   balance: true,
   hangingPunctuation: true,
   hyphenLimitLines: 2,
@@ -99,7 +99,7 @@ export const DEFAULT_COMPOSITION: Composition = {
   baselineGrid: false,
 }
 
-export const normalizeComposition = (raw: unknown): Composition => {
+const normalizeComposition = (raw: unknown): Composition => {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const d = DEFAULT_COMPOSITION
   const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback)
@@ -118,7 +118,7 @@ export const compositionOf = (t: PrintTypography | undefined | null): Compositio
 )
 
 /** Ligatures and kerning, as every text face should be set; the rest when asked for. */
-export const DEFAULT_FEATURES: OpenTypeFeatures = {
+const DEFAULT_FEATURES: OpenTypeFeatures = {
   ligatures: true,
   discretionaryLigatures: false,
   oldStyleFigures: false,
@@ -126,7 +126,7 @@ export const DEFAULT_FEATURES: OpenTypeFeatures = {
   swashes: false,
 }
 
-export const normalizeFeatures = (raw: unknown): OpenTypeFeatures => {
+const normalizeFeatures = (raw: unknown): OpenTypeFeatures => {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const out = { ...DEFAULT_FEATURES }
   for (const key of Object.keys(DEFAULT_FEATURES) as Array<keyof OpenTypeFeatures>) {
@@ -135,12 +135,12 @@ export const normalizeFeatures = (raw: unknown): OpenTypeFeatures => {
   return out
 }
 
-export const featuresOf = (t: PrintTypography | undefined | null): OpenTypeFeatures => (
+const featuresOf = (t: PrintTypography | undefined | null): OpenTypeFeatures => (
   t?.features ? normalizeFeatures(t.features) : DEFAULT_FEATURES
 )
 
 /** The features as CSS declarations' values. */
-export const featureCss = (f: OpenTypeFeatures): { ligatures: string; numeric: string; kerning: string; settings: string } => ({
+const featureCss = (f: OpenTypeFeatures): { ligatures: string; numeric: string; kerning: string; settings: string } => ({
   ligatures: [f.ligatures ? 'common-ligatures' : 'no-common-ligatures', f.discretionaryLigatures ? 'discretionary-ligatures' : 'no-discretionary-ligatures'].join(' '),
   numeric: f.oldStyleFigures ? 'oldstyle-nums' : 'normal',
   kerning: f.kerning ? 'normal' : 'none',
@@ -159,13 +159,13 @@ export const baselineGridPx = (t: PrintTypography | undefined | null): number =>
  * leading's extra over the type, plus the type's ascent, near enough — for drawing the
  * grid where the lines sit.
  */
-export const baselineOffsetPx = (t: PrintTypography): number => {
+const baselineOffsetPx = (t: PrintTypography): number => {
   const leading = leadingPt(t) * PX_PER_PT
   const size = t.fontSizePt * PX_PER_PT
   return Math.round(((leading - size) / 2 + size * 0.8) * 100) / 100
 }
 
-export const DEFAULT_IMAGE_TYPESETTING: ImageTypesetting = {
+const DEFAULT_IMAGE_TYPESETTING: ImageTypesetting = {
   maxWidthPct: 100,
   align: ImageAlign.Center,
   keepWithCaption: true,
@@ -173,7 +173,7 @@ export const DEFAULT_IMAGE_TYPESETTING: ImageTypesetting = {
 }
 
 /** How a book's pictures are set, with anything missing filled in. */
-export const normalizeImageTypesetting = (raw: unknown): ImageTypesetting => {
+const normalizeImageTypesetting = (raw: unknown): ImageTypesetting => {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const d = DEFAULT_IMAGE_TYPESETTING
   return {

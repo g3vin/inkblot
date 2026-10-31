@@ -36,11 +36,11 @@ export const TREE_KINDS: { value: TreeKind; label: string }[] = [
 
 const fold = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase()
 
-export const isFilterActive = (filter: TreeFilter) =>
+const isFilterActive = (filter: TreeFilter) =>
   filter.text.trim() !== '' || filter.kind !== 'all' || filter.recentOnly
 
 /** The name a document is shown under: its file name without the kind's suffix. */
-export function displayName(path: string): string {
+function displayName(path: string): string {
   const leaf = path.split('/').pop() ?? path
   return leaf.replace(/\.(canvas|map)$/, '')
 }

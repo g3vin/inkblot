@@ -50,7 +50,7 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
  * Structural equality of two JSON values. Key order is not part of a value, and a
  * missing key is the same as `null` only at the top of a section (see `sectionOf`).
  */
-export function sameJson(a, b) {
+function sameJson(a, b) {
   if (a === b) return true
   if (Array.isArray(a)) {
     return Array.isArray(b) && a.length === b.length && a.every((value, index) => sameJson(value, b[index]))
@@ -75,7 +75,7 @@ const without = (object, keys) => {
  * A collection's items: objects with a non-empty string id, first of each id kept —
  * the rule normalizeMap reads lists by, so a raw map and its normalized form agree.
  */
-export function mapItems(map, key) {
+function mapItems(map, key) {
   const list = key === 'bodies' ? (isObject(map?.system) ? map.system.bodies : null) : map?.[key]
   const out = []
   const seen = new Set()

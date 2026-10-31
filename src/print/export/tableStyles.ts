@@ -31,8 +31,6 @@ export function fillHex(ink: unknown): string | null {
   return `${channel(1)}${channel(3)}${channel(5)}`.toUpperCase()
 }
 
-export type TableBorders = 'all' | 'outer' | 'inner' | 'none'
-
 /** Which edges a table draws: its outside, and the lines between its cells. */
 export function tableEdges(borders: unknown): { outer: boolean; inner: boolean } {
   if (borders === 'outer') return { outer: true, inner: false }

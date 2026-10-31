@@ -46,7 +46,7 @@ export function luminance({ data, width, height }) {
 }
 
 /** A 3×3 Gaussian (1-2-1) blur, edges clamped. */
-export function blur3(gray, width, height) {
+function blur3(gray, width, height) {
   const out = new Float32Array(gray.length)
   const at = (x, y) => gray[Math.min(height - 1, Math.max(0, y)) * width + Math.min(width - 1, Math.max(0, x))]
   for (let y = 0; y < height; y += 1) {
@@ -92,7 +92,7 @@ export function otsuThreshold(gray) {
 }
 
 /** Ink mask: 1 where darker than the threshold (lighter, when inverted). */
-export function binarize(gray, threshold, invert = false) {
+function binarize(gray, threshold, invert = false) {
   const mask = new Uint8Array(gray.length)
   for (let index = 0; index < gray.length; index += 1) {
     const dark = gray[index] <= threshold
@@ -122,11 +122,11 @@ function morph(mask, width, height, keep) {
 }
 
 /** Erode then dilate: whiskers and single stray pixels go, shapes keep their size. */
-export const openMask = (mask, width, height) =>
+const openMask = (mask, width, height) =>
   morph(morph(mask, width, height, (count, self) => self && count >= 7), width, height, (count) => count >= 1)
 
 /** Drop 4-connected components smaller than `minArea` pixels. */
-export function removeSmall(mask, width, height, minArea) {
+function removeSmall(mask, width, height, minArea) {
   const out = mask.slice()
   const seen = new Uint8Array(mask.length)
   const stack = []
@@ -161,7 +161,7 @@ export function removeSmall(mask, width, height, minArea) {
  * end. Where two rings touch at a single corner, the walk turns left, keeping them
  * apart.
  */
-export function traceOutlines(mask, width, height) {
+function traceOutlines(mask, width, height) {
   const inked = (x, y) => x >= 0 && y >= 0 && x < width && y < height && mask[y * width + x] === 1
   // Directed edges keyed by their start corner.
   const edges = new Map()
@@ -230,7 +230,7 @@ export function traceOutlines(mask, width, height) {
 /* ---------- 4b. centre lines ---------- */
 
 /** Zhang–Suen thinning: the mask worn down to a one-pixel skeleton. */
-export function thin(mask, width, height) {
+function thin(mask, width, height) {
   const out = mask.slice()
   const at = (x, y) => (x >= 0 && y >= 0 && x < width && y < height ? out[y * width + x] : 0)
   let changed = true
@@ -266,7 +266,7 @@ const NEIGHBOURS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1],
  * whatever is left (closed loops). Branches shorter than `pruneLength` that end in
  * nothing — the spurs thinning leaves on a thick stroke — are dropped.
  */
-export function skeletonLines(skeleton, width, height, pruneLength = 8) {
+function skeletonLines(skeleton, width, height, pruneLength = 8) {
   const on = (x, y) => x >= 0 && y >= 0 && x < width && y < height && skeleton[y * width + x] === 1
   const neighbours = (x, y) => NEIGHBOURS.map(([dx, dy]) => [x + dx, y + dy]).filter(([nx, ny]) => on(nx, ny))
   const degree = (x, y) => neighbours(x, y).length

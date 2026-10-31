@@ -88,7 +88,7 @@ const renormalize = (map: StoredMap): StoredMap =>
   }) as StoredMap
 
 /** One edit to the document, without history. */
-export function docReducer(map: StoredMap, action: MapDocAction): StoredMap {
+function docReducer(map: StoredMap, action: MapDocAction): StoredMap {
   switch (action.type) {
     case 'doc/replace':
       return action.map

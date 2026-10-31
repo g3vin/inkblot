@@ -12,7 +12,7 @@ import { invoke } from '@tauri-apps/api/core'
 let pinterestWindow = null
 let pinterestWindowReady = null
 
-export const PINTEREST_WINDOW_LABEL = 'pinterest'
+const PINTEREST_WINDOW_LABEL = 'pinterest'
 const PINTEREST_HOME_URL = 'https://www.pinterest.com'
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 

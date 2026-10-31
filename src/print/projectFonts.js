@@ -13,7 +13,7 @@ import { exists, mkdir, readDir, readFile, writeFile } from '@tauri-apps/plugin-
 import { getProjectRoot } from '../lib/FileSystem'
 import { fontFileType, readFontInfo } from './fontFile'
 
-export const FONTS_DIR = '.assets/fonts'
+const FONTS_DIR = '.assets/fonts'
 
 const cache = new Map()
 const listeners = new Set()
@@ -25,7 +25,7 @@ export const onProjectFontsChanged = (listener) => {
 }
 
 /** The fonts already read for a project, without reading: [] until they have been. */
-export const projectFontsNow = (projectName) => cache.get(projectName)?.fonts || []
+const projectFontsNow = (projectName) => cache.get(projectName)?.fonts || []
 
 const baseName = (path) => path.split(/[/\\]/).pop() || path
 

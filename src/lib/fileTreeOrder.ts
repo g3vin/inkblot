@@ -23,7 +23,7 @@ export const getParentPath = (path: string = '') => path.split('/').slice(0, -1)
    entries missing from the stored order are appended, stale ids are dropped.
 ---------------------------------------------------------------------------- */
 
-export const ensureOrder = (
+const ensureOrder = (
   order: OrderMap,
   folderPath: string | undefined,
   children: TreeNode[],

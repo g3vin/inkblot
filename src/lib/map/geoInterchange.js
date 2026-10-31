@@ -15,7 +15,7 @@ import { BLANK_SHEET, newId, normalizeMap } from './mapModel'
 import { routeCoords } from './mapSpace'
 
 /** Maps whose points are longitude and latitude. */
-export const LONLAT_KINDS = new Set(['earth', 'planet'])
+const LONLAT_KINDS = new Set(['earth', 'planet'])
 /** Maps an import can land on. */
 export const IMPORT_KINDS = new Set(['earth', 'planet', 'blank', 'image'])
 

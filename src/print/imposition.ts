@@ -34,7 +34,7 @@ export const SIGNATURE_GUIDANCE: SignatureGuidance[] = [
 ]
 
 export const DEFAULT_SHEETS_PER_SIGNATURE = 4
-export const MAX_SHEETS_PER_SIGNATURE = 8
+const MAX_SHEETS_PER_SIGNATURE = 8
 
 export interface SheetSide {
   /** The page on the left half and the right half; 0 is blank. */
@@ -78,7 +78,7 @@ export interface ImpositionOptions {
  * back: [first + 2i + 1, last − 2i − 1] — so a 4-page folio is front 4|1, back 2|3,
  * and folded, it reads 1, 2, 3, 4.
  */
-export const signatureSheets = (first: number, n: number): Array<{ front: SheetSide; back: SheetSide }> => {
+const signatureSheets = (first: number, n: number): Array<{ front: SheetSide; back: SheetSide }> => {
   const last = first + n - 1
   const out = []
   for (let i = 0; i < n / 4; i += 1) {

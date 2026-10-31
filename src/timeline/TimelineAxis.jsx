@@ -14,7 +14,7 @@ import { formatDay } from '../lib/map/calendar'
 import { inkColor, inkVar } from '../lib/palette'
 import { effectiveLens } from '../lib/timeline/timelineModel'
 
-export const AXIS_HEIGHT = 40
+const AXIS_HEIGHT = 40
 
 export default function TimelineAxis({ timeline, calendar, axis, toX, toUnit, px, plotWidth, cursor, onScrub, onLens, view }) {
   const trackRef = useRef(null)

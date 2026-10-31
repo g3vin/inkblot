@@ -16,7 +16,7 @@
  * Mirrored in `inkblot_core::map::calendar`.
  */
 
-export const DEFAULT_CALENDAR = {
+const DEFAULT_CALENDAR = {
   mode: 'day',
   gregorianEpoch: '1850-03-01',
   custom: {

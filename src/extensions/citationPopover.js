@@ -21,7 +21,7 @@ const LOCATOR_LABELS = [
 
 let open = null
 
-export function closeCitationPopover() {
+function closeCitationPopover() {
   if (!open) return
   open.teardown()
   open = null

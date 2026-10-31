@@ -18,18 +18,6 @@ import './HistoryPanel.css'
 
 const KIND_LABELS = { bubble: 'Bubble' }
 
-/** An archive box, for the button that opens this. */
-export function ArchiveIcon({ size = 14 }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="5" rx="1.5" />
-        <path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4" />
-      </g>
-    </svg>
-  )
-}
-
 export default function ArchivePanel({ projectName, docName, editor, backLabel, onBack }) {
   const [items, setItems] = useState([])
   const [missing, setMissing] = useState(null)

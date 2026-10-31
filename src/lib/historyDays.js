@@ -1,6 +1,6 @@
 /** historyDays.js — history rows by the day they were kept: Today, Yesterday, then dates. */
 
-export function dayLabel(iso, now = new Date()) {
+function dayLabel(iso, now = new Date()) {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return 'Earlier'
   const start = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()

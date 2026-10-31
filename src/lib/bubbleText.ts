@@ -154,7 +154,7 @@ const decapitalize = (word: string): string => {
 }
 
 /** Whether the text begins with a capital — which says whether it begins a sentence. */
-export const startsCapitalized = (text: string): boolean => {
+const startsCapitalized = (text: string): boolean => {
   const first = [...String(text ?? '')].find((char) => /[\p{L}]/u.test(char))
   return !!first && first !== first.toLocaleLowerCase()
 }

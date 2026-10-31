@@ -19,7 +19,7 @@ export const TOOLBAR_LAYOUT_CHANGED = 'inkblot:toolbar-layout-changed'
 
 const announce = () => window.dispatchEvent(new CustomEvent(TOOLBAR_LAYOUT_CHANGED))
 
-export function readToolbarItems(context) {
+function readToolbarItems(context) {
   return normalizeToolbar(context, getPreference(toolbarLayoutKey(context))).items
 }
 
@@ -30,7 +30,7 @@ export function writeToolbarItems(context, items) {
   return layout.items
 }
 
-export function resetToolbarItems(context) {
+function resetToolbarItems(context) {
   return writeToolbarItems(context, DEFAULT_TOOLBARS[context])
 }
 

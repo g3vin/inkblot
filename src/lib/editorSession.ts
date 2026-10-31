@@ -25,7 +25,7 @@ export const MAX_CLIPBOARD_ENTRIES = 80
 export const MAX_CLIPBOARD_IMAGES = 12
 // Search is the sidebar's search bar, not a tab, so a stored 'search' (or any
 // unknown id) restores to the default tab.
-export const RIGHT_SIDEBAR_TAB_IDS = new Set([
+const RIGHT_SIDEBAR_TAB_IDS = new Set([
   'clipboard', 'workbench', 'notes', 'references', 'history', 'typeset', 'output', 'stats', 'map',
 ])
 
@@ -78,7 +78,7 @@ export interface EditorSession {
   projects: Record<string, ProjectSession>
 }
 
-export const createEmptySession = (fallbackProject?: string | null): EditorSession => ({
+const createEmptySession = (fallbackProject?: string | null): EditorSession => ({
   lastProject: fallbackProject || '',
   projects: {},
 })
@@ -378,7 +378,7 @@ export const showSplitIn = (ws: TabWorkspace, split: SavedSplit): TabWorkspace =
   showPanesIn(ws, split.primaryDoc, split.secondaryDoc, split.splitOrientation, split.primaryDoc)
 )
 
-export const createSplitId = (): string =>
+const createSplitId = (): string =>
   `split-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
 
 /**

@@ -112,7 +112,7 @@ export interface DocumentSurfaceOptions {
 }
 
 /** How long `docChanged` gathers edits before it sends them. */
-export const DOC_CHANGE_WINDOW_MS = 250
+const DOC_CHANGE_WINDOW_MS = 250
 
 const docChangeTimer: Scheduler = (callback) => {
   const handle = setTimeout(callback, DOC_CHANGE_WINDOW_MS)

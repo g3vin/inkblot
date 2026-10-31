@@ -41,9 +41,6 @@ export function pruneSelection(selection, present) {
   return new Set([...selection].filter(has))
 }
 
-/** Two selections with the same rows. */
-export const sameSelection = (a, b) => a.size === b.size && [...a].every((id) => b.has(id))
-
 /** A file-tree row's id: what fileTreeNodeState calls its `nodeId`. */
 export const entryId = (node) => `${node.type}:${node.path}`
 

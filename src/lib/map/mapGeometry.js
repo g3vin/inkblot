@@ -11,7 +11,7 @@
  * not.
  */
 
-export const segmentLength = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
+const segmentLength = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
 
 /** Running length at each point: `[0, |p0p1|, |p0p1|+|p1p2|, …]`. */
 export function cumulativeLengths(points) {
@@ -116,7 +116,7 @@ export function regionArea(rings) {
 }
 
 /** Even–odd containment in one ring (a ray cast to +x). */
-export function pointInRing(point, ring) {
+function pointInRing(point, ring) {
   const [x, y] = point
   let inside = false
   for (let index = 0, prev = ring.length - 1; index < ring.length; prev = index, index += 1) {

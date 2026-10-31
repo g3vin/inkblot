@@ -21,7 +21,7 @@ const VOWELS = ['a', 'e', 'i', 'o', 'u', 'ae', 'io', 'ea', 'y']
 const CODAS = ['', '', 'n', 'r', 's', 'l', 'x', 'th', 'm']
 
 /** A pronounceable name, from a generator. */
-export function galaxyName(rand) {
+function galaxyName(rand) {
   const syllables = 2 + Math.floor(rand() * 2)
   let name = ''
   for (let index = 0; index < syllables; index += 1) {

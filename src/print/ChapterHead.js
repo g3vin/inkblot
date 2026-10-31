@@ -94,5 +94,3 @@ export const ChapterHead = Node.create({
     return chapterHeadSpec(node.attrs.head || {})
   },
 })
-
-export default ChapterHead

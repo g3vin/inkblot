@@ -8,12 +8,12 @@
 
 /** The gesture's tolerances, in CSS pixels and degrees. */
 export const DEAD_ZONE = 8
-export const HYSTERESIS = 6
+const HYSTERESIS = 6
 /** A ring dot's drawn size, the middle dot's, and how far from a dot's centre a finger
  * or click still lands on it (a 44px target). */
 export const DOT = 24
 export const CENTRE = 20
-export const HIT = 22
+const HIT = 22
 
 /** The ring's radius: wider for nine slots so the dots keep the same spacing. */
 export const ringRadius = (count) => (count > 8 ? 60 : 52)
@@ -26,7 +26,7 @@ export const slotOffset = (index, count, radius = ringRadius(count)) => {
 }
 
 /** The angle of a point relative to the centre, 0–360, clockwise from twelve. */
-export const angleOf = ({ x, y }) => ((Math.atan2(x, -y) * 180) / Math.PI + 360) % 360
+const angleOf = ({ x, y }) => ((Math.atan2(x, -y) * 180) / Math.PI + 360) % 360
 
 const angularDistance = (a, b) => {
   const d = Math.abs(a - b) % 360
@@ -59,7 +59,7 @@ export const UNSWAP_AT = 16
 /** Hand travel past the swap is dropped, so pulling back starts undoing at once. */
 export const REACH = 38
 /** How far the held dot is drawn from the middle at most, and how far an ink leans in. */
-export const HELD_MAX = 16
+const HELD_MAX = 16
 export const LEAN_MAX = 5
 export const LEAN_GROW = 0.15
 

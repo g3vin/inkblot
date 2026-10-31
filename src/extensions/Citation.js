@@ -25,8 +25,7 @@ import { loadStyle, styleSpec } from '../lib/references/styles'
 import { CITATION_REVEAL_EVENT, openCitationPopover } from './citationPopover'
 import './Citation.css'
 
-export const citationKey = new PluginKey('citationRenderer')
-export { CITATION_REVEAL_EVENT }
+const citationKey = new PluginKey('citationRenderer')
 
 const EMPTY_CONTEXT = { docPath: null, references: new Map(), style: null, bibliography: null, attachedIds: [] }
 
@@ -327,5 +326,3 @@ export const Citation = Node.create({
     ]
   },
 })
-
-export default Citation

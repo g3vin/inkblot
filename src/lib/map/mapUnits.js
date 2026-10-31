@@ -11,14 +11,14 @@
 
 export const KM_PER_AU = 149597870.7
 export const KM_PER_LIGHT_YEAR = 9460730472580.8
-export const KM_PER_PARSEC = 30856775814913.67
-export const KM_PER_KILOPARSEC = KM_PER_PARSEC * 1e3
+const KM_PER_PARSEC = 30856775814913.67
+const KM_PER_KILOPARSEC = KM_PER_PARSEC * 1e3
 export const KM_PER_MEGAPARSEC = KM_PER_PARSEC * 1e6
-export const KM_PER_MEGA_LIGHT_YEAR = KM_PER_LIGHT_YEAR * 1e6
+const KM_PER_MEGA_LIGHT_YEAR = KM_PER_LIGHT_YEAR * 1e6
 /** The speed of light, in km/h. */
 export const LIGHT_KMH = 1079252848.8
 
-export const BUILTIN_UNITS = [
+const BUILTIN_UNITS = [
   { id: 'm', name: 'metres', short: 'm', km: 0.001 },
   { id: 'km', name: 'kilometres', short: 'km', km: 1 },
   { id: 'ft', name: 'feet', short: 'ft', km: 0.0003048 },

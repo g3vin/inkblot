@@ -427,7 +427,6 @@ declare module '@tiptap/core' {
   }
 }
 
-export default Pagination
 
 /**
  * Paginate a view to a settled layout right now, synchronously: measure, push,

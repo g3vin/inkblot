@@ -12,7 +12,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 
 import { TYPESET_META } from './TypesetLock'
 
-export const PAGE_BREAK_KINDS = ['page', 'column', 'recto']
+const PAGE_BREAK_KINDS = ['page', 'column', 'recto']
 
 const LABELS = {
   page: 'Page break',
@@ -79,5 +79,3 @@ export const PageBreak = Node.create({
     }
   },
 })
-
-export default PageBreak

@@ -51,7 +51,7 @@ export const MODEL_EXTENSIONS_LIST = ['glb', 'gltf']
  * Why a glTF cannot be used on its own, or null: one that points at outside
  * files (its buffers or textures beside it) would arrive without them.
  */
-export function gltfProblem(bytes) {
+function gltfProblem(bytes) {
   let json
   try {
     json = JSON.parse(new TextDecoder().decode(bytes))

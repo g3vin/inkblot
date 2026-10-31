@@ -17,7 +17,7 @@ import { buildSchedule, travelerPositionAt } from './timeline'
 /** Kilometres light covers in a day. */
 export const LIGHT_KM_PER_DAY = 299792.458 * 86400
 /** How many points a chart is drawn from. */
-export const DISTANCE_SAMPLES = 200
+const DISTANCE_SAMPLES = 200
 /** The longest span a chart covers: a century. */
 const MAX_SPAN_DAYS = 36525
 

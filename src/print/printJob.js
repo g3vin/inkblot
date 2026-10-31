@@ -55,7 +55,7 @@ const PAGE_STYLE_ID = 'print-page-style'
 const headingText = (node) => node.textBetween(0, node.content.size, '', (leaf) => (leaf.type.name === 'hardBreak' ? ': ' : '')).trim()
 
 /** Top-level H1s of a document, as { pos, text }: what a chapter's running head shows. */
-export const chapterHeadings = (doc) => {
+const chapterHeadings = (doc) => {
   const out = []
   doc.forEach((node, pos) => {
     // A compiled chapter's head: its title, as a running head wants it.

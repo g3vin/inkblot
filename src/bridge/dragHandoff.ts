@@ -23,10 +23,6 @@ export enum DragPayloadKind {
   EditorSelection = 'editorSelection',
   /** An entry dragged out of the clipboard history panel. */
   ClipboardEntry = 'clipboardEntry',
-  /** A document dragged out of the file tree. */
-  Document = 'document',
-  /** A note card dragged out of the notes panel. */
-  NoteCard = 'noteCard',
 }
 
 interface DragStarted {

@@ -62,7 +62,7 @@ export const RUBBER_BANDS = Object.freeze({ touch: 0.55, pen: 0.55, mouse: 0.4, 
 export const rubberCoefficient = (input) => RUBBER_BANDS[input] ?? RUBBER_BANDS.touch
 
 /** How far back a release's speed is measured. */
-export const VELOCITY_WINDOW_MS = 90
+const VELOCITY_WINDOW_MS = 90
 
 /**
  * The thresholds a gesture decides by.

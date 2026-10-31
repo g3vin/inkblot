@@ -28,21 +28,21 @@ import type { BackMatter, BookItem, BookSettings, FrontMatter, PageOptions } fro
 type Kind = MatterKind | GeneratedKind
 
 /** The standard order of the pages before the first chapter. */
-export const FRONT_ORDER: Kind[] = [
+const FRONT_ORDER: Kind[] = [
   GeneratedKind.HalfTitle, MatterKind.HalfTitle, MatterKind.AlsoBy, GeneratedKind.TitlePage, MatterKind.TitlePage,
   MatterKind.Copyright, MatterKind.Dedication, MatterKind.Epigraph, GeneratedKind.Contents,
   MatterKind.Foreword, MatterKind.Preface, MatterKind.Introduction,
 ]
 
 /** The standard order of the pages after the last. */
-export const BACK_ORDER: Kind[] = [
+const BACK_ORDER: Kind[] = [
   MatterKind.Afterword, MatterKind.Acknowledgements, MatterKind.AboutAuthor, MatterKind.AlsoBy,
   GeneratedKind.Notes, GeneratedKind.Bibliography, MatterKind.Glossary, MatterKind.Excerpt,
   MatterKind.ReadingGuide, MatterKind.CallToAction,
 ]
 
 /** What a kind of page is called: in the navigator, and as a page's heading. */
-export const KIND_LABELS: Record<string, string> = {
+const KIND_LABELS: Record<string, string> = {
   [GeneratedKind.HalfTitle]: 'Half Title',
   [GeneratedKind.TitlePage]: 'Title Page',
   [GeneratedKind.Contents]: 'Contents',
@@ -68,7 +68,7 @@ export const KIND_LABELS: Record<string, string> = {
 }
 
 /** Which side a kind belongs on, when it is added: front, or back. */
-export const sideOf = (kind: Kind, preferBack = false): 'front' | 'back' => {
+const sideOf = (kind: Kind, preferBack = false): 'front' | 'back' => {
   const front = FRONT_ORDER.includes(kind)
   const back = BACK_ORDER.includes(kind)
   if (front && back) return preferBack ? 'back' : 'front'
@@ -76,7 +76,7 @@ export const sideOf = (kind: Kind, preferBack = false): 'front' | 'back' => {
 }
 
 /** How each kind of page sits, unless the author changes it. */
-export const defaultPageOptions = (item: Pick<BookItem, 'kind' | 'matter' | 'generated'>): PageOptions => {
+const defaultPageOptions = (item: Pick<BookItem, 'kind' | 'matter' | 'generated'>): PageOptions => {
   const quiet = { runningHeads: false, folio: false, heading: false }
   switch (item.matter ?? item.generated) {
     case MatterKind.Copyright:
@@ -117,7 +117,7 @@ const chapterId = (path: string) => `c:${path}`
 const partId = (path: string) => `p:${path}`
 
 /** The top subfolder of the book folder a chapter is in, or null for one directly in it. */
-export const partFolderOf = (path: string, folder: string): string | null => {
+const partFolderOf = (path: string, folder: string): string | null => {
   const rest = folder ? path.slice(folder.length + 1) : path
   const parts = rest.split('/')
   if (parts.length < 2) return null
@@ -235,7 +235,7 @@ export const sectionsOf = <T extends BookItem>(items: T[]): { front: T[]; body: 
 }
 
 /** Whether a chapter item is numbered: a Chapter is; a Prologue, an Interlude are not. */
-export const isNumbered = (item: BookItem): boolean => (
+const isNumbered = (item: BookItem): boolean => (
   item.kind === BookItemKind.Chapter && (item.chapterType ?? ChapterType.Chapter) === ChapterType.Chapter
 )
 

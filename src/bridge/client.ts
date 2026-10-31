@@ -86,7 +86,7 @@ export class BridgeRequestError extends Error {
  * other side is a synchronous read of a ProseMirror document: anything approaching
  * this number is a fault, not a slow machine.
  */
-export const REQUEST_TIMEOUT_MS = 5000
+const REQUEST_TIMEOUT_MS = 5000
 
 /* ---------------- sequence checking ---------------- */
 

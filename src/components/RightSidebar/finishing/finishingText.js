@@ -37,7 +37,7 @@ const roman = (value) => {
 }
 
 /** As a manuscript gives it: to the nearest ten, hundred or thousand by length. */
-export const describeWordCount = (words) => {
+const describeWordCount = (words) => {
   const step = words < 100 ? 10 : words < 17500 ? 100 : 1000
   return `about ${(Math.round(Math.max(0, words) / step) * step).toLocaleString()} words`
 }

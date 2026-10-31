@@ -10,9 +10,9 @@
  * units prints at exactly its real size.
  */
 
-export const MM_PER_INCH = 25.4
-export const PX_PER_INCH = 96
-export const PT_PER_INCH = 72
+const MM_PER_INCH = 25.4
+const PX_PER_INCH = 96
+const PT_PER_INCH = 72
 
 export type LengthUnit = 'mm' | 'cm' | 'in' | 'pt'
 

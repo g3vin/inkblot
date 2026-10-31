@@ -14,7 +14,7 @@ const METRIC_OPTIONS = GOAL_METRICS.map((metric) => ({ value: metric, label: MET
 const NEEDS = [{ value: 'all', label: 'All of them' }, { value: 'any', label: 'Any one' }]
 
 /** One day's goal: its targets, all or any, or a rest day. */
-export function DayGoalEditor({ goal, onChange }) {
+function DayGoalEditor({ goal, onChange }) {
   const change = (patch) => onChange({ ...goal, ...patch })
   const setTarget = (id, patch) => change({ targets: goal.targets.map((t) => (t.id === id ? { ...t, ...patch } : t)) })
   return (

@@ -24,7 +24,7 @@ const DRAG_THRESHOLD = GESTURE.slop.pointer
 /** Two clicks this close in time and space finish a drawing. */
 const DOUBLE_CLICK_MS = 320
 
-export const DRAWING_TOOLS = new Set(['route', 'region', 'ruler', 'area', 'calibrate'])
+const DRAWING_TOOLS = new Set(['route', 'region', 'ruler', 'area', 'calibrate'])
 
 export function useMapInput({
   tool,

@@ -39,14 +39,14 @@ const PAGE_LIMITS: Record<Exclude<PublishingService, PublishingService.None>, { 
   [PublishingService.IngramSpark]: { min: 18, max: { [PaperStock.Cream]: 1100, [PaperStock.White]: 1200, [PaperStock.Color]: 1200 } },
 }
 
-export const SERVICE_NAMES: Record<PublishingService, string> = {
+const SERVICE_NAMES: Record<PublishingService, string> = {
   [PublishingService.None]: '',
   [PublishingService.Kdp]: 'KDP',
   [PublishingService.IngramSpark]: 'IngramSpark',
 }
 
 /** The least margin a service allows at the edges of a page, in mm (¼ in, no bleed). */
-export const MIN_OUTER_MARGIN_MM = 0.25 * INCH
+const MIN_OUTER_MARGIN_MM = 0.25 * INCH
 /** KDP puts text on a spine only past this many pages. */
 export const SPINE_TEXT_MIN_PAGES = 80
 
@@ -68,7 +68,7 @@ const trimOf = (setup: PageSetup): [number, number] => {
 const fmtIn = (inches: number): string => `${Math.round(inches * 100) / 100}″`
 
 /** The listed trim nearest a page, by how far each edge would move. */
-export const nearestTrim = (service: Exclude<PublishingService, PublishingService.None>, setup: PageSetup): [number, number] => {
+const nearestTrim = (service: Exclude<PublishingService, PublishingService.None>, setup: PageSetup): [number, number] => {
   const [w, h] = trimOf(setup)
   return TRIMS[service].reduce((best, trim) => (
     Math.abs(trim[0] - w) + Math.abs(trim[1] - h) < Math.abs(best[0] - w) + Math.abs(best[1] - h) ? trim : best
