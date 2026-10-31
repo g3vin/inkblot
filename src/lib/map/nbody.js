@@ -223,7 +223,7 @@ export function createRun(system) {
   const stateAt = (day) => {
     const d = Number.isFinite(day) ? day : 0
     const k = Math.trunc(d / span)
-    let state = copy(checkpoint(k))
+    const state = copy(checkpoint(k))
     let remaining = d - k * span
     const sign = remaining < 0 ? -1 : 1
     while (Math.abs(remaining) >= dt) {

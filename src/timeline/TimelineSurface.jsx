@@ -416,8 +416,7 @@ export default function TimelineSurface({
       case 'fit': fitAll(); return
       case 'scale': patchView({ scale: detail.value }); return
       case 'toggle-inspector': setInspectorOpen((open) => !open); return
-      case 'lens': setTimeLens(projectName, { on: !cursor.lens.on, scale: axis }, 'timeline'); return
-      default:
+      case 'lens': setTimeLens(projectName, { on: !cursor.lens.on, scale: axis }, 'timeline')
     }
   }, [addEventAt, axis, cursor.day, cursor.lens.on, deleteSelected, fitAll, patchView, projectName, redo, undo, zoomAt])
   const runCommandRef = useRef(runCommand)

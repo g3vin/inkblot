@@ -32,6 +32,33 @@ export default defineConfig([
       }],
       'react-hooks/immutability': 'off',
       'react-hooks/set-state-in-effect': 'off',
+      // Simpler spellings of the same code; `--fix` applies all but eqeqeq and radix.
+      'dot-notation': 'error',
+      eqeqeq: ['error', 'smart'],
+      'no-else-return': ['error', { allowElseIf: false }],
+      'no-lonely-if': 'error',
+      'no-unneeded-ternary': 'error',
+      'no-useless-call': 'error',
+      'no-useless-computed-key': 'error',
+      'no-useless-concat': 'error',
+      'no-useless-rename': 'error',
+      'no-useless-return': 'error',
+      'no-var': 'error',
+      'object-shorthand': ['error', 'properties'],
+      'prefer-arrow-callback': 'error',
+      // A closure made earlier may read the name before it is assigned (a frame callback
+      // that runs before setup finishes); a const would throw there.
+      'prefer-const': ['error', { ignoreReadBeforeAssign: true }],
+      'prefer-object-spread': 'error',
+      radix: 'error',
+    },
+  },
+  /* The app reports through console.warn and console.error only; scripts and tests
+     print freely. */
+  {
+    files: ['src/**/*.{js,jsx,ts,tsx}'],
+    rules: {
+      'no-console': ['error', { allow: ['warn', 'error'] }],
     },
   },
   /* TypeScript files parse with the TS parser and use its unused-vars rule, which

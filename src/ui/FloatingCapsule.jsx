@@ -6,7 +6,7 @@
 import { forwardRef } from 'react'
 import './ui.css'
 
-const FloatingCapsule = forwardRef(function FloatingCapsule({ as = 'div', className = '', children, ...rest }, ref) {
+const FloatingCapsule = forwardRef(({ as = 'div', className = '', children, ...rest }, ref) => {
   const Tag = as
   return (
     <Tag ref={ref} className={`floating-capsule ui-floating-capsule ${className}`.trim()} {...rest}>

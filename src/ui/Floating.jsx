@@ -35,10 +35,10 @@ export function ToolbarSeparator() {
   return <span role="separator" className="ib-toolbar-separator" />
 }
 
-export const FloatingActionButton = forwardRef(function FloatingActionButton(
+export const FloatingActionButton = forwardRef((
   { icon, label, shortcut, className, type = 'button', ...rest },
   ref,
-) {
+) => {
   return (
     <Tooltip content={label} shortcut={shortcut} placement="top">
       <button

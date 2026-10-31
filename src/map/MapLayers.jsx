@@ -58,7 +58,7 @@ function PlaneGround({ map, projector, projectName, inlineAssets }) {
   )
 }
 
-const EarthGround = memo(function EarthGround({ map, projector, level, onCountries, staticPaths }) {
+const EarthGround = memo(({ map, projector, level, onCountries, staticPaths }) => {
   const [livePaths, setPaths] = useState(null)
   const paths = staticPaths || livePaths
   useEffect(() => {
@@ -170,7 +170,7 @@ function nbodyTrails(system, projector) {
   })
 }
 
-const SystemGround = memo(function SystemGround({ map, projector, positions: livePositions, selection }) {
+const SystemGround = memo(({ map, projector, positions: livePositions, selection }) => {
   const bodies = map.system.bodies
   const byId = useMemo(() => new Map(bodies.map((body) => [body.id, body])), [bodies])
   const positions = livePositions || projector.positions
@@ -261,7 +261,7 @@ function SpaceNames({ map, projector, positions, selection }) {
   )
 }
 
-const BodyDisc = memo(function BodyDisc({ body, x, y, selected }) {
+const BodyDisc = memo(({ body, x, y, selected }) => {
   const isStar = body.kind === 'star'
   const color = body.color || (isStar ? temperatureToColor(body.star?.temperatureK ?? 5772) : MAP_DEFAULT_COLORS.body)
   const radius = isStar ? 11 : body.kind === 'moon' ? 3.5 : body.kind === 'station' ? 3 : body.kind === 'dwarf' ? 3.5 : 6
@@ -284,7 +284,7 @@ const BodyDisc = memo(function BodyDisc({ body, x, y, selected }) {
 
 /* ---------------- items ---------------- */
 
-const RegionLayer = memo(function RegionLayer({ map, projector, selection, idPrefix }) {
+const RegionLayer = memo(({ map, projector, selection, idPrefix }) => {
   const terrains = useMemo(() => new Map(map.terrains.map((terrain) => [terrain.id, terrain])), [map.terrains])
   return (
     <g className="map-regions">
@@ -311,7 +311,7 @@ const RegionLayer = memo(function RegionLayer({ map, projector, selection, idPre
   )
 })
 
-const RouteLayer = memo(function RouteLayer({ map, projector, space, day, selection, idPrefix }) {
+const RouteLayer = memo(({ map, projector, space, day, selection, idPrefix }) => {
   return (
     <g className="map-routes">
       {map.routes.map((route) => {
@@ -347,7 +347,7 @@ const RouteLayer = memo(function RouteLayer({ map, projector, space, day, select
   )
 })
 
-const LabelLayer = memo(function LabelLayer({ map, projector, space, day, zoom, selection, idPrefix }) {
+const LabelLayer = memo(({ map, projector, space, day, zoom, selection, idPrefix }) => {
   const routes = useMemo(() => new Map(map.routes.map((route) => [route.id, route])), [map.routes])
   return (
     <g className="map-labels">
@@ -406,7 +406,7 @@ const LabelLayer = memo(function LabelLayer({ map, projector, space, day, zoom, 
 /** Galaxy names closer than this on screen give way to the first drawn. */
 const GALAXY_NAME_CLEARANCE_PX = 34
 
-const PinLayer = memo(function PinLayer({ map, projector, space, day, selection, missingDocs, hideNames, hidden }) {
+const PinLayer = memo(({ map, projector, space, day, selection, missingDocs, hideNames, hidden }) => {
   // In a group of galaxies, a galaxy is its picture (drawn by the 3D view); its pin
   // is a quiet ring to click, named where there is room.
   const named = []
@@ -450,7 +450,7 @@ const PinLayer = memo(function PinLayer({ map, projector, space, day, selection,
 })
 
 /** One pin. Memoized: in playback only the pins riding a body move, and only they redraw. */
-const PinMark = memo(function PinMark({ pin, x, y, selected, missing, hideNames }) {
+const PinMark = memo(({ pin, x, y, selected, missing, hideNames }) => {
   return (
     <g
       className={`map-pin${selected ? ' is-selected' : ''}${missing ? ' is-missing' : ''}`}
@@ -586,7 +586,7 @@ function TimelineEventLayer({ map, projector, space, day, events }) {
  * thumbnail or an export is the map, not the editor.
  */
 /** Memoized: a pan or zoom changes none of its props, so the layers sit it out. */
-const MapLayers = memo(function MapLayers({
+const MapLayers = memo(({
   map: wholeMap,
   projector,
   space,
@@ -604,7 +604,7 @@ const MapLayers = memo(function MapLayers({
   earthPaths = null,
   timelineEvents = null,
   positions = null,
-}) {
+}) => {
   // What is on a hidden layer, or not there on this day, is not drawn at all.
   const hidden = hiddenKey(wholeMap, day)
   const map = useMemo(() => withoutHidden(wholeMap, hidden), [hidden, wholeMap])

@@ -180,7 +180,7 @@ export function useFileTreeDrag({
     const list = el.closest('.file-list')
     if (list) {
       // Keep the current drag insert position rather than jumping to end
-      return
+      
     }
   }, [order, dragInsertRef, dragOverFolderRef, setDragInsert, setDragOverFolder, setDragOverPath])
 

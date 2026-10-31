@@ -129,7 +129,7 @@ ok('dropped where it already is, nothing changes', placeDocIn(splitWs, 'N', 'end
 /* ---------------- kept splits ---------------- */
 
 const liveAB = { primaryDoc: 'A', secondaryDoc: 'B', splitOrientation: 'columns', splitRatio: 0.5 }
-let kept = recordSavedSplit([], null, liveAB)
+const kept = recordSavedSplit([], null, liveAB)
 ok('a split made is kept, and is the one showing', kept.splits.length === 1 && kept.activeId === kept.splits[0].id && kept.splits[0].secondaryDoc === 'B')
 const firstId = kept.activeId
 let again = recordSavedSplit(kept.splits, kept.activeId, liveAB)

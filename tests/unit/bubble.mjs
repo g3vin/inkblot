@@ -314,7 +314,7 @@ ok('the arrangement, capitalized where the sentence now begins',
 writeBubbleSession(editor, range, bubble, { keep: true })
 ok('Done writes the sentence into the document',
   editor.state.doc.textContent === 'Before it. The door she hesitated at. After it.')
-let found = findBubbleSession(editor.state.doc, bubble.id)
+const found = findBubbleSession(editor.state.doc, bubble.id)
 ok('and leaves the session on it', !!found && editor.state.doc.textBetween(found.from, found.to) === 'The door she hesitated at.')
 ok('with the set-aside words in it', same(found.session.aside, bubble.aside))
 ok('the chip marks it in the editor',

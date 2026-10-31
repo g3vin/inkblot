@@ -46,7 +46,7 @@ const ids = () => `id${counter++}`
   for (let i = 0; i < 500; i += 1) keys.push((key = T.keyBetween(key, null)))
   ok('appended keys only ever increase', keys.every((k, i) => i === 0 || keys[i - 1] < k))
   ok('500 appends keep keys short', keys.at(-1).length <= 16)
-  let low = 'V'
+  const low = 'V'
   let high = 'W'
   let dense = true
   for (let i = 0; i < 60; i += 1) {

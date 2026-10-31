@@ -92,8 +92,8 @@ async function restored(page, selector = '.ProseMirror', project = PROJECT) {
 function frame(boxes, { width: W, height: H }, pad = 32) {
   let x0 = Math.min(...boxes.map((b) => b.x)) - pad
   let y0 = Math.min(...boxes.map((b) => b.y)) - pad
-  let x1 = Math.max(...boxes.map((b) => b.x + b.width)) + pad
-  let y1 = Math.max(...boxes.map((b) => b.y + b.height)) + pad
+  const x1 = Math.max(...boxes.map((b) => b.x + b.width)) + pad
+  const y1 = Math.max(...boxes.map((b) => b.y + b.height)) + pad
   const w = Math.max(x1 - x0, ((y1 - y0) * W) / H)
   const h = (w * H) / W
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2

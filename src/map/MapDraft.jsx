@@ -46,7 +46,7 @@ function Measure({ at, text }) {
   )
 }
 
-const MapDraft = memo(function MapDraft({ map, projector, space, day, draft, selection, selectedItem, rubberRef }) {
+const MapDraft = memo(({ map, projector, space, day, draft, selection, selectedItem, rubberRef }) => {
   const parts = []
 
   if (draft && draft.nodes.length) {

@@ -55,7 +55,7 @@ function locator(map, space, end) {
  * and for bodies twice the longer orbit, so the closest and farthest both show.
  */
 export function distanceSpan(map, a, b, extent) {
-  let from = extent.from
+  const from = extent.from
   let to = extent.to
   if (map.mapKind === 'system') {
     const bodies = new Map(map.system.bodies.map((body) => [body.id, body]))

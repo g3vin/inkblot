@@ -39,7 +39,7 @@ ok('getCardExtensions is stable (safe to memo against)', getCardExtensions() ===
 
 /* ---- a plain card ---- */
 
-let html = render(doc(para('Hello canvas')))
+const html = render(doc(para('Hello canvas')))
 ok('a paragraph renders', html.includes('Hello canvas') && html.includes('<p>'))
 
 /* ---- every mark the titlebar Toolbar can apply must survive ---- */
