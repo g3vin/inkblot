@@ -73,6 +73,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/claude/tidy.mjs\" stop",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
