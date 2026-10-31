@@ -511,6 +511,7 @@ export default function usePrintLayoutController({
 
   useEffect(() => {
     const subscriptions = [
+      // --- typeset mode and proofing (bridge/print/typeset.rs) ---
       documentSurface.onCommand('setEditorMode', ({ mode }) => setEditorMode(stateRef.current.projectName, mode)),
       documentSurface.onCommand('setTypesetView', ({ view }) => setTypesetView(stateRef.current.projectName, view)),
       documentSurface.onCommand('setTypesetDisplay', (patch) => setTypesetDisplay(stateRef.current.projectName, patch)),
@@ -523,6 +524,7 @@ export default function usePrintLayoutController({
         const tr = ed.state.tr
         if (setParagraphTypeset(tr, range.from, range.to, patch)) ed.view.dispatch(tr)
       }),
+      // --- editions (bridge/print/covers.rs) ---
       // The book's editions: added from a preset, typeset, given a cover, exported.
       documentSurface.onCommand('editEditions', ({ action, id, name, kind, coverSetId }) => {
         const { project, folder } = currentBook()
@@ -547,6 +549,7 @@ export default function usePrintLayoutController({
           .catch(failed('Making an edition from that version'))
       }),
       documentSurface.onCommand('exportAllEditions', () => stateRef.current.onExportAllEditions?.()),
+      // --- text styles, footnotes, fonts ---
       // A note at the caret, opened to be written.
       documentSurface.onCommand('insertFootnote', () => {
         const ed = stateRef.current.activeEditor
@@ -572,6 +575,7 @@ export default function usePrintLayoutController({
         const project = stateRef.current.projectName
         if (project) addProjectFont(project, path).then(() => publish()).catch(failed('Adding the font'))
       }),
+      // --- the Book (bridge/print/book.rs) ---
       // The Book navigator: the book's own order and contents, never the file tree's.
       documentSurface.onCommand('moveBookItem', ({ id, before, ids }) => {
         const { project, folder } = currentBook()
@@ -655,6 +659,7 @@ export default function usePrintLayoutController({
           ...(continuous !== undefined ? { continuous: Boolean(continuous) } : {}),
         })
       }),
+      // --- covers (bridge/print/covers.rs) ---
       documentSurface.onCommand('setCoverImage', ({ setId, part, path }) => {
         const { project, folder } = currentBook()
         if (!project) return
@@ -690,6 +695,7 @@ export default function usePrintLayoutController({
           .then((path) => { if (path) stateRef.current.onOpenDoc?.(path) })
           .catch(failed('Opening it'))
       }),
+      // --- page and book setup (bridge/print/setup.rs) ---
       documentSurface.onCommand('setPrintLayout', ({ enabled, docPath }) => togglePrintLayout(enabled, docPath)),
       documentSurface.onCommand('setPageSetup', ({ setup, target }) => applySetup(setup, target)),
       documentSurface.onCommand('applyFormat', ({ formatId, target }) => {
@@ -739,6 +745,7 @@ export default function usePrintLayoutController({
       }),
       documentSurface.onCommand('setPrintZoom', zoomTo),
       documentSurface.onCommand('setDisplayDensity', ({ pointsPerInch }) => setDisplayPointsPerInch(pointsPerInch)),
+      // --- getting pages out (bridge/print/output.rs) ---
       documentSurface.onCommand('insertBreak', ({ kind }) => {
         stateRef.current.activeEditor?.chain().focus().insertPageBreak(kind).run()
       }),
@@ -755,6 +762,7 @@ export default function usePrintLayoutController({
         const { projectName: project } = stateRef.current
         stateRef.current.onMeasure?.({ scope: getPrintScope(project) })
       }),
+      // --- screenplays (bridge/print/script.rs) ---
       documentSurface.onCommand('setSceneNumbers', ({ mode }) => {
         stateRef.current.activeEditor?.chain().focus().setSceneNumbers(mode).run()
       }),

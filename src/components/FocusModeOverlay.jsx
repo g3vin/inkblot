@@ -56,6 +56,8 @@ const slotPluginKey = new PluginKey('focusModeSlot')
 /** What a fade touches: every drawn line but the buffer, which stays hidden at rest. */
 const SHOWN_LINES = '[data-index]:not(.is-outside), .focus-mode-slot, .focus-mode-prefix'
 
+/* ---------------- reading the page ---------------- */
+
 const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value))
 
 /** Convert wheel deltas to pixels regardless of the event's delta mode. */
@@ -225,6 +227,9 @@ export default function FocusModeOverlay({ editor, onExit, leaving = false, onEx
     endSlotRef.current = atEnd
   })
 
+
+  /* ---------------- settings and following the editor ---------------- */
+
   // Update one setting, clamping to its allowed range, and persist the result.
   const updateSetting = useCallback((key, value) => {
     setSettings((current) => {
@@ -290,6 +295,8 @@ export default function FocusModeOverlay({ editor, onExit, leaving = false, onEx
       if (!editor.isDestroyed) editor.unregisterPlugin(slotPluginKey)
     }
   }, [editor])
+
+  /* ---------------- placing the column ---------------- */
 
   const elementFor = useCallback((index) => (
     columnRef.current?.querySelector(`[data-index="${index}"]`) ?? null
@@ -431,6 +438,9 @@ export default function FocusModeOverlay({ editor, onExit, leaving = false, onEx
     }
   }, [applyY, centreFor, targetElement])
 
+
+  /* ---------------- the caret and moving between sentences ---------------- */
+
   // Move the real editor caret to a focus-text offset (via the text→doc position map).
   const placeCaret = useCallback((textOffset) => {
     const current = modelRef.current
@@ -479,6 +489,9 @@ export default function FocusModeOverlay({ editor, onExit, leaving = false, onEx
     placeCaret(all[target].start)
     announce(all[target])
   }, [announce, placeCaret, snapshot])
+
+
+  /* ---------------- scrolling ---------------- */
 
   // The wheel stopped: settle on the sentence nearest the centre. The caret stays put
   // if that is the sentence it is already in.
@@ -590,6 +603,9 @@ export default function FocusModeOverlay({ editor, onExit, leaving = false, onEx
     cancelAnimationFrame(frameRef.current)
   }, [])
 
+
+  /* ---------------- keys ---------------- */
+
   // Escape leaves; ↑/↓ step between sentences. Only while the writer is in the text (or
   // the bar, for Escape): a palette, menu or dialog over focus mode keeps its own keys.
   useEffect(() => {
@@ -626,6 +642,9 @@ export default function FocusModeOverlay({ editor, onExit, leaving = false, onEx
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [editor, moveBySentence, onExit, placeCaret, settle])
+
+
+  /* ---------------- zooming in and out ---------------- */
 
   // The page's sentence (or the caret, on an empty line): where a zoom starts or ends.
   const pageSource = useCallback(() => {

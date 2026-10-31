@@ -176,6 +176,9 @@ const ConversationTile = Node.create({
       let pointerInsideUntil = 0
       let membersMenuOpen = false
       let previewUntilEdit = !currentAttrs.saved
+
+      /* ---------------- the elements ---------------- */
+
       const disposers = []
 
       const container = document.createElement('div')
@@ -206,6 +209,8 @@ const ConversationTile = Node.create({
       resizeHandle.className = 'conversation-resize-handle'
       resizeHandle.contentEditable = 'false'
       resizeHandle.appendChild(iconElement('resize'))
+
+      /* ---------------- selection and saving attributes ---------------- */
 
       const selectNode = () => {
         const pos = typeof getPos === 'function' ? getPos() : null
@@ -263,6 +268,8 @@ const ConversationTile = Node.create({
           })
         })
       }
+
+      /* ---------------- messages and group members ---------------- */
 
       const updateMessage = (id, patch) => {
         const messages = currentAttrs.messages.map(message => (
@@ -417,6 +424,8 @@ const ConversationTile = Node.create({
       })
 
 
+      /* ---------------- the saved snapshot ---------------- */
+
       const getMeasuredSnapshotHeight = () => {
         const measured = Math.ceil(composer.scrollHeight || messagesEl.scrollHeight || 0)
         return clamp(measured || estimateSnapshotHeight(currentAttrs, currentAttrs.width), 110, 2200)
@@ -438,6 +447,8 @@ const ConversationTile = Node.create({
         syncView()
         commitAttributes({ saved: false })
       }
+
+      /* ---------------- the toolbar ---------------- */
 
       const renderToolbar = () => {
         toolbar.textContent = ''
@@ -571,6 +582,8 @@ const ConversationTile = Node.create({
           styleSelect,
         )
       }
+
+      /* ---------------- editing messages ---------------- */
 
       const layoutMessageTextarea = (textarea, value = '') => {
         const maxTextWidth = Math.max(72, Math.min(320, currentAttrs.width * 0.78 - 24))
@@ -809,6 +822,8 @@ const ConversationTile = Node.create({
         return columnAdders
       }
 
+      /* ---------------- the composer and the saved preview ---------------- */
+
       const renderComposer = () => {
         messagesEl.textContent = ''
         currentAttrs.messages.forEach((message, index, messages) => {
@@ -892,6 +907,8 @@ const ConversationTile = Node.create({
         })
       }
 
+      /* ---------------- drawing ---------------- */
+
       const syncView = () => {
         currentAttrs = normalizeAttrs(currentNode.attrs)
         if (currentAttrs.saved) previewUntilEdit = false
@@ -928,6 +945,8 @@ const ConversationTile = Node.create({
           restoreActiveControl(focusState)
         }
       }
+
+      /* ---------------- pointer and focus ---------------- */
 
       const onResizePointerDown = (event) => {
         event.preventDefault()
@@ -1011,6 +1030,8 @@ const ConversationTile = Node.create({
       body.append(preview, composer)
       container.append(toolbar, body, resizeHandle)
       syncView()
+
+      /* ---------------- the node view ---------------- */
 
       return {
         dom: container,
