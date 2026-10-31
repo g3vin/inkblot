@@ -7,6 +7,7 @@ Each script's header says how to run it. This is the index.
 | `affected.mjs` | `npm run affected`: the suites and checks a change needs |
 | `generate-types.sh` | `npm run types` / `types:check`: the TypeScript view of the Rust `#[typeshare]` types |
 | `lint-design.mjs` | `npm run lint:design`: no raw colours, fonts or radii, ratcheted against `design-baseline.json` (generated) |
+| `lint-size.mjs` | `npm run lint:size`: no source file over 700 lines, ratcheted against `size-baseline.json` |
 | `gen-spring-tokens.mjs` | writes the `--spring-*` tokens in `tokens.css` from `src/ui/physics.js` |
 | `fetch-lexicon.mjs` | `npm run lexicon`: fetches the pronouncing dictionaries into `src/lib/g2p/data/` |
 | `claude/post-edit.mjs` | Claude Code hook: formats or lints each file Claude edits |

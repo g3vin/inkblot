@@ -71,7 +71,7 @@ Step-by-step recipes for each are in [ARCHITECTURE.md → Recipes](ARCHITECTURE.
 
 Run these before every commit. Each catches failures the others can't. CI
 (`.github/workflows/ci.yml`) runs all of them except `npm run test:layout`.
-`npm run check` runs lint, lint:design, typecheck and the tests in one go, and
+`npm run check` runs lint, lint:design, lint:size, typecheck and the tests in one go, and
 `npm run check:rust` runs the Rust checks with parity and types:check. While iterating,
 `npm run affected` prints just the suites and checks your diff needs.
 
@@ -80,6 +80,7 @@ Run these before every commit. Each catches failures the others can't. CI
 | `npm test` | The suites under `tests/unit/`, in jsdom, mounting real components. `npm test -- <suite>…` runs some; `--verbose` prints every assertion | A component that throws on every render: lint, tsc and the build all pass on it |
 | `npm run lint` | ESLint, including the React Compiler rules. The bar is 0 errors and 0 warnings | A ref written during render |
 | `npm run lint:design` | No new raw colours, fonts, radii or shadows outside `src/styles/tokens.css` (a per-file ratchet; see [docs/DESIGN.md](docs/DESIGN.md#14-guardrails)) | A hard-coded hex that ignores the theme |
+| `npm run lint:size` | No source file over 700 lines; older, larger files may not grow (a per-file ratchet in `scripts/size-baseline.json`) | A component that keeps absorbing features until nobody can read it whole |
 | `npm run typecheck` | `tsc --noEmit` over the TypeScript | |
 | `npm run build` | The Vite production build | Bad dynamic imports, and named imports a module does not export |
 | `npm run parity` | One corpus (about 19,000 cases) through both the JS and the Rust implementation of every mirrored function | Float, rounding and string-semantics drift between JS and Rust |
