@@ -57,7 +57,7 @@ round-tripped through JSON (`src/bridge/transport.ts`).
 | Commands | The ⌘K registry every action joins | `src/lib/commands.ts` |
 | Reducers | Canvas and map state, with undo as snapshots | `src/canvas/canvasReducer.ts`, `src/map/mapReducer.ts` |
 | Timeline store | The project's one chronology, with previews and undo | `src/lib/timeline/timelineStore.js` |
-| `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/mod.rs` |
+| `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/` (one file per concern) |
 | UI primitives | Every control the chrome is built from | `src/ui/`, [docs/DESIGN.md](docs/DESIGN.md) |
 | Motion | The springs, projection, rubber band and coasting every motion is built from; CSS gets the same springs as generated `--spring-*` tokens, script drives them through one shared frame loop | `src/ui/physics.js`, `src/ui/useSpring.js`, `scripts/gen-spring-tokens.mjs` |
 | Reveal gate | Opening a project shows the file tree, both panes, the toolbar and the checked tabs together; each reports ready. Opened from a pile on the landing page, it also waits for the sheet's flight to land (`'arrival'`) | `Editor.jsx` (`RevealGate`), `src/ui/Reveal.jsx`, `src/lib/projectPrefetch.js` |
@@ -351,9 +351,9 @@ The mirrored modules (each JS file names its twin on a `Mirrors:` line, which
 | `canvasModel.js` | `canvas_model.rs` |
 | `storyStructure.js` | `story_structure.rs` |
 | `versionHistory.js` | `version_history/` (`mod.rs`, `text_diff.rs`, `canvas_diff.rs`) |
-| `versionStore.js` | `store/versions.rs` |
+| `versionStore.js` | `store/versions.rs` (pure), `store/version_io.rs` (on disk) |
 | `projectPaths.ts` | `store/paths.rs` |
-| `FileSystem.js`, `projectLocations.js` | `store/mod.rs`, `store/locations.rs` |
+| `FileSystem.js`, `projectLocations.js` | `store/` (`mod.rs`, `documents.rs`, `entries.rs`, `projects.rs`), `store/locations.rs` |
 | `sidebarSearch.js`, `canvasSearch.js` | `search/mod.rs` |
 | `readAloud.js` (the chunker) | `read_aloud.rs` |
 | `noteUtils.js`, `audioNotes.js` (the normalizers) | `notes.rs` |
