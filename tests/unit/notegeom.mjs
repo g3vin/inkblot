@@ -104,4 +104,26 @@ const anchor = (left, top) => ({ left, top, right: left + 8, bottom: top + 16, w
     held.get('a') === held.get('a1') - 1 && held.get('root') === held.get('a1') - 2 && held.get('a1x') === held.get('a1') - 1)
   ok('stacking: other branches sit lower still', held.get('b') === held.get('a1') - 3)
 }
+{
+  const color = (ink) => `ink:${ink || 'none'}`
+  const root = { id: 'root', color: 'teal' }
+  const kids = [{ id: 'a', color: 'rose' }, { id: 'b' }]
+  const grandchild = { id: 'a1', previewLayout: { offsetX: 120, offsetY: 30 } }
+  const childMap = new Map([['root', kids], ['a', [grandchild]]])
+  const base = { anchorRect: anchor(100, 300), rootNote: root, childMap, cardSizes: {}, drawnSizes: {}, dragLayouts: {}, keepOut: [], colorOf: color }
+  const open = G.layoutNoteBranch(base)
+  ok('branch: the root sits where a lone card would', open.rootPosition.x === G.getInitialTilePosition(anchor(100, 300)).x)
+  ok('branch: every card of an open branch is laid out', open.nodes.map(({ note }) => note.id).join() === 'root,a,a1,b')
+  ok('branch: the first string runs from the dot, then parent first',
+    open.edges[0].id === 'anchor:root' && open.edges.map((edge) => edge.toNoteId).join() === 'root,a,a1,b')
+  ok('branch: a string takes the child\'s colour, or its parent\'s', open.edges[1].color === 'ink:rose' && open.edges[3].color === 'ink:teal')
+  const a = open.positions.get('a')
+  const a1 = open.positions.get('a1')
+  ok('branch: a stored offset is from the parent', a1.x === a.x + 120 && a1.y === Math.min(a.y + 30, 800 - G.TILE_MIN_HEIGHT - G.VIEWPORT_PADDING))
+  const dragged = G.layoutNoteBranch({ ...base, dragLayouts: { a: { offsetX: 0, offsetY: 0 } } })
+  ok('branch: a drag overrides the stored offset, and the subtree follows',
+    dragged.positions.get('a').y === dragged.rootPosition.y && dragged.positions.get('a1').x === dragged.positions.get('a').x + 120)
+  const shut = G.layoutNoteBranch({ ...base, childMap: new Map([['root', [{ ...kids[0], collapsedChildren: true }, kids[1]]], ['a', [grandchild]]]) })
+  ok('branch: a collapsed note\'s children are left out', !shut.positions.has('a1') && shut.nodes.find(({ note }) => note.id === 'a').childCount === 1)
+}
 globalThis.window = saved
