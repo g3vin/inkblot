@@ -5,21 +5,14 @@
  * across launches.
  */
 import { remapKeys } from './entryOperations'
-import { getPreference, setPreference } from './preferences'
+import { getObjectPreference, setPreference } from './preferences'
 
 const KEY = 'inkblot.tree.recent'
 const LIMIT = 20
 
 // Preferences hold strings. A value that is not a JSON object (the store's default,
 // or a list written before it was serialised) reads as nothing remembered.
-const read = () => {
-  try {
-    const stored = JSON.parse(getPreference(KEY) || '{}')
-    return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {}
-  } catch {
-    return {}
-  }
-}
+const read = () => getObjectPreference(KEY)
 
 const write = (all) => setPreference(KEY, JSON.stringify(all))
 

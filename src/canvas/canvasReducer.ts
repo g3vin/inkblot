@@ -19,6 +19,8 @@
  * as a discriminated union, `action.patch` is only reachable on the actions that
  * carry one, and a `case` that reads the wrong field does not compile.
  */
+import { canRedo, canUndo, createHistory, withHistory } from '../lib/undoHistory'
+import type { ActionMeta, HistoryAction } from '../lib/undoHistory'
 import {
   incidentEdgeIds,
   makeGroupNode,
@@ -35,23 +37,11 @@ import {
   type StoredCanvasState,
 } from '../types'
 
-const HISTORY_LIMIT = 100
-
 /**
  * Group id → the members it held when the gesture began, from `groupFitsFor`.
  * Membership is a snapshot on purpose: see the note on that function.
  */
 export type FitGroups = Record<string, string[]>
-
-/** What an action says about how it should land in history, rather than what it does. */
-export interface ActionMeta {
-  /** Loading a document is not an edit — it resets the stacks instead of pushing. */
-  silent?: boolean
-  /** Edits sharing a key collapse into the one history entry they started. */
-  coalesce?: string | null
-  /** Not the writer's edit (a linked document moved), so a locked document takes it too. */
-  upkeep?: boolean
-}
 
 /** Every action that changes the document. */
 export type CanvasDocAction = ({
@@ -100,21 +90,7 @@ export type CanvasDocAction = ({
   edgeIds?: string[]
 }) & { meta?: ActionMeta }
 
-/** Every action that moves through history without changing the document itself. */
-export type CanvasHistoryAction =
-  | { type: 'history/undo' }
-  | { type: 'history/redo' }
-  | { type: 'history/breakCoalesce' }
-
-export type CanvasAction = CanvasDocAction | CanvasHistoryAction
-
-/** The undo stack, the document, and the redo stack. */
-export interface CanvasHistory {
-  past: StoredCanvasState[]
-  present: StoredCanvasState
-  future: StoredCanvasState[]
-  coalesceKey: string | null
-}
+export type CanvasAction = CanvasDocAction | HistoryAction
 
 /**
  * Grow or shrink each group in `fitGroups` around the members it held when the
@@ -321,66 +297,5 @@ function docReducer(doc: StoredCanvasState, action: CanvasAction): StoredCanvasS
 
 /* ---------------- history wrapper ---------------- */
 
-export const createHistory = (doc: StoredCanvasState): CanvasHistory => ({
-  past: [],
-  present: doc,
-  future: [],
-  coalesceKey: null,
-})
-
-export function historyReducer(history: CanvasHistory, action: CanvasAction): CanvasHistory {
-  if (action.type === 'history/undo') {
-    if (!history.past.length) return history
-    return {
-      past: history.past.slice(0, -1),
-      present: history.past[history.past.length - 1],
-      future: [history.present, ...history.future],
-      coalesceKey: null,
-    }
-  }
-
-  if (action.type === 'history/redo') {
-    if (!history.future.length) return history
-    return {
-      past: [...history.past, history.present],
-      present: history.future[0],
-      future: history.future.slice(1),
-      coalesceKey: null,
-    }
-  }
-
-  // Fired after an idle gap so a long run of coalesced edits (typing in a card,
-  // dragging a color slider) breaks into more than one undo step.
-  if (action.type === 'history/breakCoalesce') {
-    return history.coalesceKey ? { ...history, coalesceKey: null } : history
-  }
-
-  const next = docReducer(history.present, action)
-  if (next === history.present) return history
-
-  const meta = action.meta || {}
-
-  // Loading a document is not an edit.
-  if (meta.silent) {
-    return { past: [], present: next, future: [], coalesceKey: null }
-  }
-
-  // Successive edits sharing a coalesce key (dragging a color slider, typing in a
-  // card) collapse into the single history entry they started.
-  if (meta.coalesce && meta.coalesce === history.coalesceKey && history.past.length) {
-    return { ...history, present: next, future: [] }
-  }
-
-  const past = [...history.past, history.present]
-  if (past.length > HISTORY_LIMIT) past.shift()
-
-  return {
-    past,
-    present: next,
-    future: [],
-    coalesceKey: meta.coalesce || null,
-  }
-}
-
-export const canUndo = (history: CanvasHistory): boolean => history.past.length > 0
-export const canRedo = (history: CanvasHistory): boolean => history.future.length > 0
+export { canRedo, canUndo, createHistory }
+export const historyReducer = withHistory(docReducer)

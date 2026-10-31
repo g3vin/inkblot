@@ -13,7 +13,7 @@
  * so the landing page draws its piles on its first frame.
  */
 import { observeEntries, remapKeys } from './entryOperations'
-import { getPreference, setPreference } from './preferences'
+import { getObjectPreference, setPreference } from './preferences'
 
 const KEY = 'inkblot.landing.excerpts'
 const VERSION = 1
@@ -84,12 +84,7 @@ const listeners = new Set()
 
 const load = () => {
   if (state) return state
-  try {
-    const stored = JSON.parse(getPreference(KEY) || '{}')
-    state = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {}
-  } catch {
-    state = {}
-  }
+  state = getObjectPreference(KEY)
   return state
 }
 

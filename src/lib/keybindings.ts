@@ -20,7 +20,7 @@
  * a warning, as is binding one key to two commands.
  */
 import { useEffect, useSyncExternalStore } from 'react'
-import { getPreference, isHydrated, setPreference } from './preferences'
+import { getObjectPreference, isHydrated, setPreference } from './preferences'
 import { listAllCommands, runCommand, type Command } from './commands'
 
 export const KEYBINDINGS_KEY = 'inkblot-keybindings'
@@ -145,13 +145,8 @@ function readOverrides(): Overrides {
   if (overrides) return overrides
   // Not kept until the preferences are read, or it would stay empty.
   if (!isHydrated()) return NONE
-  try {
-    const parsed = JSON.parse(getPreference(KEYBINDINGS_KEY) || '{}')
-    overrides = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-  } catch {
-    overrides = {}
-  }
-  return overrides as Overrides
+  overrides = getObjectPreference<Overrides>(KEYBINDINGS_KEY)
+  return overrides
 }
 
 function writeOverrides(next: Overrides) {

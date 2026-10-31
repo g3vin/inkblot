@@ -9,7 +9,7 @@
  * window is idle. Opening a project stops the queue: its loads come first.
  */
 import { statsService } from '../stats/service'
-import { getPreference, setPreference } from './preferences'
+import { getObjectPreference, setPreference } from './preferences'
 
 const KEY = 'inkblot.landing.summaries'
 const IDLE_GAP_MS = 200
@@ -22,12 +22,7 @@ const listeners = new Set()
 
 const load = () => {
   if (state) return state
-  try {
-    const stored = JSON.parse(getPreference(KEY) || '{}')
-    state = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {}
-  } catch {
-    state = {}
-  }
+  state = getObjectPreference(KEY)
   return state
 }
 
