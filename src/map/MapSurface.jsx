@@ -3,7 +3,7 @@
  *
  * Owns the document (useMapDocument), the view (useMapViewport), what is selected,
  * the tool in hand, the drawing in progress and the story day. Everything drawn is
- * MapLayers; how pointer and keyboard turn into edits is useMapInput.
+ * MapLayers; input is useMapInput; story events useMapChronology; linked maps useMapLinks.
  *
  * Pointer model, the one every map app has taught people: dragging the map moves it,
  * clicking does what the tool does. A press on an item selects it, and dragging a
@@ -12,30 +12,21 @@
  */
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { documentSurface } from '../bridge'
-import { getDocDisplayName, isMapDoc, MAP_SUFFIX } from '../lib/docKind'
+import { getDocDisplayName, isMapDoc } from '../lib/docKind'
 import { isCharacterDoc } from '../lib/storyStructure'
 import { createProjector } from '../lib/map/mapProjection'
 import { projectedEarth } from '../lib/map/earthData'
 import { createSpace, resolvePin } from '../lib/map/mapSpace'
 import { itemPoint } from '../lib/map/mapFind'
 import { buildSchedules, mapConflicts, timelineExtent } from '../lib/map/timeline'
-import { createEmptyMap, makePin, mapDocRefs, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
-import { eventDay } from './inspector/whenSections'
+import { makePin, newId, normalizeMap, pinLabel, rewriteMapDocRefs } from '../lib/map/mapModel'
 import { geoJSONToItems, IMPORT_KINDS, readGeoFile } from '../lib/map/geoInterchange'
 import { MAP_FIND_EVENT } from '../lib/sidebarSearch'
 import { requestTimelineReveal } from '../timeline/timelineEvents'
 
 import MapSearch from './MapSearch'
-import { forgetAncestry, loadAncestry, trailFor } from '../lib/map/mapAncestry'
 import Breadcrumb from '../ui/Breadcrumb.jsx'
-import { saveMapDocument } from '../lib/map/mapFileSystem'
-import { surfaceForBody } from '../lib/map/planetPresets'
-import { presetSystem } from '../lib/map/systemPresets'
-import { starFields, starPreset } from '../lib/map/stars'
-import { random, seedOf } from '../lib/map/seeded'
-import { defaultTerrainEntries } from '../lib/map/terrains'
 import { IMAGE_EXTENSIONS_LIST, MODEL_EXTENSIONS_LIST, importAssetFromPath } from '../lib/assets'
-import { announceProjectFiles } from '../lib/projectFiles'
 import { MAP_DOC_MOVED_EVENT } from '../lib/map/mapLinks'
 import { pointsBounds } from '../lib/map/mapViewport'
 import MapLayers, { MapDefs } from './MapLayers'
@@ -54,11 +45,11 @@ import { useMapViewport } from './useMapViewport'
 import { useGlobeView } from './useGlobeView'
 import { useSpaceView } from './useSpaceView'
 import { useProjectDocs, useStoryCalendar } from './useMapProject'
-import { useStoryTimeline } from '../timeline/useStoryTimeline'
-import { addEvent, eventCovers, placeOnMap, placeTarget, setEventTime } from '../lib/timeline/timelineModel'
+import { useMapChronology } from './useMapChronology'
+import { useMapLinks } from './useMapLinks'
+import { addEvent, placeOnMap, placeTarget } from '../lib/timeline/timelineModel'
 import { getStoryCursor, setStoryDay, subscribeStoryCursor } from '../lib/timeline/storyCursor'
-import { peekStoryTimeline, replaceStoryTimeline } from '../lib/timeline/timelineStore'
-import { MAP_SET_LEG_EVENT } from '../lib/timeline/journeys'
+import { replaceStoryTimeline } from '../lib/timeline/timelineStore'
 import { openStoryCalendarSettings } from '../lib/map/storyCalendarStore'
 import ExportMapDialog from './ExportMapDialog'
 import OnlineMapsDialog from './OnlineMapsDialog'
@@ -99,9 +90,6 @@ const sortedEventsAt = (timeline, docPath, kind, id) =>
 const SNAP_PX = 14
 
 // MapLibre and the globe: loaded the first time a map is shown as a globe.
-/** The breadcrumb's glyph for each kind of map. */
-const MAP_KIND_ICONS = { earth: 'globe', planet: 'world', system: 'orbit', galaxy: 'galaxy', universe: 'universe', model: 'model' }
-
 const GlobeView = lazy(() => import('./GlobeView'))
 const SpaceView = lazy(() => import('./space/SpaceView'))
 const PlanetView = lazy(() => import('./space/PlanetView'))
@@ -664,156 +652,13 @@ export default function MapSurface({
 
   /* ---------------- the chronology ---------------- */
 
-  // Timeline events placed at this map's pins, drawn while the day is inside them.
-  const timeline = useStoryTimeline(projectName)
-  const timelineEvents = useMemo(() => {
-    if (!timeline) return []
-    const laneColor = new Map(timeline.lanes.map((lane) => [lane.id, lane.color]))
-    return timeline.events
-      .filter((event) => placeTarget(event.place)?.map === docPath && eventCovers(event, day))
-      .map((event) => {
-        const target = placeTarget(event.place)
-        return { id: event.id, title: event.title, kind: target.kind, item: target.id, color: event.color || laneColor.get(event.laneId) || null }
-      })
-  }, [day, docPath, timeline])
-
-  // A leg moved from a timeline view: this map owns its document, so it makes the edit.
-  useEffect(() => {
-    const onSetLeg = (event) => {
-      const { projectName: from, docPath: target, travelerId, legId, departDay } = event.detail || {}
-      if (from !== projectName || target !== docPath) return
-      const traveler = mapRef.current.travelers.find((item) => item.id === travelerId)
-      if (!traveler?.legs.some((leg) => leg.id === legId)) return
-      event.detail.claimed = true
-      dispatch({
-        type: 'items/patch',
-        collection: 'travelers',
-        patches: { [travelerId]: { legs: traveler.legs.map((leg) => (leg.id === legId ? { ...leg, departDay } : leg)) } },
-      })
-    }
-    window.addEventListener(MAP_SET_LEG_EVENT, onSetLeg)
-    return () => window.removeEventListener(MAP_SET_LEG_EVENT, onSetLeg)
-  }, [dispatch, docPath, mapRef, projectName])
-
-  // Places that come and go with an event: when the event moves, so do they.
-  useEffect(() => {
-    if (!timeline) return
-    const events = new Map(timeline.events.map((event) => [event.id, event]))
-    for (const collection of ['pins', 'routes', 'regions', 'labels']) {
-      const patches = {}
-      for (const item of map[collection]) {
-        const patch = {}
-        for (const [edge, key] of [['from', 'fromEvent'], ['until', 'untilEvent']]) {
-          if (!item[key]) continue
-          const next = eventDay(events.get(item[key]), edge)
-          if (next !== null && next !== item[edge]) patch[edge] = next
-        }
-        if (Object.keys(patch).length) patches[item.id] = patch
-      }
-      if (Object.keys(patches).length) dispatch({ type: 'items/patch', collection, patches, meta: { upkeep: true, coalesce: 'follow-events' } })
-    }
-  }, [dispatch, map, timeline])
-
-  // A leg moved here: events linked to it leave when it now leaves.
-  useEffect(() => {
-    const current = peekStoryTimeline(projectName)
-    if (!current) return
-    const departures = new Map()
-    for (const schedule of schedules) {
-      for (const interval of schedule.intervals) {
-        if (interval.kind === 'travel') departures.set(`${schedule.travelerId}|${interval.legId}`, interval.from)
-      }
-    }
-    const moves = []
-    for (const event of current.events) {
-      for (const link of event.links) {
-        if (link.kind !== 'mapLeg' || link.map !== docPath) continue
-        const depart = departures.get(`${link.traveler}|${link.leg}`)
-        if (Number.isFinite(depart) && depart !== event.start) moves.push({ id: event.id, depart, length: event.end === null ? null : event.end - event.start })
-      }
-    }
-    if (!moves.length) return
-    void replaceStoryTimeline(projectName, (tl) =>
-      moves.reduce((acc, move) => setEventTime(acc, move.id, move.depart, move.length === null ? null : move.depart + move.length), tl))
-  }, [docPath, projectName, schedules])
+  const { timeline, timelineEvents } = useMapChronology({ projectName, docPath, map, mapRef, dispatch, day, schedules })
 
   /* ---------------- the inspector ---------------- */
 
-  /*
-   * A map of its own for something on this one — a body's surface, a galaxy in a
-   * group, a star system in a galaxy: written beside this map, named after the
-   * thing, linked from it (`link` patches this map with the new path), saved so the
-   * new map finds this one above it, and opened.
-   */
-  const openLinkedMap = useCallback(async (name, created, link) => {
-    const folder = docPath.includes('/') ? docPath.slice(0, docPath.lastIndexOf('/') + 1) : ''
-    const base = (name || 'Untitled').replace(/[\\/:*?"<>|]/g, ' ').trim() || 'Untitled'
-    let path = `${folder}${base}${MAP_SUFFIX}`
-    for (let copy = 2; docs.paths.has(path); copy += 1) path = `${folder}${base} ${copy}${MAP_SUFFIX}`
-    if (!(await saveMapDocument(projectName, path, created))) return
-    const linked = link(mapRef.current, path)
-    dispatch({ type: 'map/patch', patch: linked })
-    await saveNow(linked)
-    forgetAncestry()
-    announceProjectFiles()
-    onOpenDoc?.(path)
-  }, [dispatch, docPath, docs.paths, mapRef, onOpenDoc, projectName, saveNow])
-
-  /** A body's surface: its planet map, made the first time to look like the body. */
-  const openSurface = useCallback(async (body) => {
-    if (!body) return
-    if (body.surface && docs.paths.has(body.surface)) {
-      onOpenDoc?.(body.surface)
-      return
-    }
-    const bodies = new Map(mapRef.current.system.bodies.map((candidate) => [candidate.id, candidate]))
-    const world = createEmptyMap('planet', {
-      surface: surfaceForBody(body, bodies),
-      scale: { kmPerUnit: 1, displayUnit: 'km', calibration: null, customUnits: [] },
-      terrains: defaultTerrainEntries(),
-      style: { theme: 'night' },
-    })
-    await openLinkedMap(body.name || 'World', world, (current, path) => ({
-      ...current,
-      system: { ...current.system, bodies: current.system.bodies.map((candidate) => (candidate.id === body.id ? { ...candidate, surface: path } : candidate)) },
-    }))
-  }, [docs.paths, mapRef, onOpenDoc, openLinkedMap])
-
-  /**
-   * A place in space as a map of its own: a galaxy in a group opens as that galaxy
-   * (its type and seed, so it looks as its dot did); a place in a galaxy becomes a
-   * star system, its star from the stars of that part of the galaxy.
-   */
-  const openPinMap = useCallback(async (pin) => {
-    const current = mapRef.current
-    let created
-    if (current.mapKind === 'universe') {
-      const look = pin.galaxy || { type: 'Sb', seed: seedOf(pin.id), radiusLy: 50000 }
-      created = createEmptyMap('galaxy', {
-        galaxy: { type: look.type, seed: look.seed, radiusLy: look.radiusLy || 50000, thicknessLy: 1000 },
-        scale: { kmPerUnit: 1, displayUnit: 'ly', calibration: null, customUnits: [] },
-        style: { theme: 'night' },
-      })
-    } else {
-      const radius = current.galaxy.radiusLy || 50000
-      const out = Math.hypot(pin.at?.[0] || 0, pin.at?.[1] || 0) / radius
-      const rand = random(seedOf(pin.id))
-      // Near the bulge the stars are old and red; out in the arms, younger and bluer.
-      const spectral = out < 0.15 ? ['K5V', 'M2V', 'K3III'][Math.floor(rand() * 3)] : ['G2V', 'K5V', 'M2V', 'F5V', 'M5V'][Math.floor(rand() * 5)]
-      const system = presetSystem('lone')
-      const preset = starPreset(spectral)
-      system.bodies = system.bodies.map((body) => (body.kind === 'star' ? { ...body, name: pin.name || 'Star', massSun: preset.massSun, radiusKm: preset.radiusSun * 695700, star: starFields(preset) } : body))
-      created = createEmptyMap('system', {
-        system,
-        scale: { kmPerUnit: 1, displayUnit: 'AU', calibration: null, customUnits: [] },
-        style: { theme: 'night' },
-      })
-    }
-    await openLinkedMap(pin.name || (current.mapKind === 'universe' ? 'Galaxy' : 'Star system'), created, (map, path) => ({
-      ...map,
-      pins: map.pins.map((candidate) => (candidate.id === pin.id ? { ...candidate, doc: path } : candidate)),
-    }))
-  }, [mapRef, openLinkedMap])
+  // Maps linked from this one (a body's surface, a pin's galaxy or star system), and the
+  // trail of maps that contain it.
+  const { openSurface, openPinMap, trail, breadcrumb } = useMapLinks({ projectName, docPath, docs, map, mapRef, dispatch, saveNow, onOpenDoc })
 
   const choosePlanetPicture = useCallback(async () => {
     try {
@@ -898,34 +743,6 @@ export default function MapSurface({
       }
     } else view.goTo?.(camera)
   }, [changeDay, flatView, view, viewKind])
-
-  /*
-   * Where this map sits: the maps that contain it, outermost first (a galaxy, its
-   * system, this world), read from the links between the project's maps.
-   */
-  const [trail, setTrail] = useState([])
-  const mapPathsKey = useMemo(() => docs.docs.map((doc) => doc.path).filter((path) => isMapDoc(path)).sort().join('\n'), [docs.docs])
-  const linksKey = useMemo(() => mapDocRefs(map).join('\n'), [map])
-  const lastLinksKey = useRef(linksKey)
-  useEffect(() => {
-    if (!docs.loaded || !mapPathsKey) return undefined
-    if (lastLinksKey.current !== linksKey) {
-      lastLinksKey.current = linksKey
-      forgetAncestry()
-    }
-    let cancelled = false
-    void loadAncestry(projectName, mapPathsKey.split('\n')).then((index) => {
-      if (!cancelled) setTrail(trailFor(docPath, index))
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [docPath, docs.loaded, linksKey, mapPathsKey, projectName])
-  const breadcrumb = useMemo(() => trail.map((step) => ({
-    id: step.path,
-    label: getDocDisplayName(step.path),
-    icon: MAP_KIND_ICONS[step.kind] || 'map',
-  })), [trail])
 
   const mapPanel = useMapPanel({
     projectName,

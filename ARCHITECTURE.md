@@ -263,7 +263,7 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   edges with hidden lines removed in a software depth buffer (`plotModel.js`).
 - **Maps nest by links.** A system in a galaxy, a galaxy in a group, is a pin whose
   `doc` is a `.map`; a body's surface is `body.surface`. `mapAncestry.js` reads the
-  links backwards for the breadcrumb, and `openLinkedMap` writes the new map, links
+  links backwards for the breadcrumb, and `openLinkedMap` (`map/useMapLinks.js`) writes the new map, links
   it and saves before opening it, so the trail is there at once.
 - **Online is opt-in.** Every map works offline. Satellite pictures, street detail,
   terrain and place search (`lib/map/onlineMaps.js`) are fetched only once the writer
